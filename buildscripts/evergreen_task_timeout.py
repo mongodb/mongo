@@ -7,7 +7,7 @@ import math
 import os
 import shlex
 import sys
-from datetime import datetime, timedelta
+from datetime import timedelta
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -19,7 +19,7 @@ from evergreen import EvergreenApi, RetryingEvergreenApi
 
 from buildscripts.ciconfig.evergreen import (EvergreenProjectConfig, parse_evergreen_file)
 from buildscripts.task_generation.resmoke_proxy import ResmokeProxyService
-from buildscripts.timeouts.timeout_service import (TimeoutParams, TimeoutService, TimeoutSettings)
+from buildscripts.timeouts.timeout_service import (TimeoutParams, TimeoutService)
 from buildscripts.util.cmdutils import enable_logging
 from buildscripts.util.taskname import determine_task_base_name
 
@@ -369,9 +369,6 @@ def main():
 
     options = parser.parse_args()
 
-    end_date = datetime.now()
-    start_date = end_date - HISTORY_LOOKBACK
-
     timeout_override = timedelta(seconds=options.timeout) if options.timeout else None
     exec_timeout_override = timedelta(
         seconds=options.exec_timeout) if options.exec_timeout else None
@@ -386,7 +383,6 @@ def main():
         binder.bind(
             EvergreenApi,
             RetryingEvergreenApi.get_api(config_file=os.path.expanduser(options.evg_api_config)))
-        binder.bind(TimeoutSettings, TimeoutSettings(start_date=start_date, end_date=end_date))
         binder.bind(TimeoutOverrides, timeout_overrides)
         binder.bind(EvergreenProjectConfig,
                     parse_evergreen_file(os.path.expanduser(options.evg_project_config)))
