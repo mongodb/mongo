@@ -99,7 +99,7 @@ StatusWith<VersionType> VersionType::fromBSON(const BSONObj& source) {
         } else if (!status.isOK()) {
             return status;
         } else {
-            version._currentVersion = version._currentVersion;
+            version._currentVersion = vCurrentVersion;
         }
     }
 
