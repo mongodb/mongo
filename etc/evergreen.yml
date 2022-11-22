@@ -2182,28 +2182,36 @@ functions:
     - command: shell.exec
       type: test
       params:
-        working_dir: src
+        working_dir: src/jstestfuzz
         shell: bash
         script: |
           set -eo pipefail
           set -o verbose
 
+          # Run first with help which will do the install
+          # Then we can run it in parallel
+          ./src/scripts/npm_run.sh --help
+
           # Run parse-jsfiles on 50 files at a time with 32 processes in parallel.
           # Grep returns 1 if it fails to find a match.
-          (grep "\.js$" modified_and_created_patch_files.txt || true) | xargs -P 32 -L 50 ./jstestfuzz/src/scripts/npm_run.sh --prefix jstestfuzz parse-jsfiles --
+          (grep "\.js$" ../modified_and_created_patch_files.txt || true) | xargs -P 32 -L 50 ./src/scripts/npm_run.sh parse-jsfiles --
 
   "lint fuzzer sanity all":
     - command: shell.exec
       type: test
       params:
-        working_dir: src
+        working_dir: src/jstestfuzz
         shell: bash
         script: |
           set -eo pipefail
           set -o verbose
 
+          # Run first with help which will do the install
+          # Then we can run it in parallel
+          ./src/scripts/npm_run.sh --help
+
           # Run parse-jsfiles on 50 files at a time with 32 processes in parallel.
-          find "$PWD/jstests" "$PWD/src/mongo/db/modules/enterprise" -path "$PWD/jstests/third_party" -prune -o -name "*.js" -print | xargs -P 32 -L 50 ./jstestfuzz/src/scripts/npm_run.sh --prefix jstestfuzz parse-jsfiles --
+          find "$PWD/../jstests" "$PWD/../src/mongo/db/modules/enterprise" -path "$PWD/../jstests/third_party" -prune -o -name "*.js" -print | xargs -P 32 -L 50 ./src/scripts/npm_run.sh parse-jsfiles --
 
   "run jstestfuzz":
     - command: shell.exec
