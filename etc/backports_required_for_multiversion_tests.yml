@@ -276,6 +276,8 @@ last-continuous:
     ticket: SERVER-68361
   - test_file: jstests/replsets/apply_ops_strips_hash.js
     ticket: SERVER-70841
+  - test_file: jstests/sharding/all_collection_stats.js
+    ticket: SERVER-71477
   suites: null
 last-lts:
   all:
@@ -627,4 +629,6 @@ last-lts:
     ticket: SERVER-68361
   - test_file: jstests/replsets/apply_ops_strips_hash.js
     ticket: SERVER-70841
+  - test_file: jstests/sharding/all_collection_stats.js
+    ticket: SERVER-71477
   suites: null
