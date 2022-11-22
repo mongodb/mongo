@@ -107,18 +107,21 @@ public:
     }
 
     /**
-     * A behavior to perform after CommandInvocation::run()
+     * A behavior to perform after CommandInvocation::run(). Note that the response argument is not
+     * const, because the ReplyBuilderInterface does not expose any const methods to inspect the
+     * response body. However, onAfterRun must not mutate the response body.
      */
     virtual void onAfterRun(OperationContext* opCtx,
                             const OpMsgRequest& request,
-                            CommandInvocation* invocation) = 0;
+                            CommandInvocation* invocation,
+                            rpc::ReplyBuilderInterface* response) = 0;
 
     /**
      * A behavior to perform after CommandInvocation::asyncRun(). Defaults to `onAfterRun(...)`.
      */
     virtual void onAfterAsyncRun(std::shared_ptr<RequestExecutionContext> rec,
                                  CommandInvocation* invocation) {
-        onAfterRun(rec->getOpCtx(), rec->getRequest(), invocation);
+        onAfterRun(rec->getOpCtx(), rec->getRequest(), invocation, rec->getReplyBuilder());
     }
 };
 
@@ -368,6 +371,7 @@ class Command {
 public:
     using CommandMap = StringMap<Command*>;
     enum class AllowedOnSecondary { kAlways, kNever, kOptIn };
+    enum class HandshakeRole { kNone, kHello, kAuth };
 
     /**
      * Constructs a new command and causes it to be registered with the global commands list. It is
@@ -423,10 +427,10 @@ public:
     }
 
     /**
-     * Returns true if this command is part of the auth handshake conversation.
+     * Returns the role this command has in the connection handshake.
      */
-    virtual bool isPartOfAuthHandshake() const {
-        return false;
+    virtual HandshakeRole handshakeRole() const {
+        return HandshakeRole::kNone;
     }
 
     /*

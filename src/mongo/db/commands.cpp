@@ -179,7 +179,7 @@ void CommandHelpers::runCommandInvocation(OperationContext* opCtx,
     invocation->run(opCtx, response);
 
     if (hooks) {
-        hooks->onAfterRun(opCtx, request, invocation);
+        hooks->onAfterRun(opCtx, request, invocation, response);
     }
 }
 

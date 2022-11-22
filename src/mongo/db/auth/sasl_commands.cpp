@@ -97,8 +97,8 @@ public:
         return false;
     }
 
-    bool isPartOfAuthHandshake() const final {
-        return true;
+    HandshakeRole handshakeRole() const final {
+        return HandshakeRole::kAuth;
     }
 } cmdSaslStart;
 
@@ -135,8 +135,8 @@ public:
         return false;
     }
 
-    bool isPartOfAuthHandshake() const final {
-        return true;
+    HandshakeRole handshakeRole() const final {
+        return HandshakeRole::kAuth;
     }
 } cmdSaslContinue;
 

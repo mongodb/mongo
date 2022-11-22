@@ -421,8 +421,8 @@ public:
         return false;
     }
 
-    bool isPartOfAuthHandshake() const final {
-        return true;
+    HandshakeRole handshakeRole() const final {
+        return HandshakeRole::kAuth;
     }
 
 } cmdAuthenticate;

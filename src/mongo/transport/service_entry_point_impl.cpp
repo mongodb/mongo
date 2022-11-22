@@ -50,6 +50,7 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/variant.h"
 #include "mongo/transport/hello_metrics.h"
+#include "mongo/transport/ingress_handshake_metrics.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_entry_point_impl_gen.h"
 #include "mongo/transport/service_executor.h"
@@ -58,7 +59,6 @@
 #include "mongo/transport/service_executor_reserved.h"
 #include "mongo/transport/service_executor_synchronous.h"
 #include "mongo/transport/session.h"
-#include "mongo/transport/session_auth_metrics.h"
 #include "mongo/transport/session_workflow.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/hierarchical_acquisition.h"
@@ -294,7 +294,7 @@ void ServiceEntryPointImpl::configureServiceExecutorContext(ServiceContext::Uniq
 void ServiceEntryPointImpl::startSession(transport::SessionHandle session) {
     invariant(session);
 
-    transport::SessionAuthMetrics::get(*session).onSessionStarted(_svcCtx->getFastClockSource());
+    transport::IngressHandshakeMetrics::get(*session).onSessionStarted(_svcCtx->getTickSource());
 
     // Setup the restriction environment on the Session, if the Session has local/remote Sockaddrs
     const auto& remoteAddr = session->remoteAddr();

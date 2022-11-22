@@ -114,8 +114,8 @@ public:
         return false;
     }
 
-    bool isPartOfAuthHandshake() const final {
-        return true;
+    HandshakeRole handshakeRole() const final {
+        return HandshakeRole::kHello;
     }
 
     bool runWithReplyBuilder(OperationContext* opCtx,
@@ -126,7 +126,19 @@ public:
         const bool apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
         auto cmd = HelloCommand::parse({"hello", apiStrict}, cmdObj);
 
-        waitInHello.execute([&](const BSONObj&) {
+        waitInHello.execute([&](const BSONObj& args) {
+            if (args.hasElement("delayMillis")) {
+                Milliseconds delay{args["delayMillis"].safeNumberLong()};
+                LOGV2(6724103,
+                      "Fail point delays Hello processing",
+                      "cmd"_attr = cmdObj,
+                      "client"_attr = opCtx->getClient()->clientAddress(true),
+                      "desc"_attr = opCtx->getClient()->desc(),
+                      "delay"_attr = delay);
+                opCtx->sleepFor(delay);
+                return;
+            }
+
             LOGV2(6524600,
                   "Fail point blocks Hello response until removed",
                   "cmd"_attr = cmdObj,

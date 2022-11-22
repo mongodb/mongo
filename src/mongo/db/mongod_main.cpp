@@ -203,7 +203,7 @@
 #include "mongo/scripting/engine.h"
 #include "mongo/stdx/future.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/transport/session_auth_metrics.h"
+#include "mongo/transport/ingress_handshake_metrics.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/background.h"
@@ -335,8 +335,9 @@ void initializeCommandHooks(ServiceContext* serviceContext) {
 
         void onAfterRun(OperationContext* opCtx,
                         const OpMsgRequest& request,
-                        CommandInvocation* invocation) override {
-            _nextHook.onAfterRun(opCtx, request, invocation);
+                        CommandInvocation* invocation,
+                        rpc::ReplyBuilderInterface* response) override {
+            _nextHook.onAfterRun(opCtx, request, invocation, response);
             _onAfterRunImpl(opCtx);
         }
 
@@ -352,7 +353,7 @@ void initializeCommandHooks(ServiceContext* serviceContext) {
             MirrorMaestro::onReceiveMirroredRead(opCtx);
         }
 
-        transport::SessionAuthMetricsCommandHooks _nextHook{};
+        transport::IngressHandshakeMetricsCommandHooks _nextHook{};
     };
 
     CommandInvocationHooks::set(serviceContext, std::make_unique<MongodCommandInvocationHooks>());

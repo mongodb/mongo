@@ -68,6 +68,7 @@
 #include "mongo/transport/hello_metrics.h"
 #include "mongo/util/decimal_counter.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
 
@@ -312,8 +313,8 @@ public:
         return false;
     }
 
-    bool isPartOfAuthHandshake() const final {
-        return true;
+    HandshakeRole handshakeRole() const final {
+        return HandshakeRole::kHello;
     }
 
     bool allowedWithSecurityToken() const final {
@@ -591,6 +592,17 @@ private:
         if (args.hasElement("notInternalClient") && cmdObj.hasElement("internalClient")) {
             LOGV2(5648902, "Fail point Hello is disabled for internal client");
             return;  // Filtered out internal client.
+        }
+        if (args.hasElement("delayMillis")) {
+            Milliseconds delay{args["delayMillis"].safeNumberLong()};
+            LOGV2(6724102,
+                  "Fail point delays Hello processing",
+                  "cmd"_attr = cmdObj,
+                  "client"_attr = opCtx->getClient()->clientAddress(true),
+                  "desc"_attr = opCtx->getClient()->desc(),
+                  "delay"_attr = delay);
+            opCtx->sleepFor(delay);
+            return;
         }
         // Default action is sleep.
         LOGV2(5648903,

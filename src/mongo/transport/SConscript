@@ -20,9 +20,9 @@ env.Library(
 )
 
 env.Library(
-    target='session_auth_metrics',
+    target='ingress_handshake_metrics',
     source=[
-        'session_auth_metrics.cpp',
+        'ingress_handshake_metrics.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -154,8 +154,8 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/traffic_recorder',
         '$BUILD_DIR/mongo/util/net/ssl_manager',
+        'ingress_handshake_metrics',
         'message_compressor',
-        'session_auth_metrics',
     ],
 )
 

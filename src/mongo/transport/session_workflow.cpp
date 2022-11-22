@@ -48,6 +48,7 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/transport/ingress_handshake_metrics.h"
 #include "mongo/transport/message_compressor_base.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/service_entry_point.h"
@@ -56,11 +57,13 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/debug_util.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/socket_exception.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_peer_info.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kExecutor
 
@@ -70,6 +73,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(doNotSetMoreToCome);
 MONGO_FAIL_POINT_DEFINE(beforeCompressingExhaustResponse);
+MONGO_FAIL_POINT_DEFINE(sessionWorkflowDelaySendMessage);
 
 namespace metrics_detail {
 
@@ -212,8 +216,11 @@ public:
     void processed() {
         _t->notify(TimeSplitId::processedWork);
     }
-    void sent() {
+    void sent(Session& session) {
         _t->notify(TimeSplitId::sentResponse);
+        IngressHandshakeMetrics::get(session).onResponseSent(
+            duration_cast<Milliseconds>(*_t->getSplitInterval(IntervalId::processWork)),
+            duration_cast<Milliseconds>(*_t->getSplitInterval(IntervalId::sendResponse)));
     }
     void finish() {
         _t.reset();
@@ -561,6 +568,13 @@ void SessionWorkflow::Impl::sendMessage() {
     // end the session.
     //
     // Otherwise, return from this function to let startNewLoop() continue the future chaining.
+
+    sessionWorkflowDelaySendMessage.execute([](auto&& data) {
+        Milliseconds delay{data["millis"].safeNumberLong()};
+        LOGV2(6724101, "sendMessage: failpoint-induced delay", "delay"_attr = delay);
+        sleepFor(delay);
+    });
+
     if (auto status = session()->sinkMessage(_work->consumeOut()); !status.isOK()) {
         LOGV2(22989,
               "Error sending response to client. Ending connection from remote",
@@ -692,7 +706,7 @@ void SessionWorkflow::Impl::startNewLoop(const Status& executorStatus) {
             _metrics.processed();
             if (_work->hasOut()) {
                 sendMessage();
-                _metrics.sent();
+                _metrics.sent(*session());
             }
         })
         .getAsync([this, anchor = shared_from_this()](Status status) {
