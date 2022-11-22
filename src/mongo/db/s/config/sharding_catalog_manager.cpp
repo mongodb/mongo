@@ -529,6 +529,7 @@ Status ShardingCatalogManager::_initConfigSettings(OperationContext* opCtx) {
     // Collection already exists, create validator on that collection
     CollMod collModCmd{NamespaceString::kConfigSettingsNamespace};
     collModCmd.getCollModRequest().setValidator(fullValidator);
+    collModCmd.getCollModRequest().setValidationLevel(ValidationLevelEnum::strict);
     BSONObjBuilder builder;
     return processCollModCommand(
         opCtx, {NamespaceString::kConfigSettingsNamespace}, collModCmd, &builder);
