@@ -33,6 +33,7 @@
 #include "mongo/db/pipeline/abt/abt_translate_bm_fixture.h"
 #include "mongo/db/pipeline/abt/canonical_query_translation.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/cqf_command_utils.h"
 #include "mongo/db/query/query_test_service_context.h"
 
 namespace mongo::optimizer {
@@ -67,6 +68,11 @@ public:
         auto cq = CanonicalQuery::canonicalize(opCtx.get(), std::move(findCommand));
         if (!cq.isOK()) {
             state.SkipWithError("Canonical query could not be created");
+            return;
+        }
+
+        if (!isEligibleForBonsai_forTesting(*cq.getValue())) {
+            state.SkipWithError("CanonicalQuery is not supported by CQF");
             return;
         }
 

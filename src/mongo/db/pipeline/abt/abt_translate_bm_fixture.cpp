@@ -160,32 +160,63 @@ void ABTTranslateBenchmarkFixture::benchmarkMatchComplex(benchmark::State& state
 
 void ABTTranslateBenchmarkFixture::benchmarkProjectExclude(benchmark::State& state) {
     auto project = buildSimpleProjectSpec(1, true /*isExclusion*/);
-    benchmarkABTTranslate(state, project, BSONObj());
+    benchmarkABTTranslate(state, BSONObj(), project);
 }
 
 void ABTTranslateBenchmarkFixture::benchmarkProjectInclude(benchmark::State& state) {
     auto project = buildSimpleProjectSpec(1, false /*isExclusion*/);
-    benchmarkABTTranslate(state, project, BSONObj());
+    benchmarkABTTranslate(state, BSONObj(), project);
 }
 
 void ABTTranslateBenchmarkFixture::benchmarkProjectIncludeTwoFields(benchmark::State& state) {
     auto project = buildSimpleProjectSpec(2, false /*isExclusion*/);
-    benchmarkABTTranslate(state, project, BSONObj());
+    benchmarkABTTranslate(state, BSONObj(), project);
 }
 
 void ABTTranslateBenchmarkFixture::benchmarkProjectIncludeTwentyFields(benchmark::State& state) {
     auto project = buildSimpleProjectSpec(20, false /*isExclusion*/);
-    benchmarkABTTranslate(state, project, BSONObj());
+    benchmarkABTTranslate(state, BSONObj(), project);
 }
 
 void ABTTranslateBenchmarkFixture::benchmarkProjectIncludeDepthTwo(benchmark::State& state) {
     auto project = buildNestedProjectSpec(2, false /*isExclusion*/);
-    benchmarkABTTranslate(state, project, BSONObj());
+    benchmarkABTTranslate(state, BSONObj(), project);
 }
 
 void ABTTranslateBenchmarkFixture::benchmarkProjectIncludeDepthTwenty(benchmark::State& state) {
     auto project = buildNestedProjectSpec(20, false /*isExclusion*/);
-    benchmarkABTTranslate(state, project, BSONObj());
+    benchmarkABTTranslate(state, BSONObj(), project);
+}
+
+void ABTTranslateBenchmarkFixture::benchmarkMatchBitsAllClear(benchmark::State& state) {
+    // $bitsAllClear is an unsupported match expression.
+    auto match = fromjson("{unsupportedExpr: {$bitsAllClear: [1, 5]}}");
+    benchmarkABTTranslate(state, match, BSONObj());
+}
+
+void ABTTranslateBenchmarkFixture::benchmarkMatchManyEqualitiesThenBitsAllClear(
+    benchmark::State& state) {
+    // Build a match expression with simple equalities on several fields, then include one
+    // unsupported match expression ($bitsAllClear).
+    auto match = buildSimpleMatchSpec(20);
+    match = match.addField(fromjson("{unsupportedExpr: {$bitsAllClear: [1, 5]}}").firstElement());
+    benchmarkABTTranslate(state, match, BSONObj());
+}
+
+void ABTTranslateBenchmarkFixture::benchmarkProjectRound(benchmark::State& state) {
+    // $round is an unsupported agg expression.
+    auto project = fromjson("{unsupportedExpr: {$round: ['$value', 1]}}");
+    benchmarkABTTranslate(state, BSONObj(), project);
+}
+
+void ABTTranslateBenchmarkFixture::benchmarkProjectManyInclusionsThenRound(
+    benchmark::State& state) {
+    // Build a projection with simple inclusions on several fields, then include add an unsupported
+    // computed expression ($round).
+    auto project = buildSimpleProjectSpec(20, false /*isExclusion*/);
+    project =
+        project.addField(fromjson("{unsupportedExpr: {$round: ['$value', 1]}}").firstElement());
+    benchmarkABTTranslate(state, BSONObj(), project);
 }
 
 void ABTTranslateBenchmarkFixture::benchmarkTwoStages(benchmark::State& state) {
@@ -207,5 +238,38 @@ void ABTTranslateBenchmarkFixture::benchmarkTwentyStages(benchmark::State& state
     benchmarkABTTranslate(state, pipeline);
 }
 
+void ABTTranslateBenchmarkFixture::benchmarkSampleStage(benchmark::State& state) {
+    std::vector<BSONObj> pipeline{fromjson("{$sample: {size: 4}}")};
+    benchmarkABTTranslate(state, pipeline);
+}
+void ABTTranslateBenchmarkFixture::benchmarkManyStagesThenSample(benchmark::State& state) {
+    // Builds a sequence of alternating $match and $project stages which match on a nested field and
+    // then exclude that field.
+    std::vector<BSONObj> pipeline;
+    for (int i = 0; i < 10; i++) {
+        pipeline.push_back(BSON("$match" << buildNestedMatchSpec(3, i)));
+        pipeline.push_back(BSON("$project" << buildNestedProjectSpec(3, true /*exclusion*/, i)));
+    }
+
+    // Finally, add an unsupported stage.
+    pipeline.push_back(fromjson("{$sample: {size: 4}}"));
+    benchmarkABTTranslate(state, pipeline);
+}
+
+void ABTTranslateBenchmarkFixture::benchmarkSampleThenManyStages(benchmark::State& state) {
+    std::vector<BSONObj> pipeline;
+
+    // Add an unsupported stage.
+    pipeline.push_back(fromjson("{$sample: {size: 4}}"));
+
+    // Builds a sequence of alternating $match and $project stages which match on a nested field and
+    // then exclude that field.
+    for (int i = 0; i < 10; i++) {
+        pipeline.push_back(BSON("$match" << buildNestedMatchSpec(3, i)));
+        pipeline.push_back(BSON("$project" << buildNestedProjectSpec(3, true /*exclusion*/, i)));
+    }
+
+    benchmarkABTTranslate(state, pipeline);
+}
 
 }  // namespace mongo

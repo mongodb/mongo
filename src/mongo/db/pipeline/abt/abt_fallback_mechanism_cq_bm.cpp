@@ -31,66 +31,50 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/pipeline/abt/abt_translate_bm_fixture.h"
-#include "mongo/db/pipeline/abt/document_source_visitor.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/cqf_command_utils.h"
 #include "mongo/db/query/query_test_service_context.h"
 
 namespace mongo::optimizer {
 namespace {
 /**
- * Benchmarks translation from optimized Pipeline to ABT.
+ * Benchmarks the fallback mechanism for CanonicalQuery.
  */
-class PipelineABTTranslateBenchmark : public ABTTranslateBenchmarkFixture {
+class FallBackMechanismCQBenchmark : public ABTTranslateBenchmarkFixture {
 public:
-    PipelineABTTranslateBenchmark() {}
+    FallBackMechanismCQBenchmark() {}
+
+    void benchmarkABTTranslate(benchmark::State& state,
+                               const std::vector<BSONObj>& pipeline) override final {
+        state.SkipWithError(
+            "Fallback mechanism for CanonicalQuery fixture cannot translate a pieline");
+        return;
+    }
 
     void benchmarkABTTranslate(benchmark::State& state,
                                BSONObj matchSpec,
                                BSONObj projectSpec) override final {
-        std::vector<BSONObj> pipeline;
-        if (!matchSpec.isEmpty()) {
-            pipeline.push_back(BSON("$match" << matchSpec));
-        }
-        if (!projectSpec.isEmpty()) {
-            pipeline.push_back(BSON("$project" << projectSpec));
-        }
-        benchmarkABTTranslate(state, pipeline);
-    }
-
-    void benchmarkABTTranslate(benchmark::State& state,
-                               const std::vector<BSONObj>& pipeline) override final {
         QueryTestServiceContext testServiceContext;
         auto opCtx = testServiceContext.makeOperationContext();
-        auto expCtx = new ExpressionContextForTest(opCtx.get(), NamespaceString("test.bm"));
+        auto nss = NamespaceString("test.bm");
 
-        Metadata metadata{{}};
-        PrefixId prefixId;
-        ProjectionName scanProjName{prefixId.getNextId("scan")};
-
-        std::unique_ptr<Pipeline, PipelineDeleter> parsedPipeline =
-            Pipeline::parse(pipeline, expCtx);
-        parsedPipeline->optimizePipeline();
-
-        if (!isEligibleForBonsai_forTesting(*parsedPipeline.get())) {
-            state.SkipWithError("Pipeline is not supported by CQF");
+        auto findCommand = std::make_unique<FindCommandRequest>(nss);
+        findCommand->setFilter(matchSpec);
+        findCommand->setProjection(projectSpec);
+        auto cq = CanonicalQuery::canonicalize(opCtx.get(), std::move(findCommand));
+        if (!cq.isOK()) {
+            state.SkipWithError("Canonical query could not be created");
             return;
         }
 
         // This is where recording starts.
         for (auto keepRunning : state) {
-            benchmark::DoNotOptimize(
-                translatePipelineToABT(metadata,
-                                       *parsedPipeline,
-                                       scanProjName,
-                                       make<ScanNode>(scanProjName, "collection"),
-                                       prefixId));
+            benchmark::DoNotOptimize(isEligibleForBonsai_forTesting(*cq.getValue()));
             benchmark::ClobberMemory();
         }
     }
 };
 
-BENCHMARK_MQL_TRANSLATION(PipelineABTTranslateBenchmark)
-BENCHMARK_MQL_PIPELINE_TRANSLATION(PipelineABTTranslateBenchmark)
+BENCHMARK_MQL_TRANSLATION(FallBackMechanismCQBenchmark)
 }  // namespace
 }  // namespace mongo::optimizer

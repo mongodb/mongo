@@ -1244,6 +1244,42 @@ boost::optional<bool> shouldForceEligibility() {
     MONGO_UNREACHABLE;
 }
 
+bool isEligibleForBonsai(const Pipeline& pipeline) {
+    ABTUnsupportedDocumentSourceVisitor visitor;
+    DocumentSourceWalker walker(nullptr /*preVisitor*/, &visitor);
+
+    // The rudimentary walker may throw if it reaches a stage that it isn't aware about, so catch it
+    // here and return ineligible.
+    // TODO SERVER-62027 this should no longer be needed once all stages require a visit.
+    try {
+        walker.walk(pipeline);
+    } catch (DBException&) {
+        visitor.eligible = false;
+    }
+
+    return visitor.eligible;
+}
+
+bool isEligibleForBonsai(const CanonicalQuery& cq) {
+    auto expression = cq.root();
+    bool eligible = true;
+    ABTMatchExpressionVisitor visitor(eligible);
+    MatchExpressionWalker walker(nullptr /*preVisitor*/, nullptr /*inVisitor*/, &visitor);
+    tree_walker::walk<true, MatchExpression>(expression, &walker);
+
+    if (cq.getProj() && eligible) {
+        auto projExecutor = projection_executor::buildProjectionExecutor(
+            cq.getExpCtx(),
+            cq.getProj(),
+            ProjectionPolicies::findProjectionPolicies(),
+            projection_executor::BuilderParamsBitSet{projection_executor::kDefaultBuilderParams});
+        ABTTransformerVisitor visitor(eligible);
+        TransformerInterfaceWalker walker(&visitor);
+        walker.walk(projExecutor.get());
+    }
+
+    return eligible;
+}
 }  // namespace
 
 MONGO_FAIL_POINT_DEFINE(enableExplainInBonsai);
@@ -1270,19 +1306,7 @@ bool isEligibleForBonsai(const AggregateCommandRequest& request,
         return false;
     }
 
-    ABTUnsupportedDocumentSourceVisitor visitor;
-    DocumentSourceWalker walker(nullptr /*preVisitor*/, &visitor);
-
-    // The rudimentary walker may throw if it reaches a stage that it isn't aware about, so catch it
-    // here and return ineligible.
-    // TODO SERVER-62027 this should no longer be needed once all stages require a visit.
-    try {
-        walker.walk(pipeline);
-    } catch (DBException&) {
-        visitor.eligible = false;
-    }
-
-    return visitor.eligible;
+    return isEligibleForBonsai(pipeline);
 }
 
 bool isEligibleForBonsai(const CanonicalQuery& cq,
@@ -1299,7 +1323,6 @@ bool isEligibleForBonsai(const CanonicalQuery& cq,
     }
 
     auto request = cq.getFindCommandRequest();
-    auto expression = cq.root();
     bool commandOptionsEligible = isEligibleCommon(request, opCtx, collection) &&
         request.getSort().isEmpty() && request.getMin().isEmpty() && request.getMax().isEmpty() &&
         !request.getReturnKey() && !request.getSingleBatch() && !request.getTailable() &&
@@ -1313,23 +1336,15 @@ bool isEligibleForBonsai(const CanonicalQuery& cq,
         return false;
     }
 
-    bool eligible = true;
-    ABTMatchExpressionVisitor visitor(eligible);
-    MatchExpressionWalker walker(nullptr /*preVisitor*/, nullptr /*inVisitor*/, &visitor);
-    tree_walker::walk<true, MatchExpression>(expression, &walker);
+    return isEligibleForBonsai(cq);
+}
 
-    if (cq.getProj()) {
-        auto projExecutor = projection_executor::buildProjectionExecutor(
-            cq.getExpCtx(),
-            cq.getProj(),
-            ProjectionPolicies::findProjectionPolicies(),
-            projection_executor::BuilderParamsBitSet{projection_executor::kDefaultBuilderParams});
-        ABTTransformerVisitor visitor(eligible);
-        TransformerInterfaceWalker walker(&visitor);
-        walker.walk(projExecutor.get());
-    }
+bool isEligibleForBonsai_forTesting(const CanonicalQuery& cq) {
+    return isEligibleForBonsai(cq);
+}
 
-    return eligible;
+bool isEligibleForBonsai_forTesting(const Pipeline& pipeline) {
+    return isEligibleForBonsai(pipeline);
 }
 
 }  // namespace mongo

@@ -31,7 +31,6 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/pipeline/abt/abt_translate_bm_fixture.h"
-#include "mongo/db/pipeline/abt/document_source_visitor.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/cqf_command_utils.h"
 #include "mongo/db/query/query_test_service_context.h"
@@ -39,11 +38,30 @@
 namespace mongo::optimizer {
 namespace {
 /**
- * Benchmarks translation from optimized Pipeline to ABT.
+ * Benchmarks the fallback mechanism for Pipelines.
  */
-class PipelineABTTranslateBenchmark : public ABTTranslateBenchmarkFixture {
+class FallBackMechanismPipelineBenchmark : public ABTTranslateBenchmarkFixture {
 public:
-    PipelineABTTranslateBenchmark() {}
+    FallBackMechanismPipelineBenchmark() {}
+
+    void benchmarkABTTranslate(benchmark::State& state,
+                               const std::vector<BSONObj>& pipeline) override final {
+        QueryTestServiceContext testServiceContext;
+        auto opCtx = testServiceContext.makeOperationContext();
+
+        auto nss = NamespaceString("test.bm");
+        auto expCtx = new ExpressionContextForTest(opCtx.get(), nss);
+
+        std::unique_ptr<Pipeline, PipelineDeleter> parsedPipeline =
+            Pipeline::parse(pipeline, expCtx);
+        parsedPipeline->optimizePipeline();
+
+        // This is where recording starts.
+        for (auto keepRunning : state) {
+            benchmark::DoNotOptimize(isEligibleForBonsai_forTesting(*parsedPipeline.get()));
+            benchmark::ClobberMemory();
+        }
+    }
 
     void benchmarkABTTranslate(benchmark::State& state,
                                BSONObj matchSpec,
@@ -57,40 +75,10 @@ public:
         }
         benchmarkABTTranslate(state, pipeline);
     }
-
-    void benchmarkABTTranslate(benchmark::State& state,
-                               const std::vector<BSONObj>& pipeline) override final {
-        QueryTestServiceContext testServiceContext;
-        auto opCtx = testServiceContext.makeOperationContext();
-        auto expCtx = new ExpressionContextForTest(opCtx.get(), NamespaceString("test.bm"));
-
-        Metadata metadata{{}};
-        PrefixId prefixId;
-        ProjectionName scanProjName{prefixId.getNextId("scan")};
-
-        std::unique_ptr<Pipeline, PipelineDeleter> parsedPipeline =
-            Pipeline::parse(pipeline, expCtx);
-        parsedPipeline->optimizePipeline();
-
-        if (!isEligibleForBonsai_forTesting(*parsedPipeline.get())) {
-            state.SkipWithError("Pipeline is not supported by CQF");
-            return;
-        }
-
-        // This is where recording starts.
-        for (auto keepRunning : state) {
-            benchmark::DoNotOptimize(
-                translatePipelineToABT(metadata,
-                                       *parsedPipeline,
-                                       scanProjName,
-                                       make<ScanNode>(scanProjName, "collection"),
-                                       prefixId));
-            benchmark::ClobberMemory();
-        }
-    }
 };
 
-BENCHMARK_MQL_TRANSLATION(PipelineABTTranslateBenchmark)
-BENCHMARK_MQL_PIPELINE_TRANSLATION(PipelineABTTranslateBenchmark)
+BENCHMARK_MQL_TRANSLATION(FallBackMechanismPipelineBenchmark)
+BENCHMARK_MQL_PIPELINE_TRANSLATION(FallBackMechanismPipelineBenchmark)
+
 }  // namespace
 }  // namespace mongo::optimizer

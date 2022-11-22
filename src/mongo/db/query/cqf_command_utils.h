@@ -76,5 +76,13 @@ bool isEligibleForBonsai(const CanonicalQuery& cq,
                          OperationContext* opCtx,
                          const CollectionPtr& collection);
 
+/**
+ * These functions are exposed only for testing; they only perform checks against the query
+ * structure. Other callers should use the functions above, which check command and collection
+ * options for further details.
+ */
+bool isEligibleForBonsai_forTesting(const CanonicalQuery& cq);
+bool isEligibleForBonsai_forTesting(const Pipeline& pipeline);
+
 }  // namespace mongo
 #undef MONGO_LOGV2_DEFAULT_COMPONENT
