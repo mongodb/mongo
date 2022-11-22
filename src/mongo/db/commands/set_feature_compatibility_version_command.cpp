@@ -959,7 +959,7 @@ private:
     // TODO (SERVER-70763): Remove once FCV 7.0 becomes last-lts.
     void _removeSchemaOnConfigSettings(
         OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
-        if (!feature_flags::gGlobalIndexesShardingCatalog.isEnabledOnVersion(requestedVersion)) {
+        if (!feature_flags::gConfigSettingsSchema.isEnabledOnVersion(requestedVersion)) {
             LOGV2(6885201, "Removing schema on config.settings");
             CollMod collModCmd{NamespaceString::kConfigSettingsNamespace};
             collModCmd.getCollModRequest().setValidator(BSONObj());
