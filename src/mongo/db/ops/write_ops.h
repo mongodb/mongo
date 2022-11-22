@@ -104,8 +104,8 @@ const std::vector<BSONObj>& arrayFiltersOf(const T& opEntry) {
 }
 
 /**
- * Utility which estimates the size in bytes of an update statement with the given parameters, when
- * serialized in the format used for the update command.
+ * Set of utilities which estimate the size, in bytes, of an update/delete statement with the given
+ * parameters, when serialized in the format used for the update/delete commands.
  */
 int getUpdateSizeEstimate(const BSONObj& q,
                           const write_ops::UpdateModification& u,
@@ -113,7 +113,19 @@ int getUpdateSizeEstimate(const BSONObj& q,
                           bool includeUpsertSupplied,
                           const boost::optional<mongo::BSONObj>& collation,
                           const boost::optional<std::vector<mongo::BSONObj>>& arrayFilters,
-                          const mongo::BSONObj& hint);
+                          const mongo::BSONObj& hint,
+                          const boost::optional<UUID>& sampleId);
+int getDeleteSizeEstimate(const BSONObj& q,
+                          const boost::optional<mongo::BSONObj>& collation,
+                          const mongo::BSONObj& hint,
+                          const boost::optional<UUID>& sampleId);
+
+/**
+ * Set of utilities which return true if the estimated write size is greater than or equal to the
+ * actual write size, false otherwise.
+ */
+bool verifySizeEstimate(const write_ops::UpdateOpEntry& update);
+bool verifySizeEstimate(const write_ops::DeleteOpEntry& deleteOp);
 
 /**
  * If the response from a write command contains any write errors, it will throw the first one. All

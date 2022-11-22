@@ -82,7 +82,8 @@ public:
                                          type != UpsertType::kNone /* includeUpsertSupplied */,
                                          boost::none /* collation */,
                                          boost::none /* arrayFilters */,
-                                         BSONObj() /* hint*/) +
+                                         BSONObj() /* hint*/,
+                                         boost::none /* sampleId */) +
                 write_ops::kWriteCommandBSONArrayPerElementOverheadBytes;
         }
     };

@@ -44,6 +44,73 @@ protected:
     using CatalogTestFixture::setUp;
 };
 
+TEST_F(WriteOpsExecTest, TestUpdateSizeEstimationLogic) {
+    // Basic test case.
+    OID id = OID::createFromString("629e1e680958e279dc29a989"_sd);
+    BSONObj updateStmt = fromjson("{$set: {a: 5}}");
+    write_ops::UpdateModification mod(std::move(updateStmt));
+    write_ops::UpdateOpEntry updateOpEntry(BSON("_id" << id), std::move(mod));
+    ASSERT(write_ops::verifySizeEstimate(updateOpEntry));
+
+    // Add 'let' constants.
+    BSONObj constants = fromjson("{constOne: 'foo'}");
+    updateOpEntry.setC(constants);
+    ASSERT(write_ops::verifySizeEstimate(updateOpEntry));
+
+    // Add 'upsertSupplied'.
+    updateOpEntry.setUpsertSupplied(OptionalBool(false));
+    ASSERT(write_ops::verifySizeEstimate(updateOpEntry));
+
+    // Set 'upsertSupplied' to true.
+    updateOpEntry.setUpsertSupplied(OptionalBool(true));
+    ASSERT(write_ops::verifySizeEstimate(updateOpEntry));
+
+    // Set 'upsertSupplied' to boost::none.
+    updateOpEntry.setUpsertSupplied(OptionalBool(boost::none));
+    ASSERT(write_ops::verifySizeEstimate(updateOpEntry));
+
+    // Add a collation.
+    BSONObj collation = fromjson("{locale: 'simple'}");
+    updateOpEntry.setCollation(collation);
+    ASSERT(write_ops::verifySizeEstimate(updateOpEntry));
+
+    // Add a hint.
+    BSONObj hint = fromjson("{_id: 1}");
+    updateOpEntry.setHint(hint);
+    ASSERT(write_ops::verifySizeEstimate(updateOpEntry));
+
+    // Add arrayFilters.
+    auto arrayFilter = std::vector<BSONObj>{fromjson("{'x.a': {$gt: 85}}")};
+    updateOpEntry.setArrayFilters(arrayFilter);
+    ASSERT(write_ops::verifySizeEstimate(updateOpEntry));
+
+    // Add a sampleId.
+    updateOpEntry.setSampleId(UUID::gen());
+    ASSERT(write_ops::verifySizeEstimate(updateOpEntry));
+}
+
+TEST_F(WriteOpsExecTest, TestDeleteSizeEstimationLogic) {
+    // Basic test case.
+    OID id = OID::createFromString("629e1e680958e279dc29a989"_sd);
+    write_ops::DeleteOpEntry deleteOpEntry(BSON("_id" << id), false /* multi */);
+    ASSERT(write_ops::verifySizeEstimate(deleteOpEntry));
+
+    // Add a collation.
+    BSONObj collation = fromjson("{locale: 'simple'}");
+    deleteOpEntry.setCollation(collation);
+    ASSERT(write_ops::verifySizeEstimate(deleteOpEntry));
+
+    // Add a hint.
+    BSONObj hint = fromjson("{_id: 1}");
+    deleteOpEntry.setHint(hint);
+    ASSERT(write_ops::verifySizeEstimate(deleteOpEntry));
+
+    // Add a sampleId.
+    deleteOpEntry.setSampleId(UUID::gen());
+    ASSERT(write_ops::verifySizeEstimate(deleteOpEntry));
+}
+
+
 TEST_F(WriteOpsExecTest, PerformAtomicTimeseriesWritesWithTransform) {
     NamespaceString ns{"db_write_ops_exec_test", "ts"};
     auto opCtx = operationContext();

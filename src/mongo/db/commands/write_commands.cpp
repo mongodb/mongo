@@ -1671,6 +1671,15 @@ public:
                 source = OperationSource::kTimeseriesUpdate;
             }
 
+            // On debug builds, verify that the estimated size of the updates are at least as large
+            // as the actual, serialized size. This ensures that the logic that estimates the size
+            // of deletes for batch writes is correct.
+            if constexpr (kDebugBuild) {
+                for (auto&& updateOp : request().getUpdates()) {
+                    invariant(write_ops::verifySizeEstimate(updateOp));
+                }
+            }
+
             long long nModified = 0;
 
             // Tracks the upserted information. The memory of this variable gets moved in the
@@ -1871,6 +1880,15 @@ public:
                                       << ns(),
                         !opCtx->inMultiDocumentTransaction());
                 source = OperationSource::kTimeseriesDelete;
+            }
+
+            // On debug builds, verify that the estimated size of the deletes are at least as large
+            // as the actual, serialized size. This ensures that the logic that estimates the size
+            // of deletes for batch writes is correct.
+            if constexpr (kDebugBuild) {
+                for (auto&& deleteOp : request().getDeletes()) {
+                    invariant(write_ops::verifySizeEstimate(deleteOp));
+                }
             }
 
             auto reply = write_ops_exec::performDeletes(opCtx, request(), source);

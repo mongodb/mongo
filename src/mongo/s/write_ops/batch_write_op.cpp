@@ -55,14 +55,6 @@ struct WriteErrorComp {
     }
 };
 
-// MAGIC NUMBERS
-//
-// Before serializing updates/deletes, we don't know how big their fields would be, but we break
-// batches before serializing.
-//
-// TODO: Revisit when we revisit command limits in general
-const int kEstDeleteOverheadBytes = (BSONObjMaxInternalSize - BSONObjMaxUserSize) / 100;
-
 /**
  * Returns a new write concern that has the copy of every field from the original
  * document but with a w set to 1. This is intended for upgrading { w: 0 } write
@@ -167,35 +159,19 @@ int getWriteSizeBytes(const WriteOp& writeOp) {
                                                         update.getUpsertSupplied().has_value(),
                                                         update.getCollation(),
                                                         update.getArrayFilters(),
-                                                        update.getHint());
+                                                        update.getHint(),
+                                                        update.getSampleId());
 
         // When running a debug build, verify that estSize is at least the BSON serialization size.
         dassert(estSize >= update.toBSON().objsize());
         return estSize;
     } else if (batchType == BatchedCommandRequest::BatchType_Delete) {
-        // Note: Be conservative here - it's okay if we send slightly too many batches.
-        auto estSize = static_cast<int>(BSONObj::kMinBSONLength);
-        static const auto intSize = 4;
-
-        // Add the size of the 'collation' field, if present.
-        estSize += !item.getDelete().getCollation() ? 0
-                                                    : (DeleteOpEntry::kCollationFieldName.size() +
-                                                       item.getDelete().getCollation()->objsize());
-
-        // Add the size of the 'limit' field.
-        estSize += DeleteOpEntry::kMultiFieldName.size() + intSize;
-
-        // Add the size of 'hint' field if present.
-        if (auto hint = item.getDelete().getHint(); !hint.isEmpty()) {
-            estSize += DeleteOpEntry::kHintFieldName.size() + hint.objsize();
-        }
-
-        // Add the size of the 'q' field, plus the constant deleteOp overhead size.
-        estSize += kEstDeleteOverheadBytes +
-            (DeleteOpEntry::kQFieldName.size() + item.getDelete().getQ().objsize());
+        const auto& deleteOp = item.getDelete();
+        auto estSize = write_ops::getDeleteSizeEstimate(
+            deleteOp.getQ(), deleteOp.getCollation(), deleteOp.getHint(), deleteOp.getSampleId());
 
         // When running a debug build, verify that estSize is at least the BSON serialization size.
-        dassert(estSize >= item.getDelete().toBSON().objsize());
+        dassert(estSize >= deleteOp.toBSON().objsize());
         return estSize;
     }
 

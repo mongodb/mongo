@@ -53,6 +53,15 @@ using write_ops::WriteCommandRequestBase;
 
 namespace {
 
+// This constant accounts for the null terminator in each field name and the BSONType byte for
+// each element.
+static constexpr int kPerElementOverhead = 2;
+
+// This constant tracks the overhead for serializing UUIDs. It includes 1 byte for the
+// 'BinDataType', 4 bytes for serializing the integer size of the UUID, and finally, 16 bytes
+// for the UUID itself.
+static const int kUUIDSize = 21;
+
 template <class T>
 void checkOpCountForCommand(const T& op, size_t numOps) {
     uassert(ErrorCodes::InvalidLength,
@@ -142,7 +151,8 @@ int getUpdateSizeEstimate(const BSONObj& q,
                           const bool includeUpsertSupplied,
                           const boost::optional<mongo::BSONObj>& collation,
                           const boost::optional<std::vector<mongo::BSONObj>>& arrayFilters,
-                          const mongo::BSONObj& hint) {
+                          const mongo::BSONObj& hint,
+                          const boost::optional<UUID>& sampleId) {
     using UpdateOpEntry = write_ops::UpdateOpEntry;
 
     // This constant accounts for the null terminator in each field name and the BSONType byte for
@@ -190,12 +200,69 @@ int getUpdateSizeEstimate(const BSONObj& q,
         })();
     }
 
-    // Add the size of 'hint' field if present.
+    // Add the size of the 'hint' field, if present.
     if (!hint.isEmpty()) {
         estSize += UpdateOpEntry::kHintFieldName.size() + hint.objsize() + kPerElementOverhead;
     }
 
+    // Add the size of the 'sampleId' field, if present.
+    if (sampleId) {
+        estSize += UpdateOpEntry::kSampleIdFieldName.size() + kUUIDSize + kPerElementOverhead;
+    }
+
     return estSize;
+}
+
+int getDeleteSizeEstimate(const BSONObj& q,
+                          const boost::optional<mongo::BSONObj>& collation,
+                          const mongo::BSONObj& hint,
+                          const boost::optional<UUID>& sampleId) {
+    using DeleteOpEntry = write_ops::DeleteOpEntry;
+
+    static const int kIntSize = 4;
+    int estSize = static_cast<int>(BSONObj::kMinBSONLength);
+
+    // Add the size of the 'q' field.
+    estSize += DeleteOpEntry::kQFieldName.size() + q.objsize() + kPerElementOverhead;
+
+    // Add the size of the 'collation' field, if present.
+    if (collation) {
+        estSize +=
+            DeleteOpEntry::kCollationFieldName.size() + collation->objsize() + kPerElementOverhead;
+    }
+
+    // Add the size of the 'limit' field.
+    estSize += DeleteOpEntry::kMultiFieldName.size() + kIntSize + kPerElementOverhead;
+
+    // Add the size of the 'hint' field, if present.
+    if (!hint.isEmpty()) {
+        estSize += DeleteOpEntry::kHintFieldName.size() + hint.objsize() + kPerElementOverhead;
+    }
+
+    // Add the size of the 'sampleId' field, if present.
+    if (sampleId) {
+        estSize += DeleteOpEntry::kSampleIdFieldName.size() + kUUIDSize + kPerElementOverhead;
+    }
+
+    return estSize;
+}
+
+bool verifySizeEstimate(const write_ops::UpdateOpEntry& update) {
+    return write_ops::getUpdateSizeEstimate(update.getQ(),
+                                            update.getU(),
+                                            update.getC(),
+                                            update.getUpsertSupplied().has_value(),
+                                            update.getCollation(),
+                                            update.getArrayFilters(),
+                                            update.getHint(),
+                                            update.getSampleId()) >= update.toBSON().objsize();
+}
+
+bool verifySizeEstimate(const write_ops::DeleteOpEntry& deleteOp) {
+    return write_ops::getDeleteSizeEstimate(deleteOp.getQ(),
+                                            deleteOp.getCollation(),
+                                            deleteOp.getHint(),
+                                            deleteOp.getSampleId()) >= deleteOp.toBSON().objsize();
 }
 
 bool isClassicalUpdateReplacement(const BSONObj& update) {
