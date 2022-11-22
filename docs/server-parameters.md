@@ -73,6 +73,8 @@ server_parameters:
       expr: # C++ bool expression, runtime evaled
       constexpr: # C++ bool expression, compile-time eval
       preprocessor: # C preprocessor condition
+      min_fcv: # string
+      feature_flag: # string
     validator: # Map containing one or more of the below
       lt: # string or expression map
       gt: # string or expression map
@@ -120,9 +122,13 @@ storage. Reading or writing a setting using this name will result in a warning i
 * `on_update`: C++ callback invoked after all validation rules have completed successfully and the 
 new value has been stored. Prototype: `Status(const cpp_vartype&);`
 
-* `condition`: Up to three conditional rules for deciding whether or not to apply this server 
+* `condition`: Up to five conditional rules for deciding whether or not to apply this server 
 parameter. `preprocessor` will be evaluated first, followed by `constexpr`, then finally `expr`. If 
-no provided setting evaluates to `false`, the server parameter will be registered.
+no provided setting evaluates to `false`, the server parameter will be registered. `feature_flag` and
+`min_fcv` are evaluated after the parameter is registered, and instead affect whether the parameter
+is enabled. `min_fcv` is a string of the form `X.Y`, representing the minimum FCV version for which
+this parameter should be enabled. `feature_flag` is the name of a feature flag variable upon which
+this server parameter depends -- if the feature flag is disabled, this parameter will be disabled.
 
 * `validator`: Zero or many validation rules to impose on the setting. All specified rules must pass 
 to consider the new setting valid. `lt`, `gt`, `lte`, `gte` fields provide for simple numeric limits 
@@ -286,6 +292,15 @@ the `tenantId` on the command request to the `ServerParameter`'s methods. On ded
 handle the passed-in `tenantId` automatically and store separate parameter values per-tenant.
 Specialized server parameters will have to take care to correctly handle the passed-in `tenantId` and
 to enforce tenant isolation.
+
+Like normal server parameters, cluster server parameters can be defined to be dependent on a minimum
+FCV version or a specific feature flag using the `condition: min_fcv/feature_flag:` syntax discussed
+above. During FCV downgrade, the cluster parameter's stored on-disk value will be deleted if either:
+(1) The downgraded FCV is lower than the cluster parameter's `min_fcv`, or (2) The cluster
+parameter's `feature_flag` is disabled on the downgraded FCV. While a cluster server parameter is
+disabled due to either of these conditions, `setClusterParameter` on it will always fail, and
+`getClusterParameter` will fail on `mongod`, and return the default value on `mongos` -- this
+difference in behavior is due to `mongos` being unaware of the current FCV.
 
 See [server_parameter_specialized_test.idl][specialized-cluster-server-param-test-idl] and 
 [server_parameter_specialized_test.h][specialized-cluster-server-param-test-data] for examples.
