@@ -594,8 +594,6 @@ void ParseAndRunCommand::_parseCommand() {
                                                 command->attachLogicalSessionsToOpCtx(),
                                                 true));
 
-    // TODO SERVER-28756: Change allowTransactionsOnConfigDatabase to true once we fix the bug
-    // where the mongos custom write path incorrectly drops the client's txnNumber.
     auto allowTransactionsOnConfigDatabase = !isMongos();
     validateSessionOptions(*_osi, command->getName(), nss, allowTransactionsOnConfigDatabase);
 
