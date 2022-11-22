@@ -1761,6 +1761,13 @@ void CollectionCatalog::_pushCatalogIdForNSS(const NamespaceString& nss,
             // This namespace was removed due to an untimestamped write, clear entries.
             ids.clear();
         }
+
+        // Make sure we erase mapping for namespace if the list is left empty as lookups expect at
+        // least one entry for existing namespaces.
+        if (ids.empty()) {
+            _catalogIds.erase(nss);
+        }
+
         return;
     }
 

@@ -811,6 +811,10 @@ public:
     CollectionCatalogTimestampTest()
         : ServiceContextMongoDTest(Options{}.forceDisableTableLogging()) {}
 
+    // Special constructor to _disable_ timestamping. Not to be used directly.
+    struct DisableTimestampingTag {};
+    CollectionCatalogTimestampTest(DisableTimestampingTag) : ServiceContextMongoDTest() {}
+
     void setUp() override {
         ServiceContextMongoDTest::setUp();
         opCtx = makeOperationContext();
@@ -1044,6 +1048,13 @@ public:
 
 protected:
     ServiceContext::UniqueOperationContext opCtx;
+};
+
+class CollectionCatalogNoTimestampTest : public CollectionCatalogTimestampTest {
+public:
+    CollectionCatalogNoTimestampTest()
+        : CollectionCatalogTimestampTest(CollectionCatalogTimestampTest::DisableTimestampingTag{}) {
+    }
 };
 
 TEST_F(CollectionCatalogTimestampTest, MinimumValidSnapshot) {
@@ -2454,6 +2465,24 @@ TEST_F(CollectionCatalogTimestampTest, CollectionLifetimeTiedToStorageTransactio
         ASSERT(!uncommittedCatalogUpdates.lookupCollection(opCtx.get(), nss).collection);
     }
 }
+
+TEST_F(CollectionCatalogNoTimestampTest, CatalogIdMappingNoTimestamp) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    NamespaceString nss("a.b");
+
+    // Create a collection on the namespace and confirm that we can lookup
+    createCollection(opCtx.get(), nss, Timestamp());
+    ASSERT(catalog()->lookupCatalogIdByNSS(nss).result ==
+           CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
+
+    // Drop the collection and confirm it is also removed from mapping
+    dropCollection(opCtx.get(), nss, Timestamp());
+    ASSERT(catalog()->lookupCatalogIdByNSS(nss).result ==
+           CollectionCatalog::CatalogIdLookup::NamespaceExistence::kNotExists);
+}
+
 
 DEATH_TEST_F(CollectionCatalogTimestampTest, OpenCollectionInWriteUnitOfWork, "invariant") {
     RAIIServerParameterControllerForTest featureFlagController(
