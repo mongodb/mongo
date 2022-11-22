@@ -3702,7 +3702,9 @@ OSTType_Decimal128 getTypeInfoDecimal128(Decimal128 value,
 
                 bits_range = bits_range_dec.toIntExact(Decimal128::kRoundTowardPositive);
 
-                if (bits_range < 128) {
+                // bits_range is always >= 0 but coverity cannot be sure since it does not
+                // understand Decimal128 math so we add a check for positive integers.
+                if (bits_range >= 0 && bits_range < 128) {
                     use_precision_mode = true;
                 }
             }
