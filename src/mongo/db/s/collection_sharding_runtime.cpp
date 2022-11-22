@@ -476,7 +476,10 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
 void CollectionShardingRuntime::appendShardVersion(BSONObjBuilder* builder) {
     auto optCollDescr = getCurrentMetadataIfKnown();
     if (optCollDescr) {
-        builder->appendTimestamp(_nss.ns(), optCollDescr->getShardVersion().toLong());
+        BSONObjBuilder versionBuilder(builder->subobjStart(_nss.ns()));
+        versionBuilder.appendTimestamp("placementVersion",
+                                       optCollDescr->getShardVersion().toLong());
+        versionBuilder.append("timestamp", optCollDescr->getShardVersion().getTimestamp());
     }
 }
 
