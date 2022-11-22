@@ -98,24 +98,15 @@ BSONObj DocumentKey::getShardKeyAndId() const {
     return getId();
 }
 
-DocumentKey getDocumentKey(OperationContext* opCtx,
-                           NamespaceString const& nss,
-                           BSONObj const& doc) {
+DocumentKey getDocumentKey(OperationContext* opCtx, const CollectionPtr& coll, BSONObj const& doc) {
     auto idField = doc["_id"];
     BSONObj id = idField ? idField.wrap() : doc;
     boost::optional<BSONObj> shardKey;
 
-    // Extract the shard key from the collection description in the CollectionShardingState
-    // if running on standalone or primary. Skip this completely on secondaries since they are
-    // not expected to have the collection metadata cached.
-    if (opCtx->writesAreReplicated()) {
-        auto collDesc = CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
-                            ->getCollectionDescription(opCtx);
-        if (collDesc.isSharded()) {
-            shardKey =
-                dotted_path_support::extractElementsBasedOnTemplate(doc, collDesc.getKeyPattern())
-                    .getOwned();
-        }
+    if (coll.isSharded()) {
+        shardKey =
+            dotted_path_support::extractElementsBasedOnTemplate(doc, coll.getShardKeyPattern())
+                .getOwned();
     }
 
     return {std::move(id), std::move(shardKey)};

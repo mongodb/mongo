@@ -80,7 +80,8 @@ public:
         repl::MutableOplogEntry* oplogEntryTemplate,
         std::vector<InsertStatement>::const_iterator begin,
         std::vector<InsertStatement>::const_iterator end,
-        std::function<boost::optional<ShardId>(const BSONObj& doc)> getDestinedRecipientFn) = 0;
+        std::function<boost::optional<ShardId>(const BSONObj& doc)> getDestinedRecipientFn,
+        const CollectionPtr& collectionPtr) = 0;
 
     /**
      * Returns the optime of the oplog entry written to the oplog.

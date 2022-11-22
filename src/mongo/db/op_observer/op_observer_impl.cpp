@@ -554,7 +554,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         write_stage_common::PreWriteFilter preWriteFilter(opCtx, nss);
 
         for (auto iter = first; iter != last; iter++) {
-            const auto docKey = repl::getDocumentKey(opCtx, nss, iter->doc).getShardKeyAndId();
+            const auto docKey = repl::getDocumentKey(opCtx, coll, iter->doc).getShardKeyAndId();
             auto operation = MutableOplogEntry::makeInsertOperation(nss, uuid, iter->doc, docKey);
             operation.setDestinedRecipient(
                 shardingWriteRouter.getReshardingDestinedRecipient(iter->doc));
@@ -590,7 +590,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         write_stage_common::PreWriteFilter preWriteFilter(opCtx, nss);
 
         for (auto iter = first; iter != last; iter++) {
-            const auto docKey = repl::getDocumentKey(opCtx, nss, iter->doc).getShardKeyAndId();
+            const auto docKey = repl::getDocumentKey(opCtx, coll, iter->doc).getShardKeyAndId();
             auto operation = MutableOplogEntry::makeInsertOperation(nss, uuid, iter->doc, docKey);
             if (inRetryableInternalTransaction) {
                 operation.setInitializedStatementIds(iter->stmtIds);
@@ -628,7 +628,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         oplogEntryTemplate.setWallClockTime(lastWriteDate);
 
         opTimeList = _oplogWriter->logInsertOps(
-            opCtx, &oplogEntryTemplate, first, last, getDestinedRecipientFn);
+            opCtx, &oplogEntryTemplate, first, last, getDestinedRecipientFn, coll);
         if (!opTimeList.empty())
             lastOpTime = opTimeList.back();
 
@@ -957,7 +957,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
 void OpObserverImpl::aboutToDelete(OperationContext* opCtx,
                                    const CollectionPtr& coll,
                                    BSONObj const& doc) {
-    repl::documentKeyDecoration(opCtx).emplace(repl::getDocumentKey(opCtx, coll->ns(), doc));
+    repl::documentKeyDecoration(opCtx).emplace(repl::getDocumentKey(opCtx, coll, doc));
 
     ShardingWriteRouter shardingWriteRouter(opCtx, coll->ns(), Grid::get(opCtx)->catalogCache());
 

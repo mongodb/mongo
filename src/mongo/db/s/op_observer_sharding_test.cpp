@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
@@ -49,6 +50,15 @@ void setCollectionFilteringMetadata(OperationContext* opCtx, CollectionMetadata 
 
 class DocumentKeyStateTest : public ShardServerTestFixture {
 protected:
+    virtual void setUp() override {
+        ShardServerTestFixture::setUp();
+
+        OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
+            operationContext());
+        uassertStatusOK(createCollection(
+            operationContext(), kTestNss.dbName(), BSON("create" << kTestNss.coll())));
+    }
+
     /**
      * Constructs a CollectionMetadata suitable for refreshing a CollectionShardingState. The only
      * salient detail is the argument `keyPattern` which, defining the shard key, selects the fields
@@ -84,8 +94,15 @@ protected:
 };
 
 TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateUnsharded) {
-    setCollectionFilteringMetadata(operationContext(), CollectionMetadata());
+    const auto metadata{CollectionMetadata()};
+    setCollectionFilteringMetadata(operationContext(), metadata);
 
+    ScopedSetShardRole scopedSetShardRole{
+        operationContext(),
+        kTestNss,
+        ShardVersion(metadata.getShardVersion(),
+                     boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
+        boost::none /* databaseVersion */};
     AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
 
     auto doc = BSON("key3"
@@ -95,7 +112,7 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateUnsharded) {
                     << "key2" << true);
 
     // Check that an order for deletion from an unsharded collection extracts just the "_id" field
-    ASSERT_BSONOBJ_EQ(repl::getDocumentKey(operationContext(), kTestNss, doc).getShardKeyAndId(),
+    ASSERT_BSONOBJ_EQ(repl::getDocumentKey(operationContext(), *autoColl, doc).getShardKeyAndId(),
                       BSON("_id"
                            << "hello"));
     ASSERT_FALSE(OpObserverShardingImpl::isMigrating(operationContext(), kTestNss, doc));
@@ -106,13 +123,13 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithoutIdInShardKey) {
     const auto metadata{makeAMetadata(BSON("key" << 1 << "key3" << 1))};
     setCollectionFilteringMetadata(operationContext(), metadata);
 
-    AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
     ScopedSetShardRole scopedSetShardRole{
         operationContext(),
         kTestNss,
         ShardVersion(metadata.getShardVersion(),
                      boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
         boost::none /* databaseVersion */};
+    AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
 
     // The order of fields in `doc` deliberately does not match the shard key
     auto doc = BSON("key3"
@@ -122,7 +139,7 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithoutIdInShardKey) {
                     << "key2" << true);
 
     // Verify the shard key is extracted, in correct order, followed by the "_id" field.
-    ASSERT_BSONOBJ_EQ(repl::getDocumentKey(operationContext(), kTestNss, doc).getShardKeyAndId(),
+    ASSERT_BSONOBJ_EQ(repl::getDocumentKey(operationContext(), *autoColl, doc).getShardKeyAndId(),
                       BSON("key" << 100 << "key3"
                                  << "abc"
                                  << "_id"
@@ -135,13 +152,13 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithIdInShardKey) {
     const auto metadata{makeAMetadata(BSON("key" << 1 << "_id" << 1 << "key2" << 1))};
     setCollectionFilteringMetadata(operationContext(), metadata);
 
-    AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
     ScopedSetShardRole scopedSetShardRole{
         operationContext(),
         kTestNss,
         ShardVersion(metadata.getShardVersion(),
                      boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
         boost::none /* databaseVersion */};
+    AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
 
     // The order of fields in `doc` deliberately does not match the shard key
     auto doc = BSON("key2" << true << "key3"
@@ -151,7 +168,7 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithIdInShardKey) {
                            << "key" << 100);
 
     // Verify the shard key is extracted with "_id" in the right place.
-    ASSERT_BSONOBJ_EQ(repl::getDocumentKey(operationContext(), kTestNss, doc).getShardKeyAndId(),
+    ASSERT_BSONOBJ_EQ(repl::getDocumentKey(operationContext(), *autoColl, doc).getShardKeyAndId(),
                       BSON("key" << 100 << "_id"
                                  << "hello"
                                  << "key2" << true));
@@ -164,20 +181,20 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithIdHashInShardKey) {
                                            << "hashed"))};
     setCollectionFilteringMetadata(operationContext(), metadata);
 
-    AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
     ScopedSetShardRole scopedSetShardRole{
         operationContext(),
         kTestNss,
         ShardVersion(metadata.getShardVersion(),
                      boost::optional<CollectionIndexes>(boost::none)) /* shardVersion */,
         boost::none /* databaseVersion */};
+    AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
 
     auto doc = BSON("key2" << true << "_id"
                            << "hello"
                            << "key" << 100);
 
     // Verify the shard key is extracted with "_id" in the right place, not hashed.
-    ASSERT_BSONOBJ_EQ(repl::getDocumentKey(operationContext(), kTestNss, doc).getShardKeyAndId(),
+    ASSERT_BSONOBJ_EQ(repl::getDocumentKey(operationContext(), *autoColl, doc).getShardKeyAndId(),
                       BSON("_id"
                            << "hello"));
     ASSERT_FALSE(OpObserverShardingImpl::isMigrating(operationContext(), kTestNss, doc));

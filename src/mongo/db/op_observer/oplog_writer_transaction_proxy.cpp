@@ -47,9 +47,10 @@ std::vector<repl::OpTime> OplogWriterTransactionProxy::logInsertOps(
     repl::MutableOplogEntry* oplogEntryTemplate,
     std::vector<InsertStatement>::const_iterator begin,
     std::vector<InsertStatement>::const_iterator end,
-    std::function<boost::optional<ShardId>(const BSONObj& doc)> getDestinedRecipientFn) {
+    std::function<boost::optional<ShardId>(const BSONObj& doc)> getDestinedRecipientFn,
+    const CollectionPtr& collectionPtr) {
     return _targetOplogWriter->logInsertOps(
-        opCtx, oplogEntryTemplate, begin, end, getDestinedRecipientFn);
+        opCtx, oplogEntryTemplate, begin, end, getDestinedRecipientFn, collectionPtr);
 }
 
 repl::OpTime OplogWriterTransactionProxy::logOp(OperationContext* opCtx,

@@ -512,7 +512,8 @@ std::vector<OpTime> logInsertOps(
     MutableOplogEntry* oplogEntryTemplate,
     std::vector<InsertStatement>::const_iterator begin,
     std::vector<InsertStatement>::const_iterator end,
-    std::function<boost::optional<ShardId>(const BSONObj& doc)> getDestinedRecipientFn) {
+    std::function<boost::optional<ShardId>(const BSONObj& doc)> getDestinedRecipientFn,
+    const CollectionPtr& collectionPtr) {
     invariant(begin != end);
     oplogEntryTemplate->setOpType(repl::OpTypeEnum::kInsert);
     // If this oplog entry is from a tenant migration, include the tenant migration
@@ -556,7 +557,7 @@ std::vector<OpTime> logInsertOps(
         if (insertStatementOplogSlot.isNull()) {
             insertStatementOplogSlot = oplogInfo->getNextOpTimes(opCtx, 1U)[0];
         }
-        const auto docKey = getDocumentKey(opCtx, nss, begin[i].doc).getShardKeyAndId();
+        const auto docKey = getDocumentKey(opCtx, collectionPtr, begin[i].doc).getShardKeyAndId();
         oplogEntry.setObject(begin[i].doc);
         oplogEntry.setObject2(docKey);
         oplogEntry.setOpTime(insertStatementOplogSlot);
