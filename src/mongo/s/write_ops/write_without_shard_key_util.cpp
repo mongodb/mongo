@@ -28,6 +28,7 @@
  */
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
@@ -37,24 +38,31 @@
 namespace mongo {
 namespace write_without_shard_key {
 
-bool canTargetQueryByShardKeyOrId(OperationContext* opCtx,
-                                  NamespaceString ns,
-                                  const BSONObj& query) {
-    auto cm =
-        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, ns));
-
-    // If a collection is unsharded then the query is always targetable to the primary shard.
-    if (!cm.isSharded()) {
-        return true;
-    }
-    auto shardKey =
-        uassertStatusOK(cm.getShardKeyPattern().extractShardKeyFromQuery(opCtx, ns, query));
-
-    if (shardKey.isEmpty() && !query.hasField("_id")) {
-        LOGV2(6970800, "A write without shard key or _id detected");
+bool useTwoPhaseProtocol(OperationContext* opCtx,
+                         NamespaceString nss,
+                         bool isUpdateOrDelete,
+                         const BSONObj& query) {
+    if (!feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
         return false;
     }
-    return true;
+
+    // updateOne and deleteOne do not use the two phase protocol for single writes that specify _id
+    // in their queries.
+    if (isUpdateOrDelete && query.hasField("_id")) {
+        return false;
+    }
+
+    auto cm =
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+
+    // Unsharded collections always target the primary shard.
+    if (!cm.isSharded()) {
+        return false;
+    }
+    auto shardKey =
+        uassertStatusOK(cm.getShardKeyPattern().extractShardKeyFromQuery(opCtx, nss, query));
+    return shardKey.isEmpty();
 }
 }  // namespace write_without_shard_key
 }  // namespace mongo

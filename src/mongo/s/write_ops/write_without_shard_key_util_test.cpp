@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
 #include "mongo/s/write_ops/write_without_shard_key_util.h"
@@ -64,30 +65,105 @@ private:
     boost::optional<ChunkManager> _cm;
 };
 
+class UnshardedCollectionTest : public CatalogCacheTestFixture {
+protected:
+    void setUp() override {
+        CatalogCacheTestFixture::setUp();
+        setupNShards(2);
+    }
+
+    OperationContext* getOpCtx() {
+        return operationContext();
+    }
+};
+
 TEST_F(WriteWithoutShardKeyUtilTest, WriteQueryContainingFullShardKeyCanTargetSingleDocument) {
-    auto hasTargetingInfo = write_without_shard_key::canTargetQueryByShardKeyOrId(
-        getOpCtx(), kNss, BSON("a" << 1 << "b" << 1));
-    ASSERT_EQ(hasTargetingInfo, true);
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagUpdateOneWithoutShardKey", true);
+    auto useTwoPhaseProtocol = write_without_shard_key::useTwoPhaseProtocol(
+        getOpCtx(), kNss, true /* isUpdateOrDelete */, BSON("a" << 1 << "b" << 1));
+    ASSERT_EQ(useTwoPhaseProtocol, false);
+
+    useTwoPhaseProtocol = write_without_shard_key::useTwoPhaseProtocol(
+        getOpCtx(), kNss, false /* isUpdateOrDelete */, BSON("a" << 1 << "b" << 1));
+    ASSERT_EQ(useTwoPhaseProtocol, false);
 }
 
 TEST_F(WriteWithoutShardKeyUtilTest,
        WriteQueryContainingPartialShardKeyCannotTargetSingleDocument) {
-    auto hasTargetingInfo =
-        write_without_shard_key::canTargetQueryByShardKeyOrId(getOpCtx(), kNss, BSON("a" << 1));
-    ASSERT_EQ(hasTargetingInfo, false);
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagUpdateOneWithoutShardKey", true);
+    auto useTwoPhaseProtocol = write_without_shard_key::useTwoPhaseProtocol(
+        getOpCtx(), kNss, true /* isUpdateOrDelete */, BSON("a" << 1));
+    ASSERT_EQ(useTwoPhaseProtocol, true);
+
+    useTwoPhaseProtocol = write_without_shard_key::useTwoPhaseProtocol(
+        getOpCtx(), kNss, false /* isUpdateOrDelete */, BSON("a" << 1));
+    ASSERT_EQ(useTwoPhaseProtocol, true);
 }
 
-TEST_F(WriteWithoutShardKeyUtilTest, WriteQueryContainingUnderscoreIdCanTargetSingleDocument) {
-    auto hasTargetingInfo =
-        write_without_shard_key::canTargetQueryByShardKeyOrId(getOpCtx(), kNss, BSON("_id" << 1));
-    ASSERT_EQ(hasTargetingInfo, true);
+TEST_F(WriteWithoutShardKeyUtilTest,
+       UpdateAndDeleteQueryContainingUnderscoreIdCanTargetSingleDocument) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagUpdateOneWithoutShardKey", true);
+    auto useTwoPhaseProtocol = write_without_shard_key::useTwoPhaseProtocol(
+        getOpCtx(), kNss, true /* isUpdateOrDelete */, BSON("_id" << 1));
+    ASSERT_EQ(useTwoPhaseProtocol, false);
 }
 
 TEST_F(WriteWithoutShardKeyUtilTest,
        WriteQueryWithoutShardKeyOrUnderscoreIdCannotTargetSingleDocument) {
-    auto hasTargetingInfo =
-        write_without_shard_key::canTargetQueryByShardKeyOrId(getOpCtx(), kNss, BSON("x" << 1));
-    ASSERT_EQ(hasTargetingInfo, false);
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagUpdateOneWithoutShardKey", true);
+    auto useTwoPhaseProtocol = write_without_shard_key::useTwoPhaseProtocol(
+        getOpCtx(), kNss, true /* isUpdateOrDelete */, BSON("x" << 1));
+    ASSERT_EQ(useTwoPhaseProtocol, true);
+
+    useTwoPhaseProtocol = write_without_shard_key::useTwoPhaseProtocol(
+        getOpCtx(), kNss, false /* isUpdateOrDelete */, BSON("x" << 1));
+    ASSERT_EQ(useTwoPhaseProtocol, true);
+}
+
+TEST_F(WriteWithoutShardKeyUtilTest, FindAndModifyQueryWithOnlyIdMustUseTwoPhaseProtocol) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagUpdateOneWithoutShardKey", true);
+    auto useTwoPhaseProtocol = write_without_shard_key::useTwoPhaseProtocol(
+        getOpCtx(), kNss, false /* isUpdateOrDelete */, BSON("_id" << 1));
+    ASSERT_EQ(useTwoPhaseProtocol, true);
+}
+
+TEST_F(WriteWithoutShardKeyUtilTest, FindAndModifyQueryWithoutShardKeyMustUseTwoPhaseProtocol) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagUpdateOneWithoutShardKey", true);
+    auto useTwoPhaseProtocol = write_without_shard_key::useTwoPhaseProtocol(
+        getOpCtx(), kNss, false /* isUpdateOrDelete */, BSON("x" << 1));
+    ASSERT_EQ(useTwoPhaseProtocol, true);
+}
+
+TEST_F(WriteWithoutShardKeyUtilTest, QueryWithFeatureFlagDisabledDoesNotUseTwoPhaseProtocol) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagUpdateOneWithoutShardKey", false);
+    auto useTwoPhaseProtocol = write_without_shard_key::useTwoPhaseProtocol(
+        getOpCtx(), kNss, false /* isUpdateOrDelete */, BSON("x" << 1));
+    ASSERT_EQ(useTwoPhaseProtocol, false);
+}
+
+TEST_F(UnshardedCollectionTest, UnshardedCollectionDoesNotUseTwoPhaseProtocol) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagUpdateOneWithoutShardKey", true);
+
+    auto future = scheduleRoutingInfoUnforcedRefresh(kNss);
+    expectGetDatabase(kNss);
+
+    // Return an empty collection
+    expectFindSendBSONObjVector(kConfigHostAndPort, {});
+
+    auto cm = *future.default_timed_get();
+    ASSERT(!cm.isSharded());
+
+    auto useTwoPhaseProtocol = write_without_shard_key::useTwoPhaseProtocol(
+        getOpCtx(), kNss, true /* isUpdateOrDelete */, BSON("x" << 1));
+    ASSERT_EQ(useTwoPhaseProtocol, false);
 }
 
 }  // namespace

@@ -37,12 +37,13 @@ namespace mongo {
 namespace write_without_shard_key {
 
 /**
- * Returns true if the write with the given query has enough information to target a single
- * document, meaning the query contains a shard key, an _id, or both.
- */
-bool canTargetQueryByShardKeyOrId(OperationContext* opCtx,
-                                  NamespaceString ns,
-                                  const BSONObj& query);
+ * Returns true if we can use the two phase protocol to complete a single write without shard
+ * key.
+ **/
+bool useTwoPhaseProtocol(OperationContext* opCtx,
+                         NamespaceString ns,
+                         bool isUpdateOrDelete,
+                         const BSONObj& query);
 
 }  // namespace write_without_shard_key
 }  // namespace mongo

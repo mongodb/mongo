@@ -433,36 +433,33 @@ StatusWith<bool> BatchWriteOp::targetBatch(
 
         // Check if an updateOne or deleteOne necessitates using the two phase write in the case
         // where the query does not contain a shard key or _id to target by.
-        if (feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
-                serverGlobalParams.featureCompatibility)) {
-            if (auto writeItem = writeOp.getWriteItem();
-                writeItem.getOpType() == BatchedCommandRequest::BatchType_Update ||
-                writeItem.getOpType() == BatchedCommandRequest::BatchType_Delete) {
+        if (auto writeItem = writeOp.getWriteItem();
+            writeItem.getOpType() == BatchedCommandRequest::BatchType_Update ||
+            writeItem.getOpType() == BatchedCommandRequest::BatchType_Delete) {
 
-                bool isMultiWrite = false;
-                BSONObj query;
+            bool isMultiWrite = false;
+            BSONObj query;
 
-                if (writeItem.getOpType() == BatchedCommandRequest::BatchType_Update) {
-                    isMultiWrite = writeItem.getUpdate().getMulti();
-                    query = writeItem.getUpdate().getQ();
-                } else {
-                    isMultiWrite = writeItem.getDelete().getMulti();
-                    query = writeItem.getDelete().getQ();
-                }
-
-                if (!isMultiWrite &&
-                    !write_without_shard_key::canTargetQueryByShardKeyOrId(
-                        _opCtx, targeter.getNS(), query)) {
-
-                    // Writes without shard key should be in their own batch.
-                    if (!batchMap.empty()) {
-                        writeOp.cancelWrites(nullptr);
-                        break;
-                    } else {
-                        isWriteWithoutShardKeyOrId = true;
-                    }
-                };
+            if (writeItem.getOpType() == BatchedCommandRequest::BatchType_Update) {
+                isMultiWrite = writeItem.getUpdate().getMulti();
+                query = writeItem.getUpdate().getQ();
+            } else {
+                isMultiWrite = writeItem.getDelete().getMulti();
+                query = writeItem.getDelete().getQ();
             }
+
+            if (!isMultiWrite &&
+                write_without_shard_key::useTwoPhaseProtocol(
+                    _opCtx, targeter.getNS(), true /* isUpdateOrDelete */, query)) {
+
+                // Writes without shard key should be in their own batch.
+                if (!batchMap.empty()) {
+                    writeOp.cancelWrites(nullptr);
+                    break;
+                } else {
+                    isWriteWithoutShardKeyOrId = true;
+                }
+            };
         }
 
         //
