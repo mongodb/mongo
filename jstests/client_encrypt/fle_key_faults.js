@@ -2,14 +2,10 @@
  * Verify the KMS support handles a buggy Key Store
  */
 
-load("jstests/client_encrypt/lib/mock_kms.js");
 load('jstests/ssl/libs/ssl_helpers.js');
 
 (function() {
 "use strict";
-
-const mock_kms = new MockKMSServerAWS();
-mock_kms.start();
 
 const x509_options = {
     sslMode: "requireSSL",
@@ -21,12 +17,6 @@ const conn = MongoRunner.runMongod(x509_options);
 const test = conn.getDB("test");
 const collection = test.coll;
 
-const awsKMS = {
-    accessKeyId: "access",
-    secretAccessKey: "secret",
-    url: mock_kms.getURL(),
-};
-
 var localKMS = {
     key: BinData(
         0,
@@ -35,7 +25,6 @@ var localKMS = {
 
 const clientSideFLEOptions = {
     kmsProviders: {
-        aws: awsKMS,
         local: localKMS,
     },
     keyVaultNamespace: "test.coll",
@@ -55,7 +44,7 @@ function testFault(kmsType, func) {
 }
 
 function testFaults(func) {
-    const kmsTypes = ["aws", "local"];
+    const kmsTypes = ["local"];
 
     for (const kmsType of kmsTypes) {
         testFault(kmsType, func);
@@ -93,5 +82,4 @@ testFaults((keyId, shell) => {
 });
 
 MongoRunner.stopMongod(conn);
-mock_kms.stop();
 }());

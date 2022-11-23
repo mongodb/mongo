@@ -35,6 +35,7 @@
 
 #include "mongo/base/data_range_cursor.h"
 #include "mongo/base/data_type_validated.h"
+#include "mongo/base/init.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
 #include "mongo/client/sasl_aws_client_protocol_gen.h"
@@ -230,6 +231,10 @@ AWSCredentials parseCredentialsFromEC2IamSecurityCredentials(StringData data) {
 
 AWSCredentials parseCredentialsFromECSTaskIamCredentials(StringData data) {
     return parseCredentials<EcsTaskSecurityCredentials>(data);
+}
+
+MONGO_INITIALIZER(SASLRegisterKMS)(::mongo::InitializerContext*) {
+    kms_message_init();
 }
 
 }  // namespace awsIam
