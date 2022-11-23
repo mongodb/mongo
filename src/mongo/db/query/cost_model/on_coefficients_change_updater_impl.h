@@ -38,6 +38,8 @@ extern const Decorable<ServiceContext>::Decoration<CostModelManager> costModelMa
 
 class OnCoefficientsChangeUpdaterImpl final : public OnCoefficientsChangeUpdater {
 public:
+    OnCoefficientsChangeUpdaterImpl(ServiceContext* serviceCtx, const BSONObj& overrides);
+
     void updateCoefficients(ServiceContext* serviceCtx, const BSONObj& overrides) final;
 };
 }  // namespace mongo::cost_model

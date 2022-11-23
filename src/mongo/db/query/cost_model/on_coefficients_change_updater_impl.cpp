@@ -29,6 +29,9 @@
 
 #include "mongo/db/query/cost_model/on_coefficients_change_updater_impl.h"
 
+#include "mongo/bson/json.h"
+#include "mongo/db/query/query_knobs_gen.h"
+
 namespace mongo::cost_model {
 
 const Decorable<ServiceContext>::Decoration<CostModelManager> costModelManager =
@@ -41,7 +44,16 @@ void OnCoefficientsChangeUpdaterImpl::updateCoefficients(ServiceContext* service
 
 ServiceContext::ConstructorActionRegisterer costModelUpdaterRegisterer{
     "costModelUpdaterRegisterer", [](ServiceContext* serviceCtx) {
+        BSONObj overrides = internalCostModelCoefficients.empty()
+            ? BSONObj()
+            : fromjson(internalCostModelCoefficients);
+
         onCoefficientsChangeUpdater(serviceCtx) =
-            std::make_unique<OnCoefficientsChangeUpdaterImpl>();
+            std::make_unique<OnCoefficientsChangeUpdaterImpl>(serviceCtx, overrides);
     }};
+
+OnCoefficientsChangeUpdaterImpl::OnCoefficientsChangeUpdaterImpl(ServiceContext* serviceCtx,
+                                                                 const BSONObj& overrides) {
+    updateCoefficients(serviceCtx, overrides);
+}
 }  // namespace mongo::cost_model

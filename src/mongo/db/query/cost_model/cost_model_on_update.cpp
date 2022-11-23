@@ -33,6 +33,9 @@
 #include "mongo/db/client.h"
 #include "mongo/db/query/cost_model/cost_model_manager.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/logv2/log.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::cost_model {
 
@@ -55,7 +58,8 @@ Status updateCostCoefficients() {
         auto updater = onCoefficientsChangeUpdater(serviceCtx).get();
         updater->updateCoefficients(serviceCtx, overrides);
     } else {
-        tasserted(7049001, "Client must be non null");
+        // 'client' may be null if the server parameter is set on mongod startup.
+        LOGV2_DEBUG(7049001, 5, "Cost model coefficients updated on startup");
     }
 
     return Status::OK();
