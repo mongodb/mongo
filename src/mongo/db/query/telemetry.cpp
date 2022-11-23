@@ -290,6 +290,26 @@ std::string fleSafeFieldNameRedactor(const BSONElement& e) {
     return e.fieldNameStringData().toString();
 }
 
+/**
+ * Append the element to the builder and redact any literals within the element. The element may be
+ * of any type.
+ */
+void appendWithRedactedLiterals(BSONObjBuilder& builder, const BSONElement& el) {
+    if (el.type() == Object) {
+        builder.append(el.fieldNameStringData(), el.Obj().redact(false, fleSafeFieldNameRedactor));
+    } else if (el.type() == Array) {
+        BSONObjBuilder arrayBuilder = builder.subarrayStart(fleSafeFieldNameRedactor(el));
+        for (auto&& arrayElem : el.Obj()) {
+            appendWithRedactedLiterals(arrayBuilder, arrayElem);
+        }
+        arrayBuilder.done();
+    } else {
+        auto fieldName = fleSafeFieldNameRedactor(el);
+        builder.append(fieldName, "###"_sd);
+    }
+    builder.done();
+}
+
 }  // namespace
 
 const BSONObj& TelemetryMetrics::redactKey(const BSONObj& key) const {
@@ -380,11 +400,8 @@ void registerAggRequest(const AggregateCommandRequest& request, OperationContext
     BSONObjBuilder pipelineBuilder = telemetryKey.subarrayStart("pipeline"_sd);
     try {
         for (auto&& stage : request.getPipeline()) {
-            auto el = stage.firstElement();
             BSONObjBuilder stageBuilder = pipelineBuilder.subobjStart("stage"_sd);
-            stageBuilder.append(el.fieldNameStringData(),
-                                el.Obj().redact(false, fleSafeFieldNameRedactor));
-            stageBuilder.done();
+            appendWithRedactedLiterals(stageBuilder, stage.firstElement());
         }
         pipelineBuilder.done();
         telemetryKey.append("namespace", request.getNamespace().toString());
@@ -433,18 +450,14 @@ void registerFindRequest(const FindCommandRequest& request,
     }
 
     BSONObjBuilder telemetryKey;
-    BSONObjBuilder findBuilder = telemetryKey.subobjStart("find"_sd);
     try {
-        auto findBson = request.toBSON({});
-        for (auto&& findEntry : findBson) {
-            if (findEntry.isABSONObj()) {
-                telemetryKey.append(findEntry.fieldNameStringData(),
-                                    findEntry.Obj().redact(false, fleSafeFieldNameRedactor));
-            } else {
-                telemetryKey.append(findEntry.fieldNameStringData(), "###"_sd);
-            }
-        }
-        findBuilder.done();
+        // Serialize the request.
+        BSONObjBuilder serializedRequest;
+        BSONObjBuilder asElement = serializedRequest.subobjStart("find");
+        request.serialize({}, &asElement);
+        asElement.done();
+        // And append as an element to the telemetry key.
+        appendWithRedactedLiterals(telemetryKey, serializedRequest.obj().firstElement());
         telemetryKey.append("namespace", collection.toString());
         if (request.getReadConcern()) {
             telemetryKey.append("readConcern", *request.getReadConcern());
