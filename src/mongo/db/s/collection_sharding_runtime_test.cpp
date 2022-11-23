@@ -556,44 +556,6 @@ TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
     ASSERT(cleanupComplete.isReady());
 }
 
-TEST_F(CollectionShardingRuntimeWithRangeDeleterTest,
-       WaitForCleanCorrectEvenAfterClearFollowedBySetFilteringMetadata) {
-    globalFailPointRegistry().find("suspendRangeDeletion")->setMode(FailPoint::alwaysOn);
-    ScopeGuard resetFailPoint(
-        [=] { globalFailPointRegistry().find("suspendRangeDeletion")->setMode(FailPoint::off); });
-
-    OperationContext* opCtx = operationContext();
-    auto metadata = makeShardedMetadata(opCtx, uuid());
-    csr()->setFilteringMetadata(opCtx, metadata);
-    const ChunkRange range = ChunkRange(BSON(kShardKey << MINKEY), BSON(kShardKey << MAXKEY));
-    const auto task = createRangeDeletionTask(opCtx, kTestNss, uuid(), range, 0);
-
-    // Schedule range deletion that will hang due to `suspendRangeDeletion` failpoint
-    auto cleanupComplete = registerAndCreatePersistentTask(
-        opCtx, task, SemiFuture<void>::makeReady() /* waitForActiveQueries */);
-
-    // Clear and set again filtering metadata
-    csr()->clearFilteringMetadata(opCtx);
-    csr()->setFilteringMetadata(opCtx, metadata);
-
-    auto waitForCleanUp = [&](Date_t timeout) {
-        return CollectionShardingRuntime::waitForClean(opCtx, kTestNss, uuid(), range, timeout);
-    };
-
-    // Check that the hanging range deletion is still tracked even following a clear of the metadata
-    auto status = waitForCleanUp(Date_t::now() + Milliseconds(100));
-    ASSERT_NOT_OK(status);
-    ASSERT(!cleanupComplete.isReady());
-
-    globalFailPointRegistry().find("suspendRangeDeletion")->setMode(FailPoint::off);
-    resetFailPoint.dismiss();
-
-    // Check that the range deletion is not tracked anymore after it succeeds
-    status = waitForCleanUp(Date_t::max());
-    ASSERT_OK(status);
-    ASSERT(cleanupComplete.isReady());
-}
-
 class CollectionShardingRuntimeWithCatalogTest
     : public CollectionShardingRuntimeWithRangeDeleterTest {
 public:
