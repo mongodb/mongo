@@ -55,6 +55,18 @@ assertArrayEq({
     ],
 });
 
+assertArrayEq({
+    actual: c.find({a: {$ne: null}}, {_id: 0}).toArray(),
+    expected: [
+        {a: 1},
+        {a: 2},
+        {a: ""},
+        {a: [1, 2]},
+        {a: [2, 3]},
+        {a: [[1, 2]]},
+    ],
+});
+
 c.drop();
 
 assert.commandWorked(c.insertMany([
