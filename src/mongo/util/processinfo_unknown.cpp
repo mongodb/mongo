@@ -51,6 +51,10 @@ int ProcessInfo::getResidentSize() {
     return -1;
 }
 
+bool ProcessInfo::checkNumaEnabled() {
+    return false;
+}
+
 void ProcessInfo::SystemInfo::collectSystemInfo() {}
 
 void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {}
