@@ -559,6 +559,8 @@ public:
     virtual void replaceMetadata(OperationContext* opCtx,
                                  std::shared_ptr<BSONCollectionCatalogEntry::MetaData> md) = 0;
 
+    virtual bool isMetadataEqual(const BSONCollectionCatalogEntry::MetaData& md) const = 0;
+
     /**
      * Specifies whether writes to this collection should X-lock the metadata resource. It is only
      * set for replicated, non-clustered capped collections. Such collections require writes to be

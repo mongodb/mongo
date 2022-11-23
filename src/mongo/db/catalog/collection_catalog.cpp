@@ -75,8 +75,6 @@ const RecoveryUnit::Snapshot::Decoration<std::shared_ptr<const CollectionCatalog
  */
 bool isExistingCollectionCompatible(std::shared_ptr<Collection> coll,
                                     boost::optional<Timestamp> readTimestamp) {
-    // If no read timestamp is provided, no existing collection is compatible since we must
-    // instantiate a new collection instance.
     if (!coll || !readTimestamp) {
         return false;
     }
@@ -786,6 +784,25 @@ CollectionPtr CollectionCatalog::openCollection(OperationContext* opCtx,
 
     auto latestCollection = _lookupCollectionByUUID(*catalogEntry->metadata->options.uuid);
 
+    if (!readTimestamp) {
+        // When openCollection is called with no timestamp, the namespace must be pending commit.
+        auto it = _pendingCommitNamespaces.find(nss);
+        invariant(it != _pendingCommitNamespaces.end());
+        auto pendingCollection = it->second;
+
+        // Use the pendingCollection if there is no latestCollection or if the metadata of the
+        // latestCollection doesn't match the durable catalogEntry.
+        if (!latestCollection || !latestCollection->isMetadataEqual(*catalogEntry->metadata)) {
+            invariant(pendingCollection->isMetadataEqual(*catalogEntry->metadata));
+            uncommittedCatalogUpdates.openCollection(opCtx, pendingCollection);
+            return CollectionPtr(pendingCollection.get(), CollectionPtr::NoYieldTag{});
+        }
+
+        invariant(latestCollection->isMetadataEqual(*catalogEntry->metadata));
+        uncommittedCatalogUpdates.openCollection(opCtx, latestCollection);
+        return CollectionPtr(latestCollection.get(), CollectionPtr::NoYieldTag{});
+    }
+
     // Return the in-memory Collection instance if it is compatible with the read timestamp.
     if (isExistingCollectionCompatible(latestCollection, readTimestamp)) {
         uncommittedCatalogUpdates.openCollection(opCtx, latestCollection);
@@ -841,7 +858,7 @@ boost::optional<DurableCatalogEntry> CollectionCatalog::_fetchPITCatalogEntry(
     }
 
     auto catalogEntry = DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, catalogId);
-    // TODO SERVER-71208 remove readTimestamp check and add invariant to make sure this scan isn't
+    // TODO SERVER-71594 remove readTimestamp check and add invariant to make sure this scan isn't
     // reached when there is no timestamp
     if (readTimestamp && (!catalogEntry || nss != catalogEntry->metadata->nss)) {
         // If no entry is found or the entry contains a different namespace, the mapping might be

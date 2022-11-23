@@ -437,6 +437,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    bool isMetadataEqual(const BSONCollectionCatalogEntry::MetaData& md) const {
+        MONGO_UNREACHABLE;
+    }
+
     bool needsCappedLock() const {
         MONGO_UNREACHABLE;
     }

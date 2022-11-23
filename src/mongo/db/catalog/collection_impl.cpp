@@ -1771,6 +1771,11 @@ void CollectionImpl::replaceMetadata(OperationContext* opCtx,
     _metadata = std::move(md);
 }
 
+bool CollectionImpl::isMetadataEqual(
+    const BSONCollectionCatalogEntry::MetaData& otherMetadata) const {
+    return !_metadata->toBSON().woCompare(otherMetadata.toBSON());
+}
+
 template <typename Func>
 void CollectionImpl::_writeMetadata(OperationContext* opCtx, Func func) {
     // Even though we are holding an exclusive lock on the Collection there may be an ongoing
