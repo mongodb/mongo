@@ -9501,9 +9501,6 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu2004-package
-  - name: .publish
-    distros:
-    - rhel80-small
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-rhel-82-arm64
