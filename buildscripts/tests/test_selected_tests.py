@@ -25,7 +25,7 @@ from buildscripts.task_generation.task_types.gentask_options import GenTaskOptio
 from buildscripts.tests.test_burn_in_tests import get_evergreen_config, mock_changed_git_files
 from buildscripts import selected_tests as under_test
 
-# pylint: disable=missing-docstring,invalid-name,unused-argument,protected-access,no-value-for-parameter
+# pylint: disable=missing-docstring,invalid-name,unused-argument,protected-access,no-value-for-parameter,too-many-locals
 
 NS = "buildscripts.selected_tests"
 
@@ -104,7 +104,9 @@ class TestAcceptance(unittest.TestCase):
         self.assertEqual(generated_config.file_list[0].file_name, "selected_tests_config.json")
 
     @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
-    def test_when_test_mappings_are_found_for_changed_files(self):
+    @patch("buildscripts.util.teststats.HistoricTaskData.get_stats_from_s3")
+    def test_when_test_mappings_are_found_for_changed_files(self, get_stats_from_s3_mock):
+        get_stats_from_s3_mock.return_value = []
         mock_evg_api = self._mock_evg_api()
         mock_evg_config = get_evergreen_config("etc/evergreen.yml")
         mock_evg_expansions = under_test.EvgExpansions(
@@ -152,7 +154,9 @@ class TestAcceptance(unittest.TestCase):
         self.assertEqual(len(rhel_80_with_generated_tasks["tasks"]), 2)
 
     @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
-    def test_when_task_mappings_are_found_for_changed_files(self):
+    @patch("buildscripts.util.teststats.HistoricTaskData.get_stats_from_s3")
+    def test_when_task_mappings_are_found_for_changed_files(self, get_stats_from_s3_mock):
+        get_stats_from_s3_mock.return_value = []
         mock_evg_api = self._mock_evg_api()
         mock_evg_config = get_evergreen_config("etc/evergreen.yml")
         mock_evg_expansions = under_test.EvgExpansions(

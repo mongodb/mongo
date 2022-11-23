@@ -88,7 +88,8 @@ class TestAcceptance(unittest.TestCase):
 
     @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
     @patch(ns("write_file"))
-    def test_tests_generated_if_a_file_changed(self, write_json_mock):
+    @patch(ns("HistoricTaskData.get_stats_from_s3"))
+    def test_tests_generated_if_a_file_changed(self, get_stats_from_s3_mock, write_json_mock):
         """
         Given a git repository with changes,
         When burn_in_tests is run,
@@ -108,6 +109,7 @@ class TestAcceptance(unittest.TestCase):
         )  # yapf: disable
         mock_evg_conf = get_evergreen_config("etc/evergreen.yml")
         mock_evg_api = MagicMock()
+        get_stats_from_s3_mock.return_value = []
 
         under_test.burn_in("task_id", variant, gen_config, repeat_config, mock_evg_api,
                            mock_evg_conf, repos, "testfile.json", 'install-dir/bin')
@@ -244,41 +246,30 @@ class TestGenerateTimeouts(unittest.TestCase):
 
 
 class TestGetTaskRuntimeHistory(unittest.TestCase):
-    def test_get_task_runtime_history(self):
-        mock_evg_api = MagicMock()
-        mock_evg_api.test_stats_by_project.return_value = [
-            MagicMock(
-                test_file="dir/test2.js",
-                task_name="task1",
-                variant="variant1",
-                distro="distro1",
-                date=datetime.utcnow().date(),
+    @patch(ns("HistoricTaskData.get_stats_from_s3"))
+    def test_get_task_runtime_history(self, get_stats_from_s3_mock):
+        test_stats = [
+            teststats_utils.HistoricalTestInformation(
+                test_name="dir/test2.js",
                 num_pass=1,
                 num_fail=0,
                 avg_duration_pass=10.1,
             )
         ]
-        analysis_duration = under_test.AVG_TEST_RUNTIME_ANALYSIS_DAYS
-        end_date = datetime.utcnow().replace(microsecond=0)
-        start_date = end_date - timedelta(days=analysis_duration)
+        get_stats_from_s3_mock.return_value = test_stats
         mock_gen_config = MagicMock(project="project1", build_variant="variant1")
 
-        executor = under_test.GenerateBurnInExecutor(mock_gen_config, MagicMock(), mock_evg_api,
-                                                     history_end_date=end_date)
+        executor = under_test.GenerateBurnInExecutor(mock_gen_config, MagicMock())
         result = executor.get_task_runtime_history("task1")
 
         self.assertEqual(result, [("dir/test2.js", 10.1)])
-        mock_evg_api.test_stats_by_project.assert_called_with(
-            "project1", after_date=start_date, before_date=end_date, group_by="test",
-            group_num_days=14, tasks=["task1"], variants=["variant1"])
 
-    def test_get_task_runtime_history_evg_degraded_mode_error(self):
-        mock_response = MagicMock(status_code=requests.codes.SERVICE_UNAVAILABLE)
-        mock_evg_api = MagicMock()
-        mock_evg_api.test_stats_by_project.side_effect = requests.HTTPError(response=mock_response)
+    @patch(ns("HistoricTaskData.get_stats_from_s3"))
+    def test_get_task_runtime_history_when_s3_has_no_data(self, get_stats_from_s3_mock):
+        get_stats_from_s3_mock.return_value = []
         mock_gen_config = MagicMock(project="project1", build_variant="variant1")
 
-        executor = under_test.GenerateBurnInExecutor(mock_gen_config, MagicMock(), mock_evg_api)
+        executor = under_test.GenerateBurnInExecutor(mock_gen_config, MagicMock())
         result = executor.get_task_runtime_history("task1")
 
         self.assertEqual(result, [])
@@ -324,7 +315,8 @@ class TestCreateGenerateTasksConfig(unittest.TestCase):
         self.assertEqual(0, len(evg_config_dict["tasks"]))
 
     @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
-    def test_one_task_one_test(self):
+    @patch(ns("HistoricTaskData.get_stats_from_s3"))
+    def test_one_task_one_test(self, get_stats_from_s3_mock):
         n_tasks = 1
         n_tests = 1
         resmoke_options = "options for resmoke"
@@ -334,6 +326,7 @@ class TestCreateGenerateTasksConfig(unittest.TestCase):
         repeat_config.generate_resmoke_options.return_value = resmoke_options
         mock_evg_api = MagicMock()
         tests_by_task = create_tests_by_task_mock(n_tasks, n_tests)
+        get_stats_from_s3_mock.return_value = []
 
         executor = under_test.GenerateBurnInExecutor(gen_config, repeat_config, mock_evg_api)
         executor.add_config_for_build_variant(build_variant, tests_by_task)
@@ -348,7 +341,8 @@ class TestCreateGenerateTasksConfig(unittest.TestCase):
         self.assertIn("tests_0", cmd[1]["vars"]["resmoke_args"])
 
     @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
-    def test_n_task_m_test(self):
+    @patch(ns("HistoricTaskData.get_stats_from_s3"))
+    def test_n_task_m_test(self, get_stats_from_s3_mock):
         n_tasks = 3
         n_tests = 5
         build_variant = BuildVariant("build variant")
@@ -356,6 +350,7 @@ class TestCreateGenerateTasksConfig(unittest.TestCase):
         repeat_config = MagicMock()
         tests_by_task = create_tests_by_task_mock(n_tasks, n_tests)
         mock_evg_api = MagicMock()
+        get_stats_from_s3_mock.return_value = []
 
         executor = under_test.GenerateBurnInExecutor(gen_config, repeat_config, mock_evg_api)
         executor.add_config_for_build_variant(build_variant, tests_by_task)
@@ -372,14 +367,12 @@ class TestCreateGenerateTasksFile(unittest.TestCase):
         gen_config = MagicMock(require_multiversion=False)
         repeat_config = MagicMock()
         tests_by_task = MagicMock()
-        mock_evg_api = MagicMock()
 
         validate_mock.return_value = False
 
         exit_mock.side_effect = ValueError("exiting")
         with self.assertRaises(ValueError):
-            executor = under_test.GenerateBurnInExecutor(gen_config, repeat_config, mock_evg_api,
-                                                         "gen_file.json")
+            executor = under_test.GenerateBurnInExecutor(gen_config, repeat_config, "gen_file.json")
             executor.execute(tests_by_task)
 
         exit_mock.assert_called_once()
