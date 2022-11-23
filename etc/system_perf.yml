@@ -2609,8 +2609,8 @@ buildvariants:
       - name: tpch_1_denormalized
       - name: tpch_10_normalized
       - name: tpch_10_denormalized
-      - name: sb_large_scale
-      - name: sb_timeseries
+      # - name: sb_large_scale
+      # - name: sb_timeseries
 
   # - name: linux-standalone-audit.2022-11
   #   display_name: Linux Standalone Audit 2022-11
@@ -2869,10 +2869,10 @@ buildvariants:
       - name: change_streams_latency
       - name: change_streams_listen_throughput
       - name: change_streams_multi_mongos
-      - name: tsbs_query_sharded
-      - name: tsbs_query_finance_sharded
-      - name: tsbs_query_sharded_balancer
-      - name: tsbs_query_finance_sharded_balancer
+      # - name: tsbs_query_sharded
+      # - name: tsbs_query_finance_sharded
+      # - name: tsbs_query_sharded_balancer
+      # - name: tsbs_query_finance_sharded_balancer
 
   # - name: linux-shard-lite-audit.2022-11
   #   display_name: Linux Shard Lite Cluster Audit 2022-11
@@ -2938,10 +2938,10 @@ buildvariants:
       - name: move_chunk_workloads
       - name: move_chunk_waiting_workloads
       - name: smoke_test
-      - name: tsbs_query_sharded
-      - name: tsbs_query_finance_sharded
-      - name: tsbs_query_sharded_balancer
-      - name: tsbs_query_finance_sharded_balancer
+      # - name: tsbs_query_sharded
+      # - name: tsbs_query_finance_sharded
+      # - name: tsbs_query_sharded_balancer
+      # - name: tsbs_query_finance_sharded_balancer
 
   # - name: linux-shard-lite-intel.2022-11
   #   display_name: Linux Shard Lite Cluster Intel 2022-11
@@ -3020,10 +3020,10 @@ buildvariants:
       - name: schedule_variant_auto_tasks
       - name: change_streams_preimage_throughput
       - name: change_streams_preimage_latency
-      - name: tsbs_query_sharded
-      - name: tsbs_query_finance_sharded
-      - name: tsbs_query_sharded_balancer
-      - name: tsbs_query_finance_sharded_balancer
+      # - name: tsbs_query_sharded
+      # - name: tsbs_query_finance_sharded
+      # - name: tsbs_query_sharded_balancer
+      # - name: tsbs_query_finance_sharded_balancer
 
   - name: linux-shard-single.2022-11
     display_name: Linux Shard Single 2022-11
@@ -3106,9 +3106,9 @@ buildvariants:
       # - name: tsbs_query
       # - name: tsbs_query_finance
       # - name: tsbs_query_manual_bucketing
-      - name: sb_large_scale
-      - name: sb_timeseries
-      - name: big_update_10k
+      # - name: sb_large_scale
+      # - name: sb_timeseries
+      # - name: big_update_10k
 
   - name: linux-3-node-replSet-intel.2022-11
     display_name: Linux 3-Node ReplSet Intel 2022-11
@@ -3311,12 +3311,12 @@ buildvariants:
       # - name: tpch_10_denormalized
       - name: linkbench
       - name: linkbench2
-      - name: tsbs_load
-      - name: tsbs_query
-      - name: tsbs_query_finance
-      - name: tsbs_query_manual_bucketing
-      - name: sb_large_scale
-      - name: sb_timeseries
+      # - name: tsbs_load
+      # - name: tsbs_query
+      # - name: tsbs_query_finance
+      # - name: tsbs_query_manual_bucketing
+      # - name: sb_large_scale
+      # - name: sb_timeseries
 
   - name: linux-3-node-replSet-notls.2022-11
     display_name: Linux 3-Node ReplSet (No TLS) 2022-11
