@@ -55,13 +55,13 @@ if env.TargetOSIs('windows'):
     # Disable warnings about deprecated functions
     env.Append(CFLAGS=['/wd4996'])
 elif env.TargetOSIs('darwin'):
-    env.Append(CPPDEFINES=['KMS_MESSAGE_ENABLE_CRYPTO_COMMON_CRYPTO'])
+    env.Append(CPPDEFINES=['KMS_MESSAGE_ENABLE_CRYPTO_COMMON_CRYPTO', 'MLIB_HAVE_STRINGS_H'])
     additional_sources.append([
         'dist/kms-message/src/kms_crypto_apple.c',
         'dist/src/crypto/commoncrypto.c',
     ])
 else:
-    env.Append(CPPDEFINES=['KMS_MESSAGE_ENABLE_CRYPTO_LIBCRYPTO'])
+    env.Append(CPPDEFINES=['KMS_MESSAGE_ENABLE_CRYPTO_LIBCRYPTO', 'MLIB_HAVE_STRINGS_H'])
     additional_sources.append([
         'dist/kms-message/src/kms_crypto_libcrypto.c',
         'dist/src/crypto/libcrypto.c',
