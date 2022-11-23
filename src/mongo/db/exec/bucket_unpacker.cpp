@@ -248,6 +248,11 @@ boost::optional<StringData> checkComparisonPredicateErrors(
         return "can't handle a computed field"_sd;
     }
 
+    // We must avoid mapping predicates on fields removed by $project.
+    if (!determineIncludeField(matchExprPath, bucketSpec.behavior(), bucketSpec.fieldSet())) {
+        return "can't handle a field removed by projection"_sd;
+    }
+
     const auto isTimeField = (matchExprPath == bucketSpec.timeField());
     if (isTimeField && matchExprData.type() != BSONType::Date) {
         // Users are not allowed to insert non-date measurements into time field. So this query
@@ -885,10 +890,8 @@ std::pair<bool, BSONObj> BucketSpec::pushdownPredicate(
                   metaField.map([](StringData s) { return s.toString(); }),
                   // Since we are operating on a collection, not a query-result,
                   // there are no inclusion/exclusion projections we need to apply
-                  // to the buckets before unpacking.
-                  {},
-                  // And there are no computed projections.
-                  {},
+                  // to the buckets before unpacking. So we can use default values for the rest of
+                  // the arguments.
               },
               maxSpanSeconds,
               collationMatchesDefault,
@@ -924,7 +927,6 @@ public:
                                           int j,
                                           const BucketSpec& spec,
                                           const std::set<std::string>& unpackFieldsToIncludeExclude,
-                                          BucketUnpacker::Behavior behavior,
                                           const BSONObj& bucket,
                                           const Value& metaValue,
                                           bool includeTimeField,
@@ -976,7 +978,6 @@ public:
                                   int j,
                                   const BucketSpec& spec,
                                   const std::set<std::string>& unpackFieldsToIncludeExclude,
-                                  BucketUnpacker::Behavior behavior,
                                   const BSONObj& bucket,
                                   const Value& metaValue,
                                   bool includeTimeField,
@@ -988,7 +989,7 @@ private:
     BSONObjIterator _timeFieldIter;
 
     // Iterators used to unpack the columns of the above bucket that are populated during the reset
-    // phase according to the provided 'Behavior' and 'BucketSpec'.
+    // phase according to the provided 'BucketSpec'.
     std::vector<std::pair<std::string, BSONObjIterator>> _fieldIters;
 };
 
@@ -1063,7 +1064,6 @@ void BucketUnpackerV1::extractSingleMeasurement(
     int j,
     const BucketSpec& spec,
     const std::set<std::string>& unpackFieldsToIncludeExclude,
-    BucketUnpacker::Behavior behavior,
     const BSONObj& bucket,
     const Value& metaValue,
     bool includeTimeField,
@@ -1078,7 +1078,7 @@ void BucketUnpackerV1::extractSingleMeasurement(
 
     for (auto&& dataElem : dataRegion) {
         const auto& colName = dataElem.fieldNameStringData();
-        if (!determineIncludeField(colName, behavior, unpackFieldsToIncludeExclude)) {
+        if (!determineIncludeField(colName, spec.behavior(), unpackFieldsToIncludeExclude)) {
             continue;
         }
         auto value = dataElem[targetIdx];
@@ -1110,7 +1110,6 @@ public:
                                   int j,
                                   const BucketSpec& spec,
                                   const std::set<std::string>& unpackFieldsToIncludeExclude,
-                                  BucketUnpacker::Behavior behavior,
                                   const BSONObj& bucket,
                                   const Value& metaValue,
                                   bool includeTimeField,
@@ -1140,7 +1139,7 @@ private:
     ColumnStore _timeColumn;
 
     // Iterators used to unpack the columns of the above bucket that are populated during the reset
-    // phase according to the provided 'Behavior' and 'BucketSpec'.
+    // phase according to the provided 'BucketSpec'.
     std::vector<ColumnStore> _fieldColumns;
 
     // Element count
@@ -1200,7 +1199,6 @@ void BucketUnpackerV2::extractSingleMeasurement(
     int j,
     const BucketSpec& spec,
     const std::set<std::string>& unpackFieldsToIncludeExclude,
-    BucketUnpacker::Behavior behavior,
     const BSONObj& bucket,
     const Value& metaValue,
     bool includeTimeField,
@@ -1236,9 +1234,11 @@ std::size_t BucketUnpackerV2::numberOfFields() {
 BucketSpec::BucketSpec(const std::string& timeField,
                        const boost::optional<std::string>& metaField,
                        const std::set<std::string>& fields,
+                       Behavior behavior,
                        const std::set<std::string>& computedProjections,
                        bool usesExtendedRange)
     : _fieldSet(fields),
+      _behavior(behavior),
       _computedMetaProjFields(computedProjections),
       _timeField(timeField),
       _timeFieldHashed(FieldNameHasher().hashedFieldName(_timeField)),
@@ -1251,6 +1251,7 @@ BucketSpec::BucketSpec(const std::string& timeField,
 
 BucketSpec::BucketSpec(const BucketSpec& other)
     : _fieldSet(other._fieldSet),
+      _behavior(other._behavior),
       _computedMetaProjFields(other._computedMetaProjFields),
       _timeField(other._timeField),
       _timeFieldHashed(HashedFieldName{_timeField, other._timeFieldHashed->hash()}),
@@ -1263,6 +1264,7 @@ BucketSpec::BucketSpec(const BucketSpec& other)
 
 BucketSpec::BucketSpec(BucketSpec&& other)
     : _fieldSet(std::move(other._fieldSet)),
+      _behavior(other._behavior),
       _computedMetaProjFields(std::move(other._computedMetaProjFields)),
       _timeField(std::move(other._timeField)),
       _timeFieldHashed(HashedFieldName{_timeField, other._timeFieldHashed->hash()}),
@@ -1276,6 +1278,7 @@ BucketSpec::BucketSpec(BucketSpec&& other)
 BucketSpec& BucketSpec::operator=(const BucketSpec& other) {
     if (&other != this) {
         _fieldSet = other._fieldSet;
+        _behavior = other._behavior;
         _computedMetaProjFields = other._computedMetaProjFields;
         _timeField = other._timeField;
         _timeFieldHashed = HashedFieldName{_timeField, other._timeFieldHashed->hash()};
@@ -1325,8 +1328,8 @@ BucketUnpacker::BucketUnpacker(BucketUnpacker&& other) = default;
 BucketUnpacker::~BucketUnpacker() = default;
 BucketUnpacker& BucketUnpacker::operator=(BucketUnpacker&& rhs) = default;
 
-BucketUnpacker::BucketUnpacker(BucketSpec spec, Behavior unpackerBehavior) {
-    setBucketSpecAndBehavior(std::move(spec), unpackerBehavior);
+BucketUnpacker::BucketUnpacker(BucketSpec spec) {
+    setBucketSpec(std::move(spec));
 }
 
 void BucketUnpacker::addComputedMetaProjFields(const std::vector<StringData>& computedFieldNames) {
@@ -1335,7 +1338,7 @@ void BucketUnpacker::addComputedMetaProjFields(const std::vector<StringData>& co
 
         // If we're already specifically including fields, we need to add the computed fields to
         // the included field set to indicate they're in the output doc.
-        if (_unpackerBehavior == BucketUnpacker::Behavior::kInclude) {
+        if (_spec.behavior() == BucketSpec::Behavior::kInclude) {
             _spec.addIncludeExcludeField(field);
         } else {
             // Since exclude is applied after addComputedMetaProjFields, we must erase the new field
@@ -1387,7 +1390,6 @@ Document BucketUnpacker::extractSingleMeasurement(int j) {
                                              j,
                                              _spec,
                                              fieldsToIncludeExcludeDuringUnpack(),
-                                             _unpackerBehavior,
                                              _bucket,
                                              _metaValue,
                                              _includeTimeField,
@@ -1501,10 +1503,10 @@ void BucketUnpacker::reset(BSONObj&& bucket, bool bucketMatchedQuery) {
             continue;
         }
 
-        // Includes a field when '_unpackerBehavior' is 'kInclude' and it's found in 'fieldSet' or
-        // _unpackerBehavior is 'kExclude' and it's not found in 'fieldSet'.
+        // Includes a field when '_spec.behavior()' is 'kInclude' and it's found in 'fieldSet' or
+        // _spec.behavior() is 'kExclude' and it's not found in 'fieldSet'.
         if (determineIncludeField(
-                colName, _unpackerBehavior, fieldsToIncludeExcludeDuringUnpack())) {
+                colName, _spec.behavior(), fieldsToIncludeExcludeDuringUnpack())) {
             _unpackingImpl->addField(elem);
         }
     }
@@ -1555,7 +1557,7 @@ int BucketUnpacker::computeMeasurementCount(const BSONObj& bucket, StringData ti
 }
 
 void BucketUnpacker::determineIncludeTimeField() {
-    const bool isInclude = _unpackerBehavior == BucketUnpacker::Behavior::kInclude;
+    const bool isInclude = _spec.behavior() == BucketSpec::Behavior::kInclude;
     const bool fieldSetContainsTime =
         _spec.fieldSet().find(_spec.timeField()) != _spec.fieldSet().end();
 
@@ -1575,22 +1577,21 @@ void BucketUnpacker::eraseMetaFromFieldSetAndDetermineIncludeMeta() {
     } else if (auto itr = _spec.fieldSet().find(*_spec.metaField());
                itr != _spec.fieldSet().end()) {
         _spec.removeIncludeExcludeField(*_spec.metaField());
-        _includeMetaField = _unpackerBehavior == BucketUnpacker::Behavior::kInclude;
+        _includeMetaField = _spec.behavior() == BucketSpec::Behavior::kInclude;
     } else {
-        _includeMetaField = _unpackerBehavior == BucketUnpacker::Behavior::kExclude;
+        _includeMetaField = _spec.behavior() == BucketSpec::Behavior::kExclude;
     }
 }
 
 void BucketUnpacker::eraseExcludedComputedMetaProjFields() {
-    if (_unpackerBehavior == BucketUnpacker::Behavior::kExclude) {
+    if (_spec.behavior() == BucketSpec::Behavior::kExclude) {
         for (const auto& field : _spec.fieldSet()) {
             _spec.eraseFromComputedMetaProjFields(field);
         }
     }
 }
 
-void BucketUnpacker::setBucketSpecAndBehavior(BucketSpec&& bucketSpec, Behavior behavior) {
-    _unpackerBehavior = behavior;
+void BucketUnpacker::setBucketSpec(BucketSpec&& bucketSpec) {
     _spec = std::move(bucketSpec);
 
     eraseMetaFromFieldSetAndDetermineIncludeMeta();
@@ -1616,7 +1617,7 @@ const std::set<std::string>& BucketUnpacker::fieldsToIncludeExcludeDuringUnpack(
 
     _unpackFieldsToIncludeExclude = std::set<std::string>();
     const auto& metaProjFields = _spec.computedMetaProjFields();
-    if (_unpackerBehavior == BucketUnpacker::Behavior::kInclude) {
+    if (_spec.behavior() == BucketSpec::Behavior::kInclude) {
         // For include, we unpack fieldSet - metaProjFields.
         for (auto&& field : _spec.fieldSet()) {
             if (metaProjFields.find(field) == metaProjFields.cend()) {
