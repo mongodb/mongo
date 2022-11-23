@@ -949,6 +949,7 @@ ThreadRunner::op_run(Operation *op)
     Track *track;
     tint_t tint = op->_table._internal->_tint;
     WT_CURSOR *cursor;
+    WT_ITEM item;
     WT_DECL_RET;
     uint64_t recno;
     uint64_t range;
@@ -957,6 +958,7 @@ ThreadRunner::op_run(Operation *op)
     uint64_t time_us;
     char buf[BUF_SIZE];
 
+    WT_CLEAR(item);
     track = NULL;
     cursor = NULL;
     recno = 0;
@@ -1042,12 +1044,30 @@ ThreadRunner::op_run(Operation *op)
     // be retried.
     if (op->is_table_op()) {
         op->kv_gen(this, true, 100, recno, _keybuf);
-        cursor->set_key(cursor, _keybuf);
+        const std::string key_format(cursor->key_format);
+        if (key_format == "S") {
+            cursor->set_key(cursor, _keybuf);
+        } else if (key_format == "u") {
+            item.data = _keybuf;
+            item.size = strlen(_keybuf);
+            cursor->set_key(cursor, &item);
+        } else {
+            THROW("The key format ('" << key_format << "') must be 'u' or 'S'.");
+        }
         if (OP_HAS_VALUE(op)) {
             uint64_t compressibility =
               op->_table.options.random_value ? 0 : op->_table.options.value_compressibility;
             op->kv_gen(this, false, compressibility, recno, _valuebuf);
-            cursor->set_value(cursor, _valuebuf);
+            const std::string value_format(cursor->value_format);
+            if (value_format == "S") {
+                cursor->set_value(cursor, _valuebuf);
+            } else if (value_format == "u") {
+                item.data = _valuebuf;
+                item.size = strlen(_valuebuf);
+                cursor->set_value(cursor, &item);
+            } else {
+                THROW("The value format ('" << value_format << "') must be 'u' or 'S'.");
+            }
         }
     }
     // Retry on rollback until success.
