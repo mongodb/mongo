@@ -2,7 +2,6 @@
 """Command line utility for determining what jstests have been added or modified."""
 
 import copy
-import datetime
 import json
 import logging
 import os.path
@@ -15,15 +14,12 @@ from collections import defaultdict
 from typing import Optional, Set, Tuple, List, Dict
 
 import click
-import requests
 import structlog
 from structlog.stdlib import LoggerFactory
 import yaml
 
 from git import Repo
 from shrub.config import Configuration
-
-from evergreen.api import RetryingEvergreenApi, EvergreenApi
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
@@ -36,7 +32,7 @@ from buildscripts.resmokelib.suitesconfig import create_test_membership_map, get
 from buildscripts.resmokelib.utils import default_if_none, globstar
 from buildscripts.ciconfig.evergreen import parse_evergreen_file, ResmokeArgs, \
     EvergreenProjectConfig, VariantTask
-from buildscripts.util.teststats import TestStats
+from buildscripts.util.teststats import TestStats, get_stats_from_s3
 from buildscripts.util.taskname import name_generated_task
 from buildscripts.patch_builds.task_generation import resmoke_commands, TimeoutInfo, TaskList
 
@@ -50,7 +46,6 @@ EXTERNAL_LOGGERS = {
     "urllib3",
 }
 
-AVG_TEST_RUNTIME_ANALYSIS_DAYS = 14
 AVG_TEST_SETUP_SEC = 4 * 60
 AVG_TEST_TIME_MULTIPLIER = 3
 CONFIG_FILE = ".evergreen.yml"
@@ -492,41 +487,23 @@ def _generate_timeouts(repeat_config: RepeatConfig, test: str,
     return TimeoutInfo.default_timeout()
 
 
-def _get_task_runtime_history(evg_api: Optional[EvergreenApi], project: str, task: str,
-                              variant: str):
+def _get_task_runtime_history(project: str, task: str, variant: str):
     """
-    Fetch historical average runtime for all tests in a task from Evergreen API.
+    Fetch historical average runtime for all tests in a task from S3.
 
-    :param evg_api: Evergreen API.
     :param project: Project name.
     :param task: Task name.
     :param variant: Variant name.
     :return: Test historical runtimes, parsed into teststat objects.
     """
-    if not evg_api:
-        return []
-
-    try:
-        end_date = datetime.datetime.utcnow().replace(microsecond=0)
-        start_date = end_date - datetime.timedelta(days=AVG_TEST_RUNTIME_ANALYSIS_DAYS)
-        data = evg_api.test_stats_by_project(project, after_date=start_date.strftime("%Y-%m-%d"),
-                                             before_date=end_date.strftime("%Y-%m-%d"),
-                                             tasks=[task], variants=[variant], group_by="test",
-                                             group_num_days=AVG_TEST_RUNTIME_ANALYSIS_DAYS)
-        test_runtimes = TestStats(data).get_tests_runtimes()
-        return test_runtimes
-    except requests.HTTPError as err:
-        if err.response.status_code == requests.codes.SERVICE_UNAVAILABLE:
-            # Evergreen may return a 503 when the service is degraded.
-            # We fall back to returning no test history
-            return []
-        else:
-            raise
+    data = get_stats_from_s3(project, task, variant)
+    test_runtimes = TestStats(data).get_tests_runtimes()
+    return test_runtimes
 
 
 def create_generate_tasks_config(evg_config: Configuration, tests_by_task: Dict,
                                  generate_config: GenerateConfig, repeat_config: RepeatConfig,
-                                 evg_api: Optional[EvergreenApi], include_gen_task: bool = True,
+                                 include_gen_task: bool = True,
                                  task_prefix: str = "burn_in") -> Configuration:
     # pylint: disable=too-many-arguments,too-many-locals
     """
@@ -536,7 +513,6 @@ def create_generate_tasks_config(evg_config: Configuration, tests_by_task: Dict,
     :param tests_by_task: Dictionary of tests to generate tasks for.
     :param generate_config: Configuration of what to generate.
     :param repeat_config: Configuration of how to repeat tests.
-    :param evg_api: Evergreen API.
     :param include_gen_task: Should generating task be include in display task.
     :param task_prefix: Prefix all task names with this.
     :return: Shrub configuration with added tasks.
@@ -545,7 +521,7 @@ def create_generate_tasks_config(evg_config: Configuration, tests_by_task: Dict,
     resmoke_options = repeat_config.generate_resmoke_options()
     for task in sorted(tests_by_task):
         multiversion_path = tests_by_task[task].get("use_multiversion")
-        task_runtime_stats = _get_task_runtime_history(evg_api, generate_config.project, task,
+        task_runtime_stats = _get_task_runtime_history(generate_config.project, task,
                                                        generate_config.build_variant)
         resmoke_args = tests_by_task[task]["resmoke_args"]
         test_list = tests_by_task[task]["tests"]
@@ -622,23 +598,22 @@ def create_tests_by_task(build_variant: str, repo: Repo, evg_conf: EvergreenProj
 
 # pylint: disable=too-many-arguments
 def create_generate_tasks_file(tests_by_task: Dict, generate_config: GenerateConfig,
-                               repeat_config: RepeatConfig, evg_api: Optional[EvergreenApi],
-                               task_prefix: str = 'burn_in', include_gen_task: bool = True) -> Dict:
+                               repeat_config: RepeatConfig, task_prefix: str = 'burn_in',
+                               include_gen_task: bool = True) -> Dict:
     """
     Create an Evergreen generate.tasks file to run the given tasks and tests.
 
     :param tests_by_task: Dictionary of tests and tasks to run.
     :param generate_config: Information about how burn_in should generate tasks.
     :param repeat_config: Information about how burn_in should repeat tests.
-    :param evg_api: Evergreen api.
     :param task_prefix: Prefix to start generated task's name with.
     :param include_gen_task: Should the generating task be included in the display task.
     :returns: Configuration to pass to 'generate.tasks'.
     """
     evg_config = Configuration()
-    evg_config = create_generate_tasks_config(
-        evg_config, tests_by_task, generate_config, repeat_config, evg_api,
-        include_gen_task=include_gen_task, task_prefix=task_prefix)
+    evg_config = create_generate_tasks_config(evg_config, tests_by_task, generate_config,
+                                              repeat_config, include_gen_task=include_gen_task,
+                                              task_prefix=task_prefix)
 
     json_config = evg_config.to_map()
     tasks_to_create = len(json_config.get('tasks', []))
@@ -687,22 +662,8 @@ def _configure_logging(verbose: bool):
         logging.getLogger(log_name).setLevel(logging.WARNING)
 
 
-def _get_evg_api(evg_api_config: str, local_mode: bool) -> Optional[EvergreenApi]:
-    """
-    Get an instance of the Evergreen Api.
-
-    :param evg_api_config: Config file with evg auth information.
-    :param local_mode: If true, do not connect to Evergreen API.
-    :return: Evergreen Api instance.
-    """
-    if not local_mode:
-        return RetryingEvergreenApi.get_api(config_file=evg_api_config)
-    return None
-
-
 def burn_in(repeat_config: RepeatConfig, generate_config: GenerateConfig, resmoke_args: str,
-            generate_tasks_file: str, no_exec: bool, evg_conf: EvergreenProjectConfig, repo: Repo,
-            evg_api: EvergreenApi):
+            generate_tasks_file: str, no_exec: bool, evg_conf: EvergreenProjectConfig, repo: Repo):
     """
     Run burn_in_tests with the given configuration.
 
@@ -713,7 +674,6 @@ def burn_in(repeat_config: RepeatConfig, generate_config: GenerateConfig, resmok
     :param no_exec: Do not execute tests, just discover tests to run.
     :param evg_conf: Evergreen configuration.
     :param repo: Git repository.
-    :param evg_api: Evergreen API client.
     """
     # Populate the config values in order to use the helpers from resmokelib.suitesconfig.
     resmoke_cmd = _set_resmoke_cmd(repeat_config, list(resmoke_args))
@@ -722,8 +682,7 @@ def burn_in(repeat_config: RepeatConfig, generate_config: GenerateConfig, resmok
     LOGGER.debug("tests and tasks found", tests_by_task=tests_by_task)
 
     if generate_tasks_file:
-        json_config = create_generate_tasks_file(tests_by_task, generate_config, repeat_config,
-                                                 evg_api)
+        json_config = create_generate_tasks_file(tests_by_task, generate_config, repeat_config)
         _write_json_file(json_config, generate_tasks_file)
     elif not no_exec:
         run_tests(tests_by_task, resmoke_cmd)
@@ -752,16 +711,12 @@ def burn_in(repeat_config: RepeatConfig, generate_config: GenerateConfig, resmok
               help="The maximum number of times to repeat tests if time option is specified.")
 @click.option("--repeat-tests-secs", "repeat_tests_secs", default=None, type=int, metavar="SECONDS",
               help="Repeat tests for the given time (in secs).")
-@click.option("--evg-api-config", "evg_api_config", default=CONFIG_FILE, metavar="FILE",
-              help="Configuration file with connection info for Evergreen API.")
-@click.option("--local", "local_mode", default=False, is_flag=True,
-              help="Local mode. Do not call out to evergreen api.")
 @click.option("--verbose", "verbose", default=False, is_flag=True, help="Enable extra logging.")
 @click.argument("resmoke_args", nargs=-1, type=click.UNPROCESSED)
 # pylint: disable=too-many-arguments,too-many-locals
 def main(build_variant, run_build_variant, distro, project, generate_tasks_file, no_exec,
          repeat_tests_num, repeat_tests_min, repeat_tests_max, repeat_tests_secs, resmoke_args,
-         local_mode, evg_api_config, verbose):
+         verbose):
     """
     Run new or changed tests in repeated mode to validate their stability.
 
@@ -799,8 +754,6 @@ def main(build_variant, run_build_variant, distro, project, generate_tasks_file,
     :param repeat_tests_max: Once this number of repetitions has been reached, stop repeating.
     :param repeat_tests_secs: Continue repeating tests for this number of seconds.
     :param resmoke_args: Arguments to pass through to resmoke.
-    :param local_mode: Don't call out to the evergreen API (used for testing).
-    :param evg_api_config: Location of configuration file to connect to evergreen.
     :param verbose: Log extra debug information.
     """
     _configure_logging(verbose)
@@ -817,11 +770,10 @@ def main(build_variant, run_build_variant, distro, project, generate_tasks_file,
                                      project=project)  # yapf: disable
     generate_config.validate(evg_conf)
 
-    evg_api = _get_evg_api(evg_api_config, local_mode)
     repo = Repo(".")
 
     burn_in(repeat_config, generate_config, resmoke_args, generate_tasks_file, no_exec, evg_conf,
-            repo, evg_api)
+            repo)
 
 
 if __name__ == "__main__":

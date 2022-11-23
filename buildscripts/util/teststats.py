@@ -2,7 +2,31 @@
 
 from collections import defaultdict
 from collections import namedtuple
+
+from typing import NamedTuple, List
+import requests
+from requests.adapters import HTTPAdapter, Retry
+
 import buildscripts.util.testname as testname  # pylint: disable=wrong-import-position
+
+TESTS_STATS_S3_LOCATION = "https://mongo-test-stats.s3.amazonaws.com"
+
+
+class HistoricalTestInformation(NamedTuple):
+    """
+    Container for information about the historical runtime of a test.
+
+    test_name: Name of test.
+    avg_duration_pass: Average of runtime of test that passed.
+    num_pass: Number of times the test has passed.
+    num_fail: Number of times the test has failed.
+    """
+
+    test_name: str
+    num_pass: int
+    num_fail: int
+    avg_duration_pass: float
+
 
 TestRuntime = namedtuple('TestRuntime', ['test_name', 'runtime'])
 
@@ -15,20 +39,20 @@ def normalize_test_name(test_name):
 class TestStats(object):
     """Represent the test statistics for the task that is being analyzed."""
 
-    def __init__(self, evg_test_stats_results):
+    def __init__(self, evg_test_stats_results: List[HistoricalTestInformation]) -> None:
         """Initialize the TestStats with raw results from the Evergreen API."""
         # Mapping from test_file to {"num_run": X, "duration": Y} for tests
         self._runtime_by_test = defaultdict(dict)
         # Mapping from 'test_name:hook_name' to
-        #       {'test_name': {'hook_name': {"num_run": X, "duration": Y}}}
+        #       {'test_name': {hook_name': {"num_run": X, "duration": Y}}}
         self._hook_runtime_by_test = defaultdict(lambda: defaultdict(dict))
 
         for doc in evg_test_stats_results:
             self._add_stats(doc)
 
-    def _add_stats(self, test_stats):
+    def _add_stats(self, test_stats: HistoricalTestInformation) -> None:
         """Add the statistics found in a document returned by the Evergreen test_stats/ endpoint."""
-        test_file = testname.normalize_test_file(test_stats.test_file)
+        test_file = testname.normalize_test_file(test_stats.test_name)
         duration = test_stats.avg_duration_pass
         num_run = test_stats.num_pass
         is_hook = testname.is_resmoke_hook(test_file)
@@ -78,3 +102,22 @@ class TestStats(object):
             test = TestRuntime(test_name=normalize_test_name(test_file), runtime=duration)
             tests.append(test)
         return sorted(tests, key=lambda x: x.runtime, reverse=True)
+
+
+def get_stats_from_s3(project: str, task: str, variant: str) -> List[HistoricalTestInformation]:
+    """
+    Retrieve test stats from s3 for a given task.
+
+    :param project: Project to query.
+    :param task: Task to query.
+    :param variant: Build variant to query.
+    :return: A list of the Test stats for the specified task.
+    """
+    session = requests.Session()
+    retries = Retry(total=5, backoff_factor=1, status_forcelist=[502, 503, 504])
+    session.mount('https://', HTTPAdapter(max_retries=retries))
+
+    response = session.get(f"{TESTS_STATS_S3_LOCATION}/{project}/{variant}/{task}")
+    data = response.json()
+
+    return [HistoricalTestInformation(**item) for item in data]

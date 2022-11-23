@@ -9,6 +9,7 @@ from shrub.config import Configuration
 import buildscripts.burn_in_tags as under_test
 
 import buildscripts.ciconfig.evergreen as _evergreen
+from buildscripts.util.teststats import HistoricalTestInformation
 
 # pylint: disable=missing-docstring,invalid-name,unused-argument,no-self-use,protected-access
 
@@ -93,7 +94,9 @@ class TestGenerateEvgBuildVariants(unittest.TestCase):
 
 class TestGenerateEvgTasks(unittest.TestCase):
     @patch(ns("create_tests_by_task"))
-    def test_generate_evg_tasks_no_tests_changed(self, create_tests_by_task_mock):
+    @patch("buildscripts.burn_in_tests.get_stats_from_s3")
+    def test_generate_evg_tasks_no_tests_changed(self, get_stats_from_s3_mock,
+                                                 create_tests_by_task_mock):
         evg_conf_mock = get_evergreen_config()
         create_tests_by_task_mock.return_value = {}
         expansions_file_data = get_expansions_data()
@@ -103,15 +106,18 @@ class TestGenerateEvgTasks(unittest.TestCase):
                 "enterprise-rhel-62-64-bit-majority-read-concern-off-required",
         }  # yapf: disable
         shrub_config = Configuration()
-        evergreen_api = MagicMock()
+        get_stats_from_s3_mock.return_value = []
         repo = MagicMock()
-        under_test._generate_evg_tasks(evergreen_api, shrub_config, expansions_file_data,
-                                       buildvariant_map, repo, evg_conf_mock)
+
+        under_test._generate_evg_tasks(shrub_config, expansions_file_data, buildvariant_map, repo,
+                                       evg_conf_mock)
 
         self.assertEqual(shrub_config.to_map(), {})
 
     @patch(ns("create_tests_by_task"))
-    def test_generate_evg_tasks_one_test_changed(self, create_tests_by_task_mock):
+    @patch("buildscripts.burn_in_tests.get_stats_from_s3")
+    def test_generate_evg_tasks_one_test_changed(self, get_stats_from_s3_mock,
+                                                 create_tests_by_task_mock):
         evg_conf_mock = get_evergreen_config()
         create_tests_by_task_mock.return_value = {
             "aggregation_mongos_passthrough": {
@@ -128,13 +134,17 @@ class TestGenerateEvgTasks(unittest.TestCase):
                 "enterprise-rhel-62-64-bit-majority-read-concern-off-required",
         }  # yapf: disable
         shrub_config = Configuration()
-        evergreen_api = MagicMock()
         repo = MagicMock()
-        evergreen_api.test_stats_by_project.return_value = [
-            MagicMock(test_file="dir/test2.js", avg_duration_pass=10)
+        get_stats_from_s3_mock.return_value = [
+            HistoricalTestInformation(
+                test_name="dir/test2.js",
+                num_pass=1,
+                num_fail=0,
+                avg_duration_pass=10,
+            )
         ]
-        under_test._generate_evg_tasks(evergreen_api, shrub_config, expansions_file_data,
-                                       buildvariant_map, repo, evg_conf_mock)
+        under_test._generate_evg_tasks(shrub_config, expansions_file_data, buildvariant_map, repo,
+                                       evg_conf_mock)
 
         generated_config = shrub_config.to_map()
         self.assertEqual(len(generated_config["buildvariants"]), 2)

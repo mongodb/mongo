@@ -96,16 +96,12 @@ class TestTestStats(unittest.TestCase):
         self.assertEqual(expected_runtimes, test_stats.get_tests_runtimes())
 
     @staticmethod
-    def _make_evg_result(test_file="dir/test1.js", num_pass=0, duration=0):
-        return Mock(
-            test_file=test_file,
-            task_name="task1",
-            variant="variant1",
-            distro="distro1",
-            date=_DATE,
+    def _make_evg_result(test_name="dir/test1.js", num_pass=0, duration=0):
+        return under_test.HistoricalTestInformation(
+            test_name=test_name,
+            avg_duration_pass=duration,
             num_pass=num_pass,
             num_fail=0,
-            avg_duration_pass=duration,
         )
 
 
@@ -685,95 +681,65 @@ class GenerateSubSuitesTest(unittest.TestCase):
 
     def test_calculate_suites(self):
         evg = Mock()
-        evg.test_stats_by_project.return_value = [
-            Mock(test_file="test{}.js".format(i), avg_duration_pass=60, num_pass=1)
-            for i in range(100)
+        test_stats = [
+            under_test.HistoricalTestInformation(
+                test_name="test{}.js".format(i),
+                avg_duration_pass=60,
+                num_pass=1,
+                num_fail=0,
+            ) for i in range(100)
         ]
         config_options = self.get_mock_options()
         config_options.max_sub_suites = 1000
 
         gen_sub_suites = under_test.GenerateSubSuites(evg, config_options)
 
-        with patch("os.path.exists") as exists_mock, patch(ns("suitesconfig")) as suitesconfig_mock:
+        with patch("os.path.exists") as exists_mock, patch(
+                ns("suitesconfig")) as suitesconfig_mock, patch(
+                    ns("get_stats_from_s3")) as get_stats_from_s3_mock:
             exists_mock.return_value = True
             suitesconfig_mock.get_suite.return_value.tests = \
-                [stat.test_file for stat in evg.test_stats_by_project.return_value]
-            suites = gen_sub_suites.calculate_suites(_DATE, _DATE)
+                [stat.test_name for stat in test_stats]
+            get_stats_from_s3_mock.return_value = test_stats
+            suites = gen_sub_suites.calculate_suites()
 
             # There are 100 tests taking 1 minute, with a target of 10 min we expect 10 suites.
             self.assertEqual(10, len(suites))
             for suite in suites:
                 self.assertEqual(10, len(suite.tests))
 
-    def test_calculate_suites_fallback(self):
-        n_tests = 100
-        response = Mock()
-        response.status_code = requests.codes.SERVICE_UNAVAILABLE
-        evg = Mock()
-        evg.test_stats_by_project.side_effect = requests.HTTPError(response=response)
-        config_options = self.get_mock_options()
-
-        gen_sub_suites = under_test.GenerateSubSuites(evg, config_options)
-        gen_sub_suites.list_tests = Mock(return_value=self.get_test_list(n_tests))
-
-        suites = gen_sub_suites.calculate_suites(_DATE, _DATE)
-
-        self.assertEqual(gen_sub_suites.config_options.fallback_num_sub_suites, len(suites))
-        for suite in suites:
-            self.assertEqual(50, len(suite.tests))
-
-        self.assertEqual(n_tests, len(gen_sub_suites.test_list))
-
     def test_calculate_suites_fallback_with_fewer_tests_than_max(self):
         n_tests = 2
-        response = Mock()
-        response.status_code = requests.codes.SERVICE_UNAVAILABLE
         evg = Mock()
-        evg.test_stats_by_project.side_effect = requests.HTTPError(response=response)
+        test_stats = []
         config_options = self.get_mock_options()
         config_options.fallback_num_sub_suites = 5
 
         gen_sub_suites = under_test.GenerateSubSuites(evg, config_options)
         gen_sub_suites.list_tests = MagicMock(return_value=self.get_test_list(n_tests))
 
-        suites = gen_sub_suites.calculate_suites(_DATE, _DATE)
+        with patch(ns("get_stats_from_s3")) as get_stats_from_s3_mock:
+            get_stats_from_s3_mock.return_value = test_stats
+            suites = gen_sub_suites.calculate_suites()
 
-        self.assertEqual(n_tests, len(suites))
-        for suite in suites:
-            self.assertEqual(1, len(suite.tests))
+            self.assertEqual(n_tests, len(suites))
+            for suite in suites:
+                self.assertEqual(1, len(suite.tests))
 
-        self.assertEqual(n_tests, len(gen_sub_suites.test_list))
+            self.assertEqual(n_tests, len(gen_sub_suites.test_list))
 
     def test_calculate_suites_uses_fallback_for_no_results(self):
         n_tests = 100
         evg = Mock()
-        evg.test_stats_by_project.return_value = []
+        test_stats = []
         config_options = self.get_mock_options()
 
         gen_sub_suites = under_test.GenerateSubSuites(evg, config_options)
         gen_sub_suites.list_tests = Mock(return_value=self.get_test_list(n_tests))
-        suites = gen_sub_suites.calculate_suites(_DATE, _DATE)
 
-        self.assertEqual(gen_sub_suites.config_options.fallback_num_sub_suites, len(suites))
-        for suite in suites:
-            self.assertEqual(50, len(suite.tests))
-
-        self.assertEqual(n_tests, len(gen_sub_suites.test_list))
-
-    def test_calculate_suites_uses_fallback_if_only_results_are_filtered(self):
-        n_tests = 100
-        evg = Mock()
-        evg.test_stats_by_project.return_value = [
-            Mock(test_file="test{}.js".format(i), avg_duration_pass=60, num_pass=1)
-            for i in range(100)
-        ]
-        config_options = self.get_mock_options()
-
-        gen_sub_suites = under_test.GenerateSubSuites(evg, config_options)
-        gen_sub_suites.list_tests = Mock(return_value=self.get_test_list(n_tests))
-        with patch("os.path.exists") as exists_mock:
-            exists_mock.return_value = False
-            suites = gen_sub_suites.calculate_suites(_DATE, _DATE)
+        with patch(ns("get_stats_from_s3")) as get_stats_from_s3_mock:
+            get_stats_from_s3_mock.return_value = test_stats
+            suites = gen_sub_suites.calculate_suites()
 
             self.assertEqual(gen_sub_suites.config_options.fallback_num_sub_suites, len(suites))
             for suite in suites:
@@ -781,18 +747,33 @@ class GenerateSubSuitesTest(unittest.TestCase):
 
             self.assertEqual(n_tests, len(gen_sub_suites.test_list))
 
-    def test_calculate_suites_error(self):
-        response = Mock()
-        response.status_code = requests.codes.INTERNAL_SERVER_ERROR
+    def test_calculate_suites_uses_fallback_if_only_results_are_filtered(self):
+        n_tests = 100
         evg = Mock()
-        evg.test_stats_by_project.side_effect = requests.HTTPError(response=response)
+        test_stats = [
+            under_test.HistoricalTestInformation(
+                test_name="test{}.js".format(i),
+                avg_duration_pass=60,
+                num_pass=1,
+                num_fail=0,
+            ) for i in range(100)
+        ]
         config_options = self.get_mock_options()
 
         gen_sub_suites = under_test.GenerateSubSuites(evg, config_options)
-        gen_sub_suites.list_tests = Mock(return_value=self.get_test_list(100))
+        gen_sub_suites.list_tests = Mock(return_value=self.get_test_list(n_tests))
 
-        with self.assertRaises(requests.HTTPError):
-            gen_sub_suites.calculate_suites(_DATE, _DATE)
+        with patch("os.path.exists") as exists_mock, patch(
+                ns("get_stats_from_s3")) as get_stats_from_s3_mock:
+            exists_mock.return_value = False
+            get_stats_from_s3_mock.return_value = test_stats
+            suites = gen_sub_suites.calculate_suites()
+
+            self.assertEqual(gen_sub_suites.config_options.fallback_num_sub_suites, len(suites))
+            for suite in suites:
+                self.assertEqual(50, len(suite.tests))
+
+            self.assertEqual(n_tests, len(gen_sub_suites.test_list))
 
     def test_filter_missing_files(self):
         tests_runtimes = [

@@ -123,12 +123,10 @@ def _generate_evg_build_variant(shrub_config, build_variant, run_build_variant,
 
 
 # pylint: disable=too-many-arguments
-def _generate_evg_tasks(evergreen_api, shrub_config, expansions_file_data, build_variant_map, repo,
-                        evg_conf):
+def _generate_evg_tasks(shrub_config, expansions_file_data, build_variant_map, repo, evg_conf):
     """
     Generate burn in tests tasks for a given shrub config and group of buildvariants.
 
-    :param evergreen_api: Evergreen.py object.
     :param shrub_config: Shrub config object that the build variants will be built upon.
     :param expansions_file_data: Config data file to use.
     :param build_variant_map: Map of base buildvariants to their generated buildvariant.
@@ -147,7 +145,7 @@ def _generate_evg_tasks(evergreen_api, shrub_config, expansions_file_data, build
                                          repeat_tests_secs=config_options.repeat_tests_secs)
 
             create_generate_tasks_config(shrub_config, tests_by_task, gen_config, repeat_config,
-                                         evergreen_api, include_gen_task=False)
+                                         include_gen_task=False)
 
 
 def _write_to_file(shrub_config):
@@ -163,7 +161,7 @@ def _write_to_file(shrub_config):
         file_handle.write(shrub_config.to_json())
 
 
-def main(evergreen_api, repo):
+def main(repo):
     """Execute Main program."""
 
     parser = argparse.ArgumentParser(description=main.__doc__)
@@ -175,10 +173,9 @@ def main(evergreen_api, repo):
     shrub_config = Configuration()
     evg_conf = evergreen.parse_evergreen_file(EVERGREEN_FILE)
     build_variant_map = _create_evg_build_variant_map(expansions_file_data, evg_conf)
-    _generate_evg_tasks(evergreen_api, shrub_config, expansions_file_data, build_variant_map, repo,
-                        evg_conf)
+    _generate_evg_tasks(shrub_config, expansions_file_data, build_variant_map, repo, evg_conf)
     _write_to_file(shrub_config)
 
 
 if __name__ == '__main__':
-    main(RetryingEvergreenApi.get_api(config_file=EVG_CONFIG_FILE), Repo("."))
+    main(Repo("."))

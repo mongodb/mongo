@@ -12,8 +12,6 @@ import unittest
 from math import ceil
 from mock import Mock, patch, MagicMock
 
-import requests
-
 from shrub.config import Configuration
 
 import buildscripts.burn_in_tests as under_test
@@ -85,7 +83,8 @@ def get_evergreen_config(config_file_path):
 
 class TestAcceptance(unittest.TestCase):
     @patch(ns("_write_json_file"))
-    def test_no_tests_run_if_none_changed(self, write_json_mock):
+    @patch(ns("get_stats_from_s3"))
+    def test_no_tests_run_if_none_changed(self, get_stats_from_s3_mock, write_json_mock):
         """
         Given a git repository with no changes,
         When burn_in_tests is run,
@@ -98,8 +97,9 @@ class TestAcceptance(unittest.TestCase):
             variant,
             "project",
         )  # yapf: disable
+        get_stats_from_s3_mock.return_value = []
 
-        under_test.burn_in(repeat_config, gen_config, "", "testfile.json", False, None, repo, None)
+        under_test.burn_in(repeat_config, gen_config, "", "testfile.json", False, None, repo)
 
         write_json_mock.assert_called_once()
         written_config = write_json_mock.call_args[0][0]
@@ -109,7 +109,8 @@ class TestAcceptance(unittest.TestCase):
 
     @unittest.skipIf(sys.platform.startswith("win"), "not supported on windows")
     @patch(ns("_write_json_file"))
-    def test_tests_generated_if_a_file_changed(self, write_json_mock):
+    @patch(ns("get_stats_from_s3"))
+    def test_tests_generated_if_a_file_changed(self, get_stats_from_s3_mock, write_json_mock):
         """
         Given a git repository with no changes,
         When burn_in_tests is run,
@@ -128,9 +129,9 @@ class TestAcceptance(unittest.TestCase):
             "project",
         )  # yapf: disable
         evg_config = get_evergreen_config("etc/evergreen.yml")
+        get_stats_from_s3_mock.return_value = []
 
-        under_test.burn_in(repeat_config, gen_config, "", "testfile.json", False, evg_config, repo,
-                           None)
+        under_test.burn_in(repeat_config, gen_config, "", "testfile.json", False, evg_config, repo)
 
         write_json_mock.assert_called_once()
         written_config = write_json_mock.call_args[0][0]
@@ -348,45 +349,26 @@ class TestGenerateTimeouts(unittest.TestCase):
 
 
 class TestGetTaskRuntimeHistory(unittest.TestCase):
-    def test_get_task_runtime_history_with_no_api(self):
-        self.assertListEqual([],
-                             under_test._get_task_runtime_history(None, "project", "task",
-                                                                  "variant"))
-
-    def test__get_task_runtime_history(self):
-        evergreen_api = Mock()
-        evergreen_api.test_stats_by_project.return_value = [
-            Mock(
-                test_file="dir/test2.js",
-                task_name="task1",
-                variant="variant1",
-                distro="distro1",
-                date=_DATE,
+    @patch(ns("get_stats_from_s3"))
+    def test__get_task_runtime_history(self, get_stats_from_s3_mock):
+        test_stats = [
+            teststats_utils.HistoricalTestInformation(
+                test_name="dir/test2.js",
                 num_pass=1,
                 num_fail=0,
                 avg_duration_pass=10.1,
             )
         ]
-        analysis_duration = under_test.AVG_TEST_RUNTIME_ANALYSIS_DAYS
-        end_date = datetime.datetime.utcnow().replace(microsecond=0)
-        start_date = end_date - datetime.timedelta(days=analysis_duration)
+        get_stats_from_s3_mock.return_value = test_stats
 
-        result = under_test._get_task_runtime_history(evergreen_api, "project1", "task1",
-                                                      "variant1")
+        result = under_test._get_task_runtime_history("project1", "task1", "variant1")
         self.assertEqual(result, [("dir/test2.js", 10.1)])
-        evergreen_api.test_stats_by_project.assert_called_with(
-            "project1", after_date=start_date.strftime("%Y-%m-%d"),
-            before_date=end_date.strftime("%Y-%m-%d"), group_by="test", group_num_days=14,
-            tasks=["task1"], variants=["variant1"])
 
-    def test__get_task_runtime_history_evg_degraded_mode_error(self):  # pylint: disable=invalid-name
-        response = Mock()
-        response.status_code = requests.codes.SERVICE_UNAVAILABLE
-        evergreen_api = Mock()
-        evergreen_api.test_stats_by_project.side_effect = requests.HTTPError(response=response)
+    @patch(ns("get_stats_from_s3"))
+    def test__get_task_runtime_history_when_s3_has_no_data(self, get_stats_from_s3_mock):  # pylint: disable=invalid-name
+        get_stats_from_s3_mock.return_value = []
 
-        result = under_test._get_task_runtime_history(evergreen_api, "project1", "task1",
-                                                      "variant1")
+        result = under_test._get_task_runtime_history("project1", "task1", "variant1")
         self.assertEqual(result, [])
 
 
@@ -479,18 +461,21 @@ TESTS_BY_TASK = {
 
 
 class TestCreateGenerateTasksConfig(unittest.TestCase):
-    def test_no_tasks_given(self):
+    @patch(ns("get_stats_from_s3"))
+    def test_no_tasks_given(self, get_stats_from_s3_mock):
         evg_config = Configuration()
         gen_config = MagicMock(run_build_variant="variant")
         repeat_config = MagicMock()
+        get_stats_from_s3_mock.return_value = []
 
         evg_config = under_test.create_generate_tasks_config(evg_config, {}, gen_config,
-                                                             repeat_config, None)
+                                                             repeat_config)
 
         evg_config_dict = evg_config.to_map()
         self.assertNotIn("tasks", evg_config_dict)
 
-    def test_one_task_one_test(self):
+    @patch(ns("get_stats_from_s3"))
+    def test_one_task_one_test(self, get_stats_from_s3_mock):
         n_tasks = 1
         n_tests = 1
         resmoke_options = "options for resmoke"
@@ -499,9 +484,10 @@ class TestCreateGenerateTasksConfig(unittest.TestCase):
         repeat_config = MagicMock()
         repeat_config.generate_resmoke_options.return_value = resmoke_options
         tests_by_task = create_tests_by_task_mock(n_tasks, n_tests)
+        get_stats_from_s3_mock.return_value = []
 
         evg_config = under_test.create_generate_tasks_config(evg_config, tests_by_task, gen_config,
-                                                             repeat_config, None)
+                                                             repeat_config)
 
         evg_config_dict = evg_config.to_map()
         tasks = evg_config_dict["tasks"]
@@ -511,21 +497,24 @@ class TestCreateGenerateTasksConfig(unittest.TestCase):
         self.assertIn("--suites=suite_0", cmd[1]["vars"]["resmoke_args"])
         self.assertIn("tests_0", cmd[1]["vars"]["resmoke_args"])
 
-    def test_n_task_m_test(self):
+    @patch(ns("get_stats_from_s3"))
+    def test_n_task_m_test(self, get_stats_from_s3_mock):
         n_tasks = 3
         n_tests = 5
         evg_config = Configuration()
         gen_config = MagicMock(run_build_variant="variant", distro=None)
         repeat_config = MagicMock()
         tests_by_task = create_tests_by_task_mock(n_tasks, n_tests)
+        get_stats_from_s3_mock.return_value = []
 
         evg_config = under_test.create_generate_tasks_config(evg_config, tests_by_task, gen_config,
-                                                             repeat_config, None)
+                                                             repeat_config)
 
         evg_config_dict = evg_config.to_map()
         self.assertEqual(n_tasks * n_tests, len(evg_config_dict["tasks"]))
 
-    def test_multiversion_path_is_used(self):
+    @patch(ns("get_stats_from_s3"))
+    def test_multiversion_path_is_used(self, get_stats_from_s3_mock):
         n_tasks = 1
         n_tests = 1
         evg_config = Configuration()
@@ -535,9 +524,10 @@ class TestCreateGenerateTasksConfig(unittest.TestCase):
         first_task = "task_0"
         multiversion_path = "multiversion_path"
         tests_by_task[first_task]["use_multiversion"] = multiversion_path
+        get_stats_from_s3_mock.return_value = []
 
         evg_config = under_test.create_generate_tasks_config(evg_config, tests_by_task, gen_config,
-                                                             repeat_config, None)
+                                                             repeat_config)
 
         evg_config_dict = evg_config.to_map()
         tasks = evg_config_dict["tasks"]

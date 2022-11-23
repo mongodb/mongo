@@ -3,8 +3,6 @@
 import datetime
 import unittest
 
-from mock import Mock
-
 import buildscripts.util.teststats as teststats_utils
 
 # pylint: disable=missing-docstring
@@ -82,14 +80,10 @@ class TestTestStats(unittest.TestCase):
         self.assertEqual(expected_runtimes, test_stats.get_tests_runtimes())
 
     @staticmethod
-    def _make_evg_result(test_file="dir/test1.js", num_pass=0, duration=0):
-        return Mock(
-            test_file=test_file,
-            task_name="task1",
-            variant="variant1",
-            distro="distro1",
-            date=_DATE,
+    def _make_evg_result(test_name="dir/test1.js", num_pass=0, duration=0):
+        return teststats_utils.HistoricalTestInformation(
+            test_name=test_name,
+            avg_duration_pass=duration,
             num_pass=num_pass,
             num_fail=0,
-            avg_duration_pass=duration,
         )
