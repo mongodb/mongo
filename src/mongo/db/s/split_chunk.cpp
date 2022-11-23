@@ -101,9 +101,9 @@ bool checkMetadataForSuccessfulSplitChunk(OperationContext* opCtx,
     Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IS);
     Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
 
-    const auto metadataAfterSplit = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-                                        opCtx, nss, CSRAcquisitionMode::kShared)
-                                        ->getCurrentMetadataIfKnown();
+    const auto scopedCSR = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+        opCtx, nss, CSRAcquisitionMode::kShared);
+    const auto metadataAfterSplit = scopedCSR->getCurrentMetadataIfKnown();
 
     ShardId shardId = ShardingState::get(opCtx)->shardId();
 
@@ -121,15 +121,15 @@ bool checkMetadataForSuccessfulSplitChunk(OperationContext* opCtx,
             metadataAfterSplit->isSharded());
     const auto placementVersion = metadataAfterSplit->getShardVersion();
     const auto epoch = placementVersion.epoch();
-    uassert(StaleConfigInfo(
-                nss,
-                ShardVersion::IGNORED() /* receivedVersion */,
-                ShardVersion(placementVersion,
-                             boost::optional<CollectionIndexes>(boost::none)) /* wantedVersion */,
-                shardId),
-            str::stream() << "Collection " << nss.ns() << " changed since split start",
-            epoch == expectedEpoch &&
-                (!expectedTimestamp || placementVersion.getTimestamp() == expectedTimestamp));
+    uassert(
+        StaleConfigInfo(nss,
+                        ShardVersion::IGNORED() /* receivedVersion */,
+                        ShardVersion(placementVersion,
+                                     scopedCSR->getCollectionIndexes(opCtx)) /* wantedVersion */,
+                        shardId),
+        str::stream() << "Collection " << nss.ns() << " changed since split start",
+        epoch == expectedEpoch &&
+            (!expectedTimestamp || placementVersion.getTimestamp() == expectedTimestamp));
 
     ChunkType nextChunk;
     for (auto it = splitPoints.begin(); it != splitPoints.end(); ++it) {

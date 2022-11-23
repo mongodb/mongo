@@ -75,16 +75,16 @@ void SessionsCollectionConfigServer::_generateIndexesIfNeeded(OperationContext* 
         nss,
         "SessionsCollectionConfigServer::_generateIndexesIfNeeded",
         [&] {
-            const ChunkManager cm = [&]() {
+            const auto cri = [&]() {
                 // (SERVER-61214) wait for the catalog cache to acknowledge that the sessions
                 // collection is sharded in order to be sure to get a valid routing table
                 while (true) {
-                    auto cm = uassertStatusOK(
+                    auto [cm, gii] = uassertStatusOK(
                         Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx,
                                                                                               nss));
 
                     if (cm.isSharded()) {
-                        return cm;
+                        return CollectionRoutingInfo(std::move(cm), std::move(gii));
                     }
                 }
             }();
@@ -93,7 +93,7 @@ void SessionsCollectionConfigServer::_generateIndexesIfNeeded(OperationContext* 
                 opCtx,
                 nss.db(),
                 nss,
-                cm,
+                cri,
                 SessionsCollection::generateCreateIndexesCmd(),
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 Shard::RetryPolicy::kNoRetry,

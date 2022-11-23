@@ -179,13 +179,14 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
     }
 
     // Snapshot the committed metadata from the time the migration starts
-    const auto [collectionMetadata, collectionUUID] = [&] {
+    const auto [collectionMetadata, collectionIndexInfo, collectionUUID] = [&] {
         UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
         AutoGetCollection autoColl(_opCtx, nss(), MODE_IS);
         auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
             opCtx, nss(), CSRAcquisitionMode::kExclusive);
 
-        const auto metadata = checkCollectionIdentity(_opCtx, nss(), _args.getEpoch(), boost::none);
+        const auto [metadata, indexInfo] =
+            checkCollectionIdentity(_opCtx, nss(), _args.getEpoch(), boost::none);
 
         UUID collectionUUID = autoColl.getCollection()->uuid();
 
@@ -199,7 +200,8 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
 
         _scopedRegisterer.emplace(this, *scopedCsr);
 
-        return std::make_tuple(std::move(metadata), std::move(collectionUUID));
+        return std::make_tuple(
+            std::move(metadata), std::move(indexInfo), std::move(collectionUUID));
     }();
 
     // Compute the max bound in case only `min` is set (moveRange)
@@ -219,10 +221,16 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
         _moveTimingHelper.setMax(max);
     }
 
-    checkShardKeyPattern(
-        _opCtx, nss(), collectionMetadata, ChunkRange(*_args.getMin(), *_args.getMax()));
-    checkRangeWithinChunk(
-        _opCtx, nss(), collectionMetadata, ChunkRange(*_args.getMin(), *_args.getMax()));
+    checkShardKeyPattern(_opCtx,
+                         nss(),
+                         collectionMetadata,
+                         collectionIndexInfo,
+                         ChunkRange(*_args.getMin(), *_args.getMax()));
+    checkRangeWithinChunk(_opCtx,
+                          nss(),
+                          collectionMetadata,
+                          collectionIndexInfo,
+                          ChunkRange(*_args.getMin(), *_args.getMax()));
 
     _collectionEpoch = _args.getEpoch();
     _collectionUUID = collectionUUID;

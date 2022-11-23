@@ -115,7 +115,7 @@ Status splitChunkAtMultiplePoints(OperationContext* opCtx,
 void moveChunk(OperationContext* opCtx, const NamespaceString& nss, const BSONObj& minKey) {
     // We need to have the most up-to-date view of the chunk we are about to move.
     const auto cm =
-        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfo(opCtx, nss));
 
     uassert(ErrorCodes::NamespaceNotSharded,
             "Could not move chunk. Collection is no longer sharded",
@@ -305,7 +305,7 @@ void ChunkSplitter::_runAutosplit(std::shared_ptr<ChunkSplitStateDriver> chunkSp
         const auto opCtx = cc().makeOperationContext();
 
         const auto cm = uassertStatusOK(
-            Grid::get(opCtx.get())->catalogCache()->getCollectionRoutingInfo(opCtx.get(), nss));
+            Grid::get(opCtx.get())->catalogCache()->getCollectionPlacementInfo(opCtx.get(), nss));
         uassert(ErrorCodes::NamespaceNotSharded,
                 "Could not split chunk. Collection is no longer sharded",
                 cm.isSharded());

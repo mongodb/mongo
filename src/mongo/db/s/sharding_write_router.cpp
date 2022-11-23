@@ -55,7 +55,7 @@ ShardingWriteRouter::ShardingWriteRouter(OperationContext* opCtx,
             const auto& donorFields = reshardingFields->getDonorFields();
             invariant(donorFields);
 
-            _reshardingChunkMgr = uassertStatusOK(catalogCache->getCollectionRoutingInfo(
+            _reshardingChunkMgr = uassertStatusOK(catalogCache->getCollectionPlacementInfo(
                 opCtx, donorFields->getTempReshardingNss(), true /* allowLocks */));
 
             tassert(6862800,

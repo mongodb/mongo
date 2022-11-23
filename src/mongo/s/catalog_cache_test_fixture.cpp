@@ -45,6 +45,16 @@
 
 namespace mongo {
 
+BSONObj makeCollectionAndIndexesAggregationResponse(const CollectionType& coll,
+                                                    const std::vector<BSONObj>& indexes) {
+    BSONObj obj = coll.toBSON();
+    BSONObjBuilder indexField;
+    indexField.append("indexes", indexes);
+    BSONObj newObj = obj.addField(indexField.obj().firstElement());
+    return CursorResponse(CollectionType::ConfigNS, CursorId{0}, {newObj})
+        .toBSON(CursorResponse::ResponseType::InitialResponse);
+}
+
 void CatalogCacheTestFixture::setUp() {
     ShardingTestFixture::setUp();
     setRemote(HostAndPort("FakeRemoteClient:34567"));
@@ -59,8 +69,9 @@ CatalogCacheTestFixture::scheduleRoutingInfoForcedRefresh(const NamespaceString&
         auto client = getServiceContext()->makeClient("Test");
         auto const catalogCache = Grid::get(getServiceContext())->catalogCache();
 
-        return boost::make_optional(uassertStatusOK(
-            catalogCache->getCollectionRoutingInfoWithRefresh(operationContext(), nss)));
+        auto cri = uassertStatusOK(
+            catalogCache->getCollectionRoutingInfoWithRefresh(operationContext(), nss));
+        return boost::make_optional(cri.cm);
     });
 }
 
@@ -70,16 +81,16 @@ CatalogCacheTestFixture::scheduleRoutingInfoUnforcedRefresh(const NamespaceStrin
         auto client = getServiceContext()->makeClient("Test");
         auto const catalogCache = Grid::get(getServiceContext())->catalogCache();
 
-        return boost::optional<ChunkManager>(
-            uassertStatusOK(catalogCache->getCollectionRoutingInfo(operationContext(), nss)));
+        auto cri = uassertStatusOK(catalogCache->getCollectionRoutingInfo(operationContext(), nss));
+        return boost::optional<ChunkManager>(cri.cm);
     });
 }
 
 executor::NetworkTestEnv::FutureHandle<boost::optional<ChunkManager>>
-CatalogCacheTestFixture::scheduleRoutingInfoIncrementalRefresh(const NamespaceString& nss) {
+CatalogCacheTestFixture::schedulePlacementInfoIncrementalRefresh(const NamespaceString& nss) {
     auto catalogCache = Grid::get(getServiceContext())->catalogCache();
     const auto cm =
-        uassertStatusOK(catalogCache->getCollectionRoutingInfo(operationContext(), nss));
+        uassertStatusOK(catalogCache->getCollectionPlacementInfo(operationContext(), nss));
     ASSERT(cm.isSharded());
 
     // Simulates the shard wanting a higher version than the one sent by the router.
@@ -91,7 +102,7 @@ CatalogCacheTestFixture::scheduleRoutingInfoIncrementalRefresh(const NamespaceSt
         auto const catalogCache = Grid::get(getServiceContext())->catalogCache();
 
         return boost::make_optional(
-            uassertStatusOK(catalogCache->getCollectionRoutingInfo(operationContext(), nss)));
+            uassertStatusOK(catalogCache->getCollectionPlacementInfo(operationContext(), nss)));
     });
 }
 
@@ -184,6 +195,11 @@ ChunkManager CatalogCacheTestFixture::makeChunkManager(
                        [](const auto& chunk) { return BSON("chunks" << chunk); });
         return aggResult;
     }());
+    onCommand([&](const executor::RemoteCommandRequest& request) {
+        ASSERT_EQ(request.target, kConfigHostAndPort);
+        ASSERT_EQ(request.dbname, "config");
+        return makeCollectionAndIndexesAggregationResponse(CollectionType(collectionBSON), {});
+    });
 
     return *future.default_timed_get();
 }
@@ -227,6 +243,22 @@ void CatalogCacheTestFixture::expectCollectionAndChunksAggregation(
     }());
 }
 
+void CatalogCacheTestFixture::expectCollectionAndIndexesAggregation(
+    NamespaceString nss,
+    OID epoch,
+    Timestamp timestamp,
+    UUID uuid,
+    const ShardKeyPattern& shardKeyPattern,
+    const std::vector<BSONObj>& globalIndexes) {
+    onCommand([&](const executor::RemoteCommandRequest& request) {
+        ASSERT_EQ(request.target, kConfigHostAndPort);
+        ASSERT_EQ(request.dbname, "config");
+        CollectionType collType(
+            nss, epoch, timestamp, Date_t::now(), uuid, shardKeyPattern.toBSON());
+        return makeCollectionAndIndexesAggregationResponse(collType, {});
+    });
+}
+
 ChunkManager CatalogCacheTestFixture::loadRoutingTableWithTwoChunksAndTwoShards(
     NamespaceString nss) {
 
@@ -260,10 +292,8 @@ ChunkManager CatalogCacheTestFixture::loadRoutingTableWithTwoChunksAndTwoShardsI
             expectGetDatabase(nss);
         }
     }
+    CollectionType collType(nss, epoch, timestamp, Date_t::now(), uuid, shardKeyPattern.toBSON());
     expectFindSendBSONObjVector(kConfigHostAndPort, [&]() {
-        CollectionType collType(
-            nss, epoch, timestamp, Date_t::now(), uuid, shardKeyPattern.toBSON());
-
         ChunkVersion version({epoch, timestamp}, {1, 0});
 
         ChunkType chunk1(
@@ -280,6 +310,11 @@ ChunkManager CatalogCacheTestFixture::loadRoutingTableWithTwoChunksAndTwoShardsI
         const auto chunk2Obj = BSON("chunks" << chunk2.toConfigBSON());
         return std::vector<BSONObj>{collType.toBSON(), chunk1Obj, chunk2Obj};
     }());
+    onCommand([&](const executor::RemoteCommandRequest& request) {
+        ASSERT_EQ(request.target, kConfigHostAndPort);
+        ASSERT_EQ(request.dbname, "config");
+        return makeCollectionAndIndexesAggregationResponse(collType, {});
+    });
 
     return *future.default_timed_get();
 }

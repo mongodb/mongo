@@ -421,7 +421,7 @@ boost::optional<int64_t> getNumOrphanDocuments(OperationContext* opCtx,
     }
 
     auto cm =
-        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfo(opCtx, nss));
 
     if (!cm.isSharded()) {
         return boost::none;

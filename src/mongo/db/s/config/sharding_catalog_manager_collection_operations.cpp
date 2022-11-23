@@ -467,7 +467,7 @@ void ShardingCatalogManager::configureCollectionBalancing(
     }
 
     const auto cm = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx, nss));
+        Grid::get(opCtx)->catalogCache()->getShardedCollectionPlacementInfoWithRefresh(opCtx, nss));
     std::set<ShardId> shardsIds;
     cm.getAllShardIds(&shardsIds);
 
@@ -511,7 +511,7 @@ void ShardingCatalogManager::applyLegacyConfigurationToSessionsCollection(Operat
                             opCtx, NamespaceString::kLogicalSessionsNamespace, txnNumber);
                     });
     const auto cm = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
+        Grid::get(opCtx)->catalogCache()->getShardedCollectionPlacementInfoWithRefresh(
             opCtx, NamespaceString::kLogicalSessionsNamespace));
     std::set<ShardId> shardsIds;
     cm.getAllShardIds(&shardsIds);
@@ -568,7 +568,7 @@ void ShardingCatalogManager::updateTimeSeriesGranularity(OperationContext* opCtx
                                                          const NamespaceString& nss,
                                                          BucketGranularityEnum granularity) {
     const auto cm = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx, nss));
+        Grid::get(opCtx)->catalogCache()->getShardedCollectionPlacementInfoWithRefresh(opCtx, nss));
     std::set<ShardId> shardIds;
     cm.getAllShardIds(&shardIds);
 

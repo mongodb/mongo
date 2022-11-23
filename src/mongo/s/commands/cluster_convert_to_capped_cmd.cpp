@@ -44,19 +44,19 @@ namespace {
 bool nonShardedCollectionCommandPassthrough(OperationContext* opCtx,
                                             const DatabaseName& dbName,
                                             const NamespaceString& nss,
-                                            const ChunkManager& cm,
+                                            const CollectionRoutingInfo& cri,
                                             const BSONObj& cmdObj,
                                             Shard::RetryPolicy retryPolicy,
                                             BSONObjBuilder* out) {
     const StringData cmdName(cmdObj.firstElementFieldName());
     uassert(ErrorCodes::IllegalOperation,
             str::stream() << "Can't do command: " << cmdName << " on a sharded collection",
-            !cm.isSharded());
+            !cri.cm.isSharded());
 
     auto responses = scatterGatherVersionedTargetByRoutingTable(opCtx,
                                                                 dbName.toStringWithTenantId(),
                                                                 nss,
-                                                                cm,
+                                                                cri,
                                                                 cmdObj,
                                                                 ReadPreferenceSetting::get(opCtx),
                                                                 retryPolicy,
@@ -108,11 +108,11 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         const NamespaceString nss(parseNs(dbName, cmdObj));
-        const auto cm =
+        const auto cri =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
         uassert(ErrorCodes::IllegalOperation,
                 "You can't convertToCapped a sharded collection",
-                !cm.isSharded());
+                !cri.cm.isSharded());
 
         // convertToCapped creates a temp collection and renames it at the end. It will require
         // special handling for create collection.
@@ -120,7 +120,7 @@ public:
             opCtx,
             dbName,
             nss,
-            cm,
+            cri,
             applyReadWriteConcern(
                 opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
             Shard::RetryPolicy::kIdempotent,

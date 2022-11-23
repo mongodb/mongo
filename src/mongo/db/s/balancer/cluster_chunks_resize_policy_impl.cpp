@@ -43,7 +43,7 @@ namespace {
 ChunkVersion getShardVersion(OperationContext* opCtx,
                              const ShardId& shardId,
                              const NamespaceString& nss) {
-    auto cm = Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfo(opCtx, nss);
+    auto cm = Grid::get(opCtx)->catalogCache()->getShardedCollectionPlacementInfo(opCtx, nss);
     return cm.getVersion(shardId);
 }
 

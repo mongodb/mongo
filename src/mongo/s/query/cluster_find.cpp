@@ -156,11 +156,12 @@ StatusWith<std::unique_ptr<FindCommandRequest>> transformQueryForShards(
  */
 std::vector<std::pair<ShardId, BSONObj>> constructRequestsForShards(
     OperationContext* opCtx,
-    const ChunkManager& cm,
+    const CollectionRoutingInfo& cri,
     const std::set<ShardId>& shardIds,
     const CanonicalQuery& query,
     const boost::optional<UUID> sampleId,
     bool appendGeoNearDistanceProjection) {
+    const auto& cm = cri.cm;
 
     std::unique_ptr<FindCommandRequest> findCommandToForward;
     if (shardIds.size() > 1) {
@@ -193,9 +194,7 @@ std::vector<std::pair<ShardId, BSONObj>> constructRequestsForShards(
         findCommandToForward->serialize(BSONObj(), &cmdBuilder);
 
         if (cm.isSharded()) {
-            const auto placementVersion = cm.getVersion(shardId);
-            ShardVersion(placementVersion, boost::optional<CollectionIndexes>(boost::none))
-                .serialize(ShardVersion::kShardVersionField, &cmdBuilder);
+            cri.getShardVersion(shardId).serialize(ShardVersion::kShardVersionField, &cmdBuilder);
         } else if (!query.nss().isOnInternalDb()) {
             ShardVersion::UNSHARDED().serialize(ShardVersion::kShardVersionField, &cmdBuilder);
             cmdBuilder.append("databaseVersion", cm.dbVersion().toBSON());
@@ -232,9 +231,11 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
                                  const CanonicalQuery& query,
                                  const ReadPreferenceSetting& readPref,
                                  const boost::optional<UUID> sampleId,
-                                 const ChunkManager& cm,
+                                 const CollectionRoutingInfo& cri,
                                  std::vector<BSONObj>* results,
                                  bool* partialResultsReturned) {
+    const auto& cm = cri.cm;
+
     auto findCommand = query.getFindCommandRequest();
     // Get the set of shards on which we will run the query.
     auto shardIds = getTargetedShardsForQuery(
@@ -307,7 +308,7 @@ CursorId runQueryWithoutRetrying(OperationContext* opCtx,
             // Construct the requests that we will use to establish cursors on the targeted shards,
             // attaching the shardVersion and txnNumber, if necessary.
             constructRequestsForShards(
-                opCtx, cm, shardIds, query, sampleId, appendGeoNearDistanceProjection),
+                opCtx, cri, shardIds, query, sampleId, appendGeoNearDistanceProjection),
             findCommand.getAllowPartialResults());
     };
 
@@ -590,8 +591,8 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
     // Re-target and re-send the initial find command to the shards until we have established the
     // shard version.
     for (size_t retries = 1; retries <= kMaxRetries; ++retries) {
-        auto swCM = getCollectionRoutingInfoForTxnCmd(opCtx, query.nss());
-        if (swCM == ErrorCodes::NamespaceNotFound) {
+        auto swCri = getCollectionRoutingInfoForTxnCmd(opCtx, query.nss());
+        if (swCri == ErrorCodes::NamespaceNotFound) {
             uassert(CollectionUUIDMismatchInfo(query.nss().dbName(),
                                                *findCommand.getCollectionUUID(),
                                                query.nss().coll().toString(),
@@ -604,11 +605,11 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
             return CursorId(0);
         }
 
-        const auto cm = uassertStatusOK(std::move(swCM));
+        const auto cri = uassertStatusOK(std::move(swCri));
 
         try {
             return runQueryWithoutRetrying(
-                opCtx, query, readPref, sampleId, cm, results, partialResultsReturned);
+                opCtx, query, readPref, sampleId, cri, results, partialResultsReturned);
         } catch (ExceptionFor<ErrorCodes::StaleDbVersion>& ex) {
             if (retries >= kMaxRetries) {
                 // Check if there are no retries remaining, so the last received error can be
@@ -686,7 +687,8 @@ CursorId ClusterFind::runQuery(OperationContext* opCtx,
             if (auto txnRouter = TransactionRouter::get(opCtx)) {
                 if (!txnRouter.canContinueOnStaleShardOrDbError(kFindCmdName, ex.toStatus())) {
                     if (ex.code() == ErrorCodes::ShardInvalidatedForTargeting) {
-                        (void)catalogCache->getCollectionRoutingInfoWithRefresh(opCtx, query.nss());
+                        (void)catalogCache->getCollectionPlacementInfoWithRefresh(opCtx,
+                                                                                  query.nss());
                     }
                     throw;
                 }

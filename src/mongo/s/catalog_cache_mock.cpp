@@ -40,9 +40,9 @@ const Status CatalogCacheMock::kChunkManagerInternalErrorStatus = {
 CatalogCacheMock::CatalogCacheMock(ServiceContext* serviceContext, CatalogCacheLoaderMock& loader)
     : CatalogCache(serviceContext, loader) {}
 
-StatusWith<ChunkManager> CatalogCacheMock::getCollectionRoutingInfo(OperationContext* opCtx,
-                                                                    const NamespaceString& nss,
-                                                                    bool allowLocks) {
+StatusWith<ChunkManager> CatalogCacheMock::getCollectionPlacementInfo(OperationContext* opCtx,
+                                                                      const NamespaceString& nss,
+                                                                      bool allowLocks) {
     return _swChunkManagerReturnValue;
 }
 

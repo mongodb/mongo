@@ -76,8 +76,8 @@ public:
 
     void refreshCatalogCache(OperationContext* opCtx, const NamespaceString& nss) override {}
 
-    ChunkManager getShardedCollectionRoutingInfo(OperationContext* opCtx,
-                                                 const NamespaceString& nss) override {
+    CollectionRoutingInfo getShardedCollectionRoutingInfo(OperationContext* opCtx,
+                                                          const NamespaceString& nss) override {
         invariant(nss == _sourceNss);
 
         const OID epoch = OID::gen();
@@ -99,11 +99,19 @@ public:
                                                boost::none /* chunkSizeBytes */,
                                                true /* allowMigrations */,
                                                chunks);
+        IndexCatalogTypeMap globalIndexesMap;
+        globalIndexesMap.emplace(
+            "randomKey_1",
+            IndexCatalogType(
+                "randomKey_1", BSON("randomKey" << 1), BSONObj(), Timestamp(1, 0), _sourceUUID));
 
-        return ChunkManager(_someDonorId,
-                            DatabaseVersion(UUID::gen(), Timestamp(1, 1)),
-                            _makeStandaloneRoutingTableHistory(std::move(rt)),
-                            boost::none /* clusterTime */);
+        return CollectionRoutingInfo{
+            ChunkManager(_someDonorId,
+                         DatabaseVersion(UUID::gen(), Timestamp(1, 1)),
+                         _makeStandaloneRoutingTableHistory(std::move(rt)),
+                         boost::none /* clusterTime */),
+            GlobalIndexesCache(CollectionIndexes(_sourceUUID, Timestamp(1, 0)),
+                               std::move(globalIndexesMap))};
     }
 
     MigrationDestinationManager::CollectionOptionsAndUUID getCollectionOptions(

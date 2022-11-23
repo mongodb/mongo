@@ -122,7 +122,7 @@ DocumentSource::GetNextResult DocumentSourceReshardingOwnershipMatch::doGetNext(
 
         auto* catalogCache = Grid::get(pExpCtx->opCtx)->catalogCache();
         _tempReshardingChunkMgr =
-            uassertStatusOK(catalogCache->getShardedCollectionRoutingInfoWithRefresh(
+            uassertStatusOK(catalogCache->getShardedCollectionPlacementInfoWithRefresh(
                 pExpCtx->opCtx, tempReshardingNss));
     }
 

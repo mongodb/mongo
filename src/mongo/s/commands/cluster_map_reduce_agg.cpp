@@ -166,7 +166,7 @@ bool runAggregationMapReduce(OperationContext* opCtx,
         involvedNamespaces.insert(resolvedOutNss);
     }
 
-    auto cm = uassertStatusOK(
+    auto [cm, _] = uassertStatusOK(
         sharded_agg_helpers::getExecutionNsRoutingInfo(opCtx, parsedMr.getNamespace()));
     auto expCtx = makeExpressionContext(opCtx, parsedMr, cm, verbosity);
 

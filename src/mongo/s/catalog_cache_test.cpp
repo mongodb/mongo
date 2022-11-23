@@ -135,7 +135,7 @@ protected:
         const auto scopedChunksProv = scopedChunksProvider(makeChunks(version.placementVersion()));
 
         const auto swChunkManager =
-            _catalogCache->getCollectionRoutingInfo(operationContext(), coll.getNss());
+            _catalogCache->getCollectionPlacementInfo(operationContext(), coll.getNss());
         ASSERT_OK(swChunkManager.getStatus());
         auto future = launchAsync([&] {
             onCommand([&](const executor::RemoteCommandRequest& request) {
@@ -153,7 +153,7 @@ protected:
             scopedCollectionProvider(Status(ErrorCodes::NamespaceNotFound, "collection not found"));
 
         const auto swChunkManager =
-            _catalogCache->getCollectionRoutingInfo(operationContext(), nss);
+            _catalogCache->getCollectionPlacementInfo(operationContext(), nss);
         ASSERT_OK(swChunkManager.getStatus());
     }
 
@@ -291,7 +291,7 @@ TEST_F(CatalogCacheTest, OnStaleShardVersionWithSameVersion) {
     loadCollection(cachedCollVersion);
     _catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
         kNss, cachedCollVersion, kShards[0]);
-    ASSERT_OK(_catalogCache->getCollectionRoutingInfo(operationContext(), kNss).getStatus());
+    ASSERT_OK(_catalogCache->getCollectionPlacementInfo(operationContext(), kNss).getStatus());
 }
 
 TEST_F(CatalogCacheTest, OnStaleShardVersionWithNoVersion) {
@@ -305,7 +305,7 @@ TEST_F(CatalogCacheTest, OnStaleShardVersionWithNoVersion) {
     _catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
         kNss, boost::none, kShards[0]);
     const auto status =
-        _catalogCache->getCollectionRoutingInfo(operationContext(), kNss).getStatus();
+        _catalogCache->getCollectionPlacementInfo(operationContext(), kNss).getStatus();
     ASSERT(status == ErrorCodes::InternalError);
 }
 
@@ -322,7 +322,7 @@ TEST_F(CatalogCacheTest, OnStaleShardVersionWithGreaterPlacementVersion) {
     _catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
         kNss, wantedCollVersion, kShards[0]);
     const auto status =
-        _catalogCache->getCollectionRoutingInfo(operationContext(), kNss).getStatus();
+        _catalogCache->getCollectionPlacementInfo(operationContext(), kNss).getStatus();
     ASSERT(status == ErrorCodes::InternalError);
 }
 
@@ -349,7 +349,7 @@ TEST_F(CatalogCacheTest, TimeseriesFieldsAreProperlyPropagatedOnCC) {
         const auto scopedChunksProv = scopedChunksProvider(chunks);
 
         const auto swChunkManager =
-            _catalogCache->getCollectionRoutingInfoWithRefresh(operationContext(), coll.getNss());
+            _catalogCache->getCollectionPlacementInfoWithRefresh(operationContext(), coll.getNss());
         ASSERT_OK(swChunkManager.getStatus());
 
         const auto& chunkManager = swChunkManager.getValue();
@@ -374,7 +374,7 @@ TEST_F(CatalogCacheTest, TimeseriesFieldsAreProperlyPropagatedOnCC) {
         const auto scopedChunksProv = scopedChunksProvider(std::vector{lastChunk});
 
         const auto swChunkManager =
-            _catalogCache->getCollectionRoutingInfoWithRefresh(operationContext(), coll.getNss());
+            _catalogCache->getCollectionPlacementInfoWithRefresh(operationContext(), coll.getNss());
         ASSERT_OK(swChunkManager.getStatus());
 
         const auto& chunkManager = swChunkManager.getValue();
@@ -399,7 +399,7 @@ TEST_F(CatalogCacheTest, LookupCollectionWithInvalidOptions) {
         ErrorCodes::InvalidOptions, "Testing error with invalid options"));
 
     const auto swChunkManager =
-        _catalogCache->getCollectionRoutingInfoWithRefresh(operationContext(), coll.getNss());
+        _catalogCache->getCollectionPlacementInfoWithRefresh(operationContext(), coll.getNss());
 
     ASSERT_EQUALS(swChunkManager.getStatus(), ErrorCodes::InvalidOptions);
 }

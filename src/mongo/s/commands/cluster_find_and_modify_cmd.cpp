@@ -404,8 +404,9 @@ public:
         }();
         const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
 
-        const auto cm =
+        const auto cri =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+        const auto& cm = cri.cm;
 
         std::shared_ptr<Shard> shard;
         if (cm.isSharded()) {
@@ -432,16 +433,14 @@ public:
         BSONObjBuilder bob;
 
         if (cm.isSharded()) {
-            ChunkVersion placementVersion = cm.getVersion(shard->getId());
-            _runCommand(
-                opCtx,
-                shard->getId(),
-                ShardVersion(placementVersion, boost::optional<CollectionIndexes>(boost::none)),
-                boost::none,
-                nss,
-                applyReadWriteConcern(opCtx, false, false, explainCmd),
-                true /* isExplain */,
-                &bob);
+            _runCommand(opCtx,
+                        shard->getId(),
+                        cri.getShardVersion(shard->getId()),
+                        boost::none,
+                        nss,
+                        applyReadWriteConcern(opCtx, false, false, explainCmd),
+                        true /* isExplain */,
+                        &bob);
         } else {
             _runCommand(opCtx,
                         shard->getId(),
@@ -499,7 +498,8 @@ public:
         // Append mongoS' runtime constants to the command object before forwarding it to the shard.
         auto cmdObjForShard = appendLegacyRuntimeConstantsToCommandObject(opCtx, cmdObj);
 
-        const auto cm = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
+        const auto cri = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
+        const auto& cm = cri.cm;
         if (cm.isSharded()) {
             const BSONObj query = cmdObjForShard.getObjectField("query");
 
@@ -522,16 +522,14 @@ public:
                 // key. This means that we always assume that a findAndModify request using _id is
                 // targetable to a single shard.
                 auto chunk = cm.findIntersectingChunk(shardKey, collation, true);
-                ChunkVersion placementVersion = cm.getVersion(chunk.getShardId());
-                _runCommand(
-                    opCtx,
-                    chunk.getShardId(),
-                    ShardVersion(placementVersion, boost::optional<CollectionIndexes>(boost::none)),
-                    boost::none,
-                    nss,
-                    applyReadWriteConcern(opCtx, this, cmdObjForShard),
-                    false /* isExplain */,
-                    &result);
+                _runCommand(opCtx,
+                            chunk.getShardId(),
+                            cri.getShardVersion(chunk.getShardId()),
+                            boost::none,
+                            nss,
+                            applyReadWriteConcern(opCtx, this, cmdObjForShard),
+                            false /* isExplain */,
+                            &result);
             }
         } else {
             _runCommand(opCtx,

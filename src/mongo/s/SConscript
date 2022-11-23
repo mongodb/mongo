@@ -29,9 +29,9 @@ env.SConscript(
 env.Library(
     target='sharding_api',
     source=[
-        'chunk_manager_targeter.cpp',
         'cluster_ddl.cpp',
         'cluster_write.cpp',
+        'collection_routing_info_targeter.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/fle_crud',
@@ -631,13 +631,13 @@ env.CppUnitTest(
         'catalog/type_tags_test.cpp',
         'chunk_manager_index_bounds_test.cpp',
         'chunk_manager_query_test.cpp',
-        'chunk_manager_targeter_test.cpp',
         'chunk_map_test.cpp',
         'chunk_test.cpp',
         'chunk_version_test.cpp',
         'chunk_writes_tracker_test.cpp',
         'client/shard_remote_test.cpp',
         'cluster_identity_loader_test.cpp',
+        'collection_routing_info_targeter_test.cpp',
         'comparable_chunk_version_test.cpp',
         'comparable_database_version_test.cpp',
         'comparable_index_version_test.cpp',

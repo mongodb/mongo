@@ -64,8 +64,8 @@ public:
 
     virtual void refreshCatalogCache(OperationContext* opCtx, const NamespaceString& nss) = 0;
 
-    virtual ChunkManager getShardedCollectionRoutingInfo(OperationContext* opCtx,
-                                                         const NamespaceString& nss) = 0;
+    virtual CollectionRoutingInfo getShardedCollectionRoutingInfo(OperationContext* opCtx,
+                                                                  const NamespaceString& nss) = 0;
 
     virtual MigrationDestinationManager::CollectionOptionsAndUUID getCollectionOptions(
         OperationContext* opCtx,
@@ -114,8 +114,8 @@ public:
 
     void refreshCatalogCache(OperationContext* opCtx, const NamespaceString& nss) override;
 
-    ChunkManager getShardedCollectionRoutingInfo(OperationContext* opCtx,
-                                                 const NamespaceString& nss) override;
+    CollectionRoutingInfo getShardedCollectionRoutingInfo(OperationContext* opCtx,
+                                                          const NamespaceString& nss) override;
 
     MigrationDestinationManager::CollectionOptionsAndUUID getCollectionOptions(
         OperationContext* opCtx,

@@ -588,7 +588,7 @@ AggregationTargeter AggregationTargeter::make(
     // Check if any of the involved collections are sharded.
     bool involvesShardedCollections = [&]() {
         for (const auto& nss : involvedNamespaces) {
-            const auto resolvedNsCM =
+            const auto [resolvedNsCM, _] =
                 uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
             if (resolvedNsCM.isSharded()) {
                 return true;

@@ -185,7 +185,7 @@ Status processManualMigrationOutcome(OperationContext* opCtx,
     }
 
     auto swCM =
-        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx, nss);
+        Grid::get(opCtx)->catalogCache()->getShardedCollectionPlacementInfoWithRefresh(opCtx, nss);
     if (!swCM.isOK()) {
         return swCM.getStatus();
     }
@@ -432,8 +432,8 @@ Status Balancer::moveRange(OperationContext* opCtx,
 
     const auto [fromShardId, min] = [&]() {
         const auto cm = uassertStatusOK(
-            Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
-                                                                                         nss));
+            Grid::get(opCtx)->catalogCache()->getShardedCollectionPlacementInfoWithRefresh(opCtx,
+                                                                                           nss));
         // TODO SERVER-64926 do not assume min always present
         const auto& chunk = cm.findIntersectingChunkWithSimpleCollation(*request.getMin());
         return std::tuple<ShardId, BSONObj>{chunk.getShardId(), chunk.getMin()};
@@ -986,7 +986,7 @@ Status Balancer::_splitChunksIfNeeded(OperationContext* opCtx) {
 
     for (const auto& splitInfo : chunksToSplitStatus.getValue()) {
         auto routingInfoStatus =
-            Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
+            Grid::get(opCtx)->catalogCache()->getShardedCollectionPlacementInfoWithRefresh(
                 opCtx, splitInfo.nss);
         if (!routingInfoStatus.isOK()) {
             return routingInfoStatus.getStatus();

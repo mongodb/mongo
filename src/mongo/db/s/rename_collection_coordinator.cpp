@@ -403,12 +403,10 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
 
                 // Retrieve the new collection version
                 const auto catalog = Grid::get(opCtx)->catalogCache();
-                const auto cm = uassertStatusOK(
+                const auto cri = uassertStatusOK(
                     catalog->getCollectionRoutingInfoWithRefresh(opCtx, _request.getTo()));
                 _response = RenameCollectionResponse(
-                    cm.isSharded() ? ShardVersion(cm.getVersion(),
-                                                  boost::optional<CollectionIndexes>(boost::none))
-                                   : ShardVersion::UNSHARDED());
+                    cri.cm.isSharded() ? cri.getCollectionVersion() : ShardVersion::UNSHARDED());
 
                 ShardingLogging::get(opCtx)->logChange(
                     opCtx,

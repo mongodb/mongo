@@ -98,9 +98,10 @@ void mergeChunks(OperationContext* opCtx,
         onCollectionPlacementVersionMismatch(opCtx, nss, boost::none);
         OperationShardingState::unsetShardRoleForLegacyDDLOperationsSentWithShardVersionIfNeeded(
             opCtx, nss);
-        const auto metadata = checkCollectionIdentity(opCtx, nss, expectedEpoch, expectedTimestamp);
-        checkShardKeyPattern(opCtx, nss, metadata, chunkRange);
-        checkRangeOwnership(opCtx, nss, metadata, chunkRange);
+        const auto [metadata, indexInfo] =
+            checkCollectionIdentity(opCtx, nss, expectedEpoch, expectedTimestamp);
+        checkShardKeyPattern(opCtx, nss, metadata, indexInfo, chunkRange);
+        checkRangeOwnership(opCtx, nss, metadata, indexInfo, chunkRange);
         return metadata;
     }();
 

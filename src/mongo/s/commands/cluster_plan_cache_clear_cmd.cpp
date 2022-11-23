@@ -93,13 +93,13 @@ bool ClusterPlanCacheClearCmd::run(OperationContext* opCtx,
                                    BSONObjBuilder& result) {
     const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
     const BSONObj query;
-    const auto routingInfo =
+    const auto cri =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
     auto shardResponses = scatterGatherVersionedTargetByRoutingTable(
         opCtx,
         nss.db(),
         nss,
-        routingInfo,
+        cri,
         applyReadWriteConcern(
             opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
         ReadPreferenceSetting::get(opCtx),

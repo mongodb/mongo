@@ -36,7 +36,7 @@
 
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/not_primary_error_tracker.h"
-#include "mongo/s/chunk_manager_targeter.h"
+#include "mongo/s/collection_routing_info_targeter.h"
 #include "mongo/s/grid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -62,7 +62,7 @@ void write(OperationContext* opCtx,
     NotPrimaryErrorTracker::Disabled scopeDisabledTracker(
         &NotPrimaryErrorTracker::get(opCtx->getClient()));
 
-    ChunkManagerTargeter targeter(opCtx, request.getNS(), targetEpoch);
+    CollectionRoutingInfoTargeter targeter(opCtx, request.getNS(), targetEpoch);
 
     LOGV2_DEBUG_OPTIONS(
         4817400, 2, {logv2::LogComponent::kShardMigrationPerf}, "Starting batch write");

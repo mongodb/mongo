@@ -36,6 +36,7 @@
 #include "mongo/bson/bsonobj_comparator_interface.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/ns_targeter.h"
 
@@ -51,12 +52,12 @@ struct TargeterStats {
 using StaleShardVersionMap = std::map<ShardId, ChunkVersion>;
 
 /**
- * NSTargeter based on a ChunkManager implementation. Wraps all exception codepaths and returns
- * NamespaceNotFound status on applicable failures.
+ * NSTargeter based on a CollectionRoutingInfo implementation. Wraps all exception codepaths and
+ * returns NamespaceNotFound status on applicable failures.
  *
  * Must be initialized before use, and initialization may fail.
  */
-class ChunkManagerTargeter : public NSTargeter {
+class CollectionRoutingInfoTargeter : public NSTargeter {
 public:
     enum class LastErrorType { kCouldNotTarget, kStaleShardVersion, kStaleDbVersion };
     /**
@@ -70,13 +71,13 @@ public:
      * for 'nss' ever becomes different from 'expectedEpoch'. Otherwise, the targeter will continue
      * targeting even if the collection gets dropped and recreated.
      */
-    ChunkManagerTargeter(OperationContext* opCtx,
-                         const NamespaceString& nss,
-                         boost::optional<OID> expectedEpoch = boost::none);
+    CollectionRoutingInfoTargeter(OperationContext* opCtx,
+                                  const NamespaceString& nss,
+                                  boost::optional<OID> expectedEpoch = boost::none);
 
-    /* Initializes the targeter with a custom ChunkManager cm, in order to support
+    /* Initializes the targeter with a custom CollectionRoutingInfo cri, in order to support
      * using a custom (synthetic) routing table */
-    ChunkManagerTargeter(const ChunkManager& cm);
+    CollectionRoutingInfoTargeter(const CollectionRoutingInfo& cri);
 
     const NamespaceString& getNS() const override;
 
@@ -124,7 +125,7 @@ public:
 
     bool timeseriesNamespaceNeedsRewrite(const NamespaceString& nss) const;
 
-    const ChunkManager& getRoutingInfo() const;
+    const CollectionRoutingInfo& getRoutingInfo() const;
 
     static BSONObj extractBucketsShardKeyFromTimeseriesDoc(
         const BSONObj& doc,
@@ -132,7 +133,7 @@ public:
         const TimeseriesOptions& timeseriesOptions);
 
 private:
-    ChunkManager _init(OperationContext* opCtx, bool refresh);
+    CollectionRoutingInfo _init(OperationContext* opCtx, bool refresh);
 
     /**
      * Returns a vector of ShardEndpoints for a potentially multi-shard query.
@@ -174,7 +175,7 @@ private:
     boost::optional<OID> _targetEpoch;
 
     // The latest loaded routing cache entry
-    ChunkManager _cm;
+    CollectionRoutingInfo _cri;
 };
 
 }  // namespace mongo

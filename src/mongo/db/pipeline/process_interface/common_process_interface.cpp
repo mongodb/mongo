@@ -154,7 +154,7 @@ std::vector<BSONObj> CommonProcessInterface::getCurrentOps(
 std::vector<FieldPath> CommonProcessInterface::collectDocumentKeyFieldsActingAsRouter(
     OperationContext* opCtx, const NamespaceString& nss) const {
     const auto cm =
-        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfo(opCtx, nss));
     if (cm.isSharded()) {
         return _shardKeyToDocumentKeyFields(cm.getShardKeyPattern().getKeyPatternFields());
     }
@@ -205,13 +205,11 @@ bool CommonProcessInterface::keyPatternNamesExactPaths(const BSONObj& keyPattern
 
 boost::optional<ShardVersion> CommonProcessInterface::refreshAndGetCollectionVersion(
     const boost::intrusive_ptr<ExpressionContext>& expCtx, const NamespaceString& nss) const {
-    const auto cm = uassertStatusOK(Grid::get(expCtx->opCtx)
-                                        ->catalogCache()
-                                        ->getCollectionRoutingInfoWithRefresh(expCtx->opCtx, nss));
+    const auto cri = uassertStatusOK(Grid::get(expCtx->opCtx)
+                                         ->catalogCache()
+                                         ->getCollectionRoutingInfoWithRefresh(expCtx->opCtx, nss));
 
-    return cm.isSharded() ? boost::make_optional(ShardVersion(
-                                cm.getVersion(), boost::optional<CollectionIndexes>(boost::none)))
-                          : boost::none;
+    return cri.cm.isSharded() ? boost::make_optional(cri.getCollectionVersion()) : boost::none;
 }
 
 std::vector<FieldPath> CommonProcessInterface::_shardKeyToDocumentKeyFields(

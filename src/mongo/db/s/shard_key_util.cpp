@@ -319,22 +319,20 @@ void ValidationBehaviorsShardCollection::createShardKeyIndex(
 ValidationBehaviorsRefineShardKey::ValidationBehaviorsRefineShardKey(OperationContext* opCtx,
                                                                      const NamespaceString& nss)
     : _opCtx(opCtx),
-      _cm(uassertStatusOK(
+      _cri(uassertStatusOK(
           Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
                                                                                        nss))),
       _indexShard(uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(
-          opCtx, _cm.getMinKeyShardIdWithSimpleCollation()))) {}
+          opCtx, _cri.cm.getMinKeyShardIdWithSimpleCollation()))) {}
 
 std::vector<BSONObj> ValidationBehaviorsRefineShardKey::loadIndexes(
     const NamespaceString& nss) const {
-    ChunkVersion placementVersion = _cm.getVersion(_indexShard->getId());
     auto indexesRes = _indexShard->runExhaustiveCursorCommand(
         _opCtx,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
         nss.db().toString(),
-        appendShardVersion(
-            BSON("listIndexes" << nss.coll()),
-            ShardVersion(placementVersion, boost::optional<CollectionIndexes>(boost::none))),
+        appendShardVersion(BSON("listIndexes" << nss.coll()),
+                           _cri.getShardVersion(_indexShard->getId())),
         Milliseconds(-1));
     if (indexesRes.getStatus().code() != ErrorCodes::NamespaceNotFound) {
         return uassertStatusOK(indexesRes).docs;
@@ -344,14 +342,13 @@ std::vector<BSONObj> ValidationBehaviorsRefineShardKey::loadIndexes(
 
 void ValidationBehaviorsRefineShardKey::verifyUsefulNonMultiKeyIndex(
     const NamespaceString& nss, const BSONObj& proposedKey) const {
-    ChunkVersion placementVersion = _cm.getVersion(_indexShard->getId());
     auto checkShardingIndexRes = uassertStatusOK(_indexShard->runCommand(
         _opCtx,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
         "admin",
         appendShardVersion(
             BSON(kCheckShardingIndexCmdName << nss.ns() << kKeyPatternField << proposedKey),
-            ShardVersion(placementVersion, boost::optional<CollectionIndexes>(boost::none))),
+            _cri.getShardVersion(_indexShard->getId())),
         Shard::RetryPolicy::kIdempotent));
     if (checkShardingIndexRes.commandStatus == ErrorCodes::UnknownError) {
         // CheckShardingIndex returns UnknownError if a compatible shard key index cannot be found,

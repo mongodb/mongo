@@ -91,7 +91,7 @@ protected:
      * constructible.
      */
     executor::NetworkTestEnv::FutureHandle<boost::optional<ChunkManager>>
-    scheduleRoutingInfoIncrementalRefresh(const NamespaceString& nss);
+    schedulePlacementInfoIncrementalRefresh(const NamespaceString& nss);
 
     /**
      * Ensures that there are 'numShards' available in the shard registry. The shard ids are
@@ -138,6 +138,12 @@ protected:
                                               UUID uuid,
                                               const ShardKeyPattern& shardKeyPattern,
                                               const std::vector<ChunkType>& chunks);
+    void expectCollectionAndIndexesAggregation(NamespaceString nss,
+                                               OID epoch,
+                                               Timestamp timestamp,
+                                               UUID uuid,
+                                               const ShardKeyPattern& shardKeyPattern,
+                                               const std::vector<BSONObj>& chunks);
 
     const HostAndPort kConfigHostAndPort{"DummyConfig", 1234};
 };

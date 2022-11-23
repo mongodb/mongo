@@ -103,23 +103,25 @@ CollectionRouter::CollectionRouter(ServiceContext* service, NamespaceString nss)
     : RouterBase(service), _nss(std::move(nss)) {}
 
 void CollectionRouter::appendCRUDRoutingTokenToCommand(const ShardId& shardId,
-                                                       const ChunkManager& cm,
+                                                       const CollectionRoutingInfo& cri,
                                                        BSONObjBuilder* builder) {
-    auto chunkVersion(cm.getVersion(shardId));
+    auto chunkVersion(cri.cm.getVersion(shardId));
+    auto collectionIndexes(cri.gii ? boost::make_optional(cri.gii->getCollectionIndexes())
+                                   : boost::none);
 
     if (chunkVersion == ChunkVersion::UNSHARDED()) {
         // Need to add the database version as well
-        const auto& dbVersion = cm.dbVersion();
+        const auto& dbVersion = cri.cm.dbVersion();
         if (!dbVersion.isFixed()) {
             BSONObjBuilder dbvBuilder(builder->subobjStart(DatabaseVersion::kDatabaseVersionField));
             dbVersion.serialize(&dbvBuilder);
         }
     }
-    ShardVersion(chunkVersion, boost::optional<CollectionIndexes>(boost::none))
+    ShardVersion(chunkVersion, collectionIndexes)
         .serialize(ShardVersion::kShardVersionField, builder);
 }
 
-ChunkManager CollectionRouter::_getRoutingInfo(OperationContext* opCtx) const {
+CollectionRoutingInfo CollectionRouter::_getRoutingInfo(OperationContext* opCtx) const {
     auto catalogCache = Grid::get(_service)->catalogCache();
     return uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, _nss));
 }

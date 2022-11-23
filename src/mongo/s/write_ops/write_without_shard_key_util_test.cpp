@@ -158,6 +158,14 @@ TEST_F(UnshardedCollectionTest, UnshardedCollectionDoesNotUseTwoPhaseProtocol) {
     // Return an empty collection
     expectFindSendBSONObjVector(kConfigHostAndPort, {});
 
+    // Return no global indexes
+    onCommand([&](const executor::RemoteCommandRequest& request) {
+        ASSERT_EQ(request.target, kConfigHostAndPort);
+        ASSERT_EQ(request.dbname, "config");
+        return CursorResponse(CollectionType::ConfigNS, CursorId{0}, {})
+            .toBSON(CursorResponse::ResponseType::InitialResponse);
+    });
+
     auto cm = *future.default_timed_get();
     ASSERT(!cm.isSharded());
 

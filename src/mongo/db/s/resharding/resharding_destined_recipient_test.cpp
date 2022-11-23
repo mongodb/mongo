@@ -332,7 +332,7 @@ TEST_F(DestinedRecipientTest, TestGetDestinedRecipientThrowsOnBlockedRefresh) {
                                  });
     }
 
-    auto sw = catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, env.tempNss);
+    auto sw = catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, env.tempNss);
 }
 
 TEST_F(DestinedRecipientTest, TestOpObserverSetsDestinedRecipientOnInserts) {

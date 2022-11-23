@@ -36,7 +36,7 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
-#include "mongo/s/chunk_manager_targeter.h"
+#include "mongo/s/collection_routing_info_targeter.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
@@ -100,7 +100,7 @@ public:
                         // If 'ns()' is a sharded time-series view collection, 'targetNs' is a
                         // namespace for time-series buckets collection. For all other collections,
                         // 'targetNs' is equal to 'ns()'.
-                        return ChunkManagerTargeter(opCtx, ns()).getNS();
+                        return CollectionRoutingInfoTargeter(opCtx, ns()).getNS();
                     }
                     return ns();
                 }();

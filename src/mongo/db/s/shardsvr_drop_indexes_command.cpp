@@ -184,7 +184,7 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
         opCtx, Grid::get(opCtx)->catalogCache(), resolvedNs, "dropIndexes", [&] {
             // If the collection is sharded, we target only the primary shard and the shards that
             // own chunks for the collection.
-            const auto routingInfo = uassertStatusOK(
+            const auto cri = uassertStatusOK(
                 Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, resolvedNs));
 
             auto cmdToBeSent = CommandHelpers::filterCommandRequestForPassthrough(
@@ -195,7 +195,7 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
                     opCtx,
                     resolvedNs.db(),
                     resolvedNs,
-                    routingInfo,
+                    cri,
                     retryState.shardsWithSuccessResponses,
                     applyReadWriteConcern(
                         opCtx,

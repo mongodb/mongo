@@ -105,7 +105,7 @@ void coordinateIndexCatalogModificationAcrossCollectionShards(
 
     // Get an up to date shard distribution.
     auto routingInfo =
-        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(
             opCtx, userCollectionNss));
     uassert(ErrorCodes::NamespaceNotSharded,
             str::stream() << "collection " << userCollectionNss << " is not sharded",

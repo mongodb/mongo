@@ -584,7 +584,7 @@ CollectionMetadata forceGetCurrentMetadata(OperationContext* opCtx, const Namesp
 
     try {
         const auto cm = uassertStatusOK(
-            Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, nss));
+            Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss));
 
         if (!cm.isSharded()) {
             return CollectionMetadata();
@@ -614,7 +614,7 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
     invariant(shardingState->canAcceptShardedCommands());
 
     const auto cm = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, nss));
+        Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfoWithRefresh(opCtx, nss));
 
     if (!cm.isSharded()) {
         // DBLock and CollectionLock are used here to avoid throwing further recursive stale

@@ -164,10 +164,10 @@ public:
             onCollectionPlacementVersionMismatch(opCtx, nss, boost::none);
             OperationShardingState::
                 unsetShardRoleForLegacyDDLOperationsSentWithShardVersionIfNeeded(opCtx, nss);
-            const auto metadata = checkCollectionIdentity(
+            const auto [metadata, indexInfo] = checkCollectionIdentity(
                 opCtx, nss, expectedCollectionEpoch, expectedCollectionTimestamp);
-            checkShardKeyPattern(opCtx, nss, metadata, chunkRange);
-            checkChunkMatchesRange(opCtx, nss, metadata, chunkRange);
+            checkShardKeyPattern(opCtx, nss, metadata, indexInfo, chunkRange);
+            checkChunkMatchesRange(opCtx, nss, metadata, indexInfo, chunkRange);
         }
 
         auto topChunk = uassertStatusOK(splitChunk(opCtx,

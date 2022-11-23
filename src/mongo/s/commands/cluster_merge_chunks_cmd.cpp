@@ -133,7 +133,7 @@ public:
         }
 
         auto const cm =
-            Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfo(opCtx, nss);
+            Grid::get(opCtx)->catalogCache()->getShardedCollectionPlacementInfo(opCtx, nss);
 
         if (!cm.getShardKeyPattern().isShardKey(minKey) ||
             !cm.getShardKeyPattern().isShardKey(maxKey)) {

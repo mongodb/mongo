@@ -64,9 +64,8 @@ const std::string kRemainingChunksToProcess("remainingChunksToProcess");
 ShardVersion getShardVersion(OperationContext* opCtx,
                              const ShardId& shardId,
                              const NamespaceString& nss) {
-    auto cm = Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfo(opCtx, nss);
-    const auto placementVersion = cm.getVersion(shardId);
-    return ShardVersion(placementVersion, boost::optional<CollectionIndexes>(boost::none));
+    auto cri = Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfo(opCtx, nss);
+    return cri.getShardVersion(shardId);
 }
 
 std::vector<ChunkType> getCollectionChunks(OperationContext* opCtx, const CollectionType& coll) {

@@ -63,7 +63,7 @@ using namespace fmt::literals;
 
 bool ShardServerProcessInterface::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
     const auto cm =
-        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfo(opCtx, nss));
     return cm.isSharded();
 }
 
@@ -74,15 +74,21 @@ void ShardServerProcessInterface::checkRoutingInfoEpochOrThrow(
     auto const shardId = ShardingState::get(expCtx->opCtx)->shardId();
     auto* catalogCache = Grid::get(expCtx->opCtx)->catalogCache();
 
+    // Since we are only checking the epoch, don't advance the time in store of the index cache
+    auto currentGlobalIndexesInfo = catalogCache->getCollectionIndexInfo(expCtx->opCtx, nss);
+
     // Mark the cache entry routingInfo for the 'nss' and 'shardId' if the entry is staler than
     // 'targetCollectionVersion'.
-    const ShardVersion ignoreIndexVersion{targetCollectionVersion,
-                                          boost::optional<CollectionIndexes>(boost::none)};
+    const ShardVersion ignoreIndexVersion{
+        targetCollectionVersion,
+        currentGlobalIndexesInfo
+            ? boost::make_optional(currentGlobalIndexesInfo->getCollectionIndexes())
+            : boost::none};
     catalogCache->invalidateShardOrEntireCollectionEntryForShardedCollection(
         nss, ignoreIndexVersion, shardId);
 
     const auto routingInfo =
-        uassertStatusOK(catalogCache->getCollectionRoutingInfo(expCtx->opCtx, nss));
+        uassertStatusOK(catalogCache->getCollectionPlacementInfo(expCtx->opCtx, nss));
 
     const auto foundVersion =
         routingInfo.isSharded() ? routingInfo.getVersion() : ChunkVersion::UNSHARDED();

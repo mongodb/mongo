@@ -74,14 +74,14 @@ public:
             const auto& cmd = request();
             const auto& nss = ns();
 
-            auto routingInfo = uassertStatusOK(
+            auto cri = uassertStatusOK(
                 Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
 
             auto shardResults = scatterGatherVersionedTargetByRoutingTable(
                 opCtx,
                 nss.db(),
                 nss,
-                routingInfo,
+                cri,
                 applyReadWriteConcern(
                     opCtx,
                     this,

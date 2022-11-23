@@ -131,6 +131,12 @@ TEST_F(ClusterExchangeTest, SingleMergeStageNotEligibleForExchangeIfOutputCollec
     expectGetDatabase(kTestTargetNss);
     // Pretend there are no collections in this database.
     expectFindSendBSONObjVector(kConfigHostAndPort, std::vector<BSONObj>());
+    onCommand([&](const executor::RemoteCommandRequest& request) {
+        ASSERT_EQ(request.target, kConfigHostAndPort);
+        ASSERT_EQ(request.dbname, "config");
+        return CursorResponse(CollectionType::ConfigNS, CursorId{0}, {})
+            .toBSON(CursorResponse::ResponseType::InitialResponse);
+    });
 
     future.default_timed_get();
 }

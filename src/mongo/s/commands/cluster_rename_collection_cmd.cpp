@@ -109,7 +109,6 @@ public:
                         !request().getCollectionUUID());
             }
             const auto dbInfo = uassertStatusOK(swDbInfo);
-            auto cri = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, fromNss));
 
             auto shard = uassertStatusOK(
                 Grid::get(opCtx)->shardRegistry()->getShard(opCtx, dbInfo->getPrimary()));

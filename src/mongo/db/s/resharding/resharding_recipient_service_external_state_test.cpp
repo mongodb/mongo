@@ -183,6 +183,8 @@ public:
             return std::vector<BSONObj>{coll.toBSON(), chunkObj};
         }());
 
+        expectCollectionAndIndexesAggregation(tempNss, epoch, timestamp, uuid, skey, {});
+
         future.default_timed_get();
     }
 

@@ -40,6 +40,8 @@
 namespace mongo {
 
 enum class CSRAcquisitionMode { kShared, kExclusive };
+typedef std::pair<CollectionMetadata, boost::optional<GlobalIndexesCache>>
+    CollectionPlacementAndIndexInfo;
 
 /**
  * See the comments for CollectionShardingState for more information on how this class fits in the

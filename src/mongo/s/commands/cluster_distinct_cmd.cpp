@@ -135,13 +135,13 @@ public:
 
         std::vector<AsyncRequestsSender::Response> shardResponses;
         try {
-            const auto routingInfo = uassertStatusOK(
+            const auto cri = uassertStatusOK(
                 Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
             shardResponses =
                 scatterGatherVersionedTargetByRoutingTable(opCtx,
                                                            nss.db(),
                                                            nss,
-                                                           routingInfo,
+                                                           cri,
                                                            explainCmd,
                                                            ReadPreferenceSetting::get(opCtx),
                                                            Shard::RetryPolicy::kIdempotent,
@@ -211,22 +211,23 @@ public:
                 CollatorFactoryInterface::get(opCtx->getServiceContext())->makeFromBSON(collation));
         }
 
-        auto swCM = getCollectionRoutingInfoForTxnCmd(opCtx, nss);
-        if (swCM == ErrorCodes::NamespaceNotFound) {
+        auto swCri = getCollectionRoutingInfoForTxnCmd(opCtx, nss);
+        if (swCri == ErrorCodes::NamespaceNotFound) {
             // If the database doesn't exist, we successfully return an empty result set without
             // creating a cursor.
             result.appendArray("values", BSONObj());
             return true;
         }
 
-        const auto cm = uassertStatusOK(std::move(swCM));
+        const auto cri = uassertStatusOK(std::move(swCri));
+        const auto& cm = cri.cm;
         std::vector<AsyncRequestsSender::Response> shardResponses;
         try {
             shardResponses = scatterGatherVersionedTargetByRoutingTable(
                 opCtx,
                 nss.db(),
                 nss,
-                cm,
+                cri,
                 applyReadWriteConcern(
                     opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
                 ReadPreferenceSetting::get(opCtx),

@@ -110,10 +110,10 @@ ShardId RecipientStateMachineExternalStateImpl::myShardId(ServiceContext* servic
 void RecipientStateMachineExternalStateImpl::refreshCatalogCache(OperationContext* opCtx,
                                                                  const NamespaceString& nss) {
     auto catalogCache = Grid::get(opCtx)->catalogCache();
-    uassertStatusOK(catalogCache->getShardedCollectionRoutingInfoWithRefresh(opCtx, nss));
+    uassertStatusOK(catalogCache->getShardedCollectionPlacementInfoWithRefresh(opCtx, nss));
 }
 
-ChunkManager RecipientStateMachineExternalStateImpl::getShardedCollectionRoutingInfo(
+CollectionRoutingInfo RecipientStateMachineExternalStateImpl::getShardedCollectionRoutingInfo(
     OperationContext* opCtx, const NamespaceString& nss) {
     auto catalogCache = Grid::get(opCtx)->catalogCache();
     return catalogCache->getShardedCollectionRoutingInfo(opCtx, nss);
@@ -127,7 +127,7 @@ RecipientStateMachineExternalStateImpl::getCollectionOptions(OperationContext* o
                                                              StringData reason) {
     // Load the collection options from the primary shard for the database.
     return _withShardVersionRetry(opCtx, nss, reason, [&] {
-        auto cm = getShardedCollectionRoutingInfo(opCtx, nss);
+        auto [cm, _] = getShardedCollectionRoutingInfo(opCtx, nss);
         return MigrationDestinationManager::getCollectionOptions(
             opCtx,
             NamespaceStringOrUUID{nss.db().toString(), uuid},
@@ -145,12 +145,12 @@ RecipientStateMachineExternalStateImpl::getCollectionIndexes(OperationContext* o
                                                              StringData reason) {
     // Load the list of indexes from the shard which owns the global minimum chunk.
     return _withShardVersionRetry(opCtx, nss, reason, [&] {
-        auto cm = getShardedCollectionRoutingInfo(opCtx, nss);
+        auto cri = getShardedCollectionRoutingInfo(opCtx, nss);
         return MigrationDestinationManager::getCollectionIndexes(
             opCtx,
             NamespaceStringOrUUID{nss.db().toString(), uuid},
-            cm.getMinKeyShardIdWithSimpleCollation(),
-            cm,
+            cri.cm.getMinKeyShardIdWithSimpleCollation(),
+            cri,
             afterClusterTime);
     });
 }

@@ -541,8 +541,9 @@ boost::optional<CreateCollectionResponse> checkIfCollectionAlreadySharded(
     const BSONObj& key,
     const BSONObj& collation,
     bool unique) {
-    auto cm = uassertStatusOK(
+    auto cri = uassertStatusOK(
         Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, nss));
+    const auto& cm = cri.cm;
 
     if (!cm.isSharded()) {
         return boost::none;
@@ -559,8 +560,7 @@ boost::optional<CreateCollectionResponse> checkIfCollectionAlreadySharded(
                 SimpleBSONObjComparator::kInstance.evaluate(defaultCollator == collation) &&
                 cm.isUnique() == unique);
 
-    CreateCollectionResponse response(
-        {cm.getVersion(), boost::optional<CollectionIndexes>(boost::none)});
+    CreateCollectionResponse response(cri.getCollectionVersion());
     response.setCollectionUUID(cm.getUUID());
     return response;
 }

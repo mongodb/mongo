@@ -228,7 +228,7 @@ TEST_F(DispatchShardPipelineTest, WrappedDispatchDoesRetryOnStaleConfigError) {
         auto results =
             router.route(operationContext(),
                          "dispatch shard pipeline"_sd,
-                         [&](OperationContext* opCtx, const ChunkManager& cm) {
+                         [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
                              return sharded_agg_helpers::dispatchShardPipeline(serializedCommand,
                                                                                hasChangeStream,
                                                                                startsWithDocuments,
@@ -272,6 +272,9 @@ TEST_F(DispatchShardPipelineTest, WrappedDispatchDoesRetryOnStaleConfigError) {
 
     expectCollectionAndChunksAggregation(
         kTestAggregateNss, epoch, timestamp, uuid, shardKeyPattern, {chunk1, chunk2});
+
+    expectCollectionAndIndexesAggregation(
+        kTestAggregateNss, epoch, timestamp, uuid, shardKeyPattern, {});
 
     // That error should be retried, but only the one on that shard.
     onCommand([&](const executor::RemoteCommandRequest& request) {

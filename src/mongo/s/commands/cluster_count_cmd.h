@@ -129,14 +129,14 @@ public:
                 }
             }
             countRequest.setSkip(boost::none);
-            const auto routingInfo = uassertStatusOK(
+            const auto cri = uassertStatusOK(
                 Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
             const auto collation = countRequest.getCollation().get_value_or(BSONObj());
             shardResponses = scatterGatherVersionedTargetByRoutingTable(
                 opCtx,
                 nss.db(),
                 nss,
-                routingInfo,
+                cri,
                 applyReadWriteConcern(
                     opCtx,
                     this,
@@ -241,13 +241,13 @@ public:
 
         std::vector<AsyncRequestsSender::Response> shardResponses;
         try {
-            const auto routingInfo = uassertStatusOK(
+            const auto cri = uassertStatusOK(
                 Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
             shardResponses =
                 scatterGatherVersionedTargetByRoutingTable(opCtx,
                                                            nss.db(),
                                                            nss,
-                                                           routingInfo,
+                                                           cri,
                                                            explainCmd,
                                                            ReadPreferenceSetting::get(opCtx),
                                                            Shard::RetryPolicy::kIdempotent,

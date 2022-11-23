@@ -35,8 +35,8 @@
 #include "mongo/db/list_indexes_gen.h"
 #include "mongo/db/timeseries/timeseries_commands_conversion_helper.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/chunk_manager_targeter.h"
 #include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/collection_routing_info_targeter.h"
 #include "mongo/s/query/store_possible_cursor.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
@@ -47,13 +47,13 @@ namespace {
 
 ListIndexesReply cursorCommandPassthroughShardWithMinKeyChunk(OperationContext* opCtx,
                                                               const NamespaceString& nss,
-                                                              const ChunkManager& cm,
+                                                              const CollectionRoutingInfo& cri,
                                                               const BSONObj& cmdObj,
                                                               const PrivilegeVector& privileges) {
     auto response = executeCommandAgainstShardWithMinKeyChunk(
         opCtx,
         nss,
-        cm,
+        cri,
         CommandHelpers::filterCommandRequestForPassthrough(cmdObj),
         ReadPreferenceSetting::get(opCtx),
         Shard::RetryPolicy::kIdempotent);
@@ -118,8 +118,8 @@ public:
 
             // The command's IDL definition permits namespace or UUID, but mongos requires a
             // namespace.
-            auto targeter = ChunkManagerTargeter(opCtx, ns());
-            auto cm = targeter.getRoutingInfo();
+            auto targeter = CollectionRoutingInfoTargeter(opCtx, ns());
+            auto cri = targeter.getRoutingInfo();
             auto cmdToBeSent = request().toBSON({});
             if (targeter.timeseriesNamespaceNeedsRewrite(ns())) {
                 cmdToBeSent =
@@ -132,7 +132,7 @@ public:
             return cursorCommandPassthroughShardWithMinKeyChunk(
                 opCtx,
                 targeter.getNS(),
-                cm,
+                cri,
                 applyReadWriteConcern(opCtx, this, cmdToBeSent),
                 {Privilege(ResourcePattern::forExactNamespace(ns()), ActionType::listIndexes)});
         }

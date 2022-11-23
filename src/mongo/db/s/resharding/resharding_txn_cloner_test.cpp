@@ -149,6 +149,14 @@ class ReshardingTxnClonerTest : public ShardServerTestFixture {
                 return repl::OpTimeWith<std::vector<ShardType>>(shardTypes);
             }
 
+            std::pair<CollectionType, std::vector<IndexCatalogType>> getCollectionAndGlobalIndexes(
+                OperationContext* opCtx,
+                const NamespaceString& nss,
+                const repl::ReadConcernArgs& readConcern) override {
+                uasserted(ErrorCodes::NamespaceNotFound,
+                          str::stream() << "Collection " << nss.ns() << " not found");
+            }
+
         private:
             const std::vector<ShardId> _shardIds;
         };

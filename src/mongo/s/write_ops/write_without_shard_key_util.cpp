@@ -54,7 +54,7 @@ bool useTwoPhaseProtocol(OperationContext* opCtx,
     }
 
     auto cm =
-        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfo(opCtx, nss));
 
     // Unsharded collections always target the primary shard.
     if (!cm.isSharded()) {

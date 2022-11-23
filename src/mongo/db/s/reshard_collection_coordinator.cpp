@@ -147,7 +147,7 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                 }
 
                 const auto cmOld = uassertStatusOK(
-                    Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
+                    Grid::get(opCtx)->catalogCache()->getShardedCollectionPlacementInfoWithRefresh(
                         opCtx, nss()));
 
                 StateDoc newDoc(_doc);
@@ -178,7 +178,7 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
 
                 // Report command completion to the oplog.
                 const auto cm = uassertStatusOK(
-                    Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
+                    Grid::get(opCtx)->catalogCache()->getShardedCollectionPlacementInfoWithRefresh(
                         opCtx, nss()));
 
                 if (_doc.getOldCollectionUUID() && _doc.getOldCollectionUUID() != cm.getUUID()) {

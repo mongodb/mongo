@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/shard_util.h"
@@ -108,7 +109,7 @@ public:
 private:
     OperationContext* _opCtx;
 
-    ChunkManager _cm;
+    CollectionRoutingInfo _cri;
 
     std::shared_ptr<Shard> _indexShard;
 };

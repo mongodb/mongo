@@ -104,8 +104,8 @@ public:
 
             Timer t;
             const auto chunkManager = uassertStatusOK(
-                Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
-                                                                                             ns()));
+                Grid::get(opCtx)->catalogCache()->getShardedCollectionPlacementInfoWithRefresh(
+                    opCtx, ns()));
 
             uassert(ErrorCodes::InvalidOptions,
                     "bounds can only have exactly 2 elements",

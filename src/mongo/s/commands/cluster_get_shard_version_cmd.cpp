@@ -100,7 +100,8 @@ public:
             result.append("version", cachedDbInfo->getVersion().toBSON());
         } else {
             // Return the collection's information.
-            const auto cm = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
+            const auto [cm, gii] =
+                uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
             uassert(ErrorCodes::NamespaceNotSharded,
                     str::stream() << "Collection " << nss.ns() << " is not sharded.",
                     cm.isSharded());

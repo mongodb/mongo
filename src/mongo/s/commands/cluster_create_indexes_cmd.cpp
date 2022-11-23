@@ -36,9 +36,9 @@
 #include "mongo/db/timeseries/timeseries_commands_conversion_helper.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/chunk_manager_targeter.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/cluster_ddl.h"
+#include "mongo/s/collection_routing_info_targeter.h"
 #include "mongo/s/grid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
@@ -104,7 +104,7 @@ public:
         // TODO SERVER-67798 Change cluster::createDatabase to use DatabaseName
         cluster::createDatabase(opCtx, dbName.toStringWithTenantId());
 
-        auto targeter = ChunkManagerTargeter(opCtx, nss);
+        auto targeter = CollectionRoutingInfoTargeter(opCtx, nss);
         auto routingInfo = targeter.getRoutingInfo();
         auto cmdToBeSent = cmdObj;
         if (targeter.timeseriesNamespaceNeedsRewrite(nss)) {

@@ -874,7 +874,7 @@ ReshardingCoordinatorExternalState::ParticipantShardsAndChunks
 ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
     OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) {
     const auto cm = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
+        Grid::get(opCtx)->catalogCache()->getShardedCollectionPlacementInfoWithRefresh(
             opCtx, coordinatorDoc.getSourceNss()));
 
     std::set<ShardId> donorShardIds;
@@ -1622,7 +1622,7 @@ ExecutorFuture<bool> ReshardingCoordinator::_isReshardingOpRedundant(
                auto cancelableOpCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
                auto opCtx = cancelableOpCtx.get();
                auto cm = uassertStatusOK(
-                   Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
+                   Grid::get(opCtx)->catalogCache()->getShardedCollectionPlacementInfoWithRefresh(
                        opCtx, _coordinatorDoc.getSourceNss()));
                const auto currentShardKey = cm.getShardKeyPattern().getKeyPattern();
                // Verify if there is any work to be done by the resharding operation by checking
@@ -2107,8 +2107,8 @@ void ReshardingCoordinator::_updateChunkImbalanceMetrics(const NamespaceString& 
 
     try {
         auto routingInfo = uassertStatusOK(
-            Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(opCtx,
-                                                                                         nss));
+            Grid::get(opCtx)->catalogCache()->getShardedCollectionPlacementInfoWithRefresh(opCtx,
+                                                                                           nss));
 
         const auto collectionZones =
             uassertStatusOK(Grid::get(opCtx)->catalogClient()->getTagsForCollection(opCtx, nss));

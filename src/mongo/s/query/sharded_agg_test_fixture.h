@@ -101,6 +101,7 @@ public:
         expectGetDatabase(nss);
         expectCollectionAndChunksAggregation(
             nss, epoch, timestamp, UUID::gen(), shardKey, chunkDistribution);
+        expectCollectionAndIndexesAggregation(nss, epoch, timestamp, UUID::gen(), shardKey, {});
 
         const auto cm = future.default_timed_get();
         ASSERT(cm->isSharded());

@@ -139,12 +139,15 @@ namespace {
 std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShards(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const ChunkManager& cm,
+    const CollectionRoutingInfo& cri,
     const std::set<ShardId>& shardsToSkip,
     const BSONObj& cmdObj,
     const BSONObj& query,
     const BSONObj& collation,
     bool eligibleForSampling = false) {
+
+    const auto& cm = cri.cm;
+
     if (!cm.isSharded()) {
         // The collection is unsharded. Target only the primary shard for the database.
 
@@ -190,10 +193,7 @@ std::vector<AsyncRequestsSender::Request> buildVersionedRequestsForTargetedShard
 
     for (const ShardId& shardId : shardIds) {
         if (shardsToSkip.find(shardId) == shardsToSkip.end()) {
-            ChunkVersion placementVersion = cm.getVersion(shardId);
-            auto cmdObjWithVersions = appendShardVersion(
-                cmdObj,
-                ShardVersion(placementVersion, boost::optional<CollectionIndexes>(boost::none)));
+            auto cmdObjWithVersions = appendShardVersion(cmdObj, cri.getShardVersion(shardId));
             if (targetedSampleId && targetedSampleId->isFor(shardId)) {
                 cmdObjWithVersions = analyze_shard_key::appendSampleId(cmdObjWithVersions,
                                                                        targetedSampleId->getId());
@@ -419,7 +419,7 @@ std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRouting
     OperationContext* opCtx,
     StringData dbName,
     const NamespaceString& nss,
-    const ChunkManager& cm,
+    const CollectionRoutingInfo& cri,
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy,
@@ -427,7 +427,7 @@ std::vector<AsyncRequestsSender::Response> scatterGatherVersionedTargetByRouting
     const BSONObj& collation,
     bool eligibleForSampling) {
     const auto requests = buildVersionedRequestsForTargetedShards(
-        opCtx, nss, cm, {} /* shardsToSkip */, cmdObj, query, collation, eligibleForSampling);
+        opCtx, nss, cri, {} /* shardsToSkip */, cmdObj, query, collation, eligibleForSampling);
 
     return gatherResponses(opCtx, dbName, readPref, retryPolicy, requests);
 }
@@ -437,7 +437,7 @@ scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(
     OperationContext* opCtx,
     StringData dbName,
     const NamespaceString& nss,
-    const ChunkManager& cm,
+    const CollectionRoutingInfo& cri,
     const std::set<ShardId>& shardsToSkip,
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref,
@@ -445,7 +445,7 @@ scatterGatherVersionedTargetByRoutingTableNoThrowOnStaleShardVersionErrors(
     const BSONObj& query,
     const BSONObj& collation) {
     const auto requests = buildVersionedRequestsForTargetedShards(
-        opCtx, nss, cm, shardsToSkip, cmdObj, query, collation);
+        opCtx, nss, cri, shardsToSkip, cmdObj, query, collation);
 
     return gatherResponsesNoThrowOnStaleShardVersionErrors(
         opCtx, dbName, readPref, retryPolicy, requests);
@@ -476,13 +476,13 @@ AsyncRequestsSender::Response executeCommandAgainstDatabasePrimary(
 AsyncRequestsSender::Response executeCommandAgainstShardWithMinKeyChunk(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const ChunkManager& cm,
+    const CollectionRoutingInfo& cri,
     const BSONObj& cmdObj,
     const ReadPreferenceSetting& readPref,
     Shard::RetryPolicy retryPolicy) {
 
     const auto query =
-        cm.isSharded() ? cm.getShardKeyPattern().getKeyPattern().globalMin() : BSONObj();
+        cri.cm.isSharded() ? cri.cm.getShardKeyPattern().getKeyPattern().globalMin() : BSONObj();
 
     auto responses = gatherResponses(
         opCtx,
@@ -490,7 +490,7 @@ AsyncRequestsSender::Response executeCommandAgainstShardWithMinKeyChunk(
         readPref,
         retryPolicy,
         buildVersionedRequestsForTargetedShards(
-            opCtx, nss, cm, {} /* shardsToSkip */, cmdObj, query, BSONObj() /* collation */));
+            opCtx, nss, cri, {} /* shardsToSkip */, cmdObj, query, BSONObj() /* collation */));
     return std::move(responses.front());
 }
 
@@ -670,13 +670,13 @@ std::set<ShardId> getTargetedShardsForQuery(boost::intrusive_ptr<ExpressionConte
 std::vector<std::pair<ShardId, BSONObj>> getVersionedRequestsForTargetedShards(
     OperationContext* opCtx,
     const NamespaceString& nss,
-    const ChunkManager& cm,
+    const CollectionRoutingInfo& cri,
     const BSONObj& cmdObj,
     const BSONObj& query,
     const BSONObj& collation) {
     std::vector<std::pair<ShardId, BSONObj>> requests;
     auto ars_requests = buildVersionedRequestsForTargetedShards(
-        opCtx, nss, cm, {} /* shardsToSkip */, cmdObj, query, collation);
+        opCtx, nss, cri, {} /* shardsToSkip */, cmdObj, query, collation);
     std::transform(std::make_move_iterator(ars_requests.begin()),
                    std::make_move_iterator(ars_requests.end()),
                    std::back_inserter(requests),
@@ -687,8 +687,8 @@ std::vector<std::pair<ShardId, BSONObj>> getVersionedRequestsForTargetedShards(
     return requests;
 }
 
-StatusWith<ChunkManager> getCollectionRoutingInfoForTxnCmd(OperationContext* opCtx,
-                                                           const NamespaceString& nss) {
+StatusWith<CollectionRoutingInfo> getCollectionRoutingInfoForTxnCmd(OperationContext* opCtx,
+                                                                    const NamespaceString& nss) {
     auto catalogCache = Grid::get(opCtx)->catalogCache();
     invariant(catalogCache);
 
@@ -711,22 +711,20 @@ StatusWith<ChunkManager> getCollectionRoutingInfoForTxnCmd(OperationContext* opC
 
 StatusWith<Shard::QueryResponse> loadIndexesFromAuthoritativeShard(OperationContext* opCtx,
                                                                    const NamespaceString& nss) {
-    const auto cm =
+    const auto cri =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
 
     auto [indexShard, listIndexesCmd] = [&]() -> std::pair<std::shared_ptr<Shard>, BSONObj> {
+        const auto& [cm, gii] = cri;
         auto cmdNoVersion = applyReadWriteConcern(
             opCtx, true /* appendRC */, false /* appendWC */, BSON("listIndexes" << nss.coll()));
         if (cm.isSharded()) {
             // For a sharded collection we must load indexes from a shard with chunks. For
             // consistency with cluster listIndexes, load from the shard that owns the minKey chunk.
             const auto minKeyShardId = cm.getMinKeyShardIdWithSimpleCollation();
-            ChunkVersion placementVersion = cm.getVersion(minKeyShardId);
             return {
                 uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, minKeyShardId)),
-                appendShardVersion(cmdNoVersion,
-                                   ShardVersion(placementVersion,
-                                                boost::optional<CollectionIndexes>(boost::none)))};
+                appendShardVersion(cmdNoVersion, cri.getShardVersion(minKeyShardId))};
         } else {
             // For an unsharded collection, the primary shard will have correct indexes. We attach
             // unsharded shard version to detect if the collection has become sharded.

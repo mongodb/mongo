@@ -52,6 +52,17 @@ using DatabaseTypeCache = ReadThroughCache<std::string, DatabaseType, Comparable
 using DatabaseTypeValueHandle = DatabaseTypeCache::ValueHandle;
 using CachedDatabaseInfo = DatabaseTypeValueHandle;
 
+struct CollectionRoutingInfo {
+    CollectionRoutingInfo(ChunkManager&& chunkManager,
+                          boost::optional<GlobalIndexesCache>&& globalIndexes)
+        : cm(std::move(chunkManager)), gii(std::move(globalIndexes)) {}
+    ChunkManager cm;
+    boost::optional<GlobalIndexesCache> gii;
+
+    ShardVersion getCollectionVersion() const;
+    ShardVersion getShardVersion(const ShardId& shardId) const;
+};
+
 /**
  * This class wrap a DatabaseVersion object augmenting it with:
  *  - a sequence number to allow for forced catalog cache refreshes
@@ -152,31 +163,31 @@ public:
                                                bool allowLocks = false);
 
     /**
-     * Blocking method to get the routing information for a specific collection at a given cluster
+     * Blocking method to get the placement information for a specific collection at a given cluster
      * time.
      *
-     * If the collection is sharded, returns routing info initialized with a ChunkManager. If the
-     * collection is not sharded, returns routing info initialized with the primary shard for the
+     * If the collection is sharded, returns placement info initialized with a ChunkManager. If the
+     * collection is not sharded, returns placement info initialized with the primary shard for the
      * specified database. If an error occurs while loading the metadata, returns a failed status.
      *
-     * If the given atClusterTime is so far in the past that it is not possible to construct routing
-     * info, returns a StaleClusterTime error.
+     * If the given atClusterTime is so far in the past that it is not possible to construct
+     * placement info, returns a StaleClusterTime error.
      */
-    StatusWith<ChunkManager> getCollectionRoutingInfoAt(OperationContext* opCtx,
-                                                        const NamespaceString& nss,
-                                                        Timestamp atClusterTime);
+    StatusWith<ChunkManager> getCollectionPlacementInfoAt(OperationContext* opCtx,
+                                                          const NamespaceString& nss,
+                                                          Timestamp atClusterTime);
 
     /**
-     * Same as the getCollectionRoutingInfoAt call above, but returns the latest known routing
+     * Same as the getCollectionPlacementInfoAt call above, but returns the latest known routing
      * information for the specified namespace.
      *
-     * While this method may fail under the same circumstances as getCollectionRoutingInfoAt, it is
-     * guaranteed to never return StaleClusterTime, because the latest routing information should
+     * While this method may fail under the same circumstances as getCollectionPlacementInfoAt, it
+     * is guaranteed to never return StaleClusterTime, because the latest routing information should
      * always be available.
      */
-    virtual StatusWith<ChunkManager> getCollectionRoutingInfo(OperationContext* opCtx,
-                                                              const NamespaceString& nss,
-                                                              bool allowLocks = false);
+    virtual StatusWith<ChunkManager> getCollectionPlacementInfo(OperationContext* opCtx,
+                                                                const NamespaceString& nss,
+                                                                bool allowLocks = false);
 
     /**
      * Blocking method to get the global index information for a specific collection at a given
@@ -205,16 +216,33 @@ public:
                                                                        bool allowLocks = false);
 
     /**
+     * Blocking method to get both the placement information and the index information for a
+     * collection.
+     */
+    StatusWith<CollectionRoutingInfo> getCollectionRoutingInfoAt(OperationContext* opCtx,
+                                                                 const NamespaceString& nss,
+                                                                 Timestamp atClusterTime);
+
+    /**
+     * Same as the getCollectionRoutingInfoAt call above, but returns the latest known routing
+     * information for the specified namespace.
+     */
+    virtual StatusWith<CollectionRoutingInfo> getCollectionRoutingInfo(OperationContext* opCtx,
+                                                                       const NamespaceString& nss,
+                                                                       bool allowLocks = false);
+
+    /**
      * Same as getDatbase above, but in addition forces the database entry to be refreshed.
      */
     StatusWith<CachedDatabaseInfo> getDatabaseWithRefresh(OperationContext* opCtx,
                                                           StringData dbName);
 
     /**
-     * Same as getCollectionRoutingInfo above, but in addition causes the namespace to be refreshed.
+     * Same as getCollectionPlacementInfo above, but in addition causes the namespace to be
+     * refreshed.
      */
-    StatusWith<ChunkManager> getCollectionRoutingInfoWithRefresh(OperationContext* opCtx,
-                                                                 const NamespaceString& nss);
+    StatusWith<ChunkManager> getCollectionPlacementInfoWithRefresh(OperationContext* opCtx,
+                                                                   const NamespaceString& nss);
 
     /**
      * Same as getCollectionIndexInfo above, but in addition causes the namespace to be refreshed.
@@ -223,19 +251,38 @@ public:
         OperationContext* opCtx, const NamespaceString& nss);
 
     /**
+     * Same as getCollectionRoutingInfo above, but in addition causes the namespace to be refreshed.
+     */
+    StatusWith<CollectionRoutingInfo> getCollectionRoutingInfoWithRefresh(
+        OperationContext* opCtx, const NamespaceString& nss);
+
+    /**
+     * Same as getCollectionPlacementInfo above, but throws NamespaceNotSharded error if the
+     * namespace is not sharded.
+     */
+    ChunkManager getShardedCollectionPlacementInfo(OperationContext* opCtx,
+                                                   const NamespaceString& nss);
+
+    /**
+     * Same as getCollectionPlacementInfoWithRefresh above, but in addition returns a
+     * NamespaceNotSharded error if the collection is not sharded.
+     */
+    StatusWith<ChunkManager> getShardedCollectionPlacementInfoWithRefresh(
+        OperationContext* opCtx, const NamespaceString& nss);
+
+    /**
      * Same as getCollectionRoutingInfo above, but throws NamespaceNotSharded error if the namespace
      * is not sharded.
      */
-    ChunkManager getShardedCollectionRoutingInfo(OperationContext* opCtx,
-                                                 const NamespaceString& nss);
-
+    CollectionRoutingInfo getShardedCollectionRoutingInfo(OperationContext* opCtx,
+                                                          const NamespaceString& nss);
 
     /**
      * Same as getCollectionRoutingInfoWithRefresh above, but in addition returns a
      * NamespaceNotSharded error if the collection is not sharded.
      */
-    StatusWith<ChunkManager> getShardedCollectionRoutingInfoWithRefresh(OperationContext* opCtx,
-                                                                        const NamespaceString& nss);
+    StatusWith<CollectionRoutingInfo> getShardedCollectionRoutingInfoWithRefresh(
+        OperationContext* opCtx, const NamespaceString& nss);
 
     /**
      * Advances the version in the cache for the given database.
@@ -384,10 +431,10 @@ private:
         Mutex _mutex = MONGO_MAKE_LATCH("IndexCache::_mutex");
     };
 
-    StatusWith<ChunkManager> _getCollectionRoutingInfoAt(OperationContext* opCtx,
-                                                         const NamespaceString& nss,
-                                                         boost::optional<Timestamp> atClusterTime,
-                                                         bool allowLocks = false);
+    StatusWith<ChunkManager> _getCollectionPlacementInfoAt(OperationContext* opCtx,
+                                                           const NamespaceString& nss,
+                                                           boost::optional<Timestamp> atClusterTime,
+                                                           bool allowLocks = false);
 
     boost::optional<GlobalIndexesCache> _getCollectionIndexInfoAt(
         OperationContext* opCtx,

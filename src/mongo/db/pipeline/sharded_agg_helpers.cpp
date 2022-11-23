@@ -185,7 +185,7 @@ std::vector<RemoteCursor> establishShardCursors(
     std::shared_ptr<executor::TaskExecutor> executor,
     const NamespaceString& nss,
     bool mustRunOnAll,
-    boost::optional<ChunkManager>& cm,
+    const boost::optional<CollectionRoutingInfo>& cri,
     const std::set<ShardId>& shardIds,
     const BSONObj& cmdObj,
     const boost::optional<analyze_shard_key::TargetedSampleId>& sampleId,
@@ -198,7 +198,7 @@ std::vector<RemoteCursor> establishShardCursors(
     std::vector<std::pair<ShardId, BSONObj>> requests;
 
     // If we don't need to run on all shards, then we should always have a valid routing table.
-    invariant(cm || mustRunOnAll);
+    invariant(cri || mustRunOnAll);
 
     if (mustRunOnAll) {
         // The pipeline contains a stage which must be run on all shards. Skip versioning and
@@ -206,14 +206,11 @@ std::vector<RemoteCursor> establishShardCursors(
         for (const auto& shardId : shardIds) {
             requests.emplace_back(shardId, cmdObj);
         }
-    } else if (cm->isSharded()) {
+    } else if (cri->cm.isSharded()) {
         // The collection is sharded. Use the routing table to decide which shards to target
         // based on the query and collation, and build versioned requests for them.
         for (const auto& shardId : shardIds) {
-            ChunkVersion placementVersion = cm->getVersion(shardId);
-            auto versionedCmdObj = appendShardVersion(
-                cmdObj,
-                ShardVersion(placementVersion, boost::optional<CollectionIndexes>(boost::none)));
+            auto versionedCmdObj = appendShardVersion(cmdObj, cri->getShardVersion(shardId));
 
             if (sampleId && sampleId->isFor(shardId)) {
                 versionedCmdObj =
@@ -225,17 +222,17 @@ std::vector<RemoteCursor> establishShardCursors(
     } else {
         // The collection is unsharded. Target only the primary shard for the database.
         // Don't append shard version info when contacting the config servers.
-        auto versionedCmdObj = cm->dbPrimary() != ShardId::kConfigServerId
+        auto versionedCmdObj = cri->cm.dbPrimary() != ShardId::kConfigServerId
             ? appendShardVersion(cmdObj, ShardVersion::UNSHARDED())
             : cmdObj;
-        versionedCmdObj = appendDbVersionIfPresent(versionedCmdObj, cm->dbVersion());
+        versionedCmdObj = appendDbVersionIfPresent(versionedCmdObj, cri->cm.dbVersion());
 
         if (sampleId) {
-            invariant(sampleId->isFor(cm->dbPrimary()));
+            invariant(sampleId->isFor(cri->cm.dbPrimary()));
             versionedCmdObj = analyze_shard_key::appendSampleId(versionedCmdObj, sampleId->getId());
         }
 
-        requests.emplace_back(cm->dbPrimary(), std::move(versionedCmdObj));
+        requests.emplace_back(cri->cm.dbPrimary(), std::move(versionedCmdObj));
     }
 
     if (MONGO_unlikely(shardedAggregateHangBeforeEstablishingShardCursors.shouldFail())) {
@@ -258,7 +255,7 @@ std::vector<RemoteCursor> establishShardCursors(
 
 std::set<ShardId> getTargetedShards(boost::intrusive_ptr<ExpressionContext> expCtx,
                                     bool mustRunOnAllShards,
-                                    const boost::optional<ChunkManager>& cm,
+                                    const boost::optional<CollectionRoutingInfo>& cri,
                                     const BSONObj shardQuery,
                                     const BSONObj collation) {
     if (mustRunOnAllShards) {
@@ -267,8 +264,8 @@ std::set<ShardId> getTargetedShards(boost::intrusive_ptr<ExpressionContext> expC
         return {std::make_move_iterator(shardIds.begin()), std::make_move_iterator(shardIds.end())};
     }
 
-    invariant(cm);
-    return getTargetedShardsForQuery(expCtx, *cm, shardQuery, collation);
+    invariant(cri);
+    return getTargetedShardsForQuery(expCtx, cri->cm, shardQuery, collation);
 }
 
 /**
@@ -826,15 +823,13 @@ std::unique_ptr<Pipeline, PipelineDeleter> runPipelineDirectlyOnSingleShard(
 
     auto* opCtx = expCtx->opCtx;
     auto* catalogCache = Grid::get(opCtx)->catalogCache();
-    auto cm =
+    auto cri =
         uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, request.getNamespace()));
 
     auto versionedCmdObj = [&] {
-        if (cm.isSharded()) {
-            ChunkVersion placementVersion = cm.getVersion(shardId);
-            return appendShardVersion(
-                aggregation_request_helper::serializeToCommandObj(request),
-                ShardVersion(placementVersion, boost::optional<CollectionIndexes>(boost::none)));
+        if (cri.cm.isSharded()) {
+            return appendShardVersion(aggregation_request_helper::serializeToCommandObj(request),
+                                      cri.getShardVersion(shardId));
         } else {
             // The collection is unsharded. Don't append shard version info when contacting the
             // config servers.
@@ -842,7 +837,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> runPipelineDirectlyOnSingleShard(
                 ? appendShardVersion(aggregation_request_helper::serializeToCommandObj(request),
                                      ShardVersion::UNSHARDED())
                 : aggregation_request_helper::serializeToCommandObj(request);
-            return appendDbVersionIfPresent(std::move(cmdObjWithShardVersion), cm.dbVersion());
+            return appendDbVersionIfPresent(std::move(cmdObjWithShardVersion), cri.cm.dbVersion());
         }
     }();
 
@@ -888,7 +883,7 @@ boost::optional<ShardedExchangePolicy> checkIfEligibleForExchange(OperationConte
         return boost::none;
     }
 
-    const auto cm =
+    const auto [cm, _] =
         uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, mergeStage->getOutputNs()));
     if (!cm.isSharded()) {
         return boost::none;
@@ -1058,7 +1053,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
 
     auto executionNsRoutingInfo = executionNsRoutingInfoStatus.isOK()
         ? std::move(executionNsRoutingInfoStatus.getValue())
-        : boost::optional<ChunkManager>{};
+        : boost::optional<CollectionRoutingInfo>{};
 
     // A $changeStream update lookup attempts to retrieve a single document by documentKey. In this
     // case, we wish to target a single shard using the simple collation, but we also want to ensure
@@ -1080,7 +1075,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
     // - The pipeline contains one or more stages which must always merge on mongoS.
     const bool needsSplit = (shardIds.size() > 1u || needsMongosMerge ||
                              (needsPrimaryShardMerge && executionNsRoutingInfo &&
-                              *(shardIds.begin()) != executionNsRoutingInfo->dbPrimary()));
+                              *(shardIds.begin()) != executionNsRoutingInfo->cm.dbPrimary()));
 
     boost::optional<ShardedExchangePolicy> exchangeSpec;
     boost::optional<SplitPipeline> splitPipelines;
@@ -1224,7 +1219,7 @@ DispatchShardPipelineResults dispatchShardPipeline(
     // must increment the number of involved shards.
     CurOp::get(opCtx)->debug().nShards = shardIds.size() +
         (needsPrimaryShardMerge && executionNsRoutingInfo &&
-         !shardIds.count(executionNsRoutingInfo->dbPrimary()));
+         !shardIds.count(executionNsRoutingInfo->cm.dbPrimary()));
 
     return DispatchShardPipelineResults{needsPrimaryShardMerge,
                                         std::move(ownedCursors),
@@ -1504,8 +1499,8 @@ BSONObj targetShardsForExplain(Pipeline* ownedPipeline) {
     return BSON("pipeline" << explainBuilder.done());
 }
 
-StatusWith<ChunkManager> getExecutionNsRoutingInfo(OperationContext* opCtx,
-                                                   const NamespaceString& execNss) {
+StatusWith<CollectionRoutingInfo> getExecutionNsRoutingInfo(OperationContext* opCtx,
+                                                            const NamespaceString& execNss) {
     // First, verify that there are shards present in the cluster. If not, then we return the
     // stronger 'ShardNotFound' error rather than 'NamespaceNotFound'. We must do this because
     // $changeStream aggregations ignore NamespaceNotFound in order to allow streams to be opened on
@@ -1589,7 +1584,8 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
     return router.route(
         expCtx->opCtx,
         "targeting pipeline to attach cursors"_sd,
-        [&](OperationContext* opCtx, const ChunkManager& cm) {
+        [&](OperationContext* opCtx, const CollectionRoutingInfo& cri) {
+            const auto& cm = cri.cm;
             auto pipelineToTarget = pipeline->clone();
 
             if (!cm.isSharded() && expCtx->ns != NamespaceString::kConfigsvrCollectionsNamespace) {

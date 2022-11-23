@@ -45,16 +45,16 @@ public:
 
     virtual ShardId myShardId(ServiceContext* service) const = 0;
 
-    virtual ChunkManager getShardedCollectionRoutingInfo(OperationContext* opCtx,
-                                                         const NamespaceString& nss) const = 0;
+    virtual ChunkManager getShardedCollectionPlacementInfo(OperationContext* opCtx,
+                                                           const NamespaceString& nss) const = 0;
 };
 
 class GlobalIndexCloningStateImpl : public GlobalIndexCloningService::CloningExternalState {
 public:
     ShardId myShardId(ServiceContext* service) const override;
 
-    ChunkManager getShardedCollectionRoutingInfo(OperationContext* opCtx,
-                                                 const NamespaceString& nss) const override;
+    ChunkManager getShardedCollectionPlacementInfo(OperationContext* opCtx,
+                                                   const NamespaceString& nss) const override;
 };
 
 }  // namespace global_index

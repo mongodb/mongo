@@ -148,14 +148,14 @@ public:
 
                 // We will time how long it takes to run the commands on the shards.
                 Timer timer;
-                const auto routingInfo =
+                const auto cri =
                     uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(
                         opCtx, *findCommand->getNamespaceOrUUID().nss()));
                 shardResponses = scatterGatherVersionedTargetByRoutingTable(
                     opCtx,
                     findCommand->getNamespaceOrUUID().nss()->db(),
                     *findCommand->getNamespaceOrUUID().nss(),
-                    routingInfo,
+                    cri,
                     explainCmd,
                     ReadPreferenceSetting::get(opCtx),
                     Shard::RetryPolicy::kIdempotent,

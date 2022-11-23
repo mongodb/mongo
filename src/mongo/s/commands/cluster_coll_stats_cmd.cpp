@@ -35,8 +35,8 @@
 #include "mongo/db/timeseries/timeseries_commands_conversion_helper.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/chunk_manager_targeter.h"
 #include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/collection_routing_info_targeter.h"
 #include "mongo/s/grid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
@@ -208,8 +208,9 @@ public:
 
         const NamespaceString nss(parseNs(dbName, cmdObj));
 
-        const auto targeter = ChunkManagerTargeter(opCtx, nss);
-        const auto cm = targeter.getRoutingInfo();
+        const auto targeter = CollectionRoutingInfoTargeter(opCtx, nss);
+        const auto cri = targeter.getRoutingInfo();
+        const auto& cm = cri.cm;
         if (cm.isSharded()) {
             result.appendBool("sharded", true);
         } else {
@@ -241,7 +242,7 @@ public:
             opCtx,
             nss.db(),
             targeter.getNS(),
-            cm,
+            cri,
             applyReadWriteConcern(
                 opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObjToSend)),
             ReadPreferenceSetting::get(opCtx),

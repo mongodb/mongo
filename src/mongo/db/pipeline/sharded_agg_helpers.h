@@ -178,8 +178,8 @@ Status appendExplainResults(DispatchShardPipelineResults&& dispatchResults,
  * Returns 'ShardNotFound' or 'NamespaceNotFound' if there are no shards in the cluster or if
  * collection 'execNss' does not exist, respectively.
  */
-StatusWith<ChunkManager> getExecutionNsRoutingInfo(OperationContext* opCtx,
-                                                   const NamespaceString& execNss);
+StatusWith<CollectionRoutingInfo> getExecutionNsRoutingInfo(OperationContext* opCtx,
+                                                            const NamespaceString& execNss);
 
 /**
  * Returns true if an aggregation over 'nss' must run on all shards.

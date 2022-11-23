@@ -131,7 +131,7 @@ ExecutorFuture<void> RefineCollectionShardKeyCoordinator::_runImpl(
                     opCtx, nss(), ShardKeyPattern(_newShardKey.toBSON()));
 
                 const auto cm = uassertStatusOK(
-                    Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
+                    Grid::get(opCtx)->catalogCache()->getShardedCollectionPlacementInfoWithRefresh(
                         opCtx, nss()));
 
                 _oldShardKey = cm.getShardKeyPattern().getKeyPattern();

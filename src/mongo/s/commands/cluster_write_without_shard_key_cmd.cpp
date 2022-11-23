@@ -113,15 +113,12 @@ public:
 
             const BSONObj cmdObj = _createCmdObj(writeCmd, commandName, targetDocId, nss);
 
-            const auto cm = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
+            const auto cri = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
             uassert(ErrorCodes::InvalidOptions,
                     "_clusterWriteWithoutShardKey can only be run against sharded collections.",
-                    cm.isSharded());
+                    cri.cm.isSharded());
 
-            ChunkVersion placementVersion = cm.getVersion(shardId);
-            auto versionedCmdObj = appendShardVersion(
-                cmdObj,
-                ShardVersion(placementVersion, boost::optional<CollectionIndexes>(boost::none)));
+            auto versionedCmdObj = appendShardVersion(cmdObj, cri.getShardVersion(shardId));
 
             AsyncRequestsSender::Request arsRequest(shardId, versionedCmdObj);
             std::vector<AsyncRequestsSender::Request> arsRequestVector({arsRequest});

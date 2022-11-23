@@ -44,6 +44,7 @@
 #include "mongo/db/s/session_catalog_migration_destination.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
@@ -175,7 +176,7 @@ public:
     static IndexesAndIdIndex getCollectionIndexes(OperationContext* opCtx,
                                                   const NamespaceStringOrUUID& nssOrUUID,
                                                   const ShardId& fromShardId,
-                                                  const boost::optional<ChunkManager>& cm,
+                                                  const boost::optional<CollectionRoutingInfo>& cri,
                                                   boost::optional<Timestamp> afterClusterTime);
 
     /**

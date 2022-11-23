@@ -144,7 +144,7 @@ public:
                         !serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
 
                 const auto cm = uassertStatusOK(
-                    Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
+                    Grid::get(opCtx)->catalogCache()->getShardedCollectionPlacementInfoWithRefresh(
                         opCtx, nss));
 
                 auto tempReshardingNss =

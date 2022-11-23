@@ -29,7 +29,9 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/s/collection_metadata.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/global_index_cache.h"
 
 namespace mongo {
 /**
@@ -40,14 +42,15 @@ namespace mongo {
 /**
  * Checks that the metadata for the collection is present in the CSR, that the collection is sharded
  * according to that metadata, and that the expected epoch and timestamp match what is present in
- * the CSR. Returns the collection metadata.
+ * the CSR. Returns the collection metadata and index info.
  *
  * Throws StaleShardVersion otherwise.
  */
-CollectionMetadata checkCollectionIdentity(OperationContext* opCtx,
-                                           const NamespaceString& nss,
-                                           const OID& expectedEpoch,
-                                           const boost::optional<Timestamp>& expectedTimestamp);
+CollectionPlacementAndIndexInfo checkCollectionIdentity(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const OID& expectedEpoch,
+    const boost::optional<Timestamp>& expectedTimestamp);
 
 /**
  * Checks that the chunk range matches the shard key pattern in the metadata.
@@ -57,6 +60,7 @@ CollectionMetadata checkCollectionIdentity(OperationContext* opCtx,
 void checkShardKeyPattern(OperationContext* opCtx,
                           const NamespaceString& nss,
                           const CollectionMetadata& metadata,
+                          const boost::optional<GlobalIndexesCache>& indexInfo,
                           const ChunkRange& chunkRange);
 
 /**
@@ -67,6 +71,7 @@ void checkShardKeyPattern(OperationContext* opCtx,
 void checkChunkMatchesRange(OperationContext* opCtx,
                             const NamespaceString& nss,
                             const CollectionMetadata& metadata,
+                            const boost::optional<GlobalIndexesCache>& indexInfo,
                             const ChunkRange& chunkRange);
 
 /**
@@ -78,6 +83,7 @@ void checkChunkMatchesRange(OperationContext* opCtx,
 void checkRangeWithinChunk(OperationContext* opCtx,
                            const NamespaceString& nss,
                            const CollectionMetadata& metadata,
+                           const boost::optional<GlobalIndexesCache>& indexInfo,
                            const ChunkRange& chunkRange);
 
 /**
@@ -88,6 +94,7 @@ void checkRangeWithinChunk(OperationContext* opCtx,
 void checkRangeOwnership(OperationContext* opCtx,
                          const NamespaceString& nss,
                          const CollectionMetadata& metadata,
+                         const boost::optional<GlobalIndexesCache>& indexInfo,
                          const ChunkRange& chunkRange);
 
 }  // namespace mongo

@@ -60,13 +60,13 @@ namespace {
  * Returns the routing information for the namespace set on the passed ExpressionContext. Also
  * verifies that the ExpressionContext's UUID, if present, matches that of the routing table entry.
  */
-StatusWith<ChunkManager> getCollectionRoutingInfo(
+StatusWith<CollectionRoutingInfo> getCollectionRoutingInfo(
     const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     auto catalogCache = Grid::get(expCtx->opCtx)->catalogCache();
     auto swRoutingInfo = catalogCache->getCollectionRoutingInfo(expCtx->opCtx, expCtx->ns);
     // Additionally check that the ExpressionContext's UUID matches the collection routing info.
-    if (swRoutingInfo.isOK() && expCtx->uuid && swRoutingInfo.getValue().isSharded()) {
-        if (!swRoutingInfo.getValue().uuidMatches(*expCtx->uuid)) {
+    if (swRoutingInfo.isOK() && expCtx->uuid && swRoutingInfo.getValue().cm.isSharded()) {
+        if (!swRoutingInfo.getValue().cm.uuidMatches(*expCtx->uuid)) {
             return {ErrorCodes::NamespaceNotFound,
                     str::stream() << "The UUID of collection " << expCtx->ns.ns()
                                   << " changed; it may have been dropped and re-created."};
@@ -160,10 +160,10 @@ boost::optional<Document> MongosProcessInterface::lookupSingleDocument(
             str::stream() << "Looking up document matching " << redact(filter.toBson()),
             [&]() -> std::vector<RemoteCursor> {
                 // Verify that the collection exists, with the correct UUID.
-                auto cm = uassertStatusOK(getCollectionRoutingInfo(foreignExpCtx));
+                auto cri = uassertStatusOK(getCollectionRoutingInfo(foreignExpCtx));
 
                 // Finalize the 'find' command object based on the routing table information.
-                if (findCmdIsByUuid && cm.isSharded()) {
+                if (findCmdIsByUuid && cri.cm.isSharded()) {
                     // Find by UUID and shard versioning do not work together (SERVER-31946).  In
                     // the sharded case we've already checked the UUID, so find by namespace is
                     // safe.  In the unlikely case that the collection has been deleted and a new
@@ -179,7 +179,7 @@ boost::optional<Document> MongosProcessInterface::lookupSingleDocument(
                 // is present, we may need to scatter-gather the query to all shards in order to
                 // find the document.
                 auto requests = getVersionedRequestsForTargetedShards(
-                    expCtx->opCtx, nss, cm, findCmd, filterObj, CollationSpec::kSimpleSpec);
+                    expCtx->opCtx, nss, cri, findCmd, filterObj, CollationSpec::kSimpleSpec);
 
                 // Dispatch the requests. The 'establishCursors' method conveniently prepares the
                 // result into a vector of cursor responses for us.
@@ -299,7 +299,7 @@ std::vector<GenericCursor> MongosProcessInterface::getIdleCursors(
 
 bool MongosProcessInterface::isSharded(OperationContext* opCtx, const NamespaceString& nss) {
     auto cm =
-        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfo(opCtx, nss));
     return cm.isSharded();
 }
 

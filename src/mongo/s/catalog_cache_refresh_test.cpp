@@ -138,6 +138,9 @@ TEST_F(CatalogCacheRefreshTest, FullLoad) {
     expectCollectionAndChunksAggregationWithReshardingFields(
         epoch, timestamp, shardKeyPattern, reshardingUUID, {chunk1, chunk2, chunk3, chunk4});
 
+    expectCollectionAndIndexesAggregation(
+        kNss, epoch, timestamp, reshardingUUID, shardKeyPattern, {});
+
     auto cm = *future.default_timed_get();
     ASSERT(cm.isSharded());
     ASSERT_EQ(4, cm.numChunks());
@@ -212,6 +215,13 @@ TEST_F(CatalogCacheRefreshTest, CollectionNotFound) {
 
     // Return an empty collection
     expectFindSendBSONObjVector(kConfigHostAndPort, {});
+
+    onCommand([&](const executor::RemoteCommandRequest& request) {
+        ASSERT_EQ(request.target, kConfigHostAndPort);
+        ASSERT_EQ(request.dbname, "config");
+        return CursorResponse(CollectionType::ConfigNS, CursorId{0}, {})
+            .toBSON(CursorResponse::ResponseType::InitialResponse);
+    });
 
     auto cm = *future.default_timed_get();
     ASSERT(!cm.isSharded());
@@ -466,7 +476,7 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadMissingChunkWithLowestVersion) {
 
     ASSERT_EQ(1, initialRoutingInfo.numChunks());
 
-    auto future = scheduleRoutingInfoIncrementalRefresh(kNss);
+    auto future = schedulePlacementInfoIncrementalRefresh(kNss);
 
     const auto incompleteChunks = [&]() {
         ChunkVersion version({epoch, timestamp}, {1, 0});
@@ -524,7 +534,7 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadMissingChunkWithHighestVersion) {
 
     ASSERT_EQ(1, initialRoutingInfo.numChunks());
 
-    auto future = scheduleRoutingInfoIncrementalRefresh(kNss);
+    auto future = schedulePlacementInfoIncrementalRefresh(kNss);
 
     const auto incompleteChunks = [&]() {
         ChunkVersion version({epoch, timestamp}, {1, 0});
@@ -579,7 +589,7 @@ TEST_F(CatalogCacheRefreshTest, ChunkEpochChangeDuringIncrementalLoadRecoveryAft
 
     setupNShards(2);
 
-    auto future = scheduleRoutingInfoIncrementalRefresh(kNss);
+    auto future = schedulePlacementInfoIncrementalRefresh(kNss);
 
     ChunkVersion oldVersion = initialRoutingInfo.getVersion();
     const OID newEpoch = OID::gen();
@@ -686,7 +696,7 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterCollectionEpochChange) {
 
     setupNShards(2);
 
-    auto future = scheduleRoutingInfoIncrementalRefresh(kNss);
+    auto future = schedulePlacementInfoIncrementalRefresh(kNss);
 
     ChunkVersion oldVersion = initialRoutingInfo.getVersion();
     ChunkVersion newVersion({OID::gen(), Timestamp(2)}, {1, 0});
@@ -746,7 +756,7 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterSplit) {
 
     ChunkVersion version = initialRoutingInfo.getVersion();
 
-    auto future = scheduleRoutingInfoIncrementalRefresh(kNss);
+    auto future = schedulePlacementInfoIncrementalRefresh(kNss);
 
     // Return set of chunks, which represent a split
     onFindCommand([&](const RemoteCommandRequest& request) {
@@ -810,7 +820,7 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMoveWithReshardingFieldsAdde
     ChunkVersion version = initialRoutingInfo.getVersion();
     const UUID uuid = initialRoutingInfo.getUUID();
 
-    auto future = scheduleRoutingInfoIncrementalRefresh(kNss);
+    auto future = schedulePlacementInfoIncrementalRefresh(kNss);
 
     ChunkVersion expectedDestShardVersion;
 
@@ -855,7 +865,7 @@ TEST_F(CatalogCacheRefreshTest, IncrementalLoadAfterMoveLastChunkWithReshardingF
 
     ChunkVersion version = initialRoutingInfo.getVersion();
 
-    auto future = scheduleRoutingInfoIncrementalRefresh(kNss);
+    auto future = schedulePlacementInfoIncrementalRefresh(kNss);
 
     // The collection type won't have resharding fields this time.
     // Return set of chunks, which represent a move

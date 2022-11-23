@@ -798,7 +798,7 @@ MigrationDestinationManager::IndexesAndIdIndex MigrationDestinationManager::getC
     OperationContext* opCtx,
     const NamespaceStringOrUUID& nssOrUUID,
     const ShardId& fromShardId,
-    const boost::optional<ChunkManager>& cm,
+    const boost::optional<CollectionRoutingInfo>& cri,
     boost::optional<Timestamp> afterClusterTime) {
     auto fromShard =
         uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, fromShardId));
@@ -813,10 +813,8 @@ MigrationDestinationManager::IndexesAndIdIndex MigrationDestinationManager::getC
 
     auto cmd = nssOrUUID.nss() ? BSON("listIndexes" << nssOrUUID.nss()->coll())
                                : BSON("listIndexes" << *nssOrUUID.uuid());
-    if (cm) {
-        ChunkVersion placementVersion = cm->getVersion(fromShardId);
-        cmd = appendShardVersion(
-            cmd, ShardVersion(placementVersion, boost::optional<CollectionIndexes>(boost::none)));
+    if (cri) {
+        cmd = appendShardVersion(cmd, cri->getShardVersion(fromShardId));
     }
     if (afterClusterTime) {
         cmd = cmd.addFields(makeLocalReadConcernWithAfterClusterTime(*afterClusterTime));

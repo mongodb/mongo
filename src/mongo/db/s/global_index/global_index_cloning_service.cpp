@@ -222,7 +222,7 @@ void GlobalIndexCloningService::CloningStateMachine::_init(
     auto opCtx = _serviceContext->makeOperationContext(Client::getCurrent());
 
     auto routingInfo =
-        _externalState->getShardedCollectionRoutingInfo(opCtx.get(), _metadata.getNss());
+        _externalState->getShardedCollectionPlacementInfo(opCtx.get(), _metadata.getNss());
 
     uassert(6755901,
             str::stream() << "Cannot create global index on unsharded ns "

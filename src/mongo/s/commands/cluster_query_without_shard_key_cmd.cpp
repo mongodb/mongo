@@ -109,7 +109,7 @@ public:
             // Get all shard ids for shards that have chunks in the desired namespace.
             const NamespaceString nss(
                 CommandHelpers::parseNsCollectionRequired(ns().dbName(), request().getWriteCmd()));
-            const auto cm = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
+            const auto cri = uassertStatusOK(getCollectionRoutingInfoForTxnCmd(opCtx, nss));
             auto parsedInfoFromRequest = [&] {
                 const auto commandName = request().getWriteCmd().firstElementFieldNameStringData();
                 BSONObjBuilder bob(request().getWriteCmd());
@@ -145,18 +145,13 @@ public:
             }();
 
             auto allShardsContainingChunksForNs =
-                getShardsToTarget(opCtx, cm, nss, parsedInfoFromRequest);
+                getShardsToTarget(opCtx, cri.cm, nss, parsedInfoFromRequest);
             auto cmdObj = createAggregateCmdObj(opCtx, parsedInfoFromRequest, nss);
 
             std::vector<AsyncRequestsSender::Request> requests;
             for (const auto& shardId : allShardsContainingChunksForNs) {
-                ChunkVersion placementVersion = cm.getVersion(shardId);
-                requests.emplace_back(
-                    shardId,
-                    appendShardVersion(
-                        cmdObj,
-                        ShardVersion(placementVersion,
-                                     boost::optional<CollectionIndexes>(boost::none))));
+                requests.emplace_back(shardId,
+                                      appendShardVersion(cmdObj, cri.getShardVersion(shardId)));
             }
 
             MultiStatementTransactionRequestsSender ars(

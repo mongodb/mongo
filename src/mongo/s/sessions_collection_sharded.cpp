@@ -61,7 +61,7 @@ BSONObj lsidQuery(const LogicalSessionId& lsid) {
 
 std::vector<LogicalSessionId> SessionsCollectionSharded::_groupSessionIdsByOwningShard(
     OperationContext* opCtx, const LogicalSessionIdSet& sessions) {
-    const auto cm = uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(
+    const auto cm = uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfo(
         opCtx, NamespaceString::kLogicalSessionsNamespace));
     uassert(ErrorCodes::NamespaceNotSharded,
             str::stream() << "Collection " << NamespaceString::kLogicalSessionsNamespace
@@ -86,7 +86,7 @@ std::vector<LogicalSessionId> SessionsCollectionSharded::_groupSessionIdsByOwnin
 
 std::vector<LogicalSessionRecord> SessionsCollectionSharded::_groupSessionRecordsByOwningShard(
     OperationContext* opCtx, const LogicalSessionRecordSet& sessions) {
-    const auto cm = uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(
+    const auto cm = uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfo(
         opCtx, NamespaceString::kLogicalSessionsNamespace));
     uassert(ErrorCodes::NamespaceNotSharded,
             str::stream() << "Collection " << NamespaceString::kLogicalSessionsNamespace
@@ -120,7 +120,7 @@ void SessionsCollectionSharded::checkSessionsCollectionExists(OperationContext* 
 
     // If the collection doesn't exist, fail. Only the config servers generate it.
     const auto cm = uassertStatusOK(
-        Grid::get(opCtx)->catalogCache()->getShardedCollectionRoutingInfoWithRefresh(
+        Grid::get(opCtx)->catalogCache()->getShardedCollectionPlacementInfoWithRefresh(
             opCtx, NamespaceString::kLogicalSessionsNamespace));
 }
 

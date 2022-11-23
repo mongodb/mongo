@@ -679,28 +679,29 @@ CreateCollectionCoordinator::_checkIfCollectionAlreadyShardedWithSameOptions(
     }
 
     // Check is there is a standard sharded collection that matches the original request parameters
-    auto routingInfo =
+    auto cri =
         uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(
             opCtx, originalNss()));
-    if (routingInfo.isSharded()) {
+    auto& cm = cri.cm;
+    auto& gii = cri.gii;
+    if (cm.isSharded()) {
         auto requestMatchesExistingCollection = [&] {
             // No timeseries fields in request
             if (_request.getTimeseries()) {
                 return false;
             }
 
-            if (_request.getUnique().value_or(false) != routingInfo.isUnique()) {
+            if (_request.getUnique().value_or(false) != cm.isUnique()) {
                 return false;
             }
 
-            if (SimpleBSONObjComparator::kInstance.evaluate(
-                    *_request.getShardKey() != routingInfo.getShardKeyPattern().toBSON())) {
+            if (SimpleBSONObjComparator::kInstance.evaluate(*_request.getShardKey() !=
+                                                            cm.getShardKeyPattern().toBSON())) {
                 return false;
             }
 
-            auto defaultCollator = routingInfo.getDefaultCollator()
-                ? routingInfo.getDefaultCollator()->getSpec().toBSON()
-                : BSONObj();
+            auto defaultCollator =
+                cm.getDefaultCollator() ? cm.getDefaultCollator()->getSpec().toBSON() : BSONObj();
             if (SimpleBSONObjComparator::kInstance.evaluate(
                     defaultCollator !=
                     resolveCollationForUserQueries(
@@ -715,37 +716,36 @@ CreateCollectionCoordinator::_checkIfCollectionAlreadyShardedWithSameOptions(
                 str::stream() << "sharding already enabled for collection " << originalNss(),
                 requestMatchesExistingCollection);
 
-        CreateCollectionResponse response(
-            {routingInfo.getVersion(), boost::optional<CollectionIndexes>(boost::none)});
-        response.setCollectionUUID(routingInfo.getUUID());
+        CreateCollectionResponse response(cri.getCollectionVersion());
+        response.setCollectionUUID(cm.getUUID());
         return response;
     }
 
     // If the request is still unresolved, check if there is an existing TS buckets namespace that
     // may be matched by the request.
     auto bucketsNss = originalNss().makeTimeseriesBucketsNamespace();
-    routingInfo = uassertStatusOK(
+    cri = uassertStatusOK(
         Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfoWithRefresh(opCtx, bucketsNss));
-    if (!routingInfo.isSharded()) {
+    cm = cri.cm;
+    gii = cri.gii;
+    if (!cm.isSharded()) {
         return boost::none;
     }
 
     auto requestMatchesExistingCollection = [&] {
-        if (routingInfo.isUnique() != _request.getUnique().value_or(false)) {
+        if (cm.isUnique() != _request.getUnique().value_or(false)) {
             return false;
         }
 
         // Timeseries options match
-        const auto& timeseriesOptionsOnDisk =
-            (*routingInfo.getTimeseriesFields()).getTimeseriesOptions();
+        const auto& timeseriesOptionsOnDisk = (*cm.getTimeseriesFields()).getTimeseriesOptions();
         if (_request.getTimeseries() &&
             !timeseries::optionsAreEqual(*_request.getTimeseries(), timeseriesOptionsOnDisk)) {
             return false;
         }
 
-        auto defaultCollator = routingInfo.getDefaultCollator()
-            ? routingInfo.getDefaultCollator()->getSpec().toBSON()
-            : BSONObj();
+        auto defaultCollator =
+            cm.getDefaultCollator() ? cm.getDefaultCollator()->getSpec().toBSON() : BSONObj();
         if (SimpleBSONObjComparator::kInstance.evaluate(
                 defaultCollator !=
                 resolveCollationForUserQueries(opCtx, bucketsNss, _request.getCollation()))) {
@@ -758,7 +758,7 @@ CreateCollectionCoordinator::_checkIfCollectionAlreadyShardedWithSameOptions(
         auto requestKeyPattern =
             uassertStatusOK(timeseries::createBucketsShardKeySpecFromTimeseriesShardKeySpec(
                 timeseriesOptions, *_request.getShardKey()));
-        if (SimpleBSONObjComparator::kInstance.evaluate(routingInfo.getShardKeyPattern().toBSON() !=
+        if (SimpleBSONObjComparator::kInstance.evaluate(cm.getShardKeyPattern().toBSON() !=
                                                         requestKeyPattern)) {
             return false;
         }
@@ -769,9 +769,8 @@ CreateCollectionCoordinator::_checkIfCollectionAlreadyShardedWithSameOptions(
             str::stream() << "sharding already enabled for collection " << bucketsNss,
             requestMatchesExistingCollection);
 
-    CreateCollectionResponse response(
-        {routingInfo.getVersion(), boost::optional<CollectionIndexes>(boost::none)});
-    response.setCollectionUUID(routingInfo.getUUID());
+    CreateCollectionResponse response(cri.getCollectionVersion());
+    response.setCollectionUUID(cm.getUUID());
     return response;
 }
 

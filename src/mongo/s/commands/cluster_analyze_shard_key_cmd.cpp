@@ -48,17 +48,18 @@ namespace {
  * Returns a new command object with shard version and/or database version appended to it based on
  * the given routing info.
  */
-BSONObj makeVersionedCmdObj(const ChunkManager& cm,
+BSONObj makeVersionedCmdObj(const CollectionRoutingInfo& cri,
                             const BSONObj& unversionedCmdObj,
                             ShardId shardId) {
-    if (cm.isSharded()) {
-        auto placementVersion = cm.getVersion(shardId);
+    if (cri.cm.isSharded()) {
         return appendShardVersion(
             unversionedCmdObj,
-            ShardVersion(placementVersion, boost::optional<CollectionIndexes>(boost::none)));
+            ShardVersion(cri.cm.getVersion(shardId),
+                         cri.gii ? boost::make_optional(cri.gii->getCollectionIndexes())
+                                 : boost::none));
     }
     auto versionedCmdObj = appendShardVersion(unversionedCmdObj, ShardVersion::UNSHARDED());
-    return appendDbVersionIfPresent(versionedCmdObj, cm.dbVersion());
+    return appendDbVersionIfPresent(versionedCmdObj, cri.cm.dbVersion());
 }
 
 class AnalyzeShardKeyCmd : public TypedCommand<AnalyzeShardKeyCmd> {
@@ -73,13 +74,13 @@ public:
         Response typedRun(OperationContext* opCtx) {
             const auto& nss = ns();
             const auto& catalogCache = Grid::get(opCtx)->catalogCache();
-            const auto cm = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
+            const auto cri = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
 
             std::set<ShardId> candidateShardIds;
-            if (cm.isSharded()) {
-                cm.getAllShardIds(&candidateShardIds);
+            if (cri.cm.isSharded()) {
+                cri.cm.getAllShardIds(&candidateShardIds);
             } else {
-                candidateShardIds.insert(cm.dbPrimary());
+                candidateShardIds.insert(cri.cm.dbPrimary());
             }
 
             const auto unversionedCmdObj =
@@ -97,7 +98,7 @@ public:
                         shardId != ShardId::kConfigServerId);
 
                 // Build a versioned command for the selected shard.
-                auto versionedCmdObj = makeVersionedCmdObj(cm, unversionedCmdObj, shardId);
+                auto versionedCmdObj = makeVersionedCmdObj(cri, unversionedCmdObj, shardId);
 
                 // Execute the command against the shard.
                 auto shard =
