@@ -45,6 +45,9 @@ function getPlanCacheSize() {
     return db.serverStatus().metrics.query.planCacheTotalSizeEstimateBytes;
 }
 
+function getPlanCacheNumEntries() {
+    return db.serverStatus().metrics.query.planCacheTotalQueryShapes;
+}
 function assertQueryInPlanCache(coll, query) {
     const explainResult = assert.commandWorked(coll.explain().find(query).finish());
     const queryHash = getQueryHashFromExplain(explainResult, db);
@@ -65,7 +68,7 @@ assert.commandWorked(coll.createIndex({a: 1, b: 1}));
 
 const initialPlanCacheSize = getPlanCacheSize();
 // Plan cache must be empty.
-assert.eq(0, coll.getPlanCache().list().length);
+assert.eq(0, getPlanCacheNumEntries());
 
 const sbeQuery = {
     a: 1
@@ -79,7 +82,7 @@ const classicQuery = {
 assert.eq(1, coll.find(sbeQuery).itcount());
 assertQueryInPlanCache(coll, sbeQuery);
 // Plan Cache must contain exactly 1 entry.
-assert.eq(1, coll.getPlanCache().list().length);
+assert.eq(1, getPlanCacheNumEntries());
 
 // Assert metric is incremented for new cache entry.
 const afterSbePlanCacheSize = getPlanCacheSize();
@@ -92,7 +95,7 @@ assert.commandWorked(
 assert.eq(1, coll.find(classicQuery).itcount());
 assertQueryInPlanCache(coll, classicQuery);
 // Plan Cache must contain exactly 2 entries.
-assert.eq(2, coll.getPlanCache().list().length);
+assert.eq(2, getPlanCacheNumEntries());
 
 // Assert metric is incremented for new cache entry.
 const afterClassicPlanCacheSize = getPlanCacheSize();

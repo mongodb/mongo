@@ -33,6 +33,7 @@
 
 namespace mongo {
 CounterMetric planCacheTotalSizeEstimateBytes("query.planCacheTotalSizeEstimateBytes");
+CounterMetric planCacheEntries("query.planCacheTotalQueryShapes");
 
 std::ostream& operator<<(std::ostream& stream, const PlanCacheKey& key) {
     stream << key.toString();
