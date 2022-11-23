@@ -409,6 +409,7 @@ resolve()
 	running=0
 	list=$(ls $home | grep '^RUNDIR.[0-9]*.log')
 	for i in $list; do
+		check_timer
 		# Note the directory may not yet exist, only the log file.
 		dir="$home/${i%.*}"
 		log="$home/$i"
@@ -611,8 +612,11 @@ format()
 
 seconds=$((minutes * 60))
 start_time="$(date -u +%s)"
-while :; do
-	# Check if our time has expired.
+elapsed=0
+
+# Check if our time has expired. Updates force_quit if the timer has expired.
+check_timer()
+{
 	[[ $seconds -ne 0 ]] && {
 		now="$(date -u +%s)"
 		elapsed=$(($now - $start_time))
@@ -621,6 +625,10 @@ while :; do
 		[[ $elapsed -ge $seconds ]] &&
 			force_quit_reason "run timed out at $(date), after $elapsed seconds"
 	}
+}
+
+while :; do
+	check_timer
 
 	# Check if we're only running the smoke-tests and we're done.
 	[[ $smoke_test -ne 0 ]] && [[ $smoke_next -ge ${#smoke_list[@]} ]] && quit=1
