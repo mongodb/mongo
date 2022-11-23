@@ -264,6 +264,8 @@ last-continuous:
     ticket: SERVER-68728
   - test_file: jstests/sharding/resharding_critical_section_metrics.js
     ticket: SERVER-68932
+  - test_file: jstests/replsets/tenant_migration_recipient_forget_migration.js
+    ticket: SERVER-69229
   - test_file: src/mongo/db/modules/enterprise/jstests/fcbis/fcbis_cannot_vote_twice_same_term.js
     ticket: SERVER-69861
   - test_file: src/mongo/db/modules/enterprise/jstests/fcbis/fcbis_election_during_storage_change.js
@@ -619,6 +621,8 @@ last-lts:
     ticket: SERVER-68628
   - test_file: jstests/sharding/move_chunk_interrupt_postimage.js
     ticket: SERVER-68728
+  - test_file: jstests/replsets/tenant_migration_recipient_forget_migration.js
+    ticket: SERVER-69229
   - test_file: src/mongo/db/modules/enterprise/jstests/fcbis/fcbis_cannot_vote_twice_same_term.js
     ticket: SERVER-69861
   - test_file: src/mongo/db/modules/enterprise/jstests/fcbis/fcbis_election_during_storage_change.js

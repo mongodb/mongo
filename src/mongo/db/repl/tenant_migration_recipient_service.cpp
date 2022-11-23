@@ -179,7 +179,7 @@ MONGO_FAIL_POINT_DEFINE(hangBeforeTaskCompletion);
 MONGO_FAIL_POINT_DEFINE(fpAfterReceivingRecipientForgetMigration);
 MONGO_FAIL_POINT_DEFINE(hangAfterCreatingRSM);
 MONGO_FAIL_POINT_DEFINE(skipRetriesWhenConnectingToDonorHost);
-MONGO_FAIL_POINT_DEFINE(fpBeforeDroppingOplogBufferCollection);
+MONGO_FAIL_POINT_DEFINE(fpBeforeDroppingTempCollections);
 MONGO_FAIL_POINT_DEFINE(fpWaitUntilTimestampMajorityCommitted);
 MONGO_FAIL_POINT_DEFINE(hangAfterUpdatingTransactionEntry);
 MONGO_FAIL_POINT_DEFINE(fpBeforeAdvancingStableTimestamp);
@@ -2729,6 +2729,23 @@ TenantMigrationRecipientService::Instance::_migrateUsingShardMergeProtocol(
         .semi();
 }
 
+void TenantMigrationRecipientService::Instance::_dropTempCollections() {
+    _stopOrHangOnFailPoint(&fpBeforeDroppingTempCollections);
+
+    auto opCtx = cc().makeOperationContext();
+    auto storageInterface = StorageInterface::get(opCtx.get());
+
+    // The donated files and oplog buffer collections can be safely dropped at this
+    // point. In case either collection does not exist, dropping will be a no-op.
+    // It isn't necessary that a given drop is majority-committed. A new primary will
+    // attempt to drop the collection anyway.
+    uassertStatusOK(storageInterface->dropCollection(
+        opCtx.get(), shard_merge_utils::getDonatedFilesNs(getMigrationUUID())));
+
+    uassertStatusOK(
+        storageInterface->dropCollection(opCtx.get(), getOplogBufferNs(getMigrationUUID())));
+}
+
 SemiFuture<void> TenantMigrationRecipientService::Instance::run(
     std::shared_ptr<executor::ScopedTaskExecutor> executor,
     const CancellationToken& token) noexcept {
@@ -3060,17 +3077,7 @@ SemiFuture<void> TenantMigrationRecipientService::Instance::run(
                 token);
         })
         .then([this, self = shared_from_this()] { return _markStateDocAsGarbageCollectable(); })
-        .then([this, self = shared_from_this()] {
-            _stopOrHangOnFailPoint(&fpBeforeDroppingOplogBufferCollection);
-            auto opCtx = cc().makeOperationContext();
-            auto storageInterface = StorageInterface::get(opCtx.get());
-
-            // The oplog buffer collection can be safely dropped at this point. In case it
-            // doesn't exist, dropping will be a no-op. It isn't necessary that the drop is
-            // majority-committed. A new primary will attempt to drop the collection anyway.
-            return storageInterface->dropCollection(opCtx.get(),
-                                                    getOplogBufferNs(getMigrationUUID()));
-        })
+        .then([this, self = shared_from_this()] { _dropTempCollections(); })
         .then([this, self = shared_from_this(), token] {
             {
                 stdx::lock_guard lk(_mutex);

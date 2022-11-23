@@ -615,6 +615,11 @@ public:
             const CancellationToken& token);
 
         /*
+         * Drops ephemeral collections used for tenant migrations.
+         */
+        void _dropTempCollections();
+
+        /*
          * Send the killBackupCursor command to the remote in order to close the backup cursor
          * connection on the donor.
          */
