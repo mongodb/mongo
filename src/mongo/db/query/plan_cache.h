@@ -51,6 +51,12 @@ class PlanCacheEntryBase;
 extern CounterMetric planCacheTotalSizeEstimateBytes;
 
 /**
+ * Tracks the number of query shapes in the plan cache entries across all the collections. Each
+ * entry in the plan cache is a unique query shape.
+ */
+extern CounterMetric planCacheEntries;
+
+/**
  * Information returned from a get(...) query.
  */
 template <class CachedPlanType, class DebugInfoType>
@@ -103,7 +109,7 @@ public:
                                          size_t works,
                                          DebugInfoType debugInfo) {
         // If the cumulative size of the plan caches is estimated to remain within a predefined
-        // threshold, then then include additional debug info which is not strictly necessary for
+        // threshold, then include additional debug info which is not strictly necessary for
         // the plan cache to be functional. Once the cumulative plan cache size exceeds this
         // threshold, omit this debug info as a heuristic to prevent plan cache memory consumption
         // from growing too large.
@@ -155,6 +161,7 @@ public:
 
     ~PlanCacheEntryBase() {
         planCacheTotalSizeEstimateBytes.decrement(estimatedEntrySizeBytes);
+        planCacheEntries.decrement(1);
     }
 
     /**
@@ -258,6 +265,8 @@ private:
         // Account for the object in the global metric for estimating the server's total plan cache
         // memory consumption.
         planCacheTotalSizeEstimateBytes.increment(estimatedEntrySizeBytes);
+        // Account for new entry in the plan cache.
+        planCacheEntries.increment(1);
     }
 
     // Ensure that PlanCacheEntryBase is non-copyable.
