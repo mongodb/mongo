@@ -24,8 +24,9 @@ const isMongos = (hello.msg === "isdbgrid");
 //
 
 coll.drop();
-assert.commandWorked(coll.insert({a: 0}));
+assert.commandWorked(coll.insert({_id: 0, a: 0}));
 assert.eq(1, coll.aggregate([{$match: {$expr: {$eq: ["$a", 0]}}}]).itcount());
+assert.eq(1, coll.aggregate([{$match: {$expr: {$eq: ["$$ROOT", {_id: 0, a: 0}]}}}]).itcount());
 assert.throws(function() {
     coll.aggregate([{$match: {$expr: {$eq: ["$a", "$$unbound"]}}}]);
 });

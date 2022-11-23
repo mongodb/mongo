@@ -163,6 +163,18 @@ TEST(RewriteExpr, EqWithComparisonToMissingDoesNotRewriteToMatch) {
     testExprRewrite(expr, expectedMatch);
 }
 
+TEST(RewriteExpr, EqWithComparisonToRootDoesNotRewriteToMatch) {
+    BSONObj expr = fromjson("{$expr: {$eq: ['$$ROOT', {a: 1}]}}");
+    const BSONObj expectedMatch;
+    testExprRewrite(expr, expectedMatch);
+}
+
+TEST(RewriteExpr, EqWithComparisonToCurrentDoesNotRewriteToMatch) {
+    BSONObj expr = fromjson("{$expr: {$eq: ['$$CURRENT', 2]}}");
+    const BSONObj expectedMatch;
+    testExprRewrite(expr, expectedMatch);
+}
+
 TEST(RewriteExpr, EqWithComparisonToArrayDoesNotRewriteToMatch) {
     BSONObj expr = fromjson("{$expr: {$eq: ['$x', [1, 2, 3]]}}");
     const BSONObj expectedMatch;
