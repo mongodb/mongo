@@ -104,6 +104,7 @@ env.Library(
         'expression_trigonometric.cpp',
         'javascript_execution.cpp',
         'make_js_function.cpp',
+        'monotonic_expression.cpp',
         'variables.cpp',
     ],
     LIBDEPS=[
@@ -629,6 +630,7 @@ env.CppUnitTest(
         'granularity_rounder_preferred_numbers_test.cpp',
         'lookup_set_cache_test.cpp',
         'memory_usage_tracker_test.cpp',
+        'monotonic_expression_test.cpp',
         'partition_key_comparator_test.cpp',
         'pipeline_metadata_tree_test.cpp',
         'pipeline_test.cpp',
