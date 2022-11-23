@@ -52,8 +52,8 @@
 #define TESTUTIL_ENV_CONFIG_TIERED \
     ",tiered_storage=(bucket=./"   \
     "bucket,bucket_prefix=pfx-,local_retention=2,name=dir_store)"
-#define TESTUTIL_ENV_CONFIG_TIERED_EXT                        \
-    ",extensions=(../../../../ext/storage_sources/dir_store/" \
+#define TESTUTIL_ENV_CONFIG_TIERED_EXT               \
+    ",extensions=(%s/ext/storage_sources/dir_store/" \
     "libwiredtiger_dir_store.so=(early_load=true))"
 #define TESTUTIL_ENV_CONFIG_REC \
     ",log=(recover=on,remove=false),statistics=(all),statistics_log=(json,on_close,wait=1)"
@@ -397,6 +397,7 @@ void testutil_copy_data(const char *);
 void testutil_copy_file(WT_SESSION *, const char *);
 void testutil_copy_if_exists(WT_SESSION *, const char *);
 void testutil_create_backup_directory(const char *);
+void testutil_deduce_build_dir(TEST_OPTS *opts);
 int testutil_general_event_handler(
   WT_EVENT_HANDLER *, WT_CONNECTION *, WT_SESSION *, WT_EVENT_TYPE, void *);
 void testutil_make_work_dir(const char *);
@@ -411,7 +412,7 @@ void testutil_progress(TEST_OPTS *, const char *);
 void testutil_sleep_wait(uint32_t, pid_t);
 #endif
 void testutil_wiredtiger_open(
-  TEST_OPTS *, const char *, WT_EVENT_HANDLER *, WT_CONNECTION **, bool);
+  TEST_OPTS *, const char *, const char *, WT_EVENT_HANDLER *, WT_CONNECTION **, bool);
 void testutil_tiered_begin(TEST_OPTS *);
 void testutil_tiered_flush_complete(TEST_OPTS *, WT_SESSION *, void *);
 void testutil_tiered_sleep(TEST_OPTS *, WT_SESSION *, uint32_t, bool *);

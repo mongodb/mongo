@@ -624,7 +624,7 @@ run_workload(void)
     if (!opts->compat && !opts->inmem)
         strcat(envconf, ENV_CONFIG_ADD_EVICT_DIRTY);
 
-    testutil_wiredtiger_open(opts, envconf, NULL, &conn, false);
+    testutil_wiredtiger_open(opts, NULL, envconf, NULL, &conn, false);
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
     /*
@@ -751,7 +751,7 @@ main(int argc, char *argv[])
     uint64_t commit_fp, durable_fp, stable_val;
     uint32_t i, timeout;
     int ch, status, ret;
-    char buf[512], fname[64], kname[64], statname[1024];
+    char buf[512], fname[64], kname[64], statname[1024], bucket[512];
     char ts_string[WT_TS_HEX_STRING_SIZE];
     bool fatal, rand_th, rand_time, verify_only;
 
@@ -824,6 +824,11 @@ main(int argc, char *argv[])
     }
     if (!verify_only) {
         testutil_make_work_dir(home);
+
+        if (opts->tiered_storage) {
+            testutil_check(__wt_snprintf(bucket, sizeof(bucket), "%s/bucket", home));
+            testutil_make_work_dir(bucket);
+        }
 
         __wt_random_init_seed(NULL, &rnd);
         if (rand_time) {
@@ -900,7 +905,7 @@ main(int argc, char *argv[])
     /*
      * Open the connection which forces recovery to be run.
      */
-    testutil_wiredtiger_open(opts, buf, &my_event, &conn, true);
+    testutil_wiredtiger_open(opts, NULL, buf, &my_event, &conn, true);
 
     printf("Connection open and recovery complete. Verify content\n");
     /* Sleep to guarantee the statistics thread has enough time to run. */

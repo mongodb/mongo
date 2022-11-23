@@ -110,6 +110,7 @@ static TEST_DRIVER driver[] = {
   {{"parse_opts", "-bbuilddir", "-T21", NULL}, {"builddir", NULL, 0, 0, false, false, 21},
     {NULL, 0, 0, 0}},
 
+  {{"parse_opts", "-T21", NULL}, {NULL, NULL, 0, 0, false, false, 21}, {NULL, 0, 0, 0}},
   /*
    * If -PT is used, the tiered_storage source is set to dir_store, even if -Po is not used. Also
    * when -PT is used, random seeds are initialized to some non-zero value.
@@ -302,9 +303,11 @@ verify_expect(
     } while (0)
 
     /*
-     * opts->home is always set, even without -h on the command line, so don't check it here.
+     * opts->home is always set, even without -h on the command line, so don't check it here. If
+     * tiered_storage is set then build_dir is deduced from the test program.
      */
-    VERIFY_STR(opts, expect, build_dir);
+    if (opts->tiered_storage != true)
+        VERIFY_STR(opts, expect, build_dir);
     VERIFY_STR(opts, expect, tiered_storage_source);
     VERIFY_INT(opts, expect, table_type);
     VERIFY_RANDOM_INT(opts, expect, data_seed);

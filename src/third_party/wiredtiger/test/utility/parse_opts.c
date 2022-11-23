@@ -211,6 +211,9 @@ testutil_parse_end_opt(TEST_OPTS *opts)
         /* Initialize the state for the random number generators. */
         parse_init_random(&opts->data_rnd, &opts->data_seed);
         parse_init_random(&opts->extra_rnd, &opts->extra_seed);
+
+        /* Deduce the build directory. */
+        testutil_deduce_build_dir(opts);
     }
 }
 
