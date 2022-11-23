@@ -496,6 +496,8 @@ PlanState HashAggStage::getNext() {
             return trackPlanState(PlanState::ADVANCED);
         } else {
             _rsCursor.reset();
+            _specificStats.spilledRecordEstimatedStorageSize =
+                _recordStore->rs()->storageSize(_opCtx);
             _recordStore.reset();
             return trackPlanState(PlanState::IS_EOF);
         }
@@ -523,6 +525,8 @@ std::unique_ptr<PlanStageStats> HashAggStage::getStats(bool includeDebugInfo) co
         bob.appendNumber("spilledRecords", _specificStats.spilledRecords);
         bob.appendNumber("spilledBytesApprox",
                          _specificStats.lastSpilledRecordSize * _specificStats.spilledRecords);
+        bob.appendNumber("spilledRecordEstimatedStorageSize",
+                         _specificStats.spilledRecordEstimatedStorageSize);
 
         ret->debugInfo = bob.obj();
     }

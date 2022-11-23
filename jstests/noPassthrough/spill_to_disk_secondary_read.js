@@ -1,7 +1,7 @@
 /*
  * Test that $group and $setWindowFields spill to the WT RecordStore on secondaries with
  * writeConcern greater than w:1.
- * @tags: [requires_replication, requires_majority_read_concern]
+ * @tags: [requires_replication, requires_majority_read_concern, requires_persistence]
  */
 (function() {
 "use strict";
@@ -92,6 +92,7 @@ const readColl = secondary.getDB("test").foo;
         assert(hashAggGroup.usedDisk, hashAggGroup);
         assert.eq(hashAggGroup.spilledRecords, expectedSpilledRecords, hashAggGroup);
         assert.gte(hashAggGroup.spilledBytesApprox, expectedSpilledBytesAtLeast, hashAggGroup);
+        assert.gt(hashAggGroup.spilledRecordEstimatedStorageSize, 0, hashAggGroup);
     } finally {
         assert.commandWorked(secondary.adminCommand({
             setParameter: 1,

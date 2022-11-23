@@ -10,6 +10,7 @@
 // @tags: [
 //   requires_collstats,
 //   requires_pipeline_optimization,
+//   requires_persistence,
 // ]
 (function() {
 'use strict';
@@ -64,6 +65,7 @@ function test({pipeline, expectedCodes, canSpillToDisk}) {
                 assert(hashAggGroup.usedDisk, hashAggGroup);
                 assert.gt(hashAggGroup.spilledRecords, 0, hashAggGroup);
                 assert.gt(hashAggGroup.spilledBytesApprox, 0, hashAggGroup);
+                assert.gt(hashAggGroup.spilledRecordEstimatedStorageSize, 0, hashAggGroup);
             }
         }
     } else {

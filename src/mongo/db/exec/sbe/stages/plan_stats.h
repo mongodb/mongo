@@ -318,6 +318,7 @@ struct HashAggStats : public SpecificStats {
     bool usedDisk{false};
     long long spilledRecords{0};
     long long lastSpilledRecordSize{0};
+    long long spilledRecordEstimatedStorageSize{0};
 };
 
 struct HashLookupStats : public SpecificStats {
