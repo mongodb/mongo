@@ -1,6 +1,6 @@
 /**
  * Test success of findAndModify without shard key command with various query filters,
- * run against a sharded cluster, when updateOneWithoutShardKey feature flag is enabled.
+ * on a sharded collection.
  *
  * @tags: [
  *    requires_sharding,
@@ -95,11 +95,21 @@ function verifySingleModification(testCase, res) {
     });
 }
 
-function runCommandAndVerify(testCase) {
-    jsTest.log(testCase.logMessage + "\n" + tojson(testCase.cmdObj));
+function runCommandAndVerify(testCase, additionalCmdFields = {}) {
+    const cmdObjWithAdditionalFields = Object.assign({}, testCase.cmdObj, additionalCmdFields);
+    jsTest.log(tojson(cmdObjWithAdditionalFields));
 
     assert.commandWorked(testColl.insert(testCase.insertDoc));
-    const res = st.getDB(dbName).runCommand(testCase.cmdObj);
+    const res = st.getDB(dbName).runCommand(cmdObjWithAdditionalFields);
+
+    if (cmdObjWithAdditionalFields.hasOwnProperty("autocommit") && !testCase.errorCode) {
+        assert.commandWorked(st.s.getDB(dbName).adminCommand({
+            commitTransaction: 1,
+            lsid: cmdObjWithAdditionalFields.lsid,
+            txnNumber: cmdObjWithAdditionalFields.txnNumber,
+            autocommit: false
+        }));
+    }
 
     if (testCase.insertDoc.length > 1) {
         return verifySingleModification(testCase, res);
@@ -202,9 +212,20 @@ const testCases = [
     },
 ];
 
+jsTest.log("Testing findAndModify without a shard key commands in various configurations.");
 testCases.forEach(testCase => {
-    jsTest.log("Testing findAndModify without a shard key commands.");
+    jsTest.log(testCase.logMessage);
     runCommandAndVerify(testCase);
+
+    const logicalSessionFields = {lsid: {id: UUID()}};
+    runCommandAndVerify(testCase, logicalSessionFields);
+
+    const retryableWriteFields = {lsid: {id: UUID()}, txnNumber: NumberLong(0)};
+    runCommandAndVerify(testCase, retryableWriteFields);
+
+    const transactionFields =
+        {lsid: {id: UUID()}, txnNumber: NumberLong(0), startTransaction: true, autocommit: false};
+    runCommandAndVerify(testCase, transactionFields);
 });
 
 st.stop();

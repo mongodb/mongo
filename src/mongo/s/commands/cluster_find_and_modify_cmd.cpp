@@ -666,7 +666,7 @@ private:
         auto txn = txn_api::SyncTransactionWithRetries(
             opCtx,
             Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
-            nullptr /* resourceYielder */);
+            TransactionRouterResourceYielder::makeForLocalHandoff());
 
         txn.run(
             opCtx, [sharedBlock](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
