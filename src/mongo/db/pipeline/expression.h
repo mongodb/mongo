@@ -49,6 +49,7 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_visitor.h"
 #include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/pipeline/monotonic_expression.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/datetime/date_time_support.h"
@@ -324,6 +325,14 @@ public:
 
     boost::optional<Variables::Id> getBoundaryVariableId() const {
         return _boundaryVariableId;
+    }
+
+    bool isMonotonic(const FieldPath& sortedFieldPath) const {
+        return getMonotonicState(sortedFieldPath) != monotonic::State::NonMonotonic;
+    }
+
+    virtual monotonic::State getMonotonicState(const FieldPath& sortedFieldPath) const {
+        return monotonic::State::NonMonotonic;
     }
 
 protected:
@@ -724,6 +733,10 @@ public:
     }
 
 private:
+    monotonic::State getMonotonicState(const FieldPath& sortedFieldPath) const final {
+        return monotonic::State::Constant;
+    }
+
     Value _value;
 };
 
@@ -941,6 +954,11 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+private:
+    monotonic::State getMonotonicState(const FieldPath& sortedFieldPath) const final {
+        return monotonic::combineExpressions(sortedFieldPath, getChildren());
+    };
 };
 
 
@@ -1185,6 +1203,11 @@ public:
 
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
+    }
+
+private:
+    monotonic::State getMonotonicState(const FieldPath& sortedFieldPath) const final {
+        return getChildren()[0]->getMonotonicState(sortedFieldPath);
     }
 };
 
@@ -1658,6 +1681,8 @@ private:
      */
     static Date_t convertToDate(const Value& value, StringData parameterName);
 
+    monotonic::State getMonotonicState(const FieldPath& sortedFieldPath) const final;
+
     // Starting time instant expression. Accepted types: Date_t, Timestamp, OID.
     boost::intrusive_ptr<Expression>& _startDate;
 
@@ -1836,6 +1861,8 @@ protected:
 
 
 private:
+    monotonic::State getMonotonicState(const FieldPath& sortedFieldPath) const final;
+
     /*
       Internal implementation of evaluate(), used recursively.
 
@@ -1923,6 +1950,11 @@ public:
 
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
+    }
+
+private:
+    monotonic::State getMonotonicState(const FieldPath& sortedFieldPath) const final {
+        return getChildren()[0]->getMonotonicState(sortedFieldPath);
     }
 };
 
@@ -3272,6 +3304,9 @@ public:
     void acceptVisitor(ExpressionConstVisitor* visitor) const final {
         return visitor->visit(this);
     }
+
+private:
+    monotonic::State getMonotonicState(const FieldPath& sortedFieldPath) const final;
 };
 
 
@@ -3981,6 +4016,10 @@ protected:
                                           long long amount,
                                           const TimeZone& timezone) const = 0;
 
+    monotonic::State getMonotonicState(const FieldPath& sortedFieldPath) const final;
+    virtual monotonic::State combineMonotonicStateOfArguments(
+        monotonic::State startDataMonotonicState, monotonic::State amountMonotonicState) const = 0;
+
 private:
     // The expression representing the startDate argument.
     boost::intrusive_ptr<Expression>& _startDate;
@@ -4021,10 +4060,14 @@ public:
     }
 
 private:
-    virtual Value evaluateDateArithmetics(Date_t date,
-                                          TimeUnit unit,
-                                          long long amount,
-                                          const TimeZone& timezone) const override;
+    monotonic::State combineMonotonicStateOfArguments(
+        monotonic::State startDataMonotonicState,
+        monotonic::State amountMonotonicState) const final;
+
+    Value evaluateDateArithmetics(Date_t date,
+                                  TimeUnit unit,
+                                  long long amount,
+                                  const TimeZone& timezone) const final;
 };
 
 class ExpressionDateSubtract final : public ExpressionDateArithmetics {
@@ -4044,10 +4087,14 @@ public:
     }
 
 private:
-    virtual Value evaluateDateArithmetics(Date_t date,
-                                          TimeUnit unit,
-                                          long long amount,
-                                          const TimeZone& timezone) const override;
+    monotonic::State combineMonotonicStateOfArguments(
+        monotonic::State startDataMonotonicState,
+        monotonic::State amountMonotonicState) const final;
+
+    Value evaluateDateArithmetics(Date_t date,
+                                  TimeUnit unit,
+                                  long long amount,
+                                  const TimeZone& timezone) const final;
 };
 
 struct SubstituteFieldPathWalker {
@@ -4130,6 +4177,8 @@ private:
      * Converts $dateTrunc expression parameter "binSize" 'value' to 64-bit integer.
      */
     static unsigned long long convertToBinSize(const Value& value);
+
+    monotonic::State getMonotonicState(const FieldPath& sortedFieldPath) const final;
 
     // Expression that evaluates to a date to truncate. Accepted BSON types: Date, bsonTimestamp,
     // jstOID.

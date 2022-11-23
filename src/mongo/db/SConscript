@@ -1589,6 +1589,7 @@ env.Library(
         'pipeline/expression.cpp',
         'pipeline/javascript_execution.cpp',
         'pipeline/make_js_function.cpp',
+        'pipeline/monotonic_expression.cpp',
         'pipeline/variables.cpp',
     ],
     LIBDEPS=[
