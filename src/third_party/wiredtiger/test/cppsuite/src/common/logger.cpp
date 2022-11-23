@@ -86,13 +86,13 @@ logger::log_msg(int64_t trace_type, const std::string &str)
 
         std::ostringstream ss;
         ss << time_buf << "[TID:" << std::this_thread::get_id() << "][" << LOG_LEVELS[trace_type]
-           << "]: " << str << std::endl;
+           << "]: " << str;
 
         std::lock_guard<std::mutex> lg(_logger_mtx);
         if (trace_type == LOG_ERROR)
-            std::cerr << ss.str();
+            std::cerr << ss.str() << std::endl;
         else
-            std::cout << ss.str();
+            std::cout << ss.str() << std::endl;
     }
 }
 } // namespace test_harness
