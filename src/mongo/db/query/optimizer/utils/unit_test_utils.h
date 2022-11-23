@@ -31,6 +31,7 @@
 
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/query/ce/ce_hinted.h"
+#include "mongo/db/query/cost_model/cost_model_gen.h"
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
@@ -196,6 +197,16 @@ OptPhaseManager makePhaseManager(OptPhaseManager::PhaseSet phaseSet,
                                  Metadata metadata,
                                  std::unique_ptr<CEInterface> ceDerivation,
                                  DebugInfo debugInfo,
+                                 QueryHints queryHints = {});
+
+/**
+ * A convenience factory function to create OptPhaseManager for unit tests with cost models.
+ */
+OptPhaseManager makePhaseManager(OptPhaseManager::PhaseSet phaseSet,
+                                 PrefixId& prefixId,
+                                 Metadata metadata,
+                                 DebugInfo debugInfo,
+                                 mongo::cost_model::CostModelCoefficients coefs,
                                  QueryHints queryHints = {});
 
 /**

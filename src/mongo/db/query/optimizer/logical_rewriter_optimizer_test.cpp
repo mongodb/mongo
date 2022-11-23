@@ -2192,7 +2192,7 @@ TEST(LogicalRewriter, RelaxComposeM) {
                                          prefixId,
                                          {{{"c1", createScanDef({}, {})}}},
                                          DebugInfo::kDefaultForTests,
-                                         {} /*hints*/);
+                                         QueryHints{});
 
     ABT optimized = rootNode;
     phaseManager.optimize(optimized);

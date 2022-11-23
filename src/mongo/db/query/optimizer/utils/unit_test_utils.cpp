@@ -296,6 +296,25 @@ OptPhaseManager makePhaseManager(OptPhaseManager::PhaseSet phaseSet,
                            std::move(queryHints)};
 }
 
+OptPhaseManager makePhaseManager(OptPhaseManager::PhaseSet phaseSet,
+                                 PrefixId& prefixId,
+                                 Metadata metadata,
+                                 DebugInfo debugInfo,
+                                 mongo::cost_model::CostModelCoefficients coefs,
+                                 QueryHints queryHints) {
+    return OptPhaseManager{std::move(phaseSet),
+                           prefixId,
+                           false /*requireRID*/,
+                           std::move(metadata),
+                           makeHeuristicCE(),  // primary CE
+                           makeHeuristicCE(),  // substitution phase CE, same as primary
+                           std::make_unique<cost_model::CostEstimator>(coefs),
+                           defaultConvertPathToInterval,
+                           ConstEval::constFold,
+                           std::move(debugInfo),
+                           std::move(queryHints)};
+}
+
 OptPhaseManager makePhaseManagerRequireRID(OptPhaseManager::PhaseSet phaseSet,
                                            PrefixId& prefixId,
                                            Metadata metadata,

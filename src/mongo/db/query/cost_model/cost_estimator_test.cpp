@@ -29,35 +29,11 @@
 
 #include "mongo/db/query/cost_model/cost_estimator.h"
 #include "mongo/db/query/cost_model/cost_model_gen.h"
+#include "mongo/db/query/cost_model/cost_model_utils.h"
 #include "mongo/db/query/optimizer/cascades/memo.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::cost_model {
-namespace {
-/**
- * Initialize the given CostModel's coefficients with the given value. It is useful in tests always
- * have the coefficeints initialized with some non zero value so we can make sure that unwanted
- * coefficients is not involved in tested calculations.
- */
-void initializeTestCostModel(CostModelCoefficients& costModel, double value = 10000) {
-    costModel.setScanStartupCost(value);
-    costModel.setScanIncrementalCost(value);
-    costModel.setIndexScanIncrementalCost(value);
-    costModel.setSeekCost(value);
-    costModel.setFilterIncrementalCost(value);
-    costModel.setEvalIncrementalCost(value);
-    costModel.setGroupByIncrementalCost(value);
-    costModel.setUnwindIncrementalCost(value);
-    costModel.setBinaryJoinIncrementalCost(value);
-    costModel.setHashJoinIncrementalCost(value);
-    costModel.setMergeJoinIncrementalCost(value);
-    costModel.setUniqueIncrementalCost(value);
-    costModel.setCollationIncrementalCost(value);
-    costModel.setCollationWithLimitIncrementalCost(value);
-    costModel.setUnionIncrementalCost(value);
-    costModel.setExchangeIncrementalCost(value);
-}
-}  // namespace
 
 /**
  * Test that the PhysicalScan's cost is calculated correctly.
