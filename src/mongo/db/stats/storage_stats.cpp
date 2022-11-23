@@ -111,13 +111,10 @@ void _appendRecordStats(OperationContext* opCtx,
     }
 
     if (serverGlobalParams.clusterRole == ClusterRole::ShardServer && !isNamespaceAlwaysUnsharded) {
-        if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-            feature_flags::gOrphanTracking.isEnabled(serverGlobalParams.featureCompatibility)) {
-            result->appendNumber(
-                kOrphanCountField,
-                BalancerStatsRegistry::get(opCtx)->getCollNumOrphanDocsFromDiskIfNeeded(
-                    opCtx, collection->uuid()));
-        }
+        result->appendNumber(
+            kOrphanCountField,
+            BalancerStatsRegistry::get(opCtx)->getCollNumOrphanDocsFromDiskIfNeeded(
+                opCtx, collection->uuid()));
     } else {
         result->appendNumber(kOrphanCountField, 0);
     }

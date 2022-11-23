@@ -700,10 +700,6 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
     }
 
     if (nss == NamespaceString::kRangeDeletionNamespace) {
-        if (!feature_flags::gOrphanTracking.isEnabled(serverGlobalParams.featureCompatibility)) {
-            return;
-        }
-
         const auto& deletedDoc = documentId;
 
         const auto numOrphanDocs = [&] {

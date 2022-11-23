@@ -42,11 +42,6 @@ feature_flags:
     cpp_varname: feature_flags::gBalanceAccordingToDataSize
     default: true
     version: 6.0 # Starting from v6.0.3
-  featureFlagOrphanTracking:
-    description: "Feature flag for enabling orphan tracking during migrations and range deletions"
-    cpp_varname: feature_flags::gOrphanTracking
-    default: true
-    version: 6.0
   featureFlagGlobalIndexesShardingCatalog:
     description: "Feature flag for enabling sharding catalog features for global indexes"
     cpp_varname: feature_flags::gGlobalIndexesShardingCatalog

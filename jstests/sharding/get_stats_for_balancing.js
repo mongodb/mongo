@@ -2,7 +2,6 @@
  * Basic tests for _shardsvrGetStatsForBalancing
  *
  * @tags: [
- *    featureFlagOrphanTracking,
  *    requires_fcv_60,
  * ]
  */

@@ -80,10 +80,6 @@ void BalancerStatsRegistry::onStepUpComplete(OperationContext* opCtx, long long 
     dassert(_state.load() == State::kSecondary);
     _state.store(State::kPrimaryIdle);
 
-    if (!feature_flags::gOrphanTracking.isEnabled(serverGlobalParams.featureCompatibility)) {
-        // If future flag is disabled do not initialize the registry
-        return;
-    }
     initializeAsync(opCtx);
 }
 
