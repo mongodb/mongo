@@ -452,7 +452,7 @@ __wt_txn_checkpoint_log(WT_SESSION_IMPL *session, bool full, uint32_t flags, WT_
     if (!full) {
         if (txn->full_ckpt) {
             if (lsnp != NULL)
-                *lsnp = *ckpt_lsn;
+                WT_ASSIGN_LSN(lsnp, ckpt_lsn);
             return (0);
         }
         return (__txn_log_file_sync(session, flags, lsnp));

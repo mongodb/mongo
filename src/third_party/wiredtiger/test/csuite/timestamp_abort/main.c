@@ -510,11 +510,13 @@ thread_run(void *arg)
         }
         if ((ret = cur_shadow->insert(cur_shadow)) == WT_ROLLBACK)
             goto rollback;
+        testutil_check(ret);
         data.size = __wt_random(&rnd) % MAX_VAL;
         data.data = obuf;
         cur_oplog->set_value(cur_oplog, &data);
         if ((ret = cur_oplog->insert(cur_oplog)) == WT_ROLLBACK)
             goto rollback;
+        testutil_check(ret);
         if (use_prep) {
             /*
              * Run with prepare every once in a while. And also yield after prepare sometimes too.
