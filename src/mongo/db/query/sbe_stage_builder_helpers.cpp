@@ -352,9 +352,9 @@ EvalStage makeLoopJoin(EvalStage left,
                        const sbe::value::SlotVector& lexicalEnvironment) {
     // If 'left' and 'right' are both null, we just return null. If one of 'left'/'right' is null
     // and the other is non-null, return whichever one is non-null.
-    if (left.stageIsNull()) {
+    if (left.isNull()) {
         return right;
-    } else if (right.stageIsNull()) {
+    } else if (right.isNull()) {
         return left;
     }
 
@@ -622,7 +622,7 @@ EvalExprStagePair generateShortCircuitingLogicalOp(sbe::EPrimBinary::Op logicOp,
 
     bool exprOnlyBranches = true;
     for (const auto& [expr, stage] : branches) {
-        if (!stage.stageIsNull()) {
+        if (!stage.isNull()) {
             exprOnlyBranches = false;
             break;
         }

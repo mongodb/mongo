@@ -45,7 +45,7 @@ namespace mongo::stage_builder {
  */
 class EvalExpr {
 public:
-    EvalExpr() = default;
+    EvalExpr() : _exprOrSlot{std::unique_ptr<sbe::EExpression>{}} {}
 
     EvalExpr(EvalExpr&& e) : _exprOrSlot(std::move(e._exprOrSlot)) {
         e.reset();
@@ -91,19 +91,23 @@ public:
         }
 
         const auto& expr = stdx::get<std::unique_ptr<sbe::EExpression>>(_exprOrSlot);
+        if (expr) {
+            return expr->clone();
+        }
 
-        tassert(
-            6897007, "Unexpected: clone() method invoked on null EvalExpr", expr.get() != nullptr);
+        return {};
+    }
 
-        return expr->clone();
+    bool isNull() const {
+        return !hasSlot() && !stdx::get<std::unique_ptr<sbe::EExpression>>(_exprOrSlot);
     }
 
     explicit operator bool() const {
-        return hasSlot() || stdx::get<std::unique_ptr<sbe::EExpression>>(_exprOrSlot) != nullptr;
+        return !isNull();
     }
 
     void reset() {
-        _exprOrSlot = std::unique_ptr<sbe::EExpression>();
+        _exprOrSlot = std::unique_ptr<sbe::EExpression>{};
     }
 
     std::unique_ptr<sbe::EExpression> extractExpr() {
@@ -126,9 +130,9 @@ private:
  * extractStage() method will return _stage. EvalStage's default constructor initializes
  * _stage to be nullptr.
  *
- * The stageIsNull() method allows callers to check if _state is nullptr. Some helper functions
- * (such as makeLoopJoin()) take advantage of this knowledge and are able to perform optimizations
- * in the case where stageIsNull() == true.
+ * The isNull() method allows callers to check if _state is nullptr. Some helper functions (such
+ * as makeLoopJoin()) take advantage of this knowledge and are able to perform optimizations in
+ * the case where isNull() == true.
  *
  * The _outSlots vector keeps track of all of the "output" slots that are produced by the current
  * sbe::PlanStage tree (_stage). The _outSlots vector is used by makeLoopJoin() and makeTraverse()
@@ -151,7 +155,7 @@ public:
         return *this;
     }
 
-    bool stageIsNull() const {
+    bool isNull() const {
         return !_stage;
     }
 

@@ -1767,13 +1767,11 @@ SlotBasedStageBuilder::buildProjectionDefault(const QuerySolutionNode* root,
 
     auto relevantSlots = getSlotsToForward(childReqs, outputs);
 
-    auto [resultSlot, resultStage] =
-        generateProjection(_state,
-                           &projection,
-                           {std::move(stage), std::move(relevantSlots)},
-                           outputs.get(kResult),
-                           root->nodeId(),
-                           &outputs);
+    auto projectionExpr = generateProjection(_state, &projection, outputs.get(kResult), &outputs);
+    auto [resultSlot, resultStage] = projectEvalExpr(std::move(projectionExpr),
+                                                     EvalStage{std::move(stage), {}},
+                                                     root->nodeId(),
+                                                     &_slotIdGenerator);
 
     stage = resultStage.extractStage(root->nodeId());
     outputs.set(kResult, resultSlot);
@@ -2308,7 +2306,8 @@ EvalStage optimizeFieldPaths(StageBuilderState& state,
         auto fieldPathStr = fieldExpr->getFieldPath().fullPath();
 
         if (!state.preGeneratedExprs.contains(fieldPathStr)) {
-            auto expr = generateExpression(state, fieldExpr, rootSlot, &outputs);
+            auto rootExpr = rootSlot.has_value() ? EvalExpr{*rootSlot} : EvalExpr{};
+            auto expr = generateExpression(state, fieldExpr, std::move(rootExpr), &outputs);
 
             auto [slot, projectStage] =
                 projectEvalExpr(std::move(expr), std::move(stage), nodeId, state.slotIdGenerator);
@@ -2331,7 +2330,8 @@ EvalExprStagePair generateGroupByKeyImpl(StageBuilderState& state,
     // Optimize field paths before generating the expression.
     stage = optimizeFieldPaths(state, idExpr, std::move(stage), outputs, nodeId);
 
-    auto expr = stage_builder::generateExpression(state, idExpr.get(), rootSlot, &outputs);
+    auto rootExpr = rootSlot.has_value() ? EvalExpr{*rootSlot} : EvalExpr{};
+    auto expr = generateExpression(state, idExpr.get(), std::move(rootExpr), &outputs);
 
     return {std::move(expr), std::move(stage)};
 }
@@ -2409,7 +2409,9 @@ std::tuple<sbe::value::SlotVector, EvalStage> generateAccumulator(
 
     // Input fields may need field traversal.
     stage = optimizeFieldPaths(state, accStmt.expr.argument, std::move(stage), outputs, nodeId);
-    auto argExpr = generateExpression(state, accStmt.expr.argument.get(), rootSlot, &outputs);
+    auto rootExpr = rootSlot.has_value() ? EvalExpr{*rootSlot} : EvalExpr{};
+    auto argExpr =
+        generateExpression(state, accStmt.expr.argument.get(), std::move(rootExpr), &outputs);
 
     // One accumulator may be translated to multiple accumulator expressions. For example, The
     // $avg will have two accumulators expressions, a sum(..) and a count which is implemented

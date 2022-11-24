@@ -84,9 +84,9 @@ struct ExpressionVisitorContext {
     };
 
     ExpressionVisitorContext(StageBuilderState& state,
-                             boost::optional<sbe::value::SlotId> optionalRootSlot,
+                             EvalExpr rootExpr,
                              const PlanStageSlots* slots = nullptr)
-        : state(state), optionalRootSlot(optionalRootSlot), slots(slots) {}
+        : state(state), rootExpr(std::move(rootExpr)), slots(slots) {}
 
     void ensureArity(size_t arity) {
         invariant(exprStack.size() >= arity);
@@ -116,7 +116,7 @@ struct ExpressionVisitorContext {
 
     std::stack<EvalExpr> exprStack;
 
-    boost::optional<sbe::value::SlotId> optionalRootSlot;
+    EvalExpr rootExpr;
 
     // The lexical environment for the expression being traversed. A variable reference takes the
     // form "$$variable_name" in MQL's concrete syntax and gets transformed into a numeric
@@ -1853,28 +1853,23 @@ public:
             }
         }
 
-        boost::optional<sbe::FrameId> frameId;
-        boost::optional<sbe::value::SlotId> slotId;
+        EvalExpr inputExpr;
         boost::optional<sbe::value::SlotId> topLevelFieldSlot;
-        boost::optional<FieldPath> fp;
         bool expectsDocumentInputOnly = false;
+        auto fp = (expr->getFieldPath().getPathLength() > 1)
+            ? boost::make_optional(expr->getFieldPathWithoutCurrentPrefix())
+            : boost::none;
 
-        if (expr->getFieldPath().getPathLength() > 1) {
-            fp = expr->getFieldPathWithoutCurrentPrefix();
-        }
-
-        if (expr->getVariableId() == Variables::kRootId &&
-            expr->getFieldPath().getPathLength() > 1) {
-            slotId = _context->optionalRootSlot;
-            expectsDocumentInputOnly = true;
-
-            if (_context->slots) {
-                auto topLevelField = std::make_pair(PlanStageSlots::kField, fp->front());
-                topLevelFieldSlot = _context->slots->getIfExists(topLevelField);
-            }
-        } else if (!Variables::isUserDefinedVariable(expr->getVariableId())) {
+        if (!Variables::isUserDefinedVariable(expr->getVariableId())) {
             if (expr->getVariableId() == Variables::kRootId) {
-                slotId = _context->optionalRootSlot;
+                // Set inputExpr to refer to the root document.
+                inputExpr = _context->rootExpr.clone();
+                expectsDocumentInputOnly = true;
+                // Check if a slot is available for the top-level field referred to by 'expr'.
+                if (expr->getFieldPath().getPathLength() > 1 && _context->slots) {
+                    auto topLevelField = std::make_pair(PlanStageSlots::kField, fp->front());
+                    topLevelFieldSlot = _context->slots->getIfExists(topLevelField);
+                }
             } else if (expr->getVariableId() == Variables::kRemoveId) {
                 // For the field paths that begin with "$$REMOVE", we always produce Nothing,
                 // so no traversal is necessary.
@@ -1886,47 +1881,38 @@ public:
                         "Encountered unexpected system variable ID",
                         it != Variables::kIdToBuiltinVarName.end());
 
-                auto variableSlot = _context->state.data->env->getSlotIfExists(it->second);
+                auto slot = _context->state.data->env->getSlotIfExists(it->second);
                 uassert(5611301,
                         str::stream()
                             << "Builtin variable '$$" << it->second << "' is not available",
-                        variableSlot.has_value());
+                        slot.has_value());
 
-                slotId = variableSlot;
+                inputExpr = *slot;
             }
         } else {
             auto it = _context->environment.find(expr->getVariableId());
             if (it != _context->environment.end()) {
-                frameId = it->second.first;
-                slotId = it->second.second;
+                inputExpr = makeVariable(*it->second.first, it->second.second);
             } else {
-                slotId = _context->state.getGlobalVariableSlot(expr->getVariableId());
+                inputExpr = _context->state.getGlobalVariableSlot(expr->getVariableId());
             }
         }
 
         if (expr->getFieldPath().getPathLength() == 1) {
-            tassert(6023419, "Must have a valid slot", slotId.has_value());
+            tassert(6929400, "Expected a valid input expression", !inputExpr.isNull());
 
             // A solo variable reference (e.g.: "$$ROOT" or "$$myvar") that doesn't need any
             // traversal.
-            if (frameId.has_value()) {
-                _context->pushExpr(makeVariable(*frameId, *slotId));
-            } else {
-                _context->pushExpr(*slotId);
-            }
+            _context->pushExpr(std::move(inputExpr));
             return;
         }
 
-        tassert(6023420,
-                "Must have a valid root slot or field slot",
-                slotId.has_value() || topLevelFieldSlot.has_value());
-
-        auto inputExpr = !slotId.has_value()
-            ? std::unique_ptr<sbe::EExpression>{}
-            : frameId.has_value() ? makeVariable(*frameId, *slotId) : makeVariable(*slotId);
+        tassert(6929401,
+                "Expected a valid input expression or a valid field slot",
+                !inputExpr.isNull() || topLevelFieldSlot.has_value());
 
         // Dereference a dotted path, which may contain arrays requiring implicit traversal.
-        auto resultExpr = generateTraverse(std::move(inputExpr),
+        auto resultExpr = generateTraverse(inputExpr.extractExpr(),
                                            expectsDocumentInputOnly,
                                            *fp,
                                            _context->state.frameIdGenerator,
@@ -3739,9 +3725,9 @@ private:
 
 EvalExpr generateExpression(StageBuilderState& state,
                             const Expression* expr,
-                            boost::optional<sbe::value::SlotId> rootSlot,
+                            EvalExpr rootExpr,
                             const PlanStageSlots* slots) {
-    ExpressionVisitorContext context(state, rootSlot, slots);
+    ExpressionVisitorContext context(state, std::move(rootExpr), slots);
 
     ExpressionPreVisitor preVisitor{&context};
     ExpressionInVisitor inVisitor{&context};

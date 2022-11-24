@@ -106,8 +106,7 @@ public:
             false /* allowDiskUse */
         };
 
-        auto evalExpr = stage_builder::generateExpression(
-            state, expression.get(), boost::make_optional(_inputSlotId));
+        auto evalExpr = stage_builder::generateExpression(state, expression.get(), _inputSlotId);
 
         LOGV2_DEBUG(6979801,
                     1,

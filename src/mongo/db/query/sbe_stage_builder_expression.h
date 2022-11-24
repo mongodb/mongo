@@ -41,12 +41,12 @@ namespace mongo::stage_builder {
 class PlanStageSlots;
 
 /**
- * Translates an input Expression into an SBE EvalExpr. 'rootSlot' should either be set to a slot
- * that holds the root document or it should be boost::none. 'slots' can optionaly be provided as
+ * Translates an input Expression into an SBE EvalExpr. 'rootExpr' should either be null or it
+ * should be an EvalExpr that produces the root document. 'slots' can optionaly be provided as
  * well so that generateExrpession() can make use of kField slots when appropriate.
  */
 EvalExpr generateExpression(StageBuilderState& state,
                             const Expression* expr,
-                            boost::optional<sbe::value::SlotId> rootSlot,
+                            EvalExpr rootExpr,
                             const PlanStageSlots* slots = nullptr);
 }  // namespace mongo::stage_builder
