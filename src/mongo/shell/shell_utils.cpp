@@ -579,8 +579,8 @@ protected:
 };
 
 std::string GoldenTestContextShellFailure::toString() const {
-    return "Test output verification failed: {}, "
-           "actual output file: {}, "
+    return "Test output verification failed: {}\n"
+           "Actual output file: {}, "
            "expected output file: {}"
            ""_format(message, actualOutputFile, expectedOutputFile);
 }

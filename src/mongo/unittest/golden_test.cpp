@@ -74,6 +74,12 @@ void GoldenTestContext::onError(const std::string& message,
                 "actualOutputRoot"_attr = getEnv()->actualOutputRoot().string(),
                 "expectedOutputRoot"_attr = getEnv()->expectedOutputRoot().string());
 
+    auto diff_cmd = unittest::GoldenTestEnvironment::getInstance()->diffCmd(
+        getExpectedOutputPath().string(), getActualOutputPath().string());
+    std::cout << std::flush;
+    int status = std::system(diff_cmd.c_str());
+    (void)status;
+
     throw TestAssertionFailureException(_testInfo->file().toString(), _testInfo->line(), message);
 }
 

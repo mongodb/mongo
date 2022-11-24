@@ -167,7 +167,10 @@ void GoldenTestContextBase::verifyOutput() {
 
     std::string expectedStr = readFile(goldenDataPath);
     if (actualStr != expectedStr) {
-        failResultMismatch(actualStr, expectedStr, "Actual result doesn't match golden data.");
+        failResultMismatch(actualStr,
+                           expectedStr,
+                           "Actual result doesn't match golden data. "
+                           "Run 'buildscripts/golden_test.py diff' for more information.");
     }
 }
 
