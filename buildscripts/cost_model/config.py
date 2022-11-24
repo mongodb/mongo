@@ -153,3 +153,23 @@ class BenchmarkConfig:
 
     warmup_runs: int
     runs: int
+
+
+@dataclass
+class EntToEndTestingConfig:
+    """End 2 End testing config."""
+
+    database: DatabaseConfig
+    data_generator: DataGeneratorConfig
+    workload_execution: WorkloadExecutionConfig
+    processor: End2EndProcessorConfig
+    result_csv_filepath: str
+
+
+@dataclass
+class End2EndProcessorConfig:
+    """Config of End 2 End tesing processor."""
+
+    enabled: bool
+    estimator: Callable[[str, int], float]
+    input_collection_name: str

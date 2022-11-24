@@ -82,6 +82,7 @@ def process_stage(stage: dict[str, any]) -> Node:
         'limitskip': process_inner_node,
         'group': process_inner_node,
         'union': process_union_node,
+        'unique': process_unique_node,
         'unwind': process_unwind_node,
     }
 
@@ -128,7 +129,8 @@ def process_nlj(stage: dict[str, any]) -> Node:
 def process_inner_node(stage: dict[str, any]) -> Node:
     """Process SBE stage with one input stage."""
     input_stage = process_stage(stage['inputStage'])
-    return Node(**get_common_fields(stage), n_processed=stage['nReturned'], children=[input_stage])
+    return Node(**get_common_fields(stage), n_processed=input_stage.n_returned,
+                children=[input_stage])
 
 
 def process_leaf_node(stage: dict[str, any]) -> Node:
@@ -154,10 +156,17 @@ def process_unwind_node(stage: dict[str, any]) -> Node:
                 children=[input_stage])
 
 
+def process_unique_node(stage: dict[str, any]) -> Node:
+    """Process unique stage."""
+    input_stage = process_stage(stage['inputStage'])
+    n_processed = stage['dupsTested']
+    return Node(**get_common_fields(stage), n_processed=n_processed, children=[input_stage])
+
+
 def get_common_fields(json_stage: dict[str, any]) -> dict[str, any]:
     """Exctract common field from json representation of SBE stage."""
     return {
         'stage': json_stage['stage'], 'plan_node_id': json_stage['planNodeId'],
-        'total_execution_time': json_stage['executionTimeMicros'],
+        'total_execution_time': json_stage['executionTimeNanos'],
         'n_returned': json_stage['nReturned']
     }

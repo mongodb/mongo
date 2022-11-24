@@ -45,22 +45,38 @@ import execution_tree
 class CostModelCoefficients:
     """Represent MongoDB's Cost Model Coefficients initially defined in the cost_model.idl file."""
 
-    startup_cost: float | None = None
     scan_incremental_cost: float | None = None
+    scan_startup_cost: float | None = None
     index_scan_incremental_cost: float | None = None
+    index_scan_startup_cost: float | None = None
     seek_cost: float | None = None
+    seek_startup_cost: float | None = None
     filter_incremental_cost: float | None = None
+    filter_startup_cost: float | None = None
     eval_incremental_cost: float | None = None
+    eval_startup_cost: float | None = None
     group_by_incremental_cost: float | None = None
+    group_by_startup_cost: float | None = None
     unwind_incremental_cost: float | None = None
+    unwind_startup_cost: float | None = None
     binary_join_incremental_cost: float | None = None
+    binary_join_startup_cost: float | None = None
     hash_join_incremental_cost: float | None = None
+    hash_join_startup_cost: float | None = None
     merge_join_incremental_cost: float | None = None
+    merge_join_startup_cost: float | None = None
     unique_incremental_cost: float | None = None
+    unique_startup_cost: float | None = None
     collation_incremental_cost: float | None = None
+    collation_startup_cost: float | None = None
     collation_with_limit_incremental_cost: float | None = None
+    collation_with_limit_startup_cost: float | None = None
     union_incremental_cost: float | None = None
+    union_startup_cost: float | None = None
     exchange_incremental_cost: float | None = None
+    exchange_startup_cost: float | None = None
+    limit_skip_incremental_cost: float | None = None
+    limit_skip_startup_cost: float | None = None
 
     def to_dict(self):
         """Convert to a dictionary with keys defined according to cost_model.idl."""

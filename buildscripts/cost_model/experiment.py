@@ -129,7 +129,8 @@ def remove_outliers(df: pd.DataFrame, lower_percentile: float = 0.1,
         high = df_seq.quantile(upper_percentile)
         return (df_seq >= low) & (df_seq <= high)
 
-    return df[df.groupby('run_id').total_execution_time.transform(is_not_outlier).eq(1)]
+    return df[df.groupby(['run_id', 'collection',
+                          'pipeline']).total_execution_time.transform(is_not_outlier).eq(1)]
 
 
 def extract_sbe_stages(df: pd.DataFrame) -> pd.DataFrame:
@@ -137,12 +138,12 @@ def extract_sbe_stages(df: pd.DataFrame) -> pd.DataFrame:
 
     def flatten_sbe_stages(explain):
         def traverse(node, stages):
-            execution_time = node['executionTimeMicros']
+            execution_time = node['executionTimeNanos']
             children_fields = ['innerStage', 'outerStage', 'inputStage']
             for field in children_fields:
                 if field in node and node[field]:
                     child = node[field]
-                    execution_time -= child['executionTimeMicros']
+                    execution_time -= child['executionTimeNanos']
                     traverse(child, stages)
                     del node[field]
             node['executionTime'] = execution_time

@@ -81,6 +81,14 @@ def generate_random_str(num: int):
     return str_list
 
 
+def random_strings_distr(size: int, count: int):
+    distr = ArrayRandomDistribution(
+        RandomDistribution.uniform([size]),
+        RandomDistribution.uniform(RangeGenerator(DataType.STRING, "a", "z")))
+
+    return RandomDistribution.uniform([''.join(s) for s in distr.generate(count)])
+
+
 small_string_choice = generate_random_str(20)
 
 distributions['string_choice_small'] = RandomDistribution.choice(small_string_choice,
@@ -143,8 +151,9 @@ def create_index_scan_collection_template(name: str, cardinality: int) -> config
         ], compound_indexes=[], cardinalities=[cardinality])
 
 
-def create_physical_scan_collection_template(name: str) -> config.CollectionTemplate:
-    return config.CollectionTemplate(
+def create_physical_scan_collection_template(name: str,
+                                             payload_size: int = 0) -> config.CollectionTemplate:
+    template = config.CollectionTemplate(
         name=name, fields=[
             config.FieldTemplate(name="choice1", data_type=config.DataType.STRING,
                                  distribution=distributions["string_choice"], indexed=False),
@@ -156,10 +165,17 @@ def create_physical_scan_collection_template(name: str) -> config.CollectionTemp
                                  distribution=distributions["string_choice"], indexed=False),
             config.FieldTemplate(name="mixed2", data_type=config.DataType.STRING,
                                  distribution=distributions["string_mixed"], indexed=False),
-        ], compound_indexes=[], cardinalities=[1000, 5000, 10000, 50000])
+        ], compound_indexes=[], cardinalities=[1000, 5000, 10000])
+
+    if payload_size > 0:
+        payload_distr = random_strings_distr(payload_size, 1000)
+        template.fields.append(
+            config.FieldTemplate(name="payload", data_type=config.DataType.STRING,
+                                 distribution=payload_distr, indexed=False))
+    return template
 
 
-collection_caridinalities = list(range(10000, 50001, 5000))
+collection_caridinalities = list(range(10000, 50001, 10000))
 
 c_int_05 = config.CollectionTemplate(
     name="c_int_05", fields=[
@@ -178,23 +194,23 @@ c_int_05 = config.CollectionTemplate(
 c_arr_01 = config.CollectionTemplate(
     name="c_arr_01", fields=[
         config.FieldTemplate(name="as", data_type=config.DataType.INTEGER,
-                             distribution=distributions["array_small"], indexed=False)
+                             distribution=distributions["array_small"], indexed=True)
     ], compound_indexes=[], cardinalities=collection_caridinalities)
 
 index_scan = create_index_scan_collection_template('index_scan', 1000000)
 
-physical_scan = create_physical_scan_collection_template('physical_scan')
+physical_scan = create_physical_scan_collection_template('physical_scan', 2000)
 
 # Data Generator settings
 data_generator = config.DataGeneratorConfig(
     enabled=True, batch_size=10000,
-    collection_templates=[index_scan, physical_scan, c_int_05,
-                          c_arr_01], write_mode=config.WriteMode, collection_name_with_card=True)
+    collection_templates=[index_scan, physical_scan, c_int_05, c_arr_01],
+    write_mode=config.WriteMode.REPLACE, collection_name_with_card=True)
 
 # Workload Execution settings
 workload_execution = config.WorkloadExecutionConfig(
     enabled=True, output_collection_name='calibrationData', write_mode=config.WriteMode.REPLACE,
-    warmup_runs=3, runs=10)
+    warmup_runs=3, runs=30)
 
 
 def make_filter_by_note(note_value: any):
@@ -212,14 +228,17 @@ abt_nodes = [
     config.AbtNodeCalibrationConfig(type='Seek'),
     config.AbtNodeCalibrationConfig(type='Filter',
                                     filter_function=make_filter_by_note('PhysicalScan')),
-    config.AbtNodeCalibrationConfig(type='Evaluation'),
+    config.AbtNodeCalibrationConfig(type='Evaluation',
+                                    filter_function=make_filter_by_note('Evaluation')),
     config.AbtNodeCalibrationConfig(type='BinaryJoin'),
     config.AbtNodeCalibrationConfig(type='HashJoin'),
     config.AbtNodeCalibrationConfig(type='MergeJoin'),
     config.AbtNodeCalibrationConfig(type='Union'),
-    config.AbtNodeCalibrationConfig(type='LimitSkip'),
+    config.AbtNodeCalibrationConfig(type='LimitSkip',
+                                    filter_function=make_filter_by_note('LimitSkip')),
     config.AbtNodeCalibrationConfig(type='GroupBy'),
     config.AbtNodeCalibrationConfig(type='Unwind'),
+    config.AbtNodeCalibrationConfig(type='Unique'),
 ]
 
 # Calibrator settings

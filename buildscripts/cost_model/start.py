@@ -94,8 +94,8 @@ async def execute_physical_scan_queries(database: DatabaseInstance,
                 continue
             keys_length = len(val) + 2
             requests.append(
-                Query(pipeline=[{'$match': {field.name: val}}], keys_length_in_bytes=keys_length,
-                      note='PhysicalScan'))
+                Query(pipeline=[{'$match': {field.name: val}}, {"$limit": 10}],
+                      keys_length_in_bytes=keys_length, note='PhysicalScan'))
 
     await workload_execution.execute(database, main_config.workload_execution, collections,
                                      requests)
@@ -150,13 +150,13 @@ async def execute_index_intersections(database: DatabaseInstance,
 
 
 async def execute_evaluation(database: DatabaseInstance, collections: Sequence[CollectionInfo]):
-    collections = [ci for ci in collections if ci.name.startswith('c_int')]
+    collections = [ci for ci in collections if ci.name.startswith('c_int_05')]
     requests = []
 
-    for i in range(500, 1000, 100):
+    for i in [100, 500, 1000]:
         requests.append(
-            Query(pipeline=[{"$match": {'in1': {"$gt": i}}}, {'$project': {'proj1': 1}}],
-                  keys_length_in_bytes=1, number_of_fields=1))
+            Query(pipeline=[{'$project': {'uniform1': 1, 'mixed2': 1}}, {"$limit": i}],
+                  keys_length_in_bytes=1, number_of_fields=1, note='Evaluation'))
 
     await workload_execution.execute(database, main_config.workload_execution, collections,
                                      requests)
@@ -173,6 +173,31 @@ async def execute_unwind(database: DatabaseInstance, collections: Sequence[Colle
             Query(pipeline=[{"$unwind": "$as"}], number_of_fields=average_size_of_arrays))
 
     await workload_execution.execute(database, main_config.workload_execution, collections,
+                                     requests)
+
+
+async def execute_unique(database: DatabaseInstance, collections: Sequence[CollectionInfo]):
+    collections = [ci for ci in collections if ci.name.startswith('c_arr_01')]
+    requests = []
+
+    for i in range(500, 1000, 200):
+        requests.append(Query(pipeline=[{"$match": {"as": {"$gt": i}}}]))
+
+    await workload_execution.execute(database, main_config.workload_execution, collections,
+                                     requests)
+
+
+async def execute_limitskip(database: DatabaseInstance, collections: Sequence[CollectionInfo]):
+    collection = [ci for ci in collections if ci.name.startswith('index_scan')][0]
+    limits = [5, 10, 15, 20]
+    skips = [5, 10, 15, 20]
+    requests = []
+
+    for limit in limits:
+        for skip in skips:
+            requests.append(Query(pipeline=[{"$skip": skip}, {"$limit": limit}], note="LimitSkip"))
+
+    await workload_execution.execute(database, main_config.workload_execution, [collection],
                                      requests)
 
 
@@ -197,6 +222,8 @@ async def main():
             execute_index_intersections,
             execute_evaluation,
             execute_unwind,
+            execute_unique,
+            execute_limitskip,
         ]
         for execute_query in execution_query_functions:
             await execute_query(database, generator.collection_infos)
