@@ -67,6 +67,10 @@ for (let i = 0; i < 20; i++) {
     assert(exists);
 }
 
+// Test valid query with empty specification
+assert.commandWorked(
+    adminDb.runCommand({aggregate: 1, pipeline: [{$_internalAllCollectionStats: {}}], cursor: {}}));
+
 // Test invalid queries/values.
 assert.commandFailedWithCode(
     adminDb.runCommand({aggregate: 1, pipeline: [{$_internalAllCollectionStats: 3}], cursor: {}}),

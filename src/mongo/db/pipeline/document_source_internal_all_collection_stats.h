@@ -117,7 +117,7 @@ private:
 
     // The specification object given to $_internalAllCollectionStats containing user specified
     // options.
-    DocumentSourceInternalAllCollectionStatsSpec _internalAllCollectionStatsSpec;
+    const DocumentSourceInternalAllCollectionStatsSpec _internalAllCollectionStatsSpec;
     boost::optional<std::deque<BSONObj>> _catalogDocs;
 
     // A $match stage can be absorbed in order to avoid unnecessarily computing the stats for

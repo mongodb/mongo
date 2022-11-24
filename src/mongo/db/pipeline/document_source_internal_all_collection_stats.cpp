@@ -61,12 +61,14 @@ DocumentSource::GetNextResult DocumentSourceInternalAllCollectionStats::doGetNex
             continue;
         }
 
-        try {
-            return {Document{DocumentSourceCollStats::makeStatsForNs(
-                pExpCtx, nss, _internalAllCollectionStatsSpec.getStats().get())}};
-        } catch (const ExceptionFor<ErrorCodes::CommandNotSupportedOnView>&) {
-            // We don't want to retrieve data for views, only for collections.
-            continue;
+        if (const auto& stats = _internalAllCollectionStatsSpec.getStats()) {
+            try {
+                return {
+                    Document{DocumentSourceCollStats::makeStatsForNs(pExpCtx, nss, stats.get())}};
+            } catch (const ExceptionFor<ErrorCodes::CommandNotSupportedOnView>&) {
+                // We don't want to retrieve data for views, only for collections.
+                continue;
+            }
         }
     }
 
