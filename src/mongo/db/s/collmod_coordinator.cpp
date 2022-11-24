@@ -382,7 +382,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                             "error"_attr = redact(status));
                 // If we have the collection UUID set, this error happened in a sharded collection,
                 // we should restore the migrations.
-                if (_doc.getCollUUID()) {
+                if (_doc.getCollUUID() && _collInfo) {
                     auto opCtxHolder = cc().makeOperationContext();
                     auto* opCtx = opCtxHolder.get();
                     getForwardableOpMetadata().setOn(opCtx);
