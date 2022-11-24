@@ -88,11 +88,12 @@ public:
             repl::ReadConcernArgs::get(opCtx) =
                 repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
-            const auto& collMod = request().getCollModRequest();
-            if (collMod.getTimeseries() && collMod.getTimeseries().value().getGranularity()) {
-                auto granularity = collMod.getTimeseries().value().getGranularity().value();
-                ShardingCatalogManager::get(opCtx)->updateTimeSeriesGranularity(
-                    opCtx, ns(), granularity);
+            auto& ts = request().getCollModRequest().getTimeseries();
+            if (ts.has_value() &&
+                (ts->getGranularity().has_value() || ts->getBucketMaxSpanSeconds().has_value() ||
+                 ts->getBucketRoundingSeconds().has_value())) {
+                ShardingCatalogManager::get(opCtx)->updateTimeSeriesBucketingParameters(
+                    opCtx, ns(), ts.get());
             }
         }
 

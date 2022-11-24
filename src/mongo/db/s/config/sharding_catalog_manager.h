@@ -442,12 +442,12 @@ public:
     void applyLegacyConfigurationToSessionsCollection(OperationContext* opCtx);
 
     /**
-     * Updates the granularity value of a time-series collection. Also bumps the shard versions for
-     * all shards.
+     * Updates the bucketing parameters of a time-series collection. Also bumps the shard versions
+     * for all shards.
      */
-    void updateTimeSeriesGranularity(OperationContext* opCtx,
-                                     const NamespaceString& nss,
-                                     BucketGranularityEnum granularity);
+    void updateTimeSeriesBucketingParameters(OperationContext* opCtx,
+                                             const NamespaceString& nss,
+                                             const CollModTimeseries& timeseriesParameters);
 
     //
     // Shard Operations

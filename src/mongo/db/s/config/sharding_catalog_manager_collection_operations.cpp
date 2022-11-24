@@ -564,44 +564,66 @@ void ShardingCatalogManager::renameShardedMetadata(
     }
 }
 
-void ShardingCatalogManager::updateTimeSeriesGranularity(OperationContext* opCtx,
-                                                         const NamespaceString& nss,
-                                                         BucketGranularityEnum granularity) {
+void ShardingCatalogManager::updateTimeSeriesBucketingParameters(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const CollModTimeseries& timeseriesParameters) {
     const auto cm = uassertStatusOK(
         Grid::get(opCtx)->catalogCache()->getShardedCollectionPlacementInfoWithRefresh(opCtx, nss));
     std::set<ShardId> shardIds;
     cm.getAllShardIds(&shardIds);
 
-    withTransaction(
-        opCtx,
-        CollectionType::ConfigNS,
-        [this, &nss, granularity, &shardIds](OperationContext* opCtx, TxnNumber txnNumber) {
-            // Update granularity value in config.collections.
-            auto granularityFieldName = CollectionType::kTimeseriesFieldsFieldName + "." +
-                TypeCollectionTimeseriesFields::kGranularityFieldName;
-            auto bucketSpanFieldName = CollectionType::kTimeseriesFieldsFieldName + "." +
-                TypeCollectionTimeseriesFields::kBucketMaxSpanSecondsFieldName;
-            auto bucketSpan = timeseries::getMaxSpanSecondsFromGranularity(granularity);
-            writeToConfigDocumentInTxn(
-                opCtx,
-                CollectionType::ConfigNS,
-                BatchedCommandRequest::buildUpdateOp(
+    withTransaction(opCtx,
                     CollectionType::ConfigNS,
-                    BSON(CollectionType::kNssFieldName << nss.ns()) /* query */,
-                    BSON("$set" << BSON(granularityFieldName
-                                        << BucketGranularity_serializer(granularity)
-                                        << bucketSpanFieldName << bucketSpan)) /* update */,
-                    false /* upsert */,
-                    false /* multi */),
-                txnNumber);
+                    [this, &nss, &timeseriesParameters, &shardIds](OperationContext* opCtx,
+                                                                   TxnNumber txnNumber) {
+                        auto granularityFieldName = CollectionType::kTimeseriesFieldsFieldName +
+                            "." + TypeCollectionTimeseriesFields::kGranularityFieldName;
+                        auto bucketSpanFieldName = CollectionType::kTimeseriesFieldsFieldName +
+                            "." + TypeCollectionTimeseriesFields::kBucketMaxSpanSecondsFieldName;
+                        auto bucketRoundingFieldName = CollectionType::kTimeseriesFieldsFieldName +
+                            "." + TypeCollectionTimeseriesFields::kBucketRoundingSecondsFieldName;
 
-            // Bump the chunk version for shards.
-            bumpMajorVersionOneChunkPerShard(opCtx,
-                                             nss,
-                                             txnNumber,
-                                             {std::make_move_iterator(shardIds.begin()),
-                                              std::make_move_iterator(shardIds.end())});
-        });
+                        BSONObjBuilder updateCmd;
+                        BSONObj bucketUp;
+                        if (timeseriesParameters.getGranularity().has_value()) {
+                            auto bucketSpan = timeseries::getMaxSpanSecondsFromGranularity(
+                                timeseriesParameters.getGranularity().get());
+                            updateCmd.append("$unset", BSON(bucketRoundingFieldName << ""));
+                            bucketUp = BSON(granularityFieldName
+                                            << BucketGranularity_serializer(
+                                                   timeseriesParameters.getGranularity().get())
+                                            << bucketSpanFieldName << bucketSpan);
+                        } else {
+                            invariant(timeseriesParameters.getBucketMaxSpanSeconds().has_value() &&
+                                      timeseriesParameters.getBucketRoundingSeconds().has_value());
+                            updateCmd.append("$unset", BSON(granularityFieldName << ""));
+                            bucketUp =
+                                BSON(bucketSpanFieldName
+                                     << timeseriesParameters.getBucketMaxSpanSeconds().get()
+                                     << bucketRoundingFieldName
+                                     << timeseriesParameters.getBucketRoundingSeconds().get());
+                        }
+                        updateCmd.append("$set", bucketUp);
+
+                        writeToConfigDocumentInTxn(
+                            opCtx,
+                            CollectionType::ConfigNS,
+                            BatchedCommandRequest::buildUpdateOp(
+                                CollectionType::ConfigNS,
+                                BSON(CollectionType::kNssFieldName << nss.ns()) /* query */,
+                                updateCmd.obj() /* update */,
+                                false /* upsert */,
+                                false /* multi */),
+                            txnNumber);
+
+                        // Bump the chunk version for shards.
+                        bumpMajorVersionOneChunkPerShard(opCtx,
+                                                         nss,
+                                                         txnNumber,
+                                                         {std::make_move_iterator(shardIds.begin()),
+                                                          std::make_move_iterator(shardIds.end())});
+                    });
 }
 
 }  // namespace mongo

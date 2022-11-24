@@ -590,9 +590,9 @@ Status ClusterAggregate::retryOnViewError(OperationContext* opCtx,
     nsStruct.executionNss = resolvedView.getNamespace();
 
     // For a sharded time-series collection, the routing is based on both routing table and the
-    // granularity value. We need to make sure we use the granularity value of the same version as
-    // the routing table, instead of the one attached in the view error. This way the shard
-    // versioning check can correctly catch stale routing information.
+    // bucketMaxSpanSeconds value. We need to make sure we use the bucketMaxSpanSeconds of the same
+    // version as the routing table, instead of the one attached in the view error. This way the
+    // shard versioning check can correctly catch stale routing information.
     boost::optional<ChunkManager> snapshotCm;
     if (nsStruct.executionNss.isTimeseriesBucketsCollection()) {
         auto executionNsRoutingInfoStatus =

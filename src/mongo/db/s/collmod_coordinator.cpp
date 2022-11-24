@@ -70,8 +70,12 @@ bool isShardedColl(OperationContext* opCtx, const NamespaceString& nss) {
     }
 }
 
-bool hasTimeSeriesGranularityUpdate(const CollModRequest& request) {
-    return request.getTimeseries() && request.getTimeseries()->getGranularity();
+bool hasTimeSeriesBucketingUpdate(const CollModRequest& request) {
+    if (!request.getTimeseries().has_value()) {
+        return false;
+    }
+    auto& ts = request.getTimeseries();
+    return ts->getGranularity() || ts->getBucketMaxSpanSeconds() || ts->getBucketRoundingSeconds();
 }
 
 }  // namespace
@@ -170,7 +174,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
 
             _saveCollectionInfoOnCoordinatorIfNecessary(opCtx);
 
-            auto isGranularityUpdate = hasTimeSeriesGranularityUpdate(_request);
+            auto isGranularityUpdate = hasTimeSeriesBucketingUpdate(_request);
             uassert(6201808,
                     "Cannot use time-series options for a non-timeseries collection",
                     _collInfo->timeSeriesOptions || !isGranularityUpdate);
@@ -212,7 +216,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
 
                 if (_isPre61Compatible() && _collInfo->isSharded) {
                     const auto migrationsAlreadyBlockedForBucketNss =
-                        hasTimeSeriesGranularityUpdate(_request) &&
+                        hasTimeSeriesBucketingUpdate(_request) &&
                         _doc.getMigrationsAlreadyBlockedForBucketNss();
 
                     if (!migrationsAlreadyBlockedForBucketNss) {
@@ -225,7 +229,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
 
                 _saveShardingInfoOnCoordinatorIfNecessary(opCtx);
 
-                if (_collInfo->isSharded && hasTimeSeriesGranularityUpdate(_request)) {
+                if (_collInfo->isSharded && hasTimeSeriesBucketingUpdate(_request)) {
                     if (_isPre61Compatible()) {
                         auto newDoc = _doc;
                         newDoc.setMigrationsAlreadyBlockedForBucketNss(true);
@@ -254,7 +258,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 _saveShardingInfoOnCoordinatorIfNecessary(opCtx);
 
                 if (_collInfo->isSharded && _collInfo->timeSeriesOptions &&
-                    hasTimeSeriesGranularityUpdate(_request)) {
+                    hasTimeSeriesBucketingUpdate(_request)) {
                     ConfigsvrCollMod request(_collInfo->nsForTargeting, _request);
                     const auto cmdObj =
                         CommandHelpers::appendMajorityWriteConcern(request.toBSON({}));
@@ -283,7 +287,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 if (_collInfo->isSharded) {
                     ShardsvrCollModParticipant request(originalNss(), _request);
                     bool needsUnblock =
-                        _collInfo->timeSeriesOptions && hasTimeSeriesGranularityUpdate(_request);
+                        _collInfo->timeSeriesOptions && hasTimeSeriesBucketingUpdate(_request);
                     request.setNeedsUnblock(needsUnblock);
 
                     std::vector<AsyncRequestsSender::Response> responses;

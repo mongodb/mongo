@@ -89,6 +89,7 @@ function runReadAfterWriteTest() {
         shard0.getDB(dbName).adminCommand({getParameter: 1, featureCompatibilityVersion: 1}));
     if (MongoRunner.compareBinVersions(fcvResult.featureCompatibilityVersion.version, "6.0") < 0) {
         jsTestLog("FCV is less than 6.0, skip granularity update read after write test");
+        st.stop();
         return;
     }
 
@@ -136,6 +137,8 @@ function runReadAfterWriteTest() {
 
     failPoint.wait();
 
+    // While the collMod command on the config server is still being processed, inserts on the
+    // collection should be blocked.
     assert.commandFailedWithCode(
         mongos0.getDB(dbName).runCommand(
             {insert: collName, documents: [{[timeField]: ISODate()}], maxTimeMS: 2000}),
