@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#pragma once
+
 #include "mongo/platform/atomic_word.h"
 
 namespace mongo {
