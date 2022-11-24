@@ -54,10 +54,6 @@ for (let [_, shardReplSet] of Object.entries(topology.shards)) {
 allNodes.push(topology.configsvr.primary);
 allNodes.forEach((hostName) => {
     const status = new Mongo(hostName).getDB('admin').serverStatus({});
-    if (hostName == topology.configsvr.primary) {
-        assert(!status.hasOwnProperty('shardingStatistics'));
-        return;
-    }
     const shardingStats = status.shardingStatistics;
     assert(!shardingStats.hasOwnProperty('resharding'));
 });

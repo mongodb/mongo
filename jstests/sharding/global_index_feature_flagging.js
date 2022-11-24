@@ -24,7 +24,7 @@ const st = new ShardingTest({
 const configPrimary = st.configRS.getPrimary();
 const serverStatusCmd = ({serverStatus: 1, shardingStatistics: 1});
 let res = assert.commandWorked(configPrimary.adminCommand(serverStatusCmd));
-assert(!res.hasOwnProperty("shardingStatistics"), res.shardingStatistics);
+assert(!res.shardingStatistics.hasOwnProperty("globalIndex"), res.shardingStatistics);
 
 const shardPrimary = st.shard0.rs.getPrimary();
 res = assert.commandWorked(shardPrimary.adminCommand(serverStatusCmd));

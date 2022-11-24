@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands/server_status.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/range_deleter_service.h"
@@ -132,6 +133,16 @@ public:
             }
 
             CollectionShardingState::appendInfoForServerStatus(opCtx, &result);
+        }
+
+        // To calculate the number of sharded collection we simply get the number of records from
+        // `config.collections` collection. This count must only be appended when serverStatus is
+        // invoked on the config server.
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            AutoGetCollectionForRead autoColl(opCtx, CollectionType::ConfigNS);
+            const auto& collection = autoColl.getCollection();
+            const auto numShardedCollections = collection ? collection->numRecords(opCtx) : 0;
+            result.append("numShardedCollections", numShardedCollections);
         }
 
         reportDataTransformMetrics(opCtx, &result);
