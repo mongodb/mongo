@@ -1849,7 +1849,13 @@ Future<void> ExecCommandDatabase::_commandExec() {
                     const auto refreshed = _execContext->behaviors->refreshCollection(opCtx, *sce);
                     if (refreshed) {
                         _refreshedCollection = true;
-                        if (!opCtx->isContinuingMultiDocumentTransaction() && !inCriticalSection) {
+
+                        // Can not rerun the command when executing a GetMore command as the cursor
+                        // is already lost.
+                        const auto isRunningGetMoreCmd =
+                            _execContext->getCommand()->getName() == "getMore";
+                        if (!opCtx->isContinuingMultiDocumentTransaction() && !inCriticalSection &&
+                            !isRunningGetMoreCmd) {
                             _resetLockerStateAfterShardingUpdate(opCtx);
                             return _commandExec();
                         }
@@ -1876,7 +1882,12 @@ Future<void> ExecCommandDatabase::_commandExec() {
 
                 if (refreshed) {
                     _refreshedCatalogCache = true;
-                    if (!opCtx->isContinuingMultiDocumentTransaction()) {
+
+                    // Can not rerun the command when executing a GetMore command as the cursor is
+                    // already lost.
+                    const auto isRunningGetMoreCmd =
+                        _execContext->getCommand()->getName() == "getMore";
+                    if (!opCtx->isContinuingMultiDocumentTransaction() && !isRunningGetMoreCmd) {
                         _resetLockerStateAfterShardingUpdate(opCtx);
                         return _commandExec();
                     }

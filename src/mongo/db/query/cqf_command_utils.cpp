@@ -926,6 +926,10 @@ public:
         unsupportedExpression();
     }
 
+    void visit(const ExpressionInternalOwningShard* expr) override final {
+        unsupportedExpression();
+    }
+
 private:
     void unsupportedExpression() {
         _eligible = false;

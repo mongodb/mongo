@@ -474,6 +474,7 @@ public:
     void visit(const ExpressionSetField* expr) final {}
     void visit(const ExpressionTsSecond* expr) final {}
     void visit(const ExpressionTsIncrement* expr) final {}
+    void visit(const ExpressionInternalOwningShard* expr) final {}
 
 private:
     void visitMultiBranchLogicExpression(const Expression* expr, sbe::EPrimBinary::Op logicOp) {
@@ -708,6 +709,7 @@ public:
     void visit(const ExpressionSetField* expr) final {}
     void visit(const ExpressionTsSecond* expr) final {}
     void visit(const ExpressionTsIncrement* expr) final {}
+    void visit(const ExpressionInternalOwningShard* expr) final {}
 
 private:
     void visitMultiBranchLogicExpression(const Expression* expr, sbe::EPrimBinary::Op logicOp) {
@@ -3241,6 +3243,10 @@ public:
             },
             _context->popExpr());
         _context->pushExpr(std::move(tsIncrementExpr));
+    }
+
+    void visit(const ExpressionInternalOwningShard* expr) final {
+        unsupportedExpression("$_internalOwningShard");
     }
 
 private:

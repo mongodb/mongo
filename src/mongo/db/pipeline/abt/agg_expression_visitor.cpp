@@ -764,6 +764,10 @@ public:
         unsupportedExpression("tsIncrement");
     }
 
+    void visit(const ExpressionInternalOwningShard* expr) override final {
+        unsupportedExpression("$_internalOwningShard");
+    }
+
 private:
     /**
      * Shared logic for $and, $or. Converts each child into an EExpression that evaluates to Boolean

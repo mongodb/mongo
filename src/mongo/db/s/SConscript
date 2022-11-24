@@ -20,6 +20,7 @@ env.Library(
         'range_deletion_task.idl',
         'shard_key_index_util.cpp',
         'sharding_api_d_params.idl',
+        'sharding_expressions.cpp',
         'sharding_migration_critical_section.cpp',
         'sharding_state.cpp',
         'sharding_statistics.cpp',

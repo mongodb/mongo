@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/pipeline/expression_walker.h"
@@ -156,6 +157,7 @@ class ExpressionInternalFindElemMatch;
 class ExpressionInternalFLEBetween;
 class ExpressionInternalFLEEqual;
 class ExpressionInternalJsEmit;
+class ExpressionInternalOwningShard;
 class ExpressionFunction;
 class ExpressionDegreesToRadians;
 class ExpressionRadiansToDegrees;
@@ -367,6 +369,8 @@ public:
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionSetField>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionTsSecond>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionTsIncrement>) = 0;
+    virtual void visit(
+        expression_walker::MaybeConstPtr<IsConst, ExpressionInternalOwningShard>) = 0;
 };
 
 using ExpressionMutableVisitor = ExpressionVisitor<false>;
@@ -528,5 +532,6 @@ struct SelectiveConstExpressionVisitorBase : public ExpressionConstVisitor {
     void visit(const ExpressionSetField*) override {}
     void visit(const ExpressionTsSecond*) override {}
     void visit(const ExpressionTsIncrement*) override {}
+    void visit(const ExpressionInternalOwningShard*) override {}
 };
 }  // namespace mongo
