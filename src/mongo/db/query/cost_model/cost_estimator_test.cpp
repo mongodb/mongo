@@ -50,29 +50,25 @@ TEST(CostEstimatorTest, PhysicalScanCost) {
 
     CostEstimator costEstimator{costModel};
 
-    mongo::optimizer::Metadata metadata{{}};
-    mongo::optimizer::cascades::Memo memo{};
+    optimizer::Metadata metadata{{}};
+    optimizer::cascades::Memo memo{};
 
     // Mimic properties from PhysicalScan group. Only DistributionRequirement is really required.
-    mongo::optimizer::properties::ProjectionRequirement pr{
-        {mongo::optimizer::ProjectionNameVector{"root"}}};
-    mongo::optimizer::properties::DistributionRequirement dr{
-        {mongo::optimizer::DistributionType::Centralized}};
+    optimizer::properties::ProjectionRequirement pr{{optimizer::ProjectionNameVector{"root"}}};
+    optimizer::properties::DistributionRequirement dr{{optimizer::DistributionType::Centralized}};
     dr.setDisableExchanges(true);
-    mongo::optimizer::properties::IndexingRequirement ir{mongo::optimizer::IndexReqTarget::Complete,
-                                                         /*dedupRID*/ true,
-                                                         /*satisfiedPartialIndexesGroupId*/ 0};
-    mongo::optimizer::properties::PhysProps physProps{};
-    mongo::optimizer::properties::setProperty(physProps, pr);
-    mongo::optimizer::properties::setProperty(physProps, dr);
-    mongo::optimizer::properties::setProperty(physProps, ir);
+    optimizer::properties::IndexingRequirement ir{optimizer::IndexReqTarget::Complete,
+                                                  /*dedupRID*/ true,
+                                                  /*satisfiedPartialIndexesGroupId*/ 0};
+    optimizer::properties::PhysProps physProps{};
+    optimizer::properties::setProperty(physProps, pr);
+    optimizer::properties::setProperty(physProps, dr);
+    optimizer::properties::setProperty(physProps, ir);
 
-    auto scanNode = mongo::optimizer::ABT::make<optimizer::PhysicalScanNode>(
-        mongo::optimizer::FieldProjectionMap{{}, {mongo::optimizer::ProjectionName{"root"}}, {}},
-        "c1",
-        false);
-    mongo::optimizer::ChildPropsType childProps{};
-    mongo::optimizer::NodeCEMap nodeCEMap{{scanNode.cast<mongo::optimizer::Node>(), ce}};
+    auto scanNode = optimizer::ABT::make<optimizer::PhysicalScanNode>(
+        optimizer::FieldProjectionMap{{}, {optimizer::ProjectionName{"root"}}, {}}, "c1", false);
+    optimizer::ChildPropsType childProps{};
+    optimizer::NodeCEMap nodeCEMap{{scanNode.cast<optimizer::Node>(), ce}};
 
     auto costAndCE =
         costEstimator.deriveCost(metadata, memo, physProps, scanNode.ref(), childProps, nodeCEMap);
@@ -100,20 +96,19 @@ TEST(CostEstimatorTest, PhysicalScanCostWithAdjustedCE) {
 
     CostEstimator costEstimator{costModel};
 
-    mongo::optimizer::Metadata metadata{{}};
-    mongo::optimizer::cascades::Memo memo{};
+    optimizer::Metadata metadata{{}};
+    optimizer::cascades::Memo memo{};
 
-    mongo::optimizer::properties::DistributionRequirement dr{
-        {mongo::optimizer::DistributionType::Centralized}};
-    mongo::optimizer::properties::LimitEstimate le{limitEstimateCE};
-    mongo::optimizer::properties::PhysProps physProps{};
-    mongo::optimizer::properties::setProperty(physProps, dr);
-    mongo::optimizer::properties::setProperty(physProps, le);
+    optimizer::properties::DistributionRequirement dr{{optimizer::DistributionType::Centralized}};
+    optimizer::properties::LimitEstimate le{limitEstimateCE};
+    optimizer::properties::PhysProps physProps{};
+    optimizer::properties::setProperty(physProps, dr);
+    optimizer::properties::setProperty(physProps, le);
 
-    auto scanNode = mongo::optimizer::ABT::make<optimizer::PhysicalScanNode>(
-        mongo::optimizer::FieldProjectionMap{{}, {}, {}}, "c1", false);
-    mongo::optimizer::ChildPropsType childProps{};
-    mongo::optimizer::NodeCEMap nodeCEMap{{scanNode.cast<mongo::optimizer::Node>(), ce}};
+    auto scanNode = optimizer::ABT::make<optimizer::PhysicalScanNode>(
+        optimizer::FieldProjectionMap{{}, {}, {}}, "c1", false);
+    optimizer::ChildPropsType childProps{};
+    optimizer::NodeCEMap nodeCEMap{{scanNode.cast<optimizer::Node>(), ce}};
 
     auto costAndCE =
         costEstimator.deriveCost(metadata, memo, physProps, scanNode.ref(), childProps, nodeCEMap);
@@ -123,5 +118,196 @@ TEST(CostEstimatorTest, PhysicalScanCostWithAdjustedCE) {
 
     // CE is expected to be adjusted.
     ASSERT_EQ(limitEstimateCE, costAndCE._ce);
+}
+
+TEST(CostEstimatorTest, IndexScanCost) {
+    const double startupCost = 1;
+    const double indexScanCost = 3;
+    const double ce = 1000;
+
+    CostModelCoefficients costModel{};
+    initializeTestCostModel(costModel);
+    costModel.setIndexScanStartupCost(startupCost);
+    costModel.setIndexScanIncrementalCost(indexScanCost);
+
+    CostEstimator costEstimator{costModel};
+
+    optimizer::Metadata metadata{{}};
+    optimizer::cascades::Memo memo{};
+
+    optimizer::properties::DistributionRequirement dr{{optimizer::DistributionType::Centralized}};
+    dr.setDisableExchanges(true);
+    optimizer::properties::IndexingRequirement ir{optimizer::IndexReqTarget::Complete,
+                                                  /*dedupRID*/ true,
+                                                  /*satisfiedPartialIndexesGroupId*/ 0};
+    optimizer::properties::PhysProps physProps{};
+    optimizer::properties::setProperty(physProps, dr);
+    optimizer::properties::setProperty(physProps, ir);
+
+    auto indexScanNode = optimizer::ABT::make<optimizer::IndexScanNode>(
+        optimizer::FieldProjectionMap{{}, {optimizer::ProjectionName{"root"}}, {}},
+        optimizer::IndexSpecification{"c1", "a_1", {}, false});
+    optimizer::ChildPropsType childProps{};
+    optimizer::NodeCEMap nodeCEMap{{indexScanNode.cast<optimizer::Node>(), ce}};
+
+    auto costAndCE = costEstimator.deriveCost(
+        metadata, memo, physProps, indexScanNode.ref(), childProps, nodeCEMap);
+
+    // Test the cost.
+    ASSERT_EQ(startupCost + indexScanCost * costAndCE._ce, costAndCE._cost.getCost());
+}
+
+TEST(CostEstimatorTest, FilterAndEvaluationCost) {
+    const double startupCost = 1;
+    const double filterCost = 2;
+    const double scanCost = 3;
+    const double evalCost = 4;
+    const double ce = 1000;
+
+    CostModelCoefficients costModel{};
+    initializeTestCostModel(costModel);
+    costModel.setFilterStartupCost(startupCost);
+    costModel.setFilterIncrementalCost(filterCost);
+    costModel.setScanStartupCost(startupCost);
+    costModel.setScanIncrementalCost(scanCost);
+    costModel.setEvalIncrementalCost(evalCost);
+    costModel.setEvalStartupCost(startupCost);
+
+    CostEstimator costEstimator{costModel};
+
+    optimizer::Metadata metadata{{}};
+    optimizer::cascades::Memo memo{};
+
+    optimizer::properties::DistributionRequirement dr{{optimizer::DistributionType::Centralized}};
+    dr.setDisableExchanges(true);
+    optimizer::properties::PhysProps physProps{};
+    optimizer::properties::setProperty(physProps, dr);
+
+    auto scanNode = optimizer::ABT::make<optimizer::PhysicalScanNode>(
+        optimizer::FieldProjectionMap{{}, {}, {}}, "c1", false);
+    optimizer::ChildPropsType childProps{};
+    optimizer::NodeCEMap nodeCEMap{{scanNode.cast<optimizer::Node>(), ce}};
+
+    auto projectionNode = optimizer::ABT::make<optimizer::EvaluationNode>(
+        "p2",
+        optimizer::ABT::make<optimizer::EvalPath>(optimizer::ABT::make<optimizer::PathIdentity>(),
+                                                  optimizer::ABT::make<optimizer::Variable>("p1")),
+        std::move(scanNode));
+
+    nodeCEMap[projectionNode.cast<optimizer::Node>()] = ce;
+
+    auto filterNode = optimizer::ABT::make<optimizer::FilterNode>(
+        optimizer::ABT::make<optimizer::EvalFilter>(
+            optimizer::ABT::make<optimizer::PathIdentity>(),
+            optimizer::ABT::make<optimizer::Variable>("p1")),
+        std::move(projectionNode));
+
+    nodeCEMap[filterNode.cast<optimizer::Node>()] = ce;
+
+    auto costAndCE = costEstimator.deriveCost(
+        metadata, memo, physProps, filterNode.ref(), childProps, nodeCEMap);
+
+    // Test the cost. The cost should be the cost of FilterNode's child if FilterNode is "trivial".
+    // Same rule applies to 'EvaluationNode'.
+    ASSERT_EQ(startupCost + scanCost * costAndCE._ce, costAndCE._cost.getCost());
+
+    // Test non-trivial EvaluationNode's cost should account for the cost of the node itself and its
+    // child.
+    auto scanNodeForEval = optimizer::ABT::make<optimizer::PhysicalScanNode>(
+        optimizer::FieldProjectionMap{{}, {}, {}}, "c1", false);
+    optimizer::NodeCEMap nodeCEMapForEval{{scanNodeForEval.cast<optimizer::Node>(), ce}};
+    auto evalNode = optimizer::ABT::make<optimizer::EvaluationNode>(
+        "evalProjA",
+        optimizer::ABT::make<optimizer::EvalPath>(
+            optimizer::ABT::make<optimizer::PathGet>(
+                "a", optimizer::ABT::make<optimizer::PathIdentity>()),
+            optimizer::ABT::make<optimizer::Variable>("scanProj1")),
+        std::move(scanNodeForEval));
+
+    nodeCEMapForEval[evalNode.cast<optimizer::Node>()] = ce;
+
+    auto costAndCEEval = costEstimator.deriveCost(
+        metadata, memo, physProps, evalNode.ref(), childProps, nodeCEMapForEval);
+
+    auto scanNodeCost = startupCost + scanCost * ce;
+    auto evalNodeCost = startupCost + evalCost * ce;
+    ASSERT_EQ(scanNodeCost + evalNodeCost, costAndCEEval._cost.getCost());
+}
+
+TEST(CostEstimatorTest, MergeJoinCost) {
+    const double startupCost = 1;
+    const double scanCost = 3;
+    const double mergeJoinCost = 5;
+    const double ce = 1000;
+
+    CostModelCoefficients costModel{};
+    initializeTestCostModel(costModel);
+    costModel.setScanStartupCost(startupCost);
+    costModel.setScanIncrementalCost(scanCost);
+    costModel.setMergeJoinStartupCost(startupCost);
+    costModel.setMergeJoinIncrementalCost(mergeJoinCost);
+
+    auto scanNodeLeft = optimizer::ABT::make<optimizer::PhysicalScanNode>(
+        optimizer::FieldProjectionMap{{}, {}, {}}, "c1", false);
+    optimizer::ChildPropsType childProps{};
+    optimizer::NodeCEMap nodeCEMap{{scanNodeLeft.cast<optimizer::Node>(), ce}};
+
+    auto scanNodeRight = optimizer::ABT::make<optimizer::PhysicalScanNode>(
+        optimizer::FieldProjectionMap{{}, {}, {}}, "c1", false);
+
+    nodeCEMap[scanNodeRight.cast<optimizer::Node>()] = ce;
+
+    auto evalNodeLeft = optimizer::ABT::make<optimizer::EvaluationNode>(
+        "evalProjA",
+        optimizer::ABT::make<optimizer::EvalPath>(optimizer::ABT::make<optimizer::PathIdentity>(),
+                                                  optimizer::ABT::make<optimizer::Variable>("p1")),
+        std::move(scanNodeLeft));
+
+    nodeCEMap[evalNodeLeft.cast<optimizer::Node>()] = ce;
+
+    auto evalNodeRight = optimizer::ABT::make<optimizer::EvaluationNode>(
+        "evalProjB",
+        optimizer::ABT::make<optimizer::EvalPath>(optimizer::ABT::make<optimizer::PathIdentity>(),
+                                                  optimizer::ABT::make<optimizer::Variable>("p2")),
+        std::move(scanNodeRight));
+
+    nodeCEMap[evalNodeRight.cast<optimizer::Node>()] = ce;
+
+    CostEstimator costEstimator{costModel};
+
+    optimizer::Metadata metadata{{}};
+    optimizer::cascades::Memo memo{};
+
+    optimizer::properties::DistributionRequirement dr{{optimizer::DistributionType::Centralized}};
+    dr.setDisableExchanges(true);
+    optimizer::properties::PhysProps physProps{};
+    optimizer::properties::setProperty(physProps, dr);
+
+    // Test the cost of MergeJoin's children.
+    auto leftChildCost = costEstimator.deriveCost(
+        metadata, memo, physProps, evalNodeLeft.ref(), childProps, nodeCEMap);
+    auto expectedCostChild = startupCost + scanCost * ce;
+
+    ASSERT_EQ(expectedCostChild, leftChildCost._cost.getCost());
+
+    auto rightChildCost = costEstimator.deriveCost(
+        metadata, memo, physProps, evalNodeRight.ref(), childProps, nodeCEMap);
+
+    ASSERT_EQ(expectedCostChild, rightChildCost._cost.getCost());
+
+    auto joinNode = optimizer::ABT::make<optimizer::MergeJoinNode>(
+        optimizer::ProjectionNameVector{"evalProjA"},
+        optimizer::ProjectionNameVector{"evalProjB"},
+        std::vector<optimizer::CollationOp>{optimizer::CollationOp::Ascending},
+        std::move(evalNodeLeft),
+        std::move(evalNodeRight));
+    nodeCEMap[joinNode.cast<optimizer::Node>()] = ce;
+
+    // Test the cost of MergeJoin. The cost should be based on the cost of MergeJoin's children and
+    // itself.
+    auto costAndCE =
+        costEstimator.deriveCost(metadata, memo, physProps, joinNode.ref(), childProps, nodeCEMap);
+    ASSERT_EQ(expectedCostChild * 2 + startupCost + costAndCE._ce * 2 * mergeJoinCost,
+              costAndCE._cost.getCost());
 }
 }  // namespace mongo::cost_model
