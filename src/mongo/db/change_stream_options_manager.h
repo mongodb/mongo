@@ -65,7 +65,7 @@ public:
     /**
      * Returns the change-streams options.
      */
-    const ChangeStreamOptions& getOptions(OperationContext* opCtx);
+    ChangeStreamOptions getOptions(OperationContext* opCtx) const;
 
     /**
      * Sets the provided change-streams options. Returns OK on success, otherwise appropriate error
@@ -87,7 +87,7 @@ private:
 
     ChangeStreamOptions _changeStreamOptions;
 
-    Mutex _mutex = MONGO_MAKE_LATCH("ChangeStreamOptionsManager::mutex");
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("ChangeStreamOptionsManager::mutex");
 };
 
 }  // namespace mongo
