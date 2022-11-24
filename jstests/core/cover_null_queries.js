@@ -3,7 +3,7 @@
  * @tags: [
  *   assumes_unsharded_collection,
  *   requires_non_retryable_writes,
- *   requires_fcv_60,
+ *   requires_fcv_62,
  *   # This test could produce unexpected explain output if additional indexes are created.
  *   assumes_no_implicit_index_creation,
  *   # TODO SERVER-67506: Dotted path equality to null matches non-object array elements in CQF.
