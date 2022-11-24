@@ -36,6 +36,7 @@ class TestResmokeSymbolizer(unittest.TestCase):
         self.assertEqual(self.symbolizer_service_mock.run_symbolizer_script.call_count, 5)
         for i, call in enumerate(self.symbolizer_service_mock.run_symbolizer_script.call_arg_list):
             self.assertEqual(call.args[0], f"file{i}.stacktrace")
+        self.file_service_mock.remove_all.assert_called_once_with(stacktrace_files)
 
     def test_symbolize_test_logs_hit_timeout(self):
         stacktrace_files = [f"file{i}.stacktrace" for i in range(5)]
@@ -46,6 +47,7 @@ class TestResmokeSymbolizer(unittest.TestCase):
         self.assertEqual(self.symbolizer_service_mock.run_symbolizer_script.call_count, 1)
         for i, call in enumerate(self.symbolizer_service_mock.run_symbolizer_script.call_arg_list):
             self.assertEqual(call.args[0], f"file{i}.stacktrace")
+        self.file_service_mock.remove_all.assert_called_once_with(stacktrace_files)
 
     def test_symbolize_test_logs_should_not_symbolize(self):
         self.config_mock.is_windows.return_value = True
@@ -189,10 +191,11 @@ class TestFileService(unittest.TestCase):
                 with open(file, "w") as fstream:
                     fstream.write("stacktrace")
 
-            self.assertEqual(
-                set(self.file_service.filter_out_empty_files(abs_file_paths)), set(abs_file_paths))
+            self.file_service.remove_empty(abs_file_paths)
+            for file in abs_file_paths:
+                self.assertTrue(os.path.exists(file))
 
-    def test_filter_out_empty_files_if_partly_empty(self):
+    def test_remove_empty_files_if_partly_empty(self):
         with TemporaryDirectory() as tmpdir:
             abs_dir_paths = [os.path.join(tmpdir, d) for d in self.relative_dir_paths]
             abs_file_paths = [os.path.join(tmpdir, f) for f in self.relative_file_paths]
@@ -205,14 +208,14 @@ class TestFileService(unittest.TestCase):
                 fstream.write("stacktrace")
             Path(abs_file_paths[3]).touch()
 
-            filtered = self.file_service.filter_out_empty_files(abs_file_paths)
+            self.file_service.remove_empty(abs_file_paths)
 
-            self.assertTrue(abs_file_paths[0] in filtered)
-            self.assertFalse(abs_file_paths[1] in filtered)
-            self.assertTrue(abs_file_paths[2] in filtered)
-            self.assertFalse(abs_file_paths[3] in filtered)
+            self.assertTrue(os.path.exists(abs_file_paths[0]))
+            self.assertFalse(os.path.exists(abs_file_paths[1]))
+            self.assertTrue(os.path.exists(abs_file_paths[2]))
+            self.assertFalse(os.path.exists(abs_file_paths[3]))
 
-    def test_filter_out_empty_files_if_all_empty(self):
+    def test_remove_empty_files_if_all_empty(self):
         with TemporaryDirectory() as tmpdir:
             abs_dir_paths = [os.path.join(tmpdir, d) for d in self.relative_dir_paths]
             abs_file_paths = [os.path.join(tmpdir, f) for f in self.relative_file_paths]
@@ -221,15 +224,20 @@ class TestFileService(unittest.TestCase):
             for file in abs_file_paths:
                 Path(file).touch()
 
-            filtered = self.file_service.filter_out_empty_files(abs_file_paths)
+            self.file_service.remove_empty(abs_file_paths)
             for file in abs_file_paths:
-                self.assertFalse(file in filtered)
+                self.assertFalse(os.path.exists(file))
 
-    def test_filter_out_already_processed_files(self):
-        processed_files = ["processed-file.stacktrace"]
-        files = [
-            "file.stacktrace", "other-file.stacktrace", "another-file.stacktrace", *processed_files
-        ]
-        self.file_service.add_to_processed_files(processed_files)
-        filtered = self.file_service.filter_out_already_processed_files(files)
-        self.assertTrue(all(file not in processed_files for file in filtered))
+    def test_remove_all_files(self):
+        with TemporaryDirectory() as tmpdir:
+            abs_dir_paths = [os.path.join(tmpdir, d) for d in self.relative_dir_paths]
+            abs_file_paths = [os.path.join(tmpdir, f) for f in self.relative_file_paths]
+            for dir_ in abs_dir_paths:
+                Path(dir_).mkdir(parents=True)
+            for file in abs_file_paths:
+                with open(file, "w") as fstream:
+                    fstream.write("stacktrace")
+
+            self.file_service.remove_all(abs_file_paths)
+            for file in abs_file_paths:
+                self.assertFalse(os.path.exists(file))
