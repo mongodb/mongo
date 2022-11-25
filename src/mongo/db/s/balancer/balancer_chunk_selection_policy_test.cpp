@@ -120,6 +120,18 @@ protected:
     std::unique_ptr<BalancerChunkSelectionPolicy> _chunkSelectionPolicy;
 };
 
+stdx::unordered_set<ShardId> getAllShardIds(
+    const std::vector<ClusterStatistics::ShardStatistics>& shardStats) {
+    stdx::unordered_set<ShardId> shards;
+    std::transform(shardStats.begin(),
+                   shardStats.end(),
+                   std::inserter(shards, shards.end()),
+                   [](const ClusterStatistics::ShardStatistics& shardStaticstics) -> ShardId {
+                       return shardStaticstics.shardId;
+                   });
+    return shards;
+}
+
 TEST_F(BalancerChunkSelectionTest, TagRangesOverlap) {
     // Set up two shards in the metadata.
     ASSERT_OK(catalogClient()->insertConfigDocument(
@@ -212,9 +224,11 @@ TEST_F(BalancerChunkSelectionTest, TagRangeMaxNotAlignedWithChunkMax) {
                 shardTargeterMock(opCtx.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
                 shardTargeterMock(opCtx.get(), kShardId1)->setFindHostReturnValue(kShardHost1);
 
-                stdx::unordered_set<ShardId> usedShards;
-                auto candidateChunksStatus =
-                    _chunkSelectionPolicy.get()->selectChunksToMove(opCtx.get(), &usedShards);
+                std::vector<ClusterStatistics::ShardStatistics> shardStats =
+                    uassertStatusOK(_clusterStats.get()->getStats(opCtx.get()));
+                auto availableShards = getAllShardIds(shardStats);
+                auto candidateChunksStatus = _chunkSelectionPolicy.get()->selectChunksToMove(
+                    opCtx.get(), shardStats, &availableShards);
                 ASSERT_OK(candidateChunksStatus.getStatus());
 
                 // The balancer does not bubble up the IllegalOperation error, but it is expected
@@ -321,9 +335,12 @@ TEST_F(BalancerChunkSelectionTest, ShardedTimeseriesCollectionsCanBeBalanced) {
         shardTargeterMock(opCtx.get(), kShardId0)->setFindHostReturnValue(kShardHost0);
         shardTargeterMock(opCtx.get(), kShardId1)->setFindHostReturnValue(kShardHost1);
 
-        stdx::unordered_set<ShardId> usedShards;
-        auto candidateChunksStatus =
-            _chunkSelectionPolicy.get()->selectChunksToMove(opCtx.get(), &usedShards);
+        std::vector<ClusterStatistics::ShardStatistics> shardStats =
+            uassertStatusOK(_clusterStats.get()->getStats(opCtx.get()));
+        auto availableShards = getAllShardIds(shardStats);
+
+        auto candidateChunksStatus = _chunkSelectionPolicy.get()->selectChunksToMove(
+            opCtx.get(), shardStats, &availableShards);
         ASSERT_OK(candidateChunksStatus.getStatus());
 
         ASSERT_EQUALS(1, candidateChunksStatus.getValue().size());

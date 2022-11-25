@@ -74,7 +74,10 @@ public:
      * Potentially blocking method, which gives out a set of chunks to be moved.
      */
     virtual StatusWith<MigrateInfoVector> selectChunksToMove(
-        OperationContext* opCtx, stdx::unordered_set<ShardId>* unavailableShards) = 0;
+        OperationContext* opCtx,
+        const std::vector<ClusterStatistics::ShardStatistics>& shardStats,
+        stdx::unordered_set<ShardId>* availableShards) = 0;
+
 
     /**
      * Given a valid namespace returns all the Migrations the balancer would need to perform

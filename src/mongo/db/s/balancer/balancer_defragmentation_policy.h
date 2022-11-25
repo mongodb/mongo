@@ -76,11 +76,11 @@ public:
 
     /**
      * Pulls the next batch of actionable chunk migration requests, given the current internal state
-     * and the passed in list of unavaible shards.
+     * and the passed in list of available shards.
      * Every chunk migration request is then expected to be acknowledged by the balancer by issuing
      * a call to applyActionResult() (declared in ActionsStreamPolicy)
      */
     virtual MigrateInfoVector selectChunksToMove(OperationContext* opCtx,
-                                                 stdx::unordered_set<ShardId>* usedShards) = 0;
+                                                 stdx::unordered_set<ShardId>* availableShards) = 0;
 };
 }  // namespace mongo
