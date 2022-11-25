@@ -77,7 +77,7 @@ ESLINT_VERSION = "${version}"
 Unfortunately pkg doesn't work well with `require(variable)` statements
 and force include files using `assets` or `scripts` options might not help.
 
-For the ESLint version 7.22.0 the following change was applied to the
+For the ESLint version 7.22.0 and 8.28.0 the following change was applied to the
 source code to make everything work:
 ```
 diff --git a/lib/cli-engine/cli-engine.js b/lib/cli-engine/cli-engine.js

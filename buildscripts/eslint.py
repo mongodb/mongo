@@ -45,7 +45,7 @@ from buildscripts.linter import git, parallel
 
 # Expected version of ESLint.
 # If you want to update the version, please refer to `buildscripts/eslint/README.md`
-ESLINT_VERSION = "7.22.0"
+ESLINT_VERSION = "8.28.0"
 
 # Name of ESLint as a binary.
 ESLINT_PROGNAME = "eslint"
