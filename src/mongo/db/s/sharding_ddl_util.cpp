@@ -654,17 +654,25 @@ void ensureCollectionDroppedNoChangeEvent(OperationContext* opCtx,
                        "mongo::sharding_ddl_util::ensureCollectionDroppedNoChangeEvent",
                        nss.toString(),
                        [&] {
-                           AutoGetCollection coll(opCtx, nss, MODE_X);
-                           if (!coll || (uuid && coll->uuid() != uuid)) {
-                               // If the collection doesn't exist or exists with a different UUID,
-                               // then the requested collection has been dropped already.
+                           try {
+                               AutoGetCollection coll(opCtx, nss, MODE_X);
+                               if (!coll || (uuid && coll->uuid() != uuid)) {
+                                   // If the collection doesn't exist or exists with a different
+                                   // UUID, then the requested collection has been dropped already.
+                                   return;
+                               }
+
+                               WriteUnitOfWork wuow(opCtx);
+                               uassertStatusOK(coll.getDb()->dropCollectionEvenIfSystem(
+                                   opCtx, nss, {} /* dropOpTime */, true /* markFromMigrate */));
+                               wuow.commit();
+                           } catch (const ExceptionFor<ErrorCodes::InvalidViewDefinition>&) {
+                               // AutoGetCollection may raise this exception when the collection
+                               // doesn't exist and the CollectionCatalog starts looking into the
+                               // list of existing views; the error can be ignored, and the
+                               // collection may be considered as already dropped.
                                return;
                            }
-
-                           WriteUnitOfWork wuow(opCtx);
-                           uassertStatusOK(coll.getDb()->dropCollectionEvenIfSystem(
-                               opCtx, nss, {} /* dropOpTime */, true /* markFromMigrate */));
-                           wuow.commit();
                        });
 }
 }  // namespace sharding_ddl_util

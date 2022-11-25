@@ -1,7 +1,10 @@
 // Tests of $changeStream notifications for metadata operations.
 // Do not run in whole-cluster passthrough since this test assumes that the change stream will be
 // invalidated by a database drop.
-// @tags: [do_not_run_in_whole_cluster_passthrough]
+// @tags: [
+//   do_not_run_in_whole_cluster_passthrough,
+//   requires_fcv_63,
+// ]
 (function() {
 "use strict";
 
@@ -78,15 +81,9 @@ const resumeToken = changes[0]._id;
 const resumeTokenDrop = changes[3]._id;
 const resumeTokenInvalidate = changes[4]._id;
 
-// Verify we can startAfter the invalidate. We should see one drop event for every other shard
-// that the collection was present on, or nothing if the collection was not sharded. This test
+// Verify we can startAfter the invalidate, but no new events may be retrieved. This test
 // exercises the bug described in SERVER-41196.
 const restartedStream = coll.watch([], {startAfter: resumeTokenInvalidate});
-for (let i = 0; i < numShards - 1; ++i) {
-    assert.soon(() => restartedStream.hasNext());
-    const nextEvent = restartedStream.next();
-    assert.eq(nextEvent.operationType, "drop", () => tojson(nextEvent));
-}
 assert(!restartedStream.hasNext(), () => tojson(restartedStream.next()));
 
 // Verify that we can resume a stream after a collection drop without an explicit collation.

@@ -226,7 +226,7 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
                     participants,
                     **executor,
                     getCurrentSession(),
-                    false /*fromMigrate*/);
+                    true /*fromMigrate*/);
 
                 // The sharded collection must be dropped on the primary shard after it has been
                 // dropped on all of the other shards to ensure it can only be re-created as
@@ -239,6 +239,9 @@ ExecutorFuture<void> DropCollectionCoordinator::_runImpl(
                     getCurrentSession(),
                     false /*fromMigrate*/);
 
+                // Remove potential query analyzer document only after purging the collection from
+                // the catalog. This ensures no leftover documents referencing an old incarnation of
+                // a collection.
                 sharding_ddl_util::removeQueryAnalyzerMetadataFromConfig(opCtx, nss(), boost::none);
 
                 ShardingLogging::get(opCtx)->logChange(opCtx, "dropCollection", nss().ns());

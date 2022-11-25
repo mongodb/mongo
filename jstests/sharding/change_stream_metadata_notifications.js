@@ -13,6 +13,7 @@ const st = new ShardingTest({
     rs: {
         nodes: 1,
         enableMajorityReadConcern: '',
+        setParameter: {writePeriodicNoops: true, periodicNoopIntervalSecs: 1}
     }
 });
 

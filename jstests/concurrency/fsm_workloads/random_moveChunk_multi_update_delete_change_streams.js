@@ -248,18 +248,8 @@ var $config = extendWorkload($config, function($config, $super) {
         }
     }
 
-    let previousWritePeriodicNoops;
-
     $config.setup = function setup(db, collName, cluster) {
         $super.setup.apply(this, arguments);
-
-        // Set 'writePeriodicNoops' to ensure liveness on change stream events in the case where one
-        // of the shards has no changes to report.
-        cluster.executeOnMongodNodes((db) => {
-            const res = db.adminCommand({setParameter: 1, writePeriodicNoops: true});
-            assert.commandWorked(res);
-            previousWritePeriodicNoops = res.was;
-        });
 
         // Set the 'x' field to mirror the '_id' and 'skey' fields. 'x' will be used as query for
         // {multi: true} writes.
@@ -280,18 +270,38 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     $config.teardown = function teardown(db, collName, cluster) {
-        cluster.executeOnMongodNodes((db) => {
-            assert.commandWorked(
-                db.adminCommand({setParameter: 1, writePeriodicNoops: previousWritePeriodicNoops}));
-        });
-
         // Drop the collection as to have a sentinel event (drop) on the change stream.
         assertAlways(db[collName].drop());
 
-        // Validate the change stream events.
+        // Validate the change stream events after setting 'writePeriodicNoops'  on all the nodes of
+        // the cluster to ensure liveness in case there are nodes with no events to report.
+        let previousWritePeriodicNoopsOnShards;
+        let previousWritePeriodicNoopsOnConfigServer;
+
+        cluster.executeOnMongodNodes((db) => {
+            const res = db.adminCommand({setParameter: 1, writePeriodicNoops: true});
+            assert.commandWorked(res);
+            previousWritePeriodicNoopsOnShards = res.was;
+        });
+        cluster.executeOnConfigNodes((db) => {
+            const res = db.adminCommand({setParameter: 1, writePeriodicNoops: true});
+            assert.commandWorked(res);
+            previousWritePeriodicNoopsOnConfigServer = res.was;
+        });
+
         var startAtOperationTime =
             Timestamp(this.startAtOperationTime.t, this.startAtOperationTime.i);
         checkChangeStream(db, collName, startAtOperationTime);
+
+        // Restore the original configuration.
+        cluster.executeOnMongodNodes((db) => {
+            assert.commandWorked(db.adminCommand(
+                {setParameter: 1, writePeriodicNoops: previousWritePeriodicNoopsOnShards}));
+        });
+        cluster.executeOnConfigNodes((db) => {
+            assert.commandWorked(db.adminCommand(
+                {setParameter: 1, writePeriodicNoops: previousWritePeriodicNoopsOnConfigServer}));
+        });
 
         $super.teardown.apply(this, arguments);
     };

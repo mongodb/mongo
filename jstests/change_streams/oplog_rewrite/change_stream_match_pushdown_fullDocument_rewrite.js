@@ -3,7 +3,7 @@
 // part of the oplog cursor's filter in order to filter out results as early as possible.
 // @tags: [
 //   featureFlagChangeStreamsRewrite,
-//   requires_fcv_51,
+//   requires_fcv_63,
 //   requires_pipeline_optimization,
 //   requires_sharding,
 //   uses_change_streams,
@@ -210,17 +210,17 @@ const runVerifyOpsTestcases = (op) => {
         // Test that {$eq: null} on the 'fullDocument' field matches the 'drop' event.
         verifyOps(resumeAfterToken,
                   {$match: {operationType: op, fullDocument: {$eq: null}}},
-                  [[op], [op]],
-                  [1, 1] /* expectedChangeStreamDocsReturned */,
-                  [1, 1] /* expectedOplogCursorReturnedDocs */,
+                  [[op]],
+                  [1, 0] /* expectedChangeStreamDocsReturned */,
+                  [1, 0] /* expectedOplogCursorReturnedDocs */,
                   true /* runOnWholeDB */);
 
         // Test that {$exists: false} on the 'fullDocument' field matches the 'drop' event.
         verifyOps(resumeAfterToken,
                   {$match: {operationType: op, fullDocument: {$exists: false}}},
-                  [[op], [op]],
-                  [1, 1] /* expectedChangeStreamDocsReturned */,
-                  [1, 1] /* expectedOplogCursorReturnedDocs */,
+                  [[op]],
+                  [1, 0] /* expectedChangeStreamDocsReturned */,
+                  [1, 0] /* expectedOplogCursorReturnedDocs */,
                   true /* runOnWholeDB */);
 
         // Test that {$exists: true} on the 'fullDocument' field does not match the 'drop' event.
