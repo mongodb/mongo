@@ -33,7 +33,7 @@ global:
     - "mongo/s/mongos_server_parameters.h"
 
 imports:
-    - "mongo/db/basic_types.idl"
+    - "mongo/idl/basic_types.idl"
 
 server_parameters:
   loadRoutingTableOnStartup:
@@ -69,3 +69,12 @@ server_parameters:
     cpp_vartype: bool
     cpp_varname: "gEnableFinerGrainedCatalogCacheRefresh"
     default: false
+  CatalogCacheRefreshVectorVerticalDepth:
+    description: >-
+        .Set vector vertical depth of catalog cache refresh.
+    set_at: [ startup ]
+    cpp_vartype: int
+    cpp_varname: "CatalogCacheRefreshVectorVerticalDepth"
+    default: 1000 # 1000 Chunks
+    validator:
+      gte: 500

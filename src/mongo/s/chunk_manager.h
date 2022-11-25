@@ -33,15 +33,18 @@
 #include <string>
 #include <vector>
 
+#include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/s/chunk.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/s/client/shard.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/s/shard_key_pattern.h"
-#include "mongo/s/shard_version.h"
-#include "mongo/s/type_collection_common_types_gen.h"
+#include "mongo/s/type_collection_timeseries_fields_gen.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/read_through_cache.h"
 
 namespace mongo {
@@ -54,15 +57,28 @@ struct ShardVersionTargetingInfo {
     // Indicates whether the shard is stale and thus needs a catalog cache refresh
     AtomicWord<bool> isStale{false};
 
+    //chunk count for the shard
+    AtomicWord<int> count{0};
     // Max chunk version for the shard
     ChunkVersion shardVersion;
 
-    ShardVersionTargetingInfo(const OID& epoch, const Timestamp& timestamp);
+    //solve porblem  "error: use of deleted function 'std::atomic<bool>::atomic(const std::atomic<bool>&)'"
+    ShardVersionTargetingInfo(const ShardVersionTargetingInfo& info) {
+        bool state = info.isStale.load();
+        isStale.store(state);
+        shardVersion = info.shardVersion;
+
+        count.store(info.count.load());
+    }
+    ShardVersionTargetingInfo(const OID& epoch, const boost::optional<Timestamp>& timestamp);
 };
 
-// Map from a shard to a struct indicating both the max chunk version on that shard and whether the
-// shard is currently marked as needing a catalog cache refresh (stale).
+
 using ShardVersionMap = stdx::unordered_map<ShardId, ShardVersionTargetingInfo, ShardId::Hasher>;
+
+// Vector of chunks ordered by max key.
+using ChunkVector = std::vector<std::shared_ptr<ChunkInfo>>;
+using MapChunkVector = std::map<std::string, std::shared_ptr<ChunkVector>>;
 
 /**
  * This class serves as a Facade around how the mapping of ranges to chunks is represented. It also
@@ -70,62 +86,168 @@ using ShardVersionMap = stdx::unordered_map<ShardId, ShardVersionTargetingInfo, 
  * underlying implementation.
  */
 class ChunkMap {
-    // Vector of chunks ordered by max key.
-    using ChunkVector = std::vector<std::shared_ptr<ChunkInfo>>;
-
 public:
-    ChunkMap(OID epoch, const Timestamp& timestamp, size_t initialCapacity = 0);
-
-    size_t size() const {
-        return _chunkMap.size();
+    explicit ChunkMap(OID epoch,
+                      const boost::optional<Timestamp>& timestamp, 
+                      long unsigned int vecterDdepthSize = 1000,
+                      size_t initialCapacity = 0)
+        : _collectionVersion(0, 0, epoch, timestamp), _collTimestamp(timestamp) {
+        maxVectorVerticalDepthSize = vecterDdepthSize;
+    }
+    
+    explicit ChunkMap(const MapChunkVector& chunkMap,
+                          const ChunkVersion& collectionVersion,
+                          const ShardVersionMap& shardVersions,
+                          const boost::optional<Timestamp>& timestamp,
+                          long unsigned int vecterDdepthSize = 1000
+                      )
+        : _collTimestamp(timestamp) {
+         _chunkMap = chunkMap;
+         _collectionVersion = collectionVersion;
+         _shardVersions = shardVersions;
+         maxVectorVerticalDepthSize = vecterDdepthSize;
+    }
+    
+    void setMaxVectorVerticalDepthSize(long unsigned int vecterDdepthSize) {
+        maxVectorVerticalDepthSize = vecterDdepthSize;
     }
 
+    long unsigned int getMaxVectorVerticalDepthSize() const {
+        return maxVectorVerticalDepthSize;
+    }
+
+    size_t size() const {
+        return totalChunksNum();
+    }
+
+    // Max version across all chunks 
     ChunkVersion getVersion() const {
         return _collectionVersion;
     }
 
+    ShardVersionMap getShardVersion() const {
+        return _shardVersions;
+    }
+
+    MapChunkVector getChunkMap() const {
+        return _chunkMap;
+    }
+
     template <typename Callable>
     void forEach(Callable&& handler, const BSONObj& shardKey = BSONObj()) const {
-        auto it = shardKey.isEmpty() ? _chunkMap.begin() : _findIntersectingChunk(shardKey);
+        if (shardKey.isEmpty()) {
+    		for (const auto& mapIt : _chunkMap) {
+    		    auto second = *mapIt.second;
+                for (auto it = second.begin(); it != second.end(); ++it) {
+                    if (!handler(*it))
+                        break;
+                }
+    		}
 
-        for (; it != _chunkMap.end(); ++it) {
-            if (!handler(*it))
-                break;
+    		return;
+        }
+
+        auto shardKeyString = ShardKeyPattern::toKeyString(shardKey);
+	
+        const auto itMin = _chunkMap.lower_bound(shardKeyString);
+        for (auto mapIt = itMin; mapIt != _chunkMap.end(); mapIt++) {
+            auto second = mapIt->second;
+            if (mapIt == itMin) {
+                auto it = _findIntersectingChunkIterator(shardKey, second);
+                for (; it != second->end(); ++it) {
+                    if (!handler(*it))
+                        return;
+                } 
+
+                continue;
+            }
+            
+            for (auto it = second->begin(); it != second->end(); ++it) {
+                if (!handler(*it))
+                    return;
+            }
         }
     }
+
 
     template <typename Callable>
     void forEachOverlappingChunk(const BSONObj& min,
                                  const BSONObj& max,
                                  bool isMaxInclusive,
                                  Callable&& handler) const {
-        const auto bounds = _overlappingBounds(min, max, isMaxInclusive);
-
+        const auto bounds = _overlappingVectorSlotBounds(min, max, isMaxInclusive);
         for (auto it = bounds.first; it != bounds.second; ++it) {
-            if (!handler(*it))
-                break;
+            auto boundsInSecondaryIndex = _overlappingBounds(min, max, isMaxInclusive, it->second);
+            for (auto itSecond = boundsInSecondaryIndex.first; 
+                itSecond != boundsInSecondaryIndex.second; ++itSecond) {
+                    auto chunkInfo = *itSecond;
+                    if (!handler(*itSecond))
+                         break;
+            }
         }
     }
 
-    ShardVersionMap constructShardVersionMap() const;
+    void constructShardVersionMap(const std::vector<std::shared_ptr<ChunkInfo>>& changedChunks);
+    MapChunkVector& getMapChunkVector();
     std::shared_ptr<ChunkInfo> findIntersectingChunk(const BSONObj& shardKey) const;
 
-    void appendChunk(const std::shared_ptr<ChunkInfo>& chunk);
+    void appendChunk(ChunkVector& chunkMap, const std::shared_ptr<ChunkInfo>& chunk);
 
-    ChunkMap createMerged(const std::vector<std::shared_ptr<ChunkInfo>>& changedChunks) const;
+    void createMerged(const ChunkMap& oldChunkMap, const std::vector<std::shared_ptr<ChunkInfo>>& changedChunks,
+        const NamespaceString& nss, bool isUpdate);
+    int totalChunksNum() const;
 
     BSONObj toBSON() const;
+    void constructShardVersionsByChunk(const std::shared_ptr<ChunkInfo>& chunk, 
+	    const OID& epoch, boost::optional<Timestamp> timestamp, bool needIncCount);
 
 private:
-    ChunkVector::const_iterator _findIntersectingChunk(const BSONObj& shardKey,
+    std::shared_ptr<ChunkInfo> _findIntersectingChunk(const BSONObj& shardKey,
                                                        bool isMaxInclusive = true) const;
-    std::pair<ChunkVector::const_iterator, ChunkVector::const_iterator> _overlappingBounds(
-        const BSONObj& min, const BSONObj& max, bool isMaxInclusive) const;
+    ChunkVector::const_iterator _findIntersectingChunkIterator(const BSONObj& shardKey,
+															   std::shared_ptr<ChunkVector> vector,
+                                                               bool isMaxInclusive = true) const;
 
-    ChunkVector _chunkMap;
+    std::pair<MapChunkVector::const_iterator, MapChunkVector::const_iterator> 
+        _overlappingVectorSlotBounds(const mongo::BSONObj& min,
+                                          const mongo::BSONObj& max,
+                                          bool isMaxInclusive) const;
+    std::pair<ChunkVector::const_iterator, ChunkVector::const_iterator>
+        _overlappingBounds(const BSONObj& min, const BSONObj& max, bool isMaxInclusive,
+        std::shared_ptr<ChunkVector> vect) const;
+    std::string toString() const;
+    void makeNew(const ChunkVector& changedChunks);
+    void makeUpdated(const ChunkMap& oldChunkMAp, const ChunkVector& changedChunks);
+    void mergeChunkMap(const ChunkMap& oldChunkMap, ChunkMap& changeChunkMap);
+    void chunkRangeValidateCheck(const ChunkVector& changedChunks);
+    bool mergeOverlapMapVectorChunk(const mongo::BSONObj& min, const mongo::BSONObj& max, 
+        ChunkVector& chunkVector);
+    void mergeTowChunkVector(const ChunkVector& changeChunks, const ChunkVector& oldVectorChunks, 
+        ChunkVector& updateChunk, bool checkVersion);
+    void minKeyMaxKeyValidateCheck(void) const;
+    void splitChunkVector(ChunkVector& chunkVector);
+    void eraseShardVersionMapElem(ShardVersionMap& oldShardVersionsMap, ShardVersionMap& newShardVersionsMap);
+    ShardVersionMap constructTempShardVersionMapCount(const ChunkVector& changedChunks); 
+
+    MapChunkVector _chunkMap;
+    int _maxSizeSingleChunksMap;
 
     // Max version across all chunks
     ChunkVersion _collectionVersion;
+    // The representation of shard versions and staleness indicators for this namespace. If a
+    // shard does not exist, it will not have an entry in the map.
+    // Note: this declaration must not be moved before _chunkMap since it is initialized by using
+    // the _chunkMap instance.
+    ShardVersionMap _shardVersions;  
+
+    // Represents the timestamp present in config.collections for this ChunkMap.
+    //
+    // Note that due to the way Phase 1 of the FCV upgrade writes timestamps to chunks
+    // (non-atomically), it is possible that chunks exist with timestamps, but the corresponding
+    // config.collections entry doesn't. In this case, the chunks timestamp should be ignored when
+    // computing the collection version and we should use _collTimestamp instead.
+    boost::optional<Timestamp> _collTimestamp;
+    long unsigned int maxVectorVerticalDepthSize;
 };
 
 /**
@@ -156,15 +278,14 @@ public:
      */
     static RoutingTableHistory makeNew(
         NamespaceString nss,
-        UUID uuid,
+        boost::optional<UUID>,
         KeyPattern shardKeyPattern,
         std::unique_ptr<CollatorInterface> defaultCollator,
         bool unique,
         OID epoch,
-        const Timestamp& timestamp,
+        const boost::optional<Timestamp>& timestamp,
         boost::optional<TypeCollectionTimeseriesFields> timeseriesFields,
         boost::optional<TypeCollectionReshardingFields> reshardingFields,
-        boost::optional<uint64_t> maxChunkSizeBytes,
         bool allowMigrations,
         const std::vector<ChunkType>& chunks);
 
@@ -175,18 +296,22 @@ public:
      * The changes in "changedChunks" must be sorted in ascending order by chunk version, and adhere
      * to the requirements of the routing table update algorithm.
      *
-     * The existence of timeseriesFields/reshardingFields inside the optional implies that this
-     * field was present inside the config.collections entry when refreshing. An uninitialized
-     * timeseriesFields/reshardingFields parameter implies that the field was not present, and will
-     * clear any currently held timeseries/resharding fields inside the resulting
-     * RoutingTableHistory.
+     * The existence of "reshardingFields" inside the optional implies that this field was present
+     * inside the config.collections entry when refreshing. An uninitialized "reshardingFields"
+     * parameter implies that the field was not present, and will clear any currently held
+     * resharding fields inside the resulting RoutingTableHistory.
      */
     RoutingTableHistory makeUpdated(
-        boost::optional<TypeCollectionTimeseriesFields> timeseriesFields,
         boost::optional<TypeCollectionReshardingFields> reshardingFields,
-        boost::optional<uint64_t> maxChunkSizeBytes,
         bool allowMigrations,
         const std::vector<ChunkType>& changedChunks) const;
+
+    /**
+     * Constructs a new instance with the same routing table but adding or removing timestamp on all
+     * chunks
+     */
+    RoutingTableHistory makeUpdatedReplacingTimestamp(
+        const boost::optional<Timestamp>& timestamp) const;
 
     const NamespaceString& nss() const {
         return _nss;
@@ -216,8 +341,18 @@ public:
      */
     void setAllShardsRefreshed();
 
+    // Max version across all chunks ,chunkmap???????
+    //ChunkVersion getShardVersion() const {
     ChunkVersion getVersion() const {
         return _chunkMap.getVersion();
+    }
+
+    MapChunkVector getChunkMap() const {
+        return _chunkMap.getChunkMap();
+    }
+
+    NamespaceString getNss() const {
+        return _nss;
     }
 
     /**
@@ -261,11 +396,6 @@ public:
     void getAllShardIds(std::set<ShardId>* all) const;
 
     /**
-     * Returns all chunk ranges for the collection.
-     */
-    void getAllChunkRanges(std::set<ChunkRange>* all) const;
-
-    /**
      * Returns the number of shards on which the collection has any chunks
      */
     int getNShardsOwningChunks() const;
@@ -277,11 +407,23 @@ public:
 
     std::string toString() const;
 
-    bool uuidMatches(const UUID& uuid) const {
-        return _uuid == uuid;
+    bool uuidMatches(UUID uuid) const {
+        return _uuid && *_uuid == uuid;
     }
 
-    const UUID& getUUID() const {
+    bool sameAllowMigrations(const RoutingTableHistory& other) const {
+        return _allowMigrations == other._allowMigrations;
+    }
+
+    bool sameReshardingFields(const RoutingTableHistory& other) const {
+        if (_reshardingFields && other._reshardingFields) {
+            return _reshardingFields->toBSON().woCompare(other._reshardingFields->toBSON()) == 0;
+        } else {
+            return !_reshardingFields && !other._reshardingFields;
+        }
+    }
+
+    boost::optional<UUID> getUUID() const {
         return _uuid;
     }
 
@@ -297,32 +439,27 @@ public:
         return _allowMigrations;
     }
 
-    // collection default chunk size or +inf, iff no splits should happen
-    boost::optional<uint64_t> maxChunkSizeBytes() const {
-        return _maxChunkSizeBytes;
-    }
-
 private:
     friend class ChunkManager;
 
     RoutingTableHistory(NamespaceString nss,
-                        UUID uuid,
+                        boost::optional<UUID> uuid,
                         KeyPattern shardKeyPattern,
                         std::unique_ptr<CollatorInterface> defaultCollator,
                         bool unique,
                         boost::optional<TypeCollectionTimeseriesFields> timeseriesFields,
                         boost::optional<TypeCollectionReshardingFields> reshardingFields,
-                        boost::optional<uint64_t> maxChunkSizeBytes,
                         bool allowMigrations,
                         ChunkMap chunkMap);
+    ShardVersionMap constructShardVersionMap();
 
     ChunkVersion _getVersion(const ShardId& shardName, bool throwOnStaleShard) const;
 
     // Namespace to which this routing information corresponds
     NamespaceString _nss;
 
-    // The UUID of the collection
-    UUID _uuid;
+    // The invariant UUID of the collection.  This is optional in 3.6, except in change streams.
+    boost::optional<UUID> _uuid;
 
     // The key pattern used to shard the collection
     ShardKeyPattern _shardKeyPattern;
@@ -342,8 +479,6 @@ private:
     // for this collection.
     boost::optional<TypeCollectionReshardingFields> _reshardingFields;
 
-    boost::optional<uint64_t> _maxChunkSizeBytes;
-
     bool _allowMigrations;
 
     // Map from the max for each chunk to an entry describing the chunk. The union of all chunks'
@@ -361,9 +496,8 @@ private:
  * Constructed to be used exclusively by the CatalogCache as a vector clock (Time) to drive
  * CollectionCache's lookups.
  *
- * The ChunkVersion class contains a timestamp for the collection generation which resets to 0 after
- * the collection is dropped or all chunks are moved off of a shard, in which case the versions
- * cannot be compared.
+ * The ChunkVersion class contains a non comparable epoch, which makes impossible to compare two
+ * ChunkVersions when their epochs's differ.
  *
  * This class wraps a ChunkVersion object with a node-local sequence number
  * (_epochDisambiguatingSequenceNum) that allows the comparision.
@@ -397,7 +531,11 @@ public:
      */
     ComparableChunkVersion() = default;
 
-    std::string toString() const;
+    BSONObj toBSONForLogging() const;
+
+    bool sameEpoch(const ComparableChunkVersion& other) const {
+        return _chunkVersion->epoch() == other._chunkVersion->epoch();
+    }
 
     bool operator==(const ComparableChunkVersion& other) const;
 
@@ -460,10 +598,10 @@ struct OptionalRoutingTableHistory {
     OptionalRoutingTableHistory() = default;
 
     // SHARDED collection constructor
-    OptionalRoutingTableHistory(std::shared_ptr<RoutingTableHistory> rt) : optRt(std::move(rt)) {}
+    OptionalRoutingTableHistory(RoutingTableHistory&& rt) : optRt(std::move(rt)) {}
 
-    // If nullptr, the collection is UNSHARDED, otherwise it is SHARDED
-    std::shared_ptr<RoutingTableHistory> optRt;
+    // If boost::none, the collection is UNSHARDED, otherwise it is SHARDED
+    boost::optional<RoutingTableHistory> optRt;
 };
 
 using RoutingTableHistoryCache =
@@ -475,12 +613,12 @@ using RoutingTableHistoryValueHandle = RoutingTableHistoryCache::ValueHandle;
  */
 struct ShardEndpoint {
     ShardEndpoint(const ShardId& shardName,
-                  boost::optional<ShardVersion> shardVersionParam,
-                  boost::optional<DatabaseVersion> dbVersionParam);
+                  boost::optional<ChunkVersion> shardVersion,
+                  boost::optional<DatabaseVersion> dbVersion);
 
     ShardId shardName;
 
-    boost::optional<ShardVersion> shardVersion;
+    boost::optional<ChunkVersion> shardVersion;
     boost::optional<DatabaseVersion> databaseVersion;
 };
 
@@ -509,10 +647,6 @@ public:
      * to provide a stable view of its constituent shards.
      */
     bool allowMigrations() const;
-
-    bool allowAutoSplit() const;
-
-    boost::optional<uint64_t> maxChunkSizeBytes() const;
 
     const ShardId& dbPrimary() const {
         return _dbPrimary;
@@ -616,38 +750,25 @@ public:
     /**
      * Finds the shard IDs for a given filter and collation. If collation is empty, we use the
      * collection default collation for targeting.
-     * If output parameter `changeRanges` is non-null, the set is populated with ChunkRanges that
-     * would be targeted by the query; if nullptr, no processing of chunk ranges occurs.
      */
     void getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
                              const BSONObj& query,
                              const BSONObj& collation,
-                             std::set<ShardId>* shardIds,
-                             std::set<ChunkRange>* chunkRanges = nullptr) const;
+                             std::set<ShardId>* shardIds) const;
 
     /**
      * Returns all shard ids which contain chunks overlapping the range [min, max]. Please note the
      * inclusive bounds on both sides (SERVER-20768).
-     * If output parameter `changeRanges` is non-null, the set is populated with ChunkRanges that
-     * would be targeted by the query.
      */
     void getShardIdsForRange(const BSONObj& min,
                              const BSONObj& max,
-                             std::set<ShardId>* shardIds,
-                             std::set<ChunkRange>* chunkRanges = nullptr) const;
+                             std::set<ShardId>* shardIds) const;
 
     /**
      * Returns the ids of all shards on which the collection has any chunks.
      */
     void getAllShardIds(std::set<ShardId>* all) const {
         _rt->optRt->getAllShardIds(all);
-    }
-
-    /**
-     * Returns the chunk ranges of all shards on which the collection has any chunks.
-     */
-    void getAllChunkRanges(std::set<ChunkRange>* all) const {
-        _rt->optRt->getAllChunkRanges(all);
     }
 
     /**
@@ -689,16 +810,14 @@ public:
         return _rt->optRt->compatibleWith(*other._rt->optRt, shard);
     }
 
-    bool uuidMatches(const UUID& uuid) const {
+    bool uuidMatches(UUID uuid) const {
+        //OptionalRoutingTableHistory::optRt, RoutingTableHistory::uuidMatches
         return _rt->optRt->uuidMatches(uuid);
     }
 
-    const UUID& getUUID() const {
+    boost::optional<UUID> getUUID() const {
+        ////OptionalRoutingTableHistory::optRt
         return _rt->optRt->getUUID();
-    }
-
-    const NamespaceString& getNss() const {
-        return _rt->optRt->nss();
     }
 
     const boost::optional<TypeCollectionTimeseriesFields>& getTimeseriesFields() const {
@@ -723,3 +842,9 @@ private:
 };
 
 }  // namespace mongo
+
+
+
+
+
+
