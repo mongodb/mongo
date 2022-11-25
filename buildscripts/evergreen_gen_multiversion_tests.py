@@ -252,9 +252,7 @@ class EvergreenMultiversionConfigGenerator(object):
         # LOOKBACK_DURATION_DAYS. Tests without enough run-time statistics will be placed
         # in the misc suite.
         gen_suites = generate_resmoke.GenerateSubSuites(self.evg_api, self.options)
-        end_date = datetime.datetime.utcnow().replace(microsecond=0)
-        start_date = end_date - datetime.timedelta(days=generate_resmoke.LOOKBACK_DURATION_DAYS)
-        suites = gen_suites.calculate_suites(start_date, end_date)
+        suites = gen_suites.calculate_suites()
         # Render the given suites into yml files that can be used by resmoke.py.
         config_file_dict = generate_resmoke.render_suite_files(suites, self.options.suite,
                                                                gen_suites.test_list, TEST_SUITE_DIR,

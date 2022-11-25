@@ -13,7 +13,7 @@ from mock import patch, MagicMock
 from shrub.v2 import BuildVariant, ShrubProject
 from shrub.variant import DisplayTaskDefinition
 
-from buildscripts.util.teststats import TestRuntime
+from buildscripts.util.teststats import TestRuntime, HistoricalTestInformation
 
 from buildscripts import evergreen_generate_resmoke_tasks as under_test
 
@@ -31,7 +31,12 @@ def ns(relative_name):  # pylint: disable=invalid-name
 
 
 def tst_stat_mock(file, duration, pass_count):
-    return MagicMock(test_file=file, avg_duration_pass=duration, num_pass=pass_count)
+    return HistoricalTestInformation(
+        test_name=file,
+        num_pass=pass_count,
+        num_fail=0,
+        avg_duration_pass=duration,
+    )
 
 
 def mock_test_stats_unavailable(evg_api_mock):
@@ -108,10 +113,10 @@ class TestAcceptance(unittest.TestCase):
         return target_directory, source_directory
 
     @staticmethod
-    def _mock_test_files(directory, n_tests, runtime, evg_api_mock, suites_config_mock):
+    def _mock_test_files(directory, n_tests, runtime, get_stats_from_s3_mock, suites_config_mock):
         test_list = [os.path.join(directory, f"test_name_{i}.js") for i in range(n_tests)]
         mock_test_stats = [tst_stat_mock(file, runtime, 5) for file in test_list]
-        evg_api_mock.test_stats_by_project.return_value = mock_test_stats
+        get_stats_from_s3_mock.return_value = mock_test_stats
         suites_config_mock.return_value.tests = test_list
         for test in test_list:
             open(test, "w").close()
@@ -136,7 +141,8 @@ class TestAcceptance(unittest.TestCase):
             self.assertEqual(0, len(os.listdir(tmpdir)))
 
     @patch(ns("suitesconfig.get_suite"))
-    def test_when_evg_test_stats_is_down(self, suites_config_mock):
+    @patch("buildscripts.util.teststats.HistoricTaskData.get_stats_from_s3")
+    def test_when_evg_test_stats_is_down(self, get_stats_from_s3_mock, suites_config_mock):
         """
         Given Evergreen historic test stats endpoint is disabled,
         When evergreen_generate_resmoke_tasks attempts to generate suites,
@@ -154,8 +160,9 @@ class TestAcceptance(unittest.TestCase):
             target_directory, source_directory = self._prep_dirs(tmpdir, mock_config)
             suite_path = os.path.join(source_directory, task)
             mock_config["suite"] = suite_path
-            test_list = self._mock_test_files(source_directory, n_tests, 5, evg_api_mock,
+            test_list = self._mock_test_files(source_directory, n_tests, 5, get_stats_from_s3_mock,
                                               suites_config_mock)
+            get_stats_from_s3_mock.return_value = []
             mock_resmoke_config_file(test_list, suite_path + ".yml")
 
             under_test.GenerateSubSuites(evg_api_mock, config).run()
@@ -181,7 +188,8 @@ class TestAcceptance(unittest.TestCase):
         sys.platform.startswith("win"), "Since this test is messing with directories, "
         "windows does not handle test generation correctly")
     @patch(ns("suitesconfig.get_suite"))
-    def test_with_each_test_in_own_task(self, suites_config_mock):
+    @patch("buildscripts.util.teststats.HistoricTaskData.get_stats_from_s3")
+    def test_with_each_test_in_own_task(self, get_stats_from_s3_mock, suites_config_mock):
         """
         Given a task with all tests having a historic runtime over the target,
         When evergreen_generate_resmoke_tasks attempts to generate suites,
@@ -200,8 +208,8 @@ class TestAcceptance(unittest.TestCase):
             target_directory, source_directory = self._prep_dirs(tmpdir, mock_config)
             suite_path = os.path.join(source_directory, task)
             mock_config["suite"] = suite_path
-            test_list = self._mock_test_files(source_directory, n_tests, 15 * 60, evg_api_mock,
-                                              suites_config_mock)
+            test_list = self._mock_test_files(source_directory, n_tests, 15 * 60,
+                                              get_stats_from_s3_mock, suites_config_mock)
             mock_resmoke_config_file(test_list, suite_path + ".yml")
 
             under_test.enable_logging(True)
@@ -857,10 +865,11 @@ class GenerateSubSuitesTest(unittest.TestCase):
         return [f"test{i}.js" for i in range(n_tests)]
 
     @patch(ns("read_suite_config"))
-    def test_calculate_suites(self, mock_read_suite_config):
+    @patch("buildscripts.util.teststats.HistoricTaskData.get_stats_from_s3")
+    def test_calculate_suites(self, mock_get_stats_from_s3, mock_read_suite_config):
         mock_read_suite_config.return_value = {}
         evg = MagicMock()
-        evg.test_stats_by_project.return_value = [
+        mock_get_stats_from_s3.return_value = [
             tst_stat_mock(f"test{i}.js", 60, 1) for i in range(100)
         ]
         config_options = self.get_mock_options()
@@ -872,40 +881,26 @@ class GenerateSubSuitesTest(unittest.TestCase):
         with patch("os.path.exists") as exists_mock, patch(ns("suitesconfig")) as suitesconfig_mock:
             exists_mock.return_value = True
             suitesconfig_mock.get_suite.return_value.tests = \
-                [stat.test_file for stat in evg.test_stats_by_project.return_value]
-            suites = gen_sub_suites.calculate_suites(_DATE, _DATE)
+                [stat.test_name for stat in mock_get_stats_from_s3.return_value]
+            suites = gen_sub_suites.calculate_suites()
 
             # There are 100 tests taking 1 minute, with a target of 10 min we expect 10 suites.
             self.assertEqual(10, len(suites))
             for suite in suites:
                 self.assertEqual(10, len(suite.tests))
 
-    def test_calculate_suites_fallback(self):
-        n_tests = 100
-        evg = mock_test_stats_unavailable(MagicMock())
-        config_options = self.get_mock_options()
-
-        gen_sub_suites = under_test.GenerateSubSuites(evg, config_options)
-        gen_sub_suites.list_tests = MagicMock(return_value=self.get_test_list(n_tests))
-
-        suites = gen_sub_suites.calculate_suites(_DATE, _DATE)
-
-        self.assertEqual(gen_sub_suites.config_options.fallback_num_sub_suites, len(suites))
-        for suite in suites:
-            self.assertEqual(50, len(suite.tests))
-
-        self.assertEqual(n_tests, len(gen_sub_suites.test_list))
-
-    def test_calculate_suites_fallback_with_fewer_tests_than_max(self):
+    @patch("buildscripts.util.teststats.HistoricTaskData.get_stats_from_s3")
+    def test_calculate_suites_fallback_with_fewer_tests_than_max(self, mock_get_stats_from_s3):
         n_tests = 2
         evg = mock_test_stats_unavailable(MagicMock())
         config_options = self.get_mock_options()
         config_options.fallback_num_sub_suites = 5
+        mock_get_stats_from_s3.return_value = []
 
         gen_sub_suites = under_test.GenerateSubSuites(evg, config_options)
         gen_sub_suites.list_tests = MagicMock(return_value=self.get_test_list(n_tests))
 
-        suites = gen_sub_suites.calculate_suites(_DATE, _DATE)
+        suites = gen_sub_suites.calculate_suites()
 
         self.assertEqual(n_tests, len(suites))
         for suite in suites:
@@ -913,15 +908,16 @@ class GenerateSubSuitesTest(unittest.TestCase):
 
         self.assertEqual(n_tests, len(gen_sub_suites.test_list))
 
-    def test_calculate_suites_uses_fallback_for_no_results(self):
+    @patch("buildscripts.util.teststats.HistoricTaskData.get_stats_from_s3")
+    def test_calculate_suites_uses_fallback_for_no_results(self, mock_get_stats_from_s3):
         n_tests = 100
         evg = MagicMock()
-        evg.test_stats_by_project.return_value = []
+        mock_get_stats_from_s3.return_value = []
         config_options = self.get_mock_options()
 
         gen_sub_suites = under_test.GenerateSubSuites(evg, config_options)
         gen_sub_suites.list_tests = MagicMock(return_value=self.get_test_list(n_tests))
-        suites = gen_sub_suites.calculate_suites(_DATE, _DATE)
+        suites = gen_sub_suites.calculate_suites()
 
         self.assertEqual(gen_sub_suites.config_options.fallback_num_sub_suites, len(suites))
         for suite in suites:
@@ -929,10 +925,12 @@ class GenerateSubSuitesTest(unittest.TestCase):
 
         self.assertEqual(n_tests, len(gen_sub_suites.test_list))
 
-    def test_calculate_suites_uses_fallback_if_only_results_are_filtered(self):
+    @patch("buildscripts.util.teststats.HistoricTaskData.get_stats_from_s3")
+    def test_calculate_suites_uses_fallback_if_only_results_are_filtered(
+            self, mock_get_stats_from_s3):
         n_tests = 100
         evg = MagicMock()
-        evg.test_stats_by_project.return_value = [
+        mock_get_stats_from_s3.return_value = [
             tst_stat_mock(f"test{i}.js", 60, 1) for i in range(100)
         ]
         config_options = self.get_mock_options()
@@ -941,7 +939,7 @@ class GenerateSubSuitesTest(unittest.TestCase):
         gen_sub_suites.list_tests = MagicMock(return_value=self.get_test_list(n_tests))
         with patch("os.path.exists") as exists_mock:
             exists_mock.return_value = False
-            suites = gen_sub_suites.calculate_suites(_DATE, _DATE)
+            suites = gen_sub_suites.calculate_suites()
 
             self.assertEqual(gen_sub_suites.config_options.fallback_num_sub_suites, len(suites))
             for suite in suites:
@@ -949,24 +947,13 @@ class GenerateSubSuitesTest(unittest.TestCase):
 
             self.assertEqual(n_tests, len(gen_sub_suites.test_list))
 
-    def test_calculate_suites_error(self):
-        response = MagicMock()
-        response.status_code = requests.codes.INTERNAL_SERVER_ERROR
-        evg = MagicMock()
-        evg.test_stats_by_project.side_effect = requests.HTTPError(response=response)
-        config_options = self.get_mock_options()
-
-        gen_sub_suites = under_test.GenerateSubSuites(evg, config_options)
-        gen_sub_suites.list_tests = MagicMock(return_value=self.get_test_list(100))
-
-        with self.assertRaises(requests.HTTPError):
-            gen_sub_suites.calculate_suites(_DATE, _DATE)
-
     @patch(ns("read_suite_config"))
-    def test_calculate_suites_with_selected_tests_to_run(self, mock_read_suite_config):
+    @patch("buildscripts.util.teststats.HistoricTaskData.get_stats_from_s3")
+    def test_calculate_suites_with_selected_tests_to_run(self, mock_get_stats_from_s3,
+                                                         mock_read_suite_config):
         mock_read_suite_config.return_value = {}
         evg = MagicMock()
-        evg.test_stats_by_project.return_value = [
+        mock_get_stats_from_s3.return_value = [
             tst_stat_mock(f"test{i}.js", 60, 1) for i in range(100)
         ]
         config_options = self.get_mock_options()
@@ -978,8 +965,8 @@ class GenerateSubSuitesTest(unittest.TestCase):
         with patch("os.path.exists") as exists_mock, patch(ns("suitesconfig")) as suitesconfig_mock:
             exists_mock.return_value = True
             suitesconfig_mock.get_suite.return_value.tests = \
-                [stat.test_file for stat in evg.test_stats_by_project.return_value]
-            suites = gen_sub_suites.calculate_suites(_DATE, _DATE)
+                [stat.test_name for stat in mock_get_stats_from_s3.return_value]
+            suites = gen_sub_suites.calculate_suites()
 
             # There are 100 tests taking 1 minute, with a target of 10 min we expect 10 suites.
             # However, since we have selected only 2 tests to run, test1.js and

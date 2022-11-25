@@ -51,7 +51,6 @@ EVG_CONFIG_FILE = "./.evergreen.yml"
 GENERATE_CONFIG_FILE = "etc/generate_subtasks_config.yml"
 MIN_TIMEOUT_SECONDS = int(timedelta(minutes=5).total_seconds())
 MAX_EXPECTED_TIMEOUT = int(timedelta(hours=48).total_seconds())
-LOOKBACK_DURATION_DAYS = 14
 GEN_SUFFIX = "_gen"
 CLEAN_EVERY_N_HOOK = "CleanEveryN"
 ASAN_SIGNATURE = "detect_leaks=1"
@@ -857,34 +856,21 @@ class GenerateSubSuites(object):
         """Get the configuration of the suite being generated."""
         return read_suite_config(self.config_options.test_suites_dir, self.config_options.suite)
 
-    def calculate_suites(self, start_date: datetime, end_date: datetime) -> List[Suite]:
+    def calculate_suites(self) -> List[Suite]:
         """
         Divide tests into suites based on statistics for the provided period.
 
-        :param start_date: Time to start historical analysis.
-        :param end_date: Time to end historical analysis.
         :return: List of sub suites to be generated.
         """
-        try:
-            evg_stats = HistoricTaskData.from_evg(self.evergreen_api, self.config_options.project,
-                                                  start_date, end_date, self.config_options.task,
-                                                  self.config_options.variant)
-            if not evg_stats:
-                LOGGER.debug("No test history, using fallback suites")
-                # This is probably a new suite, since there is no test history, just use the
-                # fallback values.
-                return self.calculate_fallback_suites()
+        evg_stats = HistoricTaskData.from_s3(self.config_options.project, self.config_options.task,
+                                             self.config_options.variant)
+
+        if evg_stats:
             target_execution_time_secs = self.config_options.target_resmoke_time * 60
             return self.calculate_suites_from_evg_stats(evg_stats, target_execution_time_secs)
-        except requests.HTTPError as err:
-            if err.response.status_code == requests.codes.SERVICE_UNAVAILABLE:
-                # Evergreen may return a 503 when the service is degraded.
-                # We fall back to splitting the tests into a fixed number of suites.
-                LOGGER.warning("Received 503 from Evergreen, "
-                               "dividing the tests evenly among suites")
-                return self.calculate_fallback_suites()
-            else:
-                raise
+
+            # Since there is no test history this is probably a new suite, just use the fallback values.
+        return self.calculate_fallback_suites()
 
     def calculate_suites_from_evg_stats(self, test_stats: HistoricTaskData,
                                         execution_time_secs: int) -> List[Suite]:
@@ -1041,9 +1027,7 @@ class GenerateSubSuites(object):
 
         :return: The suites files and evergreen configuration for the generated task.
         """
-        end_date = datetime.datetime.utcnow().replace(microsecond=0)
-        start_date = end_date - datetime.timedelta(days=LOOKBACK_DURATION_DAYS)
-        return self.calculate_suites(start_date, end_date)
+        return self.calculate_suites()
 
     def run(self):
         """Generate resmoke suites that run within a target execution time and write to disk."""

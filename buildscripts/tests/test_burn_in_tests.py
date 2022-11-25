@@ -338,44 +338,26 @@ class TestGenerateTimeouts(unittest.TestCase):
 
 
 class TestGetTaskRuntimeHistory(unittest.TestCase):
-    def test_get_task_runtime_history_with_no_api(self):
-        self.assertListEqual([],
-                             under_test._get_task_runtime_history(None, "project", "task",
-                                                                  "variant"))
-
-    def test__get_task_runtime_history(self):
-        evergreen_api = Mock()
-        evergreen_api.test_stats_by_project.return_value = [
-            Mock(
-                test_file="dir/test2.js",
-                task_name="task1",
-                variant="variant1",
-                distro="distro1",
-                date=_DATE,
+    @patch(ns("HistoricTaskData.get_stats_from_s3"))
+    def test__get_task_runtime_history(self, get_stats_from_s3_mock):
+        test_stats = [
+            teststats_utils.HistoricalTestInformation(
+                test_name="dir/test2.js",
                 num_pass=1,
                 num_fail=0,
                 avg_duration_pass=10.1,
             )
         ]
-        analysis_duration = under_test.AVG_TEST_RUNTIME_ANALYSIS_DAYS
-        end_date = datetime.datetime.utcnow().replace(microsecond=0)
-        start_date = end_date - datetime.timedelta(days=analysis_duration)
+        get_stats_from_s3_mock.return_value = test_stats
 
-        result = under_test._get_task_runtime_history(evergreen_api, "project1", "task1",
-                                                      "variant1")
+        result = under_test._get_task_runtime_history("project1", "task1", "variant1")
         self.assertEqual(result, [("dir/test2.js", 10.1)])
-        evergreen_api.test_stats_by_project.assert_called_with(
-            "project1", after_date=start_date, before_date=end_date, group_by="test",
-            group_num_days=14, tasks=["task1"], variants=["variant1"])
 
-    def test__get_task_runtime_history_evg_degraded_mode_error(self):  # pylint: disable=invalid-name
-        response = Mock()
-        response.status_code = requests.codes.SERVICE_UNAVAILABLE
-        evergreen_api = Mock()
-        evergreen_api.test_stats_by_project.side_effect = requests.HTTPError(response=response)
+    @patch(ns("HistoricTaskData.get_stats_from_s3"))
+    def test__get_task_runtime_history_when_s3_has_no_data(self, get_stats_from_s3_mock):  # pylint: disable=invalid-name
+        get_stats_from_s3_mock.return_value = []
 
-        result = under_test._get_task_runtime_history(evergreen_api, "project1", "task1",
-                                                      "variant1")
+        result = under_test._get_task_runtime_history("project1", "task1", "variant1")
         self.assertEqual(result, [])
 
 

@@ -515,33 +515,18 @@ def _generate_timeouts(repeat_config: RepeatConfig, test: str,
     return TimeoutInfo.default_timeout()
 
 
-def _get_task_runtime_history(evg_api: Optional[EvergreenApi], project: str, task: str,
-                              variant: str) -> List[TestRuntime]:
+def _get_task_runtime_history(project: str, task: str, variant: str) -> List[TestRuntime]:
     """
-    Fetch historical average runtime for all tests in a task from Evergreen API.
+    Fetch historical average runtime for all tests in a task from S3.
 
-    :param evg_api: Evergreen API.
     :param project: Project name.
     :param task: Task name.
     :param variant: Variant name.
     :return: Test historical runtimes, parsed into teststat objects.
     """
-    if not evg_api:
-        return []
-
-    try:
-        end_date = datetime.datetime.utcnow().replace(microsecond=0)
-        start_date = end_date - datetime.timedelta(days=AVG_TEST_RUNTIME_ANALYSIS_DAYS)
-        test_stats = HistoricTaskData.from_evg(evg_api, project, start_date=start_date,
-                                               end_date=end_date, task=task, variant=variant)
-        return test_stats.get_tests_runtimes()
-    except requests.HTTPError as err:
-        if err.response.status_code == requests.codes.SERVICE_UNAVAILABLE:
-            # Evergreen may return a 503 when the service is degraded.
-            # We fall back to returning no test history
-            return []
-        else:
-            raise
+    test_stats = HistoricTaskData.from_s3(project, task, variant)
+    test_runtimes = test_stats.get_tests_runtimes()
+    return test_runtimes
 
 
 def _create_task(index: int, test_count: int, test: str, task_data: Dict,
@@ -584,7 +569,7 @@ def _create_task(index: int, test_count: int, test: str, task_data: Dict,
 
 
 def create_generated_tasks(tests_by_task: Dict, task_prefix: str, generate_config: GenerateConfig,
-                           repeat_config: RepeatConfig, evg_api: EvergreenApi) -> Set[Task]:
+                           repeat_config: RepeatConfig) -> Set[Task]:
     """
     Create the set of tasks to run the given tests_by_task.
 
@@ -592,16 +577,14 @@ def create_generated_tasks(tests_by_task: Dict, task_prefix: str, generate_confi
     :param task_prefix: Prefix all task names with this.
     :param generate_config: Configuration of what to generate.
     :param repeat_config: Configuration of how to repeat tests.
-    :param evg_api: Evergreen API.
     :return: Set of shrub tasks to run tests_by_task.
     """
     tasks: Set[Task] = set()
     for task in sorted(tests_by_task):
         task_info = tests_by_task[task]
         test_list = task_info["tests"]
-        task_runtime_stats = _get_task_runtime_history(evg_api, generate_config.project,
-                                                       task_info["display_task_name"],
-                                                       generate_config.build_variant)
+        task_runtime_stats = _get_task_runtime_history(
+            generate_config.project, task_info["display_task_name"], generate_config.build_variant)
         test_count = len(test_list)
         for index, test in enumerate(test_list):
             tasks.add(
@@ -613,7 +596,7 @@ def create_generated_tasks(tests_by_task: Dict, task_prefix: str, generate_confi
 
 def create_generate_tasks_config(build_variant: BuildVariant, tests_by_task: Dict,
                                  generate_config: GenerateConfig, repeat_config: RepeatConfig,
-                                 evg_api: Optional[EvergreenApi], include_gen_task: bool = True,
+                                 include_gen_task: bool = True,
                                  task_prefix: str = "burn_in") -> None:
     # pylint: disable=too-many-arguments,too-many-locals
     """
@@ -623,12 +606,10 @@ def create_generate_tasks_config(build_variant: BuildVariant, tests_by_task: Dic
     :param tests_by_task: Dictionary of tests to generate tasks for.
     :param generate_config: Configuration of what to generate.
     :param repeat_config: Configuration of how to repeat tests.
-    :param evg_api: Evergreen API.
     :param include_gen_task: Should generating task be include in display task.
     :param task_prefix: Prefix all task names with this.
     """
-    tasks = create_generated_tasks(tests_by_task, task_prefix, generate_config, repeat_config,
-                                   evg_api)
+    tasks = create_generated_tasks(tests_by_task, task_prefix, generate_config, repeat_config)
     existing_tasks = {ExistingTask(BURN_IN_TESTS_GEN_TASK)} if include_gen_task else None
     build_variant.display_task(BURN_IN_TESTS_TASK, tasks, execution_existing_tasks=existing_tasks)
 
@@ -686,23 +667,21 @@ def create_tests_by_task(build_variant: str, evg_conf: EvergreenProjectConfig,
 
 # pylint: disable=too-many-arguments
 def create_generate_tasks_file(tests_by_task: Dict, generate_config: GenerateConfig,
-                               repeat_config: RepeatConfig, evg_api: Optional[EvergreenApi],
-                               task_prefix: str = 'burn_in', include_gen_task: bool = True) -> str:
+                               repeat_config: RepeatConfig, task_prefix: str = 'burn_in',
+                               include_gen_task: bool = True) -> str:
     """
     Create an Evergreen generate.tasks file to run the given tasks and tests.
 
     :param tests_by_task: Dictionary of tests and tasks to run.
     :param generate_config: Information about how burn_in should generate tasks.
     :param repeat_config: Information about how burn_in should repeat tests.
-    :param evg_api: Evergreen api.
     :param task_prefix: Prefix to start generated task's name with.
     :param include_gen_task: Should the generating task be included in the display task.
     :returns: Configuration to pass to 'generate.tasks'.
     """
     build_variant = BuildVariant(generate_config.run_build_variant)
     create_generate_tasks_config(build_variant, tests_by_task, generate_config, repeat_config,
-                                 evg_api, include_gen_task=include_gen_task,
-                                 task_prefix=task_prefix)
+                                 include_gen_task=include_gen_task, task_prefix=task_prefix)
 
     shrub_project = ShrubProject.empty()
     shrub_project.add_build_variant(build_variant)
@@ -793,8 +772,7 @@ def burn_in(repeat_config: RepeatConfig, generate_config: GenerateConfig, resmok
     LOGGER.debug("tests and tasks found", tests_by_task=tests_by_task)
 
     if generate_tasks_file:
-        json_text = create_generate_tasks_file(tests_by_task, generate_config, repeat_config,
-                                               evg_api)
+        json_text = create_generate_tasks_file(tests_by_task, generate_config, repeat_config)
         write_file(generate_tasks_file, json_text)
     elif not no_exec:
         run_tests(tests_by_task, resmoke_cmd)

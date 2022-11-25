@@ -155,7 +155,7 @@ def _generate_evg_tasks(evergreen_api: EvergreenApi, shrub_project: ShrubProject
                                          repeat_tests_secs=config_options.repeat_tests_secs)
 
             create_generate_tasks_config(shrub_build_variant, tests_by_task, gen_config,
-                                         repeat_config, evergreen_api, include_gen_task=False)
+                                         repeat_config, include_gen_task=False)
             shrub_project.add_build_variant(shrub_build_variant)
 
 

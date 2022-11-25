@@ -79,7 +79,7 @@ class TestHistoricTaskData(unittest.TestCase):
     @staticmethod
     def _make_evg_result(test_file="dir/test1.js", num_pass=0, duration=0):
         return Mock(
-            test_file=test_file,
+            test_name=test_file,
             task_name="task1",
             variant="variant1",
             distro="distro1",
