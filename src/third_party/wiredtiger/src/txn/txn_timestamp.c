@@ -162,9 +162,18 @@ __txn_global_query_timestamp(WT_SESSION_IMPL *session, wt_timestamp_t *tsp, cons
     WT_STAT_CONN_INCR(session, txn_query_ts);
     WT_RET(__wt_config_gets(session, cfg, "get", &cval));
     if (WT_STRING_MATCH("all_durable", cval.str, cval.len)) {
-        ts = txn_global->has_durable_timestamp ? txn_global->durable_timestamp : 0;
+        /*
+         * If there is durable timestamp set, there is nothing to return. No need to walk the
+         * concurrent transactions.
+         */
+        if (!txn_global->has_durable_timestamp) {
+            *tsp = WT_TS_NONE;
+            return (0);
+        }
 
         __wt_readlock(session, &txn_global->rwlock);
+
+        ts = txn_global->durable_timestamp;
 
         /* Walk the array of concurrent transactions. */
         WT_ORDERED_READ(session_cnt, conn->session_cnt);
