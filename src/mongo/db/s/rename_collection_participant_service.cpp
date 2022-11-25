@@ -73,7 +73,8 @@ void dropCollectionLocally(OperationContext* opCtx, const NamespaceString& nss) 
 }
 
 void clearFilteringMetadata(OperationContext* opCtx, const NamespaceString& nss) {
-    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+    // TODO (SERVER-71444): Fix to be interruptible or document exception.
+    UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
     Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
     Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
     CollectionShardingRuntime::assertCollectionLockedAndAcquire(

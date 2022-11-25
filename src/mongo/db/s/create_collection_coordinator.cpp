@@ -1290,7 +1290,9 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx,
 
         // If the refresh fails, then set the shard version to UNKNOWN and let a future
         // operation to refresh the metadata.
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+
+        // TODO (SERVER-71444): Fix to be interruptible or document exception.
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
         AutoGetCollection autoColl(opCtx, nss(), MODE_IX);
         CollectionShardingRuntime::assertCollectionLockedAndAcquire(
             opCtx, nss(), CSRAcquisitionMode::kExclusive)

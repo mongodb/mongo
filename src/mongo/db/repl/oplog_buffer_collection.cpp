@@ -459,7 +459,9 @@ void OplogBufferCollection::_createCollection(OperationContext* opCtx) {
     // This oplog-like collection will benefit from clustering by _id to reduce storage engine
     // overhead and improve _id query efficiency.
     options.clusteredIndex = clustered_util::makeDefaultClusteredIdIndex();
-    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+
+    // TODO (SERVER-71443): Fix to be interruptible or document exception.
+    UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
     auto status = _storageInterface->createCollection(opCtx, _nss, options);
     if (status.code() == ErrorCodes::NamespaceExists)
         return;
@@ -467,7 +469,8 @@ void OplogBufferCollection::_createCollection(OperationContext* opCtx) {
 }
 
 void OplogBufferCollection::_dropCollection(OperationContext* opCtx) {
-    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+    // TODO (SERVER-71443): Fix to be interruptible or document exception.
+    UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
     uassertStatusOK(_storageInterface->dropCollection(opCtx, _nss));
 }
 

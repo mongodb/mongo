@@ -212,7 +212,8 @@ void LogTransactionOperationsForShardingHandler::commit(OperationContext* opCtx,
         const auto& nss = stmt.getNss();
         auto opCtx = cc().getOperationContext();
 
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+        // TODO (SERVER-71444): Fix to be interruptible or document exception.
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
         auto scopedCss = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
             opCtx, nss, CSRAcquisitionMode::kShared);
 

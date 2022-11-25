@@ -163,7 +163,8 @@ public:
     }
 
     ~ScopedDatabaseCriticalSection() {
-        UninterruptibleLockGuard guard(_opCtx->lockState());
+        // TODO (SERVER-71444): Fix to be interruptible or document exception.
+        UninterruptibleLockGuard guard(_opCtx->lockState());  // NOLINT.
         // TODO SERVER-67438 Once ScopedDatabaseCriticalSection holds a DatabaseName obj, use dbName
         // directly
         DatabaseName databaseName(boost::none, _dbName);

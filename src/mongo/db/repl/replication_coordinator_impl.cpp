@@ -2854,7 +2854,7 @@ void ReplicationCoordinatorImpl::stepDown(OperationContext* opCtx,
             // attempt, we might as well spend whatever time we need to acquire it now.  For
             // the same reason, we also disable lock acquisition interruption, to guarantee that
             // we get the lock eventually.
-            UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+            UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
 
             // Since we have released the RSTL lock at this point, there can be some read
             // operations sneaked in here, that might hold global lock in S mode or blocked on

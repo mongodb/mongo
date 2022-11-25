@@ -128,7 +128,8 @@ StatusWith<int> StorageInterfaceImpl::getRollbackID(OperationContext* opCtx) {
 }
 
 StatusWith<int> StorageInterfaceImpl::initializeRollbackID(OperationContext* opCtx) {
-    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+    // TODO (SERVER-71443): Fix to be interruptible or document exception.
+    UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
     auto status = createCollection(opCtx, _rollbackIdNss, CollectionOptions());
     if (!status.isOK()) {
         return status;

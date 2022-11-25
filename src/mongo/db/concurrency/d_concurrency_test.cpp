@@ -1043,12 +1043,13 @@ TEST_F(DConcurrencyTestFixture, GlobalLockWaitIsNotInterruptibleWithLockGuard) {
     boost::optional<Lock::GlobalLock> globalLock = Lock::GlobalLock(opCtx1, MODE_X);
 
     // Killing the lock wait should not interrupt it.
-    auto result = runTaskAndKill(opCtx2,
-                                 [&]() {
-                                     UninterruptibleLockGuard noInterrupt(opCtx2->lockState());
-                                     Lock::GlobalLock g(opCtx2, MODE_S);
-                                 },
-                                 [&]() { globalLock.reset(); });
+    auto result =
+        runTaskAndKill(opCtx2,
+                       [&]() {
+                           UninterruptibleLockGuard noInterrupt(opCtx2->lockState());  // NOLINT.
+                           Lock::GlobalLock g(opCtx2, MODE_S);
+                       },
+                       [&]() { globalLock.reset(); });
     // Should not throw an exception.
     result.get();
 }
@@ -1067,7 +1068,7 @@ TEST_F(DConcurrencyTestFixture, DBLockWaitIsNotInterruptibleWithLockGuard) {
     auto result =
         runTaskAndKill(opCtx2,
                        [&]() {
-                           UninterruptibleLockGuard noInterrupt(opCtx2->lockState());
+                           UninterruptibleLockGuard noInterrupt(opCtx2->lockState());  // NOLINT.
                            Lock::DBLock d(opCtx2, DatabaseName(boost::none, "db"), MODE_S);
                        },
                        [&] { dbLock.reset(); });
@@ -1664,16 +1665,16 @@ TEST_F(DConcurrencyTestFixture, TicketAcquireWithMaxDeadlineRespectsUninterrupti
         boost::optional<Lock::GlobalRead> R2;
 
         // Block until a ticket is available.
-        auto result =
-            runTaskAndKill(opCtx2,
-                           [&] {
-                               UninterruptibleLockGuard noInterrupt(opCtx2->lockState());
-                               R2.emplace(opCtx2, Date_t::max(), Lock::InterruptBehavior::kThrow);
-                           },
-                           [&] {
-                               // Relase the only ticket available to unblock the other thread.
-                               R1.reset();
-                           });
+        auto result = runTaskAndKill(
+            opCtx2,
+            [&] {
+                UninterruptibleLockGuard noInterrupt(opCtx2->lockState());  // NOLINT.
+                R2.emplace(opCtx2, Date_t::max(), Lock::InterruptBehavior::kThrow);
+            },
+            [&] {
+                // Relase the only ticket available to unblock the other thread.
+                R1.reset();
+            });
 
         result.get();  // This should not throw.
         ASSERT(R2->isLocked());
@@ -1757,7 +1758,7 @@ TEST_F(DConcurrencyTestFixture, GlobalLockInInterruptedContextRespectsUninterrup
 
     opCtx->markKilled();
 
-    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+    UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
     Lock::GlobalRead globalReadLock(
         opCtx, Date_t::now(), Lock::InterruptBehavior::kThrow);  // Does not throw.
 }
@@ -1797,7 +1798,7 @@ TEST_F(DConcurrencyTestFixture, DBLockInInterruptedContextRespectsUninterruptibl
 
     opCtx->markKilled();
 
-    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+    UninterruptibleLockGuard noInterrupt(opCtx->lockState());                  // NOLINT.
     Lock::DBLock dbWriteLock(opCtx, DatabaseName(boost::none, "db"), MODE_X);  // Does not throw.
 }
 
@@ -1883,7 +1884,7 @@ TEST_F(DConcurrencyTestFixture, CollectionLockInInterruptedContextRespectsUninte
 
     opCtx->markKilled();
 
-    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+    UninterruptibleLockGuard noInterrupt(opCtx->lockState());                   // NOLINT.
     Lock::CollectionLock collLock(opCtx, NamespaceString("db.coll"), MODE_IX);  // Does not throw.
 }
 
@@ -2325,7 +2326,7 @@ TEST_F(DConcurrencyTestFixture, FailPointInLockDoesNotFailUninterruptibleGlobalN
 
         // MODE_S attempt.
         stdx::thread t2([&]() {
-            UninterruptibleLockGuard noInterrupt(&locker2);
+            UninterruptibleLockGuard noInterrupt(&locker2);  // NOLINT.
             locker2.lockGlobal(opCtx.get(), MODE_S);
         });
 
@@ -2342,7 +2343,7 @@ TEST_F(DConcurrencyTestFixture, FailPointInLockDoesNotFailUninterruptibleGlobalN
 
         // MODE_X attempt.
         stdx::thread t3([&]() {
-            UninterruptibleLockGuard noInterrupt(&locker3);
+            UninterruptibleLockGuard noInterrupt(&locker3);  // NOLINT.
             locker3.lockGlobal(opCtx.get(), MODE_X);
         });
 
@@ -2374,7 +2375,7 @@ TEST_F(DConcurrencyTestFixture, FailPointInLockDoesNotFailUninterruptibleNonInte
 
         // MODE_S attempt.
         stdx::thread t2([&]() {
-            UninterruptibleLockGuard noInterrupt(&locker2);
+            UninterruptibleLockGuard noInterrupt(&locker2);  // NOLINT.
             locker2.lockGlobal(opCtx.get(), MODE_IS);
             locker2.lock(resId, MODE_S);
         });
@@ -2393,7 +2394,7 @@ TEST_F(DConcurrencyTestFixture, FailPointInLockDoesNotFailUninterruptibleNonInte
 
         // MODE_X attempt.
         stdx::thread t3([&]() {
-            UninterruptibleLockGuard noInterrupt(&locker3);
+            UninterruptibleLockGuard noInterrupt(&locker3);  // NOLINT.
             locker3.lockGlobal(opCtx.get(), MODE_IX);
             locker3.lock(resId, MODE_X);
         });

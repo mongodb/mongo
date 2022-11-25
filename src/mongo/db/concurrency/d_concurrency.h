@@ -152,7 +152,7 @@ public:
             // returned in the locked state so the acquisition below must be guaranteed to always
             // succeed.
             invariant(_opCtx);
-            UninterruptibleLockGuard ulg(_opCtx->lockState());
+            UninterruptibleLockGuard ulg(_opCtx->lockState());  // NOLINT.
             _lock(MODE_X);
         }
 

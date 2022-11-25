@@ -1599,7 +1599,8 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
             // of RSTL lock inside abortTransaction will be no-op since we already have it.
             // This abortGuard gets dismissed before we release the RSTL while transitioning to
             // prepared.
-            UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+            // TODO (SERVER-71610): Fix to be interruptible or document exception.
+            UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
             abortTransaction(opCtx);
         } catch (...) {
             // It is illegal for aborting a prepared transaction to fail for any reason, so we crash
@@ -1886,7 +1887,8 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
         unlockGuard.dismiss();
 
         // Once entering "committing with prepare" we cannot throw an exception.
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+        // TODO (SERVER-71610): Fix to be interruptible or document exception.
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
         opCtx->recoveryUnit()->setCommitTimestamp(commitTimestamp);
 
         // On secondary, we generate a fake empty oplog slot, since it's not used by opObserver.
@@ -2092,7 +2094,7 @@ void TransactionParticipant::Participant::_abortActiveTransaction(
 
         try {
             // If we need to write an abort oplog entry, this function can no longer be interrupted.
-            UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+            UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
 
             // Write the abort oplog entry. This must be done after aborting the storage
             // transaction, so that the lock state is reset, and there is no max lock timeout on the

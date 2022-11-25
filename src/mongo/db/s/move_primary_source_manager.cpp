@@ -276,7 +276,8 @@ Status MovePrimarySourceManager::commitOnConfig(OperationContext* opCtx) {
         // metadata for this database, forcing subsequent callers to do a full refresh. Check if
         // this node can accept writes for this collection as a proxy for it being primary.
         if (!validateStatus.isOK()) {
-            UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+            // TODO (SERVER-71444): Fix to be interruptible or document exception.
+            UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
             AutoGetDb autoDb(opCtx, getNss().dbName(), MODE_IX);
 
             if (!autoDb.getDb()) {
@@ -504,7 +505,8 @@ void MovePrimarySourceManager::_cleanup(OperationContext* opCtx) {
 
     {
         // Unregister from the database's sharding state if we're still registered.
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+        // TODO (SERVER-71444): Fix to be interruptible or document exception.
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
         AutoGetDb autoDb(opCtx, getNss().dbName(), MODE_IX);
 
         auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(

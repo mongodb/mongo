@@ -165,7 +165,8 @@ void shutdown(ServiceContext* srvContext) {
         // Close all open databases, shutdown storage engine and run all deinitializers.
         auto shutdownOpCtx = serviceContext->makeOperationContext(client);
         {
-            UninterruptibleLockGuard noInterrupt(shutdownOpCtx->lockState());
+            // TODO (SERVER-71610): Fix to be interruptible or document exception.
+            UninterruptibleLockGuard noInterrupt(shutdownOpCtx->lockState());  // NOLINT.
             Lock::GlobalLock lk(shutdownOpCtx.get(), MODE_X);
             auto databaseHolder = DatabaseHolder::get(shutdownOpCtx.get());
             databaseHolder->closeAll(shutdownOpCtx.get());

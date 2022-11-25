@@ -180,7 +180,8 @@ MigrationSourceManager::MigrationSourceManager(OperationContext* opCtx,
 
     // Snapshot the committed metadata from the time the migration starts
     const auto [collectionMetadata, collectionIndexInfo, collectionUUID] = [&] {
-        UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
+        // TODO (SERVER-71444): Fix to be interruptible or document exception.
+        UninterruptibleLockGuard noInterrupt(_opCtx->lockState());  // NOLINT.
         AutoGetCollection autoColl(_opCtx, nss(), MODE_IS);
         auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
             opCtx, nss(), CSRAcquisitionMode::kExclusive);
@@ -480,7 +481,8 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
 
     if (!migrationCommitStatus.isOK()) {
         {
-            UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
+            // TODO (SERVER-71444): Fix to be interruptible or document exception.
+            UninterruptibleLockGuard noInterrupt(_opCtx->lockState());  // NOLINT.
             AutoGetCollection autoColl(_opCtx, nss(), MODE_IX);
             CollectionShardingRuntime::assertCollectionLockedAndAcquire(
                 _opCtx, nss(), CSRAcquisitionMode::kExclusive)
@@ -519,7 +521,8 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
                             "migrationId"_attr = _coordinator->getMigrationId(),
                             "error"_attr = redact(ex));
         {
-            UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
+            // TODO (SERVER-71444): Fix to be interruptible or document exception.
+            UninterruptibleLockGuard noInterrupt(_opCtx->lockState());  // NOLINT.
             AutoGetCollection autoColl(_opCtx, nss(), MODE_IX);
             CollectionShardingRuntime::assertCollectionLockedAndAcquire(
                 _opCtx, nss(), CSRAcquisitionMode::kExclusive)
@@ -637,7 +640,8 @@ SharedSemiFuture<void> MigrationSourceManager::abort() {
 
 CollectionMetadata MigrationSourceManager::_getCurrentMetadataAndCheckEpoch() {
     auto metadata = [&] {
-        UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
+        // TODO (SERVER-71444): Fix to be interruptible or document exception.
+        UninterruptibleLockGuard noInterrupt(_opCtx->lockState());  // NOLINT.
         AutoGetCollection autoColl(_opCtx, _args.getCommandParameter(), MODE_IS);
         auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
             _opCtx, _args.getCommandParameter(), CSRAcquisitionMode::kShared);
@@ -665,7 +669,8 @@ void MigrationSourceManager::_cleanup(bool completeMigration) noexcept {
 
     auto cloneDriver = [&]() {
         // Unregister from the collection's sharding state and exit the migration critical section.
-        UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
+        // TODO (SERVER-71444): Fix to be interruptible or document exception.
+        UninterruptibleLockGuard noInterrupt(_opCtx->lockState());  // NOLINT.
         AutoGetCollection autoColl(_opCtx, nss(), MODE_IX);
         auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
             _opCtx, nss(), CSRAcquisitionMode::kExclusive);
@@ -759,7 +764,8 @@ void MigrationSourceManager::_cleanup(bool completeMigration) noexcept {
                       "migrationId"_attr = _coordinator->getMigrationId());
         // Something went really wrong when completing the migration just unset the metadata and let
         // the next op to recover.
-        UninterruptibleLockGuard noInterrupt(_opCtx->lockState());
+        // TODO (SERVER-71444): Fix to be interruptible or document exception.
+        UninterruptibleLockGuard noInterrupt(_opCtx->lockState());  // NOLINT.
         AutoGetCollection autoColl(_opCtx, nss(), MODE_IX);
         CollectionShardingRuntime::assertCollectionLockedAndAcquire(
             _opCtx, nss(), CSRAcquisitionMode::kExclusive)
@@ -785,7 +791,8 @@ MigrationSourceManager::ScopedRegisterer::ScopedRegisterer(MigrationSourceManage
 }
 
 MigrationSourceManager::ScopedRegisterer::~ScopedRegisterer() {
-    UninterruptibleLockGuard noInterrupt(_msm->_opCtx->lockState());
+    // TODO (SERVER-71444): Fix to be interruptible or document exception.
+    UninterruptibleLockGuard noInterrupt(_msm->_opCtx->lockState());  // NOLINT.
     AutoGetCollection autoColl(_msm->_opCtx, _msm->_args.getCommandParameter(), MODE_IX);
     auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
         _msm->_opCtx, _msm->_args.getCommandParameter(), CSRAcquisitionMode::kExclusive);

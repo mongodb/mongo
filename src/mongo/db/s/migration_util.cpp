@@ -690,7 +690,8 @@ void notifyChangeStreamsOnRecipientFirstChunk(OperationContext* opCtx,
 
     auto const serviceContext = opCtx->getClient()->getServiceContext();
 
-    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+    // TODO (SERVER-71444): Fix to be interruptible or document exception.
+    UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
     AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
     writeConflictRetry(
         opCtx, "migrateChunkToNewShard", NamespaceString::kRsOplogNamespace.ns(), [&] {
@@ -722,7 +723,8 @@ void notifyChangeStreamsOnDonorLastChunk(OperationContext* opCtx,
 
     auto const serviceContext = opCtx->getClient()->getServiceContext();
 
-    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+    // TODO (SERVER-71444): Fix to be interruptible or document exception.
+    UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
     AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
     writeConflictRetry(
         opCtx, "migrateLastChunkFromShard", NamespaceString::kRsOplogNamespace.ns(), [&] {

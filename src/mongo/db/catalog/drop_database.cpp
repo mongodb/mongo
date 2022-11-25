@@ -188,7 +188,8 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
                 // there is a replica state change that kills this operation while the locks were
                 // yielded.
                 ScopeGuard dropPendingGuardWhileUnlocked([dbName, opCtx, &dropPendingGuard] {
-                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+                    // TODO (SERVER-71610): Fix to be interruptible or document exception.
+                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
                     AutoGetDb autoDB(opCtx, dbName, MODE_IX);
                     if (auto db = autoDB.getDb()) {
                         db->setDropPending(opCtx, false);
@@ -304,7 +305,8 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
     // any errors while we await the replication of any collection drops and then reacquire the
     // locks (which can throw) needed to finish the drop database.
     ScopeGuard dropPendingGuardWhileUnlocked([dbName, opCtx] {
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+        // TODO (SERVER-71610): Fix to be interruptible or document exception.
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
 
         AutoGetDb autoDB(opCtx, dbName, MODE_IX);
         if (auto db = autoDB.getDb()) {

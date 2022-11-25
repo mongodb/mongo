@@ -169,7 +169,8 @@ Status repairDatabase(OperationContext* opCtx, StorageEngine* engine, const Data
 
     try {
         // Ensure that we don't trigger an exception when attempting to take locks.
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+        // TODO (SERVER-71610): Fix to be interruptible or document exception.
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
 
         // Restore oplog Collection pointer cache.
         repl::acquireOplogCollectionForLogging(opCtx);

@@ -1023,7 +1023,8 @@ void MultiIndexBlock::abortWithoutCleanup(OperationContext* opCtx,
                                           const CollectionPtr& collection,
                                           bool isResumable) {
     invariant(!_buildIsCleanedUp);
-    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+    // TODO (SERVER-71610): Fix to be interruptible or document exception.
+    UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
     // Lock if it's not already locked, to ensure storage engine cannot be destructed out from
     // underneath us.
     boost::optional<Lock::GlobalLock> lk;

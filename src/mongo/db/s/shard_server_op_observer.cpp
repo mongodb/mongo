@@ -90,7 +90,8 @@ public:
 
         // Force subsequent uses of the namespace to refresh the filtering metadata so they can
         // synchronize with any work happening on the primary (e.g., migration critical section).
-        UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+        // TODO (SERVER-71444): Fix to be interruptible or document exception.
+        UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
         auto scopedCss = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
             opCtx, _nss, CSRAcquisitionMode::kExclusive);
         if (_droppingCollection)
@@ -300,8 +301,8 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                     if (!isStandaloneOrPrimary(opCtx)) {
                         lockDbIfNotPrimary.emplace(opCtx, insertedNss.dbName(), MODE_IX);
                     }
-
-                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+                    // TODO (SERVER-71444): Fix to be interruptible or document exception.
+                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
                     auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
                         opCtx, insertedNss.dbName(), DSSAcquisitionMode::kExclusive);
                     scopedDss->enterCriticalSectionCatchUpPhase(opCtx, reason);
@@ -316,7 +317,8 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                                 auto_get_collection::ViewMode::kViewsPermitted));
                     }
 
-                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+                    // TODO (SERVER-71444): Fix to be interruptible or document exception.
+                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
                     auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
                         opCtx, insertedNss, CSRAcquisitionMode::kExclusive);
                     scopedCsr->enterCriticalSectionCatchUpPhase(reason);
@@ -470,7 +472,8 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
                         lockDbIfNotPrimary.emplace(opCtx, updatedNss.dbName(), MODE_IX);
                     }
 
-                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+                    // TODO (SERVER-71444): Fix to be interruptible or document exception.
+                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
                     auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
                         opCtx, updatedNss.dbName(), DSSAcquisitionMode::kExclusive);
                     scopedDss->enterCriticalSectionCommitPhase(opCtx, reason);
@@ -485,7 +488,8 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
                                 auto_get_collection::ViewMode::kViewsPermitted));
                     }
 
-                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+                    // TODO (SERVER-71444): Fix to be interruptible or document exception.
+                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
                     auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
                         opCtx, updatedNss, CSRAcquisitionMode::kExclusive);
                     scopedCsr->enterCriticalSectionCommitPhase(reason);
@@ -662,7 +666,8 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
                         lockDbIfNotPrimary.emplace(opCtx, deletedNss.dbName(), MODE_IX);
                     }
 
-                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+                    // TODO (SERVER-71444): Fix to be interruptible or document exception.
+                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
                     auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
                         opCtx, deletedNss.dbName(), DSSAcquisitionMode::kExclusive);
 
@@ -684,7 +689,8 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
                                 auto_get_collection::ViewMode::kViewsPermitted));
                     }
 
-                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+                    // TODO (SERVER-71444): Fix to be interruptible or document exception.
+                    UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
                     auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
                         opCtx, deletedNss, CSRAcquisitionMode::kExclusive);
 

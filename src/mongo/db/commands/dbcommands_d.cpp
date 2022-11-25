@@ -330,7 +330,9 @@ public:
                 // and those helpers may throw if something has changed since the last time we took
                 // a lock. For example, AutoGetCollection will throw if this namespace has since
                 // turned into a view and AutoGetDb will throw if the database version is stale.
-                UninterruptibleLockGuard noInterrupt(opCtx->lockState());
+
+                // TODO (SERVER-71441): Fix to be interruptible or document exception.
+                UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
                 Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IS);
                 invariant(dbLock.isLocked(),
                           "Expected lock acquisition to succeed due to UninterruptibleLockGuard");
