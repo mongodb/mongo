@@ -57,15 +57,28 @@ struct ShardVersionTargetingInfo {
     // Indicates whether the shard is stale and thus needs a catalog cache refresh
     AtomicWord<bool> isStale{false};
 
+    //chunk count for the shard
+    AtomicWord<int> count{0};
     // Max chunk version for the shard
     ChunkVersion shardVersion;
 
+    //solve porblem  "error: use of deleted function 'std::atomic<bool>::atomic(const std::atomic<bool>&)'"
+    ShardVersionTargetingInfo(const ShardVersionTargetingInfo& info) {
+        bool state = info.isStale.load();
+        isStale.store(state);
+        shardVersion = info.shardVersion;
+
+        count.store(info.count.load());
+    }
     ShardVersionTargetingInfo(const OID& epoch, const boost::optional<Timestamp>& timestamp);
 };
 
-// Map from a shard to a struct indicating both the max chunk version on that shard and whether the
-// shard is currently marked as needing a catalog cache refresh (stale).
+
 using ShardVersionMap = stdx::unordered_map<ShardId, ShardVersionTargetingInfo, ShardId::Hasher>;
+
+// Vector of chunks ordered by max key.
+using ChunkVector = std::vector<std::shared_ptr<ChunkInfo>>;
+using MapChunkVector = std::map<std::string, std::shared_ptr<ChunkVector>>;
 
 /**
  * This class serves as a Facade around how the mapping of ranges to chunks is represented. It also
@@ -73,67 +86,164 @@ using ShardVersionMap = stdx::unordered_map<ShardId, ShardVersionTargetingInfo, 
  * underlying implementation.
  */
 class ChunkMap {
-    // Vector of chunks ordered by max key.
-    using ChunkVector = std::vector<std::shared_ptr<ChunkInfo>>;
-
 public:
     explicit ChunkMap(OID epoch,
-                      const boost::optional<Timestamp>& timestamp,
+                      const boost::optional<Timestamp>& timestamp, 
+                      long unsigned int vecterDdepthSize = 1000,
                       size_t initialCapacity = 0)
         : _collectionVersion(0, 0, epoch, timestamp), _collTimestamp(timestamp) {
-        _chunkMap.reserve(initialCapacity);
+        maxVectorVerticalDepthSize = vecterDdepthSize;
+    }
+    
+    explicit ChunkMap(const MapChunkVector& chunkMap,
+                          const ChunkVersion& collectionVersion,
+                          const ShardVersionMap& shardVersions,
+                          const boost::optional<Timestamp>& timestamp,
+                          long unsigned int vecterDdepthSize = 1000
+                      )
+        : _collTimestamp(timestamp) {
+         _chunkMap = chunkMap;
+         _collectionVersion = collectionVersion;
+         _shardVersions = shardVersions;
+         maxVectorVerticalDepthSize = vecterDdepthSize;
+    }
+    
+    void setMaxVectorVerticalDepthSize(long unsigned int vecterDdepthSize) {
+        maxVectorVerticalDepthSize = vecterDdepthSize;
+    }
+
+    long unsigned int getMaxVectorVerticalDepthSize() const {
+        return maxVectorVerticalDepthSize;
     }
 
     size_t size() const {
-        return _chunkMap.size();
+        return totalChunksNum();
     }
 
+    // Max version across all chunks 
     ChunkVersion getVersion() const {
         return _collectionVersion;
     }
 
+    ShardVersionMap getShardVersion() const {
+        return _shardVersions;
+    }
+
+    MapChunkVector getChunkMap() const {
+        return _chunkMap;
+    }
+
     template <typename Callable>
     void forEach(Callable&& handler, const BSONObj& shardKey = BSONObj()) const {
-        auto it = shardKey.isEmpty() ? _chunkMap.begin() : _findIntersectingChunk(shardKey);
+        if (shardKey.isEmpty()) {
+    		for (const auto& mapIt : _chunkMap) {
+    		    auto second = *mapIt.second;
+                for (auto it = second.begin(); it != second.end(); ++it) {
+                    if (!handler(*it))
+                        break;
+                }
+            }
 
-        for (; it != _chunkMap.end(); ++it) {
-            if (!handler(*it))
-                break;
+    		return;
+        }
+
+        auto shardKeyString = ShardKeyPattern::toKeyString(shardKey);
+	
+        const auto itMin = _chunkMap.lower_bound(shardKeyString);
+        for (auto mapIt = itMin; mapIt != _chunkMap.end(); mapIt++) {
+            auto second = mapIt->second;
+            if (mapIt == itMin) {
+                auto it = _findIntersectingChunkIterator(shardKey, second);
+                for (; it != second->end(); ++it) {
+                    if (!handler(*it))
+                        return;
+                } 
+
+                continue;
+            }
+            
+            for (auto it = second->begin(); it != second->end(); ++it) {
+                if (!handler(*it))
+                    return;
+            }
         }
     }
+
 
     template <typename Callable>
     void forEachOverlappingChunk(const BSONObj& min,
                                  const BSONObj& max,
                                  bool isMaxInclusive,
                                  Callable&& handler) const {
-        const auto bounds = _overlappingBounds(min, max, isMaxInclusive);
-
+        const auto bounds = _overlappingVectorSlotBounds(min, max, isMaxInclusive);
         for (auto it = bounds.first; it != bounds.second; ++it) {
-            if (!handler(*it))
-                break;
+            auto boundsInSecondaryIndex = _overlappingBounds(min, max, isMaxInclusive, it->second);
+            for (auto itSecond = boundsInSecondaryIndex.first; 
+                itSecond != boundsInSecondaryIndex.second; ++itSecond) {
+                    auto chunkInfo = *itSecond;
+                    if (!handler(*itSecond))
+                         break;
+            }
         }
     }
 
-    ShardVersionMap constructShardVersionMap() const;
+    void constructShardVersionMap(const std::vector<std::shared_ptr<ChunkInfo>>& changedChunks);
+    MapChunkVector& getMapChunkVector();
     std::shared_ptr<ChunkInfo> findIntersectingChunk(const BSONObj& shardKey) const;
 
-    void appendChunk(const std::shared_ptr<ChunkInfo>& chunk);
+    void appendChunk(ChunkVector& chunkMap, const std::shared_ptr<ChunkInfo>& chunk);
 
-    ChunkMap createMerged(const std::vector<std::shared_ptr<ChunkInfo>>& changedChunks) const;
+    void createMerged(const ChunkMap& oldChunkMap, const std::vector<std::shared_ptr<ChunkInfo>>& changedChunks,
+                      const NamespaceString& nss, bool isUpdate);
+    int totalChunksNum() const;
 
     BSONObj toBSON() const;
+    void constructShardVersionsByChunk(const std::shared_ptr<ChunkInfo>& chunk, 
+                                             const OID& epoch, boost::optional<Timestamp> timestamp, 
+                                             bool needIncCount);
 
 private:
-    ChunkVector::const_iterator _findIntersectingChunk(const BSONObj& shardKey,
+    std::shared_ptr<ChunkInfo> _findIntersectingChunk(const BSONObj& shardKey,
                                                        bool isMaxInclusive = true) const;
-    std::pair<ChunkVector::const_iterator, ChunkVector::const_iterator> _overlappingBounds(
-        const BSONObj& min, const BSONObj& max, bool isMaxInclusive) const;
+    ChunkVector::const_iterator _findIntersectingChunkIterator(const BSONObj& shardKey,
+															   std::shared_ptr<ChunkVector> vector,
+                                                               bool isMaxInclusive = true) const;
 
-    ChunkVector _chunkMap;
+    std::pair<MapChunkVector::const_iterator, MapChunkVector::const_iterator> 
+        _overlappingVectorSlotBounds(const mongo::BSONObj& min,
+                                          const mongo::BSONObj& max,
+                                          bool isMaxInclusive) const;
+    std::pair<ChunkVector::const_iterator, ChunkVector::const_iterator>
+        _overlappingBounds(const BSONObj& min, const BSONObj& max, 
+                            bool isMaxInclusive,
+                            std::shared_ptr<ChunkVector> vect) const;
+    std::string toString() const;
+    void makeNew(const ChunkVector& changedChunks);
+    void makeUpdated(const ChunkMap& oldChunkMAp, const ChunkVector& changedChunks);
+    void mergeChunkMap(const ChunkMap& oldChunkMap, ChunkMap& changeChunkMap);
+    void chunkRangeValidateCheck(const ChunkVector& changedChunks);
+    bool mergeOverlapMapVectorChunk(const mongo::BSONObj& min, 
+                                         const mongo::BSONObj& max, 
+                                         ChunkVector& chunkVector);
+    void mergeTowChunkVector(const ChunkVector& changeChunks, 
+                               const ChunkVector& oldVectorChunks, 
+                               ChunkVector& updateChunk);
+    void minKeyMaxKeyValidateCheck(void) const;
+    void splitChunkVector(ChunkVector& chunkVector);
+    void eraseShardVersionMapElem(ShardVersionMap& oldShardVersionsMap, 
+                                    ShardVersionMap& newShardVersionsMap);
+    ShardVersionMap constructTempShardVersionMapCount(const ChunkVector& changedChunks); 
+
+    MapChunkVector _chunkMap;
+    int _maxSizeSingleChunksMap;
 
     // Max version across all chunks
     ChunkVersion _collectionVersion;
+    // The representation of shard versions and staleness indicators for this namespace. If a
+    // shard does not exist, it will not have an entry in the map.
+    // Note: this declaration must not be moved before _chunkMap since it is initialized by using
+    // the _chunkMap instance.
+    ShardVersionMap _shardVersions;  
 
     // Represents the timestamp present in config.collections for this ChunkMap.
     //
@@ -142,6 +252,7 @@ private:
     // config.collections entry doesn't. In this case, the chunks timestamp should be ignored when
     // computing the collection version and we should use _collTimestamp instead.
     boost::optional<Timestamp> _collTimestamp;
+    long unsigned int maxVectorVerticalDepthSize;
 };
 
 /**
@@ -235,8 +346,17 @@ public:
      */
     void setAllShardsRefreshed();
 
+    // Max version across all chunks
     ChunkVersion getVersion() const {
         return _chunkMap.getVersion();
+    }
+
+    MapChunkVector getChunkMap() const {
+        return _chunkMap.getChunkMap();
+    }
+
+    NamespaceString getNss() const {
+        return _nss;
     }
 
     /**
@@ -335,7 +455,6 @@ private:
                         boost::optional<TypeCollectionReshardingFields> reshardingFields,
                         bool allowMigrations,
                         ChunkMap chunkMap);
-
     ChunkVersion _getVersion(const ShardId& shardName, bool throwOnStaleShard) const;
 
     // Namespace to which this routing information corresponds
@@ -520,7 +639,6 @@ public:
           _clusterTime(std::move(clusterTime)) {}
 
     // Methods supported on both sharded and unsharded collections
-
     bool isSharded() const {
         return bool(_rt->optRt);
     }

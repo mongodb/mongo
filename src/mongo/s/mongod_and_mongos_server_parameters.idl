@@ -69,3 +69,12 @@ server_parameters:
     cpp_vartype: bool
     cpp_varname: "gEnableFinerGrainedCatalogCacheRefresh"
     default: false
+  CatalogCacheRefreshVectorVerticalDepth:
+    description: >-
+        .Set vector vertical depth of catalog cache refresh.
+    set_at: [ startup ]
+    cpp_vartype: int
+    cpp_varname: "CatalogCacheRefreshVectorVerticalDepth"
+    default: 500 # 500 Chunks
+    validator:
+      gte: 100
