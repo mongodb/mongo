@@ -30,6 +30,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
 
 #include "mongo/base/checked_cast.h"
+#include "mongo/db/global_settings.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context.h"
@@ -62,10 +63,14 @@ public:
                   false,                  // .ephemeral
                   false                   // .repair
           ) {
-        repl::ReplicationCoordinator::set(
-            getGlobalServiceContext(),
-            std::unique_ptr<repl::ReplicationCoordinator>(new repl::ReplicationCoordinatorMock(
-                getGlobalServiceContext(), repl::ReplSettings())));
+        // Use a replica set so that writes to replicated collections are not journaled and thus
+        // retain their timestamps.
+        repl::ReplSettings replSettings;
+        replSettings.setReplSetString("rs");
+        setGlobalReplSettings(replSettings);
+        repl::ReplicationCoordinator::set(getGlobalServiceContext(),
+                                          std::make_unique<repl::ReplicationCoordinatorMock>(
+                                              getGlobalServiceContext(), replSettings));
         _engine.notifyStartupComplete();
     }
 
