@@ -4,7 +4,9 @@ from datetime import datetime
 import time
 import os
 import psutil
-from buildscripts.metrics.resmoke_tooling_metrics import save_resmoke_tooling_metrics
+from buildscripts.metrics.metrics_datatypes import ResmokeToolingMetrics
+from buildscripts.metrics.tooling_exit_hook import initialize_exit_hook
+from buildscripts.metrics.tooling_metrics_utils import register_metrics_collection_atexit
 from buildscripts.resmokelib import parser
 
 
@@ -25,7 +27,8 @@ def main(argv):
         "For example: resmoke.py run -h\n"
         "Note: bisect and setup-multiversion subcommands have been moved to db-contrib-tool (https://github.com/10gen/db-contrib-tool#readme).\n"
     )
-    try:
-        subcommand.execute()
-    finally:
-        save_resmoke_tooling_metrics(datetime.utcfromtimestamp(__start_time))
+    register_metrics_collection_atexit(ResmokeToolingMetrics.generate_metrics, {
+        "utc_starttime": datetime.utcfromtimestamp(__start_time),
+        "exit_hook": initialize_exit_hook()
+    })
+    subcommand.execute()

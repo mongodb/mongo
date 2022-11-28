@@ -5,11 +5,12 @@ import multiprocessing
 import os
 import socket
 import sys
-import traceback
 from typing import Any, Dict, List, Optional
 import distro
 import git
 from pydantic import BaseModel
+
+from buildscripts.metrics.tooling_exit_hook import _ExitHook
 
 # pylint: disable=bare-except
 
@@ -19,6 +20,12 @@ SCONS_SECTION_HEADER = "SCONS_ENV"
 
 class BaseMetrics(BaseModel):
     """Base class for an metrics object."""
+
+    @classmethod
+    @abstractmethod
+    def generate_metrics(cls, **kwargs):
+        """Generate metrics."""
+        raise NotImplementedError
 
     @abstractmethod
     def is_malformed(self) -> bool:
@@ -35,14 +42,14 @@ class BuildInfo(BaseMetrics):
     artifact_dir: Optional[str]
 
     @classmethod
-    def get_scons_build_info(
+    def generate_metrics(
             cls,
             utc_starttime: datetime,
             env_vars: "SCons.Variables.Variables",
             env: "SCons.Script.SConscript.SConsEnvironment",
             parser: "SCons.Script.SConsOptions.SConsOptionParser",
             args: List[str],
-    ):
+    ):  # pylint: disable=arguments-differ
         """Get SCons build info to the best of our ability."""
         artifact_dir = cls._get_scons_artifact_dir(env)
         return cls(
@@ -59,19 +66,22 @@ class BuildInfo(BaseMetrics):
     ) -> Optional[Dict[str, Any]]:
         """Get the environment variables options that can be set by users."""
 
+        artifact_dir = BuildInfo._get_scons_artifact_dir(env)
+        artifact_dir = artifact_dir if artifact_dir else '.'
+        scons_env_filepath = f'{artifact_dir}/{SCONS_ENV_FILE}'
         try:
             # Use SCons built-in method to save environment variables to a file
-            env_vars.Save(SCONS_ENV_FILE, env)
+            env_vars.Save(scons_env_filepath, env)
 
             # Add a section header to the file so we can easily parse with ConfigParser
-            with open(SCONS_ENV_FILE, 'r') as original:
+            with open(scons_env_filepath, 'r') as original:
                 data = original.read()
-            with open(SCONS_ENV_FILE, 'w') as modified:
+            with open(scons_env_filepath, 'w') as modified:
                 modified.write(f"[{SCONS_SECTION_HEADER}]\n" + data)
 
             # Parse file using config parser
             config = configparser.ConfigParser()
-            config.read(SCONS_ENV_FILE)
+            config.read(scons_env_filepath)
             str_dict = dict(config[SCONS_SECTION_HEADER])
             return {key: eval(val) for key, val in str_dict.items()}  # pylint: disable=eval-used
         except:
@@ -118,52 +128,27 @@ class BuildInfo(BaseMetrics):
         return None in [self.artifact_dir, self.env, self.options, self.build_artifacts]
 
 
-class ExitInfo(BaseMetrics):
-    """Class to store tooling exit information."""
-
-    exit_code: Optional[int]
-    exception: Optional[str]
-    stacktrace: Optional[str]
-
-    @classmethod
-    def get_resmoke_exit_info(cls):
-        """Get the current exit info."""
-        exc = sys.exc_info()[1]
-        return cls(
-            exit_code=0 if not exc else exc.code if exc.__class__ == SystemExit else 1,
-            exception=exc.__class__.__name__ if exc else None,
-            stacktrace=traceback.format_exc() if exc else None,
-        )
-
-    @classmethod
-    def get_scons_exit_info(cls, exit_code):
-        """Get the current exit info using the given exit code."""
-        return cls(
-            exit_code=exit_code if isinstance(exit_code, int) else None,
-            exception=None,
-            stacktrace=None,
-        )
-
-    def is_malformed(self):
-        """Return True if this object is missing an exit code."""
-        return self.exit_code is None
-
-
 class HostInfo(BaseMetrics):
     """Class to store host information."""
 
+    ip_address: Optional[str]
     host_os: str
     num_cores: int
     memory: Optional[float]
 
     @classmethod
-    def get_host_info(cls):
+    def generate_metrics(cls):  # pylint: disable=arguments-differ
         """Get the host info to the best of our ability."""
+        try:
+            ip_address = socket.gethostbyname(socket.gethostname())
+        except:
+            ip_address = None
         try:
             memory = cls._get_memory()
         except:
             memory = None
         return cls(
+            ip_address=ip_address,
             host_os=distro.name(pretty=True),
             num_cores=multiprocessing.cpu_count(),
             memory=memory,
@@ -174,9 +159,9 @@ class HostInfo(BaseMetrics):
         """Get total memory of the host system."""
         return os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES') / (1024.**3)
 
-    def is_malformed(self):
+    def is_malformed(self) -> bool:
         """Confirm whether this instance has all expected fields."""
-        return self.memory is None
+        return None in [self.memory, self.ip_address]
 
 
 class GitInfo(BaseMetrics):
@@ -188,7 +173,7 @@ class GitInfo(BaseMetrics):
     repo_name: Optional[str]
 
     @classmethod
-    def get_git_info(cls, filepath: str):
+    def generate_metrics(cls, filepath: str):  # pylint: disable=arguments-differ
         """Get the git info for a repo to the best of our ability."""
         try:
             commit_hash = git.Repo(filepath).head.commit.hexsha
@@ -212,7 +197,7 @@ class GitInfo(BaseMetrics):
             repo_name=repo_name,
         )
 
-    def is_malformed(self):
+    def is_malformed(self) -> bool:
         """Confirm whether this instance has all expected fields."""
         return None in [self.commit_hash, self.branch_name, self.repo_name]
 
@@ -225,7 +210,7 @@ def _get_modules_git_info():
     module_git_info = []
     try:
         module_git_info = [
-            GitInfo.get_git_info(os.path.join(MODULES_FILEPATH, module))
+            GitInfo.generate_metrics(os.path.join(MODULES_FILEPATH, module))
             for module in os.listdir(MODULES_FILEPATH)
             if os.path.isdir(os.path.join(MODULES_FILEPATH, module))
         ]
@@ -234,73 +219,79 @@ def _get_modules_git_info():
     return module_git_info
 
 
-class ToolingMetrics(BaseMetrics):
-    """Class to store tooling metrics."""
+class ResmokeToolingMetrics(BaseMetrics):
+    """Class to store resmoke tooling metrics."""
 
     source: str
     utc_starttime: datetime
     utc_endtime: datetime
     host_info: HostInfo
     git_info: GitInfo
-    exit_info: ExitInfo
-    build_info: Optional[BuildInfo]
+    exit_code: Optional[int]
     command: List[str]
     module_info: List[GitInfo]
-    ip_address: Optional[str]
 
     @classmethod
-    def get_resmoke_metrics(
+    def generate_metrics(
             cls,
             utc_starttime: datetime,
-    ):
+            exit_hook: _ExitHook,
+    ):  # pylint: disable=arguments-differ
         """Get resmoke metrics to the best of our ability."""
-        try:
-            ip_address = socket.gethostbyname(socket.gethostname())
-        except:
-            ip_address = None
         return cls(
             source='resmoke',
             utc_starttime=utc_starttime,
             utc_endtime=datetime.utcnow(),
-            host_info=HostInfo.get_host_info(),
-            git_info=GitInfo.get_git_info('.'),
-            exit_info=ExitInfo.get_resmoke_exit_info(),
-            build_info=None,
-            module_info=_get_modules_git_info(),
+            host_info=HostInfo.generate_metrics(),
+            git_info=GitInfo.generate_metrics('.'),
+            exit_code=exit_hook.exit_code if isinstance(exit_hook.exit_code, int) else None,
             command=sys.argv,
-            ip_address=ip_address,
+            module_info=_get_modules_git_info(),
         )
 
+    def is_malformed(self) -> bool:
+        """Confirm whether this instance has all expected fields."""
+        sub_metrics = self.module_info + [self.git_info] + [self.host_info]
+        return self.exit_code is None or any(metrics.is_malformed() for metrics in sub_metrics)
+
+
+class SConsToolingMetrics(BaseMetrics):
+    """Class to store scons tooling metrics."""
+
+    source: str
+    utc_starttime: datetime
+    utc_endtime: datetime
+    host_info: HostInfo
+    git_info: GitInfo
+    exit_code: Optional[int]
+    build_info: BuildInfo
+    command: List[str]
+    module_info: List[GitInfo]
+
     @classmethod
-    def get_scons_metrics(
+    def generate_metrics(
             cls,
             utc_starttime: datetime,
             env_vars: "SCons.Variables.Variables",
             env: "SCons.Script.SConscript.SConsEnvironment",
             parser: "SCons.Script.SConsOptions.SConsOptionParser",
             args: List[str],
-            exit_code: int,
-    ):
+            exit_hook: _ExitHook,
+    ):  # pylint: disable=arguments-differ
         """Get scons metrics to the best of our ability."""
-        try:
-            ip_address = socket.gethostbyname(socket.gethostname())
-        except:
-            ip_address = None
         return cls(
             source='scons',
             utc_starttime=utc_starttime,
             utc_endtime=datetime.utcnow(),
-            host_info=HostInfo.get_host_info(),
-            git_info=GitInfo.get_git_info('.'),
-            exit_info=ExitInfo.get_scons_exit_info(exit_code),
-            build_info=BuildInfo.get_scons_build_info(utc_starttime, env_vars, env, parser, args),
-            module_info=_get_modules_git_info(),
+            host_info=HostInfo.generate_metrics(),
+            git_info=GitInfo.generate_metrics('.'),
+            build_info=BuildInfo.generate_metrics(utc_starttime, env_vars, env, parser, args),
+            exit_code=exit_hook.exit_code if isinstance(exit_hook.exit_code, int) else None,
             command=sys.argv,
-            ip_address=ip_address,
+            module_info=_get_modules_git_info(),
         )
 
-    def is_malformed(self):
+    def is_malformed(self) -> bool:
         """Confirm whether this instance has all expected fields."""
-        sub_metrics = [self.build_info] if self.source == 'scons' else []
-        sub_metrics += self.module_info + [self.git_info] + [self.host_info] + [self.exit_info]
-        return self.ip_address is None or any(metrics.is_malformed() for metrics in sub_metrics)
+        sub_metrics = self.module_info + [self.git_info] + [self.host_info] + [self.build_info]
+        return self.exit_code is None or any(metrics.is_malformed() for metrics in sub_metrics)
