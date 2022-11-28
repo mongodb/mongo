@@ -83,6 +83,7 @@ namespace metrics_detail {
     X(receivedWork)              \
     X(processedWork)             \
     X(sentResponse)              \
+    X(yielded)                   \
     X(done)                      \
     /**/
 
@@ -97,13 +98,15 @@ namespace metrics_detail {
  *  |   [receivedWork]
  *  |   |   [processedWork]
  *  |   |   |   [sentResponse]
- *  |   |   |   |   [done]
- *  |<------------->|  total
- *  |   |<--------->|  active
- *  |<->|   |   |   |  receivedWork
- *  |   |<->|   |   |  processWork
- *  |   |   |<->|   |  sendResponse
- *  |   |   |   |<->|  finalize
+ *  |   |   |   |   [yielded]
+ *  |   |   |   |   |   [done]
+ *  |<----------------->| total
+ *  |   |<------------->| active
+ *  |<->|   |   |   |   | receivedWork
+ *  |   |<->|   |   |   | processWork
+ *  |   |   |<->|   |   | sendResponse
+ *  |   |   |   |<->|   | yield
+ *  |   |   |   |   |<->| finalize
  */
 #define EXPAND_INTERVAL_IDS(X)                   \
     X(total, started, done)                      \
@@ -111,7 +114,8 @@ namespace metrics_detail {
     X(receiveWork, started, receivedWork)        \
     X(processWork, receivedWork, processedWork)  \
     X(sendResponse, processedWork, sentResponse) \
-    X(finalize, sentResponse, done)              \
+    X(yield, sentResponse, yielded)              \
+    X(finalize, yielded, done)                   \
     /**/
 
 #define X_ID(id, ...) id,
@@ -165,6 +169,8 @@ struct SplitTimerPolicy {
     static constexpr size_t numTimeSplitIds = enumExtent<TimeSplitIdType>;
     static constexpr size_t numIntervalIds = enumExtent<IntervalIdType>;
 
+    explicit SplitTimerPolicy(ServiceEntryPoint* sep) : _sep(sep) {}
+
     template <typename E>
     static constexpr size_t toIdx(E e) {
         return static_cast<size_t>(e);
@@ -192,23 +198,35 @@ struct SplitTimerPolicy {
 
     void onFinish(SplitTimer<SplitTimerPolicy>* splitTimer) {
         splitTimer->notify(TimeSplitIdType::done);
-        auto t = splitTimer->getSplitInterval(IntervalIdType::active);
+        auto t = splitTimer->getSplitInterval(IntervalIdType::sendResponse);
         if (MONGO_likely(!t || *t < Milliseconds{serverGlobalParams.slowMS.load()}))
             return;
         BSONObjBuilder bob;
         splitTimer->appendIntervals(bob);
-        LOGV2(6983000, "Slow SessionWorkflow loop", "elapsed"_attr = bob.obj());
+
+        logv2::LogSeverity severity = sessionWorkflowDelaySendMessage.shouldFail()
+            ? logv2::LogSeverity::Info()
+            : _sep->slowSessionWorkflowLogSeverity();
+
+        LOGV2_DEBUG(6983000,
+                    severity.toInt(),
+                    "Slow network response send time",
+                    "elapsed"_attr = bob.obj());
     }
 
     Timer makeTimer() {
         return Timer{};
     }
+
+    ServiceEntryPoint* _sep;
 };
 
 class SessionWorkflowMetrics {
 public:
+    explicit SessionWorkflowMetrics(ServiceEntryPoint* sep) : _sep(sep) {}
+
     void start() {
-        _t.emplace();
+        _t.emplace(SplitTimerPolicy{_sep});
     }
     void received() {
         _t->notify(TimeSplitId::receivedWork);
@@ -222,11 +240,15 @@ public:
             duration_cast<Milliseconds>(*_t->getSplitInterval(IntervalId::processWork)),
             duration_cast<Milliseconds>(*_t->getSplitInterval(IntervalId::sendResponse)));
     }
+    void yielded() {
+        _t->notify(TimeSplitId::yielded);
+    }
     void finish() {
         _t.reset();
     }
 
 private:
+    ServiceEntryPoint* _sep;
     boost::optional<SplitTimer<SplitTimerPolicy>> _t;
 };
 }  // namespace metrics_detail
@@ -425,7 +447,7 @@ private:
 
     SessionWorkflow* const _workflow;
     ServiceContext* const _serviceContext;
-    ServiceEntryPoint* const _sep;
+    ServiceEntryPoint* _sep;
     RunnerAndSource _taskRunner;
 
     AtomicWord<bool> _isTerminated{false};
@@ -434,7 +456,7 @@ private:
     std::unique_ptr<WorkItem> _work;
     std::unique_ptr<WorkItem> _nextWork; /**< created by exhaust responses */
 
-    metrics_detail::SessionWorkflowMetrics _metrics;
+    metrics_detail::SessionWorkflowMetrics _metrics{_sep};
 };
 
 class SessionWorkflow::Impl::WorkItem {
@@ -583,12 +605,6 @@ void SessionWorkflow::Impl::sendMessage() {
               "connectionId"_attr = session()->id());
         uassertStatusOK(status);
     }
-
-    // Performance testing showed a significant benefit from yielding here.
-    // TODO SERVER-57531: Once we enable the use of a fixed-size thread pool
-    // for handling client connection handshaking, we should only yield here if
-    // we're on a dedicated thread.
-    executor()->yieldIfAppropriate();
 }
 
 Future<void> SessionWorkflow::Impl::processMessage() {
@@ -707,6 +723,14 @@ void SessionWorkflow::Impl::startNewLoop(const Status& executorStatus) {
             if (_work->hasOut()) {
                 sendMessage();
                 _metrics.sent(*session());
+
+                // Performance testing showed a significant benefit from yielding here.
+                // TODO SERVER-57531: Once we enable the use of a fixed-size thread pool
+                // for handling client connection handshaking, we should only yield here if
+                // we're on a dedicated thread.
+                executor()->yieldIfAppropriate();
+
+                _metrics.yielded();
             }
         })
         .getAsync([this, anchor = shared_from_this()](Status status) {

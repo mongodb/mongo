@@ -187,4 +187,8 @@ size_t ServiceEntryPointEmbedded::numOpenSessions() const {
     UASSERT_NOT_IMPLEMENTED;
 }
 
+logv2::LogSeverity ServiceEntryPointEmbedded::slowSessionWorkflowLogSeverity() {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
 }  // namespace mongo

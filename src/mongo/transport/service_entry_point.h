@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/logv2/log_severity.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/future.h"
 
@@ -89,6 +90,13 @@ public:
     virtual size_t maxOpenSessions() const {
         return std::numeric_limits<size_t>::max();
     }
+
+    /**
+     * Returns the current severity to log slow SessionWorkflow lifecycles. Returns a suppressed
+     * severity every X seconds (defined in SEP::impl) to prevent logs from overwhelming the rest
+     * of the system.
+     */
+    virtual logv2::LogSeverity slowSessionWorkflowLogSeverity() = 0;
 
     /**
      * Processes a request and fills out a DbResponse.

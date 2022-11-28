@@ -94,6 +94,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    logv2::LogSeverity slowSessionWorkflowLogSeverity() override {
+        MONGO_UNIMPLEMENTED;
+    }
+
     void setTransportLayer(transport::TransportLayer* tl) {
         _transport = tl;
     }

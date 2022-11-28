@@ -12,14 +12,7 @@ load("jstests/libs/fail_point_util.js");
 load("jstests/libs/log.js");  // For findMatchingLogLine
 
 const expectedLogId = 6983000;
-const sleepMillisInQueryFilter = 200;
-const sleepMillisBetweenQueries = 100;
-
-// This specific test doesn't care about precision in the times reported by the server. Since the
-// server may be doing some extra work before listening for another message, and since the server
-// and this test may vary in the precision by which they convert ticks to milliseconds, we allow
-// some error when comparing local times to server times.
-const errorAllowance = 0.9;
+const sleepMillisInSendResponse = 200;
 
 const expectedFields = [
     "totalMillis",
@@ -51,27 +44,18 @@ function runTest(conn) {
     assert.commandWorked(assert.commandWorked(coll.insert({_id: 1})));
 
     // In order to find the new log lines, a baseline needs to be established.
-    let slowSessionWorkflowCount = getSlowLogCount(conn);
-
-    // Do a query that we would expect to be fast. Expect no new slow SessionWorkflows are logged.
-    let count = coll.find({}).toArray();
-    assert.eq(count.length, 1, "expected 1 document");
-    let prevSlowSessionWorkflowCount = slowSessionWorkflowCount;
-    slowSessionWorkflowCount = getSlowLogCount(conn);
-    assert.eq(slowSessionWorkflowCount,
-              prevSlowSessionWorkflowCount,
-              "There should not be a slow SessionWorkflow log at this point but one was found.");
+    const prevSlowSessionWorkflowCount = getSlowLogCount(conn);
 
     // Wait, then do a query beyond the 100ms threshold. Make sure the slow loop log line exists.
-    sleep(sleepMillisBetweenQueries);
-    coll.find({$where: 'function() { sleep(' + sleepMillisInQueryFilter + '); return true; }'})
-        .toArray();
+    const fp = configureFailPoint(
+        conn, "sessionWorkflowDelaySendMessage", {millis: sleepMillisInSendResponse});
+    coll.find().toArray();
+    fp.off();
     let logAndCount = getSlowLogAndCount(conn);
-    prevSlowSessionWorkflowCount = slowSessionWorkflowCount;
-    slowSessionWorkflowCount = logAndCount.count;
-    assert.eq(slowSessionWorkflowCount,
-              prevSlowSessionWorkflowCount + 1,
-              "Expected to find a slow SessionWorkflow log.");
+    const slowSessionWorkflowCount = logAndCount.count;
+    assert.gt(slowSessionWorkflowCount,
+              prevSlowSessionWorkflowCount,
+              "Expected to find at least one slow SessionWorkflow log.");
 
     // Do some sanity checks over the actual contents of the log.
     const slowLoopObj = JSON.parse(logAndCount.log);
@@ -81,26 +65,11 @@ function runTest(conn) {
         assert(expectedField in elapsedObj,
                "Expected to find field but couldn't: " + expectedField);
     });
-    let totalElapsed = elapsedObj.totalMillis;
-    let activeElapsed = elapsedObj.activeMillis;
-    let sourceWorkElapsed = elapsedObj.receiveWorkMillis;
-    let processWorkElapsed = elapsedObj.processWorkMillis;
-    assert.gte(
-        sourceWorkElapsed,
-        sleepMillisBetweenQueries * errorAllowance,
-        "The time reported sourcing a message didn't include the time sleeping between queries.");
-    assert.gte(processWorkElapsed,
-               sleepMillisInQueryFilter,
-               "The time reported processing work didn't include the sleep in the find filter.");
+    const sendResponseElapsed = elapsedObj.sendResponseMillis;
 
-    // When comparing server time to another server time, there is no reason to expect error.
-    assert.gte(activeElapsed,
-               processWorkElapsed,
-               "The time reported as active time didn't include the time processing work.");
-    assert.gte(
-        totalElapsed,
-        sourceWorkElapsed + activeElapsed,
-        "The total time reported didn't include the sum of active time and message sourcing time.");
+    assert.gte(sendResponseElapsed,
+               sleepMillisInSendResponse,
+               "The time reported sending a response didn't include the sleep in the failpoint.");
 }
 
 // Test standalone.

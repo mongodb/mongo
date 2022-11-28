@@ -51,6 +51,7 @@ public:
     bool shutdown(Milliseconds timeout) override;
     void appendStats(BSONObjBuilder* bob) const override;
     size_t numOpenSessions() const override;
+    logv2::LogSeverity slowSessionWorkflowLogSeverity() override;
 
 private:
     class Hooks;

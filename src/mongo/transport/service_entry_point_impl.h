@@ -36,6 +36,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/stdx/variant.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/session.h"
@@ -54,6 +55,8 @@ class ServiceContext;
  */
 class ServiceEntryPointImpl : public ServiceEntryPoint {
 public:
+    static constexpr Seconds kSlowSessionWorkflowLogSuppresionPeriod{5};
+
     explicit ServiceEntryPointImpl(ServiceContext* svcCtx);
     ~ServiceEntryPointImpl();
 
@@ -76,6 +79,8 @@ public:
 
     size_t maxOpenSessions() const final;
 
+    logv2::LogSeverity slowSessionWorkflowLogSeverity() final;
+
     void onClientDisconnect(Client* client) final;
 
     /** `onClientDisconnect` calls this before doing anything else. */
@@ -95,6 +100,11 @@ private:
     size_t _rejectedSessions;
 
     std::unique_ptr<Sessions> _sessions;
+
+    logv2::SeveritySuppressor _slowSessionWorkflowLogSuppressor{
+        kSlowSessionWorkflowLogSuppresionPeriod,
+        logv2::LogSeverity::Info(),
+        logv2::LogSeverity::Debug(2)};
 };
 
 /*

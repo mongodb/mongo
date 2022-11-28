@@ -389,6 +389,10 @@ size_t ServiceEntryPointImpl::maxOpenSessions() const {
     return _maxSessions;
 }
 
+logv2::LogSeverity ServiceEntryPointImpl::slowSessionWorkflowLogSeverity() {
+    return _slowSessionWorkflowLogSuppressor();
+}
+
 bool ServiceEntryPointImpl::shutdownAndWait(Milliseconds timeout) {
     auto deadline = _svcCtx->getPreciseClockSource()->now() + timeout;
 

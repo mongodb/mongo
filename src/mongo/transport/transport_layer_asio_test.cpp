@@ -269,6 +269,10 @@ public:
         return _sessions->size();
     }
 
+    logv2::LogSeverity slowSessionWorkflowLogSeverity() override {
+        MONGO_UNIMPLEMENTED;
+    }
+
     void setOnStartSession(std::function<void(SessionThread&)> cb) {
         _onStartSession = std::move(cb);
     }
@@ -865,6 +869,10 @@ class BatonASIOLinuxTest : public LockerNoopServiceContextTest {
 
         size_t numOpenSessions() const override {
             MONGO_UNREACHABLE;
+        }
+
+        logv2::LogSeverity slowSessionWorkflowLogSeverity() override {
+            MONGO_UNIMPLEMENTED;
         }
 
     private:
