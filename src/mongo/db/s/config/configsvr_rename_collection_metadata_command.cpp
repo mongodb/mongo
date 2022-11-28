@@ -93,19 +93,15 @@ public:
                 repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
             auto txnParticipant = TransactionParticipant::get(opCtx);
-            if (!txnParticipant) {
-                // old binaries will not send the txnNumber
-                ShardingCatalogManager::get(opCtx)->renameShardedMetadata(
-                    opCtx,
-                    ns(),
-                    req.getTo(),
-                    ShardingCatalogClient::kMajorityWriteConcern,
-                    req.getOptFromCollection());
-                return;
-            }
+            uassert(ErrorCodes::InvalidOptions,
+                    str::stream() << Request::kCommandName
+                                  << " expected to be called within a transaction",
+                    txnParticipant);
 
             {
                 auto newClient = opCtx->getServiceContext()->makeClient("RenameCollectionMetadata");
+                AuthorizationSession::get(newClient.get())
+                    ->grantInternalAuthorization(newClient.get());
                 {
                     stdx::lock_guard<Client> lk(*newClient.get());
                     newClient->setSystemOperationKillableByStepdown(lk);
@@ -127,6 +123,8 @@ public:
 
             // Since we no write happened on this txnNumber, we need to make a dummy write so that
             // secondaries can be aware of this txn.
+            // Such write will also guarantee that the lastOpTime of opCtx will be inclusive of any
+            // write executed under the AlternativeClientRegion.
             DBDirectClient client(opCtx);
             client.update(NamespaceString::kServerConfigurationNamespace.ns(),
                           BSON("_id"

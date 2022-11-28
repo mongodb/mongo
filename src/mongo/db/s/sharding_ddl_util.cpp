@@ -31,6 +31,7 @@
 #include "mongo/db/s/sharding_ddl_util.h"
 
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/cluster_transaction_api.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/db_raii.h"
@@ -42,6 +43,7 @@
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_util.h"
+#include "mongo/db/transaction/transaction_api.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/write_block_bypass.h"
 #include "mongo/logv2/log.h"
@@ -49,10 +51,13 @@
 #include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog/type_namespace_placement_gen.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/set_allow_migrations_gen.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -121,15 +126,88 @@ void deleteCollection(OperationContext* opCtx,
                       const NamespaceString& nss,
                       const UUID& uuid,
                       const WriteConcernOptions& writeConcern) {
-    const auto catalogClient = Grid::get(opCtx)->catalogClient();
+    /* Perform a transaction to delete the collection and append a new placement entry.
+     * NOTE: deleteCollectionFn may be run on a separate thread than the one serving
+     * deleteCollection(). For this reason, all the referenced parameters have to
+     * be captured by value.
+     * TODO SERVER-66261 replace capture list with a single '&'.
+     */
+    auto transactionChain = [nss, uuid](const txn_api::TransactionClient& txnClient,
+                                        ExecutorPtr txnExec) {
+        // Remove config.collection entry. Query by 'ns' AND 'uuid' so that the remove can be
+        // resolved with an IXSCAN (thanks to the index on '_id') and is idempotent (thanks to the
+        // 'uuid')
+        const auto deleteCollectionQuery = BSON(
+            CollectionType::kNssFieldName << nss.ns() << CollectionType::kUuidFieldName << uuid);
 
-    // Remove config.collection entry. Query by 'ns' AND 'uuid' so that the remove can be resolved
-    // with an IXSCAN (thanks to the index on '_id') and is idempotent (thanks to the 'uuid')
-    uassertStatusOK(catalogClient->removeConfigDocuments(
-        opCtx,
-        CollectionType::ConfigNS,
-        BSON(CollectionType::kNssFieldName << nss.ns() << CollectionType::kUuidFieldName << uuid),
-        writeConcern));
+        write_ops::DeleteCommandRequest deleteOp(CollectionType::ConfigNS);
+        deleteOp.setDeletes({[&]() {
+            write_ops::DeleteOpEntry entry;
+            entry.setMulti(false);
+            entry.setQ(deleteCollectionQuery);
+            return entry;
+        }()});
+
+        return txnClient.runCRUDOp(deleteOp, {} /*stmtIds*/)
+            .thenRunOn(txnExec)
+            .then([&](const BatchedCommandResponse& deleteCollResponse) {
+                uassertStatusOK(deleteCollResponse.toStatus());
+                const auto writePlacementEntry =
+                    feature_flags::gHistoricalPlacementShardingCatalog.isEnabled(
+                        serverGlobalParams.featureCompatibility);
+
+                // Also skip the insertion of the placement entry if the previous statement didn't
+                // remove any document - we can deduce that the whole transaction was already
+                // committed in a previous attempt.
+                if (!writePlacementEntry || deleteCollResponse.getN() == 0) {
+                    BatchedCommandResponse noOpResponse;
+                    noOpResponse.setStatus(Status::OK());
+                    noOpResponse.setN(0);
+                    return SemiFuture<BatchedCommandResponse>(std::move(noOpResponse));
+                }
+
+                auto now = VectorClock::get(getGlobalServiceContext())->getTime();
+                const auto clusterTime = now.clusterTime().asTimestamp();
+                NamespacePlacementType placementInfo(
+                    NamespaceString(nss), clusterTime, {} /*shards*/);
+                placementInfo.setUuid(uuid);
+                write_ops::InsertCommandRequest insertPlacementEntry(
+                    NamespaceString::kConfigsvrPlacementHistoryNamespace, {placementInfo.toBSON()});
+
+                return txnClient.runCRUDOp(insertPlacementEntry, {} /*stmtIds*/);
+            })
+            .thenRunOn(txnExec)
+            .then([&](const BatchedCommandResponse& insertPlacementEntryResponse) {
+                uassertStatusOK(insertPlacementEntryResponse.toStatus());
+            })
+            .semi();
+    };
+
+    // The Internal Transactions API receives the write concern option through the passed Operation
+    // context.
+    WriteConcernOptions originalWC = opCtx->getWriteConcern();
+    opCtx->setWriteConcern(writeConcern);
+    ScopeGuard guard([opCtx, originalWC] { opCtx->setWriteConcern(originalWC); });
+    auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+
+    // Instantiate the right custom TXN client to ensure that the queries to the config DB will be
+    // routed to the CSRS.
+    auto customTxnClient = [&]() -> std::unique_ptr<txn_api::TransactionClient> {
+        if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+            return std::make_unique<txn_api::details::SEPTransactionClient>(
+                opCtx,
+                executor,
+                std::make_unique<txn_api::details::ClusterSEPTransactionClientBehaviors>(
+                    opCtx->getServiceContext()));
+        }
+
+        invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+        return nullptr;
+    }();
+
+    txn_api::SyncTransactionWithRetries txn(
+        opCtx, executor, nullptr /*resourceYielder*/, std::move(customTxnClient));
+    txn.run(opCtx, transactionChain);
 }
 
 write_ops::UpdateCommandRequest buildNoopWriteRequestCommand() {

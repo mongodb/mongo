@@ -29,6 +29,7 @@
 
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
@@ -51,8 +52,14 @@ class ShardingDDLUtilTest : public ConfigServerTestFixture {
 protected:
     ShardType shard0;
 
+private:
+    ReadWriteConcernDefaultsLookupMock _lookupMock;
+
     void setUp() override {
         setUpAndInitializeConfigDb();
+
+        // Manually instantiate the ReadWriteConcernDefaults decoration on the service
+        ReadWriteConcernDefaults::create(getServiceContext(), _lookupMock.getFetchDefaultsFn());
 
         // Create config.transactions collection
         auto opCtx = operationContext();

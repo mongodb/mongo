@@ -14,6 +14,7 @@ function getInfoFromConfigDatabases(dbName) {
     if (configDBsQueryResults.length === 0) {
         return null;
     }
+
     assert.eq(1, configDBsQueryResults.length);
     return configDBsQueryResults[0];
 }
@@ -23,6 +24,7 @@ function getInfoFromConfigCollections(fullCollName) {
     if (configCollsQueryResults.length === 0) {
         return null;
     }
+
     assert.eq(configCollsQueryResults.length, 1);
     return configCollsQueryResults[0];
 }
@@ -30,6 +32,10 @@ function getInfoFromConfigCollections(fullCollName) {
 function getLatestPlacementInfoFor(namespace) {
     const placementQueryResults =
         configDB.placementHistory.find({nss: namespace}).sort({timestamp: -1}).limit(1).toArray();
+    if (placementQueryResults.length === 0) {
+        return null;
+    }
+
     assert.eq(placementQueryResults.length, 1);
     return placementQueryResults[0];
 }
@@ -178,18 +184,120 @@ function testMovePrimary(dbName, fromPrimaryShardName, toPrimaryShardName) {
     assert.sameMembers(newDbInfo.shards, [toPrimaryShardName]);
 }
 
+function testDropCollection() {
+    const dbName = 'dropCollectionTestDB';
+    const collName = 'shardedCollName';
+    const nss = dbName + '.' + collName;
+    const db = st.s.getDB(dbName);
+
+    testShardCollection(dbName, collName);
+    const initialPlacementInfo = getLatestPlacementInfoFor(nss);
+    const numHistoryEntriesBeforeFirstDrop = configDB.placementHistory.count({nss: nss});
+
+    // Drop the collection
+    assert.commandWorked(db.runCommand({drop: collName}));
+
+    // Verify that a single entry gets added with the expected content.
+    const numHistoryEntriesAfterFirstDrop = configDB.placementHistory.count({nss: nss});
+    assert.eq(numHistoryEntriesBeforeFirstDrop + 1, numHistoryEntriesAfterFirstDrop);
+    const collPlacementInfo = getLatestPlacementInfoFor(nss);
+    assert.eq(0, collPlacementInfo.shards.length);
+    assert.eq(initialPlacementInfo.uuid, collPlacementInfo.uuid);
+    assert(timestampCmp(initialPlacementInfo.timestamp, collPlacementInfo.timestamp) < 0);
+
+    // Verify that no placement entry gets added if dropCollection is repeated
+    assert.commandWorked(db.runCommand({drop: collName}));
+    assert.eq(numHistoryEntriesAfterFirstDrop, configDB.placementHistory.count({nss: nss}));
+
+    // Verify that no records get added in case an unsharded collection gets dropped
+    const unshardedCollName = 'unshardedColl';
+    assert.commandWorked(db.createCollection(unshardedCollName));
+
+    assert.commandWorked(db.runCommand({drop: unshardedCollName}));
+
+    assert.eq(0, configDB.placementHistory.count({nss: dbName + '.' + unshardedCollName}));
+}
+
+function testRenameCollection() {
+    const dbName = 'renameCollectionTestDB';
+    const db = st.s.getDB(dbName);
+    const oldCollName = 'old';
+    const oldNss = dbName + '.' + oldCollName;
+
+    const targetCollName = 'target';
+    const targetNss = dbName + '.' + targetCollName;
+
+    jsTest.log(
+        'Testing that placement entries are added by rename() for each sharded collection involved in the DDL');
+    testShardCollection(dbName, oldCollName);
+    const initialPlacementForOldColl = getLatestPlacementInfoFor(oldNss);
+
+    assert.commandWorked(st.s.adminCommand({shardCollection: targetNss, key: {x: 1}}));
+    st.s.adminCommand({split: targetNss, middle: {x: 0}});
+    assert.commandWorked(st.s.adminCommand({moveChunk: targetNss, find: {x: -1}, to: shard1}));
+    const initialPlacementForTargetColl = getLatestPlacementInfoFor(targetNss);
+
+    assert.commandWorked(db[oldCollName].renameCollection(targetCollName, true /*dropTarget*/));
+    const finalPlacementForOldColl = getLatestPlacementInfoFor(oldNss);
+    const finalPlacementForTargetColl = getLatestPlacementInfoFor(targetNss);
+
+    // TODO SERVER-70682 modify the following assertions to distinguish between placement of dropped
+    // target  VS placement of renamed target.
+    assert.eq(initialPlacementForOldColl.uuid, finalPlacementForOldColl.uuid);
+    assert.sameMembers([], finalPlacementForOldColl.shards);
+
+    assert.eq(initialPlacementForTargetColl.uuid, finalPlacementForTargetColl.uuid);
+    assert.sameMembers([], finalPlacementForTargetColl.shards);
+
+    jsTest.log(
+        'Testing that no placement entries are added by rename() for unsharded collections involved in the DDL');
+    const unshardedOldCollName = 'unshardedOld';
+    const unshardedTargetCollName = 'unshardedTarget';
+    assert.commandWorked(db.createCollection(unshardedOldCollName));
+    assert.commandWorked(db.createCollection(unshardedTargetCollName));
+
+    assert.commandWorked(
+        db[unshardedOldCollName].renameCollection(unshardedTargetCollName, true /*dropTarget*/));
+
+    assert.eq(0, configDB.placementHistory.count({nss: dbName + '.' + unshardedOldCollName}));
+    assert.eq(0, configDB.placementHistory.count({nss: dbName + '.' + unshardedTargetCollName}));
+}
+
 function testDropDatabase(dbName, primaryShardName) {
     // Create the database
     testEnableSharding(dbName, primaryShardName);
+    const db = st.s.getDB(dbName);
+
+    // Create an unsharded collection
+    const unshardedCollName = 'unshardedColl';
+    const unshardedCollNss = dbName + '.' + unshardedCollName;
+    assert.commandWorked(db.createCollection(unshardedCollName));
+
+    // Create a sharded collection
+    const shardedCollName = 'shardedColl';
+    const shardedCollNss = dbName + '.' + shardedCollName;
+    testShardCollection(dbName, shardedCollName);
+    const initialShardedCollPlacementInfo = getLatestPlacementInfoFor(shardedCollNss);
 
     // Drop the database
-    let db = st.s.getDB(dbName);
     assert.commandWorked(db.dropDatabase());
 
-    // Verify the database is no longer present in the placement history
+    // Verify that a new entry with an empty set of shards has been inserted for both dbName and
+    // shardedCollName...
     const dbPlacementInfo = getLatestPlacementInfoFor(dbName);
-    assert.neq(dbPlacementInfo, null);
-    assert.eq(dbPlacementInfo.shards.length, 0);
+    assert.neq(null, dbPlacementInfo);
+    assert.eq(0, dbPlacementInfo.shards.length);
+    assert.eq(undefined, dbPlacementInfo.uuid);
+
+    const finalShardedCollPlacementInfo = getLatestPlacementInfoFor(shardedCollNss);
+    assert.neq(null, finalShardedCollPlacementInfo);
+    assert.eq(0, finalShardedCollPlacementInfo.shards);
+    assert.eq(initialShardedCollPlacementInfo.uuid, finalShardedCollPlacementInfo.uuid);
+    assert(timestampCmp(initialShardedCollPlacementInfo.timestamp,
+                        finalShardedCollPlacementInfo.timestamp) < 0);
+
+    // ...And that unshardedCollName stays untracked.
+    assert.eq(null, getLatestPlacementInfoFor(unshardedCollNss));
 }
 
 // TODO SERVER-69106 remove the logic to skip the test execution
@@ -208,6 +316,9 @@ jsTest.log(
     'Testing placement entries added by shardCollection() over an existing sharding-enabled DB');
 testShardCollection('explicitlyCreatedDB', 'coll1');
 
+jsTest.log('Testing placement entries added by dropCollection()');
+testDropCollection();
+
 jsTest.log('Testing placement entries added by shardCollection() over a non-existing db (& coll)');
 testShardCollection('implicitlyCreatedDB', 'coll1');
 
@@ -220,6 +331,8 @@ testMoveRange('explicitlyCreatedDB', 'testMoveRange');
 jsTest.log(
     'Testing placement entries added by movePrimary() over a new sharding-enabled DB with no data');
 testMovePrimary('movePrimaryDB', st.shard0.shardName, st.shard1.shardName);
+
+testRenameCollection();
 
 jsTest.log(
     'Testing placement entries added by dropDatabase() over a new sharding-enabled DB with data');
