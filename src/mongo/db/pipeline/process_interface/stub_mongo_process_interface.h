@@ -243,11 +243,11 @@ public:
         return BackupCursorState{UUID::gen(), boost::none, nullptr, {}};
     }
 
-    void closeBackupCursor(OperationContext* opCtx, const UUID& backupId) final {}
+    void closeBackupCursor(OperationContext* opCtx, const UUID& backupId) override {}
 
     BackupCursorExtendState extendBackupCursor(OperationContext* opCtx,
                                                const UUID& backupId,
-                                               const Timestamp& extendTo) final {
+                                               const Timestamp& extendTo) override {
         return {{}};
     }
 
