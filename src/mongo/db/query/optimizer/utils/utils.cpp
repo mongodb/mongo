@@ -1081,6 +1081,7 @@ public:
     struct ResultType {
         boost::optional<ABT::reference_type> _suffix;
         size_t _numTraversesSkipped = 0;
+        size_t _numTraversesFused = 0;
     };
 
     /**
@@ -1111,7 +1112,9 @@ public:
     ResultType operator()(const ABT& n, const PathTraverse& node, const ABT& other) {
         if (auto otherTraverse = other.cast<PathTraverse>();
             otherTraverse != nullptr && otherTraverse->getMaxDepth() == node.getMaxDepth()) {
-            return node.getPath().visit(*this, otherTraverse->getPath());
+            auto result = node.getPath().visit(*this, otherTraverse->getPath());
+            result._numTraversesFused++;
+            return result;
         }
         return {};
     }
@@ -1209,6 +1212,11 @@ static bool computeCandidateIndexEntry(PrefixId& prefixId,
     auto& fieldProjMap = entry._fieldProjectionMap;
     auto& intervals = entry._intervals;
 
+    // Don't allow more than one Traverse predicate to fuse with the same Traverse in the index. For
+    // each field of the index, track whether we are still allowed to fuse a Traverse predicate with
+    // it.
+    std::vector<bool> allowFuseTraverse(indexCollationSpec.size(), true);
+
     // Add open interval for the first equality prefix.
     intervals.push_back(CompoundIntervalReqExpr::makeSingularDNF());
 
@@ -1237,6 +1245,9 @@ static bool computeCandidateIndexEntry(PrefixId& prefixId,
 
                 foundSuitableField = true;
                 unsatisfiedKeys.erase(indexKey);
+                if (checkPathContainsTraverse(indexKey._path)) {
+                    allowFuseTraverse[indexField] = false;
+                }
                 entry._intervalPrefixSize++;
 
                 if (const auto& boundProjName = req.getBoundProjectionName()) {
@@ -1274,7 +1285,11 @@ static bool computeCandidateIndexEntry(PrefixId& prefixId,
         for (size_t indexField = 0; indexField < indexCollationSpec.size(); indexField++) {
             if (const auto fusedPath =
                     IndexPathFusor::fuse(queryKey._path, indexCollationSpec.at(indexField)._path);
-                fusedPath._suffix) {
+                fusedPath._suffix &&
+                (allowFuseTraverse[indexField] || fusedPath._numTraversesFused == 0)) {
+                if (fusedPath._numTraversesFused > 0) {
+                    allowFuseTraverse[indexField] = false;
+                }
                 auto it = reqMap.find(queryKey);
                 tassert(
                     6624158, "QueryKey must exist in the requirements map", it != reqMap.cend());

@@ -186,13 +186,39 @@ result = run({
             "child": {
                 "nodeType": "NestedLoopJoin",
                 "leftChild": {
-                    "nodeType": "Unique",
+                    // This Filter, GroupBy, Union implements RIDIntersect.
+                    // TODO SERVER-71871 we should not need RIDIntersect here. The original query
+                    // says: Get [c] Traverse (ComposeM PathArr (Traverse ...)), which means we
+                    // traverse 'c' once, so it should be fine to use a single index scan. The
+                    // problem is: SargableNode cannot represent this, so we get two indepedent
+                    // (perfOnly) predicates on 'c'.
+                    "nodeType": "Filter",
                     "child": {
-                        "nodeType": "Filter",
+                        "nodeType": "GroupBy",
                         "child": {
-                            "nodeType": "IndexScan",
-                            "indexDefName": "c_1",
-                            "interval": "[ [ ], BinData(0,\"\") )"
+                            "nodeType": "Union",
+                            "children": [
+                                {
+                                    "nodeType": "Evaluation",
+                                    "child": {
+                                        "nodeType": "IndexScan",
+                                        "indexDefName": "c_1",
+                                        "interval": "[ [ ], BinData(0,\"\") )"
+                                    }
+                                },
+                                {
+                                    "nodeType": "Evaluation",
+                                    "child": {
+                                        "nodeType": "Filter",
+                                        "child": {
+                                            "nodeType": "IndexScan",
+                                            "indexDefName": "c_1",
+                                            "interval":
+                                                "[ { \"$minKey\" : 1 }, { \"$maxKey\" : 1 } ]"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 },
