@@ -244,37 +244,11 @@ TEST(CostModel, IncreaseJoinsCost) {
         ABT optimized = rootNode;
         phaseManager.optimize(optimized);
 
-        ASSERT_EXPLAIN_V2(
-            "Root []\n"
-            "|   |   projections: \n"
-            "|   |       pa\n"
-            "|   RefBlock: \n"
-            "|       Variable [pa]\n"
-            "BinaryJoin [joinType: Inner, {rid_0}]\n"
-            "|   |   Const [true]\n"
-            "|   Filter []\n"
-            "|   |   EvalFilter []\n"
-            "|   |   |   Variable [evalTemp_2]\n"
-            "|   |   PathCompare [Eq]\n"
-            "|   |   Const [2]\n"
-            "|   LimitSkip []\n"
-            "|   |   limitSkip:\n"
-            "|   |       limit: 1\n"
-            "|   |       skip: 0\n"
-            "|   Seek [ridProjection: rid_0, {'b': evalTemp_2}, c1]\n"
-            "|   |   BindBlock:\n"
-            "|   |       [evalTemp_2]\n"
-            "|   |           Source []\n"
-            "|   RefBlock: \n"
-            "|       Variable [rid_0]\n"
-            "IndexScan [{'<indexKey> 0': pa, '<rid>': rid_0}, scanDefName: c1, indexDefName: index1"
-            ", interval: {=Const [1]}]\n"
-            "    BindBlock:\n"
-            "        [pa]\n"
-            "            Source []\n"
-            "        [rid_0]\n"
-            "            Source []\n",
-            optimized);
+        auto optimizedExplain = ExplainGenerator::explainV2(optimized);
+
+        // Verifies that a BinaryJoin plan is generated not a MergeJoin plan.
+        ASSERT_NE(optimizedExplain.find("BinaryJoin"), std::string::npos);
+        ASSERT_EQ(optimizedExplain.find("MergeJoin"), std::string::npos);
     }
 
     {
