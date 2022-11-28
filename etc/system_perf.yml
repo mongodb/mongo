@@ -1579,8 +1579,6 @@ buildvariants:
       - "rhel70-perf-single"
     depends_on: *_compile_amazon2
     tasks:
-      - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
       - name: industry_benchmarks
       - name: linkbench
 
