@@ -30,16 +30,12 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/query/telemetry.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::telemetry {
 
-class TelemetryStoreTest : public unittest::Test {
-protected:
-    void setUp() override {}
-
-    void tearDown() override{};
-};
+class TelemetryStoreTest : public ServiceContextTest {};
 
 TEST_F(TelemetryStoreTest, BasicUsage) {
     TelemetryStore telStore{5000000, 1000};
@@ -94,6 +90,34 @@ TEST_F(TelemetryStoreTest, BasicUsage) {
     telStore.forEach([&](const BSONObj& key, const TelemetryMetrics& entry) { numKeys++; });
 
     ASSERT_EQ(numKeys, 2);
+}
+
+/**
+ * Spin up multiple threads reading/writing the store to empirically verify we don't hit an
+ * invariant.
+ */
+TEST_F(TelemetryStoreTest, ReadWriteLocking) {
+    std::vector<stdx::thread> threads;
+    auto svcCtx = getServiceContext();
+    for (int i = 0; i < 20; ++i) {
+        threads.emplace_back([&, i]() {
+            auto client = svcCtx->makeClient(std::to_string(i));
+            auto opCtx = client->makeOperationContext();
+            if (i % 4 > 0) {
+                auto sharedTelemetryStore = getTelemetryStoreForRead(opCtx.get());
+                BSONObj key;
+                auto status = sharedTelemetryStore->lookup(key);
+                // Key isn't found, we just need to do something while holding the store's read
+                // lock.
+                ASSERT_NOT_OK(status);
+            } else {
+                [[maybe_unused]] auto oldStore = resetTelemetryStore(opCtx.get());
+            }
+        });
+    }
+    for (auto&& thread : threads) {
+        thread.join();
+    }
 }
 
 }  // namespace mongo::telemetry

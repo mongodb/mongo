@@ -170,12 +170,37 @@ using TelemetryStore = PartitionedCache<BSONObj,
                                         SimpleBSONObjComparator::EqualTo>;
 
 /**
+ * Shared instance of the telemetry store which holds a read-lock while in use. The read-lock
+ * prevents the telemetry store as a whole from being replaced. The telemetry store itself is
+ * mutable.
+ */
+class SharedTelemetryStore {
+public:
+    SharedTelemetryStore(TelemetryStore* telemetryStore, Lock::SharedLock lock)
+        : _telemetryStore(telemetryStore), _lock(std::move(lock)) {}
+
+    SharedTelemetryStore(SharedTelemetryStore&& other)
+        : _telemetryStore(other._telemetryStore), _lock(std::move(other._lock)) {}
+
+    SharedTelemetryStore(const SharedTelemetryStore&) = delete;
+    SharedTelemetryStore& operator=(const SharedTelemetryStore&) = delete;
+
+    TelemetryStore* operator->() const {
+        return _telemetryStore;
+    }
+
+private:
+    TelemetryStore* _telemetryStore;
+
+    Lock::SharedLock _lock;
+};
+
+/**
  * Acquire a reference to the global telemetry store.
  */
-std::pair<TelemetryStore*, Lock::ResourceLock> getTelemetryStoreForRead(
-    const ServiceContext* serviceCtx);
+SharedTelemetryStore getTelemetryStoreForRead(OperationContext* opCtx);
 
-std::unique_ptr<TelemetryStore> resetTelemetryStore(const ServiceContext* serviceCtx);
+std::unique_ptr<TelemetryStore> resetTelemetryStore(OperationContext* opCtx);
 
 bool isTelemetryEnabled(const ServiceContext* serviceCtx);
 
@@ -198,13 +223,13 @@ void registerFindRequest(const FindCommandRequest& request,
 
 void registerGetMoreRequest(OperationContext* opCtx, const PlanExplainer& planExplainer);
 
-void recordExecution(const OperationContext* opCtx, const OpDebug& opDebug, bool isFle);
+void recordExecution(OperationContext* opCtx, const OpDebug& opDebug, bool isFle);
 
 /**
  * Collect telemetry for the operation identified by `key`. The `isExec` flag should be set if it's
  * the beginning of execution (first batch) of results and not set for subsequent getMore() calls.
  */
-void collectTelemetry(const OperationContext* opCtx, const OpDebug& opDebug);
+void collectTelemetry(OperationContext* opCtx, const OpDebug& opDebug);
 
 }  // namespace telemetry
 }  // namespace mongo
