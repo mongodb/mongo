@@ -69,6 +69,24 @@ protected:
     }
 
     /**
+     * Compiles 'expr' to bytecode when 'expr' is computing an aggregate. The current aggregate
+     * value can be read out of the provided 'aggAccessor'.
+     *
+     * Note that when actually executing the resulting bytecode, the caller is responsible for
+     * setting the value of 'aggAccessor' to the new resulting aggregate value.
+     */
+    std::unique_ptr<vm::CodeFragment> compileAggExpression(const EExpression& expr,
+                                                           value::SlotAccessor* aggAccessor) {
+        ON_BLOCK_EXIT([this] {
+            _ctx.aggExpression = false;
+            _ctx.accumulator = nullptr;
+        });
+        _ctx.aggExpression = true;
+        _ctx.accumulator = aggAccessor;
+        return expr.compile(_ctx);
+    }
+
+    /**
      * The caller takes ownership of the Value returned by this function and must call
      * 'releaseValue()' on it. The preferred way to ensure the Value is properly released is to
      * immediately store it in a ValueGuard.

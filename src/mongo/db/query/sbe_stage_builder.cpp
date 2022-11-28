@@ -2395,7 +2395,9 @@ std::tuple<sbe::value::SlotVector, EvalStage> generateAccumulator(
     // One accumulator may be translated to multiple accumulator expressions. For example, The
     // $avg will have two accumulators expressions, a sum(..) and a count which is implemented
     // as sum(1).
-    auto accExprs = stage_builder::buildAccumulator(state, accStmt, std::move(argExpr));
+    auto collatorSlot = state.data->env->getSlotIfExists("collator"_sd);
+    auto accExprs = stage_builder::buildAccumulator(
+        accStmt, std::move(argExpr), collatorSlot, *state.frameIdGenerator);
 
     sbe::value::SlotVector aggSlots;
     for (auto& accExpr : accExprs) {

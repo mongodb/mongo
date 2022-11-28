@@ -31,10 +31,12 @@
 
 #include <fmt/printf.h>
 
+#include "mongo/db/exec/sbe/expression_test_base.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/sbe_stage_builder_accumulator.h"
 #include "mongo/db/query/sbe_stage_builder_test_fixture.h"
 #include "mongo/unittest/unittest.h"
 
@@ -1675,6 +1677,231 @@ TEST_F(SbeStageBuilderGroupTest, SbeIncompatibleExpressionInGroup) {
         auto groupSpec = fromjson(fmt::sprintf("{%s}", testCase));
         runSbeIncompatibleGroupSpecTest({groupSpec}, expCtx);
     }
+}
+
+/**
+ * A test fixture designed to test that the expressions generated to combine partial aggregates
+ * that have been spilled to disk work correctly. We use 'EExpressionTestFixture' rather than
+ * something like 'SbeStageBuilderTestFixture' so that the expressions can be tested in isolation,
+ * without actually requiring a hash agg stage or without actually spilling any data to disk.
+ */
+class SbeStageBuilderGroupAggCombinerTest : public sbe::EExpressionTestFixture {
+public:
+    explicit SbeStageBuilderGroupAggCombinerTest()
+        : _expCtx{make_intrusive<ExpressionContextForTest>()},
+          _inputSlotId{bindAccessor(&_inputAccessor)},
+          _collatorSlotId{bindAccessor(&_collatorAccessor)} {}
+
+    AccumulationStatement makeAccumulationStatement(StringData accumName) {
+        _accumulationStmtBson = BSON("unused" << BSON(accumName << "unused"));
+        VariablesParseState vps = _expCtx->variablesParseState;
+        return AccumulationStatement::parseAccumulationStatement(
+            _expCtx.get(), _accumulationStmtBson.firstElement(), vps);
+    }
+
+    /**
+     * Verifies that executing the bytecode ('code') for combining partial aggregates for $group
+     * spilling produces the 'expected' outputs given 'inputs'.
+     *
+     * The inputs and expected outputs are expressed as BSON arrays as a convenience to the caller,
+     * and should have the same length. The bytecode is executed over each element of 'inputs'
+     * one-by-one, with the result stored into a slot holding the aggregate value. At each step,
+     * this function asserts that the current aggregate value is equal to the matching element in
+     * 'expected'.
+     *
+     * The string "MISSING" can be used as a sentinel in either 'inputs' or 'outputs' in order to
+     * represent the Nothing value (since nothingness cannot literally be stored in a BSON array).
+     */
+    void aggregateAndAssertResults(BSONArray inputs,
+                                   BSONArray expected,
+                                   const sbe::vm::CodeFragment* code) {
+        // Make sure we are starting from a clean state.
+        _inputAccessor.reset();
+        _aggAccessor.reset();
+
+        auto [inputTag, inputVal] = makeArray(inputs);
+        sbe::value::ValueGuard inputGuard{inputTag, inputVal};
+        auto [expectedTag, expectedVal] = makeArray(expected);
+        sbe::value::ValueGuard expectedGuard{expectedTag, expectedVal};
+
+        sbe::value::ArrayEnumerator inputEnumerator{inputTag, inputVal};
+        sbe::value::ArrayEnumerator expectedEnumerator{expectedTag, expectedVal};
+
+        // Aggregate the inputs one-by-one, and at each step validate that the resulting accumulator
+        // state is as expected.
+        while (!inputEnumerator.atEnd()) {
+            ASSERT_FALSE(expectedEnumerator.atEnd());
+            auto [nextInputTag, nextInputVal] = inputEnumerator.getViewOfValue();
+
+            // Feed in the input value, treating "MISSING" as a special sentinel to indicate the
+            // Nothing value.
+            if (sbe::value::isString(nextInputTag) &&
+                sbe::value::getStringView(nextInputTag, nextInputVal) == "MISSING"_sd) {
+                _inputAccessor.reset();
+            } else {
+                auto [copyTag, copyVal] = sbe::value::copyValue(nextInputTag, nextInputVal);
+                _inputAccessor.reset(true, copyTag, copyVal);
+            }
+
+            auto [outputTag, outputVal] = runCompiledExpression(code);
+
+            // Validate that the output value equals the expected value, and then put the output
+            // value into the slot that holds the accumulation state.
+            auto [expectedOutputTag, expectedOutputValue] = expectedEnumerator.getViewOfValue();
+            if (sbe::value::isString(expectedOutputTag) &&
+                sbe::value::getStringView(expectedOutputTag, expectedOutputValue) == "MISSING"_sd) {
+                expectedOutputTag = sbe::value::TypeTags::Nothing;
+                expectedOutputValue = 0;
+            }
+            auto [compareTag, compareValue] = sbe::value::compareValue(
+                outputTag, outputVal, expectedOutputTag, expectedOutputValue);
+            ASSERT_EQ(compareTag, sbe::value::TypeTags::NumberInt32);
+            ASSERT_EQ(compareValue, 0);
+            _aggAccessor.reset(true, outputTag, outputVal);
+
+            inputEnumerator.advance();
+            expectedEnumerator.advance();
+        }
+    }
+
+    /**
+     * Convenience method for producing bytecode which combines partial aggregates for the given
+     * 'AccumulationStatement'.
+     *
+     * Requires that accumulation statement results in a single aggregate with one input and one
+     * output. Furthermore, cannot be used when the test case involves a non-simple collation.
+     */
+    std::unique_ptr<sbe::vm::CodeFragment> compileSingleInputNoCollator(
+        const AccumulationStatement& accStatement) {
+        auto exprs = stage_builder::buildCombinePartialAggregates(
+            accStatement, {_inputSlotId}, boost::none, _frameIdGenerator);
+        ASSERT_EQ(exprs.size(), 1u);
+        _expr = std::move(exprs[0]);
+
+        return compileAggExpression(*_expr, &_aggAccessor);
+    }
+
+protected:
+    sbe::value::FrameIdGenerator _frameIdGenerator;
+    boost::intrusive_ptr<ExpressionContextForTest> _expCtx;
+
+    // Accessor and corresponding slot id that holds the input to the agg expression. Each time we
+    // "turn the crank" this will hold the next partial aggregate to be aggregated into
+    // '_aggAccessor'.
+    sbe::value::OwnedValueAccessor _inputAccessor;
+    sbe::value::SlotId _inputSlotId;
+
+    // The accessor which holds the final output resulting from combining all partial outputs. We
+    // check that the intermediate value is as expected after every turn of the crank.
+    sbe::value::OwnedValueAccessor _aggAccessor;
+
+    sbe::value::OwnedValueAccessor _collatorAccessor;
+    sbe::value::SlotId _collatorSlotId;
+
+private:
+    BSONObj _accumulationStmtBson;
+    std::unique_ptr<sbe::EExpression> _expr;
+};
+
+TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsMin) {
+    auto accStatement = makeAccumulationStatement("$min"_sd);
+    auto compiledExpr = compileSingleInputNoCollator(accStatement);
+
+    auto inputValues = BSON_ARRAY(8 << 7 << 9 << BSONNULL << 6);
+    auto expectedAggStates = BSON_ARRAY(8 << 7 << 7 << 7 << 6);
+    aggregateAndAssertResults(inputValues, expectedAggStates, compiledExpr.get());
+
+    // Test that Nothing values are treated as expected.
+    inputValues = BSON_ARRAY("MISSING" << 9 << 7 << "MISSING" << 6);
+    expectedAggStates = BSON_ARRAY("MISSING" << 9 << 7 << 7 << 6);
+    aggregateAndAssertResults(inputValues, expectedAggStates, compiledExpr.get());
+}
+
+TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsMinWithCollation) {
+    auto accStatement = makeAccumulationStatement("$min"_sd);
+
+    auto exprs = stage_builder::buildCombinePartialAggregates(
+        accStatement, {_inputSlotId}, {_collatorSlotId}, _frameIdGenerator);
+    ASSERT_EQ(exprs.size(), 1u);
+    auto expr = std::move(exprs[0]);
+
+    CollatorInterfaceMock collator{CollatorInterfaceMock::MockType::kReverseString};
+    _collatorAccessor.reset(false,
+                            sbe::value::TypeTags::collator,
+                            sbe::value::bitcastFrom<const CollatorInterface*>(&collator));
+
+    auto compiledExpr = compileAggExpression(*expr, &_aggAccessor);
+
+    // The strings in reverse have the opposite ordering as compared to forwards.
+    auto inputValues = BSON_ARRAY("az"
+                                  << "by"
+                                  << "cx");
+    auto expectedAggStates = BSON_ARRAY("az"
+                                        << "by"
+                                        << "cx");
+    aggregateAndAssertResults(inputValues, expectedAggStates, compiledExpr.get());
+}
+
+TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsMax) {
+    auto accStatement = makeAccumulationStatement("$max"_sd);
+    auto compiledExpr = compileSingleInputNoCollator(accStatement);
+
+    auto inputValues = BSON_ARRAY(3 << 1 << 4 << BSONNULL << 8);
+    auto expectedAggStates = BSON_ARRAY(3 << 3 << 4 << 4 << 8);
+    aggregateAndAssertResults(inputValues, expectedAggStates, compiledExpr.get());
+
+    // Test that Nothing values are treated as expected.
+    inputValues = BSON_ARRAY("MISSING" << 7 << 9 << "MISSING" << 10);
+    expectedAggStates = BSON_ARRAY("MISSING" << 7 << 9 << 9 << 10);
+    aggregateAndAssertResults(inputValues, expectedAggStates, compiledExpr.get());
+}
+
+TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsMaxWithCollation) {
+    auto accStatement = makeAccumulationStatement("$max"_sd);
+
+    auto exprs = stage_builder::buildCombinePartialAggregates(
+        accStatement, {_inputSlotId}, {_collatorSlotId}, _frameIdGenerator);
+    ASSERT_EQ(exprs.size(), 1u);
+    auto expr = std::move(exprs[0]);
+
+    CollatorInterfaceMock collator{CollatorInterfaceMock::MockType::kReverseString};
+    _collatorAccessor.reset(false,
+                            sbe::value::TypeTags::collator,
+                            sbe::value::bitcastFrom<const CollatorInterface*>(&collator));
+
+    auto compiledExpr = compileAggExpression(*expr, &_aggAccessor);
+
+    // The strings in reverse have the opposite ordering as compared to forwards.
+    auto inputValues = BSON_ARRAY("cx"
+                                  << "by"
+                                  << "az");
+    auto expectedAggStates = BSON_ARRAY("cx"
+                                        << "by"
+                                        << "az");
+    aggregateAndAssertResults(inputValues, expectedAggStates, compiledExpr.get());
+}
+
+TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsFirst) {
+    auto accStatement = makeAccumulationStatement("$first"_sd);
+    auto compiledExpr = compileSingleInputNoCollator(accStatement);
+
+    auto inputValues = BSON_ARRAY(3 << 1 << BSONNULL << "MISSING" << 8);
+    auto expectedAggStates = BSON_ARRAY(3 << 3 << 3 << 3 << 3);
+    aggregateAndAssertResults(inputValues, expectedAggStates, compiledExpr.get());
+
+    // When the first value is missing, the resulting value is a literal null.
+    inputValues = BSON_ARRAY("MISSING" << 1 << BSONNULL << "MISSING" << 8);
+    expectedAggStates = BSON_ARRAY(BSONNULL << BSONNULL << BSONNULL << BSONNULL << BSONNULL);
+    aggregateAndAssertResults(inputValues, expectedAggStates, compiledExpr.get());
+}
+
+TEST_F(SbeStageBuilderGroupAggCombinerTest, CombinePartialAggsLast) {
+    auto accStatement = makeAccumulationStatement("$last"_sd);
+    auto compiledExpr = compileSingleInputNoCollator(accStatement);
+
+    auto inputValues = BSON_ARRAY(3 << 1 << BSONNULL << "MISSING" << 8);
+    auto expectedAggStates = BSON_ARRAY(3 << 1 << BSONNULL << BSONNULL << 8);
+    aggregateAndAssertResults(inputValues, expectedAggStates, compiledExpr.get());
 }
 
 }  // namespace mongo

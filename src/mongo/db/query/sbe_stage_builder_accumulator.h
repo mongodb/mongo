@@ -51,12 +51,25 @@ std::pair<std::unique_ptr<sbe::EExpression>, EvalStage> buildArgument(
 
 /**
  * Translates an input AccumulationStatement into an SBE EExpression for accumulation expressions.
- * The 'stage' parameter provides the input subtree to build on top of.
  */
 std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulator(
-    StageBuilderState& state,
     const AccumulationStatement& acc,
-    std::unique_ptr<sbe::EExpression> argExpr);
+    std::unique_ptr<sbe::EExpression> argExpr,
+    boost::optional<sbe::value::SlotId> collatorSlot,
+    sbe::value::FrameIdGenerator&);
+
+/**
+ * When SBE hash aggregation spills to disk, it spills partial aggregates which need to be combined
+ * later. This function returns the expressions that can be used to combine partial aggregates for
+ * the given accumulator 'acc'. The aggregate-of-aggregates will be stored in a slots owned by the
+ * hash agg stage, while the new partial aggregates to combine can be read from the given
+ * 'inputSlots'.
+ */
+std::vector<std::unique_ptr<sbe::EExpression>> buildCombinePartialAggregates(
+    const AccumulationStatement& acc,
+    const sbe::value::SlotVector& inputSlots,
+    boost::optional<sbe::value::SlotId> collatorSlot,
+    sbe::value::FrameIdGenerator&);
 
 /**
  * Translates an input AccumulationStatement into an SBE EExpression that represents an
