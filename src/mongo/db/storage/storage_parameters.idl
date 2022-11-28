@@ -143,11 +143,6 @@ feature_flags:
         cpp_varname: feature_flags::gClusteredIndexes
         default: true
         version: 5.3
-    featureFlagTimeseriesUpdatesAndDeletes:
-        description: "When enabled, support for updates and deletes on time-series collections"
-        cpp_varname: feature_flags::gTimeseriesUpdatesAndDeletes
-        default: true
-        version: 5.0
     featureFlagTimeseriesMetricIndexes:
         description: "When enabled, support secondary indexes on time-series measurements"
         cpp_varname: feature_flags::gTimeseriesMetricIndexes

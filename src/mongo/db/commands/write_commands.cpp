@@ -1659,10 +1659,6 @@ public:
             }
 
             if (isTimeseries(opCtx, request())) {
-                uassert(ErrorCodes::InvalidOptions,
-                        "Time-series updates are not enabled",
-                        feature_flags::gTimeseriesUpdatesAndDeletes.isEnabled(
-                            serverGlobalParams.featureCompatibility));
                 uassert(ErrorCodes::OperationNotSupportedInTransaction,
                         str::stream() << "Cannot perform a multi-document transaction on a "
                                          "time-series collection: "
@@ -1870,10 +1866,6 @@ public:
             }
 
             if (isTimeseries(opCtx, request())) {
-                uassert(ErrorCodes::InvalidOptions,
-                        "Time-series deletes are not enabled",
-                        feature_flags::gTimeseriesUpdatesAndDeletes.isEnabled(
-                            serverGlobalParams.featureCompatibility));
                 uassert(ErrorCodes::OperationNotSupportedInTransaction,
                         str::stream() << "Cannot perform a multi-document transaction on a "
                                          "time-series collection: "
