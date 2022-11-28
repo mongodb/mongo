@@ -172,7 +172,7 @@ components:
     homepage_url: https://github.com/mongodb/libmongocrypt
     open_hub_url: N/A
     release_monitoring_id: -1
-    local_directory_path: src/third_party/kms-message
+    local_directory_path: src/third_party/libmongocrypt
     team_owner: "Security"
     # Note: libmongocrypt exists in Black Duck, but not OpenHub
     upgrade_suppression: TODO SERVER-61193

@@ -59,7 +59,7 @@ if get_option('ssl') == 'on':
 
     kmsEnv = env.Clone()
 
-    kmsEnv.InjectThirdParty(libraries=['kms-message'])
+    kmsEnv.InjectThirdParty(libraries=['libmongocrypt'])
 
     kmsEnv.Library(
         target=[
@@ -73,7 +73,7 @@ if get_option('ssl') == 'on':
             '$BUILD_DIR/mongo/base',
             '$BUILD_DIR/mongo/db/server_options_core',  # For object_check.h
             '$BUILD_DIR/mongo/idl/idl_parser',
-            '$BUILD_DIR/third_party/shim_kms_message',
+            '$BUILD_DIR/third_party/shim_libmongocrypt',
             'sasl_aws_common',
         ],
     )

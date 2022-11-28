@@ -170,12 +170,6 @@ if not use_system_version_of_library('icu'):
         ],
     }
 
-if not use_system_version_of_library('kms-message'):
-    thirdPartyEnvironmentModifications['kms-message'] = {
-        'CPPPATH': ['#/src/third_party/kms-message/src'],
-        'CPPDEFINES': ['KMS_MSG_STATIC'],
-    }
-
 if not use_system_version_of_library('libbson'):
 
     platform_directory = "build_linux"
@@ -621,22 +615,6 @@ else:
     ])
 
 icuEnv.ShimLibrary(name="icu", )
-
-kmsEnv = env.Clone()
-if get_option('ssl') == 'on':
-    if use_system_version_of_library("kms-message"):
-        kmsEnv = kmsEnv.Clone(SYSLIBDEPS=[
-            env['LIBDEPS_KMS-MESSAGE_SYSLIBDEP'],
-        ])
-    else:
-        kmsEnv = kmsEnv.Clone()
-        kmsEnv.InjectThirdParty(libraries=['kms-message'])
-        kmsEnv.SConscript('kms-message/SConscript', exports={'env': kmsEnv})
-        kmsEnv = kmsEnv.Clone(LIBDEPS_INTERFACE=[
-            'kms-message/kms-message',
-        ])
-
-    kmsEnv.ShimLibrary(name="kms_message", )
 
 libbsonEnv = env.Clone()
 if get_option('ssl') == 'on':

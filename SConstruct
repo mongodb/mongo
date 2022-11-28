@@ -467,7 +467,6 @@ for pack in [
     ('google-benchmark', 'Google benchmark'),
     ('icu', 'ICU'),
     ('intel_decimal128', 'intel decimal128'),
-    ('kms-message', ),
     ('libbson', ),
     ('libmongocrypt', ),
     ('pcre2', ),
