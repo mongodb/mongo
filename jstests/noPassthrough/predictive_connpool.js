@@ -105,7 +105,7 @@ function hasConnPoolStats(args) {
         return hosts.map(host => checkStats(res, host)).every(x => x);
     }
 
-    assert.soon(checkAllStats, "Check #" + checkNum + " failed", 10000);
+    assert.soon(checkAllStats, "Check #" + checkNum + " failed");
 
     jsTestLog("Check #" + checkNum + " successful");
 }
