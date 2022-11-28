@@ -1669,7 +1669,8 @@ OpTimeBundle logApplyOps(OperationContext* opCtx,
 // Logs applyOps oplog entries for preparing a transaction, committing an unprepared
 // transaction, or committing a WUOW that is not necessarily related to a multi-document
 // transaction. This includes the in-progress 'partialTxn' oplog entries followed by the implicit
-// prepare or commit entry. If the 'prepare' argument is true, it will log entries for a prepared
+// prepare or commit entry.
+// If the 'applyOpsOperationAssignment.prepare' argument is true, it will log entries for a prepared
 // transaction. Otherwise, it logs entries for an unprepared transaction. The total number of oplog
 // entries written will be <= the size of the given 'stmts' vector, and will depend on how many
 // transaction statements are given, the data size of each statement, and the
@@ -1695,7 +1696,6 @@ int logOplogEntries(
     const std::vector<OplogSlot>& oplogSlots,
     const OpObserver::ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
     boost::optional<repl::ReplOperation::ImageBundle>* prePostImageToWriteToImageCollection,
-    bool prepare,
     Date_t wallClockTime,
     OplogWriter* oplogWriter) {
     invariant(!stmts.empty());
@@ -1728,6 +1728,7 @@ int logOplogEntries(
     // termination condition.
     auto stmtsIter = stmts.begin();
     auto applyOpsIter = applyOpsOperationAssignment.applyOpsEntries.begin();
+    auto prepare = applyOpsOperationAssignment.prepare;
     while (stmtsIter != stmts.end()) {
         tassert(6278509,
                 "Not enough \"applyOps\" entries",
@@ -1932,12 +1933,12 @@ void OpObserverImpl::onUnpreparedTransactionCommit(OperationContext* opCtx,
 
     // Log in-progress entries for the transaction along with the implicit commit.
     boost::optional<repl::ReplOperation::ImageBundle> imageToWrite;
+    invariant(!applyOpsOplogSlotAndOperationAssignment.prepare);
     int numOplogEntries = logOplogEntries(opCtx,
                                           *statements,
                                           oplogSlots,
                                           applyOpsOplogSlotAndOperationAssignment,
                                           &imageToWrite,
-                                          false /* prepare*/,
                                           wallClockTime,
                                           _oplogWriter.get());
 
@@ -2009,12 +2010,12 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx) {
             applyOpsOplogSlotAndOperationAssignment.applyOpsEntries.size() == 1);
 
     const auto wallClockTime = getWallClockTimeForOpLog(opCtx);
+    invariant(!applyOpsOplogSlotAndOperationAssignment.prepare);
     logOplogEntries(opCtx,
                     *(batchedOps->getMutableOperationsForOpObserver()),
                     oplogSlots,
                     applyOpsOplogSlotAndOperationAssignment,
                     &noPrePostImage,
-                    false,
                     wallClockTime,
                     _oplogWriter.get());
 }
@@ -2104,12 +2105,12 @@ void OpObserverImpl::onTransactionPrepare(
                     // the last reserved slot, because the transaction participant has already used
                     // that as the prepare time.
                     boost::optional<repl::ReplOperation::ImageBundle> imageToWrite;
+                    invariant(applyOpsOperationAssignment.prepare);
                     logOplogEntries(opCtx,
                                     statements,
                                     reservedSlots,
                                     applyOpsOperationAssignment,
                                     &imageToWrite,
-                                    true /* prepare */,
                                     wallClockTime,
                                     _oplogWriter.get());
                     if (imageToWrite) {
