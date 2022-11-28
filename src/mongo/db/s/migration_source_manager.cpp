@@ -288,7 +288,7 @@ void MigrationSourceManager::startClone() {
         // migration, write operations require the cloner to be present in order to track changes to
         // the chunk which needs to be transmitted to the recipient.
         _cloneDriver = std::make_shared<MigrationChunkClonerSourceLegacy>(
-            _args, _writeConcern, metadata.getKeyPattern(), _donorConnStr, _recipientHost);
+            _opCtx, _args, _writeConcern, metadata.getKeyPattern(), _donorConnStr, _recipientHost);
 
         _coordinator.emplace(_cloneDriver->getSessionId(),
                              _args.getFromShard(),

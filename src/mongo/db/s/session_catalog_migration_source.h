@@ -95,6 +95,13 @@ public:
                                   KeyPattern shardKey);
 
     /**
+     * Gets the session oplog entries to be sent to the destination. The initialization is separated
+     * from the constructor to allow the member functions of the SessionCatalogMigrationSource to be
+     * called before the initialization step is finished.
+     */
+    void init(OperationContext* opCtx);
+
+    /**
      * Returns true if there are more oplog entries to fetch at this moment. Note that new writes
      * can still continue to come in after this has returned false, so it can become true again.
      * Once this has returned false, this means that it has depleted the existing buffer so it

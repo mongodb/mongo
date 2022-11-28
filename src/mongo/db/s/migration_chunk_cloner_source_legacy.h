@@ -88,7 +88,8 @@ class MigrationChunkClonerSourceLegacy final : public MigrationChunkClonerSource
     MigrationChunkClonerSourceLegacy& operator=(const MigrationChunkClonerSourceLegacy&) = delete;
 
 public:
-    MigrationChunkClonerSourceLegacy(const ShardsvrMoveRange& request,
+    MigrationChunkClonerSourceLegacy(OperationContext* opCtx,
+                                     const ShardsvrMoveRange& request,
                                      const WriteConcernOptions& writeConcern,
                                      const BSONObj& shardKeyPattern,
                                      ConnectionString donorConnStr,
@@ -343,7 +344,7 @@ private:
     std::unique_ptr<SessionCatalogMigrationSource> _sessionCatalogSource;
 
     // Protects the entries below
-    Mutex _mutex = MONGO_MAKE_LATCH("MigrationChunkClonerSourceLegacy::_mutex");
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("MigrationChunkClonerSourceLegacy::_mutex");
 
     // The current state of the cloner
     State _state{kNew};
@@ -386,7 +387,6 @@ private:
 
     // False if the move chunk request specified ForceJumbo::kDoNotForce, true otherwise.
     const bool _forceJumbo;
-
     struct JumboChunkCloneState {
         // Plan executor for collection scan used to clone docs.
         std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> clonerExec;

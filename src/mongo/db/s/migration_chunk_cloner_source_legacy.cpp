@@ -288,6 +288,7 @@ void LogTransactionOperationsForShardingHandler::commit(OperationContext* opCtx,
 }
 
 MigrationChunkClonerSourceLegacy::MigrationChunkClonerSourceLegacy(
+    OperationContext* opCtx,
     const ShardsvrMoveRange& request,
     const WriteConcernOptions& writeConcern,
     const BSONObj& shardKeyPattern,
@@ -300,7 +301,13 @@ MigrationChunkClonerSourceLegacy::MigrationChunkClonerSourceLegacy(
                                               _args.getToShard().toString())),
       _donorConnStr(std::move(donorConnStr)),
       _recipientHost(std::move(recipientHost)),
-      _forceJumbo(_args.getForceJumbo() != ForceJumbo::kDoNotForce) {}
+      _forceJumbo(_args.getForceJumbo() != ForceJumbo::kDoNotForce) {
+    auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet) {
+        _sessionCatalogSource = std::make_unique<SessionCatalogMigrationSource>(
+            opCtx, nss(), ChunkRange(getMin(), getMax()), _shardKeyPattern.getKeyPattern());
+    }
+}
 
 MigrationChunkClonerSourceLegacy::~MigrationChunkClonerSourceLegacy() {
     invariant(_state == kDone);
@@ -313,10 +320,8 @@ Status MigrationChunkClonerSourceLegacy::startClone(OperationContext* opCtx,
     invariant(_state == kNew);
     invariant(!opCtx->lockState()->isLocked());
 
-    auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (replCoord->getReplicationMode() == repl::ReplicationCoordinator::modeReplSet) {
-        _sessionCatalogSource = std::make_unique<SessionCatalogMigrationSource>(
-            opCtx, nss(), ChunkRange(getMin(), getMax()), _shardKeyPattern.getKeyPattern());
+    if (_sessionCatalogSource) {
+        _sessionCatalogSource->init(opCtx);
 
         // Prime up the session migration source if there are oplog entries to migrate.
         _sessionCatalogSource->fetchNextOplog(opCtx);
@@ -592,10 +597,8 @@ void MigrationChunkClonerSourceLegacy::onDeleteOp(OperationContext* opCtx,
 void MigrationChunkClonerSourceLegacy::_addToSessionMigrationOptimeQueue(
     const repl::OpTime& opTime,
     SessionCatalogMigrationSource::EntryAtOpTimeType entryAtOpTimeType) {
-    if (auto sessionSource = _sessionCatalogSource.get()) {
-        if (!opTime.isNull()) {
-            sessionSource->notifyNewWriteOpTime(opTime, entryAtOpTimeType);
-        }
+    if (_sessionCatalogSource && !opTime.isNull()) {
+        _sessionCatalogSource->notifyNewWriteOpTime(opTime, entryAtOpTimeType);
     }
 }
 

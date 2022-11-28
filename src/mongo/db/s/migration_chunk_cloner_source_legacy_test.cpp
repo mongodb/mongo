@@ -276,7 +276,8 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, CorrectDocumentsFetched) {
 
     const ShardsvrMoveRange req =
         createMoveRangeRequest(ChunkRange(BSON("X" << 100), BSON("X" << 200)));
-    MigrationChunkClonerSourceLegacy cloner(req,
+    MigrationChunkClonerSourceLegacy cloner(operationContext(),
+                                            req,
                                             WriteConcernOptions(),
                                             kShardKeyPattern,
                                             kDonorConnStr,
@@ -387,7 +388,8 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, RemoveDuplicateDocuments) {
 
     const ShardsvrMoveRange req =
         createMoveRangeRequest(ChunkRange(BSON("X" << 100), BSON("X" << 200)));
-    MigrationChunkClonerSourceLegacy cloner(req,
+    MigrationChunkClonerSourceLegacy cloner(operationContext(),
+                                            req,
                                             WriteConcernOptions(),
                                             kShardKeyPattern,
                                             kDonorConnStr,
@@ -481,7 +483,8 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, OneLargeDocumentTransferMods) {
 
     const ShardsvrMoveRange req =
         createMoveRangeRequest(ChunkRange(BSON("X" << 1), BSON("X" << 100)));
-    MigrationChunkClonerSourceLegacy cloner(req,
+    MigrationChunkClonerSourceLegacy cloner(operationContext(),
+                                            req,
                                             WriteConcernOptions(),
                                             kShardKeyPattern,
                                             kDonorConnStr,
@@ -543,7 +546,8 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, ManySmallDocumentsTransferMods) {
 
     const ShardsvrMoveRange req =
         createMoveRangeRequest(ChunkRange(BSON("X" << 1), BSON("X" << 1000000)));
-    MigrationChunkClonerSourceLegacy cloner(req,
+    MigrationChunkClonerSourceLegacy cloner(operationContext(),
+                                            req,
                                             WriteConcernOptions(),
                                             kShardKeyPattern,
                                             kDonorConnStr,
@@ -616,7 +620,8 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, ManySmallDocumentsTransferMods) {
 TEST_F(MigrationChunkClonerSourceLegacyTest, CollectionNotFound) {
     const ShardsvrMoveRange req =
         createMoveRangeRequest(ChunkRange(BSON("X" << 100), BSON("X" << 200)));
-    MigrationChunkClonerSourceLegacy cloner(req,
+    MigrationChunkClonerSourceLegacy cloner(operationContext(),
+                                            req,
                                             WriteConcernOptions(),
                                             kShardKeyPattern,
                                             kDonorConnStr,
@@ -636,7 +641,8 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, ShardKeyIndexNotFound) {
 
     const ShardsvrMoveRange req =
         createMoveRangeRequest(ChunkRange(BSON("X" << 100), BSON("X" << 200)));
-    MigrationChunkClonerSourceLegacy cloner(req,
+    MigrationChunkClonerSourceLegacy cloner(operationContext(),
+                                            req,
                                             WriteConcernOptions(),
                                             kShardKeyPattern,
                                             kDonorConnStr,
@@ -656,7 +662,8 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, FailedToEngageRecipientShard) {
 
     const ShardsvrMoveRange req =
         createMoveRangeRequest(ChunkRange(BSON("X" << 100), BSON("X" << 200)));
-    MigrationChunkClonerSourceLegacy cloner(req,
+    MigrationChunkClonerSourceLegacy cloner(operationContext(),
+                                            req,
                                             WriteConcernOptions(),
                                             kShardKeyPattern,
                                             kDonorConnStr,

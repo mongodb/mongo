@@ -213,8 +213,9 @@ SessionCatalogMigrationSource::SessionCatalogMigrationSource(OperationContext* o
     : _ns(std::move(ns)),
       _rollbackIdAtInit(repl::ReplicationProcess::get(opCtx)->getRollbackID()),
       _chunkRange(std::move(chunk)),
-      _keyPattern(shardKey) {
+      _keyPattern(shardKey) {}
 
+void SessionCatalogMigrationSource::init(OperationContext* opCtx) {
     DBDirectClient client(opCtx);
     FindCommandRequest findRequest{NamespaceString::kSessionTransactionsTableNamespace};
     // Skip internal sessions for retryable writes with aborted or in progress transactions since
