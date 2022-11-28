@@ -22,6 +22,9 @@ from pkg_resources import parse_version
 
 import SCons
 import SCons.Script
+from buildscripts.metrics.metrics_datatypes import SConsToolingMetrics
+from buildscripts.metrics.tooling_exit_hook import initialize_exit_hook
+from buildscripts.metrics.tooling_metrics_utils import register_metrics_collection_atexit
 from site_scons.mongo import build_profiles
 
 # This must be first, even before EnsureSConsVersion, if
@@ -52,8 +55,6 @@ SCons.Node.FS.File.release_target_info = release_target_info_noop
 
 from buildscripts import utils
 from buildscripts import moduleconfig
-from buildscripts.metrics.scons_tooling_metrics import setup_scons_metrics_collection_atexit
-
 import psutil
 
 scons_invocation = '{} {}'.format(sys.executable, ' '.join(sys.argv))
@@ -1552,10 +1553,17 @@ env = Environment(variables=env_vars, **envDict)
 del envDict
 env.AddMethod(lambda env, name, **kwargs: add_option(name, **kwargs), 'AddOption')
 
-# Setup atexit method to store tooling metrics
-# The placement of this is intentional. We should only register this function atexit after
-# env, env_vars and the parser have been properly initialized.
-setup_scons_metrics_collection_atexit(utc_starttime, env_vars, env, _parser, sys.argv)
+# The placement of this is intentional. Here we setup an atexit method to store tooling metrics.
+# We should only register this function after env, env_vars and the parser have been properly initialized.
+register_metrics_collection_atexit(
+    SConsToolingMetrics.generate_metrics, {
+        "utc_starttime": datetime.utcnow(),
+        "env_vars": env_vars,
+        "env": env,
+        "parser": _parser,
+        "args": sys.argv,
+        "exit_hook": initialize_exit_hook(),
+    })
 
 if get_option('build-metrics'):
     env['BUILD_METRICS_ARTIFACTS_DIR'] = '$BUILD_ROOT/$VARIANT_DIR'
