@@ -755,12 +755,8 @@ public:
     void appendMoveVal(value::SlotAccessor* accessor);
     void appendLocalVal(FrameId frameId, int variable, bool moveFrom);
     void appendLocalLambda(int codePosition);
-    void appendPop() {
-        appendSimpleInstruction(Instruction::pop);
-    }
-    void appendSwap() {
-        appendSimpleInstruction(Instruction::swap);
-    }
+    void appendPop();
+    void appendSwap();
     void appendAdd(Instruction::Parameter lhs, Instruction::Parameter rhs);
     void appendSub(Instruction::Parameter lhs, Instruction::Parameter rhs);
     void appendMul(Instruction::Parameter lhs, Instruction::Parameter rhs);
@@ -769,24 +765,12 @@ public:
     void appendMod(Instruction::Parameter lhs, Instruction::Parameter rhs);
     void appendNegate(Instruction::Parameter input);
     void appendNot(Instruction::Parameter input);
-    void appendLess(Instruction::Parameter lhs, Instruction::Parameter rhs) {
-        appendSimpleInstruction(Instruction::less, lhs, rhs);
-    }
-    void appendLessEq(Instruction::Parameter lhs, Instruction::Parameter rhs) {
-        appendSimpleInstruction(Instruction::lessEq, lhs, rhs);
-    }
-    void appendGreater(Instruction::Parameter lhs, Instruction::Parameter rhs) {
-        appendSimpleInstruction(Instruction::greater, lhs, rhs);
-    }
-    void appendGreaterEq(Instruction::Parameter lhs, Instruction::Parameter rhs) {
-        appendSimpleInstruction(Instruction::greaterEq, lhs, rhs);
-    }
-    void appendEq(Instruction::Parameter lhs, Instruction::Parameter rhs) {
-        appendSimpleInstruction(Instruction::eq, lhs, rhs);
-    }
-    void appendNeq(Instruction::Parameter lhs, Instruction::Parameter rhs) {
-        appendSimpleInstruction(Instruction::neq, lhs, rhs);
-    }
+    void appendLess(Instruction::Parameter lhs, Instruction::Parameter rhs);
+    void appendLessEq(Instruction::Parameter lhs, Instruction::Parameter rhs);
+    void appendGreater(Instruction::Parameter lhs, Instruction::Parameter rhs);
+    void appendGreaterEq(Instruction::Parameter lhs, Instruction::Parameter rhs);
+    void appendEq(Instruction::Parameter lhs, Instruction::Parameter rhs);
+    void appendNeq(Instruction::Parameter lhs, Instruction::Parameter rhs);
     void appendCmp3w(Instruction::Parameter lhs, Instruction::Parameter rhs);
 
     void appendCollLess(Instruction::Parameter lhs,
@@ -817,34 +801,22 @@ public:
                          Instruction::Parameter rhs,
                          Instruction::Parameter collator);
 
-    void appendFillEmpty() {
-        appendSimpleInstruction(Instruction::fillEmpty);
-    }
+    void appendFillEmpty();
     void appendFillEmpty(Instruction::Constants k);
     void appendGetField(Instruction::Parameter lhs, Instruction::Parameter rhs);
     void appendGetField(Instruction::Parameter input, StringData fieldName);
     void appendGetElement(Instruction::Parameter lhs, Instruction::Parameter rhs);
     void appendCollComparisonKey(Instruction::Parameter lhs, Instruction::Parameter rhs);
     void appendGetFieldOrElement(Instruction::Parameter lhs, Instruction::Parameter rhs);
-    void appendTraverseP() {
-        appendSimpleInstruction(Instruction::traverseP);
-    }
+    void appendTraverseP();
     void appendTraverseP(int codePosition, Instruction::Constants k);
-    void appendTraverseF() {
-        appendSimpleInstruction(Instruction::traverseF);
-    }
+    void appendTraverseF();
     void appendTraverseF(int codePosition, Instruction::Constants k);
-    void appendTraverseCellValues() {
-        appendSimpleInstruction(Instruction::traverseCsiCellValues);
-    }
+    void appendTraverseCellValues();
     void appendTraverseCellValues(int codePosition);
-    void appendTraverseCellTypes() {
-        appendSimpleInstruction(Instruction::traverseCsiCellTypes);
-    }
+    void appendTraverseCellTypes();
     void appendTraverseCellTypes(int codePosition);
-    void appendSetField() {
-        appendSimpleInstruction(Instruction::setField);
-    }
+    void appendSetField();
     void appendGetArraySize(Instruction::Parameter input);
     void appendDateTrunc(TimeUnit unit, int64_t binSize, TimeZone timezone, DayOfWeek startOfWeek);
 
@@ -866,27 +838,17 @@ public:
     void appendIsNaN(Instruction::Parameter input);
     void appendIsInfinity(Instruction::Parameter input);
     void appendIsRecordId(Instruction::Parameter input);
-    void appendIsMinKey(Instruction::Parameter input) {
-        appendSimpleInstruction(Instruction::isMinKey, input);
-    }
-    void appendIsMaxKey(Instruction::Parameter input) {
-        appendSimpleInstruction(Instruction::isMaxKey, input);
-    }
-    void appendIsTimestamp(Instruction::Parameter input) {
-        appendSimpleInstruction(Instruction::isTimestamp, input);
-    }
+    void appendIsMinKey(Instruction::Parameter input);
+    void appendIsMaxKey(Instruction::Parameter input);
+    void appendIsTimestamp(Instruction::Parameter input);
     void appendTypeMatch(Instruction::Parameter input, uint32_t mask);
     void appendFunction(Builtin f, ArityType arity);
     void appendJump(int jumpOffset);
     void appendJumpTrue(int jumpOffset);
     void appendJumpNothing(int jumpOffset);
-    void appendRet() {
-        appendSimpleInstruction(Instruction::ret);
-    }
+    void appendRet();
     void appendAllocStack(uint32_t size);
-    void appendFail() {
-        appendSimpleInstruction(Instruction::fail);
-    }
+    void appendFail();
     void appendNumericConvert(value::TypeTags targetTag);
     void appendApplyClassicMatcher(const MatchExpression*);
 

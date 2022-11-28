@@ -341,6 +341,14 @@ void CodeFragment::appendLocalLambda(int codePosition) {
     offset += writeToMemory(offset, codeOffset);
 }
 
+void CodeFragment::appendPop() {
+    appendSimpleInstruction(Instruction::pop);
+}
+
+void CodeFragment::appendSwap() {
+    appendSimpleInstruction(Instruction::swap);
+}
+
 void CodeFragment::appendCmp3w(Instruction::Parameter lhs, Instruction::Parameter rhs) {
     appendSimpleInstruction(Instruction::cmp3w, lhs, rhs);
 }
@@ -397,6 +405,30 @@ void CodeFragment::appendNegate(Instruction::Parameter input) {
 
 void CodeFragment::appendNot(Instruction::Parameter input) {
     appendSimpleInstruction(Instruction::logicNot, input);
+}
+
+void CodeFragment::appendLess(Instruction::Parameter lhs, Instruction::Parameter rhs) {
+    appendSimpleInstruction(Instruction::less, lhs, rhs);
+}
+
+void CodeFragment::appendLessEq(Instruction::Parameter lhs, Instruction::Parameter rhs) {
+    appendSimpleInstruction(Instruction::lessEq, lhs, rhs);
+}
+
+void CodeFragment::appendGreater(Instruction::Parameter lhs, Instruction::Parameter rhs) {
+    appendSimpleInstruction(Instruction::greater, lhs, rhs);
+}
+
+void CodeFragment::appendGreaterEq(Instruction::Parameter lhs, Instruction::Parameter rhs) {
+    appendSimpleInstruction(Instruction::greaterEq, lhs, rhs);
+}
+
+void CodeFragment::appendEq(Instruction::Parameter lhs, Instruction::Parameter rhs) {
+    appendSimpleInstruction(Instruction::eq, lhs, rhs);
+}
+
+void CodeFragment::appendNeq(Instruction::Parameter lhs, Instruction::Parameter rhs) {
+    appendSimpleInstruction(Instruction::neq, lhs, rhs);
 }
 
 template <typename... Ts>
@@ -460,6 +492,10 @@ void CodeFragment::appendCollCmp3w(Instruction::Parameter lhs,
     appendSimpleInstruction(Instruction::collCmp3w, collator, lhs, rhs);
 }
 
+void CodeFragment::appendFillEmpty() {
+    appendSimpleInstruction(Instruction::fillEmpty);
+}
+
 void CodeFragment::appendFillEmpty(Instruction::Constants k) {
     Instruction i;
     i.tag = Instruction::fillEmptyImm;
@@ -508,6 +544,10 @@ void CodeFragment::appendGetFieldOrElement(Instruction::Parameter lhs, Instructi
 
 void CodeFragment::appendGetArraySize(Instruction::Parameter input) {
     appendSimpleInstruction(Instruction::getArraySize, input);
+}
+
+void CodeFragment::appendSetField() {
+    appendSimpleInstruction(Instruction::setField);
 }
 
 void CodeFragment::appendSum() {
@@ -582,6 +622,22 @@ void CodeFragment::appendIsRecordId(Instruction::Parameter input) {
     appendSimpleInstruction(Instruction::isRecordId, input);
 }
 
+void CodeFragment::appendIsMinKey(Instruction::Parameter input) {
+    appendSimpleInstruction(Instruction::isMinKey, input);
+}
+
+void CodeFragment::appendIsMaxKey(Instruction::Parameter input) {
+    appendSimpleInstruction(Instruction::isMaxKey, input);
+}
+
+void CodeFragment::appendIsTimestamp(Instruction::Parameter input) {
+    appendSimpleInstruction(Instruction::isTimestamp, input);
+}
+
+void CodeFragment::appendTraverseP() {
+    appendSimpleInstruction(Instruction::traverseP);
+}
+
 void CodeFragment::appendTraverseP(int codePosition, Instruction::Constants k) {
     Instruction i;
     i.tag = Instruction::traversePImm;
@@ -595,6 +651,10 @@ void CodeFragment::appendTraverseP(int codePosition, Instruction::Constants k) {
     offset += writeToMemory(offset, i);
     offset += writeToMemory(offset, k);
     offset += writeToMemory(offset, codeOffset);
+}
+
+void CodeFragment::appendTraverseF() {
+    appendSimpleInstruction(Instruction::traverseF);
 }
 
 void CodeFragment::appendTraverseF(int codePosition, Instruction::Constants k) {
@@ -612,6 +672,10 @@ void CodeFragment::appendTraverseF(int codePosition, Instruction::Constants k) {
     offset += writeToMemory(offset, codeOffset);
 }
 
+void CodeFragment::appendTraverseCellValues() {
+    appendSimpleInstruction(Instruction::traverseCsiCellValues);
+}
+
 void CodeFragment::appendTraverseCellValues(int codePosition) {
     Instruction i;
     i.tag = Instruction::traverseCsiCellValues;
@@ -624,6 +688,10 @@ void CodeFragment::appendTraverseCellValues(int codePosition) {
 
     offset += writeToMemory(offset, i);
     offset += writeToMemory(offset, codeOffset);
+}
+
+void CodeFragment::appendTraverseCellTypes() {
+    appendSimpleInstruction(Instruction::traverseCsiCellTypes);
 }
 
 void CodeFragment::appendTraverseCellTypes(int codePosition) {
@@ -726,6 +794,10 @@ void CodeFragment::appendJumpNothing(int jumpOffset) {
     offset += writeToMemory(offset, jumpOffset);
 }
 
+void CodeFragment::appendRet() {
+    appendSimpleInstruction(Instruction::ret);
+}
+
 void CodeFragment::appendAllocStack(uint32_t size) {
     Instruction i;
     i.tag = Instruction::allocStack;
@@ -735,6 +807,10 @@ void CodeFragment::appendAllocStack(uint32_t size) {
 
     offset += writeToMemory(offset, i);
     offset += writeToMemory(offset, size);
+}
+
+void CodeFragment::appendFail() {
+    appendSimpleInstruction(Instruction::fail);
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::getField(value::TypeTags objTag,
@@ -4952,6 +5028,15 @@ void ByteCode::swapStack() {
     auto [rhsOwned, rhsTag, rhsValue] = getFromStack(0);
     auto [lhsOwned, lhsTag, lhsValue] = getFromStack(1);
 
+    // Swap values only if they are not physically same. This is necessary for the
+    // "swap and pop" idiom for returning a value from the top of the stack (used
+    // by ELocalBind). For example, consider the case where a series of swap, pop,
+    // swap, pop... instructions are executed and the value at stack[0] and
+    // stack[1] are physically identical, but stack[1] is owned and stack[0] is
+    // not. After swapping them, the 'pop' instruction would free the owned one and
+    // leave the unowned value dangling. The only exception to this is shallow
+    // values (values which fit directly inside a 64 bit Value and don't need
+    // to be freed explicitly).
     if (rhsValue == lhsValue && rhsTag == lhsTag) {
         if (rhsOwned && !isShallowType(rhsTag)) {
             reportSwapFailure();
@@ -6217,13 +6302,6 @@ bool ByteCode::runPredicate(const CodeFragment* code) {
 
     return pass;
 }
-
-/**
- * Explicit instantiations
- */
-template void CodeFragment::appendSimpleInstruction<>(Instruction::Tags);
-template void CodeFragment::appendSimpleInstruction<Instruction::Parameter&>(
-    Instruction::Tags, Instruction::Parameter&);
 
 }  // namespace vm
 }  // namespace sbe
