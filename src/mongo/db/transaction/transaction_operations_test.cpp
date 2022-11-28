@@ -216,6 +216,7 @@ TEST(TransactionOperationsTest, GetApplyOpsInfoEmptyOps) {
                                     /*prepare=*/false);
     ASSERT_EQ(info.applyOpsEntries.size(), 0);
     ASSERT_EQ(info.numberOfOplogSlotsUsed, 0);
+    ASSERT_FALSE(info.prepare);
 }
 
 DEATH_TEST(TransactionOperationsTest,
@@ -258,6 +259,8 @@ TEST(TransactionOperationsTest, GetApplyOpsInfoReturnsOneEntryContainingTwoOpera
 
     ASSERT_EQ(info.numberOfOplogSlotsUsed, 1U);
     ASSERT_EQ(info.applyOpsEntries.size(), 1U);
+    ASSERT_FALSE(info.prepare);
+
     ASSERT_EQ(info.applyOpsEntries[0].oplogSlot, oplogSlots[0]);  // first oplog slot
     ASSERT_EQ(info.applyOpsEntries[0].operations.size(), 2U);
     ASSERT_BSONOBJ_EQ(info.applyOpsEntries[0].operations[0], op1.toBSON());
@@ -294,6 +297,7 @@ TEST(TransactionOperationsTest, GetApplyOpsInfoRespectsOperationCountLimit) {
 
     ASSERT_EQ(info.numberOfOplogSlotsUsed, 2U);
     ASSERT_EQ(info.applyOpsEntries.size(), 2U);
+    ASSERT_FALSE(info.prepare);
 
     // Check first applyOps entry.
     ASSERT_EQ(info.applyOpsEntries[0].oplogSlot, oplogSlots[0]);
@@ -337,6 +341,7 @@ TEST(TransactionOperationsTest, GetApplyOpsInfoRespectsOperationSizeLimit) {
 
     ASSERT_EQ(info.numberOfOplogSlotsUsed, 2U);
     ASSERT_EQ(info.applyOpsEntries.size(), 2U);
+    ASSERT_FALSE(info.prepare);
 
     // Check first applyOps entry.
     ASSERT_EQ(info.applyOpsEntries[0].oplogSlot, oplogSlots[0]);
@@ -399,6 +404,8 @@ TEST(TransactionOperationsTest, GetApplyOpsInfoAssignsPreImageSlotBeforeOperatio
 
     ASSERT_EQ(info.numberOfOplogSlotsUsed, 2U);
     ASSERT_EQ(info.applyOpsEntries.size(), 1U);
+    ASSERT_FALSE(info.prepare);
+
     ASSERT_EQ(info.applyOpsEntries[0].oplogSlot, oplogSlots[1]);
     ASSERT_EQ(info.applyOpsEntries[0].operations.size(), 1U);
     ASSERT_BSONOBJ_EQ(info.applyOpsEntries[0].operations[0], op.toBSON());
@@ -429,6 +436,7 @@ TEST(TransactionOperationsTest, GetApplyOpsInfoAssignsLastOplogSlotForPrepare) {
     ASSERT_EQ(info.applyOpsEntries[0].oplogSlot, oplogSlots[1]);  // last oplog slot
     ASSERT_EQ(info.applyOpsEntries[0].operations.size(), 1U);
     ASSERT_BSONOBJ_EQ(info.applyOpsEntries[0].operations[0], op.toBSON());
+    ASSERT(info.prepare);
 }
 
 }  // namespace

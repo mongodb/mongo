@@ -157,8 +157,7 @@ OpObserverMock::preTransactionPrepare(OperationContext* opCtx,
                                       const std::vector<OplogSlot>& reservedSlots,
                                       Date_t wallClockTime,
                                       TransactionOperations* transactionOperations) {
-    return std::make_unique<OpObserver::ApplyOpsOplogSlotAndOperationAssignment>(
-        OpObserver::ApplyOpsOplogSlotAndOperationAssignment{{}, {}});
+    return std::make_unique<OpObserver::ApplyOpsOplogSlotAndOperationAssignment>(/*prepare=*/true);
 }
 
 void OpObserverMock::onTransactionPrepare(

@@ -215,7 +215,7 @@ TransactionOperations::ApplyOpsInfo TransactionOperations::getApplyOpsInfo(
     bool prepare) const {
     const auto& operations = _transactionOperations;
     if (operations.empty()) {
-        return {{}, /*numberOfOplogSlotsUsed=*/0};
+        return {/*applyOpsEntries=*/{}, /*numberOfOplogSlotsUsed=*/0, prepare};
     }
     tassert(6278504, "Insufficient number of oplogSlots", operations.size() <= oplogSlots.size());
 
@@ -251,7 +251,8 @@ TransactionOperations::ApplyOpsInfo TransactionOperations::getApplyOpsInfo(
         applyOpsEntries.back().oplogSlot = oplogSlots.back();
     }
     return {std::move(applyOpsEntries),
-            static_cast<std::size_t>(oplogSlotIter - oplogSlots.begin())};
+            /*numberOfOplogSlotsUsed=*/static_cast<std::size_t>(oplogSlotIter - oplogSlots.begin()),
+            prepare};
 }
 
 std::vector<TransactionOperations::TransactionOperation>*

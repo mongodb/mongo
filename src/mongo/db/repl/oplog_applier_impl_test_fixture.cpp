@@ -153,7 +153,7 @@ OplogApplierImplOpObserver::preTransactionPrepare(OperationContext* opCtx,
                                                   const std::vector<OplogSlot>& reservedSlots,
                                                   Date_t wallClockTime,
                                                   TransactionOperations* transactionOperations) {
-    return std::make_unique<ApplyOpsOplogSlotAndOperationAssignment>();
+    return std::make_unique<ApplyOpsOplogSlotAndOperationAssignment>(/*prepare=*/true);
 }
 
 void OplogApplierImplTest::setUp() {

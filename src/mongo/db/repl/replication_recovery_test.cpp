@@ -144,7 +144,7 @@ public:
         const std::vector<OplogSlot>& reservedSlots,
         Date_t wallClockTime,
         TransactionOperations* transactionOperations) override {
-        return std::make_unique<ApplyOpsOplogSlotAndOperationAssignment>();
+        return std::make_unique<ApplyOpsOplogSlotAndOperationAssignment>(/*prepare=*/false);
     }
 
     const repl::OpTime dropOpTime = {Timestamp(Seconds(100), 1U), 1LL};

@@ -67,11 +67,25 @@ public:
             std::vector<BSONObj> operations;
         };
 
+        ApplyOpsInfo(std::vector<ApplyOpsEntry> applyOpsEntries,
+                     std::size_t numberOfOplogSlotsUsed,
+                     bool prepare)
+            : applyOpsEntries(std::move(applyOpsEntries)),
+              numberOfOplogSlotsUsed(numberOfOplogSlotsUsed),
+              prepare(prepare) {}
+
+        explicit ApplyOpsInfo(bool prepare)
+            : applyOpsEntries(), numberOfOplogSlotsUsed(0), prepare(prepare) {}
+
         // Representation of "applyOps" oplog entries.
         std::vector<ApplyOpsEntry> applyOpsEntries;
 
         // Number of oplog slots utilized.
         std::size_t numberOfOplogSlotsUsed;
+
+        // Indicates if we are generating "applyOps" oplog entries for a prepared transaction.
+        // This is derived from the 'prepared' parameter passed to the getApplyOpsInfo() function.
+        bool prepare;
     };
 
     /**
