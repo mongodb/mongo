@@ -136,6 +136,9 @@ validator::validate(
              */
             verify_collection(session, current_collection_id, current_collection_records);
 
+            logger::log_msg(
+              LOG_INFO, "Verified collection {" + std::to_string(current_collection_id) + "}.");
+
             /* Begin processing the next collection. */
             current_collection_id = tracked_collection_id;
             current_collection_records.clear();
