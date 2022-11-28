@@ -742,7 +742,7 @@ server_parameters:
     cpp_vartype: std::string
     default: sampling
     validator:
-      callback: ce::validateCEMode
+        callback: optimizer::ce::validateCEMode
 
   internalCascadesOptimizerDisableScan:
     description: "Disable full collection scans in the Cascades optimizer."

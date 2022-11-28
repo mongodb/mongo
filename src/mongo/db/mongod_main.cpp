@@ -107,9 +107,9 @@
 #include "mongo/db/periodic_runner_job_abort_expired_transactions.h"
 #include "mongo/db/pipeline/change_stream_expired_pre_image_remover.h"
 #include "mongo/db/pipeline/process_interface/replica_set_node_process_interface.h"
-#include "mongo/db/query/ce/stats_cache_loader_impl.h"
-#include "mongo/db/query/ce/stats_catalog.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/query/stats/stats_cache_loader_impl.h"
+#include "mongo/db/query/stats/stats_catalog.h"
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mongod.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/initial_syncer_factory.h"
@@ -855,9 +855,9 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
 
     LogicalSessionCache::set(serviceContext, makeLogicalSessionCacheD(kind));
 
-    auto cacheLoader = std::make_unique<StatsCacheLoaderImpl>();
-    auto catalog = std::make_unique<StatsCatalog>(serviceContext, std::move(cacheLoader));
-    StatsCatalog::set(serviceContext, std::move(catalog));
+    auto cacheLoader = std::make_unique<stats::StatsCacheLoaderImpl>();
+    auto catalog = std::make_unique<stats::StatsCatalog>(serviceContext, std::move(cacheLoader));
+    stats::StatsCatalog::set(serviceContext, std::move(catalog));
 
     if (analyze_shard_key::supportsPersistingSampledQueriesIgnoreFCV()) {
         analyze_shard_key::QueryAnalysisWriter::get(serviceContext).onStartup();

@@ -11,6 +11,7 @@ env.SConscript(
         'cost_model',
         'datetime',
         'optimizer',
+        'stats',
     ],
     exports=[
         'env',

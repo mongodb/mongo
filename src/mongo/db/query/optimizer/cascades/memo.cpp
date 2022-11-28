@@ -535,15 +535,15 @@ private:
 Memo::Context::Context(const Metadata* metadata,
                        const DebugInfo* debugInfo,
                        const LogicalPropsInterface* logicalPropsDerivation,
-                       const CEInterface* ceDerivation)
+                       const CardinalityEstimator* cardinalityEstimator)
     : _metadata(metadata),
       _debugInfo(debugInfo),
       _logicalPropsDerivation(logicalPropsDerivation),
-      _ceDerivation(ceDerivation) {
+      _cardinalityEstimator(cardinalityEstimator) {
     invariant(_metadata != nullptr);
     invariant(_debugInfo != nullptr);
     invariant(_logicalPropsDerivation != nullptr);
-    invariant(_ceDerivation != nullptr);
+    invariant(_cardinalityEstimator != nullptr);
 }
 
 size_t Memo::GroupIdVectorHash::operator()(const Memo::GroupIdVector& v) const {
@@ -617,7 +617,8 @@ void Memo::estimateCE(const Context& ctx, const GroupIdType groupId) {
         ctx._logicalPropsDerivation->deriveProps(*ctx._metadata, nodeRef, nullptr, this, groupId);
     props.merge(logicalProps);
 
-    const CEType estimate = ctx._ceDerivation->deriveCE(*ctx._metadata, *this, props, nodeRef);
+    const CEType estimate =
+        ctx._cardinalityEstimator->deriveCE(*ctx._metadata, *this, props, nodeRef);
     auto ceProp = properties::CardinalityEstimate(estimate);
 
     if (auto sargablePtr = nodeRef.cast<SargableNode>(); sargablePtr != nullptr) {
@@ -630,8 +631,8 @@ void Memo::estimateCE(const Context& ctx, const GroupIdType groupId) {
                                                  ScanParams{},
                                                  sargablePtr->getTarget(),
                                                  sargablePtr->getChild());
-            const CEType singularEst =
-                ctx._ceDerivation->deriveCE(*ctx._metadata, *this, props, singularReq.ref());
+            const CEType singularEst = ctx._cardinalityEstimator->deriveCE(
+                *ctx._metadata, *this, props, singularReq.ref());
             partialSchemaKeyCE.emplace_back(key, singularEst);
         }
     }

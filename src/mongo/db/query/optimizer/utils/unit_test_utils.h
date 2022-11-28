@@ -30,7 +30,7 @@
 #pragma once
 
 #include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/db/query/ce/ce_hinted.h"
+#include "mongo/db/query/ce/hinted_estimator.h"
 #include "mongo/db/query/cost_model/cost_model_gen.h"
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/explain.h"
@@ -168,17 +168,17 @@ IndexDefinition makeCompositeIndexDefinition(std::vector<TestIndexField> indexFi
 /**
  * A factory function to create a heuristic-based cardinality estimator.
  */
-std::unique_ptr<CEInterface> makeHeuristicCE();
+std::unique_ptr<CardinalityEstimator> makeHeuristicCE();
 
 /**
  * A factory function to create a hint-based cardinality estimator.
  */
-std::unique_ptr<CEInterface> makeHintedCE(ce::PartialSchemaSelHints hints);
+std::unique_ptr<CardinalityEstimator> makeHintedCE(ce::PartialSchemaSelHints hints);
 
 /**
  * A convenience factory function to create costing.
  */
-std::unique_ptr<CostingInterface> makeCosting();
+std::unique_ptr<CostEstimator> makeCostEstimator();
 
 /**
  * A convenience factory function to create OptPhaseManager for unit tests.
@@ -195,7 +195,7 @@ OptPhaseManager makePhaseManager(OptPhaseManager::PhaseSet phaseSet,
 OptPhaseManager makePhaseManager(OptPhaseManager::PhaseSet phaseSet,
                                  PrefixId& prefixId,
                                  Metadata metadata,
-                                 std::unique_ptr<CEInterface> ceDerivation,
+                                 std::unique_ptr<CardinalityEstimator> ce,
                                  DebugInfo debugInfo,
                                  QueryHints queryHints = {});
 

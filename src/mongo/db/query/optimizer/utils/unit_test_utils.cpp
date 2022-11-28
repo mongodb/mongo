@@ -32,9 +32,9 @@
 #include <fstream>
 
 #include "mongo/db/pipeline/abt/utils.h"
-#include "mongo/db/query/ce/ce_heuristic.h"
-#include "mongo/db/query/ce/ce_hinted.h"
-#include "mongo/db/query/cost_model/cost_estimator.h"
+#include "mongo/db/query/ce/heuristic_estimator.h"
+#include "mongo/db/query/ce/hinted_estimator.h"
+#include "mongo/db/query/cost_model/cost_estimator_impl.h"
 #include "mongo/db/query/cost_model/cost_model_manager.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/metadata.h"
@@ -246,16 +246,16 @@ IndexDefinition makeCompositeIndexDefinition(std::vector<TestIndexField> indexFi
     return IndexDefinition{std::move(idxCollSpec), isMultiKey};
 }
 
-std::unique_ptr<CEInterface> makeHeuristicCE() {
-    return std::make_unique<ce::HeuristicCE>();
+std::unique_ptr<CardinalityEstimator> makeHeuristicCE() {
+    return std::make_unique<ce::HeuristicEstimator>();
 }
 
-std::unique_ptr<CEInterface> makeHintedCE(ce::PartialSchemaSelHints hints) {
-    return std::make_unique<ce::HintedCE>(std::move(hints));
+std::unique_ptr<CardinalityEstimator> makeHintedCE(ce::PartialSchemaSelHints hints) {
+    return std::make_unique<ce::HintedEstimator>(std::move(hints));
 }
 
-std::unique_ptr<CostingInterface> makeCosting() {
-    return std::make_unique<cost_model::CostEstimator>(
+std::unique_ptr<CostEstimator> makeCostEstimator() {
+    return std::make_unique<cost_model::CostEstimatorImpl>(
         cost_model::CostModelManager::getDefaultCoefficients());
 }
 
@@ -270,7 +270,7 @@ OptPhaseManager makePhaseManager(OptPhaseManager::PhaseSet phaseSet,
                            std::move(metadata),
                            makeHeuristicCE(),  // primary CE
                            makeHeuristicCE(),  // substitution phase CE, same as primary
-                           makeCosting(),
+                           makeCostEstimator(),
                            defaultConvertPathToInterval,
                            ConstEval::constFold,
                            std::move(debugInfo),
@@ -280,16 +280,16 @@ OptPhaseManager makePhaseManager(OptPhaseManager::PhaseSet phaseSet,
 OptPhaseManager makePhaseManager(OptPhaseManager::PhaseSet phaseSet,
                                  PrefixId& prefixId,
                                  Metadata metadata,
-                                 std::unique_ptr<CEInterface> ceDerivation,
+                                 std::unique_ptr<CardinalityEstimator> ce,
                                  DebugInfo debugInfo,
                                  QueryHints queryHints) {
     return OptPhaseManager{std::move(phaseSet),
                            prefixId,
                            false /*requireRID*/,
                            std::move(metadata),
-                           std::move(ceDerivation),  // primary CE
-                           makeHeuristicCE(),        // substitution phase CE
-                           makeCosting(),
+                           std::move(ce),      // primary CE
+                           makeHeuristicCE(),  // substitution phase CE
+                           makeCostEstimator(),
                            defaultConvertPathToInterval,
                            ConstEval::constFold,
                            std::move(debugInfo),
@@ -308,7 +308,7 @@ OptPhaseManager makePhaseManager(OptPhaseManager::PhaseSet phaseSet,
                            std::move(metadata),
                            makeHeuristicCE(),  // primary CE
                            makeHeuristicCE(),  // substitution phase CE, same as primary
-                           std::make_unique<cost_model::CostEstimator>(coefs),
+                           std::make_unique<cost_model::CostEstimatorImpl>(coefs),
                            defaultConvertPathToInterval,
                            ConstEval::constFold,
                            std::move(debugInfo),
@@ -326,7 +326,7 @@ OptPhaseManager makePhaseManagerRequireRID(OptPhaseManager::PhaseSet phaseSet,
                            std::move(metadata),
                            makeHeuristicCE(),  // primary CE
                            makeHeuristicCE(),  // substitution phase CE, same as primary
-                           makeCosting(),
+                           makeCostEstimator(),
                            defaultConvertPathToInterval,
                            ConstEval::constFold,
                            std::move(debugInfo),

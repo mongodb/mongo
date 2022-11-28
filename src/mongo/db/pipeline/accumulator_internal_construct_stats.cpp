@@ -35,8 +35,8 @@
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/allowed_contexts.h"
-#include "mongo/db/query/ce/max_diff.h"
-#include "mongo/db/query/ce/value_utils.h"
+#include "mongo/db/query/stats/max_diff.h"
+#include "mongo/db/query/stats/value_utils.h"
 #include "mongo/logv2/log.h"
 
 
@@ -71,7 +71,7 @@ void AccumulatorInternalConstructStats::processInternal(const Value& input, bool
     auto val = doc["val"];
 
     LOGV2_DEBUG(6735800, 4, "Extracted document", "val"_attr = val);
-    _values.emplace_back(ce::SBEValue(mongo::optimizer::convertFrom(val)));
+    _values.emplace_back(stats::SBEValue(mongo::optimizer::convertFrom(val)));
 
     _count++;
     _memUsageBytes = sizeof(*this);
@@ -81,7 +81,7 @@ Value AccumulatorInternalConstructStats::getValue(bool toBeMerged) {
     uassert(8423374, "Can not merge analyze pipelines", !toBeMerged);
 
     // Generate and serialize maxdiff histogram for scalar and array values.
-    auto arrayHistogram = ce::createArrayEstimator(_values, ce::ScalarHistogram::kMaxBuckets);
+    auto arrayHistogram = stats::createArrayEstimator(_values, stats::ScalarHistogram::kMaxBuckets);
     auto stats = stats::makeStatistics(_count, arrayHistogram);
 
     return Value(stats);

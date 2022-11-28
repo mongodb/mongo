@@ -7,7 +7,7 @@ env = env.Clone()
 env.Library(
     target="query_ce_heuristic",
     source=[
-        'ce_heuristic.cpp',
+        'heuristic_estimator.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/query/optimizer/optimizer_memo',
@@ -17,7 +17,7 @@ env.Library(
 env.Library(
     target="query_ce_hinted",
     source=[
-        'ce_hinted.cpp',
+        'hinted_estimator.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/query/optimizer/optimizer_memo',
@@ -28,62 +28,32 @@ env.Library(
 env.Library(
     target="query_ce_histogram",
     source=[
-        'ce_histogram.cpp',
-        'collection_statistics_impl.cpp',
-        'histogram_estimation.cpp',
-        'stats_catalog.cpp',
-        'stats_cache.cpp',
-        'stats_cache_loader_impl.cpp',
+        'histogram_estimator.cpp',
+        'histogram_predicate_estimation.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/dbdirectclient',
-        '$BUILD_DIR/mongo/db/pipeline/pipeline',
+        '$BUILD_DIR/mongo/db/pipeline/abt_utils',
         '$BUILD_DIR/mongo/db/query/optimizer/optimizer_memo',
         '$BUILD_DIR/mongo/db/query/optimizer/optimizer_rewrites',
-        '$BUILD_DIR/mongo/util/caching',
-        '$BUILD_DIR/mongo/util/concurrency/thread_pool',
-        'query_stats',
+        '$BUILD_DIR/mongo/db/query/stats/stats_histograms',
     ],
 )
 
 env.Library(
     target="query_ce_sampling",
     source=[
-        'ce_sampling.cpp',
+        'sampling_estimator.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/exec/sbe/query_sbe_abt',
-        '$BUILD_DIR/mongo/db/query/optimizer/optimizer_memo',
+        '$BUILD_DIR/mongo/db/query/optimizer/optimizer',
     ],
 )
 
 env.Library(
-    target="query_stats",
+    target="test_utils",
     source=[
-        'array_histogram.cpp',
-        'scalar_histogram.cpp',
-        'stats.idl',
-        'value_utils.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/exec/sbe/query_sbe_values',
-    ],
-)
-
-env.Library(
-    target="query_stats_gen",
-    source=[
-        'max_diff.cpp',
-    ],
-    LIBDEPS=[
-        'query_stats',
-    ],
-)
-
-env.Library(
-    target="ce_test_utils",
-    source=[
-        'ce_test_utils.cpp',
+        'test_utils.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -94,150 +64,79 @@ env.Library(
         'query_ce_heuristic',
         'query_ce_histogram',
         'query_ce_sampling',
-        'query_stats',
     ],
 )
 
 env.CppUnitTest(
-    target="ce_histogram_test",
+    target="histogram_estimator_test",
     source=[
-        "ce_histogram_test.cpp",
-        "collection_statistics_mock.cpp",
+        "histogram_estimator_test.cpp",
     ],
     LIBDEPS=[
-        'ce_test_utils',
+        '$BUILD_DIR/mongo/db/query/stats/stats_test_utils',
+        'test_utils',
     ],
 )
 
 env.CppUnitTest(
-    target="ce_interpolation_test",
+    target="histogram_interpolation_test",
     source=[
-        "ce_interpolation_test.cpp",
+        "histogram_interpolation_test.cpp",
     ],
     LIBDEPS=[
-        'ce_test_utils',
+        'test_utils',
     ],
 )
 
 env.CppUnitTest(
-    target="ce_heuristic_test",
+    target="heuristic_estimator_test",
     source=[
-        "ce_heuristic_test.cpp",
+        "heuristic_estimator_test.cpp",
     ],
     LIBDEPS=[
-        'ce_test_utils',
+        'test_utils',
     ],
 )
 
 env.CppUnitTest(
-    target="ce_array_data_test",
+    target="histogram_array_data_test",
     source=[
-        "ce_array_data_test.cpp",
+        "histogram_array_data_test.cpp",
     ],
     LIBDEPS=[
-        'ce_test_utils',
+        '$BUILD_DIR/mongo/db/query/stats/stats_test_utils',
+        'test_utils',
     ],
 )
 
 env.CppUnitTest(
-    target="ce_edge_cases_test",
+    target="histogram_edge_cases_test",
     source=[
-        "ce_edge_cases_test.cpp",
+        "histogram_edge_cases_test.cpp",
     ],
     LIBDEPS=[
-        'ce_test_utils',
-        'query_stats_test_utils',
+        '$BUILD_DIR/mongo/db/query/stats/stats_test_utils',
+        'test_utils',
     ],
 )
 
 env.CppUnitTest(
-    target="ce_dataflow_nodes_test",
+    target="heuristic_dataflow_nodes_test",
     source=[
-        "ce_dataflow_nodes_test.cpp",
+        "heuristic_dataflow_nodes_test.cpp",
     ],
     LIBDEPS=[
-        'ce_test_utils',
+        'test_utils',
     ],
 )
 
 env.CppUnitTest(
-    target='stats_cache_loader_test',
+    target="generated_histograms_test",
     source=[
-        'stats_cache_loader_test.cpp',
-        'stats_cache_loader_test_fixture.cpp',
+        "generated_histograms_test.cpp",
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/auth/authmocks',
-        '$BUILD_DIR/mongo/db/catalog/collection_crud',
-        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
-        '$BUILD_DIR/mongo/db/index_builds_coordinator_mongod',
-        '$BUILD_DIR/mongo/db/multitenancy',
-        '$BUILD_DIR/mongo/db/op_observer/op_observer',
-        '$BUILD_DIR/mongo/db/op_observer/op_observer_impl',
-        '$BUILD_DIR/mongo/db/query/datetime/date_time_support',
-        '$BUILD_DIR/mongo/db/query/query_test_service_context',
-        '$BUILD_DIR/mongo/db/query_expressions',
-        '$BUILD_DIR/mongo/db/repl/drop_pending_collection_reaper',
-        '$BUILD_DIR/mongo/db/repl/oplog',
-        '$BUILD_DIR/mongo/db/repl/optime',
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
-        '$BUILD_DIR/mongo/db/repl/replmocks',
-        '$BUILD_DIR/mongo/db/repl/storage_interface_impl',
-        '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
-        '$BUILD_DIR/mongo/db/shard_role',
-        '$BUILD_DIR/mongo/db/storage/wiredtiger/storage_wiredtiger',
-        '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
-        '$BUILD_DIR/mongo/unittest/unittest',
-        '$BUILD_DIR/mongo/util/clock_source_mock',
-        '$BUILD_DIR/mongo/util/fail_point',
-        '$BUILD_DIR/mongo/util/pcre_wrapper',
-        'query_ce_histogram',
-        'query_stats',
-    ],
-)
-
-env.CppUnitTest(
-    target="stats_cache_test",
-    source=[
-        "stats_cache_test.cpp",
-        "stats_cache_loader_mock.cpp",
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/service_context',
-        'ce_test_utils',
-    ],
-)
-
-env.CppUnitTest(
-    target="stats_path_test",
-    source=[
-        "stats_path_test.cpp",
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/service_context',
-        'ce_test_utils',
-    ],
-)
-
-env.Library(
-    target="query_stats_test_utils",
-    source=[
-        'rand_utils.cpp',
-        'rand_utils_new.cpp',
-        'maxdiff_test_utils.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/exec/sbe/sbe_abt_test_util',
-        "$BUILD_DIR/mongo/unittest/unittest",
-        'query_ce_histogram',
-        'query_stats',
-        'query_stats_gen',
+        'test_utils',
     ],
 )
 
@@ -247,18 +146,7 @@ env.CppUnitTest(
         'maxdiff_histogram_test.cpp',
     ],
     LIBDEPS=[
-        'ce_test_utils',
-        'query_stats_test_utils',
-    ],
-)
-
-env.CppUnitTest(
-    target="ce_generated_histograms_test",
-    source=[
-        "ce_generated_histograms_test.cpp",
-    ],
-    LIBDEPS=[
-        'ce_test_utils',
-        'query_stats_test_utils',
+        '$BUILD_DIR/mongo/db/query/stats/stats_test_utils',
+        'test_utils',
     ],
 )

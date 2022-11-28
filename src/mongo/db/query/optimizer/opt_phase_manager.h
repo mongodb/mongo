@@ -79,9 +79,9 @@ public:
                     PrefixId& prefixId,
                     bool requireRID,
                     Metadata metadata,
-                    std::unique_ptr<CEInterface> explorationCE,
-                    std::unique_ptr<CEInterface> substitutionCE,
-                    std::unique_ptr<CostingInterface> costDerivation,
+                    std::unique_ptr<CardinalityEstimator> explorationCE,
+                    std::unique_ptr<CardinalityEstimator> substitutionCE,
+                    std::unique_ptr<CostEstimator> costEstimator,
                     PathToIntervalFn pathToInterval,
                     ConstFoldFn constFold,
                     DebugInfo debugInfo,
@@ -172,7 +172,7 @@ private:
     /**
      * Cardinality estimation implementation to be used during the exploraton phase..
      */
-    std::unique_ptr<CEInterface> _explorationCE;
+    std::unique_ptr<CardinalityEstimator> _explorationCE;
 
     /**
      * Cardinality estimation implementation to be used during the substitution phase.
@@ -181,12 +181,12 @@ private:
      * alternatives. Since some CE implementations are expensive (sampling), we let the caller pass
      * a different one for this phase.
      */
-    std::unique_ptr<CEInterface> _substitutionCE;
+    std::unique_ptr<CardinalityEstimator> _substitutionCE;
 
     /**
      * Cost derivation implementation.
      */
-    std::unique_ptr<CostingInterface> _costDerivation;
+    std::unique_ptr<CostEstimator> _costEstimator;
 
     /**
      * Path ABT node to index bounds converter implementation.

@@ -34,8 +34,7 @@
 #include "mongo/db/query/optimizer/utils/ce_math.h"
 #include "mongo/util/assert_util.h"
 
-namespace mongo::ce {
-
+namespace mongo::optimizer::ce {
 bool validSelectivity(SelectivityType sel) {
     return (sel >= 0.0 && sel <= 1.0);
 }
@@ -82,4 +81,4 @@ SelectivityType disjExponentialBackoff(std::vector<SelectivityType> disjSelectiv
     }
     return 1.0 - sel;
 }
-}  // namespace mongo::ce
+}  // namespace mongo::optimizer::ce

@@ -88,7 +88,7 @@ LogicalRewriter::LogicalRewriter(const Metadata& metadata,
                                  const PathToIntervalFn& pathToInterval,
                                  const ConstFoldFn& constFold,
                                  const LogicalPropsInterface& logicalPropsDerivation,
-                                 const CEInterface& ceDerivation)
+                                 const CardinalityEstimator& cardinalityEstimator)
     : _activeRewriteSet(std::move(rewriteSet)),
       _groupsPending(),
       _metadata(metadata),
@@ -99,7 +99,7 @@ LogicalRewriter::LogicalRewriter(const Metadata& metadata,
       _pathToInterval(pathToInterval),
       _constFold(constFold),
       _logicalPropsDerivation(logicalPropsDerivation),
-      _ceDerivation(ceDerivation) {
+      _cardinalityEstimator(cardinalityEstimator) {
     initializeRewrites();
 
     if (_activeRewriteSet.count(LogicalRewriteType::SargableSplit) > 0) {
@@ -132,7 +132,7 @@ std::pair<GroupIdType, NodeIdSet> LogicalRewriter::addNode(const ABT& node,
     }
 
     const GroupIdType resultGroupId = _memo.integrate(
-        Memo::Context{&_metadata, &_debugInfo, &_logicalPropsDerivation, &_ceDerivation},
+        Memo::Context{&_metadata, &_debugInfo, &_logicalPropsDerivation, &_cardinalityEstimator},
         node,
         std::move(targetGroupMap),
         insertNodeIds,

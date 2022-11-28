@@ -34,7 +34,7 @@
 #include "mongo/base/status.h"
 #include "mongo/db/tenant_id.h"
 
-namespace mongo::ce {
+namespace mongo::optimizer::ce {
 
 /**
  * Defines cardinality estimation modes.
@@ -45,4 +45,4 @@ const std::string kSampling = "sampling";
 
 Status validateCEMode(const std::string& value, const boost::optional<TenantId>&);
 
-}  // namespace mongo::ce
+}  // namespace mongo::optimizer::ce

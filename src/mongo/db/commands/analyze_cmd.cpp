@@ -38,8 +38,8 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/analyze_command_gen.h"
-#include "mongo/db/query/ce/stats_catalog.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/stats/stats_catalog.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 
 namespace mongo {
@@ -195,7 +195,7 @@ public:
                 uassertStatusOK(getStatusFromCommandResult(analyzeResult));
 
                 // Invalidate statistics in the cache for the analyzed path
-                StatsCatalog& statsCatalog = StatsCatalog::get(opCtx);
+                stats::StatsCatalog& statsCatalog = stats::StatsCatalog::get(opCtx);
                 uassertStatusOK(statsCatalog.invalidatePath(nss, key->toString()));
 
             } else if (sampleSize || sampleRate) {

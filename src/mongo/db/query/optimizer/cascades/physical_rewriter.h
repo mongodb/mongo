@@ -58,7 +58,7 @@ public:
                      const DebugInfo& debugInfo,
                      const QueryHints& hints,
                      const RIDProjectionsMap& ridProjections,
-                     const CostingInterface& costDerivation,
+                     const CostEstimator& costEstimator,
                      const PathToIntervalFn& pathToInterval,
                      std::unique_ptr<LogicalRewriter>& logicalRewriter);
 
@@ -96,7 +96,7 @@ private:
     const Metadata& _metadata;
     Memo& _memo;
     const GroupIdType _rootGroupId;
-    const CostingInterface& _costDerivation;
+    const CostEstimator& _costEstimator;
     const DebugInfo& _debugInfo;
     const QueryHints& _hints;
     const RIDProjectionsMap& _ridProjections;

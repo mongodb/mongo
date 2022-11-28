@@ -61,7 +61,7 @@ public:
                     const PathToIntervalFn& pathToInterval,
                     const ConstFoldFn& constFold,
                     const LogicalPropsInterface& logicalPropsDerivation,
-                    const CEInterface& ceDerivation);
+                    const CardinalityEstimator& cardinalityEstimator);
 
     // This is a transient structure. We do not allow copying or moving.
     LogicalRewriter() = delete;
@@ -130,7 +130,7 @@ private:
     const PathToIntervalFn& _pathToInterval;
     const ConstFoldFn& _constFold;
     const LogicalPropsInterface& _logicalPropsDerivation;
-    const CEInterface& _ceDerivation;
+    const CardinalityEstimator& _cardinalityEstimator;
 
     RewriteFnMap _rewriteMap;
 

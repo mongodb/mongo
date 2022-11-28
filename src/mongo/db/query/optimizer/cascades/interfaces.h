@@ -56,9 +56,9 @@ public:
 /**
  * Interface for deriving CE for a newly added logical node in a new memo group.
  */
-class CEInterface {
+class CardinalityEstimator {
 public:
-    virtual ~CEInterface() = default;
+    virtual ~CardinalityEstimator() = default;
 
     virtual CEType deriveCE(const Metadata& metadata,
                             const Memo& memo,
@@ -69,9 +69,9 @@ public:
 /**
  * Interface for deriving costs and adjusted CE (based on physical props) for a physical node.
  */
-class CostingInterface {
+class CostEstimator {
 public:
-    virtual ~CostingInterface() = default;
+    virtual ~CostEstimator() = default;
     virtual CostAndCE deriveCost(const Metadata& metadata,
                                  const Memo& memo,
                                  const properties::PhysProps& physProps,

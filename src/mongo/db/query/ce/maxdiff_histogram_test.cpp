@@ -27,30 +27,36 @@
  *    it in the license file.
  */
 
-#include <string>
-#include <vector>
-
 #include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/exec/sbe/abt/sbe_abt_test_util.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/ce/array_histogram.h"
-#include "mongo/db/query/ce/ce_test_utils.h"
-#include "mongo/db/query/ce/histogram_estimation.h"
-#include "mongo/db/query/ce/max_diff.h"
-#include "mongo/db/query/ce/maxdiff_test_utils.h"
-#include "mongo/db/query/ce/rand_utils.h"
-#include "mongo/db/query/ce/rand_utils_new.h"
-#include "mongo/db/query/ce/scalar_histogram.h"
+#include "mongo/db/query/ce/histogram_predicate_estimation.h"
+#include "mongo/db/query/ce/test_utils.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
+#include "mongo/db/query/stats/array_histogram.h"
+#include "mongo/db/query/stats/max_diff.h"
+#include "mongo/db/query/stats/maxdiff_test_utils.h"
+#include "mongo/db/query/stats/rand_utils.h"
+#include "mongo/db/query/stats/rand_utils_new.h"
+#include "mongo/db/query/stats/scalar_histogram.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_component_settings.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/unittest/unittest.h"
 
-namespace mongo::ce::statistics {
+namespace mongo::optimizer::ce {
 namespace {
+namespace value = sbe::value;
 
-using namespace sbe;
+using stats::ArrayHistogram;
+using stats::Bucket;
+using stats::DataDistribution;
+using stats::genFixedValueArray;
+using stats::getDataDistribution;
+using stats::makeHistogram;
+using stats::makeInt64Value;
+using stats::ScalarHistogram;
+
 const double kTolerance = 0.001;
 
 class HistogramTest : public ServiceContextTest {};
@@ -266,4 +272,4 @@ TEST_F(HistogramTest, MaxDiffEmptyArrays) {
 }
 
 }  // namespace
-}  // namespace mongo::ce::statistics
+}  // namespace mongo::optimizer::ce

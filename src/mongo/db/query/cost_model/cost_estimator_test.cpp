@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/cost_model/cost_estimator.h"
+#include "mongo/db/query/cost_model/cost_estimator_impl.h"
 #include "mongo/db/query/cost_model/cost_model_gen.h"
 #include "mongo/db/query/cost_model/cost_model_utils.h"
 #include "mongo/db/query/optimizer/cascades/memo.h"
@@ -48,7 +48,7 @@ TEST(CostEstimatorTest, PhysicalScanCost) {
     costModel.setScanStartupCost(startupCost);
     costModel.setScanIncrementalCost(scanCost);
 
-    CostEstimator costEstimator{costModel};
+    CostEstimatorImpl costEstimator{costModel};
 
     optimizer::Metadata metadata{{}};
     optimizer::cascades::Memo memo{};
@@ -94,7 +94,7 @@ TEST(CostEstimatorTest, PhysicalScanCostWithAdjustedCE) {
     costModel.setScanStartupCost(startupCost);
     costModel.setScanIncrementalCost(scanCost);
 
-    CostEstimator costEstimator{costModel};
+    CostEstimatorImpl costEstimator{costModel};
 
     optimizer::Metadata metadata{{}};
     optimizer::cascades::Memo memo{};
@@ -130,7 +130,7 @@ TEST(CostEstimatorTest, IndexScanCost) {
     costModel.setIndexScanStartupCost(startupCost);
     costModel.setIndexScanIncrementalCost(indexScanCost);
 
-    CostEstimator costEstimator{costModel};
+    CostEstimatorImpl costEstimator{costModel};
 
     optimizer::Metadata metadata{{}};
     optimizer::cascades::Memo memo{};
@@ -173,7 +173,7 @@ TEST(CostEstimatorTest, FilterAndEvaluationCost) {
     costModel.setEvalIncrementalCost(evalCost);
     costModel.setEvalStartupCost(startupCost);
 
-    CostEstimator costEstimator{costModel};
+    CostEstimatorImpl costEstimator{costModel};
 
     optimizer::Metadata metadata{{}};
     optimizer::cascades::Memo memo{};
@@ -273,7 +273,7 @@ TEST(CostEstimatorTest, MergeJoinCost) {
 
     nodeCEMap[evalNodeRight.cast<optimizer::Node>()] = ce;
 
-    CostEstimator costEstimator{costModel};
+    CostEstimatorImpl costEstimator{costModel};
 
     optimizer::Metadata metadata{{}};
     optimizer::cascades::Memo memo{};

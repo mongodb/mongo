@@ -34,9 +34,7 @@
 
 #include "mongo/db/query/optimizer/defs.h"
 
-namespace mongo::ce {
-
-using namespace mongo::optimizer;
+namespace mongo::optimizer::ce {
 
 // Default cardinality when actual collection cardinality is unknown.
 // Mostly used by unit tests.
@@ -68,4 +66,4 @@ SelectivityType conjExponentialBackoff(std::vector<SelectivityType> conjSelectiv
  * exponential backoff.
  */
 SelectivityType disjExponentialBackoff(std::vector<SelectivityType> disjSelectivities);
-}  // namespace mongo::ce
+}  // namespace mongo::optimizer::ce

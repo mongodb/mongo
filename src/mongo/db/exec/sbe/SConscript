@@ -137,8 +137,7 @@ env.Library(
         'abt/abt_lower.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/query/ce/query_ce_heuristic',
-        '$BUILD_DIR/mongo/db/query/optimizer/optimizer',
+        '$BUILD_DIR/mongo/db/query/optimizer/optimizer_base',
         'query_sbe',
         'query_sbe_stages',
         'query_sbe_storage',

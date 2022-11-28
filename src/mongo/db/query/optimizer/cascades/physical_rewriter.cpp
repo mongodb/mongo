@@ -110,13 +110,13 @@ PhysicalRewriter::PhysicalRewriter(const Metadata& metadata,
                                    const DebugInfo& debugInfo,
                                    const QueryHints& hints,
                                    const RIDProjectionsMap& ridProjections,
-                                   const CostingInterface& costDerivation,
+                                   const CostEstimator& costEstimator,
                                    const PathToIntervalFn& pathToInterval,
                                    std::unique_ptr<LogicalRewriter>& logicalRewriter)
     : _metadata(metadata),
       _memo(memo),
       _rootGroupId(rootGroupId),
-      _costDerivation(costDerivation),
+      _costEstimator(costEstimator),
       _debugInfo(debugInfo),
       _hints(hints),
       _ridProjections(ridProjections),
@@ -149,7 +149,7 @@ void PhysicalRewriter::costAndRetainBestNode(std::unique_ptr<ABT> node,
                                              const GroupIdType groupId,
                                              PrefixId& prefixId,
                                              PhysOptimizationResult& bestResult) {
-    const CostAndCE nodeCostAndCE = _costDerivation.deriveCost(
+    const CostAndCE nodeCostAndCE = _costEstimator.deriveCost(
         _metadata, _memo, bestResult._physProps, node->ref(), childProps, nodeCEMap);
     const CostType nodeCost = nodeCostAndCE._cost;
     uassert(6624056, "Must get non-infinity cost for physical node.", !nodeCost.isInfinite());

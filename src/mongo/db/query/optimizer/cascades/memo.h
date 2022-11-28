@@ -127,13 +127,13 @@ public:
         Context(const Metadata* metadata,
                 const DebugInfo* debugInfo,
                 const LogicalPropsInterface* logicalPropsDerivation,
-                const CEInterface* ceDerivation);
+                const CardinalityEstimator* cardinalityEstimator);
 
         // None of those should be null.
         const Metadata* _metadata;
         const DebugInfo* _debugInfo;
         const LogicalPropsInterface* _logicalPropsDerivation;
-        const CEInterface* _ceDerivation;
+        const CardinalityEstimator* _cardinalityEstimator;
     };
 
     struct Stats {

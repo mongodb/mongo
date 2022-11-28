@@ -43,7 +43,7 @@
 #include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/query/ce/value_utils.h"
+#include "mongo/db/query/stats/value_utils.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/summation.h"
 
@@ -250,7 +250,7 @@ public:
 
 private:
     double _count;
-    std::vector<ce::SBEValue> _values;
+    std::vector<stats::SBEValue> _values;
 };
 
 class AccumulatorLast final : public AccumulatorState {

@@ -30,11 +30,11 @@
 #include "mongo/db/query/ce_mode_parameter.h"
 #include "mongo/db/query/query_knobs_gen.h"
 
-namespace mongo::ce {
+namespace mongo::optimizer::ce {
 Status validateCEMode(const std::string& value, const boost::optional<TenantId>&) {
     if (value == kHeuristic || value == kHistogram || value == kSampling) {
         return Status::OK();
     }
     return Status(ErrorCodes::Error{6695700}, "Invalid cardinality estimation mode.");
 }
-}  // namespace mongo::ce
+}  // namespace mongo::optimizer::ce

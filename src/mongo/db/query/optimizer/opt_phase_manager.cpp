@@ -49,9 +49,9 @@ OptPhaseManager::OptPhaseManager(OptPhaseManager::PhaseSet phaseSet,
                                  PrefixId& prefixId,
                                  const bool requireRID,
                                  Metadata metadata,
-                                 std::unique_ptr<CEInterface> explorationCE,
-                                 std::unique_ptr<CEInterface> substitutionCE,
-                                 std::unique_ptr<CostingInterface> costDerivation,
+                                 std::unique_ptr<CardinalityEstimator> explorationCE,
+                                 std::unique_ptr<CardinalityEstimator> substitutionCE,
+                                 std::unique_ptr<CostEstimator> costEstimator,
                                  PathToIntervalFn pathToInterval,
                                  ConstFoldFn constFold,
                                  DebugInfo debugInfo,
@@ -64,14 +64,14 @@ OptPhaseManager::OptPhaseManager(OptPhaseManager::PhaseSet phaseSet,
       _logicalPropsDerivation(std::make_unique<DefaultLogicalPropsDerivation>()),
       _explorationCE(std::move(explorationCE)),
       _substitutionCE(std::move(substitutionCE)),
-      _costDerivation(std::move(costDerivation)),
+      _costEstimator(std::move(costEstimator)),
       _pathToInterval(std::move(pathToInterval)),
       _constFold(std::move(constFold)),
       _physicalNodeId(),
       _requireRID(requireRID),
       _ridProjections(),
       _prefixId(prefixId) {
-    uassert(6624093, "Cost derivation is null", _costDerivation);
+    uassert(6624093, "Cost derivation is null", _costEstimator);
     uassert(7088900, "Exploration CE is null", _explorationCE);
     uassert(7088901, "Substitution CE is null", _substitutionCE);
 
@@ -224,7 +224,7 @@ void OptPhaseManager::runMemoPhysicalRewrite(const OptPhase phase,
                               _debugInfo,
                               _hints,
                               _ridProjections,
-                              *_costDerivation,
+                              *_costEstimator,
                               _pathToInterval,
                               logicalRewriter);
 

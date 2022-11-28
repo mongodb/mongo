@@ -31,7 +31,7 @@
 
 #include "mongo/unittest/unittest.h"
 
-namespace mongo::ce {
+namespace mongo::optimizer::ce {
 
 TEST(CEModeParameterTest, ValidatesValidCEModes) {
     ASSERT_OK(validateCEMode("heuristic", boost::none));
@@ -44,4 +44,4 @@ TEST(CEModeParameterTest, RejectsInvalidCEModes) {
     ASSERT_NOT_OK(validateCEMode("", boost::none));
 }
 
-}  // namespace mongo::ce
+}  // namespace mongo::optimizer::ce
