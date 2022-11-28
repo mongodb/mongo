@@ -26,6 +26,13 @@ variables:
         variant: compile-amazon-linux2-arm64
       - name: schedule_global_auto_tasks
         variant: task_generation
+  _real_compile_amazon_linux2_arm64_with_mongocrypt_shlib: &_compile_amazon_linux2_arm64_with_mongocrypt_shlib
+      - name: compile
+        variant: compile-amazon-linux2-arm64
+      - name: compile_mongocrypt_shlib
+        variant: compile-amazon-linux2-arm64-mongocrypt-shlib
+      - name: schedule_global_auto_tasks
+        variant: task_generation
   _real_expansions: &_expansion_updates
       []
   ###
@@ -39,6 +46,9 @@ variables:
 #      - name: schedule_global_auto_tasks
 #        variant: task_generation
 # _skip_compile_amazon_linux2_arm64: &_compile_amazon_linux2_arm64
+#     - name: schedule_global_auto_tasks
+#       variant: task_generation
+# _skip_compile_amazon_linux2_arm64_with_mongocrypt_shlib: &_compile_amazon_linux2_arm64_with_mongocrypt_shlib
 #     - name: schedule_global_auto_tasks
 #       variant: task_generation
 #  _skip_expansions: &_expansion_updates
@@ -256,8 +266,8 @@ functions:
       params: {script: "echo"}
 
   ###
-  # Compile
-  compile mongodb:
+  # Prepares the environment before compiling the binaries
+  compile prep:
     # We create a virtual environment with the Python dependencies for compiling the server
     # installed.
     - command: shell.exec
@@ -317,6 +327,11 @@ functions:
     - command: expansions.update
       params:
         file: src/compile_expansions.yml
+  ###
+
+  ###
+  # Compile mongodb
+  compile mongodb:
     - command: shell.exec
       params:
         working_dir: src/mongo-tools/src/github.com/mongodb/mongo-tools
@@ -386,6 +401,29 @@ functions:
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
         display_name: mongodb${compile-variant|}.tar.gz
+  ###
+
+  ###
+  # Compile mongo_crypt_v1 shared library
+  compile mongocrypt shlib:
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+          source "${workdir}/compile_venv/bin/activate"
+          python ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} $extra_args SPLIT_DWARF=0 archive-mongo-crypt-dev MONGO_VERSION=${version} DESTDIR=$(pwd)/crypt-lib-${version} PKGDIR=$(pwd) ${patch_compile_flags|}
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/mongo-crypt-dev.tgz
+        remote_file: ${project_dir}/${version_id}/${revision}/${platform}/mongo_crypt_shared_v1-${compile-variant|}-${version_id}.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/x-gzip}
+        display_name: mongo_crypt_shared_v1-${version|}-${compile-variant|}.tgz
   ###
 
   ## Schedule Tasks ##
@@ -493,7 +531,19 @@ tasks:
           revisions:
             enterprise: ${enterprise_rev}
             mongo-tools: ${mongo-tools_rev}
+      - func: "compile prep"
       - func: "compile mongodb"
+
+  - name: compile_mongocrypt_shlib
+    commands:
+      - command: manifest.load
+      - command: git.get_project
+        params:
+          directory: src
+          revisions:
+            enterprise: ${enterprise_rev}
+      - func: "compile prep"
+      - func: "compile mongocrypt shlib"
 
   - name: renew_ssl_cert
     commands:
@@ -1161,6 +1211,33 @@ buildvariants:
       - "amazon2-arm64"
     tasks:
       - name: compile
+
+  - name: compile-amazon-linux2-arm64-mongocrypt-shlib
+    display_name: Compile mongo_crypt_v1.so for Amazon Linux 2 arm64
+    modules: *modules
+    cron: "0 0 * * 4" # 00:00 on Thursday
+    expansions:
+      <<: *compile-expansions
+      compile-variant: -arm64
+      compile_flags: >-
+        --separate-debug
+        MONGO_DISTMOD=amazon2
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --release
+        --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+        --allocator=system
+        --enable-free-mon=off
+        --enterprise-features=fle,search
+        --js-engine=none
+        --link-model=dynamic-sdk
+        --enable-http-client=off
+        --ssl=off
+        SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
+        CCFLAGS="-fno-gnu-unique"
+    run_on:
+      - "amazon2-arm64"
+    tasks:
+      - name: compile_mongocrypt_shlib
 
   - name: linux-standalone
     display_name: Linux Standalone Legacy
@@ -2717,15 +2794,40 @@ buildvariants:
   #     authentication: enabled
   #     fle: enabled
   #     storageEngine: wiredTiger
-  #     compile_variant: "-arm64"
+  #     compile-variant: "-arm64"
+  #     requires_mongocrypt_shlib: true
   #   run_on:
   #     - "rhel70-perf-single"
-  #   depends_on: *_compile_amazon_linux2_arm64
+  #   depends_on: *_compile_amazon_linux2_arm64_with_mongocrypt_shlib
   #   tasks:
   #     - name: schedule_patch_auto_tasks
   #     - name: schedule_variant_auto_tasks
   #     - name: industry_benchmarks
   #     - name: linkbench
+
+  # - name: linux-shard-lite-fle.2022-11
+  #   display_name: Linux Shard Lite FLE 2022-11
+  #   cron: "0 0 * * *"  # Everyday at 00:00 to build up history
+  #   #    cron: "0 0 * * 0,4" # 00:00 on Sunday,Thursday
+  #   modules: *modules
+  #   expansions:
+  #     mongodb_setup_release: 2022-11
+  #     mongodb_setup: shard-lite-fle
+  #     infrastructure_provisioning_release: 2022-11
+  #     infrastructure_provisioning: shard-lite
+  #     workload_setup: 2022-11
+  #     platform: linux
+  #     project_dir: *project_dir
+  #     authentication: enabled
+  #     storageEngine: wiredTiger
+  #     compile-variant: "-arm64"
+  #     requires_mongocrypt_shlib: true
+  #   run_on:
+  #     - "rhel70-perf-shard-lite"
+  #   depends_on: *_compile_amazon_linux2_arm64_with_mongocrypt_shlib
+  #   tasks:
+  #     - name: schedule_patch_auto_tasks
+  #     - name: schedule_variant_auto_tasks
 
   # - name: linux-1-node-replSet-ese-cbc.2022-11
   #   display_name: Linux 1-Node ReplSet ESE CBC 2022-11
