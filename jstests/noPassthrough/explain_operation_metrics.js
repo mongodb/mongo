@@ -25,8 +25,8 @@ const runTest = (db) => {
         const execStats = result.executionStats;
         assert(execStats.hasOwnProperty("operationMetrics"), execStats);
         const operationMetrics = execStats.operationMetrics;
-        assert.eq(132, operationMetrics.docBytesRead);
-        assert.eq(3, operationMetrics.docUnitsRead);
+        assert.eq(132, operationMetrics.docBytesRead, result);
+        assert.eq(3, operationMetrics.docUnitsRead, result);
 
         const aggResult =
             assert.commandWorked(coll.explain(verbosity).aggregate({$project: {a: "$a"}}));
@@ -34,8 +34,8 @@ const runTest = (db) => {
         const aggExecStats = aggResult.executionStats;
         assert(aggExecStats.hasOwnProperty("operationMetrics"), aggExecStats);
         const aggOperationMetrics = aggExecStats.operationMetrics;
-        assert.eq(132, aggOperationMetrics.docBytesRead);
-        assert.eq(3, aggOperationMetrics.docUnitsRead);
+        assert.eq(132, aggOperationMetrics.docBytesRead, aggResult);
+        assert.eq(3, aggOperationMetrics.docUnitsRead, aggResult);
 
         assert.commandWorked(coll.createIndex({a: 1}));
         const idxFindResult = assert.commandWorked(coll.find({a: 0}).explain(verbosity));
@@ -43,11 +43,16 @@ const runTest = (db) => {
         const idxFindExecutionStats = idxFindResult.executionStats;
         assert(idxFindExecutionStats.hasOwnProperty("operationMetrics"), idxFindExecutionStats);
         const idxFindOperationMetrics = idxFindExecutionStats.operationMetrics;
-        assert.eq(132, idxFindOperationMetrics.docBytesRead);
-        assert.eq(3, idxFindOperationMetrics.docUnitsRead);
-        assert.eq(12, idxFindOperationMetrics.idxEntryBytesRead);
-        assert.eq(3, idxFindOperationMetrics.idxEntryUnitsRead);
-        assert.eq(4, idxFindOperationMetrics.cursorSeeks);
+        assert.eq(132, idxFindOperationMetrics.docBytesRead, idxFindResult);
+        assert.eq(3, idxFindOperationMetrics.docUnitsRead, idxFindResult);
+        assert.eq(12, idxFindOperationMetrics.idxEntryBytesRead, idxFindResult);
+        assert.eq(3, idxFindOperationMetrics.idxEntryUnitsRead, idxFindResult);
+
+        // The number of cursorSeeks can change depending on whether a yield has occurred. We
+        // account for this by incrementing the expected value by the number of calls to
+        // 'restoreState'.
+        const numAdditionalCursorSeeks = idxFindExecutionStats.executionStages.restoreState;
+        assert.eq(4 + numAdditionalCursorSeeks, idxFindOperationMetrics.cursorSeeks, idxFindResult);
     }
 };
 
