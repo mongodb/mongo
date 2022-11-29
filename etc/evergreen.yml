@@ -78,7 +78,6 @@ variables:
     variant: generate-tasks-for-version
 
 - &amazon_linux2_arm64_compile_variant_dependency
-  activate: false
   depends_on:
   - name: archive_dist_test
     variant: &amazon_linux2_arm64_compile_variant_name amazon-linux2-arm64-compile
