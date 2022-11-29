@@ -8102,7 +8102,7 @@ buildvariants:
   - enterprise
   display_name: "~ TIG Daily Cron"
   run_on:
-  - rhel62-small
+  - rhel70-small
   batchtime: 10080 # 7 days
   stepback: false
   tasks:
@@ -8666,7 +8666,6 @@ buildvariants:
     distros:
     - rhel62-large
   - name: lint
-  - name: lint_fuzzer_sanity_patch
   - name: lint_yaml
   - name: burn_in_tests_gen
     distros:
@@ -8775,7 +8774,6 @@ buildvariants:
     distros:
     - rhel62-large
   - name: lint
-  - name: lint_fuzzer_sanity_patch
   - name: lint_yaml
   - name: .aggfuzzer
   - name: .aggregation
