@@ -658,8 +658,8 @@ private:
             IDLParserContext("ClusterFindAndModify"), cmdObj);
 
         auto sharedBlock = std::make_shared<SharedBlock>(nss, cmdObj);
-        sharedBlock->clusterQueryCommand = ClusterQueryWithoutShardKey(
-            cmdObj, *parsedRequest.getStmtId() ? *parsedRequest.getStmtId() : 0);
+        sharedBlock->clusterQueryCommand =
+            ClusterQueryWithoutShardKey(cmdObj, parsedRequest.getStmtId().value_or(0));
 
         auto txn = txn_api::SyncTransactionWithRetries(
             opCtx,
