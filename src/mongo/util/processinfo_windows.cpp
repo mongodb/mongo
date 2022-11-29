@@ -91,13 +91,27 @@ LpiRecords getLogicalProcessorInformationRecords() {
     return lpiRecords;
 }
 
-int getPhysicalCores() {
-    int processorCoreCount = 0;
+struct ParsedProcessorInfo {
+    int physicalCoreCount;
+    int numaNodeCount;
+    int processorPackageCount;
+};
+
+ParsedProcessorInfo getProcessorInfo() {
+    ParsedProcessorInfo ppi{0, 0, 0};
     for (auto&& lpi : getLogicalProcessorInformationRecords()) {
-        if (lpi.Relationship == RelationProcessorCore)
-            processorCoreCount++;
+        switch (lpi.Relationship) {
+            case RelationProcessorCore:
+                ppi.physicalCoreCount++;
+                break;
+            case RelationNumaNode:
+                ppi.numaNodeCount++;
+                break;
+            case RelationProcessorPackage:
+                ppi.processorPackageCount++;
+        }
     }
-    return processorCoreCount;
+    return ppi;
 }
 
 }  // namespace
@@ -245,10 +259,13 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     GetNativeSystemInfo(&ntsysinfo);
     addrSize = (ntsysinfo.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_AMD64 ? 64 : 32);
     numCores = ntsysinfo.dwNumberOfProcessors;
-    numPhysicalCores = getPhysicalCores();
+    auto ppi = getProcessorInfo();
+    numPhysicalCores = ppi.physicalCoreCount;
+    numCpuSockets = ppi.processorPackageCount;
+    hasNuma = ppi.numaNodeCount > 1;
+    numNumaNodes = ppi.numaNodeCount;
     pageSize = static_cast<unsigned long long>(ntsysinfo.dwPageSize);
     bExtra.append("pageSize", static_cast<long long>(pageSize));
-    bExtra.append("physicalCores", static_cast<int>(numPhysicalCores));
 
     // get memory info
     mse.dwLength = sizeof(mse);
@@ -352,21 +369,7 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
 
     osType = "Windows";
     osVersion = verstr.str();
-    hasNuma = checkNumaEnabled();
     _extraStats = bExtra.obj();
-}
-
-
-bool ProcessInfo::checkNumaEnabled() {
-    DWORD numaNodeCount = 0;
-    for (auto&& lpi : getLogicalProcessorInformationRecords()) {
-        if (lpi.Relationship == RelationNumaNode)
-            // Non-NUMA systems report a single record of this type.
-            ++numaNodeCount;
-    }
-
-    // For non-NUMA machines, the count is 1
-    return numaNodeCount > 1;
 }
 
 }  // namespace mongo
