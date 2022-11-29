@@ -57,6 +57,12 @@ bool isChangeStreamEnabled(OperationContext* opCtx, const TenantId& tenantId);
 bool canInitializeServices();
 
 /**
+ * Returns true if the target environment (replica-set or sharded-cluster) supports running change
+ * stream in the serverless, false otherwise.
+ */
+bool canRunInTargetEnvironment();
+
+/**
  * Returns an internal tenant id that will be used for testing purposes. This tenant id will not
  * conflict with any other tenant id.
  */

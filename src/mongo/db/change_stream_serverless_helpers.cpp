@@ -43,13 +43,18 @@
 namespace mongo {
 namespace change_stream_serverless_helpers {
 
+namespace {
+bool isServerlessChangeStreamFeatureFlagEnabled() {
+    return serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        feature_flags::gFeatureFlagServerlessChangeStreams.isEnabled(
+            serverGlobalParams.featureCompatibility);
+}
+}  // namespace
+
 bool isChangeCollectionsModeActive() {
     // A change collection mode is declared as active if the required services can be initialized,
     // the feature flag is enabled and the FCV version is already initialized.
-    return canInitializeServices() &&
-        serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        feature_flags::gFeatureFlagServerlessChangeStreams.isEnabled(
-            serverGlobalParams.featureCompatibility);
+    return canInitializeServices() && isServerlessChangeStreamFeatureFlagEnabled();
 }
 
 bool isChangeStreamEnabled(OperationContext* opCtx, const TenantId& tenantId) {
@@ -70,6 +75,10 @@ bool canInitializeServices() {
         return false;
     }
 
+    return canRunInTargetEnvironment();
+}
+
+bool canRunInTargetEnvironment() {
     // A change stream services are enabled only in the multitenant serverless settings. For the
     // sharded cluster, 'internalChangeStreamUseTenantIdForTesting' maybe provided for the testing
     // purposes until the support is available.
@@ -88,13 +97,15 @@ const TenantId& getTenantIdForTesting() {
 }
 
 boost::optional<TenantId> resolveTenantId(boost::optional<TenantId> tenantId) {
-    if (tenantId) {
-        return tenantId;
-    } else if (MONGO_unlikely(internalChangeStreamUseTenantIdForTesting.load())) {
-        return getTenantIdForTesting();
+    if (isServerlessChangeStreamFeatureFlagEnabled()) {
+        if (tenantId) {
+            return tenantId;
+        } else if (MONGO_unlikely(internalChangeStreamUseTenantIdForTesting.load())) {
+            return getTenantIdForTesting();
+        }
     }
 
-    return tenantId;
+    return boost::none;
 }
 
 TenantSet getConfigDbTenants(OperationContext* opCtx) {

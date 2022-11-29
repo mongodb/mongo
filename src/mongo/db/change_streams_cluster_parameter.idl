@@ -58,6 +58,8 @@ server_parameters:
     cpp_varname: gChangeStreamsClusterParameter
     validator:
       callback: validateChangeStreamsClusterParameter
+    condition:
+      min_fcv: 6.2
   changeCollectionExpiredDocumentsRemoverJobSleepSeconds:
     description: "Specifies the number of seconds for which the periodic change collection remover job will sleep between each cycle."
     set_at: [ startup ]

@@ -5,7 +5,7 @@
 //  requires_sharding,
 //  featureFlagServerlessChangeStreams,
 //  featureFlagMongoStore,
-//  requires_fcv_61,
+//  requires_fcv_62,
 // ]
 (function() {
 "use strict";
@@ -93,17 +93,11 @@ function testWithoutAdminDB(conn) {
     const st = new ShardingTest({
         shards: 1,
         mongos: 1,
+        config: 1,
         other: {
-            mongosOptions: {
-                setParameter: {
-                    internalChangeStreamUseTenantIdForTesting: true,
-                }
-            },
-            shardOptions: {
-                setParameter: {
-                    internalChangeStreamUseTenantIdForTesting: true,
-                }
-            }
+            mongosOptions: {setParameter: {internalChangeStreamUseTenantIdForTesting: true}},
+            shardOptions: {setParameter: {internalChangeStreamUseTenantIdForTesting: true}},
+            configOptions: {setParameter: {internalChangeStreamUseTenantIdForTesting: true}}
         }
     });
     const adminDB = st.rs0.getPrimary().getDB("admin");

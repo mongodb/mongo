@@ -34,16 +34,13 @@
 #include "mongo/base/status.h"
 #include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/change_streams_cluster_parameter_gen.h"
-#include "mongo/logv2/log.h"
+
 namespace mongo {
 
 Status validateChangeStreamsClusterParameter(
     const ChangeStreamsClusterParameterStorage& clusterParameter,
     const boost::optional<TenantId>& tenantId) {
-    // 'isChangeCollectionsModeActive' always returns false on a config server, however, setting
-    // 'changeStreams.expireAfterSeconds' parameter on mongos will also change it on config servers.
-    if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer &&
-        !change_stream_serverless_helpers::isChangeCollectionsModeActive()) {
+    if (!change_stream_serverless_helpers::canRunInTargetEnvironment()) {
         return Status(
             ErrorCodes::CommandNotSupported,
             "The 'changeStreams' cluster-wide parameter is only available in serverless.");
@@ -52,6 +49,7 @@ Status validateChangeStreamsClusterParameter(
         return Status(ErrorCodes::BadValue,
                       "Expected a positive integer for 'expireAfterSeconds' field");
     }
+
     return Status::OK();
 }
 
