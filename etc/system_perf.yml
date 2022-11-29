@@ -948,6 +948,15 @@ tasks:
             {scale: 10,
              schema: denormalized}
 
+  - name: ssb_column_store_comparison
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "ssb_column_store_index"
+          test_control_params: |
+            {scale: 5}
+
 # TODO PERF-3094: Remove this task.
   - name: column_store_index_charts_events_1G
     priority: 5
@@ -1314,6 +1323,7 @@ buildvariants:
       - name: tpch_10_normalized
       - name: tpch_10_denormalized
       - name: column_store_index_charts_events_1G
+      - name: ssb_column_store_comparison
 
   - name: linux-standalone-classic-query-engine
     display_name: Linux Standalone (Classic Query Engine) Legacy
