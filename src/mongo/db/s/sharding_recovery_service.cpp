@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include <set>
 
-#include "mongo/platform/basic.h"
+#include <fmt/format.h>
+#include <set>
 
 #include "mongo/db/s/sharding_recovery_service.h"
 
@@ -149,7 +149,12 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
                 "reason"_attr = reason,
                 "writeConcern"_attr = writeConcern);
 
-    invariant(!opCtx->lockState()->isLocked());
+    tassert(7032360,
+            fmt::format("Can't acquire recoverable critical section for collection '{}' with "
+                        "reason '{}' while holding locks",
+                        nss.toString(),
+                        reason.toString()),
+            !opCtx->lockState()->isLocked());
 
     {
         Lock::GlobalLock lk(opCtx, MODE_IX);
@@ -169,25 +174,29 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
             BSON(CollectionCriticalSectionDocument::kNssFieldName << nss.toString()));
         auto cursor = dbClient.find(std::move(findRequest));
 
-        // if there is a doc with the same nss -> in order to not fail it must have the same reason
+        // if there is a doc with the same nss -> in order to not fail it must have the same
+        // reason
         if (cursor->more()) {
             const auto bsonObj = cursor->next();
             const auto collCSDoc = CollectionCriticalSectionDocument::parse(
                 IDLParserContext("AcquireRecoverableCSBW"), bsonObj);
 
-            invariant(collCSDoc.getReason().woCompare(reason) == 0,
-                      str::stream()
-                          << "Trying to acquire a critical section blocking writes for namespace "
-                          << nss << " and reason " << reason << " but it is already taken by "
-                          << "another operation with different reason " << collCSDoc.getReason());
+            tassert(7032368,
+                    fmt::format("Trying to acquire a  critical section blocking writes for "
+                                "namespace '{}' and reason '{}' but it is already taken by another "
+                                "operation with different reason '{}'",
+                                nss.toString(),
+                                reason.toString(),
+                                collCSDoc.getReason().toString()),
+                    collCSDoc.getReason().woCompare(reason) == 0);
 
-            LOGV2_DEBUG(
-                5656601,
-                3,
-                "The recoverable critical section was already acquired to block writes, do nothing",
-                "namespace"_attr = nss,
-                "reason"_attr = reason,
-                "writeConcern"_attr = writeConcern);
+            LOGV2_DEBUG(5656601,
+                        3,
+                        "The recoverable critical section was already acquired to block "
+                        "writes, do nothing",
+                        "namespace"_attr = nss,
+                        "reason"_attr = reason,
+                        "writeConcern"_attr = writeConcern);
 
             return;
         }
@@ -195,8 +204,10 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
         // The collection critical section is not taken, try to acquire it.
 
         // The following code will try to add a doc to config.criticalCollectionSections:
-        // - If everything goes well, the shard server op observer will acquire the in-memory CS.
-        // - Otherwise this call will fail and the CS won't be taken (neither persisted nor in-mem)
+        // - If everything goes well, the shard server op observer will acquire the in-memory
+        // CS.
+        // - Otherwise this call will fail and the CS won't be taken (neither persisted nor
+        // in-mem)
         CollectionCriticalSectionDocument newDoc(nss, reason, false /* blockReads */);
         newDoc.setAdditionalInfo(additionalInfo);
 
@@ -213,10 +224,13 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
         BatchedCommandResponse batchedResponse;
         std::string unusedErrmsg;
         batchedResponse.parseBSON(commandReply, &unusedErrmsg);
-        invariant(batchedResponse.getN() > 0,
-                  str::stream() << "Insert did not add any doc to collection "
-                                << NamespaceString::kCollectionCriticalSectionsNamespace
-                                << " for namespace " << nss << " and reason " << reason);
+        tassert(7032369,
+                fmt::format("Insert did not add any doc to collection '{}' for namespace '{}' "
+                            "and reason '{}'",
+                            nss.toString(),
+                            reason.toString(),
+                            NamespaceString::kCollectionCriticalSectionsNamespace.toString()),
+                batchedResponse.getN() > 0);
     }
 
     WriteConcernResult ignoreResult;
@@ -243,7 +257,12 @@ void ShardingRecoveryService::promoteRecoverableCriticalSectionToBlockAlsoReads(
                 "reason"_attr = reason,
                 "writeConcern"_attr = writeConcern);
 
-    invariant(!opCtx->lockState()->isLocked());
+    tassert(7032364,
+            fmt::format("Can't promote recoverable critical section for collection '{}' with "
+                        "reason '{}' while holding locks",
+                        nss.toString(),
+                        reason.toString()),
+            !opCtx->lockState()->isLocked());
 
     {
         boost::optional<AutoGetDb> dbLock;
@@ -262,24 +281,29 @@ void ShardingRecoveryService::promoteRecoverableCriticalSectionToBlockAlsoReads(
             BSON(CollectionCriticalSectionDocument::kNssFieldName << nss.toString()));
         auto cursor = dbClient.find(std::move(findRequest));
 
-        invariant(
-            cursor->more(),
-            str::stream() << "Trying to acquire a critical section blocking reads for namespace "
-                          << nss << " and reason " << reason
-                          << " but the critical section wasn't acquired first blocking writers.");
+        tassert(7032361,
+                fmt::format(
+                    "Trying to acquire a critical section blocking reads for namespace '{}' and "
+                    "reason '{}' but the critical section wasn't acquired first blocking writers.",
+                    nss.toString(),
+                    reason.toString()),
+                cursor->more());
         BSONObj bsonObj = cursor->next();
         const auto collCSDoc = CollectionCriticalSectionDocument::parse(
             IDLParserContext("AcquireRecoverableCSBR"), bsonObj);
 
-        invariant(
-            collCSDoc.getReason().woCompare(reason) == 0,
-            str::stream() << "Trying to acquire a critical section blocking reads for namespace "
-                          << nss << " and reason " << reason
-                          << " but it is already taken by another operation with different reason "
-                          << collCSDoc.getReason());
+        tassert(7032362,
+                fmt::format(
+                    "Trying to acquire a critical section blocking reads for namespace '{}' and "
+                    "reason "
+                    "'{}' but it is already taken by another operation with different reason '{}'",
+                    nss.toString(),
+                    reason.toString(),
+                    collCSDoc.getReason().toString()),
+                collCSDoc.getReason().woCompare(reason) == 0);
 
-        // if there is a document with the same nss, reason and blocking reads -> do nothing, the CS
-        // is already taken!
+        // if there is a document with the same nss, reason and blocking reads -> do nothing,
+        // the CS is already taken!
         if (collCSDoc.getBlockReads()) {
             LOGV2_DEBUG(5656604,
                         3,
@@ -294,8 +318,8 @@ void ShardingRecoveryService::promoteRecoverableCriticalSectionToBlockAlsoReads(
         // The CS is in the catch-up phase, try to advance it to the commit phase.
 
         // The following code will try to update a doc from config.criticalCollectionSections:
-        // - If everything goes well, the shard server op observer will advance the in-memory CS to
-        // the
+        // - If everything goes well, the shard server op observer will advance the in-memory CS
+        // to the
         //   commit phase (blocking readers).
         // - Otherwise this call will fail and the CS won't be advanced (neither persisted nor
         // in-mem)
@@ -321,10 +345,13 @@ void ShardingRecoveryService::promoteRecoverableCriticalSectionToBlockAlsoReads(
         BatchedCommandResponse batchedResponse;
         std::string unusedErrmsg;
         batchedResponse.parseBSON(commandReply, &unusedErrmsg);
-        invariant(batchedResponse.getNModified() > 0,
-                  str::stream() << "Update did not modify any doc from collection "
-                                << NamespaceString::kCollectionCriticalSectionsNamespace
-                                << " for namespace " << nss << " and reason " << reason);
+        tassert(7032363,
+                fmt::format("Update did not modify any doc from collection '{}' for namespace '{}' "
+                            "and reason '{}'",
+                            NamespaceString::kCollectionCriticalSectionsNamespace.toString(),
+                            nss.toString(),
+                            reason.toString()),
+                batchedResponse.getNModified() > 0);
     }
 
     WriteConcernResult ignoreResult;
@@ -352,7 +379,12 @@ void ShardingRecoveryService::releaseRecoverableCriticalSection(
                 "reason"_attr = reason,
                 "writeConcern"_attr = writeConcern);
 
-    invariant(!opCtx->lockState()->isLocked());
+    tassert(7032365,
+            fmt::format("Can't release recoverable critical section for collection '{}' with "
+                        "reason '{}' while holding locks",
+                        nss.toString(),
+                        reason.toString()),
+            !opCtx->lockState()->isLocked());
 
     {
         boost::optional<AutoGetDb> dbLock;
@@ -401,12 +433,13 @@ void ShardingRecoveryService::releaseRecoverableCriticalSection(
             return;
         }
 
-        invariant(
-            !isDifferentReason,
-            str::stream() << "Trying to release a critical for namespace " << nss << " and reason "
-                          << reason
-                          << " but it is already taken by another operation with different reason "
-                          << collCSDoc.getReason());
+        tassert(7032366,
+                fmt::format("Trying to release a critical for namespace '{}' and reason '{}' but "
+                            "it is already taken by another operation with different reason '{}'",
+                            nss.toString(),
+                            reason.toString(),
+                            collCSDoc.getReason().toString()),
+                !isDifferentReason);
 
 
         // The collection critical section is taken (in any phase), try to release it.
@@ -436,10 +469,13 @@ void ShardingRecoveryService::releaseRecoverableCriticalSection(
         BatchedCommandResponse batchedResponse;
         std::string unusedErrmsg;
         batchedResponse.parseBSON(commandReply, &unusedErrmsg);
-        invariant(batchedResponse.getN() > 0,
-                  str::stream() << "Delete did not remove any doc from collection "
-                                << NamespaceString::kCollectionCriticalSectionsNamespace
-                                << " for namespace " << nss << " and reason " << reason);
+        tassert(7032367,
+                fmt::format("Delete did not remove any doc from collection '{}' for namespace '{}' "
+                            "and reason '{}'",
+                            NamespaceString::kCollectionCriticalSectionsNamespace.toString(),
+                            nss.toString(),
+                            reason.toString()),
+                batchedResponse.getN() > 0);
     }
 
     WriteConcernResult ignoreResult;

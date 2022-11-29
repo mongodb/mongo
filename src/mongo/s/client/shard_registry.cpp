@@ -126,7 +126,9 @@ ShardRegistry::Cache::LookupResult ShardRegistry::_lookup(OperationContext* opCt
     invariant(key == _kSingleton);
     // This function can potentially block for a long time on network activity, so holding of locks
     // is disallowed.
-    invariant(!opCtx->lockState() || !opCtx->lockState()->isLocked());
+    tassert(7032320,
+            "Can't perform ShardRegistry lookup while holding locks",
+            !opCtx->lockState() || !opCtx->lockState()->isLocked());
 
 
     auto lastForcedReloadIncrement = _forceReloadIncrement.load();
