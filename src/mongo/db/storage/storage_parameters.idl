@@ -137,6 +137,23 @@ server_parameters:
         default: 16777216  # 16 MB
         validator: { gte: 1 }
 
+    maxNumberOfInsertsBatchInsertsForRenameAcrossDatabases:
+        description: >-
+            Maximum number of inserts that cross-db collection renames can batch into one applyOps
+            oplog entry.
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gMaxNumberOfInsertsBatchInsertsForRenameAcrossDatabases
+        default: 500
+
+    maxSizeOfBatchedInsertsForRenameAcrossDatabasesBytes:
+        description: >-
+            Maximum size (bytes) of each batched applyOps oplog entry for cross-db collection renames.
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gMaxSizeOfBatchedInsertsForRenameAcrossDatabasesBytes
+        default: 16776216 # BSONObjMaxUserSize - 1000
+
 feature_flags:
     featureFlagClusteredIndexes:
         description: "When enabled, support non time-series collections with clustered indexes"
@@ -194,4 +211,8 @@ feature_flags:
     featureFlagPointInTimeCatalogLookups:
         description: "Support reads when in-memory catalog is out-of-sync with storage transaction"
         cpp_varname: feature_flags::gPointInTimeCatalogLookups
+        default: false
+    featureFlagInternalWritesAreReplicatedTransactionally:
+        description: Feature flag to enable internal writes to use the transactionally replicated WriteUnitOfWork API by default.
+        cpp_varname: gFeatureFlagInternalWritesAreReplicatedTransactionally
         default: false

@@ -61,10 +61,7 @@ db_a.createCollection("rename7_capped", {capped: true, size: 10000});
 a = db_a.rename7_capped;
 b = db_b.rename7_capped;
 
-a.save({a: 1});
-a.save({a: 2});
-a.save({a: 3});
-
+a.insertMany([{a: 1}, {a: 2}, {a: 3}]);
 previousMaxSize = assert.commandWorked(a.stats()).maxSize;
 
 assert.commandWorked(

@@ -219,7 +219,8 @@ function testIdempotency(primary, testFun, testName) {
     let ops = oplog
                   .find({
                       op: {$ne: 'n'},
-                      ns: new RegExp('^' + mydb.getName()),
+                      // admin.$cmd needed for cross-db rename applyOps
+                      ns: new RegExp('^' + mydb.getName() + "|^admin\.[$]cmd$"),
                       'o.startIndexBuild': {$exists: false},
                       'o.abortIndexBuild': {$exists: false},
                       'o.commitIndexBuild': {$exists: false},

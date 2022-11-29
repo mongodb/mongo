@@ -128,6 +128,7 @@ env.Library(
 env.CppUnitTest(
     target='db_op_observer_test',
     source=[
+        'batched_write_policy_test.cpp',
         'op_observer_impl_test.cpp',
         'op_observer_registry_test.cpp',
         'user_write_block_mode_op_observer_test.cpp',
