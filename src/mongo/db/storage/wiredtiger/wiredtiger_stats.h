@@ -35,21 +35,38 @@
 
 namespace mongo {
 
-class WiredTigerOperationStats final : public StorageStats {
+class WiredTigerStats final : public StorageStats {
 public:
-    WiredTigerOperationStats() = default;
-    WiredTigerOperationStats(WT_SESSION* session);
+    /**
+     * Construct a new WiredTigerStats object with the statistics of the specified session.
+     */
+    WiredTigerStats(WT_SESSION*);
+
+    WiredTigerStats() = default;
+    WiredTigerStats(const WiredTigerStats&) = default;
+    WiredTigerStats(WiredTigerStats&&) = default;
 
     BSONObj toBSON() const final;
 
-    std::shared_ptr<StorageStats> clone() const final;
+    std::unique_ptr<StorageStats> clone() const final;
+
+    WiredTigerStats& operator=(WiredTigerStats&&);
 
     StorageStats& operator+=(const StorageStats&) final;
 
-    WiredTigerOperationStats& operator+=(const WiredTigerOperationStats&);
+    WiredTigerStats& operator+=(const WiredTigerStats&);
 
-private:
+    StorageStats& operator-=(const StorageStats&) final;
+
+    WiredTigerStats& operator-=(const WiredTigerStats&);
+
+protected:
     std::map<int, long long> _stats;
 };
+
+inline WiredTigerStats operator-(WiredTigerStats lhs, const WiredTigerStats& rhs) {
+    lhs -= rhs;
+    return lhs;
+}
 
 }  // namespace mongo
