@@ -40,6 +40,7 @@
 #include "mongo/db/exec/sbe/stages/spool.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/arith_common.h"
+#include "mongo/db/exec/sbe/values/value_printer.h"
 #include "mongo/db/exec/sbe/vm/datetime.h"
 #include "mongo/util/str.h"
 
@@ -120,7 +121,9 @@ vm::CodeFragment EConstant::compileDirect(CompileCtx& ctx) const {
 std::vector<DebugPrinter::Block> EConstant::debugPrint() const {
     std::vector<DebugPrinter::Block> ret;
     std::stringstream ss;
-    ss << std::make_pair(_tag, _val);
+    value::ValuePrinters::make(ss,
+                               PrintOptions().useTagForAmbiguousValues(true).normalizeOutput(true))
+        .writeValueToStream(_tag, _val);
 
     ret.emplace_back(ss.str());
 

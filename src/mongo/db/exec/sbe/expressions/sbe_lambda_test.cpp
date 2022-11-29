@@ -30,9 +30,11 @@
 #include "mongo/db/exec/sbe/expression_test_base.h"
 
 namespace mongo::sbe {
-using SBELambdaTest = EExpressionTestFixture;
+using SBELambdaTest = GoldenEExpressionTestFixture;
 
 TEST_F(SBELambdaTest, TraverseP_AddOneToArray) {
+    auto& os = gctx->outStream();
+
     value::ViewOfValueAccessor slotAccessor;
     auto argSlot = bindAccessor(&slotAccessor);
     FrameId frame = 10;
@@ -44,22 +46,21 @@ TEST_F(SBELambdaTest, TraverseP_AddOneToArray) {
                                                            makeE<EVariable>(frame, 0),
                                                            makeC(makeInt32(1)))),
                     makeC(makeNothing())));
+    printInputExpression(os, *expr);
+
     auto compiledExpr = compileExpression(*expr);
+    printCompiledExpression(os, *compiledExpr);
 
     auto bsonArr = BSON_ARRAY(1 << 2 << 3);
 
     slotAccessor.reset(value::TypeTags::bsonArray,
                        value::bitcastFrom<const char*>(bsonArr.objdata()));
-    auto [tag, val] = runCompiledExpression(compiledExpr.get());
-    value::ValueGuard guard(tag, val);
-
-    auto [tagExpected, valExpected] = makeArray(BSON_ARRAY(2 << 3 << 4));
-    value::ValueGuard expectedGuard(tagExpected, valExpected);
-
-    ASSERT_THAT(std::make_pair(tag, val), ValueEq(std::make_pair(tagExpected, valExpected)));
+    executeAndPrintVariation(os, *compiledExpr);
 }
 
 TEST_F(SBELambdaTest, TraverseF_OpEq) {
+    auto& os = gctx->outStream();
+
     value::ViewOfValueAccessor slotAccessor;
     auto argSlot = bindAccessor(&slotAccessor);
     FrameId frame = 10;
@@ -71,19 +72,22 @@ TEST_F(SBELambdaTest, TraverseF_OpEq) {
                                                            makeE<EVariable>(frame, 0),
                                                            makeC(makeInt32(3)))),
                     makeC(makeNothing())));
+    printInputExpression(os, *expr);
+
     auto compiledExpr = compileExpression(*expr);
+    printCompiledExpression(os, *compiledExpr);
+
     auto bsonArr = BSON_ARRAY(1 << 2 << 3 << 4);
 
     slotAccessor.reset(value::TypeTags::bsonArray,
                        value::bitcastFrom<const char*>(bsonArr.objdata()));
-    auto [tag, val] = runCompiledExpression(compiledExpr.get());
-
-    value::ValueGuard guard(tag, val);
-    ASSERT_THAT(std::make_pair(tag, val), ValueEq(makeBool(true)));
+    executeAndPrintVariation(os, *compiledExpr);
 }
 
 
 TEST_F(SBELambdaTest, TraverseF_WithLocalBind) {
+    auto& os = gctx->outStream();
+
     value::ViewOfValueAccessor slotAccessor;
     auto argSlot = bindAccessor(&slotAccessor);
     FrameId frame1 = 10;
@@ -101,22 +105,20 @@ TEST_F(SBELambdaTest, TraverseF_WithLocalBind) {
                                        sbe::makeE<EVariable>(frame2, 1),
                                        sbe::makeE<EVariable>(frame2, 2));
 
-
     auto expr = sbe::makeE<ELocalBind>(
         frame2,
         makeEs(makeE<EVariable>(argSlot), makeC(makeInt32(10)), makeC(makeInt32(20))),
         std::move(ifExpr));
+    printInputExpression(os, *expr);
 
     auto compiledExpr = compileExpression(*expr);
+    printCompiledExpression(os, *compiledExpr);
 
     auto bsonArr = BSON_ARRAY(1 << 2 << 3 << 4);
 
     slotAccessor.reset(value::TypeTags::bsonArray,
                        value::bitcastFrom<const char*>(bsonArr.objdata()));
-    auto [tag, val] = runCompiledExpression(compiledExpr.get());
-
-    value::ValueGuard guard(tag, val);
-    ASSERT_THAT(std::make_pair(tag, val), ValueEq(makeInt32(10)));
+    executeAndPrintVariation(os, *compiledExpr);
 }
 
 }  // namespace mongo::sbe

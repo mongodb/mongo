@@ -1,0 +1,19 @@
+# Golden test output of SBELambdaTest/TraverseP_AddOneToArray
+-- INPUT EXPRESSION:
+traverseP(s1, lambda(l10.0) { (l10.0 + 1) }, Nothing) 
+
+-- COMPILED EXPRESSION:
+[0x0000-0x002b]
+0x0000: jmp(target: 0x001c);
+0x0005: allocStack(size:1);
+0x000a: pushConstVal(value: 1);
+0x0014: add(popLhs: 0, offsetLhs: 0, popRhs: 1, offsetRhs: 0);
+0x001b: ret();
+0x001c: pushAccessVal(accessor: <accessor>);
+0x0025: traversePImm(k: Nothing, target: 0x0005);
+
+
+-- EXECUTE VARIATION:
+SLOTS: [1: [1, 2, 3]]
+RESULT: [2, 3, 4]
+

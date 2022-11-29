@@ -692,6 +692,8 @@ enum class Builtin : uint8_t {
     internalGreatest,  // helper functions for computation of sort keys
 };
 
+std::string builtinToString(Builtin b);
+
 /**
  * This enum defines indices into an 'Array' that returns the partial sum result when 'needsMerge'
  * is requested.

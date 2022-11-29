@@ -34,6 +34,8 @@
 #include "mongo/db/exec/sbe/sbe_unittest.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/exec/sbe/values/value_printer.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/exec/sbe/vm/vm_printer.h"
 #include "mongo/unittest/golden_test.h"
@@ -125,6 +127,8 @@ protected:
     }
 
     void executeAndPrintVariation(std::ostream& os, const vm::CodeFragment& code) {
+        auto valuePrinter = makeValuePrinter(os);
+
         os << "-- EXECUTE VARIATION:" << std::endl;
         if (!boundAccessors.empty()) {
             bool first = true;
@@ -135,14 +139,24 @@ protected:
                 } else {
                     first = false;
                 }
-                os << p.first << ": " << p.second->getViewOfValue();
+                os << p.first << ": ";
+
+                auto [tag, val] = p.second->getViewOfValue();
+                valuePrinter.writeValueToStream(tag, val);
             }
             os << "]" << std::endl;
+        }
 
+        try {
             auto [owned, tag, val] = _vm.run(&code);
             value::ValueGuard guard(owned, tag, val);
-            os << "RESULT: " << std::make_pair(tag, val) << std::endl << std::endl;
+            os << "RESULT: ";
+            valuePrinter.writeValueToStream(tag, val);
+            os << std::endl;
+        } catch (const DBException& e) {
+            os << "EXCEPTION: " << e.toString() << std::endl;
         }
+        os << std::endl;
     }
 
     void runAndAssertNothing(const vm::CodeFragment* compiledExpression) {
@@ -154,6 +168,12 @@ protected:
     static std::pair<value::TypeTags, value::Value> makeBsonArray(const BSONArray& ba) {
         return value::copyValue(value::TypeTags::bsonArray,
                                 value::bitcastFrom<const char*>(ba.objdata()));
+    }
+
+
+    static std::pair<value::TypeTags, value::Value> makeBsonObject(const BSONObj& bo) {
+        return value::copyValue(value::TypeTags::bsonObject,
+                                value::bitcastFrom<const char*>(bo.objdata()));
     }
 
     static std::pair<value::TypeTags, value::Value> makeArraySet(const BSONArray& arr) {
@@ -202,8 +222,34 @@ protected:
         return {arrTag, arrVal};
     }
 
+    static std::pair<value::TypeTags, value::Value> makeObject(const BSONObj& obj) {
+        auto [tmpTag, tmpVal] = makeBsonObject(obj);
+        value::ValueGuard tmpGuard{tmpTag, tmpVal};
+
+        value::ObjectEnumerator enumerator{tmpTag, tmpVal};
+
+        auto [objTag, objVal] = value::makeNewObject();
+        value::ValueGuard guard{objTag, objVal};
+
+        auto objView = value::getObjectView(objVal);
+
+        while (!enumerator.atEnd()) {
+            auto [tag, val] = enumerator.getViewOfValue();
+            auto [copyTag, copyVal] = value::copyValue(tag, val);
+            objView->push_back(enumerator.getFieldName(), copyTag, copyVal);
+            enumerator.advance();
+        }
+        guard.reset();
+
+        return {objTag, objVal};
+    }
+
     static std::pair<value::TypeTags, value::Value> makeNothing() {
         return {value::TypeTags::Nothing, value::bitcastFrom<int64_t>(0)};
+    }
+
+    static std::pair<value::TypeTags, value::Value> makeNull() {
+        return {value::TypeTags::Null, value::bitcastFrom<int64_t>(0)};
     }
 
     static std::pair<value::TypeTags, value::Value> makeInt32(int32_t value) {
@@ -234,12 +280,52 @@ protected:
         return makeC(p.first, p.second);
     }
 
+    template <typename Stream>
+    value::ValuePrinter<Stream> makeValuePrinter(Stream& stream) {
+        return value::ValuePrinters::make(
+            stream, PrintOptions().useTagForAmbiguousValues(true).normalizeOutput(true));
+    }
+
 private:
     value::SlotIdGenerator _slotIdGenerator;
     CoScanStage _emptyStage{kEmptyPlanNodeId};
     CompileCtx _ctx;
     vm::ByteCode _vm;
     std::vector<std::pair<value::SlotId, value::SlotAccessor*>> boundAccessors;
+};
+
+
+class GoldenEExpressionTestFixture : public EExpressionTestFixture {
+public:
+    GoldenEExpressionTestFixture() {}
+
+    void run() {
+        GoldenTestContext ctx(&goldenTestConfigSbe);
+        auto guard = ScopeGuard([&] { gctx = nullptr; });
+        gctx = &ctx;
+        gctx->printTestHeader(GoldenTestContext::HeaderFormat::Text);
+        Test::run();
+    }
+
+protected:
+    GoldenTestContext* gctx;
+};
+
+class ValueVectorGuard {
+    ValueVectorGuard() = delete;
+    ValueVectorGuard& operator=(const ValueVectorGuard&) = delete;
+
+public:
+    ValueVectorGuard(std::vector<TypedValue>& values) : _values(values) {}
+
+    ~ValueVectorGuard() {
+        for (auto p : _values) {
+            value::releaseValue(p.first, p.second);
+        }
+    }
+
+private:
+    std::vector<TypedValue>& _values;
 };
 
 }  // namespace mongo::sbe

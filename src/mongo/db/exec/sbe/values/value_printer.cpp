@@ -26,10 +26,13 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/db/exec/sbe/values/value_printer.h"
+#include <algorithm>
+#include <boost/format.hpp>
+
 #include "mongo/db/exec/sbe/values/makeobj_spec.h"
 #include "mongo/db/exec/sbe/values/sort_spec.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/exec/sbe/values/value_printer.h"
 #include "mongo/platform/basic.h"
 #include "mongo/util/pcre_util.h"
 
@@ -222,6 +225,45 @@ void ValuePrinter<T>::writeArrayToStream(TypeTags tag, Value val, size_t depth) 
 }
 
 template <typename T>
+void ValuePrinter<T>::writeSortedArraySetToStream(TypeTags tag, Value val, size_t depth) {
+    std::vector<std::pair<TypeTags, Value>> items;
+    for (auto ae = ArrayEnumerator{tag, val}; !ae.atEnd(); ae.advance()) {
+        items.push_back(ae.getViewOfValue());
+    }
+    std::sort(items.begin(),
+              items.end(),
+              [&](std::pair<TypeTags, Value> lhs, std::pair<TypeTags, Value> rhs) {
+                  auto [tagCmp, valCmp] =
+                      compareValue(lhs.first, lhs.second, rhs.first, rhs.second);
+                  return tagCmp == TypeTags::NumberInt32 && bitcastTo<int32_t>(valCmp) < 0;
+              });
+    stream << '[';
+    auto shouldTruncate = true;
+    size_t iter = 0;
+    if (auto it = items.begin(); it != items.end()) {
+        while (iter < options.arrayObjectOrNestingMaxDepth() &&
+               depth < options.arrayObjectOrNestingMaxDepth()) {
+            auto [aeTag, aeVal] = *it;
+            if (aeTag == TypeTags::Array || aeTag == TypeTags::Object) {
+                ++depth;
+            }
+            writeValueToStream(aeTag, aeVal, depth);
+            it++;
+            if (it == items.end()) {
+                shouldTruncate = false;
+                break;
+            }
+            stream << ", ";
+            ++iter;
+        }
+        if (shouldTruncate || depth > options.arrayObjectOrNestingMaxDepth()) {
+            stream << "...";
+        }
+    }
+    stream << ']';
+}
+
+template <typename T>
 void ValuePrinter<T>::writeObjectToStream(TypeTags tag, Value val, size_t depth) {
     stream << '{';
     auto shouldTruncate = true;
@@ -289,6 +331,14 @@ void ValuePrinter<T>::writeBsonRegexToStream(const BsonRegex& regex) {
 }
 
 template <typename T>
+void ValuePrinter<T>::writeNormalizedDouble(double value) {
+    std::stringstream ss;
+    ss.precision(std::numeric_limits<double>::max_digits10);
+    ss << (boost::format("%f") % value);
+    stream << ss.str();
+}
+
+template <typename T>
 void ValuePrinter<T>::writeValueToStream(TypeTags tag, Value val, size_t depth) {
     switch (tag) {
         case TypeTags::NumberInt32:
@@ -301,7 +351,11 @@ void ValuePrinter<T>::writeValueToStream(TypeTags tag, Value val, size_t depth) 
             }
             break;
         case TypeTags::NumberDouble:
-            stream << bitcastTo<double>(val);
+            if (options.normalizeOutput()) {
+                writeNormalizedDouble(bitcastTo<double>(val));
+            } else {
+                stream << bitcastTo<double>(val);
+            }
             if (options.useTagForAmbiguousValues()) {
                 stream << "L";
             }
@@ -343,9 +397,15 @@ void ValuePrinter<T>::writeValueToStream(TypeTags tag, Value val, size_t depth) 
             stream << ')';
             break;
         case TypeTags::Array:
-        case TypeTags::ArraySet:
         case TypeTags::bsonArray:
             writeArrayToStream(tag, val, depth);
+            break;
+        case TypeTags::ArraySet:
+            if (options.normalizeOutput()) {
+                writeSortedArraySetToStream(tag, val, depth);
+            } else {
+                writeArrayToStream(tag, val, depth);
+            }
             break;
         case TypeTags::Object:
         case TypeTags::bsonObject:
@@ -400,15 +460,8 @@ void ValuePrinter<T>::writeValueToStream(TypeTags tag, Value val, size_t depth) 
             break;
         }
         case TypeTags::Timestamp: {
-            if (options.useTagForAmbiguousValues()) {
-                writeTagToStream(tag);
-                stream << "(";
-            }
             Timestamp ts{bitcastTo<uint64_t>(val)};
             stream << ts.toString();
-            if (options.useTagForAmbiguousValues()) {
-                stream << ")";
-            }
             break;
         }
         case TypeTags::pcreRegex: {

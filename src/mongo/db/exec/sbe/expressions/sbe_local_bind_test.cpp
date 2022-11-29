@@ -30,9 +30,11 @@
 #include "mongo/db/exec/sbe/expression_test_base.h"
 
 namespace mongo::sbe {
-using SBELocalBindTest = EExpressionTestFixture;
+using SBELocalBindTest = GoldenEExpressionTestFixture;
 
 TEST_F(SBELocalBindTest, OneVariable) {
+    auto& os = gctx->outStream();
+
     value::ViewOfValueAccessor slotAccessor;
     FrameId frame = 10;
     auto expr = sbe::makeE<ELocalBind>(frame,
@@ -40,14 +42,17 @@ TEST_F(SBELocalBindTest, OneVariable) {
                                        makeE<EPrimBinary>(EPrimBinary::Op::add,
                                                           makeE<EVariable>(frame, 0),
                                                           makeE<EVariable>(frame, 0)));
-    auto compiledExpr = compileExpression(*expr);
-    auto [tag, val] = runCompiledExpression(compiledExpr.get());
-    value::ValueGuard guard(tag, val);
+    printInputExpression(os, *expr);
 
-    ASSERT_THAT(std::make_pair(tag, val), ValueEq(makeInt32(20)));
+    auto compiledExpr = compileExpression(*expr);
+    printCompiledExpression(os, *compiledExpr);
+
+    executeAndPrintVariation(os, *compiledExpr);
 }
 
 TEST_F(SBELocalBindTest, TwoVariables) {
+    auto& os = gctx->outStream();
+
     value::ViewOfValueAccessor slotAccessor;
     FrameId frame = 10;
     auto expr = sbe::makeE<ELocalBind>(frame,
@@ -55,14 +60,17 @@ TEST_F(SBELocalBindTest, TwoVariables) {
                                        makeE<EPrimBinary>(EPrimBinary::Op::add,
                                                           makeE<EVariable>(frame, 0),
                                                           makeE<EVariable>(frame, 1)));
-    auto compiledExpr = compileExpression(*expr);
-    auto [tag, val] = runCompiledExpression(compiledExpr.get());
-    value::ValueGuard guard(tag, val);
+    printInputExpression(os, *expr);
 
-    ASSERT_THAT(std::make_pair(tag, val), ValueEq(makeInt32(30)));
+    auto compiledExpr = compileExpression(*expr);
+    printCompiledExpression(os, *compiledExpr);
+
+    executeAndPrintVariation(os, *compiledExpr);
 }
 
 TEST_F(SBELocalBindTest, NestedBind1) {
+    auto& os = gctx->outStream();
+
     value::ViewOfValueAccessor slotAccessor;
     FrameId frame1 = 10;
     FrameId frame2 = 20;
@@ -76,15 +84,17 @@ TEST_F(SBELocalBindTest, NestedBind1) {
         frame2,
         makeEs(makeC(makeInt32(20))),
         makeE<EPrimBinary>(EPrimBinary::Op::add, std::move(bindExpr), makeE<EVariable>(frame2, 0)));
+    printInputExpression(os, *expr);
 
     auto compiledExpr = compileExpression(*expr);
-    auto [tag, val] = runCompiledExpression(compiledExpr.get());
-    value::ValueGuard guard(tag, val);
+    printCompiledExpression(os, *compiledExpr);
 
-    ASSERT_THAT(std::make_pair(tag, val), ValueEq(makeInt32(50)));
+    executeAndPrintVariation(os, *compiledExpr);
 }
 
 TEST_F(SBELocalBindTest, NestedBind2) {
+    auto& os = gctx->outStream();
+
     value::ViewOfValueAccessor slotAccessor;
     FrameId frame1 = 10;
     FrameId frame2 = 20;
@@ -99,12 +109,12 @@ TEST_F(SBELocalBindTest, NestedBind2) {
                                        makeE<EPrimBinary>(EPrimBinary::Op::add,
                                                           makeE<EVariable>(frame2, 0),
                                                           makeE<EVariable>(frame2, 1)));
+    printInputExpression(os, *expr);
 
     auto compiledExpr = compileExpression(*expr);
-    auto [tag, val] = runCompiledExpression(compiledExpr.get());
-    value::ValueGuard guard(tag, val);
+    printCompiledExpression(os, *compiledExpr);
 
-    ASSERT_THAT(std::make_pair(tag, val), ValueEq(makeInt32(60)));
+    executeAndPrintVariation(os, *compiledExpr);
 }
 
 }  // namespace mongo::sbe

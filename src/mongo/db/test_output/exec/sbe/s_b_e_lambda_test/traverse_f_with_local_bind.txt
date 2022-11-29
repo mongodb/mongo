@@ -1,0 +1,43 @@
+# Golden test output of SBELambdaTest/TraverseF_WithLocalBind
+-- INPUT EXPRESSION:
+
+    let [
+        l20.0 = s1 
+        l20.1 = 10 
+        l20.2 = 20 
+    ] 
+    in 
+        if traverseF(l20.0, lambda(l10.0) { (l10.0 == 3) }, Nothing) 
+        then l20.1 
+        else l20.2 
+
+
+-- COMPILED EXPRESSION:
+[0x0000-0x0063]
+0x0000: pushAccessVal(accessor: <accessor>);
+0x0009: pushConstVal(value: 10);
+0x0013: pushConstVal(value: 20);
+0x001d: jmp(target: 0x0039);
+0x0022: allocStack(size:1);
+0x0027: pushConstVal(value: 3);
+0x0031: eq(popLhs: 0, offsetLhs: 0, popRhs: 1, offsetRhs: 0);
+0x0038: ret();
+0x0039: pushLocalVal(arg: 2);
+0x003e: traverseFImm(k: False, target: 0x0022);
+0x0044: jmpNothing(target: 0x005d);
+0x0049: jmpTrue(target: 0x0058);
+0x004e: pushLocalVal(arg: 0);
+0x0053: jmp(target: 0x005d);
+0x0058: pushLocalVal(arg: 1);
+0x005d: swap();
+0x005e: pop();
+0x005f: swap();
+0x0060: pop();
+0x0061: swap();
+0x0062: pop();
+
+
+-- EXECUTE VARIATION:
+SLOTS: [1: [1, 2, 3, 4]]
+RESULT: 10
+

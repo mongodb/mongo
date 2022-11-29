@@ -86,6 +86,19 @@ protected:
     }
 };
 
+TEST_F(SBENumericTest, Compile) {
+    GoldenTestContext gctx(&goldenTestConfigSbe);
+    gctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
+    auto& os = gctx.outStream();
+
+    auto expr = test_detail::makeEFromNumber(
+        Decimal128(123), value::TypeTags::NumberDecimal, value::TypeTags::NumberInt64);
+    printInputExpression(os, *expr);
+
+    auto compiledExpr = compileExpression(*expr);
+    printCompiledExpression(os, *compiledExpr);
+}
+
 TEST_F(SBENumericTest, Int32ToInt64) {
     assertConversion(int32_t{-2147483648},
                      int64_t{-2147483648},

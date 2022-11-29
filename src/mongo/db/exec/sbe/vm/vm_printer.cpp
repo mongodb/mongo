@@ -29,6 +29,7 @@
 
 #include <boost/format.hpp>
 
+#include "mongo/db/exec/sbe/values/value_printer.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/exec/sbe/vm/vm_printer.h"
 #include "mongo/platform/basic.h"
@@ -176,6 +177,13 @@ public:
                 case Instruction::ret: {
                     break;
                 }
+                case Instruction::allocStack: {
+                    auto size = readFromMemory<uint32_t>(pcPointer);
+                    pcPointer += sizeof(size);
+                    os << "size:" << size;
+                    break;
+                }
+
                 // Instructions with 2 arguments and a collator.
                 case Instruction::collLess:
                 case Instruction::collLessEq:
@@ -302,7 +310,10 @@ public:
                     pcPointer += sizeof(tag);
                     auto val = readFromMemory<value::Value>(pcPointer);
                     pcPointer += sizeof(val);
-                    os << "value: " << std::make_pair(tag, val);
+                    os << "value: ";
+                    value::ValuePrinters::make(
+                        os, PrintOptions().useTagForAmbiguousValues(true).normalizeOutput(true))
+                        .writeValueToStream(tag, val);
                     break;
                 }
                 case Instruction::pushAccessVal:
@@ -344,7 +355,7 @@ public:
                         arity = readFromMemory<SmallArityType>(pcPointer);
                         pcPointer += sizeof(SmallArityType);
                     }
-                    os << "f: " << static_cast<uint8_t>(f) << ", arity: " << arity;
+                    os << "f: " << builtinToString(f) << ", arity: " << arity;
                     break;
                 }
                 case Instruction::dateTruncImm: {
