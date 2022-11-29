@@ -88,8 +88,8 @@ inline constexpr bool canBePhysicalNode() {
  * Represents scanning from an underlying collection and producing a single projection conceptually
  * containing the stream of BSON objects read from the collection.
  */
-class ScanNode final : public Operator<1>, public ExclusivelyLogicalNode {
-    using Base = Operator<1>;
+class ScanNode final : public ABTOpFixedArity<1>, public ExclusivelyLogicalNode {
+    using Base = ABTOpFixedArity<1>;
 
 public:
     static constexpr const char* kDefaultCollectionNameSpec = "collectionName";
@@ -119,8 +119,8 @@ private:
  * Optionally set of fields is specified to retrieve from the underlying collection, and expose as
  * projections.
  */
-class PhysicalScanNode final : public Operator<1>, public ExclusivelyPhysicalNode {
-    using Base = Operator<1>;
+class PhysicalScanNode final : public ABTOpFixedArity<1>, public ExclusivelyPhysicalNode {
+    using Base = ABTOpFixedArity<1>;
 
 public:
     PhysicalScanNode(FieldProjectionMap fieldProjectionMap,
@@ -154,8 +154,8 @@ private:
  * array. Each array element has as many entries as the number of projections plus one. If are
  * providing a row id, the first one must be of type RecordId.
  */
-class ValueScanNode final : public Operator<1>, public ExclusivelyLogicalNode {
-    using Base = Operator<1>;
+class ValueScanNode final : public ABTOpFixedArity<1>, public ExclusivelyLogicalNode {
+    using Base = ABTOpFixedArity<1>;
 
 public:
     ValueScanNode(ProjectionNameVector projections,
@@ -203,8 +203,8 @@ private:
  * of Nothing. A typical use case is to limit it to one document, and attach projections with a
  * following EvaluationNode(s).
  */
-class CoScanNode final : public Operator<0>, public ExclusivelyPhysicalNode {
-    using Base = Operator<0>;
+class CoScanNode final : public ABTOpFixedArity<0>, public ExclusivelyPhysicalNode {
+    using Base = ABTOpFixedArity<0>;
 
 public:
     CoScanNode();
@@ -217,8 +217,8 @@ public:
  * Retrieve data using an index. Return recordIds or values (if the index is covering).
  * This is a physical node.
  */
-class IndexScanNode final : public Operator<1>, public ExclusivelyPhysicalNode {
-    using Base = Operator<1>;
+class IndexScanNode final : public ABTOpFixedArity<1>, public ExclusivelyPhysicalNode {
+    using Base = ABTOpFixedArity<1>;
 
 public:
     IndexScanNode(FieldProjectionMap fieldProjectionMap, IndexSpecification indexSpec);
@@ -251,8 +251,8 @@ private:
  * TODO SERVER-68936: Can we let it advance with a limit based on upper rid limit in case of primary
  * index?
  */
-class SeekNode final : public Operator<2>, public ExclusivelyPhysicalNode {
-    using Base = Operator<2>;
+class SeekNode final : public ABTOpFixedArity<2>, public ExclusivelyPhysicalNode {
+    using Base = ABTOpFixedArity<2>;
 
 public:
     SeekNode(ProjectionName ridProjectionName,
@@ -284,8 +284,8 @@ private:
  * Logical group delegator node: scan from a given group.
  * Used in conjunction with memo.
  */
-class MemoLogicalDelegatorNode final : public Operator<0>, public ExclusivelyLogicalNode {
-    using Base = Operator<0>;
+class MemoLogicalDelegatorNode final : public ABTOpFixedArity<0>, public ExclusivelyLogicalNode {
+    using Base = ABTOpFixedArity<0>;
 
 public:
     MemoLogicalDelegatorNode(GroupIdType groupId);
@@ -302,8 +302,8 @@ private:
  * Physical group delegator node: refer to a physical node in a memo group.
  * Used in conjunction with memo.
  */
-class MemoPhysicalDelegatorNode final : public Operator<0>, public ExclusivelyPhysicalNode {
-    using Base = Operator<0>;
+class MemoPhysicalDelegatorNode final : public ABTOpFixedArity<0>, public ExclusivelyPhysicalNode {
+    using Base = ABTOpFixedArity<0>;
 
 public:
     MemoPhysicalDelegatorNode(MemoPhysicalNodeId nodeId);
@@ -322,8 +322,8 @@ private:
  *
  * This node is both logical and physical.
  */
-class FilterNode final : public Operator<2>, public Node {
-    using Base = Operator<2>;
+class FilterNode final : public ABTOpFixedArity<2>, public Node {
+    using Base = ABTOpFixedArity<2>;
 
 public:
     FilterNode(FilterType filter, ABT child);
@@ -343,8 +343,8 @@ public:
  *
  * This node is both logical and physical.
  */
-class EvaluationNode final : public Operator<2>, public Node {
-    using Base = Operator<2>;
+class EvaluationNode final : public ABTOpFixedArity<2>, public Node {
+    using Base = ABTOpFixedArity<2>;
 
 public:
     EvaluationNode(ProjectionName projectionName, ProjectionType projection, ABT child);
@@ -384,8 +384,8 @@ public:
  * restrict the type of operations on RIDs (in this case only set intersection) as opposed to say
  * filter on rid = 5.
  */
-class RIDIntersectNode final : public Operator<2>, public ExclusivelyLogicalNode {
-    using Base = Operator<2>;
+class RIDIntersectNode final : public ABTOpFixedArity<2>, public ExclusivelyLogicalNode {
+    using Base = ABTOpFixedArity<2>;
 
 public:
     RIDIntersectNode(ProjectionName scanProjectionName, ABT leftChild, ABT rightChild);
@@ -408,8 +408,8 @@ private:
  * RID union node.
  * This is a logical node representing index-index unioning. Used for index OR-ing.
  */
-class RIDUnionNode final : public Operator<2>, public ExclusivelyLogicalNode {
-    using Base = Operator<2>;
+class RIDUnionNode final : public ABTOpFixedArity<2>, public ExclusivelyLogicalNode {
+    using Base = ABTOpFixedArity<2>;
 
 public:
     RIDUnionNode(ProjectionName scanProjectionName, ABT leftChild, ABT rightChild);
@@ -442,8 +442,8 @@ private:
  *      PathGet "a" Traverse Id | scan_0     ->  [1, +inf], <none>
  *      PathGet "b" Id          | scan_0      -> (-inf, +inf),  "pb"
  */
-class SargableNode final : public Operator<3>, public ExclusivelyLogicalNode {
-    using Base = Operator<3>;
+class SargableNode final : public ABTOpFixedArity<3>, public ExclusivelyLogicalNode {
+    using Base = ABTOpFixedArity<3>;
 
 public:
     /**
@@ -508,8 +508,8 @@ MAKE_PRINTABLE_ENUM_STRING_ARRAY(JoinTypeEnum, JoinType, JOIN_TYPE);
  * Variables used in the inner (right) side are automatically bound with variables from the left
  * (outer) side.
  */
-class BinaryJoinNode final : public Operator<3>, public Node {
-    using Base = Operator<3>;
+class BinaryJoinNode final : public ABTOpFixedArity<3>, public Node {
+    using Base = ABTOpFixedArity<3>;
 
 public:
     BinaryJoinNode(JoinType joinType,
@@ -546,8 +546,8 @@ private:
  * It assumes the outer side is probe side and inner side is "build" side. Currently supports only
  * inner joins.
  */
-class HashJoinNode final : public Operator<3>, public ExclusivelyPhysicalNode {
-    using Base = Operator<3>;
+class HashJoinNode final : public ABTOpFixedArity<3>, public ExclusivelyPhysicalNode {
+    using Base = ABTOpFixedArity<3>;
 
 public:
     HashJoinNode(JoinType joinType,
@@ -580,8 +580,8 @@ private:
  * Merge Join node.
  * This is a physical node representing joining of two sorted inputs.
  */
-class MergeJoinNode final : public Operator<3>, public ExclusivelyPhysicalNode {
-    using Base = Operator<3>;
+class MergeJoinNode final : public ABTOpFixedArity<3>, public ExclusivelyPhysicalNode {
+    using Base = ABTOpFixedArity<3>;
 
 public:
     MergeJoinNode(ProjectionNameVector leftKeys,
@@ -618,8 +618,8 @@ private:
  *
  * This node is both logical and physical.
  */
-class UnionNode final : public OperatorDynamic<2>, public Node {
-    using Base = OperatorDynamic<2>;
+class UnionNode final : public ABTOpDynamicArity<2>, public Node {
+    using Base = ABTOpDynamicArity<2>;
 
 public:
     UnionNode(ProjectionNameVector unionProjectionNames, ABTVector children);
@@ -664,8 +664,8 @@ MAKE_PRINTABLE_ENUM_STRING_ARRAY(GroupNodeTypeEnum, GroupNodeType, GROUPNODETYPE
  * This node is logical with a default physical implementation corresponding to a hash group-by.
  * Projects the group-by column from its child, and adds aggregation expressions.
  */
-class GroupByNode : public Operator<5>, public Node {
-    using Base = Operator<5>;
+class GroupByNode : public ABTOpFixedArity<5>, public Node {
+    using Base = ABTOpFixedArity<5>;
 
 public:
     GroupByNode(ProjectionNameVector groupByProjectionNames,
@@ -728,8 +728,8 @@ private:
  *
  * This node is both logical and physical.
  */
-class UnwindNode final : public Operator<3>, public Node {
-    using Base = Operator<3>;
+class UnwindNode final : public ABTOpFixedArity<3>, public Node {
+    using Base = ABTOpFixedArity<3>;
 
 public:
     UnwindNode(ProjectionName projectionName,
@@ -778,8 +778,8 @@ private:
  * sequence of given projection names. It is similar to GroupBy using the given projections as a
  * compound grouping key.
  */
-class UniqueNode final : public Operator<2>, public ExclusivelyPhysicalNode {
-    using Base = Operator<2>;
+class UniqueNode final : public ABTOpFixedArity<2>, public ExclusivelyPhysicalNode {
+    using Base = ABTOpFixedArity<2>;
 
 public:
     UniqueNode(ProjectionNameVector projections, ABT child);
@@ -800,8 +800,8 @@ private:
  *
  * It represents an operator to collate (sort, or cluster) the input.
  */
-class CollationNode final : public Operator<2>, public Node {
-    using Base = Operator<2>;
+class CollationNode final : public ABTOpFixedArity<2>, public Node {
+    using Base = ABTOpFixedArity<2>;
 
 public:
     CollationNode(properties::CollationRequirement property, ABT child);
@@ -825,8 +825,8 @@ private:
  *
  * It limits the size of the input by a fixed amount.
  */
-class LimitSkipNode final : public Operator<1>, public Node {
-    using Base = Operator<1>;
+class LimitSkipNode final : public ABTOpFixedArity<1>, public Node {
+    using Base = ABTOpFixedArity<1>;
 
 public:
     LimitSkipNode(properties::LimitSkipRequirement property, ABT child);
@@ -851,8 +851,8 @@ private:
  *
  * This node is both logical and physical.
  */
-class ExchangeNode final : public Operator<2>, public Node {
-    using Base = Operator<2>;
+class ExchangeNode final : public ABTOpFixedArity<2>, public Node {
+    using Base = ABTOpFixedArity<2>;
 
 public:
     ExchangeNode(properties::DistributionRequirement distribution, ABT child);
@@ -878,8 +878,8 @@ private:
  *
  * This node is only logical.
  */
-class RootNode final : public Operator<2>, public Node {
-    using Base = Operator<2>;
+class RootNode final : public ABTOpFixedArity<2>, public Node {
+    using Base = ABTOpFixedArity<2>;
 
 public:
     RootNode(properties::ProjectionRequirement property, ABT child);

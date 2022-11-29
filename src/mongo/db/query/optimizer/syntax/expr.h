@@ -45,7 +45,7 @@ class ExpressionSyntaxSort {};
 /**
  * Holds a constant SBE value with corresponding type tag.
  */
-class Constant final : public Operator<0>, public ExpressionSyntaxSort {
+class Constant final : public ABTOpFixedArity<0>, public ExpressionSyntaxSort {
 public:
     Constant(sbe::value::TypeTags tag, sbe::value::Value val);
 
@@ -128,7 +128,7 @@ private:
  * for checking that the reference is valid (e.g., that the referenced binding is in scope) happens
  * elsewhere.
  */
-class Variable final : public Operator<0>, public ExpressionSyntaxSort {
+class Variable final : public ABTOpFixedArity<0>, public ExpressionSyntaxSort {
     ProjectionName _name;
 
 public:
@@ -146,8 +146,8 @@ public:
 /**
  * Models arithmetic and other operations that accept a single argument, for instance negate.
  */
-class UnaryOp final : public Operator<1>, public ExpressionSyntaxSort {
-    using Base = Operator<1>;
+class UnaryOp final : public ABTOpFixedArity<1>, public ExpressionSyntaxSort {
+    using Base = ABTOpFixedArity<1>;
     Operations _op;
 
 public:
@@ -176,8 +176,8 @@ public:
  * Models arithmetic, comparison, or logical operations that take two arguments, for instance add or
  * subtract.
  */
-class BinaryOp final : public Operator<2>, public ExpressionSyntaxSort {
-    using Base = Operator<2>;
+class BinaryOp final : public ABTOpFixedArity<2>, public ExpressionSyntaxSort {
+    using Base = ABTOpFixedArity<2>;
     Operations _op;
 
 public:
@@ -209,8 +209,8 @@ public:
 /**
  * Branching operator with a condition expression, "then" expression, and an "else" expression.
  */
-class If final : public Operator<3>, public ExpressionSyntaxSort {
-    using Base = Operator<3>;
+class If final : public ABTOpFixedArity<3>, public ExpressionSyntaxSort {
+    using Base = ABTOpFixedArity<3>;
 
 public:
     If(ABT inCond, ABT inThen, ABT inElse)
@@ -242,8 +242,8 @@ public:
  * Defines a variable from one expression and a specified name which is available to be referenced
  * in a second expression.
  */
-class Let final : public Operator<2>, public ExpressionSyntaxSort {
-    using Base = Operator<2>;
+class Let final : public ABTOpFixedArity<2>, public ExpressionSyntaxSort {
+    using Base = ABTOpFixedArity<2>;
 
     ProjectionName _varName;
 
@@ -276,8 +276,8 @@ public:
  * can be referenced within the lambda. The variable takes on the value to which LambdaAbstraction
  * is applied by its parent.
  */
-class LambdaAbstraction final : public Operator<1>, public ExpressionSyntaxSort {
-    using Base = Operator<1>;
+class LambdaAbstraction final : public ABTOpFixedArity<1>, public ExpressionSyntaxSort {
+    using Base = ABTOpFixedArity<1>;
 
     ProjectionName _varName;
 
@@ -308,8 +308,8 @@ public:
  * Evaluates an expression representing a function over an expression representing the argument to
  * the function.
  */
-class LambdaApplication final : public Operator<2>, public ExpressionSyntaxSort {
-    using Base = Operator<2>;
+class LambdaApplication final : public ABTOpFixedArity<2>, public ExpressionSyntaxSort {
+    using Base = ABTOpFixedArity<2>;
 
 public:
     LambdaApplication(ABT inLambda, ABT inArgument)
@@ -335,8 +335,8 @@ public:
  * Dynamic arity operator which passes its children as arguments to a function specified by SBE
  * function expression name.
  */
-class FunctionCall final : public OperatorDynamicHomogenous, public ExpressionSyntaxSort {
-    using Base = OperatorDynamicHomogenous;
+class FunctionCall final : public ABTOpDynamicArity<0>, public ExpressionSyntaxSort {
+    using Base = ABTOpDynamicArity<0>;
     std::string _name;
 
 public:
@@ -364,8 +364,8 @@ public:
  * child. That is, the expression is evaluated first, and it is used as an input value to the root
  * path element, which can then continue the computation recursively.
  */
-class EvalPath final : public Operator<2>, public ExpressionSyntaxSort {
-    using Base = Operator<2>;
+class EvalPath final : public ABTOpFixedArity<2>, public ExpressionSyntaxSort {
+    using Base = ABTOpFixedArity<2>;
 
 public:
     EvalPath(ABT inPath, ABT inInput) : Base(std::move(inPath), std::move(inInput)) {
@@ -397,8 +397,8 @@ public:
  * EvalFilter evaluates its path child over the result of its expression child. If the result of
  * the path application is false, the value is filtered out, otherwise it's returned up the tree.
  */
-class EvalFilter final : public Operator<2>, public ExpressionSyntaxSort {
-    using Base = Operator<2>;
+class EvalFilter final : public ABTOpFixedArity<2>, public ExpressionSyntaxSort {
+    using Base = ABTOpFixedArity<2>;
 
 public:
     EvalFilter(ABT inPath, ABT inInput) : Base(std::move(inPath), std::move(inInput)) {
@@ -429,7 +429,7 @@ public:
 /**
  * Represents a source of values typically from a collection.
  */
-class Source final : public Operator<0>, public ExpressionSyntaxSort {
+class Source final : public ABTOpFixedArity<0>, public ExpressionSyntaxSort {
 public:
     bool operator==(const Source& other) const {
         return true;

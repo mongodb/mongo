@@ -102,13 +102,17 @@ using ABT = algebra::PolyValue<Blackhole,
                                References,  // utilities
                                ExpressionBinder>;
 
+/**
+ * ABT operators which have a fixed arity.
+ */
 template <size_t Arity>
-using Operator = algebra::OpSpecificArity<ABT, Arity>;
+using ABTOpFixedArity = algebra::OpFixedArity<ABT, Arity>;
 
+/**
+ * ABT operators which have a dynamic arity with an optional known minimum.
+ */
 template <size_t Arity>
-using OperatorDynamic = algebra::OpSpecificDynamicArity<ABT, Arity>;
-
-using OperatorDynamicHomogenous = OperatorDynamic<0>;
+using ABTOpDynamicArity = algebra::OpDynamicArity<ABT, Arity>;
 
 using ABTVector = std::vector<ABT>;
 
@@ -249,7 +253,7 @@ inline boost::optional<Operations> negateComparisonOp(Operations op) {
  * This is a special inert ABT node. It is used by rewriters to preserve structural properties of
  * nodes during in-place rewriting.
  */
-class Blackhole final : public Operator<0> {
+class Blackhole final : public ABTOpFixedArity<0> {
 public:
     bool operator==(const Blackhole& other) const {
         return true;
@@ -267,8 +271,8 @@ public:
  * the optimizer developers.
  * On the other hand using Variables everywhere makes writing code more verbose, hence this helper.
  */
-class References final : public OperatorDynamicHomogenous {
-    using Base = OperatorDynamicHomogenous;
+class References final : public ABTOpDynamicArity<0> {
+    using Base = ABTOpDynamicArity<0>;
 
 public:
     /**
@@ -302,8 +306,8 @@ public:
  * node that introduces a new identifier must use this binder (i.e. all relational nodes adding new
  * projections).
  */
-class ExpressionBinder : public OperatorDynamicHomogenous {
-    using Base = OperatorDynamicHomogenous;
+class ExpressionBinder : public ABTOpDynamicArity<0> {
+    using Base = ABTOpDynamicArity<0>;
     ProjectionNameVector _names;
 
 public:

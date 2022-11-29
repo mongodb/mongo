@@ -44,7 +44,7 @@ using Tree = PolyValue<Leaf, BinaryNode, NaryNode, AtLeastBinaryNode>;
 /**
  * A leaf in the tree. Just contains data - in this case a double.
  */
-class Leaf : public OpSpecificArity<Tree, 0> {
+class Leaf : public OpFixedArity<Tree, 0> {
 public:
     Leaf(double x) : x(x) {}
 
@@ -54,30 +54,29 @@ public:
 /**
  * An inner node in the tree with exactly two children.
  */
-class BinaryNode : public OpSpecificArity<Tree, 2> {
+class BinaryNode : public OpFixedArity<Tree, 2> {
 public:
-    BinaryNode(Tree left, Tree right)
-        : OpSpecificArity<Tree, 2>(std::move(left), std::move(right)) {}
+    BinaryNode(Tree left, Tree right) : OpFixedArity<Tree, 2>(std::move(left), std::move(right)) {}
 };
 
 /**
  * An inner node in the tree with any number of children, zero or greater.
  */
-class NaryNode : public OpSpecificDynamicArity<Tree, 0> {
+class NaryNode : public OpDynamicArity<Tree, 0> {
 public:
-    NaryNode(std::vector<Tree> children) : OpSpecificDynamicArity<Tree, 0>(std::move(children)) {}
+    NaryNode(std::vector<Tree> children) : OpDynamicArity<Tree, 0>(std::move(children)) {}
 };
 
 /**
  * An inner node in the tree with 2 or more nodes.
  */
-class AtLeastBinaryNode : public OpSpecificDynamicArity<Tree, 2> {
+class AtLeastBinaryNode : public OpDynamicArity<Tree, 2> {
 public:
     /**
      * Notice the required number of nodes are given as separate arguments from the vector.
      */
     AtLeastBinaryNode(std::vector<Tree> children, Tree left, Tree right)
-        : OpSpecificDynamicArity<Tree, 2>(std::move(children), std::move(left), std::move(right)) {}
+        : OpDynamicArity<Tree, 2>(std::move(children), std::move(left), std::move(right)) {}
 };
 
 /**
@@ -88,7 +87,7 @@ public:
  *
  * Notice that each kind of node did not need to fill out some boilerplate "visit()" method or
  * anything like that. The PolyValue templating magic took care of all the boilerplate for us, and
- * the operator classes (e.g. OpSpecificArity) exposes the tree structure and children.
+ * the operator classes (e.g. OpFixedArity) exposes the tree structure and children.
  */
 class NodeTransporter {
 public:

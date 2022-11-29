@@ -48,8 +48,8 @@ class PathSyntaxSort {};
  *
  * It could also be expressed as lambda that ignores its input: \ _ . c
  */
-class PathConstant final : public Operator<1>, public PathSyntaxSort {
-    using Base = Operator<1>;
+class PathConstant final : public ABTOpFixedArity<1>, public PathSyntaxSort {
+    using Base = ABTOpFixedArity<1>;
 
 public:
     PathConstant(ABT inConstant) : Base(std::move(inConstant)) {
@@ -73,8 +73,8 @@ public:
  * A lambda path element - the expression must be a single argument lambda. The lambda is applied
  * with the input value.
  */
-class PathLambda final : public Operator<1>, public PathSyntaxSort {
-    using Base = Operator<1>;
+class PathLambda final : public ABTOpFixedArity<1>, public PathSyntaxSort {
+    using Base = ABTOpFixedArity<1>;
 
 public:
     PathLambda(ABT inLambda) : Base(std::move(inLambda)) {
@@ -98,7 +98,7 @@ public:
  *
  * Not permitted under EvalFilter.
  */
-class PathIdentity final : public Operator<0>, public PathSyntaxSort {
+class PathIdentity final : public ABTOpFixedArity<0>, public PathSyntaxSort {
 public:
     bool operator==(const PathIdentity& other) const {
         return true;
@@ -112,8 +112,8 @@ public:
  * Under EvalFilter: If input is Nothing then return the result of the child expression, otherwise
  *      return the child expression negated.
  */
-class PathDefault final : public Operator<1>, public PathSyntaxSort {
-    using Base = Operator<1>;
+class PathDefault final : public ABTOpFixedArity<1>, public PathSyntaxSort {
+    using Base = ABTOpFixedArity<1>;
 
 public:
     PathDefault(ABT inDefault) : Base(std::move(inDefault)) {
@@ -136,8 +136,8 @@ public:
  *
  * Not permitted under EvalPath.
  */
-class PathCompare : public Operator<1>, public PathSyntaxSort {
-    using Base = Operator<1>;
+class PathCompare : public ABTOpFixedArity<1>, public PathSyntaxSort {
+    using Base = ABTOpFixedArity<1>;
 
     Operations _cmp;
 
@@ -170,7 +170,7 @@ public:
  *
  * Not permitted under EvalFilter.
  */
-class PathDrop final : public Operator<0>, public PathSyntaxSort {
+class PathDrop final : public ABTOpFixedArity<0>, public PathSyntaxSort {
 public:
     PathDrop(FieldNameOrderedSet inNames) : _names(std::move(inNames)) {}
 
@@ -192,7 +192,7 @@ private:
  *
  * Not permitted in EvalFilter.
  */
-class PathKeep final : public Operator<0>, public PathSyntaxSort {
+class PathKeep final : public ABTOpFixedArity<0>, public PathSyntaxSort {
 public:
     PathKeep(FieldNameOrderedSet inNames) : _names(std::move(inNames)) {}
 
@@ -213,7 +213,7 @@ private:
  * Under EvalPath: If input is an object then return it unmodified, otherwise return Nothing.
  * Under EvalFilter: If input is an object then return true, otherwise return false.
  */
-class PathObj final : public Operator<0>, public PathSyntaxSort {
+class PathObj final : public ABTOpFixedArity<0>, public PathSyntaxSort {
 public:
     bool operator==(const PathObj& other) const {
         return true;
@@ -225,7 +225,7 @@ public:
  * Under EvalPath: If input is an object then return it unmodified, otherwise return Nothing.
  * Under EvalFilter: If input is an object then return true, otherwise return false.
  */
-class PathArr final : public Operator<0>, public PathSyntaxSort {
+class PathArr final : public ABTOpFixedArity<0>, public PathSyntaxSort {
 public:
     bool operator==(const PathArr& other) const {
         return true;
@@ -242,8 +242,8 @@ public:
  * Specifies a maximum depth of the traversal: how many nested arrays are we allowed to descend. "0"
  * denotes unlimited depth.
  */
-class PathTraverse final : public Operator<1>, public PathSyntaxSort {
-    using Base = Operator<1>;
+class PathTraverse final : public ABTOpFixedArity<1>, public PathSyntaxSort {
+    using Base = ABTOpFixedArity<1>;
 
 public:
     static constexpr size_t kUnlimited = 0;
@@ -287,8 +287,8 @@ private:
  *
  * Not permitted in EvalFilter.
  */
-class PathField final : public Operator<1>, public PathSyntaxSort {
-    using Base = Operator<1>;
+class PathField final : public ABTOpFixedArity<1>, public PathSyntaxSort {
+    using Base = ABTOpFixedArity<1>;
     FieldNameType _name;
 
 public:
@@ -321,8 +321,8 @@ public:
  *
  * The specified field name is treated as a simple path.
  */
-class PathGet final : public Operator<1>, public PathSyntaxSort {
-    using Base = Operator<1>;
+class PathGet final : public ABTOpFixedArity<1>, public PathSyntaxSort {
+    using Base = ABTOpFixedArity<1>;
     FieldNameType _name;
 
 public:
@@ -354,8 +354,8 @@ public:
  * Under EvalFilter: evaluates both inner paths over the input. Returns true if both inner paths
  * return true.
  */
-class PathComposeM final : public Operator<2>, public PathSyntaxSort {
-    using Base = Operator<2>;
+class PathComposeM final : public ABTOpFixedArity<2>, public PathSyntaxSort {
+    using Base = ABTOpFixedArity<2>;
 
 public:
     PathComposeM(ABT inPath1, ABT inPath2) : Base(std::move(inPath1), std::move(inPath2)) {
@@ -388,8 +388,8 @@ public:
  *
  * Not permitted within EvalPath.
  */
-class PathComposeA final : public Operator<2>, public PathSyntaxSort {
-    using Base = Operator<2>;
+class PathComposeA final : public ABTOpFixedArity<2>, public PathSyntaxSort {
+    using Base = ABTOpFixedArity<2>;
 
 public:
     PathComposeA(ABT inPath1, ABT inPath2) : Base(std::move(inPath1), std::move(inPath2)) {
