@@ -713,7 +713,7 @@ StatusWith<std::unique_ptr<PlanCacheIndexTree>> QueryPlanner::cacheDataFromTagge
         }
 
         for (const auto& dest : orPushdownTag->getDestinations()) {
-            IndexTag* indexTag = static_cast<IndexTag*>(dest.tagData.get());
+            IndexTag* indexTag = checked_cast<IndexTag*>(dest.tagData.get());
             PlanCacheIndexTree::OrPushdown orPushdown{relevantIndices[indexTag->index].identifier,
                                                       indexTag->pos,
                                                       indexTag->canCombineBounds,

@@ -863,7 +863,7 @@ void QueryPlannerAccess::finishTextNode(QuerySolutionNode* node, const IndexEntr
         // stash in prefixExprs.
         size_t curChild = 0;
         while (curChild < amExpr->numChildren()) {
-            IndexTag* ixtag = static_cast<IndexTag*>(amExpr->getChild(curChild)->getTag());
+            IndexTag* ixtag = checked_cast<IndexTag*>(amExpr->getChild(curChild)->getTag());
             invariant(nullptr != ixtag);
             // Skip this child if it's not part of a prefix, or if we've already assigned a
             // predicate to this prefix position.
@@ -1187,7 +1187,7 @@ bool QueryPlannerAccess::processIndexScans(const CanonicalQuery& query,
             break;
         }
 
-        scanState.ixtag = static_cast<IndexTag*>(child->getTag());
+        scanState.ixtag = checked_cast<IndexTag*>(child->getTag());
         // If there's a tag it must be valid.
         verify(IndexTag::kNoIndex != scanState.ixtag->index);
 
@@ -1213,7 +1213,7 @@ bool QueryPlannerAccess::processIndexScans(const CanonicalQuery& query,
         // If 'child' is a NOT, then the tag we're interested in is on the NOT's
         // child node.
         if (MatchExpression::NOT == child->matchType()) {
-            scanState.ixtag = static_cast<IndexTag*>(child->getChild(0)->getTag());
+            scanState.ixtag = checked_cast<IndexTag*>(child->getChild(0)->getTag());
             invariant(IndexTag::kNoIndex != scanState.ixtag->index);
         }
 
@@ -1335,13 +1335,13 @@ bool QueryPlannerAccess::processIndexScansElemMatch(
     for (size_t i = 0; i < emChildren.size(); ++i) {
         MatchExpression* emChild = emChildren[i];
         invariant(nullptr != emChild->getTag());
-        scanState->ixtag = static_cast<IndexTag*>(emChild->getTag());
+        scanState->ixtag = checked_cast<IndexTag*>(emChild->getTag());
 
         // If 'emChild' is a NOT, then the tag we're interested in is on the NOT's
         // child node.
         if (MatchExpression::NOT == emChild->matchType()) {
             invariant(nullptr != emChild->getChild(0)->getTag());
-            scanState->ixtag = static_cast<IndexTag*>(emChild->getChild(0)->getTag());
+            scanState->ixtag = checked_cast<IndexTag*>(emChild->getChild(0)->getTag());
             invariant(IndexTag::kNoIndex != scanState->ixtag->index);
         }
 
@@ -1652,7 +1652,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::_buildIndexedDataAccess(
             return nullptr;
         } else if (Indexability::isBoundsGenerating(root)) {
             // Make an index scan over the tagged index #.
-            IndexTag* tag = static_cast<IndexTag*>(root->getTag());
+            IndexTag* tag = checked_cast<IndexTag*>(root->getTag());
 
             IndexBoundsBuilder::BoundsTightness tightness = IndexBoundsBuilder::EXACT;
 
