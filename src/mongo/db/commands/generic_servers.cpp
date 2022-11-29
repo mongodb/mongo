@@ -156,8 +156,11 @@ HostInfoReply HostInfoCmd::Invocation::typedRun(OperationContext*) {
     system.setMemSizeMB(static_cast<long>(p.getSystemMemSizeMB()));
     system.setMemLimitMB(static_cast<long>(p.getMemSizeMB()));
     system.setNumCores(static_cast<int>(p.getNumAvailableCores()));
+    system.setNumPhysicalCores(static_cast<int>(p.getNumPhysicalCores()));
+    system.setNumCpuSockets(static_cast<int>(p.getNumCpuSockets()));
     system.setCpuArch(p.getArch());
     system.setNumaEnabled(p.hasNumaEnabled());
+    system.setNumNumaNodes(static_cast<int>(p.getNumNumaNodes()));
 
     HostInfoOsReply os;
     os.setType(p.getOsType());

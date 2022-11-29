@@ -64,8 +64,11 @@ structs:
             memSizeMB: long
             memLimitMB: long
             numCores: int
+            numPhysicalCores: int
+            numCpuSockets: int
             cpuArch: string
             numaEnabled: bool
+            numNumaNodes: int
 
     hostInfoOsReply:
         description: "hostInfo.os reply fields"

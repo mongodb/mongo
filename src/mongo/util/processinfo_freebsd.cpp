@@ -92,10 +92,6 @@ int getSysctlByNameWithDefault<std::string>(const char* sysctlName,
     return 0;
 }
 
-bool ProcessInfo::checkNumaEnabled() {
-    return false;
-}
-
 int ProcessInfo::getVirtualMemorySize() {
     kvm_t* kd = NULL;
     int cnt = 0;
@@ -164,7 +160,7 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
 
     pageSize = static_cast<unsigned long long>(sysconf(_SC_PAGESIZE));
 
-    hasNuma = checkNumaEnabled();
+    hasNuma = false;
 }
 
 void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {}
