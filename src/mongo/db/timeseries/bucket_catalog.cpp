@@ -1428,6 +1428,10 @@ StatusWith<std::unique_ptr<BucketCatalog::Bucket>> BucketCatalog::_rehydrateBuck
         std::make_unique<Bucket>(bucketId, stripeNumber, key.hash, &_bucketStateManager);
 
     const bool isCompressed = timeseries::isCompressedBucket(bucketDoc);
+    if (isCompressed) {
+        // TODO (SERVER-69907): Allow opening compressed bucket
+        return Status{ErrorCodes::BadValue, "Reopening uncompressed buckets is not supported yet"};
+    }
 
     // Initialize the remaining member variables from the bucket document.
     bucket->setNamespace(ns);
