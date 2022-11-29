@@ -91,10 +91,6 @@ public:
         lastTearDown();
     }
 
-    void runOnExec(ServiceExecutor::TaskRunner* taskRunner, ServiceExecutor::Task task) {
-        taskRunner->schedule(std::move(task));
-    }
-
     stdx::mutex mu;  // NOLINT
     int nThreads = 0;
     ServiceContext* sc;
@@ -105,8 +101,7 @@ auto maxThreads = 2 * ProcessInfo::getNumCores();
 
 BENCHMARK_DEFINE_F(ServiceExecutorSynchronousBm, ScheduleTask)(benchmark::State& state) {
     for (auto _ : state) {
-        auto runner = executor()->makeTaskRunner();
-        runOnExec(&*runner, [](Status) {});
+        executor()->makeTaskRunner()->schedule([](Status) {});
     }
 }
 BENCHMARK_REGISTER_F(ServiceExecutorSynchronousBm, ScheduleTask)->ThreadRange(1, maxThreads);
@@ -116,7 +111,7 @@ BENCHMARK_DEFINE_F(ServiceExecutorSynchronousBm, ScheduleAndWait)(benchmark::Sta
     for (auto _ : state) {
         auto runner = executor()->makeTaskRunner();
         Notification done;
-        runOnExec(&*runner, [&](Status) { done.set(); });
+        runner->schedule([&](Status) { done.set(); });
         done.get();
     }
 }
@@ -125,7 +120,7 @@ BENCHMARK_REGISTER_F(ServiceExecutorSynchronousBm, ScheduleAndWait)->ThreadRange
 BENCHMARK_DEFINE_F(ServiceExecutorSynchronousBm, ChainedSchedule)(benchmark::State& state) {
     int chainDepth = state.range(0);
     struct LoopState {
-        std::shared_ptr<ServiceExecutor::TaskRunner> runner;
+        std::shared_ptr<ServiceExecutor::Executor> runner;
         Notification done;
         unittest::Barrier startingLine{2};
     };
@@ -133,7 +128,7 @@ BENCHMARK_DEFINE_F(ServiceExecutorSynchronousBm, ChainedSchedule)(benchmark::Sta
     std::function<void(Status)> chainedTask = [&](Status) { loopStatePtr->done.set(); };
     for (int step = 0; step != chainDepth; ++step)
         chainedTask = [this, chainedTask, &loopStatePtr](Status) {
-            runOnExec(&*loopStatePtr->runner, chainedTask);
+            loopStatePtr->runner->schedule(chainedTask);
         };
 
     // The first scheduled task starts the worker thread. This test is
@@ -149,9 +144,9 @@ BENCHMARK_DEFINE_F(ServiceExecutorSynchronousBm, ChainedSchedule)(benchmark::Sta
             {},
         };
         loopStatePtr = &loopState;
-        runOnExec(&*loopStatePtr->runner, [&](Status s) {
+        loopStatePtr->runner->schedule([&](Status s) {
             loopState.startingLine.countDownAndWait();
-            runOnExec(&*loopStatePtr->runner, chainedTask);
+            loopStatePtr->runner->schedule(chainedTask);
         });
         state.ResumeTiming();
         loopState.startingLine.countDownAndWait();
@@ -159,7 +154,7 @@ BENCHMARK_DEFINE_F(ServiceExecutorSynchronousBm, ChainedSchedule)(benchmark::Sta
     }
 }
 BENCHMARK_REGISTER_F(ServiceExecutorSynchronousBm, ChainedSchedule)
-    ->Range(1, 2 << 10)
+    ->Range(1, 1 << 8)
     ->ThreadRange(1, maxThreads);
 
 }  // namespace

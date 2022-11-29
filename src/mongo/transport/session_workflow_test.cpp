@@ -52,7 +52,6 @@
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_entry_point_impl.h"
 #include "mongo/transport/service_executor.h"
-#include "mongo/transport/service_executor_utils.h"
 #include "mongo/transport/session_workflow.h"
 #include "mongo/transport/session_workflow_test_util.h"
 #include "mongo/transport/transport_layer_mock.h"

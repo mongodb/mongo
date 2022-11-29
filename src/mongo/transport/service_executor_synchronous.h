@@ -29,69 +29,109 @@
 
 #pragma once
 
-#include <deque>
+#include <memory>
+#include <string>
 
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/service_context.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
-#include "mongo/stdx/condition_variable.h"
 #include "mongo/transport/service_executor.h"
-#include "mongo/util/hierarchical_acquisition.h"
+#include "mongo/util/duration.h"
 
-namespace mongo {
-namespace transport {
-
-/** Transitional for differential benchmarking of ServiceExecutorSynchronous refactor */
-#define TRANSITIONAL_SERVICE_EXECUTOR_SYNCHRONOUS_HAS_RESERVE 0
+namespace mongo::transport {
 
 /**
- * Creates a fresh worker thread for each top-level scheduled task. Any tasks
- * scheduled during the execution of that top-level task as it runs on such a
- * worker thread are pushed to the queue of that worker thread.
- *
- * Thus, the top-level task is expected to represent a chain of operations, each
- * of which schedules its successor before returning. The entire chain of
- * operations, and nothing else, executes on the same worker thread.
+ * Transitional for differential benchmarking of ServiceExecutorSynchronous refactor.
+ * Can be removed when it's no longer necessary to benchmark the refactor.
+ * Picked up by service_executor_bm.cpp to detect this newer API.
  */
-class ServiceExecutorSynchronous final : public ServiceExecutor {
+#define TRANSITIONAL_SERVICE_EXECUTOR_SYNCHRONOUS_HAS_RESERVE 1
+
+/**
+ * ServiceExecutorSynchronous is just a special case of ServiceExecutorReserved,
+ * Which just happens to have `reservedTheads == 0`. Both are implemented by
+ * this base class.
+ *
+ * It will start `reservedThreads` on start, and create enough new threads every
+ * time it gives out a lease, that there are at least `reservedThreads`
+ * available for work (as long as spawning is possible). This means that even
+ * when we hit the NPROC ulimit, and spawning is temporarily failing, there will
+ * still be threads ready to accept work.
+ *
+ * When a lease is released, the worker will go back to waiting for work if
+ * there are no more than `reservedThreads + maxIdleThreads` available.
+ * Otherwise it will be destroyed. This means that `reservedThreads` are for
+ * emergency use only, while the `maxIdleThreads` specifies the strength of an
+ * optimization that minimizes the churn of worker threads. With
+ * `maxIdleThreads==0`, every worker lease would spawn a new thread, which is
+ * very wasteful.
+ */
+class ServiceExecutorSyncBase : public ServiceExecutor {
 public:
-    /** Returns the ServiceExecutorSynchronous decoration on `ctx`. */
-    static ServiceExecutorSynchronous* get(ServiceContext* ctx);
-
-    explicit ServiceExecutorSynchronous(ServiceContext*);
-
-    ~ServiceExecutorSynchronous();
+    ~ServiceExecutorSyncBase() override;
 
     Status start() override;
     Status shutdown(Milliseconds timeout) override;
 
-    std::unique_ptr<TaskRunner> makeTaskRunner() override;
+    std::unique_ptr<Executor> makeTaskRunner() override;
 
     size_t getRunningThreads() const override;
 
     void appendStats(BSONObjBuilder* bob) const override;
 
-private:
-    class SharedState;
-
+protected:
     /**
-     * The behavior of `schedule` depends on whether the calling thread is a
-     * worker thread spawned by a previous `schedule` call.
+     * `reservedThreads` - At `start` time and at `makeTaskRunner` time, workers
+     * will be spawned until this number of available threads is reached. This
+     * is intended as a minimum bulwark against periods during which workers
+     * cannot spawn.
      *
-     * If a nonworker thread schedules a task, a worker thread is spawned, and
-     * the task is transferred to the new worker thread's queue.
-     *
-     * If a worker thread schedules a task, the task is pushed to the back of its
-     * queue. The worker thread exits when the queue becomes empty.
+     * `maxIdleThreads` - When a worker lease is released, the corresponding
+     * worker can be destroyed, or it can be kept for use by the next lease.
+     * This parameter specifies the upper limit on the number of such kept
+     * threads, not counting reserved threads.
      */
-    void _schedule(Task task);
+    ServiceExecutorSyncBase(std::string name,
+                            size_t reservedThreads,
+                            size_t maxIdleThreads,
+                            std::string statLabel);
 
-    void _runOnDataAvailable(const SessionHandle& session, Task onCompletionCallback);
+private:
+    class Impl;
 
-
-    std::shared_ptr<SharedState> _sharedState;
+    std::shared_ptr<Impl> _impl;
 };
 
-}  // namespace transport
-}  // namespace mongo
+/**
+ * Provides access to a pool of dedicated worker threads via `makeTaskRunner`,
+ * which retuns a worker lease. A worker lease is a handle that acts as an
+ * executor, accepting tasks. The leased worker thread is dedicated, meaning it
+ * will only work through the lease handle: all tasks scheduled on that
+ * lease will be run on that worker, and no other tasks.
+ *
+ * A worker thread may be reused and leased many times, but only serially so.
+ */
+class ServiceExecutorSynchronous : public ServiceExecutorSyncBase {
+public:
+    static inline size_t defaultReserved = 0; /** For testing */
+
+    /** Returns the ServiceExecutorSynchronous decoration on `ctx`. */
+    static ServiceExecutorSynchronous* get(ServiceContext* ctx);
+
+    ServiceExecutorSynchronous();
+};
+
+/**
+ * Same as ServiceExecutorSynchronous (implemented by the same base class), but
+ * ServiceExecutorReserved has the additional property of having configurable
+ * `reservedThreads` and `maxIdleThreads` counts. See base class docs.
+ */
+class ServiceExecutorReserved : public ServiceExecutorSyncBase {
+public:
+    /** Null result is possible, as ServiceExecutorReserved could be absent. */
+    static ServiceExecutorReserved* get(ServiceContext* ctx);
+
+    ServiceExecutorReserved(std::string name, size_t reservedThreads, size_t maxIdleThreads);
+};
+
+}  // namespace mongo::transport

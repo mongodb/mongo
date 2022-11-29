@@ -416,7 +416,7 @@ public:
         return ServiceExecutorContext::get(client())->getServiceExecutor();
     }
 
-    std::shared_ptr<ServiceExecutor::TaskRunner> taskRunner() {
+    std::shared_ptr<ServiceExecutor::Executor> taskRunner() {
         auto exec = executor();
         // Allows switching the executor between iterations of the workflow.
         if (MONGO_unlikely(!_taskRunner.source || _taskRunner.source != exec))
@@ -436,9 +436,21 @@ private:
     class WorkItem;
 
     struct RunnerAndSource {
-        std::shared_ptr<ServiceExecutor::TaskRunner> runner;
+        std::shared_ptr<ServiceExecutor::Executor> runner;
         ServiceExecutor* source = nullptr;
     };
+
+    /**
+     * Notify the task runner that this would be a good time to yield. It might
+     * not actually yield, depending on implementation and on overall system
+     * state.
+     *
+     * Yielding at certain points in a command's processing pipeline has been
+     * considered to be beneficial to performance.
+     */
+    void _yieldPointReached() {
+        taskRunner()->yieldPointReached();
+    }
 
     /** Alias: refers to this Impl, but holds a ref to the enclosing workflow. */
     std::shared_ptr<Impl> shared_from_this() {
@@ -686,6 +698,7 @@ void SessionWorkflow::Impl::scheduleNewLoop(Status status) try {
             // If we're in exhaust, we're not expecting more data.
             taskRunner()->schedule(std::move(cb));
         } else {
+            _yieldPointReached();
             taskRunner()->runOnDataAvailable(session(), std::move(cb));
         }
     } catch (const DBException& ex) {
@@ -723,13 +736,7 @@ void SessionWorkflow::Impl::startNewLoop(const Status& executorStatus) {
             if (_work->hasOut()) {
                 sendMessage();
                 _metrics.sent(*session());
-
-                // Performance testing showed a significant benefit from yielding here.
-                // TODO SERVER-57531: Once we enable the use of a fixed-size thread pool
-                // for handling client connection handshaking, we should only yield here if
-                // we're on a dedicated thread.
-                executor()->yieldIfAppropriate();
-
+                _yieldPointReached();
                 _metrics.yielded();
             }
         })

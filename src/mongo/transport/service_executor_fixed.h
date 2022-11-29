@@ -78,7 +78,7 @@ public:
      */
     int getRecursionDepthForExecutorThread() const;
 
-    std::unique_ptr<TaskRunner> makeTaskRunner() override;
+    std::unique_ptr<Executor> makeTaskRunner() override;
 
 private:
     enum class State { kNotStarted, kRunning, kStopping, kStopped };
@@ -109,6 +109,8 @@ private:
 
     /** Requires `_mutex` locked by `lk`. */
     bool _waitForStop(stdx::unique_lock<Mutex>& lk, boost::optional<Milliseconds> timeout);
+
+    void _yield() const;
 
     /** `_state` transitions: kNotStarted -> kRunning -> kStopping -> kStopped */
     State _state = State::kNotStarted;

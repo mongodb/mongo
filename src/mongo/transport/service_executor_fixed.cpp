@@ -37,6 +37,7 @@
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/processinfo.h"
 #include "mongo/util/testing_proctor.h"
 #include "mongo/util/thread_safety_context.h"
 
@@ -332,7 +333,7 @@ void ServiceExecutorFixed::_beginShutdown() {
             _checkForShutdown();
             break;
         case State::kStopping:
-            break;  // Just nead to wait it out.
+            break;  // Just need to wait it out.
         case State::kStopped:
             break;
     }
@@ -406,8 +407,6 @@ size_t ServiceExecutorFixed::getRunningThreads() const {
 void ServiceExecutorFixed::_runOnDataAvailable(const SessionHandle& session,
                                                Task onCompletionCallback) {
     invariant(session);
-    yieldIfAppropriate();
-
     // Make sure we're still allowed to schedule and track the session
     auto lk = stdx::unique_lock(_mutex);
     if (_state != State::kRunning) {
@@ -452,11 +451,17 @@ int ServiceExecutorFixed::getRecursionDepthForExecutorThread() const {
     return _executorContext->getRecursionDepth();
 }
 
-auto ServiceExecutorFixed::makeTaskRunner() -> std::unique_ptr<TaskRunner> {
+void ServiceExecutorFixed::_yield() const {
+    static const auto cores = ProcessInfo::getNumAvailableCores();
+    if (getRunningThreads() > cores)
+        stdx::this_thread::yield();
+}
+
+auto ServiceExecutorFixed::makeTaskRunner() -> std::unique_ptr<Executor> {
     iassert(ErrorCodes::ShutdownInProgress, "Executor is not running", _state == State::kRunning);
 
     /** Schedules on this. */
-    class ForwardingTaskRunner : public TaskRunner {
+    class ForwardingTaskRunner : public Executor {
     public:
         explicit ForwardingTaskRunner(ServiceExecutorFixed* e) : _e{e} {}
 
@@ -464,8 +469,12 @@ auto ServiceExecutorFixed::makeTaskRunner() -> std::unique_ptr<TaskRunner> {
             _e->_schedule(std::move(task));
         }
 
-        void runOnDataAvailable(std::shared_ptr<Session> session, Task task) override {
-            _e->_runOnDataAvailable(std::move(session), std::move(task));
+        void runOnDataAvailable(const std::shared_ptr<Session>& session, Task task) override {
+            _e->_runOnDataAvailable(session, std::move(task));
+        }
+
+        void yieldPointReached() const override {
+            _e->_yield();
         }
 
     private:
