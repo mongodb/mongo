@@ -50,8 +50,7 @@ function testMetricsArePresent(mongo, expectedMetrics, minOplogEntriesFetchedAnd
 
 function verifyStatsMissing(mongo) {
     const stats = mongo.getDB('admin').serverStatus({});
-    assert(!stats.hasOwnProperty('shardingStatistics') ||
-               !stats.shardingStatistics.hasOwnProperty('resharding'),
+    assert(!stats.shardingStatistics.hasOwnProperty('resharding'),
            `Resharding section not expected in ${tojson(stats)}`);
 }
 
