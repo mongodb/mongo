@@ -130,8 +130,11 @@ public:
         bSys.append("memSizeMB", static_cast<long long>(p.getSystemMemSizeMB()));
         bSys.append("memLimitMB", static_cast<long long>(p.getMemSizeMB()));
         bSys.append("numCores", static_cast<int>(p.getNumAvailableCores()));
+        bSys.append("numPhysicalCores", static_cast<int>(p.getNumPhysicalCores()));
+        bSys.append("numCpuSockets", static_cast<int>(p.getNumCpuSockets()));
         bSys.append("cpuArch", p.getArch());
         bSys.append("numaEnabled", p.hasNumaEnabled());
+        bSys.append("numNumaNodes", static_cast<int>(p.getNumNumaNodes()));
         bOs.append("type", p.getOsType());
         bOs.append("name", p.getOsName());
         bOs.append("version", p.getOsVersion());

@@ -55,10 +55,6 @@ double ProcessInfo::getSystemMemoryPressurePercentage() {
     return 0.0;
 }
 
-bool ProcessInfo::checkNumaEnabled() {
-    return false;
-}
-
 bool ProcessInfo::blockCheckSupported() {
     return false;
 }
