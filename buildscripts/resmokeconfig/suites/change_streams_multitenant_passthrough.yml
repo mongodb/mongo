@@ -6,8 +6,6 @@ selector:
   exclude_files:
   # TODO SERVER-68341: Implement enable/disable command for mongoQ in the serverless.
   - jstests/change_streams/projection_fakes_internal_event.js
-  # TODO SERVER-69959: Implement a majority-committed insert listener.
-  - jstests/change_streams/only_wake_getmore_for_relevant_changes.js
   # The following test uses the 'find' method directly on 'config'.'system.preimages' collection
   # while this suite enforces the tenant-specific pre-image collection for the test tenant (a.k.a.
   # '000000000000000000000000_config'.'system.preimages'), which is not directly accessible
