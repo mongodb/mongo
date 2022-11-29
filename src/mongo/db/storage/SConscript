@@ -77,6 +77,7 @@ env.Library(
         '$BUILD_DIR/mongo/base',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/query/query_knobs' if not env.TargetOSIs('windows') else [],
         '$BUILD_DIR/mongo/db/service_context',
         'storage_options',
     ],

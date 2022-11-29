@@ -36,6 +36,7 @@
 #endif
 #include <string>
 
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/storage/input_object.h"
 
 namespace mongo {
@@ -50,7 +51,13 @@ static constexpr auto kDefaultPipePath = "//./pipe/"_sd;
 
 class NamedPipeOutput {
 public:
-    NamedPipeOutput(const std::string& pipeRelativePath);
+    // Searches the named pipe in 'kDefaultPipePath' + 'pipeRelativePath'
+    NamedPipeOutput(const std::string& pipeRelativePath)
+        : NamedPipeOutput(kDefaultPipePath.toString(), pipeRelativePath) {}
+
+    // Searches the named pipe in 'pipeDir' + 'pipeRelativePath' in POSIX system'
+    NamedPipeOutput(const std::string& pipeDir, const std::string& pipeRelativePath);
+
     ~NamedPipeOutput();
     void open();
     int write(const char* data, int size);

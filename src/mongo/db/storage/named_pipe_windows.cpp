@@ -45,8 +45,10 @@
 namespace mongo {
 using namespace fmt::literals;
 
-NamedPipeOutput::NamedPipeOutput(const std::string& pipeRelativePath)
-    : _pipeAbsolutePath(kDefaultPipePath + pipeRelativePath),
+// On Windows, 'externalPipeDir' parameter is not supported and so the first argument is ignored and
+// instead, 'kDefultPipePath' is used.
+NamedPipeOutput::NamedPipeOutput(const std::string&, const std::string& pipeRelativePath)
+    : _pipeAbsolutePath(kDefaultPipePath.toString() + pipeRelativePath),
       _pipe(CreateNamedPipeA(_pipeAbsolutePath.c_str(),
                              PIPE_ACCESS_OUTBOUND,
                              (PIPE_TYPE_BYTE | PIPE_WAIT),
@@ -57,7 +59,7 @@ NamedPipeOutput::NamedPipeOutput(const std::string& pipeRelativePath)
                              nullptr)),  // lpSecurityAttributes
       _isOpen(false) {
     uassert(7005006,
-            "Failed to create a named pipe, error={}"_format(
+            "Failed to create a named pipe, error: {}"_format(
                 getErrorMessage("CreateNamedPipe", _pipeAbsolutePath)),
             _pipe != INVALID_HANDLE_VALUE);
 }
@@ -117,7 +119,11 @@ NamedPipeInput::NamedPipeInput(const std::string& pipeRelativePath)
       _pipe(INVALID_HANDLE_VALUE),
       _isOpen(false),
       _isGood(false),
-      _isEof(false) {}
+      _isEof(false) {
+    uassert(7001101,
+            "Pipe path must not include '..' but {} does"_format(_pipeAbsolutePath),
+            _pipeAbsolutePath.find("..") == std::string::npos);
+}
 
 NamedPipeInput::~NamedPipeInput() {
     close();

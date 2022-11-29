@@ -42,9 +42,9 @@ namespace mongo {
  * This template class provides a standardized input facility over StreamableInput or SeekableInput.
  *
  * This class inherits publicly from 'InputT' and expose all methods except InputT::read() so that
- * only InputStream::readBytes() is exposed for reading data but all other methods are exposed. If
- * 'InputT' is seekable, seek() method is still exposed and the client can seek to a specific
- * position before reading data with buffering.
+ * InputStream::readBytes() is exposed for reading data instead of InputT::read(). If 'InputT' is
+ * seekable, seek() method is still exposed and the client can seek to a specific position before
+ * reading data.
  *
  * Type requirement: 'InputT' must meet the StreamableInput or SeekableInput concept, e.g. the
  * NamedPipeInput class, which is the first class used as InputStream's parent.
@@ -60,7 +60,7 @@ public:
         using namespace fmt::literals;
         InputT::open();
         uassert(ErrorCodes::FileNotOpen,
-                "error"_format(getErrorMessage("open"_sd, InputT::getAbsolutePath())),
+                "error: {}"_format(getErrorMessage("open"_sd, InputT::getAbsolutePath())),
                 InputT::isOpen());
     }
 

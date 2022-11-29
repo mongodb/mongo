@@ -61,6 +61,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/dbclient_connection.h"
+#include "mongo/db/storage/named_pipe.h"
 #include "mongo/db/traffic_reader.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/basic.h"
@@ -1298,8 +1299,15 @@ BSONObj ReadTestPipes(const BSONObj& args, void* unused) {
  *   "2": OPTIONAL number; lower bound on size of "string" field in generated object (default 0)
  *   "3": OPTIONAL number; upper bound on size of "string" field in generated object (default 2048)
  *     capped at 16,750,000 (slightly less than BSON object maximum of 16 MB)
+ *   "4": OPTIONAL string; absolute path to the directory where named pipes exist. If not given,
+ *        'kDefaultPipePath' is used.
  */
 BSONObj WriteTestPipe(const BSONObj& args, void* unused) {
+    int nFields = args.nFields();
+    uassert(ErrorCodes::FailedToParse,
+            "wrong number of arguments"_format(nFields),
+            nFields >= 2 && nFields <= 5);
+
     const long kStringMaxSize = 16750000;  // max allowed size for generated object's "string" field
     BSONElement pipePathElem(args.getField("0"));
     BSONElement objectsElem(args.getField("1"));
@@ -1336,8 +1344,23 @@ BSONObj WriteTestPipe(const BSONObj& args, void* unused) {
             "Third argument (string min size) must be <= fourth argument (string max size)",
             stringMinSize <= stringMaxSize);
 
-    NamedPipeHelper::writeToPipeAsync(
-        pipePathElem.str(), objectsElem.numberLong(), stringMinSize, stringMaxSize);
+    std::string pipeDir = [&] {
+        if (nFields == 5) {
+            BSONElement pipeDirElem(args.getField("4"));
+            uassert(ErrorCodes::FailedToParse,
+                    "Fifth argument (pipe dir) must be a string",
+                    pipeDirElem.type() == BSONType::String);
+            return pipeDirElem.str();
+        } else {
+            return kDefaultPipePath.toString();
+        }
+    }();
+
+    NamedPipeHelper::writeToPipeAsync(std::move(pipeDir),
+                                      pipePathElem.str(),
+                                      objectsElem.numberLong(),
+                                      stringMinSize,
+                                      stringMaxSize);
 
     return {};
 }
@@ -1349,8 +1372,15 @@ BSONObj WriteTestPipe(const BSONObj& args, void* unused) {
  *   "0": string; relative path of the pipe
  *   "1": number; number of BSON objects to write to the pipe
  *   "2": BSONArray; array of objects to round-robin write to the pipe
+ *   "3": OPTIONAL string; absolute path to the directory where named pipes exist. If not given,
+ *        'kDefaultPipePath' is used.
  */
 BSONObj WriteTestPipeObjects(const BSONObj& args, void* unused) {
+    int nFields = args.nFields();
+    uassert(ErrorCodes::FailedToParse,
+            "wrong number of arguments = {}"_format(nFields),
+            nFields == 3 || nFields == 4);
+
     BSONElement pipePathElem(args.getField("0"));
     BSONElement objectsElem(args.getField("1"));
     BSONElement bsonElems(args.getField("2"));
@@ -1365,6 +1395,18 @@ BSONObj WriteTestPipeObjects(const BSONObj& args, void* unused) {
             "Third argument must be an array of objects to round-robin over",
             bsonElems.type() == mongo::Array);
 
+    std::string pipeDir = [&] {
+        if (nFields == 4) {
+            BSONElement pipeDirElem(args.getField("3"));
+            uassert(ErrorCodes::FailedToParse,
+                    "Fourth argument (pipe dir) must be a string",
+                    pipeDirElem.type() == BSONType::String);
+            return pipeDirElem.str();
+        } else {
+            return kDefaultPipePath.toString();
+        }
+    }();
+
     // Convert bsonElems into bsonObjs as the former are pointers into local stack memory that will
     // become invalid when this method returns, but they are needed by the async writer thread.
     std::vector<BSONElement> bsonElemsVector = bsonElems.Array();
@@ -1375,7 +1417,7 @@ BSONObj WriteTestPipeObjects(const BSONObj& args, void* unused) {
 
     // Write the pipe asynchronously.
     NamedPipeHelper::writeToPipeObjectsAsync(
-        pipePathElem.str(), objectsElem.numberLong(), bsonObjs);
+        std::move(pipeDir), pipePathElem.str(), objectsElem.numberLong(), std::move(bsonObjs));
 
     return {};
 }

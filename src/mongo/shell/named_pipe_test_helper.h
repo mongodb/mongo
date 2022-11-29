@@ -29,12 +29,9 @@
 
 #pragma once
 
-#include "mongo/db/storage/named_pipe.h"
-
 #include <string>
 
-#include "mongo/bson/bsonelement.h"
-#include "mongo/stdx/thread.h"
+#include "mongo/bson/bsonobj.h"
 
 namespace mongo {
 /**
@@ -43,22 +40,26 @@ namespace mongo {
 class NamedPipeHelper {
 public:
     static BSONObj readFromPipes(const std::vector<std::string>& pipeRelativePaths);
-    static void writeToPipeAsync(const std::string& pipeRelativePath,
+    static void writeToPipeAsync(std::string pipeDir,
+                                 std::string pipeRelativePath,
                                  long objects,
                                  long stringMinSize,
                                  long stringMaxSize);
-    static void writeToPipeObjectsAsync(const std::string& pipeRelativePath,
+    static void writeToPipeObjectsAsync(std::string pipeDir,
+                                        std::string pipeRelativePath,
                                         long objects,
-                                        const std::vector<BSONObj>& bsonObjs);
+                                        std::vector<BSONObj> bsonObjs);
 
 private:
     static std::string getString(int length);
-    static void writeToPipe(const std::string& pipeRelativePath,
+    static void writeToPipe(std::string pipeDir,
+                            std::string pipeRelativePath,
                             long objects,
                             long stringMinSize,
                             long stringMaxSize) noexcept;
-    static void writeToPipeObjects(const std::string& pipeRelativePath,
+    static void writeToPipeObjects(std::string pipeDir,
+                                   std::string pipeRelativePath,
                                    long objects,
-                                   const std::vector<BSONObj>& bsonObjs) noexcept;
+                                   std::vector<BSONObj> bsonObjs) noexcept;
 };
 }  // namespace mongo

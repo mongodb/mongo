@@ -36,6 +36,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/storage/io_error_message.h"
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/thread.h"
@@ -46,11 +47,11 @@
 namespace mongo {
 using namespace fmt::literals;
 
-NamedPipeOutput::NamedPipeOutput(const std::string& pipeRelativePath)
-    : _pipeAbsolutePath(kDefaultPipePath + pipeRelativePath), _ofs() {
+NamedPipeOutput::NamedPipeOutput(const std::string& pipeDir, const std::string& pipeRelativePath)
+    : _pipeAbsolutePath(pipeDir + pipeRelativePath), _ofs() {
     remove(_pipeAbsolutePath.c_str());
     uassert(7005005,
-            "Failed to create a named pipe, error={}"_format(
+            "Failed to create a named pipe, error: {}"_format(
                 getErrorMessage("mkfifo", _pipeAbsolutePath)),
             mkfifo(_pipeAbsolutePath.c_str(), 0664) == 0);
 }
@@ -85,7 +86,13 @@ void NamedPipeOutput::close() {
 }
 
 NamedPipeInput::NamedPipeInput(const std::string& pipeRelativePath)
-    : _pipeAbsolutePath(kDefaultPipePath + pipeRelativePath), _ifs() {}
+    : _pipeAbsolutePath((externalPipeDir == "" ? kDefaultPipePath : externalPipeDir) +
+                        pipeRelativePath),
+      _ifs() {
+    uassert(7001100,
+            "Pipe path must not include '..' but {} does"_format(_pipeAbsolutePath),
+            _pipeAbsolutePath.find("..") == std::string::npos);
+}
 
 NamedPipeInput::~NamedPipeInput() {
     close();
@@ -109,6 +116,16 @@ void NamedPipeInput::doOpen() {
             ++retries;
         }
     } while (!_ifs.is_open() && retries <= 1000);
+
+    // Makes sure that the file is a named pipe.
+    struct stat pipeInfo;
+    uassert(ErrorCodes::FileNotOpen,
+            "Failed to get info on a named pipe, error: {}"_format(
+                getErrorMessage("stat", _pipeAbsolutePath)),
+            stat(_pipeAbsolutePath.c_str(), &pipeInfo) == 0);
+    uassert(ErrorCodes::FileNotOpen,
+            "{} is not a named pipe"_format(_pipeAbsolutePath),
+            S_ISFIFO(pipeInfo.st_mode));
 }
 
 int NamedPipeInput::doRead(char* data, int size) {

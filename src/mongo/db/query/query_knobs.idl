@@ -943,12 +943,18 @@ server_parameters:
 
   enableComputeMode:
     description: "Boolean flag to enable the compute mode in which mongod is used not as a
-    persistent storage node, but as a worker node for executing queries."
+      persistent storage node, but as a worker node for executing queries."
     set_at: [ startup ]
     cpp_varname: "computeModeEnabled"
     cpp_vartype: bool
-    default:
-        expr: false
+    default: false
+
+  externalPipeDir:
+    description: "Absolute path to the directory where external named pipes can be found. The
+      trailing '/' must be included."
+    set_at: [ startup ]
+    cpp_varname: "externalPipeDir"
+    cpp_vartype: std::string
 
   internalQueryDisableExclusionProjectionFastPath:
     description: "If true, then ExclusionProjectionExecutor won't use fast path implementation. This

@@ -835,12 +835,24 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
             LOGV2_ERROR(6968200, "'enableComputeMode' can be used only in standalone server");
             exitCleanly(ExitCode::badOptions);
         }
+        if (externalPipeDir != "" && externalPipeDir.find("..") != std::string::npos) {
+            LOGV2_ERROR(7001102, "'externalPipeDir' must not have '..'");
+            exitCleanly(ExitCode::badOptions);
+        }
+
         LOGV2_WARNING_OPTIONS(
             6968201,
             {logv2::LogTag::kStartupWarnings},
             "There could be security risks in using 'enableComputeMode'. It is recommended to use "
             "this mode under an isolated environment and execute the server under a user with "
             "restricted access permissions");
+    } else {
+        if (externalPipeDir != "") {
+            LOGV2_WARNING_OPTIONS(
+                7001103,
+                {logv2::LogTag::kStartupWarnings},
+                "'externalPipeDir' is effective only when enableComputeMode=true");
+        }
     }
 
     // Set up the logical session cache
