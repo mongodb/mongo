@@ -9701,7 +9701,7 @@ buildvariants:
   - enterprise
   display_name: "~ TIG Daily Cron"
   run_on:
-  - rhel62-small
+  - rhel70-small
   stepback: false
   tasks:
   - name: lint_fuzzer_sanity_all
@@ -10230,8 +10230,6 @@ buildvariants:
   - name: lint_clang_format
   - name: lint_eslint
   - name: lint_cpplint
-  # TODO: SERVER-71624 Enable once the issue with node on RHEL 6 is resolved
-  # - name: lint_fuzzer_sanity_patch
   - name: lint_yaml
   - name: lint_errorcodes
   - name: burn_in_tests_gen
