@@ -5371,8 +5371,7 @@ buildvariants:
     - name: long-test
     # FIXME-WT-10212
     # - name: configure-combinations
-    # FIXME-WT-10214
-    # - name: format-smoke-test
+    - name: format-smoke-test
     # FIXME-WT-10213
     # - name: tiered-storage-extensions-test
     - name: compile-nonstandalone
