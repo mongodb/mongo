@@ -407,6 +407,24 @@ public:
     }
 
     /**
+     * count the number of processor packages
+     */
+    static int getNumCpuSockets() {
+        std::set<std::string> socketIds;
+
+        CpuInfoParser cpuInfoParser{
+            {
+                {"physical id", [&](const std::string& value) { socketIds.insert(value); }},
+            },
+            []() {}};
+        cpuInfoParser.run();
+
+        // On ARM64, the "physical id" field is unpopulated, causing there to be 0 sockets found. In
+        // this case, we default to 1.
+        return std::max(socketIds.size(), 1ul);
+    }
+
+    /**
      * Get some details about the CPU
      */
     static void getCpuInfo(int& procCount, std::string& freq, std::string& features) {
@@ -653,6 +671,44 @@ void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {
 }
 
 /**
+ * If the process is running with (cc)NUMA enabled, return the number of NUMA nodes. Else, return 0.
+ */
+unsigned long countNumaNodes() {
+    bool hasMultipleNodes = false;
+    bool hasNumaMaps = false;
+
+    try {
+        hasMultipleNodes = boost::filesystem::exists("/sys/devices/system/node/node1");
+        hasNumaMaps = boost::filesystem::exists("/proc/self/numa_maps");
+
+        if (hasMultipleNodes && hasNumaMaps) {
+            // proc is populated with numa entries
+
+            // read the second column of first line to determine numa state
+            // ('default' = enabled, 'interleave' = disabled).  Logic from version.cpp's warnings.
+            std::string line =
+                LinuxSysHelper::readLineFromFile("/proc/self/numa_maps").append(" \0");
+            size_t pos = line.find(' ');
+            if (pos != std::string::npos &&
+                line.substr(pos + 1, 10).find("interleave") == std::string::npos) {
+                // interleave not found, count NUMA nodes by finding the highest numbered node file
+                unsigned long i = 2;
+                while (boost::filesystem::exists(
+                    std::string(str::stream() << "/sys/devices/system/node/node" << i++)))
+                    ;
+                return i;
+            }
+        }
+    } catch (boost::filesystem::filesystem_error& e) {
+        LOGV2(23340,
+              "WARNING: Cannot detect if NUMA interleaving is enabled. Failed to probe",
+              "path"_attr = e.path1().string(),
+              "reason"_attr = e.code().message());
+    }
+    return 0;
+}
+
+/**
  * Save a BSON obj representing the host system's details
  */
 void ProcessInfo::SystemInfo::collectSystemInfo() {
@@ -661,10 +717,12 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     std::string cpuFreq, cpuFeatures;
     int cpuCount;
     int physicalCores;
+    int cpuSockets;
 
     std::string verSig = LinuxSysHelper::readLineFromFile("/proc/version_signature");
     LinuxSysHelper::getCpuInfo(cpuCount, cpuFreq, cpuFeatures);
     LinuxSysHelper::getNumPhysicalCores(physicalCores);
+    cpuSockets = LinuxSysHelper::getNumCpuSockets();
     LinuxSysHelper::getLinuxDistro(distroName, distroVersion);
 
     if (uname(&unameData) == -1) {
@@ -681,9 +739,12 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     memLimit = LinuxSysHelper::getMemorySizeLimit();
     addrSize = sizeof(void*) * CHAR_BIT;
     numCores = cpuCount;
+    numPhysicalCores = physicalCores;
+    numCpuSockets = cpuSockets;
     pageSize = static_cast<unsigned long long>(sysconf(_SC_PAGESIZE));
     cpuArch = unameData.machine;
-    hasNuma = checkNumaEnabled();
+    numNumaNodes = countNumaNodes();
+    hasNuma = numNumaNodes;
 
     BSONObjBuilder bExtra;
     bExtra.append("versionString", LinuxSysHelper::readLineFromFile("/proc/version"));
@@ -708,44 +769,10 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     bExtra.append("pageSize", static_cast<long long>(pageSize));
     bExtra.append("numPages", static_cast<int>(sysconf(_SC_PHYS_PAGES)));
     bExtra.append("maxOpenFiles", static_cast<int>(sysconf(_SC_OPEN_MAX)));
-    bExtra.append("physicalCores", physicalCores);
 
     appendMountInfo(bExtra);
 
     _extraStats = bExtra.obj();
-}
-
-/**
- * Determine if the process is running with (cc)NUMA
- */
-bool ProcessInfo::checkNumaEnabled() {
-    bool hasMultipleNodes = false;
-    bool hasNumaMaps = false;
-
-    try {
-        hasMultipleNodes = boost::filesystem::exists("/sys/devices/system/node/node1");
-        hasNumaMaps = boost::filesystem::exists("/proc/self/numa_maps");
-    } catch (boost::filesystem::filesystem_error& e) {
-        LOGV2(23340,
-              "WARNING: Cannot detect if NUMA interleaving is enabled. Failed to probe",
-              "path"_attr = e.path1().string(),
-              "reason"_attr = e.code().message());
-        return false;
-    }
-
-    if (hasMultipleNodes && hasNumaMaps) {
-        // proc is populated with numa entries
-
-        // read the second column of first line to determine numa state
-        // ('default' = enabled, 'interleave' = disabled).  Logic from version.cpp's warnings.
-        std::string line = LinuxSysHelper::readLineFromFile("/proc/self/numa_maps").append(" \0");
-        size_t pos = line.find(' ');
-        if (pos != std::string::npos &&
-            line.substr(pos + 1, 10).find("interleave") == std::string::npos)
-            // interleave not found;
-            return true;
-    }
-    return false;
 }
 
 bool ProcessInfo::blockCheckSupported() {

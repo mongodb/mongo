@@ -133,6 +133,33 @@ void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {
     info.appendNumber("page_faults", static_cast<long long>(p.prusage.pr_majf));
 }
 
+bool checkNumaEnabled() {
+    lgrp_cookie_t cookie = lgrp_init(LGRP_VIEW_OS);
+
+    if (cookie == LGRP_COOKIE_NONE) {
+        auto ec = lastSystemError();
+        LOGV2_WARNING(23362,
+                      "lgrp_init failed: {errnoWithDescription}",
+                      "errnoWithDescription"_attr = errorMessage(ec));
+        return false;
+    }
+
+    ON_BLOCK_EXIT([&] { lgrp_fini(cookie); });
+
+    int groups = lgrp_nlgrps(cookie);
+
+    if (groups == -1) {
+        auto ec = lastSystemError();
+        LOGV2_WARNING(23363,
+                      "lgrp_nlgrps failed: {errnoWithDescription}",
+                      "errnoWithDescription"_attr = errorMessage(ec));
+        return false;
+    }
+
+    // NUMA machines have more then 1 locality group
+    return groups > 1;
+}
+
 /**
  * Save a BSON obj representing the host system's details
  */
@@ -200,31 +227,6 @@ void ProcessInfo::SystemInfo::collectSystemInfo() {
     bExtra.append("numPages", static_cast<int>(sysconf(_SC_PHYS_PAGES)));
     bExtra.append("maxOpenFiles", static_cast<int>(sysconf(_SC_OPEN_MAX)));
     _extraStats = bExtra.obj();
-}
-
-bool ProcessInfo::checkNumaEnabled() {
-    lgrp_cookie_t cookie = lgrp_init(LGRP_VIEW_OS);
-
-    if (cookie == LGRP_COOKIE_NONE) {
-        LOGV2_WARNING(23362,
-                      "lgrp_init failed: {errnoWithDescription}",
-                      "errnoWithDescription"_attr = errnoWithDescription());
-        return false;
-    }
-
-    ON_BLOCK_EXIT([&] { lgrp_fini(cookie); });
-
-    int groups = lgrp_nlgrps(cookie);
-
-    if (groups == -1) {
-        LOGV2_WARNING(23363,
-                      "lgrp_nlgrps failed: {errnoWithDescription}",
-                      "errnoWithDescription"_attr = errnoWithDescription());
-        return false;
-    }
-
-    // NUMA machines have more then 1 locality group
-    return groups > 1;
 }
 
 bool ProcessInfo::blockCheckSupported() {
