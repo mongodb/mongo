@@ -39,6 +39,7 @@
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 
@@ -55,12 +56,18 @@ CollectionPtr getCollectionForCompact(OperationContext* opCtx,
                                       const NamespaceString& collectionNss) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(collectionNss, MODE_IX));
 
+    NamespaceString resolvedNs = collectionNss;
+    if (auto timeseriesOptions = timeseries::getTimeseriesOptions(
+            opCtx, collectionNss, /*convertToBucketsNamespace=*/true)) {
+        resolvedNs = collectionNss.makeTimeseriesBucketsNamespace();
+    }
+
     auto collectionCatalog = CollectionCatalog::get(opCtx);
-    CollectionPtr collection = collectionCatalog->lookupCollectionByNamespace(opCtx, collectionNss);
+    CollectionPtr collection = collectionCatalog->lookupCollectionByNamespace(opCtx, resolvedNs);
 
     if (!collection) {
         std::shared_ptr<const ViewDefinition> view =
-            collectionCatalog->lookupView(opCtx, collectionNss);
+            collectionCatalog->lookupView(opCtx, resolvedNs);
         uassert(ErrorCodes::CommandNotSupportedOnView, "can't compact a view", !view);
         uasserted(ErrorCodes::NamespaceNotFound, "collection does not exist");
     }
