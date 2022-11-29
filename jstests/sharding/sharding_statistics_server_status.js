@@ -64,6 +64,13 @@ function checkServerStatusAbortedMigrationCount(shardConn, count) {
     assert.eq(count, shardStats.countDonorMoveChunkAbortConflictingIndexOperation);
 }
 
+function checkServerStatusNumShardedCollections(conn, count) {
+    const shardStats =
+        assert.commandWorked(conn.adminCommand({serverStatus: 1})).shardingStatistics;
+    assert(shardStats.hasOwnProperty("numShardedCollections"));
+    assert.eq(count, shardStats.numShardedCollections);
+}
+
 function runConcurrentMoveChunk(host, ns, toShard) {
     const mongos = new Mongo(host);
     let result = mongos.adminCommand({moveChunk: ns, find: {_id: 1}, to: toShard});
@@ -99,6 +106,17 @@ assert.commandWorked(admin.runCommand({enableSharding: coll.getDB() + ""}));
 st.ensurePrimaryShard(coll.getDB() + "", st.shard0.shardName);
 assert.commandWorked(admin.runCommand({shardCollection: coll + "", key: {_id: 1}}));
 assert.commandWorked(admin.runCommand({split: coll + "", middle: {_id: 0}}));
+
+// Check the number of sharded collections.
+const testDB = st.rs0.getPrimary().getDB(dbName);
+const fcvDoc = testDB.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
+if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, '4.4') >= 0) {
+    st.shardColl(dbName + ".coll2", {_id: 1}, false);
+    st.shardColl(dbName + ".coll3", {_id: 1}, false);
+    const configCollections = mongos.getCollection("config.collections");
+    checkServerStatusNumShardedCollections(st.configRS.getPrimary(),
+                                           configCollections.countDocuments({}));
+}
 
 // Move chunk from shard0 to shard1 without docs.
 assert.commandWorked(
