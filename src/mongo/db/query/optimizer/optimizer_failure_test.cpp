@@ -55,6 +55,7 @@ DEATH_TEST_REGEX(Optimizer, HitIterationLimitInrunStructuralPhases, "Tripwire as
         makePhaseManager({OptPhase::PathFuse, OptPhase::ConstEvalPre},
                          prefixId,
                          {{{"test1", createScanDef({}, {})}, {"test2", createScanDef({}, {})}}},
+                         boost::none /*costModel*/,
                          DebugInfo(true, DebugInfo::kDefaultDebugLevelForTests, 0));
 
     ASSERT_THROWS_CODE(phaseManager.optimize(evalNode), DBException, 6808700);
@@ -82,6 +83,7 @@ DEATH_TEST_REGEX(Optimizer,
     auto phaseManager = makePhaseManager({OptPhase::MemoSubstitutionPhase},
                                          prefixId,
                                          {{{"test", createScanDef({}, {})}}},
+                                         boost::none /*costModel*/,
                                          DebugInfo(true, DebugInfo::kDefaultDebugLevelForTests, 0));
 
     ASSERT_THROWS_CODE(phaseManager.optimize(rootNode), DBException, 6808702);
@@ -109,6 +111,7 @@ DEATH_TEST_REGEX(Optimizer,
     auto phaseManager = makePhaseManager({OptPhase::MemoExplorationPhase},
                                          prefixId,
                                          {{{"test", createScanDef({}, {})}}},
+                                         boost::none /*costModel*/,
                                          DebugInfo(true, DebugInfo::kDefaultDebugLevelForTests, 0));
 
     ASSERT_THROWS_CODE(phaseManager.optimize(rootNode), DBException, 6808702);
@@ -134,6 +137,7 @@ DEATH_TEST_REGEX(Optimizer, BadGroupID, "Tripwire assertion.*6808704") {
     auto phaseManager = makePhaseManager({OptPhase::MemoImplementationPhase},
                                          prefixId,
                                          {{{"test", createScanDef({}, {})}}},
+                                         boost::none /*costModel*/,
                                          DebugInfo(true, DebugInfo::kDefaultDebugLevelForTests, 0));
 
     ASSERT_THROWS_CODE(phaseManager.optimize(rootNode), DBException, 6808704);
@@ -165,6 +169,7 @@ DEATH_TEST_REGEX(Optimizer, EnvHasFreeVariables, "Tripwire assertion.*6808711") 
          OptPhase::MemoImplementationPhase},
         prefixId,
         {{{"test", createScanDef({}, {})}}},
+        boost::none /*costModel*/,
         DebugInfo(true, DebugInfo::kDefaultDebugLevelForTests, DebugInfo::kIterationLimitForTests));
 
     ASSERT_THROWS_CODE(phaseManager.optimize(rootNode), DBException, 6808711);

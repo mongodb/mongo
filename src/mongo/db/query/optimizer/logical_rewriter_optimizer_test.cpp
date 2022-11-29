@@ -77,6 +77,7 @@ TEST(LogicalRewriter, RootNodeMerge) {
     auto phaseManager = makePhaseManager({OptPhase::MemoSubstitutionPhase},
                                          prefixId,
                                          {{{"test", createScanDef({}, {})}}},
+                                         boost::none /*costModel*/,
                                          DebugInfo::kDefaultForTests);
     ABT rewritten = std::move(rootNode);
     phaseManager.optimize(rewritten);
@@ -291,6 +292,7 @@ TEST(LogicalRewriter, FilterProjectRewrite) {
     auto phaseManager = makePhaseManager({OptPhase::MemoSubstitutionPhase},
                                          prefixId,
                                          {{{"test", createScanDef({}, {})}}},
+                                         boost::none /*costModel*/,
                                          DebugInfo::kDefaultForTests);
     ABT latest = std::move(rootNode);
     phaseManager.optimize(latest);
@@ -402,6 +404,7 @@ TEST(LogicalRewriter, FilterProjectComplexRewrite) {
     auto phaseManager = makePhaseManager({OptPhase::MemoSubstitutionPhase},
                                          prefixId,
                                          {{{"test", createScanDef({}, {})}}},
+                                         boost::none /*costModel*/,
                                          DebugInfo::kDefaultForTests);
     ABT latest = std::move(rootNode);
     phaseManager.optimize(latest);
@@ -480,6 +483,7 @@ TEST(LogicalRewriter, FilterProjectGroupRewrite) {
     auto phaseManager = makePhaseManager({OptPhase::MemoSubstitutionPhase},
                                          prefixId,
                                          {{{"test", createScanDef({}, {})}}},
+                                         boost::none /*costModel*/,
                                          DebugInfo::kDefaultForTests);
     ABT latest = std::move(rootNode);
     phaseManager.optimize(latest);
@@ -550,6 +554,7 @@ TEST(LogicalRewriter, FilterProjectUnwindRewrite) {
     auto phaseManager = makePhaseManager({OptPhase::MemoSubstitutionPhase},
                                          prefixId,
                                          {{{"test", createScanDef({}, {})}}},
+                                         boost::none /*costModel*/,
                                          DebugInfo::kDefaultForTests);
     ABT latest = std::move(rootNode);
     phaseManager.optimize(latest);
@@ -621,6 +626,7 @@ TEST(LogicalRewriter, FilterProjectExchangeRewrite) {
     auto phaseManager = makePhaseManager({OptPhase::MemoSubstitutionPhase},
                                          prefixId,
                                          {{{"test", createScanDef({}, {})}}},
+                                         boost::none /*costModel*/,
                                          DebugInfo::kDefaultForTests);
     ABT latest = std::move(rootNode);
     phaseManager.optimize(latest);
@@ -693,6 +699,7 @@ TEST(LogicalRewriter, UnwindCollationRewrite) {
     auto phaseManager = makePhaseManager({OptPhase::MemoSubstitutionPhase},
                                          prefixId,
                                          {{{"test", createScanDef({}, {})}}},
+                                         boost::none /*costModel*/,
                                          DebugInfo::kDefaultForTests);
     ABT latest = std::move(rootNode);
     phaseManager.optimize(latest);
@@ -806,6 +813,7 @@ TEST(LogicalRewriter, FilterUnionReorderSingleProjection) {
         makePhaseManager({OptPhase::MemoSubstitutionPhase, OptPhase::MemoExplorationPhase},
                          prefixId,
                          {{{"test1", createScanDef({}, {})}, {"test2", createScanDef({}, {})}}},
+                         boost::none /*costModel*/,
                          DebugInfo::kDefaultForTests);
     phaseManager.optimize(latest);
 
@@ -970,6 +978,7 @@ TEST(LogicalRewriter, MultipleFilterUnionReorder) {
         makePhaseManager({OptPhase::MemoSubstitutionPhase, OptPhase::MemoExplorationPhase},
                          prefixId,
                          {{{"test1", createScanDef({}, {})}, {"test2", createScanDef({}, {})}}},
+                         boost::none /*costModel*/,
                          DebugInfo::kDefaultForTests);
     phaseManager.optimize(latest);
 
@@ -1075,6 +1084,7 @@ TEST(LogicalRewriter, FilterUnionUnionPushdown) {
                                          {{{"test1", createScanDef({}, {})},
                                            {"test2", createScanDef({}, {})},
                                            {"test3", createScanDef({}, {})}}},
+                                         boost::none /*costModel*/,
                                          DebugInfo::kDefaultForTests);
     ABT latest = std::move(rootNode);
 
@@ -1220,6 +1230,7 @@ TEST(LogicalRewriter, UnionPreservesCommonLogicalProps) {
         makePhaseManager({OptPhase::MemoSubstitutionPhase, OptPhase::MemoExplorationPhase},
                          prefixId,
                          metadata,
+                         boost::none /*costModel*/,
                          DebugInfo::kDefaultForTests);
 
     ABT optimized = rootNode;
@@ -1437,6 +1448,7 @@ TEST(LogicalRewriter, SargableCE) {
         makePhaseManager({OptPhase::MemoSubstitutionPhase, OptPhase::MemoExplorationPhase},
                          prefixId,
                          {{{"test", createScanDef({}, {})}}},
+                         boost::none /*costModel*/,
                          DebugInfo::kDefaultForTests);
     ABT latest = std::move(rootNode);
     phaseManager.optimize(latest);
@@ -1547,6 +1559,7 @@ TEST(LogicalRewriter, RemoveNoopFilter) {
     auto phaseManager = makePhaseManager({OptPhase::MemoSubstitutionPhase},
                                          prefixId,
                                          {{{"test", createScanDef({}, {})}}},
+                                         boost::none /*costModel*/,
                                          DebugInfo::kDefaultForTests);
     ABT latest = std::move(rootNode);
     phaseManager.optimize(latest);
@@ -1599,6 +1612,7 @@ TEST(LogicalRewriter, NotPushdownToplevelSuccess) {
                                    {DistributionType::Centralized},
                                    {} /*partialReqMap*/}}})},
         }},
+        boost::none /*costModel*/,
         DebugInfo::kDefaultForTests);
     ABT latest = std::move(rootNode);
     phaseManager.optimize(latest);
@@ -1659,6 +1673,7 @@ TEST(LogicalRewriter, NotPushdownToplevelFailureMultikey) {
                                    {DistributionType::Centralized},
                                    {} /*partialReqMap*/}}})},
         }},
+        boost::none /*costModel*/,
         DebugInfo::kDefaultForTests);
     ABT latest = std::move(rootNode);
     phaseManager.optimize(latest);
@@ -1710,6 +1725,7 @@ TEST(LogicalRewriter, NotPushdownComposeM) {
     auto phaseManager = makePhaseManager({OptPhase::MemoSubstitutionPhase},
                                          prefixId,
                                          Metadata{{{"coll", createScanDef({}, {})}}},
+                                         boost::none /*costModel*/,
                                          DebugInfo::kDefaultForTests);
     ABT latest = std::move(rootNode);
     phaseManager.optimize(latest);
@@ -1796,6 +1812,7 @@ TEST(LogicalRewriter, NotPushdownUnderLambdaSuccess) {
                                    {DistributionType::Centralized},
                                    {} /*partialReqMap*/}}})},
         }},
+        boost::none /*costModel*/,
         DebugInfo::kDefaultForTests);
     ABT latest = std::move(rootNode);
     phaseManager.optimize(latest);
@@ -1881,6 +1898,7 @@ TEST(LogicalRewriter, NotPushdownUnderLambdaKeepOuterTraverse) {
                        {DistributionType::Centralized},
                        {} /*partialReqMap*/}}})},
         }},
+        boost::none /*costModel*/,
         DebugInfo::kDefaultForTests);
     ABT latest = std::move(rootNode);
     phaseManager.optimize(latest);
@@ -1955,6 +1973,7 @@ TEST(LogicalRewriter, NotPushdownUnderLambdaFailsWithFreeVar) {
                                          Metadata{{
                                              {"coll", createScanDef({}, {})},
                                          }},
+                                         boost::none /*costModel*/,
                                          DebugInfo::kDefaultForTests);
     ABT latest = std::move(rootNode);
     phaseManager.optimize(latest);
@@ -2023,6 +2042,7 @@ TEST(LogicalRewriter, RemoveTraverseSplitComposeM) {
                                    {DistributionType::Centralized},
                                    {} /*partialReqMap*/}}})},
         }},
+        boost::none /*costModel*/,
         DebugInfo::kDefaultForTests);
     ABT latest = std::move(rootNode);
     phaseManager.optimize(latest);
@@ -2100,6 +2120,7 @@ TEST(LogicalRewriter, TraverseComposeMTraverse) {
                                  {DistributionType::Centralized},
                                  {} /*partialReqMap*/}}})},
         }},
+        boost::none /*costModel*/,
         DebugInfo::kDefaultForTests);
     ABT latest = std::move(rootNode);
     phaseManager.optimize(latest);
@@ -2191,6 +2212,7 @@ TEST(LogicalRewriter, RelaxComposeM) {
     auto phaseManager = makePhaseManager({OptPhase::MemoSubstitutionPhase},
                                          prefixId,
                                          {{{"c1", createScanDef({}, {})}}},
+                                         boost::none /*costModel*/,
                                          DebugInfo::kDefaultForTests,
                                          QueryHints{});
 
@@ -2267,6 +2289,7 @@ TEST(PhysRewriter, FilterIndexingRIN) {
                                  false /*isMultiKey*/,
                                  {DistributionType::Centralized},
                                  {}}}})}}},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = std::move(rootNode);

@@ -57,6 +57,7 @@ ABT optimizedQueryPlan(const std::string& query,
                                           OptPhase::MemoImplementationPhase},
                                          prefixId,
                                          metadata,
+                                         boost::none /*costModel*/,
                                          DebugInfo::kDefaultForTests);
 
     ABT optimized = translated;

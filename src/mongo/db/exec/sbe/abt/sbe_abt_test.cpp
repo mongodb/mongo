@@ -381,6 +381,7 @@ TEST_F(NodeSBE, Lower1) {
     auto phaseManager = makePhaseManager(OptPhaseManager::getAllRewritesSet(),
                                          prefixId,
                                          {{{"test", createScanDef({}, {})}}},
+                                         boost::none /*costModel*/,
                                          DebugInfo::kDefaultForTests);
 
     phaseManager.optimize(tree);

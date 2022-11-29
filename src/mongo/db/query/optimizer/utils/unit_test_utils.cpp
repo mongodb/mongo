@@ -254,66 +254,61 @@ std::unique_ptr<CardinalityEstimator> makeHintedCE(ce::PartialSchemaSelHints hin
     return std::make_unique<ce::HintedEstimator>(std::move(hints));
 }
 
-std::unique_ptr<CostEstimator> makeCostEstimator() {
-    return std::make_unique<cost_model::CostEstimatorImpl>(
-        cost_model::CostModelManager::getDefaultCoefficients());
+cost_model::CostModelCoefficients getTestCostModel() {
+    return cost_model::CostModelManager::getDefaultCoefficients();
 }
 
-OptPhaseManager makePhaseManager(OptPhaseManager::PhaseSet phaseSet,
-                                 PrefixId& prefixId,
-                                 Metadata metadata,
-                                 DebugInfo debugInfo,
-                                 QueryHints queryHints) {
+std::unique_ptr<CostEstimator> makeCostEstimator() {
+    return makeCostEstimator(getTestCostModel());
+}
+
+std::unique_ptr<CostEstimator> makeCostEstimator(
+    const cost_model::CostModelCoefficients& costModel) {
+    return std::make_unique<cost_model::CostEstimatorImpl>(costModel);
+}
+
+
+OptPhaseManager makePhaseManager(
+    OptPhaseManager::PhaseSet phaseSet,
+    PrefixId& prefixId,
+    Metadata metadata,
+    const boost::optional<cost_model::CostModelCoefficients>& costModel,
+    DebugInfo debugInfo,
+    QueryHints queryHints) {
     return OptPhaseManager{std::move(phaseSet),
                            prefixId,
                            false /*requireRID*/,
                            std::move(metadata),
                            makeHeuristicCE(),  // primary CE
                            makeHeuristicCE(),  // substitution phase CE, same as primary
-                           makeCostEstimator(),
+                           makeCostEstimator(costModel ? *costModel : getTestCostModel()),
                            defaultConvertPathToInterval,
                            ConstEval::constFold,
                            std::move(debugInfo),
                            std::move(queryHints)};
 }
 
-OptPhaseManager makePhaseManager(OptPhaseManager::PhaseSet phaseSet,
-                                 PrefixId& prefixId,
-                                 Metadata metadata,
-                                 std::unique_ptr<CardinalityEstimator> ce,
-                                 DebugInfo debugInfo,
-                                 QueryHints queryHints) {
+OptPhaseManager makePhaseManager(
+    OptPhaseManager::PhaseSet phaseSet,
+    PrefixId& prefixId,
+    Metadata metadata,
+    std::unique_ptr<CardinalityEstimator> ce,
+    const boost::optional<cost_model::CostModelCoefficients>& costModel,
+    DebugInfo debugInfo,
+    QueryHints queryHints) {
     return OptPhaseManager{std::move(phaseSet),
                            prefixId,
                            false /*requireRID*/,
                            std::move(metadata),
                            std::move(ce),      // primary CE
                            makeHeuristicCE(),  // substitution phase CE
-                           makeCostEstimator(),
+                           makeCostEstimator(costModel ? *costModel : getTestCostModel()),
                            defaultConvertPathToInterval,
                            ConstEval::constFold,
                            std::move(debugInfo),
                            std::move(queryHints)};
 }
 
-OptPhaseManager makePhaseManager(OptPhaseManager::PhaseSet phaseSet,
-                                 PrefixId& prefixId,
-                                 Metadata metadata,
-                                 DebugInfo debugInfo,
-                                 mongo::cost_model::CostModelCoefficients coefs,
-                                 QueryHints queryHints) {
-    return OptPhaseManager{std::move(phaseSet),
-                           prefixId,
-                           false /*requireRID*/,
-                           std::move(metadata),
-                           makeHeuristicCE(),  // primary CE
-                           makeHeuristicCE(),  // substitution phase CE, same as primary
-                           std::make_unique<cost_model::CostEstimatorImpl>(coefs),
-                           defaultConvertPathToInterval,
-                           ConstEval::constFold,
-                           std::move(debugInfo),
-                           std::move(queryHints)};
-}
 
 OptPhaseManager makePhaseManagerRequireRID(OptPhaseManager::PhaseSet phaseSet,
                                            PrefixId& prefixId,

@@ -271,3 +271,19 @@ function assertValueOnPath(value, doc, path) {
 function assertValueOnPlanPath(value, doc, path) {
     assertValueOnPathFn(value, doc, path, navigateToPlanPath);
 }
+
+function runCommandWithCostModel(func, costModel) {
+    const oldCostModelOverrides = assert.commandWorked(db.adminCommand(
+        {'getParameter': 1, 'internalCostModelCoefficients': 1}))['internalCostModelCoefficients'];
+
+    const costModelJson = JSON.stringify(costModel);
+    assert.commandWorked(
+        db.adminCommand({'setParameter': 1, 'internalCostModelCoefficients': costModelJson}));
+
+    try {
+        return assert.commandWorked(func());
+    } finally {
+        assert.commandWorked(db.adminCommand(
+            {'setParameter': 1, 'internalCostModelCoefficients': oldCostModelOverrides}));
+    }
+}

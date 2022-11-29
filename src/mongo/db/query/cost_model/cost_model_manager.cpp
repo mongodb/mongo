@@ -38,76 +38,58 @@ namespace {
  */
 void initializeCoefficients(CostModelCoefficients& coefficients) {
     // These cost should reflect estimated aggregated execution time in milliseconds.
-    constexpr double ms = 1.0e-3;
+    // The coeffeicient ns converts values from nanoseconds to milliseconds.
+    constexpr double nsToMs = 1.0e-6;
 
-    // Startup cost of an operator. This is the minimal cost of an operator since it is
-    // present even if it doesn't process any input.
-    // TODO: calibrate the cost individually for each operator
-    coefficients.setDefaultStartupCost(0.000001);
+    coefficients.setDefaultStartupCost(1.0 * nsToMs);
 
-    // TODO: collection scan should depend on the width of the doc.
-    // TODO: the actual measured cost is (0.4 * ms), however we increase it here because currently
-    // it is not possible to estimate the cost of a collection scan vs a full index scan.
-    coefficients.setScanIncrementalCost(0.6 * ms);
-    coefficients.setScanStartupCost(0.000001);
+    coefficients.setScanIncrementalCost(422.31145989 * nsToMs);
+    coefficients.setScanStartupCost(6175.527218993269 * nsToMs);
 
-    // TODO: cost(N fields) ~ (0.55 + 0.025 * N)
-    coefficients.setIndexScanIncrementalCost(0.5 * ms);
-    coefficients.setIndexScanStartupCost(0.000001);
+    coefficients.setIndexScanIncrementalCost(403.68075869 * nsToMs);
+    coefficients.setIndexScanStartupCost(14054.983953111061 * nsToMs);
 
-    // TODO: cost(N fields) ~ 0.7 + 0.19 * N
-    coefficients.setSeekCost(2.0 * ms);
-    coefficients.setSeekStartupCost(0.000001);
+    coefficients.setSeekCost(1174.84136356 * nsToMs);
+    coefficients.setSeekStartupCost(7488.662376624863 * nsToMs);
 
-    // TODO: take the expression into account.
-    // cost(N conditions) = 0.2 + N * ???
-    coefficients.setFilterIncrementalCost(0.2 * ms);
-    coefficients.setFilterStartupCost(0.000001);
+    coefficients.setFilterIncrementalCost(83.7274685 * nsToMs);
+    coefficients.setFilterStartupCost(1461.3148783443378 * nsToMs);
 
-    // TODO: the cost of projection depends on number of fields: cost(N fields) ~ 0.1 + 0.2 * N
-    coefficients.setEvalIncrementalCost(2.0 * ms);
-    coefficients.setEvalStartupCost(0.000001);
+    coefficients.setEvalIncrementalCost(430.6176946 * nsToMs);
+    coefficients.setEvalStartupCost(1103.4048573163343 * nsToMs);
 
-    // TODO: cost(N fields) ~ 0.04 + 0.03*(N^2)
-    coefficients.setGroupByIncrementalCost(0.07 * ms);
-    coefficients.setGroupByStartupCost(0.000001);
+    coefficients.setGroupByIncrementalCost(413.07932374 * nsToMs);
+    coefficients.setGroupByStartupCost(1199.8878012735659 * nsToMs);
 
-    coefficients.setUnwindIncrementalCost(0.03 * ms);  // TODO: not yet calibrated
-    coefficients.setUnwindStartupCost(0.000001);
+    coefficients.setUnwindIncrementalCost(586.57200195 * nsToMs);
+    coefficients.setUnwindStartupCost(1.0 * nsToMs);
 
-    // TODO: not yet calibrated, should be at least as expensive as a filter
-    coefficients.setBinaryJoinIncrementalCost(0.2 * ms);
-    coefficients.setBinaryJoinStartupCost(0.000001);
+    coefficients.setBinaryJoinIncrementalCost(161.62301944 * nsToMs);
+    coefficients.setBinaryJoinStartupCost(402.8455479458652 * nsToMs);
 
-    coefficients.setHashJoinIncrementalCost(0.05 * ms);  // TODO: not yet calibrated
-    coefficients.setHashJoinStartupCost(0.000001);
+    coefficients.setHashJoinIncrementalCost(250.61365634 * nsToMs);
+    coefficients.setHashJoinStartupCost(1.0 * nsToMs);  // Already calibrated.
 
-    coefficients.setMergeJoinIncrementalCost(0.02 * ms);  // TODO: not yet calibrated
-    coefficients.setMergeJoinStartupCost(0.000001);
+    coefficients.setMergeJoinIncrementalCost(111.23423304 * nsToMs);
+    coefficients.setMergeJoinStartupCost(1517.7970800404169 * nsToMs);
 
-    coefficients.setUniqueIncrementalCost(0.7 * ms);
-    coefficients.setUniqueStartupCost(0.000001);
+    coefficients.setUniqueIncrementalCost(269.71368614 * nsToMs);
+    coefficients.setUniqueStartupCost(1.0 * nsToMs);  // Already calibrated.
 
-    // TODO: implement collation cost that depends on number and size of sorted fields
-    // Based on a mix of int and str(64) fields:
-    //  1 sort field:  sort_cost(N) = 1.0/10 * N * log(N)
-    //  5 sort fields: sort_cost(N) = 2.5/10 * N * log(N)
-    // 10 sort fields: sort_cost(N) = 3.0/10 * N * log(N)
-    // field_cost_coeff(F) ~ 0.75 + 0.2 * F
-    coefficients.setCollationIncrementalCost(2.5 * ms);  // 5 fields avg
-    coefficients.setCollationStartupCost(0.000001);
+    coefficients.setCollationIncrementalCost(2500 * nsToMs);  // TODO: not yet calibrated
+    coefficients.setCollationStartupCost(1.0 * nsToMs);       // TODO: not yet calibrated
 
-    coefficients.setCollationWithLimitIncrementalCost(1.0 * ms);  // TODO: not yet calibrated
-    coefficients.setCollationWithLimitStartupCost(0.000001);
+    coefficients.setCollationWithLimitIncrementalCost(1000 * nsToMs);  // TODO: not yet calibrated
+    coefficients.setCollationWithLimitStartupCost(1.0 * nsToMs);       // TODO: not yet calibrated
 
-    coefficients.setUnionIncrementalCost(0.02 * ms);
-    coefficients.setUnionStartupCost(0.000001);
+    coefficients.setUnionIncrementalCost(111.94945268 * nsToMs);
+    coefficients.setUnionStartupCost(69.88096657391543 * nsToMs);
 
-    coefficients.setExchangeIncrementalCost(0.1 * ms);  // TODO: not yet calibrated
-    coefficients.setExchangeStartupCost(0.000001);
+    coefficients.setExchangeIncrementalCost(100 * nsToMs);  // TODO: not yet calibrated
+    coefficients.setExchangeStartupCost(1.0 * nsToMs);      // TODO: not yet calibrated
 
-    coefficients.setLimitSkipIncrementalCost(0.0 * ms);  // TODO: not yet calibrated
-    coefficients.setLimitSkipStartupCost(0.000001);
+    coefficients.setLimitSkipIncrementalCost(62.42111111 * nsToMs);
+    coefficients.setLimitSkipStartupCost(655.1342592592522 * nsToMs);
 }
 }  // namespace
 

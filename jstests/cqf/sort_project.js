@@ -34,9 +34,11 @@ try {
 
     {
         // Covered plan. Also an index scan on all fields is cheaper than a collection scan.
-        const res = coll.explain("executionStats").aggregate([
+        // TODO SERVER-71553 The Cost Model is overriden to preserve IndexScan plan.
+        const res = runCommandWithCostModel(() => coll.explain("executionStats").aggregate([
             {'$project': {_id: 0, f_0: 1, f_1: 1, f_2: 1, f_3: 1, f_4: 1}}
-        ]);
+        ]),
+                                            {"indexScanStartupCost": 1e-9});
         assert.eq(nDocs, res.executionStats.nReturned);
         assertValueOnPlanPath("IndexScan", res, "child.child.nodeType");
     }

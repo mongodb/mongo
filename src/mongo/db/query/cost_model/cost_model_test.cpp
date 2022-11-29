@@ -66,8 +66,8 @@ TEST(CostModel, IncreaseIndexScanCost) {
             prefixId,
             {{{"c1",
                createScanDef({}, {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}})}}},
-            {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests},
-            costCoefs);
+            costCoefs,
+            {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
         ABT optimized = rootNode;
         phaseManager.optimize(optimized);
@@ -112,8 +112,8 @@ TEST(CostModel, IncreaseIndexScanCost) {
             prefixId,
             {{{"c1",
                createScanDef({}, {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}})}}},
-            {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests},
-            costCoefs);
+            costCoefs,
+            {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
         ABT optimized = rootNode;
         phaseManager.optimize(optimized);
@@ -180,8 +180,8 @@ TEST(CostModel, IncreaseJoinsCost) {
                      makeIndexDefinition("a", CollationOp::Ascending, false /*isMultiKey*/)},
                     {"index2",
                      makeIndexDefinition("b", CollationOp::Ascending, false /*isMultiKey*/)}})}}},
-            {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests},
-            costCoefs);
+            costCoefs,
+            {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
         ABT optimized = rootNode;
         phaseManager.optimize(optimized);
@@ -238,8 +238,8 @@ TEST(CostModel, IncreaseJoinsCost) {
                      makeIndexDefinition("a", CollationOp::Ascending, false /*isMultiKey*/)},
                     {"index2",
                      makeIndexDefinition("b", CollationOp::Ascending, false /*isMultiKey*/)}})}}},
-            {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests},
-            costCoefs);
+            costCoefs,
+            {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
         ABT optimized = rootNode;
         phaseManager.optimize(optimized);
@@ -272,8 +272,8 @@ TEST(CostModel, IncreaseJoinsCost) {
                      makeIndexDefinition("a", CollationOp::Ascending, false /*isMultiKey*/)},
                     {"index2",
                      makeIndexDefinition("b", CollationOp::Ascending, false /*isMultiKey*/)}})}}},
-            {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests},
-            costCoefs);
+            costCoefs,
+            {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
         ABT optimized = rootNode;
         phaseManager.optimize(optimized);

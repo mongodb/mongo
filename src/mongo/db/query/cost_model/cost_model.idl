@@ -34,7 +34,7 @@ imports:
 
 structs:
     CostModelCoefficients:
-        description: "A type representing Cost Model coefficients."
+        description: "A type representing Cost Model coefficients. By convention it takes execution time measured in milliseconds."
         strict: true
         fields:
             defaultStartupCost:
@@ -169,4 +169,3 @@ structs:
                 optional: false
                 type: double
                 stability: stable
-

@@ -176,38 +176,44 @@ std::unique_ptr<CardinalityEstimator> makeHeuristicCE();
 std::unique_ptr<CardinalityEstimator> makeHintedCE(ce::PartialSchemaSelHints hints);
 
 /**
- * A convenience factory function to create costing.
+ * Return default CostModel used in unit tests.
+ */
+cost_model::CostModelCoefficients getTestCostModel();
+
+/*
+ * A convenience factory function to create costing with default CostModel.
  */
 std::unique_ptr<CostEstimator> makeCostEstimator();
 
 /**
- * A convenience factory function to create OptPhaseManager for unit tests.
+ * A convenience factory function to create costing with overriden CostModel.
  */
-OptPhaseManager makePhaseManager(OptPhaseManager::PhaseSet phaseSet,
-                                 PrefixId& prefixId,
-                                 Metadata metadata,
-                                 DebugInfo debugInfo,
-                                 QueryHints queryHints = {});
+std::unique_ptr<CostEstimator> makeCostEstimator(
+    const cost_model::CostModelCoefficients& costModel);
 
 /**
- * A convenience factory function to create OptPhaseManager for unit tests with CE hints.
+ * A convenience factory function to create OptPhaseManager for unit tests with cost model.
  */
-OptPhaseManager makePhaseManager(OptPhaseManager::PhaseSet phaseSet,
-                                 PrefixId& prefixId,
-                                 Metadata metadata,
-                                 std::unique_ptr<CardinalityEstimator> ce,
-                                 DebugInfo debugInfo,
-                                 QueryHints queryHints = {});
+OptPhaseManager makePhaseManager(
+    OptPhaseManager::PhaseSet phaseSet,
+    PrefixId& prefixId,
+    Metadata metadata,
+    const boost::optional<cost_model::CostModelCoefficients>& costModel,
+    DebugInfo debugInfo,
+    QueryHints queryHints = {});
 
 /**
- * A convenience factory function to create OptPhaseManager for unit tests with cost models.
+ * A convenience factory function to create OptPhaseManager for unit tests with CE hints and cost
+ * model.
  */
-OptPhaseManager makePhaseManager(OptPhaseManager::PhaseSet phaseSet,
-                                 PrefixId& prefixId,
-                                 Metadata metadata,
-                                 DebugInfo debugInfo,
-                                 mongo::cost_model::CostModelCoefficients coefs,
-                                 QueryHints queryHints = {});
+OptPhaseManager makePhaseManager(
+    OptPhaseManager::PhaseSet phaseSet,
+    PrefixId& prefixId,
+    Metadata metadata,
+    std::unique_ptr<CardinalityEstimator> ce,
+    const boost::optional<cost_model::CostModelCoefficients>& costModel,
+    DebugInfo debugInfo,
+    QueryHints queryHints = {});
 
 /**
  * A convenience factory function to create OptPhaseManager for unit tests which requires RID.

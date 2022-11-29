@@ -10,24 +10,28 @@ if (!checkCascadesOptimizerEnabled(db)) {
 const t = db.cqf_index_intersect;
 t.drop();
 
-const nMatches = 60;
-
-assert.commandWorked(t.insert({a: 1, b: 1, c: 1}));
-assert.commandWorked(t.insert({a: 3, b: 2, c: 1}));
+const documents = [{a: 1, b: 1, c: 1}, {a: 3, b: 2, c: 1}];
+const nMatches = 300;
 for (let i = 0; i < nMatches; i++) {
-    assert.commandWorked(t.insert({a: 3, b: 3, c: i}));
+    documents.push({a: 3, b: 3, c: i});
 }
-assert.commandWorked(t.insert({a: 4, b: 3, c: 2}));
-assert.commandWorked(t.insert({a: 5, b: 5, c: 2}));
+documents.push({a: 4, b: 3, c: 2});
+documents.push({a: 5, b: 5, c: 2});
 
-for (let i = 1; i < nMatches + 100; i++) {
-    assert.commandWorked(t.insert({a: i + nMatches, b: i + nMatches, c: i + nMatches}));
+for (let i = 1; i < nMatches + 500; i++) {
+    documents.push({a: i + nMatches, b: i + nMatches, c: i + nMatches});
 }
+
+assert.commandWorked(t.insertMany(documents));
 
 assert.commandWorked(t.createIndex({'a': 1}));
 assert.commandWorked(t.createIndex({'b': 1}));
 
-let res = t.explain("executionStats").aggregate([{$match: {'a': 3, 'b': 3}}]);
+// TODO SERVER-71553 The Cost Model is overriden to preserve MergeJoin plan.
+// In majority of cases it works well without Cost Model override, but in some rare cases it fails.
+let res = runCommandWithCostModel(
+    () => t.explain("executionStats").aggregate([{$match: {'a': 3, 'b': 3}}]),
+    {"mergeJoinStartupCost": 1e-9, "mergeJoinIncrementalCost": 1e-9});
 assert.eq(nMatches, res.executionStats.nReturned);
 
 // Verify we can place a MergeJoin
@@ -37,7 +41,10 @@ assertValueOnPath("IndexScan", joinNode, "leftChild.nodeType");
 assertValueOnPath("IndexScan", joinNode, "rightChild.children.0.child.nodeType");
 
 // One side is not equality, and we use a HashJoin.
-res = t.explain("executionStats").aggregate([{$match: {'a': {$lte: 3}, 'b': 3}}]);
+// TODO SERVER-71553 The Cost Model is overriden to preserve HashJoin plan.
+res = runCommandWithCostModel(
+    () => t.explain("executionStats").aggregate([{$match: {'a': {$lte: 3}, 'b': 3}}]),
+    {"hashJoinIncrementalCost": 1e-9});
 assert.eq(nMatches, res.executionStats.nReturned);
 
 joinNode = navigateToPlanPath(res, "child.leftChild");

@@ -42,7 +42,6 @@ namespace mongo::optimizer {
 using PartialSchemaSelHints = ce::PartialSchemaSelHints;
 
 namespace {
-
 // Default selectivity of predicates used by HintedCE to force certain plans.
 constexpr double kDefaultSelectivity = 0.1;
 
@@ -72,6 +71,7 @@ TEST(PhysRewriter, PhysicalRewriterBasic) {
          OptPhase::MemoImplementationPhase},
         prefixId,
         {{{"test", createScanDef({}, {})}}},
+        /*costModel*/ boost::none,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = std::move(rootNode);
@@ -113,7 +113,7 @@ TEST(PhysRewriter, PhysicalRewriterBasic) {
 
     // Plan output with properties.
     ASSERT_EXPLAIN_PROPS_V2(
-        "Properties [cost: 0.620002, localCost: 0, adjustedCE: 10]\n"
+        "Properties [cost: 0.438321, localCost: 0, adjustedCE: 10]\n"
         "|   |   Logical:\n"
         "|   |       cardinalityEstimate: \n"
         "|   |           ce: 10\n"
@@ -137,7 +137,7 @@ TEST(PhysRewriter, PhysicalRewriterBasic) {
         "|   |       p2\n"
         "|   RefBlock: \n"
         "|       Variable [p2]\n"
-        "Properties [cost: 0.620002, localCost: 0.020001, adjustedCE: 10]\n"
+        "Properties [cost: 0.438321, localCost: 0.00983406, adjustedCE: 10]\n"
         "|   |   Logical:\n"
         "|   |       cardinalityEstimate: \n"
         "|   |           ce: 10\n"
@@ -166,7 +166,7 @@ TEST(PhysRewriter, PhysicalRewriterBasic) {
         "|   PathGet [a]\n"
         "|   PathCompare [Eq]\n"
         "|   Const [1]\n"
-        "Properties [cost: 0.600001, localCost: 0, adjustedCE: 100]\n"
+        "Properties [cost: 0.428487, localCost: 0, adjustedCE: 100]\n"
         "|   |   Logical:\n"
         "|   |       cardinalityEstimate: \n"
         "|   |           ce: 100\n"
@@ -193,7 +193,7 @@ TEST(PhysRewriter, PhysicalRewriterBasic) {
         "|           EvalPath []\n"
         "|           |   Variable [p1]\n"
         "|           PathIdentity []\n"
-        "Properties [cost: 0.600001, localCost: 0, adjustedCE: 100]\n"
+        "Properties [cost: 0.428487, localCost: 0, adjustedCE: 100]\n"
         "|   |   Logical:\n"
         "|   |       cardinalityEstimate: \n"
         "|   |           ce: 100\n"
@@ -217,7 +217,7 @@ TEST(PhysRewriter, PhysicalRewriterBasic) {
         "|   EvalFilter []\n"
         "|   |   Variable [p1]\n"
         "|   PathIdentity []\n"
-        "Properties [cost: 0.600001, localCost: 0.600001, adjustedCE: 1000]\n"
+        "Properties [cost: 0.428487, localCost: 0.428487, adjustedCE: 1000]\n"
         "|   |   Logical:\n"
         "|   |       cardinalityEstimate: \n"
         "|   |           ce: 1000\n"
@@ -277,6 +277,7 @@ TEST(PhysRewriter, GroupBy) {
          OptPhase::MemoImplementationPhase},
         prefixId,
         {{{"test", createScanDef({}, {})}}},
+        /*costModel*/ boost::none,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = std::move(rootNode);
@@ -347,6 +348,7 @@ TEST(PhysRewriter, GroupBy1) {
          OptPhase::MemoImplementationPhase},
         prefixId,
         {{{"test", createScanDef({}, {})}}},
+        /*costModel*/ boost::none,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = std::move(rootNode);
@@ -419,6 +421,7 @@ TEST(PhysRewriter, Unwind) {
          OptPhase::MemoImplementationPhase},
         prefixId,
         {{{"test", createScanDef({}, {})}}},
+        /*costModel*/ boost::none,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = std::move(rootNode);
@@ -497,6 +500,7 @@ TEST(PhysRewriter, DuplicateFilter) {
          OptPhase::MemoImplementationPhase},
         prefixId,
         {{{"c1", createScanDef({}, {})}}},
+        /*costModel*/ boost::none,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = std::move(rootNode);
@@ -558,6 +562,7 @@ TEST(PhysRewriter, FilterCollation) {
          OptPhase::MemoImplementationPhase},
         prefixId,
         {{{"c1", createScanDef({}, {})}}},
+        /*costModel*/ boost::none,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = std::move(rootNode);
@@ -614,6 +619,7 @@ TEST(PhysRewriter, EvalCollation) {
          OptPhase::MemoImplementationPhase},
         prefixId,
         {{{"c1", createScanDef({}, {})}}},
+        /*costModel*/ boost::none,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = std::move(rootNode);
@@ -669,6 +675,7 @@ TEST(PhysRewriter, FilterEvalCollation) {
          OptPhase::MemoImplementationPhase},
         prefixId,
         {{{"c1", createScanDef({}, {})}}},
+        /*costModel*/ boost::none,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = std::move(rootNode);
@@ -724,6 +731,7 @@ TEST(PhysRewriter, FilterIndexing) {
             prefixId,
             {{{"c1",
                createScanDef({}, {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}})}}},
+            /*costModel*/ boost::none,
             {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
         // Demonstrate sargable node is rewritten from filter node.
@@ -769,6 +777,7 @@ TEST(PhysRewriter, FilterIndexing) {
             prefixId,
             {{{"c1",
                createScanDef({}, {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}})}}},
+            /*costModel*/ boost::none,
             {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
         ABT optimized = rootNode;
@@ -810,6 +819,7 @@ TEST(PhysRewriter, FilterIndexing) {
              OptPhase::MemoImplementationPhase},
             prefixId,
             {{{"c1", createScanDef({}, {})}}},
+            /*costModel*/ boost::none,
             {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
         ABT optimized = rootNode;
@@ -875,6 +885,7 @@ TEST(PhysRewriter, FilterIndexing1) {
         prefixId,
         {{{"c1",
            createScanDef({}, {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}})}}},
+        /*costModel*/ boost::none,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -944,6 +955,7 @@ TEST(PhysRewriter, FilterIndexing2) {
                            {{{make<PathGet>("a", make<PathGet>("b", make<PathIdentity>())),
                               CollationOp::Ascending}},
                             false /*isMultiKey*/}}})}}},
+        /*costModel*/ boost::none,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -1023,6 +1035,7 @@ TEST(PhysRewriter, FilterIndexing2NonSarg) {
                {},
                {{"index1",
                  makeIndexDefinition("a", CollationOp::Ascending, false /*isMultiKey*/)}})}}},
+        /*costModel*/ boost::none,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -1145,6 +1158,7 @@ TEST(PhysRewriter, FilterIndexing3) {
                                  false /*isMultiKey*/,
                                  {DistributionType::Centralized},
                                  {}}}})}}},
+        /*costModel*/ boost::none,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = std::move(rootNode);
@@ -1199,6 +1213,7 @@ TEST(PhysRewriter, FilterIndexing3MultiKey) {
                                            true /*isMultiKey*/,
                                            {DistributionType::Centralized},
                                            {}}}})}}},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = std::move(rootNode);
@@ -1296,6 +1311,7 @@ TEST(PhysRewriter, FilterIndexing4) {
                                  false /*isMultiKey*/,
                                  {DistributionType::Centralized},
                                  {}}}})}}},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = std::move(rootNode);
@@ -1303,7 +1319,7 @@ TEST(PhysRewriter, FilterIndexing4) {
     // For now leave only GroupBy+Union RIDIntersect.
     phaseManager.getHints()._disableHashJoinRIDIntersect = true;
     phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(60, 75, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(20, 35, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // Assert the correct CEs for each node in group 1. Group 1 contains residual predicates.
     std::vector<std::pair<std::string, double>> pathAndCEs = {
@@ -1401,11 +1417,12 @@ TEST(PhysRewriter, FilterIndexing5) {
                                  false /*isMultiKey*/,
                                  {DistributionType::Centralized},
                                  {}}}})}}},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = std::move(rootNode);
     phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(20, 30, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(10, 25, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // We can cover both fields with the index, and need separate sort on "b".
     ASSERT_EXPLAIN_V2(
@@ -1490,11 +1507,12 @@ TEST(PhysRewriter, FilterIndexing6) {
                                  false /*isMultiKey*/,
                                  {DistributionType::Centralized},
                                  {}}}})}}},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = std::move(rootNode);
     phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(5, 10, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(5, 15, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // We can cover both fields with the index, and do not need a separate sort on "b".
     ASSERT_EXPLAIN_V2(
@@ -1564,6 +1582,7 @@ TEST(PhysRewriter, FilterIndexingStress) {
                                  false /*isMultiKey*/,
                                  {DistributionType::Centralized},
                                  {}}}})}}},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = std::move(rootNode);
@@ -1649,6 +1668,7 @@ TEST(PhysRewriter, FilterIndexingVariable) {
                {},
                {{"index1",
                  makeIndexDefinition("a", CollationOp::Ascending, false /*isMultiKey*/)}})}}},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = std::move(rootNode);
@@ -1740,6 +1760,7 @@ TEST(PhysRewriter, FilterIndexingMaxKey) {
          OptPhase::MemoImplementationPhase},
         prefixId,
         {{{"c1", createScanDef({}, {})}}},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -1806,6 +1827,7 @@ TEST(PhysRewriter, SargableProjectionRenames) {
         {OptPhase::MemoSubstitutionPhase},
         prefixId,
         {{{"c1", createScanDef({}, {})}}},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -1868,6 +1890,7 @@ TEST(PhysRewriter, SargableAcquireProjection) {
         {OptPhase::MemoSubstitutionPhase},
         prefixId,
         {{{"c1", createScanDef({}, {})}}},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -1937,6 +1960,7 @@ TEST(PhysRewriter, FilterReorder) {
         prefixId,
         {{{"c1", createScanDef({}, {})}}},
         makeHintedCE(std::move(hints)),
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = std::move(rootNode);
@@ -2032,6 +2056,7 @@ TEST(PhysRewriter, CoveredScan) {
                {{"index1",
                  makeIndexDefinition("a", CollationOp::Ascending, false /*isMultiKey*/)}})}}},
         makeHintedCE(std::move(hints)),
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = std::move(rootNode);
@@ -2099,6 +2124,7 @@ TEST(PhysRewriter, EvalIndexing) {
                    {},
                    {{"index1",
                      makeIndexDefinition("a", CollationOp::Ascending, false /*isMultiKey*/)}})}}},
+            boost::none /*costModel*/,
             {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
         ABT optimized = rootNode;
@@ -2132,6 +2158,7 @@ TEST(PhysRewriter, EvalIndexing) {
                    {},
                    {{"index1",
                      makeIndexDefinition("a", CollationOp::Clustered, false /*isMultiKey*/)}})}}},
+            boost::none /*costModel*/,
             {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
         ABT optimized = rootNode;
@@ -2191,6 +2218,7 @@ TEST(PhysRewriter, EvalIndexing1) {
                {},
                {{"index1",
                  makeIndexDefinition("a", CollationOp::Ascending, false /*isMultiKey*/)}})}}},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -2263,12 +2291,13 @@ TEST(PhysRewriter, EvalIndexing2) {
                {},
                {{"index1",
                  makeIndexDefinition("a", CollationOp::Ascending, false /*isMultiKey*/)}})}}},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
     phaseManager.getHints()._fastIndexNullHandling = true;
     phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(10, 20, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(8, 18, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // Verify collation is subsumed into the index scan.
     ASSERT_EXPLAIN_V2(
@@ -2336,6 +2365,11 @@ TEST(PhysRewriter, MultiKeyIndex) {
     ABT rootNode = make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}},
                                   std::move(collationNode));
 
+    // TODO SERVER-71551 Follow up unit tests with overriden Cost Model.
+    auto costModel = getTestCostModel();
+    costModel.setEvalStartupCost(1e-6);
+    costModel.setGroupByIncrementalCost(1e-4);
+
     auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
@@ -2348,6 +2382,7 @@ TEST(PhysRewriter, MultiKeyIndex) {
                 {"index2",
                  makeIndexDefinition("b", CollationOp::Descending, false /*isMultiKey*/)}})}}},
         makeHintedCE(std::move(hints)),
+        costModel,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     {
@@ -2556,6 +2591,10 @@ TEST(PhysRewriter, CompoundIndex1) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterDNode));
 
+    // TODO SERVER-71551 Follow up unit tests with overriden Cost Model.
+    auto costModel = getTestCostModel();
+    costModel.setIndexScanStartupCost(1e-6);
+
     auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
@@ -2572,6 +2611,7 @@ TEST(PhysRewriter, CompoundIndex1) {
                  IndexDefinition{{{makeNonMultikeyIndexPath("b"), CollationOp::Ascending},
                                   {makeNonMultikeyIndexPath("d"), CollationOp::Ascending}},
                                  false /*isMultiKey*/}}})}}},
+        std::move(costModel),
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -2641,6 +2681,10 @@ TEST(PhysRewriter, CompoundIndex2) {
     ABT rootNode = make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}},
                                   std::move(collationNode));
 
+    // TODO SERVER-71551 Follow up unit tests with overriden Cost Model.
+    auto costModel = getTestCostModel();
+    costModel.setIndexScanStartupCost(1e-6);
+
     auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
@@ -2659,11 +2703,12 @@ TEST(PhysRewriter, CompoundIndex2) {
                                      {makeNonMultikeyIndexPath("d"), CollationOp::Ascending}},
                                     false /*isMultiKey*/}},
                })}}},
+        std::move(costModel),
         {true /*debugMode*/, 3 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
     phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(60, 80, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(50, 70, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     const BSONObj& explainRoot = ExplainGenerator::explainBSONObj(optimized);
     ASSERT_BSON_PATH("\"BinaryJoin\"", explainRoot, "child.nodeType");
@@ -2728,6 +2773,10 @@ TEST(PhysRewriter, CompoundIndex3) {
     ABT rootNode = make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}},
                                   std::move(collationNode));
 
+    // TODO SERVER-71551 Follow up unit tests with overriden Cost Model.
+    auto costModel = getTestCostModel();
+    costModel.setIndexScanStartupCost(1e-6);
+
     auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
@@ -2743,6 +2792,7 @@ TEST(PhysRewriter, CompoundIndex3) {
                            IndexDefinition{{{makeIndexPath("b"), CollationOp::Ascending},
                                             {makeIndexPath("d"), CollationOp::Ascending}},
                                            true /*isMultiKey*/}}})}}},
+        std::move(costModel),
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -2832,6 +2882,7 @@ TEST(PhysRewriter, CompoundIndex4Negative) {
                                   {makeNonMultikeyIndexPath("d"), CollationOp::Ascending}},
                                  false /*isMultiKey*/}}})}}},
         makeHintedCE(std::move(hints)),
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -2886,6 +2937,7 @@ TEST(PhysRewriter, CompoundIndex5) {
                  IndexDefinition{{{makeNonMultikeyIndexPath("a"), CollationOp::Ascending},
                                   {makeNonMultikeyIndexPath("b"), CollationOp::Ascending}},
                                  false /*isMultiKey*/}}})}}},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -2987,11 +3039,12 @@ TEST(PhysRewriter, IndexBoundsIntersect) {
                            IndexDefinition{{{makeIndexPath("b"), CollationOp::Ascending},
                                             {makeIndexPath("a"), CollationOp::Ascending}},
                                            true /*isMultiKey*/}}})}}},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
     phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(20, 30, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(10, 20, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // Demonstrate that the predicates >70 and <90 are NOT combined into the same interval (70, 90)
     // since the paths are multiKey. With the heuristic estimate we may get either interval in the
@@ -3062,6 +3115,7 @@ TEST(PhysRewriter, IndexBoundsIntersect1) {
                {{"index1",
                  IndexDefinition{{{makeNonMultikeyIndexPath("a"), CollationOp::Ascending}},
                                  false /*isMultiKey*/}}})}}},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -3119,6 +3173,11 @@ TEST(PhysRewriter, IndexBoundsIntersect2) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode));
 
+    // TODO SERVER-71551 Follow up unit tests with overriden Cost Model.
+    auto costModel = getTestCostModel();
+    costModel.setSeekStartupCost(1e-6);
+    costModel.setIndexScanStartupCost(1e-6);
+
     auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
@@ -3129,6 +3188,7 @@ TEST(PhysRewriter, IndexBoundsIntersect2) {
                          {{"index1",
                            IndexDefinition{{{makeIndexPath("a"), CollationOp::Ascending}},
                                            true /*isMultiKey*/}}})}}},
+        std::move(costModel),
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -3209,6 +3269,7 @@ TEST(PhysRewriter, IndexBoundsIntersect3) {
                  IndexDefinition{{{makeIndexPath(FieldPathType{"a", "c"}, true /*isMultiKey*/),
                                    CollationOp::Ascending}},
                                  true /*isMultiKey*/}}})}}},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -3284,15 +3345,16 @@ TEST(PhysRewriter, IndexResidualReq) {
                  IndexDefinition{{{makeNonMultikeyIndexPath("a"), CollationOp::Ascending},
                                   {makeNonMultikeyIndexPath("b"), CollationOp::Ascending}},
                                  false /*isMultiKey*/}}})}}},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
     phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(10, 20, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(5, 15, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // Make sure we can use the index to cover "b" while testing "b.c" with a separate filter.
     ASSERT_EXPLAIN_PROPS_V2(
-        "Properties [cost: 0.231002, localCost: 0, adjustedCE: 189.571]\n"
+        "Properties [cost: 0.176361, localCost: 0, adjustedCE: 189.571]\n"
         "|   |   Logical:\n"
         "|   |       cardinalityEstimate: \n"
         "|   |           ce: 189.571\n"
@@ -3316,7 +3378,7 @@ TEST(PhysRewriter, IndexResidualReq) {
         "|   |       pa\n"
         "|   RefBlock: \n"
         "|       Variable [pa]\n"
-        "Properties [cost: 0.231002, localCost: 0.231002, adjustedCE: 330]\n"
+        "Properties [cost: 0.176361, localCost: 0.176361, adjustedCE: 330]\n"
         "|   |   Logical:\n"
         "|   |       cardinalityEstimate: \n"
         "|   |           ce: 189.571\n"
@@ -3414,12 +3476,13 @@ TEST(PhysRewriter, IndexResidualReq1) {
                  makeCompositeIndexDefinition({{"a", CollationOp::Ascending, false /*isMultiKey*/},
                                                {"d", CollationOp::Ascending, false /*isMultiKey*/}},
                                               false /*isMultiKey*/)}})}}},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
     phaseManager.getHints()._fastIndexNullHandling = true;
     phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(50, 75, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(65, 90, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // Prefer index1 over index2 and index3 in order to cover all fields.
     ASSERT_EXPLAIN_V2(
@@ -3485,6 +3548,7 @@ TEST(PhysRewriter, IndexResidualReq2) {
                                {{"a", CollationOp::Ascending, true /*isMultiKey*/},
                                 {"c", CollationOp::Ascending, true /*isMultiKey*/},
                                 {"b", CollationOp::Ascending, true /*isMultiKey*/}})}})}}},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -3558,6 +3622,7 @@ TEST(PhysRewriter, ElemMatchIndex) {
         prefixId,
         {{{"c1",
            createScanDef({}, {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}})}}},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -3641,6 +3706,7 @@ TEST(PhysRewriter, ElemMatchIndex1) {
                            makeCompositeIndexDefinition(
                                {{"b", CollationOp::Ascending, true /*isMultiKey*/},
                                 {"a", CollationOp::Ascending, true /*isMultiKey*/}})}})}}},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -3717,6 +3783,7 @@ TEST(PhysRewriter, ElemMatchIndexNoArrays) {
                {},
                {{"index1",
                  makeIndexDefinition("a", CollationOp::Ascending, false /*multiKey*/)}})}}},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -3783,11 +3850,12 @@ TEST(PhysRewriter, ObjectElemMatchResidual) {
                            makeCompositeIndexDefinition(
                                {{"b", CollationOp::Ascending, true /*isMultiKey*/},
                                 {"a", CollationOp::Ascending, true /*isMultiKey*/}})}})}}},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
     phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(40, 50, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(20, 30, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // We should pick the index, and do at least some filtering before the fetch.
     // We don't have index bounds, both because 'a' is not the first field of the index,
@@ -3898,9 +3966,8 @@ TEST(PhysRewriter, ObjectElemMatchBounds) {
                {{"index1",
                  IndexDefinition{{{makeIndexPath(FieldPathType{"a", "b"}, true /*isMultiKey*/),
                                    CollationOp::Ascending}},
-                                 true /*isMultiKey*/}}}
-
-               )}}},
+                                 true /*isMultiKey*/}}})}}},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -3970,6 +4037,12 @@ TEST(PhysRewriter, NestedElemMatch) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode));
 
+    // TODO SERVER-71551 Follow up unit tests with overriden Cost Model.
+    auto costModel = getTestCostModel();
+    costModel.setGroupByStartupCost(1e-6);
+    costModel.setGroupByIncrementalCost(1e-4);
+    costModel.setEvalStartupCost(1e-6);
+
     auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
@@ -3980,6 +4053,7 @@ TEST(PhysRewriter, NestedElemMatch) {
                {},
                {{"index1",
                  makeIndexDefinition("a", CollationOp::Ascending, true /*isMultiKey*/)}})}}},
+        std::move(costModel),
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -4098,6 +4172,7 @@ TEST(PhysRewriter, PathObj) {
                                {{"a", CollationOp::Ascending, false /*isMultiKey*/},
                                 {"b", CollationOp::Ascending, true /*isMultiKey*/}})}})}}},
         makeHintedCE(std::move(hints)),
+        boost::none /*costModel*/,
         DebugInfo{true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests},
         {} /*hints*/);
 
@@ -4181,6 +4256,7 @@ TEST(PhysRewriter, ArrayConstantIndex) {
                            makeCompositeIndexDefinition(
                                {{"b", CollationOp::Ascending, true /*isMultiKey*/},
                                 {"a", CollationOp::Ascending, true /*isMultiKey*/}})}})}}},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -4281,6 +4357,7 @@ TEST(PhysRewriter, ArrayConstantNoIndex) {
          OptPhase::MemoImplementationPhase},
         prefixId,
         {{{"c1", createScanDef({}, {})}}},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -4345,6 +4422,7 @@ TEST(PhysRewriter, ParallelScan) {
         {{{"c1",
            createScanDef({}, {}, ConstEval::constFold, {DistributionType::UnknownPartitioning})}},
          5 /*numberOfPartitions*/},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -4411,6 +4489,7 @@ TEST(PhysRewriter, HashPartitioning) {
                          {DistributionType::HashPartitioning,
                           makeSeq(make<PathGet>("a", make<PathIdentity>()))})}},
          5 /*numberOfPartitions*/},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -4501,11 +4580,12 @@ TEST(PhysRewriter, IndexPartitioning) {
                {DistributionType::HashPartitioning, makeSeq(makeNonMultikeyIndexPath("b"))})}},
          5 /*numberOfPartitions*/},
         makeHintedCE(std::move(hints)),
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
     phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(75, 125, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(60, 100, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     ASSERT_EXPLAIN_V2(
         "Root []\n"
@@ -4600,6 +4680,11 @@ TEST(PhysRewriter, IndexPartitioning1) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"pc"}}, std::move(groupByNode));
 
+    // TODO SERVER-71551 Follow up unit tests with overriden Cost Model.
+    auto costModel = getTestCostModel();
+    costModel.setBinaryJoinIncrementalCost(0.002);
+    costModel.setHashJoinIncrementalCost(5e-5);
+
     auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
@@ -4624,11 +4709,12 @@ TEST(PhysRewriter, IndexPartitioning1) {
                {DistributionType::HashPartitioning, makeSeq(makeNonMultikeyIndexPath("c"))})}},
          5 /*numberOfPartitions*/},
         makeHintedCE(std::move(hints)),
+        std::move(costModel),
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
     phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(125, 175, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(110, 160, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     const BSONObj& result = ExplainGenerator::explainBSONObj(optimized);
 
@@ -4684,6 +4770,7 @@ TEST(PhysRewriter, LocalGlobalAgg) {
         {{{"c1",
            createScanDef({}, {}, ConstEval::constFold, {DistributionType::UnknownPartitioning})}},
          5 /*numberOfPartitions*/},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -4762,6 +4849,7 @@ TEST(PhysRewriter, LocalGlobalAgg1) {
         {{{"c1",
            createScanDef({}, {}, ConstEval::constFold, {DistributionType::UnknownPartitioning})}},
          5 /*numberOfPartitions*/},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -4817,6 +4905,7 @@ TEST(PhysRewriter, LocalLimitSkip) {
         {{{"c1",
            createScanDef({}, {}, ConstEval::constFold, {DistributionType::UnknownPartitioning})}},
          5 /*numberOfPartitions*/},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -4824,7 +4913,7 @@ TEST(PhysRewriter, LocalLimitSkip) {
     ASSERT_BETWEEN(5, 15, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     ASSERT_EXPLAIN_PROPS_V2(
-        "Properties [cost: 0.0066022, localCost: 0, adjustedCE: 20]\n"
+        "Properties [cost: 0.00929774, localCost: 0, adjustedCE: 20]\n"
         "|   |   Logical:\n"
         "|   |       cardinalityEstimate: \n"
         "|   |           ce: 20\n"
@@ -4845,7 +4934,7 @@ TEST(PhysRewriter, LocalLimitSkip) {
         "|   |       root\n"
         "|   RefBlock: \n"
         "|       Variable [root]\n"
-        "Properties [cost: 0.0066022, localCost: 1e-06, adjustedCE: 30]\n"
+        "Properties [cost: 0.00929774, localCost: 0.00252777, adjustedCE: 30]\n"
         "|   |   Logical:\n"
         "|   |       cardinalityEstimate: \n"
         "|   |           ce: 1000\n"
@@ -4872,7 +4961,7 @@ TEST(PhysRewriter, LocalLimitSkip) {
         "|   limitSkip:\n"
         "|       limit: 20\n"
         "|       skip: 10\n"
-        "Properties [cost: 0.0066012, localCost: 0.003001, adjustedCE: 30]\n"
+        "Properties [cost: 0.00676997, localCost: 0.003001, adjustedCE: 30]\n"
         "|   |   Logical:\n"
         "|   |       cardinalityEstimate: \n"
         "|   |           ce: 1000\n"
@@ -4897,7 +4986,7 @@ TEST(PhysRewriter, LocalLimitSkip) {
         "|   |   distribution: \n"
         "|   |       type: Centralized\n"
         "|   RefBlock: \n"
-        "Properties [cost: 0.0036002, localCost: 0.0036002, adjustedCE: 30]\n"
+        "Properties [cost: 0.00376897, localCost: 0.00376897, adjustedCE: 30]\n"
         "|   |   Logical:\n"
         "|   |       cardinalityEstimate: \n"
         "|   |           ce: 1000\n"
@@ -4949,6 +5038,7 @@ TEST(PhysRewriter, CollationLimit) {
          OptPhase::MemoImplementationPhase},
         prefixId,
         {{{"c1", createScanDef({}, {})}}},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -4958,7 +5048,7 @@ TEST(PhysRewriter, CollationLimit) {
     // We have a collation node with limit-skip physical properties. It will be lowered to a
     // sort node with limit.
     ASSERT_EXPLAIN_PROPS_V2(
-        "Properties [cost: 4.92193, localCost: 0, adjustedCE: 20]\n"
+        "Properties [cost: 4.75042, localCost: 0, adjustedCE: 20]\n"
         "|   |   Logical:\n"
         "|   |       cardinalityEstimate: \n"
         "|   |           ce: 20\n"
@@ -4978,7 +5068,7 @@ TEST(PhysRewriter, CollationLimit) {
         "|   |       root\n"
         "|   RefBlock: \n"
         "|       Variable [root]\n"
-        "Properties [cost: 4.92193, localCost: 4.32193, adjustedCE: 20]\n"
+        "Properties [cost: 4.75042, localCost: 4.32193, adjustedCE: 20]\n"
         "|   |   Logical:\n"
         "|   |       cardinalityEstimate: \n"
         "|   |           ce: 1000\n"
@@ -5012,7 +5102,7 @@ TEST(PhysRewriter, CollationLimit) {
         "|   |       pa: Ascending\n"
         "|   RefBlock: \n"
         "|       Variable [pa]\n"
-        "Properties [cost: 0.600001, localCost: 0.600001, adjustedCE: 1000]\n"
+        "Properties [cost: 0.428487, localCost: 0.428487, adjustedCE: 1000]\n"
         "|   |   Logical:\n"
         "|   |       cardinalityEstimate: \n"
         "|   |           ce: 1000\n"
@@ -5096,6 +5186,7 @@ TEST(PhysRewriter, PartialIndex1) {
                                            true /*isMultiKey*/,
                                            {DistributionType::Centralized},
                                            std::move(conversionResult->_reqMap)}}})}}},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -5177,6 +5268,7 @@ TEST(PhysRewriter, PartialIndex2) {
                                            true /*isMultiKey*/,
                                            {DistributionType::Centralized},
                                            std::move(conversionResult->_reqMap)}}})}}},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -5257,6 +5349,7 @@ TEST(PhysRewriter, PartialIndexReject) {
                                            true /*isMultiKey*/,
                                            {DistributionType::Centralized},
                                            std::move(conversionResult->_reqMap)}}})}}},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -5429,6 +5522,7 @@ TEST(PhysRewriter, UnionRewrite) {
          OptPhase::MemoImplementationPhase},
         prefixId,
         {{{"test1", createScanDef({}, {})}, {"test2", createScanDef({}, {})}}},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = std::move(rootNode);
@@ -5498,6 +5592,7 @@ TEST(PhysRewriter, JoinRewrite) {
          OptPhase::MemoImplementationPhase},
         prefixId,
         {{{"test1", createScanDef({}, {})}, {"test2", createScanDef({}, {})}}},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = std::move(rootNode);
@@ -5578,6 +5673,7 @@ TEST(PhysRewriter, JoinRewrite1) {
                          {{"index1",
                            {{{makeNonMultikeyIndexPath("b"), CollationOp::Ascending}},
                             false /*isMultiKey*/}}})}}},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = std::move(rootNode);
@@ -5628,6 +5724,7 @@ TEST(PhysRewriter, RootInterval) {
          OptPhase::MemoImplementationPhase},
         prefixId,
         {{{"c1", createScanDef({}, {})}}},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
@@ -5684,6 +5781,7 @@ TEST(PhysRewriter, EqMemberSargable) {
                    {},
                    {{"index1",
                      makeIndexDefinition("a", CollationOp::Ascending, false /*isMultiKey*/)}})}}},
+            boost::none /*costModel*/,
             {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
         ABT optimized = rootNode;
@@ -5726,6 +5824,7 @@ TEST(PhysRewriter, EqMemberSargable) {
             prefixId,
             {{{"c1",
                createScanDef({}, {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}})}}},
+            boost::none /*costModel*/,
             {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
         ABT optimized = rootNode;
@@ -5829,11 +5928,12 @@ TEST(PhysRewriter, IndexSubfieldCovered) {
                {},
                {{"index1",
                  makeIndexDefinition("a", CollationOp::Ascending, false /*isMultiKey*/)}})}}},
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
     phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(35, 50, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(20, 35, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // Observe we have a covered plan. The filters for subfields "b" and "c" are expressed as
     // residual predicates. Also observe the traverse for "a.c" is removed due to "a" being
@@ -5916,12 +6016,13 @@ TEST(PhysRewriter, PerfOnlyPreds1) {
                                                {"a", CollationOp::Ascending, false /*isMultiKey*/}},
                                               false /*isMultiKey*/)}})}}},
         makeHintedCE(std::move(hints)),
+        boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;
     phaseManager.getHints()._disableYieldingTolerantPlans = false;
     phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(10, 15, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(15, 20, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // Demonstrate predicates are repeated on the Seek side. Also demonstrate null handling, and the
     // fact that we apply the predicates on the Seek side in increasing selectivity order.
@@ -5991,6 +6092,12 @@ TEST(PhysRewriter, PerfOnlyPreds2) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"pa"}}, std::move(filterNode2));
 
+    // TODO SERVER-71551 Follow up unit tests with overriden Cost Model.
+    auto costModel = getTestCostModel();
+    costModel.setSeekStartupCost(1e-6);
+    costModel.setIndexScanStartupCost(1e-6);
+    costModel.setMergeJoinStartupCost(1e-6);
+
     PrefixId prefixId;
     auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
@@ -6004,6 +6111,7 @@ TEST(PhysRewriter, PerfOnlyPreds2) {
                 {"index2",
                  makeIndexDefinition("b", CollationOp::Ascending, false /*isMultiKey*/)}})}}},
         makeHintedCE(std::move(hints)),
+        std::move(costModel),
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
     ABT optimized = rootNode;

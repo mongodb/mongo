@@ -204,14 +204,67 @@ ABT translatetoABT(const std::string& pipelineStr,
         metadata, pipelineStr, prefixId.getNextId("scan"), scanDefName, prefixId, involvedNss);
 }
 
+cost_model::CostModelCoefficients getPipelineTestDefaultCoefficients() {
+    // These cost should reflect estimated aggregated execution time in milliseconds.
+    // The coeffeicient us converts values from microseconds to milliseconds.
+    cost_model::CostModelCoefficients coefficients{};
+    constexpr double usToMs = 1.0e-3;
+    coefficients.setDefaultStartupCost(0.000001);
+    coefficients.setScanIncrementalCost(0.6 * usToMs);
+    coefficients.setScanStartupCost(0.000001);
+    coefficients.setIndexScanIncrementalCost(0.5 * usToMs);
+    coefficients.setIndexScanStartupCost(0.000001);
+    coefficients.setSeekCost(2.0 * usToMs);
+    coefficients.setSeekStartupCost(0.000001);
+    coefficients.setFilterIncrementalCost(0.2 * usToMs);
+    coefficients.setFilterStartupCost(0.000001);
+    coefficients.setEvalIncrementalCost(2.0 * usToMs);
+    coefficients.setEvalStartupCost(0.000001);
+    coefficients.setGroupByIncrementalCost(0.07 * usToMs);
+    coefficients.setGroupByStartupCost(0.000001);
+
+    coefficients.setUnwindIncrementalCost(0.03 * usToMs);
+    coefficients.setUnwindStartupCost(0.000001);
+
+    coefficients.setBinaryJoinIncrementalCost(0.2 * usToMs);
+    coefficients.setBinaryJoinStartupCost(0.000001);
+
+    coefficients.setHashJoinIncrementalCost(0.05 * usToMs);
+    coefficients.setHashJoinStartupCost(0.000001);
+
+    coefficients.setMergeJoinIncrementalCost(0.02 * usToMs);
+    coefficients.setMergeJoinStartupCost(0.000001);
+
+    coefficients.setUniqueIncrementalCost(0.7 * usToMs);
+    coefficients.setUniqueStartupCost(0.000001);
+
+    coefficients.setCollationIncrementalCost(2.5 * usToMs);
+    coefficients.setCollationStartupCost(0.000001);
+
+    coefficients.setCollationWithLimitIncrementalCost(1.0 * usToMs);
+    coefficients.setCollationWithLimitStartupCost(0.000001);
+
+    coefficients.setUnionIncrementalCost(0.02 * usToMs);
+    coefficients.setUnionStartupCost(0.000001);
+
+    coefficients.setExchangeIncrementalCost(0.1 * usToMs);
+    coefficients.setExchangeStartupCost(0.000001);
+
+    coefficients.setLimitSkipIncrementalCost(0.0 * usToMs);
+    coefficients.setLimitSkipStartupCost(0.000001);
+    return coefficients;
+}
+
 ABT optimizeABT(ABT abt,
                 opt::unordered_set<OptPhase> phaseSet,
                 Metadata metadata,
+                cost_model::CostModelCoefficients&& costModel,
                 PathToIntervalFn pathToInterval,
                 bool phaseManagerDisableScan) {
     PrefixId prefixId;
 
-    auto phaseManager = makePhaseManager(phaseSet, prefixId, metadata, DebugInfo::kDefaultForTests);
+    auto phaseManager = makePhaseManager(
+        phaseSet, prefixId, metadata, std::move(costModel), DebugInfo::kDefaultForTests);
     if (phaseManagerDisableScan) {
         phaseManager.getHints()._disableScan = true;
     }
@@ -249,8 +302,13 @@ std::string testABTTranslationAndOptimization(
 
     std::string explained;
     if (optimizePipeline) {
-        ABT optimized =
-            optimizeABT(translated, phaseSet, metadata, pathToInterval, phaseManagerDisableScan);
+        ABT optimized = optimizeABT(translated,
+                                    phaseSet,
+                                    metadata,
+                                    // TODO SERVER-71554
+                                    getPipelineTestDefaultCoefficients(),
+                                    pathToInterval,
+                                    phaseManagerDisableScan);
         explained = ExplainGenerator::explainV2(optimized);
     } else {
         explained = ExplainGenerator::explainV2(translated);
@@ -259,5 +317,4 @@ std::string testABTTranslationAndOptimization(
     stream << explained << std::endl << std::endl;
     return explained;
 }
-
 }  // namespace mongo::optimizer
