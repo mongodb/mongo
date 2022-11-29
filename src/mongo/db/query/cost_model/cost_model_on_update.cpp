@@ -56,6 +56,11 @@ Status updateCostCoefficients() {
 
         const auto overrides = getCostModelCoefficientsOverride();
         auto updater = onCoefficientsChangeUpdater(serviceCtx).get();
+        if (!updater) {
+            return Status(ErrorCodes::IllegalOperation,
+                          "failed to set 'internalCostModelCoefficients' because "
+                          "OnCoefficientsChangeUpdater is null");
+        }
         updater->updateCoefficients(serviceCtx, overrides);
     } else {
         // 'client' may be null if the server parameter is set on mongod startup.
