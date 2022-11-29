@@ -247,3 +247,6 @@ scons_env.env
 
 # buildscripts_test by-product
 test_success.ninja
+
+# test report generation result
+report.json

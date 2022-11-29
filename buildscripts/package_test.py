@@ -52,7 +52,7 @@ JOURNALCTL_URL = f"{DOCKER_SYSTEMCTL_REPO}/master/files/docker/journalctl3.py"
 OS_DOCKER_LOOKUP = {
     'amazon': None,
     'amzn64': None,
-    # TODO(SERVER-69982) This can be reenabled when the ticket is fixed
+    # TODO(SERVER-69982) This can be re-enabled when the ticket is fixed
     # 'amazon': ('amazonlinux:1', "yum", frozenset(["python38", "wget", "pkgconfig", "systemd"]), "python3"),
     # 'amzn64': ('amazonlinux:1', "yum", frozenset(["python38", "wget", "pkgconfig", "systemd"]), "python3"),
     'amazon2': ('amazonlinux:2', "yum", frozenset(["python3", "wget", "pkgconfig", "systemd"]),
@@ -100,7 +100,7 @@ OS_DOCKER_LOOKUP = {
     'suse11': None,
     'suse12': None,
     # ('registry.suse.com/suse/sles12sp5:latest', "zypper", frozenset(["python3", "wget", "pkg-config", "systemd"]), "python3"),
-    # The offical repo fails with the following error
+    # The official repo fails with the following error
     # Problem retrieving the repository index file for service 'container-suseconnect-zypp':
     # [container-suseconnect-zypp|file:/usr/lib/zypp/plugins/services/container-suseconnect-zypp]
     'suse15': ('opensuse/leap:15', "zypper", frozenset(["python3", "wget", "pkg-config",
@@ -212,7 +212,7 @@ def run_test(test: Test) -> Result:
 
     os.makedirs(log_external_path.parent, exist_ok=True)
     command = f"bash -c \"{test.python_command} /mnt/package_test/package_test_internal.py {log_docker_path} {' '.join(test.packages_urls)}\""
-    logging.debug("Attemtping to run the following docker command: %s", command)
+    logging.debug("Attempting to run the following docker command: %s", command)
 
     try:
         image = build_image(test)
@@ -246,20 +246,22 @@ def run_test(test: Test) -> Result:
     return result
 
 
-logging.info("Attemping to download current mongo releases json")
+logging.info("Attempting to download current mongo releases json")
 r = requests.get('https://downloads.mongodb.org/current.json')
 current_releases = r.json()
 
-logging.info("Attemping to download current mongo tools releases json")
+logging.info("Attempting to download current mongo tools releases json")
 r = requests.get('https://downloads.mongodb.org/tools/db/release.json')
 current_tools_releases = r.json()
 
-logging.info("Attemping to download current mongosh releases json")
+logging.info("Attempting to download current mongosh releases json")
 r = requests.get('https://s3.amazonaws.com/info-mongodb-com/com-download-center/mongosh.json')
 mongosh_releases = r.json()
 
 
 def iterate_over_downloads() -> Generator[Dict[str, Any], None, None]:
+    # TODO: TOOLS-3204 - we need to sub the arch alias until package
+    # rchitectures are named consistently with the server packages
     for version in current_releases["versions"]:
         for download in version["downloads"]:
             if download["edition"] == "source":
@@ -271,6 +273,10 @@ def iterate_over_downloads() -> Generator[Dict[str, Any], None, None]:
 
 
 def get_tools_package(arch_name: str, os_name: str) -> Optional[str]:
+    # TODO: MONGOSH-1308 - we need to sub the arch alias until package
+    # architectures are named consistently with the server packages
+    if arch_name == "aarch64" and os_name != "amazon2":
+        arch_name = "arm64"
     for download in current_tools_releases["versions"][0]["downloads"]:
         if download["name"] == os_name and download["arch"] == arch_name:
             return download["package"]["url"]
@@ -278,7 +284,9 @@ def get_tools_package(arch_name: str, os_name: str) -> Optional[str]:
 
 
 def get_mongosh_package(arch_name: str, os_name: str) -> Optional[str]:
-    if arch_name == "x86_64":
+    if arch_name == "aarch64":
+        arch_name = "arm64"
+    if arch_name in ("x86_64", "amd64"):
         arch_name = "x64"
     pkg_ext = "rpm"
     if "debian" in os_name or "ubuntu" in os_name:
@@ -287,6 +295,14 @@ def get_mongosh_package(arch_name: str, os_name: str) -> Optional[str]:
         if platform_type["os"] == pkg_ext and platform_type["arch"] == arch_name:
             return platform_type["download_link"]
     return None
+
+
+def get_arch_aliases(arch_name: str) -> List[str]:
+    if arch_name in ('amd64', 'x86_64'):
+        return ['amd64', 'x86_64']
+    if arch_name in ('ppc64le', 'ppc64el'):
+        return ['ppc64le', 'ppc64el']
+    return [arch_name]
 
 
 arches: Set[str] = set()
@@ -342,12 +358,14 @@ for extra_test in extra_tests:
     if tools_package:
         urls.append(tools_package)
     else:
-        logging.warning("Could not find tools package for %s and %s", arch, test_os)
+        logging.error("Could not find tools package for %s and %s", arch, test_os)
+        sys.exit(1)
 
     if mongosh_package:
         urls.append(mongosh_package)
     else:
-        logging.warning("Could not find mongosh package for %s and %s", arch, test_os)
+        logging.error("Could not find mongosh package for %s and %s", arch, test_os)
+        sys.exit(1)
 
     tests.append(Test(os_name=test_os, version="custom", packages_urls=urls))
 
@@ -356,7 +374,9 @@ if mongo_os != "none":
     for dl in iterate_over_downloads():
         if mongo_os not in ["all", dl["target"]]:
             continue
-        if dl["arch"] != arch:
+
+        # amd64 and x86_64 should be treated as aliases of each other
+        if dl["arch"] not in get_arch_aliases(dl["arch"]):
             continue
 
         if not OS_DOCKER_LOOKUP[dl["target"]]:
@@ -365,7 +385,7 @@ if mongo_os != "none":
                 dl['target'], dl['version'])
             continue
 
-        if not "packages" in dl:
+        if "packages" not in dl:
             logging.info(
                 "Skipping test on target because there are no packages %s->??? on mongo version %s",
                 dl['target'], dl['version'])
