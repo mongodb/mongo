@@ -4,6 +4,7 @@
  *
  * @tags: [
  *   requires_replication,
+ *   requires_snapshot_read,
  * ]
  */
 (function() {
