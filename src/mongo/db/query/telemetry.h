@@ -202,8 +202,6 @@ SharedTelemetryStore getTelemetryStoreForRead(OperationContext* opCtx);
 
 std::unique_ptr<TelemetryStore> resetTelemetryStore(OperationContext* opCtx);
 
-bool isTelemetryEnabled(const ServiceContext* serviceCtx);
-
 /**
  * Register a request for telemetry collection. The telemetry machinery may decide not to collect
  * anything but this should be called for all requests. The decision is made based on the feature

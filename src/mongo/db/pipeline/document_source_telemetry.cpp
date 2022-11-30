@@ -34,10 +34,11 @@
 
 namespace mongo {
 
-REGISTER_DOCUMENT_SOURCE(telemetry,
-                         DocumentSourceTelemetry::LiteParsed::parse,
-                         DocumentSourceTelemetry::createFromBson,
-                         AllowedWithApiStrict::kNeverInVersion1);
+REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(telemetry,
+                                           DocumentSourceTelemetry::LiteParsed::parse,
+                                           DocumentSourceTelemetry::createFromBson,
+                                           AllowedWithApiStrict::kNeverInVersion1,
+                                           feature_flags::gFeatureFlagTelemetry);
 
 std::unique_ptr<DocumentSourceTelemetry::LiteParsed> DocumentSourceTelemetry::LiteParsed::parse(
     const NamespaceString& nss, const BSONElement& spec) {

@@ -29,8 +29,10 @@
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/catalog/rename_collection.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/telemetry.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::telemetry {
@@ -38,6 +40,13 @@ namespace mongo::telemetry {
 class TelemetryStoreTest : public ServiceContextTest {};
 
 TEST_F(TelemetryStoreTest, BasicUsage) {
+    // Turning on the flag at runtime will crash as telemetry store registerer (which creates the
+    // telemetry store) is called at start up and if flag is off, the telemetry store will have
+    // never been created. Thus, instead of turning on the flag at runtime and crashing, we skip the
+    // test if telemetry feature flag is off.
+    if (!feature_flags::gFeatureFlagTelemetry.isEnabledAndIgnoreFCV()) {
+        return;
+    }
     TelemetryStore telStore{5000000, 1000};
 
     auto getMetrics = [&](BSONObj& key) {
@@ -97,6 +106,13 @@ TEST_F(TelemetryStoreTest, BasicUsage) {
  * invariant.
  */
 TEST_F(TelemetryStoreTest, ReadWriteLocking) {
+    // Turning on the flag at runtime will crash as telemetry store registerer (which creates the
+    // telemetry store) is called at start up and if flag is off, the telemetry store will have
+    // never been created. Thus, instead of turning on the flag at runtime and crashing, we skip the
+    // test if telemetry feature flag is off.
+    if (!feature_flags::gFeatureFlagTelemetry.isEnabledAndIgnoreFCV()) {
+        return;
+    }
     std::vector<stdx::thread> threads;
     auto svcCtx = getServiceContext();
     for (int i = 0; i < 20; ++i) {

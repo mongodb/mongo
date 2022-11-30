@@ -2,13 +2,18 @@
  * Test that telemetry key generation works for queries with non-object fields.
  */
 load('jstests/libs/analyze_plan.js');
+load("jstests/libs/feature_flag_util.js");
 
 (function() {
 "use strict";
 
+if (!FeatureFlagUtil.isEnabled(db, "Telemetry")) {
+    return;
+}
+
 // Turn on the collecting of telemetry metrics.
 let options = {
-    setParameter: "internalQueryConfigureTelemetrySamplingRate=2147483647",
+    setParameter: {internalQueryConfigureTelemetrySamplingRate: 2147483647},
 };
 
 const conn = MongoRunner.runMongod(options);
