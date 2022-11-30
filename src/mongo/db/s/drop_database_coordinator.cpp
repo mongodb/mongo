@@ -211,7 +211,7 @@ void DropDatabaseCoordinator::_dropShardedCollection(
     participants.erase(std::remove(participants.begin(), participants.end(), primaryShardId),
                        participants.end());
     sharding_ddl_util::sendDropCollectionParticipantCommandToShards(
-        opCtx, nss, participants, **executor, getCurrentSession(), false /* fromMigrate */);
+        opCtx, nss, participants, **executor, getCurrentSession(), true /* fromMigrate */);
 
     // The sharded collection must be dropped on the primary shard after it has been dropped on all
     // of the other shards to ensure it can only be re-created as unsharded with a higher optime

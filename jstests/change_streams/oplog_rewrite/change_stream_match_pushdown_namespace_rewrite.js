@@ -1035,33 +1035,30 @@ const secondResumeAfterToken =
 assert.commandWorked(db.dropDatabase());
 
 // This group of tests ensures that the match on 'coll1' only sees the 'drop' events.
-// TODO SERVER-71364 for each call to verifyOnWholeCluster() below:
-// - convert {coll1: {drop: ["coll1", "coll1"]}} object into {coll1: {drop: ["coll1"]}}
-// - set every expectedOplogRetDocsForEachShard below to [1, 0]
 verifyOnWholeCluster(secondResumeAfterToken,
                      {$match: {ns: {db: dbName, coll: "coll1"}}},
-                     {coll1: {drop: ["coll1", "coll1"]}},
-                     [1, 1] /* expectedOplogRetDocsForEachShard */);
+                     {coll1: {drop: ["coll1"]}},
+                     [1, 0] /* expectedOplogRetDocsForEachShard */);
 verifyOnWholeCluster(secondResumeAfterToken,
                      {$match: {$expr: {$eq: ["$ns", {db: dbName, coll: "coll1"}]}}},
-                     {coll1: {drop: ["coll1", "coll1"]}},
-                     [1, 1] /* expectedOplogRetDocsForEachShard */);
+                     {coll1: {drop: ["coll1"]}},
+                     [1, 0] /* expectedOplogRetDocsForEachShard */);
 verifyOnWholeCluster(secondResumeAfterToken,
                      {$match: {"ns.coll": "coll1"}},
-                     {coll1: {drop: ["coll1", "coll1"]}},
-                     [1, 1] /* expectedOplogRetDocsForEachShard */);
+                     {coll1: {drop: ["coll1"]}},
+                     [1, 0] /* expectedOplogRetDocsForEachShard */);
 verifyOnWholeCluster(secondResumeAfterToken,
                      {$match: {$expr: {$eq: ["$ns.coll", "coll1"]}}},
-                     {coll1: {drop: ["coll1", "coll1"]}},
-                     [1, 1] /* expectedOplogRetDocsForEachShard */);
+                     {coll1: {drop: ["coll1"]}},
+                     [1, 0] /* expectedOplogRetDocsForEachShard */);
 verifyOnWholeCluster(secondResumeAfterToken,
                      {$match: {"ns.coll": /^col.*1/}},
-                     {coll1: {drop: ["coll1", "coll1"]}},
-                     [1, 1] /* expectedOplogRetDocsForEachShard */);
+                     {coll1: {drop: ["coll1"]}},
+                     [1, 0] /* expectedOplogRetDocsForEachShard */);
 verifyOnWholeCluster(secondResumeAfterToken,
                      {$match: {$expr: {$regexMatch: {input: "$ns.coll", regex: "^col.*1"}}}},
-                     {coll1: {drop: ["coll1", "coll1"]}},
-                     [1, 1] /* expectedOplogRetDocsForEachShard */);
+                     {coll1: {drop: ["coll1"]}},
+                     [1, 0] /* expectedOplogRetDocsForEachShard */);
 
 // Ensure that the '$ns' object containing only 'db' should see only the 'dropDatabase' event and
 // only the required documents gets returned at the oplog for each shard.
