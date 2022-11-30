@@ -185,6 +185,7 @@ function testSimpleAggregationsOverNamedPipes(pipeDir) {
     // Test correctness by verifying reading from the pipes returns the same objects written to
     // them.
     ////////////////////////////////////////////////////////////////////////////////////////////////
+    // The following objects are also in BSON file external_data_source.bson in the same order.
     const kObjsToWrite = [
         {"Zero": "zero zero zero zero zero zero zero zero zero zero zero zero zero zero zero zero"},
         {"One": "one one one one one one one one one one one one one one one one one one one one"},
@@ -209,9 +210,36 @@ function testSimpleAggregationsOverNamedPipes(pipeDir) {
     });
     // Verify the objects read from the pipes match what was written to them.
     for (let pipe = 0; pipe < kPipes; ++pipe) {
-        for (let obj = 0; obj < objsPerPipe; ++obj) {
+        for (let objIdx = 0; objIdx < objsPerPipe; ++objIdx) {
             assert.eq(cursor.next(),
-                      kObjsToWrite[obj % kNumObjs],
+                      kObjsToWrite[objIdx % kNumObjs],
+                      "Object read from pipe does not match expected.");
+        }
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+    // Test _writeTestPipeBsonFile() correctness by verifying it writes objects from
+    // external_data_source.bson correctly as read back via $_externalDataSources. This is the same
+    // as prior test except for using _writeTestPipeBsonFile() instead of _writeTestPipeObjects().
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+    _writeTestPipeBsonFile(
+        pipeName1, objsPerPipe, "jstests/noPassthrough/external_data_source.bson", pipeDir);
+    _writeTestPipeBsonFile(
+        pipeName2, objsPerPipe, "jstests/noPassthrough/external_data_source.bson", pipeDir);
+    cursor = db.coll.aggregate([{$project: {_id: 0}}], {
+        $_externalDataSources: [{
+            collName: "coll",
+            dataSources: [
+                {url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "bson"},
+                {url: kUrlProtocolFile + pipeName2, storageType: "pipe", fileType: "bson"}
+            ]
+        }]
+    });
+    // Verify the objects read from the pipes match what was written to them.
+    for (let pipe = 0; pipe < kPipes; ++pipe) {
+        for (let objIdx = 0; objIdx < objsPerPipe; ++objIdx) {
+            assert.eq(cursor.next(),
+                      kObjsToWrite[objIdx % kNumObjs],
                       "Object read from pipe does not match expected.");
         }
     }
@@ -231,7 +259,7 @@ function testSimpleAggregationsOverNamedPipes(pipeDir) {
     // $_externalDataSources specified in order (local, foreign).
     _writeTestPipeObjects(pipeName1, kObjsToWrite1.length, kObjsToWrite1, pipeDir);  // local
     _writeTestPipeObjects(pipeName2, kObjsToWrite2.length, kObjsToWrite2, pipeDir);  // foreign
-    let cursor1 = db.local.aggregate(
+    cursor = db.local.aggregate(
         [{
             $lookup:
                 {from: "foreign", localField: "localKey", foreignField: "foreignKey", as: "out"}
@@ -252,7 +280,7 @@ function testSimpleAggregationsOverNamedPipes(pipeDir) {
         });
     // Verify the $lookup result.
     for (let expected = 0; expected < kExpectedLookup.length; ++expected) {
-        assert.eq(cursor1.next(),
+        assert.eq(cursor.next(),
                   kExpectedLookup[expected],
                   "Lookup result " + expected + " does not match expected.");
     }
@@ -260,7 +288,7 @@ function testSimpleAggregationsOverNamedPipes(pipeDir) {
     // $_externalDataSources specified in order (foreign, local).
     _writeTestPipeObjects(pipeName1, kObjsToWrite1.length, kObjsToWrite1, pipeDir);  // local
     _writeTestPipeObjects(pipeName2, kObjsToWrite2.length, kObjsToWrite2, pipeDir);  // foreign
-    let cursor2 = db.local.aggregate(
+    cursor = db.local.aggregate(
         [{
             $lookup:
                 {from: "foreign", localField: "localKey", foreignField: "foreignKey", as: "out"}
@@ -281,7 +309,7 @@ function testSimpleAggregationsOverNamedPipes(pipeDir) {
         });
     // Verify the $lookup result.
     for (let expected = 0; expected < kExpectedLookup.length; ++expected) {
-        assert.eq(cursor2.next(),
+        assert.eq(cursor.next(),
                   kExpectedLookup[expected],
                   "Lookup result " + expected + " does not match expected.");
     }

@@ -37,6 +37,7 @@
 #include <boost/iostreams/tee.hpp>
 #include <fcntl.h>
 #include <fmt/format.h>
+#include <fstream>
 #include <iostream>
 #include <iterator>
 #include <map>
@@ -1365,6 +1366,107 @@ BSONObj WriteTestPipe(const BSONObj& args, void* unused) {
     return {};
 }
 
+namespace {
+
+/**
+ * Attempts to read the requested number of bytes from the given input stream to the given buffer
+ * and returns the number of bytes actually read.
+ */
+int32_t readBytes(char* buf, int32_t count, std::ifstream& ifs) {
+    ifs.read(buf, count);
+    return ifs.gcount();
+}
+
+}  // namespace
+
+/**
+ * Writes a test named pipe of BSONobj's that are first read into memory from a BSON file, then
+ * round-robinned into the pipe up to the requested number of objects. This is the same as function
+ * WriteTestPipeObjects except the objects are read from a file instead of passed in as a BSONArray.
+ *   "0": string; relative path of the pipe
+ *   "1": number; number of BSON objects to write to the pipe
+ *   "2": string; relative path to the file of BSON objects; these must fit in memory
+ *   "3": OPTIONAL string; absolute path to the directory where named pipes exist. If not given,
+ *        'kDefaultPipePath' is used.
+ */
+BSONObj WriteTestPipeBsonFile(const BSONObj& args, void* unused) {
+    int nFields = args.nFields();
+    uassert(ErrorCodes::FailedToParse,
+            "Function requires 3 or 4 arguments but {} were given"_format(nFields),
+            nFields == 3 || nFields == 4);
+
+    BSONElement pipePathElem(args.getField("0"));
+    BSONElement objectsElem(args.getField("1"));
+    BSONElement bsonFilePathElem(args.getField("2"));
+
+    uassert(ErrorCodes::FailedToParse,
+            "First argument (pipe path) must be a string",
+            pipePathElem.type() == BSONType::String);
+    uassert(ErrorCodes::FailedToParse,
+            "Second argument (number of objects) must be a number",
+            objectsElem.isNumber());
+    uassert(ErrorCodes::FailedToParse,
+            "Third argument (BSON file path) must be a string",
+            bsonFilePathElem.type() == BSONType::String);
+
+    std::string pipeDir = [&] {
+        if (nFields == 4) {
+            BSONElement pipeDirElem(args.getField("3"));
+            uassert(ErrorCodes::FailedToParse,
+                    "Fourth argument (pipe dir) must be a string",
+                    pipeDirElem.type() == BSONType::String);
+            return pipeDirElem.str();
+        } else {
+            return kDefaultPipePath.toString();
+        }
+    }();
+
+    // Open the BSON object file.
+    std::ifstream ifs(bsonFilePathElem.str(), std::ios::binary | std::ios::in);
+    uassert(
+        ErrorCodes::FileOpenFailed,
+        "Failed to open '{}': {}"_format(bsonFilePathElem.str(), errorMessage(lastSystemError())),
+        ifs.is_open());
+
+    // Read the BSON object file into a vector of BSONObj.
+    const int32_t kSizeSize = sizeof(int32_t);
+    std::vector<BSONObj> bsonObjs;
+    char sizeBuf[kSizeSize];  // buffer to read size of next BSONObj into
+    bool eof = false;
+    while (!eof) {
+        int32_t nBytes = readBytes(sizeBuf, kSizeSize, ifs);
+        if (nBytes == kSizeSize) {
+            int32_t size = ConstDataView(sizeBuf).read<LittleEndian<int32_t>>();
+            SharedBuffer buf = SharedBuffer::allocate(size);  // buffer for the full BSONObj
+            invariant(buf.get());
+
+            memcpy(buf.get(), sizeBuf, kSizeSize);
+            int32_t totalRead = kSizeSize;
+            while ((nBytes = readBytes(buf.get() + totalRead, size - totalRead, ifs)) > 0) {
+                totalRead += nBytes;
+                if (totalRead == size) {
+                    break;
+                }
+            }
+            uassert(ErrorCodes::InvalidBSON,
+                    "Expected {} bytes in BSON object but got {}"_format(size, totalRead),
+                    totalRead == size);
+
+            bsonObjs.emplace_back(buf);
+        } else {
+            eof = true;
+            uassert(ErrorCodes::InvalidBSON,
+                    "Expected {} bytes in size field but got {}"_format(kSizeSize, nBytes),
+                    nBytes == 0);  // 0 is normal EOF
+        }
+    }  // while !eof
+
+    // Write the pipe asynchronously.
+    NamedPipeHelper::writeToPipeObjectsAsync(
+        std::move(pipeDir), pipePathElem.str(), objectsElem.numberLong(), bsonObjs);
+
+    return {};
+}
 
 /**
  * Writes a test named pipe by round-robinning caller-provided objects to the pipe. 'args' BSONObj
@@ -1378,7 +1480,7 @@ BSONObj WriteTestPipe(const BSONObj& args, void* unused) {
 BSONObj WriteTestPipeObjects(const BSONObj& args, void* unused) {
     int nFields = args.nFields();
     uassert(ErrorCodes::FailedToParse,
-            "wrong number of arguments = {}"_format(nFields),
+            "Function requires 3 or 4 arguments but {} were given"_format(nFields),
             nFields == 3 || nFields == 4);
 
     BSONElement pipePathElem(args.getField("0"));
@@ -1509,6 +1611,7 @@ void installShellUtilsLauncher(Scope& scope) {
     scope.injectNative("getFCVConstants", GetFCVConstants);
     scope.injectNative("_readTestPipes", ReadTestPipes);
     scope.injectNative("_writeTestPipe", WriteTestPipe);
+    scope.injectNative("_writeTestPipeBsonFile", WriteTestPipeBsonFile);
     scope.injectNative("_writeTestPipeObjects", WriteTestPipeObjects);
 }
 }  // namespace shell_utils
