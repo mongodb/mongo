@@ -43,6 +43,8 @@ function leftmostLeafStage(node) {
             node = node.child;
         } else if (node.leftChild) {
             node = node.leftChild;
+        } else if (node.children) {
+            node = node.children[0];
         } else {
             break;
         }
@@ -51,10 +53,20 @@ function leftmostLeafStage(node) {
 }
 
 /**
+ * Retrieves the cardinality estimate from a node in explain.
+ */
+function extractLogicalCEFromNode(node) {
+    const ce = node.properties.logicalProperties.cardinalityEstimate[0].ce;
+    assert.neq(ce, null, tojson(node));
+    return ce;
+}
+
+/**
  * Get a very simplified version of a plan, which only includes nodeType and nesting structure.
  */
 function getPlanSkeleton(node, options = {}) {
-    const {extraKeepKeys = [], keepKeysDeep = [], printFilter = false} = options;
+    const {extraKeepKeys = [], keepKeysDeep = [], printFilter = false, printLogicalCE = false} =
+        options;
 
     const keepKeys = [
         'nodeType',
@@ -77,12 +89,14 @@ function getPlanSkeleton(node, options = {}) {
             Object.keys(node)
                 .filter(key => (keepKeys.includes(key) || keepKeysDeep.includes(key)))
                 .map(key => {
-                    if (keepKeysDeep.includes(key)) {
-                        return [key, node[key]];
-                    } else if (key === 'interval') {
+                    if (key === 'interval') {
                         return [key, prettyInterval(node[key])];
                     } else if (key === 'filter' && printFilter) {
                         return [key, prettyExpression(node[key])];
+                    } else if (key === "properties" && printLogicalCE) {
+                        return ["logicalCE", extractLogicalCEFromNode(node)];
+                    } else if (keepKeysDeep.includes(key)) {
+                        return [key, node[key]];
                     } else {
                         return [key, getPlanSkeleton(node[key], options)];
                     }
@@ -252,6 +266,10 @@ function navigateToPath(doc, path) {
 
 function navigateToPlanPath(doc, path) {
     return navigateToPath(doc, "queryPlanner.winningPlan.optimizerPlan." + path);
+}
+
+function navigateToRootNode(doc) {
+    return navigateToPath(doc, "queryPlanner.winningPlan.optimizerPlan");
 }
 
 function assertValueOnPathFn(value, doc, path, fn) {

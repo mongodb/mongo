@@ -43,14 +43,6 @@ TypeCounts mapStatsTypeCountToTypeCounts(std::vector<TypeTag> tc) {
 
 ArrayHistogram::ArrayHistogram() : ArrayHistogram(ScalarHistogram(), {}) {}
 
-ArrayHistogram::ArrayHistogram(Statistics stats)
-    : ArrayHistogram(stats.getScalarHistogram(),
-                     mapStatsTypeCountToTypeCounts(stats.getTypeCount()),
-                     stats.getTrueCount(),
-                     stats.getFalseCount()) {
-    // TODO SERVER-71513: initialize non-scalar histogram fields.
-}
-
 ArrayHistogram::ArrayHistogram(ScalarHistogram scalar,
                                TypeCounts typeCounts,
                                ScalarHistogram arrayUnique,
@@ -86,6 +78,26 @@ ArrayHistogram::ArrayHistogram(ScalarHistogram scalar,
       _arrayMax(boost::none),
       _arrayTypeCounts(boost::none) {
     invariant(!isArray());
+}
+
+ArrayHistogram* ArrayHistogram::makeArrayHistogram(Statistics stats) {
+    if (auto maybeArrayStats = stats.getArrayStatistics(); maybeArrayStats) {
+        return new ArrayHistogram(stats.getScalarHistogram(),
+                                  mapStatsTypeCountToTypeCounts(stats.getTypeCount()),
+                                  maybeArrayStats->getUniqueHistogram(),
+                                  maybeArrayStats->getMinHistogram(),
+                                  maybeArrayStats->getMaxHistogram(),
+                                  mapStatsTypeCountToTypeCounts(maybeArrayStats->getTypeCount()),
+                                  stats.getTrueCount(),
+                                  stats.getFalseCount());
+    }
+
+    // If we don't have ArrayStatistics available, we should construct a histogram with only scalar
+    // fields.
+    return new ArrayHistogram(stats.getScalarHistogram(),
+                              mapStatsTypeCountToTypeCounts(stats.getTypeCount()),
+                              stats.getTrueCount(),
+                              stats.getFalseCount());
 }
 
 bool ArrayHistogram::isArray() const {
@@ -162,6 +174,15 @@ double ArrayHistogram::getArrayCount() const {
     return 0;
 }
 
+void serializeTypeCounts(const TypeCounts& typeCounts, BSONObjBuilder& bob) {
+    BSONArrayBuilder typeCountBuilder(bob.subarrayStart("typeCount"));
+    for (const auto& [sbeType, count] : typeCounts) {
+        auto typeCount = BSON("typeName" << stats::serialize(sbeType) << "count" << count);
+        typeCountBuilder.append(typeCount);
+    }
+    typeCountBuilder.doneFast();
+}
+
 BSONObj ArrayHistogram::serialize() const {
     BSONObjBuilder histogramBuilder;
 
@@ -173,18 +194,20 @@ BSONObj ArrayHistogram::serialize() const {
     histogramBuilder.appendNumber("emptyArrayCount", getEmptyArrayCount());
 
     // Serialize type counts.
-    BSONArrayBuilder typeCountBuilder(histogramBuilder.subarrayStart("typeCount"));
-    const auto& typeCounts = getTypeCounts();
-    for (const auto& [sbeType, count] : typeCounts) {
-        auto typeCount = BSON("typeName" << stats::serialize(sbeType) << "count" << count);
-        typeCountBuilder.append(typeCount);
-    }
-    typeCountBuilder.doneFast();
+    serializeTypeCounts(getTypeCounts(), histogramBuilder);
 
     // Serialize scalar histogram.
     histogramBuilder.append("scalarHistogram", getScalar().serialize());
 
-    // TODO SERVER-71513: serialize array histograms.
+    if (isArray()) {
+        // Serialize array histograms and type counts.
+        BSONObjBuilder arrayStatsBuilder(histogramBuilder.subobjStart("arrayStatistics"));
+        arrayStatsBuilder.append("minHistogram", getArrayMin().serialize());
+        arrayStatsBuilder.append("maxHistogram", getArrayMax().serialize());
+        arrayStatsBuilder.append("uniqueHistogram", getArrayUnique().serialize());
+        serializeTypeCounts(getArrayTypeCounts(), arrayStatsBuilder);
+        arrayStatsBuilder.doneFast();
+    }
 
     histogramBuilder.doneFast();
     return histogramBuilder.obj();

@@ -31,9 +31,14 @@
 
 #include "mongo/db/pipeline/abt/utils.h"
 #include "mongo/db/query/ce/histogram_predicate_estimation.h"
+#include "mongo/db/query/cqf_command_utils.h"
+#include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/utils/abt_hash.h"
 #include "mongo/db/query/optimizer/utils/ce_math.h"
 #include "mongo/db/query/optimizer/utils/memo_utils.h"
+#include "mongo/logv2/log.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::optimizer::ce {
 namespace {
@@ -149,6 +154,8 @@ public:
                 // the fallback (currently HeuristicCE), we can't combine heuristic & histogram
                 // estimates. In this case, default to Heuristic if we don't have a histogram for
                 // any of the predicates.
+                OPTIMIZER_DEBUG_LOG(
+                    7151300, 5, "Falling back to heuristic CE", "path"_attr = serializedPath);
                 return _fallbackCE->deriveCE(metadata, memo, logicalProps, n.ref());
             }
 
@@ -162,7 +169,7 @@ public:
         }
 
         std::vector<double> topLevelSelectivities;
-        for (const auto& [_, conjunctReq] : conjunctRequirements) {
+        for (const auto& [serializedPath, conjunctReq] : conjunctRequirements) {
             const CEType totalCard = _stats->getCardinality();
 
             if (conjunctReq.intervals.empty() && !conjunctReq.includeScalar) {
@@ -188,11 +195,24 @@ public:
                                                             interval,
                                                             childResult,
                                                             conjunctReq.includeScalar);
+                        OPTIMIZER_DEBUG_LOG(7151301,
+                                            5,
+                                            "Estimated path and interval using histograms.",
+                                            "path"_attr = serializedPath,
+                                            "interval"_attr =
+                                                ExplainGenerator::explainInterval(interval),
+                                            "ce"_attr = cardinality);
 
                         // We may still not have been able to estimate the interval using
                         // histograms, for instance if the interval bounds were non-Constant. In
                         // this case, we should fallback to heuristics.
                         if (cardinality < 0) {
+                            OPTIMIZER_DEBUG_LOG(7151302,
+                                                5,
+                                                "Falling back to heuristic CE",
+                                                "path"_attr = serializedPath,
+                                                "interval"_attr =
+                                                    ExplainGenerator::explainInterval(interval));
                             return _fallbackCE->deriveCE(metadata, memo, logicalProps, n.ref());
                         }
 
@@ -207,6 +227,13 @@ public:
                 }
 
                 auto backoff = ce::disjExponentialBackoff(std::move(disjSelectivities));
+                OPTIMIZER_DEBUG_LOG(7151303,
+                                    5,
+                                    "Estimating disjunction on path using histograms",
+                                    "path"_attr = serializedPath,
+                                    "intervalDNF"_attr =
+                                        ExplainGenerator::explainIntervalExpr(intervalDNF),
+                                    "selectivity"_attr = backoff);
                 topLevelSelectivities.push_back(backoff);
             }
         }
@@ -216,6 +243,11 @@ public:
             auto backoff = ce::conjExponentialBackoff(std::move(topLevelSelectivities));
             childResult *= backoff;
         }
+        OPTIMIZER_DEBUG_LOG(7151304,
+                            5,
+                            "Final estimate for SargableNode using histograms.",
+                            "node"_attr = ExplainGenerator::explainV2(n),
+                            "cardinality"_attr = childResult);
         return childResult;
     }
 

@@ -40,11 +40,14 @@ using TypeCounts = std::map<sbe::value::TypeTags, double>;
 
 class ArrayHistogram {
 public:
+    /**
+     * Factory method for constructing an ArrayHistogram using StatsPath IDL as input. Caller is
+     * responsible for freeing.
+     */
+    static ArrayHistogram* makeArrayHistogram(Statistics stats);
+
     // Constructs an empty scalar histogram.
     ArrayHistogram();
-
-    // Constructor using StatsPath IDL as input.
-    ArrayHistogram(Statistics stats);
 
     // Constructor for scalar field histograms.
     ArrayHistogram(ScalarHistogram scalar,

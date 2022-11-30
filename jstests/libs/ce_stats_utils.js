@@ -1,28 +1,25 @@
 load('jstests/aggregation/extras/utils.js');  // For assertArrayEq.
 load("jstests/libs/optimizer_utils.js");      // For checkCascadesOptimizerEnabled.
-load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
 
 /**
- * Retrieves the cardinality estimate from a node in explain.
+ * Returns a simplified skeleton of the physical plan including intervals & logical CE.
  */
-function extractCEFromExplain(node) {
-    const ce = node.properties.adjustedCE;
-    assert.neq(ce, null);
-    return ce;
+function summarizeExplainForCE(explain) {
+    const node = getPlanSkeleton(navigateToRootNode(explain), {
+        extraKeepKeys: ["interval", "properties"],
+        printLogicalCE: true,
+    });
+    return node;
 }
 
 /**
- * Extracts the cardinality estimate for the given $match predicate, assuming we get an index scan
- * plan.
+ * Extracts the cardinality estimate of the explain root node.
  */
-function getIxscanCEForMatch(coll, predicate, hint) {
-    // We expect the plan to include a BinaryJoin whose left child is an IxScan whose logical
-    // representation was estimated via histograms.
-    const explain = coll.explain().aggregate([{$match: predicate}], {hint});
-    const ixScan = leftmostLeafStage(explain);
-    assert.neq(ixScan, null);
-    assert.eq(ixScan.nodeType, "IndexScan");
-    return extractCEFromExplain(ixScan);
+function getRootCE(explain) {
+    const rootNode = navigateToRootNode(explain);
+    assert.neq(rootNode, null, tojson(explain));
+    assert.eq(rootNode.nodeType, "Root", tojson(rootNode));
+    return extractLogicalCEFromNode(rootNode);
 }
 
 /**
@@ -33,22 +30,50 @@ function assertApproxEq(expected, actual, msg, tolerance = 0.01) {
 }
 
 /**
- * Validates that the results and cardinality estimate for a given $match predicate agree.
+ * Validates that the results and cardinality estimate for a given $match predicate agree. Note that
+ * if the ce parameter is omitted, we expect our estimate to exactly match what the query actually
+ * returns.
  */
 function verifyCEForMatch({coll, predicate, expected, ce, hint}) {
-    const actual = coll.aggregate([{$match: predicate}], {hint}).toArray();
-    assertArrayEq({actual, expected});
-
-    const actualCE = getIxscanCEForMatch(coll, predicate, hint);
-    const expectedCE = ce == undefined ? expected.length : ce;
-    assertApproxEq(actualCE,
-                   expectedCE,
-                   `${tojson(predicate)} should have been estimated as ${expectedCE}, estimated ${
-                       actualCE} instead.`);
+    const CEs = ce ? [ce] : undefined;
+    return verifyCEForMatchNodes(
+        {coll, predicate, expected, getNodeCEs: (explain) => [getRootCE(explain)], CEs, hint});
 }
 
 /**
- * Validates that the generated histogram for the given 'coll' has the expected type counters.
+ * Validates that the results and cardinality estimate for a given $match predicate agree.
+ * The caller should specify a function 'getNodeCEs' which takes explain output as an input, and
+ * returns the cardinality estimates of the nodes the caller wants to verify in an array. The
+ * expected estimates should be defined in CEs, or it defaults to the number of documents expected
+ * to be returned by the query.
+ */
+function verifyCEForMatchNodes({coll, predicate, expected, getNodeCEs, CEs, hint}) {
+    // Run aggregation & verify query results.
+    const options = hint ? {hint} : {};
+    const actual = coll.aggregate([{$match: predicate}], options).toArray();
+    assertArrayEq({actual, expected});
+
+    // Obtain explain.
+    const explain = coll.explain().aggregate([{$match: predicate}], options);
+    const explainSummarized = tojson(summarizeExplainForCE(explain));
+    jsTestLog(explainSummarized);
+
+    // Verify expected vs. actual CE.
+    const actualCEs = getNodeCEs(explain);
+    const expectedCEs = CEs == undefined ? [expected.length] : CEs;
+    assert.eq(actualCEs.length, expectedCEs.length);
+    for (let i = 0; i < actualCEs.length; i++) {
+        const actualCE = actualCEs[i];
+        const expectedCE = expectedCEs[i];
+        assertApproxEq(actualCE,
+                       expectedCE,
+                       `${tojson(predicate)} node ${i} should have been estimated as ${
+                           expectedCE}, estimated ${actualCE} instead.`);
+    }
+}
+
+/**
+ * Validates that the generated histogram for the given "coll" has the expected type counters.
  */
 function createAndValidateHistogram({coll, expectedHistogram, empty = false}) {
     const field = expectedHistogram._id;
@@ -78,11 +103,6 @@ function createAndValidateHistogram({coll, expectedHistogram, empty = false}) {
 function runHistogramsTest(test) {
     if (!checkCascadesOptimizerEnabled(db)) {
         jsTestLog("Skipping test because the optimizer is not enabled");
-        return;
-    }
-
-    if (checkSBEEnabled(db, ["featureFlagSbeFull"], true)) {
-        jsTestLog("Skipping the test because it doesn't work in Full SBE");
         return;
     }
 

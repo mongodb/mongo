@@ -295,6 +295,9 @@ ArrayHistogram createArrayEstimator(const std::vector<SBEValue>& arrayData, size
     double trueCount = 0;
     double falseCount = 0;
 
+    // Tracks whether we should use the scalar constructor.
+    bool isScalar = true;
+
     for (const auto& v : arrayData) {
         const auto val = v.getValue();
         const auto tag = v.getTag();
@@ -306,6 +309,8 @@ ArrayHistogram createArrayEstimator(const std::vector<SBEValue>& arrayData, size
         }
 
         if (tag == value::TypeTags::Array) {
+            isScalar = false;
+
             // If we have an array, we can construct min, max, and unique histograms from its
             // elements, provided that they are histogrammable.
             std::vector<SBEValue> arrayElements;
@@ -317,6 +322,7 @@ ArrayHistogram createArrayEstimator(const std::vector<SBEValue>& arrayData, size
                 continue;
             }
 
+            // TODO SERVER-71057: Only count types once per array for histogram CE.
             for (size_t i = 0; i < arrSize; i++) {
                 const auto [tag, val] = arr->getAt(i);
 
@@ -363,6 +369,11 @@ ArrayHistogram createArrayEstimator(const std::vector<SBEValue>& arrayData, size
         sortValueVector(values);
         return genMaxDiffHistogram(getDataDistribution(values), nBuckets);
     };
+
+    if (isScalar) {
+        // If we don't have array elements, we do not include array fields in the final histogram.
+        return {makeHistogram(scalarData), std::move(typeCounts), trueCount, falseCount};
+    }
 
     return {makeHistogram(scalarData),
             std::move(typeCounts),
