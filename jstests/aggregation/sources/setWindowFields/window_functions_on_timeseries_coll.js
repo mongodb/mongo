@@ -118,7 +118,7 @@ function assertExplainBehaviorAndCorrectResults(pipeline, expectedOpts, expected
         assert.sameMembers(expectedOpts.inExcludeSpec.exclude, unpackBucket.exclude);
     }
 
-    assert(arrayEq(expectedResults, coll.aggregate(pipeline).toArray()));
+    assertArrayEq({expected: expectedResults, actual: coll.aggregate(pipeline).toArray()});
 }
 
 assertExplainBehaviorAndCorrectResults(
@@ -187,7 +187,7 @@ assertExplainBehaviorAndCorrectResults(
         },
         {
             _id: 3,
-            time: ISODate("2021-01-01T12:05:00Z"),
+            time: ISODate("2021-01-01T01:05:00Z"),
             attributes: {sensor: "S2", field: "a"},
             temperature: 60,
             language: "en",
