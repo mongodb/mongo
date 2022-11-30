@@ -73,8 +73,13 @@ T parseFindPayload(BSONValue payload) {
                        payload);
 }
 
+/**
+ * Given an array of tags, return a $in predicate with __safeContent__.
+ */
 std::unique_ptr<Expression> makeTagDisjunction(ExpressionContext* expCtx,
                                                std::vector<Value>&& tags);
+
+std::unique_ptr<MatchExpression> makeTagDisjunction(BSONArray&& tagArray);
 
 /**
  * Convert a vector of PrfBlocks to a BSONArray for use in MatchExpression tag generation.
@@ -86,7 +91,6 @@ BSONArray toBSONArray(std::vector<PrfBlock>&& vec);
  */
 std::vector<Value> toValues(std::vector<PrfBlock>&& vec);
 
-std::unique_ptr<MatchExpression> makeTagDisjunction(BSONArray&& tagArray);
 
 void logTagsExceeded(const ExceptionFor<ErrorCodes::FLEMaxTagLimitExceeded>& ex);
 

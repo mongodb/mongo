@@ -30,6 +30,8 @@
 #include "encrypted_predicate.h"
 
 #include "mongo/crypto/fle_crypto.h"
+#include "mongo/crypto/fle_crypto_types.h"
+#include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/query/fle/query_rewriter_interface.h"
 #include "mongo/logv2/log.h"
 
@@ -50,11 +52,34 @@ std::unique_ptr<MatchExpression> makeTagDisjunction(BSONArray&& tagArray) {
     auto tagElems = std::vector<BSONElement>();
     tagArray.elems(tagElems);
 
-    auto newExpr = std::make_unique<InMatchExpression>(StringData(kSafeContent));
-    newExpr->setBackingBSON(std::move(tagArray));
-    uassertStatusOK(newExpr->setEqualities(std::move(tagElems)));
+    auto inExpr = std::make_unique<InMatchExpression>(kSafeContent);
+    inExpr->setBackingBSON(std::move(tagArray));
+    uassertStatusOK(inExpr->setEqualities(std::move(tagElems)));
 
-    return newExpr;
+    // __safeContent__ is always an array, so wrap the $in expr in an $elemMatch.
+    // most of the time, wrapping the predicate in $elemMatch doesn't have an effect (see the Single
+    // Query Condition in the $elemMatch documentation), but it is necessary for upserts to
+    // recognize that __safeContent__ should be an array when there is only one tag in the
+    // predicate.
+    auto elemMatchExpr = std::make_unique<ElemMatchValueMatchExpression>(kSafeContent);
+    elemMatchExpr->add(std::move(inExpr));
+
+    return elemMatchExpr;
+}
+
+std::unique_ptr<Expression> makeTagDisjunction(ExpressionContext* expCtx,
+                                               std::vector<Value>&& tags) {
+    std::vector<boost::intrusive_ptr<Expression>> orListElems;
+    for (auto&& tagElt : tags) {
+        // ... and for each tag, construct expression {$in: [tag,
+        // "$__safeContent__"]}.
+        std::vector<boost::intrusive_ptr<Expression>> inVec{
+            ExpressionConstant::create(expCtx, tagElt),
+            ExpressionFieldPath::createPathFromString(
+                expCtx, kSafeContentString, expCtx->variablesParseState)};
+        orListElems.push_back(make_intrusive<ExpressionIn>(expCtx, std::move(inVec)));
+    }
+    return std::make_unique<ExpressionOr>(expCtx, std::move(orListElems));
 }
 
 BSONArray toBSONArray(std::vector<PrfBlock>&& vec) {
@@ -72,22 +97,6 @@ std::vector<Value> toValues(std::vector<PrfBlock>&& vec) {
     }
     return output;
 }
-
-std::unique_ptr<Expression> makeTagDisjunction(ExpressionContext* expCtx,
-                                               std::vector<Value>&& tags) {
-    std::vector<boost::intrusive_ptr<Expression>> orListElems;
-    for (auto&& tagElt : tags) {
-        // ... and for each tag, construct expression {$in: [tag,
-        // "$__safeContent__"]}.
-        std::vector<boost::intrusive_ptr<Expression>> inVec{
-            ExpressionConstant::create(expCtx, tagElt),
-            ExpressionFieldPath::createPathFromString(
-                expCtx, kSafeContent, expCtx->variablesParseState)};
-        orListElems.push_back(make_intrusive<ExpressionIn>(expCtx, std::move(inVec)));
-    }
-    return std::make_unique<ExpressionOr>(expCtx, std::move(orListElems));
-}
-
 
 bool isPayloadOfType(EncryptedBinDataType ty, const BSONElement& elt) {
     if (!elt.isBinData(BinDataType::Encrypt)) {

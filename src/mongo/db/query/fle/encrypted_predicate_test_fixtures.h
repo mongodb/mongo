@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/fle/encrypted_predicate.h"
 #include "mongo/db/query/fle/equality_predicate.h"
@@ -87,6 +88,12 @@ public:
         return inExpr;
     }
 
+    static std::unique_ptr<MatchExpression> makeElemMatchWithIn(StringData fieldname,
+                                                                BSONArray disjunctions) {
+        auto elemMatchExpr = std::make_unique<ElemMatchValueMatchExpression>(fieldname);
+        elemMatchExpr->add(makeInExpr(fieldname, disjunctions));
+        return elemMatchExpr;
+    }
     /*
      * Assertion helper for tag disjunction rewrite.
      */
@@ -95,7 +102,7 @@ public:
                              BSONArray expectedTags) {
 
         auto actual = pred.rewrite(input);
-        auto expected = makeInExpr(kSafeContent, expectedTags);
+        auto expected = makeElemMatchWithIn(kSafeContent, expectedTags);
         ASSERT_BSONOBJ_EQ(actual->serialize(),
                           static_cast<MatchExpression*>(expected.get())->serialize());
     }
