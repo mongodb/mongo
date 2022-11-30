@@ -75,6 +75,7 @@ public:
                     serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());
+            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
             // Set the operation context read concern level to local for reads into the config
             // database.
