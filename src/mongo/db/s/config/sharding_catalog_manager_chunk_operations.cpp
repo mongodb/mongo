@@ -94,13 +94,11 @@ StatusWith<ChunkType> findChunkContainingRange(OperationContext* opCtx,
                                                const UUID& uuid,
                                                const OID& epoch,
                                                const Timestamp& timestamp,
-                                               const BSONObj& min,
-                                               const BSONObj& max) {
+                                               const ChunkRange& range) {
     const auto chunkQuery = [&]() {
         BSONObjBuilder queryBuilder;
         queryBuilder << ChunkType::collectionUUID << uuid;
-        queryBuilder << ChunkType::min(BSON("$lte" << min));
-        queryBuilder << ChunkType::max(BSON("$gte" << max));
+        queryBuilder << ChunkType::min(BSON("$lte" << range.getMin()));
         return queryBuilder.obj();
     }();
 
@@ -112,21 +110,26 @@ StatusWith<ChunkType> findChunkContainingRange(OperationContext* opCtx,
             repl::ReadConcernLevel::kLocalReadConcern,
             ChunkType::ConfigNS,
             chunkQuery,
-            BSONObj(),
-            2 /* limit */);
+            BSON(ChunkType::min << -1),
+            1 /* limit */);
 
     if (!findResponseWith.isOK()) {
         return findResponseWith.getStatus();
     }
 
-    if (findResponseWith.getValue().docs.size() != 1) {
-        return {ErrorCodes::Error(40165),
-                str::stream() << "Could not find a chunk including bounds [" << min << ", " << max
-                              << "). Cannot execute the migration commit with invalid chunks."};
+    if (!findResponseWith.getValue().docs.empty()) {
+        const auto containingChunk = uassertStatusOK(ChunkType::parseFromConfigBSON(
+            findResponseWith.getValue().docs.front(), epoch, timestamp));
+
+        if (containingChunk.getRange().covers(range)) {
+            return containingChunk;
+        }
     }
 
-    return uassertStatusOK(
-        ChunkType::parseFromConfigBSON(findResponseWith.getValue().docs.front(), epoch, timestamp));
+    return {ErrorCodes::Error(40165),
+            str::stream() << "Could not find a chunk including bounds [" << range.getMin() << ", "
+                          << range.getMax()
+                          << "). Cannot execute the migration commit with invalid chunks."};
 }
 
 BSONObj buildCountChunksInRangeCommand(const UUID& collectionUUID,
@@ -1101,12 +1104,8 @@ ShardingCatalogManager::commitChunkMigration(OperationContext* opCtx,
             migratedChunk.isVersionSet() && migratedChunk.getVersion().isSet());
 
     // Check if range still exists and which shard owns it
-    auto swCurrentChunk = findChunkContainingRange(opCtx,
-                                                   coll.getUuid(),
-                                                   coll.getEpoch(),
-                                                   coll.getTimestamp(),
-                                                   migratedChunk.getMin(),
-                                                   migratedChunk.getMax());
+    auto swCurrentChunk = findChunkContainingRange(
+        opCtx, coll.getUuid(), coll.getEpoch(), coll.getTimestamp(), migratedChunk.getRange());
 
     if (!swCurrentChunk.isOK()) {
         return swCurrentChunk.getStatus();
