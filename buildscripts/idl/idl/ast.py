@@ -34,6 +34,7 @@ This is a lossy translation from the IDL Syntax tree as the IDL AST only contain
 the enums and structs that need code generated for them, and just enough information to do that.
 """
 from abc import ABCMeta, abstractmethod
+import enum
 from typing import Any, Dict, List, Optional
 
 from . import common, errors
@@ -62,8 +63,6 @@ class IDLAST(object):
         self.commands = []  # type: List[Command]
         self.enums = []  # type: List[Enum]
         self.structs = []  # type: List[Struct]
-        self.generic_argument_lists = []  # type: List[GenericArgumentList]
-        self.generic_reply_field_lists = []  # type: List[GenericReplyFieldList]
         self.server_parameters = []  # type: List[ServerParameter]
         self.configs = []  # type: List[ConfigOption]
 
@@ -140,7 +139,32 @@ class Struct(common.SourceLocation):
         self.non_const_getter = False  # type: bool
         self.cpp_validator_func = None  # type: str
         self.is_command_reply = False  # type: bool
+        self.generic_list_type = None  # type: Optional[GenericListType]
         super(Struct, self).__init__(file_name, line, column)
+
+
+class GenericListType(enum.Enum):
+    ARG = 1
+    REPLY = 2
+
+
+class GenericFieldInfo(common.SourceLocation):
+    """Options for a field in a field list."""
+
+    def __init__(self, file_name, line, column):
+        # type: (str, int, int) -> None
+        """Construct a FieldListEntry."""
+        self.name = None  # type: str
+        self.forward_to_shards = False  # type: bool
+        self.forward_from_shards = False  # type: bool
+        self.arg = True  # type: bool
+        super(GenericFieldInfo, self).__init__(file_name, line, column)
+
+    def get_should_forward(self):
+        """Get the shard-forwarding rule for a generic argument or reply field."""
+        if self.arg:
+            return self.forward_to_shards
+        return self.forward_from_shards
 
 
 class Expression(common.SourceLocation):
@@ -215,6 +239,9 @@ class Field(common.SourceLocation):
         # Validation rules.
         self.validator = None  # type: Optional[Validator]
 
+        # Extra info for generic fields.
+        self.generic_field_info = None  # type: Optional[GenericFieldInfo]
+
         super(Field, self).__init__(file_name, line, column)
 
 
@@ -263,62 +290,6 @@ class Command(Struct):
         self.is_deprecated = False  # type: bool
         self.access_checks = None  # type: List[AccessCheck]
         super(Command, self).__init__(file_name, line, column)
-
-
-class FieldListBase(common.SourceLocation, metaclass=ABCMeta):
-    """Base class for generic argument or reply field lists."""
-
-    def __init__(self, file_name, line, column):
-        # type: (str, int, int) -> None
-        """Construct a field list."""
-        self.name = None  # type: str
-        self.cpp_name = None  # type: str
-        self.description = None  # type: str
-        self.fields = []  # type: List[FieldListEntry]
-        super(FieldListBase, self).__init__(file_name, line, column)
-
-    @abstractmethod
-    def get_should_forward_name(self):
-        # type: () -> str
-        """Get the name of the shard-forwarding rule for this generic argument or reply field."""
-        pass
-
-
-class GenericArgumentList(FieldListBase):
-    """IDL generic argument list."""
-
-    def get_should_forward_name(self):
-        # type: () -> str
-        """Get the name of the shard-forwarding rule for a generic argument."""
-        return "shouldForwardToShards"
-
-
-class GenericReplyFieldList(FieldListBase):
-    """IDL generic reply field list."""
-
-    def get_should_forward_name(self):
-        # type: () -> str
-        """Get the name of the shard-forwarding rule for a generic reply field."""
-        return "shouldForwardFromShards"
-
-
-class FieldListEntry(common.SourceLocation):
-    """Options for a field in a field list."""
-
-    def __init__(self, file_name, line, column):
-        # type: (str, int, int) -> None
-        """Construct a FieldListEntry."""
-        self.name = None  # type: str
-        self.forward_to_shards = False  # type: bool
-        self.forward_from_shards = False  # type: bool
-        super(FieldListEntry, self).__init__(file_name, line, column)
-
-    def get_should_forward(self):
-        """Get the shard-forwarding rule for a generic argument or reply field."""
-        assert not (self.forward_to_shards and self.forward_from_shards), \
-            "Only FieldListEntry.forward_to_shards or forward_from_shards should be set"
-
-        return self.forward_to_shards or self.forward_from_shards
 
 
 class EnumValue(common.SourceLocation):

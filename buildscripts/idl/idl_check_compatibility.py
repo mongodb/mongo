@@ -1472,14 +1472,14 @@ def check_compatibility(old_idl_dir: str, new_idl_dir: str, old_import_directori
     return ctxt.errors
 
 
-def get_generic_arguments(gen_args_file_path: str) -> Tuple[Set[str], Set[str]]:
+def get_generic_arguments(gen_args_file_path: str, includes: str) -> Tuple[Set[str], Set[str]]:
     """Get arguments and reply fields from generic_argument.idl and check validity."""
     arguments: Set[str] = set()
     reply_fields: Set[str] = set()
 
     with open(gen_args_file_path) as gen_args_file:
         parsed_idl_file = parser.parse(gen_args_file, gen_args_file_path,
-                                       CompilerImportResolver([]))
+                                       CompilerImportResolver(includes))
         if parsed_idl_file.errors:
             parsed_idl_file.errors.dump_errors()
             raise ValueError(f"Cannot parse {gen_args_file_path}")
@@ -1494,8 +1494,9 @@ def get_generic_arguments(gen_args_file_path: str) -> Tuple[Set[str], Set[str]]:
     return arguments, reply_fields
 
 
-def check_generic_arguments_compatibility(old_gen_args_file_path: str, new_gen_args_file_path: str
-                                          ) -> IDLCompatibilityErrorCollection:
+def check_generic_arguments_compatibility(old_gen_args_file_path: str, new_gen_args_file_path: str,
+                                          old_includes: str,
+                                          new_includes: str) -> IDLCompatibilityErrorCollection:
     """Check IDL compatibility between old and new generic_argument.idl files."""
     # IDLCompatibilityContext takes in both 'old_idl_dir' and 'new_idl_dir',
     # but for generic_argument.idl, the parent directories aren't helpful for logging purposes.
@@ -1504,8 +1505,8 @@ def check_generic_arguments_compatibility(old_gen_args_file_path: str, new_gen_a
     ctxt = IDLCompatibilityContext("old generic_argument.idl", "new generic_argument.idl",
                                    IDLCompatibilityErrorCollection())
 
-    old_arguments, old_reply_fields = get_generic_arguments(old_gen_args_file_path)
-    new_arguments, new_reply_fields = get_generic_arguments(new_gen_args_file_path)
+    old_arguments, old_reply_fields = get_generic_arguments(old_gen_args_file_path, old_includes)
+    new_arguments, new_reply_fields = get_generic_arguments(new_gen_args_file_path, new_includes)
 
     for old_argument in old_arguments:
         if old_argument not in new_arguments:
@@ -1552,8 +1553,8 @@ def main():
 
     old_generic_args_path = os.path.join(args.old_idl_dir, "mongo/idl/generic_argument.idl")
     new_generic_args_path = os.path.join(args.new_idl_dir, "mongo/idl/generic_argument.idl")
-    error_gen_args_coll = check_generic_arguments_compatibility(old_generic_args_path,
-                                                                new_generic_args_path)
+    error_gen_args_coll = check_generic_arguments_compatibility(
+        old_generic_args_path, new_generic_args_path, args.old_include, args.new_include)
     if error_gen_args_coll.has_errors():
         sys.exit(1)
 

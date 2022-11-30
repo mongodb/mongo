@@ -36,7 +36,7 @@ import sys
 import textwrap
 from abc import ABCMeta, abstractmethod
 from enum import Enum
-from typing import Dict, Iterable, List, Mapping, Tuple, Union, cast
+from typing import Dict, List, Mapping, Tuple, Union, cast
 
 from . import (ast, bson, common, cpp_types, enum_types, generic_field_list_types, struct_types,
                writer)
@@ -467,12 +467,12 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
         if len(required_constructor.args) != len(constructor.args):
             self._writer.write_line(required_constructor.get_declaration())
 
-    def gen_field_list_entry_lookup_methods(self, field_list):
-        # type: (ast.FieldListBase) -> None
+    def gen_field_list_entry_lookup_methods_struct(self, struct):
+        # type: (ast.Struct) -> None
         """Generate the declarations for generic argument or reply field lookup methods."""
-        field_list_info = generic_field_list_types.get_field_list_info(field_list)
-        self._writer.write_line(field_list_info.get_has_field_method().get_declaration())
-        self._writer.write_line(field_list_info.get_should_forward_method().get_declaration())
+        info = generic_field_list_types.get_field_list_info(struct)
+        self._writer.write_line(info.get_has_field_method().get_declaration())
+        self._writer.write_line(info.get_should_forward_method().get_declaration())
 
     def gen_serializer_methods(self, struct):
         # type: (ast.Struct) -> None
@@ -761,10 +761,9 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
 
         self._writer.write_empty_line()
 
-    def gen_field_list_entries_declaration(self, field_list):
-        # type: (ast.FieldListBase) -> None
+    def gen_field_list_entries_declaration_struct(self, struct):  # type: (ast.Struct) -> None
         """Generate the field list entries map for a generic argument or reply field list."""
-        field_list_info = generic_field_list_types.get_field_list_info(field_list)
+        field_list_info = generic_field_list_types.get_field_list_info(struct)
         self._writer.write_line(
             common.template_args('// Map: fieldName -> ${should_forward_name}',
                                  should_forward_name=field_list_info.get_should_forward_name()))
@@ -1143,6 +1142,11 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                     self.write_empty_line()
                     self.gen_constexpr_getters()
 
+                    if struct.generic_list_type:
+                        self.gen_field_list_entry_lookup_methods_struct(struct)
+                        self.write_empty_line()
+                        self.gen_field_list_entries_declaration_struct(struct)
+
                     self.write_unindented_line('protected:')
                     self.gen_protected_serializer_methods(struct)
 
@@ -1183,24 +1187,6 @@ class _CppHeaderFileWriter(_CppFileWriterBase):
                     self.gen_constexpr_members(struct)
 
                 self.write_empty_line()
-
-            field_lists_list: Iterable[Iterable[ast.FieldListBase]]
-            field_lists_list = [spec.generic_argument_lists, spec.generic_reply_field_lists]
-            for field_lists in field_lists_list:
-                for field_list in field_lists:
-                    self.gen_description_comment(field_list.description)
-                    with self.gen_class_declaration_block(field_list.cpp_name):
-                        self.write_unindented_line('public:')
-
-                        # Field lookup methods
-                        self.gen_field_list_entry_lookup_methods(field_list)
-                        self.write_empty_line()
-
-                        # Member variables
-                        self.write_unindented_line('private:')
-                        self.gen_field_list_entries_declaration(field_list)
-
-                    self.write_empty_line()
 
             for scp in spec.server_parameters:
                 if scp.cpp_class is None:
@@ -1630,10 +1616,10 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             #print(struct.name + ": "+  str(required_constructor.args))
             self._gen_constructor(struct, required_constructor, False)
 
-    def gen_field_list_entry_lookup_methods(self, field_list):
-        # type: (ast.FieldListBase) -> None
+    def gen_field_list_entry_lookup_methods_struct(self, struct):
+        # type: (ast.Struct) -> None
         """Generate the definitions for generic argument or reply field lookup methods."""
-        field_list_info = generic_field_list_types.get_field_list_info(field_list)
+        field_list_info = generic_field_list_types.get_field_list_info(struct)
         defn = field_list_info.get_has_field_method().get_definition()
         with self._block('%s {' % (defn, ), '}'):
             self._writer.write_line(
@@ -2360,23 +2346,23 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         self._gen_known_fields_declaration(struct, "knownBSON", False)
         self._gen_known_fields_declaration(struct, "knownOP_MSG", True)
 
-    def gen_field_list_entries_declaration(self, field_list):
-        # type: (ast.FieldListBase) -> None
-        """Generate the field list entries map for a generic argument or reply field list."""
-        klass = common.title_case(field_list.cpp_name)
-        field_list_info = generic_field_list_types.get_field_list_info(field_list)
+    def gen_field_list_entries_declaration_struct(self, struct):
+        # type: (ast.Struct) -> None
+        field_list_info = generic_field_list_types.get_field_list_info(struct)
+        klass = common.title_case(struct.cpp_name)
         self._writer.write_line(
             common.template_args('// Map: fieldName -> ${should_forward_name}',
                                  should_forward_name=field_list_info.get_should_forward_name()))
         block_name = common.template_args(
             'const stdx::unordered_map<std::string, bool> ${klass}::_genericFields {', klass=klass)
         with self._block(block_name, "};"):
-            sorted_entries = sorted(field_list.fields, key=lambda f: f.name)
+            sorted_entries = sorted(struct.fields, key=lambda f: f.name)
             for entry in sorted_entries:
                 self._writer.write_line(
                     common.template_args(
                         '{"${name}", ${should_forward}},', klass=klass, name=entry.name,
-                        should_forward='true' if entry.get_should_forward() else 'false'))
+                        should_forward='true'
+                        if entry.generic_field_info.get_should_forward() else 'false'))
 
     def _gen_server_parameter_specialized(self, param):
         # type: (ast.ServerParameter) -> None
@@ -2801,16 +2787,11 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 self.gen_to_bson_serializer_method(struct)
                 self.write_empty_line()
 
-            field_lists_list: Iterable[Iterable[ast.FieldListBase]]
-            field_lists_list = [spec.generic_argument_lists, spec.generic_reply_field_lists]
-            for field_lists in field_lists_list:
-                for field_list in field_lists:
-                    # Member variables
-                    self.gen_field_list_entries_declaration(field_list)
+                if struct.generic_list_type:
+                    self.gen_field_list_entries_declaration_struct(struct)
                     self.write_empty_line()
-
                     # Write field lookup methods
-                    self.gen_field_list_entry_lookup_methods(field_list)
+                    self.gen_field_list_entry_lookup_methods_struct(struct)
                     self.write_empty_line()
 
             if spec.server_parameters:

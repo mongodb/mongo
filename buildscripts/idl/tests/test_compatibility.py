@@ -1465,8 +1465,9 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
                 path.join(dir_path,
                           "compatibility_test_pass/old_generic_argument/generic_argument.idl"),
                 path.join(dir_path,
-                          "compatibility_test_pass/new_generic_argument/generic_argument.idl")).
-            has_errors())
+                          "compatibility_test_pass/new_generic_argument/generic_argument.idl"),
+                path.join(dir_path, "compatibility_test_pass/old_generic_argument/"),
+                path.join(dir_path, "compatibility_test_pass/new_generic_argument/")).has_errors())
 
     def test_generic_argument_compatibility_fail(self):
         """Tests that incompatible old and new generic_argument.idl files should fail."""
@@ -1475,7 +1476,9 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
             path.join(dir_path,
                       "compatibility_test_fail/old_generic_argument/generic_argument.idl"),
             path.join(dir_path,
-                      "compatibility_test_fail/new_generic_argument/generic_argument.idl"))
+                      "compatibility_test_fail/new_generic_argument/generic_argument.idl"),
+            path.join(dir_path, "compatibility_test_pass/old_generic_argument/"),
+            path.join(dir_path, "compatibility_test_pass/new_generic_argument/"))
 
         self.assertTrue(error_collection.has_errors())
         self.assertTrue(error_collection.count() == 2)

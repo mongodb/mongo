@@ -32,33 +32,42 @@ from .struct_types import MethodInfo
 
 
 class FieldListInfo:
-    """Class for generic argument and generic reply field list code generation."""
+    """Class encapsulating code gen information needed for fields in a special command generic argument/reply struct."""
 
-    def __init__(self, field_list):
-        # type: (ast.FieldListBase) -> None
+    def __init__(self, struct):
+        # type: (ast.Struct) -> None
         """Create a FieldListInfo instance."""
-        self._field_list = field_list
+        self.struct = struct
 
     def get_has_field_method(self):
         # type: () -> MethodInfo
         """Get the hasField method for a generic argument or generic reply field list."""
-        class_name = common.title_case(self._field_list.cpp_name)
+        class_name = common.title_case(self.struct.cpp_name)
         return MethodInfo(class_name, 'hasField', ['StringData fieldName'], 'bool', static=True)
 
     def get_should_forward_name(self):
         """Get the name of the shard-forwarding rule for a generic argument or reply field."""
-        return self._field_list.get_should_forward_name()
+        if self.struct.generic_list_type == ast.GenericListType.ARG:
+            return "shouldForwardToShards"
+        else:
+            return "shouldForwardFromShards"
+
+    def lookup_should_forward(self, field):
+        if self.struct.generic_list_type == ast.GenericListType.ARG:
+            return field.forward_to_shards
+        else:
+            return field.forward_from_shards
 
     def get_should_forward_method(self):
         # type: () -> MethodInfo
         """Get the method for checking the shard-forwarding rule of an argument or reply field."""
-        class_name = common.title_case(self._field_list.cpp_name)
+        class_name = common.title_case(self.struct.cpp_name)
         return MethodInfo(class_name, self.get_should_forward_name(), ['StringData fieldName'],
                           'bool', static=True)
 
 
-def get_field_list_info(field_list):
-    # type: (ast.FieldListBase) -> FieldListInfo
+def get_field_list_info(struct):
+    # type: (ast.Struct) -> FieldListInfo
     """Get type information about the generic argument or reply field list to generate C++ code."""
 
-    return FieldListInfo(field_list)
+    return FieldListInfo(struct)
