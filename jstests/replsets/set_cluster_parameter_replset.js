@@ -40,9 +40,9 @@ function checkClusterParameterInitialSync(rst) {
     rst.awaitReplication();
 
     // Check that the new node has the latest cluster parameter values.
-    runGetClusterParameterNode(newNode,
-                               ["testIntClusterParameter", "testStrClusterParameter"],
-                               [newIntParameter, newStrParameter]);
+    assert(runGetClusterParameterNode(newNode,
+                                      ["testIntClusterParameter", "testStrClusterParameter"],
+                                      [newIntParameter, newStrParameter]));
 
     // Check that setClusterParameter properly works with the reconfigured replica set.
     newIntParameter.intData = 30;
