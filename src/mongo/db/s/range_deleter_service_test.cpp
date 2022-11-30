@@ -861,6 +861,7 @@ TEST_F(RangeDeleterServiceTest, RegisterPendingTaskAndMarkItNonPending) {
         opCtx, taskWithOngoingQueries->getTask(), taskWithOngoingQueries->getOngoingQueriesFuture())
         .get(opCtx);
 
+    completionFuture.get();
     ASSERT(completionFuture.isReady());
 }
 
