@@ -88,7 +88,7 @@ function verifyStats({exemptCount, normalCount}) {
 
     // Clients on the normal executor own their thread and cannot wait asynchronously.
     assert.eq(executorStatus["clientsRunning"], executorStatus["clientsInTotal"]);
-    assert.eq(executorStatus["clientsRunning"], executorStatus["threadsRunning"]);
+    assert.lte(executorStatus["clientsRunning"], executorStatus["threadsRunning"]);
     assert.eq(executorStatus["clientsWaitingForData"], 0);
 
     // Clients on the reserved executor run on a thread and cannot wait asynchronously.
