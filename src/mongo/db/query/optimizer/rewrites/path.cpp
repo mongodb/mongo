@@ -84,7 +84,8 @@ bool PathFusion::fuse(ABT& lhs, const ABT& rhs) {
     }
 
     if (rhs.is<PathLambda>() && _kindCtx.back() == Kind::project) {
-        lhs = make<PathComposeM>(std::move(lhs), rhs);
+        // PathLambda should be the left child.
+        lhs = make<PathComposeM>(rhs, std::move(lhs));
         return true;
     }
 

@@ -31,11 +31,14 @@
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/rewrites/path.h"
 #include "mongo/db/query/optimizer/rewrites/path_lower.h"
+#include "mongo/db/query/optimizer/utils/unit_test_abt_literals.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::optimizer {
 namespace {
+using namespace unit_test_abt_literals;
+
 TEST(Path, Const) {
     auto tree = make<EvalPath>(make<PathConstant>(Constant::int64(2)), make<Variable>("ptest"));
     auto env = VariableEnvironment::build(tree);
@@ -1065,8 +1068,32 @@ TEST(Path, Lower10) {
     // Add some asserts on the shape of the tree or something.
 }
 
+TEST(Path, PathComposeLambdaLHS) {
+    auto tree =
+        _evalp(_get("a", _id()),
+               _evalp(_plambda(_lambda("x", _binary("Add", "x"_var, "1"_cint64))), "9"_cint64))
+            ._n;
+    auto env = VariableEnvironment::build(tree);
+
+    auto fusor = PathFusion(env);
+    fusor.optimize(tree);
+
+    // PathLambda should be the left child.
+    ASSERT_EXPLAIN_V2(
+        "EvalPath []\n"
+        "|   Const [9]\n"
+        "PathComposeM []\n"
+        "|   PathGet [a]\n"
+        "|   PathIdentity []\n"
+        "PathLambda []\n"
+        "LambdaAbstraction [x]\n"
+        "BinaryOp [Add]\n"
+        "|   Const [1]\n"
+        "Variable [x]\n",
+        tree);
+}
+
 TEST(Path, NoLambdaPathCompose) {
-    PrefixId prefixId;
     auto tree = make<EvalFilter>(
         make<PathGet>("a", make<PathIdentity>()),
         make<EvalPath>(
