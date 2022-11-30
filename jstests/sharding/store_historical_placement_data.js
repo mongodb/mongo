@@ -300,6 +300,47 @@ function testDropDatabase(dbName, primaryShardName) {
     assert.eq(null, getLatestPlacementInfoFor(unshardedCollNss));
 }
 
+function testReshardCollection() {
+    const dbName = 'reshardCollectionTestDB';
+    const collName = 'shardedCollName';
+    const nss = dbName + '.' + collName;
+    let db = st.s.getDB(dbName);
+
+    // Start with a collection with a single chunk on shard0.
+    assert.commandWorked(st.s.adminCommand({enableSharding: dbName, primaryShard: shard0}));
+    assert.commandWorked(st.s.adminCommand({shardCollection: nss, key: {oldShardKey: 1}}));
+    const initialNumPlacementEntries = configDB.placementHistory.count({});
+    const initialCollPlacementInfo =
+        getValidatedPlacementInfoForCollection(dbName, collName, [shard0], true);
+
+    // Create a set of zones that will force the new set of chunk to be distributed across all the
+    // shards of the cluster.
+    const zone1Name = 'zone1';
+    assert.commandWorked(st.s.adminCommand({addShardToZone: shard1, zone: zone1Name}));
+    const zone1Descriptor = {zone: zone1Name, min: {newShardKey: 0}, max: {newShardKey: 100}};
+    const zone2Name = 'zone2';
+    assert.commandWorked(st.s.adminCommand({addShardToZone: shard2, zone: zone2Name}));
+    const zone2Descriptor = {zone: zone2Name, min: {newShardKey: 200}, max: {newShardKey: 300}};
+
+    // Launch the reshard operation.
+    assert.commandWorked(db.adminCommand({
+        reshardCollection: nss,
+        key: {newShardKey: 1},
+        zones: [zone1Descriptor, zone2Descriptor]
+    }));
+
+    // A single new placement document should have been added (the temp collection created by
+    // resharding does not get tracked in config.placementHistory).
+    assert.eq(1 + initialNumPlacementEntries, configDB.placementHistory.count({}));
+
+    // Verify that the latest placement info matches the expectations.
+    const finalCollPlacementInfo =
+        getValidatedPlacementInfoForCollection(dbName, collName, [shard0, shard1, shard2], false);
+
+    // The resharded collection maintains its nss, but changes its uuid.
+    assert.neq(initialCollPlacementInfo.uuid, finalCollPlacementInfo.uuid);
+}
+
 // TODO SERVER-69106 remove the logic to skip the test execution
 const historicalPlacementDataFeatureFlag = FeatureFlagUtil.isEnabled(
     st.configRS.getPrimary().getDB('admin'), "HistoricalPlacementShardingCatalog");
@@ -337,6 +378,8 @@ testRenameCollection();
 jsTest.log(
     'Testing placement entries added by dropDatabase() over a new sharding-enabled DB with data');
 testDropDatabase('dropDatabaseDB', st.shard0.shardName);
+
+testReshardCollection();
 
 st.stop();
 }());

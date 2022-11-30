@@ -58,6 +58,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_namespace_placement_gen.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/abort_reshard_collection_gen.h"
@@ -66,6 +67,7 @@
 #include "mongo/s/request_types/flush_resharding_state_change_gen.h"
 #include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
 #include "mongo/s/resharding/resharding_coordinator_service_conflicting_op_in_progress_info.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/assert_util.h"
@@ -532,6 +534,35 @@ void writeToConfigCollectionsForTempNss(OperationContext* opCtx,
     }
 }
 
+void writeToConfigPlacementHistoryForOriginalNss(
+    OperationContext* opCtx,
+    const ReshardingCoordinatorDocument& coordinatorDoc,
+    const Timestamp& newCollectionTimestamp,
+    TxnNumber txnNumber) {
+    if (!feature_flags::gHistoricalPlacementShardingCatalog.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        return;
+    }
+
+    invariant(coordinatorDoc.getState() == CoordinatorStateEnum::kCommitting,
+              "New placement data on the collection being resharded can only be persisted at "
+              "commit time");
+
+    NamespacePlacementType placementInfo(
+        coordinatorDoc.getSourceNss(),
+        newCollectionTimestamp,
+        resharding::extractShardIdsFromParticipantEntries(coordinatorDoc.getRecipientShards()));
+    placementInfo.setUuid(coordinatorDoc.getReshardingUUID());
+
+    auto request = BatchedCommandRequest::buildInsertOp(
+        NamespaceString::kConfigsvrPlacementHistoryNamespace, {placementInfo.toBSON()});
+
+    auto response = ShardingCatalogManager::get(opCtx)->writeToConfigDocumentInTxn(
+        opCtx, NamespaceString::kConfigsvrPlacementHistoryNamespace, request, txnNumber);
+
+    assertNumDocsModifiedMatchesExpected(request, response, 1);
+}
+
 void insertChunkAndTagDocsForTempNss(OperationContext* opCtx,
                                      const std::vector<ChunkType>& initialChunks,
                                      std::vector<BSONObj> newZones) {
@@ -663,6 +694,11 @@ void writeDecisionPersistedState(OperationContext* opCtx,
             // shard key, new epoch, and new UUID
             updateConfigCollectionsForOriginalNss(
                 opCtx, coordinatorDoc, newCollectionEpoch, newCollectionTimestamp, txnNumber);
+
+            // Insert the list of recipient shard IDs (together with the new timestamp and UUID) as
+            // the latest entry in config.placementHistory about the original namespace
+            writeToConfigPlacementHistoryForOriginalNss(
+                opCtx, coordinatorDoc, newCollectionTimestamp, txnNumber);
         });
 }
 
