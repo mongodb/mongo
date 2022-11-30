@@ -776,19 +776,28 @@ CollectionPtr CollectionCatalog::openCollection(OperationContext* opCtx,
 
     auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
 
-    // Try to find a catalog entry matching 'readTimestamp'.
-    auto catalogEntry = _fetchPITCatalogEntry(opCtx, nss, readTimestamp);
-    if (!catalogEntry) {
-        return CollectionPtr();
-    }
-
-    auto latestCollection = _lookupCollectionByUUID(*catalogEntry->metadata->options.uuid);
-
+    // When openCollection is called with no timestamp, the namespace must be pending commit. We
+    // compare the collection instance in _pendingCommitNamespaces and the collection instance in
+    // the in-memory catalog with the durable catalog entry to determine which instance to return.
     if (!readTimestamp) {
-        // When openCollection is called with no timestamp, the namespace must be pending commit.
         auto it = _pendingCommitNamespaces.find(nss);
         invariant(it != _pendingCommitNamespaces.end());
-        auto pendingCollection = it->second;
+        const auto& pendingCollection = it->second;
+
+        RecordId catalogId;
+        if (pendingCollection) {
+            catalogId = pendingCollection->getCatalogId();
+        } else {
+            auto lookupResult = lookupCatalogIdByNSS(nss, boost::none);
+            invariant(lookupResult.result == CatalogIdLookup::NamespaceExistence::kExists);
+            catalogId = lookupResult.id;
+        }
+
+        auto catalogEntry = DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, catalogId);
+        if (!catalogEntry || nss != catalogEntry->metadata->nss) {
+            return CollectionPtr();
+        }
+        auto latestCollection = _lookupCollectionByUUID(*catalogEntry->metadata->options.uuid);
 
         // Use the pendingCollection if there is no latestCollection or if the metadata of the
         // latestCollection doesn't match the durable catalogEntry.
@@ -802,6 +811,14 @@ CollectionPtr CollectionCatalog::openCollection(OperationContext* opCtx,
         uncommittedCatalogUpdates.openCollection(opCtx, latestCollection);
         return CollectionPtr(latestCollection.get(), CollectionPtr::NoYieldTag{});
     }
+
+    // Try to find a catalog entry matching 'readTimestamp'.
+    auto catalogEntry = _fetchPITCatalogEntry(opCtx, nss, readTimestamp);
+    if (!catalogEntry) {
+        return CollectionPtr();
+    }
+
+    auto latestCollection = _lookupCollectionByUUID(*catalogEntry->metadata->options.uuid);
 
     // Return the in-memory Collection instance if it is compatible with the read timestamp.
     if (isExistingCollectionCompatible(latestCollection, readTimestamp)) {
@@ -858,9 +875,8 @@ boost::optional<DurableCatalogEntry> CollectionCatalog::_fetchPITCatalogEntry(
     }
 
     auto catalogEntry = DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, catalogId);
-    // TODO SERVER-71594 remove readTimestamp check and add invariant to make sure this scan isn't
-    // reached when there is no timestamp
-    if (readTimestamp && (!catalogEntry || nss != catalogEntry->metadata->nss)) {
+    if (!catalogEntry || nss != catalogEntry->metadata->nss) {
+        invariant(readTimestamp);
         // If no entry is found or the entry contains a different namespace, the mapping might be
         // incorrect since it is incomplete after startup; scans durable catalog to confirm.
         auto catalogEntry = DurableCatalog::get(opCtx)->scanForCatalogEntryByNss(opCtx, nss);

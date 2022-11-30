@@ -2674,6 +2674,32 @@ DEATH_TEST_F(CollectionCatalogTimestampTest, OpenCollectionInWriteUnitOfWork, "i
         CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, readTimestamp);
 }
 
+TEST_F(CollectionCatalogTimestampTest, ConcurrentCreateCollectionAndOpenCollectionBeforeCommit) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    const NamespaceString nss("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+
+    // When the snapshot is opened right before the create is committed to the durable catalog, the
+    // collection instance should not exist yet.
+    concurrentCreateCollectionAndOpenCollection(
+        opCtx.get(), nss, createCollectionTs, true, false, 0);
+}
+
+TEST_F(CollectionCatalogTimestampTest, ConcurrentCreateCollectionAndOpenCollectionAfterCommit) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    const NamespaceString nss("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+
+    // When the snapshot is opened right after the create is committed to the durable catalog, the
+    // collection instance should exist.
+    concurrentCreateCollectionAndOpenCollection(
+        opCtx.get(), nss, createCollectionTs, false, true, 0);
+}
+
 TEST_F(CollectionCatalogTimestampTest, ConcurrentDropCollectionAndOpenCollectionBeforeCommit) {
     RAIIServerParameterControllerForTest featureFlagController(
         "featureFlagPointInTimeCatalogLookups", true);
@@ -2720,6 +2746,60 @@ TEST_F(CollectionCatalogTimestampTest,
     // the openCollection looks for the originalNss, the collection instance should be returned.
     concurrentRenameCollectionAndOpenCollection(
         opCtx.get(), originalNss, newNss, originalNss, renameCollectionTs, true, true, 0);
+}
+
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentRenameCollectionAndOpenCollectionWithOriginalNameAfterCommit) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    const NamespaceString originalNss("a.b");
+    const NamespaceString newNss("a.c");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp renameCollectionTs = Timestamp(20, 20);
+
+    createCollection(opCtx.get(), originalNss, createCollectionTs);
+
+    // When the snapshot is opened right after the rename is committed to the durable catalog, and
+    // the openCollection looks for the originalNss, no collection instance should be returned.
+    concurrentRenameCollectionAndOpenCollection(
+        opCtx.get(), originalNss, newNss, originalNss, renameCollectionTs, false, false, 0);
+}
+
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentRenameCollectionAndOpenCollectionWithNewNameBeforeCommit) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    const NamespaceString originalNss("a.b");
+    const NamespaceString newNss("a.c");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp renameCollectionTs = Timestamp(20, 20);
+
+    createCollection(opCtx.get(), originalNss, createCollectionTs);
+
+    // When the snapshot is opened right before the rename is committed to the durable catalog, and
+    // the openCollection looks for the newNss, no collection instance should be returned.
+    concurrentRenameCollectionAndOpenCollection(
+        opCtx.get(), originalNss, newNss, newNss, renameCollectionTs, true, false, 0);
+}
+
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentRenameCollectionAndOpenCollectionWithNewNameAfterCommit) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    const NamespaceString originalNss("a.b");
+    const NamespaceString newNss("a.c");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp renameCollectionTs = Timestamp(20, 20);
+
+    createCollection(opCtx.get(), originalNss, createCollectionTs);
+
+    // When the snapshot is opened right after the rename is committed to the durable catalog, and
+    // the openCollection looks for the newNss, the collection instance should be returned.
+    concurrentRenameCollectionAndOpenCollection(
+        opCtx.get(), originalNss, newNss, newNss, renameCollectionTs, false, true, 0);
 }
 
 TEST_F(CollectionCatalogTimestampTest, ConcurrentCreateIndexAndOpenCollectionBeforeCommit) {
