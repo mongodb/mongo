@@ -103,7 +103,7 @@ public:
                                                            ActionType::internal));
         }
     };
-} sharsvrdDropCollectionParticipantCommand;
+} shardsvrDropDatabaseParticipantCommand;
 
 }  // namespace
 }  // namespace mongo
