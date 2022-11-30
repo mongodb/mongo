@@ -98,7 +98,7 @@ buildvariants:
     has_packages: false
     compile_variant: ubuntu1804-ninja-build-profiles
   tasks:
-  - name: compile_ninja_default_profile_TG
+  - name: compile_ninja_default_profile_linux_TG
     distros:
     - ubuntu1804-xlarge
   - name: compile_ninja_opt_profile_TG

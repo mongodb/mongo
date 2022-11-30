@@ -62,7 +62,7 @@ LINUX_BUILD_PROFILES = {
     BuildProfileType.DEFAULT:
         BuildProfile(
             ninja="disabled",
-            variables_files=['./etc/scons/mongodbtoolchain_stable_gcc.vars'],
+            variables_files=[],
             allocator="auto",
             sanitize=None,
             link_model="auto",

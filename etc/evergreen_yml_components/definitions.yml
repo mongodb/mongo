@@ -2499,6 +2499,25 @@ tasks:
     vars:
       ninja_file: "build.ninja"
 
+- name: compile_ninja_default_profile_linux
+  tags: []
+  depends_on:
+  - name: version_expansions_gen
+    variant: generate-tasks-for-version
+  commands:
+  - func: "scons compile"
+    vars:
+      generating_for_ninja: true
+      separate_debug: off
+      task_compile_flags: >-
+        --build-profile=default
+        --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
+        --ninja
+  - *f_expansions_write
+  - func: "ninja compile"
+    vars:
+      ninja_file: "build.ninja"
+
 - name: compile_ninja_opt_profile
   tags: []
   depends_on:
@@ -7982,6 +8001,11 @@ task_groups:
   name: compile_ninja_default_profile_TG
   tasks:
   - compile_ninja_default_profile
+
+- <<: *compile_task_group_template
+  name: compile_ninja_default_profile_linux_TG
+  tasks:
+  - compile_ninja_default_profile_linux
 
 - <<: *compile_task_group_template
   name: compile_ninja_opt_profile_TG
