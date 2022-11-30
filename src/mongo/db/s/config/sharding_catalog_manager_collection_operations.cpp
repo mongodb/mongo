@@ -379,9 +379,6 @@ void ShardingCatalogManager::configureCollectionBalancing(
     boost::optional<bool> defragmentCollection,
     boost::optional<bool> enableAutoSplitter) {
 
-    // Hold the FCV region to serialize with the setFeatureCompatibilityVersion command
-    FixedFCVRegion fcvRegion(opCtx);
-
     uassert(ErrorCodes::InvalidOptions,
             "invalid configure collection balancing update",
             chunkSizeMB || defragmentCollection || enableAutoSplitter);
