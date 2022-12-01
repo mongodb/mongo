@@ -1,15 +1,18 @@
 /**
  * Test that the telemetry metrics are updated correctly across getMores.
  */
-load('jstests/libs/analyze_plan.js');
 load("jstests/libs/profiler.js");  // For getLatestProfilerEntry.
 
 (function() {
 "use strict";
 
-// Turn on the collection of telemetry metrics.
+if (!FeatureFlagUtil.isEnabled(db, "Telemetry")) {
+    return;
+}
+
+// Turn on the collecting of telemetry metrics.
 let options = {
-    setParameter: "internalQueryConfigureTelemetrySamplingRate=2147483647",
+    setParameter: {internalQueryConfigureTelemetrySamplingRate: 2147483647},
 };
 
 const conn = MongoRunner.runMongod(options);
@@ -17,6 +20,10 @@ const testDB = conn.getDB('test');
 var coll = testDB[jsTestName()];
 var collTwo = db[jsTestName() + 'Two'];
 coll.drop();
+
+// Make it easier to extract correct telemetry store entry for purposes of this test.
+assert.commandWorked(testDB.adminCommand(
+    {setParameter: 1, internalQueryConfigureTelemetryFieldNameRedactionStrategy: "none"}));
 
 function verifyMetrics(batch) {
     batch.forEach(element => {
@@ -73,11 +80,14 @@ verifyMetrics(telStore.cursor.firstBatch);
 
 // Ensure that for queries using an index, keys scanned is nonzero.
 assert.commandWorked(coll.createIndex({bar: 1}));
-coll.aggregate([{$match: {bar: 1}}], {cursor: {batchSize: 2}});
+coll.aggregate([{$match: {$or: [{bar: 1, foo: 1}]}}], {cursor: {batchSize: 2}});
 // This filters telemetry entries to just the one entered for the above agg command.
 telStore = testDB.adminCommand({
     aggregate: 1,
-    pipeline: [{$telemetry: {}}, {$match: {"key.pipeline.$match.bar": {$eq: "###"}}}],
+    pipeline: [
+        {$telemetry: {}},
+        {$match: {"key.pipeline.$match.$or": {$eq: [{'bar': '###', 'foo': '###'}]}}}
+    ],
     cursor: {}
 });
 assert(telStore.cursor.firstBatch[0].metrics.keysScanned.sum > 0);

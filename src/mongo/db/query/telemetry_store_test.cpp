@@ -29,6 +29,7 @@
 
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/catalog/rename_collection.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/telemetry.h"
 #include "mongo/unittest/unittest.h"
 
@@ -42,6 +43,13 @@ protected:
 };
 
 TEST_F(TelemetryStoreTest, BasicUsage) {
+    // Turning on the flag at runtime will crash as telemetry store registerer (which creates the
+    // telemetry store) is called at start up and if flag is off, the telemetry store will have
+    // never been created. Thus, instead of turning on the flag at runtime and crashing, we skip the
+    // test if telemetry feature flag is off.
+    if (!feature_flags::gFeatureFlagTelemetry.isEnabledAndIgnoreFCV()) {
+        return;
+    }
     TelemetryStore telStore{5000000, 1000};
 
     auto getMetrics = [&](BSONObj& key) {

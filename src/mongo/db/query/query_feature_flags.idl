@@ -80,3 +80,8 @@ feature_flags:
       of queries, including NLJ $lookup plans. Also enables the SBE plan cache."
       cpp_varname: gFeatureFlagSbeFull
       default: false
+
+    featureFlagTelemetry:
+      description: "Feature flag for enabling the telemetry store."
+      cpp_varname: gFeatureFlagTelemetry
+      default: false

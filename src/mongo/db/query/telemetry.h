@@ -177,8 +177,6 @@ std::pair<TelemetryStore*, Lock::ResourceLock> getTelemetryStoreForRead(
 
 std::unique_ptr<TelemetryStore> resetTelemetryStore(const ServiceContext* serviceCtx);
 
-bool isTelemetryEnabled(const ServiceContext* serviceCtx);
-
 /**
  * Register a request for telemetry collection. The telemetry machinery may decide not to collect
  * anything but this should be called for all requests. The decision is made based on the feature
@@ -198,7 +196,7 @@ void registerFindRequest(const FindCommandRequest& request,
 
 void registerGetMoreRequest(OperationContext* opCtx, const PlanExplainer& planExplainer);
 
-void recordExecution(const OperationContext* opCtx, const OpDebug& opDebug, bool isFle);
+void recordExecution(OperationContext* opCtx, const OpDebug& opDebug, bool isFle);
 
 /**
  * Collect telemetry for the operation identified by `key`. The `isExec` flag should be set if it's

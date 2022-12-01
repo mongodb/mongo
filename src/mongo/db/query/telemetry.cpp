@@ -38,11 +38,13 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/query/plan_explainer.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/rate_limiting.h"
 #include "mongo/db/query/telemetry_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/client_metadata.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/system_clock_source.h"
 #include <cstddef>
 
@@ -51,6 +53,11 @@
 namespace mongo {
 
 namespace telemetry {
+
+bool isTelemetryEnabled() {
+    return feature_flags::gFeatureFlagTelemetry.isEnabledAndIgnoreFCV();
+}
+
 
 namespace {
 
@@ -135,6 +142,13 @@ const auto telemetryRateLimiter =
 
 ServiceContext::ConstructorActionRegisterer telemetryStoreManagerRegisterer{
     "TelemetryStoreManagerRegisterer", [](ServiceContext* serviceCtx) {
+        if (!isTelemetryEnabled()) {
+            // featureFlags are not allowed to be changed at runtime. Therefore it's not an issue
+            // to not create a telemetry store in ConstructorActionRegisterer at start up with the
+            // flag off - because the flag can not be turned on at any point afterwards.
+            return;
+        }
+
         telemetry_util::telemetryStoreOnParamChangeUpdater(serviceCtx) =
             std::make_unique<TelemetryOnParamChangeUpdaterImpl>();
         auto status = memory_util::MemorySize::parse(queryTelemetryStoreSize.get());
@@ -167,17 +181,17 @@ ServiceContext::ConstructorActionRegisterer telemetryStoreManagerRegisterer{
             std::make_unique<RateLimiting>(queryTelemetrySamplingRate.load());
     }};
 
-bool isTelemetryEnabled(const ServiceContext* serviceCtx) {
-    return telemetryRateLimiter(serviceCtx)->getSamplingRate() > 0;
-}
-
 /**
  * Internal check for whether we should collect metrics. This checks the rate limiting
  * configuration for a global on/off decision and, if enabled, delegates to the rate limiter.
  */
 bool shouldCollect(const ServiceContext* serviceCtx) {
     // Quick escape if telemetry is turned off.
-    if (!isTelemetryEnabled(serviceCtx)) {
+    if (!isTelemetryEnabled()) {
+        return false;
+    }
+    // Cannot collect telemetry if sampling rate is not greater than 0.
+    if (telemetryRateLimiter(serviceCtx)->getSamplingRate() <= 0) {
         return false;
     }
     // Check if rate limiting allows us to collect telemetry for this request.
@@ -383,6 +397,11 @@ const BSONObj& TelemetryMetrics::redactKey(const BSONObj& key) const {
 }
 
 void registerAggRequest(const AggregateCommandRequest& request, OperationContext* opCtx) {
+
+    if (!isTelemetryEnabled()) {
+        return;
+    }
+
     if (request.getEncryptionInformation()) {
         return;
     }
@@ -436,6 +455,9 @@ void registerAggRequest(const AggregateCommandRequest& request, OperationContext
 void registerFindRequest(const FindCommandRequest& request,
                          const NamespaceString& collection,
                          OperationContext* opCtx) {
+    if (!isTelemetryEnabled()) {
+        return;
+    }
     if (request.getEncryptionInformation()) {
         return;
     }
@@ -472,6 +494,9 @@ void registerFindRequest(const FindCommandRequest& request,
 }
 
 void registerGetMoreRequest(OperationContext* opCtx, const PlanExplainer& planExplainer) {
+    if (!isTelemetryEnabled()) {
+        return;
+    }
     auto&& telemetryKey = planExplainer.getTelemetryKey();
     if (telemetryKey.isEmpty() || !shouldCollect(opCtx->getServiceContext())) {
         return;
@@ -481,14 +506,20 @@ void registerGetMoreRequest(OperationContext* opCtx, const PlanExplainer& planEx
 
 std::pair<TelemetryStore*, Lock::ResourceLock> getTelemetryStoreForRead(
     const ServiceContext* serviceCtx) {
+    uassert(6579000, "Telemetry is not enabled without the feature flag on", isTelemetryEnabled());
     return telemetryStoreDecoration(serviceCtx)->getTelemetryStore();
 }
 
 std::unique_ptr<TelemetryStore> resetTelemetryStore(const ServiceContext* serviceCtx) {
+    uassert(6579002, "Telemetry is not enabled without the feature flag on", isTelemetryEnabled());
     return telemetryStoreDecoration(serviceCtx)->resetTelemetryStore();
 }
 
-void recordExecution(const OperationContext* opCtx, const OpDebug& opDebug, bool isFle) {
+void recordExecution(OperationContext* opCtx, const OpDebug& opDebug, bool isFle) {
+
+    if (!isTelemetryEnabled()) {
+        return;
+    }
     if (isFle) {
         return;
     }
