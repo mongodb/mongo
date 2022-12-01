@@ -85,6 +85,10 @@ public:
         return o;
     }
 
+    ReplOperation() = default;
+    explicit ReplOperation(DurableReplOperation durableReplOp)
+        : DurableReplOperation(std::move(durableReplOp)) {}
+
     const BSONObj& getPostImageDocumentKey() const {
         return _postImageDocumentKey;
     }
