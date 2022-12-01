@@ -95,9 +95,10 @@ public:
      * BinData (0x05)
      */
     BSONBinData BinData() const {
+        uint8_t subtype = ConstDataView(value() + kCountBytes).read<LittleEndian<uint8_t>>();
         return {value() + kCountBytes + kBinDataSubTypeBytes,
                 ConstDataView(value()).read<LittleEndian<int>>(),
-                static_cast<BinDataType>(*(value() + kCountBytes))};
+                static_cast<BinDataType>(subtype)};
     }
 
     /**
