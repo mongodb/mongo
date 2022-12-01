@@ -767,7 +767,7 @@ const BucketCatalog::BucketHandle& BucketCatalog::WriteBatch::bucket() const {
     return _bucket;
 }
 
-const std::vector<BSONObj>& BucketCatalog::WriteBatch::measurements() const {
+const BucketCatalog::BatchMeasurements& BucketCatalog::WriteBatch::measurements() const {
     return _measurements;
 }
 
@@ -797,9 +797,9 @@ bool BucketCatalog::WriteBatch::finished() const {
 
 BSONObj BucketCatalog::WriteBatch::toBSON() const {
     auto toFieldName = [](const auto& nameHashPair) { return nameHashPair.first; };
-    return BSON("docs" << _measurements << "bucketMin" << _min << "bucketMax" << _max
-                       << "numCommittedMeasurements" << int(_numPreviouslyCommittedMeasurements)
-                       << "newFieldNamesToBeInserted"
+    return BSON("docs" << std::vector<BSONObj>(_measurements.begin(), _measurements.end())
+                       << "bucketMin" << _min << "bucketMax" << _max << "numCommittedMeasurements"
+                       << int(_numPreviouslyCommittedMeasurements) << "newFieldNamesToBeInserted"
                        << std::set<std::string>(
                               boost::make_transform_iterator(_newFieldNamesToBeInserted.begin(),
                                                              toFieldName),

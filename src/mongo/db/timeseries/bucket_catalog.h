@@ -53,6 +53,10 @@ protected:
     static constexpr std::size_t kNumStaticNewFields = 10;
     using NewFieldNames = boost::container::small_vector<StringMapHashedKey, kNumStaticNewFields>;
 
+    // Number of measurements we can hold in a batch without needing to allocate memory.
+    static constexpr std::size_t kNumStaticBatchMeasurements = 10;
+    using BatchMeasurements = boost::container::small_vector<BSONObj, kNumStaticBatchMeasurements>;
+
     using StripeNumber = std::uint8_t;
 
     using EraCountMap = std::map<uint64_t, uint64_t>;
@@ -208,7 +212,7 @@ public:
          */
         const BucketHandle& bucket() const;
 
-        const std::vector<BSONObj>& measurements() const;
+        const BatchMeasurements& measurements() const;
         const BSONObj& min() const;
         const BSONObj& max() const;
         const StringMap<std::size_t>& newFieldNamesToBeInserted() const;
@@ -255,7 +259,7 @@ public:
         OperationId _opId;
         ExecutionStatsController _stats;
 
-        std::vector<BSONObj> _measurements;
+        BatchMeasurements _measurements;
         BSONObj _min;  // Batch-local min; full if first batch, updates otherwise.
         BSONObj _max;  // Batch-local max; full if first batch, updates otherwise.
         uint32_t _numPreviouslyCommittedMeasurements = 0;
