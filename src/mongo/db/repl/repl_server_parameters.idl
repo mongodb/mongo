@@ -719,3 +719,7 @@ feature_flags:
         cpp_varname: feature_flags::gDowngradingToUpgrading
         default: false
 
+    featureFlagApplyPreparedTxnsInParallel:
+        description: when enabled, secondaries will apply prepared transactions in parallel.
+        cpp_varname: feature_flags::gApplyPreparedTxnsInParallel
+        default: false
