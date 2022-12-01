@@ -107,13 +107,13 @@ void CollectionMetadata::throwIfReshardingInProgress(NamespaceString const& nss)
     }
 }
 
-BSONObj CollectionMetadata::extractDocumentKey(const BSONObj& doc) const {
+BSONObj CollectionMetadata::extractDocumentKey(const ShardKeyPattern* shardKeyPattern,
+                                               const BSONObj& doc) {
     BSONObj key;
 
-    if (isSharded()) {
-        auto const& pattern = _cm->getShardKeyPattern();
-        key = dotted_path_support::extractElementsBasedOnTemplate(doc, pattern.toBSON());
-        if (pattern.hasId()) {
+    if (shardKeyPattern) {
+        key = dotted_path_support::extractElementsBasedOnTemplate(doc, shardKeyPattern->toBSON());
+        if (shardKeyPattern->hasId()) {
             return key;
         }
         // else, try to append an _id field from the document.
@@ -142,6 +142,10 @@ BSONObj CollectionMetadata::toBSON() const {
     BSONObjBuilder builder;
     toBSONBasic(builder);
     return builder.obj();
+}
+
+BSONObj CollectionMetadata::extractDocumentKey(const BSONObj& doc) const {
+    return extractDocumentKey(isSharded() ? &_cm->getShardKeyPattern() : nullptr, doc);
 }
 
 std::string CollectionMetadata::toStringBasic() const {

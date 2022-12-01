@@ -210,6 +210,10 @@ public:
                               const std::vector<OplogSlot>& reservedSlots,
                               std::vector<repl::ReplOperation>* statements,
                               size_t numberOfPreImagesToWrite) final;
+
+    void onTransactionPrepareNonPrimary(OperationContext* opCtx,
+                                        const std::vector<repl::OplogEntry>& statements,
+                                        const repl::OpTime& prepareOpTime) final;
     void onTransactionAbort(OperationContext* opCtx,
                             boost::optional<OplogSlot> abortOplogEntryOpTime) final;
     void onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final;
@@ -253,6 +257,10 @@ private:
     virtual void shardObserveTransactionPrepareOrUnpreparedCommit(
         OperationContext* opCtx,
         const std::vector<repl::ReplOperation>& stmts,
+        const repl::OpTime& prepareOrCommitOptime) {}
+    virtual void shardObserveNonPrimaryTransactionPrepare(
+        OperationContext* opCtx,
+        const std::vector<repl::OplogEntry>& stmts,
         const repl::OpTime& prepareOrCommitOptime) {}
 };
 

@@ -169,6 +169,9 @@ public:
                               const std::vector<OplogSlot>& reservedSlots,
                               std::vector<repl::ReplOperation>* statements,
                               size_t numberOfPreImagesToWrite) override{};
+    void onTransactionPrepareNonPrimary(OperationContext* opCtx,
+                                        const std::vector<repl::OplogEntry>& statements,
+                                        const repl::OpTime& prepareOpTime) override {}
     void onTransactionAbort(OperationContext* opCtx,
                             boost::optional<OplogSlot> abortOplogEntryOpTime) override{};
     void onReplicationRollback(OperationContext* opCtx,
