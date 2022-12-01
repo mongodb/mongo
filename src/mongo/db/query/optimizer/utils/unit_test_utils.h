@@ -44,10 +44,21 @@ void maybePrintABT(const ABT& abt);
 
 std::string getPropsStrForExplain(const OptPhaseManager& phaseManager);
 
+/**
+ * Computes a difference between the expected and actual formatted output and outputs it to the
+ * provide stream instance. Used to display difference between expected and actual format for
+ * auto-update macros. It is exposed in the header here for testability.
+ */
+void outputDiff(std::ostream& os,
+                const std::vector<std::string>& expFormatted,
+                const std::vector<std::string>& actualFormatted,
+                size_t lineNumber);
+
 bool handleAutoUpdate(const std::string& expected,
                       const std::string& actual,
                       const std::string& fileName,
-                      size_t lineNumber);
+                      size_t lineNumber,
+                      bool needsEscaping);
 
 /**
  * Auto update result back in the source file if the assert fails.
@@ -64,12 +75,13 @@ bool handleAutoUpdate(const std::string& expected,
  *      constant other than 'NOLINT'. If we have a single-line constant, the auto-updating will
  *      generate a 'NOLINT' at the end of the line.
  *      2. The expression which we are explaining ('tree' in the example above) must fit on a single
- *      line. The macro should be indented by 4 spaces.
- *
- * TODO: SERVER-71004: Extend the usability of the auto-update macro.
+ *      line.
+ *      3. The macro should be indented by 4 spaces.
  */
-#define ASSERT_STR_EQ_AUTO(expected, actual) \
-    ASSERT(handleAutoUpdate(expected, actual, __FILE__, __LINE__))
+#define AUTO_UPDATE_HELPER(expected, actual, needsEscaping) \
+    handleAutoUpdate(expected, actual, __FILE__, __LINE__, needsEscaping)
+
+#define ASSERT_STR_EQ_AUTO(expected, actual) ASSERT(AUTO_UPDATE_HELPER(expected, actual, true))
 
 
 #define ASSERT_EXPLAIN(expected, abt) \
@@ -141,9 +153,26 @@ bool handleAutoUpdate(const std::string& expected,
                   .toString(false /*includeFieldName*/));
 
 
+#define ASSERT_NUMBER_EQ_AUTO(expected, actual) \
+    ASSERT(AUTO_UPDATE_HELPER(str::stream() << expected, str::stream() << actual, false))
+
 #define ASSERT_BETWEEN(a, b, value) \
     ASSERT_LTE(a, value);           \
     ASSERT_GTE(b, value);
+
+/**
+ * This is the auto-updating version of ASSERT_BETWEEN. If the value falls outside the range, we
+ * create a new range which is +-25% if the value. This is expressed as a fractional operation in
+ * order to preserve the type of the value (int->int, double->double).
+ */
+#define ASSERT_BETWEEN_AUTO(a, b, value)                                    \
+    if ((value) < (a) || (value) > (b)) {                                   \
+        ASSERT(AUTO_UPDATE_HELPER(str::stream() << (a) << ",\n"             \
+                                                << (b),                     \
+                                  str::stream() << (3 * value / 4) << ",\n" \
+                                                << (5 * value / 4),         \
+                                  false));                                  \
+    }
 
 struct TestIndexField {
     FieldNameType fieldName;

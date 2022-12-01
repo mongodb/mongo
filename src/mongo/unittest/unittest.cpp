@@ -671,6 +671,11 @@ SpawnInfo& getSpawnInfo() {
     return *v;
 }
 
+bool& getAutoUpdateOptimizerAsserts() {
+    static bool flag = false;
+    return flag;
+}
+
 namespace {
 // At startup, teach the terminate handler how to print TestAssertionFailureException.
 [[maybe_unused]] const auto earlyCall = [] {

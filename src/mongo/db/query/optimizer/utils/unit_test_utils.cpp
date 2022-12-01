@@ -40,6 +40,7 @@
 #include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/node.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/str_escape.h"
 
 
@@ -47,8 +48,6 @@ namespace mongo::optimizer {
 
 static constexpr bool kDebugAsserts = false;
 
-// DO NOT COMMIT WITH "TRUE".
-static constexpr bool kAutoUpdateOnFailure = false;
 static constexpr const char* kTempFileSuffix = ".tmp.txt";
 
 // Map from file name to a list of updates. We keep track of how many lines are added or deleted at
@@ -79,7 +78,7 @@ std::string getPropsStrForExplain(const OptPhaseManager& phaseManager) {
         &phaseManager.getMemo());
 }
 
-static std::vector<std::string> formatStr(const std::string& str) {
+static std::vector<std::string> formatStr(const std::string& str, const bool needsEscaping) {
     std::vector<std::string> replacementLines;
     std::istringstream lineInput(str);
 
@@ -91,18 +90,28 @@ static std::vector<std::string> formatStr(const std::string& str) {
         // Read the string line by line and format it to match the test file's expected format. We
         // have an initial indentation, followed by quotes and the escaped string itself.
 
-        std::string escaped = mongo::str::escapeForJSON(line);
+        std::string escaped = needsEscaping ? mongo::str::escapeForJSON(line) : line;
         for (;;) {
             // If the line is estimated to exceed the maximum length allowed by the linter, break it
             // up and make sure to insert '\n' only at the end of the last segment.
-            const bool breakupLine = escaped.size() > kEscapedLength;
+            const bool breakupLine = needsEscaping && escaped.size() > kEscapedLength;
 
             std::ostringstream os;
-            os << "        \"" << escaped.substr(0, kEscapedLength);
-            if (!breakupLine) {
-                os << "\\n";
+            os << "        ";
+            if (needsEscaping) {
+                os << "\"";
             }
-            os << "\"\n";
+
+            os << escaped.substr(0, kEscapedLength);
+
+            if (needsEscaping) {
+                if (!breakupLine) {
+                    os << "\\n";
+                }
+                os << "\"";
+            }
+            os << "\n";
+
             replacementLines.push_back(os.str());
 
             if (breakupLine) {
@@ -128,26 +137,112 @@ static std::vector<std::string> formatStr(const std::string& str) {
     return replacementLines;
 }
 
+static boost::optional<size_t> diffLookAhead(const size_t thisIndex,
+                                             const std::vector<std::string>& thisSideLines,
+                                             const std::string& otherLine) {
+    static constexpr size_t kLookAheadSize = 5;
+
+    const size_t maxIndex = std::min(thisIndex + kLookAheadSize, thisSideLines.size());
+    for (size_t i = thisIndex + 1; i < maxIndex; i++) {
+        if (thisSideLines.at(i) == otherLine) {
+            return i;
+        }
+    }
+
+    return {};
+}
+
+void outputDiff(std::ostream& os,
+                const std::vector<std::string>& expFormatted,
+                const std::vector<std::string>& actualFormatted,
+                const size_t lineNumber) {
+    const size_t actualSize = actualFormatted.size();
+    const size_t expSize = expFormatted.size();
+    invariant(lineNumber >= expSize);
+    const size_t startLineNumber = lineNumber - expSize;
+
+    const auto outputLine =
+        [&os](const bool isExpected, const size_t lineNumber, const std::string& line) {
+            os << "L" << lineNumber << ": " << (isExpected ? "-" : "+") << line;
+        };
+
+    size_t expectedIndex = 0;
+    size_t actualIndex = 0;
+    for (;;) {
+        if (actualIndex >= actualSize) {
+            // Exhausted actual side.
+
+            if (expectedIndex >= expSize) {
+                // Reached the end.
+                break;
+            }
+
+            // Print remaining expected side.
+            const auto& expLine = expFormatted.at(expectedIndex);
+            outputLine(true /*isExpected*/, startLineNumber + expectedIndex, expLine);
+            expectedIndex++;
+            continue;
+        }
+
+        const auto& actualLine = actualFormatted.at(actualIndex);
+        if (expectedIndex >= expSize) {
+            // Exhausted expected side. Print remaining actual side.
+            outputLine(false /*isExpected*/, startLineNumber + actualIndex, actualLine);
+            actualIndex++;
+            continue;
+        }
+
+        const auto& expLine = expFormatted.at(expectedIndex);
+        if (actualLine == expLine) {
+            // Current lines are equal, skip.
+            expectedIndex++;
+            actualIndex++;
+            continue;
+        }
+
+        if (const auto fwdIndex = diffLookAhead(actualIndex, actualFormatted, expLine)) {
+            // Looked ahead successfully into the actual side. Move actual side forward.
+            for (size_t i = actualIndex; i < *fwdIndex; i++) {
+                outputLine(false /*isExpected*/, startLineNumber + i, actualFormatted.at(i));
+            }
+            actualIndex = *fwdIndex;
+            continue;
+        }
+        if (const auto fwdIndex = diffLookAhead(expectedIndex, expFormatted, actualLine)) {
+            // Looked ahead successfully into the expected side. Move expected side forward.
+            for (size_t i = expectedIndex; i < *fwdIndex; i++) {
+                outputLine(true /*isExpected*/, startLineNumber + i, expFormatted.at(i));
+            }
+            expectedIndex = *fwdIndex;
+            continue;
+        }
+
+        // Move both sides forward.
+        outputLine(false /*isExpected*/, startLineNumber + actualIndex, actualLine);
+        outputLine(true /*isExpected*/, startLineNumber + expectedIndex, expLine);
+        actualIndex++;
+        expectedIndex++;
+    }
+}
+
 bool handleAutoUpdate(const std::string& expected,
                       const std::string& actual,
                       const std::string& fileName,
-                      const size_t lineNumber) {
+                      const size_t lineNumber,
+                      const bool needsEscaping) {
     if (expected == actual) {
         return true;
     }
-    if constexpr (!kAutoUpdateOnFailure) {
+
+    const auto expectedFormatted = formatStr(expected, needsEscaping);
+    const auto actualFormatted = formatStr(actual, needsEscaping);
+
+    std::cout << fileName << ":" << lineNumber << ": results differ:\n";
+    outputDiff(std::cout, expectedFormatted, actualFormatted, lineNumber);
+
+    if (!mongo::unittest::getAutoUpdateOptimizerAsserts()) {
         std::cout << "Auto-updating is disabled.\n";
         return false;
-    }
-
-    const auto expectedFormatted = formatStr(expected);
-    const auto actualFormatted = formatStr(actual);
-
-    std::cout << "Updating expected result in file '" << fileName << "', line: " << lineNumber
-              << ".\n";
-    std::cout << "Replacement:\n";
-    for (const auto& line : actualFormatted) {
-        std::cout << line;
     }
 
     // Compute the total number of lines added or removed before the current macro line.
