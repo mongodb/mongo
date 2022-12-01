@@ -45,6 +45,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/s/session_catalog_migration.h"
+#include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/session/session.h"
 #include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/db/transaction/transaction_history_iterator.h"
@@ -423,6 +424,14 @@ bool SessionCatalogMigrationSource::shouldSkipOplogEntry(const mongo::repl::Oplo
     return false;
 }
 
+long long SessionCatalogMigrationSource::getSessionOplogEntriesToBeMigratedSoFar() {
+    return _sessionOplogEntriesToBeMigratedSoFar.load();
+}
+
+long long SessionCatalogMigrationSource::getSessionOplogEntriesSkippedSoFarLowerBound() {
+    return _sessionOplogEntriesSkippedSoFarLowerBound.load();
+}
+
 void SessionCatalogMigrationSource::_extractOplogEntriesForInternalTransactionForRetryableWrite(
     WithLock,
     const repl::OplogEntry& applyOpsOplogEntry,
@@ -439,6 +448,9 @@ void SessionCatalogMigrationSource::_extractOplogEntriesForInternalTransactionFo
             IDLParserContext{"SessionOplogIterator::_"
                              "extractOplogEntriesForInternalTransactionForRetryableWrite"},
             innerOp);
+
+        ScopeGuard skippedEntryTracker(
+            [this] { _sessionOplogEntriesSkippedSoFarLowerBound.addAndFetch(1); });
 
         if (replOp.getStatementIds().empty()) {
             // Skip this operation since it is not retryable.
@@ -458,6 +470,9 @@ void SessionCatalogMigrationSource::_extractOplogEntriesForInternalTransactionFo
         }
 
         oplogBuffer->emplace_back(unrolledOplogEntry);
+
+        skippedEntryTracker.dismiss();
+        _sessionOplogEntriesToBeMigratedSoFar.addAndFetch(1);
     }
 }
 
@@ -475,7 +490,6 @@ bool SessionCatalogMigrationSource::_handleWriteHistory(WithLock lk, OperationCo
 
             // Determine if this oplog entry should be migrated. If so, add the oplog entry or the
             // oplog entries derived from it to the oplog buffer.
-
             if (isInternalSessionForRetryableWrite(*nextOplog->getSessionId())) {
                 invariant(nextOplog->getCommandType() == repl::OplogEntry::CommandType::kApplyOps);
                 // Derive retryable write oplog entries from this retryable internal transaction
@@ -493,6 +507,8 @@ bool SessionCatalogMigrationSource::_handleWriteHistory(WithLock lk, OperationCo
             auto nextStmtIds = nextOplog->getStatementIds();
             invariant(!nextStmtIds.empty());
 
+            ScopeGuard skippedEntryTracker(
+                [this] { _sessionOplogEntriesSkippedSoFarLowerBound.addAndFetch(1); });
             // Skip the rest of the chain for this session since the ns is unrelated with the
             // current one being migrated. It is ok to not check the rest of the chain because
             // retryable writes doesn't allow touching different namespaces.
@@ -508,6 +524,8 @@ bool SessionCatalogMigrationSource::_handleWriteHistory(WithLock lk, OperationCo
             }
 
             _unprocessedOplogBuffer.emplace_back(*nextOplog);
+            skippedEntryTracker.dismiss();
+            _sessionOplogEntriesToBeMigratedSoFar.addAndFetch(1);
         }
 
         // Peek the next oplog entry in the buffer and process it. We cannot pop the oplog
@@ -519,6 +537,7 @@ bool SessionCatalogMigrationSource::_handleWriteHistory(WithLock lk, OperationCo
         invariant(!_lastFetchedOplog);
         if (nextImageOplog) {
             _lastFetchedOplogImage = downConvertSessionInfoIfNeeded(*nextImageOplog);
+            _sessionOplogEntriesToBeMigratedSoFar.addAndFetch(1);
         }
         _lastFetchedOplog = downConvertSessionInfoIfNeeded(nextOplog);
         _unprocessedOplogBuffer.pop_back();
@@ -617,6 +636,7 @@ bool SessionCatalogMigrationSource::_fetchNextNewWriteOplog(OperationContext* op
             if (entryAtOpTimeType == EntryAtOpTimeType::kRetryableWrite) {
                 _unprocessedNewWriteOplogBuffer.emplace_back(nextNewWriteOplog);
                 _newWriteOpTimeList.pop_front();
+                _sessionOplogEntriesToBeMigratedSoFar.addAndFetch(1);
             } else if (entryAtOpTimeType == EntryAtOpTimeType::kTransaction) {
                 invariant(nextNewWriteOplog.getCommandType() ==
                           repl::OplogEntry::CommandType::kApplyOps);
@@ -656,6 +676,7 @@ bool SessionCatalogMigrationSource::_fetchNextNewWriteOplog(OperationContext* op
                                            opCtx->getServiceContext()->getFastClockSource()->now());
                 _unprocessedNewWriteOplogBuffer.emplace_back(sentinelOplogEntry);
                 _newWriteOpTimeList.pop_front();
+                _sessionOplogEntriesToBeMigratedSoFar.addAndFetch(1);
             } else {
                 MONGO_UNREACHABLE;
             }
@@ -668,11 +689,13 @@ bool SessionCatalogMigrationSource::_fetchNextNewWriteOplog(OperationContext* op
     }
 
     auto nextNewWriteImageOplog = fetchPrePostImageOplog(opCtx, &(*nextNewWriteOplog));
+
     {
         stdx::lock_guard<Latch> lk(_newOplogMutex);
         invariant(!_lastFetchedNewWriteOplogImage);
         invariant(!_lastFetchedNewWriteOplog);
         if (nextNewWriteImageOplog) {
+            _sessionOplogEntriesToBeMigratedSoFar.addAndFetch(1);
             _lastFetchedNewWriteOplogImage =
                 downConvertSessionInfoIfNeeded(*nextNewWriteImageOplog);
         }

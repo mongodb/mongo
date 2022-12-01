@@ -178,6 +178,9 @@ public:
                                      const ShardKeyPattern& shardKeyPattern,
                                      const ChunkRange& chunkRange);
 
+    long long getSessionOplogEntriesToBeMigratedSoFar();
+    long long getSessionOplogEntriesSkippedSoFarLowerBound();
+
 private:
     /**
      * An iterator for extracting session write oplogs that need to be cloned during migration.
@@ -331,6 +334,16 @@ private:
     // Sets to true if there is no need to fetch an oplog anymore (for example, because migration
     // aborted).
     std::shared_ptr<Notification<bool>> _newOplogNotification;
+
+    // The number of session oplog entries that need to be migrated
+    // from the source to the destination
+    AtomicWord<long long> _sessionOplogEntriesToBeMigratedSoFar{0};
+
+    // There are optimizations so that we do not send all of the oplog
+    // entries to the destination. This stat provides a lower bound on the number of session oplog
+    // entries that we did not send to the destination. It is a lower bound because some of the
+    // optimizations do not allow us to know the exact number of oplog entries we skipped.
+    AtomicWord<long long> _sessionOplogEntriesSkippedSoFarLowerBound{0};
 };
 
 }  // namespace mongo

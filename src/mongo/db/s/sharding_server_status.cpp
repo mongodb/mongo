@@ -93,9 +93,9 @@ public:
             grid->getBalancerConfiguration()->getMaxChunkSizeBytes();
         result.append("maxChunkSizeInBytes", maxChunkSizeInBytes);
 
-        // Get a migration status report if a migration is active for which this is the source
-        // shard. The call to getActiveMigrationStatusReport will take an IS lock on the namespace
-        // of the active migration if there is one that is active.
+        // Get a migration status report if a migration is active. The call to
+        // getActiveMigrationStatusReport will take an IS lock on the namespace of the active
+        // migration if there is one that is active.
         BSONObj migrationStatus =
             ActiveMigrationsRegistry::get(opCtx).getActiveMigrationStatusReport(opCtx);
         if (!migrationStatus.isEmpty()) {

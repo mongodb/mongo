@@ -773,15 +773,28 @@ void MigrationSourceManager::_cleanup(bool completeMigration) noexcept {
     }
 }
 
-BSONObj MigrationSourceManager::getMigrationStatusReport() const {
-    return migrationutil::makeMigrationStatusDocument(
+BSONObj MigrationSourceManager::getMigrationStatusReport(
+    const CollectionShardingRuntime::ScopedCollectionShardingRuntime& scopedCsrLock) const {
+    boost::optional<long long> sessionOplogEntriesToBeMigratedSoFar;
+    boost::optional<long long> sessionOplogEntriesSkippedSoFarLowerBound;
+
+    if (_cloneDriver) {
+        sessionOplogEntriesToBeMigratedSoFar =
+            _cloneDriver->getSessionOplogEntriesToBeMigratedSoFar();
+        sessionOplogEntriesSkippedSoFarLowerBound =
+            _cloneDriver->getSessionOplogEntriesSkippedSoFarLowerBound();
+    }
+
+    return migrationutil::makeMigrationStatusDocumentSource(
         _args.getCommandParameter(),
         _args.getFromShard(),
         _args.getToShard(),
         true,
         // TODO SERVER-64926 do not assume min always present
         *_args.getMin(),
-        _args.getMax().value_or(BSONObj()));
+        _args.getMax().value_or(BSONObj()),
+        sessionOplogEntriesToBeMigratedSoFar,
+        sessionOplogEntriesSkippedSoFarLowerBound);
 }
 
 MigrationSourceManager::ScopedRegisterer::ScopedRegisterer(MigrationSourceManager* msm,

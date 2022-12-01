@@ -51,20 +51,46 @@ namespace migrationutil {
  * Creates a report document with the provided parameters:
  *
  * {
- *     source:          "shard0000"
- *     destination:     "shard0001"
- *     isDonorShard:    true or false
- *     chunk:           {"min": <MinKey>, "max": <MaxKey>}
- *     collection:      "dbName.collName"
+ *     source:                          "shard0000"
+ *     destination:                     "shard0001"
+ *     isDonorShard:                    true or false
+ *     chunk:                           {"min": <MinKey>, "max": <MaxKey>}
+ *     collection:                      "dbName.collName"
+ *     sessionOplogEntriesToBeMigratedSoFar: <Number>
+ *     sessionOplogEntriesSkipped:      <Number>
  * }
  *
  */
-BSONObj makeMigrationStatusDocument(const NamespaceString& nss,
-                                    const ShardId& fromShard,
-                                    const ShardId& toShard,
-                                    const bool& isDonorShard,
-                                    const BSONObj& min,
-                                    const BSONObj& max);
+BSONObj makeMigrationStatusDocumentSource(
+    const NamespaceString& nss,
+    const ShardId& fromShard,
+    const ShardId& toShard,
+    const bool& isDonorShard,
+    const BSONObj& min,
+    const BSONObj& max,
+    boost::optional<long long> sessionOplogEntriesToBeMigratedSoFar,
+    boost::optional<long long> sessionOplogEntriesSkippedSoFarLowerBound);
+
+/**
+ * Creates a report document with the provided parameters:
+ *
+ * {
+ *     source:                      "shard0000"
+ *     destination:                 "shard0001"
+ *     isDonorShard:                true or false
+ *     chunk:                       {"min": <MinKey>, "max": <MaxKey>}
+ *     collection:                  "dbName.collName"
+ *     sessionOplogEntriesMigrated: <Number>
+ * }
+ *
+ */
+BSONObj makeMigrationStatusDocumentDestination(const NamespaceString& nss,
+                                               const ShardId& fromShard,
+                                               const ShardId& toShard,
+                                               const bool& isDonorShard,
+                                               const BSONObj& min,
+                                               const BSONObj& max,
+                                               long long sessionOplogEntriesMigrated);
 
 /**
  * Returns a chunk range with extended or truncated boundaries to match the number of fields in the

@@ -99,6 +99,10 @@ const char kDestinationShard[] = "destination";
 const char kIsDonorShard[] = "isDonorShard";
 const char kChunk[] = "chunk";
 const char kCollection[] = "collection";
+const char kSessionOplogEntriesMigrated[] = "sessionOplogEntriesMigrated";
+const char ksessionOplogEntriesSkippedSoFarLowerBound[] =
+    "sessionOplogEntriesSkippedSoFarLowerBound";
+const char ksessionOplogEntriesToBeMigratedSoFar[] = "sessionOplogEntriesToBeMigratedSoFar";
 const auto kLogRetryAttemptThreshold = 20;
 const Backoff kExponentialBackoff(Seconds(10), Milliseconds::max());
 
@@ -325,18 +329,53 @@ std::shared_ptr<executor::ThreadPoolTaskExecutor> getMigrationUtilExecutor(
     return migrationUtilExecutorDecoration(serviceContext).getExecutor();
 }
 
-BSONObj makeMigrationStatusDocument(const NamespaceString& nss,
-                                    const ShardId& fromShard,
-                                    const ShardId& toShard,
-                                    const bool& isDonorShard,
-                                    const BSONObj& min,
-                                    const BSONObj& max) {
+BSONObjBuilder _makeMigrationStatusDocumentCommon(const NamespaceString& nss,
+                                                  const ShardId& fromShard,
+                                                  const ShardId& toShard,
+                                                  const bool& isDonorShard,
+                                                  const BSONObj& min,
+                                                  const BSONObj& max) {
     BSONObjBuilder builder;
     builder.append(kSourceShard, fromShard.toString());
     builder.append(kDestinationShard, toShard.toString());
     builder.append(kIsDonorShard, isDonorShard);
     builder.append(kChunk, BSON(ChunkType::min(min) << ChunkType::max(max)));
     builder.append(kCollection, nss.ns());
+    return builder;
+}
+
+BSONObj makeMigrationStatusDocumentSource(
+    const NamespaceString& nss,
+    const ShardId& fromShard,
+    const ShardId& toShard,
+    const bool& isDonorShard,
+    const BSONObj& min,
+    const BSONObj& max,
+    boost::optional<long long> sessionOplogEntriesToBeMigratedSoFar,
+    boost::optional<long long> sessionOplogEntriesSkippedSoFarLowerBound) {
+    BSONObjBuilder builder =
+        _makeMigrationStatusDocumentCommon(nss, fromShard, toShard, isDonorShard, min, max);
+    if (sessionOplogEntriesToBeMigratedSoFar) {
+        builder.append(ksessionOplogEntriesToBeMigratedSoFar,
+                       sessionOplogEntriesToBeMigratedSoFar.value());
+    }
+    if (sessionOplogEntriesSkippedSoFarLowerBound) {
+        builder.append(ksessionOplogEntriesSkippedSoFarLowerBound,
+                       sessionOplogEntriesSkippedSoFarLowerBound.value());
+    }
+    return builder.obj();
+}
+
+BSONObj makeMigrationStatusDocumentDestination(const NamespaceString& nss,
+                                               const ShardId& fromShard,
+                                               const ShardId& toShard,
+                                               const bool& isDonorShard,
+                                               const BSONObj& min,
+                                               const BSONObj& max,
+                                               long long sessionOplogEntriesMigrated) {
+    BSONObjBuilder builder =
+        _makeMigrationStatusDocumentCommon(nss, fromShard, toShard, isDonorShard, min, max);
+    builder.append(kSessionOplogEntriesMigrated, sessionOplogEntriesMigrated);
     return builder.obj();
 }
 

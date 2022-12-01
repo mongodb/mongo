@@ -221,6 +221,9 @@ public:
         return *_args.getMax();
     }
 
+    boost::optional<long long> getSessionOplogEntriesSkippedSoFarLowerBound() override;
+    boost::optional<long long> getSessionOplogEntriesToBeMigratedSoFar() override;
+
 private:
     friend class LogOpForShardingHandler;
     friend class LogTransactionOperationsForShardingHandler;

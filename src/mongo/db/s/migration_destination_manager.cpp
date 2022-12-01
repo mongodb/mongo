@@ -451,11 +451,18 @@ void MigrationDestinationManager::report(BSONObjBuilder& b,
     bb.done();
 }
 
-BSONObj MigrationDestinationManager::getMigrationStatusReport() {
+BSONObj MigrationDestinationManager::getMigrationStatusReport(
+    const CollectionShardingRuntime::ScopedCollectionShardingRuntime& scopedCsrLock) {
     stdx::lock_guard<Latch> lk(_mutex);
     if (_isActive(lk)) {
-        return migrationutil::makeMigrationStatusDocument(
-            _nss, _fromShard, _toShard, false, _min, _max);
+        return migrationutil::makeMigrationStatusDocumentDestination(
+            _nss,
+            _fromShard,
+            _toShard,
+            false,
+            _min,
+            _max,
+            _sessionMigration->getSessionOplogEntriesMigrated());
     } else {
         return BSONObj();
     }

@@ -39,6 +39,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/s/active_migrations_registry.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_recipient_recovery_document_gen.h"
 #include "mongo/db/s/migration_session_id.h"
 #include "mongo/db/s/session_catalog_migration_destination.h"
@@ -117,7 +118,8 @@ public:
      * Returns a report on the active migration, if the migration is active. Otherwise return an
      * empty BSONObj.
      */
-    BSONObj getMigrationStatusReport();
+    BSONObj getMigrationStatusReport(
+        const CollectionShardingRuntime::ScopedCollectionShardingRuntime& scopedCsrLock);
 
     /**
      * Returns OK if migration started successfully.
@@ -270,7 +272,11 @@ private:
     void onStepDown() final;
     void onBecomeArbiter() final {}
 
-    // Mutex to guard all fields
+    // The number of session oplog entries recieved from the source shard. Not all oplog
+    // entries recieved from the source shard may be committed
+    AtomicWord<long long> _sessionOplogEntriesMigrated{0};
+
+    // Mutex to guard all fields below
     mutable Mutex _mutex = MONGO_MAKE_LATCH("MigrationDestinationManager::_mutex");
 
     // Migration session ID uniquely identifies the migration and indicates whether the prepare

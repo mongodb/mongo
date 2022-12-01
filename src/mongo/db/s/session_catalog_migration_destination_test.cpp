@@ -45,6 +45,7 @@
 #include "mongo/db/s/session_catalog_migration.h"
 #include "mongo/db/s/session_catalog_migration_destination.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
+#include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/session/initialize_operation_session_info.h"
 #include "mongo/db/session/logical_session_cache_noop.h"
@@ -342,6 +343,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldJoinProperlyWhenNothingToTr
 
     sessionMigration.start(getServiceContext());
     finishSessionExpectSuccess(&sessionMigration);
+    ASSERT_EQ(sessionMigration.getSessionOplogEntriesMigrated(), 0);
 }
 
 TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithSameTxn) {
@@ -383,6 +385,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithSameTxn) {
 
     finishSessionExpectSuccess(&sessionMigration);
     auto opCtx = operationContext();
+    ASSERT_EQ(sessionMigration.getSessionOplogEntriesMigrated(), 3);
     setUpSessionWithTxn(opCtx, sessionId, 2);
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
     auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
@@ -445,6 +448,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithMultiStmtIds) {
 
     finishSessionExpectSuccess(&sessionMigration);
     auto opCtx = operationContext();
+    ASSERT_EQ(sessionMigration.getSessionOplogEntriesMigrated(), 3);
     setUpSessionWithTxn(opCtx, sessionId, 2);
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
     auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
@@ -515,6 +519,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldOnlyStoreHistoryOfLatestTxn
 
     auto opCtx = operationContext();
     setUpSessionWithTxn(opCtx, sessionId, txnNum);
+    ASSERT_EQ(sessionMigration.getSessionOplogEntriesMigrated(), 3);
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
     auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
     auto txnParticipant = TransactionParticipant::get(opCtx);
@@ -570,6 +575,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithSameTxnInSeparate
     finishSessionExpectSuccess(&sessionMigration);
 
     auto opCtx = operationContext();
+    ASSERT_EQ(sessionMigration.getSessionOplogEntriesMigrated(), 3);
     setUpSessionWithTxn(opCtx, sessionId, 2);
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
     auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
@@ -636,10 +642,11 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithDifferentSession)
     returnOplog({oplog1, oplog2, oplog3});
 
     finishSessionExpectSuccess(&sessionMigration);
+    auto opCtx = operationContext();
+    ASSERT_EQ(sessionMigration.getSessionOplogEntriesMigrated(), 3);
 
     ASSERT_TRUE(SessionCatalogMigrationDestination::State::Done == sessionMigration.getState());
 
-    auto opCtx = operationContext();
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
 
     {
@@ -725,8 +732,9 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldNotNestAlreadyNestedOplog) 
     returnOplog({oplog1, oplog2});
 
     finishSessionExpectSuccess(&sessionMigration);
-
     auto opCtx = operationContext();
+    ASSERT_EQ(sessionMigration.getSessionOplogEntriesMigrated(), 2);
+
     setUpSessionWithTxn(opCtx, sessionId, 2);
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
     auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
@@ -779,8 +787,9 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandlePreImageFindA
     returnOplog({preImageOplog, updateOplog});
 
     finishSessionExpectSuccess(&sessionMigration);
-
     auto opCtx = operationContext();
+    ASSERT_EQ(sessionMigration.getSessionOplogEntriesMigrated(), 2);
+
     setUpSessionWithTxn(opCtx, sessionId, 2);
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
     auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
@@ -875,8 +884,9 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandleForgedPreImag
     returnOplog({preImageOplog, updateOplog});
 
     finishSessionExpectSuccess(&sessionMigration);
-
     auto opCtx = operationContext();
+    ASSERT_EQ(sessionMigration.getSessionOplogEntriesMigrated(), 2);
+
     setUpSessionWithTxn(opCtx, sessionId, 2);
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
     auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
@@ -968,8 +978,9 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandlePostImageFind
     returnOplog({postImageOplog, updateOplog});
 
     finishSessionExpectSuccess(&sessionMigration);
-
     auto opCtx = operationContext();
+    ASSERT_EQ(sessionMigration.getSessionOplogEntriesMigrated(), 2);
+
     setUpSessionWithTxn(opCtx, sessionId, 2);
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
     auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
@@ -1062,8 +1073,9 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandleForgedPostIma
     returnOplog({postImageOplog, updateOplog});
 
     finishSessionExpectSuccess(&sessionMigration);
-
     auto opCtx = operationContext();
+    ASSERT_EQ(sessionMigration.getSessionOplogEntriesMigrated(), 2);
+
     setUpSessionWithTxn(opCtx, sessionId, 2);
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
     auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
@@ -1156,10 +1168,11 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldBeAbleToHandleFindAndModify
     returnOplog({updateOplog});
 
     finishSessionExpectSuccess(&sessionMigration);
+    auto opCtx = operationContext();
+    ASSERT_EQ(sessionMigration.getSessionOplogEntriesMigrated(), 2);
 
     ASSERT_TRUE(SessionCatalogMigrationDestination::State::Done == sessionMigration.getState());
 
-    auto opCtx = operationContext();
     setUpSessionWithTxn(opCtx, sessionId, 2);
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
     auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
@@ -1261,6 +1274,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, OlderTxnShouldBeIgnored) {
     returnOplog({oplog1, oplog2});
 
     finishSessionExpectSuccess(&sessionMigration);
+    ASSERT_EQ(sessionMigration.getSessionOplogEntriesMigrated(), 2);
 
     ASSERT_TRUE(SessionCatalogMigrationDestination::State::Done == sessionMigration.getState());
 
@@ -1518,6 +1532,7 @@ TEST_F(SessionCatalogMigrationDestinationTest,
     returnOplog({oplog2});
 
     finishSessionExpectSuccess(&sessionMigration);
+    ASSERT_EQ(sessionMigration.getSessionOplogEntriesMigrated(), 2);
 
     setUpSessionWithTxn(opCtx, sessionId, 2);
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
@@ -1832,6 +1847,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, ShouldIgnoreAlreadyExecutedStatem
     returnOplog({oplog1, oplog2, oplog3});
 
     finishSessionExpectSuccess(&sessionMigration);
+    ASSERT_EQ(sessionMigration.getSessionOplogEntriesMigrated(), 3);
 
     setUpSessionWithTxn(opCtx, sessionId, 19);
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
@@ -1902,6 +1918,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, OplogEntriesWithIncompleteHistory
     ASSERT_TRUE(SessionCatalogMigrationDestination::State::Done == sessionMigration.getState());
 
     auto opCtx = operationContext();
+    ASSERT_EQ(sessionMigration.getSessionOplogEntriesMigrated(), 3);
     setUpSessionWithTxn(opCtx, *sessionInfo.getSessionId(), 2);
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
     auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
@@ -1983,6 +2000,7 @@ TEST_F(SessionCatalogMigrationDestinationTest,
     sessionMigration.join();
 
     ASSERT_TRUE(SessionCatalogMigrationDestination::State::Done == sessionMigration.getState());
+    ASSERT_EQ(sessionMigration.getSessionOplogEntriesMigrated(), 3);
 
     // Check nothing was written for session 1
     {
@@ -2080,6 +2098,7 @@ TEST_F(SessionCatalogMigrationDestinationTest, MigratingKnownStmtWhileOplogTrunc
     sessionMigration.join();
 
     ASSERT_TRUE(SessionCatalogMigrationDestination::State::Done == sessionMigration.getState());
+    ASSERT_EQ(sessionMigration.getSessionOplogEntriesMigrated(), 1);
 
     ASSERT_EQ(lastOpTimeBeforeMigrate, getLastWriteOpTime());
 }

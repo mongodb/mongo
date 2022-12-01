@@ -1277,4 +1277,22 @@ MigrationChunkClonerSourceLegacy::getNotificationForNextSessionMigrationBatch() 
     return _sessionCatalogSource->getNotificationForNewOplog();
 }
 
+boost::optional<long long>
+MigrationChunkClonerSourceLegacy::getSessionOplogEntriesSkippedSoFarLowerBound() {
+    if (!_sessionCatalogSource) {
+        return boost::none;
+    }
+
+    return _sessionCatalogSource->getSessionOplogEntriesSkippedSoFarLowerBound();
+}
+
+boost::optional<long long>
+MigrationChunkClonerSourceLegacy::getSessionOplogEntriesToBeMigratedSoFar() {
+    if (!_sessionCatalogSource) {
+        return boost::none;
+    }
+
+    return _sessionCatalogSource->getSessionOplogEntriesToBeMigratedSoFar();
+}
+
 }  // namespace mongo

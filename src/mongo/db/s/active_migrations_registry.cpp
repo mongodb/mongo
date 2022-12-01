@@ -31,6 +31,7 @@
 
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/s/migration_destination_manager.h"
 #include "mongo/db/s/migration_session_id.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/service_context.h"
@@ -218,13 +219,16 @@ BSONObj ActiveMigrationsRegistry::getActiveMigrationStatusReport(OperationContex
 
         if (_activeMoveChunkState) {
             nss = _activeMoveChunkState->args.getCommandParameter();
+        } else if (_activeReceiveChunkState) {
+            nss = _activeReceiveChunkState->nss;
         }
     }
 
-    // The state of the MigrationSourceManager could change between taking and releasing the mutex
-    // above and then taking the collection lock here, but that's fine because it isn't important to
-    // return information on a migration that just ended or started. This is just best effort and
-    // desireable for reporting, and then diagnosing, migrations that are stuck.
+    // The state of the MigrationSourceManager or the MigrationDestinationManager could change
+    // between taking and releasing the mutex above and then taking the collection lock here, but
+    // that's fine because it isn't important to return information on a migration that just ended
+    // or started. This is just best effort and desireable for reporting, and then diagnosing,
+    // migrations that are stuck.
     if (nss) {
         // Lock the collection so nothing changes while we're getting the migration report.
         AutoGetCollection autoColl(opCtx, nss.value(), MODE_IS);
@@ -232,7 +236,9 @@ BSONObj ActiveMigrationsRegistry::getActiveMigrationStatusReport(OperationContex
             opCtx, nss.value(), CSRAcquisitionMode::kShared);
 
         if (auto msm = MigrationSourceManager::get(*scopedCsr)) {
-            return msm->getMigrationStatusReport();
+            return msm->getMigrationStatusReport(scopedCsr);
+        } else if (auto mdm = MigrationDestinationManager::get(opCtx)) {
+            return mdm->getMigrationStatusReport(scopedCsr);
         }
     }
 

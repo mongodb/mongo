@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/s/session_catalog_migration_source.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/util/time_support.h"
 
@@ -167,6 +168,17 @@ public:
      * disambiguated.
      */
     virtual const MigrationSessionId& getSessionId() const = 0;
+
+    /**
+     * Returns the number of session oplog entries that were not found but not sent to the
+     * destination shard.
+     */
+    virtual boost::optional<long long> getSessionOplogEntriesSkippedSoFarLowerBound() = 0;
+
+    /**
+     * Returns the number of session oplog entries that need to be sent to the destination shard.
+     */
+    virtual boost::optional<long long> getSessionOplogEntriesToBeMigratedSoFar() = 0;
 
 protected:
     MigrationChunkClonerSource();

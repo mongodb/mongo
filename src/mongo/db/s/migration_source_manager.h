@@ -168,7 +168,8 @@ public:
      *
      * Must be called with some form of lock on the collection namespace.
      */
-    BSONObj getMigrationStatusReport() const;
+    BSONObj getMigrationStatusReport(
+        const CollectionShardingRuntime::ScopedCollectionShardingRuntime& scopedCsrLock) const;
 
     const NamespaceString& nss() {
         return _args.getCommandParameter();
