@@ -3,7 +3,7 @@
  * 1. Ignore multi-statement transaction prepare conflicts in the clone phase, and
  * 2. Pick up the changes for prepared transactions in the transfer mods phase.
  *
- * @tags: [uses_transactions, uses_prepare_transaction]
+ * @tags: [uses_transactions, uses_prepare_transaction, requires_persistence]
  */
 
 (function() {
@@ -17,8 +17,17 @@ const collName = "user";
 
 const staticMongod = MongoRunner.runMongod({});  // For startParallelOps.
 
-let runTest = function(withStepUp) {
-    const st = new ShardingTest({shards: {rs0: {nodes: withStepUp ? 2 : 1}, rs1: {nodes: 1}}});
+const TestMode = {
+    kBasic: 'basic',
+    kWithStepUp: 'with stepUp',
+    kWithRestart: 'with restart',
+};
+
+let runTest = function(testMode) {
+    jsTest.log(`Running test in mode ${testMode}`);
+
+    const st = new ShardingTest(
+        {shards: {rs0: {nodes: testMode == TestMode.kWithStepUp ? 2 : 1}, rs1: {nodes: 1}}});
     const collection = st.s.getDB(dbName).getCollection(collName);
 
     CreateShardedCollectionUtil.shardCollectionWithChunks(collection, {x: 1}, [
@@ -81,8 +90,23 @@ let runTest = function(withStepUp) {
 
     let prepareTimestamp = res.prepareTimestamp;
 
-    if (withStepUp) {
+    if (testMode == TestMode.kWithStepUp) {
         st.rs0.stepUp(st.rs0.getSecondary());
+    } else if (testMode == TestMode.kWithRestart) {
+        TestData.skipCollectionAndIndexValidation = true;
+        st.rs0.restart(st.rs0.getPrimary());
+        st.rs0.waitForPrimary();
+        TestData.skipCollectionAndIndexValidation = false;
+
+        assert.soon(() => {
+            try {
+                st.shard0.getDB(dbName).getCollection(collName).findOne();
+                return true;
+            } catch (ex) {
+                print("Caught expected once exception due to restart: " + tojson(ex));
+                return false;
+            }
+        });
     }
 
     const joinMoveChunk =
@@ -157,9 +181,9 @@ let runTest = function(withStepUp) {
     st.stop();
 };
 
-runTest(false);
-// TODO: SERVER-71219 Enable test after fixing.
-// runTest(true);
+runTest(TestMode.kBasic);
+runTest(TestMode.kWithStepUp);
+runTest(TestMode.kWithRestart);
 
 MongoRunner.stopMongod(staticMongod);
 })();

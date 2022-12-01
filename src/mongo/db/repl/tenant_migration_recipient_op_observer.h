@@ -207,6 +207,10 @@ public:
         size_t numberOfPrePostImagesToWrite,
         Date_t wallClockTime) final {}
 
+    void onTransactionPrepareNonPrimary(OperationContext* opCtx,
+                                        const std::vector<repl::OplogEntry>& statements,
+                                        const repl::OpTime& prepareOpTime) final {}
+
     void onTransactionAbort(OperationContext* opCtx,
                             boost::optional<OplogSlot> abortOplogEntryOpTime) final {}
 

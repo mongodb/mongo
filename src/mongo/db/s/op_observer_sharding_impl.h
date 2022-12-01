@@ -74,6 +74,10 @@ protected:
         OperationContext* opCtx,
         const std::vector<repl::ReplOperation>& stmts,
         const repl::OpTime& prepareOrCommitOptime) override;
+    void shardObserveNonPrimaryTransactionPrepare(
+        OperationContext* opCtx,
+        const std::vector<repl::OplogEntry>& stmts,
+        const repl::OpTime& prepareOrCommitOptime) override;
 };
 
 }  // namespace mongo

@@ -38,6 +38,7 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/op_observer.h"
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/timestamp_block.h"
@@ -498,6 +499,11 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
         }
 
         txnParticipant.prepareTransaction(opCtx, entry.getOpTime());
+
+        auto opObserver = opCtx->getServiceContext()->getOpObserver();
+        invariant(opObserver);
+        opObserver->onTransactionPrepareNonPrimary(opCtx, ops, entry.getOpTime());
+
         // Prepare transaction success.
         abortOnError.dismiss();
 

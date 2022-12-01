@@ -209,6 +209,11 @@ public:
         const ApplyOpsOplogSlotAndOperationAssignment* applyOpsOperationAssignment,
         size_t numberOfPrePostImagesToWrite,
         Date_t wallClockTime) final;
+
+    void onTransactionPrepareNonPrimary(OperationContext* opCtx,
+                                        const std::vector<repl::OplogEntry>& statements,
+                                        const repl::OpTime& prepareOpTime) final;
+
     void onTransactionAbort(OperationContext* opCtx,
                             boost::optional<OplogSlot> abortOplogEntryOpTime) final;
     void onMajorityCommitPointUpdate(ServiceContext* service,
@@ -243,6 +248,10 @@ private:
     virtual void shardObserveTransactionPrepareOrUnpreparedCommit(
         OperationContext* opCtx,
         const std::vector<repl::ReplOperation>& stmts,
+        const repl::OpTime& prepareOrCommitOptime) {}
+    virtual void shardObserveNonPrimaryTransactionPrepare(
+        OperationContext* opCtx,
+        const std::vector<repl::OplogEntry>& stmts,
         const repl::OpTime& prepareOrCommitOptime) {}
     void _onReplicationRollback(OperationContext* opCtx, const RollbackObserverInfo& rbInfo) final;
 };

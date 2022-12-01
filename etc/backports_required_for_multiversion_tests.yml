@@ -248,6 +248,8 @@ last-continuous:
     ticket: SERVER-72620
   - test_file: jstests/core/timeseries/bucket_unpacking_with_sort_extended_range.js
     ticket: SERVER-73110
+  - test_file: jstests/sharding/prepare_transaction_then_migrate.js
+    ticket: SERVER-71219
   suites: null
 last-lts:
   all:
@@ -316,7 +318,7 @@ last-lts:
   - test_file: jstests/core/txns/errors_on_committed_transaction.js
     ticket: SERVER-52547
   - test_file: jstests/sharding/prepare_transaction_then_migrate.js
-    ticket: SERVER-52906
+    ticket: SERVER-71219
   - test_file: jstests/sharding/migration_waits_for_majority_commit.js
     ticket: SERVER-52906
   - test_file: jstests/sharding/migration_ignore_interrupts_1.js
