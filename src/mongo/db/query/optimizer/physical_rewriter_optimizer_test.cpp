@@ -3044,7 +3044,7 @@ TEST(PhysRewriter, IndexBoundsIntersect) {
 
     ABT optimized = rootNode;
     phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(10, 20, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(10, 30, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // Demonstrate that the predicates >70 and <90 are NOT combined into the same interval (70, 90)
     // since the paths are multiKey. With the heuristic estimate we may get either interval in the
