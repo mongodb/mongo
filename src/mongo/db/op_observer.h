@@ -349,6 +349,15 @@ public:
                                       size_t numberOfPreImagesToWrite) = 0;
 
     /**
+     * This is called when a transaction transitions into prepare while it is not primary. Example
+     * case can include secondary oplog application or when node was restared and tries to
+     * recover prepared transactions from the oplog.
+     */
+    virtual void onTransactionPrepareNonPrimary(OperationContext* opCtx,
+                                                const std::vector<repl::OplogEntry>& statements,
+                                                const repl::OpTime& prepareOpTime) = 0;
+
+    /**
      * The onTransactionAbort method is called when an atomic transaction aborts, before the
      * RecoveryUnit onRollback() is called. It must not be called when the transaction to abort is
      * active.

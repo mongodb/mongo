@@ -61,13 +61,13 @@ class RecordId;
  */
 class LogTransactionOperationsForShardingHandler final : public RecoveryUnit::Change {
 public:
-    /**
-     * Invariant: idObj should belong to a document that is part of the active chunk being migrated
-     */
+    LogTransactionOperationsForShardingHandler(ServiceContext* svcCtx,
+                                               const std::vector<repl::OplogEntry>& stmts,
+                                               repl::OpTime prepareOrCommitOpTime);
+
     LogTransactionOperationsForShardingHandler(ServiceContext* svcCtx,
                                                const std::vector<repl::ReplOperation>& stmts,
-                                               const repl::OpTime& prepareOrCommitOpTime)
-        : _svcCtx(svcCtx), _stmts(stmts), _prepareOrCommitOpTime(prepareOrCommitOpTime) {}
+                                               repl::OpTime prepareOrCommitOpTime);
 
     void commit(boost::optional<Timestamp>) override;
 
@@ -75,6 +75,8 @@ public:
 
 private:
     ServiceContext* _svcCtx;
+    // Use to keep BSON obj alive for the lifetime of this object.
+    std::vector<BSONObj> _ownedReplBSONObj;
     std::vector<repl::ReplOperation> _stmts;
     const repl::OpTime _prepareOrCommitOpTime;
 };
@@ -329,7 +331,24 @@ private:
      */
     Status _checkRecipientCloningStatus(OperationContext* opCtx, Milliseconds maxTimeToWait);
 
-    // The original move chunk request
+    /**
+     * Inspects the pre and post image document keys and determines which xferMods bucket to
+     * add a new entry. Returns false if neither pre or post image document keys fall into
+     * the chunk boundaries being migrated.
+     */
+    bool _processUpdateForXferMod(const BSONObj& preImageDocKey, const BSONObj& postImageDocKey);
+
+    /**
+     * Defer processing of update ops into xferMods entries to when nextModsBatch is called.
+     */
+    void _deferProcessingForXferMod(const BSONObj& preImageDocKey);
+
+    /**
+     * Converts all deferred update ops captured by the op observer into xferMods entries.
+     */
+    void _processDeferredXferMods(OperationContext* opCtx, Database* database);
+
+    // The original move range request
     const MoveChunkRequest _args;
 
     // The shard key associated with the namespace
@@ -384,6 +403,13 @@ private:
 
     // Amount of delete xfer mods that have not yet reached the recipient.
     size_t _untransferredDeletesCounter{0};
+
+    // Amount of ops that are yet to be converted to update/delete xferMods.
+    size_t _deferredUntransferredOpsCounter{0};
+
+    // Stores document keys of document that needs to be examined if we need to put in to xferMods
+    // list later.
+    std::vector<BSONObj> _deferredReloadOrDeletePreImageDocKeys;
 
     // Total bytes in _reload + _deleted (xfer mods)
     uint64_t _memoryUsed{0};

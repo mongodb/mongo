@@ -1330,6 +1330,12 @@ void OpObserverImpl::onTransactionPrepare(OperationContext* opCtx,
     shardObserveTransactionPrepareOrUnpreparedCommit(opCtx, *statements, prepareOpTime);
 }
 
+void OpObserverImpl::onTransactionPrepareNonPrimary(OperationContext* opCtx,
+                                                    const std::vector<repl::OplogEntry>& statements,
+                                                    const repl::OpTime& prepareOpTime) {
+    shardObserveNonPrimaryTransactionPrepare(opCtx, statements, prepareOpTime);
+}
+
 void OpObserverImpl::onTransactionAbort(OperationContext* opCtx,
                                         boost::optional<OplogSlot> abortOplogEntryOpTime) {
     invariant(opCtx->getTxnNumber());
