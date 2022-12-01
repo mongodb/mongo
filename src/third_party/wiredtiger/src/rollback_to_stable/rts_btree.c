@@ -913,6 +913,7 @@ __rts_btree_abort_col_fix(WT_SESSION_IMPL *session, WT_REF *ref, wt_timestamp_t 
     uint32_t ins_recno_offset, recno_offset, numtws, tw;
 
     page = ref->page;
+    WT_ASSERT(session, page != NULL);
 
     /*
      * Review the changes to the original on-page data items. Note that while this can report back
