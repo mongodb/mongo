@@ -32,6 +32,11 @@
 #include "mongo/bson/util/bsoncolumn.h"
 #include "mongo/db/exec/bucket_unpacker.h"
 #include "mongo/db/matcher/expression_algo.h"
+#include "mongo/db/matcher/expression_always_boolean.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
+
+#include "mongo/logv2/log.h"
 
 namespace mongo {
 

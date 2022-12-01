@@ -3,12 +3,17 @@
  *  [1970-01-01 00:00:00 UTC - 2038-01-29 03:13:07 UTC].
  *
  * @tags: [
+ *   # Refusing to run a test that issues an aggregation command with explain because it may
+ *   # return incomplete results if interrupted by a stepdown.
+ *   does_not_support_stepdowns,
  *   # We need a timeseries collection.
  *   requires_timeseries,
  *   # Timeseries collections require FCV 5.0.
  *   requires_fcv_50,
  *   # Cannot insert into a time-series collection in a multi-document transaction
  *   does_not_support_transactions,
+ *   # Explain of a resolved view must be executed by mongos.
+ *   directly_against_shardsvrs_incompatible,
  *   # TODO SERVER-73641 Re-enable this test once the bug is fixed in the sharded case.
  *   assumes_unsharded_collection,
  * ]
@@ -55,11 +60,13 @@ function runTest(underflow, overflow, query, results) {
 
     const pipeline = [{$match: query}, {$project: {_id: 0, [timeFieldName]: 1}}];
 
+    const plan = tsColl.explain().aggregate(pipeline);
+
     // Verify agg pipeline. We don't want to go through a plan that encourages a sort order to
     // avoid BUS and index selection, so we sort after gathering the results.
     const aggActuals = tsColl.aggregate(pipeline).toArray();
     aggActuals.sort(cmpTimeFields);
-    assert.docEq(aggActuals, results);
+    assert.docEq(results, aggActuals, JSON.stringify(plan, null, 4));
 
     // Verify the equivalent find command. We again don't want to go through a plan that
     // encourages a sort order to avoid BUS and index selection, so we sort after gathering the
@@ -158,33 +165,25 @@ runTest(true, true, {[timeFieldName]: {$gte: new Date("1980-01-01")}}, [
     {[timeFieldName]: new Date("2040-01-01")}
 ]);
 
-// Verify ranges that straddle the lower epoch work properly
+// Verify ranges that straddle the lower and upper epoch boundaries work properly.
 runTest(
     true, false, {[timeFieldName]: {$gt: new Date("1920-01-01"), $lt: new Date("1980-01-01")}}, [
         {[timeFieldName]: new Date("1965-01-01")},
         {[timeFieldName]: new Date("1975-01-01")},
     ]);
-
 runTest(
     false, true, {[timeFieldName]: {$gt: new Date("1980-01-01"), $lt: new Date("2050-01-01")}}, [
         {[timeFieldName]: new Date("1995-01-01")},
         {[timeFieldName]: new Date("2040-01-01")},
     ]);
-
-// TODO: SERVER-69952 Literals outside the epoch are currently compared to _id, generally,
-// so we cannot match against them. This will have to be fixed in a similar manner by determining
-// whether the compared dates can be outside the epoch range and not relying on _id in that case.
-//
-// The following scenarios fail:
-// runTest(
-//    false, false, {[timeFieldName]: {$gt: new Date("1920-01-01"), $lt: new Date("1980-01-01")}}, [
-//         {[timeFieldName]: new Date("1971-01-01")},
-//         {[timeFieldName]: new Date("1975-01-01")},
-//     ]);
-// runTest(
-//     false, false, {[timeFieldName]: {$gt: new Date("1980-01-01"), $lt: new Date("2050-01-01")}},
-//     [
-//         {[timeFieldName]: new Date("1995-01-01")},
-//         {[timeFieldName]: new Date("2030-01-01")},
-//     ]);
+runTest(
+    false, false, {[timeFieldName]: {$gt: new Date("1920-01-01"), $lt: new Date("1980-01-01")}}, [
+        {[timeFieldName]: new Date("1971-01-01")},
+        {[timeFieldName]: new Date("1975-01-01")},
+    ]);
+runTest(
+    false, false, {[timeFieldName]: {$gt: new Date("1980-01-01"), $lt: new Date("2050-01-01")}}, [
+        {[timeFieldName]: new Date("1995-01-01")},
+        {[timeFieldName]: new Date("2030-01-01")},
+    ]);
 })();

@@ -43,6 +43,7 @@
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_algo.h"
+#include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_internal_expr_comparison.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
@@ -116,6 +117,9 @@ void optimizeEndOfPipeline(Pipeline::SourceContainer::iterator itr,
     container->splice(std::next(itr), endOfPipeline);
 }
 
+constexpr long long max32BitEpochMillis =
+    static_cast<long long>(std::numeric_limits<uint32_t>::max()) * 1000;
+
 /**
  * Creates an ObjectId initialized with an appropriate timestamp corresponding to 'rhs' and
  * returns it as a Value.
@@ -135,7 +139,7 @@ auto constructObjectIdValue(const BSONElement& rhs, int bucketMaxSpanSeconds) {
         oid.init(date, maxOrMin == OIDInit::max);
         return oid;
     };
-    // Make an ObjectId cooresponding to a date value adjusted by the max bucket value for the
+    // Make an ObjectId corresponding to a date value adjusted by the max bucket value for the
     // time series view that this query operates on. This predicate can be used in a comparison
     // to gauge a max value for a given bucket, rather than a min value.
     auto makeMaxAdjustedDateOID = [&](auto&& date, auto&& maxOrMin) {
@@ -144,9 +148,16 @@ auto constructObjectIdValue(const BSONElement& rhs, int bucketMaxSpanSeconds) {
             // Subtract max bucket range.
             return makeDateOID(date - Seconds{bucketMaxSpanSeconds}, maxOrMin);
         else
-            // Since we're out of range, just make a predicate that is true for all date types.
-            return makeDateOID(Date_t::min(), OIDInit::min);
+            // Since we're out of range, just make a predicate that is true for all dates.
+            // We'll never use an OID for a date < 0 due to OID range limitations, so we set the
+            // minimum date to 0.
+            return makeDateOID(Date_t::fromMillisSinceEpoch(0LL), OIDInit::min);
     };
+
+    // Because the OID timestamp is only 4 bytes, we can't convert larger dates
+    invariant(rhs.date().toMillisSinceEpoch() >= 0LL);
+    invariant(rhs.date().toMillisSinceEpoch() <= max32BitEpochMillis);
+
     // An ObjectId consists of a 4-byte timestamp, as well as a unique value and a counter, thus
     // two ObjectIds initialized with the same date will have different values. To ensure that we
     // do not incorrectly include or exclude any buckets, depending on the operator we will
@@ -707,10 +718,16 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
 
     BSONObj minTime;
     BSONObj maxTime;
+    bool dateIsExtended = false;
     if (isTimeField) {
         auto timeField = matchExprData.Date();
         minTime = BSON("" << timeField - Seconds(bucketMaxSpanSeconds));
         maxTime = BSON("" << timeField + Seconds(bucketMaxSpanSeconds));
+
+        // The date is in the "extended" range if it doesn't fit into the bottom
+        // 32 bits.
+        long long timestamp = timeField.toMillisSinceEpoch();
+        dateIsExtended = timestamp < 0LL || timestamp > max32BitEpochMillis;
     }
 
     auto minPath = std::string{kControlMinFieldNamePrefix} + matchExprPath;
@@ -743,6 +760,10 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
                     MatchExprPredicate<InternalExprGTEMatchExpression>(maxPath, matchExprData),
                     MatchExprPredicate<InternalExprLTEMatchExpression>(maxPath,
                                                                        maxTime.firstElement()));
+            } else if (dateIsExtended) {
+                // Since by this point we know that no time value has been inserted which is
+                // outside the epoch range, we know that no document can meet this criteria
+                return std::make_unique<AlwaysFalseMatchExpression>();
             } else {
                 return makePredicate(
                     MatchExprPredicate<InternalExprLTEMatchExpression>(minPath, matchExprData),
@@ -784,6 +805,14 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
                     MatchExprPredicate<InternalExprGTMatchExpression>(maxPath, matchExprData),
                     MatchExprPredicate<InternalExprGTMatchExpression>(minPath,
                                                                       minTime.firstElement()));
+            } else if (matchExprData.Date().toMillisSinceEpoch() < 0LL) {
+                // Since by this point we know that no time value has been inserted < 0,
+                // every document must meet this criteria
+                return std::make_unique<AlwaysTrueMatchExpression>();
+            } else if (matchExprData.Date().toMillisSinceEpoch() > max32BitEpochMillis) {
+                // Since by this point we know that no time value has been inserted >
+                // max32BitEpochMillis, we know that no document can meet this criteria
+                return std::make_unique<AlwaysFalseMatchExpression>();
             } else {
                 return makePredicate(
                     MatchExprPredicate<InternalExprGTMatchExpression>(maxPath, matchExprData),
@@ -814,6 +843,14 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
                     MatchExprPredicate<InternalExprGTEMatchExpression>(maxPath, matchExprData),
                     MatchExprPredicate<InternalExprGTEMatchExpression>(minPath,
                                                                        minTime.firstElement()));
+            } else if (matchExprData.Date().toMillisSinceEpoch() < 0LL) {
+                // Since by this point we know that no time value has been inserted < 0,
+                // every document must meet this criteria
+                return std::make_unique<AlwaysTrueMatchExpression>();
+            } else if (matchExprData.Date().toMillisSinceEpoch() > max32BitEpochMillis) {
+                // Since by this point we know that no time value has been inserted > 0xffffffff,
+                // we know that no value can meet this criteria
+                return std::make_unique<AlwaysFalseMatchExpression>();
             } else {
                 return makePredicate(
                     MatchExprPredicate<InternalExprGTEMatchExpression>(maxPath, matchExprData),
@@ -845,6 +882,14 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
                     MatchExprPredicate<InternalExprLTMatchExpression>(minPath, matchExprData),
                     MatchExprPredicate<InternalExprLTMatchExpression>(maxPath,
                                                                       maxTime.firstElement()));
+            } else if (matchExprData.Date().toMillisSinceEpoch() < 0LL) {
+                // Since by this point we know that no time value has been inserted < 0,
+                // we know that no document can meet this criteria
+                return std::make_unique<AlwaysFalseMatchExpression>();
+            } else if (matchExprData.Date().toMillisSinceEpoch() > max32BitEpochMillis) {
+                // Since by this point we know that no time value has been inserted > 0xffffffff
+                // every time value must be less than this value
+                return std::make_unique<AlwaysTrueMatchExpression>();
             } else {
                 return makePredicate(
                     MatchExprPredicate<InternalExprLTMatchExpression>(minPath, matchExprData),
@@ -874,6 +919,14 @@ std::unique_ptr<MatchExpression> createComparisonPredicate(
                     MatchExprPredicate<InternalExprLTEMatchExpression>(minPath, matchExprData),
                     MatchExprPredicate<InternalExprLTEMatchExpression>(maxPath,
                                                                        maxTime.firstElement()));
+            } else if (matchExprData.Date().toMillisSinceEpoch() < 0LL) {
+                // Since by this point we know that no time value has been inserted < 0,
+                // we know that no document can meet this criteria
+                return std::make_unique<AlwaysFalseMatchExpression>();
+            } else if (matchExprData.Date().toMillisSinceEpoch() > max32BitEpochMillis) {
+                // Since by this point we know that no time value has been inserted > 0xffffffff
+                // every document must be less than this value
+                return std::make_unique<AlwaysTrueMatchExpression>();
             } else {
                 return makePredicate(
                     MatchExprPredicate<InternalExprLTEMatchExpression>(minPath, matchExprData),
