@@ -89,8 +89,10 @@ public:
         ProgressMeterHolder pm;
         {
             stdx::unique_lock<Client> lk(*opCtx->getClient());
-            pm.set(CurOp::get(opCtx)->setProgress_inlock(
-                _progressMessage, _keysInserted, 3 /* secondsBetween */));
+            pm.set(lk,
+                   CurOp::get(opCtx)->setProgress_inlock(
+                       _progressMessage, _keysInserted, 3 /* secondsBetween */),
+                   opCtx);
         }  // namespace mongo
 
         int64_t iterations = 0;
@@ -162,12 +164,18 @@ public:
                 yield(opCtx, &collection, _ns);
             }
 
-            // If we're here either it's a dup and we're cool with it or the addKey went just
-            // fine.
-            pm.hit();
+            {
+                stdx::unique_lock<Client> lk(*opCtx->getClient());
+                // If we're here either it's a dup and we're cool with it or the addKey went just
+                // fine.
+                pm.get(lk)->hit();
+            }
         }
 
-        pm.finished();
+        {
+            stdx::unique_lock<Client> lk(*opCtx->getClient());
+            pm.get(lk)->finished();
+        }
 
         LOGV2(20685,
               "Index build: inserted {bulk_getKeysInserted} keys from external sorter into "

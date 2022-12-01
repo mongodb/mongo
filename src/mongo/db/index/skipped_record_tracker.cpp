@@ -135,7 +135,9 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
     {
         stdx::unique_lock<Client> lk(*opCtx->getClient());
         progress.set(
-            CurOp::get(opCtx)->setProgress_inlock(curopMessage, _skippedRecordCounter.load(), 1));
+            lk,
+            CurOp::get(opCtx)->setProgress_inlock(curopMessage, _skippedRecordCounter.load(), 1),
+            opCtx);
     }
 
     SharedBufferFragmentBuilder pooledBuilder(KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
@@ -213,10 +215,17 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
         wuow.commit();
         cursor->restore();
 
-        progress->hit();
+        {
+            stdx::unique_lock<Client> lk(*opCtx->getClient());
+            progress.get(lk)->hit();
+        }
         resolved++;
     }
-    progress->finished();
+
+    {
+        stdx::unique_lock<Client> lk(*opCtx->getClient());
+        progress.get(lk)->finished();
+    }
 
     int logLevel = (resolved > 0) ? 0 : 1;
     LOGV2_DEBUG(23883,

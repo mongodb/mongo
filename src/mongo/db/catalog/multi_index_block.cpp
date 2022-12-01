@@ -417,7 +417,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
     ProgressMeterHolder progress;
     {
         stdx::unique_lock<Client> lk(*opCtx->getClient());
-        progress.set(CurOp::get(opCtx)->setProgress_inlock(curopMessage, numRecords));
+        progress.set(lk, CurOp::get(opCtx)->setProgress_inlock(curopMessage, numRecords), opCtx);
     }
 
     hangAfterSettingUpIndexBuild.executeIf(
@@ -479,7 +479,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
                       "Index build: collection scan restarting",
                       "buildUUID"_attr = _buildUUID,
                       "collectionUUID"_attr = _collectionUUID,
-                      "totalRecords"_attr = progress->hits(),
+                      "totalRecords"_attr = progress.get(WithLock::withoutLock())->hits(),
                       "duration"_attr = duration_cast<Milliseconds>(timer.elapsed()),
                       "phase"_attr = IndexBuildPhase_serializer(_phase),
                       "collectionScanPosition"_attr = _lastRecordIdInserted,
@@ -498,7 +498,10 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
 
     do {
         restartCollectionScan = false;
-        progress->reset(collection->numRecords(opCtx));
+        {
+            stdx::unique_lock<Client> lk(*opCtx->getClient());
+            progress.get(lk)->reset(collection->numRecords(opCtx));
+        }
         timer.reset();
 
         try {
@@ -514,7 +517,7 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
                   "buildUUID"_attr = _buildUUID,
                   "collectionUUID"_attr = _collectionUUID,
                   logAttrs(collection->ns()),
-                  "totalRecords"_attr = progress->hits(),
+                  "totalRecords"_attr = progress.get(WithLock::withoutLock())->hits(),
                   "readSource"_attr =
                       RecoveryUnit::toString(opCtx->recoveryUnit()->getTimestampReadSource()),
                   "duration"_attr = duration_cast<Milliseconds>(timer.elapsed()));
@@ -528,14 +531,15 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
                   "Index build: collection scan stopped",
                   "buildUUID"_attr = _buildUUID,
                   "collectionUUID"_attr = _collectionUUID,
-                  "totalRecords"_attr = progress->hits(),
+                  "totalRecords"_attr = progress.get(WithLock::withoutLock())->hits(),
                   "duration"_attr = duration_cast<Milliseconds>(timer.elapsed()),
                   "phase"_attr = IndexBuildPhase_serializer(_phase),
                   "collectionScanPosition"_attr = _lastRecordIdInserted,
                   "readSource"_attr = RecoveryUnit::toString(readSource),
                   "error"_attr = ex);
             ex.addContext(str::stream()
-                          << "collection scan stopped. totalRecords: " << progress->hits()
+                          << "collection scan stopped. totalRecords: "
+                          << progress.get(WithLock::withoutLock())->hits()
                           << "; durationMillis: " << duration_cast<Milliseconds>(timer.elapsed())
                           << "; phase: " << IndexBuildPhase_serializer(_phase)
                           << "; collectionScanPosition: " << _lastRecordIdInserted
@@ -575,7 +579,10 @@ Status MultiIndexBlock::insertAllDocumentsInCollection(
         collection.restore();
     }
 
-    progress.finished();
+    {
+        stdx::unique_lock<Client> lk(*opCtx->getClient());
+        progress.get(lk)->finished();
+    }
 
     Status ret = dumpInsertsFromBulk(opCtx, collection);
     if (!ret.isOK())
@@ -616,14 +623,17 @@ void MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
             continue;
         }
 
-        progress->get()->setTotalWhileRunning(collection->numRecords(opCtx));
+        {
+            stdx::unique_lock<Client> lk(*opCtx->getClient());
+            progress->get(lk)->setTotalWhileRunning(collection->numRecords(opCtx));
+        }
 
         uassertStatusOK(
             _failPointHangDuringBuild(opCtx,
                                       &hangIndexBuildDuringCollectionScanPhaseBeforeInsertion,
                                       "before",
                                       objToIndex,
-                                      (*progress)->hits()));
+                                      progress->get(WithLock::withoutLock())->hits()));
 
         // The external sorter is not part of the storage engine and therefore does not need
         // a WriteUnitOfWork to write keys.
@@ -653,11 +663,14 @@ void MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
                                   &hangIndexBuildDuringCollectionScanPhaseAfterInsertion,
                                   "after",
                                   objToIndex,
-                                  (*progress)->hits())
+                                  progress->get(WithLock::withoutLock())->hits())
             .ignore();
 
-        // Go to the next document.
-        progress->hit();
+        {
+            stdx::unique_lock<Client> lk(*opCtx->getClient());
+            // Go to the next document.
+            progress->get(lk)->hit();
+        }
     }
 }
 

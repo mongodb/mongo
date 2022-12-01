@@ -746,9 +746,8 @@ public:
     /**
      * Sets the message and the progress meter for this CurOp.
      *
-     * While it is necessary to hold the lock while this method executes, the
-     * "hit" and "finished" methods of ProgressMeter may be called safely from
-     * the thread executing the operation without locking the Client.
+     * Accessors and modifiers of ProgressMeter associated with the CurOp must follow the same
+     * locking scheme as CurOp. It is necessary to hold the lock while this method executes.
      */
     ProgressMeter& setProgress_inlock(StringData name,
                                       unsigned long long progressMeterTotal = 0,

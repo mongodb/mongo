@@ -137,15 +137,18 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
     ProgressMeterHolder progress;
     {
         stdx::unique_lock<Client> lk(*opCtx->getClient());
-        progress.set(CurOp::get(opCtx)->setProgress_inlock(curopMessage));
+        progress.set(lk, CurOp::get(opCtx)->setProgress_inlock(curopMessage), opCtx);
     }
 
-    // Force the progress meter to log at the end of every batch. By default, the progress meter
-    // only logs after a large number of calls to hit(), but since we use such large batch sizes,
-    // progress would rarely be displayed.
-    progress->reset(_sideWritesCounter->load() - appliedAtStart /* total */,
-                    3 /* secondsBetween */,
-                    1 /* checkInterval */);
+    {
+        stdx::unique_lock<Client> lk(*opCtx->getClient());
+        // Force the progress meter to log at the end of every batch. By default, the progress meter
+        // only logs after a large number of calls to hit(), but since we use such large batch
+        // sizes, progress would rarely be displayed.
+        progress.get(lk)->reset(_sideWritesCounter->load() - appliedAtStart /* total */,
+                                3 /* secondsBetween */,
+                                1 /* checkInterval */);
+    }
 
     // Apply operations in batches per WriteUnitOfWork. The batch size limit allows the drain to
     // yield at a frequent interval, releasing locks and storage engine resources.
@@ -241,7 +244,10 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
 
         wuow.commit();
 
-        progress->hit(batchSize);
+        {
+            stdx::unique_lock<Client> lk(*opCtx->getClient());
+            progress.get(lk)->hit(batchSize);
+        }
         _numApplied += batchSize;
 
         // Lock yielding will be directed by the yield policy provided.
@@ -250,8 +256,12 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
             _yield(opCtx, &coll);
         }
 
-        // Account for more writes coming in during a batch.
-        progress->setTotalWhileRunning(_sideWritesCounter->loadRelaxed() - appliedAtStart);
+        {
+            stdx::unique_lock<Client> lk(*opCtx->getClient());
+            // Account for more writes coming in during a batch.
+            progress.get(lk)->setTotalWhileRunning(_sideWritesCounter->loadRelaxed() -
+                                                   appliedAtStart);
+        }
         return false;
     };
 
@@ -268,7 +278,10 @@ Status IndexBuildInterceptor::drainWritesIntoIndex(OperationContext* opCtx,
         atEof = swAtEof.getValue();
     }
 
-    progress->finished();
+    {
+        stdx::unique_lock<Client> lk(*opCtx->getClient());
+        progress.get(lk)->finished();
+    }
 
     int logLevel = (_numApplied - appliedAtStart > 0) ? 0 : 1;
     LOGV2_DEBUG(20689,

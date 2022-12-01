@@ -323,8 +323,10 @@ private:
             AutoGetCollection coll(opCtx, info.nss, MODE_IS);
             if (coll) {
                 stdx::unique_lock<Client> lk(*opCtx->getClient());
-                progress.set(CurOp::get(opCtx)->setProgress_inlock(StringData(curOpMessage),
-                                                                   coll->numRecords(opCtx)));
+                progress.set(lk,
+                             CurOp::get(opCtx)->setProgress_inlock(StringData(curOpMessage),
+                                                                   coll->numRecords(opCtx)),
+                             opCtx);
             } else {
                 const auto entry = dbCheckWarningHealthLogEntry(
                     info.nss,
@@ -451,7 +453,10 @@ private:
             totalDocsSeen += stats.nDocs;
             totalBytesSeen += stats.nBytes;
             docsInCurrentInterval += stats.nDocs;
-            progress.get()->hit(stats.nDocs);
+            {
+                stdx::unique_lock<Client> lk(*opCtx->getClient());
+                progress.get(lk)->hit(stats.nDocs);
+            }
 
             // Check if we've exceeded any limits.
             bool reachedLast = stats.lastKey >= info.end;
@@ -468,7 +473,10 @@ private:
             }
         } while (!reachedEnd);
 
-        progress.finished();
+        {
+            stdx::unique_lock<Client> lk(*opCtx->getClient());
+            progress.get(lk)->finished();
+        }
     }
 
     /**

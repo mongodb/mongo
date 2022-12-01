@@ -155,7 +155,9 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
     {
         stdx::unique_lock<Client> lk(*opCtx->getClient());
         progressMeter.set(
-            CurOp::get(opCtx)->setProgress_inlock(curopMessage, coll->numRecords(opCtx)));
+            lk,
+            CurOp::get(opCtx)->setProgress_inlock(curopMessage, coll->numRecords(opCtx)),
+            opCtx);
     }
 
     auto ns = coll->ns();
@@ -191,9 +193,12 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
                                   "id"_attr = id,
                                   "error"_attr = redact(validStatus));
                     rs->deleteRecord(opCtx, id);
-                    // Must reduce the progress meter's expected total after deleting an invalid
-                    // document from the collection.
-                    progressMeter->setTotalWhileRunning(coll->numRecords(opCtx));
+                    {
+                        stdx::unique_lock<Client> lk(*opCtx->getClient());
+                        // Must reduce the progress meter's expected total after deleting an invalid
+                        // document from the collection.
+                        progressMeter.get(lk)->setTotalWhileRunning(coll->numRecords(opCtx));
+                    }
                 } else {
                     numRecords++;
                     dataSize += data.size();
@@ -213,7 +218,10 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
                     if (!insertStatus.isOK()) {
                         return insertStatus;
                     }
-                    progressMeter.hit();
+                    {
+                        stdx::unique_lock<Client> lk(*opCtx->getClient());
+                        progressMeter.get(lk)->hit();
+                    }
                 }
                 record = cursor->next();
             }
@@ -237,7 +245,10 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
         }
     }
 
-    progressMeter.finished();
+    {
+        stdx::unique_lock<Client> lk(*opCtx->getClient());
+        progressMeter.get(lk)->finished();
+    }
 
     long long recordsRemoved = 0;
     long long bytesRemoved = 0;
