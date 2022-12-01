@@ -38,5 +38,5 @@ server_parameters:
     set_at: [ startup, runtime ]
     cpp_vartype: AtomicWord<double>
     cpp_varname: gConnectionAcquisitionToWireLoggingRate
-    default: 0.2
+    default: 0.05
     validator: { gte: 0.0, lte: 1.0 }
