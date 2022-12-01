@@ -36,6 +36,7 @@
 #include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/logv2/log.h"
 #include "mongo/unittest/barrier.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -46,6 +47,16 @@
 #include "mongo/util/tick_source_mock.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
+#define ASSERT_SOON_EXP(exp)                         \
+    if (!(exp)) {                                    \
+        LOGV2_WARNING(7153501,                       \
+                      "Expression failed, retrying", \
+                      "exp"_attr = #exp,             \
+                      "file"_attr = __FILE__,        \
+                      "line"_attr = __LINE__);       \
+        return false;                                \
+    }
 
 namespace {
 using namespace mongo;
@@ -68,24 +79,24 @@ protected:
     ServiceContext::UniqueOperationContext _opCtx;
 };
 
-static inline const Seconds kWaitTimeout{2};
+// Windows test variants are sometimes slow so we have a relatively large timeout here for the
+// assertSoon.
+static inline const Seconds kWaitTimeout{20};
 static inline const Milliseconds kSleepTime{1};
 
 /**
  * Asserts that eventually the predicate does not throw an exception.
  */
-void assertSoon(std::function<void()> predicate, Milliseconds timeout = kWaitTimeout) {
+void assertSoon(std::function<bool()> predicate, Milliseconds timeout = kWaitTimeout) {
     Timer t;
-    while (true) {
-        try {
-            predicate();
-            break;
-        } catch (...) {
-            if (t.elapsed() >= timeout) {
-                throw;
-            }
-            sleepFor(kSleepTime);
+    while (!predicate()) {
+        if (t.elapsed() >= timeout) {
+            LOGV2_ERROR(7153502,
+                        "assertSoon failed, please check the logs for the reason all attempts have "
+                        "failed.");
+            ASSERT_TRUE(false);
         }
+        sleepFor(kSleepTime);
     }
 }
 
@@ -452,7 +463,8 @@ TEST_F(TicketHolderTest, OnlyLowPriorityOps) {
         assertSoon([&] {
             stdx::lock_guard lk(ticketCheckMutex);
             // Other low priority thread takes the ticket
-            ASSERT_TRUE(low1PriorityAdmission.ticket || low2PriorityAdmission.ticket);
+            ASSERT_SOON_EXP(low1PriorityAdmission.ticket || low2PriorityAdmission.ticket);
+            return true;
         });
 
         MockAdmission low3PriorityAdmission(this->getServiceContext(),
@@ -471,13 +483,14 @@ TEST_F(TicketHolderTest, OnlyLowPriorityOps) {
 
         auto releaseCurrentTicket = [&] {
             stdx::lock_guard lk(ticketCheckMutex);
-            ASSERT_TRUE(low1PriorityAdmission.ticket || low2PriorityAdmission.ticket ||
-                        low3PriorityAdmission.ticket);
+            ASSERT_SOON_EXP(low1PriorityAdmission.ticket || low2PriorityAdmission.ticket ||
+                            low3PriorityAdmission.ticket);
             // Ensure only one ticket is present.
-            ASSERT_EQ(static_cast<int>(low1PriorityAdmission.ticket.has_value()) +
-                          static_cast<int>(low2PriorityAdmission.ticket.has_value()) +
-                          static_cast<int>(low3PriorityAdmission.ticket.has_value()),
-                      1);
+            auto numTickets = static_cast<int>(low1PriorityAdmission.ticket.has_value()) +
+                static_cast<int>(low2PriorityAdmission.ticket.has_value()) +
+                static_cast<int>(low3PriorityAdmission.ticket.has_value());
+            ASSERT_SOON_EXP(numTickets == 1);
+
             if (low1PriorityAdmission.ticket.has_value()) {
                 low1PriorityAdmission.ticket.reset();
             } else if (low2PriorityAdmission.ticket.has_value()) {
@@ -485,6 +498,7 @@ TEST_F(TicketHolderTest, OnlyLowPriorityOps) {
             } else {
                 low3PriorityAdmission.ticket.reset();
             }
+            return true;
         };
 
         // Release the ticket.
@@ -671,7 +685,10 @@ TEST_F(TicketHolderTest, PriorityBasicMetrics) {
         // Test that the metrics eventually converge to the following set of values. There can be
         // cases where the values are incorrect for brief periods of time due to optimistic
         // concurrency.
-        assertSoon([&] { ASSERT_EQ(stats["available"], 0); });
+        assertSoon([&] {
+            ASSERT_SOON_EXP(stats["available"] == 0);
+            return true;
+        });
     }
 
     tickSource->advance(Microseconds(100));
@@ -756,9 +773,10 @@ TEST_F(TicketHolderTest, PrioritImmediateMetrics) {
         // cases where the values are incorrect for brief periods of time due to optimistic
         // concurrency.
         assertSoon([&] {
-            ASSERT_EQ(stats["available"], 0);
-            ASSERT_EQ(stats["out"], 1);
-            ASSERT_EQ(stats["totalTickets"], 1);
+            ASSERT_SOON_EXP(stats["available"] == 0);
+            ASSERT_SOON_EXP(stats["out"] == 1);
+            ASSERT_SOON_EXP(stats["totalTickets"] == 1);
+            return true;
         });
     }
 
@@ -774,17 +792,17 @@ TEST_F(TicketHolderTest, PrioritImmediateMetrics) {
         // concurrency.
         assertSoon([&]() {
             // only reported in the priority specific statistics.
-            ASSERT_EQ(stats["available"], 0);
-            ASSERT_EQ(stats["out"], 1);
-            ASSERT_EQ(stats["totalTickets"], 1);
+            ASSERT_SOON_EXP(stats["available"] == 0);
+            ASSERT_SOON_EXP(stats["out"] == 1);
+            ASSERT_SOON_EXP(stats["totalTickets"] == 1);
 
             auto currentStats = stats.getStats();
             auto immediatePriorityStats = currentStats.getObjectField("immediatePriority");
-            ASSERT_EQ(immediatePriorityStats.getIntField("newAdmissions"), 1);
-
-            ASSERT_EQ(immediatePriorityStats.getIntField("startedProcessing"), 1);
-            ASSERT_EQ(immediatePriorityStats.getIntField("processing"), 1);
-            ASSERT_EQ(immediatePriorityStats.getIntField("finishedProcessing"), 0);
+            ASSERT_SOON_EXP(immediatePriorityStats.getIntField("newAdmissions") == 1);
+            ASSERT_SOON_EXP(immediatePriorityStats.getIntField("startedProcessing") == 1);
+            ASSERT_SOON_EXP(immediatePriorityStats.getIntField("processing") == 1);
+            ASSERT_SOON_EXP(immediatePriorityStats.getIntField("finishedProcessing") == 0);
+            return true;
         });
     }
 
@@ -793,9 +811,10 @@ TEST_F(TicketHolderTest, PrioritImmediateMetrics) {
     tickSource->advance(Microseconds(200));
 
     assertSoon([&] {
-        ASSERT_EQ(stats["out"], 0);
-        ASSERT_EQ(stats["available"], 1);
-        ASSERT_EQ(stats["totalTickets"], 1);
+        ASSERT_SOON_EXP(stats["available"] == 1);
+        ASSERT_SOON_EXP(stats["out"] == 0);
+        ASSERT_SOON_EXP(stats["totalTickets"] == 1);
+        return true;
     });
 
     immediatePriorityAdmission.ticket.reset();
@@ -913,11 +932,15 @@ TEST_F(TicketHolderTest, LowPriorityExpedited) {
 
     std::vector<stdx::thread> threads;
     MockAdmission lowPriorityAdmission(svcCtx, AdmissionContext::Priority::kLow);
+    // This mutex protects the lowPriorityAdmission ticket
+    Mutex ticketMutex;
+
     threads.emplace_back([&]() {
-        lowPriorityAdmission.ticket =
-            holder.waitForTicket(lowPriorityAdmission.opCtx.get(),
-                                 &lowPriorityAdmission.admCtx,
-                                 TicketHolder::WaitMode::kUninterruptible);
+        auto ticket = holder.waitForTicket(lowPriorityAdmission.opCtx.get(),
+                                           &lowPriorityAdmission.admCtx,
+                                           TicketHolder::WaitMode::kUninterruptible);
+        stdx::lock_guard lk(ticketMutex);
+        lowPriorityAdmission.ticket = std::move(ticket);
     });
 
     auto queuedNormalAdmissionsCount = 4;
@@ -937,8 +960,8 @@ TEST_F(TicketHolderTest, LowPriorityExpedited) {
     initialAdmission.ticket.reset();
 
     assertSoon([&] {
-        ASSERT_EQ(holder.expedited(), 1);
-        ASSERT(lowPriorityAdmission.ticket);
+        stdx::lock_guard lk(ticketMutex);
+        return holder.expedited() == 1 && lowPriorityAdmission.ticket;
     });
 
     lowPriorityAdmission.ticket.reset();
