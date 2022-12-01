@@ -57,12 +57,20 @@ StatusWith<Schema> generateSchemaFromBucketDoc(const BSONObj& bucketDoc,
                                                const StringData::ComparatorInterface* comparator);
 
 /**
- * Extracts the time field of a measurement document and its meta field if it is present.
+ * Extracts the time field of a measurement document.
  *
  * Returns a bad status if the document is malformed.
  */
-StatusWith<std::pair<Date_t, boost::optional<BSONElement>>> extractTimeAndMeta(
-    const BSONObj& doc, const TimeseriesOptions& options);
+StatusWith<Date_t> extractTime(const BSONObj& doc, StringData timeFieldName);
+
+/**
+ * Extracts the time field of a measurement document and its meta field.
+ *
+ * Returns a bad status if the document is malformed.
+ */
+StatusWith<std::pair<Date_t, BSONElement>> extractTimeAndMeta(const BSONObj& doc,
+                                                              StringData timeFieldName,
+                                                              StringData metaFieldName);
 
 
 /**

@@ -76,18 +76,27 @@ BSONObj BucketCatalogHelpersTest::_findSuitableBucket(OperationContext* opCtx,
             "Missing bucketMaxSpanSeconds option.",
             options.getBucketMaxSpanSeconds());
 
-    auto swDocTimeAndMeta = timeseries::extractTimeAndMeta(measurementDoc, options);
-    if (!swDocTimeAndMeta.isOK()) {
-        return BSONObj();
+    Date_t time;
+    BSONElement metadata;
+    if (!options.getMetaField().has_value()) {
+        auto swTime = timeseries::extractTime(measurementDoc, options.getTimeField());
+        ASSERT_OK(swTime);
+        time = swTime.getValue();
+    } else {
+        auto swDocTimeAndMeta = timeseries::extractTimeAndMeta(
+            measurementDoc, options.getTimeField(), options.getMetaField().value());
+        ASSERT_OK(swDocTimeAndMeta);
+        time = swDocTimeAndMeta.getValue().first;
+        metadata = swDocTimeAndMeta.getValue().second;
     }
-    auto [time, metadata] = swDocTimeAndMeta.getValue();
+
     auto controlMinTimePath =
         timeseries::kControlMinFieldNamePrefix.toString() + options.getTimeField();
 
     boost::optional<BSONObj> normalizedMetadata;
-    if (metadata && (*metadata).ok()) {
+    if (metadata.ok()) {
         BSONObjBuilder builder;
-        timeseries::normalizeMetadata(&builder, *metadata, timeseries::kBucketMetaFieldName);
+        timeseries::normalizeMetadata(&builder, metadata, timeseries::kBucketMetaFieldName);
         normalizedMetadata = builder.obj();
     }
 

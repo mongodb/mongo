@@ -1285,14 +1285,23 @@ StatusWith<std::pair<BucketCatalog::BucketKey, Date_t>> BucketCatalog::_extractB
     const StringData::ComparatorInterface* comparator,
     const TimeseriesOptions& options,
     const BSONObj& doc) const {
-    auto swDocTimeAndMeta = timeseries::extractTimeAndMeta(doc, options);
-    if (!swDocTimeAndMeta.isOK()) {
-        return swDocTimeAndMeta.getStatus();
-    }
-    auto time = swDocTimeAndMeta.getValue().first;
+    Date_t time;
     BSONElement metadata;
-    if (auto metadataValue = swDocTimeAndMeta.getValue().second) {
-        metadata = *metadataValue;
+
+    if (!options.getMetaField().has_value()) {
+        auto swTime = timeseries::extractTime(doc, options.getTimeField());
+        if (!swTime.isOK()) {
+            return swTime.getStatus();
+        }
+        time = swTime.getValue();
+    } else {
+        auto swDocTimeAndMeta = timeseries::extractTimeAndMeta(
+            doc, options.getTimeField(), options.getMetaField().value());
+        if (!swDocTimeAndMeta.isOK()) {
+            return swDocTimeAndMeta.getStatus();
+        }
+        time = swDocTimeAndMeta.getValue().first;
+        metadata = swDocTimeAndMeta.getValue().second;
     }
 
     // Buckets are spread across independently-lockable stripes to improve parallelism. We map a
