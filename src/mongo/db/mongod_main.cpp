@@ -197,6 +197,7 @@
 #include "mongo/platform/process_id.h"
 #include "mongo/platform/random.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
+#include "mongo/s/catalog/sharding_catalog_client_impl.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query_analysis_sampler.h"
@@ -742,9 +743,16 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
             initializeGlobalShardingStateForMongoD(
                 startupOpCtx.get(), ShardId::kConfigServerId, ConnectionString::forLocal());
 
+            // ShardLocal to use for explicitly local commands on the config server.
+            auto localConfigShard =
+                Grid::get(serviceContext)->shardRegistry()->createLocalConfigShard();
+            auto localCatalogClient = std::make_unique<ShardingCatalogClientImpl>(localConfigShard);
+
             ShardingCatalogManager::create(
                 startupOpCtx->getServiceContext(),
-                makeShardingTaskExecutor(executor::makeNetworkInterface("AddShard-TaskExecutor")));
+                makeShardingTaskExecutor(executor::makeNetworkInterface("AddShard-TaskExecutor")),
+                std::move(localConfigShard),
+                std::move(localCatalogClient));
 
             if (!gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV()) {
                 Grid::get(startupOpCtx.get())->setShardingInitialized();

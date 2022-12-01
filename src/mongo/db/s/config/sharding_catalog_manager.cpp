@@ -273,11 +273,18 @@ std::vector<std::vector<BSONObj>> createBulkWriteBatches(const std::vector<BSONO
 }  // namespace
 
 void ShardingCatalogManager::create(ServiceContext* serviceContext,
-                                    std::unique_ptr<executor::TaskExecutor> addShardExecutor) {
+                                    std::unique_ptr<executor::TaskExecutor> addShardExecutor,
+                                    std::shared_ptr<Shard> localConfigShard,
+                                    std::unique_ptr<ShardingCatalogClient> localCatalogClient) {
+    invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+
     auto& shardingCatalogManager = getShardingCatalogManager(serviceContext);
     invariant(!shardingCatalogManager);
 
-    shardingCatalogManager.emplace(serviceContext, std::move(addShardExecutor));
+    shardingCatalogManager.emplace(serviceContext,
+                                   std::move(addShardExecutor),
+                                   std::move(localConfigShard),
+                                   std::move(localCatalogClient));
 }
 
 void ShardingCatalogManager::clearForTests(ServiceContext* serviceContext) {
@@ -299,9 +306,14 @@ ShardingCatalogManager* ShardingCatalogManager::get(OperationContext* operationC
 }
 
 ShardingCatalogManager::ShardingCatalogManager(
-    ServiceContext* serviceContext, std::unique_ptr<executor::TaskExecutor> addShardExecutor)
+    ServiceContext* serviceContext,
+    std::unique_ptr<executor::TaskExecutor> addShardExecutor,
+    std::shared_ptr<Shard> localConfigShard,
+    std::unique_ptr<ShardingCatalogClient> localCatalogClient)
     : _serviceContext(serviceContext),
       _executorForAddShard(std::move(addShardExecutor)),
+      _localConfigShard(std::move(localConfigShard)),
+      _localCatalogClient(std::move(localCatalogClient)),
       _kShardMembershipLock("shardMembershipLock"),
       _kChunkOpLock("chunkOpLock"),
       _kZoneOpLock("zoneOpLock") {
@@ -377,16 +389,19 @@ Status ShardingCatalogManager::upgradeConfigSettings(OperationContext* opCtx) {
     return _initConfigSettings(opCtx);
 }
 
+ShardingCatalogClient* ShardingCatalogManager::localCatalogClient() {
+    invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+    return _localCatalogClient.get();
+}
+
 void ShardingCatalogManager::discardCachedConfigDatabaseInitializationState() {
     stdx::lock_guard<Latch> lk(_mutex);
     _configInitialized = false;
 }
 
 Status ShardingCatalogManager::_initConfigVersion(OperationContext* opCtx) {
-    const auto catalogClient = Grid::get(opCtx)->catalogClient();
-
     auto versionStatus =
-        catalogClient->getConfigVersion(opCtx, repl::ReadConcernLevel::kLocalReadConcern);
+        _localCatalogClient->getConfigVersion(opCtx, repl::ReadConcernLevel::kLocalReadConcern);
     if (versionStatus.isOK() || versionStatus != ErrorCodes::NoMatchingDocument) {
         return versionStatus.getStatus();
     }
@@ -399,7 +414,7 @@ Status ShardingCatalogManager::_initConfigVersion(OperationContext* opCtx) {
         newVersion.setCurrentVersion(VersionType::CURRENT_CONFIG_VERSION);
         newVersion.setMinCompatibleVersion(VersionType::MIN_COMPATIBLE_CONFIG_VERSION);
     }
-    auto insertStatus = catalogClient->insertConfigDocument(
+    auto insertStatus = _localCatalogClient->insertConfigDocument(
         opCtx, VersionType::ConfigNS, newVersion.toBSON(), kNoWaitWriteConcern);
     return insertStatus;
 }
@@ -547,8 +562,8 @@ Status ShardingCatalogManager::setFeatureCompatibilityVersionOnShards(OperationC
     // We do a direct read of the shards collection with local readConcern so no shards are missed,
     // but don't go through the ShardRegistry to prevent it from caching data that may be rolled
     // back.
-    const auto opTimeWithShards = uassertStatusOK(Grid::get(opCtx)->catalogClient()->getAllShards(
-        opCtx, repl::ReadConcernLevel::kLocalReadConcern));
+    const auto opTimeWithShards = uassertStatusOK(
+        _localCatalogClient->getAllShards(opCtx, repl::ReadConcernLevel::kLocalReadConcern));
 
     for (const auto& shardType : opTimeWithShards.value) {
         const auto shardStatus =
@@ -583,15 +598,14 @@ StatusWith<bool> ShardingCatalogManager::_isShardRequiredByZoneStillInUse(
     const ReadPreferenceSetting& readPref,
     const std::string& shardName,
     const std::string& zoneName) {
-    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
     auto findShardStatus =
-        configShard->exhaustiveFindOnConfig(opCtx,
-                                            readPref,
-                                            repl::ReadConcernLevel::kLocalReadConcern,
-                                            NamespaceString::kConfigsvrShardsNamespace,
-                                            BSON(ShardType::tags() << zoneName),
-                                            BSONObj(),
-                                            2);
+        _localConfigShard->exhaustiveFindOnConfig(opCtx,
+                                                  readPref,
+                                                  repl::ReadConcernLevel::kLocalReadConcern,
+                                                  NamespaceString::kConfigsvrShardsNamespace,
+                                                  BSON(ShardType::tags() << zoneName),
+                                                  BSONObj(),
+                                                  2);
 
     if (!findShardStatus.isOK()) {
         return findShardStatus.getStatus();
@@ -617,13 +631,13 @@ StatusWith<bool> ShardingCatalogManager::_isShardRequiredByZoneStillInUse(
         }
 
         auto findChunkRangeStatus =
-            configShard->exhaustiveFindOnConfig(opCtx,
-                                                readPref,
-                                                repl::ReadConcernLevel::kLocalReadConcern,
-                                                TagsType::ConfigNS,
-                                                BSON(TagsType::tag() << zoneName),
-                                                BSONObj(),
-                                                1);
+            _localConfigShard->exhaustiveFindOnConfig(opCtx,
+                                                      readPref,
+                                                      repl::ReadConcernLevel::kLocalReadConcern,
+                                                      TagsType::ConfigNS,
+                                                      BSON(TagsType::tag() << zoneName),
+                                                      BSONObj(),
+                                                      1);
 
         if (!findChunkRangeStatus.isOK()) {
             return findChunkRangeStatus.getStatus();

@@ -98,38 +98,6 @@ void toBatchError(const Status& status, BatchedCommandResponse* response) {
     response->setStatus(status);
 }
 
-void sendRetryableWriteBatchRequestToConfig(OperationContext* opCtx,
-                                            const NamespaceString& nss,
-                                            std::vector<BSONObj>& docs,
-                                            TxnNumber txnNumber,
-                                            const WriteConcernOptions& writeConcern) {
-    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-
-    BatchedCommandRequest request([&] {
-        write_ops::InsertCommandRequest insertOp(nss);
-        insertOp.setDocuments(docs);
-        return insertOp;
-    }());
-    request.setWriteConcern(writeConcern.toBSON());
-
-    BSONObj cmdObj = request.toBSON();
-    BSONObjBuilder bob(cmdObj);
-    bob.append(OperationSessionInfo::kTxnNumberFieldName, txnNumber);
-
-    BatchedCommandResponse batchResponse;
-    auto response = configShard->runCommand(opCtx,
-                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                            nss.db().toString(),
-                                            bob.obj(),
-                                            Shard::kDefaultConfigCommandTimeout,
-                                            Shard::RetryPolicy::kIdempotent);
-
-    auto writeStatus = Shard::CommandResponse::processBatchWriteResponse(response, &batchResponse);
-
-    uassertStatusOK(batchResponse.toStatus());
-    uassertStatusOK(writeStatus);
-}
-
 AggregateCommandRequest makeCollectionAndChunksAggregation(OperationContext* opCtx,
                                                            const NamespaceString& nss,
                                                            const ChunkVersion& sinceVersion) {
@@ -351,6 +319,7 @@ AggregateCommandRequest makeCollectionAndIndexesAggregation(OperationContext* op
 }
 
 std::vector<BSONObj> runCatalogAggregation(OperationContext* opCtx,
+                                           std::shared_ptr<Shard> configShard,
                                            AggregateCommandRequest& aggRequest,
                                            const repl::ReadConcernArgs& readConcern,
                                            const Milliseconds& maxTimeout) {
@@ -385,7 +354,6 @@ std::vector<BSONObj> runCatalogAggregation(OperationContext* opCtx,
         return true;
     };
 
-    const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
     for (int retry = 1; retry <= kMaxWriteRetry; retry++) {
         const Status status = configShard->runAggregation(opCtx, aggRequest, callback);
         if (retry < kMaxWriteRetry &&
@@ -402,6 +370,7 @@ std::vector<BSONObj> runCatalogAggregation(OperationContext* opCtx,
 
 std::vector<ShardId> makeAndRunPlacementHistoryAggregation(
     OperationContext* opCtx,
+    const std::shared_ptr<Shard>& configShard,
     const Timestamp& minClusterTime,
     const boost::optional<NamespaceString>& nss) {
     /*
@@ -579,8 +548,8 @@ std::vector<ShardId> makeAndRunPlacementHistoryAggregation(
         }
     }();
 
-    auto aggrResult =
-        runCatalogAggregation(opCtx, aggRequest, readConcern, Shard::kDefaultConfigCommandTimeout);
+    auto aggrResult = runCatalogAggregation(
+        opCtx, configShard, aggRequest, readConcern, Shard::kDefaultConfigCommandTimeout);
 
     // Parse the result
     std::vector<ShardId> activeShards;
@@ -607,7 +576,8 @@ std::vector<ShardId> makeAndRunPlacementHistoryAggregation(
 
 }  // namespace
 
-ShardingCatalogClientImpl::ShardingCatalogClientImpl() = default;
+ShardingCatalogClientImpl::ShardingCatalogClientImpl(std::shared_ptr<Shard> overrideConfigShard)
+    : _overrideConfigShard(std::move(overrideConfigShard)) {}
 
 ShardingCatalogClientImpl::~ShardingCatalogClientImpl() = default;
 
@@ -814,14 +784,13 @@ StatusWith<BSONObj> ShardingCatalogClientImpl::getGlobalSettings(OperationContex
 
 StatusWith<VersionType> ShardingCatalogClientImpl::getConfigVersion(
     OperationContext* opCtx, repl::ReadConcernLevel readConcern) {
-    auto findStatus = Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
-        opCtx,
-        kConfigReadSelector,
-        readConcern,
-        VersionType::ConfigNS,
-        BSONObj(),
-        BSONObj(),
-        boost::none /* no limit */);
+    auto findStatus = _getConfigShard(opCtx)->exhaustiveFindOnConfig(opCtx,
+                                                                     kConfigReadSelector,
+                                                                     readConcern,
+                                                                     VersionType::ConfigNS,
+                                                                     BSONObj(),
+                                                                     BSONObj(),
+                                                                     boost::none /* no limit */);
     if (!findStatus.isOK()) {
         return findStatus.getStatus();
     }
@@ -933,8 +902,12 @@ std::pair<CollectionType, std::vector<ChunkType>> ShardingCatalogClientImpl::get
     const repl::ReadConcernArgs& readConcern) {
     auto aggRequest = makeCollectionAndChunksAggregation(opCtx, nss, sinceVersion);
 
-    std::vector<BSONObj> aggResult = runCatalogAggregation(
-        opCtx, aggRequest, readConcern, Milliseconds(gFindChunksOnConfigTimeoutMS.load()));
+    std::vector<BSONObj> aggResult =
+        runCatalogAggregation(opCtx,
+                              _getConfigShard(opCtx),
+                              aggRequest,
+                              readConcern,
+                              Milliseconds(gFindChunksOnConfigTimeoutMS.load()));
 
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "Collection " << nss.ns() << " not found",
@@ -990,8 +963,11 @@ ShardingCatalogClientImpl::getCollectionAndGlobalIndexes(OperationContext* opCtx
                                                          const repl::ReadConcernArgs& readConcern) {
     auto aggRequest = makeCollectionAndIndexesAggregation(opCtx, nss);
 
-    std::vector<BSONObj> aggResult =
-        runCatalogAggregation(opCtx, aggRequest, readConcern, Shard::kDefaultConfigCommandTimeout);
+    std::vector<BSONObj> aggResult = runCatalogAggregation(opCtx,
+                                                           _getConfigShard(opCtx),
+                                                           aggRequest,
+                                                           readConcern,
+                                                           Shard::kDefaultConfigCommandTimeout);
 
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "Collection " << nss.ns() << " not found",
@@ -1138,14 +1114,13 @@ Status ShardingCatalogClientImpl::runUserManagementWriteCommand(OperationContext
         cmdToRun = modifiedCmd.obj();
     }
 
-    auto swResponse =
-        Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
-            opCtx,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            dbname.toString(),
-            cmdToRun,
-            Shard::kDefaultConfigCommandTimeout,
-            Shard::RetryPolicy::kNotIdempotent);
+    auto swResponse = _getConfigShard(opCtx)->runCommandWithFixedRetryAttempts(
+        opCtx,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        dbname.toString(),
+        cmdToRun,
+        Shard::kDefaultConfigCommandTimeout,
+        Shard::RetryPolicy::kNotIdempotent);
 
     if (!swResponse.isOK()) {
         return swResponse.getStatus();
@@ -1169,14 +1144,13 @@ bool ShardingCatalogClientImpl::runUserManagementReadCommand(OperationContext* o
                                                              const std::string& dbname,
                                                              const BSONObj& cmdObj,
                                                              BSONObjBuilder* result) {
-    auto resultStatus =
-        Grid::get(opCtx)->shardRegistry()->getConfigShard()->runCommandWithFixedRetryAttempts(
-            opCtx,
-            kConfigPrimaryPreferredSelector,
-            dbname,
-            cmdObj,
-            Shard::kDefaultConfigCommandTimeout,
-            Shard::RetryPolicy::kIdempotent);
+    auto resultStatus = _getConfigShard(opCtx)->runCommandWithFixedRetryAttempts(
+        opCtx,
+        kConfigPrimaryPreferredSelector,
+        dbname,
+        cmdObj,
+        Shard::kDefaultConfigCommandTimeout,
+        Shard::RetryPolicy::kIdempotent);
     if (resultStatus.isOK()) {
         CommandHelpers::filterCommandReplyForPassthrough(resultStatus.getValue().response, result);
         return resultStatus.getValue().commandStatus.isOK();
@@ -1200,7 +1174,7 @@ Status ShardingCatalogClientImpl::insertConfigDocument(OperationContext* opCtx,
     }());
     request.setWriteConcern(writeConcern.toBSON());
 
-    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    const auto configShard = _getConfigShard(opCtx);
     for (int retry = 1; retry <= kMaxWriteRetry; retry++) {
         auto response = configShard->runBatchWriteCommand(
             opCtx, Shard::kDefaultConfigCommandTimeout, request, Shard::RetryPolicy::kNoRetry);
@@ -1306,8 +1280,7 @@ StatusWith<bool> ShardingCatalogClientImpl::_updateConfigDocument(
     }());
     request.setWriteConcern(writeConcern.toBSON());
 
-    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-    auto response = configShard->runBatchWriteCommand(
+    auto response = _getConfigShard(opCtx)->runBatchWriteCommand(
         opCtx, maxTimeMs, request, Shard::RetryPolicy::kIdempotent);
 
     Status status = response.toStatus();
@@ -1342,8 +1315,7 @@ Status ShardingCatalogClientImpl::removeConfigDocuments(OperationContext* opCtx,
     }());
     request.setWriteConcern(writeConcern.toBSON());
 
-    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-    auto response = configShard->runBatchWriteCommand(
+    auto response = _getConfigShard(opCtx)->runBatchWriteCommand(
         opCtx, Shard::kDefaultConfigCommandTimeout, request, Shard::RetryPolicy::kIdempotent);
     return response.toStatus();
 }
@@ -1357,7 +1329,7 @@ ShardingCatalogClientImpl::_exhaustiveFindOnConfig(OperationContext* opCtx,
                                                    const BSONObj& sort,
                                                    boost::optional<long long> limit,
                                                    const boost::optional<BSONObj>& hint) {
-    auto response = Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+    auto response = _getConfigShard(opCtx)->exhaustiveFindOnConfig(
         opCtx, readPref, readConcern, nss, query, sort, limit, hint);
     if (!response.isOK()) {
         return response.getStatus();
@@ -1372,19 +1344,18 @@ StatusWith<std::vector<KeysCollectionDocument>> ShardingCatalogClientImpl::getNe
     StringData purpose,
     const LogicalTime& newerThanThis,
     repl::ReadConcernLevel readConcernLevel) {
-    auto config = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-
     BSONObjBuilder queryBuilder;
     queryBuilder.append("purpose", purpose);
     queryBuilder.append("expiresAt", BSON("$gt" << newerThanThis.asTimestamp()));
 
-    auto findStatus = config->exhaustiveFindOnConfig(opCtx,
-                                                     kConfigReadSelector,
-                                                     readConcernLevel,
-                                                     NamespaceString::kKeysCollectionNamespace,
-                                                     queryBuilder.obj(),
-                                                     BSON("expiresAt" << 1),
-                                                     boost::none);
+    auto findStatus =
+        _getConfigShard(opCtx)->exhaustiveFindOnConfig(opCtx,
+                                                       kConfigReadSelector,
+                                                       readConcernLevel,
+                                                       NamespaceString::kKeysCollectionNamespace,
+                                                       queryBuilder.obj(),
+                                                       BSON("expiresAt" << 1),
+                                                       boost::none);
 
     if (!findStatus.isOK()) {
         return findStatus.getStatus();
@@ -1412,7 +1383,8 @@ std::vector<ShardId> ShardingCatalogClientImpl::getShardsThatOwnDataForCollAtClu
             "A full collection namespace must be specified",
             !collName.coll().empty());
 
-    return makeAndRunPlacementHistoryAggregation(opCtx, clusterTime, collName);
+    return makeAndRunPlacementHistoryAggregation(
+        opCtx, _getConfigShard(opCtx), clusterTime, collName);
 }
 
 
@@ -1423,13 +1395,22 @@ std::vector<ShardId> ShardingCatalogClientImpl::getShardsThatOwnDataForDbAtClust
             "A full db namespace must be specified",
             dbName.coll().empty() && !dbName.db().empty());
 
-    return makeAndRunPlacementHistoryAggregation(opCtx, clusterTime, dbName);
+    return makeAndRunPlacementHistoryAggregation(
+        opCtx, _getConfigShard(opCtx), clusterTime, dbName);
 }
 
 std::vector<ShardId> ShardingCatalogClientImpl::getShardsThatOwnDataAtClusterTime(
     OperationContext* opCtx, const Timestamp& clusterTime) {
 
-    return makeAndRunPlacementHistoryAggregation(opCtx, clusterTime, boost::none);
+    return makeAndRunPlacementHistoryAggregation(
+        opCtx, _getConfigShard(opCtx), clusterTime, boost::none);
+}
+
+std::shared_ptr<Shard> ShardingCatalogClientImpl::_getConfigShard(OperationContext* opCtx) {
+    if (_overrideConfigShard) {
+        return _overrideConfigShard;
+    }
+    return Grid::get(opCtx)->shardRegistry()->getConfigShard();
 }
 
 }  // namespace mongo

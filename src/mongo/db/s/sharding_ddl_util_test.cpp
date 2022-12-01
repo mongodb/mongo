@@ -165,10 +165,16 @@ TEST_F(ShardingDDLUtilTest, ShardedRenameMetadata) {
     std::vector<BSONObj> fromChunks;
     findN(client, std::move(fromChunksRequest), nChunks, fromChunks);
 
-    auto fromCollType = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, fromNss);
+    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    auto catalogClient = Grid::get(opCtx)->catalogClient();
+    auto fromCollType = catalogClient->getCollection(opCtx, fromNss);
     // Perform the metadata rename
-    sharding_ddl_util::shardedRenameMetadata(
-        opCtx, fromCollType, kToNss, ShardingCatalogClient::kMajorityWriteConcern);
+    sharding_ddl_util::shardedRenameMetadata(opCtx,
+                                             configShard.get(),
+                                             catalogClient,
+                                             fromCollType,
+                                             kToNss,
+                                             ShardingCatalogClient::kMajorityWriteConcern);
 
     // Check that the FROM config.collections entry has been deleted
     ASSERT(client.findOne(CollectionType::ConfigNS, fromCollQuery).isEmpty());

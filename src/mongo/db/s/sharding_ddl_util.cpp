@@ -97,6 +97,7 @@ void runTransactionOnShardingCatalog(OperationContext* opCtx,
 }
 
 void updateTags(OperationContext* opCtx,
+                Shard* configShard,
                 const NamespaceString& fromNss,
                 const NamespaceString& toNss,
                 const WriteConcernOptions& writeConcern) {
@@ -117,7 +118,6 @@ void updateTags(OperationContext* opCtx,
     }());
     request.setWriteConcern(writeConcern.toBSON());
 
-    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
     auto response = configShard->runBatchWriteCommand(
         opCtx, Milliseconds::max(), request, Shard::RetryPolicy::kIdempotentOrCursorInvalidated);
 
@@ -435,6 +435,7 @@ void removeQueryAnalyzerMetadataFromConfig(OperationContext* opCtx,
 }
 
 void removeTagsMetadataFromConfig_notIdempotent(OperationContext* opCtx,
+                                                Shard* configShard,
                                                 const NamespaceString& nss,
                                                 const WriteConcernOptions& writeConcern) {
     // Remove config.tags entries
@@ -455,7 +456,6 @@ void removeTagsMetadataFromConfig_notIdempotent(OperationContext* opCtx,
 
     request.setWriteConcern(writeConcern.toBSON());
 
-    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
     auto response = configShard->runBatchWriteCommand(
         opCtx, Milliseconds::max(), request, Shard::RetryPolicy::kIdempotentOrCursorInvalidated);
 
@@ -478,11 +478,11 @@ void removeCollAndChunksMetadataFromConfig(OperationContext* opCtx,
 }
 
 bool removeCollAndChunksMetadataFromConfig_notIdempotent(OperationContext* opCtx,
+                                                         ShardingCatalogClient* catalogClient,
                                                          const NamespaceString& nss,
                                                          const WriteConcernOptions& writeConcern) {
     invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
     IgnoreAPIParametersBlock ignoreApiParametersBlock(opCtx);
-    const auto catalogClient = Grid::get(opCtx)->catalogClient();
 
     ON_BLOCK_EXIT(
         [&] { Grid::get(opCtx)->catalogCache()->invalidateCollectionEntry_LINEARIZABLE(nss); });
@@ -500,12 +500,13 @@ bool removeCollAndChunksMetadataFromConfig_notIdempotent(OperationContext* opCtx
 }
 
 void shardedRenameMetadata(OperationContext* opCtx,
+                           Shard* configShard,
+                           ShardingCatalogClient* catalogClient,
                            CollectionType& fromCollType,
                            const NamespaceString& toNss,
                            const WriteConcernOptions& writeConcern) {
     invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
 
-    auto catalogClient = Grid::get(opCtx)->catalogClient();
     auto fromNss = fromCollType.getNss();
     auto fromUUID = fromCollType.getUuid();
 
@@ -520,7 +521,8 @@ void shardedRenameMetadata(OperationContext* opCtx,
         }
 
         // Delete "TO" chunk/collection entries referring a dropped collection
-        removeCollAndChunksMetadataFromConfig_notIdempotent(opCtx, toNss, writeConcern);
+        removeCollAndChunksMetadataFromConfig_notIdempotent(
+            opCtx, catalogClient, toNss, writeConcern);
     } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
         // The "TO" collection is not sharded or doesn't exist
     }
@@ -529,7 +531,7 @@ void shardedRenameMetadata(OperationContext* opCtx,
     deleteCollection(opCtx, fromNss, fromUUID, writeConcern);
 
     // Update "FROM" tags to "TO".
-    updateTags(opCtx, fromNss, toNss, writeConcern);
+    updateTags(opCtx, configShard, fromNss, toNss, writeConcern);
 
     // Retrieve the most recent placement information about "FROM", excluding the entry that
     // matches its deletion (an empty 'shards' field).
@@ -544,15 +546,14 @@ void shardedRenameMetadata(OperationContext* opCtx,
                           << BSON("$ne" << BSONArray()));
 
         auto queryResponse =
-            uassertStatusOK(
-                Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
-                    opCtx,
-                    ReadPreferenceSetting(ReadPreference::Nearest, TagSet{}),
-                    repl::ReadConcernLevel::kMajorityReadConcern,
-                    NamespaceString::kConfigsvrPlacementHistoryNamespace,
-                    query,
-                    BSON(NamespacePlacementType::kTimestampFieldName << -1) /*sort*/,
-                    1 /*limit*/))
+            uassertStatusOK(configShard->exhaustiveFindOnConfig(
+                                opCtx,
+                                ReadPreferenceSetting(ReadPreference::Nearest, TagSet{}),
+                                repl::ReadConcernLevel::kMajorityReadConcern,
+                                NamespaceString::kConfigsvrPlacementHistoryNamespace,
+                                query,
+                                BSON(NamespacePlacementType::kTimestampFieldName << -1) /*sort*/,
+                                1 /*limit*/))
                 .docs;
 
         /*

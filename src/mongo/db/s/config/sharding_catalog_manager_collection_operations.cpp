@@ -57,16 +57,19 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(hangRefineCollectionShardKeyBeforeUpdatingChunks);
 MONGO_FAIL_POINT_DEFINE(hangRefineCollectionShardKeyBeforeCommit);
 
-void triggerFireAndForgetShardRefreshes(OperationContext* opCtx, const CollectionType& coll) {
+void triggerFireAndForgetShardRefreshes(OperationContext* opCtx,
+                                        Shard* configShard,
+                                        ShardingCatalogClient* catalogClient,
+                                        const CollectionType& coll) {
     const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-    const auto allShards = uassertStatusOK(Grid::get(opCtx)->catalogClient()->getAllShards(
+    const auto allShards = uassertStatusOK(catalogClient->getAllShards(
                                                opCtx, repl::ReadConcernLevel::kLocalReadConcern))
                                .value;
     for (const auto& shardEntry : allShards) {
         const auto query = BSON(ChunkType::collectionUUID
                                 << coll.getUuid() << ChunkType::shard(shardEntry.getName()));
 
-        const auto chunk = uassertStatusOK(shardRegistry->getConfigShard()->exhaustiveFindOnConfig(
+        const auto chunk = uassertStatusOK(configShard->exhaustiveFindOnConfig(
                                                opCtx,
                                                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                                                repl::ReadConcernLevel::kLocalReadConcern,
@@ -225,7 +228,7 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
 
     const auto newEpoch = OID::gen();
 
-    auto collType = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
+    auto collType = _localCatalogClient->getCollection(opCtx, nss);
     const auto oldShardKeyPattern = ShardKeyPattern(collType.getKeyPattern());
 
     uassertStatusOK(ShardingLogging::get(opCtx)->logChangeChecked(
@@ -360,7 +363,8 @@ void ShardingCatalogManager::refineCollectionShardKey(OperationContext* opCtx,
     // Trigger refreshes on each shard containing chunks in the namespace 'nss'. Since this isn't
     // necessary for correctness, all refreshes are best-effort.
     try {
-        triggerFireAndForgetShardRefreshes(opCtx, collType);
+        triggerFireAndForgetShardRefreshes(
+            opCtx, _localConfigShard.get(), _localCatalogClient.get(), collType);
     } catch (const DBException& ex) {
         LOGV2(
             51798,
@@ -538,7 +542,8 @@ void ShardingCatalogManager::renameShardedMetadata(
     if (optFromCollType) {
         // Rename CSRS metadata in case the source collection is sharded
         auto collType = *optFromCollType;
-        sharding_ddl_util::shardedRenameMetadata(opCtx, collType, to, writeConcern);
+        sharding_ddl_util::shardedRenameMetadata(
+            opCtx, _localConfigShard.get(), _localCatalogClient.get(), collType, to, writeConcern);
         ShardingLogging::get(opCtx)->logChange(
             opCtx,
             "renameCollection.metadata",
@@ -550,8 +555,9 @@ void ShardingCatalogManager::renameShardedMetadata(
         // target collection was sharded
         // throws if the provided UUID does not match
         sharding_ddl_util::removeCollAndChunksMetadataFromConfig_notIdempotent(
-            opCtx, to, writeConcern);
-        sharding_ddl_util::removeTagsMetadataFromConfig_notIdempotent(opCtx, to, writeConcern);
+            opCtx, _localCatalogClient.get(), to, writeConcern);
+        sharding_ddl_util::removeTagsMetadataFromConfig_notIdempotent(
+            opCtx, _localConfigShard.get(), to, writeConcern);
         ShardingLogging::get(opCtx)->logChange(opCtx,
                                                "renameCollection.metadata",
                                                str::stream()

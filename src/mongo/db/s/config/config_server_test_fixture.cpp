@@ -113,16 +113,12 @@ void ConfigServerTestFixture::setUp() {
     // Initialize sharding components as a config server.
     serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
 
-    {
-        // The catalog manager requires a special executor used for operations during addShard.
-        auto specialNet(std::make_unique<executor::NetworkInterfaceMock>());
-        _mockNetworkForAddShard = specialNet.get();
+    // The catalog manager requires a special executor used for operations during addShard.
+    auto specialNet(std::make_unique<executor::NetworkInterfaceMock>());
+    _mockNetworkForAddShard = specialNet.get();
 
-        auto specialExec(makeThreadPoolTestExecutor(std::move(specialNet)));
-        _executorForAddShard = specialExec.get();
-
-        ShardingCatalogManager::create(getServiceContext(), std::move(specialExec));
-    }
+    auto specialExec(makeThreadPoolTestExecutor(std::move(specialNet)));
+    _executorForAddShard = specialExec.get();
 
     _addShardNetworkTestEnv =
         std::make_unique<NetworkTestEnv>(_executorForAddShard, _mockNetworkForAddShard);
@@ -130,6 +126,13 @@ void ConfigServerTestFixture::setUp() {
     CatalogCacheLoader::set(getServiceContext(), std::move(configServerCatalogCacheLoader));
 
     uassertStatusOK(initializeGlobalShardingStateForMongodForTest(ConnectionString::forLocal()));
+
+    auto shardLocal = Grid::get(getServiceContext())->shardRegistry()->createLocalConfigShard();
+    auto localCatalogClient = std::make_unique<ShardingCatalogClientImpl>(shardLocal);
+    ShardingCatalogManager::create(getServiceContext(),
+                                   std::move(specialExec),
+                                   std::move(shardLocal),
+                                   std::move(localCatalogClient));
 }
 
 void ConfigServerTestFixture::tearDown() {
@@ -145,7 +148,7 @@ void ConfigServerTestFixture::tearDown() {
 }
 
 std::unique_ptr<ShardingCatalogClient> ConfigServerTestFixture::makeShardingCatalogClient() {
-    return std::make_unique<ShardingCatalogClientImpl>();
+    return std::make_unique<ShardingCatalogClientImpl>(nullptr /* overrideConfigShard */);
 }
 
 std::unique_ptr<BalancerConfiguration> ConfigServerTestFixture::makeBalancerConfiguration() {

@@ -51,7 +51,7 @@ class TaskExecutor;
 class ShardingCatalogClientImpl final : public ShardingCatalogClient {
 
 public:
-    ShardingCatalogClientImpl();
+    ShardingCatalogClientImpl(std::shared_ptr<Shard> overrideConfigShard);
     virtual ~ShardingCatalogClientImpl();
 
     /*
@@ -59,10 +59,10 @@ public:
      * writing a document to the "config.collections" collection with the catalog information
      * described by "coll."
      */
-    static Status updateShardingCatalogEntryForCollection(OperationContext* opCtx,
-                                                          const NamespaceString& nss,
-                                                          const CollectionType& coll,
-                                                          bool upsert);
+    Status updateShardingCatalogEntryForCollection(OperationContext* opCtx,
+                                                   const NamespaceString& nss,
+                                                   const CollectionType& coll,
+                                                   bool upsert);
 
     DatabaseType getDatabase(OperationContext* opCtx,
                              StringData db,
@@ -214,13 +214,13 @@ private:
      * was upserted or it existed and any of the fields changed) and false otherwise (basically
      * returns whether the update command's response update.n value is > 0).
      */
-    static StatusWith<bool> _updateConfigDocument(OperationContext* opCtx,
-                                                  const NamespaceString& nss,
-                                                  const BSONObj& query,
-                                                  const BSONObj& update,
-                                                  bool upsert,
-                                                  const WriteConcernOptions& writeConcern,
-                                                  Milliseconds maxTimeMs);
+    StatusWith<bool> _updateConfigDocument(OperationContext* opCtx,
+                                           const NamespaceString& nss,
+                                           const BSONObj& query,
+                                           const BSONObj& update,
+                                           bool upsert,
+                                           const WriteConcernOptions& writeConcern,
+                                           Milliseconds maxTimeMs);
 
     StatusWith<repl::OpTimeWith<std::vector<BSONObj>>> _exhaustiveFindOnConfig(
         OperationContext* opCtx,
@@ -241,6 +241,17 @@ private:
         const std::string& dbName,
         const ReadPreferenceSetting& readPref,
         repl::ReadConcernLevel readConcernLevel);
+
+    /**
+     * Returns the Shard type that should be used to access the config server. Unless an instance
+     * was provided at construction, which may be done e.g. to force using local operations, falls
+     * back to using the config shard from the ShardRegistry.
+     */
+    std::shared_ptr<Shard> _getConfigShard(OperationContext* opCtx);
+
+    // If set, this is used as the config shard by all methods. Be careful to only use an instance
+    // that is always valid, like a ShardLocal.
+    std::shared_ptr<Shard> _overrideConfigShard;
 };
 
 }  // namespace mongo

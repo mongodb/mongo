@@ -34,7 +34,9 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/async_requests_sender.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/client/shard.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
 namespace mongo {
@@ -68,6 +70,7 @@ void removeTagsMetadataFromConfig(OperationContext* opCtx,
  * Erase tags metadata from config server for the given namespace.
  */
 void removeTagsMetadataFromConfig_notIdempotent(OperationContext* opCtx,
+                                                Shard* configShard,
                                                 const NamespaceString& nss,
                                                 const WriteConcernOptions& writeConcern);
 
@@ -87,6 +90,7 @@ void removeCollAndChunksMetadataFromConfig(OperationContext* opCtx,
  * Returns true if the collection existed before being removed.
  */
 bool removeCollAndChunksMetadataFromConfig_notIdempotent(OperationContext* opCtx,
+                                                         ShardingCatalogClient* catalogClient,
                                                          const NamespaceString& nss,
                                                          const WriteConcernOptions& writeConcern);
 
@@ -106,6 +110,8 @@ void removeQueryAnalyzerMetadataFromConfig(OperationContext* opCtx,
  * This function is idempotent and can just be invoked by the CSRS.
  */
 void shardedRenameMetadata(OperationContext* opCtx,
+                           Shard* configShard,
+                           ShardingCatalogClient* catalogClient,
                            CollectionType& fromCollType,
                            const NamespaceString& toNss,
                            const WriteConcernOptions& writeConcern);

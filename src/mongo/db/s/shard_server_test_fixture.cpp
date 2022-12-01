@@ -91,7 +91,7 @@ void ShardServerTestFixture::tearDown() {
 }
 
 std::unique_ptr<ShardingCatalogClient> ShardServerTestFixture::makeShardingCatalogClient() {
-    return std::make_unique<ShardingCatalogClientImpl>();
+    return std::make_unique<ShardingCatalogClientImpl>(nullptr /* overrideConfigShard */);
 }
 
 void ShardServerTestFixtureWithCatalogCacheMock::setUp() {

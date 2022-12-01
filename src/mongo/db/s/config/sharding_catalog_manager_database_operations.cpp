@@ -161,7 +161,6 @@ DatabaseType ShardingCatalogManager::createDatabase(
     }
 
     // Expensive createDatabase code path
-    const auto catalogClient = Grid::get(opCtx)->catalogClient();
 
     // Check if a database already exists with the same name (case insensitive), and if so, return
     // the existing entry.
@@ -243,7 +242,7 @@ DatabaseType ShardingCatalogManager::createDatabase(
             } else {
                 // Do this write with majority writeConcern to guarantee that the shard sees the
                 // write when it receives the _flushDatabaseCacheUpdates.
-                uassertStatusOK(catalogClient->insertConfigDocument(
+                uassertStatusOK(_localCatalogClient->insertConfigDocument(
                     opCtx,
                     NamespaceString::kConfigDatabasesNamespace,
                     db.toBSON(),

@@ -191,7 +191,7 @@ Status initializeGlobalShardingState(
     const auto service = opCtx->getServiceContext();
     auto const grid = Grid::get(service);
 
-    grid->init(std::make_unique<ShardingCatalogClientImpl>(),
+    grid->init(std::make_unique<ShardingCatalogClientImpl>(nullptr /* overrideConfigShard */),
                std::move(catalogCache),
                std::move(srsp),
                std::make_unique<ClusterCursorManager>(service->getPreciseClockSource()),

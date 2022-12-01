@@ -413,7 +413,7 @@ void ShardingTestFixture::checkReadConcern(const BSONObj& cmdObj,
 }
 
 std::unique_ptr<ShardingCatalogClient> ShardingTestFixture::makeShardingCatalogClient() {
-    return std::make_unique<ShardingCatalogClientImpl>();
+    return std::make_unique<ShardingCatalogClientImpl>(nullptr /* overrideConfigShard */);
 }
 
 }  // namespace mongo

@@ -275,6 +275,12 @@ public:
      */
     std::unique_ptr<Shard> createConnection(const ConnectionString& connStr) const;
 
+    /**
+     * Returns a ShardLocal for the config server that is not tracked by the registry. May only be
+     * called on a config server node.
+     */
+    std::shared_ptr<Shard> createLocalConfigShard() const;
+
     void toBSON(BSONObjBuilder* result) const;
 
     /**

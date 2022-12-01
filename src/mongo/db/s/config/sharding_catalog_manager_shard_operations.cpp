@@ -110,18 +110,18 @@ const WriteConcernOptions kMajorityWriteConcern{WriteConcernOptions::kMajority,
 /**
  * Generates a unique name to be given to a newly added shard.
  */
-StatusWith<std::string> generateNewShardName(OperationContext* opCtx) {
+StatusWith<std::string> generateNewShardName(OperationContext* opCtx, Shard* configShard) {
     BSONObjBuilder shardNameRegex;
     shardNameRegex.appendRegex(ShardType::name(), "^shard");
 
-    auto findStatus = Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
-        opCtx,
-        kConfigReadSelector,
-        repl::ReadConcernLevel::kLocalReadConcern,
-        NamespaceString::kConfigsvrShardsNamespace,
-        shardNameRegex.obj(),
-        BSON(ShardType::name() << -1),
-        1);
+    auto findStatus =
+        configShard->exhaustiveFindOnConfig(opCtx,
+                                            kConfigReadSelector,
+                                            repl::ReadConcernLevel::kLocalReadConcern,
+                                            NamespaceString::kConfigsvrShardsNamespace,
+                                            shardNameRegex.obj(),
+                                            BSON(ShardType::name() << -1),
+                                            1);
     if (!findStatus.isOK()) {
         return findStatus.getStatus();
     }
@@ -228,8 +228,8 @@ StatusWith<boost::optional<ShardType>> ShardingCatalogManager::_checkIfShardExis
     const ConnectionString& proposedShardConnectionString,
     const std::string* proposedShardName) {
     // Check whether any host in the connection is already part of the cluster.
-    const auto existingShards = Grid::get(opCtx)->catalogClient()->getAllShards(
-        opCtx, repl::ReadConcernLevel::kLocalReadConcern);
+    const auto existingShards =
+        _localCatalogClient->getAllShards(opCtx, repl::ReadConcernLevel::kLocalReadConcern);
     if (!existingShards.isOK()) {
         return existingShards.getStatus().withContext(
             "Failed to load existing shards during addShard");
@@ -655,7 +655,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
     for (const auto& dbName : dbNamesStatus.getValue()) {
         try {
-            auto dbt = Grid::get(opCtx)->catalogClient()->getDatabase(
+            auto dbt = _localCatalogClient->getDatabase(
                 opCtx, dbName, repl::ReadConcernLevel::kLocalReadConcern);
             return Status(ErrorCodes::OperationFailed,
                           str::stream() << "can't add shard "
@@ -676,7 +676,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
 
     // If a name for a shard wasn't provided, generate one
     if (shardType.getName().empty()) {
-        auto result = generateNewShardName(opCtx);
+        auto result = generateNewShardName(opCtx, _localConfigShard.get());
         if (!result.isOK()) {
             return result.getStatus();
         }
@@ -759,11 +759,11 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
               "Going to insert new entry for shard into config.shards",
               "shardType"_attr = shardType.toString());
 
-        Status result = Grid::get(opCtx)->catalogClient()->insertConfigDocument(
-            opCtx,
-            NamespaceString::kConfigsvrShardsNamespace,
-            shardType.toBSON(),
-            ShardingCatalogClient::kLocalWriteConcern);
+        Status result =
+            _localCatalogClient->insertConfigDocument(opCtx,
+                                                      NamespaceString::kConfigsvrShardsNamespace,
+                                                      shardType.toBSON(),
+                                                      ShardingCatalogClient::kLocalWriteConcern);
         if (!result.isOK()) {
             LOGV2(21943,
                   "Error adding shard: {shardType} err: {error}",
@@ -782,7 +782,7 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
                 dbName, shardType.getName(), DatabaseVersion(UUID::gen(), clusterTime));
 
             {
-                const auto status = Grid::get(opCtx)->catalogClient()->updateConfigDocument(
+                const auto status = _localCatalogClient->updateConfigDocument(
                     opCtx,
                     NamespaceString::kConfigDatabasesNamespace,
                     BSON(DatabaseType::kNameFieldName << dbName),
@@ -826,18 +826,16 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     const auto name = shardId.toString();
     audit::logRemoveShard(opCtx->getClient(), name);
 
-    const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-
     Lock::ExclusiveLock shardLock(opCtx, _kShardMembershipLock);
 
     auto findShardResponse = uassertStatusOK(
-        configShard->exhaustiveFindOnConfig(opCtx,
-                                            kConfigReadSelector,
-                                            repl::ReadConcernLevel::kLocalReadConcern,
-                                            NamespaceString::kConfigsvrShardsNamespace,
-                                            BSON(ShardType::name() << name),
-                                            BSONObj(),
-                                            1));
+        _localConfigShard->exhaustiveFindOnConfig(opCtx,
+                                                  kConfigReadSelector,
+                                                  repl::ReadConcernLevel::kLocalReadConcern,
+                                                  NamespaceString::kConfigsvrShardsNamespace,
+                                                  BSON(ShardType::name() << name),
+                                                  BSONObj(),
+                                                  1));
     uassert(ErrorCodes::ShardNotFound,
             str::stream() << "Shard " << shardId << " does not exist",
             !findShardResponse.docs.empty());
@@ -870,8 +868,6 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
             NamespaceString::kConfigsvrShardsNamespace,
             BSON(ShardType::name() << name << ShardType::draining(true)))) > 0;
 
-    auto* const catalogClient = Grid::get(opCtx)->catalogClient();
-
     if (!isShardCurrentlyDraining) {
         LOGV2(21945,
               "Going to start draining shard: {shardId}",
@@ -886,14 +882,14 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
             BSON("shard" << name),
             ShardingCatalogClient::kLocalWriteConcern));
 
-        uassertStatusOKWithContext(
-            catalogClient->updateConfigDocument(opCtx,
-                                                NamespaceString::kConfigsvrShardsNamespace,
-                                                BSON(ShardType::name() << name),
-                                                BSON("$set" << BSON(ShardType::draining(true))),
-                                                false,
-                                                ShardingCatalogClient::kLocalWriteConcern),
-            "error starting removeShard");
+        uassertStatusOKWithContext(_localCatalogClient->updateConfigDocument(
+                                       opCtx,
+                                       NamespaceString::kConfigsvrShardsNamespace,
+                                       BSON(ShardType::name() << name),
+                                       BSON("$set" << BSON(ShardType::draining(true))),
+                                       false,
+                                       ShardingCatalogClient::kLocalWriteConcern),
+                                   "error starting removeShard");
 
         return {RemoveShardProgress::STARTED,
                 boost::optional<RemoveShardProgress::DrainingShardUsage>(boost::none)};
@@ -939,14 +935,14 @@ RemoveShardProgress ShardingCatalogManager::removeShard(OperationContext* opCtx,
     shardLock.lock();
 
     // Find a controlShard to be updated.
-    auto controlShardQueryStatus =
-        configShard->exhaustiveFindOnConfig(opCtx,
-                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                                            repl::ReadConcernLevel::kLocalReadConcern,
-                                            NamespaceString::kConfigsvrShardsNamespace,
-                                            BSON(ShardType::name.ne(name)),
-                                            {},
-                                            1);
+    auto controlShardQueryStatus = _localConfigShard->exhaustiveFindOnConfig(
+        opCtx,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        repl::ReadConcernLevel::kLocalReadConcern,
+        NamespaceString::kConfigsvrShardsNamespace,
+        BSON(ShardType::name.ne(name)),
+        {},
+        1);
     auto controlShardResponse = uassertStatusOK(controlShardQueryStatus);
     // Since it's not possible to remove the last shard, there should always be a control shard.
     uassert(4740601,
@@ -993,14 +989,13 @@ StatusWith<long long> ShardingCatalogManager::_runCountCommandOnConfig(Operation
     countBuilder.append("count", nss.coll());
     countBuilder.append("query", query);
 
-    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
     auto resultStatus =
-        configShard->runCommandWithFixedRetryAttempts(opCtx,
-                                                      kConfigReadSelector,
-                                                      nss.db().toString(),
-                                                      countBuilder.done(),
-                                                      Shard::kDefaultConfigCommandTimeout,
-                                                      Shard::RetryPolicy::kIdempotent);
+        _localConfigShard->runCommandWithFixedRetryAttempts(opCtx,
+                                                            kConfigReadSelector,
+                                                            nss.db().toString(),
+                                                            countBuilder.done(),
+                                                            Shard::kDefaultConfigCommandTimeout,
+                                                            Shard::RetryPolicy::kIdempotent);
     if (!resultStatus.isOK()) {
         return resultStatus.getStatus();
     }
@@ -1243,11 +1238,11 @@ void ShardingCatalogManager::_pushClusterParametersToNewShard(
 }
 
 void ShardingCatalogManager::_standardizeClusterParameters(OperationContext* opCtx, Shard* shard) {
-    auto configServer = Grid::get(opCtx)->shardRegistry()->getConfigShard();
-    auto tenantIds = uassertStatusOK(getTenantsWithConfigDbsOnShard(opCtx, configServer.get()));
+    auto tenantIds =
+        uassertStatusOK(getTenantsWithConfigDbsOnShard(opCtx, _localConfigShard.get()));
     TenantIdMap<std::vector<BSONObj>> configSvrClusterParameterDocs;
     for (const auto& tenantId : tenantIds) {
-        auto findResponse = uassertStatusOK(configServer->exhaustiveFindOnConfig(
+        auto findResponse = uassertStatusOK(_localConfigShard->exhaustiveFindOnConfig(
             opCtx,
             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
             repl::ReadConcernLevel::kLocalReadConcern,
@@ -1259,14 +1254,14 @@ void ShardingCatalogManager::_standardizeClusterParameters(OperationContext* opC
         configSvrClusterParameterDocs.emplace(tenantId, findResponse.docs);
     }
 
-    auto shardsDocs = uassertStatusOK(
-        configServer->exhaustiveFindOnConfig(opCtx,
-                                             ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                             repl::ReadConcernLevel::kLocalReadConcern,
-                                             NamespaceString::kConfigsvrShardsNamespace,
-                                             BSONObj(),
-                                             BSONObj(),
-                                             boost::none));
+    auto shardsDocs = uassertStatusOK(_localConfigShard->exhaustiveFindOnConfig(
+        opCtx,
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+        repl::ReadConcernLevel::kLocalReadConcern,
+        NamespaceString::kConfigsvrShardsNamespace,
+        BSONObj(),
+        BSONObj(),
+        boost::none));
 
     // If this is the first shard being added, and no cluster parameters have been set, then this
     // can be seen as a replica set to shard conversion -- absorb all of this shard's cluster

@@ -427,6 +427,11 @@ std::unique_ptr<Shard> ShardRegistry::createConnection(const ConnectionString& c
     return _shardFactory->createUniqueShard(ShardId("<unnamed>"), connStr);
 }
 
+std::shared_ptr<Shard> ShardRegistry::createLocalConfigShard() const {
+    invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+    return _shardFactory->createShard(ShardId::kConfigServerId, ConnectionString::forLocal());
+}
+
 void ShardRegistry::toBSON(BSONObjBuilder* result) const {
     BSONObjBuilder map;
     BSONObjBuilder hosts;
