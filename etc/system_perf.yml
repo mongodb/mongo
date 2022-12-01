@@ -115,10 +115,6 @@ modules:
     repo: git@github.com:mongodb-labs/YCSB.git
     prefix: ${workdir}/src
     branch: production
-  - name: benchmarks
-    repo: git@github.com:mongodb-labs/benchmarks.git
-    prefix: ${workdir}/src
-    branch: master
   - name: py-tpcc
     repo: git@github.com:mongodb-labs/py-tpcc.git
     prefix: ${workdir}/src
@@ -1155,23 +1151,6 @@ tasks:
         vars:
           test_control: "change_streams_multi_mongos"
 
-  - name: sb_large_scale
-    priority: 5
-    exec_timeout_secs: 43200 # 12 hours
-    commands:
-      - func: f_run_dsi_workload
-        vars:
-          test_control: "sb_large_scale"
-          additional_tfvars: "tags: {expire-on-delta: 12}"
-
-  - name: sb_timeseries
-    priority: 5
-    commands:
-      - func: f_run_dsi_workload
-        vars:
-          test_control: "sb_timeseries"
-
-
 buildvariants:
   - name: task_generation
     display_name: Task Generation
@@ -1501,8 +1480,6 @@ buildvariants:
       - name: tpch_10_normalized
       - name: tpch_10_denormalized
       - name: industry_benchmarks_wmajority
-      - name: sb_large_scale
-      - name: sb_timeseries
 
   - name: linux-standalone-audit
     display_name: Linux Standalone Audit Legacy
@@ -1935,8 +1912,6 @@ buildvariants:
       - name: tsbs_query
       - name: tsbs_query_finance
       - name: tsbs_query_manual_bucketing
-      - name: sb_large_scale
-      - name: sb_timeseries
       - name: big_update_10k
 
   - name: linux-3-node-replSet-last-continuous-fcv
@@ -1993,8 +1968,6 @@ buildvariants:
       - name: tsbs_query
       - name: tsbs_query_finance
       - name: tsbs_query_manual_bucketing
-      - name: sb_large_scale
-      - name: sb_timeseries
 
   - name: linux-3-node-replSet-last-lts-fcv
     display_name: Linux 3-Node ReplSet (Last LTS FCV) Legacy
@@ -2050,8 +2023,6 @@ buildvariants:
       - name: tsbs_query
       - name: tsbs_query_finance
       - name: tsbs_query_manual_bucketing
-      - name: sb_large_scale
-      - name: sb_timeseries
 
   # Note that the "disabled-feature-flags" part of the name is kept to avoid breaking
   # history even though the display name is "all feature flags"
@@ -2111,8 +2082,6 @@ buildvariants:
       - name: tsbs_query
       - name: tsbs_query_finance
       - name: tsbs_query_manual_bucketing
-      - name: sb_large_scale
-      - name: sb_timeseries
 
   - name: linux-3-node-replSet-noflowcontrol
     display_name: Linux 3-Node ReplSet (Flow Control off) Legacy
@@ -2694,8 +2663,6 @@ buildvariants:
       - name: tpch_1_denormalized
       - name: tpch_10_normalized
       - name: tpch_10_denormalized
-      # - name: sb_large_scale
-      # - name: sb_timeseries
 
   - name: linux-standalone-audit.2022-11
     display_name: Linux Standalone Audit 2022-11
@@ -3215,8 +3182,6 @@ buildvariants:
       # - name: tsbs_query
       # - name: tsbs_query_finance
       # - name: tsbs_query_manual_bucketing
-      # - name: sb_large_scale
-      # - name: sb_timeseries
       # - name: big_update_10k
 
   - name: linux-3-node-replSet-intel.2022-11
@@ -3300,12 +3265,10 @@ buildvariants:
       # - name: tpch_10_denormalized
       - name: linkbench
       - name: linkbench2
-      - name: tsbs_load
-      - name: tsbs_query
-      - name: tsbs_query_finance
-      - name: tsbs_query_manual_bucketing
-      - name: sb_large_scale
-      - name: sb_timeseries
+      # - name: tsbs_load
+      # - name: tsbs_query
+      # - name: tsbs_query_finance
+      # - name: tsbs_query_manual_bucketing
 
   - name: linux-3-node-replSet-last-lts-fcv.2022-11
     display_name: Linux 3-Node ReplSet (Last LTS FCV) 2022-11
@@ -3359,12 +3322,10 @@ buildvariants:
       # - name: tpch_10_denormalized
       - name: linkbench
       - name: linkbench2
-      - name: tsbs_load
-      - name: tsbs_query
-      - name: tsbs_query_finance
-      - name: tsbs_query_manual_bucketing
-      - name: sb_large_scale
-      - name: sb_timeseries
+      # - name: tsbs_load
+      # - name: tsbs_query
+      # - name: tsbs_query_finance
+      # - name: tsbs_query_manual_bucketing
 
   - name: linux-3-node-replSet-all-feature-flags.2022-11
     display_name: Linux 3-Node ReplSet (all feature flags) 2022-11
@@ -3424,8 +3385,6 @@ buildvariants:
       # - name: tsbs_query
       # - name: tsbs_query_finance
       # - name: tsbs_query_manual_bucketing
-      # - name: sb_large_scale
-      # - name: sb_timeseries
 
   - name: linux-3-node-replSet-notls.2022-11
     display_name: Linux 3-Node ReplSet (No TLS) 2022-11
