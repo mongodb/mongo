@@ -1,7 +1,7 @@
 /**
  * Test to validate that a shard key index cannot be hidden if it cannot be dropped.
  *  @tags: [
- *   requires_fcv_62,
+ *   requires_fcv_60,
  * ]
  */
 
