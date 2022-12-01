@@ -197,22 +197,45 @@ StatusWith<Schema> generateSchemaFromBucketDoc(const BSONObj& bucketDoc,
     }
 }
 
-StatusWith<std::pair<Date_t, boost::optional<BSONElement>>> extractTimeAndMeta(
-    const BSONObj& doc, const TimeseriesOptions& options) {
-    auto timeElem = doc[options.getTimeField()];
+StatusWith<Date_t> extractTime(const BSONObj& doc, StringData timeFieldName) {
+    auto timeElem = doc[timeFieldName];
     if (!timeElem || BSONType::Date != timeElem.type()) {
         return {ErrorCodes::BadValue,
-                str::stream() << "'" << options.getTimeField() << "' must be present and contain a "
+                str::stream() << "'" << timeFieldName << "' must be present and contain a "
                               << "valid BSON UTC datetime value"};
     }
+    return timeElem.Date();
+}
 
-    auto time = timeElem.Date();
-    auto metaFieldName = options.getMetaField();
 
-    if (metaFieldName) {
-        return std::make_pair(time, doc[*metaFieldName]);
+StatusWith<std::pair<Date_t, BSONElement>> extractTimeAndMeta(const BSONObj& doc,
+                                                              StringData timeFieldName,
+                                                              StringData metaFieldName) {
+    // Iterate the document once, checking for both fields.
+    BSONElement timeElem;
+    BSONElement metaElem;
+    for (auto&& el : doc) {
+        if (!timeElem && el.fieldNameStringData() == timeFieldName) {
+            timeElem = el;
+            if (metaElem) {
+                break;
+            }
+        } else if (!metaElem && el.fieldNameStringData() == metaFieldName) {
+            metaElem = el;
+            if (timeElem) {
+                break;
+            }
+        }
     }
-    return std::make_pair(time, boost::none);
+
+    if (!timeElem || BSONType::Date != timeElem.type()) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "'" << timeFieldName << "' must be present and contain a "
+                              << "valid BSON UTC datetime value"};
+    }
+    auto time = timeElem.Date();
+
+    return std::make_pair(time, metaElem);
 }
 
 void normalizeMetadata(BSONObjBuilder* builder,
