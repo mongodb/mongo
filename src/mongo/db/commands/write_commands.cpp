@@ -1225,9 +1225,9 @@ public:
                     return false;
                 }
 
-                const auto& insertResult = swResult.getValue();
-                const auto& batch = insertResult.batch;
-                batches.emplace_back(batch, index);
+                auto& insertResult = swResult.getValue();
+                batches.emplace_back(std::move(insertResult.batch), index);
+                const auto& batch = batches.back().first;
                 if (isTimeseriesWriteRetryable(opCtx)) {
                     stmtIds[batch->bucket().id].push_back(stmtId);
                 }
