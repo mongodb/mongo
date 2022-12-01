@@ -274,7 +274,10 @@ class AutoGetOplog {
     AutoGetOplog& operator=(const AutoGetOplog&) = delete;
 
 public:
-    AutoGetOplog(OperationContext* opCtx, OplogAccessMode mode, Date_t deadline = Date_t::max());
+    AutoGetOplog(OperationContext* opCtx,
+                 OplogAccessMode mode,
+                 Date_t deadline = Date_t::max(),
+                 bool skipRSTLLock = false);
 
     /**
      * Return a pointer to the per-service-context LocalOplogInfo.

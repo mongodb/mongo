@@ -58,14 +58,19 @@ public:
             return builder.obj();
         }
 
-        Lock::GlobalLock lk(
-            opCtx, LockMode::MODE_IS, Date_t::now(), Lock::InterruptBehavior::kLeaveUnlocked);
+        Lock::GlobalLock lk(opCtx,
+                            LockMode::MODE_IS,
+                            Date_t::now(),
+                            Lock::InterruptBehavior::kLeaveUnlocked,
+                            // Replication state change does not affect the following operation.
+                            true /* skipRSTLLock */);
+
         if (!lk.isLocked()) {
             LOGV2_DEBUG(4822100, 2, "Failed to retrieve oplogTruncation statistics");
             return BSONObj();
         }
 
-        AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
+        AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead, Date_t::max(), true);
         auto oplog = oplogRead.getCollection();
         if (oplog) {
             const auto localDb =

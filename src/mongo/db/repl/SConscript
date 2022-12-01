@@ -1143,6 +1143,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/server_status',
+        '$BUILD_DIR/mongo/db/repl/local_oplog_info',
         '$BUILD_DIR/mongo/db/repl/speculative_authenticate',
         '$BUILD_DIR/mongo/db/stats/counters',
         '$BUILD_DIR/mongo/transport/message_compressor',

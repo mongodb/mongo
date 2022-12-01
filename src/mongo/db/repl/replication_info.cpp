@@ -276,23 +276,28 @@ public:
         result.append("latestOptime", replCoord->getMyLastAppliedOpTime().getTimestamp());
 
         auto earliestOplogTimestampFetch = [&]() -> Timestamp {
-            AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead);
-            if (!oplogRead.getCollection()) {
-                return Timestamp();
-            }
-
             // Try to get the lock. If it's already locked, immediately return null timestamp.
-            Lock::GlobalLock lk(
-                opCtx, MODE_IS, Date_t::now(), Lock::InterruptBehavior::kLeaveUnlocked);
+            Lock::GlobalLock lk(opCtx,
+                                MODE_IS,
+                                Date_t::now(),
+                                Lock::InterruptBehavior::kLeaveUnlocked,
+                                /* Not sensitive to replication so we can skip RSTL locking*/
+                                true);
             if (!lk.isLocked()) {
                 LOGV2_DEBUG(
                     6294100, 2, "Failed to get global lock for oplog server status section");
                 return Timestamp();
             }
 
+            AutoGetOplog oplogRead(opCtx, OplogAccessMode::kRead, Date_t::max(), true);
+            auto oplog = oplogRead.getCollection();
+            if (!oplog) {
+                return Timestamp();
+            }
+
             // Try getting earliest oplog timestamp using getEarliestOplogTimestamp
             auto swEarliestOplogTimestamp =
-                oplogRead.getCollection()->getRecordStore()->getEarliestOplogTimestamp(opCtx);
+                oplog->getRecordStore()->getEarliestOplogTimestamp(opCtx);
 
             if (swEarliestOplogTimestamp.getStatus() == ErrorCodes::OplogOperationUnsupported) {
                 // Falling back to use getSingleton if the storage engine does not support

@@ -224,7 +224,8 @@ public:
         GlobalLock(OperationContext* opCtx,
                    LockMode lockMode,
                    Date_t deadline,
-                   InterruptBehavior behavior);
+                   InterruptBehavior behavior,
+                   bool skipRSTLLock = false);
 
         GlobalLock(GlobalLock&&);
 
@@ -242,7 +243,7 @@ public:
                 }
                 _unlock();
             }
-            if (lockResult == LOCK_OK || lockResult == LOCK_WAITING) {
+            if (!_skipRSTLLock && (lockResult == LOCK_OK || lockResult == LOCK_WAITING)) {
                 _opCtx->lockState()->unlock(resourceIdReplicationStateTransitionLock);
             }
         }
@@ -252,6 +253,12 @@ public:
         }
 
     private:
+        /**
+         * Constructor helper functions, to handle skipping or taking the RSTL lock.
+         */
+        void _takeGlobalLockOnly(LockMode lockMode, Date_t deadline);
+        void _takeGlobalAndRSTLLocks(LockMode lockMode, Date_t deadline);
+
         void _unlock();
 
         OperationContext* const _opCtx;
@@ -259,6 +266,7 @@ public:
         ResourceLock _pbwm;
         ResourceLock _fcvLock;
         InterruptBehavior _interruptBehavior;
+        bool _skipRSTLLock;
         const bool _isOutermostLock;
     };
 
