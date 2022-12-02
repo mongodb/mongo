@@ -88,6 +88,7 @@ ArrayHistogram* ArrayHistogram::makeArrayHistogram(Statistics stats) {
                                   maybeArrayStats->getMinHistogram(),
                                   maybeArrayStats->getMaxHistogram(),
                                   mapStatsTypeCountToTypeCounts(maybeArrayStats->getTypeCount()),
+                                  stats.getEmptyArrayCount(),
                                   stats.getTrueCount(),
                                   stats.getFalseCount());
     }

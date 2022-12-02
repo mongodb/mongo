@@ -30,10 +30,12 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/query/stats/max_diff.h"
 #include "mongo/db/query/stats/scalar_histogram.h"
 #include "mongo/db/query/stats/stats_cache_loader_impl.h"
 #include "mongo/db/query/stats/stats_cache_loader_test_fixture.h"
 #include "mongo/db/query/stats/stats_gen.h"
+#include "mongo/db/query/stats/value_utils.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
@@ -56,7 +58,7 @@ void StatsCacheLoaderTest::createStatsCollection(NamespaceString nss) {
     wuow.commit();
 }
 
-TEST_F(StatsCacheLoaderTest, VerifyStatsLoad) {
+TEST_F(StatsCacheLoaderTest, VerifyStatsLoadsScalar) {
     // Initialize histogram buckets.
     constexpr double doubleCount = 15.0;
     constexpr double trueCount = 12.0;
@@ -108,6 +110,79 @@ TEST_F(StatsCacheLoaderTest, VerifyStatsLoad) {
     // Read stats path & verify values are consistent with what we expect.
     auto actualAH = _statsCacheLoader.getStats(operationContext(), std::make_pair(nss, path)).get();
     auto actualSerialized = actualAH->serialize();
+
+    ASSERT_BSONOBJ_EQ(expectedSerialized, actualSerialized);
+}
+
+TEST_F(StatsCacheLoaderTest, VerifyStatsLoadsArray) {
+    constexpr double numDocs = 12.0;
+
+    auto nonEmptyArrayVal = sbe::value::makeNewArray().second;
+    auto nonEmptyArray = sbe::value::getArrayView(nonEmptyArrayVal);
+    nonEmptyArray->push_back(sbe::value::TypeTags::NumberDouble, 1.0);
+    nonEmptyArray->push_back(sbe::value::TypeTags::NumberDouble, 2.0);
+    nonEmptyArray->push_back(sbe::value::TypeTags::NumberDouble, 3.0);
+
+    auto emptyArray1Val = sbe::value::makeNewArray().second;
+    auto emptyArray2Val = sbe::value::makeNewArray().second;
+    auto emptyArray3Val = sbe::value::makeNewArray().second;
+
+    // Create a small ArrayHistogram with boolean & empty array counts using maxdiff.
+    const std::vector<SBEValue> values{
+        // Scalar doubles: 1, 2, 3.
+        SBEValue{sbe::value::TypeTags::NumberDouble, sbe::value::bitcastFrom<double>(1.0)},
+        SBEValue{sbe::value::TypeTags::NumberDouble, sbe::value::bitcastFrom<double>(2.0)},
+        SBEValue{sbe::value::TypeTags::NumberDouble, sbe::value::bitcastFrom<double>(3.0)},
+        // 5x booleans: 2 true, 4 false.
+        SBEValue{sbe::value::TypeTags::Boolean, true},
+        SBEValue{sbe::value::TypeTags::Boolean, true},
+        SBEValue{sbe::value::TypeTags::Boolean, false},
+        SBEValue{sbe::value::TypeTags::Boolean, false},
+        SBEValue{sbe::value::TypeTags::Boolean, false},
+        SBEValue{sbe::value::TypeTags::Boolean, false},
+        // 3x empty arrays.
+        SBEValue{sbe::value::TypeTags::Array, emptyArray1Val},
+        SBEValue{sbe::value::TypeTags::Array, emptyArray2Val},
+        SBEValue{sbe::value::TypeTags::Array, emptyArray3Val},
+        // A non-empty array.
+        SBEValue{sbe::value::TypeTags::Array, nonEmptyArrayVal},
+    };
+    ArrayHistogram ah = createArrayEstimator(values, numDocs);
+    auto expectedSerialized = ah.serialize();
+
+    // Sanity check counters.
+    ASSERT_EQ(ah.getTrueCount(), 2.0);
+    ASSERT_EQ(ah.getFalseCount(), 4.0);
+    ASSERT_EQ(ah.getEmptyArrayCount(), 3.0);
+
+    // Serialize histogram into a stats path.
+    std::string path = "somePath";
+    auto serialized = stats::makeStatsPath(path, numDocs, ah);
+
+    // Initalize stats collection.
+    NamespaceString nss("test", "stats");
+    std::string statsColl(StatsCacheLoader::kStatsPrefix + "." + nss.coll());
+    NamespaceString statsNss(nss.db(), statsColl);
+    createStatsCollection(statsNss);
+
+    // Write serialized stats path to collection.
+    AutoGetCollection autoColl(operationContext(), statsNss, MODE_IX);
+    const CollectionPtr& coll = autoColl.getCollection();
+    {
+        WriteUnitOfWork wuow(operationContext());
+        ASSERT_OK(collection_internal::insertDocument(
+            operationContext(), coll, InsertStatement(serialized), nullptr));
+        wuow.commit();
+    }
+
+    // Read stats path & verify values are consistent with what we expect.
+    auto actualAH = _statsCacheLoader.getStats(operationContext(), std::make_pair(nss, path)).get();
+    auto actualSerialized = actualAH->serialize();
+
+    // Sanity check counters.
+    ASSERT_EQ(actualAH->getTrueCount(), 2.0);
+    ASSERT_EQ(actualAH->getFalseCount(), 4.0);
+    ASSERT_EQ(actualAH->getEmptyArrayCount(), 3.0);
 
     ASSERT_BSONOBJ_EQ(expectedSerialized, actualSerialized);
 }
