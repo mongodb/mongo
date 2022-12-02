@@ -660,11 +660,11 @@ bool isIndexEligibleForRightSideOfLookupPushdown(const IndexEntry& index,
 
 bool QueryPlannerAnalysis::isEligibleForHashJoin(const SecondaryCollectionInfo& foreignCollInfo) {
     return !internalQueryDisableLookupExecutionUsingHashJoin.load() && foreignCollInfo.exists &&
-        foreignCollInfo.noOfRecords <=
+        foreignCollInfo.stats.noOfRecords <=
         internalQueryCollectionMaxNoOfDocumentsToChooseHashJoin.load() &&
-        foreignCollInfo.approximateDataSizeBytes <=
+        foreignCollInfo.stats.approximateDataSizeBytes <=
         internalQueryCollectionMaxDataSizeBytesToChooseHashJoin.load() &&
-        foreignCollInfo.storageSizeBytes <=
+        foreignCollInfo.stats.storageSizeBytes <=
         internalQueryCollectionMaxStorageSizeBytesToChooseHashJoin.load();
 }
 

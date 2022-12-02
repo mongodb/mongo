@@ -7,14 +7,14 @@
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   requires_replication,
- *   uses_column_store_index,
  * ]
  */
 (function() {
 "use strict";
 
 load("jstests/noPassthrough/libs/index_build.js");
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+load("jstests/libs/sbe_util.js");          // For checkSBEEnabled.
+load("jstests/libs/columnstore_util.js");  // For setUpServerForColumnStoreIndexTest.
 
 const dbName = "test";
 
@@ -32,8 +32,10 @@ rst.initiate();
 const primary = rst.getPrimary();
 const coll = primary.getDB(dbName).getCollection(jsTestName());
 
-const columnstoreEnabled = checkSBEEnabled(
-    primary.getDB(dbName), ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"], true);
+const columnstoreEnabled =
+    checkSBEEnabled(
+        primary.getDB(dbName), ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"], true) &&
+    setUpServerForColumnStoreIndexTest(primary.getDB(dbName));
 
 const bulk = coll.initializeUnorderedBulkOp();
 for (let i = 0; i < numDocuments; i++) {

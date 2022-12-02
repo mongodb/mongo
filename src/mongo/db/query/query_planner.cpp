@@ -69,6 +69,7 @@
 #include "mongo/db/query/util/set_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util_core.h"
+#include "mongo/util/processinfo.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -231,6 +232,39 @@ std::pair<DepsTracker, DepsTracker> computeDeps(const QueryPlannerParams& params
     return {std::move(filterDeps), std::move(outputDeps)};
 }
 
+/**
+ * Determines whether a column scan should be used given stats about the collection.
+ *
+ * Column scan should not be used (i.e., would likely perform worse than a collection scan) if the
+ * entire collection can fit in memory, or if the average document size is small.
+ *
+ * Both of these thresholds (collection size and average document size) can also be adjusted via
+ * query knobs.
+ */
+bool collectionSatisfiesCsiPlanningHeuristics(const QueryPlannerParams& plannerParams) {
+    const auto numDocs = plannerParams.collectionStats.noOfRecords;
+    const auto uncompressedDataSizeBytes = plannerParams.collectionStats.approximateDataSizeBytes;
+
+    // Check if the entire uncompressed collection is greater than our min collection size
+    // threshold, or if it can fit in memory if the min size is unspecified.
+    const auto collectionSizeThresholdBytes = [&]() {
+        const auto configuredThresholdBytes = internalQueryColumnScanMinCollectionSizeBytes.load();
+        // If there is no threshold specified (== -1), use available memory size.
+        return configuredThresholdBytes == -1
+            ? static_cast<long long>(ProcessInfo::getMemSizeMB()) * 1024 * 1024
+            : configuredThresholdBytes;
+    }();
+    if (uncompressedDataSizeBytes < collectionSizeThresholdBytes) {
+        return false;
+    }
+
+    // Check if the average document size is greater than our threshold for using column scan.
+    const auto docSizeThresholdBytes = internalQueryColumnScanMinAvgDocSizeBytes.load();
+    auto avgDocSizeBytes =
+        numDocs > 0 ? uncompressedDataSizeBytes / static_cast<double>(numDocs) : 0.0;
+    return avgDocSizeBytes >= docSizeThresholdBytes;
+}
+
 Status computeColumnScanIsPossibleStatus(const CanonicalQuery& query,
                                          const QueryPlannerParams& params) {
     if (params.columnStoreIndexes.empty()) {
@@ -245,6 +279,10 @@ Status computeColumnScanIsPossibleStatus(const CanonicalQuery& query,
         return {ErrorCodes::InvalidOptions,
                 "A columnstore index can only be used with queries in the SBE engine, but the "
                 "query specified to force the classic engine"};
+    }
+    if (!collectionSatisfiesCsiPlanningHeuristics(params)) {
+        return {ErrorCodes::Error{6995600},
+                "Collection did not pass heuristics for using column scan"};
     }
     return Status::OK();
 }

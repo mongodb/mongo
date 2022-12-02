@@ -12,7 +12,13 @@
  *   assumes_unsharded_collection,
  *   # column store row store expression skipping is new in 6.2.
  *   requires_fcv_62,
- *   uses_column_store_index,
+ *   # Columnstore tests set server parameters to disable columnstore query planning heuristics -
+ *   # 1) server parameters are stored in-memory only so are not transferred onto the recipient,
+ *   # 2) server parameters may not be set in stepdown passthroughs because it is a command that may
+ *   #      return different values after a failover
+ *   tenant_migration_incompatible,
+ *   does_not_support_stepdowns,
+ *   not_allowed_with_security_token,
  * ]
  */
 (function() {
@@ -22,11 +28,16 @@ load('jstests/aggregation/extras/utils.js');  // For assertArrayEq.
 load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
 // For areAllCollectionsClustered.
 load("jstests/libs/clustered_collections/clustered_collection_util.js");
+load("jstests/libs/columnstore_util.js");  // For setUpServerForColumnStoreIndexTest.
 
 const columnstoreEnabled = checkSBEEnabled(
     db, ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"], true /* checkAllNodes */);
 if (!columnstoreEnabled) {
     jsTestLog("Skipping columnstore index test since the feature flag is not enabled.");
+    return;
+}
+
+if (!setUpServerForColumnStoreIndexTest(db)) {
     return;
 }
 

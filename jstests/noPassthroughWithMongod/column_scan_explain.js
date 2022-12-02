@@ -2,7 +2,6 @@
  * Tests the explain support for the COLUMN_SCAN stage.
  * @tags: [
  *   # column store indexes are still under a feature flag and require full sbe
- *   uses_column_store_index,
  *   featureFlagColumnstoreIndexes,
  *   featureFlagSbeFull,
  * ]
@@ -14,6 +13,11 @@ load("jstests/aggregation/extras/utils.js");  // For assertArrayEq
 load("jstests/libs/analyze_plan.js");         // For planHasStage.
 load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
 load("jstests/libs/sbe_explain_helpers.js");  // For getSbePlanStages.
+load("jstests/libs/columnstore_util.js");     // For setUpServerForColumnStoreIndexTest.
+
+if (!setUpServerForColumnStoreIndexTest(db)) {
+    return;
+}
 
 const coll = db.column_scan_explain;
 coll.drop();

@@ -45,6 +45,8 @@ const paramList = [
     {name: "internalQueryMaxNumberOfFieldsToChooseUnfilteredColumnScan", value: 100},
     {name: "internalQueryMaxNumberOfFieldsToChooseFilteredColumnScan", value: 100},
     {name: "internalCostModelCoefficients", value: '{"filterIncrementalCost": 1.0}'},
+    {name: "internalQueryColumnScanMinAvgDocSizeBytes", value: 2048},
+    {name: "internalQueryColumnScanMinCollectionSizeBytes", value: 2048},
 ];
 
 const conn = MongoRunner.runMongod();

@@ -6,14 +6,14 @@
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   requires_replication,
- *   uses_column_store_index,
  * ]
  */
 (function() {
 "use strict";
 
 load("jstests/noPassthrough/libs/index_build.js");
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+load("jstests/libs/sbe_util.js");          // For checkSBEEnabled.
+load("jstests/libs/columnstore_util.js");  // For setUpServerForColumnStoreIndexTest.
 
 const dbName = "test";
 const collName = jsTestName();
@@ -26,7 +26,8 @@ let primary = rst.getPrimary();
 let coll = primary.getDB(dbName).getCollection(collName);
 const columnstoreEnabled = checkSBEEnabled(primary.getDB(dbName),
                                            ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"],
-                                           true /* checkAllNodes */);
+                                           true /* checkAllNodes */) &&
+    setUpServerForColumnStoreIndexTest(primary.getDB(dbName));
 
 assert.commandWorked(coll.insert({a: 1}));
 

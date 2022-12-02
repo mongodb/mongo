@@ -5,7 +5,6 @@
  *   requires_persistence,
  *   requires_replication,
  *   # column store indexes are still under a feature flag and require full sbe
- *   uses_column_store_index,
  *   featureFlagColumnstoreIndexes,
  *   featureFlagSbeFull,
  * ]
@@ -15,6 +14,7 @@
 'use strict';
 
 load('jstests/libs/index_catalog_helpers.js');
+load("jstests/libs/columnstore_util.js");  // For setUpServerForColumnStoreIndexTest.
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
@@ -24,6 +24,11 @@ let primary = rst.getPrimary();
 
 const collName = 'columnstore_index_persistence';
 let db_primary = primary.getDB('test');
+
+if (!setUpServerForColumnStoreIndexTest(db_primary)) {
+    return;
+}
+
 let coll_primary = db_primary.getCollection(collName);
 
 assert.commandWorked(coll_primary.createIndex({"$**": "columnstore"}));

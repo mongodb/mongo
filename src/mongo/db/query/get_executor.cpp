@@ -330,6 +330,15 @@ void fillOutIndexEntries(OperationContext* opCtx,
 }
 }  // namespace
 
+CollectionStats fillOutCollectionStats(OperationContext* opCtx, const CollectionPtr& collection) {
+    auto recordStore = collection->getRecordStore();
+    CollectionStats stats;
+    stats.noOfRecords = recordStore->numRecords(opCtx),
+    stats.approximateDataSizeBytes = recordStore->dataSize(opCtx),
+    stats.storageSizeBytes = recordStore->storageSize(opCtx);
+    return stats;
+}
+
 void fillOutPlannerParams(OperationContext* opCtx,
                           const CollectionPtr& collection,
                           const CanonicalQuery* canonicalQuery,
@@ -408,6 +417,8 @@ void fillOutPlannerParams(OperationContext* opCtx,
         plannerParams->clusteredInfo = collection->getClusteredInfo();
         plannerParams->clusteredCollectionCollator = collection->getDefaultCollator();
     }
+
+    plannerParams->collectionStats = fillOutCollectionStats(opCtx, collection);
 }
 
 std::map<NamespaceString, SecondaryCollectionInfo> fillOutSecondaryCollectionsInformation(
@@ -427,10 +438,7 @@ std::map<NamespaceString, SecondaryCollectionInfo> fillOutSecondaryCollectionsIn
                                 secondaryColl,
                                 secondaryInfo.indexes,
                                 secondaryInfo.columnIndexes);
-            auto recordStore = secondaryColl->getRecordStore();
-            secondaryInfo.noOfRecords = recordStore->numRecords(opCtx);
-            secondaryInfo.approximateDataSizeBytes = recordStore->dataSize(opCtx);
-            secondaryInfo.storageSizeBytes = recordStore->storageSize(opCtx);
+            secondaryInfo.stats = fillOutCollectionStats(opCtx, secondaryColl);
         } else {
             secondaryInfo.exists = false;
         }

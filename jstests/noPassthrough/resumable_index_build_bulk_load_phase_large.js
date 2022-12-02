@@ -7,14 +7,14 @@
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   requires_replication,
- *   uses_column_store_index,
  * ]
  */
 (function() {
 "use strict";
 
 load("jstests/noPassthrough/libs/index_build.js");
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+load("jstests/libs/sbe_util.js");          // For checkSBEEnabled.
+load("jstests/libs/columnstore_util.js");  // For setUpServerForColumnStoreIndexTest.
 
 const dbName = "test";
 
@@ -23,8 +23,10 @@ const rst = new ReplSetTest(
 rst.startSet();
 rst.initiate();
 
-const columnstoreEnabled = checkSBEEnabled(
-    rst.getPrimary().getDB(dbName), ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"], true);
+const columnstoreEnabled = checkSBEEnabled(rst.getPrimary().getDB(dbName),
+                                           ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"],
+                                           true) &&
+    setUpServerForColumnStoreIndexTest(rst.getPrimary().getDB(dbName));
 
 // Insert enough data so that the collection scan spills to disk.
 const coll = rst.getPrimary().getDB(dbName).getCollection(jsTestName());

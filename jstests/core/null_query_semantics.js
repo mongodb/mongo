@@ -1,17 +1,22 @@
 // Tests the behavior of queries with a {$eq: null} or {$ne: null} predicate.
 // @tags: [
-//   uses_column_store_index,
 //   # TODO SERVER-67550: Equality to null does not match undefined in CQF.
 //   cqf_incompatible,
+//   # Columnstore tests set server parameters to disable columnstore query planning heuristics -
+//   # 1) server parameters are stored in-memory only so are not transferred onto the recipient,
+//   # 2) server parameters may not be set in stepdown passthroughs because it is a command that may
+//   #      return different values after a failover
+//   tenant_migration_incompatible,
+//   does_not_support_stepdowns,
+//   not_allowed_with_security_token,
 // ]
 //
 (function() {
 "use strict";
 
 load("jstests/aggregation/extras/utils.js");  // For 'resultsEq'.
-// For areAllCollectionsClustered.
-load("jstests/libs/clustered_collections/clustered_collection_util.js");
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
+load("jstests/libs/columnstore_util.js");     // For setUpServerForColumnStoreIndexTest.
 
 function extractAValues(results) {
     return results.map(function(res) {
@@ -787,7 +792,7 @@ const keyPatterns = [
 // Include Columnstore Index only if FF is enabled and collection is not clustered.
 const columnstoreEnabled = checkSBEEnabled(
     db, ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"], true /* checkAllNodes */);
-if (columnstoreEnabled && !ClusteredCollectionUtil.areAllCollectionsClustered(db.getMongo())) {
+if (columnstoreEnabled && setUpServerForColumnStoreIndexTest(db)) {
     keyPatterns.push({keyPattern: {"$**": "columnstore"}});
 }
 

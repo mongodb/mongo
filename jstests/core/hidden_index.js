@@ -5,7 +5,13 @@
  * @tags: [
  *   # CollMod is not retryable.
  *   requires_non_retryable_commands,
- *   uses_column_store_index,
+ *   # Columnstore tests set server parameters to disable columnstore query planning heuristics -
+ *   # 1) server parameters are stored in-memory only so are not transferred onto the recipient,
+ *   # 2) server parameters may not be set in stepdown passthroughs because it is a command that may
+ *   #      return different values after a failover
+ *   tenant_migration_incompatible,
+ *   does_not_support_stepdowns,
+ *   not_allowed_with_security_token,
  * ]
  */
 
@@ -16,9 +22,12 @@ load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Col
 load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
 load("jstests/libs/index_catalog_helpers.js");     // For IndexCatalogHelpers.findByName.
 load("jstests/libs/sbe_util.js");                  // For checkSBEEnabled.
+load("jstests/libs/columnstore_util.js");          // For setUpServerForColumnStoreIndexTest.
 
-const columnstoreEnabled = checkSBEEnabled(
-    db, ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"], true /* checkAllNodes */);
+const columnstoreEnabled =
+    checkSBEEnabled(
+        db, ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"], true /* checkAllNodes */) &&
+    setUpServerForColumnStoreIndexTest(db);
 
 const collName = "hidden_index";
 let coll = assertDropAndRecreateCollection(db, collName);

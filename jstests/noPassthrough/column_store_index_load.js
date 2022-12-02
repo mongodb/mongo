@@ -8,7 +8,6 @@
  *   # yet implemented.
  *   does_not_support_stepdowns,
  *   # column store indexes are still under a feature flag and require full sbe
- *   uses_column_store_index,
  *   featureFlagColumnstoreIndexes,
  *   featureFlagSbeFull,
  * ]
@@ -17,9 +16,14 @@
 "use strict";
 
 load("jstests/libs/analyze_plan.js");
+load("jstests/libs/columnstore_util.js");  // For setUpServerForColumnStoreIndexTest.
 
 const mongod = MongoRunner.runMongod({});
 const db = mongod.getDB("test");
+
+if (!setUpServerForColumnStoreIndexTest(db)) {
+    return;
+}
 
 //
 // Create test documents.

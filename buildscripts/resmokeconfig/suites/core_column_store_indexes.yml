@@ -18,8 +18,6 @@ selector:
   # Column Store Indexes are known to mess up projection field order and it is fundamental to the
   # design so we accept these tests will fail.
   - tests_projection_field_order
-  # Avoid creating a double index.
-  - uses_column_store_index
   # The rename command is not compatibile with auto-created indexes since it will try to copy over
   # existing indexes and get an error for a duplicate index.
   - uses_rename
@@ -46,4 +44,6 @@ executor:
         enableTestCommands: 1
         failpoint.createColumnIndexOnAllCollections:
           mode: alwaysOn
+        internalQueryColumnScanMinAvgDocSizeBytes: 0
+        internalQueryColumnScanMinCollectionSizeBytes: 0
     num_nodes: 1

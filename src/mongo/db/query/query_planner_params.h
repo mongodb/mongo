@@ -40,14 +40,9 @@
 namespace mongo {
 
 /**
- * Struct containing information about secondary collections (such as the 'from' collection in
- * $lookup) useful for query planning.
+ * Struct containing basic stats about a collection useful for query planning.
  */
-struct SecondaryCollectionInfo {
-    std::vector<IndexEntry> indexes{};
-    std::vector<ColumnIndexEntry> columnIndexes{};
-    bool exists{true};
-
+struct CollectionStats {
     // The number of records in the collection.
     long long noOfRecords{0};
 
@@ -56,6 +51,17 @@ struct SecondaryCollectionInfo {
 
     // The allocated storage size in bytes.
     long long storageSizeBytes{0};
+};
+
+/**
+ * Struct containing information about secondary collections (such as the 'from' collection in
+ * $lookup) useful for query planning.
+ */
+struct SecondaryCollectionInfo {
+    std::vector<IndexEntry> indexes{};
+    std::vector<ColumnIndexEntry> columnIndexes{};
+    bool exists{true};
+    CollectionStats stats{};
 };
 
 
@@ -159,6 +165,9 @@ struct QueryPlannerParams {
 
     // Columnar indexes available.
     std::vector<ColumnIndexEntry> columnStoreIndexes;
+
+    // Basic collection stats for the main collection.
+    CollectionStats collectionStats;
 
     // What's our shard key?  If INCLUDE_SHARD_FILTER is set we will create a shard filtering
     // stage.  If we know the shard key, we can perform covering analysis instead of always

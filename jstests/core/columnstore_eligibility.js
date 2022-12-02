@@ -7,15 +7,23 @@
  *   # Cannot run aggregate with explain in a transaction.
  *   does_not_support_transactions,
  *   # column store indexes are still under a feature flag and require full sbe
- *   uses_column_store_index,
  *   featureFlagColumnstoreIndexes,
  *   featureFlagSbeFull,
+ *   # Columnstore tests set server parameters to disable columnstore query planning heuristics -
+ *   # server parameters are stored in-memory only so are not transferred onto the recipient.
+ *   tenant_migration_incompatible,
+ *   not_allowed_with_security_token,
  * ]
  */
 (function() {
 "use strict";
 
 load("jstests/libs/analyze_plan.js");
+load("jstests/libs/columnstore_util.js");  // For setUpServerForColumnStoreIndexTest.
+
+if (!setUpServerForColumnStoreIndexTest(db)) {
+    return;
+}
 
 const coll = db.columnstore_eligibility;
 coll.drop();

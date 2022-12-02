@@ -3,20 +3,28 @@
  * sometimes exists.
  *
  * @tags: [
- *   uses_column_store_index,
  *   # We could potentially need to resume an index build in the event of a stepdown, which is not
  *   # yet implemented.
  *   does_not_support_stepdowns,
  *   requires_fcv_62,
+ *   # Columnstore tests set server parameters to disable columnstore query planning heuristics -
+ *   # server parameters are stored in-memory only so are not transferred onto the recipient.
+ *   tenant_migration_incompatible,
+ *   not_allowed_with_security_token,
  * ]
  */
 (function() {
 "use strict";
 
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+load("jstests/libs/sbe_util.js");          // For checkSBEEnabled.
+load("jstests/libs/columnstore_util.js");  // For setUpServerForColumnStoreIndexTest.
 
 if (!checkSBEEnabled(db, ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"])) {
     jsTestLog("Skipping test since columnstore Indexes are not enabled");
+    return;
+}
+
+if (!setUpServerForColumnStoreIndexTest(db)) {
     return;
 }
 

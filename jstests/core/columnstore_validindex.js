@@ -4,9 +4,15 @@
  *   # Uses index building in background.
  *   requires_background_index,
  *   # column store indexes are still under a feature flag and require full sbe
- *   uses_column_store_index,
  *   featureFlagColumnstoreIndexes,
  *   featureFlagSbeFull,
+ *   # Columnstore tests set server parameters to disable columnstore query planning heuristics -
+ *   # 1) server parameters are stored in-memory only so are not transferred onto the recipient,
+ *   # 2) server parameters may not be set in stepdown passthroughs because it is a command that may
+ *   #      return different values after a failover
+ *   tenant_migration_incompatible,
+ *   does_not_support_stepdowns,
+ *   not_allowed_with_security_token,
  * ]
  */
 (function() {
@@ -14,6 +20,11 @@
 
 load("jstests/libs/index_catalog_helpers.js");     // For "IndexCatalogHelpers."
 load("jstests/libs/collection_drop_recreate.js");  // For "assertDropCollection."
+load("jstests/libs/columnstore_util.js");          // For "setUpServerForColumnStoreIndexTest."
+
+if (!setUpServerForColumnStoreIndexTest(db)) {
+    return;
+}
 
 const kCollectionName = "columnstore_validindex";
 const coll = db.getCollection(kCollectionName);

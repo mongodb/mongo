@@ -3,7 +3,6 @@
  * the columstore index is the winning plan.
  * @tags: [
  *   # column store indexes are still under a feature flag and require full sbe
- *   uses_column_store_index,
  *   featureFlagColumnstoreIndexes,
  *   featureFlagSbeFull,
  * ]
@@ -11,11 +10,18 @@
 (function() {
 "use strict";
 
+load("jstests/libs/columnstore_util.js");  // For setUpServerForColumnStoreIndexTest.
+
 const conn = MongoRunner.runMongod({});
 assert.neq(null, conn, "mongod was unable to start up");
 
 const db = conn.getDB(jsTestName());
 assert.commandWorked(db.dropDatabase());
+
+if (!setUpServerForColumnStoreIndexTest(db)) {
+    return;
+}
+
 const coll = db.collection;
 
 // Set logLevel to 1 so that all queries will be logged.

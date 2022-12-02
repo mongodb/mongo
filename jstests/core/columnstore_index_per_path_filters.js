@@ -6,9 +6,15 @@
  *   # Runs explain on an aggregate command which is only compatible with readConcern local.
  *   assumes_read_concern_unchanged,
  *   # column store indexes are still under a feature flag and require full sbe
- *   uses_column_store_index,
  *   featureFlagColumnstoreIndexes,
  *   featureFlagSbeFull,
+ *   # Columnstore tests set server parameters to disable columnstore query planning heuristics -
+ *   # 1) server parameters are stored in-memory only so are not transferred onto the recipient,
+ *   # 2) server parameters may not be set in stepdown passthroughs because it is a command that may
+ *   #      return different values after a failover
+ *   tenant_migration_incompatible,
+ *   does_not_support_stepdowns,
+ *   not_allowed_with_security_token,
  * ]
  */
 (function() {
@@ -17,6 +23,11 @@
 load("jstests/aggregation/extras/utils.js");  // For "resultsEq."
 load("jstests/libs/analyze_plan.js");         // For "planHasStage."
 load("jstests/libs/sbe_explain_helpers.js");  // For getSbePlanStages.
+load("jstests/libs/columnstore_util.js");     // For "setUpServerForColumnStoreIndexTest."
+
+if (!setUpServerForColumnStoreIndexTest(db)) {
+    return;
+}
 
 const coll_filters = db.columnstore_index_per_path_filters;
 function runPerPathFiltersTest({docs, query, projection, expected, testDescription}) {
