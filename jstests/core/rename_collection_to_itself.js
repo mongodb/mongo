@@ -7,7 +7,7 @@
  */
 
 {
-    // Rename a collection to itself fails without loosing data
+    // Rename a collection to itself fails without losing data.
     const sameColl = db['sameColl'];
     assert.commandWorked(sameColl.insert({a: 1}));
 

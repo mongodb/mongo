@@ -465,7 +465,7 @@ Status renameBetweenDBs(OperationContext* opCtx,
                       << source << "; target: " << target);
 
     uassert(ErrorCodes::InvalidOptions,
-            "Cannot provide an expected collection UUID when renaming between databases",
+            "Cannot provide an expected collection UUID when renaming across databases",
             !options.expectedSourceUUID && !options.expectedTargetUUID);
 
     boost::optional<Lock::DBLock> sourceDbLock;
@@ -768,13 +768,13 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
             << source << "; target: " << target);
 
     // Refer to txnCmdAllowlist in commands.cpp.
-    invariant(
-        !opCtx->inMultiDocumentTransaction(),
-        str::stream() << "renameBetweenDBs not supported in multi-document transaction: source: "
-                      << source << "; target: " << target);
+    invariant(!opCtx->inMultiDocumentTransaction(),
+              str::stream() << "renameCollectionAcrossDatabases not supported in multi-document "
+                               "transaction: source: "
+                            << source << "; target: " << target);
 
     uassert(ErrorCodes::InvalidOptions,
-            "Cannot provide an expected collection UUID when renaming between databases",
+            "Cannot provide an expected collection UUID when renaming across databases",
             !options.expectedSourceUUID && !options.expectedTargetUUID);
 
     boost::optional<Lock::DBLock> sourceDbLock;
@@ -819,7 +819,7 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
 
     if (isReplicatedChanged(opCtx, source, target))
         return {ErrorCodes::IllegalOperation,
-                "Cannot rename collections between a replicated and an unreplicated database"};
+                "Cannot rename collections across a replicated and an unreplicated database"};
 
     IndexBuildsCoordinator::get(opCtx)->assertNoIndexBuildInProgForCollection(sourceColl->uuid());
 
@@ -1201,7 +1201,7 @@ Status renameCollection(OperationContext* opCtx,
 
     if (source.tenantId() != target.tenantId()) {
         return Status(ErrorCodes::IllegalOperation,
-                      "renaming a collection between tenants is not allowed");
+                      "renaming a collection across tenants is not allowed");
     }
 
     StringData dropTargetMsg = options.dropTarget ? "yes"_sd : "no"_sd;

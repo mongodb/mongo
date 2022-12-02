@@ -148,16 +148,19 @@ var tests = {
         assert.commandWorked(x.insert({_id: 1, x: 1}));
         assert.commandWorked(y.insert({_id: 1, y: 1}));
 
-        assert.commandWorked(
-            mydb.adminCommand({renameCollection: x.getFullName(), to: z.getFullName()}));
+        assert.commandWorked(mydb.adminCommand(
+            {renameCollection: x.getFullName(), to: z.getFullName()}));  // across databases
         assert.commandWorked(z.insert({_id: 2, x: 2}));
         assert.commandWorked(x.insert({_id: 2, x: false}));
         assert.commandWorked(y.insert({y: 2}));
 
+        assert.commandWorked(mydb.adminCommand({
+            renameCollection: y.getFullName(),
+            to: x.getFullName(),
+            dropTarget: true
+        }));  // within database
         assert.commandWorked(mydb.adminCommand(
-            {renameCollection: y.getFullName(), to: x.getFullName(), dropTarget: true}));
-        assert.commandWorked(
-            mydb.adminCommand({renameCollection: z.getFullName(), to: y.getFullName()}));
+            {renameCollection: z.getFullName(), to: y.getFullName()}));  // across databases
         return [mydb, otherdb];
     },
     renameCollectionAcrossDatabasesWithDropAndConvertToCapped: (db1) => {

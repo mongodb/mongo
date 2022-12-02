@@ -53,7 +53,7 @@ function runTestWithAuth(conn, allowsRename, verifyFunction) {
     if (!allowsRename) {
         verifyFunction(dbSrc.adminCommand(
                            {renameCollection: dbSrc + ".encrypted", to: dbTgt + ".unencrypted"}),
-                       "Renaming an encrypted collection between DBs passed",
+                       "Renaming an encrypted collection across DBs passed",
                        srcEncryptedErrmsg);
     }
 
@@ -70,7 +70,7 @@ function runTestWithAuth(conn, allowsRename, verifyFunction) {
             to: dbTgt + ".encrypted",
             dropTarget: true
         }),
-                       "Renaming to an encrypted collection between DBs passed",
+                       "Renaming to an encrypted collection across DBs passed",
                        tgtEncryptedErrmsg);
     }
 }
