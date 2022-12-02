@@ -286,7 +286,7 @@ class ConfigExpandNode {
 public:
     ConfigExpandNode(const YAML::Node& node,
                      const std::string& nodePath,
-                     const OptionsParser::ConfigExpand& configExpand) {
+                     const ConfigExpand& configExpand) {
         invariant(node.IsMap());
 
         auto nodeName = nodePath;
@@ -569,7 +569,7 @@ std::string runYAMLRestExpansion(StringData url, Seconds timeout) {
  */
 StatusWith<YAML::Node> runYAMLExpansion(const YAML::Node& node,
                                         const std::string& nodePath,
-                                        const OptionsParser::ConfigExpand& configExpand) try {
+                                        const ConfigExpand& configExpand) try {
     invariant(node.IsMap());
     ConfigExpandNode expansion(node, nodePath, configExpand);
 
@@ -623,7 +623,7 @@ Status YAMLNodeToValue(const YAML::Node& YAMLNode,
                        const Key& key,
                        OptionDescription const** option,
                        Value* value,
-                       const OptionsParser::ConfigExpand& configExpand) {
+                       const ConfigExpand& configExpand) {
     bool isRegistered = false;
 
     // The logic below should ensure that we don't use this uninitialized, but we need to
@@ -907,7 +907,7 @@ Status addYAMLNodesToEnvironment(const YAML::Node& root,
                                  const OptionSection& options,
                                  const std::string parentPath,
                                  Environment* environment,
-                                 const OptionsParser::ConfigExpand& configExpand) {
+                                 const ConfigExpand& configExpand) {
     std::vector<OptionDescription> options_vector;
     Status ret = options.getAllOptions(&options_vector);
     if (!ret.isOK()) {
@@ -923,11 +923,8 @@ Status addYAMLNodesToEnvironment(const YAML::Node& root,
         auto swExpansion = runYAMLExpansion(root, parentPath, configExpand);
         if (swExpansion.isOK()) {
             // Expanded fine, but disallow recursion.
-            return addYAMLNodesToEnvironment(swExpansion.getValue(),
-                                             options,
-                                             parentPath,
-                                             environment,
-                                             OptionsParser::ConfigExpand());
+            return addYAMLNodesToEnvironment(
+                swExpansion.getValue(), options, parentPath, environment, ConfigExpand());
         } else if (swExpansion.getStatus().code() != ErrorCodes::NoSuchKey) {
             return swExpansion.getStatus();
         }  // else not an expansion block.
@@ -967,7 +964,7 @@ Status addYAMLNodesToEnvironment(const YAML::Node& root,
             auto swExpansion = runYAMLExpansion(YAMLNode, dottedName, expand);
             if (swExpansion.isOK()) {
                 YAMLNode = std::move(swExpansion.getValue());
-                expand = OptionsParser::ConfigExpand();
+                expand = ConfigExpand();
             } else if (swExpansion.getStatus().code() != ErrorCodes::NoSuchKey) {
                 return swExpansion.getStatus();
             }  // else not an expansion block.
@@ -1410,15 +1407,19 @@ Status OptionsParser::addDefaultValues(const OptionSection& options, Environment
     return Status::OK();
 }
 
+Status OptionsParser::readConfigFile(const std::string& filename,
+                                     std::string* contents,
+                                     ConfigExpand configExpand) {
+    return readRawFile(filename, contents, configExpand);
+}
+
 /**
  * Reads the entire config file into the output string.  This was done this way because the JSON
  * parser only takes complete strings, and we were using that to parse the config file before.
  * We could redesign the parser to use some kind of streaming interface, but for now this is
  * simple and works for the current use case of config files which should be limited in size.
  */
-Status OptionsParser::readConfigFile(const std::string& filename,
-                                     std::string* contents,
-                                     ConfigExpand configExpand) {
+Status readRawFile(const std::string& filename, std::string* contents, ConfigExpand configExpand) {
     // check if it's a valid file
     const auto badFile = [&](StringData errMsg) -> Status {
         return {ErrorCodes::BadValue,
@@ -1683,8 +1684,8 @@ StatusWith<std::vector<std::string>> transformImplicitOptions(
 
 }  // namespace
 
-StatusWith<OptionsParser::ConfigExpand> parseConfigExpand(const Environment& cli) {
-    OptionsParser::ConfigExpand ret;
+StatusWith<ConfigExpand> parseConfigExpand(const Environment& cli) {
+    ConfigExpand ret;
 
     if (!cli.count("configExpand")) {
         return ret;

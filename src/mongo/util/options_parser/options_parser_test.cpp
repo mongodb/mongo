@@ -55,7 +55,7 @@ constexpr auto OptionParserTest = moe::OptionSection::OptionParserUsageType::Opt
 
 class OptionsParserTester : public moe::OptionsParser {
 public:
-    Status readConfigFile(const std::string& filename, std::string* config, ConfigExpand) {
+    Status readConfigFile(const std::string& filename, std::string* config, moe::ConfigExpand) {
         if (filename != _filename) {
             ::mongo::StringBuilder sb;
             sb << "Parser using filename: " << filename
@@ -2192,6 +2192,12 @@ TEST(ConfigFromFilesystem, NullTerminated) {
     argv.push_back(TEST_CONFIG_PATH("endStringNull.conf"));
 
     ASSERT_NOT_OK(parser.run(testOpts, argv, &environment));
+}
+
+TEST(ConfigFromFilesystem, ReadRawFile) {
+    std::string fileContents;
+    ASSERT_OK(readRawFile(TEST_CONFIG_PATH("good.json"), &fileContents, moe::ConfigExpand{}));
+    ASSERT_EQ("{\n    \"port\" : 5\n}\n", fileContents);
 }
 
 TEST(JSONConfigFile, ComposingStringVector) {
