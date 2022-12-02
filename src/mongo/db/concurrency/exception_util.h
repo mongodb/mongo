@@ -49,11 +49,6 @@ extern FailPoint skipWriteConflictRetries;
  */
 void logWriteConflictAndBackoff(int attempt, StringData operation, StringData ns);
 
-void handleWriteConflictException(OperationContext* opCtx,
-                                  int* writeConflictAttempts,
-                                  StringData opStr,
-                                  StringData ns);
-
 void handleTemporarilyUnavailableException(OperationContext* opCtx,
                                            int attempts,
                                            StringData opStr,
@@ -125,7 +120,10 @@ auto writeConflictRetry(OperationContext* opCtx, StringData opStr, StringData ns
         try {
             return f();
         } catch (WriteConflictException const&) {
-            handleWriteConflictException(opCtx, &writeConflictAttempts, opStr, ns);
+            CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
+            logWriteConflictAndBackoff(writeConflictAttempts, opStr, ns);
+            ++writeConflictAttempts;
+            opCtx->recoveryUnit()->abandonSnapshot();
         } catch (TemporarilyUnavailableException const& e) {
             handleTemporarilyUnavailableException(opCtx, ++attemptsTempUnavailable, opStr, ns, e);
         } catch (TransactionTooLargeForCacheException const& e) {

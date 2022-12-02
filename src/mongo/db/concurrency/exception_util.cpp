@@ -53,16 +53,6 @@ void logWriteConflictAndBackoff(int attempt, StringData operation, StringData ns
                   logAttrs(NamespaceString(ns)));
 }
 
-void handleWriteConflictException(OperationContext* opCtx,
-                                  int* writeConflictAttempts,
-                                  StringData opStr,
-                                  StringData ns) {
-    CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
-    logWriteConflictAndBackoff(*writeConflictAttempts, opStr, ns);
-    ++writeConflictAttempts;
-    opCtx->recoveryUnit()->abandonSnapshot();
-}
-
 namespace {
 
 Counter64 temporarilyUnavailableErrors;
@@ -150,7 +140,12 @@ void handleTransactionTooLargeForCacheException(OperationContext* opCtx,
     // only difference being the rate of retry. We prefer retrying faster, by converting to
     // WriteConflictException, to avoid stalling replication longer than necessary.
     transactionTooLargeForCacheErrorsConvertedToWriteConflict.increment(1);
-    handleWriteConflictException(opCtx, writeConflictAttempts, opStr, ns);
+
+    // Handle as write conflict.
+    CurOp::get(opCtx)->debug().additiveMetrics.incrementWriteConflicts(1);
+    logWriteConflictAndBackoff(*writeConflictAttempts, opStr, ns);
+    ++(*writeConflictAttempts);
+    opCtx->recoveryUnit()->abandonSnapshot();
 }
 
 }  // namespace mongo
