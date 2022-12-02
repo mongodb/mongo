@@ -791,7 +791,7 @@ TEST(PhysRewriter, FilterIndexing) {
             "|   |       root\n"
             "|   RefBlock: \n"
             "|       Variable [root]\n"
-            "BinaryJoin [joinType: Inner, {rid_0}]\n"
+            "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
             "|   |   Const [true]\n"
             "|   LimitSkip []\n"
             "|   |   limitSkip:\n"
@@ -968,7 +968,7 @@ TEST(PhysRewriter, FilterIndexing2) {
         "|   |       root\n"
         "|   RefBlock: \n"
         "|       Variable [root]\n"
-        "BinaryJoin [joinType: Inner, {rid_0}]\n"
+        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
         "|   LimitSkip []\n"
         "|   |   limitSkip:\n"
@@ -1049,7 +1049,7 @@ TEST(PhysRewriter, FilterIndexing2NonSarg) {
         "|   |       root\n"
         "|   RefBlock: \n"
         "|       Variable [root]\n"
-        "BinaryJoin [joinType: Inner, {rid_0}]\n"
+        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
         "|   LimitSkip []\n"
         "|   |   limitSkip:\n"
@@ -1227,7 +1227,7 @@ TEST(PhysRewriter, FilterIndexing3MultiKey) {
         "|   |       pa\n"
         "|   RefBlock: \n"
         "|       Variable [pa]\n"
-        "BinaryJoin [joinType: Inner, {rid_0}]\n"
+        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
         "|   LimitSkip []\n"
         "|   |   limitSkip:\n"
@@ -1599,35 +1599,29 @@ TEST(PhysRewriter, FilterIndexingStress) {
     ASSERT_BSON_PATH("\"Filter\"", explainRoot, "child.child.child.child.nodeType");
     ASSERT_BSON_PATH("\"Filter\"", explainRoot, "child.child.child.child.child.nodeType");
 
-    const BSONObj& explainBinaryJoin = dotted_path_support::extractElementAtPath(
-                                           explainRoot, "child.child.child.child.child.child")
-                                           .Obj();
-    ASSERT_BSON_PATH("\"BinaryJoin\"", explainBinaryJoin, "nodeType");
-    ASSERT_BSON_PATH("\"Filter\"", explainBinaryJoin, "rightChild.nodeType");
-    ASSERT_BSON_PATH("\"Filter\"", explainBinaryJoin, "rightChild.child.nodeType");
-    ASSERT_BSON_PATH("\"Filter\"", explainBinaryJoin, "rightChild.child.child.nodeType");
-    ASSERT_BSON_PATH("\"Filter\"", explainBinaryJoin, "rightChild.child.child.child.nodeType");
+    const BSONObj& explainNLJ = dotted_path_support::extractElementAtPath(
+                                    explainRoot, "child.child.child.child.child.child")
+                                    .Obj();
+    ASSERT_BSON_PATH("\"NestedLoopJoin\"", explainNLJ, "nodeType");
+    ASSERT_BSON_PATH("\"Filter\"", explainNLJ, "rightChild.nodeType");
+    ASSERT_BSON_PATH("\"Filter\"", explainNLJ, "rightChild.child.nodeType");
+    ASSERT_BSON_PATH("\"Filter\"", explainNLJ, "rightChild.child.child.nodeType");
+    ASSERT_BSON_PATH("\"Filter\"", explainNLJ, "rightChild.child.child.child.nodeType");
+    ASSERT_BSON_PATH("\"Filter\"", explainNLJ, "rightChild.child.child.child.child.nodeType");
+    ASSERT_BSON_PATH("\"Filter\"", explainNLJ, "rightChild.child.child.child.child.child.nodeType");
     ASSERT_BSON_PATH(
-        "\"Filter\"", explainBinaryJoin, "rightChild.child.child.child.child.nodeType");
+        "\"LimitSkip\"", explainNLJ, "rightChild.child.child.child.child.child.child.nodeType");
     ASSERT_BSON_PATH(
-        "\"Filter\"", explainBinaryJoin, "rightChild.child.child.child.child.child.nodeType");
-    ASSERT_BSON_PATH("\"LimitSkip\"",
-                     explainBinaryJoin,
-                     "rightChild.child.child.child.child.child.child.nodeType");
-    ASSERT_BSON_PATH("\"Seek\"",
-                     explainBinaryJoin,
-                     "rightChild.child.child.child.child.child.child.child.nodeType");
+        "\"Seek\"", explainNLJ, "rightChild.child.child.child.child.child.child.child.nodeType");
 
-    ASSERT_BSON_PATH("\"MergeJoin\"", explainBinaryJoin, "leftChild.nodeType");
-    ASSERT_BSON_PATH("\"IndexScan\"", explainBinaryJoin, "leftChild.leftChild.nodeType");
-    ASSERT_BSON_PATH("\"index1\"", explainBinaryJoin, "leftChild.leftChild.indexDefName");
-    ASSERT_BSON_PATH("\"Union\"", explainBinaryJoin, "leftChild.rightChild.nodeType");
+    ASSERT_BSON_PATH("\"MergeJoin\"", explainNLJ, "leftChild.nodeType");
+    ASSERT_BSON_PATH("\"IndexScan\"", explainNLJ, "leftChild.leftChild.nodeType");
+    ASSERT_BSON_PATH("\"index1\"", explainNLJ, "leftChild.leftChild.indexDefName");
+    ASSERT_BSON_PATH("\"Union\"", explainNLJ, "leftChild.rightChild.nodeType");
+    ASSERT_BSON_PATH("\"Evaluation\"", explainNLJ, "leftChild.rightChild.children.0.nodeType");
+    ASSERT_BSON_PATH("\"IndexScan\"", explainNLJ, "leftChild.rightChild.children.0.child.nodeType");
     ASSERT_BSON_PATH(
-        "\"Evaluation\"", explainBinaryJoin, "leftChild.rightChild.children.0.nodeType");
-    ASSERT_BSON_PATH(
-        "\"IndexScan\"", explainBinaryJoin, "leftChild.rightChild.children.0.child.nodeType");
-    ASSERT_BSON_PATH(
-        "\"index3\"", explainBinaryJoin, "leftChild.rightChild.children.0.child.indexDefName");
+        "\"index3\"", explainNLJ, "leftChild.rightChild.children.0.child.indexDefName");
 }
 
 TEST(PhysRewriter, FilterIndexingVariable) {
@@ -1685,7 +1679,7 @@ TEST(PhysRewriter, FilterIndexingVariable) {
         "|   |       root\n"
         "|   RefBlock: \n"
         "|       Variable [root]\n"
-        "BinaryJoin [joinType: Inner, {rid_0}]\n"
+        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
         "|   LimitSkip []\n"
         "|   |   limitSkip:\n"
@@ -2071,7 +2065,7 @@ TEST(PhysRewriter, CoveredScan) {
         "|   |       pa\n"
         "|   RefBlock: \n"
         "|       Variable [pa]\n"
-        "BinaryJoin [joinType: Inner, {rid_0}]\n"
+        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
         "|   LimitSkip []\n"
         "|   |   limitSkip:\n"
@@ -2231,7 +2225,7 @@ TEST(PhysRewriter, EvalIndexing1) {
         "|   |       root\n"
         "|   RefBlock: \n"
         "|       Variable [root]\n"
-        "BinaryJoin [joinType: Inner, {rid_0}]\n"
+        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
         "|   LimitSkip []\n"
         "|   |   limitSkip:\n"
@@ -2409,7 +2403,7 @@ TEST(PhysRewriter, MultiKeyIndex) {
             "|   RefBlock: \n"
             "|       Variable [pa]\n"
             "|       Variable [pb]\n"
-            "BinaryJoin [joinType: Inner, {rid_0}]\n"
+            "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
             "|   |   Const [true]\n"
             "|   LimitSkip []\n"
             "|   |   limitSkip:\n"
@@ -2507,7 +2501,7 @@ TEST(PhysRewriter, MultiKeyIndex) {
             "|   |       root\n"
             "|   RefBlock: \n"
             "|       Variable [root]\n"
-            "BinaryJoin [joinType: Inner, {rid_0}]\n"
+            "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
             "|   |   Const [true]\n"
             "|   LimitSkip []\n"
             "|   |   limitSkip:\n"
@@ -2619,7 +2613,7 @@ TEST(PhysRewriter, CompoundIndex1) {
     ASSERT_BETWEEN(35, 50, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     const BSONObj& explainRoot = ExplainGenerator::explainBSONObj(optimized);
-    ASSERT_BSON_PATH("\"BinaryJoin\"", explainRoot, "child.nodeType");
+    ASSERT_BSON_PATH("\"NestedLoopJoin\"", explainRoot, "child.nodeType");
     ASSERT_BSON_PATH("\"Seek\"", explainRoot, "child.rightChild.child.nodeType");
     ASSERT_BSON_PATH("\"MergeJoin\"", explainRoot, "child.leftChild.nodeType");
     ASSERT_BSON_PATH("\"IndexScan\"", explainRoot, "child.leftChild.leftChild.nodeType");
@@ -2711,7 +2705,7 @@ TEST(PhysRewriter, CompoundIndex2) {
     ASSERT_BETWEEN(50, 70, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     const BSONObj& explainRoot = ExplainGenerator::explainBSONObj(optimized);
-    ASSERT_BSON_PATH("\"BinaryJoin\"", explainRoot, "child.nodeType");
+    ASSERT_BSON_PATH("\"NestedLoopJoin\"", explainRoot, "child.nodeType");
     ASSERT_BSON_PATH("\"Seek\"", explainRoot, "child.rightChild.child.nodeType");
     ASSERT_BSON_PATH("\"MergeJoin\"", explainRoot, "child.leftChild.nodeType");
     ASSERT_BSON_PATH("\"IndexScan\"", explainRoot, "child.leftChild.leftChild.nodeType");
@@ -2804,7 +2798,7 @@ TEST(PhysRewriter, CompoundIndex3) {
     ASSERT_BSON_PATH("\"Collation\"", explainRoot, "child.nodeType");
     ASSERT_BSON_PATH("\"pa\"", explainRoot, "child.collation.0.projectionName");
     ASSERT_BSON_PATH("\"pb\"", explainRoot, "child.collation.1.projectionName");
-    ASSERT_BSON_PATH("\"BinaryJoin\"", explainRoot, "child.child.nodeType");
+    ASSERT_BSON_PATH("\"NestedLoopJoin\"", explainRoot, "child.child.nodeType");
     ASSERT_BSON_PATH("\"Seek\"", explainRoot, "child.child.rightChild.child.nodeType");
     ASSERT_BSON_PATH("\"MergeJoin\"", explainRoot, "child.child.leftChild.nodeType");
 
@@ -2896,7 +2890,7 @@ TEST(PhysRewriter, CompoundIndex4Negative) {
     // Also demonstrate we pick index1 with the more selective predicate.
 
     const BSONObj& explainRoot = ExplainGenerator::explainBSONObj(optimized);
-    ASSERT_BSON_PATH("\"BinaryJoin\"", explainRoot, "child.nodeType");
+    ASSERT_BSON_PATH("\"NestedLoopJoin\"", explainRoot, "child.nodeType");
     ASSERT_BSON_PATH("\"Filter\"", explainRoot, "child.rightChild.nodeType");
     ASSERT_BSON_PATH("2", explainRoot, "child.rightChild.filter.path.value.value");
     ASSERT_BSON_PATH("\"Seek\"", explainRoot, "child.rightChild.child.child.nodeType");
@@ -2953,7 +2947,7 @@ TEST(PhysRewriter, CompoundIndex5) {
         "|   |       root\n"
         "|   RefBlock: \n"
         "|       Variable [root]\n"
-        "BinaryJoin [joinType: Inner, {rid_0}]\n"
+        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
         "|   LimitSkip []\n"
         "|   |   limitSkip:\n"
@@ -3051,7 +3045,7 @@ TEST(PhysRewriter, IndexBoundsIntersect) {
     // index, and the other one as a residual filter.
 
     const BSONObj& explainRoot = ExplainGenerator::explainBSONObj(optimized);
-    ASSERT_BSON_PATH("\"BinaryJoin\"", explainRoot, "child.nodeType");
+    ASSERT_BSON_PATH("\"NestedLoopJoin\"", explainRoot, "child.nodeType");
 
     ASSERT_BSON_PATH("\"Filter\"", explainRoot, "child.rightChild.nodeType");
     const std::string filterVal = dotted_path_support::extractElementAtPath(
@@ -3130,7 +3124,7 @@ TEST(PhysRewriter, IndexBoundsIntersect1) {
         "|   |       root\n"
         "|   RefBlock: \n"
         "|       Variable [root]\n"
-        "BinaryJoin [joinType: Inner, {rid_0}]\n"
+        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
         "|   LimitSkip []\n"
         "|   |   limitSkip:\n"
@@ -3203,7 +3197,7 @@ TEST(PhysRewriter, IndexBoundsIntersect2) {
         "|   |       root\n"
         "|   RefBlock: \n"
         "|       Variable [root]\n"
-        "BinaryJoin [joinType: Inner, {rid_0}]\n"
+        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
         "|   LimitSkip []\n"
         "|   |   limitSkip:\n"
@@ -3491,7 +3485,7 @@ TEST(PhysRewriter, IndexResidualReq1) {
         "|   |       root\n"
         "|   RefBlock: \n"
         "|       Variable [root]\n"
-        "BinaryJoin [joinType: Inner, {rid_0}]\n"
+        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
         "|   LimitSkip []\n"
         "|   |   limitSkip:\n"
@@ -3562,7 +3556,7 @@ TEST(PhysRewriter, IndexResidualReq2) {
         "|   |       root\n"
         "|   RefBlock: \n"
         "|       Variable [root]\n"
-        "BinaryJoin [joinType: Inner, {rid_0}]\n"
+        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
         "|   LimitSkip []\n"
         "|   |   limitSkip:\n"
@@ -3635,7 +3629,7 @@ TEST(PhysRewriter, ElemMatchIndex) {
         "|   |       root\n"
         "|   RefBlock: \n"
         "|       Variable [root]\n"
-        "BinaryJoin [joinType: Inner, {rid_0}]\n"
+        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
         "|   Filter []\n"
         "|   |   EvalFilter []\n"
@@ -3721,7 +3715,7 @@ TEST(PhysRewriter, ElemMatchIndex1) {
         "|   |       root\n"
         "|   RefBlock: \n"
         "|       Variable [root]\n"
-        "BinaryJoin [joinType: Inner, {rid_0}]\n"
+        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
         "|   Filter []\n"
         "|   |   EvalFilter []\n"
@@ -3880,7 +3874,7 @@ TEST(PhysRewriter, ObjectElemMatchResidual) {
         "|   PathComposeM []\n"
         "|   |   PathGet [c] PathTraverse [1] PathCompare [Eq] Const [1]\n"
         "|   PathGet [b] PathTraverse [1] PathCompare [Eq] Const [1]\n"
-        "BinaryJoin [joinType: Inner, {rid_0}]\n"
+        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
         "|   Filter []\n"
         "|   |   EvalFilter []\n"
@@ -3991,7 +3985,7 @@ TEST(PhysRewriter, ObjectElemMatchBounds) {
         "|   PathComposeM []\n"
         "|   |   PathGet [c] PathTraverse [1] PathCompare [Eq] Const [5]\n"
         "|   PathGet [b] PathTraverse [1] PathCompare [Eq] Const [4]\n"
-        "BinaryJoin [joinType: Inner, {rid_0}]\n"
+        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
         "|   Filter []\n"
         "|   |   EvalFilter []\n"
@@ -4076,7 +4070,7 @@ TEST(PhysRewriter, NestedElemMatch) {
         "|   PathGet [a] PathTraverse [1] PathComposeM []\n"
         "|   |   PathTraverse [1] PathCompare [Eq] Const [2]\n"
         "|   PathArr []\n"
-        "BinaryJoin [joinType: Inner, {rid_0}]\n"
+        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
         "|   Filter []\n"
         "|   |   EvalFilter []\n"
@@ -4187,7 +4181,7 @@ TEST(PhysRewriter, PathObj) {
         "|   |       root\n"
         "|   RefBlock: \n"
         "|       Variable [root]\n"
-        "BinaryJoin [joinType: Inner, {rid_0}]\n"
+        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
         "|   LimitSkip []\n"
         "|   |   limitSkip:\n"
@@ -4282,7 +4276,7 @@ TEST(PhysRewriter, ArrayConstantIndex) {
         "|   PathTraverse [1]\n"
         "|   PathCompare [Eq]\n"
         "|   Const [[1, 2, 3]]\n"
-        "BinaryJoin [joinType: Inner, {rid_0}]\n"
+        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
         "|   LimitSkip []\n"
         "|   |   limitSkip:\n"
@@ -4611,7 +4605,7 @@ TEST(PhysRewriter, IndexPartitioning) {
         "|   |               pa\n"
         "|   RefBlock: \n"
         "|       Variable [pa]\n"
-        "BinaryJoin [joinType: Inner, {rid_0}]\n"
+        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
         "|   Filter []\n"
         "|   |   EvalFilter []\n"
@@ -4682,7 +4676,7 @@ TEST(PhysRewriter, IndexPartitioning1) {
 
     // TODO SERVER-71551 Follow up unit tests with overriden Cost Model.
     auto costModel = getTestCostModel();
-    costModel.setBinaryJoinIncrementalCost(0.002);
+    costModel.setNestedLoopJoinIncrementalCost(0.002);
     costModel.setHashJoinIncrementalCost(5e-5);
 
     auto phaseManager = makePhaseManager(
@@ -5200,7 +5194,7 @@ TEST(PhysRewriter, PartialIndex1) {
         "|   |       root\n"
         "|   RefBlock: \n"
         "|       Variable [root]\n"
-        "BinaryJoin [joinType: Inner, {rid_0}]\n"
+        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
         "|   Filter []\n"
         "|   |   EvalFilter []\n"
@@ -5282,7 +5276,7 @@ TEST(PhysRewriter, PartialIndex2) {
         "|   |       root\n"
         "|   RefBlock: \n"
         "|       Variable [root]\n"
-        "BinaryJoin [joinType: Inner, {rid_0}]\n"
+        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
         "|   LimitSkip []\n"
         "|   |   limitSkip:\n"
@@ -5607,7 +5601,7 @@ TEST(PhysRewriter, JoinRewrite) {
         "|   RefBlock: \n"
         "|       Variable [p11]\n"
         "|       Variable [p21]\n"
-        "BinaryJoin [joinType: Inner]\n"
+        "NestedLoopJoin [joinType: Inner]\n"
         "|   |   BinaryOp [Eq]\n"
         "|   |   |   Variable [p22]\n"
         "|   |   Variable [p12]\n"
@@ -5689,7 +5683,7 @@ TEST(PhysRewriter, JoinRewrite1) {
         "|   RefBlock: \n"
         "|       Variable [p1]\n"
         "|       Variable [p2]\n"
-        "BinaryJoin [joinType: Inner, {p1, p2}]\n"
+        "NestedLoopJoin [joinType: Inner, {p1, p2}]\n"
         "|   |   Const [true]\n"
         "|   IndexScan [{}, scanDefName: test2, indexDefName: index1, interval: {>If [] BinaryOp "
         "[Gte] Variable [p1] Variable [p2] Variable [p1] Variable [p2]}]\n"
@@ -5838,7 +5832,7 @@ TEST(PhysRewriter, EqMemberSargable) {
             "|   |       root\n"
             "|   RefBlock: \n"
             "|       Variable [root]\n"
-            "BinaryJoin [joinType: Inner, {rid_0}]\n"
+            "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
             "|   |   Const [true]\n"
             "|   LimitSkip []\n"
             "|   |   limitSkip:\n"
@@ -6032,7 +6026,7 @@ TEST(PhysRewriter, PerfOnlyPreds1) {
         "|   |       pa\n"
         "|   RefBlock: \n"
         "|       Variable [pa]\n"
-        "BinaryJoin [joinType: Inner, {rid_0}]\n"
+        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
         "|   Filter []\n"
         "|   |   EvalFilter []\n"
@@ -6126,7 +6120,7 @@ TEST(PhysRewriter, PerfOnlyPreds2) {
         "|   |       pa\n"
         "|   RefBlock: \n"
         "|       Variable [pa]\n"
-        "BinaryJoin [joinType: Inner, {rid_0}]\n"
+        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
         "|   Filter []\n"
         "|   |   EvalFilter []\n"

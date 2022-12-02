@@ -1067,6 +1067,7 @@ def register_abt_printers(pp):
                                "BinaryJoinNode",
                                "HashJoinNode",
                                "MergeJoinNode",
+                               "NestedLoopJoinNode",
                                "UnionNode",
                                "GroupByNode",
                                "UnwindNode",

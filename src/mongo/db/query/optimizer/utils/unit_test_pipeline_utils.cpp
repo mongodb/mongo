@@ -226,8 +226,8 @@ cost_model::CostModelCoefficients getPipelineTestDefaultCoefficients() {
     coefficients.setUnwindIncrementalCost(0.03 * usToMs);
     coefficients.setUnwindStartupCost(0.000001);
 
-    coefficients.setBinaryJoinIncrementalCost(0.2 * usToMs);
-    coefficients.setBinaryJoinStartupCost(0.000001);
+    coefficients.setNestedLoopJoinIncrementalCost(0.2 * usToMs);
+    coefficients.setNestedLoopJoinStartupCost(0.000001);
 
     coefficients.setHashJoinIncrementalCost(0.05 * usToMs);
     coefficients.setHashJoinStartupCost(0.000001);

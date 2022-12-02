@@ -453,7 +453,7 @@ Root []
 |   |       scan_0
 |   RefBlock: 
 |       Variable [scan_0]
-BinaryJoin [joinType: Inner, {rid_0}]
+NestedLoopJoin [joinType: Inner, {rid_0}]
 |   |   Const [true]
 |   LimitSkip []
 |   |   limitSkip:
@@ -846,7 +846,7 @@ Collation []
 |   |       sort_0: Ascending
 |   RefBlock: 
 |       Variable [sort_0]
-BinaryJoin [joinType: Inner, {rid_0}]
+NestedLoopJoin [joinType: Inner, {rid_0}]
 |   |   Const [true]
 |   LimitSkip []
 |   |   limitSkip:
@@ -907,7 +907,7 @@ Root []
 |   |       scan_0
 |   RefBlock: 
 |       Variable [scan_0]
-BinaryJoin [joinType: Inner, {rid_0}]
+NestedLoopJoin [joinType: Inner, {rid_0}]
 |   |   Const [true]
 |   LimitSkip []
 |   |   limitSkip:
@@ -1004,7 +1004,7 @@ Root []
 |   |       scan_0
 |   RefBlock: 
 |       Variable [scan_0]
-BinaryJoin [joinType: Inner, {rid_0}]
+NestedLoopJoin [joinType: Inner, {rid_0}]
 |   |   Const [true]
 |   LimitSkip []
 |   |   limitSkip:
@@ -1064,7 +1064,7 @@ Root []
 |   |       scan_0
 |   RefBlock: 
 |       Variable [scan_0]
-BinaryJoin [joinType: Inner, {rid_0}]
+NestedLoopJoin [joinType: Inner, {rid_0}]
 |   |   Const [true]
 |   Filter []
 |   |   EvalFilter []

@@ -136,7 +136,7 @@ public:
                                          const ABT& gbBind,
                                          const ABT& gbRefs);
 
-    std::unique_ptr<sbe::PlanStage> walk(const BinaryJoinNode& n,
+    std::unique_ptr<sbe::PlanStage> walk(const NestedLoopJoinNode& n,
                                          const ABT& leftChild,
                                          const ABT& rightChild,
                                          const ABT& filter);

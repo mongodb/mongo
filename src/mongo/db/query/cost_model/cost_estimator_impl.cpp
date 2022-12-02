@@ -130,14 +130,14 @@ public:
         return {evalCost, _cardinalityEstimate};
     }
 
-    CostAndCEInternal operator()(const ABT& /*n*/, const BinaryJoinNode& node) {
+    CostAndCEInternal operator()(const ABT& /*n*/, const NestedLoopJoinNode& node) {
         CostAndCEInternal leftChildResult = deriveChild(node.getLeftChild(), 0);
         CostAndCEInternal rightChildResult = deriveChild(node.getRightChild(), 1);
-        const double joinCost = _coefficients.getBinaryJoinStartupCost() +
-            _coefficients.getBinaryJoinIncrementalCost() *
+        const double nestedLoopjoinCost = _coefficients.getNestedLoopJoinStartupCost() +
+            _coefficients.getNestedLoopJoinIncrementalCost() *
                 (leftChildResult._ce + rightChildResult._ce) +
             leftChildResult._cost + rightChildResult._cost;
-        return {joinCost, _cardinalityEstimate};
+        return {nestedLoopjoinCost, _cardinalityEstimate};
     }
 
     CostAndCEInternal operator()(const ABT& /*n*/, const HashJoinNode& node) {

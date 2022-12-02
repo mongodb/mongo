@@ -44,7 +44,7 @@ Root []
 |   |       scan_0
 |   RefBlock: 
 |       Variable [scan_0]
-BinaryJoin [joinType: Inner, {rid_0}]
+NestedLoopJoin [joinType: Inner, {rid_0}]
 |   |   Const [true]
 |   Filter []
 |   |   BinaryOp [FillEmpty]

@@ -497,15 +497,14 @@ struct Collector {
             node, std::move(leftChildResult), std::move(rightChildResult));
     }
 
-    CollectedInfo transport(const ABT& n,
-                            const BinaryJoinNode& binaryJoinNode,
-                            CollectedInfo leftChildResult,
-                            CollectedInfo rightChildResult,
-                            CollectedInfo filterResult) {
+    template <class T>
+    CollectedInfo handleJoinWithCorrelatedProjs(const T& node,
+                                                CollectedInfo leftChildResult,
+                                                CollectedInfo rightChildResult,
+                                                CollectedInfo filterResult) {
         CollectedInfo result{};
 
-        const ProjectionNameSet& correlatedProjNames =
-            binaryJoinNode.getCorrelatedProjectionNames();
+        const ProjectionNameSet& correlatedProjNames = node.getCorrelatedProjectionNames();
         {
             const ProjectionNameSet& leftProjections = leftChildResult.getProjections();
             for (const ProjectionName& boundProjectionName : correlatedProjNames) {
@@ -533,9 +532,31 @@ struct Collector {
 
         result.mergeNoDefs(std::move(filterResult));
 
-        result.nodeDefs[&binaryJoinNode] = result.defs;
+        result.nodeDefs[&node] = result.defs;
 
         return result;
+    }
+
+    CollectedInfo transport(const ABT& n,
+                            const BinaryJoinNode& binaryJoinNode,
+                            CollectedInfo leftChildResult,
+                            CollectedInfo rightChildResult,
+                            CollectedInfo filterResult) {
+        return handleJoinWithCorrelatedProjs<BinaryJoinNode>(binaryJoinNode,
+                                                             std::move(leftChildResult),
+                                                             std::move(rightChildResult),
+                                                             std::move(filterResult));
+    }
+
+    CollectedInfo transport(const ABT& n,
+                            const NestedLoopJoinNode& nestedLoopJoinNode,
+                            CollectedInfo leftChildResult,
+                            CollectedInfo rightChildResult,
+                            CollectedInfo filterResult) {
+        return handleJoinWithCorrelatedProjs<NestedLoopJoinNode>(nestedLoopJoinNode,
+                                                                 std::move(leftChildResult),
+                                                                 std::move(rightChildResult),
+                                                                 std::move(filterResult));
     }
 
     CollectedInfo transport(const ABT& n,

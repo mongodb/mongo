@@ -70,7 +70,7 @@ class CostEstimator:
             'Evaluation': self.evaluation,
             'GroupBy': self.group_by,
             'Unwind': self.unwind,
-            'BinaryJoin': self.binary_join,
+            'NestedLoopJoin': self.nested_loop_join,
             'HashJoin': self.hash_join,
             'MergeJoin': self.merge_join,
             'Unique': self.unique,
@@ -112,9 +112,9 @@ class CostEstimator:
         """Estinamate Unwind ABT node."""
         return self.cost_model.unwind_startup_cost + cardinality * self.cost_model.unwind_incremental_cost
 
-    def binary_join(self, cardinality: int) -> float:
-        """Estinamate BinaryJoin ABT node."""
-        return self.cost_model.binary_join_startup_cost + cardinality * self.cost_model.binary_join_incremental_cost
+    def nested_loop_join(self, cardinality: int) -> float:
+        """Estinamate NestedLoopJoin ABT node."""
+        return self.cost_model.nested_loop_join_startup_cost + cardinality * self.cost_model.nested_loop_join_incremental_cost
 
     def hash_join(self, cardinality: int) -> float:
         """Estinamate HashJoin ABT node."""
@@ -201,12 +201,13 @@ def make_config():
         eval_incremental_cost=430.6176946, eval_startup_cost=1103.4048573163343,
         group_by_incremental_cost=413.07932374, group_by_startup_cost=1199.8878012735659,
         unwind_incremental_cost=586.57200195, unwind_startup_cost=1.0,
-        binary_join_incremental_cost=161.62301944, binary_join_startup_cost=402.8455479458652,
-        hash_join_incremental_cost=250.61365634, hash_join_startup_cost=1.0,
-        merge_join_incremental_cost=111.23423304, merge_join_startup_cost=1517.7970800404169,
-        unique_incremental_cost=269.71368614, unique_startup_cost=1.0,
-        union_incremental_cost=111.94945268, union_startup_cost=69.88096657391543,
-        limit_skip_incremental_cost=62.42111111, limit_skip_startup_cost=655.1342592592522)
+        nested_loop_join_incremental_cost=161.62301944,
+        nested_loop_join_startup_cost=402.8455479458652, hash_join_incremental_cost=250.61365634,
+        hash_join_startup_cost=1.0, merge_join_incremental_cost=111.23423304,
+        merge_join_startup_cost=1517.7970800404169, unique_incremental_cost=269.71368614,
+        unique_startup_cost=1.0, union_incremental_cost=111.94945268,
+        union_startup_cost=69.88096657391543, limit_skip_incremental_cost=62.42111111,
+        limit_skip_startup_cost=655.1342592592522)
 
     cost_estimator = CostEstimator(cost_model)
 

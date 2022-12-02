@@ -64,8 +64,8 @@ void initializeCoefficients(CostModelCoefficients& coefficients) {
     coefficients.setUnwindIncrementalCost(586.57200195 * nsToMs);
     coefficients.setUnwindStartupCost(1.0 * nsToMs);
 
-    coefficients.setBinaryJoinIncrementalCost(161.62301944 * nsToMs);
-    coefficients.setBinaryJoinStartupCost(402.8455479458652 * nsToMs);
+    coefficients.setNestedLoopJoinIncrementalCost(161.62301944 * nsToMs);
+    coefficients.setNestedLoopJoinStartupCost(402.8455479458652 * nsToMs);
 
     coefficients.setHashJoinIncrementalCost(250.61365634 * nsToMs);
     coefficients.setHashJoinStartupCost(1.0 * nsToMs);  // Already calibrated.

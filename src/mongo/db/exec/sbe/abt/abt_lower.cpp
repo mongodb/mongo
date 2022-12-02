@@ -641,7 +641,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const GroupByNode& n,
                                          planNodeId);
 }
 
-std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const BinaryJoinNode& n,
+std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const NestedLoopJoinNode& n,
                                                       const ABT& leftChild,
                                                       const ABT& rightChild,
                                                       const ABT& filter) {

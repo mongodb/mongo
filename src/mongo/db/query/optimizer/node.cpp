@@ -601,6 +601,53 @@ ABT& MergeJoinNode::getRightChild() {
     return get<1>();
 }
 
+NestedLoopJoinNode::NestedLoopJoinNode(JoinType joinType,
+                                       ProjectionNameSet correlatedProjectionNames,
+                                       FilterType filter,
+                                       ABT leftChild,
+                                       ABT rightChild)
+    : Base(std::move(leftChild), std::move(rightChild), std::move(filter)),
+      _joinType(joinType),
+      _correlatedProjectionNames(std::move(correlatedProjectionNames)) {
+    assertExprSort(getFilter());
+    assertNodeSort(getLeftChild());
+    assertNodeSort(getRightChild());
+}
+
+JoinType NestedLoopJoinNode::getJoinType() const {
+    return _joinType;
+}
+
+const ProjectionNameSet& NestedLoopJoinNode::getCorrelatedProjectionNames() const {
+    return _correlatedProjectionNames;
+}
+
+bool NestedLoopJoinNode::operator==(const NestedLoopJoinNode& other) const {
+    return _joinType == other._joinType &&
+        _correlatedProjectionNames == other._correlatedProjectionNames &&
+        getLeftChild() == other.getLeftChild() && getRightChild() == other.getRightChild();
+}
+
+const ABT& NestedLoopJoinNode::getLeftChild() const {
+    return get<0>();
+}
+
+ABT& NestedLoopJoinNode::getLeftChild() {
+    return get<0>();
+}
+
+const ABT& NestedLoopJoinNode::getRightChild() const {
+    return get<1>();
+}
+
+ABT& NestedLoopJoinNode::getRightChild() {
+    return get<1>();
+}
+
+const ABT& NestedLoopJoinNode::getFilter() const {
+    return get<2>();
+}
+
 /**
  * A helper that builds References object of UnionNode for reference tracking purposes.
  *

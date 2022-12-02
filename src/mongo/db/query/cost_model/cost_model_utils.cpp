@@ -44,7 +44,7 @@ void initializeTestCostModel(CostModelCoefficients& costModel, double value) {
     costModel.setEvalIncrementalCost(value);
     costModel.setGroupByIncrementalCost(value);
     costModel.setUnwindIncrementalCost(value);
-    costModel.setBinaryJoinIncrementalCost(value);
+    costModel.setNestedLoopJoinIncrementalCost(value);
     costModel.setHashJoinIncrementalCost(value);
     costModel.setMergeJoinIncrementalCost(value);
     costModel.setUniqueIncrementalCost(value);

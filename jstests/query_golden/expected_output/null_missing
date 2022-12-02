@@ -32,7 +32,7 @@ Plan skeleton: {
 			"optimizerPlan" : {
 				"nodeType" : "Root",
 				"child" : {
-					"nodeType" : "BinaryJoin",
+					"nodeType" : "NestedLoopJoin",
 					"leftChild" : {
 						"nodeType" : "IndexScan"
 					},

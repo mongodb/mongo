@@ -59,8 +59,8 @@ class CostModelCoefficients:
     group_by_startup_cost: float | None = None
     unwind_incremental_cost: float | None = None
     unwind_startup_cost: float | None = None
-    binary_join_incremental_cost: float | None = None
-    binary_join_startup_cost: float | None = None
+    nested_loop_join_incremental_cost: float | None = None
+    nested_loop_join_startup_cost: float | None = None
     hash_join_incremental_cost: float | None = None
     hash_join_startup_cost: float | None = None
     merge_join_incremental_cost: float | None = None

@@ -700,6 +700,40 @@ public:
         }
     }
 
+    static void printCorrelatedProjections(
+        ExplainPrinter& printer, const mongo::optimizer::ProjectionNameSet& correlatedProjections) {
+        ProjectionNameOrderedSet ordered;
+        for (const ProjectionName& projName : correlatedProjections) {
+            ordered.insert(projName);
+        }
+
+        if constexpr (version < ExplainVersion::V3) {
+            if (!correlatedProjections.empty()) {
+                printer.print(", {");
+                bool first = true;
+                for (const ProjectionName& projectionName : ordered) {
+                    if (first) {
+                        first = false;
+                    } else {
+                        printer.print(", ");
+                    }
+                    printer.print(projectionName);
+                }
+                printer.print("}");
+            }
+        } else if constexpr (version == ExplainVersion::V3) {
+            std::vector<ExplainPrinter> printers;
+            for (const ProjectionName& projectionName : ordered) {
+                ExplainPrinter local;
+                local.print(projectionName);
+                printers.push_back(std::move(local));
+            }
+            printer.fieldName("correlatedProjections").print(printers);
+        } else {
+            MONGO_UNREACHABLE;
+        }
+    }
+
     /**
      * Nodes
      */
@@ -1410,36 +1444,7 @@ public:
             .fieldName("joinType")
             .print(JoinTypeEnum::toString[static_cast<int>(node.getJoinType())]);
 
-        ProjectionNameOrderedSet ordered;
-        for (const ProjectionName& projName : node.getCorrelatedProjectionNames()) {
-            ordered.insert(projName);
-        }
-
-        if constexpr (version < ExplainVersion::V3) {
-            if (!node.getCorrelatedProjectionNames().empty()) {
-                printer.print(", {");
-                bool first = true;
-                for (const ProjectionName& projectionName : ordered) {
-                    if (first) {
-                        first = false;
-                    } else {
-                        printer.print(", ");
-                    }
-                    printer.print(projectionName);
-                }
-                printer.print("}");
-            }
-        } else if constexpr (version == ExplainVersion::V3) {
-            std::vector<ExplainPrinter> printers;
-            for (const ProjectionName& projectionName : ordered) {
-                ExplainPrinter local;
-                local.print(projectionName);
-                printers.push_back(std::move(local));
-            }
-            printer.fieldName("correlatedProjections").print(printers);
-        } else {
-            MONGO_UNREACHABLE;
-        }
+        printCorrelatedProjections(printer, node.getCorrelatedProjectionNames());
 
         printer.separator("]");
         nodeCEPropsPrint(printer, n, node);
@@ -1545,6 +1550,32 @@ public:
             .print(joinConditionPrinter)
             .fieldName("collation", ExplainVersion::V3)
             .print(collationPrinter)
+            .maybeReverse()
+            .fieldName("leftChild", ExplainVersion::V3)
+            .print(leftChildResult)
+            .fieldName("rightChild", ExplainVersion::V3)
+            .print(rightChildResult);
+        return printer;
+    }
+
+    ExplainPrinter transport(const ABT& n,
+                             const NestedLoopJoinNode& node,
+                             ExplainPrinter leftChildResult,
+                             ExplainPrinter rightChildResult,
+                             ExplainPrinter filterResult) {
+        ExplainPrinter printer("NestedLoopJoin");
+        maybePrintProps(printer, node);
+        printer.separator(" [")
+            .fieldName("joinType")
+            .print(JoinTypeEnum::toString[static_cast<int>(node.getJoinType())]);
+
+        printCorrelatedProjections(printer, node.getCorrelatedProjectionNames());
+
+        printer.separator("]");
+        nodeCEPropsPrint(printer, n, node);
+        printer.setChildCount(3)
+            .fieldName("expression", ExplainVersion::V3)
+            .print(filterResult)
             .maybeReverse()
             .fieldName("leftChild", ExplainVersion::V3)
             .print(leftChildResult)

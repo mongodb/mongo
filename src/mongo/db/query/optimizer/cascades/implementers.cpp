@@ -992,13 +992,17 @@ public:
         }
 
         // TODO: consider hash join if the predicate is equality.
-        ABT physicalJoin = n;
-        BinaryJoinNode& newNode = *physicalJoin.cast<BinaryJoinNode>();
+        ABT nlj = make<NestedLoopJoinNode>(std::move(node.getJoinType()),
+                                           std::move(node.getCorrelatedProjectionNames()),
+                                           std::move(node.getFilter()),
+                                           std::move(node.getLeftChild()),
+                                           std::move(node.getRightChild()));
+        NestedLoopJoinNode& newNode = *nlj.cast<NestedLoopJoinNode>();
 
-        optimizeChildren<BinaryJoinNode, PhysicalRewriteType::NLJ>(
+        optimizeChildren<NestedLoopJoinNode, PhysicalRewriteType::NLJ>(
             _queue,
             kDefaultPriority,
-            std::move(physicalJoin),
+            std::move(nlj),
             ChildPropsType{{&newNode.getLeftChild(), std::move(leftPhysProps)},
                            {&newNode.getRightChild(), std::move(rightPhysProps)}});
     }
@@ -1629,21 +1633,21 @@ private:
                 }
             }
         } else {
-            ABT physicalJoin = make<BinaryJoinNode>(JoinType::Inner,
-                                                    ProjectionNameSet{ridProjectionName},
-                                                    Constant::boolean(true),
-                                                    leftChild,
-                                                    rightChild);
+            ABT nlj = make<NestedLoopJoinNode>(JoinType::Inner,
+                                               ProjectionNameSet{ridProjectionName},
+                                               Constant::boolean(true),
+                                               leftChild,
+                                               rightChild);
 
             PhysProps leftPhysPropsLocal = leftPhysProps;
             PhysProps rightPhysPropsLocal = rightPhysProps;
             setCollationForRIDIntersect(
                 collationLeftRightSplit, leftPhysPropsLocal, rightPhysPropsLocal);
 
-            optimizeChildren<BinaryJoinNode, PhysicalRewriteType::IndexFetch>(
+            optimizeChildren<NestedLoopJoinNode, PhysicalRewriteType::IndexFetch>(
                 _queue,
                 kDefaultPriority,
-                std::move(physicalJoin),
+                std::move(nlj),
                 std::move(leftPhysPropsLocal),
                 std::move(rightPhysPropsLocal));
         }

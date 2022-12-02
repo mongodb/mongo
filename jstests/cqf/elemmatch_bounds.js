@@ -92,7 +92,7 @@ result = run({
     plan: {
         "nodeType": "Root",
         "child": {
-            "nodeType": "BinaryJoin",
+            "nodeType": "NestedLoopJoin",
             "leftChild": {"nodeType": "IndexScan", "indexDefName": "a.b_1", "interval": "[ 2, 2 ]"},
             "rightChild": {"nodeType": "LimitSkip", "child": {"nodeType": "Seek"}}
         }
@@ -109,7 +109,7 @@ result = run({
     plan: {
         "nodeType": "Root",
         "child": {
-            "nodeType": "BinaryJoin",
+            "nodeType": "NestedLoopJoin",
             "leftChild": {
                 "nodeType": "IndexScan",
                 "indexDefName": "a.b_1",
@@ -136,7 +136,7 @@ result = run({
     plan: {
         "nodeType": "Root",
         "child": {
-            "nodeType": "BinaryJoin",
+            "nodeType": "NestedLoopJoin",
             "leftChild": {
                 "nodeType": "Unique",
                 "child": {"nodeType": "IndexScan", "indexDefName": "c_1", "interval": "( 1, 3 )"}
@@ -158,7 +158,7 @@ result = run({
     plan: {
         "nodeType": "Root",
         "child": {
-            "nodeType": "BinaryJoin",
+            "nodeType": "NestedLoopJoin",
             "leftChild": {
                 "nodeType": "Unique",
                 "child": {"nodeType": "IndexScan", "indexDefName": "a.b_1", "interval": "( 1, 3 )"}
@@ -184,7 +184,7 @@ result = run({
         "child": {
             "nodeType": "Filter",
             "child": {
-                "nodeType": "BinaryJoin",
+                "nodeType": "NestedLoopJoin",
                 "leftChild": {
                     "nodeType": "Unique",
                     "child": {

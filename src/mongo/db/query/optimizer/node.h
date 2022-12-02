@@ -503,12 +503,10 @@ MAKE_PRINTABLE_ENUM_STRING_ARRAY(JoinTypeEnum, JoinType, JOIN_TYPE);
  * Logical binary join.
  * Join of two logical nodes. Can express inner and outer joins, with an associated join predicate.
  *
- * This node is logical, with a default physical implementation corresponding to a Nested Loops Join
- * (NLJ).
- * Variables used in the inner (right) side are automatically bound with variables from the left
- * (outer) side.
+ * Variables specified in correlatedProjectionNames and used in the inner (right) side are
+ * automatically bound with variables from the left (outer) side.
  */
-class BinaryJoinNode final : public ABTOpFixedArity<3>, public Node {
+class BinaryJoinNode final : public ABTOpFixedArity<3>, public ExclusivelyLogicalNode {
     using Base = ABTOpFixedArity<3>;
 
 public:
@@ -610,6 +608,45 @@ private:
     // Join condition is a conjunction of _leftKeys.at(i) == _rightKeys.at(i).
     const ProjectionNameVector _leftKeys;
     const ProjectionNameVector _rightKeys;
+};
+
+/**
+ * Physical nested loop join (NLJ). Can express inner and outer joins, with an associated join
+ * predicate.
+ *
+ * Variables specified in correlatedProjectionNames and used in the inner (right) side are
+ * automatically bound with variables from the left (outer) side.
+ */
+class NestedLoopJoinNode final : public ABTOpFixedArity<3>, public ExclusivelyPhysicalNode {
+    using Base = ABTOpFixedArity<3>;
+
+public:
+    NestedLoopJoinNode(JoinType joinType,
+                       ProjectionNameSet correlatedProjectionNames,
+                       FilterType filter,
+                       ABT leftChild,
+                       ABT rightChild);
+
+    bool operator==(const NestedLoopJoinNode& other) const;
+
+    JoinType getJoinType() const;
+
+    const ProjectionNameSet& getCorrelatedProjectionNames() const;
+
+    const ABT& getLeftChild() const;
+    ABT& getLeftChild();
+
+    const ABT& getRightChild() const;
+    ABT& getRightChild();
+
+    const ABT& getFilter() const;
+
+private:
+    const JoinType _joinType;
+
+    // Those projections must exist on the outer side and are used to bind free variables on the
+    // inner side.
+    const ProjectionNameSet _correlatedProjectionNames;
 };
 
 /**

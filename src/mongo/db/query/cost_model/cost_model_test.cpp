@@ -78,7 +78,7 @@ TEST(CostModel, IncreaseIndexScanCost) {
             "|   |       root\n"
             "|   RefBlock: \n"
             "|       Variable [root]\n"
-            "BinaryJoin [joinType: Inner, {rid_0}]\n"
+            "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
             "|   |   Const [true]\n"
             "|   LimitSkip []\n"
             "|   |   limitSkip:\n"
@@ -223,8 +223,8 @@ TEST(CostModel, IncreaseJoinsCost) {
         PrefixId prefixId;
         CostModelCoefficients costCoefs{};
         initializeTestCostModel(costCoefs, 100.0);
-        // Decreasing the cost of BinaryJoin should result in a BinaryJoin plan.
-        costCoefs.setBinaryJoinIncrementalCost(10.0);
+        // Decreasing the cost of NestedLoopJoin should result in a NestedLoopJoin plan.
+        costCoefs.setNestedLoopJoinIncrementalCost(10.0);
 
         auto phaseManager = makePhaseManager(
             {OptPhase::MemoSubstitutionPhase,
@@ -246,8 +246,8 @@ TEST(CostModel, IncreaseJoinsCost) {
 
         auto optimizedExplain = ExplainGenerator::explainV2(optimized);
 
-        // Verifies that a BinaryJoin plan is generated not a MergeJoin plan.
-        ASSERT_NE(optimizedExplain.find("BinaryJoin"), std::string::npos);
+        // Verifies that a NestedLoopJoin plan is generated not a MergeJoin plan.
+        ASSERT_NE(optimizedExplain.find("NestedLoopJoin"), std::string::npos);
         ASSERT_EQ(optimizedExplain.find("MergeJoin"), std::string::npos);
     }
 
@@ -255,10 +255,10 @@ TEST(CostModel, IncreaseJoinsCost) {
         PrefixId prefixId;
         CostModelCoefficients costCoefs{};
         initializeTestCostModel(costCoefs, 100.0);
-        // Increasing the cost of both MergeJoin and BinaryJoin should use neither of the two joins
-        // but a PhysicalScan plan.
+        // Increasing the cost of both MergeJoin and NestedLoopJoin should use neither of the two
+        // joins but a PhysicalScan plan.
         costCoefs.setMergeJoinIncrementalCost(10000.0);
-        costCoefs.setBinaryJoinIncrementalCost(10000.0);
+        costCoefs.setNestedLoopJoinIncrementalCost(10000.0);
 
         auto phaseManager = makePhaseManager(
             {OptPhase::MemoSubstitutionPhase,
