@@ -288,8 +288,9 @@ DocumentSourceMergeSpec parseMergeSpecAndResolveTargetNamespace(const BSONElemen
     if (spec.type() == BSONType::String) {
         targetNss = {defaultDb, spec.valueStringData()};
     } else {
-        mergeSpec =
-            DocumentSourceMergeSpec::parse(IDLParserContext{kStageName}, spec.embeddedObject());
+        mergeSpec = DocumentSourceMergeSpec::parse(
+            IDLParserContext(kStageName, false /* apiStrict */, defaultDb.tenantId()),
+            spec.embeddedObject());
         targetNss = mergeSpec.getTargetNss();
         if (targetNss.coll().empty()) {
             // If the $merge spec is an object, the target namespace can be specified as a string

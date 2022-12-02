@@ -37,6 +37,7 @@
 #include "mongo/db/pipeline/document_source_merge.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/process_interface/non_shardsvr_process_interface.h"
+#include "mongo/idl/server_parameter_test_util.h"
 
 namespace mongo {
 namespace {
@@ -954,55 +955,180 @@ TEST_F(DocumentSourceMergeTest, FailsToParseIfOnFieldHaveDuplicates) {
 using DocumentSourceMergeServerlessTest = ServerlessAggregationContextFixture;
 
 TEST_F(DocumentSourceMergeServerlessTest,
-       LiteParsedDocumentSourceLookupContainsExpectedNamespacesInServerless) {
-    const std::string targetColl = "target_collection";
+       LiteParsedDocumentSourceLookupStringContainsExpectedNamespacesInServerless) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+
+    for (bool flagStatus : {false, true}) {
+        RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
+                                                                   flagStatus);
+
+        auto tenantId = TenantId(OID::gen());
+        NamespaceString nss(tenantId, _targetDb, "testColl");
+
+        // Pass collection name as a string.
+        auto stageSpec = BSON("$merge" << _targetColl);
+        auto liteParsedLookup =
+            DocumentSourceMerge::LiteParsed::parse(nss, stageSpec.firstElement());
+        auto namespaceSet = liteParsedLookup->getInvolvedNamespaces();
+        ASSERT_EQ(1, namespaceSet.size());
+        ASSERT_EQ(1ul, namespaceSet.count(NamespaceString(tenantId, _targetDb, _targetColl)));
+    }
+}
+
+TEST_F(DocumentSourceMergeServerlessTest,
+       LiteParsedDocumentSourceLookupObjContainsExpectedNamespacesInServerless) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+
+    for (bool flagStatus : {false, true}) {
+        RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
+                                                                   flagStatus);
+
+        auto tenantId = TenantId(OID::gen());
+        NamespaceString nss(tenantId, _targetDb, "testColl");
+
+        // Pass collection name as a db + coll object.
+        auto stageSpec =
+            BSON("$merge" << BSON("into" << BSON("db" << _targetDb << "coll" << _targetColl)));
+        auto liteParsedLookup =
+            DocumentSourceMerge::LiteParsed::parse(nss, stageSpec.firstElement());
+        auto namespaceSet = liteParsedLookup->getInvolvedNamespaces();
+        ASSERT_EQ(1, namespaceSet.size());
+        ASSERT_EQ(1ul, namespaceSet.count(NamespaceString(tenantId, _targetDb, _targetColl)));
+    }
+}
+
+TEST_F(DocumentSourceMergeServerlessTest,
+       LiteParsedDocumentSourceLookupObjContainsExpectedNamespacesInServerlessPrefixed) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", false);
 
     auto tenantId = TenantId(OID::gen());
-    NamespaceString nss(tenantId, "test", "testColl");
-    std::vector<BSONObj> pipeline;
+    NamespaceString nss(tenantId, _targetDb, "testColl");
 
-    auto stageSpec = BSON("$merge" << targetColl);
+    // Pass collection name as a db + coll object.
+    auto stageSpec =
+        BSON("$merge" << BSON("into" << BSON("db" << nss.dbName().toStringWithTenantId() << "coll"
+                                                  << _targetColl)));
     auto liteParsedLookup = DocumentSourceMerge::LiteParsed::parse(nss, stageSpec.firstElement());
     auto namespaceSet = liteParsedLookup->getInvolvedNamespaces();
     ASSERT_EQ(1, namespaceSet.size());
-    ASSERT_EQ(1ul, namespaceSet.count(NamespaceString(tenantId, "test", "target_collection")));
-
-    // TODO SERVER-68564 Add a test case once IDL parsed objects have access to tenantId.
+    ASSERT_EQ(1ul, namespaceSet.count(NamespaceString(tenantId, _targetDb, _targetColl)));
 }
 
-TEST_F(DocumentSourceMergeServerlessTest, CreateFromBSONContainsExpectedNamespacesInServerless) {
+TEST_F(DocumentSourceMergeServerlessTest,
+       CreateFromBSONStringContainsExpectedNamespacesInServerless) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+
     auto expCtx = getExpCtx();
     ASSERT(expCtx->ns.tenantId());
 
-    const std::string targetColl = "target_collection";
+    for (bool flagStatus : {false, true}) {
+        RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
+                                                                   flagStatus);
 
-    // Pass collection name as a string.
-    auto spec = BSON("$merge" << targetColl);
+        // Pass collection name as a string.
+        auto spec = BSON("$merge" << _targetColl);
+        auto mergeStage = DocumentSourceMerge::createFromBson(spec.firstElement(), expCtx);
+        auto mergeSource = static_cast<DocumentSourceMerge*>(mergeStage.get());
+        ASSERT(mergeStage);
+        ASSERT(mergeSource->getOutputNs().tenantId());
+        ASSERT_EQ(*mergeSource->getOutputNs().tenantId(), *expCtx->ns.tenantId());
+
+        // Assert the tenantId is not included in the serialized namespace.
+        auto dbField = flagStatus ? expCtx->ns.dbName().toString()
+                                  : expCtx->ns.dbName().toStringWithTenantId();
+        auto expectedDoc = Document{{"db", dbField}, {"coll", _targetColl}};
+
+        auto serialized = mergeSource->serialize().getDocument();
+        ASSERT_DOCUMENT_EQ(serialized["$merge"][kIntoFieldName].getDocument(), expectedDoc);
+    }
+}
+
+TEST_F(DocumentSourceMergeServerlessTest,
+       CreateFromBSONCollObjContainsExpectedNamespacesInServerless) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+
+    auto expCtx = getExpCtx();
+    ASSERT(expCtx->ns.tenantId());
+
+    for (bool flagStatus : {false, true}) {
+        RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
+                                                                   flagStatus);
+
+        // Pass collection name as a coll object.
+        auto spec = BSON("$merge" << BSON("into" << BSON("coll" << _targetColl)));
+        auto mergeStage = DocumentSourceMerge::createFromBson(spec.firstElement(), expCtx);
+        auto mergeSource = static_cast<DocumentSourceMerge*>(mergeStage.get());
+        ASSERT(mergeSource);
+        ASSERT(mergeSource->getOutputNs().tenantId());
+        ASSERT_EQ(*mergeSource->getOutputNs().tenantId(), *expCtx->ns.tenantId());
+
+        auto dbField = flagStatus ? expCtx->ns.dbName().toString()
+                                  : expCtx->ns.dbName().toStringWithTenantId();
+        auto expectedDoc = Document{{"db", dbField}, {"coll", _targetColl}};
+
+        auto serialized = mergeSource->serialize().getDocument();
+        ASSERT_DOCUMENT_EQ(serialized["$merge"][kIntoFieldName].getDocument(), expectedDoc);
+    }
+}
+
+TEST_F(DocumentSourceMergeServerlessTest,
+       CreateFromBSONDbObjContainsExpectedNamespacesInServerless) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+
+    auto expCtx = getExpCtx();
+    ASSERT(expCtx->ns.tenantId());
+
+    for (bool flagStatus : {false, true}) {
+        RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
+                                                                   flagStatus);
+
+        // Pass collection name as a db + coll object.
+        auto spec =
+            BSON("$merge" << BSON("into" << BSON("db" << _targetDb << "coll" << _targetColl)));
+        auto mergeStage = DocumentSourceMerge::createFromBson(spec.firstElement(), expCtx);
+        auto mergeSource = static_cast<DocumentSourceMerge*>(mergeStage.get());
+        ASSERT(mergeSource);
+        ASSERT(mergeSource->getOutputNs().tenantId());
+        ASSERT_EQ(*mergeSource->getOutputNs().tenantId(), *expCtx->ns.tenantId());
+
+        auto dbField = flagStatus
+            ? _targetDb
+            : str::stream() << (*expCtx).ns.tenantId()->toString() << '_' << _targetDb;
+        auto expectedDoc = Document{{"db", dbField}, {"coll", _targetColl}};
+
+        auto serialized = mergeSource->serialize().getDocument();
+        ASSERT_DOCUMENT_EQ(serialized["$merge"][kIntoFieldName].getDocument(), expectedDoc);
+    }
+}
+
+TEST_F(DocumentSourceMergeServerlessTest,
+       CreateFromBSONDbObjContainsExpectedNamespacesInServerlessPrefix) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+
+    auto expCtx = getExpCtx();
+    ASSERT(expCtx->ns.tenantId());
+
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", false);
+
+    // We're expecting a prefix given gFeatureFlagRequireTenantId is false.
+    std::string dbField = str::stream() << (*expCtx).ns.tenantId()->toString() << '_' << _targetDb;
+
+    // Pass collection name as a db + coll object.
+    auto spec = BSON("$merge" << BSON("into" << BSON("db" << dbField << "coll" << _targetColl)));
     auto mergeStage = DocumentSourceMerge::createFromBson(spec.firstElement(), expCtx);
     auto mergeSource = static_cast<DocumentSourceMerge*>(mergeStage.get());
-    ASSERT(mergeStage);
-    ASSERT(mergeSource->getOutputNs().tenantId());
-    ASSERT_EQ(*mergeSource->getOutputNs().tenantId(), *expCtx->ns.tenantId());
-
-    // Assert the tenantId is not included in the serialized namespace.
-    auto serialized = mergeSource->serialize().getDocument();
-    auto expectedDoc = Document{{"db", expCtx->ns.dbName().db()}, {"coll", targetColl}};
-    ASSERT_DOCUMENT_EQ(serialized["$merge"][kIntoFieldName].getDocument(), expectedDoc);
-
-    // Pass collection name as an object.
-    spec = BSON("$merge" << BSON("into" << BSON("coll" << targetColl)));
-    mergeStage = DocumentSourceMerge::createFromBson(spec.firstElement(), expCtx);
-    mergeSource = static_cast<DocumentSourceMerge*>(mergeStage.get());
     ASSERT(mergeSource);
     ASSERT(mergeSource->getOutputNs().tenantId());
     ASSERT_EQ(*mergeSource->getOutputNs().tenantId(), *expCtx->ns.tenantId());
 
-    // Assert the tenantId is not included in the serialized namespace.
-    serialized = mergeSource->serialize().getDocument();
-    ASSERT_DOCUMENT_EQ(serialized["$merge"][kIntoFieldName].getDocument(), expectedDoc);
+    auto expectedDoc = Document{{"db", dbField}, {"coll", _targetColl}};
 
-    // TODO SERVER-68564 Add a test case once IDL parsed objects have access to tenantId.
+    auto serialized = mergeSource->serialize().getDocument();
+    ASSERT_DOCUMENT_EQ(serialized["$merge"][kIntoFieldName].getDocument(), expectedDoc);
 }
+
 
 }  // namespace
 }  // namespace mongo

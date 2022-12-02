@@ -50,6 +50,7 @@
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/idl/server_parameter_test_util.h"
 
 namespace mongo {
 namespace {
@@ -1481,14 +1482,98 @@ TEST_F(DocumentSourceLookUpServerlessTest,
                                << "as"
                                << "lookup1"));
 
-    NamespaceString nss(expCtx->ns.dbName(), "testColl");
-    std::vector<BSONObj> pipeline;
+    NamespaceString nss(expCtx->ns.dbName(), _targetColl);
     auto liteParsedLookup = DocumentSourceLookUp::LiteParsed::parse(nss, stageSpec.firstElement());
     auto namespaceSet = liteParsedLookup->getInvolvedNamespaces();
 
     ASSERT_EQ(1ul, namespaceSet.count(NamespaceString(expCtx->ns.dbName(), "namespace1")));
     ASSERT_EQ(1ul, namespaceSet.count(NamespaceString(expCtx->ns.dbName(), "namespace2")));
     ASSERT_EQ(2ul, namespaceSet.size());
+}
+
+TEST_F(
+    DocumentSourceLookUpServerlessTest,
+    LiteParsedDocumentSourceLookupObjExpectedNamespacesInServerlessWhenPassingInNssWithTenantId) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+
+    auto expCtx = getExpCtx();
+
+    auto stageSpec =
+        BSON("$lookup" << BSON(
+                 "from" << BSON("db"
+                                << "config"
+                                << "coll"
+                                << "cache.chunks.test.foo")
+                        << "pipeline"
+                        << BSON_ARRAY(BSON(
+                               "$lookup"
+                               << BSON("from" << BSON("db"
+                                                      << "local"
+                                                      << "coll"
+                                                      << "oplog.rs")
+                                              << "as"
+                                              << "lookup2"
+                                              << "pipeline"
+                                              << BSON_ARRAY(BSON("$match" << BSON("x" << 1))))))
+                        << "as"
+                        << "lookup1"));
+    NamespaceString nss(expCtx->ns.dbName(), _targetColl);
+
+    for (bool flagStatus : {false, true}) {
+        RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
+                                                                   flagStatus);
+
+        // The result must match one of several system const NamespaceStrings, which means parse()
+        // will fail an assertion if nss contains any tenantId.
+        ASSERT_THROWS_CODE(DocumentSourceLookUp::LiteParsed::parse(nss, stageSpec.firstElement()),
+                           AssertionException,
+                           ErrorCodes::FailedToParse);
+    }
+}
+
+TEST_F(DocumentSourceLookUpServerlessTest,
+       LiteParsedDocumentSourceLookupObjExpectedNamespacesInServerlessWithFlags) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+
+    auto expCtx = getExpCtx();
+
+    auto stageSpec =
+        BSON("$lookup" << BSON(
+                 "from" << BSON("db"
+                                << "config"
+                                << "coll"
+                                << "cache.chunks.test.foo")
+                        << "pipeline"
+                        << BSON_ARRAY(BSON(
+                               "$lookup"
+                               << BSON("from" << BSON("db"
+                                                      << "local"
+                                                      << "coll"
+                                                      << "oplog.rs")
+                                              << "as"
+                                              << "lookup2"
+                                              << "pipeline"
+                                              << BSON_ARRAY(BSON("$match" << BSON("x" << 1))))))
+                        << "as"
+                        << "lookup1"));
+
+    // TODO SERVER-62491 Use system tenantId to construct nss.
+    NamespaceString nss(boost::none, expCtx->ns.dbName().toString(), _targetColl);
+
+    for (bool flagStatus : {false, true}) {
+        RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
+                                                                   flagStatus);
+
+        auto liteParsedLookup =
+            DocumentSourceLookUp::LiteParsed::parse(nss, stageSpec.firstElement());
+        auto namespaceSet = liteParsedLookup->getInvolvedNamespaces();
+
+        ASSERT_EQ(
+            1ul,
+            namespaceSet.count(NamespaceString(boost::none, "config", "cache.chunks.test.foo")));
+        ASSERT_EQ(1ul, namespaceSet.count(NamespaceString(boost::none, "local", "oplog.rs")));
+        ASSERT_EQ(2ul, namespaceSet.size());
+    }
 }
 
 TEST_F(DocumentSourceLookUpServerlessTest, CreateFromBSONContainsExpectedNamespacesInServerless) {

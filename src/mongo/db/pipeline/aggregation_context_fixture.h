@@ -90,6 +90,9 @@ public:
     ServerlessAggregationContextFixture()
         : AggregationContextFixture(
               NamespaceString(TenantId(OID::gen()), "unittests", "pipeline_test")) {}
+
+    const std::string _targetDb = "test";
+    const std::string _targetColl = "target_collection";
 };
 
 }  // namespace mongo

@@ -40,6 +40,7 @@
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
@@ -756,10 +757,10 @@ TEST_F(DocumentSourceGraphLookUpTest, IncrementNestedAggregateOpCounterOnCreateB
 }
 
 
-using DocumentSourceUnionWithServerlessTest = ServerlessAggregationContextFixture;
+using DocumentSourceGraphLookupServerlessTest = ServerlessAggregationContextFixture;
 
-TEST_F(DocumentSourceUnionWithServerlessTest,
-       LiteParsedDocumentSourceLookupContainsExpectedNamespacesInServerless) {
+TEST_F(DocumentSourceGraphLookupServerlessTest,
+       LiteParsedDocumentSourceLookupStringExpectedNamespacesInServerless) {
     auto expCtx = getExpCtx();
     auto originalBSON = BSON("$graphLookup" << BSON("from"
                                                     << "foo"
@@ -772,8 +773,7 @@ TEST_F(DocumentSourceUnionWithServerlessTest,
                                                     << "as"
                                                     << "connections"));
 
-    std::vector<BSONObj> pipeline;
-    NamespaceString nss(expCtx->ns.dbName(), "testColl");
+    NamespaceString nss(expCtx->ns.dbName(), _targetColl);
     auto liteParsedLookup =
         DocumentSourceGraphLookUp::LiteParsed::parse(nss, originalBSON.firstElement());
     auto namespaceSet = liteParsedLookup->getInvolvedNamespaces();
@@ -781,7 +781,76 @@ TEST_F(DocumentSourceUnionWithServerlessTest,
     ASSERT_EQ(1ul, namespaceSet.count(NamespaceString(expCtx->ns.dbName(), "foo")));
 }
 
-TEST_F(DocumentSourceUnionWithServerlessTest,
+TEST_F(
+    DocumentSourceGraphLookupServerlessTest,
+    LiteParsedDocumentSourceLookupObjExpectedNamespacesInServerlessWhenPassingInNssWithTenantId) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    auto expCtx = getExpCtx();
+
+    auto originalBSON =
+        BSON("$graphLookup" << BSON("from" << BSON("db"
+                                                   << "local"
+                                                   << "coll"
+                                                   << "system.tenantMigration.oplogView")
+                                           << "startWith"
+                                           << "$x"
+                                           << "connectFromField"
+                                           << "id"
+                                           << "connectToField"
+                                           << "id"
+                                           << "as"
+                                           << "connections"));
+
+    NamespaceString nss(expCtx->ns.dbName(), _targetColl);
+
+    for (bool flagStatus : {false, true}) {
+        RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
+                                                                   flagStatus);
+
+        // The result must match NamespaceString::kTenantMigrationOplogView, which means parse()
+        // will fail an assertion if nss contains any tenantId.
+        ASSERT_THROWS_CODE(
+            DocumentSourceGraphLookUp::LiteParsed::parse(nss, originalBSON.firstElement()),
+            AssertionException,
+            ErrorCodes::FailedToParse);
+    }
+}
+
+TEST_F(DocumentSourceGraphLookupServerlessTest,
+       LiteParsedDocumentSourceLookupObjExpectedNamespacesInServerless) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    auto expCtx = getExpCtx();
+
+    auto originalBSON =
+        BSON("$graphLookup" << BSON("from" << BSON("db"
+                                                   << "local"
+                                                   << "coll"
+                                                   << "system.tenantMigration.oplogView")
+                                           << "startWith"
+                                           << "$x"
+                                           << "connectFromField"
+                                           << "id"
+                                           << "connectToField"
+                                           << "id"
+                                           << "as"
+                                           << "connections"));
+
+    for (bool flagStatus : {false, true}) {
+        RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
+                                                                   flagStatus);
+
+        // TODO SERVER-62491 Use system tenantId to construct nss.
+        NamespaceString nss(boost::none, expCtx->ns.dbName().toString(), _targetColl);
+        auto liteParsedLookup =
+            DocumentSourceGraphLookUp::LiteParsed::parse(nss, originalBSON.firstElement());
+        auto namespaceSet = liteParsedLookup->getInvolvedNamespaces();
+
+        ASSERT_EQ(1, namespaceSet.size());
+        ASSERT_EQ(1ul, namespaceSet.count(NamespaceString::kTenantMigrationOplogView));
+    }
+}
+
+TEST_F(DocumentSourceGraphLookupServerlessTest,
        CreateFromBSONContainsExpectedNamespacesInServerless) {
     auto expCtx = getExpCtx();
     auto tenantId = expCtx->ns.tenantId();
