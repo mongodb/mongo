@@ -130,5 +130,9 @@ verifyServerStatusElectionReasonCounterChange(statusBeforeTakeover.electionMetri
                                               "catchUpTakeover",
                                               1);
 
+// This test produces a rollback and the above is expected to be robust to the network error
+// it causes, but stopSet below is not so we await before it is called.
+replSet.awaitSecondaryNodes();
+replSet.awaitReplication();
 replSet.stopSet();
 })();
