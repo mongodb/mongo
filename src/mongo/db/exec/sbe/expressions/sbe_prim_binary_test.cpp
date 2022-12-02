@@ -478,4 +478,23 @@ TEST_F(SBEPrimBinaryTest, FillEmptyWithConstant) {
     }
 }
 
+/* Regression tests */
+
+TEST_F(SBEPrimBinaryTest, DivMemory) {
+    // Regression test for https://jira.mongodb.org/browse/SERVER-71527
+    auto& os = gctx->outStream();
+    auto expr = sbe::makeE<EPrimBinary>(
+        EPrimBinary::Op::div,
+        sbe::makeE<EPrimBinary>(EPrimBinary::Op::add,
+                                makeC(value::makeCopyDecimal(Decimal128(1))),
+                                makeC(value::makeCopyDecimal(Decimal128(1)))),
+        sbe::makeE<EPrimBinary>(EPrimBinary::Op::sub,
+                                makeC(value::makeCopyDecimal(Decimal128(1))),
+                                makeC(value::makeCopyDecimal(Decimal128(1)))));
+    printInputExpression(os, *expr);
+    auto compiledExpr = compileExpression(*expr);
+    printCompiledExpression(os, *compiledExpr);
+    executeAndPrintVariation(os, *compiledExpr);
+}
+
 }  // namespace mongo::sbe

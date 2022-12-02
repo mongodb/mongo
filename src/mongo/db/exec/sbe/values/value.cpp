@@ -831,12 +831,12 @@ std::pair<TypeTags, Value> compareValue(TypeTags lhsTag,
     }
 }
 
-bool isNaN(TypeTags tag, Value val) {
+bool isNaN(TypeTags tag, Value val) noexcept {
     return (tag == TypeTags::NumberDouble && std::isnan(bitcastTo<double>(val))) ||
         (tag == TypeTags::NumberDecimal && bitcastTo<Decimal128>(val).isNaN());
 }
 
-bool isInfinity(TypeTags tag, Value val) {
+bool isInfinity(TypeTags tag, Value val) noexcept {
     return (tag == TypeTags::NumberDouble && std::isinf(bitcastTo<double>(val))) ||
         (tag == TypeTags::NumberDecimal && bitcastTo<Decimal128>(val).isInfinite());
 }

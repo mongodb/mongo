@@ -307,9 +307,9 @@ std::pair<TypeTags, Value> compareValue(
     Value rhsValue,
     const StringData::ComparatorInterface* comparator = nullptr);
 
-bool isNaN(TypeTags tag, Value val);
+bool isNaN(TypeTags tag, Value val) noexcept;
 
-bool isInfinity(TypeTags tag, Value val);
+bool isInfinity(TypeTags tag, Value val) noexcept;
 
 /**
  * A simple hash combination.
@@ -327,15 +327,15 @@ inline std::size_t hashCombine(std::size_t state, std::size_t val) noexcept {
  */
 class ValueGuard {
 public:
-    ValueGuard(const std::pair<TypeTags, Value> typedValue)
+    MONGO_COMPILER_ALWAYS_INLINE ValueGuard(const std::pair<TypeTags, Value> typedValue)
         : ValueGuard(typedValue.first, typedValue.second) {}
-    ValueGuard(TypeTags tag, Value val) : _tag(tag), _value(val) {}
-    ValueGuard(bool owned, TypeTags tag, Value val)
+    MONGO_COMPILER_ALWAYS_INLINE ValueGuard(TypeTags tag, Value val) : _tag(tag), _value(val) {}
+    MONGO_COMPILER_ALWAYS_INLINE ValueGuard(bool owned, TypeTags tag, Value val)
         : ValueGuard(owned ? tag : TypeTags::Nothing, owned ? val : 0) {}
     ValueGuard() = delete;
     ValueGuard(const ValueGuard&) = delete;
     ValueGuard(ValueGuard&& other) = delete;
-    ~ValueGuard() {
+    MONGO_COMPILER_ALWAYS_INLINE ~ValueGuard() {
         releaseValue(_tag, _value);
     }
 

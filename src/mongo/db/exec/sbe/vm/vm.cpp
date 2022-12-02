@@ -5408,18 +5408,14 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [popRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
                 auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
 
                 auto [owned, tag, val] = genericAdd(lhsTag, lhsVal, rhsTag, rhsVal);
 
                 pushStack(owned, tag, val);
 
-                if (rhsOwned && popRhs) {
-                    value::releaseValue(rhsTag, rhsVal);
-                }
-                if (lhsOwned && popLhs) {
-                    value::releaseValue(lhsTag, lhsVal);
-                }
                 break;
             }
             case Instruction::sub: {
@@ -5427,18 +5423,13 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [popRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
                 auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
 
                 auto [owned, tag, val] = genericSub(lhsTag, lhsVal, rhsTag, rhsVal);
 
                 pushStack(owned, tag, val);
-
-                if (rhsOwned && popRhs) {
-                    value::releaseValue(rhsTag, rhsVal);
-                }
-                if (lhsOwned && popLhs) {
-                    value::releaseValue(lhsTag, lhsVal);
-                }
                 break;
             }
             case Instruction::mul: {
@@ -5446,18 +5437,13 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [popRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
                 auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
 
                 auto [owned, tag, val] = genericMul(lhsTag, lhsVal, rhsTag, rhsVal);
 
                 pushStack(owned, tag, val);
-
-                if (rhsOwned && popRhs) {
-                    value::releaseValue(rhsTag, rhsVal);
-                }
-                if (lhsOwned && popLhs) {
-                    value::releaseValue(lhsTag, lhsVal);
-                }
                 break;
             }
             case Instruction::div: {
@@ -5465,18 +5451,13 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [popRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
                 auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
 
                 auto [owned, tag, val] = genericDiv(lhsTag, lhsVal, rhsTag, rhsVal);
 
                 pushStack(owned, tag, val);
-
-                if (rhsOwned && popRhs) {
-                    value::releaseValue(rhsTag, rhsVal);
-                }
-                if (lhsOwned && popLhs) {
-                    value::releaseValue(lhsTag, lhsVal);
-                }
                 break;
             }
             case Instruction::idiv: {
@@ -5484,18 +5465,13 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [popRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
                 auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
 
                 auto [owned, tag, val] = genericIDiv(lhsTag, lhsVal, rhsTag, rhsVal);
 
                 pushStack(owned, tag, val);
-
-                if (rhsOwned && popRhs) {
-                    value::releaseValue(rhsTag, rhsVal);
-                }
-                if (lhsOwned && popLhs) {
-                    value::releaseValue(lhsTag, lhsVal);
-                }
                 break;
             }
             case Instruction::mod: {
@@ -5503,33 +5479,24 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [popRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
                 auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
 
                 auto [owned, tag, val] = genericMod(lhsTag, lhsVal, rhsTag, rhsVal);
 
                 pushStack(owned, tag, val);
-
-                if (rhsOwned && popRhs) {
-                    value::releaseValue(rhsTag, rhsVal);
-                }
-                if (lhsOwned && popLhs) {
-                    value::releaseValue(lhsTag, lhsVal);
-                }
                 break;
             }
             case Instruction::negate: {
                 auto [popParam, offsetParam] = decodeParam(pcPointer);
                 auto [owned, tag, val] = getFromStack(offsetParam, popParam);
+                value::ValueGuard paramGuard(owned && popParam, tag, val);
 
                 auto [resultOwned, resultTag, resultVal] = genericSub(
                     value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0), tag, val);
 
                 pushStack(resultOwned, resultTag, resultVal);
-
-                if (owned && popParam) {
-                    value::releaseValue(resultTag, resultVal);
-                }
-
                 break;
             }
             case Instruction::numConvert: {
@@ -5551,14 +5518,11 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
             case Instruction::logicNot: {
                 auto [popParam, offsetParam] = decodeParam(pcPointer);
                 auto [owned, tag, val] = getFromStack(offsetParam, popParam);
+                value::ValueGuard paramGuard(owned && popParam, tag, val);
 
                 auto [resultTag, resultVal] = genericNot(tag, val);
 
                 pushStack(false, resultTag, resultVal);
-
-                if (owned && popParam) {
-                    value::releaseValue(tag, val);
-                }
                 break;
             }
             case Instruction::less: {
@@ -5566,18 +5530,13 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [popRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
                 auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
 
                 auto [tag, val] = genericCompare<std::less<>>(lhsTag, lhsVal, rhsTag, rhsVal);
 
                 pushStack(false, tag, val);
-
-                if (rhsOwned && popRhs) {
-                    value::releaseValue(rhsTag, rhsVal);
-                }
-                if (lhsOwned && popLhs) {
-                    value::releaseValue(lhsTag, lhsVal);
-                }
                 break;
             }
             case Instruction::collLess: {
@@ -5586,23 +5545,16 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [popRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
                 auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
                 auto [collOwned, collTag, collVal] = getFromStack(offsetColl, popColl);
+                value::ValueGuard collGuard(collOwned && popColl, collTag, collVal);
 
                 auto [tag, val] =
                     genericCompare<std::less<>>(lhsTag, lhsVal, rhsTag, rhsVal, collTag, collVal);
 
                 pushStack(false, tag, val);
-
-                if (rhsOwned && popRhs) {
-                    value::releaseValue(rhsTag, rhsVal);
-                }
-                if (lhsOwned && popLhs) {
-                    value::releaseValue(lhsTag, lhsVal);
-                }
-                if (collOwned && popColl) {
-                    value::releaseValue(collTag, collVal);
-                }
                 break;
             }
             case Instruction::lessEq: {
@@ -5610,18 +5562,13 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [popRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
                 auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
 
                 auto [tag, val] = genericCompare<std::less_equal<>>(lhsTag, lhsVal, rhsTag, rhsVal);
 
                 pushStack(false, tag, val);
-
-                if (rhsOwned && popRhs) {
-                    value::releaseValue(rhsTag, rhsVal);
-                }
-                if (lhsOwned && popLhs) {
-                    value::releaseValue(lhsTag, lhsVal);
-                }
                 break;
             }
             case Instruction::collLessEq: {
@@ -5630,23 +5577,16 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [popRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
                 auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
                 auto [collOwned, collTag, collVal] = getFromStack(offsetColl, popColl);
+                value::ValueGuard collGuard(collOwned && popColl, collTag, collVal);
 
                 auto [tag, val] = genericCompare<std::less_equal<>>(
                     lhsTag, lhsVal, rhsTag, rhsVal, collTag, collVal);
 
                 pushStack(false, tag, val);
-
-                if (rhsOwned && popRhs) {
-                    value::releaseValue(rhsTag, rhsVal);
-                }
-                if (lhsOwned && popLhs) {
-                    value::releaseValue(lhsTag, lhsVal);
-                }
-                if (collOwned && popColl) {
-                    value::releaseValue(collTag, collVal);
-                }
                 break;
             }
             case Instruction::greater: {
@@ -5654,18 +5594,14 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [popRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
                 auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
 
                 auto [tag, val] = genericCompare<std::greater<>>(lhsTag, lhsVal, rhsTag, rhsVal);
 
                 pushStack(false, tag, val);
 
-                if (rhsOwned && popRhs) {
-                    value::releaseValue(rhsTag, rhsVal);
-                }
-                if (lhsOwned && popLhs) {
-                    value::releaseValue(lhsTag, lhsVal);
-                }
                 break;
             }
             case Instruction::collGreater: {
@@ -5674,23 +5610,16 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [popRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
                 auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
                 auto [collOwned, collTag, collVal] = getFromStack(offsetColl, popColl);
+                value::ValueGuard collGuard(collOwned && popColl, collTag, collVal);
 
                 auto [tag, val] = genericCompare<std::greater<>>(
                     lhsTag, lhsVal, rhsTag, rhsVal, collTag, collVal);
 
                 pushStack(false, tag, val);
-
-                if (rhsOwned && popRhs) {
-                    value::releaseValue(rhsTag, rhsVal);
-                }
-                if (lhsOwned && popLhs) {
-                    value::releaseValue(lhsTag, lhsVal);
-                }
-                if (collOwned && popColl) {
-                    value::releaseValue(collTag, collVal);
-                }
                 break;
             }
             case Instruction::greaterEq: {
@@ -5698,19 +5627,14 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [popRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
                 auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
 
                 auto [tag, val] =
                     genericCompare<std::greater_equal<>>(lhsTag, lhsVal, rhsTag, rhsVal);
 
                 pushStack(false, tag, val);
-
-                if (rhsOwned && popRhs) {
-                    value::releaseValue(rhsTag, rhsVal);
-                }
-                if (lhsOwned && popLhs) {
-                    value::releaseValue(lhsTag, lhsVal);
-                }
                 break;
             }
             case Instruction::collGreaterEq: {
@@ -5719,23 +5643,16 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [popRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
                 auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
                 auto [collOwned, collTag, collVal] = getFromStack(offsetColl, popColl);
+                value::ValueGuard collGuard(collOwned && popColl, collTag, collVal);
 
                 auto [tag, val] = genericCompare<std::greater_equal<>>(
                     lhsTag, lhsVal, rhsTag, rhsVal, collTag, collVal);
 
                 pushStack(false, tag, val);
-
-                if (rhsOwned && popRhs) {
-                    value::releaseValue(rhsTag, rhsVal);
-                }
-                if (lhsOwned && popLhs) {
-                    value::releaseValue(lhsTag, lhsVal);
-                }
-                if (collOwned && popColl) {
-                    value::releaseValue(collTag, collVal);
-                }
                 break;
             }
             case Instruction::eq: {
@@ -5743,18 +5660,13 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [popRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
                 auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
 
                 auto [tag, val] = genericCompare<std::equal_to<>>(lhsTag, lhsVal, rhsTag, rhsVal);
 
                 pushStack(false, tag, val);
-
-                if (rhsOwned && popRhs) {
-                    value::releaseValue(rhsTag, rhsVal);
-                }
-                if (lhsOwned && popLhs) {
-                    value::releaseValue(lhsTag, lhsVal);
-                }
                 break;
             }
             case Instruction::collEq: {
@@ -5763,23 +5675,16 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [popRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
                 auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
                 auto [collOwned, collTag, collVal] = getFromStack(offsetColl, popColl);
+                value::ValueGuard collGuard(collOwned && popColl, collTag, collVal);
 
                 auto [tag, val] = genericCompare<std::equal_to<>>(
                     lhsTag, lhsVal, rhsTag, rhsVal, collTag, collVal);
 
                 pushStack(false, tag, val);
-
-                if (rhsOwned && popRhs) {
-                    value::releaseValue(rhsTag, rhsVal);
-                }
-                if (lhsOwned && popLhs) {
-                    value::releaseValue(lhsTag, lhsVal);
-                }
-                if (collOwned && popColl) {
-                    value::releaseValue(collTag, collVal);
-                }
                 break;
             }
             case Instruction::neq: {
@@ -5787,19 +5692,14 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [popRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
                 auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
 
                 auto [tag, val] = genericCompare<std::equal_to<>>(lhsTag, lhsVal, rhsTag, rhsVal);
                 std::tie(tag, val) = genericNot(tag, val);
 
                 pushStack(false, tag, val);
-
-                if (rhsOwned && popRhs) {
-                    value::releaseValue(rhsTag, rhsVal);
-                }
-                if (lhsOwned && popLhs) {
-                    value::releaseValue(lhsTag, lhsVal);
-                }
                 break;
             }
             case Instruction::collNeq: {
@@ -5808,24 +5708,17 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [popRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
                 auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
                 auto [collOwned, collTag, collVal] = getFromStack(offsetColl, popColl);
+                value::ValueGuard collGuard(collOwned && popColl, collTag, collVal);
 
                 auto [tag, val] = genericCompare<std::equal_to<>>(
                     lhsTag, lhsVal, rhsTag, rhsVal, collTag, collVal);
                 std::tie(tag, val) = genericNot(tag, val);
 
                 pushStack(false, tag, val);
-
-                if (rhsOwned && popRhs) {
-                    value::releaseValue(rhsTag, rhsVal);
-                }
-                if (lhsOwned && popLhs) {
-                    value::releaseValue(lhsTag, lhsVal);
-                }
-                if (collOwned && popColl) {
-                    value::releaseValue(collTag, collVal);
-                }
                 break;
             }
             case Instruction::cmp3w: {
@@ -5833,18 +5726,14 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [popRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
                 auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
 
                 auto [tag, val] = compare3way(lhsTag, lhsVal, rhsTag, rhsVal);
 
                 pushStack(false, tag, val);
 
-                if (rhsOwned && popRhs) {
-                    value::releaseValue(rhsTag, rhsVal);
-                }
-                if (lhsOwned && popLhs) {
-                    value::releaseValue(lhsTag, lhsVal);
-                }
                 break;
             }
             case Instruction::collCmp3w: {
@@ -5853,22 +5742,15 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [popRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
                 auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
                 auto [collOwned, collTag, collVal] = getFromStack(offsetColl, popColl);
+                value::ValueGuard collGuard(collOwned && popColl, collTag, collVal);
 
                 auto [tag, val] = compare3way(lhsTag, lhsVal, rhsTag, rhsVal, collTag, collVal);
 
                 pushStack(false, tag, val);
-
-                if (rhsOwned && popRhs) {
-                    value::releaseValue(rhsTag, rhsVal);
-                }
-                if (lhsOwned && popLhs) {
-                    value::releaseValue(lhsTag, lhsVal);
-                }
-                if (collOwned && popColl) {
-                    value::releaseValue(collTag, collVal);
-                }
                 break;
             }
             case Instruction::fillEmpty: {
@@ -5925,7 +5807,9 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [popRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
                 auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
 
                 auto [owned, tag, val] = getField(lhsTag, lhsVal, rhsTag, rhsVal);
 
@@ -5936,13 +5820,6 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 }
 
                 pushStack(owned, tag, val);
-
-                if (rhsOwned && popRhs) {
-                    value::releaseValue(rhsTag, rhsVal);
-                }
-                if (lhsOwned && popLhs) {
-                    value::releaseValue(lhsTag, lhsVal);
-                }
                 break;
             }
             case Instruction::getFieldImm: {
@@ -5953,7 +5830,7 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 pcPointer += size;
 
                 auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
-
+                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
                 auto [owned, tag, val] = getField(lhsTag, lhsVal, fieldName);
 
                 // Copy value only if needed
@@ -5963,10 +5840,6 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 }
 
                 pushStack(owned, tag, val);
-
-                if (lhsOwned && popLhs) {
-                    value::releaseValue(lhsTag, lhsVal);
-                }
                 break;
             }
             case Instruction::getElement: {
@@ -5974,7 +5847,9 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [popRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
                 auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
 
                 auto [owned, tag, val] = getElement(lhsTag, lhsVal, rhsTag, rhsVal);
 
@@ -5985,25 +5860,15 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 }
 
                 pushStack(owned, tag, val);
-
-                if (rhsOwned && popRhs) {
-                    value::releaseValue(rhsTag, rhsVal);
-                }
-                if (lhsOwned && popLhs) {
-                    value::releaseValue(lhsTag, lhsVal);
-                }
                 break;
             }
             case Instruction::getArraySize: {
                 auto [popParam, offsetParam] = decodeParam(pcPointer);
                 auto [owned, tag, val] = getFromStack(offsetParam, popParam);
+                value::ValueGuard paramGuard(owned && popParam, tag, val);
 
                 auto [resultOwned, resultTag, resultVal] = getArraySize(tag, val);
                 pushStack(resultOwned, resultTag, resultVal);
-
-                if (owned && popParam) {
-                    value::releaseValue(tag, val);
-                }
                 break;
             }
             case Instruction::collComparisonKey: {
@@ -6011,7 +5876,9 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [popRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
                 auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
 
                 if (lhsTag != value::TypeTags::Nothing && rhsTag == value::TypeTags::collator) {
                     // If lhs is a collatable type, call collComparisonKey() to obtain the
@@ -6030,13 +5897,6 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                     // If lhs was Nothing or rhs wasn't Collator, return Nothing.
                     pushStack(false, value::TypeTags::Nothing, 0);
                 }
-
-                if (rhsOwned && popRhs) {
-                    value::releaseValue(rhsTag, rhsVal);
-                }
-                if (lhsOwned && popLhs) {
-                    value::releaseValue(lhsTag, lhsVal);
-                }
                 break;
             }
             case Instruction::getFieldOrElement: {
@@ -6044,7 +5904,9 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [popRhs, offsetRhs] = decodeParam(pcPointer);
 
                 auto [rhsOwned, rhsTag, rhsVal] = getFromStack(offsetRhs, popRhs);
+                value::ValueGuard rhsGuard(rhsOwned && popRhs, rhsTag, rhsVal);
                 auto [lhsOwned, lhsTag, lhsVal] = getFromStack(offsetLhs, popLhs);
+                value::ValueGuard lhsGuard(lhsOwned && popLhs, lhsTag, lhsVal);
 
                 auto [owned, tag, val] = getFieldOrElement(lhsTag, lhsVal, rhsTag, rhsVal);
 
@@ -6055,13 +5917,6 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 }
 
                 pushStack(owned, tag, val);
-
-                if (rhsOwned && popRhs) {
-                    value::releaseValue(rhsTag, rhsVal);
-                }
-                if (lhsOwned && popLhs) {
-                    value::releaseValue(lhsTag, lhsVal);
-                }
                 break;
             }
             case Instruction::traverseP: {
@@ -6125,16 +5980,14 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
             }
             case Instruction::aggSum: {
                 auto [fieldOwned, fieldTag, fieldVal] = getFromStack(0);
+                value::ValueGuard fieldGuard(fieldOwned, fieldTag, fieldVal);
                 popStack();
+
                 auto [accOwned, accTag, accVal] = getFromStack(0);
 
                 auto [owned, tag, val] = aggSum(accTag, accVal, fieldTag, fieldVal);
 
                 topStack(owned, tag, val);
-
-                if (fieldOwned) {
-                    value::releaseValue(fieldTag, fieldVal);
-                }
                 if (accOwned) {
                     value::releaseValue(accTag, accVal);
                 }
@@ -6142,16 +5995,14 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
             }
             case Instruction::aggMin: {
                 auto [fieldOwned, fieldTag, fieldVal] = getFromStack(0);
+                value::ValueGuard fieldGuard(fieldOwned, fieldTag, fieldVal);
                 popStack();
+
                 auto [accOwned, accTag, accVal] = getFromStack(0);
 
                 auto [owned, tag, val] = aggMin(accTag, accVal, fieldTag, fieldVal);
 
                 topStack(owned, tag, val);
-
-                if (fieldOwned) {
-                    value::releaseValue(fieldTag, fieldVal);
-                }
                 if (accOwned) {
                     value::releaseValue(accTag, accVal);
                 }
@@ -6159,9 +6010,13 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
             }
             case Instruction::aggCollMin: {
                 auto [fieldOwned, fieldTag, fieldVal] = getFromStack(0);
+                value::ValueGuard fieldGuard(fieldOwned, fieldTag, fieldVal);
                 popStack();
+
                 auto [collOwned, collTag, collVal] = getFromStack(0);
+                value::ValueGuard collGuard(collOwned, collTag, collVal);
                 popStack();
+
                 auto [accOwned, accTag, accVal] = getFromStack(0);
 
                 // Skip aggregation step if the collation is Nothing or an unexpected type.
@@ -6175,13 +6030,6 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [owned, tag, val] = aggMin(accTag, accVal, fieldTag, fieldVal, collator);
 
                 topStack(owned, tag, val);
-
-                if (fieldOwned) {
-                    value::releaseValue(fieldTag, fieldVal);
-                }
-                if (collOwned) {
-                    value::releaseValue(collTag, collVal);
-                }
                 if (accOwned) {
                     value::releaseValue(accTag, accVal);
                 }
@@ -6189,16 +6037,14 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
             }
             case Instruction::aggMax: {
                 auto [fieldOwned, fieldTag, fieldVal] = getFromStack(0);
+                value::ValueGuard fieldGuard(fieldOwned, fieldTag, fieldVal);
                 popStack();
+
                 auto [accOwned, accTag, accVal] = getFromStack(0);
 
                 auto [owned, tag, val] = aggMax(accTag, accVal, fieldTag, fieldVal);
 
                 topStack(owned, tag, val);
-
-                if (fieldOwned) {
-                    value::releaseValue(fieldTag, fieldVal);
-                }
                 if (accOwned) {
                     value::releaseValue(accTag, accVal);
                 }
@@ -6206,9 +6052,13 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
             }
             case Instruction::aggCollMax: {
                 auto [fieldOwned, fieldTag, fieldVal] = getFromStack(0);
+                value::ValueGuard fieldGuard(fieldOwned, fieldTag, fieldVal);
                 popStack();
+
                 auto [collOwned, collTag, collVal] = getFromStack(0);
+                value::ValueGuard collGuard(collOwned, collTag, collVal);
                 popStack();
+
                 auto [accOwned, accTag, accVal] = getFromStack(0);
 
                 // Skip aggregation step if the collation is Nothing or an unexpected type.
@@ -6222,13 +6072,6 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 auto [owned, tag, val] = aggMax(accTag, accVal, fieldTag, fieldVal, collator);
 
                 topStack(owned, tag, val);
-
-                if (fieldOwned) {
-                    value::releaseValue(fieldTag, fieldVal);
-                }
-                if (collOwned) {
-                    value::releaseValue(collTag, collVal);
-                }
                 if (accOwned) {
                     value::releaseValue(accTag, accVal);
                 }
@@ -6236,16 +6079,14 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
             }
             case Instruction::aggFirst: {
                 auto [fieldOwned, fieldTag, fieldVal] = getFromStack(0);
+                value::ValueGuard fieldGuard(fieldOwned, fieldTag, fieldVal);
                 popStack();
+
                 auto [accOwned, accTag, accVal] = getFromStack(0);
 
                 auto [owned, tag, val] = aggFirst(accTag, accVal, fieldTag, fieldVal);
 
                 topStack(owned, tag, val);
-
-                if (fieldOwned) {
-                    value::releaseValue(fieldTag, fieldVal);
-                }
                 if (accOwned) {
                     value::releaseValue(accTag, accVal);
                 }
@@ -6253,16 +6094,14 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
             }
             case Instruction::aggLast: {
                 auto [fieldOwned, fieldTag, fieldVal] = getFromStack(0);
+                value::ValueGuard fieldGuard(fieldOwned, fieldTag, fieldVal);
                 popStack();
+
                 auto [accOwned, accTag, accVal] = getFromStack(0);
 
                 auto [owned, tag, val] = aggLast(accTag, accVal, fieldTag, fieldVal);
 
                 topStack(owned, tag, val);
-
-                if (fieldOwned) {
-                    value::releaseValue(fieldTag, fieldVal);
-                }
                 if (accOwned) {
                     value::releaseValue(accTag, accVal);
                 }
