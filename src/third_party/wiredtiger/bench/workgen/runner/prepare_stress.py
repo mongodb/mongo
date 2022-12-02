@@ -115,7 +115,8 @@ nops_per_thread = icount // (populate_threads * table_count)
 pop_thread = Thread(pop_ops * nops_per_thread)
 pop_thread.options.session_config="isolation=snapshot"
 pop_workload = Workload(context, populate_threads * pop_thread)
-pop_workload.run(conn)
+ret = pop_workload.run(conn)
+assert ret == 0, ret
 
 # Log like file, requires that logging be enabled in the connection config.
 log_name = "table:log"
@@ -187,7 +188,8 @@ workload.options.oldest_timestamp_lag=30
 workload.options.stable_timestamp_lag=10
 # timestamp_advance is the number of seconds to wait before moving oldest and stable timestamp.
 workload.options.timestamp_advance=1
-workload.run(conn)
+ret = workload.run(conn)
+assert ret == 0, ret
 
 end_time = time.time()
 run_time = end_time - start_time

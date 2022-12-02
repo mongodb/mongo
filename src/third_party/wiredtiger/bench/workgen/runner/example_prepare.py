@@ -48,7 +48,8 @@ op = Operation(Operation.OP_INSERT, table)
 thread = Thread(op * 5000)
 pop_workload = Workload(context, thread)
 print('populate:')
-pop_workload.run(conn)
+ret = pop_workload.run(conn)
+assert ret == 0, ret
 
 opread = Operation(Operation.OP_SEARCH, table)
 read_txn = txn(opread * 5, 'read_timestamp')
@@ -82,7 +83,8 @@ workload.options.stable_timestamp_lag=10
 # timestamp_advance is the number of seconds to wait before moving oldest and stable timestamp.
 workload.options.timestamp_advance=1
 print('transactional prepare workload:')
-workload.run(conn)
+ret = workload.run(conn)
+assert ret == 0, ret
 
 end_time = time.time()
 run_time = end_time - start_time
