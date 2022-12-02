@@ -68,8 +68,7 @@ let runTest = (operationToRunFn, expectedOpIncreases) => {
 setUp();
 
 // TODO (SERVER-71289): Remove mongos version check in catalog_cache_refresh_counters.js.
-const isLatestMongos = jsTestOptions().mongosBinVersion !== "last-lts" &&
-    jsTestOptions().mongosBinVersion !== "last-continuous";
+const isLatestMongos = jsTestOptions().mongosBinVersion !== "last-lts";
 
 /**
  * Verify that insert operations get logged when blocked by a refresh.
