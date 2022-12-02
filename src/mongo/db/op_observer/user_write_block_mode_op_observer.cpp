@@ -40,9 +40,9 @@ namespace {
 
 const auto documentIdDecoration = OperationContext::declareDecoration<BSONObj>();
 
-bool isStandaloneOrPrimary(OperationContext* opCtx) {
+bool isStandaloneOrPrimary(OperationContext* opCtx, const NamespaceString& nss) {
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    return replCoord->canAcceptWritesForDatabase(opCtx, NamespaceString::kAdminDb);
+    return replCoord->canAcceptWritesFor(opCtx, nss);
 }
 
 }  // namespace
@@ -52,11 +52,13 @@ void UserWriteBlockModeOpObserver::onInserts(OperationContext* opCtx,
                                              std::vector<InsertStatement>::const_iterator first,
                                              std::vector<InsertStatement>::const_iterator last,
                                              bool fromMigrate) {
+    const auto& nss = coll->ns();
+
     if (!fromMigrate) {
-        _checkWriteAllowed(opCtx, coll->ns());
+        _checkWriteAllowed(opCtx, nss);
     }
 
-    if (coll->ns() == NamespaceString::kUserWritesCriticalSectionsNamespace &&
+    if (nss == NamespaceString::kUserWritesCriticalSectionsNamespace &&
         !user_writes_recoverable_critical_section_util::inRecoveryMode(opCtx)) {
         for (auto it = first; it != last; ++it) {
             const auto& insertedDoc = it->doc;
@@ -70,7 +72,8 @@ void UserWriteBlockModeOpObserver::onInserts(OperationContext* opCtx,
                  insertedNss = collCSDoc.getNss()](boost::optional<Timestamp>) {
                     invariant(insertedNss.isEmpty());
                     boost::optional<Lock::GlobalLock> globalLockIfNotPrimary;
-                    if (!isStandaloneOrPrimary(opCtx)) {
+                    if (!isStandaloneOrPrimary(
+                            opCtx, NamespaceString::kUserWritesCriticalSectionsNamespace)) {
                         globalLockIfNotPrimary.emplace(opCtx, MODE_IX);
                     }
 
@@ -88,11 +91,13 @@ void UserWriteBlockModeOpObserver::onInserts(OperationContext* opCtx,
 
 void UserWriteBlockModeOpObserver::onUpdate(OperationContext* opCtx,
                                             const OplogUpdateEntryArgs& args) {
+    const auto& nss = args.coll->ns();
+
     if (args.updateArgs->source != OperationSource::kFromMigrate) {
-        _checkWriteAllowed(opCtx, args.coll->ns());
+        _checkWriteAllowed(opCtx, nss);
     }
 
-    if (args.coll->ns() == NamespaceString::kUserWritesCriticalSectionsNamespace &&
+    if (nss == NamespaceString::kUserWritesCriticalSectionsNamespace &&
         !user_writes_recoverable_critical_section_util::inRecoveryMode(opCtx)) {
         const auto collCSDoc = UserWriteBlockingCriticalSectionDocument::parse(
             IDLParserContext("UserWriteBlockOpObserver"), args.updateArgs->updatedDoc);
@@ -105,7 +110,8 @@ void UserWriteBlockModeOpObserver::onUpdate(OperationContext* opCtx,
              insertedNss = collCSDoc.getNss()](boost::optional<Timestamp>) {
                 invariant(updatedNss.isEmpty());
                 boost::optional<Lock::GlobalLock> globalLockIfNotPrimary;
-                if (!isStandaloneOrPrimary(opCtx)) {
+                if (!isStandaloneOrPrimary(opCtx,
+                                           NamespaceString::kUserWritesCriticalSectionsNamespace)) {
                     globalLockIfNotPrimary.emplace(opCtx, MODE_IX);
                 }
 
@@ -154,7 +160,8 @@ void UserWriteBlockModeOpObserver::onDelete(OperationContext* opCtx,
             [opCtx, deletedNss = collCSDoc.getNss()](boost::optional<Timestamp>) {
                 invariant(deletedNss.isEmpty());
                 boost::optional<Lock::GlobalLock> globalLockIfNotPrimary;
-                if (!isStandaloneOrPrimary(opCtx)) {
+                if (!isStandaloneOrPrimary(opCtx,
+                                           NamespaceString::kUserWritesCriticalSectionsNamespace)) {
                     globalLockIfNotPrimary.emplace(opCtx, MODE_IX);
                 }
 
@@ -275,7 +282,7 @@ void UserWriteBlockModeOpObserver::_checkWriteAllowed(OperationContext* opCtx,
                                                       const NamespaceString& nss) {
     // Evaluate write blocking only on replica set primaries.
     const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-    if (replCoord->isReplEnabled() && isStandaloneOrPrimary(opCtx)) {
+    if (replCoord->isReplEnabled() && replCoord->canAcceptWritesFor(opCtx, nss)) {
         GlobalUserWriteBlockState::get(opCtx)->checkUserWritesAllowed(opCtx, nss);
     }
 }

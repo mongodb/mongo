@@ -35,6 +35,7 @@
 #include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/jsobj.h"
@@ -87,55 +88,45 @@ void profile(OperationContext* opCtx, NetworkOp op) {
 
     const BSONObj p = b.done();
 
-    const string dbName(nsToDatabase(CurOp::get(opCtx)->getNS()));
-
-    // Set the opCtx to be only interruptible for replication state changes. This is needed
-    // because for some operations that are already marked as killed due to errors such as
-    // operation time exceeding maxTimeMS, we still want to output the profiler entry. Thus
-    // in these cases we do not interrupt lock acquisition even though the opCtx has already
-    // been killed. In the meantime we need to make sure replication state changes can still
-    // interrupt lock acquisition, otherwise there could be deadlocks when the state change
-    // thread is waiting for the session checked out by this opCtx while holding RSTL lock.
-    // However when maxLockTimeout is set, we want it to be always interruptible.
-    if (!opCtx->lockState()->hasMaxLockTimeout()) {
-        opCtx->setIgnoreInterruptsExceptForReplStateChange(true);
-    }
-
-    // IX lock acquisitions beyond this block will not be related to writes to system.profile.
-    ON_BLOCK_EXIT([opCtx] { opCtx->setIgnoreInterruptsExceptForReplStateChange(false); });
+    const auto ns = CurOp::get(opCtx)->getNS();
+    const string dbName(nsToDatabase(ns));
 
     try {
+        // We create a new opCtx so that we aren't interrupted by having the original operation
+        // killed or timed out. Those are the case we want to have profiling data.
+        auto newClient = opCtx->getServiceContext()->makeClient("profiling");
+        auto newCtx = newClient->makeOperationContext();
+        // We swap the lockers as that way we preserve locks held in transactions and any other
+        // options set for the locker like maxLockTimeout.
+        auto oldLocker = opCtx->getClient()->swapLockState(
+            std::make_unique<LockerImpl>(opCtx->getServiceContext()));
+        auto emptyLocker = newClient->swapLockState(std::move(oldLocker));
+        ON_BLOCK_EXIT([&] {
+            auto oldCtxLocker = newClient->swapLockState(std::move(emptyLocker));
+            opCtx->getClient()->swapLockState(std::move(oldCtxLocker));
+        });
+        AlternativeClientRegion acr(newClient);
         const auto dbProfilingNS =
             NamespaceString(dbName, NamespaceString::kSystemDotProfileCollectionName);
-        AutoGetCollection autoColl(opCtx, dbProfilingNS, MODE_IX);
+        AutoGetCollection autoColl(newCtx.get(), dbProfilingNS, MODE_IX);
         Database* const db = autoColl.getDb();
         if (!db) {
             // Database disappeared.
             LOGV2(20700,
                   "note: not profiling because db went away for {namespace}",
                   "note: not profiling because db went away for namespace",
-                  "namespace"_attr = CurOp::get(opCtx)->getNS());
+                  "namespace"_attr = ns);
             return;
         }
 
-        // We are about to enforce prepare conflicts for the OperationContext. But it is illegal
-        // to change the behavior of ignoring prepare conflicts while any storage transaction is
-        // still active. So we need to call abandonSnapshot() to close any open transactions.
-        // This call is also harmless because any previous reads or writes should have already
-        // completed, as profile() is called at the end of an operation.
-        opCtx->recoveryUnit()->abandonSnapshot();
-        // The profiler performs writes even after read commands. Ignoring prepare conflicts is
-        // not allowed while performing writes, so temporarily enforce prepare conflicts.
-        EnforcePrepareConflictsBlock enforcePrepare(opCtx);
+        uassertStatusOK(createProfileCollection(newCtx.get(), db));
+        auto coll = CollectionCatalog::get(newCtx.get())
+                        ->lookupCollectionByNamespace(newCtx.get(), dbProfilingNS);
 
-        uassertStatusOK(createProfileCollection(opCtx, db));
-        auto coll =
-            CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, dbProfilingNS);
-
-        WriteUnitOfWork wuow(opCtx);
+        WriteUnitOfWork wuow(newCtx.get());
         OpDebug* const nullOpDebug = nullptr;
         uassertStatusOK(collection_internal::insertDocument(
-            opCtx, coll, InsertStatement(p), nullOpDebug, false));
+            newCtx.get(), coll, InsertStatement(p), nullOpDebug, false));
         wuow.commit();
     } catch (const AssertionException& assertionEx) {
         LOGV2_WARNING(20703,
@@ -143,7 +134,7 @@ void profile(OperationContext* opCtx, NetworkOp op) {
                       "{namespace}: {assertion}",
                       "Caught Assertion while trying to profile operation",
                       "operation"_attr = networkOpToString(op),
-                      "namespace"_attr = CurOp::get(opCtx)->getNS(),
+                      "namespace"_attr = ns,
                       "assertion"_attr = redact(assertionEx));
     }
 }

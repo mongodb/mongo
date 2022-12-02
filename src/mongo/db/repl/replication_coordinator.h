@@ -1033,7 +1033,6 @@ public:
      */
     static bool isOplogDisabledForNS(const NamespaceString& nss);
 
-
     /**
      * Returns the stable timestamp that the storage engine recovered to on startup. If the
      * recovery point was not stable, returns "none".

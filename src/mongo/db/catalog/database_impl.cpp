@@ -763,7 +763,7 @@ Collection* DatabaseImpl::_createCollection(
     auto coordinator = repl::ReplicationCoordinator::get(opCtx);
     bool canAcceptWrites =
         (coordinator->getReplicationMode() != repl::ReplicationCoordinator::modeReplSet) ||
-        coordinator->canAcceptWritesForDatabase(opCtx, nss.db()) || nss.isSystemDotProfile();
+        coordinator->canAcceptWritesFor(opCtx, nss);
 
     CollectionOptions optionsWithUUID = options;
     bool generatedUUID = false;

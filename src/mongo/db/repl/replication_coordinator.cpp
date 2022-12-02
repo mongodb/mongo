@@ -104,6 +104,5 @@ bool ReplicationCoordinator::isOplogDisabledForNS(const NamespaceString& nss) {
 
     return false;
 }
-
 }  // namespace repl
 }  // namespace mongo

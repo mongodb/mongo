@@ -33,6 +33,7 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/repl/collection_utils.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
@@ -244,7 +245,15 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
           // databases).
 
           Lock::DBLockSkipOptions dbLockOptions;
-          dbLockOptions.skipRSTLLock = false;
+          dbLockOptions.skipRSTLLock = [&] {
+              const auto& maybeNss = nsOrUUID.nss();
+
+              if (maybeNss) {
+                  const auto& nss = *maybeNss;
+                  return repl::canCollectionSkipRSTLLockAcquisition(nss);
+              }
+              return false;
+          }();
           dbLockOptions.skipFlowControlTicket = [&nsOrUUID] {
               const auto& maybeNss = nsOrUUID.nss();
 
