@@ -284,12 +284,21 @@ public:
             auto keyPattern = cmd.getKeyPattern().get_value_or({});
             const bool estimate = cmd.getEstimate();
 
-            AutoGetCollectionForReadCommand collection(opCtx, nss);
+            Reply reply;
 
-            auto collDesc = CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, nss)
-                                ->getCollectionDescription(opCtx);
-            if (collDesc.isSharded()) {
-                const ShardKeyPattern shardKeyPattern(collDesc.getKeyPattern());
+            AutoGetCollectionForReadCommand autoColl(opCtx, nss);
+            const auto& collection = autoColl.getCollection();
+
+            if (!collection) {
+                // Collection does not exist
+                reply.setNumObjects(0);
+                reply.setSize(0);
+                reply.setMillis(timer.millis());
+                return reply;
+            }
+
+            if (collection.isSharded()) {
+                const ShardKeyPattern shardKeyPattern(collection.getShardKeyPattern());
                 uassert(ErrorCodes::BadValue,
                         "keyPattern must be empty or must be an object that equals the shard key",
                         keyPattern.isEmpty() ||
@@ -307,12 +316,7 @@ public:
                 max = shardKeyPattern.normalizeShardKey(max);
             }
 
-            long long numRecords = 0;
-            if (collection) {
-                numRecords = collection->numRecords(opCtx);
-            }
-
-            Reply reply;
+            const long long numRecords = collection->numRecords(opCtx);
             reply.setNumObjects(numRecords);
 
             if (numRecords == 0) {
@@ -335,10 +339,8 @@ public:
                     reply.setMillis(timer.millis());
                     return reply;
                 }
-                exec =
-                    InternalPlanner::collectionScan(opCtx,
-                                                    &collection.getCollection(),
-                                                    PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
+                exec = InternalPlanner::collectionScan(
+                    opCtx, &collection, PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
             } else {
                 if (keyPattern.isEmpty()) {
                     // if keyPattern not provided, try to infer it from the fields in 'min'
@@ -346,7 +348,7 @@ public:
                 }
 
                 auto shardKeyIdx = findShardKeyPrefixedIndex(opCtx,
-                                                             *collection,
+                                                             collection,
                                                              collection->getIndexCatalog(),
                                                              keyPattern,
                                                              /*requireSingleKey=*/true);
@@ -360,14 +362,13 @@ public:
                 min = Helpers::toKeyFormat(kp.extendRangeBound(min, false));
                 max = Helpers::toKeyFormat(kp.extendRangeBound(max, false));
 
-                exec = InternalPlanner::shardKeyIndexScan(
-                    opCtx,
-                    &collection.getCollection(),
-                    *shardKeyIdx,
-                    min,
-                    max,
-                    BoundInclusion::kIncludeStartKeyOnly,
-                    PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
+                exec = InternalPlanner::shardKeyIndexScan(opCtx,
+                                                          &collection,
+                                                          *shardKeyIdx,
+                                                          min,
+                                                          max,
+                                                          BoundInclusion::kIncludeStartKeyOnly,
+                                                          PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
             }
 
             CurOpFailpointHelpers::waitWhileFailPointEnabled(
