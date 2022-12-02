@@ -35,6 +35,7 @@ function assertApproxEq(expected, actual, msg, tolerance = 0.01) {
  * returns.
  */
 function verifyCEForMatch({coll, predicate, expected, ce, hint}) {
+    jsTestLog(`Verify CE for match ${tojson(predicate)}`);
     const CEs = ce ? [ce] : undefined;
     return verifyCEForMatchNodes(
         {coll, predicate, expected, getNodeCEs: (explain) => [getRootCE(explain)], CEs, hint});
@@ -78,7 +79,6 @@ function verifyCEForMatchNodes({coll, predicate, expected, getNodeCEs, CEs, hint
 function createAndValidateHistogram({coll, expectedHistogram, empty = false}) {
     const field = expectedHistogram._id;
     const stats = db.system.statistics[coll.getName()];
-    stats.drop();
 
     // We can't use forceBonsai here because the new optimizer doesn't know how to handle the
     // analyze command.

@@ -472,6 +472,9 @@ TEST(EstimatorTest, TwoBucketsObjectIdHistogram) {
     std::vector<BucketData> data{{Value(startOid), 2.0, 0.0, 0.0},
                                  {Value(endOid), 1.0, 97.0, 77.0}};
     const ScalarHistogram hist = createHistogram(data);
+    if constexpr (kCETestLogOnly) {
+        std::cout << hist.serialize() << std::endl;
+    }
 
     ASSERT_EQ(100.0, getTotals(hist).card);
 
@@ -511,9 +514,9 @@ TEST(EstimatorTest, TwoBucketsObjectIdHistogram) {
     ASSERT_APPROX_EQUAL(1.25, expectedCard, kErrorBound);
 
     expectedCard = estimate(hist, tag, value, EstimationType::kLess).card;
-    ASSERT_APPROX_EQUAL(83.95, expectedCard, kErrorBound);
+    ASSERT_APPROX_EQUAL(74.00, expectedCard, kErrorBound);
     expectedCard = estimate(hist, tag, value, EstimationType::kGreater).card;
-    ASSERT_APPROX_EQUAL(14.78, expectedCard, kErrorBound);
+    ASSERT_APPROX_EQUAL(24.74, expectedCard, kErrorBound);
 
     const auto oidAfter = OID("63340dbed6cd8af737d4139b");
     oidAfter.view().readInto(value::getObjectIdView(value));
@@ -751,8 +754,6 @@ TEST(EstimatorTest, TwoBucketsMixedHistogram) {
     ASSERT_APPROX_EQUAL(45.5, expectedCard, kErrorBound);
 }
 
-// TODO: enable the following test after SERVER-71376 Fix histogram generation on MacOs
-#if 0
 /**
  * Tests for cardinality estimates for queries over minimum values of date, timestamp, and objectId
  * types. When the histogram has at least 2 buckets per data type, the minimum value, if present in
@@ -766,7 +767,7 @@ TEST(EstimatorTest, MinValueMixedHistogramFromData) {
     const Timestamp startTs{Seconds(1516864323LL), 0};
     const Timestamp endTs{Seconds(1526864323LL), 0};
     const auto startOid = OID("63340d8d27afef2de7357e8d");
-    //    const auto endOid = OID("63340dbed6cd8af737d4139a");
+    const auto endOid = OID("63340dbed6cd8af737d4139a");
 
     std::vector<SBEValue> data;
     data.emplace_back(value::TypeTags::Date, value::bitcastFrom<int64_t>(startInstant));
@@ -793,23 +794,74 @@ TEST(EstimatorTest, MinValueMixedHistogramFromData) {
     startOid.view().readInto(value::getObjectIdView(objVal));
     std::tie(tag, val) = copyValue(objTag, objVal);
     data.emplace_back(tag, val);
-    /* TODO: add another objectId value when mapping to double is fixed by SERVER-71205.
-        endOid.view().readInto(value::getObjectIdView(objVal));
-        std::tie(tag, val) = copyValue(objTag, objVal);
-        data.emplace_back(tag, val);
-    */
+    endOid.view().readInto(value::getObjectIdView(objVal));
+    std::tie(tag, val) = copyValue(objTag, objVal);
+    data.emplace_back(tag, val);
 
     sortValueVector(data);
 
     // Force each type except numbers to use a single bucket. This way there is no bucket for the
     // min value if present in the data and it needs to be estimated.
     const ScalarHistogram& hist = makeHistogram(data, 6);
+
     // Mixed data are sorted in the histogram according to the BSON order as defined in bsontypes.h
     // the canonicalizeBSONTypeUnsafeLookup function.
     if constexpr (kCETestLogOnly) {
         std::cout << printValueArray(data) << "\n";
         std::cout << "Mixed types " << hist.dump();
     }
+
+    // Assert that our scalar histogram is what we expect.
+    auto expected = fromjson(
+        "{ \
+        buckets: [ \
+            { \
+                boundaryCount: 1.0, \
+                rangeCount: 0.0, \
+                rangeDistincts: 0.0, \
+                cumulativeCount: 1.0, \
+                cumulativeDistincts: 1.0 \
+            }, \
+            { \
+                boundaryCount: 1.0, \
+                rangeCount: 0.0, \
+                rangeDistincts: 0.0, \
+                cumulativeCount: 2.0, \
+                cumulativeDistincts: 2.0 \
+            }, \
+            { \
+                boundaryCount: 1.0, \
+                rangeCount: 1.0, \
+                rangeDistincts: 1.0, \
+                cumulativeCount: 4.0, \
+                cumulativeDistincts: 4.0 \
+            }, \
+            { \
+                boundaryCount: 1.0, \
+                rangeCount: 1.0, \
+                rangeDistincts: 1.0, \
+                cumulativeCount: 6.0, \
+                cumulativeDistincts: 6.0 \
+            }, \
+            { \
+                boundaryCount: 1.0, \
+                rangeCount: 1.0, \
+                rangeDistincts: 1.0, \
+                cumulativeCount: 8.0, \
+                cumulativeDistincts: 8.0 \
+            }, \
+            { \
+                boundaryCount: 1.0, \
+                rangeCount: 1.0, \
+                rangeDistincts: 1.0, \
+                cumulativeCount: 10.0, \
+                cumulativeDistincts: 10.0 \
+            } \
+        ], \
+        bounds: [ 100, 1000, 'xyz', ObjectId('63340dbed6cd8af737d4139a'), \
+                  new Date(1516864323000), Timestamp(1526864323, 0) ] \
+	}");
+    ASSERT_BSONOBJ_EQ(expected, hist.serialize());
 
     // Minimum ObjectId.
     auto&& [minOid, inclOid] = getMinMaxBoundForType(true /*isMin*/, value::TypeTags::ObjectId);
@@ -931,7 +983,6 @@ TEST(EstimatorTest, MinValueMixedHistogramFromData) {
                                      true /* includeScalar */);
     ASSERT_EQ(3.0, expectedCard);
 }
-#endif
 
 TEST(EstimatorTest, MinValueMixedHistogramFromBuckets) {
     const auto endOid = OID("63340dbed6cd8af737d4139a");

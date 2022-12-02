@@ -98,6 +98,17 @@ int32_t compareValues(sbe::value::TypeTags tag1,
 void sortValueVector(std::vector<SBEValue>& sortVector);
 
 /**
+ * Convert a prefix of the input string (up to 8 characters) to a double.
+ */
+double stringToDouble(const StringData& sd);
+
+/**
+ * Treats the entire ObjectId as a string of 12 unsigned characters and applies the string-to-double
+ * formula to all of them. This preserves SBE ordering.
+ */
+double objectIdToDouble(const sbe::value::ObjectIdType* sd);
+
+/**
     Convert a value of any supported type into a double according to some metric. This
     metric will be consistent with ordering in the type.
 */

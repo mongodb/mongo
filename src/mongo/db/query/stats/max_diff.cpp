@@ -280,6 +280,8 @@ ScalarHistogram genMaxDiffHistogram(const DataDistribution& dataDistrib, size_t 
 }
 
 ArrayHistogram createArrayEstimator(const std::vector<SBEValue>& arrayData, size_t nBuckets) {
+    uassert(7120500, "A histogram must have at least one bucket.", nBuckets > 0);
+
     // Values that will be used as inputs to histogram generation code.
     std::vector<SBEValue> scalarData;
     std::vector<SBEValue> arrayMinData;

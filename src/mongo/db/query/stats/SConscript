@@ -121,3 +121,13 @@ env.Library(
         'stats_histograms',
     ],
 )
+
+env.CppUnitTest(
+    target="type_collision_test",
+    source=[
+        "type_collision_test.cpp",
+    ],
+    LIBDEPS=[
+        'stats_test_utils',
+    ],
+)

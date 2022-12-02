@@ -139,32 +139,55 @@ void sortValueVector(std::vector<SBEValue>& sortVector) {
     std::sort(sortVector.begin(), sortVector.end(), cmp);
 }
 
+template <typename T, typename C, size_t E>
+double convertToDouble(const T& arr, const size_t maxPrecision) {
+    double result = 0.0;
+    for (size_t i = 0; i < maxPrecision; ++i) {
+        const C ch = arr[i];
+        const double charToDbl = ch / std::pow(2, i * E);
+        result += charToDbl;
+    }
+    return result;
+}
+
+double stringToDouble(const StringData& sd) {
+    constexpr size_t exponent = sizeof(double);
+    const size_t maxPrecision = std::min(sd.size(), exponent);
+    return convertToDouble<StringData, char, exponent>(sd, maxPrecision);
+}
+
+double objectIdToDouble(const value::ObjectIdType* oid) {
+    // An ObjectId is backed by an array of 12 unsigned characters, therefore we can treat it as a
+    // string and apply the same formula to convert it to a double while ensuring that the double
+    // value is sorted lexicographically. This is necessary because valueSpread() expects the double
+    // value to be ordered in the same way as the values used to generate a histogram.
+    constexpr size_t maxPrecision = sizeof(value::ObjectIdType);
+    return convertToDouble<value::ObjectIdType, uint8_t, maxPrecision>(*oid, maxPrecision);
+}
+
 double valueToDouble(value::TypeTags tag, value::Value val) {
     double result = 0;
-    if (value::isNumber(tag)) {
+    if (tag == value::TypeTags::NumberDecimal) {
+        // We cannot directly cast NumberDecimal values to doubles, because they are wider. However,
+        // we can downcast a Decimal128 type with rounding to a double value.
+        const Decimal128 d = value::numericCast<Decimal128>(tag, val);
+        result = d.toDouble();
+
+    } else if (value::isNumber(tag)) {
         result = value::numericCast<double>(tag, val);
+
     } else if (value::isString(tag)) {
         const StringData sd = value::getStringView(tag, val);
+        result = stringToDouble(sd);
 
-        // Convert a prefix of the string to a double.
-        const size_t maxPrecision = std::min(sd.size(), sizeof(double));
-        for (size_t i = 0; i < maxPrecision; ++i) {
-            const char ch = sd[i];
-            const double charToDbl = ch / std::pow(2, i * 8);
-            result += charToDbl;
-        }
     } else if (tag == value::TypeTags::Date || tag == value::TypeTags::Timestamp) {
         int64_t v = value::bitcastTo<int64_t>(val);
         result = value::numericCast<double>(value::TypeTags::NumberInt64, v);
 
     } else if (tag == value::TypeTags::ObjectId) {
-        auto objView =
-            ConstDataView(reinterpret_cast<const char*>(sbe::value::getObjectIdView(val)->data()));
-        // Take the first 8 bytes of the ObjectId.
-        // ToDo: consider using the entire ObjectId or other parts of it
-        // 	 auto v = objView.read<LittleEndian<uint64_t>>(sizeof(uint32_t));
-        auto v = objView.read<LittleEndian<uint64_t>>();
-        result = value::numericCast<double>(value::TypeTags::NumberInt64, v);
+        const auto oid = sbe::value::getObjectIdView(val);
+        result = objectIdToDouble(oid);
+
     } else {
         uassert(6844500, "Unexpected value type", false);
     }
