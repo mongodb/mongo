@@ -2785,10 +2785,11 @@ buildvariants:
       authentication: enabled
       fle: enabled
       storageEngine: wiredTiger
-      compile_variant: "-arm64"
+      compile-variant: "-arm64"
+      requires_mongocrypt_shlib: true
     run_on:
       - "rhel70-perf-single"
-    depends_on: *_compile_amazon_linux2_arm64
+    depends_on: *_compile_amazon_linux2_arm64_with_mongocrypt_shlib
     tasks:
       - name: schedule_patch_auto_tasks
       - name: schedule_variant_auto_tasks
