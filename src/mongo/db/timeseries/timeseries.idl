@@ -123,13 +123,13 @@ structs:
                               value. Specified in seconds."
                 type: safeInt
                 optional: true
-                validator: { gte: 1 }
+                validator: { gte: 1, lte: 31536000 }
                 stability: stable
             bucketMaxSpanSeconds:
                 description: "The maximum range of time values for a bucket, in seconds"
                 type: safeInt
                 optional: true
-                validator: { gte: 1 }
+                validator: { gte: 1, lte: 31536000 }
                 stability: stable
 
     CollModTimeseries:
@@ -144,9 +144,9 @@ structs:
                 optional: true
                 type: safeInt
                 stability: unstable
-                validator: { gte: 1 }
+                validator: { gte: 1, lte: 31536000 }
             bucketMaxSpanSeconds:
                 optional: true
                 type: safeInt
                 stability: unstable
-                validator: { gte: 1 }
+                validator: { gte: 1, lte: 31536000 }

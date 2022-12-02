@@ -992,9 +992,20 @@ def check_param_or_type_validator(ctxt: IDLCompatibilityContext, old_field: synt
     Check compatibility between old and new validators in command parameter type and command type
     struct fields.
     """
+
+    # These parameters were added as 'stable' in previous versions but have been undocumented until
+    # version 6.3. So we can go ahead and ignore their validator checks which were updated in
+    # SERVER-71601.
+    #
+    # Do not add additional parameters to this list.
+    ignore_validator_check_list = [
+        "create-param-bucketMaxSpanSeconds", "create-param-bucketRoundingSeconds"
+    ]
+
     if new_field.validator:
         if old_field.validator:
-            if new_field.validator != old_field.validator:
+            allow_name: str = cmd_name + "-param-" + old_field.name
+            if new_field.validator != old_field.validator and allow_name not in ignore_validator_check_list:
                 ctxt.add_command_or_param_type_validators_not_equal_error(
                     cmd_name, new_field.name, new_idl_file_path, type_name, is_command_parameter)
         else:

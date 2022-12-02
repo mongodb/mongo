@@ -26,31 +26,26 @@ assert.commandWorked(testDB.dropDatabase());
 
 const timeFieldName = 'time';
 const coll = testDB.t;
-const bucketRoundingSecondsTime = 4000;
-const bucketMaxSpanSecondsTime = 4000;
 const granularitySeconds = "seconds";
 const granularityMinutes = "minutes";
 const granularityHours = "hours";
 const bucketInvalidOptionsError = ErrorCodes.InvalidOptions;
+const idlInvalidValueError = 51024;
+
+const bucketRoundingSecondsTime = 4000;
+const bucketMaxSpanSecondsTime = 4000;
+const bucketingValueMax = 86400 * 365;  // Seconds in a year.
 
 const granularityTimeOptionsArr = [granularitySeconds, granularityMinutes, granularityHours];
 
 const verifyCreateCommandFails = function(secondsOptions = {}, errorCode) {
     coll.drop();
     const fullTimeseriesOptions = Object.merge({timeField: timeFieldName}, secondsOptions);
-
-    if (errorCode) {
-        assert.commandFailedWithCode(
-            testDB.createCollection(coll.getName(), {timeseries: fullTimeseriesOptions}),
-            errorCode);
-    } else {
-        assert.commandFailed(
-            testDB.createCollection(coll.getName(), {timeseries: fullTimeseriesOptions}));
-    }
+    assert.commandFailedWithCode(
+        testDB.createCollection(coll.getName(), {timeseries: fullTimeseriesOptions}), errorCode);
 
     const collections =
         assert.commandWorked(testDB.runCommand({listCollections: 1})).cursor.firstBatch;
-
     assert.isnull(collections.find(entry => entry.name === 'system.buckets.' + coll.getName()));
     assert.isnull(collections.find(entry => entry.name === coll.getName()));
 };
@@ -186,10 +181,6 @@ const verifyCreateCommandFails = function(secondsOptions = {}, errorCode) {
     verifyCreateCommandFails({bucketRoundingSeconds: 100, bucketMaxSpanSeconds: 50},
                              bucketInvalidOptionsError);
 
-    // Verify the create command fails when bucketRoundingSeconds or bucketMaxSpanSeconds is a
-    // negative value.
-    verifyCreateCommandFails({bucketRoundingSeconds: -1, bucketMaxSpanSeconds: -1});
-
     // Verify the create command fails when granularity is set as minutes alongside
     // bucketRoundingSeconds and bucketMaxSpanSeconds and they are not the default granularity
     // values.
@@ -209,5 +200,16 @@ const verifyCreateCommandFails = function(secondsOptions = {}, errorCode) {
         bucketMaxSpanSeconds: bucketMaxSpanSecondsTime
     },
                              bucketInvalidOptionsError);
+
+    // Verify the create command fails when bucketRoundingSeconds or bucketMaxSpanSeconds is a
+    // negative value.
+    verifyCreateCommandFails({bucketRoundingSeconds: -1, bucketMaxSpanSeconds: -1},
+                             idlInvalidValueError);
+
+    // Verify the create command fails when we go over the maximum value for bucketMaxSpanSeconds
+    // and bucketRoundingSeconds.
+    verifyCreateCommandFails(
+        {bucketRoundingSeconds: bucketingValueMax + 1, bucketMaxSpanSeconds: bucketingValueMax + 1},
+        idlInvalidValueError);
 })();
 })();

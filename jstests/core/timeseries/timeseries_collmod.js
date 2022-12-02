@@ -21,6 +21,8 @@ const collName = "timeseries_collmod";
 const coll = db.getCollection(collName);
 const bucketMaxSpanSecondsHours = 60 * 60 * 24 * 30;
 const bucketRoundingSecondsHours = 60 * 60 * 24;
+const bucketingValueMax = 86400 * 365;  // Seconds in a year.
+const idlInvalidValueError = 51024;
 
 coll.drop();
 assert.commandWorked(
@@ -188,5 +190,22 @@ if (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db.getMongo())) {
     // seconds.
     assert.commandWorked(
         db.runCommand({"collMod": collName, "timeseries": {"granularity": "minutes"}}));
+
+    // Fails to set bucketMaxSpanSeconds and bucketRoundingSeconds past the bucketing limit.
+    assert.commandFailedWithCode(db.runCommand({
+        "collMod": collName,
+        "timeseries": {
+            "bucketMaxSpanSeconds": bucketingValueMax + 1,
+            "bucketRoundingSeconds": bucketingValueMax + 1
+        }
+    }),
+                                 idlInvalidValueError);
+
+    // Successfully set the bucketMaxSpanSeconds and bucketRoundingSeconds to the limit.
+    assert.commandWorked(db.runCommand({
+        "collMod": collName,
+        "timeseries":
+            {"bucketMaxSpanSeconds": bucketingValueMax, "bucketRoundingSeconds": bucketingValueMax}
+    }));
 }
 })();
