@@ -2960,11 +2960,13 @@ if env.TargetOSIs('posix'):
     if not (env.TargetOSIs('darwin') and env.ToolchainIs('clang')):
         env.Append(LINKFLAGS=["-pthread"])
 
-    # SERVER-9761: Ensure early detection of missing symbols in dependent libraries at program
-    # startup.
-    env.Append(LINKFLAGS=[
-        "-Wl,-bind_at_load" if env.TargetOSIs('macOS') else "-Wl,-z,now",
-    ], )
+    # SERVER-9761: Ensure early detection of missing symbols in dependent
+    # libraries at program startup. For non-release dynamic builds we disable
+    # this behavior in the interest of improved mongod startup times.
+    if has_option('release') or get_option('link-model') != 'dynamic':
+        env.Append(LINKFLAGS=[
+            "-Wl,-bind_at_load" if env.TargetOSIs('macOS') else "-Wl,-z,now",
+        ], )
 
     # We need to use rdynamic for backtraces with glibc unless we have libunwind.
     nordyn = (env.TargetOSIs('darwin') or use_libunwind)
