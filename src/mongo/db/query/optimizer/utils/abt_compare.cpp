@@ -95,6 +95,8 @@ private:
         const auto [tag, val] = node.get();
         const auto [otherTag, otherVal] = other.get();
         const auto [compareTag, compareVal] = compareValue(tag, val, otherTag, otherVal);
+        uassert(
+            7086703, "Invalid comparison result", compareTag == sbe::value::TypeTags::NumberInt32);
         return sbe::value::bitcastTo<int32_t>(compareVal);
     }
 

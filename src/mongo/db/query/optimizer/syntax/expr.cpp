@@ -119,6 +119,7 @@ Constant::~Constant() {
 
 bool Constant::operator==(const Constant& other) const {
     const auto [compareTag, compareVal] = compareValue(_tag, _val, other._tag, other._val);
+    uassert(7086702, "Invalid comparison result", compareTag == sbe::value::TypeTags::NumberInt32);
     return sbe::value::bitcastTo<int32_t>(compareVal) == 0;
 }
 

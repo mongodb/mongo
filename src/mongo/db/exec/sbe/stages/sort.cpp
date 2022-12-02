@@ -136,7 +136,7 @@ void SortStage::makeSorter() {
             auto [lhsTag, lhsVal] = lhs.getViewOfValue(idx);
             auto [rhsTag, rhsVal] = rhs.getViewOfValue(idx);
             auto [tag, val] = value::compareValue(lhsTag, lhsVal, rhsTag, rhsVal);
-
+            uassert(7086700, "Invalid comparison result", tag == value::TypeTags::NumberInt32);
             auto result = value::bitcastTo<int32_t>(val);
             if (result) {
                 return _dirs[idx] == value::SortDirection::Descending ? -result : result;

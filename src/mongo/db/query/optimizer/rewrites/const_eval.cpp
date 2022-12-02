@@ -310,6 +310,9 @@ void ConstEval::transport(ABT& n, const BinaryOp& op, ABT& lhs, ABT& rhs) {
 
                     const auto [compareTag, compareVal] =
                         sbe::value::compareValue(lhsTag, lhsVal, rhsTag, rhsVal);
+                    uassert(7086701,
+                            "Invalid comparison result",
+                            compareTag == sbe::value::TypeTags::NumberInt32);
                     const auto cmpVal = sbe::value::bitcastTo<int32_t>(compareVal);
 
                     switch (op.op()) {
