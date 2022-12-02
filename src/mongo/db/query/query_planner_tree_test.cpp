@@ -433,7 +433,7 @@ TEST_F(QueryPlannerTest, RootedOrOfAndDontCollapseDifferentBounds) {
         "bounds: {c: [[3,3,true,true]], d: [[4,4,true,true]]}}}]}}}}");
 }
 
-TEST_F(QueryPlannerTest, DontCrashTryingToPushToSingleChildIndexedOr) {
+TEST_F(QueryPlannerTest, DontCrashTryingToPushToSingleChildIndexedOr1) {
     FailPointEnableBlock failPoint("disableMatchExpressionOptimization");
     addIndex(BSON("indexed" << 1));
     runQuery(
@@ -444,6 +444,26 @@ TEST_F(QueryPlannerTest, DontCrashTryingToPushToSingleChildIndexedOr) {
                  "  ] }"));
 
     assertNumSolutions(3U);
+}
+
+TEST_F(QueryPlannerTest, DontCrashTryingToPushToSingleChildIndexedOr2) {
+    // Test that queries with single-child $and, $or do not crash when match-expression optimization
+    // is disabled. Normally these single-child nodes are eliminated, so when they are left in place
+    // it can confuse OR-pushdown optimization.
+    //
+    // Originally designed to reproduce SERVER-70597, which would only happen when the
+    // INDEX_INTERSECTION option is enabled.
+    FailPointEnableBlock failPoint("disableMatchExpressionOptimization");
+    addIndex(BSON("a" << 1 << "b" << 1));
+
+    params.options |= QueryPlannerParams::INDEX_INTERSECTION;
+    runQuery(
+        fromjson("{ $and : [\n"
+                 "      { $and : [ { a : 2 } ] },\n"
+                 "      { $or : [ { b : 3 } ] }\n"
+                 "  ] }"));
+
+    assertNumSolutions(2U);
 }
 
 // SERVER-13960: properly handle $or with a mix of exact and inexact predicates.
