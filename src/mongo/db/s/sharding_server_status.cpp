@@ -38,6 +38,7 @@
 #include "mongo/db/s/sharding_data_transform_cumulative_metrics.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_statistics.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog_cache.h"

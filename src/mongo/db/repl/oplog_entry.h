@@ -35,7 +35,6 @@
 #include "mongo/db/repl/apply_ops_gen.h"
 #include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/util/overloaded_visitor.h"
 
@@ -190,11 +189,7 @@ public:
      * the FCV checks.  Once these are deprecated, we should remove this overridden function
      * entirely.
      */
-    void setTid(boost::optional<mongo::TenantId> value) & {
-        if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-            gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))
-            DurableReplOperation::setTid(value);
-    }
+    void setTid(boost::optional<mongo::TenantId> value) &;
 
     /**
      * Exports pre/post image information, if present, for writing to the image collection.
@@ -305,11 +300,7 @@ public:
         getDurableReplOperation().setOpType(std::move(value));
     }
 
-    void setTid(boost::optional<mongo::TenantId> value) & {
-        if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-            gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))
-            getDurableReplOperation().setTid(std::move(value));
-    }
+    void setTid(boost::optional<mongo::TenantId> value) &;
 
     void setNss(NamespaceString value) & {
         getDurableReplOperation().setNss(std::move(value));

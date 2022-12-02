@@ -221,6 +221,12 @@ void ReplOperation::extractPrePostImageForTransaction(boost::optional<ImageBundl
     }
 }
 
+void ReplOperation::setTid(boost::optional<mongo::TenantId> value) & {
+    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))
+        DurableReplOperation::setTid(value);
+}
+
 // Static
 ReplOperation MutableOplogEntry::makeInsertOperation(const NamespaceString& nss,
                                                      UUID uuid,
@@ -355,6 +361,12 @@ StatusWith<MutableOplogEntry> MutableOplogEntry::parse(const BSONObj& object) {
         return exceptionToStatus();
     }
     MONGO_UNREACHABLE;
+}
+
+void MutableOplogEntry::setTid(boost::optional<mongo::TenantId> value) & {
+    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))
+        getDurableReplOperation().setTid(std::move(value));
 }
 
 void MutableOplogEntry::setOpTime(const OpTime& opTime) & {

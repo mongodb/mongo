@@ -37,6 +37,7 @@
 #include "mongo/db/commands/fle2_compact_gen.h"
 #include "mongo/db/s/compact_structured_encryption_data_coordinator.h"
 #include "mongo/db/s/compact_structured_encryption_data_coordinator_gen.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/cluster_commands_helpers.h"
 

@@ -37,6 +37,7 @@
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/global_index.h"
 #include "mongo/db/s/global_index_crud_commands_gen.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
 
 namespace mongo {

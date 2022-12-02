@@ -41,6 +41,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog_applier_utils.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/util/fail_point.h"
 
