@@ -41,7 +41,7 @@ namespace {
 constexpr auto source = "https://mongodbcorp.okta.com/oauth2/ausfgfhg2j9rtr0nT297/v1/keys"_sd;
 
 TEST(JWKManager, parseJWKSetBasicFromSource) {
-    auto httpClient = HttpClient::create();
+    auto httpClient = HttpClient::createWithoutConnectionPool();
     httpClient->setHeaders({"Accept: */*"});
 
     DataBuilder getJWKs = httpClient->get(source);

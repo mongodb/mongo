@@ -53,7 +53,7 @@ StringData reduceInt(StringData value) {
 }  // namespace
 
 JWKManager::JWKManager(StringData source) : _keyURI(source) {
-    auto httpClient = HttpClient::create();
+    auto httpClient = HttpClient::createWithoutConnectionPool();
     httpClient->setHeaders({"Accept: */*"});
 
     DataBuilder getJWKs = httpClient->get(source);

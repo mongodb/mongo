@@ -133,6 +133,7 @@ env.CppUnitTest(
         'aead_encryption_test.cpp',
         'encryption_fields_util_test.cpp',
         'encryption_fields_validation_test.cpp',
+        'jwt_test.cpp',
         'fle_crypto_test.cpp',
         'fle_crypto_test_vectors.cpp',
         'mechanism_scram_test.cpp',
@@ -148,6 +149,7 @@ env.CppUnitTest(
         'aead_encryption',
         'encrypted_field_config',
         'fle_crypto',
+        'jwt',
         'sha_block_${MONGO_CRYPTO}',
     ],
 )
@@ -165,16 +167,5 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/idl/idl_parser',
-    ],
-)
-
-env.CppUnitTest(
-    target='jwt_test',
-    source=[
-        'jwt_test.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        'jwt',
     ],
 )
