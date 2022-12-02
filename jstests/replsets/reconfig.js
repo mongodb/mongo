@@ -5,6 +5,8 @@
 (function() {
 "use strict";
 
+load("jstests/replsets/rslib.js");
+
 // Skip db hash check because secondary is left with a different config.
 TestData.skipCheckDBHashes = true;
 
@@ -32,6 +34,10 @@ const primaryOplog = primary.getDB("local")['oplog.rs'];
 const lastOp = primaryOplog.find(expectedNoOp).sort({'$natural': -1}).limit(1).toArray();
 assert(lastOp.length > 0);
 replTest.awaitReplication();
+
+// Make sure that all nodes have installed the config before moving on.
+replTest.waitForConfigReplication(primary, nodes);
+assert.soonNoExcept(() => isConfigCommitted(primary));
 
 jsTestLog("Invalid reconfig");
 config.version++;
