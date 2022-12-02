@@ -44,22 +44,22 @@ struct Transaction;
 
 #ifndef SWIG
 struct OptionsList {
-    OptionsList();
+    OptionsList() = default;
     OptionsList(const OptionsList &other);
 
-    void add_int(const char *name, int default_value, const char *desc);
-    void add_bool(const char *name, bool default_value, const char *desc);
-    void add_double(const char *name, double default_value, const char *desc);
-    void add_string(const char *name, const std::string &default_value,
-      const char *desc);
+    void add_int(const std::string& name, int default_value, const std::string& desc);
+    void add_bool(const std::string& name, bool default_value, const std::string& desc);
+    void add_double(const std::string& name, double default_value, const std::string& desc);
+    void add_string(const std::string& name, const std::string &default_value,
+      const std::string& desc);
 
     std::string help() const;
-    std::string help_description(const char *option_name) const;
-    std::string help_type(const char *option_name) const;
+    std::string help_description(const std::string& option_name) const;
+    std::string help_type(const std::string& option_name) const;
 
 private:
-    void add_option(const char *name, const std::string typestr,
-      const char *desc);
+    void add_option(const std::string&name, const std::string typestr,
+      const std::string&desc);
     typedef std::pair<std::string, std::string> TypeDescPair;
     std::map<std::string, TypeDescPair> _option_map;
 };
@@ -137,7 +137,7 @@ struct Stats {
 
     Stats(bool latency = false);
     Stats(const Stats &other);
-    ~Stats();
+    ~Stats() = default;
 
     void add(Stats&, bool reset = false);
     void assign(const Stats&);
@@ -185,7 +185,7 @@ struct TableOptions {
 
     TableOptions();
     TableOptions(const TableOptions &other);
-    ~TableOptions();
+    ~TableOptions() = default;
 
     void describe(std::ostream &os) const {
 	os << "key_size " << key_size;
@@ -195,9 +195,9 @@ struct TableOptions {
     }
 
     std::string help() const { return _options.help(); }
-    std::string help_description(const char *option_name) const {
+    std::string help_description(const std::string& option_name) const {
 	return _options.help_description(option_name); }
-    std::string help_type(const char *option_name) const {
+    std::string help_type(const std::string& option_name) const {
 	return _options.help_type(option_name); }
 
 private:
@@ -212,7 +212,7 @@ struct Table {
     /* XXX select table from range */
 
     Table();
-    Table(const char *tablename);
+    Table(const std::string& tablename);
     Table(const Table &other);
     ~Table();
 
@@ -229,7 +229,7 @@ struct ParetoOptions {
     double range_high;
     ParetoOptions(int param = 0);
     ParetoOptions(const ParetoOptions &other);
-    ~ParetoOptions();
+    ~ParetoOptions() = default;
 
     void describe(std::ostream &os) const {
 	os << "Pareto: parameter " << param;
@@ -239,9 +239,9 @@ struct ParetoOptions {
     }
 
     std::string help() const { return _options.help(); }
-    std::string help_description(const char *option_name) const {
+    std::string help_description(const std::string& option_name) const {
 	return _options.help_description(option_name); }
-    std::string help_type(const char *option_name) const {
+    std::string help_type(const std::string& option_name) const {
 	return _options.help_type(option_name); }
 
     static ParetoOptions DEFAULT;
@@ -307,7 +307,7 @@ struct Operation {
     Operation(OpType optype, Table table, Key key);
     Operation(OpType optype, Table table);
     // Constructor with string applies to NOOP, SLEEP, CHECKPOINT
-    Operation(OpType optype, const char *config);
+    Operation(OpType optype, const std::string& config);
     Operation(const Operation &other);
     ~Operation();
 
@@ -342,7 +342,7 @@ struct ThreadOptions {
 
     ThreadOptions();
     ThreadOptions(const ThreadOptions &other);
-    ~ThreadOptions();
+    ~ThreadOptions() = default;
 
     void describe(std::ostream &os) const {
 	os << "throttle " << throttle;
@@ -352,9 +352,9 @@ struct ThreadOptions {
     }
 
     std::string help() const { return _options.help(); }
-    std::string help_description(const char *option_name) const {
+    std::string help_description(const std::string& option_name) const {
 	return _options.help_description(option_name); }
-    std::string help_type(const char *option_name) const {
+    std::string help_type(const std::string& option_name) const {
 	return _options.help_type(option_name); }
 
 private:
@@ -386,7 +386,7 @@ struct Thread {
     Thread();
     Thread(const Operation &op);
     Thread(const Thread &other);
-    ~Thread();
+    ~Thread() = default;
 
     void describe(std::ostream &os) const;
 };
@@ -446,7 +446,7 @@ struct WorkloadOptions {
 
     WorkloadOptions();
     WorkloadOptions(const WorkloadOptions &other);
-    ~WorkloadOptions();
+    ~WorkloadOptions() = default;
 
     void describe(std::ostream &os) const {
 	os << "run_time " << run_time;
@@ -454,9 +454,9 @@ struct WorkloadOptions {
     }
 
     std::string help() const { return _options.help(); }
-    std::string help_description(const char *option_name) const {
+    std::string help_description(const std::string& option_name) const {
 	return _options.help_description(option_name); }
-    std::string help_type(const char *option_name) const {
+    std::string help_type(const std::string& option_name) const {
 	return _options.help_type(option_name); }
 
 private:
@@ -472,7 +472,7 @@ struct Workload {
     Workload(Context *context, const ThreadListWrapper &threadlist);
     Workload(Context *context, const Thread &thread);
     Workload(const Workload &other);
-    ~Workload();
+    ~Workload() = default;
 
 #ifndef SWIG
     Workload& operator=(const Workload &other);

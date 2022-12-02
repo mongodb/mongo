@@ -64,9 +64,9 @@ extern "C" {
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) < (b) ? (b) : (a))
-#define TIMESPEC_DOUBLE(ts) ((double)(ts).tv_sec + ts.tv_nsec * 0.000000001)
+#define TIMESPEC_DOUBLE(ts) (static_cast<double>((ts).tv_sec) + ts.tv_nsec * 0.000000001)
 #define PCT(n, total) ((total) == 0 ? 0 : ((n)*100) / (total))
-#define OPS_PER_SEC(ops, ts) (int)((ts) == 0 ? 0.0 : (ops) / TIMESPEC_DOUBLE(ts))
+#define OPS_PER_SEC(ops, ts) static_cast<int>((ts) == 0 ? 0.0 : (ops) / TIMESPEC_DOUBLE(ts))
 
 // Get the value of a STL container, even if it is not present
 #define CONTAINER_VALUE(container, idx, dfault) \
@@ -84,12 +84,12 @@ extern "C" {
         }                                                                             \
     } while (0)
 
-#define THROW_ERRNO(e, args)                             \
-    do {                                                 \
-        std::stringstream __sstm;                        \
-        __sstm << args;                                  \
-        WorkgenException __wge(e, __sstm.str().c_str()); \
-        throw(__wge);                                    \
+#define THROW_ERRNO(e, args)                     \
+    do {                                         \
+        std::stringstream __sstm;                \
+        __sstm << args;                          \
+        WorkgenException __wge(e, __sstm.str()); \
+        throw(__wge);                            \
     } while (0)
 
 #define THROW(args) THROW_ERRNO(0, args)
@@ -119,20 +119,20 @@ static uint32_t context_count = 0;
 static void *
 thread_runner_main(void *arg)
 {
-    ThreadRunner *runner = (ThreadRunner *)arg;
+    ThreadRunner *runner = static_cast<ThreadRunner *>(arg);
     try {
         runner->_errno = runner->run();
     } catch (WorkgenException &wge) {
         runner->_exception = wge;
     }
-    return (NULL);
+    return (nullptr);
 }
 
 static void *
 thread_workload(void *arg)
 {
 
-    WorkloadRunnerConnection *runnerConnection = (WorkloadRunnerConnection *)arg;
+    WorkloadRunnerConnection *runnerConnection = static_cast<WorkloadRunnerConnection *>(arg);
     WorkloadRunner *runner = runnerConnection->runner;
     WT_CONNECTION *connection = runnerConnection->connection;
 
@@ -142,13 +142,13 @@ thread_workload(void *arg)
         std::cerr << "Exception while incrementing timestamp." << std::endl;
     }
 
-    return (NULL);
+    return (nullptr);
 }
 
 static void *
 thread_idle_table_cycle_workload(void *arg)
 {
-    WorkloadRunnerConnection *runnerConnection = (WorkloadRunnerConnection *)arg;
+    WorkloadRunnerConnection *runnerConnection = static_cast<WorkloadRunnerConnection *>(arg);
     WT_CONNECTION *connection = runnerConnection->connection;
     WorkloadRunner *runner = runnerConnection->runner;
 
@@ -158,19 +158,17 @@ thread_idle_table_cycle_workload(void *arg)
         std::cerr << "Exception while create/drop tables." << std::endl;
     }
 
-    return (NULL);
+    return (nullptr);
 }
 
 int
-WorkloadRunner::check_timing(const char *name, uint64_t last_interval)
+WorkloadRunner::check_timing(const std::string &name, uint64_t last_interval)
 {
     WorkloadOptions *options = &_workload->options;
-    int msg_err;
-    const char *str;
-
-    msg_err = 0;
+    int msg_err = 0;
 
     if (last_interval > options->max_idle_table_cycle) {
+        std::string str;
         if (options->max_idle_table_cycle_fatal) {
             msg_err = ETIMEDOUT;
             str = "ERROR";
@@ -189,39 +187,43 @@ int
 WorkloadRunner::start_table_idle_cycle(WT_CONNECTION *conn)
 {
     WT_SESSION *session;
-    WT_CURSOR *cursor;
-    uint64_t start, stop, last_interval;
-    int ret, cycle_count;
-    char uri[BUF_SIZE];
-
-    cycle_count = 0;
-    if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0) {
-        THROW("Error Opening a Session.");
+    if (conn->open_session(conn, nullptr, nullptr, &session) != 0) {
+        THROW("Error opening a session.");
     }
 
-    for (cycle_count = 0; !stopping; ++cycle_count) {
+    for (int cycle_count = 0; !stopping; ++cycle_count) {
+        char uri[BUF_SIZE];
         snprintf(uri, BUF_SIZE, "table:test_cycle%04d", cycle_count);
 
+        uint64_t start;
         workgen_clock(&start);
+
         /* Create a table. */
+        int ret;
         if ((ret = session->create(session, uri, "key_format=S,value_format=S")) != 0) {
             if (ret == EBUSY)
                 continue;
             THROW("Table create failed in start_table_idle_cycle.");
         }
+
+        uint64_t stop;
         workgen_clock(&stop);
-        last_interval = ns_to_sec(stop - start);
+
+        uint64_t last_interval = ns_to_sec(stop - start);
         if ((ret = check_timing("CREATE", last_interval)) != 0)
             THROW_ERRNO(ret, "WT_SESSION->create timeout.");
+
         start = stop;
 
         /* Open and close cursor. */
-        if ((ret = session->open_cursor(session, uri, NULL, NULL, &cursor)) != 0) {
+        WT_CURSOR *cursor;
+        if ((ret = session->open_cursor(session, uri, nullptr, nullptr, &cursor)) != 0) {
             THROW("Cursor open failed.");
         }
         if ((ret = cursor->close(cursor)) != 0) {
             THROW("Cursor close failed.");
         }
+
         workgen_clock(&stop);
         last_interval = ns_to_sec(stop - start);
         if ((ret = check_timing("CURSOR", last_interval)) != 0)
@@ -276,13 +278,13 @@ WorkloadRunner::increment_timestamp(WT_CONNECTION *conn)
 static void *
 monitor_main(void *arg)
 {
-    Monitor *monitor = (Monitor *)arg;
+    Monitor *monitor = static_cast<Monitor *>(arg);
     try {
         monitor->_errno = monitor->run();
     } catch (WorkgenException &wge) {
         monitor->_exception = wge;
     }
-    return (NULL);
+    return (nullptr);
 }
 
 // Exponentiate (like the pow function), except that it returns an exact
@@ -303,18 +305,17 @@ power64(int base, int exp)
     return result;
 }
 
-OptionsList::OptionsList() : _option_map() {}
 OptionsList::OptionsList(const OptionsList &other) : _option_map(other._option_map) {}
 
 void
-OptionsList::add_option(const char *name, const std::string typestr, const char *desc)
+OptionsList::add_option(const std::string &name, const std::string typestr, const std::string &desc)
 {
     TypeDescPair pair(typestr, desc);
     _option_map[name] = pair;
 }
 
 void
-OptionsList::add_int(const char *name, int default_value, const char *desc)
+OptionsList::add_int(const std::string &name, int default_value, const std::string &desc)
 {
     std::stringstream sstm;
     sstm << "int, default=" << default_value;
@@ -322,7 +323,7 @@ OptionsList::add_int(const char *name, int default_value, const char *desc)
 }
 
 void
-OptionsList::add_bool(const char *name, bool default_value, const char *desc)
+OptionsList::add_bool(const std::string &name, bool default_value, const std::string &desc)
 {
     std::stringstream sstm;
     sstm << "boolean, default=" << (default_value ? "true" : "false");
@@ -330,7 +331,7 @@ OptionsList::add_bool(const char *name, bool default_value, const char *desc)
 }
 
 void
-OptionsList::add_double(const char *name, double default_value, const char *desc)
+OptionsList::add_double(const std::string &name, double default_value, const std::string &desc)
 {
     std::stringstream sstm;
     sstm << "double, default=" << default_value;
@@ -338,7 +339,8 @@ OptionsList::add_double(const char *name, double default_value, const char *desc
 }
 
 void
-OptionsList::add_string(const char *name, const std::string &default_value, const char *desc)
+OptionsList::add_string(
+  const std::string &name, const std::string &default_value, const std::string &desc)
 {
     std::stringstream sstm;
     sstm << "string, default=\"" << default_value << "\"";
@@ -357,13 +359,13 @@ pretty_print(const char *p, const char *indent, std::stringstream &sstm)
             ;
         if (t == p) /* No spaces? */
             break;
-        if (indent != NULL)
+        if (indent != nullptr)
             sstm << indent;
         std::string line(p, (size_t)(t - p));
         sstm << line << std::endl;
     }
     if (*p != '\0') {
-        if (indent != NULL)
+        if (indent != nullptr)
             sstm << indent;
         sstm << p << std::endl;
     }
@@ -382,23 +384,21 @@ OptionsList::help() const
 }
 
 std::string
-OptionsList::help_description(const char *option_name) const
+OptionsList::help_description(const std::string &option_name) const
 {
-    const std::string key(option_name);
-    if (_option_map.count(key) == 0)
-        return (std::string(""));
+    if (_option_map.count(option_name) == 0)
+        return ("");
     else
-        return (_option_map.find(key)->second.second);
+        return (_option_map.find(option_name)->second.second);
 }
 
 std::string
-OptionsList::help_type(const char *option_name) const
+OptionsList::help_type(const std::string &option_name) const
 {
-    const std::string key(option_name);
-    if (_option_map.count(key) == 0)
-        return std::string("");
+    if (_option_map.count(option_name) == 0)
+        return ("");
     else
-        return (_option_map.find(key)->second.first);
+        return (_option_map.find(option_name)->second.first);
 }
 
 Context::Context() : _verbose(false), _internal(new ContextInternal()) {}
@@ -415,7 +415,7 @@ Context::operator=(const Context &other)
 }
 
 ContextInternal::ContextInternal()
-    : _tint(), _table_names(), _table_runtime(NULL), _runtime_alloced(0), _tint_last(0),
+    : _tint(), _table_names(), _table_runtime(nullptr), _runtime_alloced(0), _tint_last(0),
       _context_count(0)
 {
     uint32_t count;
@@ -426,7 +426,7 @@ ContextInternal::ContextInternal()
 
 ContextInternal::~ContextInternal()
 {
-    if (_table_runtime != NULL)
+    if (_table_runtime != nullptr)
         delete _table_runtime;
 }
 
@@ -446,10 +446,10 @@ ContextInternal::create_all()
 }
 
 Monitor::Monitor(WorkloadRunner &wrunner)
-    : _errno(0), _exception(), _wrunner(wrunner), _stop(false), _handle(), _out(NULL), _json(NULL)
+    : _errno(0), _exception(), _wrunner(wrunner), _stop(false), _handle(), _out(nullptr),
+      _json(nullptr)
 {
 }
-Monitor::~Monitor() {}
 
 int
 Monitor::run()
@@ -460,13 +460,12 @@ Monitor::run()
     Stats prev_totals;
     WorkloadOptions *options = &_wrunner._workload->options;
     uint64_t latency_max = (uint64_t)options->max_latency * THOUSAND;
-    bool first_iteration;
+    bool first_iteration = true;
 
     // Format header of the table in _out stream.
-    if (_out != NULL)
+    if (_out != nullptr)
         _format_out_header();
 
-    first_iteration = true;
     workgen_version(version, sizeof(version));
     Stats prev_interval;
 
@@ -476,7 +475,7 @@ Monitor::run()
     useconds_t sample_usecs = ms_to_us(options->sample_interval_ms) - sec_to_us(sample_secs);
 
     // Format JSON prefix.
-    if (_json != NULL)
+    if (_json != nullptr)
         _format_json_prefix(version);
 
     while (!_stop) {
@@ -514,11 +513,11 @@ Monitor::run()
         double interval_secs = options->sample_interval_ms / 1000.0;
 
         // Format entry into _out stream.
-        if (_out != NULL)
+        if (_out != nullptr)
             _format_out_entry(interval, interval_secs, t, checkpointing, *tm);
 
         // Format entry into _json stream.
-        if (_json != NULL)
+        if (_json != nullptr)
             _format_json_entry(*tm, t, first_iteration, interval, checkpointing, interval_secs);
 
         // Check latency threshold. Write warning into std::cerr in case read, insert or update
@@ -532,7 +531,7 @@ Monitor::run()
     }
 
     // Format JSON suffix.
-    if (_json != NULL)
+    if (_json != nullptr)
         _format_json_suffix();
 
     return (0);
@@ -675,14 +674,13 @@ ParetoOptions::ParetoOptions(const ParetoOptions &other)
       _options(other._options)
 {
 }
-ParetoOptions::~ParetoOptions() {}
 
 ThreadRunner::ThreadRunner()
-    : _errno(0), _exception(), _thread(NULL), _context(NULL), _icontext(NULL), _workload(NULL),
-      _wrunner(NULL), _rand_state(NULL), _throttle(NULL), _throttle_ops(0), _throttle_limit(0),
-      _in_transaction(false), _start_time_us(0), _op_time_us(0), _number(0), _stats(false),
-      _table_usage(), _cursors(NULL), _stop(false), _session(NULL), _keybuf(NULL), _valuebuf(NULL),
-      _repeat(false)
+    : _errno(0), _exception(), _thread(nullptr), _context(nullptr), _icontext(nullptr),
+      _workload(nullptr), _wrunner(nullptr), _rand_state(nullptr), _throttle(nullptr),
+      _throttle_ops(0), _throttle_limit(0), _in_transaction(false), _start_time_us(0),
+      _op_time_us(0), _number(0), _stats(false), _table_usage(), _cursors(nullptr), _stop(false),
+      _session(nullptr), _keybuf(nullptr), _valuebuf(nullptr), _repeat(false)
 {
 }
 
@@ -694,21 +692,20 @@ ThreadRunner::~ThreadRunner()
 int
 ThreadRunner::create_all(WT_CONNECTION *conn)
 {
-    size_t keysize, valuesize;
-
     WT_RET(close_all());
-    ASSERT(_session == NULL);
+    ASSERT(_session == nullptr);
     if (_thread->options.synchronized)
         _thread->_op.synchronized_check();
-    WT_RET(conn->open_session(conn, NULL, _thread->options.session_config.c_str(), &_session));
+    WT_RET(conn->open_session(conn, nullptr, _thread->options.session_config.c_str(), &_session));
     _table_usage.clear();
     _stats.track_latency(_workload->options.sample_interval_ms > 0);
     WT_RET(workgen_random_alloc(_session, &_rand_state));
     _throttle_ops = 0;
     _throttle_limit = 0;
     _in_transaction = 0;
-    keysize = 1;
-    valuesize = 1;
+
+    size_t keysize = 1;
+    size_t valuesize = 1;
     op_create_all(&_thread->_op, keysize, valuesize);
     _keybuf = new char[keysize];
     _valuebuf = new char[valuesize];
@@ -721,15 +718,15 @@ int
 ThreadRunner::open_all()
 {
     typedef WT_CURSOR *WT_CURSOR_PTR;
-    if (_cursors != NULL)
+    if (_cursors != nullptr)
         delete _cursors;
     _cursors = new WT_CURSOR_PTR[_icontext->_tint_last + 1];
     memset(_cursors, 0, sizeof(WT_CURSOR *) * (_icontext->_tint_last + 1));
     for (std::map<uint32_t, uint32_t>::iterator i = _table_usage.begin(); i != _table_usage.end();
          i++) {
         uint32_t tindex = i->first;
-        const char *uri = _icontext->_table_names[tindex].c_str();
-        WT_RET(_session->open_cursor(_session, uri, NULL, NULL, &_cursors[tindex]));
+        const std::string uri(_icontext->_table_names[tindex]);
+        WT_RET(_session->open_cursor(_session, uri.c_str(), nullptr, nullptr, &_cursors[tindex]));
     }
     return (0);
 }
@@ -737,13 +734,13 @@ ThreadRunner::open_all()
 int
 ThreadRunner::close_all()
 {
-    if (_throttle != NULL) {
+    if (_throttle != nullptr) {
         delete _throttle;
-        _throttle = NULL;
+        _throttle = nullptr;
     }
-    if (_session != NULL) {
-        WT_RET(_session->close(_session, NULL));
-        _session = NULL;
+    if (_session != nullptr) {
+        WT_RET(_session->close(_session, nullptr));
+        _session = nullptr;
     }
     free_all();
     return (0);
@@ -752,21 +749,21 @@ ThreadRunner::close_all()
 void
 ThreadRunner::free_all()
 {
-    if (_rand_state != NULL) {
+    if (_rand_state != nullptr) {
         workgen_random_free(_rand_state);
-        _rand_state = NULL;
+        _rand_state = nullptr;
     }
-    if (_cursors != NULL) {
+    if (_cursors != nullptr) {
         delete _cursors;
-        _cursors = NULL;
+        _cursors = nullptr;
     }
-    if (_keybuf != NULL) {
+    if (_keybuf != nullptr) {
         delete _keybuf;
-        _keybuf = NULL;
+        _keybuf = nullptr;
     }
-    if (_valuebuf != NULL) {
+    if (_valuebuf != nullptr) {
         delete _valuebuf;
-        _valuebuf = NULL;
+        _valuebuf = nullptr;
     }
 }
 
@@ -839,8 +836,6 @@ ThreadRunner::get_static_counts(Stats &stats)
 void
 ThreadRunner::op_create_all(Operation *op, size_t &keysize, size_t &valuesize)
 {
-    tint_t tint;
-
     op->create_all();
     if (op->is_table_op()) {
         op->kv_compute_max(true, false);
@@ -856,6 +851,8 @@ ThreadRunner::op_create_all(Operation *op, size_t &keysize, size_t &valuesize)
         if (op->_table._internal->_context_count != 0 &&
           op->_table._internal->_context_count != _icontext->_context_count)
             THROW("multiple Contexts not supported");
+
+        tint_t tint;
         if ((tint = op->_table._internal->_tint) == 0) {
             std::string uri = op->_table._uri;
 
@@ -877,7 +874,7 @@ ThreadRunner::op_create_all(Operation *op, size_t &keysize, size_t &valuesize)
             usage_flags |= ThreadRunner::USAGE_WRITE;
         _table_usage[op->_table._internal->_tint] = usage_flags;
     }
-    if (op->_group != NULL)
+    if (op->_group != nullptr)
         for (std::vector<Operation>::iterator i = op->_group->begin(); i != op->_group->end(); i++)
             op_create_all(&*i, keysize, valuesize);
 }
@@ -891,21 +888,18 @@ ThreadRunner::op_create_all(Operation *op, size_t &keysize, size_t &valuesize)
 static uint64_t
 pareto_calculation(uint32_t randint, uint64_t recno_max, ParetoOptions &pareto)
 {
-    double S1, S2, U;
-    uint32_t result;
-    double r;
-
-    r = (double)randint;
+    double r = static_cast<double>(randint);
     if (pareto.range_high != 1.0 || pareto.range_low != 0.0) {
         if (pareto.range_high <= pareto.range_low || pareto.range_high > 1.0 ||
           pareto.range_low < 0.0)
             THROW("Pareto illegal range");
-        r = (pareto.range_low * (double)UINT32_MAX) + r * (pareto.range_high - pareto.range_low);
+        r = (pareto.range_low * static_cast<double>(UINT32_MAX)) +
+          r * (pareto.range_high - pareto.range_low);
     }
-    S1 = (-1 / PARETO_SHAPE);
-    S2 = recno_max * (pareto.param / 100.0) * (PARETO_SHAPE - 1);
-    U = 1 - r / (double)UINT32_MAX; // interval [0, 1)
-    result = (uint64_t)((pow(U, S1) - 1) * S2);
+    double S1 = (-1 / PARETO_SHAPE);
+    double S2 = recno_max * (pareto.param / 100.0) * (PARETO_SHAPE - 1);
+    double U = 1 - r / static_cast<double>(UINT32_MAX); // interval [0, 1)
+    uint32_t result = (uint64_t)((pow(U, S1) - 1) * S2);
 
     // This Pareto calculation chooses out of range values less than 20%
     // of the time, depending on pareto_param.  For param of 0, it is
@@ -927,7 +921,6 @@ uint64_t
 ThreadRunner::op_get_key_recno(Operation *op, uint64_t range, tint_t tint)
 {
     uint64_t recno_count;
-    uint32_t rval;
 
     (void)op;
     if (range > 0)
@@ -937,7 +930,7 @@ ThreadRunner::op_get_key_recno(Operation *op, uint64_t range, tint_t tint)
     if (recno_count == 0)
         // The file has no entries, returning 0 forces a WT_NOTFOUND return.
         return (0);
-    rval = random_value();
+    uint32_t rval = random_value();
     if (op->_key._keytype == Key::KEYGEN_PARETO)
         rval = pareto_calculation(rval, recno_count, op->_key._pareto);
     return (rval % recno_count + 1); // recnos are one-based.
@@ -959,13 +952,13 @@ ThreadRunner::op_run(Operation *op)
     char buf[BUF_SIZE];
 
     WT_CLEAR(item);
-    track = NULL;
-    cursor = NULL;
+    track = nullptr;
+    cursor = nullptr;
     recno = 0;
     own_cursor = false;
     retry_op = true;
     range = op->_table.options.range;
-    if (_throttle != NULL) {
+    if (_throttle != nullptr) {
         while (_throttle_ops >= _throttle_limit && !_in_transaction && !_stop) {
             // Calling throttle causes a sleep until the next time division,
             // and we are given a new batch of operations to do before calling
@@ -1022,12 +1015,12 @@ ThreadRunner::op_run(Operation *op)
         break;
     }
     if ((op->_internal->_flags & WORKGEN_OP_REOPEN) != 0) {
-        WT_ERR(_session->open_cursor(_session, op->_table._uri.c_str(), NULL, NULL, &cursor));
+        WT_ERR(_session->open_cursor(_session, op->_table._uri.c_str(), nullptr, nullptr, &cursor));
         own_cursor = true;
     } else
         cursor = _cursors[tint];
 
-    measure_latency = track != NULL && track->ops != 0 && track->track_latency() &&
+    measure_latency = track != nullptr && track->ops != 0 && track->track_latency() &&
       (track->ops % _workload->options.sample_rate == 0);
 
     VERBOSE(*this, "OP " << op->_optype << " " << op->_table._uri.c_str() << ", recno=" << recno);
@@ -1037,7 +1030,7 @@ ThreadRunner::op_run(Operation *op)
 
     // Whether or not we are measuring latency, we track how many operations
     // are in progress, or that complete.
-    if (track != NULL)
+    if (track != nullptr)
         track->begin();
 
     // Set up the key and value first, outside the transaction which may
@@ -1072,7 +1065,7 @@ ThreadRunner::op_run(Operation *op)
     }
     // Retry on rollback until success.
     while (retry_op) {
-        if (op->transaction != NULL) {
+        if (op->transaction != nullptr) {
             if (_in_transaction)
                 THROW("nested transactions not supported");
             if (op->transaction->use_commit_timestamp && op->transaction->use_prepare_timestamp) {
@@ -1124,7 +1117,7 @@ ThreadRunner::op_run(Operation *op)
             else {
                 retry_op = true;
                 track->rollbacks++;
-                WT_ERR(_session->rollback_transaction(_session, NULL));
+                WT_ERR(_session->rollback_transaction(_session, nullptr));
                 _in_transaction = false;
                 ret = 0;
             }
@@ -1140,10 +1133,10 @@ ThreadRunner::op_run(Operation *op)
         uint64_t stop;
         workgen_clock(&stop);
         track->complete_with_latency(ns_to_us(stop - start));
-    } else if (track != NULL)
+    } else if (track != nullptr)
         track->complete();
 
-    if (op->_group != NULL) {
+    if (op->_group != nullptr) {
         uint64_t endtime = 0;
         uint64_t now;
 
@@ -1168,9 +1161,9 @@ ThreadRunner::op_run(Operation *op)
 err:
     if (own_cursor)
         WT_TRET(cursor->close(cursor));
-    if (op->transaction != NULL) {
+    if (op->transaction != nullptr) {
         if (ret != 0 || op->transaction->_rollback)
-            WT_TRET(_session->rollback_transaction(_session, NULL));
+            WT_TRET(_session->rollback_transaction(_session, nullptr));
         else if (_in_transaction) {
             // Set prepare, commit and durable timestamp if prepare is set.
             if (op->transaction->use_prepare_timestamp) {
@@ -1215,7 +1208,7 @@ ThreadRunner::random_signed()
 {
     uint32_t r = random_value();
     int sign = ((r & 0x1) == 0 ? 1 : -1);
-    return ((r * sign) / (float)UINT32_MAX);
+    return ((r * sign) / static_cast<float>(UINT32_MAX));
 }
 
 Throttle::Throttle(ThreadRunner &runner, double throttle, double throttle_burst)
@@ -1236,8 +1229,6 @@ Throttle::Throttle(ThreadRunner &runner, double throttle, double throttle_burst)
     _ops_per_div = (uint64_t)ceill(_throttle / THROTTLE_PER_SEC);
 }
 
-Throttle::~Throttle() {}
-
 // Each time throttle is called, we sleep and return a number of operations to
 // perform next.  To implement this we keep a time calculation in _next_div set
 // initially to the current time + 1/THROTTLE_PER_SEC.  Each call to throttle
@@ -1255,8 +1246,6 @@ Throttle::~Throttle() {}
 int
 Throttle::throttle(uint64_t op_count, uint64_t *op_limit)
 {
-    uint64_t ops;
-    int64_t sleep_ms;
     timespec now;
 
     workgen_epoch(&now);
@@ -1270,7 +1259,7 @@ Throttle::throttle(uint64_t op_count, uint64_t *op_limit)
 
         // Sleep until the next division, but potentially with some randomness.
         if (now < _next_div) {
-            sleep_ms = ts_ms(_next_div - now);
+            int64_t sleep_ms = ts_ms(_next_div - now);
             sleep_ms += (_ms_per_div * _burst * _runner.random_signed());
             if (sleep_ms > 0) {
                 DEBUG_CAPTURE(_runner, ", sleep=" << sleep_ms);
@@ -1280,6 +1269,7 @@ Throttle::throttle(uint64_t op_count, uint64_t *op_limit)
         _next_div = ts_add_ms(_next_div, _ms_per_div);
     }
 
+    uint64_t ops;
     if (_burst == 0.0)
         ops = _ops_left_this_second;
     else
@@ -1328,7 +1318,6 @@ ThreadOptions::ThreadOptions(const ThreadOptions &other)
       _options(other._options)
 {
 }
-ThreadOptions::~ThreadOptions() {}
 
 void
 ThreadListWrapper::extend(const ThreadListWrapper &other)
@@ -1357,12 +1346,8 @@ ThreadListWrapper::multiply(const int n)
 }
 
 Thread::Thread() : options(), _op() {}
-
 Thread::Thread(const Operation &op) : options(), _op(op) {}
-
 Thread::Thread(const Thread &other) : options(other.options), _op(other._op) {}
-
-Thread::~Thread() {}
 
 void
 Thread::describe(std::ostream &os) const
@@ -1374,38 +1359,38 @@ Thread::describe(std::ostream &os) const
 }
 
 Operation::Operation()
-    : _optype(OP_NONE), _internal(NULL), _table(), _key(), _value(), _config(), transaction(NULL),
-      _group(NULL), _repeatgroup(0), _timed(0.0)
+    : _optype(OP_NONE), _internal(nullptr), _table(), _key(), _value(), _config(),
+      transaction(nullptr), _group(nullptr), _repeatgroup(0), _timed(0.0)
 {
-    init_internal(NULL);
+    init_internal(nullptr);
 }
 
 Operation::Operation(OpType optype, Table table, Key key, Value value)
-    : _optype(optype), _internal(NULL), _table(table), _key(key), _value(value), _config(),
-      transaction(NULL), _group(NULL), _repeatgroup(0), _timed(0.0)
+    : _optype(optype), _internal(nullptr), _table(table), _key(key), _value(value), _config(),
+      transaction(nullptr), _group(nullptr), _repeatgroup(0), _timed(0.0)
 {
-    init_internal(NULL);
+    init_internal(nullptr);
     size_check();
 }
 
 Operation::Operation(OpType optype, Table table, Key key)
-    : _optype(optype), _internal(NULL), _table(table), _key(key), _value(), _config(),
-      transaction(NULL), _group(NULL), _repeatgroup(0), _timed(0.0)
+    : _optype(optype), _internal(nullptr), _table(table), _key(key), _value(), _config(),
+      transaction(nullptr), _group(nullptr), _repeatgroup(0), _timed(0.0)
 {
-    init_internal(NULL);
+    init_internal(nullptr);
     size_check();
 }
 
 Operation::Operation(OpType optype, Table table)
-    : _optype(optype), _internal(NULL), _table(table), _key(), _value(), _config(),
-      transaction(NULL), _group(NULL), _repeatgroup(0), _timed(0.0)
+    : _optype(optype), _internal(nullptr), _table(table), _key(), _value(), _config(),
+      transaction(nullptr), _group(nullptr), _repeatgroup(0), _timed(0.0)
 {
-    init_internal(NULL);
+    init_internal(nullptr);
     size_check();
 }
 
 Operation::Operation(const Operation &other)
-    : _optype(other._optype), _internal(NULL), _table(other._table), _key(other._key),
+    : _optype(other._optype), _internal(nullptr), _table(other._table), _key(other._key),
       _value(other._value), _config(other._config), transaction(other.transaction),
       _group(other._group), _repeatgroup(other._repeatgroup), _timed(other._timed)
 {
@@ -1414,11 +1399,11 @@ Operation::Operation(const Operation &other)
     init_internal(other._internal);
 }
 
-Operation::Operation(OpType optype, const char *config)
-    : _optype(optype), _internal(NULL), _table(), _key(), _value(), _config(config),
-      transaction(NULL), _group(NULL), _repeatgroup(0), _timed(0.0)
+Operation::Operation(OpType optype, const std::string &config)
+    : _optype(optype), _internal(nullptr), _table(), _key(), _value(), _config(config),
+      transaction(nullptr), _group(nullptr), _repeatgroup(0), _timed(0.0)
 {
-    init_internal(NULL);
+    init_internal(nullptr);
 }
 
 Operation::~Operation()
@@ -1439,7 +1424,7 @@ Operation::operator=(const Operation &other)
     _repeatgroup = other._repeatgroup;
     _timed = other._timed;
     delete _internal;
-    _internal = NULL;
+    _internal = nullptr;
     init_internal(other._internal);
     return (*this);
 }
@@ -1447,39 +1432,40 @@ Operation::operator=(const Operation &other)
 void
 Operation::init_internal(OperationInternal *other)
 {
-    ASSERT(_internal == NULL);
+    ASSERT(_internal == nullptr);
 
     switch (_optype) {
     case OP_CHECKPOINT:
-        if (other == NULL)
+        if (other == nullptr)
             _internal = new CheckpointOperationInternal();
         else
-            _internal = new CheckpointOperationInternal(*(CheckpointOperationInternal *)other);
+            _internal =
+              new CheckpointOperationInternal(*static_cast<CheckpointOperationInternal *>(other));
         break;
     case OP_INSERT:
     case OP_REMOVE:
     case OP_SEARCH:
     case OP_UPDATE:
-        if (other == NULL)
+        if (other == nullptr)
             _internal = new TableOperationInternal();
         else
-            _internal = new TableOperationInternal(*(TableOperationInternal *)other);
+            _internal = new TableOperationInternal(*static_cast<TableOperationInternal *>(other));
         break;
     case OP_LOG_FLUSH:
         _internal = new LogFlushOperationInternal();
         break;
     case OP_NONE:
     case OP_NOOP:
-        if (other == NULL)
+        if (other == nullptr)
             _internal = new OperationInternal();
         else
             _internal = new OperationInternal(*other);
         break;
     case OP_SLEEP:
-        if (other == NULL)
+        if (other == nullptr)
             _internal = new SleepOperationInternal();
         else
-            _internal = new SleepOperationInternal(*(SleepOperationInternal *)other);
+            _internal = new SleepOperationInternal(*static_cast<SleepOperationInternal *>(other));
         break;
     default:
         ASSERT(false);
@@ -1489,8 +1475,8 @@ Operation::init_internal(OperationInternal *other)
 bool
 Operation::combinable() const
 {
-    return (
-      _group != NULL && _repeatgroup == 1 && _timed == 0.0 && transaction == NULL && _config == "");
+    return (_group != nullptr && _repeatgroup == 1 && _timed == 0.0 && transaction == nullptr &&
+      _config.empty());
 }
 
 void
@@ -1516,14 +1502,14 @@ Operation::describe(std::ostream &os) const
     }
     if (!_config.empty())
         os << ", '" << _config << "'";
-    if (transaction != NULL) {
+    if (transaction != nullptr) {
         os << ", [";
         transaction->describe(os);
         os << "]";
     }
     if (_timed != 0.0)
         os << ", [timed " << _timed << " secs]";
-    if (_group != NULL) {
+    if (_group != nullptr) {
         os << ", group";
         if (_repeatgroup != 1)
             os << "[repeat " << _repeatgroup << "]";
@@ -1562,7 +1548,7 @@ Operation::get_static_counts(Stats &stats, int multiplier)
     else if (_optype == OP_CHECKPOINT)
         stats.checkpoint.ops += multiplier;
 
-    if (_group != NULL)
+    if (_group != nullptr)
         for (std::vector<Operation>::iterator i = _group->begin(); i != _group->end(); i++)
             i->get_static_counts(stats, multiplier * _repeatgroup);
 }
@@ -1577,14 +1563,10 @@ Operation::is_table_op() const
 void
 Operation::kv_compute_max(bool iskey, bool has_random)
 {
-    uint64_t max;
-    int size;
-    TableOperationInternal *internal;
-
     ASSERT(is_table_op());
-    internal = (TableOperationInternal *)_internal;
+    TableOperationInternal *internal = static_cast<TableOperationInternal *>(_internal);
 
-    size = iskey ? _key._size : _value._size;
+    int size = iskey ? _key._size : _value._size;
     if (size == 0)
         size = iskey ? _table.options.key_size : _table.options.value_size;
 
@@ -1597,6 +1579,7 @@ Operation::kv_compute_max(bool iskey, bool has_random)
             THROW("Random keys not allowed");
     }
 
+    uint64_t max;
     if (size > 1)
         max = power64(10, (size - 1)) - 1;
     else
@@ -1614,10 +1597,8 @@ Operation::kv_compute_max(bool iskey, bool has_random)
 void
 Operation::kv_size_buffer(bool iskey, size_t &maxsize) const
 {
-    TableOperationInternal *internal;
-
     ASSERT(is_table_op());
-    internal = (TableOperationInternal *)_internal;
+    TableOperationInternal *internal = static_cast<TableOperationInternal *>(_internal);
 
     if (iskey) {
         if ((size_t)internal->_keysize > maxsize)
@@ -1632,15 +1613,11 @@ void
 Operation::kv_gen(
   ThreadRunner *runner, bool iskey, uint64_t compressibility, uint64_t n, char *result) const
 {
-    TableOperationInternal *internal;
-    uint_t max;
-    uint_t size;
-
     ASSERT(is_table_op());
-    internal = (TableOperationInternal *)_internal;
+    TableOperationInternal *internal = static_cast<TableOperationInternal *>(_internal);
 
-    size = iskey ? internal->_keysize : internal->_valuesize;
-    max = iskey ? internal->_keymax : internal->_valuemax;
+    uint_t size = iskey ? internal->_keysize : internal->_valuesize;
+    uint_t max = iskey ? internal->_keymax : internal->_valuemax;
     if (n > max)
         THROW((iskey ? "Key" : "Value") << " (" << n << ") too large for size (" << size << ")");
     /* Setup the buffer, defaulting to zero filled. */
@@ -1697,7 +1674,7 @@ Operation::synchronized_check() const
     if (_optype != Operation::OP_NONE) {
         if (is_table_op() || _internal->sync_time_us() == 0)
             THROW("operation cannot be synchronized, needs to be timed()");
-    } else if (_group != NULL) {
+    } else if (_group != nullptr) {
         for (std::vector<Operation>::iterator i = _group->begin(); i != _group->end(); i++)
             i->synchronized_check();
     }
@@ -1707,25 +1684,23 @@ int
 CheckpointOperationInternal::run(ThreadRunner *runner, WT_SESSION *session)
 {
     (void)runner; /* not used */
-    return (session->checkpoint(session, NULL));
+    return (session->checkpoint(session, nullptr));
 }
 
 int
 LogFlushOperationInternal::run(ThreadRunner *runner, WT_SESSION *session)
 {
     (void)runner; /* not used */
-    return (session->log_flush(session, NULL));
+    return (session->log_flush(session, nullptr));
 }
 
 void
 SleepOperationInternal::parse_config(const std::string &config)
 {
-    const char *configp;
-    char *endp;
+    if (!config.empty())
+        _sleepvalue = std::stof(config);
 
-    configp = config.c_str();
-    _sleepvalue = strtod(configp, &endp);
-    if (configp == endp || *endp != '\0' || _sleepvalue < 0.0)
+    if (config.empty() || _sleepvalue < 0.0)
         THROW(
           "sleep operation requires a configuration string as "
           "a non-negative float, e.g. '1.5'");
@@ -1734,14 +1709,15 @@ SleepOperationInternal::parse_config(const std::string &config)
 int
 SleepOperationInternal::run(ThreadRunner *runner, WT_SESSION *session)
 {
-    uint64_t endtime;
-    uint64_t now, now_us;
-
     (void)runner;  /* not used */
     (void)session; /* not used */
 
+    uint64_t now;
     workgen_clock(&now);
-    now_us = ns_to_us(now);
+
+    uint64_t now_us = ns_to_us(now);
+    uint64_t endtime;
+
     if (runner->_thread->options.synchronized)
         endtime = runner->_op_time_us + secs_us(_sleepvalue);
     else
@@ -1781,7 +1757,7 @@ TableOperationInternal::parse_config(const std::string &config)
 
 Track::Track(bool latency_tracking)
     : ops_in_progress(0), ops(0), rollbacks(0), latency_ops(0), latency(0), bucket_ops(0),
-      min_latency(0), max_latency(0), us(NULL), ms(NULL), sec(NULL)
+      min_latency(0), max_latency(0), us(nullptr), ms(nullptr), sec(nullptr)
 {
     track_latency(latency_tracking);
 }
@@ -1789,9 +1765,10 @@ Track::Track(bool latency_tracking)
 Track::Track(const Track &other)
     : ops_in_progress(other.ops_in_progress), ops(other.ops), rollbacks(other.rollbacks),
       latency_ops(other.latency_ops), latency(other.latency), bucket_ops(other.bucket_ops),
-      min_latency(other.min_latency), max_latency(other.max_latency), us(NULL), ms(NULL), sec(NULL)
+      min_latency(other.min_latency), max_latency(other.max_latency), us(nullptr), ms(nullptr),
+      sec(nullptr)
 {
-    if (other.us != NULL) {
+    if (other.us != nullptr) {
         us = new uint32_t[LATENCY_US_BUCKETS];
         ms = new uint32_t[LATENCY_MS_BUCKETS];
         sec = new uint32_t[LATENCY_SEC_BUCKETS];
@@ -1803,7 +1780,7 @@ Track::Track(const Track &other)
 
 Track::~Track()
 {
-    if (us != NULL) {
+    if (us != nullptr) {
         delete us;
         delete ms;
         delete sec;
@@ -1825,7 +1802,7 @@ Track::add(Track &other, bool reset)
     if (reset)
         other.max_latency = 0;
 
-    if (us != NULL && other.us != NULL) {
+    if (us != nullptr && other.us != nullptr) {
         for (int i = 0; i < LATENCY_US_BUCKETS; i++)
             us[i] += other.us[i];
         for (int i = 0; i < LATENCY_MS_BUCKETS; i++)
@@ -1845,19 +1822,19 @@ Track::assign(const Track &other)
     min_latency = other.min_latency;
     max_latency = other.max_latency;
 
-    if (other.us == NULL && us != NULL) {
+    if (other.us == nullptr && us != nullptr) {
         delete us;
         delete ms;
         delete sec;
-        us = NULL;
-        ms = NULL;
-        sec = NULL;
-    } else if (other.us != NULL && us == NULL) {
+        us = nullptr;
+        ms = nullptr;
+        sec = nullptr;
+    } else if (other.us != nullptr && us == nullptr) {
         us = new uint32_t[LATENCY_US_BUCKETS];
         ms = new uint32_t[LATENCY_MS_BUCKETS];
         sec = new uint32_t[LATENCY_SEC_BUCKETS];
     }
-    if (us != NULL) {
+    if (us != nullptr) {
         memcpy(us, other.us, sizeof(uint32_t) * LATENCY_US_BUCKETS);
         memcpy(ms, other.ms, sizeof(uint32_t) * LATENCY_MS_BUCKETS);
         memcpy(sec, other.sec, sizeof(uint32_t) * LATENCY_SEC_BUCKETS);
@@ -1890,7 +1867,7 @@ Track::clear()
     bucket_ops = 0;
     min_latency = 0;
     max_latency = 0;
-    if (us != NULL) {
+    if (us != nullptr) {
         memset(us, 0, sizeof(uint32_t) * LATENCY_US_BUCKETS);
         memset(ms, 0, sizeof(uint32_t) * LATENCY_MS_BUCKETS);
         memset(sec, 0, sizeof(uint32_t) * LATENCY_SEC_BUCKETS);
@@ -1907,7 +1884,7 @@ Track::complete()
 void
 Track::complete_with_latency(uint64_t usecs)
 {
-    ASSERT(us != NULL);
+    ASSERT(us != nullptr);
 
     --ops_in_progress;
     ops++;
@@ -1991,7 +1968,7 @@ Track::subtract(const Track &other)
 
     // There's no sensible thing to be done for min/max_latency.
 
-    if (us != NULL && other.us != NULL) {
+    if (us != nullptr && other.us != nullptr) {
         for (int i = 0; i < LATENCY_US_BUCKETS; i++)
             us[i] -= other.us[i];
         for (int i = 0; i < LATENCY_MS_BUCKETS; i++)
@@ -2005,7 +1982,7 @@ void
 Track::track_latency(bool newval)
 {
     if (newval) {
-        if (us == NULL) {
+        if (us == nullptr) {
             us = new uint32_t[LATENCY_US_BUCKETS];
             ms = new uint32_t[LATENCY_MS_BUCKETS];
             sec = new uint32_t[LATENCY_SEC_BUCKETS];
@@ -2014,13 +1991,13 @@ Track::track_latency(bool newval)
             memset(sec, 0, sizeof(uint32_t) * LATENCY_SEC_BUCKETS);
         }
     } else {
-        if (us != NULL) {
+        if (us != nullptr) {
             delete us;
             delete ms;
             delete sec;
-            us = NULL;
-            ms = NULL;
-            sec = NULL;
+            us = nullptr;
+            ms = nullptr;
+            sec = nullptr;
         }
     }
 }
@@ -2028,7 +2005,7 @@ Track::track_latency(bool newval)
 void
 Track::_get_us(long *result)
 {
-    if (us != NULL) {
+    if (us != nullptr) {
         for (int i = 0; i < LATENCY_US_BUCKETS; i++)
             result[i] = (long)us[i];
     } else
@@ -2037,7 +2014,7 @@ Track::_get_us(long *result)
 void
 Track::_get_ms(long *result)
 {
-    if (ms != NULL) {
+    if (ms != nullptr) {
         for (int i = 0; i < LATENCY_MS_BUCKETS; i++)
             result[i] = (long)ms[i];
     } else
@@ -2046,7 +2023,7 @@ Track::_get_ms(long *result)
 void
 Track::_get_sec(long *result)
 {
-    if (sec != NULL) {
+    if (sec != nullptr) {
         for (int i = 0; i < LATENCY_SEC_BUCKETS; i++)
             result[i] = (long)sec[i];
     } else
@@ -2064,8 +2041,6 @@ Stats::Stats(const Stats &other)
       read(other.read), remove(other.remove), update(other.update), truncate(other.truncate)
 {
 }
-
-Stats::~Stats() {}
 
 void
 Stats::add(Stats &other, bool reset)
@@ -2201,10 +2176,9 @@ TableOptions::TableOptions(const TableOptions &other)
       range(other.range), _options(other._options)
 {
 }
-TableOptions::~TableOptions() {}
 
 Table::Table() : options(), _uri(), _internal(new TableInternal()) {}
-Table::Table(const char *uri) : options(), _uri(uri), _internal(new TableInternal()) {}
+Table::Table(const std::string &uri) : options(), _uri(uri), _internal(new TableInternal()) {}
 Table::Table(const Table &other)
     : options(other.options), _uri(other._uri), _internal(new TableInternal(*other._internal))
 {
@@ -2233,7 +2207,6 @@ TableInternal::TableInternal(const TableInternal &other)
     : _tint(other._tint), _context_count(other._context_count)
 {
 }
-TableInternal::~TableInternal() {}
 
 WorkloadOptions::WorkloadOptions()
     : max_latency(0), report_file("workload.stat"), report_interval(0), run_time(0),
@@ -2284,19 +2257,18 @@ WorkloadOptions::WorkloadOptions(const WorkloadOptions &other)
       sample_rate(other.sample_rate), _options(other._options)
 {
 }
-WorkloadOptions::~WorkloadOptions() {}
 
 Workload::Workload(Context *context, const ThreadListWrapper &tlw)
     : options(), stats(), _context(context), _threads(tlw._threads)
 {
-    if (context == NULL)
+    if (context == nullptr)
         THROW("Workload constructor requires a Context");
 }
 
 Workload::Workload(Context *context, const Thread &thread)
     : options(), stats(), _context(context), _threads()
 {
-    if (context == NULL)
+    if (context == nullptr)
         THROW("Workload constructor requires a Context");
     _threads.push_back(thread);
 }
@@ -2305,7 +2277,6 @@ Workload::Workload(const Workload &other)
     : options(other.options), stats(other.stats), _context(other._context), _threads(other._threads)
 {
 }
-Workload::~Workload() {}
 
 Workload &
 Workload::operator=(const Workload &other)
@@ -2330,14 +2301,12 @@ WorkloadRunner::WorkloadRunner(Workload *workload)
 {
     ts_clear(_start);
 }
-WorkloadRunner::~WorkloadRunner() {}
 
 int
 WorkloadRunner::run(WT_CONNECTION *conn)
 {
     WT_DECL_RET;
     WorkloadOptions *options = &_workload->options;
-    std::ofstream report_out;
 
     _wt_home = conn->get_home(conn);
 
@@ -2346,12 +2315,16 @@ WorkloadRunner::run(WT_CONNECTION *conn)
         THROW(
           "Workload.options.timestamp_advance must be positive if either "
           "Workload.options.oldest_timestamp_lag or Workload.options.stable_timestamp_lag is set");
+
     if (options->sample_interval_ms > 0 && options->sample_rate <= 0)
         THROW("Workload.options.sample_rate must be positive");
+
+    std::ofstream report_out;
     if (!options->report_file.empty()) {
-        open_report_file(report_out, options->report_file.c_str(), "Workload.options.report_file");
+        open_report_file(report_out, options->report_file, "Workload.options.report_file");
         _report_out = &report_out;
     }
+
     WT_ERR(create_all(conn, _workload->_context));
     WT_ERR(open_all());
     WT_ERR(ThreadRunner::cross_check(_trunners));
@@ -2372,7 +2345,8 @@ WorkloadRunner::open_all()
 }
 
 void
-WorkloadRunner::open_report_file(std::ofstream &of, const char *filename, const char *desc)
+WorkloadRunner::open_report_file(
+  std::ofstream &of, const std::string &filename, const std::string &desc)
 {
     std::stringstream sstm;
 
@@ -2455,49 +2429,45 @@ WorkloadRunner::final_report(timespec &totalsecs)
 int
 WorkloadRunner::run_all(WT_CONNECTION *conn)
 {
-    void *status;
-    std::vector<pthread_t> thread_handles;
-    Stats counts(false);
-    WorkgenException *exception;
-    WorkloadOptions *options = &_workload->options;
-    WorkloadRunnerConnection *runnerConnection;
-    WorkloadRunnerConnection *createDropTableCycle;
-    Monitor monitor(*this);
-    std::ofstream monitor_out;
-    std::ofstream monitor_json;
-    std::ostream &out = *_report_out;
-    pthread_t time_thandle, idle_table_thandle;
     WT_DECL_RET;
 
-    runnerConnection = createDropTableCycle = NULL;
+    Stats counts(false);
     for (size_t i = 0; i < _trunners.size(); i++)
         _trunners[i].get_static_counts(counts);
+
+    std::ostream &out = *_report_out;
     out << "Starting workload: " << _trunners.size() << " threads, ";
     counts.report(out);
     out << std::endl;
 
     // Start all threads
+    WorkloadOptions *options = &_workload->options;
+    Monitor monitor(*this);
+    std::ofstream monitor_out;
+    std::ofstream monitor_json;
     if (options->sample_interval_ms > 0) {
         open_report_file(monitor_out, "monitor", "monitor output file");
         monitor._out = &monitor_out;
 
         if (!options->sample_file.empty()) {
-            open_report_file(monitor_json, options->sample_file.c_str(), "sample JSON output file");
+            open_report_file(monitor_json, options->sample_file, "sample JSON output file");
             monitor._json = &monitor_json;
         }
 
-        if ((ret = pthread_create(&monitor._handle, NULL, monitor_main, &monitor)) != 0) {
+        if ((ret = pthread_create(&monitor._handle, nullptr, monitor_main, &monitor)) != 0) {
             std::cerr << "monitor thread failed err=" << ret << std::endl;
             return (ret);
         }
     }
 
+    void *status;
+    std::vector<pthread_t> thread_handles;
     for (size_t i = 0; i < _trunners.size(); i++) {
         pthread_t thandle;
         ThreadRunner *runner = &_trunners[i];
         runner->_stop = false;
         runner->_repeat = (options->run_time != 0);
-        if ((ret = pthread_create(&thandle, NULL, thread_runner_main, runner)) != 0) {
+        if ((ret = pthread_create(&thandle, nullptr, thread_runner_main, runner)) != 0) {
             std::cerr << "pthread_create failed err=" << ret << std::endl;
             std::cerr << "Stopping all threads." << std::endl;
             for (size_t j = 0; j < thread_handles.size(); j++) {
@@ -2511,36 +2481,41 @@ WorkloadRunner::run_all(WT_CONNECTION *conn)
     }
 
     // Start Timestamp increment thread
+    pthread_t time_thandle;
+    WorkloadRunnerConnection *runnerConnection = nullptr;
     if (options->oldest_timestamp_lag > 0 || options->stable_timestamp_lag > 0) {
 
         runnerConnection = new WorkloadRunnerConnection();
         runnerConnection->runner = this;
         runnerConnection->connection = conn;
 
-        if ((ret = pthread_create(&time_thandle, NULL, thread_workload, runnerConnection)) != 0) {
+        if ((ret = pthread_create(&time_thandle, nullptr, thread_workload, runnerConnection)) !=
+          0) {
             std::cerr << "pthread_create failed err=" << ret << std::endl;
             std::cerr << "Stopping Time threads." << std::endl;
             (void)pthread_join(time_thandle, &status);
             delete runnerConnection;
-            runnerConnection = NULL;
+            runnerConnection = nullptr;
             stopping = true;
         }
     }
 
     // Start Idle table cycle thread
+    pthread_t idle_table_thandle;
+    WorkloadRunnerConnection *createDropTableCycle = nullptr;
     if (options->max_idle_table_cycle > 0) {
 
         createDropTableCycle = new WorkloadRunnerConnection();
         createDropTableCycle->runner = this;
         createDropTableCycle->connection = conn;
 
-        if ((ret = pthread_create(&idle_table_thandle, NULL, thread_idle_table_cycle_workload,
+        if ((ret = pthread_create(&idle_table_thandle, nullptr, thread_idle_table_cycle_workload,
                createDropTableCycle)) != 0) {
             std::cerr << "pthread_create failed err=" << ret << std::endl;
             std::cerr << "Stopping Create Drop table idle cycle threads." << std::endl;
             (void)pthread_join(idle_table_thandle, &status);
             delete createDropTableCycle;
-            createDropTableCycle = NULL;
+            createDropTableCycle = nullptr;
             stopping = true;
         }
     }
@@ -2601,25 +2576,25 @@ WorkloadRunner::run_all(WT_CONNECTION *conn)
     stopping = true;
 
     // wait for all threads
-    exception = NULL;
+    WorkgenException *exception = nullptr;
     for (size_t i = 0; i < _trunners.size(); i++) {
         WT_TRET(pthread_join(thread_handles[i], &status));
         if (_trunners[i]._errno != 0)
             VERBOSE(_trunners[i], "Thread " << i << " has errno " << _trunners[i]._errno);
         WT_TRET(_trunners[i]._errno);
         _trunners[i].close_all();
-        if (exception == NULL && !_trunners[i]._exception._str.empty())
+        if (exception == nullptr && !_trunners[i]._exception._str.empty())
             exception = &_trunners[i]._exception;
     }
 
     // Wait for the time increment thread
-    if (runnerConnection != NULL) {
+    if (runnerConnection != nullptr) {
         WT_TRET(pthread_join(time_thandle, &status));
         delete runnerConnection;
     }
 
     // Wait for the idle table cycle thread.
-    if (createDropTableCycle != NULL) {
+    if (createDropTableCycle != nullptr) {
         WT_TRET(pthread_join(idle_table_thandle, &status));
         delete createDropTableCycle;
     }
@@ -2629,7 +2604,7 @@ WorkloadRunner::run_all(WT_CONNECTION *conn)
         WT_TRET(pthread_join(monitor._handle, &status));
         if (monitor._errno != 0)
             std::cerr << "Monitor thread has errno " << monitor._errno << std::endl;
-        if (exception == NULL && !monitor._exception._str.empty())
+        if (exception == nullptr && !monitor._exception._str.empty())
             exception = &monitor._exception;
 
         monitor_out.close();
@@ -2644,7 +2619,7 @@ WorkloadRunner::run_all(WT_CONNECTION *conn)
     if (ret != 0)
         std::cerr << "run_all failed err=" << ret << std::endl;
     (*_report_out) << std::endl;
-    if (exception != NULL)
+    if (exception != nullptr)
         throw *exception;
     return (ret);
 }
