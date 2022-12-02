@@ -904,7 +904,6 @@ Status BucketCatalog::reopenBucket(OperationContext* opCtx,
                                 ns,
                                 coll->getDefaultCollator(),
                                 *options,
-                                stats,
                                 BucketToReopen{bucketDoc, validator},
                                 boost::none);
     if (!res.isOK()) {
@@ -1391,16 +1390,11 @@ StatusWith<std::unique_ptr<BucketCatalog::Bucket>> BucketCatalog::_rehydrateBuck
     const NamespaceString& ns,
     const StringData::ComparatorInterface* comparator,
     const TimeseriesOptions& options,
-    ExecutionStatsController stats,
-    boost::optional<BucketToReopen> bucketToReopen,
+    const BucketToReopen& bucketToReopen,
     boost::optional<const BucketKey&> expectedKey) {
-    if (!bucketToReopen) {
-        // Nothing to rehydrate.
-        return {ErrorCodes::BadValue, "No bucket to rehydrate"};
-    }
     invariant(feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
         serverGlobalParams.featureCompatibility));
-    const auto& [bucketDoc, validator, catalogEra] = bucketToReopen.value();
+    const auto& [bucketDoc, validator, catalogEra] = bucketToReopen;
     if (catalogEra < _bucketStateManager.getEra()) {
         return {ErrorCodes::WriteConflict, "Bucket is from an earlier era, may be outdated"};
     }
@@ -1625,8 +1619,9 @@ StatusWith<BucketCatalog::InsertResult> BucketCatalog::_insert(
     CreationInfo info{key, stripeNumber, time, options, stats, &result.closedBuckets};
     boost::optional<BucketToReopen> bucketToReopen = std::move(bucketFindResult.bucketToReopen);
 
-    auto rehydratedBucket =
-        _rehydrateBucket(opCtx, ns, comparator, options, stats, bucketToReopen, key);
+    auto rehydratedBucket = bucketToReopen.has_value()
+        ? _rehydrateBucket(opCtx, ns, comparator, options, bucketToReopen.value(), key)
+        : StatusWith<std::unique_ptr<Bucket>>{ErrorCodes::BadValue, "No bucket to rehydrate"};
     if (rehydratedBucket.getStatus().code() == ErrorCodes::WriteConflict) {
         stats.incNumBucketReopeningsFailed();
         return rehydratedBucket.getStatus();

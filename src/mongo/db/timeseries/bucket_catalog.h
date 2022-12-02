@@ -972,8 +972,7 @@ protected:
         const NamespaceString& ns,
         const StringData::ComparatorInterface* comparator,
         const TimeseriesOptions& options,
-        ExecutionStatsController stats,
-        boost::optional<BucketToReopen> bucketToReopen,
+        const BucketToReopen& bucketToReopen,
         boost::optional<const BucketKey&> expectedKey);
 
     /**
