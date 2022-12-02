@@ -5726,6 +5726,14 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *gen_task_template
+  name: concurrency_compute_mode_gen
+  tags: ["concurrency", "no_passthrough", "compute_mode"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      resmoke_jobs_max: 1
+
+- <<: *gen_task_template
   name: concurrency_replication_metrics_gen
   tags: ["concurrency", "repl", "disabled_on_code_coverage"]
   commands:
