@@ -87,7 +87,7 @@ private:
                                PrefixId& prefixId,
                                PhysOptimizationResult& bestResult);
 
-    std::pair<bool, CostType> optimizeChildren(CostType nodeCost,
+    boost::optional<CostType> optimizeChildren(CostType nodeCost,
                                                ChildPropsType childProps,
                                                PrefixId& prefixId,
                                                CostType costLimit);

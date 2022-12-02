@@ -64,7 +64,7 @@ struct PhysNodes {
     const PhysOptimizationResult& at(size_t index) const;
     PhysOptimizationResult& at(size_t index);
 
-    std::pair<size_t, bool> find(const properties::PhysProps& props) const;
+    boost::optional<size_t> find(const properties::PhysProps& props) const;
 
     const PhysNodeVector& getNodes() const;
 
@@ -178,7 +178,7 @@ public:
 
     LogicalRewriteQueue& getLogicalRewriteQueue(GroupIdType groupId);
 
-    std::pair<size_t, bool> findNodeInGroup(GroupIdType groupId, ABT::reference_type node) const;
+    boost::optional<size_t> findNodeInGroup(GroupIdType groupId, ABT::reference_type node) const;
 
     ABT::reference_type getNode(MemoLogicalNodeId nodeMemoId) const;
 
@@ -217,7 +217,7 @@ private:
 
     std::pair<MemoLogicalNodeId, bool> addNode(GroupIdType groupId, ABT n, LogicalRewriteType rule);
 
-    std::pair<MemoLogicalNodeId, bool> findNode(const GroupIdVector& groups, const ABT& node);
+    boost::optional<MemoLogicalNodeId> findNode(const GroupIdVector& groups, const ABT& node);
 
     std::vector<std::unique_ptr<Group>> _groups;
 

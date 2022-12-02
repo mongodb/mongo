@@ -220,21 +220,21 @@ private:
             return it->second * childResult;
         }
 
-        const auto [success, selectivity] = estimateSelectivity(abtTree);
-        if (!success) {
+        const auto selectivity = estimateSelectivity(abtTree);
+        if (!selectivity) {
             return _fallbackCE->deriveCE(metadata, memo, logicalProps, n.ref());
         }
 
-        _selectivityCacheMap.emplace(std::move(abtTree), selectivity);
+        _selectivityCacheMap.emplace(std::move(abtTree), *selectivity);
 
         OPTIMIZER_DEBUG_LOG(6264805,
                             5,
                             "CE sampling estimated filter selectivity",
-                            "selectivity"_attr = selectivity);
-        return selectivity * childResult;
+                            "selectivity"_attr = *selectivity);
+        return *selectivity * childResult;
     }
 
-    std::pair<bool, SelectivityType> estimateSelectivity(ABT abtTree) {
+    boost::optional<optimizer::SelectivityType> estimateSelectivity(ABT abtTree) {
         // Add a group by to count number of documents.
         const ProjectionName sampleSumProjection = "sum";
         abtTree =
@@ -289,13 +289,13 @@ private:
             const auto [tag, value] = accessors.at(0)->getViewOfValue();
             if (tag == sbe::value::TypeTags::NumberInt64) {
                 // TODO: check if we get exactly one result from the groupby?
-                return {true, static_cast<double>(value) / _sampleSize};
+                return static_cast<double>(value) / _sampleSize;
             }
-            return {false, {}};
+            return boost::none;
         };
 
         // If nothing passes the filter, estimate 0.0 selectivity. HashGroup will return 0 results.
-        return {true, 0.0};
+        return 0.0;
     }
 
     struct NodeRefHash {

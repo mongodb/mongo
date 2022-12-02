@@ -177,7 +177,7 @@ public:
         if (hasProperty<IndexingAvailability>(_logicalProps)) {
             ridProjName = _ridProjections.at(
                 getPropertyConst<IndexingAvailability>(_logicalProps).getScanDefName());
-            needsRID = requiredProjections.find(*ridProjName).second;
+            needsRID = requiredProjections.find(*ridProjName).has_value();
         }
         if (needsRID && !node.getHasRID()) {
             // We cannot provide RID.
@@ -193,7 +193,7 @@ public:
             nodeCEMap.emplace(physNode.cast<Node>(), 0.0);
 
             for (const ProjectionName& boundProjName : node.binder().names()) {
-                if (requiredProjections.find(boundProjName).second) {
+                if (requiredProjections.find(boundProjName)) {
                     physNode = make<EvaluationNode>(
                         boundProjName, Constant::nothing(), std::move(physNode));
                     nodeCEMap.emplace(physNode.cast<Node>(), 0.0);
@@ -234,7 +234,7 @@ public:
             const ProjectionNameVector& boundProjNames = node.binder().names();
             for (size_t i = 0; i < boundProjNames.size(); i++) {
                 const ProjectionName& boundProjName = boundProjNames.at(i);
-                if (requiredProjections.find(boundProjName).second) {
+                if (requiredProjections.find(boundProjName)) {
                     physNode = make<EvaluationNode>(boundProjName,
                                                     getElementFn(i + (node.getHasRID() ? 1 : 0)),
                                                     std::move(physNode));
@@ -415,7 +415,7 @@ public:
         const auto& requiredProjections =
             getPropertyConst<ProjectionRequirement>(_physProps).getProjections();
         const ProjectionName& ridProjName = _ridProjections.at(scanDefName);
-        const bool needsRID = requiredProjections.find(ridProjName).second;
+        const bool needsRID = requiredProjections.find(ridProjName).has_value();
 
         const ProjectionName& scanProjectionName = indexingAvailability.getScanProjection();
         const GroupIdType scanGroupId = indexingAvailability.getScanGroupId();
@@ -1119,7 +1119,7 @@ public:
             const ProjectionName& aggProjectionName =
                 node.getAggregationProjectionNames().at(aggIndex);
 
-            if (requiredProjections.find(aggProjectionName).second) {
+            if (requiredProjections.find(aggProjectionName)) {
                 // We require this agg expression.
                 aggregationProjectionNames.push_back(aggProjectionName);
                 const ABT& aggExpr = node.getAggregationExpressions().at(aggIndex);

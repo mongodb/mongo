@@ -84,7 +84,7 @@ public:
     bool operator==(const ProjectionNameOrderPreservingSet& other) const;
 
     std::pair<size_t, bool> emplace_back(ProjectionName projectionName);
-    std::pair<size_t, bool> find(const ProjectionName& projectionName) const;
+    boost::optional<size_t> find(const ProjectionName& projectionName) const;
     bool erase(const ProjectionName& projectionName);
 
     bool isEqualIgnoreOrder(const ProjectionNameOrderPreservingSet& other) const;

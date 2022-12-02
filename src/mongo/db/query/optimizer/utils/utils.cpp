@@ -1691,7 +1691,7 @@ void removeRedundantResidualPredicates(const ProjectionNameOrderPreservingSet& r
         auto& [key, req, ce] = *it;
 
         if (const auto& boundProjName = req.getBoundProjectionName();
-            boundProjName && !requiredProjections.find(*boundProjName).second) {
+            boundProjName && !requiredProjections.find(*boundProjName)) {
             if (isIntervalReqFullyOpenDNF(req.getIntervals())) {
                 residualReqs.erase(it++);
                 continue;
@@ -1714,8 +1714,7 @@ void removeRedundantResidualPredicates(const ProjectionNameOrderPreservingSet& r
     auto& fieldProjMap = fieldProjectionMap._fieldProjections;
     for (auto it = fieldProjMap.begin(); it != fieldProjMap.end();) {
         const ProjectionName& projName = it->second;
-        if (!requiredProjections.find(projName).second &&
-            residualTempProjections.count(projName) == 0) {
+        if (!requiredProjections.find(projName) && residualTempProjections.count(projName) == 0) {
             fieldProjMap.erase(it++);
         } else {
             it++;
@@ -1773,7 +1772,7 @@ ABT lowerRIDIntersectGroupBy(PrefixId& prefixId,
         ProjectionName tempProjectionName = prefixId.getNextId("unionTemp");
         unionProjections.push_back(tempProjectionName);
 
-        if (leftProjections.find(projectionName).second) {
+        if (leftProjections.find(projectionName)) {
             leftChild = make<EvaluationNode>(
                 tempProjectionName, make<Variable>(projectionName), std::move(leftChild));
             nodeCEMap.emplace(leftChild.cast<Node>(), leftCE);

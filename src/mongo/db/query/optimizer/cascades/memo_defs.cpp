@@ -50,9 +50,8 @@ ABT::reference_type OrderPreservingABTSet::at(const size_t index) const {
 }
 
 std::pair<size_t, bool> OrderPreservingABTSet::emplace_back(ABT node) {
-    auto [index, found] = find(node.ref());
-    if (found) {
-        return {index, false};
+    if (const auto index = find(node.ref())) {
+        return {*index, false};
     }
 
     const size_t id = _vector.size();
@@ -61,13 +60,13 @@ std::pair<size_t, bool> OrderPreservingABTSet::emplace_back(ABT node) {
     return {id, true};
 }
 
-std::pair<size_t, bool> OrderPreservingABTSet::find(ABT::reference_type node) const {
+boost::optional<size_t> OrderPreservingABTSet::find(ABT::reference_type node) const {
     auto it = _map.find(node);
     if (it == _map.end()) {
-        return {0, false};
+        return boost::none;
     }
 
-    return {it->second, true};
+    return it->second;
 }
 
 void OrderPreservingABTSet::clear() {

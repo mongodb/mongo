@@ -65,7 +65,7 @@ public:
 
     ABT::reference_type at(size_t index) const;
     std::pair<size_t, bool> emplace_back(ABT node);
-    std::pair<size_t, bool> find(ABT::reference_type node) const;
+    boost::optional<size_t> find(ABT::reference_type node) const;
 
     void clear();
 

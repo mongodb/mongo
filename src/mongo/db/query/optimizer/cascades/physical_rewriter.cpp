@@ -62,7 +62,7 @@ public:
             getPropertyConst<ProjectionRequirement>(_availableProps).getProjections();
         // Do we have a projection superset (not necessarily strict superset)?
         for (const ProjectionName& projectionName : requiredProp.getProjections().getVector()) {
-            if (!availableProjections.find(projectionName).second) {
+            if (!availableProjections.find(projectionName)) {
                 return false;
             }
         }
@@ -161,13 +161,11 @@ void PhysicalRewriter::costAndRetainBestNode(std::unique_ptr<ABT> node,
 
     const CostType childCostLimit =
         bestResult._nodeInfo ? bestResult._nodeInfo->_cost : bestResult._costLimit;
-    const auto [success, cost] = optimizeChildren(nodeCost, childProps, prefixId, childCostLimit);
-    const bool improvement =
-        success && (!bestResult._nodeInfo || cost < bestResult._nodeInfo->_cost);
+    const auto cost = optimizeChildren(nodeCost, childProps, prefixId, childCostLimit);
+    const bool improvement = cost && (!bestResult._nodeInfo || *cost < bestResult._nodeInfo->_cost);
 
     if (_debugInfo.hasDebugLevel(3)) {
-        std::cout << (success ? (improvement ? "Improved" : "Did not improve")
-                              : "Failed optimizing")
+        std::cout << (cost ? (improvement ? "Improved" : "Did not improve") : "Failed optimizing")
                   << "\n";
         printCandidateInfo(*node, groupId, nodeCost, childProps, bestResult);
     }
@@ -175,8 +173,12 @@ void PhysicalRewriter::costAndRetainBestNode(std::unique_ptr<ABT> node,
     tassert(6678300,
             "Retaining node with uninitialized rewrite rule",
             rule != cascades::PhysicalRewriteType::Uninitialized);
-    PhysNodeInfo candidateNodeInfo{
-        std::move(*node), cost, nodeCost, nodeCostAndCE._ce, rule, std::move(nodeCEMap)};
+    PhysNodeInfo candidateNodeInfo{std::move(*node),
+                                   cost.value_or(CostType::kInfinity),
+                                   nodeCost,
+                                   nodeCostAndCE._ce,
+                                   rule,
+                                   std::move(nodeCEMap)};
     const bool keepRejectedPlans = _hints._keepRejectedPlans;
     if (improvement) {
         if (keepRejectedPlans && bestResult._nodeInfo) {
@@ -192,7 +194,7 @@ void PhysicalRewriter::costAndRetainBestNode(std::unique_ptr<ABT> node,
  * Convert nodes from logical to physical memo delegators.
  * Performs branch-and-bound search.
  */
-std::pair<bool, CostType> PhysicalRewriter::optimizeChildren(const CostType nodeCost,
+boost::optional<CostType> PhysicalRewriter::optimizeChildren(const CostType nodeCost,
                                                              ChildPropsType childProps,
                                                              PrefixId& prefixId,
                                                              const CostType costLimit) {
@@ -200,7 +202,7 @@ std::pair<bool, CostType> PhysicalRewriter::optimizeChildren(const CostType node
 
     CostType totalCost = nodeCost;
     if (costLimit < totalCost && !disableBranchAndBound) {
-        return {false, CostType::kInfinity};
+        return boost::none;
     }
 
     for (auto& [node, props] : childProps) {
@@ -210,12 +212,12 @@ std::pair<bool, CostType> PhysicalRewriter::optimizeChildren(const CostType node
             disableBranchAndBound ? CostType::kInfinity : (costLimit - totalCost);
         auto optGroupResult = optimizeGroup(groupId, std::move(props), prefixId, childCostLimit);
         if (!optGroupResult._success) {
-            return {false, CostType::kInfinity};
+            return boost::none;
         }
 
         totalCost += optGroupResult._cost;
         if (costLimit < totalCost && !disableBranchAndBound) {
-            return {false, CostType::kInfinity};
+            return boost::none;
         }
 
         ABT optimizedChild =
@@ -223,7 +225,7 @@ std::pair<bool, CostType> PhysicalRewriter::optimizeChildren(const CostType node
         std::swap(*node, optimizedChild);
     }
 
-    return {true, totalCost};
+    return totalCost;
 }
 
 PhysicalRewriter::OptimizeGroupResult::OptimizeGroupResult()
@@ -258,12 +260,12 @@ PhysicalRewriter::OptimizeGroupResult PhysicalRewriter::optimizeGroup(const Grou
 
     auto& physicalNodes = group._physicalNodes;
     // Establish if we have found exact match of the physical properties in the winner's circle.
-    const auto [exactPropsIndex, hasExactProps] = physicalNodes.find(physProps);
+    const auto exactPropsIndex = physicalNodes.find(physProps);
     // If true, we have found compatible (but not equal) props with cost under our cost limit.
     bool hasCompatibleProps = false;
 
-    if (hasExactProps) {
-        PhysOptimizationResult& physNode = physicalNodes.at(exactPropsIndex);
+    if (exactPropsIndex) {
+        PhysOptimizationResult& physNode = physicalNodes.at(*exactPropsIndex);
         if (!physicalNodes.isOptimized(physNode._index)) {
             // Currently optimizing under the same properties higher up the stack (recursive loop).
             return {};
@@ -272,7 +274,7 @@ PhysicalRewriter::OptimizeGroupResult PhysicalRewriter::optimizeGroup(const Grou
 
         if (!physNode._nodeInfo) {
             if (physNode._costLimit < costLimit) {
-                physicalNodes.raiseCostLimit(exactPropsIndex, costLimit);
+                physicalNodes.raiseCostLimit(*exactPropsIndex, costLimit);
                 // Fall through and continue optimizing.
             } else {
                 // Previously failed to optimize under less strict cost limit.
@@ -339,8 +341,8 @@ PhysicalRewriter::OptimizeGroupResult PhysicalRewriter::optimizeGroup(const Grou
 
     // If found an exact match for properties, re-use entry and continue optimizing under higher
     // cost limit. Otherwise create with a new entry for the current properties.
-    PhysOptimizationResult& bestResult = hasExactProps
-        ? physicalNodes.at(exactPropsIndex)
+    PhysOptimizationResult& bestResult = exactPropsIndex
+        ? physicalNodes.at(*exactPropsIndex)
         : physicalNodes.addOptimizationResult(physProps, costLimit);
     PhysQueueAndImplPos& queue = physicalNodes.getQueue(bestResult._index);
 

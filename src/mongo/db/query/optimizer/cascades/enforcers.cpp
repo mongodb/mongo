@@ -227,7 +227,7 @@ public:
         const ProjectionNameOrderPreservingSet& requiredProjections =
             getPropertyConst<ProjectionRequirement>(_physProps).getProjections();
         const ProjectionName& scanProjection = indexingAvailability.getScanProjection();
-        const bool requiresScanProjection = requiredProjections.find(scanProjection).second;
+        const bool requiresScanProjection = requiredProjections.find(scanProjection).has_value();
 
         if (!requiresScanProjection) {
             // Try indexScanOnly (covered index) if we do not require scan projection.

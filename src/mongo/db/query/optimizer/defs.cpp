@@ -59,9 +59,8 @@ bool ProjectionNameOrderPreservingSet::operator==(
 
 std::pair<size_t, bool> ProjectionNameOrderPreservingSet::emplace_back(
     ProjectionName projectionName) {
-    auto [index, found] = find(projectionName);
-    if (found) {
-        return {index, false};
+    if (const auto index = find(projectionName)) {
+        return {*index, false};
     }
 
     const size_t id = _vector.size();
@@ -70,27 +69,27 @@ std::pair<size_t, bool> ProjectionNameOrderPreservingSet::emplace_back(
     return {id, true};
 }
 
-std::pair<size_t, bool> ProjectionNameOrderPreservingSet::find(
+boost::optional<size_t> ProjectionNameOrderPreservingSet::find(
     const ProjectionName& projectionName) const {
     auto it = _map.find(projectionName);
     if (it == _map.end()) {
-        return {0, false};
+        return boost::none;
     }
 
-    return {it->second, true};
+    return it->second;
 }
 
 bool ProjectionNameOrderPreservingSet::erase(const ProjectionName& projectionName) {
-    auto [index, found] = find(projectionName);
-    if (!found) {
+    auto index = find(projectionName);
+    if (!index) {
         return false;
     }
 
-    if (index < _vector.size() - 1) {
+    if (*index < _vector.size() - 1) {
         // Repoint map.
-        _map.at(_vector.back()) = index;
+        _map.at(_vector.back()) = *index;
         // Fill gap with last element.
-        _vector.at(index) = std::move(_vector.back());
+        _vector.at(*index) = std::move(_vector.back());
     }
 
     _map.erase(projectionName);
@@ -103,7 +102,7 @@ bool ProjectionNameOrderPreservingSet::isEqualIgnoreOrder(
     const ProjectionNameOrderPreservingSet& other) const {
     size_t numMatches = 0;
     for (const auto& projectionName : _vector) {
-        if (other.find(projectionName).second) {
+        if (other.find(projectionName)) {
             numMatches++;
         } else {
             return false;

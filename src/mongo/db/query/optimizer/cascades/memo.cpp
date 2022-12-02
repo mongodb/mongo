@@ -56,12 +56,12 @@ PhysOptimizationResult& PhysNodes::at(const size_t index) {
     return *_physicalNodes.at(index);
 }
 
-std::pair<size_t, bool> PhysNodes::find(const properties::PhysProps& props) const {
+boost::optional<size_t> PhysNodes::find(const properties::PhysProps& props) const {
     auto it = _physPropsToPhysNodeMap.find(props);
     if (it == _physPropsToPhysNodeMap.cend()) {
-        return {0, false};
+        return boost::none;
     }
-    return {it->second, true};
+    return it->second;
 }
 
 const PhysNodeVector& PhysNodes::getNodes() const {
@@ -435,14 +435,12 @@ private:
         if (it == _targetGroupMap.cend()) {
             return nullptr;
         }
-        const auto [index, found] = _memo.findNodeInGroup(it->second, n.ref());
-        if (!found) {
-            return nullptr;
+        if (const auto index = _memo.findNodeInGroup(it->second, n.ref())) {
+            ABT::reference_type result = _memo.getNode({it->second, *index});
+            uassert(6624049, "Node type in memo does not match target type", result.is<T>());
+            return result;
         }
-
-        ABT::reference_type result = _memo.getNode({it->second, index});
-        uassert(6624049, "Node type in memo does not match target type", result.is<T>());
-        return result;
+        return nullptr;
     }
 
     void updateTargetGroupRefs(
@@ -566,7 +564,7 @@ Group& Memo::getGroup(const GroupIdType groupId) {
     return *_groups.at(groupId);
 }
 
-std::pair<size_t, bool> Memo::findNodeInGroup(GroupIdType groupId, ABT::reference_type node) const {
+boost::optional<size_t> Memo::findNodeInGroup(GroupIdType groupId, ABT::reference_type node) const {
     return getGroup(groupId)._logicalNodes.find(node);
 }
 
@@ -583,7 +581,7 @@ std::pair<MemoLogicalNodeId, bool> Memo::addNode(GroupIdType groupId,
     Group& group = *_groups.at(groupId);
     OrderPreservingABTSet& nodes = group._logicalNodes;
 
-    auto [index, inserted] = nodes.emplace_back(std::move(n));
+    const auto [index, inserted] = nodes.emplace_back(std::move(n));
     if (inserted) {
         group._rules.push_back(rule);
     }
@@ -594,16 +592,16 @@ ABT::reference_type Memo::getNode(const MemoLogicalNodeId nodeMemoId) const {
     return getGroup(nodeMemoId._groupId)._logicalNodes.at(nodeMemoId._index);
 }
 
-std::pair<MemoLogicalNodeId, bool> Memo::findNode(const GroupIdVector& groups, const ABT& node) {
+boost::optional<MemoLogicalNodeId> Memo::findNode(const GroupIdVector& groups, const ABT& node) {
     const auto it = _inputGroupsToNodeIdMap.find(groups);
     if (it != _inputGroupsToNodeIdMap.cend()) {
         for (const MemoLogicalNodeId& nodeMemoId : it->second) {
             if (getNode(nodeMemoId) == node) {
-                return {nodeMemoId, true};
+                return nodeMemoId;
             }
         }
     }
-    return {{0, 0}, false};
+    return boost::none;
 }
 
 void Memo::estimateCE(const Context& ctx, const GroupIdType groupId) {
@@ -656,13 +654,11 @@ MemoLogicalNodeId Memo::addNode(const Context& ctx,
         uassert(6624127, "Target group appears inside group vector", groupId != targetGroupId);
     }
 
-    auto [existingId, foundNode] = findNode(groupVector, n);
-
-    if (foundNode) {
+    if (const auto existingId = findNode(groupVector, n)) {
         uassert(6624054,
                 "Found node outside target group",
-                targetGroupId < 0 || targetGroupId == existingId._groupId);
-        return existingId;
+                targetGroupId < 0 || targetGroupId == existingId->_groupId);
+        return *existingId;
     }
 
     const bool noTargetGroup = targetGroupId < 0;
