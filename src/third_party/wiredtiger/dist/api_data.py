@@ -1894,7 +1894,11 @@ methods = {
         must not be older than the current oldest timestamp. See @ref timestamp_global_api'''),
 ]),
 
-'WT_CONNECTION.rollback_to_stable' : Method([]),
+'WT_CONNECTION.rollback_to_stable' : Method([
+    Config('dryrun', 'false', r'''
+        perform the checks associated with RTS, but don't modify any data.''',
+        type='boolean'),
+]),
 
 'WT_SESSION.reconfigure' : Method(session_config),
 

@@ -55,7 +55,12 @@ class test_rollback_to_stable04(test_rollback_to_stable_base):
         ('prepare', dict(prepare=True))
     ]
 
-    scenarios = make_scenarios(format_values, in_memory_values, prepare_values)
+    dryrun_values = [
+        ('no_dryrun', dict(dryrun=False)),
+        ('dryrun', dict(dryrun=True))
+    ]
+
+    scenarios = make_scenarios(format_values, in_memory_values, prepare_values, dryrun_values)
 
     def conn_config(self):
         config = 'cache_size=500MB,statistics=(all)'
@@ -146,12 +151,16 @@ class test_rollback_to_stable04(test_rollback_to_stable_base):
         # Checkpoint to ensure the data is flushed, then rollback to the stable timestamp.
         if not self.in_memory:
             self.session.checkpoint()
-        self.conn.rollback_to_stable()
+        self.conn.rollback_to_stable('dryrun={}'.format('true' if self.dryrun else 'false'))
 
         # Check that the correct data is seen at and after the stable timestamp.
         self.check(value_modQ, uri, nrows, None, 30)
-        self.check(value_modQ, uri, nrows, None, 150)
-        self.check(value_a, uri, nrows, None, 20)
+        if self.dryrun:
+            self.check(value_modZ, uri, nrows, None, 150)
+            self.check(value_a, uri, nrows, None, 20)
+        else:
+            self.check(value_modQ, uri, nrows, None, 150)
+            self.check(value_a, uri, nrows, None, 20)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         calls = stat_cursor[stat.conn.txn_rts][2]
@@ -167,7 +176,9 @@ class test_rollback_to_stable04(test_rollback_to_stable_base):
         self.assertEqual(keys_removed, 0)
         self.assertEqual(keys_restored, 0)
         self.assertGreater(pages_visited, 0)
-        if self.in_memory:
+        if self.dryrun:
+            self.assertEqual(upd_aborted + hs_removed + hs_sweep, 0)
+        elif self.in_memory:
             self.assertEqual(upd_aborted, nrows * 11)
             self.assertEqual(hs_removed + hs_sweep, 0)
         else:

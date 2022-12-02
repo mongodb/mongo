@@ -44,7 +44,12 @@ class test_rollback_to_stable37(test_rollback_to_stable_base):
         ('row_integer', dict(key_format='i', value_format='S')),
     ]
 
-    scenarios = make_scenarios(format_values)
+    dryrun_values = [
+        ('no_dryrun', dict(dryrun=False)),
+        ('dryrun', dict(dryrun=True))
+    ]
+
+    scenarios = make_scenarios(format_values, dryrun_values)
 
     def test_rollback_to_stable(self):
         uri = 'table:test_rollback_to_stable37'
@@ -99,11 +104,15 @@ class test_rollback_to_stable37(test_rollback_to_stable_base):
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(2000))
         self.session.checkpoint()
 
-        self.conn.rollback_to_stable()
+        self.conn.rollback_to_stable('dryrun={}'.format('true' if self.dryrun else 'false'))
 
         self.check(value_c, uri, nrows, None, 1000)
         self.check(value_c, uri, nrows, None, 2000)
-        self.check(value_c, uri, nrows, None, 3000)
+
+        if self.dryrun:
+            self.check(value_d, uri, nrows, None, 3000)
+        else:
+            self.check(value_c, uri, nrows, None, 3000)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         keys_removed = stat_cursor[stat.conn.txn_rts_keys_removed][2]
