@@ -422,7 +422,8 @@ public:
                                                 _ctx.getNextId("matchExpression"));
 
         // If we have a top-level composition, flatten it into a chain of separate FilterNodes.
-        const auto& composition = collectComposed(matchExpr);
+        const auto& composition =
+            collectComposedBounded(matchExpr, kMaxPathConjunctionDecomposition);
         for (const auto& path : composition) {
             _ctx.setNode<FilterNode>(entry._rootProjection,
                                      make<EvalFilter>(path, make<Variable>(entry._rootProjection)),

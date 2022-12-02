@@ -62,7 +62,22 @@ inline size_t computeHashSeq(const Args&... seq) {
     return result;
 }
 
+/**
+ * Returns a vector all paths nested under conjunctions (PathComposeM) in the given path.
+ * For example, PathComposeM(PathComposeM(Foo, Bar), Baz) returns [Foo, Bar, Baz].
+ * If the given path is not a conjunction, returns a vector with the given path.
+ */
 std::vector<ABT::reference_type> collectComposed(const ABT& n);
+
+/**
+ * Like collectComposed() but bounded by a maximum number of composed paths.
+ * If the given path has more PathComposeM;s than specified by maxDepth, then return a vector
+ * with the given path. Otherwise, returns the result of collectComposed().
+ *
+ * This is useful for preventing the optimizer from unintentionally creating a very deep tree which
+ * causes stack-overflow on a recursive traversal.
+ */
+std::vector<ABT::reference_type> collectComposedBounded(const ABT& n, size_t maxDepth);
 
 /**
  * Returns true if the path represented by 'node' is of the form PathGet "field" PathId

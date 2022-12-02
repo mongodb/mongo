@@ -1028,7 +1028,9 @@ struct SubstituteConvert<FilterNode> {
         // Sub-rewrite: attempt to de-compose filter. If we have a path with a prefix of PathGet's
         // followed by a PathComposeM, then split into two filter nodes at the composition and
         // retain the prefix for each.
-        // TODO: consider using a standalone rewrite.
+        // TODO SERVER-71584: Consider splitting this rewrite into its own phase. Share its
+        // implementation with the version of this optimization performed at the end of ABT
+        // translation.
         if (auto* evalFilter = filterNode.getFilter().cast<EvalFilter>()) {
             ABT::reference_type pathRef = evalFilter->getPath().ref();
             FieldPathType fieldPath;

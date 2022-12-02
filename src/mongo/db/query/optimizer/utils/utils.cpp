@@ -45,11 +45,24 @@ std::vector<ABT::reference_type> collectComposed(const ABT& n) {
         auto lhs = collectComposed(comp->getPath1());
         auto rhs = collectComposed(comp->getPath2());
         lhs.insert(lhs.end(), rhs.begin(), rhs.end());
-
         return lhs;
     }
-
     return {n.ref()};
+}
+
+// Helper function to count the size of a nested conjunction.
+size_t countComposed(const ABT& n) {
+    if (auto comp = n.cast<PathComposeM>()) {
+        return countComposed(comp->getPath1()) + countComposed(comp->getPath2());
+    }
+    return 1;
+}
+
+std::vector<ABT::reference_type> collectComposedBounded(const ABT& n, size_t maxDepth) {
+    if (countComposed(n) > maxDepth) {
+        return {n.ref()};
+    }
+    return collectComposed(n);
 }
 
 bool isSimplePath(const ABT& node) {

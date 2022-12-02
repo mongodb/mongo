@@ -27,8 +27,13 @@
  *    it in the license file.
  */
 
+#include "mongo/db/pipeline/abt/canonical_query_translation.h"
 #include "mongo/db/pipeline/abt/utils.h"
+#include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/utils/unit_test_pipeline_utils.h"
+#include "mongo/db/query/optimizer/utils/unit_test_utils.h"
+#include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/golden_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -205,4 +210,54 @@ TEST_F(ABTTranslationTest, SortTranslation) {
 }
 
 }  // namespace
+
+TEST_F(ServiceContextTest, CanonicalQueryTranslation) {
+    Metadata metadata({{"collection", createScanDef({}, {})}});
+
+    auto opCtx = makeOperationContext();
+    auto findCommand = query_request_helper::makeFromFindCommandForTests(
+        fromjson("{find: 'collection', '$db': 'test', filter: {a: 10, b: 20, c:30}}"));
+    auto statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(findCommand));
+    ASSERT_OK(statusWithCQ.getStatus());
+    PrefixId prefixId;
+
+    auto translation = translateCanonicalQueryToABT(metadata,
+                                                    *(statusWithCQ.getValue()),
+                                                    ProjectionName{"test"},
+                                                    make<ScanNode>("test", "test"),
+                                                    prefixId);
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       test\n"
+        "|   RefBlock: \n"
+        "|       Variable [test]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [test]\n"
+        "|   PathGet [b]\n"
+        "|   PathTraverse [1]\n"
+        "|   PathCompare [Eq]\n"
+        "|   Const [20]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [test]\n"
+        "|   PathGet [a]\n"
+        "|   PathTraverse [1]\n"
+        "|   PathCompare [Eq]\n"
+        "|   Const [10]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [test]\n"
+        "|   PathGet [c]\n"
+        "|   PathTraverse [1]\n"
+        "|   PathCompare [Eq]\n"
+        "|   Const [30]\n"
+        "Scan [test]\n"
+        "    BindBlock:\n"
+        "        [test]\n"
+        "            Source []\n",
+        translation);
+}
+
 }  // namespace mongo::optimizer
