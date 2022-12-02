@@ -317,7 +317,7 @@ public:
      */
     NamespaceString(DatabaseName dbName, StringData collectionName)
         : _dbName(std::move(dbName)), _ns(str::stream() << _dbName.db() << '.' << collectionName) {
-        auto db = _dbName.db();
+        const auto& db = _dbName.db();
 
         uassert(ErrorCodes::InvalidNamespace,
                 "'.' is an invalid character in the database name: " + db,
