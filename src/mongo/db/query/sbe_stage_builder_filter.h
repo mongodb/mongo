@@ -45,12 +45,13 @@ class PlanStageSlots;
  * 'root'. The 'stage' parameter provides the input subtree to build on top of. The 'inputSlot'
  * and 'slots' parameters specify the input(s) that the filter should use.
  *
- * The 'useKeySlots' parameter controls whether kKey slots in 'slots' are allowed to be used as a
- * source of input. Typically 'useKeySlots' is false unless we are generating a filter over an
- * index scan.
+ * The 'isFilterOverIxscan' parameter controls if we should search for kField slots in 'slots' that
+ * correspond to the full paths needed by the filter. Typically 'isFilterOverIxscan' is false unless
+ * we are generating a filter over an index scan.
  *
- * If the caller sets 'useKeySlots' to true, then the caller must also provide a vector of key field
- * names ('keyFields') that lists the names of all the kKey slots that are needed by 'root'.
+ * If the caller sets 'isFilterOverIxscan' to true, then the caller must also provide a vector of
+ * key field names ('keyFields') that lists the names of all the kField slots that are needed by
+ * 'root'.
  *
  * This function returns a pair containing an optional<SlotId> and an EvalStage. If 'trackIndex' is
  * false then the optional<SlotId> will always be boost::none. If 'trackIndex' is true, then this
@@ -58,8 +59,8 @@ class PlanStageSlots;
  * element if an array traversal was performed. (If multiple array traversals were performed, it is
  * undefined which traversal will report the index of the matching array element.)
  *
- * Note that this function does not allow both 'useKeySlots' and 'trackIndex' to be true. If they
- * are both true, then this function will throw an exception.
+ * Note that this function does not allow both 'isFilterOverIxscan' and 'trackIndex' to be true. If
+ * they are both true, then this function will throw an exception.
  */
 std::pair<boost::optional<sbe::value::SlotId>, EvalStage> generateFilter(
     StageBuilderState& state,
@@ -69,7 +70,7 @@ std::pair<boost::optional<sbe::value::SlotId>, EvalStage> generateFilter(
     const PlanStageSlots* slots,
     PlanNodeId planNodeId,
     const std::vector<std::string>& keyFields = {},
-    bool useKeySlots = false,
+    bool isFilterOverIxscan = false,
     bool trackIndex = false);
 
 /**

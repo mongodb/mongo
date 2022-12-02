@@ -119,22 +119,22 @@ public:
     //    paths (when we are getting the dotted field from a non-multikey index and we know no array
     //    traversal is needed). These slots hold the actual values of the fields / field paths (not
     //    the sort key or collation comparison key for the field).
-    // 3) kKey slots represent the raw key value that comes from an ixscan / ixseek stage for a
+    // 3) kSortKey slots represent the raw key value that comes from an ixscan / ixseek stage for a
     //    given field path. This raw key value can be used for sorting / comparison, but it is not
     //    always equal to the actual value of the field path (for example, if the key is coming from
     //    an index that has a non-simple collation).
     enum class Type {
         kMeta,
         kField,
-        kKey,
+        kSortKey,
     };
 
     using Name = std::pair<Type, StringData>;
     using OwnedName = std::pair<Type, std::string>;
 
-    static constexpr auto kField = Type::kField;
-    static constexpr auto kKey = Type::kKey;
     static constexpr auto kMeta = Type::kMeta;
+    static constexpr auto kField = Type::kField;
+    static constexpr auto kSortKey = Type::kSortKey;
 
     static constexpr Name kResult = {kMeta, "result"_sd};
     static constexpr Name kRecordId = {kMeta, "recordId"_sd};
@@ -214,9 +214,9 @@ public:
     using Name = PlanStageSlots::Name;
     using OwnedName = std::pair<Type, std::string>;
 
-    static constexpr auto kField = PlanStageSlots::Type::kField;
-    static constexpr auto kKey = PlanStageSlots::Type::kKey;
     static constexpr auto kMeta = PlanStageSlots::Type::kMeta;
+    static constexpr auto kField = PlanStageSlots::Type::kField;
+    static constexpr auto kSortKey = PlanStageSlots::Type::kSortKey;
 
     PlanStageReqs copy() const {
         return *this;
@@ -265,9 +265,9 @@ public:
         return *this;
     }
 
-    PlanStageReqs& setKeys(std::vector<std::string> strs) {
+    PlanStageReqs& setSortKeys(std::vector<std::string> strs) {
         for (size_t i = 0; i < strs.size(); ++i) {
-            _slots.insert_or_assign(std::make_pair(kKey, std::move(strs[i])), true);
+            _slots.insert_or_assign(std::make_pair(kSortKey, std::move(strs[i])), true);
         }
         return *this;
     }
@@ -312,8 +312,8 @@ public:
     bool hasFields() const {
         return hasType(kField);
     }
-    bool hasKeys() const {
-        return hasType(kKey);
+    bool hasSortKeys() const {
+        return hasType(kSortKey);
     }
 
     std::vector<std::string> getOfType(Type t) const {
@@ -329,8 +329,8 @@ public:
     std::vector<std::string> getFields() const {
         return getOfType(kField);
     }
-    std::vector<std::string> getKeys() const {
-        return getOfType(kKey);
+    std::vector<std::string> getSortKeys() const {
+        return getOfType(kSortKey);
     }
 
     PlanStageReqs& clearAllOfType(Type t) {
@@ -343,8 +343,8 @@ public:
     PlanStageReqs& clearAllFields() {
         return clearAllOfType(kField);
     }
-    PlanStageReqs& clearAllKeys() {
-        return clearAllOfType(kKey);
+    PlanStageReqs& clearAllSortKeys() {
+        return clearAllOfType(kSortKey);
     }
 
     friend PlanStageSlots::PlanStageSlots(const PlanStageReqs& reqs,

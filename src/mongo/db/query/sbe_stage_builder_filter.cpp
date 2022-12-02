@@ -127,12 +127,12 @@ struct MatchExpressionVisitorContext {
                                   const MatchExpression* root,
                                   PlanNodeId planNodeId,
                                   const PlanStageSlots* slots,
-                                  bool useKeySlots,
+                                  bool isFilterOverIxscan,
                                   const FilterStateHelper& stateHelper)
         : state{state},
           inputSlot{inputSlot},
           slots{slots},
-          useKeySlots{useKeySlots},
+          isFilterOverIxscan{isFilterOverIxscan},
           topLevelAnd{nullptr},
           planNodeId{planNodeId},
           stateHelper{stateHelper} {
@@ -199,11 +199,11 @@ struct MatchExpressionVisitorContext {
     EvalStack<FrameData> evalStack;
 
     // The current context must be initialized either with a slot containing the entire document
-    // ('inputSlot') or with set of kField slots and/or kKey slots ('slots').
+    // ('inputSlot') or with set of kField slots ('slots').
     boost::optional<sbe::value::SlotId> inputSlot;
     const PlanStageSlots* slots = nullptr;
 
-    bool useKeySlots = false;
+    bool isFilterOverIxscan = false;
 
     const MatchExpression* topLevelAnd;
 
@@ -711,12 +711,12 @@ void generatePredicateImpl(MatchExpressionVisitorContext* context,
 
         boost::optional<sbe::value::SlotId> topLevelFieldSlot;
         if (isFieldPathOnRootDoc && context->slots) {
-            // If we are allowed to use the kKey slots, search for a kKey slot whose path matches
-            // 'path' (this is how we generate filter predicates for index scans).
-            if (context->useKeySlots && !path.empty()) {
-                auto name = std::make_pair(PlanStageSlots::kKey, path.dottedField());
+            // If we are generating a filter over an index scan, search for a kField slot that
+            // corresponds to the full path 'path'.
+            if (context->isFilterOverIxscan && !path.empty()) {
+                auto name = std::make_pair(PlanStageSlots::kField, path.dottedField());
                 if (auto slot = context->slots->getIfExists(name); slot) {
-                    // We found a kKey slot that matches. We don't need to perform any traversal;
+                    // We found a kField slot that matches. We don't need to perform any traversal;
                     // we can just evaluate the predicate on the slot directly and return.
                     auto result = makePredicate(*slot, frame.extractStage());
                     if (useCombinator) {
@@ -725,6 +725,7 @@ void generatePredicateImpl(MatchExpressionVisitorContext* context,
                     return result;
                 }
             }
+
             // Search for a kField slot whose path matches the first part of 'path'.
             topLevelFieldSlot = context->slots->getIfExists(
                 std::make_pair(PlanStageSlots::kField, path.getPart(0)));
@@ -1843,7 +1844,8 @@ EvalStage applyClassicMatcherOverIndexScan(const MatchExpression* root,
     auto keySlots = sbe::makeSV();
     for (const auto& field : keyFields) {
         keyPatternBuilder.append(field, 1);
-        keySlots.emplace_back(slots->get(std::make_pair(PlanStageSlots::kKey, StringData(field))));
+        keySlots.emplace_back(
+            slots->get(std::make_pair(PlanStageSlots::kField, StringData(field))));
     }
 
     auto keyPatternTree = buildKeyPatternTree(keyPatternBuilder.obj(), keySlots);
@@ -1867,12 +1869,12 @@ std::pair<boost::optional<sbe::value::SlotId>, EvalStage> generateFilter(
     const PlanStageSlots* slots,
     PlanNodeId nodeId,
     const std::vector<std::string>& keyFields,
-    bool useKeySlots,
+    bool isFilterOverIxscan,
     bool trackIndex) {
-    // We don't support tracking the index when 'useKeySlots' is true.
+    // We don't support tracking the index when 'isFilterOverIxscan' is true.
     tassert(7097206,
             "The 'trackIndex' option is not support for filters over index scans",
-            !useKeySlots || !trackIndex);
+            !isFilterOverIxscan || !trackIndex);
 
     // The planner adds an $and expression without the operands if the query was empty. We can bail
     // out early without generating the filter plan stage if this is the case.
@@ -1889,9 +1891,9 @@ std::pair<boost::optional<sbe::value::SlotId>, EvalStage> generateFilter(
         tassert(6681403, "trackIndex=true not supported for classic matcher in SBE", !trackIndex);
         tassert(7097207,
                 "Expected input slot or key slots to be defined",
-                inputSlot.has_value() || useKeySlots);
+                inputSlot.has_value() || isFilterOverIxscan);
 
-        auto outputStage = useKeySlots
+        auto outputStage = isFilterOverIxscan
             ? applyClassicMatcherOverIndexScan(root, std::move(stage), slots, keyFields, nodeId)
             : applyClassicMatcher(root, std::move(stage), *inputSlot, nodeId);
         return {boost::none, std::move(outputStage)};
@@ -1899,7 +1901,7 @@ std::pair<boost::optional<sbe::value::SlotId>, EvalStage> generateFilter(
 
     auto stateHelper = makeFilterStateHelper(trackIndex);
     MatchExpressionVisitorContext context{
-        state, std::move(stage), inputSlot, root, nodeId, slots, useKeySlots, *stateHelper};
+        state, std::move(stage), inputSlot, root, nodeId, slots, isFilterOverIxscan, *stateHelper};
 
     MatchExpressionPreVisitor preVisitor{&context};
     MatchExpressionInVisitor inVisitor{&context};

@@ -50,6 +50,8 @@ class Projection;
 
 namespace mongo::stage_builder {
 
+class PlanStageSlots;
+
 std::unique_ptr<sbe::EExpression> makeUnaryOp(sbe::EPrimUnary::Op unaryOp,
                                               std::unique_ptr<sbe::EExpression> operand);
 
@@ -937,69 +939,119 @@ struct StageBuilderState {
 };
 
 /**
- * Tree representing index key pattern or a subset of it.
+ * A tree of nodes arranged based on field path. PathTreeNode can be used to represent index key
+ * patterns, projections, etc. A PathTreeNode can also optionally hold a value of type T.
  *
- * For example, the key pattern {a.b: 1, x: 1, a.c: 1} would look like:
+ * For example, the key pattern {a.b: 1, x: 1, a.c: 1} in tree form would look like:
  *
  *         <root>
  *         /   |
  *        a    x
  *       / \
  *      b   c
- *
- * This tree is used for building SBE subtrees to re-hydrate index keys and for covered projections.
  */
-struct IndexKeyPatternTreeNode {
-    IndexKeyPatternTreeNode* emplace(StringData fieldComponent) {
-        auto newNode = std::make_unique<IndexKeyPatternTreeNode>();
+template <typename T>
+struct PathTreeNode {
+    PathTreeNode() = default;
+    explicit PathTreeNode(StringData name) : name(name) {}
+
+    // Aside from the root node, it is very common for a node to have no children or only 1 child.
+    using ChildrenVector = absl::InlinedVector<std::unique_ptr<PathTreeNode<T>>, 1>;
+
+    PathTreeNode<T>* emplace(StringData fieldComponent) {
+        auto newNode = std::make_unique<PathTreeNode<T>>(fieldComponent);
         const auto newNodeRaw = newNode.get();
-        children.emplace(fieldComponent, std::move(newNode));
-        childrenOrder.push_back(fieldComponent.toString());
+        children.emplace_back(std::move(newNode));
+
+        if (childrenMap) {
+            childrenMap->emplace(fieldComponent, newNodeRaw);
+        } else if (children.size() >= 3) {
+            // If 'childrenMap' is null and there are 3 or more children, build 'childrenMap' now.
+            buildChildrenMap();
+        }
 
         return newNodeRaw;
     }
 
-    /**
-     * Returns leaf node matching field path. If the field path provided resolves to a non-leaf
-     * node, null will be returned.
-     *
-     * For example, if tree was built for key pattern {a: 1, a.b: 1}, this method will return
-     * nullptr for field path "a". On the other hand, this method will return corresponding node for
-     * field path "a.b".
-     */
-    IndexKeyPatternTreeNode* findLeafNode(const sbe::MatchPath& fieldRef, size_t currentIndex = 0) {
-        if (currentIndex == fieldRef.numParts()) {
-            if (children.empty()) {
-                return this;
+    bool isLeaf() const {
+        return children.empty();
+    }
+
+    PathTreeNode<T>* findChild(StringData fieldComponent) {
+        if (childrenMap) {
+            auto it = childrenMap->find(fieldComponent);
+            return it != childrenMap->end() ? it->second : nullptr;
+        }
+        for (auto&& child : children) {
+            if (child->name == fieldComponent) {
+                return child.get();
             }
-            return nullptr;
+        }
+        return nullptr;
+    }
+
+    PathTreeNode<T>* findNode(const sbe::MatchPath& fieldRef, size_t currentIndex = 0) {
+        if (currentIndex == fieldRef.numParts()) {
+            return this;
         }
 
         auto currentPart = fieldRef.getPart(currentIndex);
-        if (auto it = children.find(currentPart); it != children.end()) {
-            return it->second->findLeafNode(fieldRef, currentIndex + 1);
+        if (auto child = findChild(currentPart)) {
+            return child->findNode(fieldRef, currentIndex + 1);
         } else {
             return nullptr;
         }
     }
 
-    StringMap<std::unique_ptr<IndexKeyPatternTreeNode>> children;
-    std::vector<std::string> childrenOrder;
+    /**
+     * Returns leaf node matching field path. If the field path provided resolves to a non-leaf
+     * node, null will be returned. For example, if tree was built for key pattern {a.b: 1}, this
+     * method will return nullptr for field path "a".
+     */
+    PathTreeNode<T>* findLeafNode(const sbe::MatchPath& fieldRef, size_t currentIndex = 0) {
+        auto* node = findNode(fieldRef, currentIndex);
+        return (node && node->isLeaf() ? node : nullptr);
+    }
 
-    // Which slot the index key for this component is stored in. May be boost::none for non-leaf
-    // nodes.
-    boost::optional<sbe::value::SlotId> indexKeySlot;
+    void clearChildren() {
+        children.clear();
+        childrenMap.reset();
+    }
+
+    void buildChildrenMap() {
+        if (!childrenMap) {
+            childrenMap = std::make_unique<StringDataMap<PathTreeNode<T>*>>();
+            for (auto&& child : children) {
+                childrenMap->insert_or_assign(child->name, child.get());
+            }
+        }
+    }
+
+    std::string name;
+
+    ChildrenVector children;
+
+    // We only build a hash map when there are 3 or more children. The vast majority of nodes
+    // will have 2 children or less, so we dynamically allocate 'childrenMap' to save space.
+    std::unique_ptr<StringDataMap<PathTreeNode<T>*>> childrenMap;
+
+    T value = {};
 };
 
-std::unique_ptr<IndexKeyPatternTreeNode> buildKeyPatternTree(const BSONObj& keyPattern,
-                                                             const sbe::value::SlotVector& slots);
-std::unique_ptr<sbe::EExpression> buildNewObjExpr(const IndexKeyPatternTreeNode* kpTree);
+using SlotTreeNode = PathTreeNode<boost::optional<sbe::value::SlotId>>;
+
+std::unique_ptr<SlotTreeNode> buildKeyPatternTree(const BSONObj& keyPattern,
+                                                  const sbe::value::SlotVector& slots);
+
+std::unique_ptr<sbe::EExpression> buildNewObjExpr(const SlotTreeNode* slotTree);
 
 std::unique_ptr<sbe::PlanStage> rehydrateIndexKey(std::unique_ptr<sbe::PlanStage> stage,
                                                   const BSONObj& indexKeyPattern,
                                                   PlanNodeId nodeId,
                                                   const sbe::value::SlotVector& indexKeySlots,
                                                   sbe::value::SlotId resultSlot);
+
+std::unique_ptr<SlotTreeNode> buildSlotTreeForProjection(const projection_ast::Projection& proj);
 
 template <typename T>
 inline const char* getRawStringData(const T& str) {
@@ -1010,7 +1062,328 @@ inline const char* getRawStringData(const T& str) {
     }
 }
 
-IndexKeyPatternTreeNode buildPatternTree(const projection_ast::Projection& projection);
+template <typename T, typename IterT, typename StringT>
+inline auto buildPathTreeImpl(const std::vector<StringT>& paths,
+                              boost::optional<IterT> valsBegin,
+                              boost::optional<IterT> valsEnd,
+                              bool removeConflictingPaths) {
+    auto tree = std::make_unique<PathTreeNode<T>>();
+    auto valsIt = std::move(valsBegin);
+
+    for (auto&& pathStr : paths) {
+        auto path = sbe::MatchPath{pathStr};
+
+        size_t numParts = path.numParts();
+        size_t i = 0;
+
+        auto* node = tree.get();
+        StringData part;
+        for (; i < numParts; ++i) {
+            part = path.getPart(i);
+            auto child = node->findChild(part);
+            if (!child) {
+                break;
+            }
+            node = child;
+        }
+
+        // When 'removeConflictingPaths' is true, if we're processing a sub-path of another path
+        // that's already been processed, then we should ignore the sub-path.
+        const bool ignorePath = (removeConflictingPaths && node->isLeaf() && node != tree.get());
+        if (!ignorePath) {
+            if (i < numParts) {
+                node = node->emplace(part);
+                for (++i; i < numParts; ++i) {
+                    node = node->emplace(path.getPart(i));
+                }
+            } else if (removeConflictingPaths && !node->isLeaf()) {
+                // If 'removeConflictingPaths' is true, delete any children that 'node' has.
+                node->clearChildren();
+            }
+            if (valsIt) {
+                tassert(7182003,
+                        "buildPathTreeImpl() did not expect iterator 'valsIt' to reach the end",
+                        !valsEnd || *valsIt != *valsEnd);
+
+                node->value = **valsIt;
+            }
+        }
+
+        if (valsIt) {
+            ++(*valsIt);
+        }
+    }
+
+    return tree;
+}
+
+/**
+ * Builds a path tree from a set of paths and returns the root node of the tree.
+ *
+ * If 'removeConflictingPaths' is false, this function will build a tree that contains all paths
+ * specified in 'paths' (regardless of whether there are any paths that conflict).
+ *
+ * If 'removeConflictingPaths' is true, when there are two conflicting paths (ex. "a" and "a.b")
+ * the conflict is resolved by removing the longer path ("a.b") and keeping the shorter path ("a").
+ */
+template <typename T, typename StringT>
+auto buildPathTree(const std::vector<StringT>& paths, bool removeConflictingPaths) {
+    return buildPathTreeImpl<T, std::move_iterator<typename std::vector<T>::iterator>, StringT>(
+        paths, boost::none, boost::none, removeConflictingPaths);
+}
+
+/**
+ * Builds a path tree from a set of paths, assigns a sequence of values to the sequence of nodes
+ * corresponding to each path, and returns the root node of the tree.
+ *
+ * The 'values' sequence/vector and the 'paths' vector are expected to have the same number of
+ * elements. The nth value in the the 'values' sequence will be assigned to the node corresponding
+ * to the nth path in 'paths'.
+ *
+ * If 'removeConflictingPaths' is false, this function will build a tree that contains all paths
+ * specified in 'paths' (regardless of whether there are any paths that conflict).
+ *
+ * If 'removeConflictingPaths' is true, when there are two conflicting paths (ex. "a" and "a.b")
+ * the conflict is resolved by removing the longer path ("a.b") and keeping the shorter path ("a").
+ * Note that when a path from 'paths' is removed due to a conflict, the corresponding value in
+ * 'values' will be ignored.
+ */
+template <typename T, typename IterT, typename StringT>
+auto buildPathTree(const std::vector<StringT>& paths,
+                   IterT valuesBegin,
+                   IterT valuesEnd,
+                   bool removeConflictingPaths) {
+    return buildPathTreeImpl<T, IterT, StringT>(
+        paths, std::move(valuesBegin), std::move(valuesEnd), removeConflictingPaths);
+}
+
+template <typename T, typename U>
+auto buildPathTree(const std::vector<std::string>& paths,
+                   const std::vector<U>& values,
+                   bool removeConflictingPaths) {
+    tassert(7182004,
+            "buildPathTreeImpl() expects 'paths' and 'values' to be the same size",
+            paths.size() == values.size());
+
+    return buildPathTree<T>(paths, values.begin(), values.end(), removeConflictingPaths);
+}
+
+template <typename T, typename U>
+auto buildPathTree(const std::vector<std::string>& paths,
+                   std::vector<U>&& values,
+                   bool removeConflictingPaths) {
+    tassert(7182005,
+            "buildPathTreeImpl() expects 'paths' and 'values' to be the same size",
+            paths.size() == values.size());
+
+    return buildPathTree<T>(paths,
+                            std::make_move_iterator(values.begin()),
+                            std::make_move_iterator(values.end()),
+                            removeConflictingPaths);
+}
+
+/**
+ * If a boolean can be constructed from type T, this function will construct a boolean from 'value'
+ * and then return the negation. If a boolean cannot be constructed from type T, then this function
+ * returns false.
+ */
+template <typename T>
+bool convertsToFalse(const T& value) {
+    if constexpr (std::is_constructible_v<bool, T>) {
+        return !bool(value);
+    } else {
+        return false;
+    }
+}
+
+template <typename T>
+struct InvokeAndReturnBoolHelper {
+    template <typename FuncT, typename... Args>
+    static bool invoke(FuncT&& fn, bool defaultReturnValue, Args&&... args) {
+        (std::forward<FuncT>(fn))(std::forward<Args>(args)...);
+        return defaultReturnValue;
+    }
+};
+template <>
+struct InvokeAndReturnBoolHelper<bool> {
+    template <typename FuncT, typename... Args>
+    static bool invoke(FuncT&& fn, bool, Args&&... args) {
+        return (std::forward<FuncT>(fn))(std::forward<Args>(args)...);
+    }
+};
+
+/**
+ * This function will invoke an invocable object ('fn') with the specified arguments ('args'). If
+ * 'fn' returns bool, this function will return fn's return value. If 'fn' returns void or some type
+ * other than bool, this function will return 'defaultReturnValue'.
+ *
+ * As a special case, this function alows fn's type (FuncT) to be nullptr_t. In such cases, this
+ * function will do nothing and it will return 'defaultReturnValue'.
+ *
+ * If 'fn' is not invocable with the specified arguments and fn's type is not nullptr_t, this
+ * function will raise a static assertion.
+ *
+ * Note that when a bool can be constructed from 'fn' (for example, if FuncT is a function pointer
+ * type), this method will always invoke 'fn' regardless of whether "!bool(fn)" is true or false.
+ * It is the caller's responsibility to do any necessary checks (ex. null checks) before calling
+ * this function.
+ */
+template <typename FuncT, typename... Args>
+inline bool invokeAndReturnBool(FuncT&& fn, bool defaultReturnValue, Args&&... args) {
+    if constexpr (std::is_invocable_v<FuncT, Args...>) {
+        return InvokeAndReturnBoolHelper<typename std::invoke_result<FuncT, Args...>::type>::invoke(
+            std::forward<FuncT>(fn), defaultReturnValue, std::forward<Args>(args)...);
+    } else {
+        static_assert(std::is_null_pointer_v<std::remove_reference_t<FuncT>>);
+        return defaultReturnValue;
+    }
+}
+
+/**
+ * This is a helper function used by visitPathTreeNodes() to invoke preVisit and postVisit callback
+ * functions. This helper function will check if 'fn' supports invocation with the following args:
+ *   (1) Node* node, const std::string& path, const DfsState& dfsState
+ *   (2) Node* node, const DfsState& dfsState
+ *   (3) Node* node, const std::string& path
+ *   (4) Node* node
+ *
+ * After checking what 'fn' supports, this helper function will then use invokeAndReturnBool() to
+ * invoke 'fn' accordingly and it will return invokeAndReturnBool()'s return value. If 'fn' supports
+ * multiple signatures, whichever signature that appears first in the list above will be used.
+ */
+template <typename NodeT, typename FuncT>
+inline bool invokeVisitPathTreeNodesCallback(
+    FuncT&& fn,
+    NodeT* node,
+    const std::string& path,
+    const std::vector<std::pair<NodeT*, size_t>>& dfsState) {
+    using DfsState = std::vector<std::pair<NodeT*, size_t>>;
+
+    if constexpr (std::is_invocable_v<FuncT, NodeT*, const std::string&, const DfsState&>) {
+        return invokeAndReturnBool(std::forward<FuncT>(fn), true, node, path, dfsState);
+    } else if constexpr (std::is_invocable_v<FuncT, NodeT*, const DfsState&>) {
+        return invokeAndReturnBool(std::forward<FuncT>(fn), true, node, dfsState);
+    } else if constexpr (std::is_invocable_v<FuncT, NodeT*, const std::string&>) {
+        return invokeAndReturnBool(std::forward<FuncT>(fn), true, node, path);
+    } else {
+        return invokeAndReturnBool(std::forward<FuncT>(fn), true, node);
+    }
+}
+
+/**
+ * This function performs a DFS traversal on a path tree (as given by 'treeRoot') and it invokes
+ * the specified preVisit and postVisit callbacks at the appropriate times.
+ *
+ * The caller may pass nullptr for 'preVisit' if they do not wish to perform any pre-visit actions,
+ * and likewise the caller may pass nullptr for 'postVisit' if they do not wish to perform any
+ * post-visit actions.
+ *
+ * Assuming 'preVisit' is not null, the 'preVisit' callback must support one of the following
+ * signatures:
+ *   (1) Node* node, const std::string& path, const DfsState& dfsState
+ *   (2) Node* node, const DfsState& dfsState
+ *   (3) Node* node, const std::string& path
+ *   (4) Node* node
+ *
+ * Likewise, assuming 'postVisit' is not null, the 'postVisit' callback must support one of the
+ * signatures listed above. For details, see invokeVisitPathTreeNodesCallback().
+ *
+ * The 'preVisit' callback can return any type. If preVisit's return type is not bool or if
+ * 'preVisit' returns boolean true, then preVisit's return value is ignored. If preVisit's return
+ * type is bool _and_ preVisit returns boolean false, then the node that was just pre-visited will
+ * be "skipped" and its descendents will not be visited (i.e. instead of the DFS descending, it will
+ * backtrack), and likewise the 'postVisit' callback will be "skipped" as well and won't be invoked
+ * for the node.
+ *
+ * The 'postVisit' callback can return any type. postVisit's return value (if any) is ignored.
+ *
+ * If 'invokeCallbacksForRootNode' is false (which is the default), the preVisit and postVisit
+ * callbacks won't be invoked for the root node of the tree. If 'invokeCallbacksForRootNode' is
+ * true, the preVisit and postVisit callbacks will be invoked for the root node of the tree at
+ * the appropriate times.
+ *
+ * The 'rootPath' parameter allows the caller to specify the absolute path of 'treeRoot', which
+ * will be used as the base/prefix to determine the paths of all the other nodes in the tree. If
+ * no 'rootPath' argument is provided, then 'rootPath' defaults to boost::none.
+ */
+template <typename T, typename PreVisitFn, typename PostVisitFn>
+void visitPathTreeNodes(PathTreeNode<T>* treeRoot,
+                        const PreVisitFn& preVisit,
+                        const PostVisitFn& postVisit,
+                        bool invokeCallbacksForRootNode = false,
+                        boost::optional<std::string> rootPath = boost::none) {
+    using Node = PathTreeNode<T>;
+    using DfsState = std::vector<std::pair<Node*, size_t>>;
+    constexpr bool isPathNeeded =
+        std::is_invocable_v<PreVisitFn, Node*, const std::string&, const DfsState&> ||
+        std::is_invocable_v<PreVisitFn, Node*, const std::string&> ||
+        std::is_invocable_v<PostVisitFn, Node*, const std::string&, const DfsState&> ||
+        std::is_invocable_v<PostVisitFn, Node*, const std::string&>;
+
+    if (!treeRoot || treeRoot->children.empty()) {
+        return;
+    }
+
+    const bool hasPreVisit = !convertsToFalse(preVisit);
+    const bool hasPostVisit = !convertsToFalse(postVisit);
+
+    // Perform a depth-first traversal using 'dfs' to keep track of where we are.
+    DfsState dfs;
+    dfs.emplace_back(treeRoot, std::numeric_limits<size_t>::max());
+    boost::optional<std::string> path = std::move(rootPath);
+    const std::string emptyPath;
+
+    auto getPath = [&]() -> const std::string& { return path ? *path : emptyPath; };
+    auto dfsPop = [&] {
+        dfs.pop_back();
+        if (isPathNeeded && path) {
+            if (auto pos = path->find_last_of('.'); pos != std::string::npos) {
+                path->resize(pos);
+            } else {
+                path = boost::none;
+            }
+        }
+    };
+
+    if (hasPreVisit && invokeCallbacksForRootNode) {
+        // Invoke the pre-visit callback on the root node if appropriate.
+        if (!invokeVisitPathTreeNodesCallback(preVisit, treeRoot, getPath(), dfs)) {
+            dfsPop();
+        }
+    }
+
+    while (!dfs.empty()) {
+        ++dfs.back().second;
+        auto [node, idx] = dfs.back();
+        const bool isRootNode = dfs.size() == 1;
+
+        if (idx < node->children.size()) {
+            auto child = node->children[idx].get();
+            dfs.emplace_back(child, std::numeric_limits<size_t>::max());
+            if (isPathNeeded) {
+                if (path) {
+                    path->append(1, '.');
+                    *path += child->name;
+                } else {
+                    path = child->name;
+                }
+            }
+
+            if (hasPreVisit) {
+                // Invoke the pre-visit callback.
+                if (!invokeVisitPathTreeNodesCallback(preVisit, child, getPath(), dfs)) {
+                    dfsPop();
+                }
+            }
+        } else {
+            if (hasPostVisit && (invokeCallbacksForRootNode || !isRootNode)) {
+                // Invoke the post-visit callback.
+                invokeVisitPathTreeNodesCallback(postVisit, node, getPath(), dfs);
+            }
+            dfsPop();
+        }
+    }
+}
 
 /**
  * This function extracts the dependencies for expressions that appear inside a projection. Note
@@ -1023,35 +1396,21 @@ IndexKeyPatternTreeNode buildPatternTree(const projection_ast::Projection& proje
 void addProjectionExprDependencies(const projection_ast::Projection& projection, DepsTracker* deps);
 
 /**
- * This method retrieves the values of the specified top-level fields ('fields') from 'resultSlot'
+ * This method retrieves the values of the specified field paths ('fields') from 'resultSlot'
  * and stores the values into slots.
  *
  * This method returns a pair containing: (1) the updated SBE plan stage tree and; (2) a vector of
- * the slots ('slots') containing the field values.
+ * the slots ('outSlots') containing the field path values.
  *
- * The order of slots in 'slots' will match the order of fields in 'fields'.
+ * The order of slots in 'outSlots' will match the order of field paths in 'fields'.
  */
-std::pair<std::unique_ptr<sbe::PlanStage>, sbe::value::SlotVector> projectTopLevelFields(
+std::pair<std::unique_ptr<sbe::PlanStage>, sbe::value::SlotVector> projectFieldsToSlots(
     std::unique_ptr<sbe::PlanStage> stage,
     const std::vector<std::string>& fields,
     sbe::value::SlotId resultSlot,
     PlanNodeId nodeId,
-    sbe::value::SlotIdGenerator* slotIdGenerator);
-
-/**
- * This method projects the constant value Nothing to multiple slots (the specific number of slots
- * being specified by parameter 'n').
- *
- * This method returns a pair containing: (1) the updated SBE plan stage tree and; (2) a vector of
- * slots ('slots') containing Nothing.
- *
- * The number of slots in 'slots' will always be equal to parameter 'n'.
- */
-std::pair<std::unique_ptr<sbe::PlanStage>, sbe::value::SlotVector> projectNothingToSlots(
-    std::unique_ptr<sbe::PlanStage> stage,
-    size_t n,
-    PlanNodeId nodeId,
-    sbe::value::SlotIdGenerator* slotIdGenerator);
+    sbe::value::SlotIdGenerator* slotIdGenerator,
+    const PlanStageSlots* slots = nullptr);
 
 template <typename T>
 inline StringData getTopLevelField(const T& path) {

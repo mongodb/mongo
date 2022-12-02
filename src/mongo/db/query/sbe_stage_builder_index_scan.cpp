@@ -692,7 +692,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
     StageBuilderState& state,
     const CollectionPtr& collection,
     const IndexScanNode* ixn,
-    const sbe::IndexKeysInclusionSet& originalIndexKeyBitset,
+    const sbe::IndexKeysInclusionSet& originalFieldBitset,
+    const sbe::IndexKeysInclusionSet& sortKeyBitset,
     PlanYieldPolicy* yieldPolicy,
     StringMap<const IndexAccessMethod*>* iamMap,
     bool needsCorruptionCheck) {
@@ -716,7 +717,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
 
     // Determine the set of fields from the index required to apply the filter and union those with
     // the set of fields from the index required by the parent stage.
-    auto [indexFilterKeyBitset, indexFilterKeyFields] = [&]() {
+    auto [indexFilterFieldBitset, indexFilterFieldNames] = [&]() {
         if (ixn->filter) {
             DepsTracker tracker;
             match_expression::addDependencies(ixn->filter.get(), &tracker);
@@ -724,16 +725,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
         }
         return std::make_pair(sbe::IndexKeysInclusionSet{}, std::vector<std::string>{});
     }();
-    auto indexKeyBitset = originalIndexKeyBitset | indexFilterKeyBitset;
-
-    std::vector<std::string> keys;
-    size_t i = 0;
-    for (const auto& elt : ixn->index.keyPattern) {
-        if (indexKeyBitset.test(i)) {
-            keys.emplace_back(elt.fieldNameStringData());
-        }
-        ++i;
-    }
+    auto fieldBitset = originalFieldBitset | indexFilterFieldBitset;
+    auto fieldAndSortKeyBitset = fieldBitset | sortKeyBitset;
 
     // Add the access method corresponding to 'indexName' to 'iamMap' if needed.
     if (iamMap) {
@@ -741,24 +734,39 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
     }
 
     // Generate the various slots needed for a consistency check and/or a corruption check if
-    // requested. Also generate slots for the index keys that are required by 'indexKeyBitset'.
+    // requested.
     PlanStageReqs reqs;
     reqs.setIf(PlanStageSlots::kSnapshotId, iamMap)
         .setIf(PlanStageSlots::kIndexId, iamMap)
         .setIf(PlanStageSlots::kIndexKey, iamMap)
-        .setIf(PlanStageSlots::kIndexKeyPattern, needsCorruptionCheck)
-        .setKeys(keys);
-
+        .setIf(PlanStageSlots::kIndexKeyPattern, needsCorruptionCheck);
     PlanStageSlots outputs(reqs, state.slotIdGenerator);
-    std::unique_ptr<sbe::PlanStage> stage;
 
-    auto indexKeySlots = sbe::makeSV();
-    for (const auto& key : keys) {
-        indexKeySlots.emplace_back(outputs.get(std::make_pair(PlanStageSlots::kKey, key)));
+    // Generate slots needed by 'fieldAndSortKeyBitset'.
+    auto fieldAndSortKeySlots = sbe::makeSV();
+    size_t i = 0;
+    for (const auto& elt : ixn->index.keyPattern) {
+        if (fieldAndSortKeyBitset.test(i)) {
+            auto slot = state.slotId();
+            fieldAndSortKeySlots.emplace_back(slot);
+
+            if (fieldBitset.test(i)) {
+                auto name = std::make_pair(PlanStageSlots::kField, elt.fieldNameStringData());
+                reqs.set(name);
+                outputs.set(name, slot);
+            }
+            if (sortKeyBitset.test(i)) {
+                auto name = std::make_pair(PlanStageSlots::kSortKey, elt.fieldNameStringData());
+                reqs.set(name);
+                outputs.set(name, slot);
+            }
+        }
+        ++i;
     }
 
     reqs.set(PlanStageSlots::kRecordId);
 
+    std::unique_ptr<sbe::PlanStage> stage;
     if (intervals.size() == 1) {
         // If we have just a single interval, we can construct a simplified sub-tree.
         auto&& [lowKey, highKey] = intervals[0];
@@ -772,8 +780,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
                                             ixn->direction == 1,
                                             std::move(lowKey),
                                             std::move(highKey),
-                                            indexKeyBitset,
-                                            indexKeySlots,
+                                            fieldAndSortKeyBitset,
+                                            fieldAndSortKeySlots,
                                             outputs.getIfExists(PlanStageSlots::kSnapshotId),
                                             outputs.getIfExists(PlanStageSlots::kIndexId),
                                             outputs.getIfExists(PlanStageSlots::kIndexKey),
@@ -793,8 +801,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
             keyPattern,
             ixn->direction == 1,
             std::move(intervals),
-            indexKeyBitset,
-            indexKeySlots,
+            fieldAndSortKeyBitset,
+            fieldAndSortKeySlots,
             outputs.getIfExists(PlanStageSlots::kSnapshotId),
             outputs.getIfExists(PlanStageSlots::kIndexId),
             outputs.getIfExists(PlanStageSlots::kIndexKey),
@@ -814,8 +822,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
             keyPattern,
             accessMethod->getSortedDataInterface()->getKeyStringVersion(),
             accessMethod->getSortedDataInterface()->getOrdering(),
-            indexKeyBitset,
-            indexKeySlots,
+            fieldAndSortKeyBitset,
+            fieldAndSortKeySlots,
             outputs.getIfExists(PlanStageSlots::kSnapshotId),
             outputs.getIfExists(PlanStageSlots::kIndexId),
             outputs.getIfExists(PlanStageSlots::kIndexKey),
@@ -841,7 +849,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
                                                boost::none,
                                                &outputs,
                                                ixn->nodeId(),
-                                               indexFilterKeyFields,
+                                               indexFilterFieldNames,
                                                true /* useKeySlots */,
                                                false /* trackIndex */);
 
@@ -928,7 +936,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
     StageBuilderState& state,
     const CollectionPtr& collection,
     const IndexScanNode* ixn,
-    const sbe::IndexKeysInclusionSet& originalIndexKeyBitset,
+    const sbe::IndexKeysInclusionSet& originalFieldBitset,
+    const sbe::IndexKeysInclusionSet& sortKeyBitset,
     PlanYieldPolicy* yieldPolicy,
     StringMap<const IndexAccessMethod*>* iamMap,
     bool needsCorruptionCheck) {
@@ -959,7 +968,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
 
     // Determine the set of fields from the index required to apply the filter and union those
     // with the set of fields from the index required by the parent stage.
-    auto [indexFilterKeyBitset, indexFilterKeyFields] = [&]() {
+    auto [indexFilterFieldBitset, indexFilterFieldNames] = [&]() {
         if (ixn->filter) {
             DepsTracker tracker;
             match_expression::addDependencies(ixn->filter.get(), &tracker);
@@ -967,8 +976,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
         }
         return std::make_pair(sbe::IndexKeysInclusionSet{}, std::vector<std::string>{});
     }();
-    auto indexKeyBitset = originalIndexKeyBitset | indexFilterKeyBitset;
-    auto outputIndexKeySlots = state.slotIdGenerator->generateMultiple(indexKeyBitset.count());
+    auto fieldBitset = originalFieldBitset | indexFilterFieldBitset;
+    auto fieldAndSortKeyBitset = fieldBitset | sortKeyBitset;
+
+    auto outputFieldAndSortKeySlots =
+        state.slotIdGenerator->generateMultiple(fieldAndSortKeyBitset.count());
 
     // Whenever possible we should prefer building simplified single interval index scan plans in
     // order to get the best performance.
@@ -976,13 +988,13 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
         auto makeSlot =
             [&](const bool cond,
                 const PlanStageSlots::Name slotKey) -> boost::optional<sbe::value::SlotId> {
-            if (!cond)
-                return boost::none;
-
-            const auto slot = state.slotId();
-            reqs.set(slotKey);
-            outputs.set(slotKey, slot);
-            return slot;
+            if (cond) {
+                const auto slot = state.slotId();
+                reqs.set(slotKey);
+                outputs.set(slotKey, slot);
+                return slot;
+            }
+            return boost::none;
         };
 
         boost::optional<std::pair<sbe::value::SlotId, sbe::value::SlotId>> indexScanBoundsSlots;
@@ -994,8 +1006,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
             forward,
             nullptr,
             nullptr,
-            indexKeyBitset,
-            outputIndexKeySlots,
+            fieldAndSortKeyBitset,
+            outputFieldAndSortKeySlots,
             makeSlot(iamMap, PlanStageSlots::kSnapshotId),
             makeSlot(iamMap, PlanStageSlots::kIndexId),
             makeSlot(iamMap, PlanStageSlots::kIndexKey),
@@ -1010,12 +1022,13 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
         parameterizedScanSlots = {ParameterizedIndexScanSlots::SingleIntervalPlan{
             indexScanBoundsSlots->first, indexScanBoundsSlots->second}};
     } else {
-        auto genericIndexKeySlots = state.slotIdGenerator->generateMultiple(indexKeyBitset.count());
-        auto optimizedIndexKeySlots =
-            state.slotIdGenerator->generateMultiple(indexKeyBitset.count());
-        auto genericIndexScanSlots = genericIndexKeySlots;
-        auto optimizedIndexScanSlots = optimizedIndexKeySlots;
-        auto branchOutputSlots = outputIndexKeySlots;
+        auto genericFieldAndSortKeySlots =
+            state.slotIdGenerator->generateMultiple(fieldAndSortKeyBitset.count());
+        auto optimizedFieldAndSortKeySlots =
+            state.slotIdGenerator->generateMultiple(fieldAndSortKeyBitset.count());
+        auto genericIndexScanSlots = genericFieldAndSortKeySlots;
+        auto optimizedIndexScanSlots = optimizedFieldAndSortKeySlots;
+        auto branchOutputSlots = outputFieldAndSortKeySlots;
 
         auto makeSlotsForThenElseBranches = [&](const bool cond, const PlanStageSlots::Name slotKey)
             -> std::tuple<boost::optional<sbe::value::SlotId>,
@@ -1056,8 +1069,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
                 keyPattern,
                 accessMethod->getSortedDataInterface()->getKeyStringVersion(),
                 accessMethod->getSortedDataInterface()->getOrdering(),
-                indexKeyBitset,
-                genericIndexKeySlots,
+                fieldAndSortKeyBitset,
+                genericFieldAndSortKeySlots,
                 genericIndexScanSnapshotIdSlot,
                 genericIndexScanIndexIdSlot,
                 genericIndexScanIndexKeySlot,
@@ -1080,8 +1093,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
                                                     keyPattern,
                                                     forward,
                                                     boost::none,
-                                                    indexKeyBitset,
-                                                    optimizedIndexKeySlots,
+                                                    fieldAndSortKeyBitset,
+                                                    optimizedFieldAndSortKeySlots,
                                                     optimizedIndexScanSnapshotIdSlot,
                                                     optimizedIndexScanIndexIdSlot,
                                                     optimizedIndexScanIndexKeySlot,
@@ -1120,10 +1133,17 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
     size_t i = 0;
     size_t slotIdx = 0;
     for (const auto& elt : ixn->index.keyPattern) {
-        StringData name = elt.fieldNameStringData();
-        if (indexKeyBitset.test(i)) {
-            reqs.set(std::make_pair(PlanStageSlots::kKey, name));
-            outputs.set(std::make_pair(PlanStageSlots::kKey, name), outputIndexKeySlots[slotIdx]);
+        if (fieldAndSortKeyBitset.test(i)) {
+            if (fieldBitset.test(i)) {
+                auto name = std::make_pair(PlanStageSlots::kField, elt.fieldNameStringData());
+                reqs.set(name);
+                outputs.set(name, outputFieldAndSortKeySlots[slotIdx]);
+            }
+            if (sortKeyBitset.test(i)) {
+                auto name = std::make_pair(PlanStageSlots::kSortKey, elt.fieldNameStringData());
+                reqs.set(name);
+                outputs.set(name, outputFieldAndSortKeySlots[slotIdx]);
+            }
             ++slotIdx;
         }
         ++i;
@@ -1140,7 +1160,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
                                                boost::none,
                                                &outputs,
                                                ixn->nodeId(),
-                                               indexFilterKeyFields,
+                                               indexFilterFieldNames,
                                                true /* useKeySlots */,
                                                false /* trackIndex */);
 

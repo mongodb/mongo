@@ -51,13 +51,14 @@ using IndexIntervals =
  * This method returns a pair containing: (1) an SBE plan stage tree implementing an index scan;
  * and (2) a PlanStageSlots object containing a kRecordId slot, possibly some other kMeta slots,
  * and slots produced by the index scan that correspond to parts of the index key specified by
- * the 'indexKeyBitset' bitset.
+ * 'fieldBitset | sortKeyBitset'.
  */
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
     StageBuilderState& state,
     const CollectionPtr& collection,
     const IndexScanNode* ixn,
-    const sbe::IndexKeysInclusionSet& indexKeyBitset,
+    const sbe::IndexKeysInclusionSet& fieldBitset,
+    const sbe::IndexKeysInclusionSet& sortKeyBitset,
     PlanYieldPolicy* yieldPolicy,
     StringMap<const IndexAccessMethod*>* iamMap,
     bool needsCorruptionCheck);
@@ -88,13 +89,14 @@ std::pair<sbe::value::TypeTags, sbe::value::Value> packIndexIntervalsInSbeArray(
  * This method returns a pair containing: (1) an SBE plan stage tree implementing a generic multi-
  * interval index scan; and (2) a PlanStageSlots object containing a kRecordId slot, possibly some
  * other kMeta slots, and slots produced by the index scan that correspond to parts of the index
- * key specified by the 'indexKeyBitset' bitset.
+ * key specified by 'fieldBitset | sortKeyBitset'.
  */
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWithDynamicBounds(
     StageBuilderState& state,
     const CollectionPtr& collection,
     const IndexScanNode* ixn,
-    const sbe::IndexKeysInclusionSet& indexKeyBitset,
+    const sbe::IndexKeysInclusionSet& fieldBitset,
+    const sbe::IndexKeysInclusionSet& sortKeyBitset,
     PlanYieldPolicy* yieldPolicy,
     StringMap<const IndexAccessMethod*>* iamMap,
     bool needsCorruptionCheck);
