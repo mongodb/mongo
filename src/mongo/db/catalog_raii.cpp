@@ -628,6 +628,8 @@ ReadSourceScope::ReadSourceScope(OperationContext* opCtx,
                                  RecoveryUnit::ReadSource readSource,
                                  boost::optional<Timestamp> provided)
     : _opCtx(opCtx), _originalReadSource(opCtx->recoveryUnit()->getTimestampReadSource()) {
+    // Abandoning the snapshot is unsafe when the snapshot is managed by a lock free read helper.
+    invariant(!_opCtx->isLockFreeReadsOp());
 
     if (_originalReadSource == RecoveryUnit::ReadSource::kProvided) {
         _originalReadTimestamp = *_opCtx->recoveryUnit()->getPointInTimeReadTimestamp(_opCtx);
@@ -638,6 +640,9 @@ ReadSourceScope::ReadSourceScope(OperationContext* opCtx,
 }
 
 ReadSourceScope::~ReadSourceScope() {
+    // Abandoning the snapshot is unsafe when the snapshot is managed by a lock free read helper.
+    invariant(!_opCtx->isLockFreeReadsOp());
+
     _opCtx->recoveryUnit()->abandonSnapshot();
     if (_originalReadSource == RecoveryUnit::ReadSource::kProvided) {
         _opCtx->recoveryUnit()->setTimestampReadSource(_originalReadSource, _originalReadTimestamp);
