@@ -55,10 +55,10 @@ multiversion::FeatureCompatibilityVersion FeatureCompatibilityVersionParser::par
     }
 
     uasserted(4926900,
-              str::stream() << "Invalid feature compatibility version value, expected '"
-                            << multiversion::toString(GenericFCV::kLastLTS) << "' or '"
-                            << multiversion::toString(GenericFCV::kLastContinuous) << "' or '"
-                            << multiversion::toString(GenericFCV::kLatest) << ". See "
+              str::stream() << "Invalid feature compatibility version value '" << versionString
+                            << "'; expected '" << multiversion::toString(GenericFCV::kLastLTS)
+                            << "' or '" << multiversion::toString(GenericFCV::kLastContinuous)
+                            << "' or '" << multiversion::toString(GenericFCV::kLatest) << "'. See "
                             << feature_compatibility_version_documentation::kCompatibilityLink
                             << ".");
 }
