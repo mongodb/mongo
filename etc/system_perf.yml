@@ -1229,7 +1229,7 @@ buildvariants:
 
   - name: linux-standalone
     display_name: Linux Standalone Legacy
-    cron: "0 0 * * 2,4,6" # Tuesday, Thursday and Saturday at 00:00
+    cron: "0 0 * * 4" # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: standalone
@@ -1268,7 +1268,7 @@ buildvariants:
 
   - name: linux-standalone-all-feature-flags
     display_name: Linux Standalone (all feature flags) Legacy
-    cron: "0 0 * * 2,4,6" # Tuesday, Thursday and Saturday at 00:00
+    cron: "0 0 * * 4" # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: standalone-all-feature-flags
@@ -1571,7 +1571,7 @@ buildvariants:
 
   - name: linux-1-node-replSet-cwrwc
     display_name: Linux 1-Node ReplSet CWRWC Legacy
-    cron: "0 0 * * 0,4" # 00:00 on Sunday,Thursday
+    cron: "0 0 * * 4" # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: single-replica-cwrwc
@@ -1635,7 +1635,7 @@ buildvariants:
 
   - name: linux-1-node-15gbwtcache
     display_name: Linux 1-Node ReplSet 15 GB WiredTiger Cache Legacy
-    cron: "0 0 * * 2,4" # 00:00 on Tuesday,Thursday
+    cron: "0 0 * * 4" # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: single-replica-15gbwtcache
@@ -1657,7 +1657,7 @@ buildvariants:
 
   - name: linux-3-node-1dayhistory-15gbwtcache
     display_name: Linux 3-Node ReplSet 1 Day History 15 GB WiredTiger Cache Legacy
-    cron: "0 0 * * 0,4" # 00:00 on Sunday,Thursday
+    cron: "0 0 * * 4" # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: replica-1dayhistory-15gbwtcache
@@ -1732,7 +1732,7 @@ buildvariants:
 
   - name: linux-shard-lite
     display_name: Linux Shard Lite Cluster Legacy
-    cron: "0 0 * * 0,4" # 00:00 on Sunday,Thursday
+    cron: "0 0 * * 4" # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: shard-lite
@@ -1840,7 +1840,7 @@ buildvariants:
 
   - name: linux-shard-single
     display_name: Linux Shard Single Legacy
-    cron: "0 0 * * 2,4" # 00:00 on Tuesday,Thursday
+    cron: "0 0 * * 4" # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: shard-single
@@ -1858,7 +1858,7 @@ buildvariants:
 
   - name: linux-3-node-replSet
     display_name: Linux 3-Node ReplSet Legacy
-    cron: "0 0 * * 1,2,3,4,5,6" # Everyday except Sunday at 00:00
+    cron: "0 0 * * 4" # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: replica
@@ -2396,8 +2396,7 @@ buildvariants:
 
   - name: linux-standalone.2022-11
     display_name: Linux Standalone 2022-11
-    cron: "0 0 * * *"  # Everyday at 00:00 to build up history
-    #    cron: "0 0 * * 2,4,6" # Tuesday, Thursday and Saturday at 00:00
+    cron: "0 0 * * 2,4,6" # Tuesday, Thursday and Saturday at 00:00
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2440,8 +2439,7 @@ buildvariants:
 
   - name: linux-standalone-all-feature-flags.2022-11
     display_name: Linux Standalone (all feature flags) 2022-11
-    cron: "0 0 * * *"  # Everyday at 00:00 to build up history
-    #    cron: "0 0 * * 2,4,6" # Tuesday, Thursday and Saturday at 00:00
+    cron: "0 0 * * 2,4,6" # Tuesday, Thursday and Saturday at 00:00
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2481,8 +2479,7 @@ buildvariants:
   - name: linux-standalone-classic-query-engine.2022-11
     display_name: Linux Standalone (Classic Query Engine) 2022-11
     # Will make it less frequent when the current SBE perf improvement is finished (SERVER-69799).
-    cron: "0 0 * * *"  # Everyday at 00:00 to build up history
-    #    cron: "0 0 * * 0,2,3,4,5" # Run it every day except Saturday and Monday.
+    cron: "0 0 * * 0,2,3,4,5" # Run it every day except Saturday and Monday.
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2521,8 +2518,7 @@ buildvariants:
   - name: linux-standalone-sbe.2022-11
     display_name: Linux Standalone (SBE) 2022-11
     # Will make it less frequent when the current SBE perf improvement is finished (SERVER-69799).
-    cron: "0 0 * * *"  # Everyday at 00:00 to build up history
-    #    cron: "0 0 * * 0,2,3,4,5" # Run it every day except Saturday and Monday.
+    cron: "0 0 * * 0,2,3,4,5" # Run it every day except Saturday and Monday.
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2543,8 +2539,7 @@ buildvariants:
   - name: linux-1-node-replSet-classic-query-engine.2022-11
     display_name: Linux 1-Node ReplSet (Classic Query Engine) 2022-11
     # Will make it less frequent when the current SBE perf improvement is finished (SERVER-69799).
-    cron: "0 0 * * *"  # Everyday at 00:00 to build up history
-    #    cron: "0 0 * * 0,2,3,4,5" # Run it every day except Saturday and Monday.
+    cron: "0 0 * * 0,2,3,4,5" # Run it every day except Saturday and Monday.
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2570,8 +2565,7 @@ buildvariants:
   - name: linux-1-node-replSet-sbe.2022-11
     display_name: Linux 1-Node ReplSet (SBE) 2022-11
     # Will make it less frequent when the current SBE perf improvement is finished (SERVER-69799).
-    cron: "0 0 * * *"  # Everyday at 00:00 to build up history
-    #    cron: "0 0 * * 0,2,3,4,5" # Run it every day except Saturday and Monday.
+    cron: "0 0 * * 0,2,3,4,5" # Run it every day except Saturday and Monday.
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2591,8 +2585,7 @@ buildvariants:
 
   - name: linux-1-node-replSet-all-feature-flags.2022-11
     display_name: Linux 1-Node ReplSet (all feature flags) 2022-11
-    cron: "0 0 * * *"  # Everyday at 00:00 to build up history
-    #    cron: "0 0 * * 4" # 00:00 on Thursday
+    cron: "0 0 * * 4" # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2614,8 +2607,7 @@ buildvariants:
 
   - name: linux-1-node-replSet.2022-11
     display_name: Linux 1-Node ReplSet 2022-11
-    cron: "0 0 * * *"  # Everyday at 00:00 to build up history
-    #    cron: "0 0 * * 4" # 00:00 on Thursday
+    cron: "0 0 * * 4" # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2859,8 +2851,7 @@ buildvariants:
 
   - name: linux-1-node-15gbwtcache.2022-11
     display_name: Linux 1-Node ReplSet 15 GB WiredTiger Cache 2022-11
-    cron: "0 0 * * *"  # Everyday at 00:00 to build up history
-    #    cron: "0 0 * * 2,4" # 00:00 on Tuesday,Thursday
+    cron: "0 0 * * 2,4" # 00:00 on Tuesday,Thursday
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2886,8 +2877,7 @@ buildvariants:
 
   - name: linux-3-node-1dayhistory-15gbwtcache.2022-11
     display_name: Linux 3-Node ReplSet 1 Day History 15 GB WiredTiger Cache 2022-11
-    cron: "0 0 * * *"  # Everyday at 00:00 to build up history
-    #    cron: "0 0 * * 0,4" # 00:00 on Sunday,Thursday
+    cron: "0 0 * * 0,4" # 00:00 on Sunday,Thursday
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2913,8 +2903,7 @@ buildvariants:
 
   - name: linux-3-shard.2022-11
     display_name: Linux 3-Shard Cluster 2022-11
-    cron: "0 0 * * *"  # Everyday at 00:00 to build up history
-    #    cron: "0 0 * * 4" # 00:00 on Thursday
+    cron: "0 0 * * 4" # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -2974,8 +2963,7 @@ buildvariants:
 
   - name: linux-shard-lite.2022-11
     display_name: Linux Shard Lite Cluster 2022-11
-    cron: "0 0 * * *"  # Everyday at 00:00 to build up history
-    #    cron: "0 0 * * 0,4" # 00:00 on Sunday,Thursday
+    cron: "0 0 * * 0,4" # 00:00 on Sunday,Thursday
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -3103,8 +3091,7 @@ buildvariants:
 
   - name: linux-shard-single.2022-11
     display_name: Linux Shard Single 2022-11
-    cron: "0 0 * * *"  # Everyday at 00:00 to build up history
-    #    cron: "0 0 * * 2,4" # 00:00 on Tuesday,Thursday
+    cron: "0 0 * * 2,4" # 00:00 on Tuesday,Thursday
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -3126,8 +3113,7 @@ buildvariants:
 
   - name: linux-3-node-replSet.2022-11
     display_name: Linux 3-Node ReplSet 2022-11
-    cron: "0 0 * * *"  # Everyday at 00:00 to build up history
-    #    cron: "0 0 * * 1,2,3,4,5,6" # Everyday except Sunday at 00:00
+    cron: "0 0 * * 1,2,3,4,5,6" # Everyday except Sunday at 00:00
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -3329,8 +3315,7 @@ buildvariants:
 
   - name: linux-3-node-replSet-all-feature-flags.2022-11
     display_name: Linux 3-Node ReplSet (all feature flags) 2022-11
-    cron: "0 0 * * *"  # Everyday at 00:00 to build up history
-    #    cron: "0 0 * * 4" # 00:00 on Thursday
+    cron: "0 0 * * 4" # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
