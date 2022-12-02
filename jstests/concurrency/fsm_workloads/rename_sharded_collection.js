@@ -23,7 +23,8 @@
 const numChunks = 20;
 const documentsPerChunk = 5;
 const dbNames = ['db0', 'db1'];
-const collNames = ['collA', 'collB', 'collC'];
+const collNames =
+    ['rename_sharded_collectionA', 'rename_sharded_collectionB', 'rename_sharded_collectionC'];
 
 /*
  * Initialize a collection with expected number of chunks/documents and randomly distribute chunks
