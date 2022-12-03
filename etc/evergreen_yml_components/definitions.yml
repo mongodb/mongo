@@ -6169,7 +6169,6 @@ tasks:
     vars:
       use_large_distro: "true"
       suite: sharding
-      multiversion_exclude_tags_version: last_lts
 
 - <<: *gen_task_template
   name: sharding_max_mirroring_gen
@@ -6236,7 +6235,6 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       use_large_distro: "true"
-      multiversion_exclude_tags_version: last_lts
 
 - <<: *gen_task_template
   name: sharding_opportunistic_secondary_targeting_gen
