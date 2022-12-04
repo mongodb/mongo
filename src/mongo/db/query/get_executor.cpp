@@ -1662,9 +1662,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
     deleteStageParams->canonicalQuery = cq.get();
 
     const bool batchDelete =
-        (deleteStageParams->isMulti && !deleteStageParams->fromMigrate &&
-         !deleteStageParams->returnDeleted && deleteStageParams->sort.isEmpty() &&
-         !deleteStageParams->numStatsForDoc) &&
+        (deleteStageParams->isMulti && !opCtx->inMultiDocumentTransaction() &&
+         !deleteStageParams->fromMigrate && !deleteStageParams->returnDeleted &&
+         deleteStageParams->sort.isEmpty() && !deleteStageParams->numStatsForDoc) &&
         ((gInternalBatchUserMultiDeletesForTest.load() &&
           nss.ns() == "__internalBatchedDeletesTesting.Collection0") ||
          (batchDeletesByDefault.shouldFail()));

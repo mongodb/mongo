@@ -30,9 +30,15 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/client/read_preference.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/logical_session_cache_noop.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/read_write_concern_defaults.h"
+#include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/transaction_coordinator_service.h"
+#include "mongo/db/session_catalog_mongod.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 
@@ -44,18 +50,37 @@ using unittest::assertGet;
 class MergeChunkTest : public ConfigServerTestFixture {
 protected:
     std::string _shardName = "shard0000";
+
     void setUp() override {
         ConfigServerTestFixture::setUp();
+
         ShardType shard;
         shard.setName(_shardName);
         shard.setHost(_shardName + ":12");
         setupShards({shard});
+
+        DBDirectClient client(operationContext());
+        client.createCollection(NamespaceString::kSessionTransactionsTableNamespace.ns());
+        client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+                             {MongoDSessionCatalog::getConfigTxnPartialIndexSpec()});
+        client.createCollection(CollectionType::ConfigNS.ns());
+
+        ReadWriteConcernDefaults::create(getServiceContext(), _lookupMock.getFetchDefaultsFn());
+        LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
+        TransactionCoordinatorService::get(operationContext())
+            ->onShardingInitialization(operationContext(), true);
+    }
+
+    void tearDown() override {
+        TransactionCoordinatorService::get(operationContext())->onStepDown();
+        ConfigServerTestFixture::tearDown();
     }
 
     const ShardId _shardId{_shardName};
     const NamespaceString _nss1{"TestDB.TestColl1"};
     const NamespaceString _nss2{"TestDB.TestColl2"};
     const KeyPattern _keyPattern{BSON("x" << 1)};
+    ReadWriteConcernDefaultsLookupMock _lookupMock;
 };
 
 TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceed) {

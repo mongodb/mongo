@@ -673,6 +673,18 @@ private:
      */
     void _standardizeClusterParameters(OperationContext* opCtx, RemoteCommandTargeter* targeter);
 
+    /**
+     * Execute the merge chunk updates using the internal transaction API.
+     */
+    void _mergeChunksInTransaction(OperationContext* opCtx,
+                                   const NamespaceString& nss,
+                                   const UUID& collectionUUID,
+                                   const ChunkVersion& mergeVersion,
+                                   const boost::optional<Timestamp>& validAfter,
+                                   const ChunkRange& chunkRange,
+                                   const ShardId& shardId,
+                                   std::shared_ptr<std::vector<ChunkType>> chunksToMerge);
+
     // The owning service context
     ServiceContext* const _serviceContext;
 
