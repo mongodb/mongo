@@ -362,13 +362,19 @@ public:
         bool estimate = jsobj["estimate"].trueValue();
 
         const NamespaceString nss(ns);
-        AutoGetCollectionForReadCommand collection(opCtx, nss);
+        AutoGetCollectionForReadCommand autoColl(opCtx, nss);
+        const auto& collection = autoColl.getCollection();
 
-        const auto collDesc =
-            CollectionShardingState::get(opCtx, nss)->getCollectionDescription(opCtx);
+        if (!collection) {
+            // Collection does not exist
+            result.appendNumber("size", 0);
+            result.appendNumber("numObjects", 0);
+            result.append("millis", timer.millis());
+            return true;
+        }
 
-        if (collDesc.isSharded()) {
-            const ShardKeyPattern shardKeyPattern(collDesc.getKeyPattern());
+        if (collection.isSharded()) {
+            const ShardKeyPattern shardKeyPattern(collection.getShardKeyPattern());
             uassert(ErrorCodes::BadValue,
                     "keyPattern must be empty or must be an object that equals the shard key",
                     keyPattern.isEmpty() ||
@@ -386,10 +392,7 @@ public:
             max = shardKeyPattern.normalizeShardKey(max);
         }
 
-        long long numRecords = 0;
-        if (collection) {
-            numRecords = collection->numRecords(opCtx);
-        }
+        const long long numRecords = collection->numRecords(opCtx);
 
         if (numRecords == 0) {
             result.appendNumber("size", 0);
@@ -409,7 +412,7 @@ public:
                 return 1;
             }
             exec = InternalPlanner::collectionScan(
-                opCtx, &collection.getCollection(), PlanYieldPolicy::YieldPolicy::NO_YIELD);
+                opCtx, &collection, PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
         } else if (min.isEmpty() || max.isEmpty()) {
             errmsg = "only one of min or max specified";
             return false;
@@ -434,12 +437,12 @@ public:
             max = Helpers::toKeyFormat(kp.extendRangeBound(max, false));
 
             exec = InternalPlanner::indexScan(opCtx,
-                                              &collection.getCollection(),
+                                              &collection,
                                               idx,
                                               min,
                                               max,
                                               BoundInclusion::kIncludeStartKeyOnly,
-                                              PlanYieldPolicy::YieldPolicy::NO_YIELD);
+                                              PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
         }
 
         long long avgObjSize = collection->dataSize(opCtx) / numRecords;
