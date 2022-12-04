@@ -467,7 +467,7 @@ public:
                 result.append("millis", timer.millis());
                 return 1;
             }
-            exec = InternalPlanner::collectionScan(opCtx, ns, collection, PlanExecutor::NO_YIELD);
+            exec = InternalPlanner::collectionScan(opCtx, ns, collection, PlanExecutor::YIELD_AUTO);
         } else if (min.isEmpty() || max.isEmpty()) {
             errmsg = "only one of min or max specified";
             return false;
@@ -497,7 +497,7 @@ public:
                                               min,
                                               max,
                                               BoundInclusion::kIncludeStartKeyOnly,
-                                              PlanExecutor::NO_YIELD);
+                                              PlanExecutor::YIELD_AUTO);
         }
 
         long long avgObjSize = collection->dataSize(opCtx) / numRecords;
