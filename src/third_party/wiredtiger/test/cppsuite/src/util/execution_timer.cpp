@@ -28,7 +28,7 @@
 
 #include "execution_timer.h"
 
-#include "metrics_writer.h"
+#include "src/component/metrics_writer.h"
 
 namespace test_harness {
 execution_timer::execution_timer(const std::string id, const std::string &test_name)

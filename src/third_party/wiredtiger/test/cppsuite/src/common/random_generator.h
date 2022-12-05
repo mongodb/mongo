@@ -64,6 +64,11 @@ class random_generator {
     std::string generate_pseudo_random_string(
       std::size_t length, characters_type type = characters_type::PSEUDO_ALPHANUMERIC);
 
+    /*
+     * Generate a boolean with 50/50 probability.
+     */
+    bool generate_bool();
+
     /* Generate a random integer between min and max. */
     template <typename T>
     T

@@ -26,57 +26,33 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef TEST_H
-#define TEST_H
+#pragma once
 
-#include <string>
-
-#include "database_operation.h"
-#include "src/component/metrics_monitor.h"
-#include "src/component/workload_manager.h"
-#include "src/storage/connection_manager.h"
+#include <condition_variable>
+#include <mutex>
 
 namespace test_harness {
-struct test_args {
-    const std::string test_config;
-    const std::string test_name;
-    std::string wt_open_config;
-    const std::string home;
-};
 
 /*
- * The base class for a test, the standard usage pattern is to just call run().
+ * A barrier is a sychronization class that allows thread_count threads to perform an action at the
+ * same time. They are introduced in C++20 so we need a basic implementation in the meantime.
+ *
+ * In order to synchronize across threads call wait() on each thread, once thread_count threads have
+ * called wait() they will exit the wait() and continue.
  */
-class test : public database_operation {
+class barrier {
     public:
-    explicit test(const test_args &args);
-    virtual ~test();
-
-    /* Delete the copy constructor and the assignment operator. */
-    test(const test &) = delete;
-    test &operator=(const test &) = delete;
-
-    /* Initialize the operation tracker component and its dependencies. */
-    void init_operation_tracker(operation_tracker *op_tracker = nullptr);
-
-    /*
-     * The primary run function that most tests will be able to utilize without much other code.
-     */
-    virtual void run();
-
-    protected:
-    const test_args &_args;
-    configuration *_config;
-    timestamp_manager *_timestamp_manager = nullptr;
-    operation_tracker *_operation_tracker = nullptr;
+    /* Mutexes have a deleted copy constructor so we need to as well. */
+    barrier(barrier const &) = delete;
+    ~barrier() = default;
+    explicit barrier(std::size_t thread_count);
+    void wait();
 
     private:
-    std::vector<component *> _components;
-    metrics_monitor *_metrics_monitor = nullptr;
-    thread_manager *_thread_manager = nullptr;
-    workload_manager *_workload_manager = nullptr;
-    database _database;
+    std::mutex _mutex;
+    std::condition_variable _cond;
+    std::size_t _threshold;
+    std::size_t _count;
+    std::size_t _generation;
 };
 } // namespace test_harness
-
-#endif

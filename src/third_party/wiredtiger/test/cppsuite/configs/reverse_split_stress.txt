@@ -1,0 +1,44 @@
+# This workload is inserts content continuously and truncates off the start of the file.
+# The truncations truncate up to 83% of the file each time.
+duration_seconds=7200,
+cache_size_mb=256,
+compression_enabled=true,
+timestamp_manager=
+(
+    enabled=true,
+    oldest_lag=30,
+    stable_lag=30
+),
+workload_manager=
+(
+    populate_config=
+    (
+        collection_count=5,
+        key_count_per_collection=10000,
+        key_size=50,
+        thread_count=5,
+        value_size=100000
+    ),
+    insert_config=
+    (
+        key_size=50,
+        op_rate= 1ms,
+        ops_per_transaction=(max=30,min=0),
+        thread_count=5,
+        value_size=100000
+    ),
+    remove_config=
+    (
+        op_rate=45s,
+        ops_per_transaction=(max=1,min=0),
+        thread_count=5
+    ),
+    checkpoint_config=
+    (
+        op_rate=60s,
+    )
+),
+operation_tracker=
+(
+    enabled=false,
+)
