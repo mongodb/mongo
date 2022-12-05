@@ -162,8 +162,8 @@ public:
         };
 
         const auto addEvalFilterFn = [&](ABT path, ABT expr, const Operations op) {
-            PathAppender appender(make<PathCompare>(op, std::move(expr)));
-            appender.append(path);
+            PathAppender::appendInPlace(path, make<PathCompare>(op, std::move(expr)));
+
             _ctx.push<EvalFilter>(std::move(path), _ctx.getRootProjVar());
         };
 

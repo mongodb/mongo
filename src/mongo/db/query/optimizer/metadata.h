@@ -36,11 +36,31 @@
 
 namespace mongo::optimizer {
 
+/**
+ * Describes how documents are distributed among separate threads or machines.
+ */
 struct DistributionAndPaths {
     DistributionAndPaths(DistributionType type);
     DistributionAndPaths(DistributionType type, ABTVector paths);
 
+    /**
+     * Each distribution type assigns documents to partitions in a particular pattern.
+     *
+     * For example, RangePartitioning tries to keep similar values together,
+     * while HashPartitioning tries to separate similar values.
+     */
     DistributionType _type;
+
+    /**
+     * The paths identify the parts of a document that determine its partition.
+     *
+     * For example, in RangePartitioning or HashPartitioning, if two documents agree on
+     * these paths, then they always end up in the same partition.
+     *
+     * Some distribution types, such as Centralized or Replicated, don't need to
+     * look at any part of a document to decide its partition, so they don't
+     * need any paths.
+     */
     ABTVector _paths;
 };
 

@@ -1466,16 +1466,14 @@ private:
                     distribAndProjections._projectionNames;
 
                 for (const ABT& partitioningPath : distributionAndPaths._paths) {
-                    auto it = reqMap.find(PartialSchemaKey{scanProjection, partitioningPath});
-                    if (it == reqMap.cend()) {
+                    if (auto it = reqMap.find(PartialSchemaKey{scanProjection, partitioningPath});
+                        it != reqMap.cend() &&
+                        it->second.getBoundProjectionName() ==
+                            requiredProjections.at(distributionPartitionIndex)) {
+                        distributionPartitionIndex++;
+                    } else {
                         return false;
                     }
-
-                    if (it->second.getBoundProjectionName() !=
-                        requiredProjections.at(distributionPartitionIndex)) {
-                        return false;
-                    }
-                    distributionPartitionIndex++;
                 }
 
                 return distributionPartitionIndex == requiredProjections.size();
