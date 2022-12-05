@@ -79,11 +79,24 @@ selector:
 executor:
   archive:
     tests: true
+    hooks:
+      - CheckReplDBHash
+      - CheckReplOplogs
+      - ValidateCollections
   config:
     shell_options:
       eval: |
         testingReplication = true;
         load('jstests/libs/override_methods/inject_security_token.js');
+  hooks:
+  # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+  # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+  # validating the entire contents of the collection.
+  - class: CheckReplOplogs
+  - class: CheckReplDBHash
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
   fixture:
     class: ReplicaSetFixture
     num_nodes: 3
