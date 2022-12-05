@@ -53,12 +53,22 @@ __rollback_delete_hs(WT_SESSION_IMPL *session, WT_ITEM *key, wt_timestamp_t ts)
     for (; ret == 0; ret = hs_cursor->prev(hs_cursor)) {
         /* Retrieve the time window from the history cursor. */
         __wt_hs_upd_time_window(hs_cursor, &hs_tw);
-        if (hs_tw->start_ts < ts)
+
+        /*
+         * Remove all history store versions with a stop timestamp greater than the start/stop
+         * timestamp of a stable update in the data store.
+         */
+        if (hs_tw->stop_ts <= ts)
             break;
 
         WT_ERR(hs_cursor->remove(hs_cursor));
         WT_STAT_CONN_DATA_INCR(session, txn_rts_hs_removed);
-        if (hs_tw->start_ts == ts)
+
+        /*
+         * The globally visible start time window's are cleared during history store reconciliation.
+         * Treat them also as a stable entry removal from the history store.
+         */
+        if (hs_tw->start_ts == ts || hs_tw->start_ts == WT_TS_NONE)
             WT_STAT_CONN_DATA_INCR(session, cache_hs_key_truncate_rts);
         else
             WT_STAT_CONN_DATA_INCR(session, cache_hs_key_truncate_rts_unstable);
