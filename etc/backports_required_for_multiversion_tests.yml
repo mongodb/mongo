@@ -228,6 +228,8 @@ last-continuous:
     ticket: SERVER-70190
   - test_file: jstests/core/cover_null_queries.js
     ticket: SERVER-70436
+  - test_file: jstests/replsets/wtimeout_too_large.js
+    ticket: SERVER-70360
   - test_file: jstests/sharding/all_collection_stats.js
     ticket: SERVER-71477
   - test_file: jstests/sharding/drop_collection.js
@@ -545,6 +547,8 @@ last-lts:
     ticket: SERVER-70190
   - test_file: jstests/core/cover_null_queries.js
     ticket: SERVER-70436
+  - test_file: jstests/replsets/wtimeout_too_large.js
+    ticket: SERVER-70360
   - test_file: jstests/sharding/all_collection_stats.js
     ticket: SERVER-71477
   - test_file: jstests/sharding/drop_collection.js

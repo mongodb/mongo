@@ -233,11 +233,18 @@ void serializeWriteConcernW(const WriteConcernW& w, StringData fieldName, BSONOb
 }
 
 std::int64_t parseWTimeoutFromBSON(BSONElement element) {
+    // Store wTimeout as a 64-bit value but functionally limit it to int32 as values larger than
+    // than that do not make much sense to use and were not previously supported.
     constexpr std::array<mongo::BSONType, 4> validTypes{
         NumberLong, NumberInt, NumberDecimal, NumberDouble};
     bool isValidType = std::any_of(
         validTypes.begin(), validTypes.end(), [&](auto type) { return element.type() == type; });
-    return isValidType ? element.safeNumberLong() : 0;
+
+    auto value = isValidType ? element.safeNumberLong() : 0;
+    uassert(ErrorCodes::FailedToParse,
+            "wtimeout must be a 32-bit integer",
+            value <= std::numeric_limits<int32_t>::max());
+    return value;
 }
 
 BSONObj WriteConcernOptions::toBSON() const {
