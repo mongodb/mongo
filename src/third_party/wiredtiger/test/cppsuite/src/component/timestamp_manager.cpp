@@ -158,7 +158,7 @@ timestamp_manager::get_valid_read_ts() const
 uint64_t
 timestamp_manager::get_time_now_s() const
 {
-    auto now = std::chrono::system_clock::now().time_since_epoch();
+    auto now = std::chrono::steady_clock::now().time_since_epoch();
     uint64_t current_time_s =
       static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::seconds>(now).count()) << 32;
     return (current_time_s);
