@@ -2463,6 +2463,8 @@ buildvariants:
       - name: bestbuy_agg_merge_different_db
       - name: bestbuy_agg_merge_same_db
       - name: bestbuy_agg_merge_wordcount
+      - name: bestbuy_4_analytics
+      - name: bestbuy_4_analytics_columnstore
       - name: bestbuy_query
       - name: cursor_manager
       - name: map_reduce_workloads
@@ -2472,6 +2474,7 @@ buildvariants:
       - name: tpch_10_normalized
       - name: tpch_10_denormalized
       - name: column_store_index_charts_events_1G
+      - name: ssb_column_store_comparison
 
   - name: linux-standalone-classic-query-engine.2022-11
     display_name: Linux Standalone (Classic Query Engine) 2022-11
