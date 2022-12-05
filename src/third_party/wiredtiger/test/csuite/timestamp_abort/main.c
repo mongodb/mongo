@@ -626,7 +626,7 @@ run_workload(void)
     if (!opts->compat && !opts->inmem)
         strcat(envconf, ENV_CONFIG_ADD_EVICT_DIRTY);
 
-    testutil_wiredtiger_open(opts, NULL, envconf, NULL, &conn, false);
+    testutil_wiredtiger_open(opts, NULL, envconf, NULL, &conn, false, false);
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
     /*
@@ -907,7 +907,7 @@ main(int argc, char *argv[])
     /*
      * Open the connection which forces recovery to be run.
      */
-    testutil_wiredtiger_open(opts, NULL, buf, &my_event, &conn, true);
+    testutil_wiredtiger_open(opts, NULL, buf, &my_event, &conn, true, false);
 
     printf("Connection open and recovery complete. Verify content\n");
     /* Sleep to guarantee the statistics thread has enough time to run. */

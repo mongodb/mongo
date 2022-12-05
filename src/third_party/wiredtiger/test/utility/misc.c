@@ -403,13 +403,14 @@ testutil_print_command_line(int argc, char *const *argv)
  */
 void
 testutil_wiredtiger_open(TEST_OPTS *opts, const char *home, const char *config,
-  WT_EVENT_HANDLER *event_handler, WT_CONNECTION **connectionp, bool rerun)
+  WT_EVENT_HANDLER *event_handler, WT_CONNECTION **connectionp, bool rerun, bool benchmarkrun)
 {
     char buf[1024], tiered_ext_cfg[512];
 
     if (opts->tiered_storage)
         testutil_check(__wt_snprintf(tiered_ext_cfg, sizeof(tiered_ext_cfg),
-          TESTUTIL_ENV_CONFIG_TIERED_EXT TESTUTIL_ENV_CONFIG_TIERED, opts->build_dir));
+          TESTUTIL_ENV_CONFIG_TIERED_EXT TESTUTIL_ENV_CONFIG_TIERED, opts->build_dir,
+          benchmarkrun ? 0 : 2));
 
     testutil_check(__wt_snprintf(buf, sizeof(buf), "%s%s%s%s", config,
       (rerun ? TESTUTIL_ENV_CONFIG_REC : ""), (opts->compat ? TESTUTIL_ENV_CONFIG_COMPAT : ""),

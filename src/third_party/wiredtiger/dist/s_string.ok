@@ -466,6 +466,7 @@ ThreadListWrapper
 Timespec
 Timestamp
 Timestamps
+Tput
 TryCV
 TxnID
 UDF
@@ -957,6 +958,7 @@ getline
 getone
 getones
 getopt
+getpid
 getraw
 gettime
 gettimeofday
@@ -1444,6 +1446,7 @@ snprintf
 sp
 spinlock
 spinlocks
+srand
 src
 srch
 ss
