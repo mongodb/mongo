@@ -31,7 +31,7 @@
 
 #include <benchmark/benchmark.h>
 
-#include "migration_chunk_cloner_source_legacy.h"
+#include "migration_chunk_cloner_source.h"
 
 namespace mongo {
 namespace {

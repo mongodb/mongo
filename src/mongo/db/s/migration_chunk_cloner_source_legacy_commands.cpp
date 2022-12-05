@@ -40,7 +40,7 @@
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/migration_chunk_cloner_source_legacy.h"
+#include "mongo/db/s/migration_chunk_cloner_source.h"
 #include "mongo/db/s/migration_source_manager.h"
 #include "mongo/db/write_concern.h"
 
@@ -80,9 +80,7 @@ public:
             auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
                 opCtx, *nss, CSRAcquisitionMode::kShared);
 
-            if (auto cloner = MigrationSourceManager::getCurrentCloner(*scopedCsr)) {
-                _chunkCloner = std::dynamic_pointer_cast<MigrationChunkClonerSourceLegacy,
-                                                         MigrationChunkClonerSource>(cloner);
+            if ((_chunkCloner = MigrationSourceManager::getCurrentCloner(*scopedCsr))) {
                 invariant(_chunkCloner);
             } else {
                 uasserted(ErrorCodes::IllegalOperation,
@@ -108,7 +106,7 @@ public:
         return _autoColl->getCollection();
     }
 
-    MigrationChunkClonerSourceLegacy* getCloner() const {
+    MigrationChunkClonerSource* getCloner() const {
         invariant(_chunkCloner);
         return _chunkCloner.get();
     }
@@ -118,7 +116,7 @@ private:
     boost::optional<AutoGetCollection> _autoColl;
 
     // Contains the active cloner for the namespace
-    std::shared_ptr<MigrationChunkClonerSourceLegacy> _chunkCloner;
+    std::shared_ptr<MigrationChunkClonerSource> _chunkCloner;
 };
 
 class InitialCloneCommand : public BasicCommand {

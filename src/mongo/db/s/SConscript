@@ -117,7 +117,6 @@ env.Library(
         'global_index/global_index_util.cpp',
         'global_index_crud_commands.idl',
         'metadata_manager.cpp',
-        'migration_chunk_cloner_source_legacy.cpp',
         'migration_chunk_cloner_source.cpp',
         'migration_coordinator_document.idl',
         'migration_recipient_recovery_document.idl',

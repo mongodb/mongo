@@ -25,7 +25,7 @@ const ns = dbName + "." + collName;
 const shardKeys = [-1, 1];
 
 // This number is chosen so that the chunks are considered 'large' as defined by
-// the MigrationChunkClonerSourceLegacy class. Currently, that class considers chunks containing
+// the MigrationChunkClonerSource class. Currently, that class considers chunks containing
 // more than the following number of documents as 'large':
 //    (13/10) * MaxChunkSize / avgRecSize (MaxChunkSize is 64MB by default)
 const numDocs = 10;

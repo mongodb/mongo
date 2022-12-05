@@ -33,7 +33,7 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/migration_chunk_cloner_source_legacy.h"
+#include "mongo/db/s/migration_chunk_cloner_source.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
@@ -64,9 +64,9 @@ const ConnectionString kRecipientConnStr =
                                      HostAndPort("RecipientHost2:1234"),
                                      HostAndPort("RecipientHost3:1234")});
 
-class MigrationChunkClonerSourceLegacyTest : public ShardServerTestFixture {
+class MigrationChunkClonerSourceTest : public ShardServerTestFixture {
 protected:
-    MigrationChunkClonerSourceLegacyTest() : ShardServerTestFixture(Options{}.useMockClock(true)) {}
+    MigrationChunkClonerSourceTest() : ShardServerTestFixture(Options{}.useMockClock(true)) {}
 
     void setUp() override {
         ShardServerTestFixture::setUp();
@@ -266,7 +266,7 @@ private:
     boost::optional<DBDirectClient> _client;
 };
 
-TEST_F(MigrationChunkClonerSourceLegacyTest, CorrectDocumentsFetched) {
+TEST_F(MigrationChunkClonerSourceTest, CorrectDocumentsFetched) {
     const std::vector<BSONObj> contents = {createCollectionDocument(99),
                                            createCollectionDocument(100),
                                            createCollectionDocument(199),
@@ -276,12 +276,12 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, CorrectDocumentsFetched) {
 
     const ShardsvrMoveRange req =
         createMoveRangeRequest(ChunkRange(BSON("X" << 100), BSON("X" << 200)));
-    MigrationChunkClonerSourceLegacy cloner(operationContext(),
-                                            req,
-                                            WriteConcernOptions(),
-                                            kShardKeyPattern,
-                                            kDonorConnStr,
-                                            kRecipientConnStr.getServers()[0]);
+    MigrationChunkClonerSource cloner(operationContext(),
+                                      req,
+                                      WriteConcernOptions(),
+                                      kShardKeyPattern,
+                                      kDonorConnStr,
+                                      kRecipientConnStr.getServers()[0]);
 
     {
         auto futureStartClone = launchAsync([&]() {
@@ -380,7 +380,7 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, CorrectDocumentsFetched) {
 }
 
 
-TEST_F(MigrationChunkClonerSourceLegacyTest, RemoveDuplicateDocuments) {
+TEST_F(MigrationChunkClonerSourceTest, RemoveDuplicateDocuments) {
     const std::vector<BSONObj> contents = {createCollectionDocument(100),
                                            createCollectionDocument(199)};
 
@@ -388,12 +388,12 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, RemoveDuplicateDocuments) {
 
     const ShardsvrMoveRange req =
         createMoveRangeRequest(ChunkRange(BSON("X" << 100), BSON("X" << 200)));
-    MigrationChunkClonerSourceLegacy cloner(operationContext(),
-                                            req,
-                                            WriteConcernOptions(),
-                                            kShardKeyPattern,
-                                            kDonorConnStr,
-                                            kRecipientConnStr.getServers()[0]);
+    MigrationChunkClonerSource cloner(operationContext(),
+                                      req,
+                                      WriteConcernOptions(),
+                                      kShardKeyPattern,
+                                      kDonorConnStr,
+                                      kRecipientConnStr.getServers()[0]);
 
     {
         auto futureStartClone = launchAsync([&]() {
@@ -476,19 +476,19 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, RemoveDuplicateDocuments) {
 }
 
 
-TEST_F(MigrationChunkClonerSourceLegacyTest, OneLargeDocumentTransferMods) {
+TEST_F(MigrationChunkClonerSourceTest, OneLargeDocumentTransferMods) {
     const std::vector<BSONObj> contents = {createCollectionDocument(1)};
 
     createShardedCollection(contents);
 
     const ShardsvrMoveRange req =
         createMoveRangeRequest(ChunkRange(BSON("X" << 1), BSON("X" << 100)));
-    MigrationChunkClonerSourceLegacy cloner(operationContext(),
-                                            req,
-                                            WriteConcernOptions(),
-                                            kShardKeyPattern,
-                                            kDonorConnStr,
-                                            kRecipientConnStr.getServers()[0]);
+    MigrationChunkClonerSource cloner(operationContext(),
+                                      req,
+                                      WriteConcernOptions(),
+                                      kShardKeyPattern,
+                                      kDonorConnStr,
+                                      kRecipientConnStr.getServers()[0]);
 
     {
         auto futureStartClone = launchAsync([&]() {
@@ -539,19 +539,19 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, OneLargeDocumentTransferMods) {
     futureCommit.default_timed_get();
 }
 
-TEST_F(MigrationChunkClonerSourceLegacyTest, ManySmallDocumentsTransferMods) {
+TEST_F(MigrationChunkClonerSourceTest, ManySmallDocumentsTransferMods) {
     const std::vector<BSONObj> contents = {createCollectionDocument(1)};
 
     createShardedCollection(contents);
 
     const ShardsvrMoveRange req =
         createMoveRangeRequest(ChunkRange(BSON("X" << 1), BSON("X" << 1000000)));
-    MigrationChunkClonerSourceLegacy cloner(operationContext(),
-                                            req,
-                                            WriteConcernOptions(),
-                                            kShardKeyPattern,
-                                            kDonorConnStr,
-                                            kRecipientConnStr.getServers()[0]);
+    MigrationChunkClonerSource cloner(operationContext(),
+                                      req,
+                                      WriteConcernOptions(),
+                                      kShardKeyPattern,
+                                      kDonorConnStr,
+                                      kRecipientConnStr.getServers()[0]);
 
     {
         auto futureStartClone = launchAsync([&]() {
@@ -617,21 +617,21 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, ManySmallDocumentsTransferMods) {
     futureCommit.default_timed_get();
 }
 
-TEST_F(MigrationChunkClonerSourceLegacyTest, CollectionNotFound) {
+TEST_F(MigrationChunkClonerSourceTest, CollectionNotFound) {
     const ShardsvrMoveRange req =
         createMoveRangeRequest(ChunkRange(BSON("X" << 100), BSON("X" << 200)));
-    MigrationChunkClonerSourceLegacy cloner(operationContext(),
-                                            req,
-                                            WriteConcernOptions(),
-                                            kShardKeyPattern,
-                                            kDonorConnStr,
-                                            kRecipientConnStr.getServers()[0]);
+    MigrationChunkClonerSource cloner(operationContext(),
+                                      req,
+                                      WriteConcernOptions(),
+                                      kShardKeyPattern,
+                                      kDonorConnStr,
+                                      kRecipientConnStr.getServers()[0]);
 
     ASSERT_NOT_OK(cloner.startClone(operationContext(), UUID::gen(), _lsid, _txnNumber));
     cloner.cancelClone(operationContext());
 }
 
-TEST_F(MigrationChunkClonerSourceLegacyTest, ShardKeyIndexNotFound) {
+TEST_F(MigrationChunkClonerSourceTest, ShardKeyIndexNotFound) {
     {
         OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
             operationContext());
@@ -641,18 +641,18 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, ShardKeyIndexNotFound) {
 
     const ShardsvrMoveRange req =
         createMoveRangeRequest(ChunkRange(BSON("X" << 100), BSON("X" << 200)));
-    MigrationChunkClonerSourceLegacy cloner(operationContext(),
-                                            req,
-                                            WriteConcernOptions(),
-                                            kShardKeyPattern,
-                                            kDonorConnStr,
-                                            kRecipientConnStr.getServers()[0]);
+    MigrationChunkClonerSource cloner(operationContext(),
+                                      req,
+                                      WriteConcernOptions(),
+                                      kShardKeyPattern,
+                                      kDonorConnStr,
+                                      kRecipientConnStr.getServers()[0]);
 
     ASSERT_NOT_OK(cloner.startClone(operationContext(), UUID::gen(), _lsid, _txnNumber));
     cloner.cancelClone(operationContext());
 }
 
-TEST_F(MigrationChunkClonerSourceLegacyTest, FailedToEngageRecipientShard) {
+TEST_F(MigrationChunkClonerSourceTest, FailedToEngageRecipientShard) {
     const std::vector<BSONObj> contents = {createCollectionDocument(99),
                                            createCollectionDocument(100),
                                            createCollectionDocument(199),
@@ -662,12 +662,12 @@ TEST_F(MigrationChunkClonerSourceLegacyTest, FailedToEngageRecipientShard) {
 
     const ShardsvrMoveRange req =
         createMoveRangeRequest(ChunkRange(BSON("X" << 100), BSON("X" << 200)));
-    MigrationChunkClonerSourceLegacy cloner(operationContext(),
-                                            req,
-                                            WriteConcernOptions(),
-                                            kShardKeyPattern,
-                                            kDonorConnStr,
-                                            kRecipientConnStr.getServers()[0]);
+    MigrationChunkClonerSource cloner(operationContext(),
+                                      req,
+                                      WriteConcernOptions(),
+                                      kShardKeyPattern,
+                                      kDonorConnStr,
+                                      kRecipientConnStr.getServers()[0]);
 
     {
         auto futureStartClone = launchAsync([&]() {
