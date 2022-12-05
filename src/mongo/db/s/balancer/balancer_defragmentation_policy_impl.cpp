@@ -520,6 +520,14 @@ public:
                     moveRequest.chunkToMove->busyInOperation = false;
                     moveRequest.chunkToMergeWith->busyInOperation = false;
 
+                    if (migrationResponse.code() == ErrorCodes::ChunkTooBig ||
+                        migrationResponse.code() == ErrorCodes::ExceededMemoryLimit) {
+                        // Never try moving this chunk again, it isn't actually small
+                        _removeIteratorFromSmallChunks(moveRequest.chunkToMove,
+                                                       moveRequest.chunkToMove->shard);
+                        return;
+                    }
+
                     if (isRetriableForDefragmentation(migrationResponse)) {
                         // The migration will be eventually retried
                         return;
@@ -710,7 +718,7 @@ private:
                                chunkToMove->range.getMin(),
                                chunkToMove->range.getMax(),
                                version,
-                               ForceJumbo::kForceBalancer,
+                               ForceJumbo::kDoNotForce,
                                maxChunkSizeBytes);
         }
 
