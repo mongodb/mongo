@@ -178,7 +178,7 @@ function assertDiffPercentage(actual, expected, maxPercentage) {
 function testQuerySampling(dbName, collNameNotSampled, collNameSampled) {
     const sampledNs = dbName + "." + collNameSampled;
     const sampleRate = 5;
-    const durationSecs = 60;
+    const durationSecs = 90;
 
     assert.commandWorked(
         st.s.adminCommand({configureQueryAnalyzer: sampledNs, mode: "full", sampleRate}));
