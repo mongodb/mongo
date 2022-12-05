@@ -91,7 +91,11 @@ env.Library(
     ],
 )
 
-env.Library(
+fleCryptoEnv = env.Clone()
+fleCryptoEnv.InjectThirdParty(libraries=['libmongocrypt'])
+fleCryptoEnv.InjectThirdParty(libraries=['libbson'])
+
+fleCryptoEnv.Library(
     target="fle_crypto",
     source=[
         "encryption_fields_util.cpp",
@@ -108,6 +112,7 @@ env.Library(
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/db/exec/document_value/document_value',
         '$BUILD_DIR/mongo/db/query/query_knobs',
+        '$BUILD_DIR/third_party/shim_libmongocrypt',
         'aead_encryption',
         'encrypted_field_config',
         'fle_fields',

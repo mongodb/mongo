@@ -191,16 +191,24 @@ if not use_system_version_of_library('libbson'):
 if not use_system_version_of_library('libmongocrypt'):
 
     platform_directory = "build_linux"
+    crypto_directory = "build_libcrypto"
+
     if env.TargetOSIs('windows'):
         platform_directory = "build_windows"
+        crypto_directory = "build_cng"
     elif env.TargetOSIs('darwin'):
         platform_directory = "build_osx"
+        crypto_directory = "build_commoncrypto"
+
+    if get_option('ssl') == 'off':
+        crypto_directory = "build_none"
 
     thirdPartyEnvironmentModifications['libmongocrypt'] = {
         'CPPPATH': [
             '#/src/third_party/libmongocrypt/dist/src',
             '#/src/third_party/libmongocrypt/dist/kms-message/src',
             '#/src/third_party/libmongocrypt/' + platform_directory,
+            '#/src/third_party/libmongocrypt/' + crypto_directory,
         ],
         'CPPDEFINES': [
             'KMS_MSG_STATIC',
@@ -617,33 +625,31 @@ else:
 icuEnv.ShimLibrary(name="icu", )
 
 libbsonEnv = env.Clone()
-if get_option('ssl') == 'on':
-    if use_system_version_of_library("libbson"):
-        libbsonEnv = libbsonEnv.Clone(SYSLIBDEPS=[
-            env['LIBDEPS_LIBBSON_SYSLIBDEP'],
-        ])
-    else:
-        libbsonEnv = libbsonEnv.Clone()
-        libbsonEnv.InjectThirdParty(libraries=['libbson'])
-        libbsonEnv.SConscript('libbson/SConscript', exports={'env': libbsonEnv})
-        libbsonEnv = libbsonEnv.Clone(LIBDEPS_INTERFACE=[
-            'libbson/libbson',
-        ])
+if use_system_version_of_library("libbson"):
+    libbsonEnv = libbsonEnv.Clone(SYSLIBDEPS=[
+        env['LIBDEPS_LIBBSON_SYSLIBDEP'],
+    ])
+else:
+    libbsonEnv = libbsonEnv.Clone()
+    libbsonEnv.InjectThirdParty(libraries=['libbson'])
+    libbsonEnv.SConscript('libbson/SConscript', exports={'env': libbsonEnv})
+    libbsonEnv = libbsonEnv.Clone(LIBDEPS_INTERFACE=[
+        'libbson/libbson',
+    ])
 
-    libbsonEnv.ShimLibrary(name="libbson", )
+libbsonEnv.ShimLibrary(name="libbson", )
 
 mcEnv = env.Clone()
-if get_option('ssl') == 'on':
-    if use_system_version_of_library("libmongocrypt"):
-        mcEnv = mcEnv.Clone(SYSLIBDEPS=[
-            env['LIBDEPS_LIBMONGOCRYPT_SYSLIBDEP'],
-        ])
-    else:
-        mcEnv = mcEnv.Clone()
-        mcEnv.InjectThirdParty(libraries=['libmongocrypt'])
-        mcEnv.SConscript('libmongocrypt/SConscript', exports={'env': mcEnv})
-        mcEnv = mcEnv.Clone(LIBDEPS_INTERFACE=[
-            'libmongocrypt/libmongocrypt',
-        ])
+if use_system_version_of_library("libmongocrypt"):
+    mcEnv = mcEnv.Clone(SYSLIBDEPS=[
+        env['LIBDEPS_LIBMONGOCRYPT_SYSLIBDEP'],
+    ])
+else:
+    mcEnv = mcEnv.Clone()
+    mcEnv.InjectThirdParty(libraries=['libmongocrypt'])
+    mcEnv.SConscript('libmongocrypt/SConscript', exports={'env': mcEnv})
+    mcEnv = mcEnv.Clone(LIBDEPS_INTERFACE=[
+        'libmongocrypt/libmongocrypt',
+    ])
 
-    mcEnv.ShimLibrary(name="libmongocrypt", )
+mcEnv.ShimLibrary(name="libmongocrypt", )

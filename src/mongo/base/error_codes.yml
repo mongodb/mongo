@@ -507,6 +507,7 @@ error_codes:
     - {code: 387, name: EncounteredFLEPayloadWhileRedacting}
 
     - {code: 388, name: TransactionTooLargeForCache}
+    - {code: 389, name: LibmongocryptError}
 
     # Error codes 4000-8999 are reserved.
 

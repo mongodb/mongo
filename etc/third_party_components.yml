@@ -199,7 +199,7 @@ components:
     local_directory_path: src/third_party/unwind
     team_owner: "Service Architecture"
 
-  mongo-c-driver:
+  "MongoDB C Driver":
     homepage_url: https://github.com/mongodb/mongo-c-driver
     open_hub_url: https://www.openhub.net/p/mongo-c-driver
     release_monitoring_id: 10712

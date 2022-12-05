@@ -1,6 +1,9 @@
 # -*- mode: python; -*-
-Import("env")
-Import("endian")
+Import([
+    "endian",
+    "env",
+    'get_option',
+])
 
 env = env.Clone()
 
@@ -44,39 +47,46 @@ for to_remove in [('_GNU_SOURCE', )]:
 
 additional_sources = []
 
-if env.TargetOSIs('windows'):
+if get_option('ssl') == 'off':
+    env.Append(CPPDEFINES=['MONGOCRYPT_ENABLE_CRYPTO'])
+    additional_sources.append([
+        'dist/kms-message/src/kms_crypto_none.c',
+        'dist/src/crypto/none.c',
+    ])
+elif env.TargetOSIs('windows'):
     env.Append(CPPDEFINES=['KMS_MESSAGE_ENABLE_CRYPTO_CNG'])
     additional_sources.append([
         'dist/kms-message/src/kms_crypto_windows.c',
         'dist/src/crypto/cng.c',
-        'dist/src/os_win/os_dll.c',
-        'dist/src/os_win/os_mutex.c',
     ])
-    # Disable warnings about deprecated functions
-    env.Append(CFLAGS=['/wd4996'])
 elif env.TargetOSIs('darwin'):
-    env.Append(CPPDEFINES=['KMS_MESSAGE_ENABLE_CRYPTO_COMMON_CRYPTO', 'MLIB_HAVE_STRINGS_H'])
+    env.Append(CPPDEFINES=['KMS_MESSAGE_ENABLE_CRYPTO_COMMON_CRYPTO'])
     additional_sources.append([
         'dist/kms-message/src/kms_crypto_apple.c',
         'dist/src/crypto/commoncrypto.c',
     ])
 else:
-    env.Append(CPPDEFINES=['KMS_MESSAGE_ENABLE_CRYPTO_LIBCRYPTO', 'MLIB_HAVE_STRINGS_H'])
+    env.Append(CPPDEFINES=['KMS_MESSAGE_ENABLE_CRYPTO_LIBCRYPTO'])
     additional_sources.append([
         'dist/kms-message/src/kms_crypto_libcrypto.c',
         'dist/src/crypto/libcrypto.c',
     ])
 
 if not env.TargetOSIs('windows'):
+    env.Append(CPPDEFINES=['MLIB_HAVE_STRINGS_H'])
+
     additional_sources.append([
         'dist/src/os_posix/os_dll.c',
         'dist/src/os_posix/os_mutex.c',
     ])
-
-if env.TargetOSIs('windows'):
-    env.Append(CPPPATH=["build_windows"])
 else:
-    env.Append(CPPPATH=["build_posix"])
+    additional_sources.append([
+        'dist/src/os_win/os_dll.c',
+        'dist/src/os_win/os_mutex.c',
+    ])
+
+    # Disable warnings about deprecated functions
+    env.Append(CFLAGS=['/wd4996'])
 
 env.Library(
     target="libmongocrypt",

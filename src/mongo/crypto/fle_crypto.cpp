@@ -47,6 +47,12 @@
 #include <variant>
 #include <vector>
 
+extern "C" {
+#include <mc-fle2-payload-iev-private.h>
+#include <mongocrypt-buffer-private.h>
+#include <mongocrypt.h>
+}
+
 #include "mongo/base/data_builder.h"
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_range_cursor.h"
@@ -74,12 +80,15 @@
 #include "mongo/db/basic_types_gen.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 // Optional defines to help with debugging
 //
@@ -151,6 +160,219 @@ constexpr auto kDebugValueCount = "_debug_value_count";
 constexpr auto kDebugValueStart = "_debug_value_start";
 constexpr auto kDebugValueEnd = "_debug_value_end";
 #endif
+
+namespace libmongocrypt_support_detail {
+
+template <typename T>
+using libmongocrypt_deleter_func = void(T*);
+
+template <typename T, libmongocrypt_deleter_func<T> DelFunc>
+struct LibMongoCryptDeleter {
+    void operator()(T* ptr) {
+        if (ptr) {
+            DelFunc(ptr);
+        }
+    }
+};
+
+template <typename T, libmongocrypt_deleter_func<T> DelFunc>
+using libmongocrypt_unique_ptr = std::unique_ptr<T, LibMongoCryptDeleter<T, DelFunc>>;
+
+}  // namespace libmongocrypt_support_detail
+
+using UniqueMongoCrypt =
+    libmongocrypt_support_detail::libmongocrypt_unique_ptr<mongocrypt_t, mongocrypt_destroy>;
+
+using UniqueMongoCryptCtx =
+    libmongocrypt_support_detail::libmongocrypt_unique_ptr<mongocrypt_ctx_t,
+                                                           mongocrypt_ctx_destroy>;
+
+/**
+ * C++ friendly wrapper around libmongocrypt's public mongocrypt_status_t* and its associated
+ * functions.
+ */
+class MongoCryptStatus {
+public:
+    ~MongoCryptStatus() {
+        mongocrypt_status_destroy(_status);
+    }
+
+    MongoCryptStatus(MongoCryptStatus&) = delete;
+    MongoCryptStatus(MongoCryptStatus&&) = delete;
+
+    static MongoCryptStatus create() {
+        return MongoCryptStatus(mongocrypt_status_new());
+    }
+
+    /**
+     * Get the error category for the status.
+     */
+    mongocrypt_status_type_t getType() {
+        return mongocrypt_status_type(_status);
+    }
+
+    /**
+     * Get a libmongocrypt specific error code
+     */
+    uint32_t getCode() {
+        return mongocrypt_status_code(_status);
+    }
+
+    /**
+     * Returns true if there are no errors
+     */
+    bool isOk() {
+        return mongocrypt_status_ok(_status);
+    }
+
+    operator mongocrypt_status_t*() {
+        return _status;
+    }
+
+    /**
+     * Convert a mongocrypt_status_t to a mongo::Status.
+     */
+    Status toStatus() {
+        if (getType() == MONGOCRYPT_STATUS_OK) {
+            return Status::OK();
+        }
+
+        uint32_t len;
+        StringData errorPrefix;
+        switch (getType()) {
+            case MONGOCRYPT_STATUS_ERROR_CLIENT: {
+                errorPrefix = "Client Error: "_sd;
+                break;
+            }
+            case MONGOCRYPT_STATUS_ERROR_KMS: {
+                errorPrefix = "Kms Error: "_sd;
+                break;
+            }
+            case MONGOCRYPT_STATUS_ERROR_CRYPT_SHARED: {
+                errorPrefix = "Crypt Shared  Error: "_sd;
+                break;
+            }
+            default: {
+                errorPrefix = "Unexpected Error: "_sd;
+                break;
+            }
+        }
+
+        return Status(ErrorCodes::LibmongocryptError,
+                      str::stream() << errorPrefix << mongocrypt_status_message(_status, &len));
+    }
+
+private:
+    explicit MongoCryptStatus(mongocrypt_status_t* status) : _status(status) {}
+
+private:
+    mongocrypt_status_t* _status;
+};
+
+/**
+ * C++ friendly wrapper around libmongocrypt's public mongocrypt_binary_t* and its associated
+ * functions.
+ *
+ * mongocrypt_binary_t* is a view type. Callers must ensure the data has a valid lifetime.
+ */
+class MongoCryptBinary {
+public:
+    ~MongoCryptBinary() {
+        mongocrypt_binary_destroy(_binary);
+    }
+
+    MongoCryptBinary(MongoCryptBinary&) = delete;
+    MongoCryptBinary(MongoCryptBinary&&) = delete;
+
+    static MongoCryptBinary create() {
+        return MongoCryptBinary(mongocrypt_binary_new());
+    }
+
+    static MongoCryptBinary createFromCDR(ConstDataRange cdr) {
+        return MongoCryptBinary(mongocrypt_binary_new_from_data(
+            const_cast<uint8_t*>(cdr.data<uint8_t>()), cdr.length()));
+    }
+
+    static MongoCryptBinary createFromBSONObj(const BSONObj& obj) {
+        return MongoCryptBinary(mongocrypt_binary_new_from_data(
+            const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(obj.objdata())), obj.objsize()));
+    }
+
+    uint32_t length() {
+        return mongocrypt_binary_len(_binary);
+    }
+
+    uint8_t* data() {
+        return mongocrypt_binary_data(_binary);
+    }
+
+    ConstDataRange toCDR() {
+        return ConstDataRange(data(), length());
+    }
+
+    /**
+     * Callers responsibility to call getOwned() if needed as this is a view on underlying data
+     */
+    BSONObj toBSON() {
+        return BSONObj(reinterpret_cast<const char*>(data()));
+    }
+
+    operator mongocrypt_binary_t*() {
+        return _binary;
+    }
+
+private:
+    explicit MongoCryptBinary(mongocrypt_binary_t* binary) : _binary(binary) {}
+
+private:
+    mongocrypt_binary_t* _binary;
+};
+
+/**
+ * C++ friendly wrapper around libmongocrypt's private _mongocrypt_buffer_t and its associated
+ * functions.
+ *
+ * This class may or may not own data.
+ */
+class MongoCryptBuffer {
+public:
+    MongoCryptBuffer() {
+        _mongocrypt_buffer_init(&_buffer);
+    }
+
+    MongoCryptBuffer(ConstDataRange cdr) {
+        _mongocrypt_buffer_init(&_buffer);
+
+        _buffer.data = const_cast<uint8_t*>(cdr.data<uint8_t>());
+        _buffer.len = cdr.length();
+    }
+
+    ~MongoCryptBuffer() {
+        _mongocrypt_buffer_cleanup(&_buffer);
+    }
+
+    MongoCryptBuffer(MongoCryptBuffer&) = delete;
+    MongoCryptBuffer(MongoCryptBuffer&&) = delete;
+
+    uint32_t length() {
+        return _buffer.len;
+    }
+
+    uint8_t* data() {
+        return _buffer.data;
+    }
+
+    bool empty() {
+        return _mongocrypt_buffer_empty(&_buffer);
+    }
+
+    ConstDataRange toCDR() {
+        return ConstDataRange(data(), length());
+    }
+
+private:
+    _mongocrypt_buffer_t _buffer;
+};
 
 using UUIDBuf = std::array<uint8_t, UUID::kNumBytes>;
 
