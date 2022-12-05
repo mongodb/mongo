@@ -203,12 +203,7 @@ class test_rollback_to_stable01(test_rollback_to_stable_base):
         ('prepare', dict(prepare=True))
     ]
 
-    dryrun_values = [
-        ('no_dryrun', dict(dryrun=False)),
-        ('dryrun', dict(dryrun=True)),
-    ]
-
-    scenarios = make_scenarios(format_values, in_memory_values, prepare_values, dryrun_values)
+    scenarios = make_scenarios(format_values, in_memory_values, prepare_values)
 
     def conn_config(self):
         config = 'cache_size=50MB,statistics=(all)'
@@ -253,13 +248,10 @@ class test_rollback_to_stable01(test_rollback_to_stable_base):
         if not self.in_memory:
             self.session.checkpoint()
 
-        self.conn.rollback_to_stable("dryrun={}".format("true" if self.dryrun else "false"))
+        self.conn.rollback_to_stable()
         # Check that the new updates are only seen after the update timestamp.
         self.session.breakpoint()
-        if self.dryrun:
-            self.check(0, uri, nrows if self.value_format == '8t' else 0, None, 20)
-        else:
-            self.check(valuea, uri, nrows, None, 20)
+        self.check(valuea, uri, nrows, None, 20)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         calls = stat_cursor[stat.conn.txn_rts][2]
@@ -273,9 +265,7 @@ class test_rollback_to_stable01(test_rollback_to_stable_base):
         self.assertEqual(calls, 1)
         self.assertEqual(hs_removed, 0)
         self.assertEqual(keys_removed, 0)
-        if self.dryrun:
-            self.assertEqual(upd_aborted, 0)
-        elif self.in_memory:
+        if self.in_memory:
             self.assertEqual(upd_aborted, nrows)
         else:
             self.assertEqual(upd_aborted + keys_restored, nrows)

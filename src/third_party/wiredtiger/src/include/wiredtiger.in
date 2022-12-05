@@ -2646,10 +2646,7 @@ struct __wt_connection {
 	 * @snippet ex_all.c rollback to stable
 	 *
 	 * @param connection the connection handle
-	 * @configstart{WT_CONNECTION.rollback_to_stable, see dist/api_data.py}
-	 * @config{dryrun, perform the checks associated with RTS\, but don't modify any data., a
-	 * boolean flag; default \c false.}
-	 * @configend
+	 * @configempty{WT_CONNECTION.rollback_to_stable, see dist/api_data.py}
 	 * @errors
 	 * An error should occur only in the case of a system problem, and an application typically
 	 * will retry WT_CONNECTION::rollback_to_stable on error, or fail outright.

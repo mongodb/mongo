@@ -62,12 +62,7 @@ class test_rollback_to_stable02(test_rollback_to_stable_base):
         ('prepare', dict(prepare=True))
     ]
 
-    dryrun_values = [
-        ('no_dryrun', dict(dryrun=False)),
-        ('dryrun', dict(dryrun=True))
-    ]
-
-    scenarios = make_scenarios(format_values, in_memory_values, prepare_values, dryrun_values)
+    scenarios = make_scenarios(format_values, in_memory_values, prepare_values)
 
     def conn_config(self):
         config = 'cache_size=100MB,statistics=(all)'
@@ -127,15 +122,10 @@ class test_rollback_to_stable02(test_rollback_to_stable_base):
         if not self.in_memory:
             self.session.checkpoint()
 
-        self.conn.rollback_to_stable('dryrun={}'.format('true' if self.dryrun else 'false'))
+        self.conn.rollback_to_stable()
         # Check that the new updates are only seen after the update timestamp.
         self.session.breakpoint()
-
-        if self.dryrun:
-            self.check(valued, uri, nrows, None, 40)
-        else:
-            self.check(valueb, uri, nrows, None, 40)
-
+        self.check(valueb, uri, nrows, None, 40)
         self.check(valueb, uri, nrows, None, 20)
         self.check(valuea, uri, nrows, None, 10)
 
@@ -152,11 +142,7 @@ class test_rollback_to_stable02(test_rollback_to_stable_base):
         self.assertEqual(keys_removed, 0)
         self.assertEqual(keys_restored, 0)
         self.assertGreater(pages_visited, 0)
-
-        if self.dryrun:
-            self.assertEqual(upd_aborted, 0)
-        else:
-            self.assertGreaterEqual(upd_aborted, nrows * 2)
+        self.assertGreaterEqual(upd_aborted, nrows * 2)
 
 if __name__ == '__main__':
     wttest.run()

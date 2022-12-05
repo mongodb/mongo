@@ -48,12 +48,7 @@ class test_rollback_to_stable13(test_rollback_to_stable_base):
         ('prepare', dict(prepare=True))
     ]
 
-    dryrun_values = [
-        ('no_dryrun', dict(dryrun=False)),
-        ('dryrun', dict(dryrun=True)),
-    ]
-
-    scenarios = make_scenarios(format_values, prepare_values, dryrun_values)
+    scenarios = make_scenarios(format_values, prepare_values)
 
     def conn_config(self):
         config = 'cache_size=50MB,statistics=(all)'
@@ -304,9 +299,9 @@ class test_rollback_to_stable13(test_rollback_to_stable_base):
         self.check(None, uri, 0, nrows, 41 if self.prepare else 40)
         self.check(value_c, uri, nrows, None, 61 if self.prepare else 60)
 
-        self.conn.rollback_to_stable("dryrun={}".format("true" if self.dryrun else "false"))
+        self.conn.rollback_to_stable()
         # Perform several updates and checkpoint.
-        self.large_updates(uri, value_c, ds, nrows, self.prepare, 65 if self.dryrun else 60)
+        self.large_updates(uri, value_c, ds, nrows, self.prepare, 60)
         self.session.checkpoint()
         # Simulate a server crash and restart.
         simulate_crash_restart(self, ".", "RESTART")
@@ -316,6 +311,4 @@ class test_rollback_to_stable13(test_rollback_to_stable_base):
         self.check(value_a, uri, nrows, None, 20)
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         restored_tombstones = stat_cursor[stat.conn.txn_rts_hs_restore_tombstones][2]
-
-        # Unchanged due to shutdown/startup RTS.
         self.assertEqual(restored_tombstones, nrows)
