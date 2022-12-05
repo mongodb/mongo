@@ -40,6 +40,27 @@ __rec_update_save(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, WT_
 }
 
 /*
+ * __rec_delete_hs_upd_save --
+ *     Save an update into a WT_DELETE_HS_UPD list to delete it from the history store later.
+ */
+static inline int
+__rec_delete_hs_upd_save(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, WT_ROW *rip,
+  WT_UPDATE *upd, WT_UPDATE *tombstone)
+{
+    WT_DELETE_HS_UPD *delete_hs_upd;
+
+    WT_RET(__wt_realloc_def(
+      session, &r->delete_hs_upd_allocated, r->delete_hs_upd_next + 1, &r->delete_hs_upd));
+    delete_hs_upd = &r->delete_hs_upd[r->delete_hs_upd_next];
+    delete_hs_upd->ins = ins;
+    delete_hs_upd->rip = rip;
+    delete_hs_upd->upd = upd;
+    delete_hs_upd->tombstone = tombstone;
+    ++r->delete_hs_upd_next;
+    return (0);
+}
+
+/*
  * __rec_append_orig_value --
  *     Append the key's original value to its update list. It assumes that we have an onpage value,
  *     the onpage value is not a prepared update, and we don't overwrite transaction id to
@@ -182,6 +203,45 @@ err:
 }
 
 /*
+ * __rec_find_and_save_delete_hs_upd --
+ *     Find and save the update that needs to be deleted from the history store later
+ */
+static int
+__rec_find_and_save_delete_hs_upd(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins,
+  WT_ROW *rip, WT_UPDATE_SELECT *upd_select)
+{
+    WT_UPDATE *delete_tombstone, *delete_upd;
+
+    delete_tombstone = NULL;
+
+    for (delete_upd = upd_select->tombstone != NULL ? upd_select->tombstone : upd_select->upd;
+         delete_upd != NULL; delete_upd = delete_upd->next) {
+        if (delete_upd->txnid == WT_TXN_ABORTED)
+            continue;
+
+        if (F_ISSET(delete_upd, WT_UPDATE_TO_DELETE_FROM_HS)) {
+            /*
+             * If we want to remove an update from the history store in WiredTiger, it must be in
+             * history store.
+             */
+            WT_ASSERT(session, F_ISSET(delete_upd, WT_UPDATE_HS | WT_UPDATE_RESTORED_FROM_HS));
+            if (delete_upd->type == WT_UPDATE_TOMBSTONE)
+                delete_tombstone = delete_upd;
+            else {
+                WT_RET(
+                  __rec_delete_hs_upd_save(session, r, ins, rip, delete_upd, delete_tombstone));
+                break;
+            }
+        }
+    }
+
+    /* If we delete a tombstone from the history store, we must also delete the update. */
+    WT_ASSERT(session, delete_tombstone == NULL || delete_upd != NULL);
+
+    return (0);
+}
+
+/*
  * __rec_need_save_upd --
  *     Return if we need to save the update chain
  */
@@ -189,8 +249,6 @@ static inline bool
 __rec_need_save_upd(
   WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_UPDATE_SELECT *upd_select, bool has_newer_updates)
 {
-    WT_UPDATE *upd;
-
     if (upd_select->tw.prepare)
         return (true);
 
@@ -200,15 +258,6 @@ __rec_need_save_upd(
     /* No need to save the update chain if we want to delete the key from the disk image. */
     if (upd_select->upd != NULL && upd_select->upd->type == WT_UPDATE_TOMBSTONE)
         return (false);
-
-    /* Save the update chain to delete the update from the history store later. */
-    for (upd = upd_select->upd; upd != NULL; upd = upd->next) {
-        if (upd->txnid == WT_TXN_ABORTED)
-            continue;
-
-        if (F_ISSET(upd, WT_UPDATE_TO_DELETE_FROM_HS))
-            return (true);
-    }
 
     /*
      * Don't save updates for any reconciliation that doesn't involve history store (in-memory
@@ -294,15 +343,10 @@ __rec_validate_upd_chain(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_UPDATE *s
     if (!F_ISSET(r, WT_REC_CHECKPOINT_RUNNING))
         return (0);
 
-    for (upd = select_upd; upd != NULL; upd = upd->next) {
-        if (upd->txnid == WT_TXN_ABORTED)
-            continue;
-
-        /* Cannot delete the update from history store when checkpoint is running. */
-        if (F_ISSET(upd, WT_UPDATE_TO_DELETE_FROM_HS)) {
-            WT_STAT_CONN_DATA_INCR(session, cache_eviction_blocked_remove_hs_race_with_checkpoint);
-            return (EBUSY);
-        }
+    /* Cannot delete the update from history store when checkpoint is running. */
+    if (r->delete_hs_upd_next > 0) {
+        WT_STAT_CONN_DATA_INCR(session, cache_eviction_blocked_remove_hs_race_with_checkpoint);
+        return (EBUSY);
     }
 
     /*
@@ -415,6 +459,7 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, W
      * both must be initialized.
      */
     upd_select->upd = NULL;
+    upd_select->tombstone = NULL;
     upd_select->upd_saved = false;
     upd_select->ooo_tombstone = false;
     select_tw = &upd_select->tw;
@@ -608,7 +653,7 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, W
          */
         if (upd->type == WT_UPDATE_TOMBSTONE) {
             WT_TIME_WINDOW_SET_STOP(select_tw, upd);
-            tombstone = upd;
+            tombstone = upd_select->tombstone = upd;
 
             /* Find the update this tombstone applies to. */
             if (!__wt_txn_upd_visible_all(session, upd)) {
@@ -711,6 +756,13 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, W
       NULL :
       upd_select->upd;
 
+    /*
+     * If we have done a prepared rollback, we may have restored a history store value to the update
+     * chain but the same value is left in the history store. Save it to delete it from the history
+     * store later.
+     */
+    WT_RET(__rec_find_and_save_delete_hs_upd(session, r, ins, rip, upd_select));
+
     /* Check the update chain for conditions that could prevent it's eviction. */
     WT_RET(__rec_validate_upd_chain(session, r, onpage_upd, select_tw, vpack));
 
@@ -752,7 +804,7 @@ __wt_rec_upd_select(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins, W
         /* Catch this case in diagnostic builds. */
         WT_STAT_CONN_DATA_INCR(session, cache_eviction_blocked_ooo_checkpoint_race_3);
         WT_ASSERT(session, false);
-        WT_RET(EBUSY);
+        return (EBUSY);
     }
 
     /*

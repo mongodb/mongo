@@ -65,6 +65,17 @@ struct __wt_rec_chunk {
 };
 
 /*
+ * WT_DELETE_HS_UPD --
+ *	Update that needs to be deleted from the history store.
+ */
+struct __wt_delete_hs_upd {
+    WT_INSERT *ins; /* Insert list reference */
+    WT_ROW *rip;    /* Original on-page reference */
+    WT_UPDATE *upd;
+    WT_UPDATE *tombstone;
+};
+
+/*
  * Reconciliation is the process of taking an in-memory page, walking each entry
  * in the page, building a backing disk image in a temporary buffer representing
  * that information, and writing that buffer to disk.  What could be simpler?
@@ -227,6 +238,15 @@ struct __wt_reconcile {
     size_t supd_allocated;
     size_t supd_memsize; /* Size of saved update structures */
 
+    /*
+     * List of updates to be deleted from the history store. While reviewing updates for each page,
+     * we save the updates that needs to be deleted from history store here, and then delete them
+     * after we have built the disk image.
+     */
+    WT_DELETE_HS_UPD *delete_hs_upd; /* Updates to delete from history store */
+    uint32_t delete_hs_upd_next;
+    size_t delete_hs_upd_allocated;
+
     /* List of pages we've written so far. */
     WT_MULTI *multi;
     uint32_t multi_next;
@@ -305,7 +325,8 @@ struct __wt_reconcile {
 };
 
 typedef struct {
-    WT_UPDATE *upd; /* Update to write (or NULL) */
+    WT_UPDATE *upd;       /* Update to write (or NULL) */
+    WT_UPDATE *tombstone; /* The tombstone to write (or NULL) */
 
     WT_TIME_WINDOW tw;
 
