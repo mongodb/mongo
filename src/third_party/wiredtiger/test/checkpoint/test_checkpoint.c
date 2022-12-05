@@ -133,7 +133,6 @@ main(int argc, char *argv[])
                 break;
             default:
                 return (usage());
-                break;
             }
             break;
         case 't':
