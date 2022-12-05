@@ -167,7 +167,6 @@ ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendCommandWithRun
 
     return std::move(resFuture)
         .then([](detail::AsyncRPCInternalResponse r) -> ReplyType {
-            // TODO SERVER-67661: Make IDL reply types have string representation for logging
             auto res = CommandType::Reply::parseSharingOwnership(IDLParserContext("AsyncRPCRunner"),
                                                                  r.response);
 
