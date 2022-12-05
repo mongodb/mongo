@@ -1,8 +1,5 @@
 // Verifies the serverStatus output and FTDC output for the read write concern defaults.
 //
-// TODO SERVER-45052: Split this test into the appropriate suites for replica sets, sharded
-// clusters, and standalone servers.
-//
 // @tags: [requires_sharding]
 (function() {
 "use strict";

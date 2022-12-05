@@ -1041,9 +1041,6 @@ function runTests(conn, regularCheckConn, configSvrCheckConn) {
                 {explicitRWC: true, explicitProvenance: true});
 }
 
-// TODO SERVER-45052: Move the main code into jstests/lib, and then call it from jstests/replsets
-// and jstests/sharding.
-
 let rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
