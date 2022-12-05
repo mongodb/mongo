@@ -60,12 +60,12 @@ TEST(ConfigSvrMergeChunks, BasicValidConfigCommand) {
 
 TEST(ConfigSvrMergeChunks, ConfigCommandtoBSON) {
     auto collUUID = UUID::gen();
-    BSONObj serializedRequest = BSON("_configsvrCommitChunksMerge"
-                                     << "TestDB.TestColl"
-                                     << "shard"
-                                     << "shard0000"
-                                     << "collUUID" << collUUID.toBSON() << "chunkRange"
-                                     << chunkRange.toBSON() << "validAfter" << Timestamp{100});
+    BSONObj serializedRequest =
+        BSON("_configsvrCommitChunksMerge"
+             << "TestDB.TestColl"
+             << "shard"
+             << "shard0000"
+             << "collUUID" << collUUID.toBSON() << "chunkRange" << chunkRange.toBSON());
     BSONObj writeConcernObj = BSON("w"
                                    << "majority");
 

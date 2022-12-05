@@ -746,11 +746,10 @@ void ShardingCatalogManager::_mergeChunksInTransaction(
     const NamespaceString& nss,
     const UUID& collectionUUID,
     const ChunkVersion& mergeVersion,
-    const boost::optional<Timestamp>& validAfter,
+    const Timestamp& validAfter,
     const ChunkRange& chunkRange,
     const ShardId& shardId,
     std::shared_ptr<std::vector<ChunkType>> chunksToMerge) {
-    dassert(validAfter);
     auto updateChunksFn =
         [chunksToMerge, collectionUUID, mergeVersion, validAfter, chunkRange, shardId](
             const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
@@ -787,8 +786,7 @@ void ShardingCatalogManager::_mergeChunksInTransaction(
                         mergedChunk.setVersion(mergeVersion);
                         mergedChunk.setEstimatedSizeBytes(boost::none);
 
-                        mergedChunk.setHistory(
-                            {ChunkHistory(validAfter.value(), mergedChunk.getShard())});
+                        mergedChunk.setHistory({ChunkHistory(validAfter, mergedChunk.getShard())});
 
                         entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
                             mergedChunk.toConfigBSON()));
@@ -849,11 +847,7 @@ ShardingCatalogManager::commitChunksMerge(OperationContext* opCtx,
                                           const boost::optional<Timestamp>& timestamp,
                                           const UUID& requestCollectionUUID,
                                           const ChunkRange& chunkRange,
-                                          const ShardId& shardId,
-                                          const boost::optional<Timestamp>& validAfter) {
-    if (!validAfter) {
-        return {ErrorCodes::IllegalOperation, "chunk operation requires validAfter timestamp"};
-    }
+                                          const ShardId& shardId) {
 
     // Mark opCtx as interruptible to ensure that all reads and writes to the metadata collections
     // under the exclusive _kChunkOpLock happen on the same term.
@@ -932,6 +926,12 @@ ShardingCatalogManager::commitChunksMerge(OperationContext* opCtx,
 
     // 3. Prepare the data for the merge
     //    and ensure that the retrieved list of chunks covers the whole range.
+
+    // The `validAfter` field must always be set. If not existing, it means the chunk
+    // always belonged to the same shard, hence it's valid to set `0` as the time at
+    // which the chunk started being valid.
+    Timestamp validAfter{0};
+
     auto chunksToMerge = std::make_shared<std::vector<ChunkType>>();
     chunksToMerge->reserve(shardChunksInRangeResponse.docs.size());
     for (const auto& chunkDoc : shardChunksInRangeResponse.docs) {
@@ -952,6 +952,15 @@ ShardingCatalogManager::commitChunksMerge(OperationContext* opCtx,
                         << chunkRange.toString(),
                     chunk.getMin().woCompare(chunksToMerge->back().getMax()) == 0);
         }
+
+        // Get the `validAfter` field from the most recent chunk placed on the shard
+        if (!chunk.getHistory().empty()) {
+            const auto& chunkValidAfter = chunk.getHistory().front().getValidAfter();
+            if (validAfter < chunkValidAfter) {
+                validAfter = chunkValidAfter;
+            }
+        }
+
         chunksToMerge->push_back(std::move(chunk));
     }
     uassert(ErrorCodes::IllegalOperation,

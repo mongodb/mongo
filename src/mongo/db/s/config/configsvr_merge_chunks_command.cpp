@@ -94,8 +94,7 @@ public:
                                                                       request().getTimestamp(),
                                                                       request().getCollectionUUID(),
                                                                       request().getChunkRange(),
-                                                                      request().getShard(),
-                                                                      request().getValidAfter()));
+                                                                      request().getShard()));
             return ConfigSvrMergeResponse{shardAndCollVers.shardVersion};
         }
 
