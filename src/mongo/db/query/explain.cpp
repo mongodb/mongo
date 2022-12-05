@@ -86,7 +86,7 @@ void generatePlannerInfo(PlanExecutor* exec,
                          BSONObjBuilder* out) {
     BSONObjBuilder plannerBob(out->subobjStart("queryPlanner"));
 
-    plannerBob.append("namespace", exec->nss().ns());
+    plannerBob.append("namespace", NamespaceStringUtil::serialize(exec->nss()));
 
     // Find whether there is an index filter set for the query shape. The 'indexFilterSet' field
     // will always be false in the case of EOF or idhack plans.

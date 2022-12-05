@@ -10,12 +10,13 @@ function checkNsSerializedCorrectly(
     if (featureFlagRequireTenantId) {
         // This case represents the upgraded state where we will not include the tenantId as the
         // db prefix.
-        const nss = kDbName + "." + kCollectionName;
+        const nss = kDbName + (kCollectionName == "" ? "" : "." + kCollectionName);
         assert.eq(nsField, nss);
     } else {
         // This case represents the downgraded state where we will continue to prefix namespaces.
-        const prefixedDb = kTenant + "_" + kDbName;
-        assert.eq(nsField, prefixedDb + "." + kCollectionName);
+        const prefixedNss =
+            kTenant + "_" + kDbName + (kCollectionName == "" ? "" : "." + kCollectionName);
+        assert.eq(nsField, prefixedNss);
     }
 }
 
@@ -134,6 +135,11 @@ function runTest(featureFlagRequireTenantId) {
             ];
             assert(arrayEq(expectedColls, colls.cursor.firstBatch),
                    tojson(colls.cursor.firstBatch));
+            checkNsSerializedCorrectly(featureFlagRequireTenantId,
+                                       kTenant,
+                                       kDbName,
+                                       "$cmd.listCollections",
+                                       colls.cursor.ns);
 
             const prefixedDbName = kTenant + '_' + tokenDB.getName();
             const targetDb = featureFlagRequireTenantId ? tokenDB.getName() : prefixedDbName;
@@ -173,6 +179,11 @@ function runTest(featureFlagRequireTenantId) {
         {
             const cmdRes = tokenDB.runCommand({explain: {find: kCollName, filter: {a: 1}}});
             assert.eq(1, cmdRes.executionStats.nReturned, tojson(cmdRes));
+            checkNsSerializedCorrectly(featureFlagRequireTenantId,
+                                       kTenant,
+                                       kDbName,
+                                       kCollName,
+                                       cmdRes.queryPlanner.namespace);
         }
 
         // Test count and distinct command.
@@ -231,7 +242,11 @@ function runTest(featureFlagRequireTenantId) {
         // Drop the collection, and then the database. Check that listCollections no longer returns
         // the 3 collections.
         {
-            assert.commandWorked(tokenDB.runCommand({drop: kCollName}));
+            // Drop the collection, and check that the "ns" returned is serialized correctly.
+            const dropRes = assert.commandWorked(tokenDB.runCommand({drop: kCollName}));
+            checkNsSerializedCorrectly(
+                featureFlagRequireTenantId, kTenant, kDbName, kCollName, dropRes.ns);
+
             const collsAfterDropColl = assert.commandWorked(tokenDB.runCommand(
                 {listCollections: 1, nameOnly: true, filter: {name: kCollName}}));
             assert.eq(0,
@@ -296,6 +311,8 @@ function runTest(featureFlagRequireTenantId) {
                     {key: {b: 1}, name: "indexB"}
                 ],
                 getIndexesKeyAndName(res.cursor.firstBatch)));
+            checkNsSerializedCorrectly(
+                featureFlagRequireTenantId, kTenant, kDbName, kCollName, res.cursor.ns);
 
             // Drop those new created indexes.
             res = assert.commandWorked(
