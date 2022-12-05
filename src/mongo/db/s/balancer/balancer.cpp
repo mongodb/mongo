@@ -1054,6 +1054,16 @@ int Balancer::_moveChunks(OperationContext* opCtx,
         shardSvrRequest.setMaxChunkSizeBytes(maxChunkSizeBytes);
         shardSvrRequest.setFromShard(migrateInfo.from);
         shardSvrRequest.setEpoch(migrateInfo.version.epoch());
+        const auto forceJumbo = [&]() {
+            if (migrateInfo.forceJumbo == MoveChunkRequest::ForceJumbo::kForceManual) {
+                return ForceJumbo::kForceManual;
+            }
+            if (migrateInfo.forceJumbo == MoveChunkRequest::ForceJumbo::kForceBalancer) {
+                return ForceJumbo::kForceBalancer;
+            }
+            return ForceJumbo::kDoNotForce;
+        }();
+        shardSvrRequest.setForceJumbo(forceJumbo);
         const auto [secondaryThrottle, wc] =
             getSecondaryThrottleAndWriteConcern(balancerConfig->getSecondaryThrottle());
         shardSvrRequest.setSecondaryThrottle(secondaryThrottle);
