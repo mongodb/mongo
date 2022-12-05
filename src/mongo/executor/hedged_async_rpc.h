@@ -120,6 +120,7 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
 
     // Set up cancellation token to cancel remaining hedged operations.
     CancellationSource hedgeCancellationToken{token};
+    auto targetsAttempted = std::make_shared<std::vector<HostAndPort>>();
     auto tryBody = [=, targeter = std::move(targeter)] {
         return targeter->resolve(token)
             .thenRunOn(exec)
@@ -128,10 +129,11 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
                 // command execution body. We'll retry if the policy indicates to.
                 return Status{AsyncRPCErrorInfo(status), status.reason()};
             })
-            .then([cmd, opCtx, exec, token, hedgeCancellationToken, readPref](
+            .then([cmd, opCtx, exec, token, hedgeCancellationToken, readPref, targetsAttempted](
                       std::vector<HostAndPort> targets) {
                 invariant(targets.size(),
                           "Successful targeting implies there are hosts to target.");
+                *targetsAttempted = targets;
 
                 HedgeOptions opts = getHedgeOptions(CommandType::kCommandName, readPref);
 
@@ -191,13 +193,17 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
         // so that the API always returns RemoteCommandExecutionError. Additionally,
         // we need to make sure we cancel outstanding requests.
         .unsafeToInlineFuture()
-        .onCompletion([hedgeCancellationToken](
+        .onCompletion([hedgeCancellationToken, targetsAttempted](
                           StatusWith<SingleResponse> result) mutable -> StatusWith<SingleResponse> {
             hedgeCancellationToken.cancel();
             if (!result.isOK()) {
                 auto status = result.getStatus();
                 if (status.code() == ErrorCodes::RemoteCommandExecutionError) {
-                    return status;
+                    auto extraInfo = result.getStatus().template extraInfo<AsyncRPCErrorInfo>();
+                    AsyncRPCErrorInfo extraInfoCopy = *extraInfo;
+                    extraInfoCopy.setTargetsAttempted(*targetsAttempted);
+                    result = Status{std::move(extraInfoCopy), status.reason()};
+                    return result;
                 }
                 // The API implementation guarantees that all errors are provided as
                 // RemoteCommandExecutionError, so if we've reached this code, it means that the API
@@ -207,7 +213,7 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
                 // API implementation's error-handling while still ensuring that we always return
                 // the correct error code in production.
                 dassert(ErrorCodes::isA<ErrorCategory::CancellationError>(status.code()));
-                return Status{AsyncRPCErrorInfo(status),
+                return Status{AsyncRPCErrorInfo(status, *targetsAttempted),
                               "Remote command execution failed due to executor shutdown"};
             }
             return result;

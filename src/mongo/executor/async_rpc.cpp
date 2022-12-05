@@ -54,23 +54,26 @@ public:
                                                           OperationContext* opCtx,
                                                           std::shared_ptr<TaskExecutor> exec,
                                                           CancellationToken token) final {
+        auto targetsUsed = std::make_shared<std::vector<HostAndPort>>();
         return targeter->resolve(token)
             .thenRunOn(exec)
-            .then([dbName, cmdBSON, opCtx, exec = std::move(exec), token](
+            .then([dbName, cmdBSON, opCtx, exec = std::move(exec), token, targetsUsed](
                       std::vector<HostAndPort> targets) {
                 invariant(targets.size(),
                           "Successful targeting implies there are hosts to target.");
+                *targetsUsed = targets;
                 executor::RemoteCommandRequestOnAny executorRequest(
                     targets, dbName.toString(), cmdBSON, rpc::makeEmptyMetadata(), opCtx);
                 return exec->scheduleRemoteCommandOnAny(executorRequest, token);
             })
-            .onError([](Status s) -> StatusWith<TaskExecutor::ResponseOnAnyStatus> {
+            .onError([targetsUsed](Status s) -> StatusWith<TaskExecutor::ResponseOnAnyStatus> {
                 // If there was a scheduling error or other local error before the
                 // command was accepted by the executor.
-                return Status{AsyncRPCErrorInfo(s), "Remote command execution failed"};
+                return Status{AsyncRPCErrorInfo(s, *targetsUsed),
+                              "Remote command execution failed"};
             })
-            .then([](TaskExecutor::ResponseOnAnyStatus r) {
-                auto s = makeErrorIfNeeded(r);
+            .then([targetsUsed](TaskExecutor::ResponseOnAnyStatus r) {
+                auto s = makeErrorIfNeeded(r, *targetsUsed);
                 uassertStatusOK(s);
                 return AsyncRPCInternalResponse{r.data, r.target.get()};
             });

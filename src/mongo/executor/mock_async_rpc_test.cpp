@@ -81,7 +81,11 @@ public:
     }
 
     ExecutorFuture<AsyncRPCResponse<HelloCommandReply>> sendHelloCommandToLocalHost() {
-        return sendHelloCommandToHostAndPort({"localhost", serverGlobalParams.port});
+        return sendHelloCommandToHostAndPort(getLocalHost());
+    }
+
+    HostAndPort getLocalHost() {
+        return {"localhost", serverGlobalParams.port};
     }
 
 private:
@@ -135,6 +139,12 @@ TEST_F(SyncMockAsyncRPCRunnerTestFixture, RemoteError) {
         auto remoteError = extraInfo->asRemote();
         ASSERT_EQ(remoteError.getRemoteCommandResult().code(), exampleErrCode);
         ASSERT_EQ(remoteError.getRemoteCommandResult().reason(), exampleErrMsg);
+
+        // Ensure the targetsAttempted/used portions of the error is populated correctly.
+        auto targetsAttempted = extraInfo->getTargetsAttempted();
+        ASSERT_EQ(targetsAttempted.size(), 1);
+        ASSERT_EQ(targetsAttempted[0], getLocalHost());
+        ASSERT_EQ(remoteError.getTargetUsed(), getLocalHost());
     };
     // Ensure we fail to parse the reply due to the unknown fields.
     ASSERT_THROWS_WITH_CHECK(responseFuture.get(), DBException, check);
@@ -156,6 +166,10 @@ TEST_F(SyncMockAsyncRPCRunnerTestFixture, LocalError) {
     // local error (which is just a Status) is the one we provided.
     ASSERT(extraInfo->isLocal());
     ASSERT_EQ(extraInfo->asLocal(), exampleLocalErr);
+    // Ensure the targetsAttempted portion of the error is populated correctly.
+    auto targetsAttempted = extraInfo->getTargetsAttempted();
+    ASSERT_EQ(targetsAttempted.size(), 1);
+    ASSERT_EQ(targetsAttempted[0], getLocalHost());
 }
 
 TEST_F(SyncMockAsyncRPCRunnerTestFixture, MultipleResponses) {
@@ -269,6 +283,72 @@ TEST_F(AsyncMockAsyncRPCRunnerTestFixture, Expectation) {
     expectation.get();
     ASSERT_BSONOBJ_EQ(reply.response.toBSON(), helloReply.toBSON());
     ASSERT_EQ(HostAndPort("localhost", serverGlobalParams.port), reply.targetUsed);
+}
+
+TEST_F(AsyncMockAsyncRPCRunnerTestFixture, ExpectLocalError) {
+    // We expect that some code will use the runner to send a hello
+    // to localhost on "testdb".
+    auto matcher = [](const AsyncMockAsyncRPCRunner::Request& req) {
+        bool isHello = req.cmdBSON.firstElementFieldName() == "hello"_sd;
+        bool isRightTarget = req.target == HostAndPort("localhost", serverGlobalParams.port);
+        return isHello && isRightTarget;
+    };
+
+    auto exampleLocalErr = Status{ErrorCodes::InterruptedAtShutdown, "example local error"};
+    auto expectation = getMockRunner().expect(matcher, exampleLocalErr, "example expectation");
+    ASSERT_FALSE(expectation.isReady());
+
+    // Allow a request to be scheduled on the mock.
+    auto response = sendHelloCommandToLocalHost();
+
+    // Now, our expectation should be met, and the response to it provided.
+    auto reply = response.getNoThrow();
+    expectation.get();
+    auto err = reply.getStatus();
+    auto info = err.extraInfo<AsyncRPCErrorInfo>();
+    ASSERT(info->isLocal());
+    ASSERT_EQ(info->asLocal(), exampleLocalErr);
+    // Ensure the targetsAttempted portion of the error is populated correctly.
+    auto targetsAttempted = info->getTargetsAttempted();
+    ASSERT_EQ(targetsAttempted.size(), 1);
+    ASSERT_EQ(targetsAttempted[0], getLocalHost());
+}
+
+TEST_F(AsyncMockAsyncRPCRunnerTestFixture, ExpectRemoteError) {
+    StringData exampleErrMsg{"example error message"};
+    auto exampleErrCode = ErrorCodes::ShutdownInProgress;
+    ErrorReply errorReply;
+    errorReply.setOk(0);
+    errorReply.setCode(exampleErrCode);
+    errorReply.setCodeName(ErrorCodes::errorString(exampleErrCode));
+    errorReply.setErrmsg(exampleErrMsg);
+    // We expect that some code will use the runner to send a hello
+    // to localhost on "testdb".
+    auto matcher = [](const AsyncMockAsyncRPCRunner::Request& req) {
+        bool isHello = req.cmdBSON.firstElementFieldName() == "hello"_sd;
+        bool isRightTarget = req.target == HostAndPort("localhost", serverGlobalParams.port);
+        return isHello && isRightTarget;
+    };
+
+    auto expectation = getMockRunner().expect(matcher, errorReply.toBSON(), "example expectation");
+    ASSERT_FALSE(expectation.isReady());
+
+    // Allow a request to be scheduled on the mock.
+    auto response = sendHelloCommandToLocalHost();
+
+    // Now, our expectation should be met, and the response to it provided.
+    auto reply = response.getNoThrow();
+    expectation.get();
+    auto err = reply.getStatus();
+    auto info = err.extraInfo<AsyncRPCErrorInfo>();
+    ASSERT(info->isRemote());
+    auto remoteErr = info->asRemote();
+    ASSERT_BSONOBJ_EQ(remoteErr.getResponseObj(), errorReply.toBSON());
+    // Ensure the targetsAttempted portion of the error is populated correctly.
+    auto targetsAttempted = info->getTargetsAttempted();
+    ASSERT_EQ(targetsAttempted.size(), 1);
+    ASSERT_EQ(targetsAttempted[0], getLocalHost());
+    ASSERT_EQ(remoteErr.getTargetUsed(), getLocalHost());
 }
 
 TEST_F(AsyncMockAsyncRPCRunnerTestFixture, AsyncMockAsyncRPCRunnerWithRetryPolicy) {

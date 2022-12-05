@@ -118,13 +118,14 @@ public:
  * Returns a RemoteCommandExecutionError with ErrorExtraInfo populated to contain
  * details about any error, local or remote, contained in `r`.
  */
-inline Status makeErrorIfNeeded(TaskExecutor::ResponseOnAnyStatus r) {
+inline Status makeErrorIfNeeded(TaskExecutor::ResponseOnAnyStatus r,
+                                std::vector<HostAndPort> targetsAttempted) {
     if (r.status.isOK() && getStatusFromCommandResult(r.data).isOK() &&
         getWriteConcernStatusFromCommandResult(r.data).isOK() &&
         getFirstWriteErrorStatusFromCommandResult(r.data).isOK()) {
         return Status::OK();
     }
-    return {AsyncRPCErrorInfo(r), "Remote command execution failed"};
+    return {AsyncRPCErrorInfo(r, targetsAttempted), "Remote command execution failed"};
 }
 
 /**

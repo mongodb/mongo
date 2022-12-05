@@ -792,6 +792,82 @@ TEST_F(HedgedAsyncRPCTest, DynamicDelayBetweenRetries) {
     ASSERT_EQ(maxNumRetries, testPolicy->getNumRetriesPerformed());
 }
 
+namespace m = unittest::match;
+TEST_F(HedgedAsyncRPCTest, AttemptedTargetsPropogatedWithLocalErrors) {
+    auto resultFuture = sendHedgedCommandWithHosts(testFindCmd, kTwoHosts);
+
+    // Respond to one of the RPCs composing the hedged command with a fatal local error.
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["find"]);
+        return fatalInternalErrorStatus;
+    });
+
+    // Ensure that both of the hosts are recorded as attempted targets.
+    auto error = resultFuture.getNoThrow().getStatus();
+    auto info = error.extraInfo<AsyncRPCErrorInfo>();
+    ASSERT(info);
+    ASSERT(info->isLocal());
+
+    auto eitherHostMatcher = m::AnyOf(m::Eq(kTwoHosts[0]), m::Eq(kTwoHosts[1]));
+    ASSERT_THAT(info->getTargetsAttempted(), m::ElementsAre(eitherHostMatcher, eitherHostMatcher));
+}
+
+TEST_F(HedgedAsyncRPCTest, NoAttemptedTargetIfTargetingFails) {
+    HelloCommand helloCmd;
+    initializeCommand(helloCmd);
+    Status resolveErr{ErrorCodes::BadValue, "Failing resolve for test!"};
+    auto targeter = std::make_unique<FailingTargeter>(resolveErr);
+
+
+    auto opCtxHolder = makeOperationContext();
+    auto resultFuture = sendHedgedCommand(
+        helloCmd, opCtxHolder.get(), std::move(targeter), getExecutorPtr(), _cancellationToken);
+
+    auto error = resultFuture.getNoThrow().getStatus();
+    ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);
+    auto extraInfo = error.extraInfo<AsyncRPCErrorInfo>();
+    ASSERT(extraInfo);
+    ASSERT(extraInfo->isLocal());
+    ASSERT_EQ(extraInfo->asLocal(), resolveErr);
+    auto targetsAttempted = extraInfo->getTargetsAttempted();
+    ASSERT_EQ(targetsAttempted.size(), 0);
+}
+
+TEST_F(HedgedAsyncRPCTest, RemoteErrorAttemptedTargetsContainActual) {
+    auto resultFuture = sendHedgedCommandWithHosts(testFindCmd, kTwoHosts);
+
+    auto network = getNetworkInterfaceMock();
+    auto now = getNetworkInterfaceMock()->now();
+    network->enterNetwork();
+
+    // Schedules a fatal error response for the hedged request, and then a delayed success response
+    // for the authoritative request.
+    performAuthoritativeHedgeBehavior(
+        network,
+        [&](NetworkInterfaceMock::NetworkOperationIterator authoritative,
+            NetworkInterfaceMock::NetworkOperationIterator hedged) {
+            network->scheduleResponse(authoritative, now + Milliseconds(1000), testSuccessResponse);
+            network->scheduleResponse(hedged, now, testFatalErrorResponse);
+        });
+
+    network->runUntil(now + Milliseconds(1500));
+
+    network->exitNetwork();
+
+    // Ensure that both of the hosts are recorded as attempted targets.
+    auto error = resultFuture.getNoThrow().getStatus();
+    auto info = error.extraInfo<AsyncRPCErrorInfo>();
+    ASSERT(info);
+    ASSERT(info->isRemote());
+    auto remoteErr = info->asRemote();
+
+    auto eitherHostMatcher = m::AnyOf(m::Eq(kTwoHosts[0]), m::Eq(kTwoHosts[1]));
+    ASSERT_THAT(info->getTargetsAttempted(), m::ElementsAre(eitherHostMatcher, eitherHostMatcher));
+
+    // Ensure that the actual host from the remote error is one of the attempted ones.
+    ASSERT_THAT(remoteErr.getTargetUsed(), eitherHostMatcher);
+}
+
 }  // namespace
 }  // namespace async_rpc
 }  // namespace mongo

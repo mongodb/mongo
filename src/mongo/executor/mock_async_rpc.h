@@ -102,6 +102,7 @@ public:
         std::shared_ptr<TaskExecutor> exec,
         CancellationToken token) final {
         auto [p, f] = makePromiseFuture<BSONObj>();
+        auto targetsAttempted = std::make_shared<std::vector<HostAndPort>>();
         return targeter->resolve(token)
             .thenRunOn(exec)
             .onError([](Status s) -> StatusWith<std::vector<HostAndPort>> {
@@ -109,16 +110,20 @@ public:
             })
             .then([=, f = std::move(f), p = std::move(p)](auto&& targets) mutable {
                 stdx::lock_guard lg{_m};
+                *targetsAttempted = targets;
                 _requests.emplace_back(cmdBSON, dbName, targets[0], std::move(p));
                 _hasRequestsCV.notify_one();
-                return std::move(f).then([targetUsed = targets[0]](StatusWith<BSONObj> resp) {
+                return std::move(f).onCompletion([targetUsed = targets[0],
+                                                  targetsAttempted](StatusWith<BSONObj> resp) {
                     if (!resp.isOK()) {
-                        uassertStatusOK(Status{AsyncRPCErrorInfo(resp.getStatus()),
-                                               "Remote command execution failed"});
+                        uassertStatusOK(
+                            Status{AsyncRPCErrorInfo(resp.getStatus(), *targetsAttempted),
+                                   "Remote command execution failed"});
                     }
                     Status maybeError(
                         detail::makeErrorIfNeeded(executor::RemoteCommandOnAnyResponse(
-                            targetUsed, resp.getValue(), Microseconds(1))));
+                                                      targetUsed, resp.getValue(), Microseconds(1)),
+                                                  *targetsAttempted));
                     uassertStatusOK(maybeError);
                     return detail::AsyncRPCInternalResponse{resp.getValue(), targetUsed};
                 });
@@ -209,35 +214,41 @@ public:
         std::shared_ptr<TaskExecutor> exec,
         CancellationToken token) final {
         auto [p, f] = makePromiseFuture<BSONObj>();
-        return targeter->resolve(token).thenRunOn(exec).then(
-            [this, p = std::move(p), cmdBSON, dbName = dbName.toString()](auto&& targets) {
-                stdx::lock_guard lg(_m);
-                Request req{dbName, cmdBSON, targets[0]};
-                auto expectation =
-                    std::find_if(_expectations.begin(),
-                                 _expectations.end(),
-                                 [&](const Expectation& e) { return e.matcher(req) && !e.met; });
-                if (expectation == _expectations.end()) {
-                    // This request was not expected. We record it and return a generic error
-                    // response.
-                    _unexpectedRequests.push_back(req);
-                    uassertStatusOK(
-                        Status{AsyncRPCErrorInfo(Status(ErrorCodes::InternalErrorNotSupported,
-                                                        "Unexpected request")),
-                               "Remote command execution failed"});
-                }
-                auto ans = expectation->response;
-                expectation->promise.emplaceValue();
-                expectation->met = true;
-                if (!ans.isOK()) {
-                    uassertStatusOK(Status{AsyncRPCErrorInfo(ans.getStatus()),
-                                           "Remote command execution failed"});
-                }
-                Status maybeError(detail::makeErrorIfNeeded(executor::RemoteCommandOnAnyResponse(
-                    targets[0], ans.getValue(), Microseconds(1))));
-                uassertStatusOK(maybeError);
-                return detail::AsyncRPCInternalResponse{ans.getValue(), targets[0]};
-            });
+        auto targetsAttempted = std::make_shared<std::vector<HostAndPort>>();
+        return targeter->resolve(token).thenRunOn(exec).then([this,
+                                                              p = std::move(p),
+                                                              cmdBSON,
+                                                              dbName = dbName.toString(),
+                                                              targetsAttempted](auto&& targets) {
+            *targetsAttempted = targets;
+            stdx::lock_guard lg(_m);
+            Request req{dbName, cmdBSON, targets[0]};
+            auto expectation =
+                std::find_if(_expectations.begin(), _expectations.end(), [&](const Expectation& e) {
+                    return e.matcher(req) && !e.met;
+                });
+            if (expectation == _expectations.end()) {
+                // This request was not expected. We record it and return a generic error
+                // response.
+                _unexpectedRequests.push_back(req);
+                uassertStatusOK(
+                    Status{AsyncRPCErrorInfo(
+                               Status(ErrorCodes::InternalErrorNotSupported, "Unexpected request")),
+                           "Remote command execution failed"});
+            }
+            auto ans = expectation->response;
+            expectation->promise.emplaceValue();
+            expectation->met = true;
+            if (!ans.isOK()) {
+                uassertStatusOK(Status{AsyncRPCErrorInfo(ans.getStatus(), *targetsAttempted),
+                                       "Remote command execution failed"});
+            }
+            Status maybeError(detail::makeErrorIfNeeded(
+                executor::RemoteCommandOnAnyResponse(targets[0], ans.getValue(), Microseconds(1)),
+                *targetsAttempted));
+            uassertStatusOK(maybeError);
+            return detail::AsyncRPCInternalResponse{ans.getValue(), targets[0]};
+        });
     }
 
     using RequestMatcher = std::function<bool(const Request&)>;

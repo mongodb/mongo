@@ -36,10 +36,9 @@
 #include "mongo/stdx/variant.h"
 
 namespace mongo {
-class BSONObjBuilder;
+using executor::RemoteCommandOnAnyResponse;
 
 enum class CommandErrorProvenance { kLocal, kRemote };
-
 
 /**
  * Contains information to augment the 'RemoteCommandExecutionError' error code. In particular, this
@@ -52,13 +51,14 @@ public:
      */
     class RemoteError {
     public:
-        // The BSON recieved over-the-wire that encodes the remote
+        // The BSON received over-the-wire that encodes the remote
         // error is stored and used to construct this in-memory representation.
-        explicit RemoteError(BSONObj obj)
-            : _error{obj},
+        explicit RemoteError(RemoteCommandOnAnyResponse rcr)
+            : _error{rcr.data},
               _remoteCommandResult{getStatusFromCommandResult(_error)},
               _remoteCommandWriteConcernError{getWriteConcernStatusFromCommandResult(_error)},
-              _remoteCommandFirstWriteError{getFirstWriteErrorStatusFromCommandResult(_error)} {
+              _remoteCommandFirstWriteError{getFirstWriteErrorStatusFromCommandResult(_error)},
+              _targetUsed{*rcr.target} {
             // The buffer backing the default empty BSONObj has static duration so it is effectively
             // owned.
             invariant(_error.isOwned() || _error.objdata() == BSONObj().objdata());
@@ -87,40 +87,52 @@ public:
             return _errLabels;
         }
 
+        HostAndPort getTargetUsed() const {
+            return _targetUsed;
+        }
+
     private:
-        const BSONObj _error;
+        BSONObj _error;
         Status _remoteCommandResult;
         Status _remoteCommandWriteConcernError;
         Status _remoteCommandFirstWriteError;
         std::vector<BSONElement> _errLabels;
+        HostAndPort _targetUsed;
     };
 
     // Required member of every ErrorExtraInfo.
     static constexpr auto code = ErrorCodes::RemoteCommandExecutionError;
 
     // Unused and marked unreachable - the RemoteCommandExecutionError is InternalOnly and should
-    // never be encoded in a BSONObj / recieved or sent over-the-wire.
+    // never be encoded in a BSONObj / received or sent over-the-wire.
     static std::shared_ptr<const ErrorExtraInfo> parse(const BSONObj& obj);
 
     /**
      * Construct the relevant extra info from the RemoteCommandResponse provided by the TaskExecutor
      * used to invoke the remote command.
      */
-    explicit AsyncRPCErrorInfo(executor::RemoteCommandOnAnyResponse rcr)
-        : _error{RemoteError(rcr.data)} {
-        if (!rcr.status.isOK()) {
-            _prov = CommandErrorProvenance::kLocal;
-            _error = rcr.status;
-            return;
-        }
-        _prov = CommandErrorProvenance::kRemote;
-    }
-
+    AsyncRPCErrorInfo(RemoteCommandOnAnyResponse rcr, std::vector<HostAndPort> targets)
+        : _prov{[&] {
+              if (!rcr.status.isOK())
+                  return CommandErrorProvenance::kLocal;
+              return CommandErrorProvenance::kRemote;
+          }()},
+          _error{[&]() -> stdx::variant<Status, RemoteError> {
+              if (_prov == CommandErrorProvenance::kLocal) {
+                  return rcr.status;
+              } else {
+                  return RemoteError(rcr);
+              }
+          }()},
+          _targetsAttempted{targets} {}
     /**
      * Construct the relevant extra info from an error status - used if a remote command invokation
      * attempt fails before it reaches the TaskExecutor level.
      */
     explicit AsyncRPCErrorInfo(Status s) : _prov{CommandErrorProvenance::kLocal}, _error{s} {}
+
+    AsyncRPCErrorInfo(Status s, std::vector<HostAndPort> targets)
+        : _prov{CommandErrorProvenance::kLocal}, _error{s}, _targetsAttempted{targets} {}
 
     bool isLocal() const {
         return _prov == CommandErrorProvenance::kLocal;
@@ -131,20 +143,30 @@ public:
     }
 
     const RemoteError& asRemote() const {
-        return stdx::get<const RemoteError>(_error);
+        return stdx::get<RemoteError>(_error);
     }
 
     Status asLocal() const {
         return stdx::get<Status>(_error);
     }
 
+    std::vector<HostAndPort> getTargetsAttempted() const {
+        return _targetsAttempted;
+    }
+
+    void setTargetsAttempted(std::vector<HostAndPort> targetsAttempted) {
+        _targetsAttempted = targetsAttempted;
+    }
+
     // Unused and marked unreachable - the RemoteCommandExecutionError is InternalOnly and should
-    // never be encoded in a BSONObj / recieved or sent over-the-wire.
+    // never be encoded in a BSONObj / received or sent over-the-wire.
     void serialize(BSONObjBuilder* bob) const final;
 
 private:
+    AsyncRPCErrorInfo(RemoteError err) : _prov{CommandErrorProvenance::kRemote}, _error{err} {}
     CommandErrorProvenance _prov;
-    stdx::variant<Status, const RemoteError> _error;
+    stdx::variant<Status, RemoteError> _error;
+    std::vector<HostAndPort> _targetsAttempted;
 };
 
 namespace async_rpc {

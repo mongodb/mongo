@@ -493,6 +493,86 @@ TEST_F(AsyncRPCTestFixture, FailedTargeting) {
     ASSERT_EQ(extraInfo->asLocal(), targeterFailStatus);
 }
 
+
+TEST_F(AsyncRPCTestFixture, AttemptedTargetCorrectlyPropogatedWithLocalError) {
+    HelloCommand helloCmd;
+    initializeCommand(helloCmd);
+    HostAndPort target("FakeHost1", 12345);
+    auto targeter = std::make_unique<FixedTargeter>(target);
+
+    auto opCtxHolder = makeOperationContext();
+    auto resultFuture = sendCommand(
+        helloCmd, opCtxHolder.get(), std::move(targeter), getExecutorPtr(), _cancellationToken);
+
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["hello"]);
+        ASSERT_EQ(request.target, target);
+        return Status(ErrorCodes::NetworkTimeout, "mock");
+    });
+
+    auto error = resultFuture.getNoThrow().getStatus();
+    ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);
+    auto extraInfo = error.extraInfo<AsyncRPCErrorInfo>();
+    ASSERT(extraInfo);
+    ASSERT(extraInfo->isLocal());
+    auto targetsAttempted = extraInfo->getTargetsAttempted();
+    ASSERT_EQ(targetsAttempted.size(), 1);
+    ASSERT_EQ(targetsAttempted[0], target);
+}
+
+TEST_F(AsyncRPCTestFixture, NoAttemptedTargetIfTargetingFails) {
+    HelloCommand helloCmd;
+    initializeCommand(helloCmd);
+    Status resolveErr{ErrorCodes::BadValue, "Failing resolve for test!"};
+    auto targeter = std::make_unique<FailingTargeter>(resolveErr);
+
+
+    auto opCtxHolder = makeOperationContext();
+    auto resultFuture = sendCommand(
+        helloCmd, opCtxHolder.get(), std::move(targeter), getExecutorPtr(), _cancellationToken);
+
+    auto error = resultFuture.getNoThrow().getStatus();
+    ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);
+    auto extraInfo = error.extraInfo<AsyncRPCErrorInfo>();
+    ASSERT(extraInfo);
+    ASSERT(extraInfo->isLocal());
+    ASSERT_EQ(extraInfo->asLocal(), resolveErr);
+    auto targetsAttempted = extraInfo->getTargetsAttempted();
+    ASSERT_EQ(targetsAttempted.size(), 0);
+}
+
+TEST_F(AsyncRPCTestFixture, RemoteErrorAttemptedTargetMatchesActual) {
+    HelloCommand helloCmd;
+    initializeCommand(helloCmd);
+    HostAndPort target("FakeHost1", 12345);
+    auto targeter = std::make_unique<FixedTargeter>(target);
+
+
+    auto opCtxHolder = makeOperationContext();
+    auto resultFuture = sendCommand(
+        helloCmd, opCtxHolder.get(), std::move(targeter), getExecutorPtr(), _cancellationToken);
+
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["hello"]);
+        ASSERT_EQ(request.target, target);
+        return createErrorResponse(Status(ErrorCodes::BadValue, "mock"));
+    });
+
+    auto error = resultFuture.getNoThrow().getStatus();
+    ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);
+    auto extraInfo = error.extraInfo<AsyncRPCErrorInfo>();
+    ASSERT(extraInfo);
+    ASSERT(extraInfo->isRemote());
+
+    auto remoteErr = extraInfo->asRemote();
+    auto targetsAttempted = extraInfo->getTargetsAttempted();
+    ASSERT_EQ(targetsAttempted.size(), 1);
+    auto targetAttempted = targetsAttempted[0];
+    auto targetHeardFrom = remoteErr.getTargetUsed();
+    ASSERT_EQ(targetAttempted, targetHeardFrom);
+    ASSERT_EQ(target, targetHeardFrom);
+}
+
 }  // namespace
 }  // namespace async_rpc
 }  // namespace mongo
