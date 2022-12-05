@@ -9,7 +9,7 @@ toolchains:
     testing: v4
   releases:
     default:
-      current: c6da1cf7f0b4b60d53566305e59857d3d540dcf7
+      current: 549e9c72ce95de436fb83815796d54a47893c049
     rhel80-s390x-playbook:
       current: 41a191fa8daae48ef6271805fe30c004c69e18d4
     ubuntu1804-power8-playbook:
