@@ -369,6 +369,9 @@ private:
 
 /**
  * A logical property which provides an estimated row count for a given ABT tree.
+ *
+ * It also tracks a per-predicate CE. This allows us to split a SargableNode and estimate
+ * the result, without consulting the CE module again for every split.
  */
 class CardinalityEstimate final : public LogicalPropertyTag {
 public:
