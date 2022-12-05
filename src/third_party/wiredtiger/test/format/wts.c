@@ -158,6 +158,8 @@ configure_timing_stress(char *p, size_t max)
         CONFIG_APPEND(p, ",prepare_checkpoint_delay");
     if (GV(STRESS_CHECKPOINT_RESERVED_TXNID_DELAY))
         CONFIG_APPEND(p, ",checkpoint_reserved_txnid_delay");
+    if (GV(STRESS_FAILPOINT_EVICTION_FAIL_AFTER_RECONCILIATION))
+        CONFIG_APPEND(p, ",failpoint_eviction_fail_after_reconciliation");
     if (GV(STRESS_FAILPOINT_HS_DELETE_KEY_FROM_TS))
         CONFIG_APPEND(p, ",failpoint_history_store_delete_key_from_ts");
     if (GV(STRESS_HS_CHECKPOINT_DELAY))

@@ -266,6 +266,9 @@ CONFIG configuration_list[] = {
   {"stress.checkpoint_prepare", "stress checkpoint prepare",
     C_BOOL, 2, 0, 0, V_GLOBAL_STRESS_CHECKPOINT_PREPARE},
 
+  {"stress.failpoint_eviction_fail_after_reconciliation", "stress failpoint eviction fail after reconciliation",
+    C_BOOL, 30, 0, 0, V_GLOBAL_STRESS_FAILPOINT_EVICTION_FAIL_AFTER_RECONCILIATION},
+
   {"stress.failpoint_hs_delete_key_from_ts", "stress failpoint history store delete key from ts",
     C_BOOL, 30, 0, 0, V_GLOBAL_STRESS_FAILPOINT_HS_DELETE_KEY_FROM_TS},
 
