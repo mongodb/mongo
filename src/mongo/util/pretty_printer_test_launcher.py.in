@@ -1,0 +1,25 @@
+#! /usr/bin/env python3
+"""
+Wrapper python script to launch the pretty_printer_test_py program as interpolated
+by scons with the standard input set to the test file readtest_input, also as
+interpolated by scons.
+"""
+
+import subprocess
+
+gdb_path = '@gdb_path@'
+args = [
+    gdb_path,
+    '-nx',
+    '-batch',
+    '-ex',
+    r'source @pretty_printer_test_py@',
+    '-args',
+    r'@pretty_printer_test_program@',
+]
+print(f"Pretty printer test running command:\n{' '.join(args)}")
+proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+stdout, stderr = proc.communicate()
+
+print(stdout.decode('utf-8'))
+exit(proc.returncode)

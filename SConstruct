@@ -4341,6 +4341,12 @@ def doConfigure(myenv):
         #
         myenv.Append(CCFLAGS=["/Zc:inline"])
 
+    if myenv.ToolchainIs('clang'):
+        # We add this flag to make clang emit debug info for c++ stl types so that our pretty
+        # printers will work with newer clang's which omit this debug info. This does increase
+        # the overall debug info size.
+        myenv.AddToCCFLAGSIfSupported('-fno-limit-debug-info')
+
     if myenv.ToolchainIs('gcc', 'clang'):
         # Usually, --gdb-index is too expensive in big static binaries, but for dynamic
         # builds it works well.

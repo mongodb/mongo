@@ -10,7 +10,7 @@ case "${unameOut}" in
     *)          machine="UNKNOWN:${unameOut}"
 esac
 
-TOOLCHAIN_ROOT=/opt/mongodbtoolchain/v3  # TODO: Update to v4 after SERVER-62994.
+TOOLCHAIN_ROOT=/opt/mongodbtoolchain/v4
 
 if [[ "${machine}" = "Cygwin" ]]; then
     out_dir="/cygdrive/c/setup_script_output.txt"
@@ -102,7 +102,7 @@ fi' >> .bash_profile
     cd debug
 
     # As the name suggests, pretty printers. Primarily for boost::optional<T>
-    git clone git@github.com:ruediger/Boost-Pretty-Printer.git &
+    git clone git@github.com:mongodb-forks/Boost-Pretty-Printer.git --branch mongodb-stable &
 
     archive_fail() {
         echo "Error: archive [${1}] not found." >&2

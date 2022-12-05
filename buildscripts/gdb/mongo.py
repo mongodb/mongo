@@ -5,24 +5,108 @@ import json
 import os
 import re
 import sys
+import glob
+import subprocess
+import warnings
+import textwrap
 
 import gdb
 
-# pylint: disable=invalid-name,wildcard-import,broad-except
-try:
-    # Try to find and load the C++ pretty-printer library.
-    import glob
-    pp = glob.glob("/opt/mongodbtoolchain/v3/share/gcc-*/python/libstdcxx/v6/printers.py")
+def detect_toolchain(progspace):
+
+    readelf_bin = '/opt/mongodbtoolchain/v4/bin/readelf'
+    if not os.path.exists(readelf_bin):
+        readelf_bin = '/opt/mongodbtoolchain/v3/bin/readelf'
+    if not os.path.exists(readelf_bin):
+        readelf_bin = 'readelf'
+
+    gcc_version_regex = re.compile(r'.*GCC: \(GNU\) (\d+\.\d+\.\d+).*')
+    clang_version_regex = re.compile(r'.*clang version (\d+\.\d+\.\d+).*')
+
+    readelf_cmd = [readelf_bin, '-p', '.comment', progspace.filename]
+    # take an educated guess as to where we could find the c++ printers, better than hardcoding
+    result = subprocess.run(readelf_cmd, capture_output=True, text=True)
+
+    gcc_version = None
+    for line in result.stdout.split('\n'):
+        if match := re.search(gcc_version_regex, line):
+            gcc_version = match.group(1)
+            break
+    clang_version = None
+    for line in result.stdout.split('\n'):
+        if match := re.search(clang_version_regex, line):
+            clang_version = match.group(1)
+            break
+
+    if clang_version:
+        print(f"Detected binary built with Clang: {clang_version}")
+    elif gcc_version:
+        print(f"Detected binary built with GCC: {gcc_version}")
+    else:
+        print("Could not detect compiler.")
+
+    # default is v4 if we can't find a version
+    toolchain_ver = None
+    if gcc_version:
+        if int(gcc_version.split('.')[0]) == 8:
+            toolchain_ver = 'v3'
+        elif int(gcc_version.split('.')[0])  == 11:
+            toolchain_ver = 'v4'
+
+    if not toolchain_ver:
+        toolchain_ver = 'v4'
+        print(f"""
+WARNING: could not detect a MongoDB toolchain to load matching stdcxx printers:
+-----------------
+command:
+{' '.join(readelf_cmd)}
+STDOUT:
+{result.stdout.strip()}
+STDERR:
+{result.stderr.strip()}
+-----------------
+Assuming {toolchain_ver} as a default, this could cause issues with the printers.""")
+
+    pp = glob.glob(f"/opt/mongodbtoolchain/{toolchain_ver}/share/gcc-*/python/libstdcxx/v6/printers.py")
     printers = pp[0]
-    path = os.path.dirname(os.path.dirname(os.path.dirname(printers)))
-    sys.path.insert(0, path)
-    from libstdcxx.v6 import register_libstdcxx_printers
-    from libstdcxx.v6 import printers as stdlib_printers
-    register_libstdcxx_printers(gdb.current_objfile())
-    print("Loaded libstdc++ pretty printers from '%s'" % printers)
-except Exception as e:
-    print("Failed to load the libstdc++ pretty printers: " + str(e))
-# pylint: enable=invalid-name,wildcard-import
+    return os.path.dirname(os.path.dirname(os.path.dirname(printers)))
+
+stdcxx_printer_toolchain_paths = dict()
+def load_libstdcxx_printers(progspace):
+    if progspace not in stdcxx_printer_toolchain_paths:
+        stdcxx_printer_toolchain_paths[progspace] = detect_toolchain(progspace)
+        try:
+            sys.path.insert(0, stdcxx_printer_toolchain_paths[progspace])
+            from libstdcxx.v6 import register_libstdcxx_printers
+            from libstdcxx.v6 import printers as stdlib_printers
+            register_libstdcxx_printers(progspace)
+            print(f"Loaded libstdc++ pretty printers from '{stdcxx_printer_toolchain_paths[progspace]}'")
+        except Exception as exc:
+            print(f"Failed to load the libstdc++ pretty printers from {stdcxx_printer_toolchain_paths[progspace]}: {exc}")
+
+def on_new_object_file(objfile) -> None:
+    """Import the libstdc++ GDB pretty printers when either the `attach <pid>` or
+    `core-file <pathname>` commands are run in GDB.
+    """
+    progspace = objfile.new_objfile.progspace
+    if progspace.filename is None:
+        # The `attach` command would have filled in the filename so we only need to check if
+        # a core dump has been loaded with the executable file also being loaded.
+        target_info = gdb.execute("info target", to_string=True)
+        if re.match(r"^Local core dump file:", target_info):
+            warnings.warn(
+                "Unable to locate the libstdc++ GDB pretty printers without an executable"
+                " file. Try running the `file` command with the path to the executable file"
+                " and reloading the core dump with the `core-file` command")
+        return
+
+
+    load_libstdcxx_printers(objfile.new_objfile.progspace)
+
+if gdb.selected_inferior().progspace.filename:
+    load_libstdcxx_printers(gdb.selected_inferior().progspace)
+else:
+    gdb.events.new_objfile.connect(on_new_object_file)
 
 try:
     import bson

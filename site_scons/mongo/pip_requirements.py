@@ -12,7 +12,7 @@ class MissingRequirements(Exception):
     pass
 
 
-def verify_requirements(requirements_file: str, silent: bool = False):
+def verify_requirements(requirements_file: str, silent: bool = False, executable=sys.executable):
     """Check if the modules in a pip requirements file are installed.
     This allows for a more friendly user message with guidance on how to
     resolve the missing dependencies.
@@ -30,7 +30,7 @@ def verify_requirements(requirements_file: str, silent: bool = False):
     def raiseSuggestion(ex, pip_pkg):
         raise MissingRequirements(f"{ex}\n"
                                   f"Try running:\n"
-                                  f"    {sys.executable} -m pip install {pip_pkg}") from ex
+                                  f"    {executable} -m pip install {pip_pkg}") from ex
 
     # Import the prequisites for this function, providing hints on failure.
     try:
