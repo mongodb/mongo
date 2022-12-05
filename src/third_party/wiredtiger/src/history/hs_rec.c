@@ -468,6 +468,11 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_MULTI *mult
                 continue;
 
             if (F_ISSET(upd, WT_UPDATE_TO_DELETE_FROM_HS)) {
+                /*
+                 * If we want to remove an update from the history store in WiredTiger, it must be
+                 * in history store.
+                 */
+                WT_ASSERT(session, F_ISSET(upd, WT_UPDATE_HS | WT_UPDATE_RESTORED_FROM_HS));
                 if (upd->type == WT_UPDATE_TOMBSTONE)
                     delete_tombstone = upd;
                 else {

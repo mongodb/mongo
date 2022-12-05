@@ -708,5 +708,9 @@ __evict_review(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t evict_flags, bool
       !__wt_page_is_modified(page) || LF_ISSET(WT_REC_HS | WT_REC_IN_MEMORY) ||
         WT_IS_METADATA(btree->dhandle));
 
+    /* Fail 0.1% of the time. */
+    if (__wt_failpoint(session, WT_TIMING_STRESS_FAILPOINT_EVICTION_FAIL_AFTER_RECONCILIATION, 10))
+        return (EBUSY);
+
     return (0);
 }

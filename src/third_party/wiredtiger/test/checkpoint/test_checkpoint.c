@@ -68,6 +68,7 @@ main(int argc, char *argv[])
     g.ntables = 3;
     g.nworkers = 1;
     g.sweep_stress = g.use_timestamps = false;
+    g.failpoint_eviction_fail_after_reconciliation = false;
     g.failpoint_hs_delete_key_from_ts = false;
     g.hs_checkpoint_timing_stress = g.reserved_txnid_timing_stress = false;
     g.checkpoint_slow_timing_stress = false;
@@ -127,8 +128,12 @@ main(int argc, char *argv[])
             case '5':
                 g.checkpoint_slow_timing_stress = true;
                 break;
+            case '7':
+                g.failpoint_eviction_fail_after_reconciliation = true;
+                break;
             default:
                 return (usage());
+                break;
             }
             break;
         case 't':
@@ -273,7 +278,10 @@ wt_connect(const char *config_open)
       g.reserved_txnid_timing_stress || g.checkpoint_slow_timing_stress) {
         timing_stress = true;
         testutil_check(__wt_snprintf(timing_stress_config, sizeof(timing_stress_config),
-          ",timing_stress_for_test=[%s%s%s%s%s]", g.sweep_stress ? "aggressive_sweep" : "",
+          ",timing_stress_for_test=[%s%s%s%s%s%s]", g.sweep_stress ? "aggressive_sweep" : "",
+          g.failpoint_eviction_fail_after_reconciliation ?
+            "failpoint_eviction_fail_after_reconciliation" :
+            "",
           g.failpoint_hs_delete_key_from_ts ? "failpoint_history_store_delete_key_from_ts" : "",
           g.hs_checkpoint_timing_stress ? "history_store_checkpoint_delay" : "",
           g.reserved_txnid_timing_stress ? "checkpoint_reserved_txnid_delay" : "",
@@ -292,8 +300,10 @@ wt_connect(const char *config_open)
      */
     if (g.sweep_stress)
         testutil_check(__wt_snprintf(config, sizeof(config),
-          "create,cache_cursors=false,statistics=(fast),statistics_log=(json,wait=1),error_prefix="
-          "\"%s\",file_manager=(close_handle_minimum=1,close_idle_time=1,close_scan_interval=1),"
+          "create,cache_cursors=false,statistics=(fast),statistics_log=(json,wait=1),error_"
+          "prefix="
+          "\"%s\",file_manager=(close_handle_minimum=1,close_idle_time=1,close_scan_interval=1)"
+          ","
           "log=(enabled),cache_size=1GB, eviction_dirty_trigger=%i, "
           "eviction_dirty_target=%i,%s%s%s%s",
           progname, fast_eviction ? 5 : 20, fast_eviction ? 1 : 5, timing_stress_config,
@@ -301,7 +311,8 @@ wt_connect(const char *config_open)
           config_open == NULL ? "" : config_open));
     else
         testutil_check(__wt_snprintf(config, sizeof(config),
-          "create,cache_cursors=false,statistics=(fast),statistics_log=(json,wait=1),log=(enabled),"
+          "create,cache_cursors=false,statistics=(fast),statistics_log=(json,wait=1),log=("
+          "enabled),"
           "error_prefix=\"%s\",cache_size=1G, eviction_dirty_trigger=%i, "
           "eviction_dirty_target=%i,%s%s%s%s",
           progname, fast_eviction ? 5 : 20, fast_eviction ? 1 : 5,
@@ -589,6 +600,8 @@ usage(void)
       "\t\t3: hs_checkpoint_timing_stress\n"
       "\t\t4: reserved_txnid_timing_stress\n"
       "\t\t5: checkpoint_slow_timing_stress\n"
+      "\t\t6: evict_reposition_timing_stress\n"
+      "\t\t7: failpoint_eviction_fail_after_reconciliation\n"
       "\t-T specify a table configuration\n"
       "\t-t set a file type ( col | mix | row | lsm )\n"
       "\t-v verify only\n"
