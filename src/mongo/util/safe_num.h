@@ -41,6 +41,7 @@ namespace mutablebson {
 class Element;
 class Document;
 }  // namespace mutablebson
+class Value;
 
 /**
  * SafeNum holds and does arithmetic on a number in a safe way, handling overflow
@@ -156,6 +157,7 @@ public:
 
     friend class mutablebson::Element;
     friend class mutablebson::Document;
+    friend class Value;
 
     /**
      * Appends contents to given BSONObjBuilder.

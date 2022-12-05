@@ -4280,6 +4280,152 @@ TEST(ExpressionFLETest, ParseAndSerializeBetween) {
         } })");
     ASSERT_BSONOBJ_EQ(value.getDocument().toBson(), roundTripExpr);
 }
+TEST(ExpressionBitAndTest, BitAndCorrectness) {
+    assertExpectedResults("$bitAnd",
+                          {
+                              // Explicit correctness cases.
+                              {{0b0, 0b0}, 0b0},
+                              {{0b0, 0b1}, 0b0},
+                              {{0b1, 0b0}, 0b0},
+                              {{0b1, 0b1}, 0b1},
+
+                              {{0b00, 0b00}, 0b00},
+                              {{0b00, 0b01}, 0b00},
+                              {{0b01, 0b00}, 0b00},
+                              {{0b01, 0b01}, 0b01},
+
+                              {{0b00, 0b00}, 0b00},
+                              {{0b00, 0b11}, 0b00},
+                              {{0b11, 0b00}, 0b00},
+                              {{0b11, 0b11}, 0b11},
+                          });
+}
+
+TEST(ExpressionBitAndTest, BitAndInt) {
+    assertExpectedResults(
+        "$bitAnd",
+        {
+            // Empty operand list should evaluate to the identity for the operation.
+            {{}, -1},
+            // Singleton cases.
+            {{0}, 0},
+            {{256}, 256},
+            // Binary cases
+            {{5, 2}, 5 & 2},
+            {{255, 0}, 255 & 0},
+            // Ternary cases
+            {{5, 2, 10}, 5 & 2 & 10},
+        });
+}
+
+TEST(ExpressionBitAndTest, BitAndLong) {
+    assertExpectedResults("$bitAnd",
+                          {
+                              // Singleton cases.
+                              {{0LL}, 0LL},
+                              {{1LL << 40}, 1LL << 40},
+                              {{256LL}, 256LL},
+                              // Binary cases.
+                              {{5LL, 2LL}, 5LL & 2LL},
+                              {{255LL, 0LL}, 255LL & 0LL},
+                              // Ternary cases.
+                              {{5, 2, 10}, 5 & 2 & 10},
+                          });
+}
+
+TEST(ExpressionBitAndTest, BitAndMixedTypes) {
+    // Any NumberLong widens the resulting type to NumberLong.
+    assertExpectedResults("$bitAnd",
+                          {
+                              // Binary cases
+                              {{5LL, 2}, 5LL & 2},
+                              {{5, 2LL}, 5 & 2LL},
+                              {{255LL, 0}, 255LL & 0},
+                              {{255, 0LL}, 255 & 0LL},
+                          });
+}
+
+TEST(ExpressionBitOrTest, BitOrInt) {
+    assertExpectedResults("$bitOr",
+                          {
+                              {{}, 0},
+                              // Singleton cases.
+                              {{0}, 0},
+                              {{256}, 256},
+                              // Binary cases
+                              {{5, 2}, 5 | 2},
+                              {{255, 0}, 255 | 0},
+                              // Ternary cases
+                              {{5, 2, 10}, 5 | 2 | 10},
+                          });
+}
+
+TEST(ExpressionBitOrTest, BitOrLong) {
+    assertExpectedResults("$bitOr",
+                          {
+                              // Singleton cases.
+                              {{0LL}, 0LL},
+                              {{256LL}, 256LL},
+                              // Binary cases.
+                              {{5LL, 2LL}, 5LL | 2LL},
+                              {{255LL, 0LL}, 255LL | 0LL},
+                              // Ternary cases.
+                              {{5, 2, 10}, 5 | 2 | 10},
+                          });
+}
+
+TEST(ExpressionBitOrTest, BitOrMixedTypes) {
+    // Any NumberLong widens the resulting type to NumberLong.
+    assertExpectedResults("$bitOr",
+                          {
+                              // Binary cases
+                              {{5LL, 2}, 5LL | 2},
+                              {{5, 2LL}, 5 | 2LL},
+                              {{255LL, 0}, 255LL | 0},
+                              {{255, 0LL}, 255 | 0LL},
+                          });
+}
+
+TEST(ExpressionBitXorTest, BitXorInt) {
+    assertExpectedResults("$bitXor",
+                          {
+                              {{}, 0},
+                              // Singleton cases.
+                              {{0}, 0},
+                              {{256}, 256},
+                              // Binary cases
+                              {{5, 2}, 5 ^ 2},
+                              {{255, 0}, 255 ^ 0},
+                              // Ternary cases
+                              {{5, 2, 10}, 5 ^ 2 ^ 10},
+                          });
+}
+
+TEST(ExpressionBitXorTest, BitXorLong) {
+    assertExpectedResults("$bitXor",
+                          {
+                              // Singleton cases.
+                              {{0LL}, 0LL},
+                              {{256LL}, 256LL},
+                              // Binary cases.
+                              {{5LL, 2LL}, 5LL ^ 2LL},
+                              {{255LL, 0LL}, 255LL ^ 0LL},
+                              // Ternary cases.
+                              {{5, 2, 10}, 5 ^ 2 ^ 10},
+                          });
+}
+
+TEST(ExpressionBitXorTest, BitXorMixedTypes) {
+    // Any NumberLong widens the resulting type to NumberLong.
+    assertExpectedResults("$bitXor",
+                          {
+                              // Binary cases
+                              {{5LL, 2}, 5LL ^ 2},
+                              {{5, 2LL}, 5 ^ 2LL},
+                              {{255LL, 0}, 255LL ^ 0},
+                              {{255, 0LL}, 255 ^ 0LL},
+                          });
+}
 
 TEST(ExpressionBitNotTest, Int) {
     int min = numeric_limits<int>::min();

@@ -168,6 +168,9 @@ class ExpressionDateSubtract;
 class ExpressionDateTrunc;
 class ExpressionGetField;
 class ExpressionSetField;
+class ExpressionBitAnd;
+class ExpressionBitOr;
+class ExpressionBitXor;
 
 class AccumulatorAvg;
 class AccumulatorFirstN;
@@ -218,6 +221,9 @@ public:
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionTestApiVersion>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionArray>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionArrayElemAt>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionBitAnd>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionBitOr>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionBitXor>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionBitNot>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionFirst>) = 0;
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionLast>) = 0;
@@ -402,6 +408,9 @@ struct SelectiveConstExpressionVisitorBase : public ExpressionConstVisitor {
     void visit(const ExpressionAnyElementTrue*) override {}
     void visit(const ExpressionArray*) override {}
     void visit(const ExpressionArrayElemAt*) override {}
+    void visit(const ExpressionBitAnd*) override {}
+    void visit(const ExpressionBitOr*) override {}
+    void visit(const ExpressionBitXor*) override {}
     void visit(const ExpressionBitNot*) override {}
     void visit(const ExpressionFirst*) override {}
     void visit(const ExpressionLast*) override {}

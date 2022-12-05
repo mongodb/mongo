@@ -8070,6 +8070,11 @@ const char* ExpressionBitNot::getOpName() const {
     return "$bitNot";
 }
 
+/* ------------------------- $bitAnd, $bitOr, and $bitXor ------------------------ */
+
+REGISTER_STABLE_EXPRESSION(bitAnd, ExpressionBitAnd::parse);
+REGISTER_STABLE_EXPRESSION(bitOr, ExpressionBitOr::parse);
+REGISTER_STABLE_EXPRESSION(bitXor, ExpressionBitXor::parse);
 
 MONGO_INITIALIZER_GROUP(BeginExpressionRegistration, ("default"), ("EndExpressionRegistration"))
 MONGO_INITIALIZER_GROUP(EndExpressionRegistration, ("BeginExpressionRegistration"), ())

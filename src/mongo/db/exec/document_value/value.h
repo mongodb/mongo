@@ -33,6 +33,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/value_internal.h"
 #include "mongo/util/concepts.h"
+#include "mongo/util/safe_num.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -145,6 +146,9 @@ public:
     // TODO: add an unsafe version that can share storage with the BSONElement
     /// Deep-convert from BSONElement to Value
     explicit Value(const BSONElement& elem);
+
+    /// Create a value from a SafeNum.
+    explicit Value(const SafeNum& value);
 
 
     /** Construct a long or integer-valued Value.

@@ -398,6 +398,17 @@ public:
         unsupportedExpression();
     }
 
+    void visit(const ExpressionBitAnd* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionBitOr* expr) override final {
+        unsupportedExpression();
+    }
+
+    void visit(const ExpressionBitXor* expr) override final {
+        unsupportedExpression();
+    }
     void visit(const ExpressionBitNot* expr) override final {
         unsupportedExpression();
     }

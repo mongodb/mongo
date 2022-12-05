@@ -56,6 +56,9 @@ public:
     void visit(const ExpressionAnyElementTrue*) {}
     void visit(const ExpressionArray*) {}
     void visit(const ExpressionArrayElemAt*) {}
+    void visit(const ExpressionBitAnd*) {}
+    void visit(const ExpressionBitOr*) {}
+    void visit(const ExpressionBitXor*) {}
     void visit(const ExpressionBitNot*) {}
     void visit(const ExpressionFirst*) {}
     void visit(const ExpressionLast*) {}

@@ -86,11 +86,18 @@ public:
     void visit(const ExpressionArrayElemAt* expr) override final {
         unsupportedExpression(expr->getOpName());
     }
-
+    void visit(const ExpressionBitAnd* expr) override final {
+        unsupportedExpression("bitAnd");
+    }
+    void visit(const ExpressionBitOr* expr) override final {
+        unsupportedExpression("bitOr");
+    }
+    void visit(const ExpressionBitXor* expr) override final {
+        unsupportedExpression("bitXor");
+    }
     void visit(const ExpressionBitNot* expr) override final {
         unsupportedExpression(expr->getOpName());
     }
-
     void visit(const ExpressionFirst* expr) override final {
         unsupportedExpression(expr->getOpName());
     }
