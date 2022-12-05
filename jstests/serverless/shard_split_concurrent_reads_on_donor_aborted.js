@@ -24,7 +24,6 @@ load("jstests/serverless/libs/shard_split_test.js");
 load("jstests/serverless/shard_split_concurrent_reads_on_donor_util.js");
 
 const kCollName = "testColl";
-const kTenantDefinedDbName = "0";
 
 /**
  * Tests that after the split abort, the donor does not reject linearizable reads or reads with

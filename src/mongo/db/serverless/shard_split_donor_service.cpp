@@ -470,7 +470,11 @@ boost::optional<BSONObj> ShardSplitDonorService::DonorStateMachine::reportForCur
     }
     const auto& tenantIds = _stateDoc.getTenantIds();
     if (tenantIds) {
-        bob.append("tenantIds", *tenantIds);
+        std::vector<std::string> tenantIdsAsStrings;
+        for (const auto& tid : *tenantIds) {
+            tenantIdsAsStrings.push_back(tid.toString());
+        }
+        bob.append("tenantIds", tenantIdsAsStrings);
     }
     if (_stateDoc.getBlockOpTime()) {
         _stateDoc.getBlockOpTime()->append(&bob, "blockOpTime");
@@ -608,7 +612,7 @@ ShardSplitDonorService::DonorStateMachine::_abortIndexBuildsAndEnterBlockingStat
     const ScopedTaskExecutorPtr& executor, const CancellationToken& abortToken) {
     checkForTokenInterrupt(abortToken);
 
-    boost::optional<std::vector<StringData>> tenantIds;
+    boost::optional<std::vector<TenantId>> tenantIds;
     {
         stdx::lock_guard<Latch> lg(_mutex);
         if (_stateDoc.getState() > ShardSplitDonorStateEnum::kAbortingIndexBuilds) {
@@ -627,7 +631,10 @@ ShardSplitDonorService::DonorStateMachine::_abortIndexBuildsAndEnterBlockingStat
     auto* indexBuildsCoordinator = IndexBuildsCoordinator::get(opCtx.get());
     for (const auto& tenantId : *tenantIds) {
         indexBuildsCoordinator->abortTenantIndexBuilds(
-            opCtx.get(), MigrationProtocolEnum::kMultitenantMigrations, tenantId, "shard split");
+            opCtx.get(),
+            MigrationProtocolEnum::kMultitenantMigrations,
+            tenantId.toString(),
+            "shard split");
     }
 
     if (MONGO_unlikely(pauseShardSplitBeforeBlockingState.shouldFail())) {

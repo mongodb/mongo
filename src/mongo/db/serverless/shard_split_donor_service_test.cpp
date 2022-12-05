@@ -229,11 +229,10 @@ void fastForwardCommittedSnapshotOpTime(
         serviceContext, *foundStateDoc.getCommitOrAbortOpTime());
 }
 
-bool hasActiveSplitForTenants(OperationContext* opCtx,
-                              const std::vector<std::string>& tenantNames) {
-    return std::all_of(tenantNames.begin(), tenantNames.end(), [&](const auto& tenantName) {
+bool hasActiveSplitForTenants(OperationContext* opCtx, const std::vector<TenantId>& tenantIds) {
+    return std::all_of(tenantIds.begin(), tenantIds.end(), [&](const auto& tenantId) {
         return tenant_migration_access_blocker::hasActiveTenantMigration(
-            opCtx, StringData(tenantName + "_db"));
+            opCtx, StringData(tenantId.toString() + "_db"));
     });
 }
 
@@ -402,10 +401,12 @@ protected:
     }
 
     ShardSplitDonorDocument defaultStateDocument() const {
-        return ShardSplitDonorDocument::parse(
+        auto shardSplitStateDoc = ShardSplitDonorDocument::parse(
             IDLParserContext{"donor.document"},
-            BSON("_id" << _uuid << "tenantIds" << _tenantIds << "recipientTagName"
-                       << _recipientTagName << "recipientSetName" << _recipientSetName));
+            BSON("_id" << _uuid << "recipientTagName" << _recipientTagName << "recipientSetName"
+                       << _recipientSetName));
+        shardSplitStateDoc.setTenantIds(_tenantIds);
+        return shardSplitStateDoc;
     }
 
     /**
@@ -457,7 +458,7 @@ protected:
     MockReplicaSet _recipientSet{
         "recipientSetForTest", 3, true /* hasPrimary */, false /* dollarPrefixHosts */};
     const NamespaceString _nss{"testDB2", "testColl2"};
-    std::vector<std::string> _tenantIds = {"tenant1", "tenantAB"};
+    std::vector<TenantId> _tenantIds = {TenantId(OID::gen()), TenantId(OID::gen())};
     std::string _recipientTagName{"$recipientNode"};
     std::string _recipientSetName{_recipientSet.getURI().getSetName()};
 

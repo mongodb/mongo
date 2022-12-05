@@ -102,10 +102,11 @@ void TenantMigrationAccessBlockerRegistry::add(StringData tenantId,
     _tenantMigrationAccessBlockers.emplace(tenantId, mtabPair);
 }
 
-void TenantMigrationAccessBlockerRegistry::add(const std::vector<StringData>& tenantIds,
+void TenantMigrationAccessBlockerRegistry::add(const std::vector<TenantId>& tenantIds,
                                                std::shared_ptr<TenantMigrationAccessBlocker> mtab) {
+    // TODO SERVER-71186 use tenantId directly instead of a string conversion.
     for (auto&& tenantId : tenantIds) {
-        add(tenantId, mtab);
+        add(tenantId.toString(), mtab);
     }
 }
 

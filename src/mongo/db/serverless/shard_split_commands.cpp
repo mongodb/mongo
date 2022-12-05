@@ -64,16 +64,7 @@ public:
 
             const auto& cmd = request();
             auto stateDoc = ShardSplitDonorDocument(cmd.getMigrationId());
-            std::vector<std::string> tenantIds;
-            // TODO (SERVER-71184) revert the code to directly assigned getTenantIds to the statedoc
-            for (auto id : cmd.getTenantIds()) {
-                tenantIds.push_back(id.toString());
-            }
-            std::vector<StringData> tenantIdsSd;
-            for (const auto& id : tenantIds) {
-                tenantIdsSd.push_back(id);
-            }
-            stateDoc.setTenantIds(tenantIdsSd);
+            stateDoc.setTenantIds(cmd.getTenantIds());
             stateDoc.setRecipientTagName(cmd.getRecipientTagName());
             stateDoc.setRecipientSetName(cmd.getRecipientSetName());
 

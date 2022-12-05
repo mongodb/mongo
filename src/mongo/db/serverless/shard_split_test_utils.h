@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/tenant_id.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo {
@@ -43,13 +44,13 @@ namespace shard_split {
 // test fixture, which introduces additional errors in the test and makes debugging harder.
 class ScopedTenantAccessBlocker {
 public:
-    ScopedTenantAccessBlocker(const std::vector<std::string>& tenants, OperationContext* opCtx);
+    ScopedTenantAccessBlocker(const std::vector<TenantId>& tenants, OperationContext* opCtx);
     ~ScopedTenantAccessBlocker();
 
     void dismiss();
 
 private:
-    std::vector<std::string> _tenants;
+    std::vector<TenantId> _tenants;
     OperationContext* _opCtx;
 };
 

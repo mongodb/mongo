@@ -69,7 +69,7 @@ structs:
                     monitor the recipient for split acceptance.
                 optional: true
             tenantIds:
-                type: array<string>
+                type: array<tenant_id>
                 optional: true
                 description: "The identifier for the list of tenants being migrated."
             state:

@@ -456,9 +456,9 @@ function getOperationStateDocument(conn) {
     const collection = isShardSplitPassthrough() ? "shardSplitDonors" : "tenantMigrationDonors";
     let filter = {tenantId: TestData.tenantId};
     if (isShardSplitPassthrough()) {
-        let tenantIdsAsStrings = [];
-        TestData.tenantIds.forEach(tenantId => tenantIdsAsStrings.push(tenantId));
-        filter = {tenantIds: tenantIdsAsStrings};
+        let tenantIds = [];
+        TestData.tenantIds.forEach(tenantId => tenantIds.push(ObjectId(tenantId)));
+        filter = {tenantIds: tenantIds};
     } else if (isShardMergePassthrough(conn)) {
         // TODO (SERVER-68643) No longer require to check for shard merge since shard merge will be
         // the only protocol left.
@@ -467,6 +467,7 @@ function getOperationStateDocument(conn) {
 
     const findRes = assert.commandWorked(
         originalRunCommand.apply(conn, ["config", {find: collection, filter}, 0]));
+
     const docs = findRes.cursor.firstBatch;
     // There should only be one active migration at any given time.
     assert.eq(docs.length, 1, tojson(docs));

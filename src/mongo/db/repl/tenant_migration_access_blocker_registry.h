@@ -116,9 +116,9 @@ public:
     void add(StringData tenantId, std::shared_ptr<TenantMigrationAccessBlocker> mtab);
 
     /**
-     * Add one access blocker and associate it with many tenant ids.
+     * Add one access blocker and associate it with many tenant_id objects.
      */
-    void add(const std::vector<StringData>& tenantIds,
+    void add(const std::vector<TenantId>& tenantIds,
              std::shared_ptr<TenantMigrationAccessBlocker> mtab);
 
     /**

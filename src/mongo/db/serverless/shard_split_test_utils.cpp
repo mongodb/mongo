@@ -37,14 +37,15 @@ namespace mongo {
 namespace test {
 namespace shard_split {
 
-ScopedTenantAccessBlocker::ScopedTenantAccessBlocker(const std::vector<std::string>& tenants,
+ScopedTenantAccessBlocker::ScopedTenantAccessBlocker(const std::vector<TenantId>& tenants,
                                                      OperationContext* opCtx)
     : _tenants(tenants), _opCtx(opCtx) {}
 
 ScopedTenantAccessBlocker::~ScopedTenantAccessBlocker() {
     for (const auto& tenant : _tenants) {
+        // TODO SERVER-71186 use tenantId directly instead of a string conversion.
         TenantMigrationAccessBlockerRegistry::get(_opCtx->getServiceContext())
-            .remove(tenant, TenantMigrationAccessBlocker::BlockerType::kDonor);
+            .remove(tenant.toString(), TenantMigrationAccessBlocker::BlockerType::kDonor);
     }
 }
 

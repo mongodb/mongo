@@ -162,7 +162,7 @@ void onTransitionToAbortingIndexBuilds(OperationContext* opCtx,
     if (isPrimary(opCtx)) {
         // onRollback is not registered on secondaries since secondaries should not fail to
         // apply the write.
-        opCtx->recoveryUnit()->onRollback([opCtx, tenantIds, migrationId = donorStateDoc.getId()] {
+        opCtx->recoveryUnit()->onRollback([opCtx, migrationId = donorStateDoc.getId()] {
             TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                 .removeAccessBlockersForMigration(
                     migrationId, TenantMigrationAccessBlocker::BlockerType::kDonor);
