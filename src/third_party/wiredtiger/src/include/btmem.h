@@ -1176,6 +1176,7 @@ struct __wt_update {
 #define WT_UPDATE_RESTORED_FAST_TRUNCATE 0x10u   /* Fast truncate instantiation */
 #define WT_UPDATE_RESTORED_FROM_DS 0x20u         /* Update restored from data store. */
 #define WT_UPDATE_RESTORED_FROM_HS 0x40u         /* Update restored from history store. */
+#define WT_UPDATE_TO_DELETE_FROM_HS 0x80u        /* Update needs to be deleted from history store */
                                                  /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
     uint8_t flags;
 

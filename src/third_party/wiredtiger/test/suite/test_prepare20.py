@@ -27,14 +27,14 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 
-# test_prepare19.py
+# test_prepare20.py
 # Check that we can use an application-level log to replay unstable transactions.
 
-import wiredtiger, wttest
+import wttest
 from wtscenario import make_scenarios
 from helper import simulate_crash_restart
 
-class test_prepare19(wttest.WiredTigerTestCase):
+class test_prepare20(wttest.WiredTigerTestCase):
     # Do write the logs immediately, but don't waste time fsyncing them.
     conn_config = 'log=(enabled),transaction_sync=(enabled=true,method=none)'
 
@@ -131,7 +131,7 @@ class test_prepare19(wttest.WiredTigerTestCase):
         # First pass: find prepared txns. Ignore (thus abort) any that didn't even prepare.
         txns = {}
         self.lcursor.reset()
-        for lsn, op, k, oldv, newv in self.lcursor:
+        for _, op, k, oldv, newv in self.lcursor:
             if op == self.BEGIN:
                 # "key" is the txnid
                 txns[k] = False
@@ -143,7 +143,7 @@ class test_prepare19(wttest.WiredTigerTestCase):
         writing = False
         committime = None
         durabletime = None
-        for lsn, op, k, oldv, newv in self.lcursor:
+        for _, op, k, oldv, newv in self.lcursor:
             if op == self.BEGIN:
                 # "key" is the txnid
                 if txns[k]:
@@ -198,9 +198,9 @@ class test_prepare19(wttest.WiredTigerTestCase):
 
     # Now the test.
 
-    def test_prepare19(self):
-        data_uri = 'file:prepare19data'
-        log_uri = 'file:prepare19log'
+    def test_prepare20(self):
+        data_uri = 'file:prepare20data'
+        log_uri = 'file:prepare20log'
 
         # Create one table for data and another to be an application-level log.
         # The log's format is application-lsn -> operation, key, oldvalue, newvalue
