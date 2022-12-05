@@ -4478,14 +4478,6 @@ var authCommandsLib = {
           }]
         },
         {
-          testname: "getnonce",
-          command: {getnonce: 1},
-          testcases: [
-              {runOnDb: firstDbName, roles: roles_all, privileges: []},
-              {runOnDb: secondDbName, roles: roles_all, privileges: []}
-          ]
-        },
-        {
           testname: "getParameter",
           command: {getParameter: 1, quiet: 1},
           testcases: [

@@ -221,7 +221,6 @@ let testCases = {
     getParameter: {skip: "does not return user data"},
     getShardMap: {skip: "does not return user data"},
     getShardVersion: {skip: "primary only"},
-    getnonce: {skip: "does not return user data"},
     godinsert: {skip: "for testing only"},
     grantPrivilegesToRole: {skip: "primary only"},
     grantRolesToRole: {skip: "primary only"},

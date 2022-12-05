@@ -435,7 +435,7 @@ let viewsCommandTests = {
         isAdminCommand: true,
         skipSharded: true,  // mongos is tested in views/views_sharded.js
     },
-    getnonce: {skip: isUnrelated},
+    getnonce: {skip: "removed in v6.3"},
     godinsert: {skip: isAnInternalCommand},
     grantPrivilegesToRole: {skip: "tested in auth/commands_user_defined_roles.js"},
     grantRolesToRole: {skip: isUnrelated},

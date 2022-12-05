@@ -693,9 +693,6 @@ const allCommands = {
         //     },
         //     isShardedOnly: true,
     },
-    getnonce: {
-        command: {getnonce: 1},
-    },
     godinsert: {
         setUp: function(conn) {
             assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));

@@ -547,7 +547,7 @@ TenantMigrationConcurrentWriteUtil.testCases = {
     getParameter: {skip: isNotRunOnUserDatabase},
     getShardMap: {skip: isNotRunOnUserDatabase},
     getShardVersion: {skip: isNotRunOnUserDatabase},
-    getnonce: {skip: isNotRunOnUserDatabase},
+    getnonce: {skip: "removed in v6.3"},
     godinsert: {skip: isNotRunOnUserDatabase},
     grantPrivilegesToRole: {skip: isAuthCommand},
     grantRolesToRole: {skip: isAuthCommand},

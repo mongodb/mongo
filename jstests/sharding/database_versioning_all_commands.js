@@ -496,7 +496,6 @@ let testCases = {
     getParameter: {skip: "executes locally on mongos (not sent to any remote node)"},
     getShardMap: {skip: "executes locally on mongos (not sent to any remote node)"},
     getShardVersion: {skip: "executes locally on mongos (not sent to any remote node)"},
-    getnonce: {skip: "not on a user database"},
     grantPrivilegesToRole: {skip: "always targets the config server"},
     grantRolesToRole: {skip: "always targets the config server"},
     grantRolesToUser: {skip: "always targets the config server"},

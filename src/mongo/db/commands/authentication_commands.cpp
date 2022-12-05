@@ -32,13 +32,9 @@
 
 #include "mongo/db/commands/authentication_commands.h"
 
-#include <memory>
 #include <string>
-#include <vector>
 
 #include "mongo/base/status.h"
-#include "mongo/bson/mutable/algorithm.h"
-#include "mongo/bson/mutable/document.h"
 #include "mongo/client/authenticate.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/config.h"
@@ -46,24 +42,15 @@
 #include "mongo/db/auth/authentication_session.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/cluster_auth_mode.h"
-#include "mongo/db/auth/privilege.h"
-#include "mongo/db/auth/security_key.h"
-#include "mongo/db/auth/user_name.h"
-#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/authentication_commands_gen.h"
 #include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/commands/user_management_commands_gen.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/random.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/transport/session.h"
-#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_peer_info.h"
 #include "mongo/util/net/ssl_types.h"
-#include "mongo/util/text.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 
@@ -73,76 +60,6 @@ namespace {
 
 constexpr auto kExternalDB = "$external"_sd;
 constexpr auto kDBFieldName = "db"_sd;
-
-/**
- * Returns a random 64-bit nonce.
- *
- * Previously, this command would have been called prior to {authenticate: ...}
- * when using the MONGODB-CR authentication mechanism.
- * Since that mechanism has been removed from MongoDB 3.8,
- * it is nominally no longer required.
- *
- * Unfortunately, mongo-tools uses a connection library
- * which optimistically invokes {getnonce: 1} upon connection
- * under the assumption that it will eventually be used as part
- * of "classic" authentication.
- * If the command dissapeared, then all of mongo-tools would
- * fail to connect, despite using SCRAM-SHA-1 or another valid
- * auth mechanism. Thus, we have to keep this command around for now.
- *
- * Note that despite nonces being available, they are not bound
- * to the AuthorizationSession anymore, and the authenticate
- * command doesn't acknowledge their existence.
- */
-class CmdGetNonce : public BasicCommand {
-public:
-    CmdGetNonce() : BasicCommand("getnonce") {}
-
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return AllowedOnSecondary::kAlways;
-    }
-
-    std::string help() const final {
-        return "internal";
-    }
-
-    bool supportsWriteConcern(const BSONObj& cmd) const final {
-        return false;
-    }
-
-    bool requiresAuth() const override {
-        return false;
-    }
-
-    Status checkAuthForOperation(OperationContext*,
-                                 const DatabaseName&,
-                                 const BSONObj&) const override {
-        // No auth required since this command was explicitly part
-        // of an authentication workflow.
-        return Status::OK();
-    }
-
-    bool run(OperationContext* opCtx,
-             const DatabaseName&,
-             const BSONObj& cmdObj,
-             BSONObjBuilder& result) final {
-        CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
-        auto n = getNextNonce();
-        std::stringstream ss;
-        ss << std::hex << n;
-        result.append("nonce", ss.str());
-        return true;
-    }
-
-private:
-    int64_t getNextNonce() {
-        stdx::lock_guard<SimpleMutex> lk(_randMutex);
-        return _random.nextInt64();
-    }
-
-    SimpleMutex _randMutex;  // Synchronizes accesses to _random.
-    SecureRandom _random;
-} cmdGetNonce;
 
 /**
  * A simple class to track "global" parameters related to the logout command.

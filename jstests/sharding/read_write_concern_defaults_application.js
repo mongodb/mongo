@@ -487,7 +487,7 @@ let testCases = {
     getParameter: {skip: "does not accept read or write concern"},
     getShardMap: {skip: "internal command"},
     getShardVersion: {skip: "internal command"},
-    getnonce: {skip: "does not accept read or write concern"},
+    getnonce: {skip: "removed in v6.3"},
     godinsert: {skip: "for testing only"},
     grantPrivilegesToRole: {
         setUp: function(conn) {
