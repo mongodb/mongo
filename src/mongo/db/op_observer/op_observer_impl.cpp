@@ -1614,7 +1614,7 @@ void writeChangeStreamPreImagesForTransaction(
 // updated after the oplog entry is written.
 //
 // Returns the optime of the written oplog entry.
-OpTimeBundle logApplyOps(OperationContext* opCtx,
+repl::OpTime logApplyOps(OperationContext* opCtx,
                          MutableOplogEntry* oplogEntry,
                          DurableTxnStateEnum txnState,
                          boost::optional<repl::OpTime> startOpTime,
@@ -1640,14 +1640,12 @@ OpTimeBundle logApplyOps(OperationContext* opCtx,
     }
 
     try {
-        OpTimeBundle times;
-        times.writeOpTime =
+        auto writeOpTime =
             logOperation(opCtx, oplogEntry, false /*assignWallClockTime*/, oplogWriter);
-        times.wallClockTime = oplogEntry->getWallClockTime();
         if (updateTxnTable) {
             SessionTxnRecord sessionTxnRecord;
-            sessionTxnRecord.setLastWriteOpTime(times.writeOpTime);
-            sessionTxnRecord.setLastWriteDate(times.wallClockTime);
+            sessionTxnRecord.setLastWriteOpTime(writeOpTime);
+            sessionTxnRecord.setLastWriteDate(oplogEntry->getWallClockTime());
             sessionTxnRecord.setState(txnState);
             sessionTxnRecord.setStartOpTime(startOpTime);
             if (txnRetryCounter && !isDefaultTxnRetryCounter(*txnRetryCounter)) {
@@ -1655,7 +1653,7 @@ OpTimeBundle logApplyOps(OperationContext* opCtx,
             }
             onWriteOpCompleted(opCtx, std::move(stmtIdsWritten), sessionTxnRecord);
         }
-        return times;
+        return writeOpTime;
     } catch (const AssertionException& e) {
         // Change the error code to TransactionTooLarge if it is BSONObjectTooLarge.
         uassert(ErrorCodes::TransactionTooLarge,
@@ -1707,7 +1705,7 @@ int logOplogEntries(
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
 
     const auto txnParticipant = TransactionParticipant::get(opCtx);
-    OpTimeBundle prevWriteOpTime;
+    repl::OpTime prevWriteOpTime;
 
     // Writes to the oplog only require a Global intent lock. Guaranteed by
     // OplogSlotReserver.
@@ -1804,7 +1802,7 @@ int logOplogEntries(
         MutableOplogEntry oplogEntry;
         oplogEntry.setOpTime(applyOpsEntry.oplogSlot);
         if (txnParticipant) {
-            oplogEntry.setPrevWriteOpTimeInTransaction(prevWriteOpTime.writeOpTime);
+            oplogEntry.setPrevWriteOpTimeInTransaction(prevWriteOpTime);
         }
         oplogEntry.setWallClockTime(wallClockTime);
         oplogEntry.setObject(applyOpsBuilder.done());
@@ -1828,7 +1826,7 @@ int logOplogEntries(
 
         if (imageToWrite) {
             invariant(!(*prePostImageToWriteToImageCollection));
-            imageToWrite->timestamp = prevWriteOpTime.writeOpTime.getTimestamp();
+            imageToWrite->timestamp = prevWriteOpTime.getTimestamp();
             *prePostImageToWriteToImageCollection = *imageToWrite;
         }
 
