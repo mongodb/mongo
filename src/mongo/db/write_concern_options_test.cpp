@@ -150,14 +150,12 @@ TEST(WriteConcernOptionsTest, ParseWTimeoutAsNaNDouble) {
     ASSERT_EQUALS(WriteConcernOptions::kNoTimeout, options.wTimeout);
 }
 
-TEST(WriteConcernOptionsTest, ParseWTimeoutAsDoubleLargerThanInt) {
+TEST(WriteConcernOptionsTest, ParseWTimeoutAsDoubleLargerThanIntFails) {
     // Set wtimeout to a double with value larger than INT_MAX.
     auto sw = WriteConcernOptions::parse(BSON("wtimeout" << 2999999999.0));
-    ASSERT_OK(sw.getStatus());
-    WriteConcernOptions options = sw.getValue();
-    ASSERT_TRUE(WriteConcernOptions::SyncMode::UNSET == options.syncMode);
-    ASSERT_EQUALS(1, stdx::get<int64_t>(options.w));
-    ASSERT_EQUALS(options.wTimeout, Milliseconds{2999999999});
+    auto status = sw.getStatus();
+    ASSERT_NOT_OK(status);
+    ASSERT_EQUALS(ErrorCodes::FailedToParse, status.code());
 }
 
 TEST(WriteConcernOptionsTest, ParseReturnsFailedToParseOnUnknownField) {
