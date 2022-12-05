@@ -374,7 +374,7 @@ public:
         unimplementedTasserted();
     }
 
-    bool isMetadataEqual(const BSONCollectionCatalogEntry::MetaData& md) const final {
+    bool isMetadataEqual(const BSONObj& otherMetadata) const final {
         unimplementedTasserted();
         return false;
     }

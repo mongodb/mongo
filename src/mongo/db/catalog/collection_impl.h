@@ -368,7 +368,7 @@ public:
     void replaceMetadata(OperationContext* opCtx,
                          std::shared_ptr<BSONCollectionCatalogEntry::MetaData> md) final;
 
-    bool isMetadataEqual(const BSONCollectionCatalogEntry::MetaData& md) const final;
+    bool isMetadataEqual(const BSONObj& otherMetadata) const final;
 
     bool needsCappedLock() const final;
 

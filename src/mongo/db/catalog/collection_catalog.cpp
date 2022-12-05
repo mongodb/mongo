@@ -793,22 +793,27 @@ CollectionPtr CollectionCatalog::openCollection(OperationContext* opCtx,
             catalogId = lookupResult.id;
         }
 
-        auto catalogEntry = DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, catalogId);
-        if (!catalogEntry || nss != catalogEntry->metadata->nss) {
+        auto catalogEntry = DurableCatalog::get(opCtx)->getCatalogEntry(opCtx, catalogId);
+        if (catalogEntry.isEmpty() ||
+            nss != DurableCatalog::getNamespaceFromCatalogEntry(catalogEntry)) {
             return CollectionPtr();
         }
-        auto latestCollection = _lookupCollectionByUUID(*catalogEntry->metadata->options.uuid);
+
+        auto latestCollection = lookupCollectionByNamespaceForRead(opCtx, nss);
+        auto metadata = DurableCatalog::getMetadataFromCatalogEntry(catalogEntry);
 
         // Use the pendingCollection if there is no latestCollection or if the metadata of the
         // latestCollection doesn't match the durable catalogEntry.
-        if (!latestCollection || !latestCollection->isMetadataEqual(*catalogEntry->metadata)) {
-            invariant(pendingCollection->isMetadataEqual(*catalogEntry->metadata));
+        if (!latestCollection || !latestCollection->isMetadataEqual(metadata)) {
+            invariant(pendingCollection->isMetadataEqual(metadata));
             uncommittedCatalogUpdates.openCollection(opCtx, pendingCollection);
             return CollectionPtr(pendingCollection.get(), CollectionPtr::NoYieldTag{});
         }
 
-        invariant(latestCollection->isMetadataEqual(*catalogEntry->metadata));
-        uncommittedCatalogUpdates.openCollection(opCtx, latestCollection);
+        invariant(latestCollection->isMetadataEqual(metadata));
+        // TODO SERVER-71817 remove const cast
+        uncommittedCatalogUpdates.openCollection(
+            opCtx, std::const_pointer_cast<Collection>(latestCollection));
         return CollectionPtr(latestCollection.get(), CollectionPtr::NoYieldTag{});
     }
 

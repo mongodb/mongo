@@ -1204,9 +1204,10 @@ private:
             ASSERT_EQ(coll->getIndexCatalog()->numIndexesTotal(), expectedNumIndexes);
 
             auto catalogEntry =
-                DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, coll->getCatalogId());
-            ASSERT(catalogEntry);
-            ASSERT(coll->isMetadataEqual(*catalogEntry->metadata.get()));
+                DurableCatalog::get(opCtx)->getCatalogEntry(opCtx, coll->getCatalogId());
+            ASSERT(!catalogEntry.isEmpty());
+            ASSERT(
+                coll->isMetadataEqual(DurableCatalog::getMetadataFromCatalogEntry(catalogEntry)));
         } else {
             ASSERT(!coll);
             auto catalogEntry = DurableCatalog::get(opCtx)->scanForCatalogEntryByNss(opCtx, nss);

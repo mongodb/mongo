@@ -84,6 +84,21 @@ public:
         return false;
     }
 
+    /**
+     * Gets the parsed namespace from a raw BSON catalog entry.
+     */
+    static NamespaceString getNamespaceFromCatalogEntry(const BSONObj& catalogEntry) {
+        return NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(
+            catalogEntry["ns"].checkAndGetStringData());
+    }
+
+    /**
+     * Gets the metadata as BSON from a raw BSON catalog entry.
+     */
+    static BSONObj getMetadataFromCatalogEntry(const BSONObj& catalogEntry) {
+        return catalogEntry["md"].Obj();
+    }
+
     virtual void init(OperationContext* opCtx) = 0;
 
     virtual std::vector<EntryIdentifier> getAllCatalogEntries(OperationContext* opCtx) const = 0;

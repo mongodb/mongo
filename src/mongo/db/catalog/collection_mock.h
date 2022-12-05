@@ -437,7 +437,7 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    bool isMetadataEqual(const BSONCollectionCatalogEntry::MetaData& md) const {
+    bool isMetadataEqual(const BSONObj& otherMetadata) const {
         MONGO_UNREACHABLE;
     }
 

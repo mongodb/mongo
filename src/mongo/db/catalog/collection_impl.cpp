@@ -1771,9 +1771,8 @@ void CollectionImpl::replaceMetadata(OperationContext* opCtx,
     _metadata = std::move(md);
 }
 
-bool CollectionImpl::isMetadataEqual(
-    const BSONCollectionCatalogEntry::MetaData& otherMetadata) const {
-    return !_metadata->toBSON().woCompare(otherMetadata.toBSON());
+bool CollectionImpl::isMetadataEqual(const BSONObj& otherMetadata) const {
+    return !_metadata->toBSON().woCompare(otherMetadata);
 }
 
 template <typename Func>
