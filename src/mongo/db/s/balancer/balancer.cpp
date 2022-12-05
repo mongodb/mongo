@@ -1053,6 +1053,7 @@ int Balancer::_moveChunks(OperationContext* opCtx,
         shardSvrRequest.setMaxChunkSizeBytes(maxChunkSizeBytes);
         shardSvrRequest.setFromShard(migrateInfo.from);
         shardSvrRequest.setEpoch(migrateInfo.version.epoch());
+        shardSvrRequest.setForceJumbo(migrateInfo.forceJumbo);
         const auto [secondaryThrottle, wc] =
             getSecondaryThrottleAndWriteConcern(balancerConfig->getSecondaryThrottle());
         shardSvrRequest.setSecondaryThrottle(secondaryThrottle);
