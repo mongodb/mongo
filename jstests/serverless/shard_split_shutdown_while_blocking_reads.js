@@ -62,7 +62,12 @@ donorRst.stop(donorPrimary);
 readThread.join();
 
 splitThread.join();
-assert.commandFailedWithCode(splitThread.returnData(), ErrorCodes.InterruptedDueToReplStateChange);
+// In some cases (ASAN builds) we could end up closing the connection before stopping the worker
+// thread. This race condition would result in HostUnreachable instead of
+// InterruptedDueToReplStateChange.
+assert.commandFailedWithCode(
+    splitThread.returnData(),
+    ErrorCodes.InterruptedDueToReplStateChange || ErrorCodes.HostUnreachable);
 
 // Shut down all the other nodes.
 test.donor.nodes.filter(node => node.port != donorPrimary.port)

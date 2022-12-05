@@ -53,7 +53,11 @@ let readThread = new Thread((host, dbName, collName, afterClusterTime) => {
         find: collName,
         readConcern: {afterClusterTime: Timestamp(afterClusterTime.t, afterClusterTime.i)}
     });
-    assert.commandFailedWithCode(res, ErrorCodes.InterruptedAtShutdown);
+    // In some cases (ASAN builds) we could end up closing the connection before stopping the
+    // worker thread. This race condition would result in HostUnreachable instead of
+    // InterruptedDueToReplStateChange.
+    assert.commandFailedWithCode(
+        res, ErrorCodes.InterruptedDueToReplStateChange || ErrorCodes.HostUnreachable);
 }, donorPrimary.host, kDbName, kCollName, donorDoc.blockTimestamp);
 readThread.start();
 
