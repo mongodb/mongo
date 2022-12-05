@@ -2705,7 +2705,7 @@ tasks:
       - func: "fetch artifacts"
       - command: shell.exec
         params:
-          working_dir: "wiredtiger/cmake_build/test/checkpoint"
+          working_dir: "wiredtiger/build_posix/test/checkpoint"
           shell: bash
           script: |
             set -o errexit
