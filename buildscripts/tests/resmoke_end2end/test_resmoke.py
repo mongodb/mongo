@@ -86,7 +86,7 @@ class TestArchivalOnFailure(_ResmokeSelftest):
         self.resmoke_process.wait()
 
         # test archival
-        archival_dirs_to_expect = 4  # 2 tests * 2 nodes
+        archival_dirs_to_expect = 8  # (2 tests + 2 stacktrace files) * 2 nodes
         self.assert_dir_file_count(self.test_dir, self.archival_file, archival_dirs_to_expect)
 
     def test_no_archival_locally(self):
@@ -169,7 +169,7 @@ class TestTimeout(_ResmokeSelftest):
         ]
         self.execute_resmoke(resmoke_args)
 
-        archival_dirs_to_expect = 4  # 2 tests * 2 nodes
+        archival_dirs_to_expect = 8  # (2 tests + 2 stacktrace files) * 2 nodes
         self.assert_dir_file_count(self.test_dir, self.archival_file, archival_dirs_to_expect)
 
         analysis_pids_to_expect = 6  # 2 tests * (2 mongod + 1 mongo)
@@ -187,7 +187,7 @@ class TestTimeout(_ResmokeSelftest):
 
         self.execute_resmoke(resmoke_args, sleep_secs=25)
 
-        archival_dirs_to_expect = 2  # 2 tests * 2 nodes / 2 data_file directories
+        archival_dirs_to_expect = 4  # ((2 tests + 2 stacktrace files) * 2 nodes) / 2 data_file directories
         self.assert_dir_file_count(self.test_dir, self.archival_file, archival_dirs_to_expect)
         self.assert_dir_file_count(self.test_dir_inner, self.archival_file, archival_dirs_to_expect)
 

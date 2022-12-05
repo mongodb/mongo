@@ -8,7 +8,7 @@ import time
 from datetime import timedelta
 from threading import Lock
 
-from typing import List, Optional, NamedTuple
+from typing import List, Optional, NamedTuple, Set
 
 from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib.testing.testcases.interface import TestCase
@@ -19,6 +19,7 @@ _lock = Lock()
 
 STACKTRACE_FILE_EXTENSION = ".stacktrace"
 SYMBOLIZE_RETRY_TIMEOUT_SECS = timedelta(minutes=4).total_seconds()
+PROCESSED_FILES_LIST_FILE_PATH = "symbolizer-processed-files.txt"  # noqa
 
 
 class ResmokeSymbolizerConfig(NamedTuple):
@@ -69,7 +70,8 @@ class ResmokeSymbolizer:
         )
         self.symbolizer_service = symbolizer_service if symbolizer_service is not None else SymbolizerService(
         )
-        self.file_service = file_service if file_service is not None else FileService()
+        self.file_service = file_service if file_service is not None else FileService(
+            PROCESSED_FILES_LIST_FILE_PATH)
 
     def symbolize_test_logs(self, test: TestCase,
                             symbolize_retry_timeout: float = SYMBOLIZE_RETRY_TIMEOUT_SECS) -> None:
@@ -107,8 +109,9 @@ class ResmokeSymbolizer:
                 if time.perf_counter() - start_time > symbolize_retry_timeout:
                     break
 
-            # To avoid performing the same actions on these files again, we remove them
-            self.file_service.remove_all(files)
+            # To avoid performing the same actions on these files again, we mark them as processed
+            self.file_service.add_to_processed_files(files)
+            self.file_service.write_processed_files(PROCESSED_FILES_LIST_FILE_PATH)
 
             test.logger.info("\nEND Symbolization \nSymbolization process completed. ")
 
@@ -162,14 +165,60 @@ class ResmokeSymbolizer:
 
         files = self.file_service.find_all_children_recursively(dir_path)
         files = self.file_service.filter_by_extension(files, STACKTRACE_FILE_EXTENSION)
-        self.file_service.remove_empty(files)
+        files = self.file_service.filter_out_empty_files(files)
         files = self.file_service.filter_out_non_files(files)
+        files = self.file_service.filter_out_already_processed_files(files)
 
         return files
 
 
 class FileService:
     """A service for working with files."""
+
+    def __init__(self, processed_files_list_path: str = PROCESSED_FILES_LIST_FILE_PATH):
+        """Initialize FileService instance."""
+        self._processed_files = self.load_processed_files(processed_files_list_path)
+
+    @staticmethod
+    def load_processed_files(file_path: str) -> Set[str]:
+        """
+        Load processed files info from a file.
+
+        :param: path to a file where we store processed files info.
+        """
+        if os.path.exists(file_path):
+            with open(file_path, "r") as file:
+                return {line for line in set(file.readlines()) if line}
+        return set()
+
+    def add_to_processed_files(self, files: List[str]) -> None:
+        """
+        Bulk add to collection of processed files.
+
+        :param files: files to add to processed files collection
+        :return: None
+        """
+        for file in files:
+            self._processed_files.add(file)
+
+    def write_processed_files(self, file_path: str) -> None:
+        """
+        Write processed files info to a file.
+
+        :param file_path: path to a file where we store processed files info
+        :return: None
+        """
+        with open(file_path, "w") as file:
+            file.write("\n".join(self._processed_files))
+
+    def is_processed(self, file: str) -> bool:
+        """
+        Check if file is already processed or not.
+
+        :param file: file path
+        :return: whether the file is already processed or not
+        """
+        return file in self._processed_files
 
     @staticmethod
     def find_all_children_recursively(dir_path: str) -> List[str]:
@@ -205,25 +254,24 @@ class FileService:
         """
         return [f for f in files if os.path.isfile(f)]
 
-    @staticmethod
-    def remove_empty(files: List[str]) -> None:
+    def filter_out_already_processed_files(self, files: List[str]):
         """
-        Delete files that are empty.
+        Filter out already processed files.
+
+        :param files: list of file paths
+        :return: non-processed files
+        """
+        return [f for f in files if not self.is_processed(f)]
+
+    @staticmethod
+    def filter_out_empty_files(files: List[str]) -> List[str]:
+        """
+        Filter our files that are empty.
 
         :param files: list of paths
+        :return: Non-empty files
         """
-        for file in [f for f in files if os.stat(f).st_size == 0]:
-            os.remove(file)
-
-    @staticmethod
-    def remove_all(files: List[str]) -> None:
-        """
-        Delete all files.
-
-        :param files: list of paths
-        """
-        for file in files:
-            os.remove(file)
+        return [f for f in files if not os.stat(f).st_size == 0]
 
     @staticmethod
     def check_path_exists(path: str) -> bool:
