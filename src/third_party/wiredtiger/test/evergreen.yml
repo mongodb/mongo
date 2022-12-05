@@ -3636,6 +3636,7 @@ buildvariants:
       --enable-diagnostic
       --enable-python
       --enable-zlib
+      --enable-zstd
       --enable-snappy
       --enable-strict
       --enable-static
