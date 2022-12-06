@@ -6838,19 +6838,6 @@ tasks:
   - *set_up_venv
   - func: "run package test"
 
-- name: test_packages_complete
-  tags: []
-  depends_on:
-  - name: package
-  commands:
-  - command: manifest.load
-  - func: "git get project and add git tag"
-  - *f_expansions_write
-  - *kill_processes
-  - *cleanup_environment
-  - *set_up_venv
-  - func: "run complete package test"
-
 - name: package
   tags: []
   depends_on:
