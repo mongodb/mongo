@@ -110,7 +110,9 @@ private:
 /**
  *  Schedule a write via appendOplogNote command to the primary of this replica set.
  */
-Status makeNoopWriteIfNeeded(OperationContext* opCtx, LogicalTime clusterTime, StringData dbName) {
+Status makeNoopWriteIfNeeded(OperationContext* opCtx,
+                             LogicalTime clusterTime,
+                             const DatabaseName& dbName) {
     repl::ReplicationCoordinator* const replCoord = repl::ReplicationCoordinator::get(opCtx);
     invariant(replCoord->isReplEnabled());
 
@@ -281,7 +283,7 @@ void setPrepareConflictBehaviorForReadConcernImpl(OperationContext* opCtx,
 
 Status waitForReadConcernImpl(OperationContext* opCtx,
                               const repl::ReadConcernArgs& readConcernArgs,
-                              StringData dbName,
+                              const DatabaseName& dbName,
                               bool allowAfterClusterTime) {
     // If we are in a direct client within a transaction, then we may be holding locks, so it is
     // illegal to wait for read concern. This is fine, since the outer operation should have handled

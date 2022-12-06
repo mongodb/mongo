@@ -146,7 +146,8 @@ public:
      * Returns the first 'DonorRecipientAccessBlockerPair' it finds whose 'tenantId' is a prefix for
      * 'dbName'.
      */
-    boost::optional<DonorRecipientAccessBlockerPair> getAccessBlockersForDbName(StringData dbName);
+    boost::optional<DonorRecipientAccessBlockerPair> getAccessBlockersForDbName(
+        const DatabaseName& dbName);
 
 
     /**
@@ -161,7 +162,7 @@ public:
      * 'dbName' and is of the requested type.
      */
     std::shared_ptr<TenantMigrationAccessBlocker> getTenantMigrationAccessBlockerForDbName(
-        StringData dbName, TenantMigrationAccessBlocker::BlockerType type);
+        const DatabaseName& dbName, TenantMigrationAccessBlocker::BlockerType type);
 
     /**
      * Searches through TenantMigrationAccessBlockers and
@@ -221,7 +222,7 @@ private:
         WithLock) const;
 
     std::shared_ptr<TenantMigrationDonorAccessBlocker> _getAllTenantDonorAccessBlocker(
-        WithLock, StringData dbName) const;
+        WithLock, const DatabaseName& dbName) const;
 
     mutable Mutex _mutex = MONGO_MAKE_LATCH("TenantMigrationAccessBlockerRegistry::_mutex");
 

@@ -1912,7 +1912,7 @@ void OpObserverImpl::onUnpreparedTransactionCommit(OperationContext* opCtx,
     // migrated. We only need check the namespace of the first statement since a transaction's
     // statements must all be for the same tenant.
     tenant_migration_access_blocker::checkIfCanWriteOrThrow(
-        opCtx, statements->begin()->getNss().db(), oplogSlots.back().getTimestamp());
+        opCtx, statements->begin()->getNss().dbName(), oplogSlots.back().getTimestamp());
 
     if (MONGO_unlikely(hangAndFailUnpreparedCommitAfterReservingOplogSlot.shouldFail())) {
         hangAndFailUnpreparedCommitAfterReservingOplogSlot.pauseWhileSet(opCtx);
@@ -1982,7 +1982,7 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx) {
     // statements must all be for the same tenant.
     const auto& firstOpNss = batchedOps->getMutableOperationsForOpObserver()->begin()->getNss();
     tenant_migration_access_blocker::checkIfCanWriteOrThrow(
-        opCtx, firstOpNss.db(), oplogSlots.back().getTimestamp());
+        opCtx, firstOpNss.dbName(), oplogSlots.back().getTimestamp());
 
     boost::optional<repl::ReplOperation::ImageBundle> noPrePostImage;
 

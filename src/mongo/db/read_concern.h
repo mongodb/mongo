@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/database_name.h"
 #include "mongo/util/duration.h"
 
 namespace mongo {
@@ -67,7 +68,7 @@ void setPrepareConflictBehaviorForReadConcern(OperationContext* opCtx,
  */
 Status waitForReadConcern(OperationContext* opCtx,
                           const repl::ReadConcernArgs& readConcernArgs,
-                          StringData dbName,
+                          const DatabaseName& dbName,
                           bool allowAfterClusterTime);
 
 /*

@@ -487,7 +487,7 @@ void _adjustChangeStreamReadConcern(OperationContext* opCtx) {
     }
 
     // Wait for read concern again since we changed the original read concern.
-    uassertStatusOK(waitForReadConcern(opCtx, readConcernArgs, StringData(), true));
+    uassertStatusOK(waitForReadConcern(opCtx, readConcernArgs, DatabaseName(), true));
     setPrepareConflictBehaviorForReadConcern(
         opCtx, readConcernArgs, PrepareConflictBehavior::kIgnoreConflicts);
 }

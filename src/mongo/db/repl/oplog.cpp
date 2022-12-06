@@ -383,7 +383,8 @@ void _logOpsInner(OperationContext* opCtx,
     // index build on the donor after the blockTimestamp, plus if an index build fails to commit due
     // to TenantMigrationConflict, we need to be able to abort the index build and clean up.
     if (!isAbortIndexBuild) {
-        tenant_migration_access_blocker::checkIfCanWriteOrThrow(opCtx, nss.db(), timestamps.back());
+        tenant_migration_access_blocker::checkIfCanWriteOrThrow(
+            opCtx, nss.dbName(), timestamps.back());
     }
 
     Status result = insertDocumentsForOplog(opCtx, oplogCollection, records, timestamps);

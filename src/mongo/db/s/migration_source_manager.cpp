@@ -306,7 +306,7 @@ void MigrationSourceManager::startClone() {
     if (replEnabled) {
         auto const readConcernArgs = repl::ReadConcernArgs(
             replCoord->getMyLastAppliedOpTime(), repl::ReadConcernLevel::kLocalReadConcern);
-        uassertStatusOK(waitForReadConcern(_opCtx, readConcernArgs, StringData(), false));
+        uassertStatusOK(waitForReadConcern(_opCtx, readConcernArgs, DatabaseName(), false));
 
         setPrepareConflictBehaviorForReadConcern(
             _opCtx, readConcernArgs, PrepareConflictBehavior::kEnforce);

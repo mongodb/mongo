@@ -80,30 +80,32 @@ TenantMigrationDonorDocument parseDonorStateDocument(const BSONObj& doc);
  * will be set for the returned future when the migration is committed or aborted. Note: for better
  * performance, check if the future is immediately ready.
  */
-SemiFuture<void> checkIfCanReadOrBlock(OperationContext* opCtx, const OpMsgRequest& request);
+SemiFuture<void> checkIfCanReadOrBlock(OperationContext* opCtx,
+                                       const DatabaseName& dbName,
+                                       const OpMsgRequest& request);
 
 /**
  * If the operation has read concern "linearizable", throws TenantMigrationCommitted error if the
  * database has been migrated to a different replica set.
  */
-void checkIfLinearizableReadWasAllowedOrThrow(OperationContext* opCtx, StringData dbName);
+void checkIfLinearizableReadWasAllowedOrThrow(OperationContext* opCtx, const DatabaseName& dbName);
 
 /**
  * Throws TenantMigrationConflict if the database is being migrated and the migration is in the
  * blocking state. Throws TenantMigrationCommitted if it is in committed.
  */
-void checkIfCanWriteOrThrow(OperationContext* opCtx, StringData dbName, Timestamp writeTs);
+void checkIfCanWriteOrThrow(OperationContext* opCtx, const DatabaseName& dbName, Timestamp writeTs);
 
 /**
  * Returns TenantMigrationConflict if the database is being migrated (even if migration is not yet
  * in the blocking state). Returns TenantMigrationCommitted if it is in committed.
  */
-Status checkIfCanBuildIndex(OperationContext* opCtx, StringData dbName);
+Status checkIfCanBuildIndex(OperationContext* opCtx, const DatabaseName& dbName);
 
 /**
  * Returns true if there is either a donor or recipient access blocker for the given dbName.
  */
-bool hasActiveTenantMigration(OperationContext* opCtx, StringData dbName);
+bool hasActiveTenantMigration(OperationContext* opCtx, const DatabaseName& dbName);
 
 /**
  * Scan config.tenantMigrationDonors and creates the necessary TenantMigrationAccessBlockers for

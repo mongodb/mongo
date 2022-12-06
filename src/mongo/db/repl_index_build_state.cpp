@@ -358,8 +358,7 @@ ReplIndexBuildState::TryAbortResult ReplIndexBuildState::tryAbort(OperationConte
                                         opCtx->recoveryUnit()->getCommitTimestamp());
     auto skipCheck = _shouldSkipIndexBuildStateTransitionCheck(opCtx);
     Status abortStatus = signalAction == IndexBuildAction::kTenantMigrationAbort
-        ? tenant_migration_access_blocker::checkIfCanBuildIndex(opCtx,
-                                                                dbName.toStringWithTenantId())
+        ? tenant_migration_access_blocker::checkIfCanBuildIndex(opCtx, dbName)
         : Status(ErrorCodes::IndexBuildAborted, reason);
     invariant(!abortStatus.isOK());
     _indexBuildState.setState(IndexBuildState::kAborted, skipCheck, abortTimestamp, abortStatus);

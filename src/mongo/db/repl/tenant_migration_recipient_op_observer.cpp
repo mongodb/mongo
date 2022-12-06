@@ -162,7 +162,8 @@ void TenantMigrationRecipientOpObserver::onCreateCollection(OperationContext* op
         if (!recipientInfo)
             return;
 
-        auto tenantId = tenant_migration_access_blocker::parseTenantIdFromDB(collectionName.db());
+        const auto tenantId = tenant_migration_access_blocker::parseTenantIdFromDB(
+            collectionName.dbName().toStringWithTenantId());
 
         tassert(
             6461602,

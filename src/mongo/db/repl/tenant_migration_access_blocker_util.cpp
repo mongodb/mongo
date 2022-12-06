@@ -172,11 +172,12 @@ TenantMigrationDonorDocument parseDonorStateDocument(const BSONObj& doc) {
     return donorStateDoc;
 }
 
-SemiFuture<void> checkIfCanReadOrBlock(OperationContext* opCtx, const OpMsgRequest& request) {
+SemiFuture<void> checkIfCanReadOrBlock(OperationContext* opCtx,
+                                       const DatabaseName& dbName,
+                                       const OpMsgRequest& request) {
     // We need to check both donor and recipient access blockers in the case where two
     // migrations happen back-to-back before the old recipient state (from the first
     // migration) is garbage collected.
-    auto dbName = request.getDatabase();
     auto& blockerRegistry = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext());
     auto mtabPair = blockerRegistry.getAccessBlockersForDbName(dbName);
 
@@ -278,7 +279,7 @@ SemiFuture<void> checkIfCanReadOrBlock(OperationContext* opCtx, const OpMsgReque
         .semi();  // To require continuation in the user executor.
 }
 
-void checkIfLinearizableReadWasAllowedOrThrow(OperationContext* opCtx, StringData dbName) {
+void checkIfLinearizableReadWasAllowedOrThrow(OperationContext* opCtx, const DatabaseName& dbName) {
     if (repl::ReadConcernArgs::get(opCtx).getLevel() ==
         repl::ReadConcernLevel::kLinearizableReadConcern) {
         // Only the donor access blocker will block linearizable reads.
@@ -291,7 +292,9 @@ void checkIfLinearizableReadWasAllowedOrThrow(OperationContext* opCtx, StringDat
     }
 }
 
-void checkIfCanWriteOrThrow(OperationContext* opCtx, StringData dbName, Timestamp writeTs) {
+void checkIfCanWriteOrThrow(OperationContext* opCtx,
+                            const DatabaseName& dbName,
+                            Timestamp writeTs) {
     // The migration protocol guarantees the recipient will not get writes until the migration
     // is committed.
     auto mtab = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
@@ -304,7 +307,7 @@ void checkIfCanWriteOrThrow(OperationContext* opCtx, StringData dbName, Timestam
     }
 }
 
-Status checkIfCanBuildIndex(OperationContext* opCtx, StringData dbName) {
+Status checkIfCanBuildIndex(OperationContext* opCtx, const DatabaseName& dbName) {
     // We only block index builds on the donor.
     auto mtab = TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                     .getTenantMigrationAccessBlockerForDbName(dbName, MtabType::kDonor);
@@ -326,8 +329,8 @@ Status checkIfCanBuildIndex(OperationContext* opCtx, StringData dbName) {
     return Status::OK();
 }
 
-bool hasActiveTenantMigration(OperationContext* opCtx, StringData dbName) {
-    if (dbName.empty()) {
+bool hasActiveTenantMigration(OperationContext* opCtx, const DatabaseName& dbName) {
+    if (dbName.db().empty()) {
         return false;
     }
 

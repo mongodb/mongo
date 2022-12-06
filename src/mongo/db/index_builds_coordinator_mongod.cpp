@@ -197,8 +197,7 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
             // The checks here catch empty index builds and also allow us to stop index
             // builds before waiting for throttling. It may race with the abort at the start
             // of migration so we do check again later.
-            uassertStatusOK(tenant_migration_access_blocker::checkIfCanBuildIndex(
-                opCtx, dbName.toStringWithTenantId()));
+            uassertStatusOK(tenant_migration_access_blocker::checkIfCanBuildIndex(opCtx, dbName));
             uassertStatusOK(writeBlockState->checkIfIndexBuildAllowedToStart(opCtx, nss));
 
             stdx::unique_lock<Latch> lk(_throttlingMutex);
@@ -272,8 +271,8 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
         }
 
         if (opCtx->getClient()->isFromUserConnection()) {
-            auto migrationStatus = tenant_migration_access_blocker::checkIfCanBuildIndex(
-                opCtx, dbName.toStringWithTenantId());
+            auto migrationStatus =
+                tenant_migration_access_blocker::checkIfCanBuildIndex(opCtx, dbName);
             if (!migrationStatus.isOK()) {
                 LOGV2(4886200,
                       "Aborted index build before start due to tenant migration",

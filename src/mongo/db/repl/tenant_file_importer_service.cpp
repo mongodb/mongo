@@ -96,7 +96,7 @@ void importCopiedFiles(OperationContext* opCtx, const UUID& migrationId) {
 
     auto metadatas = wiredTigerRollbackToStableAndGetMetadata(opCtx, tempWTDirectory.string());
     for (auto&& m : metadatas) {
-        auto tenantId = parseTenantIdFromDB(m.ns.db());
+        const auto tenantId = parseTenantIdFromDB(m.ns.toStringWithTenantId());
         if (tenantId == boost::none) {
             continue;
         }

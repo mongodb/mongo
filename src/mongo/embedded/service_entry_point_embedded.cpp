@@ -86,7 +86,7 @@ public:
                             const OpMsgRequest& request) const override {
         auto rcStatus = mongo::waitForReadConcern(opCtx,
                                                   repl::ReadConcernArgs::get(opCtx),
-                                                  request.getDatabase(),
+                                                  invocation->ns().dbName(),
                                                   invocation->allowsAfterClusterTime());
         uassertStatusOK(rcStatus);
     }
