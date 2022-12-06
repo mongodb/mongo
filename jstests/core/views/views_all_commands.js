@@ -232,6 +232,7 @@ let viewsCommandTests = {
     balancerStatus: {skip: isUnrelated},
     balancerStop: {skip: isUnrelated},
     buildInfo: {skip: isUnrelated},
+    bulkWrite: {skip: isUnrelated},
     captrunc: {
         command: {captrunc: "view", n: 2, inc: false},
         expectFailure: true,

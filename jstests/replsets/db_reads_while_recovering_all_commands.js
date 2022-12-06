@@ -140,6 +140,7 @@ const allCommands = {
     authenticate: {skip: isNotAUserDataRead},
     autoSplitVector: {skip: isPrimaryOnly},
     buildInfo: {skip: isNotAUserDataRead},
+    bulkWrite: {skip: isPrimaryOnly},
     captrunc: {skip: isPrimaryOnly},
     checkShardingIndex: {skip: isPrimaryOnly},
     cleanupOrphaned: {skip: isPrimaryOnly},

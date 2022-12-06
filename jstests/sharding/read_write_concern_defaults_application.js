@@ -234,6 +234,7 @@ let testCases = {
     balancerStatus: {skip: "does not accept read or write concern"},
     balancerStop: {skip: "does not accept read or write concern"},
     buildInfo: {skip: "does not accept read or write concern"},
+    bulkWrite: {skip: "not yet implemented"},
     captrunc: {skip: "test command"},
     checkShardingIndex: {skip: "does not accept read or write concern"},
     cleanupOrphaned: {skip: "only on shard server"},

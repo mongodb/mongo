@@ -20,6 +20,7 @@ const commandsAddedToMongosSinceLastLTS = [
     "analyze",
     "analyzeShardKey",  // TODO (SERVER-68977): Remove upgrade/downgrade for PM-1858.
     "appendOplogNote",
+    "bulkWrite",
     "cleanupReshardCollection",
     "commitReshardCollection",
     "compactStructuredEncryptionData",
