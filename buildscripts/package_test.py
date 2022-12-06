@@ -17,6 +17,9 @@ import docker
 import docker.errors
 import requests
 
+from docker.client import DockerClient
+from docker.models.containers import Container
+
 from simple_report import Result, Report
 
 root = logging.getLogger()
@@ -142,7 +145,7 @@ class Test:
     package_manager: str = dataclasses.field(default="", repr=False)
     update_command: str = dataclasses.field(default="", repr=False)
     install_command: str = dataclasses.field(default="", repr=False)
-    base_packages: str = dataclasses.field(default="", repr=False)
+    base_packages: List[str] = dataclasses.field(default_factory=list)
     python_command: str = dataclasses.field(default="", repr=False)
     packages_urls: List[str] = dataclasses.field(default_factory=list)
     packages_paths: List[Path] = dataclasses.field(default_factory=list)
@@ -152,7 +155,7 @@ class Test:
 
         self.base_image = OS_DOCKER_LOOKUP[self.os_name][0]
         self.package_manager = OS_DOCKER_LOOKUP[self.os_name][1]
-        self.base_packages = OS_DOCKER_LOOKUP[self.os_name][2]
+        self.base_packages = list(OS_DOCKER_LOOKUP[self.os_name][2])
         self.python_command = OS_DOCKER_LOOKUP[self.os_name][3]
 
         self.update_command = PACKAGE_MANAGER_COMMANDS[self.package_manager]["update"]
@@ -170,7 +173,7 @@ class Test:
         return self.os_name + "-" + self.version
 
 
-def build_image(test: Test) -> str:
+def build_image(test: Test, client: DockerClient) -> str:
     commands: List[str] = [
         test.update_command,
         test.install_command.format(" ".join(test.base_packages)),
@@ -187,11 +190,25 @@ def build_image(test: Test) -> str:
     if test.python_command != 'python3':
         commands.append(f"ln -s {test.python_command} /usr/bin/python3")
 
-    logging.info("Building base image for %s: %s", test.os_name, test.base_image)
+    tries = 1
+    while True:
+        try:
+            logging.info("Pulling base image for %s: %s, try %s", test.os_name, test.base_image,
+                         tries)
+            base_image = client.images.pull(test.base_image)
+        except docker.errors.ImageNotFound as exc:
+            if tries >= 5:
+                logging.error("Base image %s not found after %s tries", test.base_image, tries)
+                raise exc
+        else:
+            break
+        finally:
+            tries += 1
+            time.sleep(1)
 
-    client = docker.from_env()
-    container = client.containers.run(
-        test.base_image, ["/bin/bash", "-x", "-c", " && ".join(commands)], detach=True, tty=True)
+    logging.info("Building test image for %s: %s", test.os_name, test.base_image)
+    container = client.containers.run(base_image, ["/bin/bash", "-x", "-c", " && ".join(commands)],
+                                      detach=True, tty=True)
 
     # Wait for the container to finish and exit (timeout is in seconds)
     container.wait(timeout=120)
@@ -199,9 +216,8 @@ def build_image(test: Test) -> str:
     return container.commit(repository=f"localhost/{test.os_name}", changes="CMD /bin/systemd")
 
 
-def run_test(test: Test) -> Result:
+def run_test(test: Test, client: DockerClient) -> Result:
     result = Result(status="pass", test_file=test.name(), start=time.time(), log_raw="")
-    client = docker.from_env()
 
     log_name = f"logs/{test.os_name}_{test.version}_{uuid.uuid4().hex}.log"
     test_docker_root = Path("/mnt/package_test").resolve()
@@ -215,8 +231,8 @@ def run_test(test: Test) -> Result:
     logging.debug("Attempting to run the following docker command: %s", command)
 
     try:
-        image = build_image(test)
-        container: docker.Container = client.containers.run(
+        image = build_image(test, client)
+        container: Container = client.containers.run(
             image, command=command, auto_remove=True, detach=True,
             volumes=[f'{test_external_root}:{test_docker_root}'])
         for log in container.logs(stream=True):
@@ -397,9 +413,19 @@ if mongo_os != "none":
         tests.append(
             Test(os_name=dl["target"], packages_urls=dl["packages"], version=dl["version"]))
 
+docker_client = docker.client.from_env()
+docker_username = os.environ.get('docker_username')
+docker_password = os.environ.get('docker_password')
+if all((docker_username, docker_password)):
+    logging.info("Logging into docker.io")
+    response = docker_client.login(username=docker_username, password=docker_password)
+    logging.debug("Login response: %s", response)
+else:
+    logging.warn("Skipping docker login")
+
 report = Report(results=[], failures=0)
 with futures.ThreadPoolExecutor() as tpe:
-    test_futures = [tpe.submit(run_test, test) for test in tests]
+    test_futures = [tpe.submit(run_test, test, docker_client) for test in tests]
     completed_tests = 0  # pylint: disable=invalid-name
     for f in futures.as_completed(test_futures):
         completed_tests += 1
