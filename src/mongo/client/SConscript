@@ -255,7 +255,6 @@ env.Library(
     target='async_client',
     source=[
         'async_client.cpp',
-        env.Idlc('async_client.idl')[0],
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/wire_version',

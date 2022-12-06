@@ -35,7 +35,6 @@
 #include <memory>
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/client/async_client_gen.h"
 #include "mongo/client/authenticate.h"
 #include "mongo/client/sasl_client_authenticate.h"
 #include "mongo/config.h"
@@ -63,6 +62,7 @@
 
 namespace mongo {
 MONGO_FAIL_POINT_DEFINE(pauseBeforeMarkKeepOpen);
+MONGO_FAIL_POINT_DEFINE(alwaysLogConnAcquisitionToWireTime)
 
 namespace {
 bool connHealthMetricsEnabled() {
@@ -316,14 +316,14 @@ Future<rpc::UniqueReply> AsyncDBClient::runCommand(
                 durationCount<Microseconds>(fromConnAcquiredTimer.get()->elapsed());
             totalTimeForEgressConnectionAcquiredToWireMicros.increment(timeElapsedMicros);
             if (timeElapsedMicros >= 1000 ||
-                _random.nextCanonicalDouble() <= gConnectionAcquisitionToWireLoggingRate.load()) {
-                LOGV2_INFO(6496702,
-                           "Acquired connection for remote operation and completed writing to wire",
-                           "durationMicros"_attr = timeElapsedMicros);
-            } else {
+                MONGO_unlikely(alwaysLogConnAcquisitionToWireTime.shouldFail())) {
+                // Log slow acquisition times at info level but rate limit it to prevent spamming
+                // users.
+                static auto& logSeverity = *new logv2::SeveritySuppressor{
+                    Seconds{1}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(2)};
                 LOGV2_DEBUG(
-                    6496701,
-                    2,
+                    6496702,
+                    logSeverity().toInt(),
                     "Acquired connection for remote operation and completed writing to wire",
                     "durationMicros"_attr = timeElapsedMicros);
             }

@@ -2,7 +2,7 @@
  * Tests that we are able to log the metrics corresponding to the time it takes from egress
  * connection acquisition to writing to the wire.
  *
- * @tags: [requires_fcv_62, featureFlagConnHealthMetrics]
+ * @tags: [requires_fcv_63, featureFlagConnHealthMetrics]
  */
 (function() {
 "use strict";
@@ -16,13 +16,17 @@ function getConnAcquiredToWireMicros(conn) {
         .metrics.network.totalTimeForEgressConnectionAcquiredToWireMicros;
 }
 
-// Set it so that we log the intended metrics only on the mongos.
-const paramsDoc = {
-    mongosOptions: {setParameter: {connectionAcquisitionToWireLoggingRate: 1.0}},
-    shardOptions: {setParameter: {connectionAcquisitionToWireLoggingRate: 0.0}},
-    configOptions: {setParameter: {connectionAcquisitionToWireLoggingRate: 0.0}},
+const setParamOptions = {
+    "failpoint.alwaysLogConnAcquisitionToWireTime": tojson({mode: "alwaysOn"}),
+    logComponentVerbosity: tojson({network: {verbosity: 2}})
 };
-const st = new ShardingTest({shards: 1, mongos: 1, other: paramsDoc});
+
+const st = new ShardingTest({
+    shards: 1,
+    rs: {nodes: 1, setParameter: setParamOptions},
+    mongos: 1,
+    mongosOptions: {setParameter: setParamOptions}
+});
 let initialConnAcquiredToWireTime = getConnAcquiredToWireMicros(st.s);
 jsTestLog(`Initial metric value for mongos totalTimeForEgressConnectionAcquiredToWireMicros: ${
     tojson(initialConnAcquiredToWireTime)}`);
@@ -39,22 +43,9 @@ assert.gt(afterConnAcquiredToWireTime,
           initialConnAcquiredToWireTime,
           st.s.adminCommand({serverStatus: 1}));
 
-// Test that setting the logging rate to 0 results in silencing of the logs.
-st.s.adminCommand({setParameter: 1, connectionAcquisitionToWireLoggingRate: 0.0});
-assert.commandWorked(st.s.adminCommand({clearLog: 'global'}));
-assert.commandWorked(st.s.getDB(jsTestName())["test"].insert({x: 2}));
-try {
-    checkLog.containsJson(st.s, 6496702, null, 5 * 1000);
-    assert(false);
-} catch (e) {
-    jsTestLog("Waited long enough to believe logs were correctly silenced.");
-}
-
 // Test with mirrored reads to execute the 'fireAndForget' path and verify logs are still correctly
 // printed.
 const shardPrimary = st.rs0.getPrimary();
-assert.commandWorked(
-    shardPrimary.adminCommand({setParameter: 1, connectionAcquisitionToWireLoggingRate: 1.0}));
 assert.commandWorked(shardPrimary.adminCommand({clearLog: 'global'}));
 initialConnAcquiredToWireTime = getConnAcquiredToWireMicros(shardPrimary);
 jsTestLog(`Initial metric value for mongod totalTimeForEgressConnectionAcquiredToWireMicros: ${
