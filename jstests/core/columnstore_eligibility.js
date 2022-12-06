@@ -174,4 +174,29 @@ assert.commandWorked(coll.createIndex({a: 1}));
 explain = coll.explain().aggregate([{$match: {a: 1}}, {$count: "count"}]);
 assert(aggPlanHasStage(explain, "COUNT_SCAN") || aggPlanHasStage(explain, "IXSCAN"), explain);
 assert.commandWorked(coll.dropIndex({a: 1}));
+
+// CSI Can never be used for a filter/$match on numeric components because that represents a
+// filter over 2^k columns, where k is the number of numeric components. E.g.
+// find({a.0.b.1: 123}) represents 4 paths:
+//
+// {a: {0: {b: {1: 123}}}}
+// {a: [{b: {1: 123}}]}
+// {a: {0: {b: [<anything>, 123]}}}
+// {a: [{b: [<anything>, 123]}]}
+//
+// Today we're guaranteed CSI will never be used when numeric components are present in a
+// filter because SBE does not support querying on such paths.
+explain = coll.find({'a.0': 2}, {_id: 0, 'a.b': 1}).explain();
+assert(!planHasStage(db, explain, "COLUMN_SCAN"), explain);
+
+explain = coll.find({'a.0.b.1': 2}, {_id: 0, 'a.b': 1}).explain();
+assert(!planHasStage(db, explain, "COLUMN_SCAN"), explain);
+
+// CSI _can_ be used when there's a numeric path component used in a projection. This
+// is because MQL projection treats numeric components only as object keys, not array indexes.
+explain = coll.find({'a.b': 2}, {_id: 0, 'a.0': 1}).explain();
+assert(planHasStage(db, explain, "COLUMN_SCAN"), explain);
+
+explain = coll.find({'a.b': 2}, {_id: 0, 'a.0.b.123': 1}).explain();
+assert(planHasStage(db, explain, "COLUMN_SCAN"), explain);
 }());

@@ -643,6 +643,40 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
     });
 }());
 
+// Test that a numeric path component never describes an array index if used in a projection. We
+// have the $slice operator for that functionality.
+(function testNumericPathComponentsTreatedOnlyAsObjectKeyNames() {
+    const kProjection = {_id: 0, "a.2": 1};
+    const kIndexes = [{a: 1}, {"$**": "columnstore"}];
+    testInputOutput({
+        input: {a: {"2": 99}, b: 1},
+        projection: kProjection,
+        expectedOutput: {a: {"2": 99}},
+        interestingIndexes: kIndexes,
+    });
+
+    testInputOutput({
+        input: {a: [0, 1, 2, 3, 4]},
+        projection: kProjection,
+        expectedOutput: {a: []},
+        interestingIndexes: kIndexes,
+    });
+
+    testInputOutput({
+        input: {a: [{x: 1}, {y: 1}, {z: 1}]},
+        projection: kProjection,
+        expectedOutput: {a: [{}, {}, {}]},
+        interestingIndexes: kIndexes,
+    });
+
+    testInputOutput({
+        input: {a: [0, 1, 2, 3, 4, {obj: 123}, {"2": 123}]},
+        projection: kProjection,
+        expectedOutput: {a: [{}, {"2": 123}]},
+        interestingIndexes: kIndexes,
+    });
+})();
+
 // Test some miscellaneous properties of projections.
 (function testMiscellaneousProjections() {
     // Test including and excluding _id only.
