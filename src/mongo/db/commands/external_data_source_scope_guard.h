@@ -48,7 +48,7 @@ public:
     // so that it can drop virtual collections in the new 'opCtx'.
     static void updateOperationContext(const ClientCursor* cursor, OperationContext* opCtx) {
         if (auto self = get(cursor); self) {
-            get(cursor)->_opCtx = opCtx;
+            self->_opCtx = opCtx;
         }
     }
 

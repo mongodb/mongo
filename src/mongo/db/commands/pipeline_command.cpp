@@ -128,7 +128,8 @@ public:
               _privileges(std::move(privileges)) {
             auto externalDataSources = _aggregationRequest.getExternalDataSources();
             uassert(7039000,
-                    "$_externalDataSources is available only when enableComputeMode=true",
+                    "Either $_externalDataSources must always be present when enableComputeMode="
+                    "true or must not when enableComputeMode=false",
                     computeModeEnabled == externalDataSources.has_value());
 
             if (!externalDataSources) {
