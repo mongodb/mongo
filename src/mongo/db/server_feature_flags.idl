@@ -70,3 +70,7 @@ feature_flags:
         description: "Support for bulkWrite command and one-shot transactions"
         cpp_varname: gFeatureFlagBulkWriteCommand
         default: false
+    featureFlagAuditConfigClusterParameter:
+        description: "Enable use of new auditConfig cluster server parameter"
+        cpp_varname: feature_flags::gFeatureFlagAuditConfigClusterParameter
+        default: false
