@@ -2,7 +2,7 @@
  * Tests the internal command _clusterWriteWithoutShardKey. The command must be run in a
  * transaction.
  *
- * @tags: [requires_fcv_62, featureFlagUpdateOneWithoutShardKey]
+ * @tags: [requires_fcv_63, featureFlagUpdateOneWithoutShardKey]
  */
 (function() {
 "use strict";

@@ -2,7 +2,7 @@
  * Tests support for _refreshQueryAnalyzerConfiguration command on a non-sharded cluster. Verifies
  * that it is not supported on any mongod.
  *
- * @tags: [requires_fcv_62, featureFlagAnalyzeShardKey]
+ * @tags: [requires_fcv_63, featureFlagAnalyzeShardKey]
  */
 (function() {
 "use strict";

@@ -3,7 +3,7 @@
  * mongods don't support that. Specifically, tests that each write query on a shardsvr mongod
  * generates at most one document regardless of the number of documents that it modifies.
  *
- * @tags: [requires_fcv_62, featureFlagAnalyzeShardKey]
+ * @tags: [requires_fcv_63, featureFlagAnalyzeShardKey]
  */
 (function() {
 "use strict";

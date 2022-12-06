@@ -2,7 +2,7 @@
  * Tests that the periodic job for persisting sampled queries on shardsvr mongods can handle
  * failover.
  *
- * @tags: [requires_fcv_62, featureFlagAnalyzeShardKey]
+ * @tags: [requires_fcv_63, featureFlagAnalyzeShardKey]
  */
 (function() {
 "use strict";

@@ -4,7 +4,7 @@
  * protocol. The protocol assumes that the collection is sharded and no shard key is given to in the
  * initial request.
  *
- * @tags: [requires_fcv_62, featureFlagUpdateOneWithoutShardKey]
+ * @tags: [requires_fcv_63, featureFlagUpdateOneWithoutShardKey]
  */
 (function() {
 "use strict";

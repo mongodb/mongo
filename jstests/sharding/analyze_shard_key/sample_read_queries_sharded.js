@@ -1,7 +1,7 @@
 /**
  * Tests basic support for sampling read queries against a sharded collection on a sharded cluster.
  *
- * @tags: [requires_fcv_62, featureFlagAnalyzeShardKey]
+ * @tags: [requires_fcv_63, featureFlagAnalyzeShardKey]
  */
 (function() {
 "use strict";

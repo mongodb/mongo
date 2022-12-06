@@ -2,7 +2,7 @@
  * Tests that the analyzeShardKey command still works correctly when the shard key values exceeds
  * the memory limit for aggregation.
  *
- * @tags: [requires_fcv_62, featureFlagAnalyzeShardKey]
+ * @tags: [requires_fcv_63, featureFlagAnalyzeShardKey]
  */
 (function() {
 "use strict";

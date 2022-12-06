@@ -2,7 +2,7 @@
  * Tests that retrying a retryable findAndModify doesn't cause it to have multiple sampled query
  * documents.
  *
- * @tags: [requires_fcv_62, featureFlagAnalyzeShardKey]
+ * @tags: [requires_fcv_63, featureFlagAnalyzeShardKey]
  */
 (function() {
 "use strict";
