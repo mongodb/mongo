@@ -130,16 +130,26 @@ NamedPipeInput::~NamedPipeInput() {
 }
 
 void NamedPipeInput::doOpen() {
-    // Retry open every 1 ms for up to 1 sec in case writer has not created the pipe yet.
+    // Retry the open every {1, 2, 4, 8, 16} ms for 1,000 reps each (allowing up to 31 seconds of
+    // retry) in case the pipe writer has not finished creating the pipe yet.
     int retries = 0;
+    int sleepMs = 1;
     do {
         _pipe = CreateFileA(
             _pipeAbsolutePath.c_str(), GENERIC_READ, 0, nullptr, OPEN_EXISTING, 0, nullptr);
         if (_pipe == INVALID_HANDLE_VALUE) {
-            stdx::this_thread::sleep_for(stdx::chrono::milliseconds(1));
+            stdx::this_thread::sleep_for(stdx::chrono::milliseconds(sleepMs));
             ++retries;
+            if (retries % 1000 == 0) {
+                sleepMs *= 2;
+            }
         }
-    } while (_pipe == INVALID_HANDLE_VALUE && retries <= 1000);
+    } while (_pipe == INVALID_HANDLE_VALUE && retries <= 5000);
+    if (retries > 1000) {
+        LOGV2_WARNING(7184901,
+                      "NamedPipeInput::doOpen() waited for pipe longer than 1 sec",
+                      "_pipeAbsolutePath"_attr = _pipeAbsolutePath);
+    }
 
     if (_pipe != INVALID_HANDLE_VALUE) {
         _isOpen = true;

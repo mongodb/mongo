@@ -107,15 +107,25 @@ void NamedPipeInput::doOpen() {
     // IOs due to MBSC's assembly buffer algorithm.
     _ifs.rdbuf()->pubsetbuf(0, 0);
 
-    // Retry open every 1 ms for up to 1 sec in case writer has not created the pipe yet.
+    // Retry the open every {1, 2, 4, 8, 16} ms for 1,000 reps each (allowing up to 31 seconds of
+    // retry) in case the pipe writer has not finished creating the pipe yet.
     int retries = 0;
+    int sleepMs = 1;
     do {
         _ifs.open(_pipeAbsolutePath.c_str(), std::ios::binary | std::ios::in);
         if (!_ifs.is_open()) {
-            stdx::this_thread::sleep_for(stdx::chrono::milliseconds(1));
+            stdx::this_thread::sleep_for(stdx::chrono::milliseconds(sleepMs));
             ++retries;
+            if (retries % 1000 == 0) {
+                sleepMs *= 2;
+            }
         }
-    } while (!_ifs.is_open() && retries <= 1000);
+    } while (!_ifs.is_open() && retries <= 5000);
+    if (retries > 1000) {
+        LOGV2_WARNING(7184900,
+                      "NamedPipeInput::doOpen() waited for pipe longer than 1 sec",
+                      "_pipeAbsolutePath"_attr = _pipeAbsolutePath);
+    }
 
     // Makes sure that the file is a named pipe.
     struct stat pipeInfo;

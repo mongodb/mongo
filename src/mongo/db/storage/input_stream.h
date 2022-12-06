@@ -60,7 +60,8 @@ public:
         using namespace fmt::literals;
         InputT::open();
         uassert(ErrorCodes::FileNotOpen,
-                "error: {}"_format(getErrorMessage("open"_sd, InputT::getAbsolutePath())),
+                "Named pipe still not open for read after exhausting retries. Error: {}"_format(
+                    getErrorMessage("open"_sd, InputT::getAbsolutePath())),
                 InputT::isOpen());
     }
 
