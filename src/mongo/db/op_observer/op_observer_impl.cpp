@@ -1628,8 +1628,6 @@ repl::OpTime logApplyOps(OperationContext* opCtx,
 
     invariant(bool(txnRetryCounter) == bool(TransactionParticipant::get(opCtx)));
 
-    oplogEntry->setOpType(repl::OpTypeEnum::kCommand);
-    oplogEntry->setNss({"admin", "$cmd"});
     // Batched writes (that is, WUOWs with 'groupOplogEntries') are not associated with a txnNumber,
     // so do not emit an lsid either.
     oplogEntry->setSessionId(opCtx->getTxnNumber() ? opCtx->getLogicalSessionId() : boost::none);
@@ -1799,6 +1797,8 @@ int logOplogEntries(
         auto startOpTime = boost::make_optional(!implicitCommit, firstOpTimeOfTxn);
 
         MutableOplogEntry oplogEntry;
+        oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+        oplogEntry.setNss({"admin", "$cmd"});
         oplogEntry.setOpTime(applyOpsEntry.oplogSlot);
         if (txnParticipant) {
             oplogEntry.setPrevWriteOpTimeInTransaction(prevWriteOpTime);
@@ -2124,6 +2124,8 @@ void OpObserverImpl::onTransactionPrepare(
 
                     auto oplogSlot = reservedSlots.front();
                     MutableOplogEntry oplogEntry;
+                    oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
+                    oplogEntry.setNss({"admin", "$cmd"});
                     oplogEntry.setOpTime(oplogSlot);
                     oplogEntry.setPrevWriteOpTimeInTransaction(repl::OpTime());
                     oplogEntry.setObject(applyOpsBuilder.done());
