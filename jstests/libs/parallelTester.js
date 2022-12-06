@@ -249,6 +249,10 @@ if (typeof _threadInject != "undefined") {
             "collmod_convert_to_unique_violations.js",
             "collmod_convert_to_unique_violations_size_limit.js",
 
+            // The parallel tester does not respect test tags, compact cannot run against the
+            // inMemory storage engine.
+            "timeseries/timeseries_compact.js",
+
             // TODO (SERVER-63228): Remove this exclusion once the feature flag is enabled by
             // default.
             "timeseries/timeseries_index_ttl_partial.js",
