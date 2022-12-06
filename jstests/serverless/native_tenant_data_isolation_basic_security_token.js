@@ -27,7 +27,7 @@ function runTest(featureFlagRequireTenantId) {
             auth: '',
             setParameter: {
                 multitenancySupport: true,
-                featureFlagMongoStore: true,
+                featureFlagSecurityToken: true,
                 featureFlagRequireTenantID: featureFlagRequireTenantId
             }
         }

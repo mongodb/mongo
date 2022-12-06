@@ -11,8 +11,11 @@
 // Create a replica set with multi-tenancy enabled.
 const replSetTest = ReplSetTest({nodes: 1});
 replSetTest.startSet({
-    setParameter:
-        {multitenancySupport: true, featureFlagMongoStore: true, featureFlagRequireTenantID: true}
+    setParameter: {
+        multitenancySupport: true,
+        featureFlagSecurityToken: true,
+        featureFlagRequireTenantID: true
+    }
 });
 replSetTest.initiate();
 

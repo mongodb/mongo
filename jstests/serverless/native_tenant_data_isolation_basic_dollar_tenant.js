@@ -10,11 +10,8 @@ function runTest(featureFlagRequireTenantId) {
         nodes: 3,
         nodeOptions: {
             auth: '',
-            setParameter: {
-                multitenancySupport: true,
-                featureFlagMongoStore: true,
-                featureFlagRequireTenantID: featureFlagRequireTenantId
-            }
+            setParameter:
+                {multitenancySupport: true, featureFlagRequireTenantID: featureFlagRequireTenantId}
         }
     });
     rst.startSet({keyFile: 'jstests/libs/key1'});

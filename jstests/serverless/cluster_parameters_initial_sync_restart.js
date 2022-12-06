@@ -105,8 +105,7 @@ function checkClusterParameterRestart(rst) {
 }
 
 const baseOptions = {
-    setParameter:
-        {multitenancySupport: true, featureFlagMongoStore: true, featureFlagRequireTenantID: true}
+    setParameter: {multitenancySupport: true, featureFlagRequireTenantID: true}
 };
 
 const rst = new ReplSetTest({

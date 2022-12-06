@@ -14,7 +14,7 @@ function runTest(featureFlagRequireTenantId) {
             auth: '',
             setParameter: {
                 multitenancySupport: true,
-                featureFlagMongoStore: true,
+                featureFlagSecurityToken: true,
                 featureFlagRequireTenantID: featureFlagRequireTenantId
             }
         }
@@ -84,7 +84,7 @@ function runTest(featureFlagRequireTenantId) {
     const secondary = rst.add({
         setParameter: {
             multitenancySupport: true,
-            featureFlagMongoStore: true,
+            featureFlagSecurityToken: true,
             featureFlagRequireTenantID: featureFlagRequireTenantId
         }
     });

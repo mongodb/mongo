@@ -819,6 +819,7 @@ protected:
 
 TEST_F(OpMsgWithAuth, ParseValidatedTenancyScopeFromSecurityToken) {
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest securityTokenController("featureFlagSecurityToken", true);
 
     const auto kTenantId = TenantId(OID::gen());
     const auto token = makeSecurityToken(UserName("user", "admin", kTenantId));

@@ -3,13 +3,6 @@
 (function() {
 'use strict';
 
-if (!TestData.setParameters.featureFlagMongoStore) {
-    assert.throws(() => MongoRunner.runMongod({
-        setParameter: "multitenancySupport=true",
-    }));
-    return;
-}
-
 function setup(conn) {
     const admin = conn.getDB('admin');
     assert.commandWorked(

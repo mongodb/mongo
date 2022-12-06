@@ -10,14 +10,8 @@ load("jstests/replsets/rslib.js");  // For reInitiateWithoutThrowingOnAbortedMem
 
 const rst = new ReplSetTest({
     nodes: 1,
-    nodeOptions: {
-        auth: '',
-        setParameter: {
-            multitenancySupport: true,
-            featureFlagMongoStore: true,
-            featureFlagRequireTenantID: true
-        }
-    }
+    nodeOptions:
+        {auth: '', setParameter: {multitenancySupport: true, featureFlagRequireTenantID: true}}
 });
 rst.startSet({keyFile: 'jstests/libs/key1'});
 rst.initiate();
@@ -51,12 +45,8 @@ assert.eq(1, res.n);
 
 // Attempt to add a secondary to the replica set - initial sync should fail.
 const secondary = rst.add({
-    setParameter: {
-        multitenancySupport: true,
-        featureFlagMongoStore: true,
-        featureFlagRequireTenantID: true,
-        numInitialSyncAttempts: 1
-    }
+    setParameter:
+        {multitenancySupport: true, featureFlagRequireTenantID: true, numInitialSyncAttempts: 1}
 });
 
 const secondaryAdminDB = secondary.getDB("admin");

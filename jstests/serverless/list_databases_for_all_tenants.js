@@ -235,7 +235,7 @@ function runTestsWithMultiTenancySupport(featureFlagRequireTenantID) {
             auth: '',
             setParameter: {
                 multitenancySupport: true,
-                featureFlagMongoStore: true,
+                featureFlagSecurityToken: true,
                 featureFlagRequireTenantID: featureFlagRequireTenantID
             }
         }
@@ -266,7 +266,7 @@ function runTestNoMultiTenancySupport() {
             auth: '',
             setParameter: {
                 multitenancySupport: false,
-                featureFlagMongoStore: true,
+                featureFlagSecurityToken: true,
                 featureFlagRequireTenantID: false
             }
         }

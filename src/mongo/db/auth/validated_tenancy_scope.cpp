@@ -45,9 +45,6 @@ namespace {
 const auto validatedTenancyScopeDecoration =
     OperationContext::declareDecoration<boost::optional<ValidatedTenancyScope>>();
 MONGO_INITIALIZER(SecurityTokenOptionValidate)(InitializerContext*) {
-    uassert(ErrorCodes::BadValue,
-            "multitenancySupport may not be specified if featureFlagMongoStore is not enabled",
-            !gMultitenancySupport || gFeatureFlagMongoStore.isEnabledAndIgnoreFCV());
     if (gMultitenancySupport) {
         logv2::detail::setGetTenantIDCallback([]() -> boost::optional<TenantId> {
             auto* client = Client::getCurrent();
@@ -68,9 +65,11 @@ MONGO_INITIALIZER(SecurityTokenOptionValidate)(InitializerContext*) {
 }  // namespace
 
 ValidatedTenancyScope::ValidatedTenancyScope(BSONObj obj, InitTag tag) : _originalToken(obj) {
+    const bool enabled = gMultitenancySupport && gFeatureFlagSecurityToken.isEnabledAndIgnoreFCV();
+
     uassert(ErrorCodes::InvalidOptions,
             "Multitenancy not enabled, refusing to accept securityToken",
-            gMultitenancySupport || (tag == InitTag::kInitForShell));
+            enabled || (tag == InitTag::kInitForShell));
 
     auto token = SecurityToken::parse(IDLParserContext{"Security Token"}, obj);
     auto authenticatedUser = token.getAuthenticatedUser();

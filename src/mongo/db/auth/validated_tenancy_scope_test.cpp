@@ -112,6 +112,7 @@ TEST_F(ValidatedTenancyScopeTestFixture, MultitenancySupportWithTenantOK) {
 
 TEST_F(ValidatedTenancyScopeTestFixture, MultitenancySupportWithSecurityTokenOK) {
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest securityTokenController("featureFlagSecurityToken", true);
 
     const TenantId kTenantId(OID::gen());
     auto body = BSON("ping" << 1);

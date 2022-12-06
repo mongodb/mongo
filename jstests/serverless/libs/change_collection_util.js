@@ -77,7 +77,7 @@ class ChangeStreamMultitenantReplicaSetTest extends ReplSetTest {
         this._multitenancyParameters = {
             featureFlagServerlessChangeStreams: true,
             multitenancySupport: true,
-            featureFlagMongoStore: true,
+            featureFlagSecurityToken: true,
             featureFlagRequireTenantID: true
         };
 

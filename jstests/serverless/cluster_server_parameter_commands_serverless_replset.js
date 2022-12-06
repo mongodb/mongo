@@ -20,7 +20,6 @@ const rst = new ReplSetTest({
 rst.startSet({
     setParameter: {
         multitenancySupport: true,
-        featureFlagMongoStore: true,
         featureFlagRequireTenantID: true,
         featureFlagServerlessChangeStreams: true
     }

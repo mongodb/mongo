@@ -17,7 +17,6 @@ replSetTest.startSet({
     setParameter: {
         featureFlagServerlessChangeStreams: true,
         multitenancySupport: true,
-        featureFlagMongoStore: true,
         featureFlagRequireTenantID: true
     }
 });
@@ -77,7 +76,6 @@ const standalone = MongoRunner.runMongod({
     setParameter: {
         featureFlagServerlessChangeStreams: true,
         multitenancySupport: true,
-        featureFlagMongoStore: true,
         featureFlagRequireTenantID: true
     },
     dbpath: primary.dbpath,
@@ -117,7 +115,6 @@ replSetTest.start(primary, {
     setParameter: {
         featureFlagServerlessChangeStreams: true,
         multitenancySupport: true,
-        featureFlagMongoStore: true,
         featureFlagRequireTenantID: true
     }
 });

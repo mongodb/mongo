@@ -39,7 +39,7 @@ executor:
       set_parameters:
         enableTestCommands: 1
         multitenancySupport: true
-        featureFlagMongoStore: true
+        featureFlagSecurityToken: true
         featureFlagRequireTenantID: true
         logComponentVerbosity:
           command: 2

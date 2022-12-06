@@ -10,14 +10,7 @@ const kAcceptedSecurityTokenID = 5838100;
 const kLogMessageID = 5060500;
 const kLogoutMessageID = 6161506;
 const kStaleAuthenticationMessageID = 6161507;
-const isMongoStoreEnabled = TestData.setParameters.featureFlagMongoStore;
-
-if (!isMongoStoreEnabled) {
-    assert.throws(() => MongoRunner.runMongod({
-        setParameter: "multitenancySupport=true",
-    }));
-    return;
-}
+const isSecurityTokenEnabled = TestData.setParameters.featureFlagSecurityToken;
 
 function assertNoTokensProcessedYet(conn) {
     assert.eq(false,
@@ -40,7 +33,7 @@ function makeTokenAndExpect(user, db) {
     return [token, {token: expect}];
 }
 
-function runTest(conn, enabled, rst = undefined) {
+function runTest(conn, multitenancyEnabled, rst = undefined) {
     const admin = conn.getDB('admin');
 
     // Must be authenticated as a user with ActionType::useTenant in order to use $tenant
@@ -51,7 +44,7 @@ function runTest(conn, enabled, rst = undefined) {
     const createUserCmd =
         {createUser: 'user1', "$tenant": tenantID, pwd: 'pwd', roles: ['readWriteAnyDatabase']};
     const countUserCmd = {count: "system.users", query: {user: 'user1'}, "$tenant": tenantID};
-    if (enabled) {
+    if (multitenancyEnabled) {
         assert.commandWorked(admin.runCommand(createUserCmd));
 
         // Confirm the user exists on the tenant authz collection only, and not the global
@@ -94,7 +87,7 @@ function runTest(conn, enabled, rst = undefined) {
     const [token, expect] = makeTokenAndExpect('user1', 'admin');
     tokenConn._setSecurityToken(token);
 
-    if (enabled) {
+    if (multitenancyEnabled && isSecurityTokenEnabled) {
         // Basic use.
         assert.commandWorked(tokenDB.runCommand({features: 1}));
 

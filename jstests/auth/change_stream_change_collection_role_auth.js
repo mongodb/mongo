@@ -170,7 +170,6 @@ replSetTest.startSet({
     setParameter: {
         featureFlagServerlessChangeStreams: true,
         multitenancySupport: true,
-        featureFlagMongoStore: true,
         internalChangeStreamUseTenantIdForTesting: true,
     }
 });

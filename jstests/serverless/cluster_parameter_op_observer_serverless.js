@@ -47,10 +47,7 @@ function runTest(conn) {
 }
 
 const rst = new ReplSetTest({nodes: 3});
-rst.startSet({
-    setParameter:
-        {multitenancySupport: true, featureFlagMongoStore: true, featureFlagRequireTenantID: true}
-});
+rst.startSet({setParameter: {multitenancySupport: true, featureFlagRequireTenantID: true}});
 rst.initiate();
 
 // Create a root user within the multitenant environment so that getTenantConnection works.

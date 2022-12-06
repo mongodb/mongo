@@ -30,9 +30,9 @@ global:
     cpp_namespace: "mongo"
 
 feature_flags:
-    featureFlagMongoStore:
-        description: "Enable mongod operation in MongoStore mode"
-        cpp_varname: gFeatureFlagMongoStore
+    featureFlagSecurityToken:
+        description: "Enable parsing and handling of SecurityTokens in multitenancy mode"
+        cpp_varname: gFeatureFlagSecurityToken
         default: false
     featureFlagRequireTenantID:
         # Only available with the server parameter "multitenancySupport".

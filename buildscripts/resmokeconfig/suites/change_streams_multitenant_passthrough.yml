@@ -40,7 +40,7 @@ executor:
       # Enable causal consistency for change streams suites using 1 node replica sets. See
       # change_streams.yml for detailed explanation.
       # TODO SERVER-67267 Load 'inject_tenant_prefix.js', add 'multitenancySupport',
-      #                   'featureFlagMongoStore' and 'featureFlagRequireTenantID' flags. The
+      #                   'featureFlagSecurityToken' and 'featureFlagRequireTenantID' flags. The
       #                   'inject_tenant_prefix' should also be called for the
       #                   'enable_change_stream.py' file.
       eval: >-

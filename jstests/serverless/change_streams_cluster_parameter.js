@@ -4,8 +4,7 @@
 //  requires_replication,
 //  requires_sharding,
 //  featureFlagServerlessChangeStreams,
-//  featureFlagMongoStore,
-//  requires_fcv_62,
+//  requires_fcv_63,
 // ]
 (function() {
 "use strict";

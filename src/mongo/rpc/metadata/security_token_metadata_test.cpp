@@ -37,6 +37,7 @@
 #include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/rpc/op_msg_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -67,23 +68,27 @@ protected:
 };
 
 TEST_F(SecurityTokenMetadataTest, SecurityTokenNotAccepted) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest securityTokenController("featureFlagSecurityToken", false);
+
     const auto kPingBody = BSON(kPingFieldName << 1);
     const auto kTokenBody = makeSecurityToken(UserName("user", "admin", TenantId(OID::gen())));
 
-    gMultitenancySupport = false;
     auto msgBytes = OpMsgBytes{0, kBodySection, kPingBody, kSecurityTokenSection, kTokenBody};
     ASSERT_THROWS_CODE_AND_WHAT(msgBytes.parse(),
                                 DBException,
-                                ErrorCodes::Unauthorized,
-                                "Unsupported Security Token provided");
+                                ErrorCodes::InvalidOptions,
+                                "Multitenancy not enabled, refusing to accept securityToken");
 }
 
 TEST_F(SecurityTokenMetadataTest, BasicSuccess) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest securityTokenController("featureFlagSecurityToken", true);
+
     const auto kTenantId = TenantId(OID::gen());
     const auto kPingBody = BSON(kPingFieldName << 1);
     const auto kTokenBody = makeSecurityToken(UserName("user", "admin", kTenantId));
 
-    gMultitenancySupport = true;
     auto msg = OpMsgBytes{0, kBodySection, kPingBody, kSecurityTokenSection, kTokenBody}.parse();
     ASSERT_BSONOBJ_EQ(msg.body, kPingBody);
     ASSERT_EQ(msg.sequences.size(), 0u);

@@ -5,12 +5,9 @@
 'use strict';
 
 const tenantID = ObjectId();
-const isMongoStoreEnabled = TestData.setParameters.featureFlagMongoStore;
+const isSecurityTokenEnabled = TestData.setParameters.featureFlagSecurityToken;
 
-if (!isMongoStoreEnabled) {
-    assert.throws(() => MongoRunner.runMongod({
-        setParameter: "multitenancySupport=true",
-    }));
+if (!isSecurityTokenEnabled) {
     return;
 }
 

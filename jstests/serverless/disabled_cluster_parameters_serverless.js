@@ -19,10 +19,7 @@ TestData.enableTestCommands = false;
 const rst = new ReplSetTest({
     nodes: 3,
 });
-rst.startSet({
-    setParameter:
-        {multitenancySupport: true, featureFlagMongoStore: true, featureFlagRequireTenantID: true}
-});
+rst.startSet({setParameter: {multitenancySupport: true, featureFlagRequireTenantID: true}});
 rst.initiate();
 
 // Setup the necessary logging level for the test.

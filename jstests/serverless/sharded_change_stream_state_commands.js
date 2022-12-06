@@ -1,8 +1,7 @@
 // Test that the 'setChangeStreamState' and 'getChangeStreamState' commands work as expected in the
 // multi-tenant sharded cluster environment for various cases.
 // @tags: [
-//   featureFlagMongoStore,
-//   requires_fcv_61,
+//   requires_fcv_63,
 // ]
 (function() {
 "use strict";
