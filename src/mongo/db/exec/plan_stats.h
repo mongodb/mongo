@@ -1040,6 +1040,14 @@ struct GroupStats : public SpecificStats {
     // Tracks an estimate of the total size of all documents output by the group stage in bytes.
     size_t totalOutputDataSizeBytes = 0;
 
+    // The size of the file spilled to disk. Note that this is not the same as the number of bytes
+    // spilled to disk, as any data spilled to disk will be compressed before being written to a
+    // file.
+    uint64_t spillFileSizeBytes = 0u;
+
+    // The number of bytes evicted from memory and spilled to disk.
+    uint64_t numBytesSpilledEstimate = 0u;
+
     // The number of times that we spilled data to disk while grouping the data.
     uint64_t spills = 0u;
 };

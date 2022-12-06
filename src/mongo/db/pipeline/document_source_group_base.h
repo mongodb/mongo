@@ -248,9 +248,12 @@ private:
     // definition of equality.
     boost::optional<GroupsMap> _groups;
 
+    // Tracks the size of the spill file.
+    std::unique_ptr<SorterFileStats> _spillStats;
     std::shared_ptr<Sorter<Value, Value>::File> _file;
     std::vector<std::shared_ptr<Sorter<Value, Value>::Iterator>> _sortedFiles;
     bool _spilled;
+
 
     // Only used when '_spilled' is false.
     GroupsMap::iterator _groupsIterator;
