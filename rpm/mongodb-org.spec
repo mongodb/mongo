@@ -281,7 +281,7 @@ fi
 %postun -n mongodb-org-server
 if test $1 -ge 1
 then
-  /usr/bin/systemctl restart mongod >/dev/null 2>&1 || :
+  /usr/bin/systemctl try-restart mongod >/dev/null 2>&1 || :
 fi
 
 %files
