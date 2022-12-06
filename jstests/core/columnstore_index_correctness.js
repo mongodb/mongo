@@ -384,4 +384,35 @@ assert.commandWorked(coll.createIndex({"$**": "columnstore"}));
         assert(resultsEq(expectedResults[i], actualResults), explain);
     }
 })();
+
+// Test column store queries with collations.
+(function testCollation() {
+    const c = db.columnstore_index_correctness_collation;
+    c.drop();
+    assert.commandWorked(c.createIndex({"$**": "columnstore"}));
+    // Insert case sensitive values.
+    assert.commandWorked(c.insert([{x: "hello"}, {x: "Hello"}, {x: "HELLO"}]));
+
+    function runTest(collation, expectedMatches) {
+        const explain = c.find({x: "hello"}, {_id: 0, x: 1}).collation(collation).explain();
+        const columnScanPlanStages = getPlanStages(explain, "COLUMN_SCAN");
+        assert.eq(columnScanPlanStages.length,
+                  1,
+                  `Could not find 'COLUMN_SCAN' stage: ${tojson(explain)}`);
+        // Ensure that the filter actually got pushed down.
+        assert(columnScanPlanStages[0].hasOwnProperty("filtersByPath") &&
+                   columnScanPlanStages[0]["filtersByPath"].hasOwnProperty("x"),
+               tojson(columnScanPlanStages[0]));
+
+        const actualMatches = c.find({x: "hello"}, {_id: 0, x: 1}).collation(collation).itcount();
+        assert.eq(actualMatches,
+                  expectedMatches,
+                  `Expected to find ${expectedMatches} doc(s) using collation ${
+                      tojson(collation)} but found ${actualMatches}`);
+    }
+
+    runTest({}, 1);                           // no collation
+    runTest({locale: "en", strength: 3}, 1);  // case sensitive
+    runTest({locale: "en", strength: 2}, 3);  // case insensitive
+})();
 })();

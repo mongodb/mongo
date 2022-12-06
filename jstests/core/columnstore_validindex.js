@@ -40,10 +40,18 @@ IndexCatalogHelpers.createIndexAndVerifyWithDrop(
 IndexCatalogHelpers.createIndexAndVerifyWithDrop(
     coll, {"$**": "columnstore"}, {background: true, name: kIndexName});
 
-// TODO SERVER-64365 Can create a columnstore index with index level collation.
+// Test that you cannot create a columnstore index with a collation - either with the argument or
+// because the collection has a default collation specified.
 assert.commandFailedWithCode(
     coll.createIndex({"$**": "columnstore"}, {collation: {locale: "fr"}, name: kIndexName}),
     ErrorCodes.CannotCreateIndex);
+
+const collationCollName = "columnstore_collation";
+const collationColl = db[collationCollName];
+assertDropCollection(db, collationCollName);
+assert.commandWorked(db.createCollection(collationCollName, {collation: {locale: "fr"}}));
+assert.commandFailedWithCode(collationColl.createIndex({"$**": "columnstore"}),
+                             ErrorCodes.CannotCreateIndex);
 
 // Can create a valid columnstore index with subpaths.
 IndexCatalogHelpers.createIndexAndVerifyWithDrop(
