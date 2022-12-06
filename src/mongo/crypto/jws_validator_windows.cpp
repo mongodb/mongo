@@ -27,41 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/bson/json.h"
-#include "mongo/crypto/jwk_manager.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
-#include "mongo/util/net/http_client.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/crypto/jws_validator.h"
 
 namespace mongo::crypto {
-namespace {
 
-constexpr auto source = "https://mongodbcorp.okta.com/oauth2/ausfgfhg2j9rtr0nT297/v1/keys"_sd;
-
-TEST(JWKManager, parseJWKSetBasicFromSource) {
-    auto httpClient = HttpClient::createWithoutConnectionPool();
-    httpClient->setHeaders({"Accept: */*"});
-
-    DataBuilder getJWKs = httpClient->get(source);
-
-    ConstDataRange cdr = getJWKs.getCursor();
-    StringData str;
-    cdr.readInto<StringData>(&str);
-
-    BSONObj data = fromjson(str);
-    JWKManager manager(source);
-
-    for (const auto& key : data["keys"_sd].Obj()) {
-        auto keyFromKid = manager.getKey(key["kid"_sd].str());
-        ASSERT_BSONOBJ_EQ(key.Obj(), keyFromKid);
-    }
-
-    for (const auto& key : data["keys"_sd].Obj()) {
-        ASSERT(manager.getValidator(key["kid"_sd].str()));
-    }
+// TODO: SERVER-68518, remove or implement this class
+StatusWith<std::unique_ptr<JWSValidator>> JWSValidator::create(StringData algorithm,
+                                                               const BSONObj& key) {
+    return {ErrorCodes::OperationFailed, "Signature Verification Not Available"};
 }
-
-}  // namespace
 }  // namespace mongo::crypto
