@@ -29,17 +29,17 @@ End2End testing.
 
 The test executes the given query pipelines with the given Cost Model Coefficients and compares
 the predicted cost of every ABT node with the actual running time of the nodes.
-It produces descriptive statistics (mean, stddev, min, max) and run Student's t-test to prove
-a Null hypothesis that the means of the actual and estimated costs are equal.
-If the p-value produced by the t-test is less than the threshold value (usually 0.05 or 0.01)
-we can say that the Null hypothesis is proven and there is no significant difference
-in the actual and estimated costs.
+It produces descriptive statistics (mean, stddev, min, max) and calculates R2 to
+estimate quality of the tested Cost Model.
 """
 
-from typing import Sequence
+from typing import Callable, Sequence, Tuple
 import os
 import asyncio
 import dataclasses
+import pandas as pd
+import numpy as np
+from sklearn.metrics import r2_score
 from calibration_settings import main_config, HIDDEN_STRING_VALUE, distributions
 from database_instance import DatabaseInstance, get_database_parameter
 from random_generator import RandomDistribution
@@ -49,9 +49,10 @@ from workload_execution import Query
 import workload_execution
 import config
 import experiment as exp
-import pandas as pd
-import numpy as np
-from scipy import stats
+import physical_tree as pt
+import execution_tree as et
+from parameters_extractor import get_excution_stats
+from cost_estimator import ExecutionStats
 
 
 class CostEstimator:
@@ -142,7 +143,48 @@ class CostEstimator:
 
     def default_estimator(self, _: int) -> float:
         """Used if no ABT nodes matched."""
-        return -1
+        return -1e10
+
+
+class AbtCostEstimator:
+    """Calculates a cost for the given ABT tree."""
+
+    def __init__(self, estimate_node: Callable[[str, int], float]):
+        self.estimate_node = estimate_node
+
+    def estimate(self, abt: pt.Node, sbe: et.Node,
+                 estimations: Sequence[Tuple[str, ExecutionStats, float]], level=0):
+        stats = get_excution_stats(sbe, abt.plan_node_id)
+        local_cost = self.estimate_node(abt.node_type, stats.n_processed)
+        estimations.append((abt.node_type, stats, local_cost))
+        child_cost = sum((self.estimate(child, sbe, estimations, level + 1)
+                          for child in abt.children), start=0.0)
+        return local_cost + child_cost
+
+
+@dataclasses.dataclass(init=False)
+class EndToEndStatisticsRow:
+    """Represents a row with descriptive statistics of one query execution."""
+
+    def __init__(self, pipeline: str = None, abt_type: str = None, abt_type_id: int = 0,
+                 execution_time: float = 0.0, estimated_cost: float = 0.0, n_documents: int = 0):
+        self.pipeline = pipeline if pipeline is not None else ''
+        self.abt_type = abt_type if abt_type is not None else ''
+        self.abt_type_id = abt_type_id
+        self.execution_time = execution_time
+        self.estimated_cost = estimated_cost
+        self.estimation_error = execution_time - estimated_cost
+        self.estimation_error_per_doc = self.estimation_error / n_documents if n_documents != 0 else 0
+        self.relative_error = self.estimation_error / self.execution_time if self.execution_time != 0 else 0
+
+    pipeline: str
+    abt_type: str
+    abt_type_id: int
+    execution_time: float
+    estimated_cost: float
+    estimation_error: float
+    estimation_error_per_doc: float
+    relative_error: float
 
 
 def make_config():
@@ -189,14 +231,14 @@ def make_config():
         write_mode=config.WriteMode.REPLACE, collection_name_with_card=True)
 
     workload_execution_config = config.WorkloadExecutionConfig(
-        enabled=True, output_collection_name='end2endData', write_mode=config.WriteMode.REPLACE,
+        enabled=True, output_collection_name='end2endData', write_mode=config.WriteMode.APPEND,
         warmup_runs=3, runs=30)
 
     # The cost model to test.
     cost_model = CostModelCoefficients(
         scan_incremental_cost=422.31145989, scan_startup_cost=6175.527218993269,
         index_scan_incremental_cost=403.68075869, index_scan_startup_cost=14054.983953111061,
-        seek_cost=898.60272877, seek_startup_cost=7488.662376624863,
+        seek_cost=1223.35513997, seek_startup_cost=7488.662376624863,
         filter_incremental_cost=83.7274685, filter_startup_cost=1461.3148783443378,
         eval_incremental_cost=430.6176946, eval_startup_cost=1103.4048573163343,
         group_by_incremental_cost=413.07932374, group_by_startup_cost=1199.8878012735659,
@@ -315,17 +357,41 @@ def extract_abt_nodes(df: pd.DataFrame, estimate_cost) -> pd.DataFrame:
                 if stat.n_processed == 0:
                     continue
                 estimated_cost = estimate_cost(abt_type, stat.n_processed)
-                estimation_error = abs(stat.execution_time - estimated_cost)
-                estimation_error_per_doc = estimation_error / stat.n_processed
-                row = {
-                    'abt_type': abt_type, **dataclasses.asdict(stat), 'estimated_cost':
-                        estimated_cost, 'estimation_error': estimation_error,
-                    'estimation_error_per_doc': estimation_error_per_doc, 'source': df_seq.name
-                }
-                rows.append(row)
+                rows.append(
+                    EndToEndStatisticsRow(abt_type=abt_type, execution_time=stat.execution_time,
+                                          estimated_cost=estimated_cost,
+                                          n_documents=stat.n_processed))
         return rows
 
     return pd.DataFrame(list(df.apply(extract, axis=1).explode()))
+
+
+def build_abt_nodes_report(df: pd.DataFrame, processor_config: config.End2EndProcessorConfig):
+    return extract_abt_nodes(df, processor_config.estimator)
+
+
+def build_queries_report(df: pd.DataFrame, processor_config: config.End2EndProcessorConfig):
+    abt_estimator = AbtCostEstimator(processor_config.estimator)
+
+    def calculate_cost(row):
+        rows = []
+        estimations = []
+        total_estimated_cost = abt_estimator.estimate(row['abt'], row['sbe'], estimations)
+        local_id = 0
+        rows.append(
+            EndToEndStatisticsRow(pipeline=row['pipeline'], abt_type_id=local_id,
+                                  execution_time=row['total_execution_time'],
+                                  estimated_cost=total_estimated_cost))
+        for (abt_type, stats, local_cost) in estimations:
+            local_id += 1
+            rows.append(
+                EndToEndStatisticsRow(pipeline=row['pipeline'], abt_type=abt_type,
+                                      abt_type_id=local_id,
+                                      execution_time=row['total_execution_time'],
+                                      estimated_cost=local_cost, n_documents=stats.n_processed))
+        return rows
+
+    return pd.DataFrame(list(df.apply(calculate_cost, axis=1).explode()))
 
 
 async def conduct_end2end(database: DatabaseInstance,
@@ -335,22 +401,29 @@ async def conduct_end2end(database: DatabaseInstance,
 
     df = await exp.load_calibration_data(database, processor_config.input_collection_name)
     noout_df = exp.remove_outliers(df, 0.0, 0.90)
-    abt_df = extract_abt_nodes(noout_df, processor_config.estimator)
 
-    def pvalue(group):
-        ttest_result = stats.ttest_ind(group['execution_time'], group['estimated_cost'],
-                                       equal_var=False)
-        return ttest_result.pvalue
+    abt_report = build_abt_nodes_report(noout_df, processor_config)
 
-    pvalues = pd.DataFrame(abt_df.groupby('abt_type').apply(pvalue)).reset_index()
-    pvalues.columns = ['abt_type', 'pvalue']
-    print(pvalues)
+    queries_report = build_queries_report(noout_df, processor_config)
 
-    agg_stats = abt_df.groupby('abt_type')[[
-        'execution_time', 'estimated_cost', 'estimation_error', 'estimation_error_per_doc'
+    report = pd.concat([abt_report, queries_report], axis=0)
+
+    group_columns = ['pipeline', 'abt_type', 'abt_type_id']
+
+    def calc_r2(group):
+        return r2_score(group['execution_time'], group['estimated_cost'])
+
+    r2_scores = report.groupby(group_columns).apply(calc_r2).reset_index()
+    r2_scores.columns = [group_columns + ['r2'], [''] * (len(group_columns) + 1)]
+
+    agg_stats = report.groupby(group_columns)[[
+        'execution_time', 'estimated_cost', 'estimation_error', 'estimation_error_per_doc',
+        'relative_error'
     ]].agg([np.mean, np.std, np.min, np.max])
 
-    return pd.merge(pvalues, agg_stats, on="abt_type")
+    report = pd.merge(r2_scores, agg_stats, on=group_columns)
+    del report['abt_type_id']
+    return report
 
 
 async def end2end(e2e_config: config.EntToEndTestingConfig):
@@ -373,11 +446,9 @@ async def end2end(e2e_config: config.EntToEndTestingConfig):
             e2e_config.workload_execution.write_mode = config.WriteMode.APPEND
 
         #4. Process end to end testing. Compare the estimated and actual costs and return results.
-        result = await conduct_end2end(database, e2e_config.processor)
+        report = await conduct_end2end(database, e2e_config.processor)
         if e2e_config.result_csv_filepath is not None:
-            result.to_csv(e2e_config.result_csv_filepath, index=False)
-
-        print(result)
+            report.to_csv(e2e_config.result_csv_filepath, index=False)
 
 
 async def main():
@@ -386,5 +457,9 @@ async def main():
 
 
 if __name__ == '__main__':
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(main())
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        pass

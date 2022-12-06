@@ -225,7 +225,7 @@ abt_nodes = [
                                     filter_function=make_filter_by_note('PhysicalScan')),
     config.AbtNodeCalibrationConfig(type='IndexScan',
                                     filter_function=make_filter_by_note('IndexScan')),
-    config.AbtNodeCalibrationConfig(type='Seek'),
+    config.AbtNodeCalibrationConfig(type='Seek', filter_function=make_filter_by_note('IndexScan')),
     config.AbtNodeCalibrationConfig(type='Filter',
                                     filter_function=make_filter_by_note('PhysicalScan')),
     config.AbtNodeCalibrationConfig(type='Evaluation',
