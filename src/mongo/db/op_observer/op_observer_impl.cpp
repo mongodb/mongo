@@ -100,7 +100,6 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(failCollectionUpdates);
 MONGO_FAIL_POINT_DEFINE(hangAndFailUnpreparedCommitAfterReservingOplogSlot);
-MONGO_FAIL_POINT_DEFINE(hangAfterLoggingApplyOpsForTransaction);
 
 constexpr auto kNumRecordsFieldName = "numRecords"_sd;
 constexpr auto kMsgFieldName = "msg"_sd;

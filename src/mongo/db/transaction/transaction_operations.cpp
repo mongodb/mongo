@@ -83,6 +83,8 @@ std::vector<BSONObj> packOperationsIntoApplyOps(
 
 }  // namespace
 
+MONGO_FAIL_POINT_DEFINE(hangAfterLoggingApplyOpsForTransaction);
+
 // static
 void TransactionOperations::packTransactionStatementsForApplyOps(
     std::vector<TransactionOperation>::const_iterator stmtBegin,

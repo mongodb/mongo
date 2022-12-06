@@ -41,6 +41,8 @@
 
 namespace mongo {
 
+extern FailPoint hangAfterLoggingApplyOpsForTransaction;
+
 /**
  * Container for ReplOperation used in multi-doc transactions and batched writer context.
  * Includes statistics on operations held in this container.
