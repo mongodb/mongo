@@ -37,6 +37,7 @@
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
+#include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/rpc/unique_message.h"
 #include "mongo/transport/baton.h"
 #include "mongo/transport/message_compressor_manager.h"
@@ -51,10 +52,7 @@ public:
     explicit AsyncDBClient(const HostAndPort& peer,
                            transport::SessionHandle session,
                            ServiceContext* svcCtx)
-        : _peer(std::move(peer)),
-          _session(std::move(session)),
-          _svcCtx(svcCtx),
-          _random{PseudoRandom(SecureRandom().nextInt64())} {}
+        : _peer(std::move(peer)), _session(std::move(session)), _svcCtx(svcCtx) {}
 
     using Handle = std::shared_ptr<AsyncDBClient>;
 
@@ -104,6 +102,7 @@ public:
 
     const HostAndPort& remote() const;
     const HostAndPort& local() const;
+    static constexpr Seconds kSlowConnAcquiredToWireLogSuppresionPeriod{5};
 
 private:
     Future<executor::RemoteCommandResponse> _continueReceiveExhaustResponse(
@@ -123,7 +122,6 @@ private:
     transport::SessionHandle _session;
     ServiceContext* const _svcCtx;
     MessageCompressorManager _compressorManager;
-    PseudoRandom _random;
 };
 
 }  // namespace mongo
