@@ -51,14 +51,14 @@ structs:
         strict: false
         inline_chained_structs: true
         chained_structs:
-            JWK: JWK
+            JWK: JWK 
         fields:
-            n:
-                description: Modulus of the RSA Key
+            n:  
+                description: Modulus of the RSA Key 
                 type: base64urlstring
                 cpp_name: modulus
-            e:
-                description: Public key component of the RSA key
+            e:  
+                description: Public key component of the RSA key 
                 type: base64urlstring
                 cpp_name: publicExponent
 
@@ -72,52 +72,4 @@ structs:
                 # Non-specific sub-type to accommodate future key types
                 type: array<object>
 
-    JWSHeader:
-        description: Describes the contents of a JWT token body and
-            any cryptographic operations applied to the token.
-        strict: false
-        fields:
-            typ:
-                description: The type of the token, e.g. 'JWT'.
-                type: string
-                cpp_name: type
-                optional: true
-            alg:
-                description: Algorithm used to secure the JWT, e.g. 'RS256'.
-                type: string
-                cpp_name: algorithm
-            kid:
-                description: The ID identifying the key used.
-                type: string
-                cpp_name: keyId
 
-    JWT:
-        description: A set of claims relating to the bearer of the token.
-        strict: false
-        fields:
-            iss:
-                description: Issuer; CS string identifying the issuing provider.
-                type: string
-                cpp_name: issuer
-            sub:
-                description: Subject; CS string identifying the subject.
-                type: string
-                cpp_name: subject
-            aud:
-                description: Audience; array of CS strings identifying
-                    intended token consumer(s).
-                type:
-                    variant: [string, array<string>]
-                cpp_name: audience
-            iat:
-                description: Time at which the JWT was issued. (Unix Epoch)
-                type: safeInt64
-                cpp_name: issuedAtEpoch
-            exp:
-                description: Time at which the JWT expires. (Unix Epoch)
-                type: safeInt64
-                cpp_name: expirationEpoch
-            auth_time:
-                description: Time when the authentication occurred. (Unix Epoch)
-                type: safeInt64
-                optional: true

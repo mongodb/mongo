@@ -34,15 +34,12 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/crypto/jws_validator.h"
-
 
 namespace mongo::crypto {
 
 class JWKManager {
 public:
-    using SharedValidator = std::shared_ptr<JWSValidator>;
-
+    JWKManager() = default;
     /**
     Fetch a JWKS file from the specified URL, parse them as keys,
     and instantiate JWSValidator instances.
@@ -50,38 +47,15 @@ public:
     explicit JWKManager(StringData source);
 
     /**
-    Parse a BSONObj array of keys, and instantiate JWSValidator instances.
-    This was added for testing purposes.
-    */
-    explicit JWKManager(BSONObj keys);
-
-    /**
     Given a unique keyId it will return the matching JWK.
     If no key is found for the given keyId, a uassert will be thrown.
     */
     const BSONObj& getKey(StringData keyId) const;
 
-    /**
-     * Fetch a specific JWSValidator from the JWKManager by keyId.
-     * If the keyId does not exist,
-     * a rate-limited refresh of the JWK endpoint will be
-     * triggered.
-     * If the keyId still does not exist, return ptr will be empty.
-     */
-    SharedValidator getValidator(StringData keyId) const;
-
-    std::size_t size() const {
-        return _validators->size();
-    }
-
-private:
-    void _setAndValidateKeys(const BSONObj& keys);
-
 private:
     // Map<keyId, JWKRSA>
     std::map<std::string, BSONObj> _keyMaterial;  // From last load
     std::string _keyURI;
-    std::shared_ptr<std::map<std::string, SharedValidator>> _validators;
 };
 
 }  // namespace mongo::crypto
