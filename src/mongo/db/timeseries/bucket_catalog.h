@@ -1118,7 +1118,8 @@ protected:
                                             const BSONObj& doc,
                                             CreationInfo* info,
                                             Bucket* bucket,
-                                            int32_t sizeToBeAdded,
+                                            NewFieldNames* newFieldNamesToBeInserted,
+                                            int32_t* sizeToBeAdded,
                                             AllowBucketCreation mode);
 
     /**

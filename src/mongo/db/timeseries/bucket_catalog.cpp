@@ -1688,12 +1688,11 @@ std::shared_ptr<BucketCatalog::WriteBatch> BucketCatalog::_insertIntoBucket(
     ClosedBuckets* closedBuckets) {
     NewFieldNames newFieldNamesToBeInserted;
     int32_t sizeToBeAdded = 0;
-    bucket->_calculateBucketFieldsAndSizeChange(
-        doc, info->options.getMetaField(), &newFieldNamesToBeInserted, &sizeToBeAdded);
 
     bool isNewlyOpenedBucket = bucket->_ns.isEmpty();
     if (!isNewlyOpenedBucket) {
-        auto action = _determineRolloverAction(opCtx, doc, info, bucket, sizeToBeAdded, mode);
+        auto action = _determineRolloverAction(
+            opCtx, doc, info, bucket, &newFieldNamesToBeInserted, &sizeToBeAdded, mode);
         if (action == RolloverAction::kSoftClose && mode == AllowBucketCreation::kNo) {
             // We don't actually want to roll this bucket over yet, bail out.
             return std::shared_ptr<WriteBatch>{};
@@ -1701,10 +1700,11 @@ std::shared_ptr<BucketCatalog::WriteBatch> BucketCatalog::_insertIntoBucket(
             info->openedDuetoMetadata = false;
             bucket = _rollover(stripe, stripeLock, bucket, *info, action);
             isNewlyOpenedBucket = true;
-
-            bucket->_calculateBucketFieldsAndSizeChange(
-                doc, info->options.getMetaField(), &newFieldNamesToBeInserted, &sizeToBeAdded);
         }
+    }
+    if (isNewlyOpenedBucket) {
+        bucket->_calculateBucketFieldsAndSizeChange(
+            doc, info->options.getMetaField(), &newFieldNamesToBeInserted, &sizeToBeAdded);
     }
 
     auto batch = bucket->_activeBatch(getOpId(opCtx, combine), info->stats);
@@ -2098,12 +2098,14 @@ BucketCatalog::Bucket* BucketCatalog::_allocateBucket(Stripe* stripe,
     return bucket;
 }
 
-BucketCatalog::RolloverAction BucketCatalog::_determineRolloverAction(OperationContext* opCtx,
-                                                                      const BSONObj& doc,
-                                                                      CreationInfo* info,
-                                                                      Bucket* bucket,
-                                                                      int32_t sizeToBeAdded,
-                                                                      AllowBucketCreation mode) {
+BucketCatalog::RolloverAction BucketCatalog::_determineRolloverAction(
+    OperationContext* opCtx,
+    const BSONObj& doc,
+    CreationInfo* info,
+    Bucket* bucket,
+    NewFieldNames* newFieldNamesToBeInserted,
+    int32_t* sizeToBeAdded,
+    AllowBucketCreation mode) {
     // If the mode is enabled to create new buckets, then we should update stats for soft closures
     // accordingly. If we specify the mode to not allow bucket creation, it means we are not sure if
     // we want to soft close the bucket yet and should wait to update closure stats.
@@ -2126,11 +2128,6 @@ BucketCatalog::RolloverAction BucketCatalog::_determineRolloverAction(OperationC
         info->stats.incNumBucketsClosedDueToCount();
         return RolloverAction::kHardClose;
     }
-    if (bucket->schemaIncompatible(
-            doc, info->options.getMetaField(), info->key.metadata.getComparator())) {
-        info->stats.incNumBucketsClosedDueToSchemaChange();
-        return RolloverAction::kHardClose;
-    }
 
     // In scenarios where we have a high cardinality workload and face increased cache pressure we
     // will decrease the size of buckets before we close them.
@@ -2147,13 +2144,15 @@ BucketCatalog::RolloverAction BucketCatalog::_determineRolloverAction(OperationC
     // We restrict the ceiling of the bucket max size under cache pressure.
     int32_t absoluteMaxSize = std::min(largeMeasurementsMaxBucketSize, cacheDerivedBucketMaxSize);
 
-    if (bucket->_size + sizeToBeAdded > effectiveMaxSize) {
+    bucket->_calculateBucketFieldsAndSizeChange(
+        doc, info->options.getMetaField(), newFieldNamesToBeInserted, sizeToBeAdded);
+    if (bucket->_size + *sizeToBeAdded > effectiveMaxSize) {
         bool keepBucketOpenForLargeMeasurements =
             bucket->_numMeasurements < static_cast<std::uint64_t>(gTimeseriesBucketMinCount) &&
             feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
                 serverGlobalParams.featureCompatibility);
         if (keepBucketOpenForLargeMeasurements) {
-            if (bucket->_size + sizeToBeAdded > absoluteMaxSize) {
+            if (bucket->_size + *sizeToBeAdded > absoluteMaxSize) {
                 if (absoluteMaxSize != largeMeasurementsMaxBucketSize) {
                     info->stats.incNumBucketsClosedDueToCachePressure();
                 } else {
@@ -2178,6 +2177,12 @@ BucketCatalog::RolloverAction BucketCatalog::_determineRolloverAction(OperationC
             }
             return RolloverAction::kHardClose;
         }
+    }
+
+    if (bucket->schemaIncompatible(
+            doc, info->options.getMetaField(), info->key.metadata.getComparator())) {
+        info->stats.incNumBucketsClosedDueToSchemaChange();
+        return RolloverAction::kHardClose;
     }
 
     return RolloverAction::kNone;
