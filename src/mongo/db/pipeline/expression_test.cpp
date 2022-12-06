@@ -4280,205 +4280,234 @@ TEST(ExpressionFLETest, ParseAndSerializeBetween) {
         } })");
     ASSERT_BSONOBJ_EQ(value.getDocument().toBson(), roundTripExpr);
 }
+
+/**
+ * Expressions registered with REGISTER_EXPRESSION_WITH_FEATURE_FLAG with feature flags that are not
+ * active by default are not available for parsing in unit tests, since at MONGO_INITIALIZER-time,
+ * the feature flag is false, so the expression isn't registered. This function calls the parse
+ * function on an expression class directly to bypass the global parser map.
+ */
+template <typename T>
+Value evaluateUnregisteredExpression(vector<ImplicitValue> operands) {
+    auto expCtx = ExpressionContextForTest{};
+    auto val = Value(ImplicitValue::convertToValues(operands));
+    const BSONObj obj = BSON("" << val);
+    auto expr = T::parse(&expCtx, obj.firstElement(), expCtx.variablesParseState);
+    return expr->evaluate({}, &expCtx.variables);
+}
+
+/**
+ * Version of assertExpectedResults() that bypasses the global parser map and always parses
+ * expressions of the templated type.
+ */
+template <typename T>
+void assertExpectedResultsUnregistered(
+    initializer_list<pair<initializer_list<ImplicitValue>, ImplicitValue>> operations) {
+    for (auto&& op : operations) {
+        try {
+            Value result = evaluateUnregisteredExpression<T>(op.first);
+            ASSERT_VALUE_EQ(op.second, result);
+            ASSERT_EQUALS(op.second.getType(), result.getType());
+        } catch (...) {
+            LOGV2(6688000, "failed", "argument"_attr = ImplicitValue::convertToValues(op.first));
+            throw;
+        }
+    }
+}
+
 TEST(ExpressionBitAndTest, BitAndCorrectness) {
-    assertExpectedResults("$bitAnd",
-                          {
-                              // Explicit correctness cases.
-                              {{0b0, 0b0}, 0b0},
-                              {{0b0, 0b1}, 0b0},
-                              {{0b1, 0b0}, 0b0},
-                              {{0b1, 0b1}, 0b1},
+    assertExpectedResultsUnregistered<ExpressionBitAnd>({
+        // Explicit correctness cases.
+        {{0b0, 0b0}, 0b0},
+        {{0b0, 0b1}, 0b0},
+        {{0b1, 0b0}, 0b0},
+        {{0b1, 0b1}, 0b1},
 
-                              {{0b00, 0b00}, 0b00},
-                              {{0b00, 0b01}, 0b00},
-                              {{0b01, 0b00}, 0b00},
-                              {{0b01, 0b01}, 0b01},
+        {{0b00, 0b00}, 0b00},
+        {{0b00, 0b01}, 0b00},
+        {{0b01, 0b00}, 0b00},
+        {{0b01, 0b01}, 0b01},
 
-                              {{0b00, 0b00}, 0b00},
-                              {{0b00, 0b11}, 0b00},
-                              {{0b11, 0b00}, 0b00},
-                              {{0b11, 0b11}, 0b11},
-                          });
+        {{0b00, 0b00}, 0b00},
+        {{0b00, 0b11}, 0b00},
+        {{0b11, 0b00}, 0b00},
+        {{0b11, 0b11}, 0b11},
+    });
 }
 
 TEST(ExpressionBitAndTest, BitAndInt) {
-    assertExpectedResults(
-        "$bitAnd",
-        {
-            // Empty operand list should evaluate to the identity for the operation.
-            {{}, -1},
-            // Singleton cases.
-            {{0}, 0},
-            {{256}, 256},
-            // Binary cases
-            {{5, 2}, 5 & 2},
-            {{255, 0}, 255 & 0},
-            // Ternary cases
-            {{5, 2, 10}, 5 & 2 & 10},
-        });
+    assertExpectedResultsUnregistered<ExpressionBitAnd>({
+        // Empty operand list should evaluate to the identity for the operation.
+        {{}, -1},
+        // Singleton cases.
+        {{0}, 0},
+        {{256}, 256},
+        // Binary cases
+        {{5, 2}, 5 & 2},
+        {{255, 0}, 255 & 0},
+        // Ternary cases
+        {{5, 2, 10}, 5 & 2 & 10},
+    });
 }
 
 TEST(ExpressionBitAndTest, BitAndLong) {
-    assertExpectedResults("$bitAnd",
-                          {
-                              // Singleton cases.
-                              {{0LL}, 0LL},
-                              {{1LL << 40}, 1LL << 40},
-                              {{256LL}, 256LL},
-                              // Binary cases.
-                              {{5LL, 2LL}, 5LL & 2LL},
-                              {{255LL, 0LL}, 255LL & 0LL},
-                              // Ternary cases.
-                              {{5, 2, 10}, 5 & 2 & 10},
-                          });
+    assertExpectedResultsUnregistered<ExpressionBitAnd>({
+        // Singleton cases.
+        {{0LL}, 0LL},
+        {{1LL << 40}, 1LL << 40},
+        {{256LL}, 256LL},
+        // Binary cases.
+        {{5LL, 2LL}, 5LL & 2LL},
+        {{255LL, 0LL}, 255LL & 0LL},
+        // Ternary cases.
+        {{5, 2, 10}, 5 & 2 & 10},
+    });
 }
 
 TEST(ExpressionBitAndTest, BitAndMixedTypes) {
     // Any NumberLong widens the resulting type to NumberLong.
-    assertExpectedResults("$bitAnd",
-                          {
-                              // Binary cases
-                              {{5LL, 2}, 5LL & 2},
-                              {{5, 2LL}, 5 & 2LL},
-                              {{255LL, 0}, 255LL & 0},
-                              {{255, 0LL}, 255 & 0LL},
-                          });
+    assertExpectedResultsUnregistered<ExpressionBitAnd>({
+        // Binary cases
+        {{5LL, 2}, 5LL & 2},
+        {{5, 2LL}, 5 & 2LL},
+        {{255LL, 0}, 255LL & 0},
+        {{255, 0LL}, 255 & 0LL},
+    });
 }
 
 TEST(ExpressionBitOrTest, BitOrInt) {
-    assertExpectedResults("$bitOr",
-                          {
-                              {{}, 0},
-                              // Singleton cases.
-                              {{0}, 0},
-                              {{256}, 256},
-                              // Binary cases
-                              {{5, 2}, 5 | 2},
-                              {{255, 0}, 255 | 0},
-                              // Ternary cases
-                              {{5, 2, 10}, 5 | 2 | 10},
-                          });
+    assertExpectedResultsUnregistered<ExpressionBitOr>({
+        {{}, 0},
+        // Singleton cases.
+        {{0}, 0},
+        {{256}, 256},
+        // Binary cases
+        {{5, 2}, 5 | 2},
+        {{255, 0}, 255 | 0},
+        // Ternary cases
+        {{5, 2, 10}, 5 | 2 | 10},
+    });
 }
 
 TEST(ExpressionBitOrTest, BitOrLong) {
-    assertExpectedResults("$bitOr",
-                          {
-                              // Singleton cases.
-                              {{0LL}, 0LL},
-                              {{256LL}, 256LL},
-                              // Binary cases.
-                              {{5LL, 2LL}, 5LL | 2LL},
-                              {{255LL, 0LL}, 255LL | 0LL},
-                              // Ternary cases.
-                              {{5, 2, 10}, 5 | 2 | 10},
-                          });
+    assertExpectedResultsUnregistered<ExpressionBitOr>({
+        // Singleton cases.
+        {{0LL}, 0LL},
+        {{256LL}, 256LL},
+        // Binary cases.
+        {{5LL, 2LL}, 5LL | 2LL},
+        {{255LL, 0LL}, 255LL | 0LL},
+        // Ternary cases.
+        {{5, 2, 10}, 5 | 2 | 10},
+    });
 }
 
 TEST(ExpressionBitOrTest, BitOrMixedTypes) {
     // Any NumberLong widens the resulting type to NumberLong.
-    assertExpectedResults("$bitOr",
-                          {
-                              // Binary cases
-                              {{5LL, 2}, 5LL | 2},
-                              {{5, 2LL}, 5 | 2LL},
-                              {{255LL, 0}, 255LL | 0},
-                              {{255, 0LL}, 255 | 0LL},
-                          });
+    assertExpectedResultsUnregistered<ExpressionBitOr>({
+        // Binary cases
+        {{5LL, 2}, 5LL | 2},
+        {{5, 2LL}, 5 | 2LL},
+        {{255LL, 0}, 255LL | 0},
+        {{255, 0LL}, 255 | 0LL},
+    });
 }
 
 TEST(ExpressionBitXorTest, BitXorInt) {
-    assertExpectedResults("$bitXor",
-                          {
-                              {{}, 0},
-                              // Singleton cases.
-                              {{0}, 0},
-                              {{256}, 256},
-                              // Binary cases
-                              {{5, 2}, 5 ^ 2},
-                              {{255, 0}, 255 ^ 0},
-                              // Ternary cases
-                              {{5, 2, 10}, 5 ^ 2 ^ 10},
-                          });
+    assertExpectedResultsUnregistered<ExpressionBitXor>({
+        {{}, 0},
+        // Singleton cases.
+        {{0}, 0},
+        {{256}, 256},
+        // Binary cases
+        {{5, 2}, 5 ^ 2},
+        {{255, 0}, 255 ^ 0},
+        // Ternary cases
+        {{5, 2, 10}, 5 ^ 2 ^ 10},
+    });
 }
 
 TEST(ExpressionBitXorTest, BitXorLong) {
-    assertExpectedResults("$bitXor",
-                          {
-                              // Singleton cases.
-                              {{0LL}, 0LL},
-                              {{256LL}, 256LL},
-                              // Binary cases.
-                              {{5LL, 2LL}, 5LL ^ 2LL},
-                              {{255LL, 0LL}, 255LL ^ 0LL},
-                              // Ternary cases.
-                              {{5, 2, 10}, 5 ^ 2 ^ 10},
-                          });
+    assertExpectedResultsUnregistered<ExpressionBitXor>({
+        // Singleton cases.
+        {{0LL}, 0LL},
+        {{256LL}, 256LL},
+        // Binary cases.
+        {{5LL, 2LL}, 5LL ^ 2LL},
+        {{255LL, 0LL}, 255LL ^ 0LL},
+        // Ternary cases.
+        {{5, 2, 10}, 5 ^ 2 ^ 10},
+    });
 }
 
 TEST(ExpressionBitXorTest, BitXorMixedTypes) {
     // Any NumberLong widens the resulting type to NumberLong.
-    assertExpectedResults("$bitXor",
-                          {
-                              // Binary cases
-                              {{5LL, 2}, 5LL ^ 2},
-                              {{5, 2LL}, 5 ^ 2LL},
-                              {{255LL, 0}, 255LL ^ 0},
-                              {{255, 0LL}, 255 ^ 0LL},
-                          });
+    assertExpectedResultsUnregistered<ExpressionBitXor>({
+        // Binary cases
+        {{5LL, 2}, 5LL ^ 2},
+        {{5, 2LL}, 5 ^ 2LL},
+        {{255LL, 0}, 255LL ^ 0},
+        {{255, 0LL}, 255 ^ 0LL},
+    });
 }
+
 
 TEST(ExpressionBitNotTest, Int) {
     int min = numeric_limits<int>::min();
     int max = numeric_limits<int>::max();
-    assertExpectedResults("$bitNot",
-                          {
-                              {{0}, -1},
-                              {{-1}, 0},
-                              {{1}, -2},
-                              {{3}, -4},
-                              {{100}, -101},
-                              {{min}, ~min},
-                              {{max}, ~max},
-                              {{max}, min},
-                              {{min}, max},
-                          });
+    assertExpectedResultsUnregistered<ExpressionBitNot>({
+        {{0}, -1},
+        {{-1}, 0},
+        {{1}, -2},
+        {{3}, -4},
+        {{100}, -101},
+        {{min}, ~min},
+        {{max}, ~max},
+        {{max}, min},
+        {{min}, max},
+    });
 }
 
 TEST(ExpressionBitNotTest, Long) {
     long long min = numeric_limits<long long>::min();
     long long max = numeric_limits<long long>::max();
-    assertExpectedResults("$bitNot",
-                          {
-                              {{0LL}, -1LL},
-                              {{-1LL}, 0LL},
-                              {{1LL}, -2LL},
-                              {{3LL}, -4LL},
-                              {{100LL}, -101LL},
-                              {{2147483649LL}, ~2147483649LL},
-                              {{-2147483655LL}, ~(-2147483655LL)},
-                              {{min}, ~min},
-                              {{max}, ~max},
-                              {{max}, min},
-                              {{min}, max},
-                          });
+    assertExpectedResultsUnregistered<ExpressionBitNot>({
+        {{0LL}, -1LL},
+        {{-1LL}, 0LL},
+        {{1LL}, -2LL},
+        {{3LL}, -4LL},
+        {{100LL}, -101LL},
+        {{2147483649LL}, ~2147483649LL},
+        {{-2147483655LL}, ~(-2147483655LL)},
+        {{min}, ~min},
+        {{max}, ~max},
+        {{max}, min},
+        {{min}, max},
+    });
 }
 
 TEST(ExpressionBitNotTest, OtherNumerics) {
-    ASSERT_THROWS_CODE(
-        evaluateExpression("$bitNot", {1.5}), AssertionException, ErrorCodes::TypeMismatch);
-    ASSERT_THROWS_CODE(evaluateExpression("$bitNot", {Decimal128("0")}),
+    ASSERT_THROWS_CODE(evaluateUnregisteredExpression<ExpressionBitNot>({1.5}),
+                       AssertionException,
+                       ErrorCodes::TypeMismatch);
+    ASSERT_THROWS_CODE(evaluateUnregisteredExpression<ExpressionBitNot>({Decimal128("0")}),
                        AssertionException,
                        ErrorCodes::TypeMismatch);
 }
 
 TEST(ExpressionBitNotTest, NonNumerics) {
-    ASSERT_THROWS_CODE(evaluateExpression("$bitNot", {"hi"_sd}), AssertionException, 28765);
-    ASSERT_THROWS_CODE(evaluateExpression("$bitNot", {true}), AssertionException, 28765);
+    ASSERT_THROWS_CODE(
+        evaluateUnregisteredExpression<ExpressionBitNot>({"hi"_sd}), AssertionException, 28765);
+    ASSERT_THROWS_CODE(
+        evaluateUnregisteredExpression<ExpressionBitNot>({true}), AssertionException, 28765);
 }
 
 TEST(ExpressionBitNotTest, Arrays) {
-    ASSERT_THROWS_CODE(evaluateExpression("$bitNot", {1, 2, 3}), AssertionException, 16020);
-    ASSERT_THROWS_CODE(evaluateExpression("$bitNot", {1LL, 2LL, 3LL}), AssertionException, 16020);
+    ASSERT_THROWS_CODE(
+        evaluateUnregisteredExpression<ExpressionBitNot>({1, 2, 3}), AssertionException, 16020);
+    ASSERT_THROWS_CODE(evaluateUnregisteredExpression<ExpressionBitNot>({1LL, 2LL, 3LL}),
+                       AssertionException,
+                       16020);
 }
 }  // namespace ExpressionTests
 }  // namespace mongo

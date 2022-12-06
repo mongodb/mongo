@@ -8069,16 +8069,33 @@ Value ExpressionBitNot::evaluateNumericArg(const Value& numericArg) const {
     }
 }
 
-REGISTER_STABLE_EXPRESSION(bitNot, ExpressionBitNot::parse);
+REGISTER_EXPRESSION_WITH_FEATURE_FLAG(bitNot,
+                                      ExpressionBitNot::parse,
+                                      AllowedWithApiStrict::kNeverInVersion1,
+                                      AllowedWithClientType::kAny,
+                                      feature_flags::gFeatureFlagBitwise);
+
 const char* ExpressionBitNot::getOpName() const {
     return "$bitNot";
 }
 
 /* ------------------------- $bitAnd, $bitOr, and $bitXor ------------------------ */
 
-REGISTER_STABLE_EXPRESSION(bitAnd, ExpressionBitAnd::parse);
-REGISTER_STABLE_EXPRESSION(bitOr, ExpressionBitOr::parse);
-REGISTER_STABLE_EXPRESSION(bitXor, ExpressionBitXor::parse);
+REGISTER_EXPRESSION_WITH_FEATURE_FLAG(bitAnd,
+                                      ExpressionBitAnd::parse,
+                                      AllowedWithApiStrict::kNeverInVersion1,
+                                      AllowedWithClientType::kAny,
+                                      feature_flags::gFeatureFlagBitwise);
+REGISTER_EXPRESSION_WITH_FEATURE_FLAG(bitOr,
+                                      ExpressionBitOr::parse,
+                                      AllowedWithApiStrict::kNeverInVersion1,
+                                      AllowedWithClientType::kAny,
+                                      feature_flags::gFeatureFlagBitwise);
+REGISTER_EXPRESSION_WITH_FEATURE_FLAG(bitXor,
+                                      ExpressionBitXor::parse,
+                                      AllowedWithApiStrict::kNeverInVersion1,
+                                      AllowedWithClientType::kAny,
+                                      feature_flags::gFeatureFlagBitwise);
 
 MONGO_INITIALIZER_GROUP(BeginExpressionRegistration, ("default"), ("EndExpressionRegistration"))
 MONGO_INITIALIZER_GROUP(EndExpressionRegistration, ("BeginExpressionRegistration"), ())

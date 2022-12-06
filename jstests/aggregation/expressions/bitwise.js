@@ -1,6 +1,7 @@
 // Verify that bitwise agg expressions work as expected.
 // @tags: [
 //   requires_fcv_63,
+//   featureFlagBitwiseAggOperators,
 // ]
 load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
 (function() {

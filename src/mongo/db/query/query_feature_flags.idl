@@ -85,3 +85,9 @@ feature_flags:
       description: "Feature flag for enabling the telemetry store."
       cpp_varname: gFeatureFlagTelemetry
       default: false
+
+    featureFlagBitwiseAggOperators:
+      description: "Feature flag for enabling support for bitwise operators in the aggregation language."
+      cpp_varname: gFeatureFlagBitwise
+      default: true
+      version: 6.3
