@@ -3159,7 +3159,7 @@ buildvariants:
       # - name: tsbs_query
       # - name: tsbs_query_finance
       # - name: tsbs_query_manual_bucketing
-      # - name: big_update_10k
+      - name: big_update_10k
 
   - name: linux-3-node-replSet-intel.2022-11
     display_name: Linux 3-Node ReplSet Intel 2022-11
