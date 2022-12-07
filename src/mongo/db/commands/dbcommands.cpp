@@ -464,7 +464,7 @@ public:
 
         uassert(ErrorCodes::OperationFailed, "No collection name specified", !nss.coll().empty());
 
-        result.append("ns", nss.ns());
+        result.append("ns", NamespaceStringUtil::serialize(nss));
         auto spec = StorageStatsSpec::parse(IDLParserContext("collStats"), cmdObj);
         Status status = appendCollectionStorageStats(opCtx, nss, spec, &result);
         if (!status.isOK() && (status.code() != ErrorCodes::NamespaceNotFound)) {

@@ -96,7 +96,7 @@ void _appendRecordStats(OperationContext* opCtx,
     long long numRecords = collection->numRecords(opCtx);
     if (isTimeseries) {
         BSONObjBuilder bob(result->subobjStart("timeseries"));
-        bob.append("bucketsNs", collNss.ns());
+        bob.append("bucketsNs", NamespaceStringUtil::serialize(collNss));
         bob.appendNumber("bucketCount", numRecords);
         if (numRecords) {
             bob.append("avgBucketSize", collection->averageObjectSize(opCtx));

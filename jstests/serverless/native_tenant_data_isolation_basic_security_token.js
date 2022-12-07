@@ -239,6 +239,27 @@ function runTest(featureFlagRequireTenantId) {
             assert(arrayEq(expectedDbs, dbs.databases.map(db => db.name)));
         }
 
+        {
+            // Test the collStats command.
+            let res = assert.commandWorked(tokenDB.runCommand({collStats: kCollName}));
+            checkNsSerializedCorrectly(
+                featureFlagRequireTenantId, kTenant, kDbName, kCollName, res.ns);
+
+            // perform the same test on a timeseries collection
+            const timeFieldName = "time";
+            const tsColl = "timeseriesColl";
+            assert.commandWorked(
+                tokenDB.createCollection(tsColl, {timeseries: {timeField: timeFieldName}}));
+            res = assert.commandWorked(tokenDB.runCommand({collStats: tsColl}));
+            checkNsSerializedCorrectly(
+                featureFlagRequireTenantId, kTenant, kDbName, tsColl, res.ns);
+            checkNsSerializedCorrectly(featureFlagRequireTenantId,
+                                       kTenant,
+                                       kDbName,
+                                       'system.buckets.' + tsColl,
+                                       res.timeseries.bucketsNs);
+        }
+
         // Drop the collection, and then the database. Check that listCollections no longer returns
         // the 3 collections.
         {
