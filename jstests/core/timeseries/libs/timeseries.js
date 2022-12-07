@@ -33,13 +33,6 @@ var TimeseriesTest = class {
     }
 
     /**
-     * Returns whether time-series bucket compression are supported.
-     */
-    static timeseriesBucketCompressionEnabled(conn) {
-        return FeatureFlagUtil.isEnabled(conn, "TimeseriesBucketCompression");
-    }
-
-    /**
      * Returns whether time-series scalability improvements (like bucket reopening) are enabled.
      */
     static timeseriesScalabilityImprovementsEnabled(conn) {

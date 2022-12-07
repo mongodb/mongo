@@ -281,10 +281,7 @@ CompressionResult compressBucket(const BSONObj& bucketDoc,
 
         // Add compressed time field first
         {
-            BSONColumnBuilder timeColumn(
-                std::move(columnBuffer),
-                feature_flags::gTimeseriesBucketCompressionWithArrays.isEnabled(
-                    serverGlobalParams.featureCompatibility));
+            BSONColumnBuilder timeColumn(std::move(columnBuffer));
             for (const auto& measurement : measurements) {
                 timeColumn.append(measurement.timeField);
             }
@@ -317,10 +314,7 @@ CompressionResult compressBucket(const BSONObj& bucketDoc,
 
         // Then add compressed data fields.
         for (size_t i = 0; i < columns.size(); ++i) {
-            BSONColumnBuilder column(
-                std::move(columnBuffer),
-                feature_flags::gTimeseriesBucketCompressionWithArrays.isEnabled(
-                    serverGlobalParams.featureCompatibility));
+            BSONColumnBuilder column(std::move(columnBuffer));
             for (const auto& measurement : measurements) {
                 if (auto elem = measurement.dataFields[i]) {
                     column.append(elem);

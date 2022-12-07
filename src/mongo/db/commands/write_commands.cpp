@@ -710,11 +710,6 @@ public:
 
         TimeseriesSingleWriteResult _performTimeseriesBucketCompression(
             OperationContext* opCtx, const BucketCatalog::ClosedBucket& closedBucket) const {
-            if (!feature_flags::gTimeseriesBucketCompression.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
-                return {SingleWriteResult(), true};
-            }
-
             // Buckets with just a single measurement is not worth compressing.
             if (closedBucket.numMeasurements.has_value() &&
                 closedBucket.numMeasurements.value() <= 1) {

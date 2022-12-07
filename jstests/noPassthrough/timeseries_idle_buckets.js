@@ -16,7 +16,6 @@ rst.initiate();
 
 const db = rst.getPrimary().getDB(jsTestName());
 
-const isTimeseriesBucketCompressionEnabled = TimeseriesTest.timeseriesBucketCompressionEnabled(db);
 assert.commandWorked(db.dropDatabase());
 
 const coll = db.timeseries_idle_buckets;
@@ -71,7 +70,7 @@ for (let i = 0; i < numDocs; i++) {
                          .toArray();
     if (bucketDocs.length > 1) {
         // If bucket compression is enabled the expired bucket should have been compressed
-        assert.eq(isTimeseriesBucketCompressionEnabled ? 2 : 1,
+        assert.eq(2,
                   bucketDocs[0].control.version,
                   'unexpected control.version in first bucket: ' + tojson(bucketDocs));
         assert.eq(1,

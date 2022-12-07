@@ -165,11 +165,6 @@ feature_flags:
         cpp_varname: feature_flags::gTimeseriesMetricIndexes
         default: true
         version: 6.0
-    featureFlagTimeseriesBucketCompression:
-        description: "Enable bucket compression on time-series collections"
-        cpp_varname: feature_flags::gTimeseriesBucketCompression
-        default: true
-        version: 5.2
     featureFlagCollModIndexUnique:
         description: "When enabled, collMod supports making an index unique"
         cpp_varname: feature_flags::gCollModIndexUnique
@@ -188,11 +183,6 @@ feature_flags:
     featureFlagDocumentSourceListCatalog:
         description: "When enabled, allow the use of the $listCatalog aggregation stage"
         cpp_varname: feature_flags::gDocumentSourceListCatalog
-        default: true
-        version: 6.0
-    featureFlagTimeseriesBucketCompressionWithArrays:
-        description: "Enable array compression support for time-series bucket compression"
-        cpp_varname: feature_flags::gTimeseriesBucketCompressionWithArrays
         default: true
         version: 6.0
     featureFlagDerivedMetadata:

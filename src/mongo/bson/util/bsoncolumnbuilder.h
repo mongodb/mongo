@@ -47,8 +47,8 @@ namespace mongo {
  */
 class BSONColumnBuilder {
 public:
-    BSONColumnBuilder(bool arrayCompression = false);
-    BSONColumnBuilder(BufBuilder&& builder, bool arrayCompression = false);
+    BSONColumnBuilder();
+    explicit BSONColumnBuilder(BufBuilder builder);
 
     /**
      * Appends a BSONElement to this BSONColumnBuilder.
@@ -285,9 +285,6 @@ private:
     BufBuilder _bufBuilder;
 
     int _numInterleavedStartWritten = 0;
-
-    // Indicates if array compression should be used
-    bool _arrayCompression = false;
 
     bool _finalized = false;
 };

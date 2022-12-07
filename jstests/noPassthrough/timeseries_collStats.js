@@ -22,8 +22,6 @@ const conn = MongoRunner.runMongod({
 
 const dbName = jsTestName();
 const testDB = conn.getDB(dbName);
-const isTimeseriesBucketCompressionEnabled =
-    TimeseriesTest.timeseriesBucketCompressionEnabled(testDB);
 const isTimeseriesScalabilityImprovementsEnabled =
     TimeseriesTest.timeseriesScalabilityImprovementsEnabled(testDB);
 
@@ -179,9 +177,7 @@ expectedStats.numBucketInserts++;
 expectedStats.numCommits++;
 expectedStats.numBucketsClosedDueToTimeBackward++;
 expectedStats.numMeasurementsCommitted++;
-if (isTimeseriesBucketCompressionEnabled) {
-    expectedStats.numCompressedBuckets++;
-}
+expectedStats.numCompressedBuckets++;
 if (isTimeseriesScalabilityImprovementsEnabled) {
     expectedStats.numBucketQueriesFailed++;
 }
@@ -200,9 +196,7 @@ expectedStats.numCommits += 2;
 expectedStats.numMeasurementsCommitted += numDocs;
 expectedStats.avgNumMeasurementsPerCommit =
     Math.floor(expectedStats.numMeasurementsCommitted / expectedStats.numCommits);
-if (isTimeseriesBucketCompressionEnabled) {
-    expectedStats.numCompressedBuckets++;
-}
+expectedStats.numCompressedBuckets++;
 if (isTimeseriesScalabilityImprovementsEnabled) {
     expectedStats.numBucketQueriesFailed++;
 }
@@ -225,10 +219,8 @@ expectedStats.numCommits += 2;
 expectedStats.numMeasurementsCommitted += 1001;
 expectedStats.avgNumMeasurementsPerCommit =
     Math.floor(expectedStats.numMeasurementsCommitted / expectedStats.numCommits);
-if (isTimeseriesBucketCompressionEnabled) {
-    expectedStats.numCompressedBuckets++;
-    expectedStats.numSubObjCompressionRestart += 2;
-}
+expectedStats.numCompressedBuckets++;
+expectedStats.numSubObjCompressionRestart += 2;
 if (isTimeseriesScalabilityImprovementsEnabled) {
     expectedStats.numBucketQueriesFailed++;
 }

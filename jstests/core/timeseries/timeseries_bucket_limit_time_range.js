@@ -14,8 +14,6 @@
 load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest'.
 
 TimeseriesTest.run((insert) => {
-    const isTimeseriesBucketCompressionEnabled =
-        TimeseriesTest.timeseriesBucketCompressionEnabled(db);
     const isTimeseriesScalabilityImprovementsEnabled =
         TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db);
 
@@ -93,7 +91,7 @@ TimeseriesTest.run((insert) => {
                                                             // of closing, but another simultaneous
                                                             // operation may close it in the
                                                             // background.
-            assert.eq(isTimeseriesBucketCompressionEnabled ? 2 : 1,
+            assert.eq(2,
                       bucketDocs[0].control.version,
                       'unexpected control.version in first bucket: ' + tojson(bucketDocs));
         }

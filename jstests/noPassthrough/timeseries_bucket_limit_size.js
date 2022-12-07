@@ -18,8 +18,6 @@ const dbName = jsTestName();
 const db = conn.getDB(dbName);
 
 TimeseriesTest.run((insert) => {
-    const isTimeseriesBucketCompressionEnabled =
-        TimeseriesTest.timeseriesBucketCompressionEnabled(db);
     const areTimeseriesScalabilityImprovementsEnabled =
         TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db);
 
@@ -83,7 +81,7 @@ TimeseriesTest.run((insert) => {
         assert.eq(largeValue,
                   bucketDocs[0].control.max.x,
                   'invalid control.max for x in first bucket: ' + tojson(bucketDocs[0].control));
-        assert.eq(isTimeseriesBucketCompressionEnabled ? 2 : 1,
+        assert.eq(2,
                   bucketDocs[0].control.version,
                   'unexpected control.version in first bucket: ' + tojson(bucketDocs));
 

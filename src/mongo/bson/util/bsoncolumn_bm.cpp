@@ -130,7 +130,7 @@ std::vector<BSONObj> generateObjectIds(int num, int skipPercentage) {
 }
 
 BSONObj buildCompressed(const std::vector<BSONObj>& elems) {
-    BSONColumnBuilder col("");
+    BSONColumnBuilder col;
     for (auto&& elem : elems) {
         if (!elem.isEmpty()) {
             col.append(elem.firstElement());
@@ -208,7 +208,7 @@ void benchmarkCompression(benchmark::State& state,
     uint64_t totalElements = 0;
     uint64_t totalBytes = 0;
     for (auto _ : state) {
-        BSONColumnBuilder columnBuilder("");
+        BSONColumnBuilder columnBuilder;
         for (auto&& decompressed : col) {
             columnBuilder.append(decompressed);
             totalBytes += decompressed.size();
