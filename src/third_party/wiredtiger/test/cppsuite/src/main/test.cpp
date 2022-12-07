@@ -128,7 +128,7 @@ test::run()
     db_create_config += ",cache_max_wait_ms=" + std::to_string(cache_max_wait_ms);
 
     /* Add the user supplied wiredtiger open config. */
-    db_create_config += "," + _args.wt_open_config;
+    db_create_config += _args.wt_open_config;
 
     /* Create connection. */
     connection_manager::instance().create(

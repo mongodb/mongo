@@ -40,7 +40,7 @@ namespace test_harness {
 struct test_args {
     const std::string test_config;
     const std::string test_name;
-    std::string wt_open_config;
+    const std::string wt_open_config;
     const std::string home;
 };
 

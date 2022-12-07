@@ -60,14 +60,6 @@ type_string(thread_type type)
 thread_worker::thread_worker(uint64_t id, thread_type type, configuration *config,
   scoped_session &&created_session, timestamp_manager *timestamp_manager,
   operation_tracker *op_tracker, database &dbase)
-    : thread_worker(
-        id, type, config, std::move(created_session), timestamp_manager, op_tracker, dbase, nullptr)
-{
-}
-
-thread_worker::thread_worker(uint64_t id, thread_type type, configuration *config,
-  scoped_session &&created_session, timestamp_manager *timestamp_manager,
-  operation_tracker *op_tracker, database &dbase, std::shared_ptr<barrier> barrier_ptr)
     : /* These won't exist for certain threads which is why we use optional here. */
       collection_count(config->get_optional_int(COLLECTION_COUNT, 1)),
       key_count(config->get_optional_int(KEY_COUNT_PER_COLLECTION, 1)),
@@ -76,7 +68,7 @@ thread_worker::thread_worker(uint64_t id, thread_type type, configuration *confi
       thread_count(config->get_int(THREAD_COUNT)), type(type), id(id), db(dbase),
       session(std::move(created_session)), tsm(timestamp_manager),
       txn(transaction(config, timestamp_manager, session.get())), op_tracker(op_tracker),
-      _sleep_time_ms(config->get_throttle_ms()), _barrier(barrier_ptr)
+      _sleep_time_ms(config->get_throttle_ms())
 {
     if (op_tracker->enabled())
         op_track_cursor = session.open_scoped_cursor(op_tracker->get_operation_table_name());
@@ -266,12 +258,6 @@ void
 thread_worker::sleep()
 {
     std::this_thread::sleep_for(std::chrono::milliseconds(_sleep_time_ms));
-}
-
-void
-thread_worker::sync()
-{
-    _barrier->wait();
 }
 
 bool

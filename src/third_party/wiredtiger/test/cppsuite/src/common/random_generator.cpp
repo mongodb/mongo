@@ -73,12 +73,6 @@ random_generator::generate_pseudo_random_string(std::size_t length, characters_t
     return (random_string);
 }
 
-bool
-random_generator::generate_bool()
-{
-    return generate_integer<int>(0, 1) == 1;
-}
-
 random_generator::random_generator()
 {
     _generator = std::mt19937(std::random_device{}());
