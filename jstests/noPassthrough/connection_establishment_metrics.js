@@ -94,9 +94,7 @@ let queryShell = runTestQuery(db);
 jsTestLog("Checking the mongos log.");
 
 assert.soon(() => validateLogAndExtractEntry() != null,
-            "Slow connection establishment log entry not found.",
-            5000,
-            250);
+            "Slow connection establishment log entry not found.");
 
 queryShell();
 connDelayFailPoint.off();
