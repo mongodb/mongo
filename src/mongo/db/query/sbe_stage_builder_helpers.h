@@ -34,6 +34,7 @@
 #include <string>
 #include <utility>
 
+#include "mongo/db/exec/sbe/abt/abt_lower.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/match_path.h"
 #include "mongo/db/exec/sbe/stages/filter.h"
@@ -336,7 +337,8 @@ std::pair<sbe::value::SlotId, EvalStage> projectEvalExpr(
     EvalExpr expr,
     EvalStage stage,
     PlanNodeId planNodeId,
-    sbe::value::SlotIdGenerator* slotIdGenerator);
+    sbe::value::SlotIdGenerator* slotIdGenerator,
+    optimizer::SlotVarMap& slotVarMap);
 
 template <bool IsConst, bool IsEof = false>
 EvalStage makeFilter(EvalStage stage,
@@ -436,7 +438,8 @@ using BranchFn = std::function<std::pair<sbe::value::SlotId, EvalStage>(
     EvalExpr expr,
     EvalStage stage,
     PlanNodeId planNodeId,
-    sbe::value::SlotIdGenerator* slotIdGenerator)>;
+    sbe::value::SlotIdGenerator* slotIdGenerator,
+    optimizer::SlotVarMap& slotVarMap)>;
 
 /**
  * Creates a chain of EIf expressions that will inspect each arg in order and return the first
@@ -453,7 +456,8 @@ std::unique_ptr<sbe::EExpression> makeIfNullExpr(
 EvalExprStagePair generateUnion(std::vector<EvalExprStagePair> branches,
                                 BranchFn branchFn,
                                 PlanNodeId planNodeId,
-                                sbe::value::SlotIdGenerator* slotIdGenerator);
+                                sbe::value::SlotIdGenerator* slotIdGenerator,
+                                optimizer::SlotVarMap& slotVarMap);
 /**
  * Creates limit-1/union stage with specified branches. Each branch is passed to 'branchFn' first.
  * If 'branchFn' is not set, expression from branch is simply projected to a slot.
@@ -461,7 +465,8 @@ EvalExprStagePair generateUnion(std::vector<EvalExprStagePair> branches,
 EvalExprStagePair generateSingleResultUnion(std::vector<EvalExprStagePair> branches,
                                             BranchFn branchFn,
                                             PlanNodeId planNodeId,
-                                            sbe::value::SlotIdGenerator* slotIdGenerator);
+                                            sbe::value::SlotIdGenerator* slotIdGenerator,
+                                            optimizer::SlotVarMap& slotVarMap);
 
 /** This helper takes an SBE SlotIdGenerator and an SBE Array and returns an output slot and a
  * unwind/project/limit/coscan subtree that streams out the elements of the array one at a time via
@@ -583,6 +588,7 @@ public:
      * value. Index part of the constructed state is empty.
      */
     virtual Expression makeState(Expression expr) const = 0;
+    virtual optimizer::ABT makeState(optimizer::ABT expr) const = 0;
 
     /**
      * Creates an expression that constructs an initial state from 'expr'. 'expr' must evaluate to a
@@ -596,6 +602,7 @@ public:
      * Creates an expression that extracts boolean value from the state evaluated from 'expr'.
      */
     virtual Expression getBool(Expression expr) const = 0;
+    virtual optimizer::ABT getBool(optimizer::ABT expr) const = 0;
 
     Expression getBool(sbe::value::SlotId slotId) const {
         return getBool(sbe::makeE<sbe::EVariable>(slotId));
@@ -625,7 +632,8 @@ public:
      * Uses an expression from 'EvalExprStagePair' to construct state. Expresion must evaluate to
      * boolean value.
      */
-    virtual EvalExprStagePair makePredicateCombinator(EvalExprStagePair pair) const = 0;
+    virtual EvalExprStagePair makePredicateCombinator(EvalExprStagePair pair,
+                                                      optimizer::SlotVarMap& varMap) const = 0;
 
     /**
      * Creates traverse stage with fold and final expressions tuned to maintain consistent state.
@@ -676,6 +684,11 @@ public:
         return sbe::makeE<sbe::EIf>(std::move(expr), makeState(true), makeState(false));
     }
 
+    optimizer::ABT makeState(optimizer::ABT expr) const override {
+        return optimizer::make<optimizer::If>(
+            std::move(expr), optimizer::Constant::int64(0), optimizer::Constant::int64(-1));
+    }
+
     Expression makeInitialState(Expression expr) const override {
         return sbe::makeE<sbe::EIf>(
             std::move(expr), makeConstant(ValueType, 1), makeConstant(ValueType, -2));
@@ -684,6 +697,11 @@ public:
     Expression getBool(Expression expr) const override {
         return sbe::makeE<sbe::EPrimBinary>(
             sbe::EPrimBinary::greaterEq, std::move(expr), makeConstant(ValueType, 0));
+    }
+
+    optimizer::ABT getBool(optimizer::ABT expr) const override {
+        return optimizer::make<optimizer::BinaryOp>(
+            optimizer::Operations::Gte, std::move(expr), optimizer::Constant::int64(0));
     }
 
     Expression mergeStates(Expression left,
@@ -733,9 +751,10 @@ public:
         return {indexSlot, std::move(resultStage)};
     }
 
-    EvalExprStagePair makePredicateCombinator(EvalExprStagePair pair) const override {
+    EvalExprStagePair makePredicateCombinator(EvalExprStagePair pair,
+                                              optimizer::SlotVarMap& varMap) const override {
         auto [expr, stage] = std::move(pair);
-        return {makeState(expr.extractExpr()), std::move(stage)};
+        return {makeState(expr.extractExpr(varMap)), std::move(stage)};
     }
 
     EvalStage makeTraverseCombinator(EvalStage outer,
@@ -765,11 +784,19 @@ public:
         return expr;
     }
 
+    optimizer::ABT makeState(optimizer::ABT expr) const override {
+        return expr;
+    }
+
     Expression makeInitialState(Expression expr) const override {
         return expr;
     }
 
     Expression getBool(Expression expr) const override {
+        return expr;
+    }
+
+    optimizer::ABT getBool(optimizer::ABT expr) const override {
         return expr;
     }
 
@@ -789,7 +816,8 @@ public:
         return {stateSlot, std::move(stage)};
     }
 
-    EvalExprStagePair makePredicateCombinator(EvalExprStagePair pair) const override {
+    EvalExprStagePair makePredicateCombinator(EvalExprStagePair pair,
+                                              optimizer::SlotVarMap& varMap) const override {
         return pair;
     }
 
@@ -836,6 +864,7 @@ EvalExprStagePair generateShortCircuitingLogicalOp(sbe::EPrimBinary::Op logicOp,
                                                    std::vector<EvalExprStagePair> branches,
                                                    PlanNodeId planNodeId,
                                                    sbe::value::SlotIdGenerator* slotIdGenerator,
+                                                   optimizer::SlotVarMap& slotVarMap,
                                                    const FilterStateHelper& stateHelper);
 
 /**
@@ -934,6 +963,9 @@ struct StageBuilderState {
     // corresponding to field paths to 'generateExpression' to avoid repeated expression generation.
     // Key is expected to represent field paths in form CURRENT.<field_name>[.<field_name>]*.
     stdx::unordered_map<std::string /*field path*/, EvalExpr> preGeneratedExprs;
+
+    // Holds the mapping between the custom ABT variable names and the slot id they are referencing.
+    optimizer::SlotVarMap slotVarMap;
 };
 
 /**
@@ -1122,4 +1154,38 @@ inline std::vector<T> appendVectorUnique(std::vector<T> lhs, std::vector<T> rhs)
     }
     return lhs;
 }
+
+std::unique_ptr<sbe::EExpression> abtToExpr(optimizer::ABT& abt, optimizer::SlotVarMap& slotMap);
+
+template <typename... Args>
+inline auto makeABTFunction(StringData name, Args&&... args) {
+    return optimizer::make<optimizer::FunctionCall>(
+        name.toString(), optimizer::makeSeq(std::forward<Args>(args)...));
+}
+
+template <typename T>
+inline auto makeABTConstant(sbe::value::TypeTags tag, T value) {
+    return optimizer::make<optimizer::Constant>(tag, sbe::value::bitcastFrom<T>(value));
+}
+
+inline auto makeABTConstant(StringData str) {
+    auto [tag, value] = sbe::value::makeNewString(str);
+    return makeABTConstant(tag, value);
+}
+
+/**
+ * Creates a balanced boolean binary expression tree from given collection of leaf expression.
+ */
+optimizer::ABT makeBalancedBooleanOpTree(optimizer::Operations logicOp,
+                                         std::vector<optimizer::ABT> leaves);
+
+/**
+ * Check if expression returns Nothing and return boolean false if so. Otherwise, return the
+ * expression.
+ */
+optimizer::ABT makeFillEmptyFalse(optimizer::ABT e);
+
+optimizer::ProjectionName makeVariableName(sbe::value::SlotId slotId);
+optimizer::ProjectionName makeLocalVariableName(sbe::FrameId frameId, sbe::value::SlotId slotId);
+
 }  // namespace mongo::stage_builder

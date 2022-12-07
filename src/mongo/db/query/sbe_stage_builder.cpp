@@ -616,24 +616,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 }
 
 namespace {
-std::unique_ptr<sbe::EExpression> abtToExpr(optimizer::ABT& abt, optimizer::SlotVarMap& slotMap) {
-    auto env = optimizer::VariableEnvironment::build(abt);
-
-    optimizer::PrefixId prefixId;
-    // Convert paths into ABT expressions.
-    optimizer::EvalPathLowering pathLower{prefixId, env};
-    pathLower.optimize(abt);
-
-    // Run the constant folding to eliminate lambda applications as they are not directly
-    // supported by the SBE VM.
-    optimizer::ConstEval constEval{env};
-    constEval.optimize(abt);
-
-    // And finally convert to the SBE expression.
-    optimizer::SBEExpressionLowering exprLower{env, slotMap};
-    return exprLower.optimize(abt);
-}
-
 std::unique_ptr<sbe::EExpression> generatePerColumnPredicate(StageBuilderState& state,
                                                              const MatchExpression* me,
                                                              const sbe::EVariable& inputVar) {
@@ -642,34 +624,34 @@ std::unique_ptr<sbe::EExpression> generatePerColumnPredicate(StageBuilderState& 
         // the element is an object or array.
         case MatchExpression::REGEX:
             return generateRegexExpr(state, checked_cast<const RegexMatchExpression*>(me), inputVar)
-                .extractExpr();
+                .extractExpr(state.slotVarMap);
         case MatchExpression::MOD:
             return generateModExpr(state, checked_cast<const ModMatchExpression*>(me), inputVar)
-                .extractExpr();
+                .extractExpr(state.slotVarMap);
         case MatchExpression::BITS_ALL_SET:
             return generateBitTestExpr(state,
                                        checked_cast<const BitTestMatchExpression*>(me),
                                        sbe::BitTestBehavior::AllSet,
                                        inputVar)
-                .extractExpr();
+                .extractExpr(state.slotVarMap);
         case MatchExpression::BITS_ALL_CLEAR:
             return generateBitTestExpr(state,
                                        checked_cast<const BitTestMatchExpression*>(me),
                                        sbe::BitTestBehavior::AllClear,
                                        inputVar)
-                .extractExpr();
+                .extractExpr(state.slotVarMap);
         case MatchExpression::BITS_ANY_SET:
             return generateBitTestExpr(state,
                                        checked_cast<const BitTestMatchExpression*>(me),
                                        sbe::BitTestBehavior::AnySet,
                                        inputVar)
-                .extractExpr();
+                .extractExpr(state.slotVarMap);
         case MatchExpression::BITS_ANY_CLEAR:
             return generateBitTestExpr(state,
                                        checked_cast<const BitTestMatchExpression*>(me),
                                        sbe::BitTestBehavior::AnyClear,
                                        inputVar)
-                .extractExpr();
+                .extractExpr(state.slotVarMap);
         case MatchExpression::EXISTS:
             return makeConstant(sbe::value::TypeTags::Boolean, true);
         case MatchExpression::LT:
@@ -677,37 +659,37 @@ std::unique_ptr<sbe::EExpression> generatePerColumnPredicate(StageBuilderState& 
                                           checked_cast<const ComparisonMatchExpression*>(me),
                                           sbe::EPrimBinary::less,
                                           inputVar)
-                .extractExpr();
+                .extractExpr(state.slotVarMap);
         case MatchExpression::GT:
             return generateComparisonExpr(state,
                                           checked_cast<const ComparisonMatchExpression*>(me),
                                           sbe::EPrimBinary::greater,
                                           inputVar)
-                .extractExpr();
+                .extractExpr(state.slotVarMap);
         case MatchExpression::EQ:
             return generateComparisonExpr(state,
                                           checked_cast<const ComparisonMatchExpression*>(me),
                                           sbe::EPrimBinary::eq,
                                           inputVar)
-                .extractExpr();
+                .extractExpr(state.slotVarMap);
         case MatchExpression::LTE:
             return generateComparisonExpr(state,
                                           checked_cast<const ComparisonMatchExpression*>(me),
                                           sbe::EPrimBinary::lessEq,
                                           inputVar)
-                .extractExpr();
+                .extractExpr(state.slotVarMap);
         case MatchExpression::GTE:
             return generateComparisonExpr(state,
                                           checked_cast<const ComparisonMatchExpression*>(me),
                                           sbe::EPrimBinary::greaterEq,
                                           inputVar)
-                .extractExpr();
+                .extractExpr(state.slotVarMap);
         case MatchExpression::MATCH_IN: {
             auto expr = checked_cast<const InMatchExpression*>(me);
             tassert(6988583,
                     "Push-down of non-scalar values in $in is not supported.",
                     !expr->hasNonScalarOrNonEmptyValues());
-            return generateInExpr(state, expr, inputVar).extractExpr();
+            return generateInExpr(state, expr, inputVar).extractExpr(state.slotVarMap);
         }
         case MatchExpression::TYPE_OPERATOR: {
             const auto& expr = checked_cast<const TypeMatchExpression*>(me);
@@ -2310,8 +2292,8 @@ EvalStage optimizeFieldPaths(StageBuilderState& state,
         if (!state.preGeneratedExprs.contains(fieldPathStr)) {
             auto expr = generateExpression(state, fieldExpr, rootSlot, &outputs);
 
-            auto [slot, projectStage] =
-                projectEvalExpr(std::move(expr), std::move(stage), nodeId, state.slotIdGenerator);
+            auto [slot, projectStage] = projectEvalExpr(
+                std::move(expr), std::move(stage), nodeId, state.slotIdGenerator, state.slotVarMap);
 
             state.preGeneratedExprs.emplace(fieldPathStr, slot);
             stage = std::move(projectStage);
@@ -2353,15 +2335,18 @@ std::tuple<sbe::value::SlotVector, EvalStage, std::unique_ptr<sbe::EExpression>>
             auto [groupByEvalExpr, groupByEvalStage] = generateGroupByKeyImpl(
                 state, fieldExpr, outputs, rootSlot, std::move(stage), nodeId, slotIdGenerator);
 
-            auto [slot, projectStage] = projectEvalExpr(
-                std::move(groupByEvalExpr), std::move(groupByEvalStage), nodeId, slotIdGenerator);
+            auto [slot, projectStage] = projectEvalExpr(std::move(groupByEvalExpr),
+                                                        std::move(groupByEvalStage),
+                                                        nodeId,
+                                                        slotIdGenerator,
+                                                        state.slotVarMap);
 
             slots.push_back(slot);
             groupByEvalExpr = slot;
             stage = std::move(projectStage);
 
             exprs.emplace_back(makeConstant(fieldName));
-            exprs.emplace_back(groupByEvalExpr.extractExpr());
+            exprs.emplace_back(groupByEvalExpr.extractExpr(state.slotVarMap));
         }
 
         // When there's only one field in the document _id expression, 'Nothing' is converted to
@@ -2371,8 +2356,11 @@ std::tuple<sbe::value::SlotVector, EvalStage, std::unique_ptr<sbe::EExpression>>
         // SERVER-21992 issue goes away and the distinct scan should be able to return 'Nothing' and
         // 'Null' separately.
         if (slots.size() == 1) {
-            auto [slot, projectStage] = projectEvalExpr(
-                makeFillEmptyNull(std::move(exprs[1])), std::move(stage), nodeId, slotIdGenerator);
+            auto [slot, projectStage] = projectEvalExpr(makeFillEmptyNull(std::move(exprs[1])),
+                                                        std::move(stage),
+                                                        nodeId,
+                                                        slotIdGenerator,
+                                                        state.slotVarMap);
             slots[0] = slot;
             exprs[1] = makeVariable(slots[0]);
             stage = std::move(projectStage);
@@ -2389,9 +2377,12 @@ std::tuple<sbe::value::SlotVector, EvalStage, std::unique_ptr<sbe::EExpression>>
 
     // The group-by field may end up being 'Nothing' and in that case _id: null will be
     // returned. Calling 'makeFillEmptyNull' for the group-by field takes care of that.
-    auto fillEmptyNullExpr = makeFillEmptyNull(groupByEvalExpr.extractExpr());
-    auto [slot, projectStage] = projectEvalExpr(
-        std::move(fillEmptyNullExpr), std::move(groupByEvalStage), nodeId, slotIdGenerator);
+    auto fillEmptyNullExpr = makeFillEmptyNull(groupByEvalExpr.extractExpr(state.slotVarMap));
+    auto [slot, projectStage] = projectEvalExpr(std::move(fillEmptyNullExpr),
+                                                std::move(groupByEvalStage),
+                                                nodeId,
+                                                slotIdGenerator,
+                                                state.slotVarMap);
     stage = std::move(projectStage);
 
     return {sbe::value::SlotVector{slot}, std::move(stage), nullptr};
@@ -2416,7 +2407,7 @@ std::tuple<sbe::value::SlotVector, EvalStage> generateAccumulator(
     // as sum(1).
     auto collatorSlot = state.data->env->getSlotIfExists("collator"_sd);
     auto accExprs = stage_builder::buildAccumulator(
-        accStmt, argExpr.extractExpr(), collatorSlot, *state.frameIdGenerator);
+        accStmt, argExpr.extractExpr(state.slotVarMap), collatorSlot, *state.frameIdGenerator);
 
     sbe::value::SlotVector aggSlots;
     for (auto& accExpr : accExprs) {
