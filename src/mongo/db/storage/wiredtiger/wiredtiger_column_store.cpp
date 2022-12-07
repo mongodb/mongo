@@ -46,8 +46,7 @@ StatusWith<std::string> WiredTigerColumnStore::generateCreateString(
     const IndexDescriptor& desc) {
     StringBuilder sb;
 
-    // TODO: SERVER-65487 uncomment this invariant once INDEX_COLUMN is defined.
-    // invariant(desc.getIndexType() == INDEX_COLUMN);
+    invariant(desc.getIndexType() == INDEX_COLUMN);
 
     // TODO: SERVER-65976 Tune values used in WT config string.
 
