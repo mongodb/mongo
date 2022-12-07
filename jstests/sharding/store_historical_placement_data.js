@@ -29,9 +29,15 @@ function getInfoFromConfigCollections(fullCollName) {
     return configCollsQueryResults[0];
 }
 
+function getLatestPlacementEntriesFor(namespace, numEntries) {
+    return configDB.placementHistory.find({nss: namespace})
+        .sort({timestamp: -1})
+        .limit(numEntries)
+        .toArray();
+}
+
 function getLatestPlacementInfoFor(namespace) {
-    const placementQueryResults =
-        configDB.placementHistory.find({nss: namespace}).sort({timestamp: -1}).limit(1).toArray();
+    const placementQueryResults = getLatestPlacementEntriesFor(namespace, 1);
     if (placementQueryResults.length === 0) {
         return null;
     }
@@ -238,16 +244,33 @@ function testRenameCollection() {
     const initialPlacementForTargetColl = getLatestPlacementInfoFor(targetNss);
 
     assert.commandWorked(db[oldCollName].renameCollection(targetCollName, true /*dropTarget*/));
-    const finalPlacementForOldColl = getLatestPlacementInfoFor(oldNss);
-    const finalPlacementForTargetColl = getLatestPlacementInfoFor(targetNss);
 
-    // TODO SERVER-70682 modify the following assertions to distinguish between placement of dropped
-    // target  VS placement of renamed target.
+    // The old collection shouldn't be served by any shard anymore
+    const finalPlacementForOldColl = getLatestPlacementInfoFor(oldNss);
     assert.eq(initialPlacementForOldColl.uuid, finalPlacementForOldColl.uuid);
     assert.sameMembers([], finalPlacementForOldColl.shards);
 
-    assert.eq(initialPlacementForTargetColl.uuid, finalPlacementForTargetColl.uuid);
-    assert.sameMembers([], finalPlacementForTargetColl.shards);
+    // The target collection should have
+    // - an entry for its old incarnation (no shards should serve its data) at T1
+    // - an entry for its renamed incarnation (with the same properties of
+    // initialPlacementForOldColl) at T2 > T1
+    const [targetCollPlacementInfoWhenRenamed, targetCollPlacementInfoWhenDropped] = (function() {
+        const placementEntries = getLatestPlacementEntriesFor(targetNss, 2);
+        assert.eq(2, placementEntries.length);
+        const placementInfoWhenDropped = placementEntries[1];
+        const placementInfoWhenRenamed = placementEntries[0];
+        assert(timestampCmp(placementInfoWhenDropped.timestamp,
+                            placementInfoWhenRenamed.timestamp) < 0);
+
+        return placementEntries;
+    })();
+
+    assert.eq(initialPlacementForTargetColl.uuid, targetCollPlacementInfoWhenDropped.uuid);
+    assert.sameMembers([], targetCollPlacementInfoWhenDropped.shards);
+
+    assert.eq(initialPlacementForOldColl.uuid, targetCollPlacementInfoWhenRenamed.uuid);
+    assert.sameMembers(initialPlacementForOldColl.shards,
+                       targetCollPlacementInfoWhenRenamed.shards);
 
     jsTest.log(
         'Testing that no placement entries are added by rename() for unsharded collections involved in the DDL');
@@ -357,11 +380,11 @@ jsTest.log(
     'Testing placement entries added by shardCollection() over an existing sharding-enabled DB');
 testShardCollection('explicitlyCreatedDB', 'coll1');
 
-jsTest.log('Testing placement entries added by dropCollection()');
-testDropCollection();
-
 jsTest.log('Testing placement entries added by shardCollection() over a non-existing db (& coll)');
 testShardCollection('implicitlyCreatedDB', 'coll1');
+
+jsTest.log('Testing placement entries added by dropCollection()');
+testDropCollection();
 
 jsTest.log('Testing placement entries added/not added by a sequence of moveChunk() commands');
 testMoveChunk('explicitlyCreatedDB', 'testMoveChunk');

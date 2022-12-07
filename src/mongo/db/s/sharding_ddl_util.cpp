@@ -66,6 +66,36 @@ namespace mongo {
 namespace sharding_ddl_util {
 namespace {
 
+void runTransactionOnShardingCatalog(OperationContext* opCtx,
+                                     txn_api::Callback&& transactionChain,
+                                     const WriteConcernOptions& writeConcern) {
+    // The Internal Transactions API receives the write concern option through the passed Operation
+    // context.
+    WriteConcernOptions originalWC = opCtx->getWriteConcern();
+    opCtx->setWriteConcern(writeConcern);
+    ScopeGuard guard([opCtx, originalWC] { opCtx->setWriteConcern(originalWC); });
+    auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+
+    // Instantiate the right custom TXN client to ensure that the queries to the config DB will be
+    // routed to the CSRS.
+    auto customTxnClient = [&]() -> std::unique_ptr<txn_api::TransactionClient> {
+        if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+            return std::make_unique<txn_api::details::SEPTransactionClient>(
+                opCtx,
+                executor,
+                std::make_unique<txn_api::details::ClusterSEPTransactionClientBehaviors>(
+                    opCtx->getServiceContext()));
+        }
+
+        invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+        return nullptr;
+    }();
+
+    txn_api::SyncTransactionWithRetries txn(
+        opCtx, executor, nullptr /*resourceYielder*/, std::move(customTxnClient));
+    txn.run(opCtx, std::move(transactionChain));
+}
+
 void updateTags(OperationContext* opCtx,
                 const NamespaceString& fromNss,
                 const NamespaceString& toNss,
@@ -183,31 +213,7 @@ void deleteCollection(OperationContext* opCtx,
             .semi();
     };
 
-    // The Internal Transactions API receives the write concern option through the passed Operation
-    // context.
-    WriteConcernOptions originalWC = opCtx->getWriteConcern();
-    opCtx->setWriteConcern(writeConcern);
-    ScopeGuard guard([opCtx, originalWC] { opCtx->setWriteConcern(originalWC); });
-    auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
-
-    // Instantiate the right custom TXN client to ensure that the queries to the config DB will be
-    // routed to the CSRS.
-    auto customTxnClient = [&]() -> std::unique_ptr<txn_api::TransactionClient> {
-        if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
-            return std::make_unique<txn_api::details::SEPTransactionClient>(
-                opCtx,
-                executor,
-                std::make_unique<txn_api::details::ClusterSEPTransactionClientBehaviors>(
-                    opCtx->getServiceContext()));
-        }
-
-        invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
-        return nullptr;
-    }();
-
-    txn_api::SyncTransactionWithRetries txn(
-        opCtx, executor, nullptr /*resourceYielder*/, std::move(customTxnClient));
-    txn.run(opCtx, transactionChain);
+    runTransactionOnShardingCatalog(opCtx, std::move(transactionChain), writeConcern);
 }
 
 write_ops::UpdateCommandRequest buildNoopWriteRequestCommand() {
@@ -503,38 +509,110 @@ void shardedRenameMetadata(OperationContext* opCtx,
     auto fromNss = fromCollType.getNss();
     auto fromUUID = fromCollType.getUuid();
 
-    // Delete eventual TO chunk/collection entries referring a dropped collection
+    // Delete eventual "TO" chunk/collection entries referring a dropped collection
     try {
         auto coll =
             catalogClient->getCollection(opCtx, toNss, repl::ReadConcernLevel::kLocalReadConcern);
 
         if (coll.getUuid() == fromCollType.getUuid()) {
-            // Metadata rename already happened
+            // shardedRenameMetadata() was already completed in a previous commit attempt.
             return;
         }
 
-        // Delete TO chunk/collection entries referring a dropped collection
+        // Delete "TO" chunk/collection entries referring a dropped collection
         removeCollAndChunksMetadataFromConfig_notIdempotent(opCtx, toNss, writeConcern);
     } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-        // The TO collection is not sharded or doesn't exist
+        // The "TO" collection is not sharded or doesn't exist
     }
 
-    // Delete FROM collection entry
+    // Delete "FROM" from config.collections.
     deleteCollection(opCtx, fromNss, fromUUID, writeConcern);
 
-    // Update FROM tags to TO
+    // Update "FROM" tags to "TO".
     updateTags(opCtx, fromNss, toNss, writeConcern);
 
-    // Update namespace and bump timestamp of the FROM collection entry
+    // Retrieve the most recent placement information about "FROM", excluding the entry that
+    // matches its deletion (an empty 'shards' field).
+    auto renamedCollPlacementInfo = [&]() -> boost::optional<NamespacePlacementType> {
+        if (!feature_flags::gHistoricalPlacementShardingCatalog.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
+            return boost::none;
+        }
+
+        auto query = BSON(NamespacePlacementType::kNssFieldName
+                          << fromNss.ns() << NamespacePlacementType::kShardsFieldName
+                          << BSON("$ne" << BSONArray()));
+
+        auto queryResponse =
+            uassertStatusOK(
+                Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+                    opCtx,
+                    ReadPreferenceSetting(ReadPreference::Nearest, TagSet{}),
+                    repl::ReadConcernLevel::kMajorityReadConcern,
+                    NamespaceString::kConfigsvrPlacementHistoryNamespace,
+                    query,
+                    BSON(NamespacePlacementType::kTimestampFieldName << -1) /*sort*/,
+                    1 /*limit*/))
+                .docs;
+
+        /*
+         * TODO SERVER-70687 Replace the if block below with
+         * uassert(RetriableErrorCode,queryResponse.size() == 1)
+         */
+        if (queryResponse.empty()) {
+            // If the "FROM" collection was created under a legacy FCV, no previous placement
+            // info will be available. Skip also the insertion of the updated one.
+            LOGV2_WARNING(7068200,
+                          "Unable to retrieve placement entry for the namespace being renamed",
+                          "fromNss"_attr = fromNss);
+            return boost::none;
+        }
+
+        return NamespacePlacementType::parse(IDLParserContext("shardedRenameMetadata"),
+                                             queryResponse.back());
+    }();
+
+    // Rename namespace and bump timestamp in the original collection and placement entries of
+    // "FROM".
     fromCollType.setNss(toNss);
     auto now = VectorClock::get(opCtx)->getTime();
     auto newTimestamp = now.clusterTime().asTimestamp();
     fromCollType.setTimestamp(newTimestamp);
     fromCollType.setEpoch(OID::gen());
+    if (renamedCollPlacementInfo) {
+        renamedCollPlacementInfo->setNss(toNss);
+        renamedCollPlacementInfo->setTimestamp(newTimestamp);
+    }
 
-    // Insert the TO collection entry
-    uassertStatusOK(catalogClient->insertConfigDocument(
-        opCtx, CollectionType::ConfigNS, fromCollType.toBSON(), writeConcern));
+    // Use the modified entries to insert collection and placement entries for "TO".
+    auto transactionChain = [collInfo = std::move(fromCollType),
+                             placementInfo = std::move(renamedCollPlacementInfo)](
+                                const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+        write_ops::InsertCommandRequest insertConfigCollectionDoc(CollectionType::ConfigNS,
+                                                                  {collInfo.toBSON()});
+        return txnClient.runCRUDOp(insertConfigCollectionDoc, {} /*stmtIds*/)
+            .thenRunOn(txnExec)
+            .then([&](const BatchedCommandResponse& insertCollResponse) {
+                uassertStatusOK(insertCollResponse.toStatus());
+                if (!placementInfo || insertCollResponse.getN() == 0) {
+                    BatchedCommandResponse noOpResponse;
+                    noOpResponse.setStatus(Status::OK());
+                    noOpResponse.setN(0);
+                    return SemiFuture<BatchedCommandResponse>(std::move(noOpResponse));
+                }
+                write_ops::InsertCommandRequest insertPlacementEntry(
+                    NamespaceString::kConfigsvrPlacementHistoryNamespace,
+                    {placementInfo->toBSON()});
+                return txnClient.runCRUDOp(insertPlacementEntry, {} /*stmtIds*/);
+            })
+            .thenRunOn(txnExec)
+            .then([&](const BatchedCommandResponse& insertPlacementResponse) {
+                uassertStatusOK(insertPlacementResponse.toStatus());
+            })
+            .semi();
+    };
+
+    runTransactionOnShardingCatalog(opCtx, std::move(transactionChain), writeConcern);
 }
 
 void checkCatalogConsistencyAcrossShardsForRename(
