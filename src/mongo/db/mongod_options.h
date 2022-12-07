@@ -79,4 +79,8 @@ Status storeMongodOptions(const moe::Environment& params);
  * Help test user for storage.dbPath config option.
  */
 std::string storageDBPathDescription();
+
+void setMagicRestoreMain(std::function<ExitCode(ServiceContext* svcCtx)> magicRestoreMainFn);
+std::function<ExitCode(ServiceContext* svcCtx)> getMagicRestoreMain();
+
 }  // namespace mongo

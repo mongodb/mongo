@@ -941,6 +941,13 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         exitCleanly(ExitCode::clean);
     }
 
+    if (storageGlobalParams.magicRestore) {
+        if (getMagicRestoreMain() == nullptr) {
+            LOGV2_FATAL_NOTRACE(7180701, "--magicRestore cannot be used with a community build");
+        }
+        return getMagicRestoreMain()(serviceContext);
+    }
+
     MONGO_IDLE_THREAD_BLOCK;
     return waitForShutdown();
 }

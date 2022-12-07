@@ -80,6 +80,9 @@ struct StorageGlobalParams {
     // entries for collections not restored and more.
     bool restore;
 
+    // --magicRestore
+    bool magicRestore;
+
     // Whether the Storage Engine selected should be ephemeral in nature or not.
     bool ephemeral = false;
 

@@ -48,6 +48,7 @@ void StorageGlobalParams::reset() {
     upgrade = false;
     repair = false;
     restore = false;
+    magicRestore = false;
 
     noTableScan.store(false);
     directoryperdb = false;
