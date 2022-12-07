@@ -98,8 +98,7 @@ Status WiredTigerColumnStore::create(OperationContext* opCtx,
 WiredTigerColumnStore::WiredTigerColumnStore(OperationContext* ctx,
                                              const std::string& uri,
                                              StringData ident,
-                                             const IndexDescriptor* desc,
-                                             bool readOnly)
+                                             const IndexDescriptor* desc)
     : ColumnStore(ident),
       _uri(uri),
       _tableId(WiredTigerSession::genTableId()),

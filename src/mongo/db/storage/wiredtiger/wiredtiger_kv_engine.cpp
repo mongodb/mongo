@@ -1749,9 +1749,7 @@ std::unique_ptr<ColumnStore> WiredTigerKVEngine::getColumnStore(
     const CollectionOptions& collOptions,
     StringData ident,
     const IndexDescriptor* descriptor) {
-    // TODO SERVER-66098 readOnly support.
-    const bool readOnly = false;
-    return std::make_unique<WiredTigerColumnStore>(opCtx, _uri(ident), ident, descriptor, readOnly);
+    return std::make_unique<WiredTigerColumnStore>(opCtx, _uri(ident), ident, descriptor);
 }
 
 std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(OperationContext* opCtx,

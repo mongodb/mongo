@@ -58,6 +58,13 @@ struct CellViewForPath {
     CellView value;
 };
 
+/**
+ * This is a base class for column store index storage access, similar to RecordStore and
+ * SortedDataInterface.
+ *
+ * Whereas RecordStore maps RecordId to RecordData and SDI maps KeyString to RecordId, ColumnStore
+ * stores tuples of Path, RecordId and Value in a separate format.
+ */
 class ColumnStore {
 protected:
     class Cursor;

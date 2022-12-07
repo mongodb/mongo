@@ -34,6 +34,31 @@
 
 namespace mongo {
 
+/**
+ * A ColumnStore index implementation for WiredTiger.
+ *
+ * Two documents in a RecordStore, for example:
+ *
+ * RID 1 : { _id: ObjectID(...), version: 2, author: { first: "Bob", last: "Adly" } }
+ * RID 2 : { _id: ObjectID(...), version: 3, author: { first: "Bob", last: "Adly" }, viewed: true }
+ *
+ * would look something like this in a ColumnStore:
+ *
+ * { _id\01, { vals: [ ObjectId("...") ] } }
+ * { _id\02, { vals: [ ObjectId("...") ] } }
+ * { author\01, { flags: [HAS_SUBPATHS] } }
+ * { author\02, { flags: [HAS_SUBPATHS] } }
+ * { author.first\01, { vals: [ "Bob" ] } }
+ * { author.first\02, { vals: [ "Bob" ] } }
+ * { author.last\01, { vals: [ "Adly" ] } }
+ * { author.last\02, { vals: [ "Adly" ] } }
+ * { version\01, { vals: [ 2 ] } }
+ * { version\02, { vals: [ 3 ] } }
+ * { viewed\02, { vals: [ true ] } }
+ * { \xFF1, { flags: [HAS_SUBPATHS] } }
+ * { \xFF2, { flags: [HAS_SUBPATHS] } }
+ *
+ */
 class WiredTigerColumnStore final : public ColumnStore {
 public:
     class WriteCursor;
@@ -51,8 +76,7 @@ public:
     WiredTigerColumnStore(OperationContext* ctx,
                           const std::string& uri,
                           StringData ident,
-                          const IndexDescriptor* desc,
-                          bool readOnly = false);
+                          const IndexDescriptor* desc);
     ~WiredTigerColumnStore() = default;
 
     //
