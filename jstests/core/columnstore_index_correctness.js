@@ -396,13 +396,13 @@ assert.commandWorked(coll.createIndex({"$**": "columnstore"}));
     function runTest(collation, expectedMatches) {
         const explain = c.find({x: "hello"}, {_id: 0, x: 1}).collation(collation).explain();
         const columnScanPlanStages = getPlanStages(explain, "COLUMN_SCAN");
-        assert.eq(columnScanPlanStages.length,
-                  1,
-                  `Could not find 'COLUMN_SCAN' stage: ${tojson(explain)}`);
+        assert.gte(columnScanPlanStages.length,
+                   1,
+                   `Could not find 'COLUMN_SCAN' stage: ${tojson(explain)}`);
         // Ensure that the filter actually got pushed down.
         assert(columnScanPlanStages[0].hasOwnProperty("filtersByPath") &&
                    columnScanPlanStages[0]["filtersByPath"].hasOwnProperty("x"),
-               tojson(columnScanPlanStages[0]));
+               tojson(columnScanPlanStages));
 
         const actualMatches = c.find({x: "hello"}, {_id: 0, x: 1}).collation(collation).itcount();
         assert.eq(actualMatches,
