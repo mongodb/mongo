@@ -380,6 +380,7 @@ RCS
 RDNOLOCK
 RDONLY
 READONLY
+REALLOC
 RECNO
 REF's
 REFs
@@ -400,6 +401,7 @@ RXB
 Radu
 ReadFile
 Readonly
+Realloc
 RedHat
 Redistributions
 Refactor
