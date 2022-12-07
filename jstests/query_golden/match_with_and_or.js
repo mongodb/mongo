@@ -37,10 +37,9 @@ const docs = [
     {a: [[1, {b: [1, 2, {c: 1}, {c: 2}]}]]},
 ];
 const indexes = [
-    // TODO SERVER-71524: Invalid index plans sometimes chosen by CQF cause result differences.
-    // {a: 1},
-    // {'a.b': 1},
-    // {a: 1, x: 1},
+    {a: 1},
+    {'a.b': 1},
+    {a: 1, x: 1},
 ];
 resetCollection(coll, docs, indexes);
 
