@@ -804,17 +804,25 @@ void IndexBuildsCoordinator::abortTenantIndexBuilds(OperationContext* opCtx,
                                                     MigrationProtocolEnum protocol,
                                                     StringData tenantId,
                                                     const std::string& reason) {
+    const boost::optional<TenantId> optTenantId =
+        tenantId.empty() ? boost::none : boost::make_optional(TenantId(OID(tenantId)));
+    abortTenantIndexBuilds(opCtx, protocol, optTenantId, reason);
+}
+
+void IndexBuildsCoordinator::abortTenantIndexBuilds(OperationContext* opCtx,
+                                                    MigrationProtocolEnum protocol,
+                                                    const boost::optional<TenantId>& tenantId,
+                                                    const std::string& reason) {
+    const auto tenantIdStr = tenantId ? (*tenantId).toString() : "";
     LOGV2(4886203,
           "About to abort all index builders running for collections belonging to the given tenant",
-          "tenantId"_attr = tenantId,
+          "tenantId"_attr = tenantIdStr,
           "reason"_attr = reason);
 
     auto builds = [&]() -> std::vector<std::shared_ptr<ReplIndexBuildState>> {
         auto indexBuildFilter = [=](const auto& replState) {
             // Abort *all* index builds at the start of shard merge.
-            return protocol == MigrationProtocolEnum::kShardMerge ||
-                repl::ClonerUtils::isDatabaseForTenant(replState.dbName.toStringWithTenantId(),
-                                                       tenantId);
+            return repl::ClonerUtils::isDatabaseForTenant(replState.dbName, tenantId, protocol);
         };
         return activeIndexBuilds.filterIndexBuilds(indexBuildFilter);
     }();
@@ -829,7 +837,7 @@ void IndexBuildsCoordinator::abortTenantIndexBuilds(OperationContext* opCtx,
             // The index build may already be in the midst of tearing down.
             LOGV2(4886204,
                   "Index build: failed to abort index build for tenant migration",
-                  "tenantId"_attr = tenantId,
+                  "tenantId"_attr = tenantIdStr,
                   "buildUUID"_attr = replState->buildUUID,
                   "db"_attr = replState->dbName,
                   "collectionUUID"_attr = replState->collectionUUID,
@@ -840,7 +848,7 @@ void IndexBuildsCoordinator::abortTenantIndexBuilds(OperationContext* opCtx,
     for (const auto& replState : buildsWaitingToFinish) {
         LOGV2(6221600,
               "Waiting on the index build to unregister before continuing the tenant migration.",
-              "tenantId"_attr = tenantId,
+              "tenantId"_attr = tenantIdStr,
               "buildUUID"_attr = replState->buildUUID,
               "db"_attr = replState->dbName,
               "collectionUUID"_attr = replState->collectionUUID,

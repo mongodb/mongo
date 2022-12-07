@@ -64,7 +64,7 @@ public:
     const UUID _othertestFooUUID = UUID::gen();
     const NamespaceString _othertestFooNss = NamespaceString("othertest.foo");
     const TenantId _tenantId{OID::gen()};
-    const NamespaceString _testTenantFooNss{_tenantId.toString() + "_test.test"};
+    const NamespaceString _testTenantFooNss{_tenantId, "test.test"};
     const UUID _testFooTenantUUID = UUID::gen();
     const IndexBuildsCoordinator::IndexBuildOptions _indexBuildOptions = {
         CommitQuorumOptions(CommitQuorumOptions::kDisabled)};
@@ -400,7 +400,7 @@ TEST_F(IndexBuildsCoordinatorMongodTest, AbortBuildIndexDueToTenantMigration) {
     // build may already have been unregistered.
     _indexBuildsCoord->abortTenantIndexBuilds(operationContext(),
                                               MigrationProtocolEnum::kMultitenantMigrations,
-                                              _tenantId.toString(),
+                                              _tenantId,
                                               "tenant migration");
 
     ASSERT_EQ(0, _indexBuildsCoord->getActiveIndexBuildCount(operationContext()));
