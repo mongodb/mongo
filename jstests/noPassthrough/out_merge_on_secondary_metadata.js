@@ -35,7 +35,7 @@ assert.commandWorked(
     primaryDB.runCommand({createUser: "testUser", pwd: "pwd", roles: [], writeConcern: {w: 2}}));
 primaryDB.grantRolesToUser("testUser", [{role: "readWrite", db: "test"}], {w: 2});
 const expectedUserAndRoleMetadata = {
-    $impersonatedUsers: [{"user": "testUser", "db": "test"}],
+    $impersonatedUser: {"user": "testUser", "db": "test"},
     $impersonatedRoles: [{"role": "readWrite", "db": "test"}]
 };
 

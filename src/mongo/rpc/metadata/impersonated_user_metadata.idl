@@ -42,6 +42,11 @@ structs:
       "$impersonatedUsers":
         type: array<UserName>
         cpp_name: "users"
+        optional: true
+      "$impersonatedUser":
+        type: UserName
+        cpp_name: "user"
+        optional: true
       "$impersonatedRoles":
         type: array<RoleName>
         cpp_name: "roles"

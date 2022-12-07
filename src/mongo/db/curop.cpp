@@ -217,8 +217,13 @@ void CurOp::reportCurrentOpForClient(OperationContext* opCtx,
     auto maybeImpersonationData = rpc::getImpersonatedUserMetadata(clientOpCtx);
     if (maybeImpersonationData) {
         BSONArrayBuilder users(infoBuilder->subarrayStart("effectiveUsers"));
-        for (const auto& user : maybeImpersonationData->getUsers()) {
-            user.serializeToBSON(&users);
+
+        if (maybeImpersonationData->getUser()) {
+            maybeImpersonationData->getUser()->serializeToBSON(&users);
+        } else if (maybeImpersonationData->getUsers()) {
+            for (const auto& user : maybeImpersonationData->getUsers().get()) {
+                user.serializeToBSON(&users);
+            }
         }
 
         users.doneFast();

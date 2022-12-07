@@ -45,7 +45,17 @@ ForwardableOperationMetadata::ForwardableOperationMetadata(OperationContext* opC
         setComment(optComment->wrap());
     }
     if (const auto authMetadata = rpc::getImpersonatedUserMetadata(opCtx)) {
-        setImpersonatedUserMetadata({{authMetadata->getUsers(), authMetadata->getRoles()}});
+        if (authMetadata->getUser()) {
+            AuthenticationMetadata metadata;
+            metadata.setUser(authMetadata->getUser().get());
+            metadata.setRoles(authMetadata->getRoles());
+            setImpersonatedUserMetadata(metadata);
+        } else if (authMetadata->getUsers()) {
+            AuthenticationMetadata metadata;
+            metadata.setUsers(authMetadata->getUsers().get());
+            metadata.setRoles(authMetadata->getRoles());
+            setImpersonatedUserMetadata(metadata);
+        }
     }
 
     setMayBypassWriteBlocking(WriteBlockBypass::get(opCtx).isWriteBlockBypassEnabled());
@@ -60,10 +70,20 @@ void ForwardableOperationMetadata::setOn(OperationContext* opCtx) const {
 
     if (const auto& optAuthMetadata = getImpersonatedUserMetadata()) {
         const auto& authMetadata = optAuthMetadata.value();
-        const auto& users = authMetadata.getUsers();
-        if (!users.empty() || !authMetadata.getRoles().empty()) {
-            fassert(ErrorCodes::InternalError, users.size() == 1);
-            AuthorizationSession::get(client)->setImpersonatedUserData(users[0],
+        UserName username;
+
+        if (authMetadata.getUser()) {
+            fassert(ErrorCodes::InternalError, authMetadata.getUsers() == boost::none);
+
+            username = authMetadata.getUser().get();
+        } else if (authMetadata.getUsers()) {
+            // TODO SERVER-72448: Remove
+            fassert(ErrorCodes::InternalError, authMetadata.getUsers()->size() == 1);
+            username = authMetadata.getUsers().get()[0];
+        }
+
+        if (!authMetadata.getRoles().empty()) {
+            AuthorizationSession::get(client)->setImpersonatedUserData(username,
                                                                        authMetadata.getRoles());
         }
     }

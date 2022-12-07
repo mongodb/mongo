@@ -58,13 +58,12 @@ void readImpersonatedUserMetadata(const BSONElement& elem, OperationContext* opC
         IDLParserContext errCtx(kImpersonationMetadataSectionName);
         auto data = ImpersonatedUserMetadata::parse(errCtx, elem.embeddedObject());
 
-        uassert(ErrorCodes::BadValue,
-                "Impersonating multiple users is not supported",
-                data.getUsers().size() <= 1);
+        // TODO SERVER-72448: Remove the getUsers() pathway
+        const bool userExists = data.getUser() || (data.getUsers() && !data.getUsers()->empty());
 
         // Set the impersonation data only if there are actually impersonated
         // users/roles.
-        if ((!data.getUsers().empty()) || (!data.getRoles().empty())) {
+        if (userExists || !data.getRoles().empty()) {
             newData = std::move(data);
         }
     }
@@ -92,11 +91,19 @@ void writeAuthDataToImpersonatedUserMetadata(OperationContext* opCtx, BSONObjBui
     }
 
     ImpersonatedUserMetadata metadata;
-    if (userName) {
-        metadata.setUsers({userName.value()});
+    if (serverGlobalParams.featureCompatibility.isLessThanOrEqualTo(
+            multiversion::FeatureCompatibilityVersion::kVersion_6_2)) {
+        if (userName) {
+            metadata.setUsers({{userName.value()}});
+        } else {
+            metadata.setUsers({});
+        }
     } else {
-        metadata.setUsers({});
+        if (userName) {
+            metadata.setUser(userName.value());
+        }
     }
+
     metadata.setRoles(roleNameIteratorToContainer<std::vector<RoleName>>(roleNames));
 
     BSONObjBuilder section(out->subobjStart(kImpersonationMetadataSectionName));
