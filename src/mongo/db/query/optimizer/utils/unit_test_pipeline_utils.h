@@ -47,28 +47,37 @@ ABT translatePipeline(const Metadata& metadata,
                       PrefixId& prefixId,
                       const std::vector<ExpressionContext::ResolvedNamespace>& involvedNss = {});
 
-ABT translatePipeline(Metadata& metadata,
-                      const std::string& pipelineStr,
-                      std::string scanDefName,
-                      PrefixId& prefixId);
-
-ABT translatePipeline(const std::string& pipelineStr, std::string scanDefName = "collection");
-
 /**
- * This function translates the given pipeline string to an ABT and (if optimization phases are
- * provided) optimizes the ABT using the parameters specified. It then writes the output to a file
- * that will be compared to the golden testing file for the test file.
- * The function returns the explained optimized plan.
- **/
-std::string testABTTranslationAndOptimization(
-    unittest::GoldenTestContext& gctx,
-    const std::string& variationName,
-    const std::string& pipelineStr,
-    std::string scanDefName = "collection",
-    opt::unordered_set<OptPhase> phaseSet = {},
-    Metadata metadata = {{{"collection", createScanDef({}, {})}}},
-    PathToIntervalFn pathToInterval = {},
-    bool phaseManagerDisableScan = false,
-    const std::vector<ExpressionContext::ResolvedNamespace>& involvedNss = {});
+ * Fixture for ABT tests which use the golden testing infrastructure.
+ */
+class ABTGoldenTestFixture : public unittest::Test {
+public:
+    static constexpr StringData kConfigPath = "src/mongo/db/test_output/pipeline/abt"_sd;
+
+    ABTGoldenTestFixture()
+        : _config{kConfigPath.toString()},
+          _ctx(std::make_unique<unittest::GoldenTestContext>(&_config)) {}
+
+protected:
+    /**
+     * This function translates the given pipeline string to an ABT and (if optimization phases are
+     * provided) optimizes the ABT using the parameters specified. It then writes the output to a
+     * file that will be compared to the golden testing file for the test file. The function returns
+     * the explained optimized plan.
+     **/
+    std::string testABTTranslationAndOptimization(
+        const std::string& variationName,
+        const std::string& pipelineStr,
+        std::string scanDefName = "collection",
+        opt::unordered_set<OptPhase> phaseSet = {},
+        Metadata metadata = {{{"collection", createScanDef({}, {})}}},
+        PathToIntervalFn pathToInterval = {},
+        bool phaseManagerDisableScan = false,
+        const std::vector<ExpressionContext::ResolvedNamespace>& involvedNss = {});
+
+private:
+    unittest::GoldenTestConfig _config;
+    std::unique_ptr<unittest::GoldenTestContext> _ctx;
+};
 
 }  // namespace mongo::optimizer

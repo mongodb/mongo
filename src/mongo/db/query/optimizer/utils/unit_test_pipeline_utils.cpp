@@ -83,20 +83,6 @@ ABT translatePipeline(const Metadata& metadata,
                                   prefixId);
 }
 
-ABT translatePipeline(Metadata& metadata,
-                      const std::string& pipelineStr,
-                      std::string scanDefName,
-                      PrefixId& prefixId) {
-    return translatePipeline(
-        metadata, pipelineStr, prefixId.getNextId("scan"), scanDefName, prefixId);
-}
-
-ABT translatePipeline(const std::string& pipelineStr, std::string scanDefName) {
-    PrefixId prefixId;
-    Metadata metadata{{}};
-    return translatePipeline(metadata, pipelineStr, std::move(scanDefName), prefixId);
-}
-
 void serializeOptPhases(std::ostream& stream, opt::unordered_set<OptPhase> phaseSet) {
     // The order of phases in the golden file must be the same every time the test is run.
     std::set<std::string> orderedPhases;
@@ -195,15 +181,6 @@ void serializeMetadata(std::ostream& stream, Metadata metadata) {
     }
 }
 
-ABT translatetoABT(const std::string& pipelineStr,
-                   std::string scanDefName,
-                   Metadata metadata,
-                   const std::vector<ExpressionContext::ResolvedNamespace>& involvedNss) {
-    PrefixId prefixId;
-    return translatePipeline(
-        metadata, pipelineStr, prefixId.getNextId("scan"), scanDefName, prefixId, involvedNss);
-}
-
 cost_model::CostModelCoefficients getPipelineTestDefaultCoefficients() {
     // These cost should reflect estimated aggregated execution time in milliseconds.
     // The coeffeicient us converts values from microseconds to milliseconds.
@@ -274,8 +251,7 @@ ABT optimizeABT(ABT abt,
     return optimized;
 }
 
-std::string testABTTranslationAndOptimization(
-    unittest::GoldenTestContext& gctx,
+std::string ABTGoldenTestFixture::testABTTranslationAndOptimization(
     const std::string& variationName,
     const std::string& pipelineStr,
     std::string scanDefName,
@@ -284,9 +260,9 @@ std::string testABTTranslationAndOptimization(
     PathToIntervalFn pathToInterval,
     bool phaseManagerDisableScan,
     const std::vector<ExpressionContext::ResolvedNamespace>& involvedNss) {
-    auto& stream = gctx.outStream();
     bool optimizePipeline = !phaseSet.empty();
 
+    std::ostream& stream = _ctx->outStream();
     stream << "==== VARIATION: " << variationName << " ====" << std::endl;
     stream << "-- INPUTS:" << std::endl;
     stream << "pipeline: " << pipelineStr << std::endl;
@@ -298,7 +274,9 @@ std::string testABTTranslationAndOptimization(
 
     stream << std::endl << "-- OUTPUT:" << std::endl;
 
-    ABT translated = translatetoABT(pipelineStr, scanDefName, metadata, involvedNss);
+    PrefixId prefixId;
+    ABT translated = translatePipeline(
+        metadata, pipelineStr, prefixId.getNextId("scan"), scanDefName, prefixId, involvedNss);
 
     std::string explained;
     if (optimizePipeline) {

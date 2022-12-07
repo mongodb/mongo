@@ -49,8 +49,8 @@ ABT optimizedQueryPlan(const std::string& query,
     PrefixId prefixId;
     std::string scanDefName = "coll";
     Metadata metadata = {{{scanDefName, createScanDef({}, indexes)}}};
-    ABT translated =
-        translatePipeline(metadata, "[{$match: " + query + "}]", scanDefName, prefixId);
+    ABT translated = translatePipeline(
+        metadata, "[{$match: " + query + "}]", prefixId.getNextId("scan"), scanDefName, prefixId);
 
     auto phaseManager = makePhaseManager({OptPhase::MemoSubstitutionPhase,
                                           OptPhase::MemoExplorationPhase,

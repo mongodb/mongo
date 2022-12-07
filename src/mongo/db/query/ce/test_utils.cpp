@@ -61,7 +61,8 @@ CEType CETester::getCE(const std::string& pipeline,
     }
 
     // Construct ABT from pipeline and optimize.
-    ABT abt = translatePipeline(pipeline, _collName);
+    ABT abt =
+        translatePipeline(_metadata, pipeline, _prefixId.getNextId("scan"), _collName, _prefixId);
 
     // Get cardinality estimate.
     return getCE(abt, nodePredicate);

@@ -37,13 +37,10 @@
 
 namespace mongo::optimizer {
 
-unittest::GoldenTestConfig goldenTestConfigABTOptimization{"src/mongo/db/test_output/pipeline/abt"};
+using ABTOptimizationTest = ABTGoldenTestFixture;
 
-TEST(ABTOptimizationTest, OptimizePipelineTests) {
-    unittest::GoldenTestContext gctx(&goldenTestConfigABTOptimization);
-
+TEST_F(ABTOptimizationTest, OptimizePipelineTests) {
     const auto explainedOr = testABTTranslationAndOptimization(
-        gctx,
         "optimized $match with $or: pipeline is able to use a SargableNode with a disjunction of "
         "point intervals.",
         "[{$match: {$or: [{a: 1}, {a: 2}, {a: 3}]}}]",
@@ -53,7 +50,6 @@ TEST(ABTOptimizationTest, OptimizePipelineTests) {
            createScanDef({}, {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}})}}});
 
     const auto explainedIn = testABTTranslationAndOptimization(
-        gctx,
         "optimized $match with $in and a list of equalities becomes a comparison to an EqMember "
         "list.",
         "[{$match: {a: {$in: [1, 2, 3]}}}]",
@@ -66,7 +62,6 @@ TEST(ABTOptimizationTest, OptimizePipelineTests) {
     ASSERT_EQ(explainedOr, explainedIn);
 
     testABTTranslationAndOptimization(
-        gctx,
         "optimized $project inclusion then $match: observe the Filter can be reordered "
         "against the Eval node",
         "[{$project: {a: 1, b: 1}}, {$match: {a: 2}}]",
@@ -77,8 +72,7 @@ TEST(ABTOptimizationTest, OptimizePipelineTests) {
          OptPhase::MemoExplorationPhase,
          OptPhase::MemoImplementationPhase});
 
-    testABTTranslationAndOptimization(gctx,
-                                      "optimized $match basic",
+    testABTTranslationAndOptimization("optimized $match basic",
                                       "[{$match: {a: 1, b: 2}}]",
                                       "collection",
                                       {OptPhase::MemoSubstitutionPhase,
@@ -86,7 +80,6 @@ TEST(ABTOptimizationTest, OptimizePipelineTests) {
                                        OptPhase::MemoImplementationPhase});
 
     testABTTranslationAndOptimization(
-        gctx,
         "optimized $expr filter: make sure we have a single array constant for (1, 2, 'str', ...)",
         "[{$project: {a: {$filter: {input: [1, 2, 'str', {a: 2.0, b:'s'}, 3, 4], as: 'num', cond: "
         "{$and: [{$gte: ['$$num', 2]}, {$lte: ['$$num', 3]}]}}}}}]",
@@ -94,7 +87,6 @@ TEST(ABTOptimizationTest, OptimizePipelineTests) {
         {OptPhase::ConstEvalPre});
 
     testABTTranslationAndOptimization(
-        gctx,
         "optimized $group local global",
         "[{$group: {_id: '$a', c: {$sum: '$b'}}}]",
         "collection",
@@ -105,14 +97,12 @@ TEST(ABTOptimizationTest, OptimizePipelineTests) {
            createScanDef({}, {}, ConstEval::constFold, {DistributionType::UnknownPartitioning})}},
          5 /*numberOfPartitions*/});
 
-    testABTTranslationAndOptimization(gctx,
-                                      "optimized $unwind then $sort",
+    testABTTranslationAndOptimization("optimized $unwind then $sort",
                                       "[{$unwind: '$x'}, {$sort: {'x': 1}}]",
                                       "collection",
                                       OptPhaseManager::getAllRewritesSet());
 
     testABTTranslationAndOptimization(
-        gctx,
         "optimized $match with index",
         "[{$match: {'a': 10}}]",
         "collection",
@@ -123,7 +113,6 @@ TEST(ABTOptimizationTest, OptimizePipelineTests) {
            createScanDef({}, {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}})}}});
 
     testABTTranslationAndOptimization(
-        gctx,
         "optimized $match index covered",
         "[{$project: {_id: 0, a: 1}}, {$match: {'a': 10}}]",
         "collection",
@@ -140,7 +129,6 @@ TEST(ABTOptimizationTest, OptimizePipelineTests) {
                                  false /*multiKey*/}}})}}});
 
     testABTTranslationAndOptimization(
-        gctx,
         "optimized $match index covered, match then project",
         "[{$match: {'a': 10}}, {$project: {_id: 0, a: 1}}]",
         "collection",
@@ -157,7 +145,6 @@ TEST(ABTOptimizationTest, OptimizePipelineTests) {
                                  false /*multiKey*/}}})}}});
 
     testABTTranslationAndOptimization(
-        gctx,
         "optimized $match index covered, match on two indexed keys then project",
         "[{$match: {'a': 10, 'b': 20}}, {$project: {_id: 0, a: 1}}]",
         "collection",
@@ -175,7 +162,6 @@ TEST(ABTOptimizationTest, OptimizePipelineTests) {
                                  false /*multiKey*/}}})}}});
 
     testABTTranslationAndOptimization(
-        gctx,
         "optimized $match index covered, match on three indexed keys then project",
         "[{$match: {'a': 10, 'b': 20, 'c': 30}}, {$project: {_id: 0, a: 1, b: 1, c: 1}}]",
         "collection",
@@ -194,7 +180,6 @@ TEST(ABTOptimizationTest, OptimizePipelineTests) {
                                  false /*multiKey*/}}})}}});
 
     testABTTranslationAndOptimization(
-        gctx,
         "optimized $match index covered, inclusion project then match on three indexed keys",
         "[{$project: {_id: 0, a: 1, b: 1, c: 1}}, {$match: {'a': 10, 'b': 20, 'c': 30}}]",
         "collection",
@@ -213,7 +198,6 @@ TEST(ABTOptimizationTest, OptimizePipelineTests) {
                                  false /*multiKey*/}}})}}});
 
     testABTTranslationAndOptimization(
-        gctx,
         "optimized $match sort index",
         "[{$match: {'a': 10}}, {$sort: {'a': 1}}]",
         "collection",
@@ -224,7 +208,6 @@ TEST(ABTOptimizationTest, OptimizePipelineTests) {
            createScanDef({}, {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}})}}});
 
     testABTTranslationAndOptimization(
-        gctx,
         "optimized range index",
         "[{$match: {'a': {$gt: 70, $lt: 90}}}]",
         "collection",
@@ -237,7 +220,6 @@ TEST(ABTOptimizationTest, OptimizePipelineTests) {
         true);
 
     testABTTranslationAndOptimization(
-        gctx,
         "optimized index on two keys",
         "[{$match: {'a': 2, 'b': 2}}]",
         "collection",
@@ -252,7 +234,6 @@ TEST(ABTOptimizationTest, OptimizePipelineTests) {
                                            true /*multiKey*/}}})}}});
 
     testABTTranslationAndOptimization(
-        gctx,
         "optimized index on one key",
         "[{$match: {'a': 2, 'b': 2}}]",
         "collection",
@@ -264,7 +245,6 @@ TEST(ABTOptimizationTest, OptimizePipelineTests) {
            createScanDef({}, {{"index1", makeIndexDefinition("a", CollationOp::Ascending)}})}}});
 
     testABTTranslationAndOptimization(
-        gctx,
         "optimized $group eval no inline: verify that \"b\" is not inlined in the group "
         "expression, but is coming from the physical scan",
         "[{$group: {_id: null, a: {$first: '$b'}}}]",
@@ -274,8 +254,7 @@ TEST(ABTOptimizationTest, OptimizePipelineTests) {
     std::string scanDefA = "collA";
     std::string scanDefB = "collB";
     Metadata metadata{{{scanDefA, {}}, {scanDefB, {}}}};
-    testABTTranslationAndOptimization(gctx,
-                                      "optimized union",
+    testABTTranslationAndOptimization("optimized union",
                                       "[{$unionWith: 'collB'}, {$match: {_id: 1}}]",
                                       scanDefA,
                                       {OptPhase::MemoSubstitutionPhase,
@@ -287,7 +266,6 @@ TEST(ABTOptimizationTest, OptimizePipelineTests) {
                                       {{NamespaceString("a." + scanDefB), {}}});
 
     testABTTranslationAndOptimization(
-        gctx,
         "optimized common expression elimination",
         "[{$project: {foo: {$add: ['$b', 1]}, bar: {$add: ['$b', 1]}}}]",
         "test",
@@ -295,7 +273,6 @@ TEST(ABTOptimizationTest, OptimizePipelineTests) {
         {{{"test", createScanDef({}, {})}}});
 
     testABTTranslationAndOptimization(
-        gctx,
         "optimized group by dependency: demonstrate that \"c\" is set to the array size "
         "(not the array itself coming from the group)",
         "[{$group: {_id: {}, b: {$addToSet: '$a'}}}, {$project: "
@@ -309,7 +286,6 @@ TEST(ABTOptimizationTest, OptimizePipelineTests) {
         {{{"test", createScanDef({}, {})}}});
 
     testABTTranslationAndOptimization(
-        gctx,
         "optimized double $elemMatch",
         "[{$match: {a: {$elemMatch: {$gte: 5, $lte: 6}}, b: {$elemMatch: {$gte: 1, $lte: 3}}}}]",
         "test",
@@ -318,9 +294,7 @@ TEST(ABTOptimizationTest, OptimizePipelineTests) {
         defaultConvertPathToInterval);
 }
 
-TEST(ABTOptimizationTest, PartialIndex) {
-    unittest::GoldenTestContext gctx(&goldenTestConfigABTOptimization);
-
+TEST_F(ABTOptimizationTest, PartialIndex) {
     PrefixId prefixId;
     std::string scanDefName = "collection";
     ProjectionName scanProjName = prefixId.getNextId("scan");
@@ -346,7 +320,6 @@ TEST(ABTOptimizationTest, PartialIndex) {
                                           std::move(conversionResult->_reqMap)}}})}}};
 
     testABTTranslationAndOptimization(
-        gctx,
         "optimized partial index: the expression matches the pipeline",
         "[{$match: {'a': 3, 'b': 2}}]",
         scanDefName,
@@ -354,7 +327,6 @@ TEST(ABTOptimizationTest, PartialIndex) {
         metadata);
 
     testABTTranslationAndOptimization(
-        gctx,
         "optimized partial index negative: the expression does not match the pipeline",
         "[{$match: {'a': 3, 'b': 3}}]",
         scanDefName,
