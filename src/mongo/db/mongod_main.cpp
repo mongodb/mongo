@@ -56,6 +56,7 @@
 #include "mongo/db/catalog/health_log.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/index_key_validate.h"
+#include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/change_collection_expired_documents_remover.h"
 #include "mongo/db/change_stream_change_collection_manager.h"
 #include "mongo/db/change_stream_options_manager.h"
@@ -367,14 +368,18 @@ void registerPrimaryOnlyServices(ServiceContext* serviceContext) {
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         services.push_back(std::make_unique<ReshardingCoordinatorService>(serviceContext));
         services.push_back(std::make_unique<ConfigsvrCoordinatorService>(serviceContext));
-    } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+    }
+
+    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
         services.push_back(std::make_unique<RenameCollectionParticipantService>(serviceContext));
         services.push_back(std::make_unique<ShardingDDLCoordinatorService>(serviceContext));
         services.push_back(std::make_unique<ReshardingDonorService>(serviceContext));
         services.push_back(std::make_unique<ReshardingRecipientService>(serviceContext));
         services.push_back(std::make_unique<TenantMigrationDonorService>(serviceContext));
         services.push_back(std::make_unique<repl::TenantMigrationRecipientService>(serviceContext));
-    } else {
+    }
+
+    if (serverGlobalParams.clusterRole == ClusterRole::None) {
         services.push_back(std::make_unique<TenantMigrationDonorService>(serviceContext));
         services.push_back(std::make_unique<repl::TenantMigrationRecipientService>(serviceContext));
         if (getGlobalReplSettings().isServerless()) {
@@ -674,7 +679,8 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     }
 
     try {
-        if (serverGlobalParams.clusterRole != ClusterRole::ShardServer &&
+        if ((serverGlobalParams.clusterRole == ClusterRole::ConfigServer ||
+             serverGlobalParams.clusterRole == ClusterRole::None) &&
             replSettings.usingReplSets()) {
             ReadWriteConcernDefaults::get(startupOpCtx.get()->getServiceContext())
                 .refreshIfNecessary(startupOpCtx.get());
@@ -730,7 +736,9 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
                     uassertStatusOK(ShardingStateRecovery_DEPRECATED::recover(startupOpCtx.get()));
                 }
             }
-        } else if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        }
+
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             initializeGlobalShardingStateForMongoD(
                 startupOpCtx.get(), ShardId::kConfigServerId, ConnectionString::forLocal());
 
@@ -738,8 +746,13 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
                 startupOpCtx->getServiceContext(),
                 makeShardingTaskExecutor(executor::makeNetworkInterface("AddShard-TaskExecutor")));
 
-            Grid::get(startupOpCtx.get())->setShardingInitialized();
-        } else if (replSettings.usingReplSets()) {  // standalone replica set
+            if (!gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV()) {
+                Grid::get(startupOpCtx.get())->setShardingInitialized();
+            }
+        }
+
+        if (serverGlobalParams.clusterRole == ClusterRole::None &&
+            replSettings.usingReplSets()) {  // standalone replica set
             // The keys client must use local read concern if the storage engine can't support
             // majority read concern.
             auto keysClientMustUseLocalReads =
@@ -862,10 +875,10 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
 
     // Set up the logical session cache
     LogicalSessionCacheServer kind = LogicalSessionCacheServer::kStandalone;
-    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
-        kind = LogicalSessionCacheServer::kSharded;
-    } else if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         kind = LogicalSessionCacheServer::kConfigServer;
+    } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+        kind = LogicalSessionCacheServer::kSharded;
     } else if (replSettings.usingReplSets()) {
         kind = LogicalSessionCacheServer::kReplicaSet;
     }
@@ -1207,14 +1220,21 @@ void setUpObservers(ServiceContext* serviceContext) {
         if (getGlobalReplSettings().isServerless()) {
             opObserverRegistry->addObserver(std::make_unique<ShardSplitDonorOpObserver>());
         }
-    } else if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-        opObserverRegistry->addObserver(
-            std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
+    }
+
+    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        if (!gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV()) {
+            opObserverRegistry->addObserver(
+                std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
+        }
+
         opObserverRegistry->addObserver(std::make_unique<ConfigServerOpObserver>());
         opObserverRegistry->addObserver(std::make_unique<ReshardingOpObserver>());
         opObserverRegistry->addObserver(
             std::make_unique<analyze_shard_key::QueryAnalysisOpObserver>());
-    } else {
+    }
+
+    if (serverGlobalParams.clusterRole == ClusterRole::None) {
         opObserverRegistry->addObserver(
             std::make_unique<OpObserverImpl>(std::make_unique<OplogWriterImpl>()));
         opObserverRegistry->addObserver(std::make_unique<repl::TenantMigrationDonorOpObserver>());
@@ -1225,6 +1245,7 @@ void setUpObservers(ServiceContext* serviceContext) {
             opObserverRegistry->addObserver(std::make_unique<ShardSplitDonorOpObserver>());
         }
     }
+
     opObserverRegistry->addObserver(std::make_unique<AuthOpObserver>());
     opObserverRegistry->addObserver(
         std::make_unique<repl::PrimaryOnlyServiceOpObserver>(serviceContext));

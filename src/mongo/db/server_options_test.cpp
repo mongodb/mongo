@@ -51,6 +51,7 @@
 #include "mongo/db/server_options_helpers.h"
 #include "mongo/db/server_options_nongeneral_gen.h"
 #include "mongo/db/server_options_server_helpers.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/errno_util.h"
@@ -64,6 +65,7 @@
 namespace mongo {
 namespace {
 
+using mongo::ClusterRole;
 using mongo::ErrorCodes;
 using mongo::Status;
 
@@ -703,6 +705,34 @@ TEST(SetupOptions, NonNumericSampleRateYAMLConfigOptionFailsToParse) {
                      "    slowOpSampleRate: invalid\n");
 
     ASSERT_NOT_OK(parser.run(options, argv, &environment));
+}
+
+TEST(ClusterRole, Equality) {
+    ASSERT_TRUE(ClusterRole(ClusterRole::None) == ClusterRole::None);
+    ASSERT_TRUE(ClusterRole(ClusterRole::None) != ClusterRole::ConfigServer);
+    ASSERT_TRUE(ClusterRole(ClusterRole::None) != ClusterRole::ShardServer);
+
+    ASSERT_TRUE(ClusterRole(ClusterRole::ConfigServer) != ClusterRole::None);
+    ASSERT_TRUE(ClusterRole(ClusterRole::ConfigServer) == ClusterRole::ConfigServer);
+    ASSERT_TRUE(ClusterRole(ClusterRole::ConfigServer) != ClusterRole::ShardServer);
+
+    ASSERT_TRUE(ClusterRole(ClusterRole::ShardServer) != ClusterRole::None);
+    ASSERT_TRUE(ClusterRole(ClusterRole::ShardServer) != ClusterRole::ConfigServer);
+    ASSERT_TRUE(ClusterRole(ClusterRole::ShardServer) == ClusterRole::ShardServer);
+
+    RAIIServerParameterControllerForTest controller("featureFlagCatalogShard", true);
+
+    ASSERT_TRUE(ClusterRole(ClusterRole::None) == ClusterRole::None);
+    ASSERT_TRUE(ClusterRole(ClusterRole::None) != ClusterRole::ConfigServer);
+    ASSERT_TRUE(ClusterRole(ClusterRole::None) != ClusterRole::ShardServer);
+
+    ASSERT_TRUE(ClusterRole(ClusterRole::ConfigServer) != ClusterRole::None);
+    ASSERT_TRUE(ClusterRole(ClusterRole::ConfigServer) == ClusterRole::ConfigServer);
+    ASSERT_TRUE(ClusterRole(ClusterRole::ConfigServer) == ClusterRole::ShardServer);
+
+    ASSERT_TRUE(ClusterRole(ClusterRole::ShardServer) != ClusterRole::None);
+    ASSERT_TRUE(ClusterRole(ClusterRole::ShardServer) != ClusterRole::ConfigServer);
+    ASSERT_TRUE(ClusterRole(ClusterRole::ShardServer) == ClusterRole::ShardServer);
 }
 
 #if !defined(_WIN32) && !(defined(__APPLE__) && TARGET_OS_TV)

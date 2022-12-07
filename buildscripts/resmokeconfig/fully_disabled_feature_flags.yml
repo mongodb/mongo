@@ -15,3 +15,5 @@
 # Disable the new logic for the resilient movePrimary for non-dedicated tests until the logic is
 # mature enough to be enabled for all tests.
 - featureFlagResilientMovePrimary
+# Disable the feature flag for catalog shard until most of the codebase can run in this mode.
+- featureFlagCatalogShard

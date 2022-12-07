@@ -31,6 +31,7 @@
 
 #include "mongo/db/s/query_analysis_coordinator.h"
 
+#include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
@@ -184,7 +185,10 @@ void QueryAnalysisCoordinator::onStartup(OperationContext* opCtx) {
     }
 
     {
-        invariant(_samplers.empty());
+        if (!gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV()) {
+            invariant(_samplers.empty());
+        }
+
         auto minPingTime = _getMinLastPingTime();
         FindCommandRequest findRequest{MongosType::ConfigNS};
         findRequest.setFilter(BSON(MongosType::ping << BSON("$gte" << minPingTime)));

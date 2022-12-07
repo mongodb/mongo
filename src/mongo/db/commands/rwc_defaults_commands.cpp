@@ -83,7 +83,8 @@ void assertNotStandaloneOrShardServer(OperationContext* opCtx, StringData cmdNam
 
     uassert(51301,
             str::stream() << "'" << cmdName << "' is not supported on shard nodes.",
-            serverGlobalParams.clusterRole != ClusterRole::ShardServer);
+            serverGlobalParams.clusterRole == ClusterRole::None ||
+                serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
 }
 
 auto makeResponse(const ReadWriteConcernDefaults::RWConcernDefaultAndTime& rwcDefault,

@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/auth/cluster_auth_mode.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/logv2/log_format.h"
 #include "mongo/platform/atomic_word.h"
@@ -42,37 +43,6 @@ namespace mongo {
 
 const int DEFAULT_UNIX_PERMS = 0700;
 constexpr size_t DEFAULT_MAX_CONN = 1000000;
-
-class ClusterRole {
-public:
-    enum Value : uint8_t {
-        None = 0,
-        ShardServer = 1 << 0,
-        ConfigServer = 1 << 1,
-    };
-
-    ClusterRole(Value v = ClusterRole::None) : _value(v) {}
-
-    ClusterRole& operator=(const ClusterRole& rhs) {
-        _value = rhs._value;
-        return *this;
-    }
-
-    constexpr bool operator==(const ClusterRole& other) const {
-        return _value == other._value;
-    }
-
-    constexpr bool operator!=(const ClusterRole& other) const {
-        return _value != other._value;
-    }
-
-    constexpr bool is(const ClusterRole& other) const {
-        return (_value & other._value) != 0;
-    }
-
-private:
-    Value _value;
-};
 
 struct ServerGlobalParams {
     std::string binaryName;  // mongod or mongos

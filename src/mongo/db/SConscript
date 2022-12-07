@@ -58,30 +58,22 @@ env.SConscript(
 # all the server binaries. It must not depend on anything other than utilities that are outside of
 # the server codebase.
 env.Library(
-    target='server_base', source=[
-        'basic_types.idl',
+    target='server_base',
+    source=[
         'database_name.cpp',
-        'feature_compatibility_version_parser.cpp',
-        'feature_compatibility_version_document.idl',
-        'feature_flag.cpp',
         'index_names.cpp',
         'keypattern.cpp',
-        'logical_time.cpp',
-        'multitenancy.idl',
-        'namespace_string.cpp',
-        'server_parameter_with_storage.cpp',
-        'server_parameter.cpp',
-        'server_parameter.idl',
         'shard_id.cpp',
         'shutdown_in_progress_quiesce_info.cpp',
         'tenant_id.cpp',
-    ], LIBDEPS=[
+    ],
+    LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/idl/idl_parser',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
-    ], LIBDEPS_PRIVATE=[
         'server_options_core',
-    ])
+    ],
+)
 
 #
 # The db/'common' lib has the abstractions that are shared by components of the
@@ -314,11 +306,24 @@ env.Library(
 env.Library(
     target="server_options_core",
     source=[
+        'basic_types.idl',
         "server_options.cpp",
+        "catalog_shard_feature_flag.idl",
+        "cluster_role.cpp",
+        'feature_compatibility_version_parser.cpp',
+        'feature_compatibility_version_document.idl',
+        "feature_flag.cpp",
+        'logical_time.cpp',
+        'multitenancy.idl',
+        'namespace_string.cpp',
+        'server_parameter_with_storage.cpp',
+        'server_parameter.cpp',
+        'server_parameter.idl',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/bson_validate',
+        '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )
 
