@@ -259,19 +259,11 @@ public:
      * Does not require holding locks.
      *
      * Does not stop new index builds from starting. Caller must make that guarantee.
-     *
-     * TODO (SERVER-71669) Remove this method since we now use TenantId object type for tenantId.
      */
     void abortTenantIndexBuilds(OperationContext* opCtx,
                                 MigrationProtocolEnum protocol,
                                 StringData tenantId,
                                 const std::string& reason);
-
-    void abortTenantIndexBuilds(OperationContext* opCtx,
-                                MigrationProtocolEnum protocol,
-                                const boost::optional<TenantId>& tenantId,
-                                const std::string& reason);
-
     /**
      * Signals all of the index builds to abort and then waits until the index builds are no longer
      * running. The provided 'reason' will be used in the error message that the index builders

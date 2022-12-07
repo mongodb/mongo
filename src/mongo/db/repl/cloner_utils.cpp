@@ -60,20 +60,6 @@ bool ClonerUtils::isDatabaseForTenant(StringData db, StringData prefix) {
     return db.startsWith(prefix + "_");
 }
 
-bool ClonerUtils::isDatabaseForTenant(const DatabaseName& db,
-                                      const boost::optional<TenantId>& prefix,
-                                      MigrationProtocolEnum protocol) {
-    if (!prefix) {
-        return protocol == MigrationProtocolEnum::kShardMerge;
-    }
-
-    if (db.tenantId()) {
-        return *db.tenantId() == *prefix;
-    } else {
-        return isDatabaseForTenant(db.toStringWithTenantId(), (*prefix).toString());
-    }
-}
-
 // TODO SERVER-70027: Pass tenantID object to this function instead of StringData.
 bool ClonerUtils::isNamespaceForTenant(NamespaceString nss, StringData prefix) {
     if (gMultitenancySupport && nss.tenantId() != boost::none) {

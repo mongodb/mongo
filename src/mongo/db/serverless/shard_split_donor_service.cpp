@@ -631,7 +631,10 @@ ShardSplitDonorService::DonorStateMachine::_abortIndexBuildsAndEnterBlockingStat
     auto* indexBuildsCoordinator = IndexBuildsCoordinator::get(opCtx.get());
     for (const auto& tenantId : *tenantIds) {
         indexBuildsCoordinator->abortTenantIndexBuilds(
-            opCtx.get(), MigrationProtocolEnum::kMultitenantMigrations, tenantId, "shard split");
+            opCtx.get(),
+            MigrationProtocolEnum::kMultitenantMigrations,
+            tenantId.toString(),
+            "shard split");
     }
 
     if (MONGO_unlikely(pauseShardSplitBeforeBlockingState.shouldFail())) {
@@ -861,15 +864,16 @@ ExecutorFuture<repl::OpTime> ShardSplitDonorService::DonorStateMachine::_updateS
     const ScopedTaskExecutorPtr& executor,
     const CancellationToken& token,
     ShardSplitDonorStateEnum nextState) {
-    auto [isInsert, originalStateDocBson] = [&]() {
+    auto [tenantIds, isInsert, originalStateDocBson] = [&]() {
         stdx::lock_guard<Latch> lg(_mutex);
         auto currentState = _stateDoc.getState();
         auto isInsert = currentState == ShardSplitDonorStateEnum::kUninitialized ||
             currentState == ShardSplitDonorStateEnum::kAborted;
-        return std::make_tuple(isInsert, _stateDoc.toBSON());
+        return std::make_tuple(_stateDoc.getTenantIds(), isInsert, _stateDoc.toBSON());
     }();
 
     return AsyncTry([this,
+                     tenantIds = std::move(tenantIds),
                      isInsert = isInsert,
                      originalStateDocBson = originalStateDocBson,
                      uuid = _migrationId,
