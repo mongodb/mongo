@@ -60,7 +60,8 @@ selector:
   - jstests/core/exhaust.js
   # This test does not use same connection on same database (required by the inject_security_token.js override).
   - jstests/core/txns/write_conflicts_with_non_txns.js
-  # TODO SERVER-69723: once $listCatalog can work correctly in multitenancy environment, remove the js file from the exlude_files list.
+  # In a multitenancy environment the catalog will always return tenant-prefixed entries, and the
+  # override we use in this suite checks for the absence of a prefix breaking the list_catalog tests.
   - jstests/core/list_catalog.js
   # TODO SERVER-70921: these tests cannot work as the tenant information is missed when running find, count and distinct command against views.
   - jstests/core/timeseries/timeseries_index_partial.js
