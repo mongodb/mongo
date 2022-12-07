@@ -1745,7 +1745,6 @@ int logOplogEntries(
         auto firstOp = stmtsIter == stmts.begin();
         auto lastOp = nextStmt == stmts.end();
 
-        auto implicitCommit = lastOp && !prepare;
         auto implicitPrepare = lastOp && prepare;
         auto isPartialTxn = !lastOp;
 
@@ -1788,13 +1787,28 @@ int logOplogEntries(
 
         // The first optime of the transaction is always the first oplog slot, except in the
         // case of a single prepare oplog entry.
-        auto firstOpTimeOfTxn =
-            (implicitPrepare && firstOp) ? oplogSlots.back() : oplogSlots.front();
-
         // We always write the startOpTime field, which is the first optime of the
         // transaction, except when transitioning to 'committed' state, in which it should
         // no longer be set.
-        auto startOpTime = boost::make_optional(!implicitCommit, firstOpTimeOfTxn);
+        boost::optional<repl::OpTime> startOpTime;
+        if (prepare) {
+            // For a single prepare oplog entry, choose the last oplog slot for the
+            // first optime of the transaction.
+            if (lastOp && firstOp) {
+                startOpTime = oplogSlots.back();
+            } else {
+                // This is set for every oplog entry in the applyOps chain of a prepared
+                // multi-doc transaction.
+                startOpTime = oplogSlots.front();
+            }
+        } else if (!lastOp) {
+            // This is set for every oplog entry, except for the last one, in the applyOps
+            // chain of an unprepared multi-doc transaction.
+            startOpTime = oplogSlots.front();
+        } else {
+            // Leave first optime unset for the last entry in the applyOps chain of an
+            // unprepared multi-doc transaction.
+        }
 
         MutableOplogEntry oplogEntry;
         oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
