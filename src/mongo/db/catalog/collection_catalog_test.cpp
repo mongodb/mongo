@@ -848,7 +848,7 @@ public:
 
         _setupDDLOperation(opCtx, timestamp);
         WriteUnitOfWork wuow(opCtx);
-        _renameCollection(opCtx, from, to);
+        _renameCollection(opCtx, from, to, timestamp);
         wuow.commit();
     }
 
@@ -966,7 +966,9 @@ public:
             opCtx,
             lookupNss,
             timestamp,
-            [this, &from, &to](OperationContext* opCtx) { _renameCollection(opCtx, from, to); },
+            [this, &from, &to, &timestamp](OperationContext* opCtx) {
+                _renameCollection(opCtx, from, to, timestamp);
+            },
             openSnapshotBeforeCommit,
             expectedExistence,
             expectedNumIndexes);
@@ -1082,10 +1084,17 @@ private:
 
     void _renameCollection(OperationContext* opCtx,
                            const NamespaceString& from,
-                           const NamespaceString& to) {
+                           const NamespaceString& to,
+                           Timestamp timestamp) {
         Lock::DBLock dbLk(opCtx, from.db(), MODE_IX);
         Lock::CollectionLock fromLk(opCtx, from, MODE_X);
         Lock::CollectionLock toLk(opCtx, to, MODE_X);
+
+        // Drop the collection if it exists. This triggers the same behavior as renaming with
+        // dropTarget=true.
+        if (CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, to)) {
+            _dropCollection(opCtx, to, timestamp);
+        }
 
         CollectionWriter collection(opCtx, from);
 
@@ -2015,7 +2024,7 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingRename) {
         catalog.cleanupForOldestTimestampAdvanced(Timestamp(1, 1));
     });
 
-    // Create and rename collection. We have two windows where the namespace exists but for
+    // Create and rename collection. We have two windows where the collection exists but for
     // different namespaces
     createCollection(opCtx.get(), from, Timestamp(1, 5));
     RecordId rid = catalog()->lookupCollectionByNamespace(opCtx.get(), from)->getCatalogId();
@@ -2050,6 +2059,41 @@ TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingRename) {
     ASSERT_EQ(catalog()->lookupCatalogIdByNSS(to, Timestamp(1, 9)).result,
               CollectionCatalog::CatalogIdLookup::NamespaceExistence::kNotExists);
     // Lookup at rename on 'to' returns catalogId
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(to, Timestamp(1, 10)).id, rid);
+    // Lookup after rename on 'to' returns catalogId
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(to, Timestamp(1, 20)).id, rid);
+}
+
+TEST_F(CollectionCatalogTimestampTest, CatalogIdMappingRenameDropTarget) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    NamespaceString from("a.b");
+    NamespaceString to("a.c");
+
+    // Initialize the oldest timestamp to (1, 1)
+    CollectionCatalog::write(opCtx.get(), [](CollectionCatalog& catalog) {
+        catalog.cleanupForOldestTimestampAdvanced(Timestamp(1, 1));
+    });
+
+    // Create collections. The 'to' namespace will exist for one collection from Timestamp(1, 6)
+    // until it is dropped by the rename at Timestamp(1, 10), after which the 'to' namespace will
+    // correspond to the renamed collection.
+    createCollection(opCtx.get(), from, Timestamp(1, 5));
+    createCollection(opCtx.get(), to, Timestamp(1, 6));
+    RecordId rid = catalog()->lookupCollectionByNamespace(opCtx.get(), from)->getCatalogId();
+    RecordId originalToRid =
+        catalog()->lookupCollectionByNamespace(opCtx.get(), to)->getCatalogId();
+    renameCollection(opCtx.get(), from, to, Timestamp(1, 10));
+
+    // Lookup without timestamp on 'to' returns latest catalog id
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(to, boost::none).id, rid);
+    // Lookup before rename and oldest on 'to' returns unknown
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(to, Timestamp(1, 0)).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kUnknown);
+    // Lookup before rename on 'to' returns the original rid
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(to, Timestamp(1, 9)).id, originalToRid);
+    // Lookup at rename timestamp on 'to' returns catalogId
     ASSERT_EQ(catalog()->lookupCatalogIdByNSS(to, Timestamp(1, 10)).id, rid);
     // Lookup after rename on 'to' returns catalogId
     ASSERT_EQ(catalog()->lookupCatalogIdByNSS(to, Timestamp(1, 20)).id, rid);
@@ -2640,15 +2684,76 @@ TEST_F(CollectionCatalogNoTimestampTest, CatalogIdMappingNoTimestamp) {
 
     // Create a collection on the namespace and confirm that we can lookup
     createCollection(opCtx.get(), nss, Timestamp());
-    ASSERT(catalog()->lookupCatalogIdByNSS(nss).result ==
-           CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
 
     // Drop the collection and confirm it is also removed from mapping
     dropCollection(opCtx.get(), nss, Timestamp());
-    ASSERT(catalog()->lookupCatalogIdByNSS(nss).result ==
-           CollectionCatalog::CatalogIdLookup::NamespaceExistence::kNotExists);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(nss).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kNotExists);
 }
 
+TEST_F(CollectionCatalogNoTimestampTest, CatalogIdMappingNoTimestampRename) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    NamespaceString a("a.a");
+    NamespaceString b("a.b");
+
+    // Create a collection on the namespace and confirm that we can lookup
+    createCollection(opCtx.get(), a, Timestamp());
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(a).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(b).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kNotExists);
+
+    // Rename the collection and check lookup behavior
+    renameCollection(opCtx.get(), a, b, Timestamp());
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(a).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kNotExists);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(b).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
+
+    // Drop the collection and confirm it is also removed from mapping
+    dropCollection(opCtx.get(), b, Timestamp());
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(a).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kNotExists);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(b).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kNotExists);
+}
+
+TEST_F(CollectionCatalogNoTimestampTest, CatalogIdMappingNoTimestampRenameDropTarget) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    NamespaceString a("a.a");
+    NamespaceString b("a.b");
+
+    // Create collections on the namespaces and confirm that we can lookup
+    createCollection(opCtx.get(), a, Timestamp());
+    createCollection(opCtx.get(), b, Timestamp());
+    auto [aId, aResult] = catalog()->lookupCatalogIdByNSS(a);
+    auto [bId, bResult] = catalog()->lookupCatalogIdByNSS(b);
+    ASSERT_EQ(aResult, CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
+    ASSERT_EQ(bResult, CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
+
+    // Rename the collection and check lookup behavior
+    renameCollection(opCtx.get(), a, b, Timestamp());
+    auto [aIdAfter, aResultAfter] = catalog()->lookupCatalogIdByNSS(a);
+    auto [bIdAfter, bResultAfter] = catalog()->lookupCatalogIdByNSS(b);
+    ASSERT_EQ(aResultAfter, CollectionCatalog::CatalogIdLookup::NamespaceExistence::kNotExists);
+    ASSERT_EQ(bResultAfter, CollectionCatalog::CatalogIdLookup::NamespaceExistence::kExists);
+    // Verify that the the recordId on b is now what was on a. We performed a rename with
+    // dropTarget=true.
+    ASSERT_EQ(aId, bIdAfter);
+
+    // Drop the collection and confirm it is also removed from mapping
+    dropCollection(opCtx.get(), b, Timestamp());
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(a).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kNotExists);
+    ASSERT_EQ(catalog()->lookupCatalogIdByNSS(b).result,
+              CollectionCatalog::CatalogIdLookup::NamespaceExistence::kNotExists);
+}
 
 DEATH_TEST_F(CollectionCatalogTimestampTest, OpenCollectionInWriteUnitOfWork, "invariant") {
     RAIIServerParameterControllerForTest featureFlagController(

@@ -406,7 +406,7 @@ public:
      * Returns the CatalogId for a given 'nss' at timestamp 'ts'.
      */
     struct CatalogIdLookup {
-        enum NamespaceExistence {
+        enum class NamespaceExistence {
             // Namespace exists at time 'ts' and catalogId set in 'id'.
             kExists,
             // Namespace does not exist at time 'ts'.

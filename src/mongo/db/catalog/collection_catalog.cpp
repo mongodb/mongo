@@ -1843,14 +1843,24 @@ void CollectionCatalog::_pushCatalogIdForRename(const NamespaceString& from,
         return;
     }
 
-    if (!ts)
-        return;
-
     // Get 'toIds' first, it may need to instantiate in the container which invalidates all
     // references.
     auto& toIds = _catalogIds[to];
     auto& fromIds = _catalogIds.at(from);
     invariant(!fromIds.empty());
+
+    // Make sure untimestamped writes have a single entry in mapping. We move the single entry from
+    // 'from' to 'to'. We do not have to worry about mixing timestamped and untimestamped like
+    // _pushCatalogIdForNSS.
+    if (!ts) {
+        // We should never perform rename in a mixed-mode environment. 'from' should contain a
+        // single entry and there should be nothing in 'to' .
+        invariant(fromIds.size() == 1);
+        invariant(toIds.empty());
+        toIds.push_back(TimestampedCatalogId{fromIds.back().id, Timestamp::min()});
+        _catalogIds.erase(from);
+        return;
+    }
 
     // An entry could exist already if concurrent writes are performed, keep the latest change in
     // that case.
