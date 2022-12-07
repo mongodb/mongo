@@ -219,8 +219,14 @@ public:
 
             if (pendingActions.rangesWithoutDataSize.size() > pendingActions.rangesToMerge.size()) {
                 const auto& rangeToMeasure = pendingActions.rangesWithoutDataSize.back();
-                nextAction = boost::optional<DefragmentationAction>(DataSizeInfo(
-                    shardId, _nss, _uuid, rangeToMeasure, shardVersion, _shardKey, false));
+                nextAction =
+                    boost::optional<DefragmentationAction>(DataSizeInfo(shardId,
+                                                                        _nss,
+                                                                        _uuid,
+                                                                        rangeToMeasure,
+                                                                        shardVersion,
+                                                                        _shardKey,
+                                                                        true /* estimate */));
                 pendingActions.rangesWithoutDataSize.pop_back();
             } else if (!pendingActions.rangesToMerge.empty()) {
                 const auto& rangeToMerge = pendingActions.rangesToMerge.back();
