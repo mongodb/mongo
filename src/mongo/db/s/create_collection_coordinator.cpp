@@ -531,6 +531,14 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
 
                             // A previous request already created and committed the collection
                             // but there was a stepdown after the commit.
+
+                            // Ensure that the change stream event gets emitted at least once.
+                            notifyChangeStreamsOnShardCollection(
+                                opCtx,
+                                nss(),
+                                *createCollectionResponseOpt->getCollectionUUID(),
+                                _request.toBSON());
+
                             // The critical section might have been taken by a migration, we force
                             // to skip the invariant check and we do nothing in case it was taken.
                             _releaseCriticalSections(opCtx, false /* throwIfReasonDiffers */);
@@ -574,7 +582,15 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                             _request.getUnique().value_or(false))) {
 
                     // A previous request already created and committed the collection
-                    // but there was a stepdown after the commit.
+                    // but there was a stepdown before completing the execution of the coordinator.
+                    // Ensure that the change stream event gets emitted at least once.
+                    notifyChangeStreamsOnShardCollection(
+                        opCtx,
+                        nss(),
+                        *createCollectionResponseOpt->getCollectionUUID(),
+                        _request.toBSON());
+
+                    // Return any previously acquired resource.
                     _releaseCriticalSections(opCtx);
 
                     _result = createCollectionResponseOpt;
