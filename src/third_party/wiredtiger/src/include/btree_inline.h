@@ -1617,6 +1617,21 @@ __wt_page_del_visible_all(WT_SESSION_IMPL *session, WT_PAGE_DELETED *page_del, b
     if (page_del == NULL)
         return (true);
 
+    /*
+     * Check whether truncate transaction is committed or not. In case of prepared transactions,
+     * truncate operation is committed in two phases. In the first phase prepared state is set to
+     * resolved and in the later phase the committed flag of all the fast truncated pages is set to
+     * true. The two phase design is to handle any page split cases, when a fast truncated page is
+     * read back and later that page splits, in which case all the new split pages will not have
+     * page_del info.
+     *
+     * There is a window between setting the prepared state to resolved and setting the committed
+     * flag to true. Hence if committed flag is not set, consider it as not committed irrespective
+     * of visibility check, to avoid checking visibility when transaction commit is in progress.
+     */
+    if (!__wt_page_del_committed(page_del))
+        return (false);
+
     /* We discard page_del on transaction abort, so should never see an aborted one. */
     WT_ASSERT(session, page_del->txnid != WT_TXN_ABORTED);
 
@@ -1642,6 +1657,21 @@ __wt_page_del_visible(WT_SESSION_IMPL *session, WT_PAGE_DELETED *page_del, bool 
     /* If the page delete info is NULL, the deletion was previously found to be globally visible. */
     if (page_del == NULL)
         return (true);
+
+    /*
+     * Check whether truncate transaction is committed or not. In case of prepared transactions,
+     * truncate operation is committed in two phases. In the first phase prepared state is set to
+     * resolved and in the later phase the committed flag of all the fast truncated pages is set to
+     * true. The two phase design is to handle any page split cases, when a fast truncated page is
+     * read back and later that page splits, in which case all the new split pages will not have
+     * page_del info.
+     *
+     * There is a window between setting the prepared state to resolved and setting the committed
+     * flag to true. Hence if committed flag is not set, consider it as not committed irrespective
+     * of visibility check, to avoid checking visibility when transaction commit is in progress.
+     */
+    if (!__wt_page_del_committed(page_del))
+        return (false);
 
     /* We discard page_del on transaction abort, so should never see an aborted one. */
     WT_ASSERT(session, page_del->txnid != WT_TXN_ABORTED);
