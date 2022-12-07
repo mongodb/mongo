@@ -2828,12 +2828,16 @@ buildvariants:
   - name: check_feature_flag_tags
   # - name: .aggfuzzer !.feature_flag_guarded # Not passing
   # - name: .aggregation !.feature_flag_guarded # Not passing
-  # - name: audit # Not passing
-  # - name: .auth # Not passing
+  - name: audit
+  # - name: .auth  # Not passing
   # - name: burn_in_tags_gen # No burn in tests needed
   - name: buildscripts_test
   # - name: resmoke_end2end_tests # Not passing
   # - name: unittest_shell_hang_analyzer_gen # Not passing
+  - name: cqf
+  - name: cqf_disabled_pipeline_opt
+  # - name: cqf_passthrough # Not passing
+  - name: cqf_parallel
   # - name: .causally_consistent !.sharding # Not passing
   # - name: .change_streams # Not passing
   # - name: .change_stream_fuzzer # Not passing
@@ -2852,7 +2856,7 @@ buildvariants:
   - name: config_fuzzer_jsCore
     distros:
     - rhel80-large
-  # - name: disk_wiredtiger # Not passing
+  - name: disk_wiredtiger
   # - name: .encrypt # Not passing
   # - name: idl_tests # Not relevant for TSAN
   # - name: initial_sync_fuzzer_gen # Not passing
@@ -2873,7 +2877,9 @@ buildvariants:
   # - name: .multi_shard # Not passing
   # - name: multi_stmt_txn_jscore_passthrough_with_migration_gen # Not passing
   # - name: multiversion_gen # Multiversion does not pass yet, also making this work is going to be pretty tricky
-  # - name: .query_fuzzer # Not passing
+  - name: .query_fuzzer
+  - name: query_golden_classic
+  - name: query_golden_cqf
   # - name: .random_multiversion_ds # Multiversion does not pass yet, also making this work is going to be pretty tricky
   # - name: .read_write_concern .large # Not passing
   #   distros:
@@ -2915,8 +2921,8 @@ buildvariants:
   # - name: secondary_reads_passthrough_gen # Not passing
   - name: server_discovery_and_monitoring_json_test_TG
   # - name: .serverless # Not passing
-    # distros:
-    # - rhel80-xlarge
+  #   distros:
+  #   - rhel80-xlarge
   - name: server_selection_json_test_TG
     distros:
     - rhel80-xlarge
@@ -2935,18 +2941,12 @@ buildvariants:
     compile_variant: *enterprise-rhel80-debug-complete-tsan
   tasks:
   - name: compile_test_and_package_serial_TG
-  - name: cqf
-  - name: cqf_disabled_pipeline_opt
-  - name: cqf_passthrough
-  - name: cqf_parallel
-  - name: query_golden_classic
-  - name: query_golden_cqf
   - name: .aggfuzzer !.feature_flag_guarded
   - name: .aggregation !.feature_flag_guarded
-  - name: audit
   - name: .auth
   - name: resmoke_end2end_tests
   - name: unittest_shell_hang_analyzer_gen
+  - name: cqf_passthrough
   - name: .causally_consistent !.sharding
   - name: .change_streams
   - name: .change_stream_fuzzer
@@ -2962,7 +2962,6 @@ buildvariants:
   - name: config_fuzzer_concurrency_replication
     distros:
     - rhel80-large
-  - name: disk_wiredtiger
   - name: .encrypt
   - name: initial_sync_fuzzer_gen
   - name: .integration
@@ -2975,7 +2974,6 @@ buildvariants:
   - name: .multi_shard
   - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
   # - name: multiversion_gen # Multiversion does not pass yet, also making this work is going to be pretty tricky
-  - name: .query_fuzzer
   # - name: .random_multiversion_ds # Multiversion does not pass yet, also making this work is going to be pretty tricky
   - name: .read_write_concern .large
     distros:
@@ -2998,7 +2996,6 @@ buildvariants:
     - rhel80-medium
   - name: .read_only
   - name: .rollbackfuzzer
-  - name: sasl
   - name: search
   - name: search_auth
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
