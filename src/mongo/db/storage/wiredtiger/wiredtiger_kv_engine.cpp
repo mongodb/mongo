@@ -748,7 +748,7 @@ void WiredTigerKVEngine::cleanShutdown() {
 
     const Timestamp stableTimestamp = getStableTimestamp();
     const Timestamp initialDataTimestamp = getInitialDataTimestamp();
-    if (gTakeUnstableCheckpointOnShutdown) {
+    if (gTakeUnstableCheckpointOnShutdown || initialDataTimestamp.asULL() <= 1) {
         closeConfig += "use_timestamp=false,";
     } else if (!serverGlobalParams.enableMajorityReadConcern &&
                stableTimestamp < initialDataTimestamp) {
