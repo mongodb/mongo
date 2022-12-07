@@ -984,6 +984,35 @@ TEST(FromJsonTest, TimestampObjectTest) {
     });
 }
 
+TEST(FromJsonTest, JSUUIDTest) {
+    BSONObjBuilder uuidObjBuilder;
+    UUID uuid = assertGet(UUID::parse("5fc51c8b-9a77-49ff-9f94-0a7e96173aa0"));
+    uuid.appendToBuilder(&uuidObjBuilder, "a");
+    checkEquivalence(R"({ "a" : UUID( "5fc51c8b-9a77-49ff-9f94-0a7e96173aa0" ) })",
+                     uuidObjBuilder.obj());
+    checkRejectionEach({
+        R"({ "a" : UUID( 20 ) })",                                       // Not a string
+        R"({ "a" : UUID() })",                                           // NoArgs
+        R"({ "a" : UUID( "a" ) })",                                      // Wrong input size
+        R"({ "a" : UUID( "/5fc51c8b-9a77-49ff-9f94-0a7e96173aa0" ) })",  // Right size, but wrong
+                                                                         // character set
+    });
+}
+
+TEST(FromJsonTest, UUIDObjectTest) {
+    BSONObjBuilder uuidObjBuilder;
+    UUID uuid = assertGet(UUID::parse("5fc51c8b-9a77-49ff-9f94-0a7e96173aa0"));
+    uuid.appendToBuilder(&uuidObjBuilder, "a");
+    checkEquivalence(R"({ "a" : {"$uuid": "5fc51c8b-9a77-49ff-9f94-0a7e96173aa0" } })",
+                     uuidObjBuilder.obj());
+    checkRejectionEach({
+        R"({ "a" : {"$uuid": 20} })",                                       // Not a string
+        R"({ "a" : {"$uuid": "a"} })",                                      // Wrong input size
+        R"({ "a" : {"$uuid": "/5fc51c8b-9a77-49ff-9f94-0a7e96173aa0"} })",  // Right size, but wrong
+                                                                            // character set
+    });
+}
+
 BSONObj re(const std::string& name, const std::string& re, const std::string& options) {
     BSONObjBuilder b;
     b.appendRegex(name, re, options);

@@ -78,6 +78,7 @@ using namespace fmt::literals;
 // Size hints given to char vectors
 enum {
     ID_RESERVE_SIZE = 24,
+    UUID_RESERVE_SIZE = 36,
     PAT_RESERVE_SIZE = 4096,
     OPT_RESERVE_SIZE = 64,
     FIELD_RESERVE_SIZE = 4096,
@@ -159,6 +160,11 @@ Status JParse::value(StringData fieldName, BSONObjBuilder& builder) {
         }
     } else if (readToken("Dbref") || readToken("DBRef")) {
         Status ret = dbRef(fieldName, builder);
+        if (ret != Status::OK()) {
+            return ret;
+        }
+    } else if (readToken("UUID")) {
+        Status ret = uuid(fieldName, builder);
         if (ret != Status::OK()) {
             return ret;
         }
@@ -995,6 +1001,27 @@ Status JParse::objectId(StringData fieldName, BSONObjBuilder& builder) {
         return parseError("Expecting hex digits: " + id);
     }
     builder.append(fieldName, OID(id));
+    return Status::OK();
+}
+
+Status JParse::uuid(StringData fieldName, BSONObjBuilder& builder) {
+    if (!readToken(LPAREN)) {
+        return parseError("Expecting '('");
+    }
+    std::string uuid;
+    uuid.reserve(UUID_RESERVE_SIZE);
+    Status ret = quotedString(&uuid);
+    if (ret != Status::OK()) {
+        return ret;
+    }
+    if (!readToken(RPAREN)) {
+        return parseError("Expecting ')'");
+    }
+    StatusWith<UUID> swUUID = UUID::parse(uuid);
+    if (!swUUID.isOK()) {
+        return swUUID.getStatus();
+    }
+    swUUID.getValue().appendToBuilder(&builder, fieldName);
     return Status::OK();
 }
 

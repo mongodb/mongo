@@ -319,6 +319,12 @@ private:
     Status objectId(StringData fieldName, BSONObjBuilder&);
 
     /*
+     * UUID :
+     *     UUID( <36 character [<hex>, '-'] std::string> )
+     */
+    Status uuid(StringData fieldName, BSONObjBuilder& builder);
+
+    /*
      * NUMBERLONG :
      *     NumberLong( <number> )
      */
