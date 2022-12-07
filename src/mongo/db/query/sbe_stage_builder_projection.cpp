@@ -92,8 +92,8 @@ public:
         return *_expr.getSlot();
     }
 
-    ExpressionType extractExpr(optimizer::SlotVarMap& slotVarMap) {
-        return _expr.extractExpr(slotVarMap);
+    ExpressionType extractExpr() {
+        return _expr.extractExpr();
     }
 
     EvalExpr extractEvalExpr() {
@@ -132,8 +132,8 @@ struct ProjectionTraversalVisitorContext {
             return inputExpr.clone();
         }
 
-        ExpressionType getInputExpr(optimizer::SlotVarMap& slotVarMap) const {
-            return getInputEvalExpr().extractExpr(slotVarMap);
+        ExpressionType getInputExpr() const {
+            return getInputEvalExpr().extractExpr();
         }
 
         // The input expression for the current level. This is the parent sub-document for each of
@@ -205,8 +205,7 @@ struct ProjectionTraversalVisitorContext {
         return projectEvalExpr(eval.extractEvalExpr(),
                                std::move(topLevel().evalStage),
                                planNodeId,
-                               state.slotIdGenerator,
-                               state.slotVarMap);
+                               state.slotIdGenerator);
     }
 
     ProjectionTraversalVisitorContext(StageBuilderState& state,
@@ -441,7 +440,7 @@ public:
             tassert(6897006,
                     "Expected input EvalExpr to be a slot",
                     _context->isBasicProjection || slot);
-            return std::make_pair(slot, evalExpr.extractExpr(_context->state.slotVarMap));
+            return std::make_pair(slot, evalExpr.extractExpr());
         }();
 
         const bool containsComputedField = _context->topLevel().subtreeContainsComputedField;
@@ -462,7 +461,7 @@ public:
 
         auto args = sbe::makeEs(std::move(makeObjSpecExpr), childInputExpr->clone());
         for (auto& expr : projectExprs) {
-            args.push_back(expr.extractExpr(_context->state.slotVarMap));
+            args.push_back(expr.extractExpr());
         }
 
         auto innerExpr = sbe::makeE<sbe::EFunction>("makeBsonObj", std::move(args));
@@ -492,7 +491,7 @@ public:
 
         auto fromExpr = [&]() {
             if (_context->isLastLevel()) {
-                return _context->topLevel().getInputExpr(_context->state.slotVarMap);
+                return _context->topLevel().getInputExpr();
             } else if (_context->numLevels() == 2 && _context->slots) {
                 auto name =
                     std::make_pair(PlanStageSlots::kField, StringData(_context->topFrontField()));
@@ -501,7 +500,7 @@ public:
                 }
             }
             return makeFunction("getField"_sd,
-                                _context->topLevel().getInputExpr(_context->state.slotVarMap),
+                                _context->topLevel().getInputExpr(),
                                 makeConstant(_context->topFrontField()));
         }();
 
@@ -698,13 +697,12 @@ public:
         inBranch = makeFilter<true>(
             std::move(inBranch), makeVariable(traversingAnArrayFlagSlot), _context->planNodeId);
 
-        auto fromBranch =
-            makeProject(std::move(_context->topLevel().evalStage),
-                        _context->planNodeId,
-                        inputArraySlot,
-                        makeFunction("getField"_sd,
-                                     _context->topLevel().getInputExpr(_context->state.slotVarMap),
-                                     makeConstant(_context->topFrontField())));
+        auto fromBranch = makeProject(std::move(_context->topLevel().evalStage),
+                                      _context->planNodeId,
+                                      inputArraySlot,
+                                      makeFunction("getField"_sd,
+                                                   _context->topLevel().getInputExpr(),
+                                                   makeConstant(_context->topFrontField())));
 
         fromBranch = makeProject(std::move(fromBranch),
                                  _context->planNodeId,
@@ -778,7 +776,7 @@ public:
             sbe::value::SlotId slot;
             if (!expr.hasSlot()) {
                 slot = _context->state.slotId();
-                projectsMap.emplace(slot, expr.extractExpr(_context->state.slotVarMap));
+                projectsMap.emplace(slot, expr.extractExpr());
             } else {
                 slot = *expr.getSlot();
             }
@@ -906,10 +904,9 @@ public:
     void visit(const projection_ast::ProjectionSliceASTNode* node) final {
         using namespace std::literals;
 
-        auto arrayFromField =
-            makeFunction("getField"_sd,
-                         _context->topLevel().getInputExpr(_context->state.slotVarMap),
-                         makeConstant(_context->topFrontField()));
+        auto arrayFromField = makeFunction("getField"_sd,
+                                           _context->topLevel().getInputExpr(),
+                                           makeConstant(_context->topFrontField()));
         auto binds = sbe::makeEs(std::move(arrayFromField));
         auto frameId = _context->state.frameId();
         sbe::EVariable arrayVariable{frameId, 0};

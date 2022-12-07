@@ -116,6 +116,22 @@ env.Library(
 )
 
 env.Library(
+    target='sbe_stage_builder_helpers',
+    source=[
+        'sbe_stage_builder_helpers.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/exec/sbe/query_sbe',
+        '$BUILD_DIR/mongo/db/exec/sbe/query_sbe_stages',
+        '$BUILD_DIR/mongo/db/exec/sbe/query_sbe_storage',
+        '$BUILD_DIR/mongo/db/index/index_access_method',
+        '$BUILD_DIR/mongo/db/query_expressions',
+        '$BUILD_DIR/mongo/db/storage/execution_context',
+    ],
+)
+
+env.Library(
     target='projection_ast',
     source=[
         'projection.cpp',
