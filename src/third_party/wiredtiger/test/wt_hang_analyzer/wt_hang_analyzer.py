@@ -377,7 +377,7 @@ class GDBDumper(object):
     @staticmethod
     def __find_debugger(debugger):
         """Find the installed debugger."""
-        return find_program(debugger, ['/opt/mongodbtoolchain/v3/bin/gdb', '/usr/bin'])
+        return find_program(debugger, ['/opt/mongodbtoolchain/v4/bin/gdb', '/usr/bin'])
 
     def dump_info(self, root_logger, logger, pid, process_name, take_dump):
         """Dump info."""
