@@ -28,7 +28,7 @@
  */
 
 
-#include "mongo/transport/session_asio.h"
+#include "mongo/transport/asio_session.h"
 
 #include "mongo/config.h"
 #include "mongo/db/commands/server_status_metric.h"

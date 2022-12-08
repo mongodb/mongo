@@ -70,13 +70,13 @@
 #include "mongo/util/net/ssl.hpp"
 #endif
 
-// session_asio.h has some header dependencies that require it to be the last header.
+// asio_session.h has some header dependencies that require it to be the last header.
 
 #ifdef __linux__
 #include "mongo/transport/baton_asio_linux.h"
 #endif
 
-#include "mongo/transport/session_asio.h"
+#include "mongo/transport/asio_session.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 

@@ -69,10 +69,10 @@ on one port. Since we give administrators the ability to upgrade clusters to TLS
 having to edit the replset config. Because the transport layer has to be ready to receive TLS or cleartext traffic, it
 has to be able to determine what it is speaking on the fly by inspecting the first message it receives from an incoming
 connection to determine if it needs to speak cleartext or TLS. If the transport layer believes it is speaking TLS, 
-[it will create a new `asio::ssl::stream<GenericSocket>` object which wraps the underlying physical connection's `GenericSocket` object](../../transport/session_asio.h).
+[it will create a new `asio::ssl::stream<GenericSocket>` object which wraps the underlying physical connection's `GenericSocket` object](../../transport/asio_session.h).
 The outer `Socket` accepts requests to perform reads and writes, but encrypts/decrypts data before/after interacting 
 with the physical socket. ASIO also provides the 
-[implementation](https://github.com/mongodb/mongo/blob/master/src/mongo/transport/session_asio.h#L75)
+[implementation](https://github.com/mongodb/mongo/blob/master/src/mongo/transport/asio_session.h#L75)
 for the TLS socket for OpenSSL, but we provide [our own implementation](ssl) for SChannel and Secure Transport.
 
 ### FIPS Mode
