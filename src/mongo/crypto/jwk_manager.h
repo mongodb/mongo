@@ -44,22 +44,22 @@ public:
     using SharedValidator = std::shared_ptr<JWSValidator>;
 
     /**
-    Fetch a JWKS file from the specified URL, parse them as keys,
-    and instantiate JWSValidator instances.
-    */
+     * Fetch a JWKS file from the specified URL, parse them as keys,
+     * and instantiate JWSValidator instances.
+     */
     explicit JWKManager(StringData source);
 
     /**
-    Parse a BSONObj array of keys, and instantiate JWSValidator instances.
-    This was added for testing purposes.
-    */
+     * Parse a BSONObj array of keys, and instantiate JWSValidator instances.
+     * This was added for testing purposes.
+     */
     explicit JWKManager(BSONObj keys);
 
     /**
-    Given a unique keyId it will return the matching JWK.
-    If no key is found for the given keyId, a uassert will be thrown.
-    */
-    const BSONObj& getKey(StringData keyId) const;
+     * Given a unique keyId it will return the matching JWK.
+     * If no key is found for the given keyId, a
+     */
+    StatusWith<BSONObj> getKey(StringData keyId) const;
 
     /**
      * Fetch a specific JWSValidator from the JWKManager by keyId.
@@ -73,6 +73,11 @@ public:
     std::size_t size() const {
         return _validators->size();
     }
+
+    /**
+     * Get the list of keyIds held by this key manager.
+     */
+    std::vector<std::string> getKeyIds() const;
 
 private:
     void _setAndValidateKeys(const BSONObj& keys);

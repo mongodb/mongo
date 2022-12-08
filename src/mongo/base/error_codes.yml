@@ -511,8 +511,8 @@ error_codes:
     - {code: 389, name: LibmongocryptError}
 
     - {code: 390, name: InvalidSignature}
-
     - {code: 391, name: ReauthenticationRequired}
+    - {code: 392, name: InvalidJWT}
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)

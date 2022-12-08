@@ -152,6 +152,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/base/secure_allocator',
         '$BUILD_DIR/mongo/shell/kms_idl',
+        '$BUILD_DIR/mongo/util/net/http_client_impl',
         '$BUILD_DIR/mongo/util/net/openssl_init' if ssl_provider == 'openssl' else [],
         'aead_encryption',
         'encrypted_field_config',
@@ -171,11 +172,12 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/client/sasl_client',
-        '$BUILD_DIR/mongo/util/net/http_client_impl',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/client/sasl_client',
+        '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
         '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/mongo/util/net/http_client_impl',
     ],
 )
 

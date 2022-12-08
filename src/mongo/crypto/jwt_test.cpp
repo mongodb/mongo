@@ -54,7 +54,7 @@ TEST(JWKManager, parseJWKSetBasicFromSource) {
     JWKManager manager(source);
 
     for (const auto& key : data["keys"_sd].Obj()) {
-        auto keyFromKid = manager.getKey(key["kid"_sd].str());
+        auto keyFromKid = uassertStatusOK(manager.getKey(key["kid"_sd].str()));
         ASSERT_BSONOBJ_EQ(key.Obj(), keyFromKid);
     }
 

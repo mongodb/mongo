@@ -32,6 +32,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/crypto/jws_validator.h"
 #include "mongo/crypto/jwt_types_gen.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/net/http_client.h"
@@ -58,8 +59,9 @@ StringData reduceInt(StringData value) {
 JWKManager::JWKManager(StringData source) : _keyURI(source) {
     auto httpClient = HttpClient::createWithoutConnectionPool();
     httpClient->setHeaders({"Accept: */*"});
+    httpClient->allowInsecureHTTP(getTestCommandsEnabled());
 
-    DataBuilder getJWKs = httpClient->get(source);
+    auto getJWKs = httpClient->get(source);
 
     ConstDataRange cdr = getJWKs.getCursor();
     StringData str;
@@ -73,11 +75,11 @@ JWKManager::JWKManager(BSONObj keys) {
     _setAndValidateKeys(keys);
 }
 
-const BSONObj& JWKManager::getKey(StringData keyId) const {
+StatusWith<BSONObj> JWKManager::getKey(StringData keyId) const {
     auto it = _keyMaterial.find(keyId.toString());
-    uassert(ErrorCodes::NoSuchKey,
-            str::stream() << "Unknown key '" << keyId << "'",
-            it != _keyMaterial.end());
+    if (it == _keyMaterial.end()) {
+        return {ErrorCodes::NoSuchKey, str::stream() << "Unknown key '" << keyId << "'"};
+    }
     return it->second;
 }
 
@@ -132,7 +134,17 @@ void JWKManager::_setAndValidateKeys(const BSONObj& keys) {
         SharedValidator shValidator = std::move(swValidator.getValue());
 
         _validators->insert({keyId, shValidator});
+        LOGV2_DEBUG(7070202, 3, "Loaded JWK key", "kid"_attr = keyId, "typ"_attr = JWK.getType());
     }
+}
+
+std::vector<std::string> JWKManager::getKeyIds() const {
+    std::vector<std::string> ids;
+    std::transform(_validators->cbegin(),
+                   _validators->cend(),
+                   std::back_inserter(ids),
+                   [](const auto& it) { return it.first; });
+    return ids;
 }
 
 }  // namespace mongo::crypto
