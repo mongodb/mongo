@@ -324,8 +324,11 @@ void insertChunks(OperationContext* opCtx,
             Grid::get(opCtx->getServiceContext())->getExecutorPool()->getFixedExecutor();
         auto newOpCtx = CancelableOperationContext(
             cc().makeOperationContext(), opCtx->getCancellationToken(), executor);
-        newOpCtx->setLogicalSessionId(*osi.getSessionId());
-        newOpCtx->setTxnNumber(*osi.getTxnNumber());
+        {
+            auto lk = stdx::lock_guard(*newOpCtx->getClient());
+            newOpCtx->setLogicalSessionId(*osi.getSessionId());
+            newOpCtx->setTxnNumber(*osi.getTxnNumber());
+        }
 
         BatchedCommandResponse response;
         BatchWriteExecStats stats;

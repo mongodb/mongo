@@ -235,9 +235,11 @@ boost::optional<SharedSemiFuture<void>> withSessionCheckedOut(OperationContext* 
                                                               TxnNumber txnNumber,
                                                               boost::optional<StmtId> stmtId,
                                                               unique_function<void()> callable) {
-
-    opCtx->setLogicalSessionId(std::move(lsid));
-    opCtx->setTxnNumber(txnNumber);
+    {
+        auto lk = stdx::lock_guard(*opCtx->getClient());
+        opCtx->setLogicalSessionId(std::move(lsid));
+        opCtx->setTxnNumber(txnNumber);
+    }
 
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
     auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);

@@ -196,12 +196,15 @@ Status applyCommitTransaction(OperationContext* opCtx,
             // Transaction operations are in its own batch, so we can modify their opCtx.
             invariant(entry.getSessionId());
             invariant(entry.getTxnNumber());
-            opCtx->setLogicalSessionId(*entry.getSessionId());
-            opCtx->setTxnNumber(*entry.getTxnNumber());
-            if (auto txnRetryCounter = entry.getOperationSessionInfo().getTxnRetryCounter()) {
-                opCtx->setTxnRetryCounter(*txnRetryCounter);
+            {
+                auto lk = stdx::lock_guard(*opCtx->getClient());
+                opCtx->setLogicalSessionId(*entry.getSessionId());
+                opCtx->setTxnNumber(*entry.getTxnNumber());
+                if (auto txnRetryCounter = entry.getOperationSessionInfo().getTxnRetryCounter()) {
+                    opCtx->setTxnRetryCounter(*txnRetryCounter);
+                }
+                opCtx->setInMultiDocumentTransaction();
             }
-            opCtx->setInMultiDocumentTransaction();
 
             // The write on transaction table may be applied concurrently, so refreshing state
             // from disk may read that write, causing starting a new transaction on an existing
@@ -242,12 +245,15 @@ Status applyAbortTransaction(OperationContext* opCtx,
             // Transaction operations are in its own batch, so we can modify their opCtx.
             invariant(entry.getSessionId());
             invariant(entry.getTxnNumber());
-            opCtx->setLogicalSessionId(*entry.getSessionId());
-            opCtx->setTxnNumber(*entry.getTxnNumber());
-            if (auto txnRetryCounter = entry.getOperationSessionInfo().getTxnRetryCounter()) {
-                opCtx->setTxnRetryCounter(*txnRetryCounter);
+            {
+                auto lk = stdx::lock_guard(*opCtx->getClient());
+                opCtx->setLogicalSessionId(*entry.getSessionId());
+                opCtx->setTxnNumber(*entry.getTxnNumber());
+                if (auto txnRetryCounter = entry.getOperationSessionInfo().getTxnRetryCounter()) {
+                    opCtx->setTxnRetryCounter(*txnRetryCounter);
+                }
+                opCtx->setInMultiDocumentTransaction();
             }
-            opCtx->setInMultiDocumentTransaction();
 
             // The write on transaction table may be applied concurrently, so refreshing state
             // from disk may read that write, causing starting a new transaction on an existing
@@ -421,12 +427,15 @@ Status _applyPrepareTransaction(OperationContext* opCtx,
     // Transaction operations are in their own batch, so we can modify their opCtx.
     invariant(entry.getSessionId());
     invariant(entry.getTxnNumber());
-    opCtx->setLogicalSessionId(*entry.getSessionId());
-    opCtx->setTxnNumber(*entry.getTxnNumber());
-    if (auto txnRetryCounter = entry.getOperationSessionInfo().getTxnRetryCounter()) {
-        opCtx->setTxnRetryCounter(*txnRetryCounter);
+    {
+        auto lk = stdx::lock_guard(*opCtx->getClient());
+        opCtx->setLogicalSessionId(*entry.getSessionId());
+        opCtx->setTxnNumber(*entry.getTxnNumber());
+        if (auto txnRetryCounter = entry.getOperationSessionInfo().getTxnRetryCounter()) {
+            opCtx->setTxnRetryCounter(*txnRetryCounter);
+        }
+        opCtx->setInMultiDocumentTransaction();
     }
-    opCtx->setInMultiDocumentTransaction();
 
     return writeConflictRetry(opCtx, "applying prepare transaction", entry.getNss().ns(), [&] {
         // The write on transaction table may be applied concurrently, so refreshing state

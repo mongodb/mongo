@@ -149,8 +149,11 @@ BSONObj commitOrAbortTransaction(OperationContext* opCtx,
     newOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
     AuthorizationSession::get(newOpCtx.get()->getClient())
         ->grantInternalAuthorization(newOpCtx.get()->getClient());
-    newOpCtx.get()->setLogicalSessionId(opCtx->getLogicalSessionId().value());
-    newOpCtx.get()->setTxnNumber(txnNumber);
+    {
+        auto lk = stdx::lock_guard(*newOpCtx->getClient());
+        newOpCtx->setLogicalSessionId(opCtx->getLogicalSessionId().value());
+        newOpCtx->setTxnNumber(txnNumber);
+    }
 
     BSONObjBuilder bob;
     bob.append(cmdName, true);

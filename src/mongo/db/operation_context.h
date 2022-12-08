@@ -491,7 +491,8 @@ public:
 
     bool isRetryableWrite() const {
         return _txnNumber &&
-            (!_inMultiDocumentTransaction || isInternalSessionForRetryableWrite(*_lsid));
+            (!_inMultiDocumentTransaction ||
+             isInternalSessionForRetryableWrite(*getLogicalSessionId()));
     }
 
     /**
@@ -673,7 +674,7 @@ public:
      * Calls to resetMultiDocumentTransactionState will reset _killOpsExempt to false.
      */
     void setKillOpsExempt() {
-        invariant(!_lsid);
+        invariant(!getLogicalSessionId());
         _killOpsExempt = true;
     }
 

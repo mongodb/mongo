@@ -592,9 +592,12 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
             uassert(ErrorCodes::InvalidOptions,
                     "txnRetryCounter is only supported in sharded clusters",
                     !optTxnRetryCounter.has_value());
-            opCtx->setLogicalSessionId(sessionId);
-            opCtx->setTxnNumber(txnNumber);
-            opCtx->setInMultiDocumentTransaction();
+            {
+                auto lk = stdx::lock_guard(*opCtx->getClient());
+                opCtx->setLogicalSessionId(sessionId);
+                opCtx->setTxnNumber(txnNumber);
+                opCtx->setInMultiDocumentTransaction();
+            }
             LOGV2_DEBUG(5351502,
                         1,
                         "Tenant Oplog Applier committing transaction",
@@ -751,8 +754,11 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
                 prePostImageEntry = boost::none;
             }
 
-            opCtx->setLogicalSessionId(sessionId);
-            opCtx->setTxnNumber(txnNumber);
+            {
+                auto lk = stdx::lock_guard(*opCtx->getClient());
+                opCtx->setLogicalSessionId(sessionId);
+                opCtx->setTxnNumber(txnNumber);
+            }
             if (!scopedSession) {
                 auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx.get());
                 scopedSession = mongoDSessionCatalog->checkOutSessionWithoutOplogRead(opCtx.get());

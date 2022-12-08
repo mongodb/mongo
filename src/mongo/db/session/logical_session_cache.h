@@ -129,6 +129,7 @@ public:
           _acr(_alternateClient),
           _newOpCtx(cc().makeOperationContext()),
           _lsid(makeLogicalSessionId(opCtx)) {
+        auto lk = stdx::lock_guard(*_newOpCtx->getClient());
         _newOpCtx->setLogicalSessionId(_lsid);
     }
 

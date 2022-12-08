@@ -436,8 +436,11 @@ SessionCatalogMigrationDestination::_processSessionOplog(const BSONObj& oplogBSO
     auto uniqueOpCtx =
         CancelableOperationContext(cc().makeOperationContext(), cancellationToken, executor);
     auto opCtx = uniqueOpCtx.get();
-    opCtx->setLogicalSessionId(result.sessionId);
-    opCtx->setTxnNumber(result.txnNum);
+    {
+        auto lk = stdx::lock_guard(*opCtx->getClient());
+        opCtx->setLogicalSessionId(result.sessionId);
+        opCtx->setTxnNumber(result.txnNum);
+    }
 
     // Irrespective of whether or not the oplog gets logged, we want to update the
     // entriesMigrated counter to signal that we have succesfully recieved the oplog

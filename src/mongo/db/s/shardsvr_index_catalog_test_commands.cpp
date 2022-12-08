@@ -91,8 +91,11 @@ public:
 
             osi.setSessionId(session.getSessionId());
             osi.setTxnNumber(session.getTxnNumber());
-            opCtx->setLogicalSessionId(*osi.getSessionId());
-            opCtx->setTxnNumber(*osi.getTxnNumber());
+            {
+                auto lk = stdx::lock_guard(*opCtx->getClient());
+                opCtx->setLogicalSessionId(*osi.getSessionId());
+                opCtx->setTxnNumber(*osi.getTxnNumber());
+            }
             sharding_index_catalog_util::registerIndexCatalogEntry(
                 opCtx,
                 Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
@@ -170,8 +173,11 @@ public:
 
             osi.setSessionId(session.getSessionId());
             osi.setTxnNumber(session.getTxnNumber());
-            opCtx->setLogicalSessionId(*osi.getSessionId());
-            opCtx->setTxnNumber(*osi.getTxnNumber());
+            {
+                auto lk = stdx::lock_guard(*opCtx->getClient());
+                opCtx->setLogicalSessionId(*osi.getSessionId());
+                opCtx->setTxnNumber(*osi.getTxnNumber());
+            }
 
             sharding_index_catalog_util::unregisterIndexCatalogEntry(
                 opCtx,

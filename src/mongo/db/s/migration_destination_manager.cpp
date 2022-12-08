@@ -1119,8 +1119,11 @@ void MigrationDestinationManager::_migrateThread(CancellationToken cancellationT
             // yield this session, but will verify the txnNumber has not changed before continuing,
             // preserving the guarantee that orphans cannot be created after the txnNumber is
             // advanced.
-            opCtx->setLogicalSessionId(_lsid);
-            opCtx->setTxnNumber(_txnNumber);
+            {
+                auto lk = stdx::lock_guard(*opCtx->getClient());
+                opCtx->setLogicalSessionId(_lsid);
+                opCtx->setTxnNumber(_txnNumber);
+            }
 
             auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
             auto sessionTxnState = mongoDSessionCatalog->checkOutSession(opCtx);

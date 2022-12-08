@@ -250,7 +250,10 @@ void implicitlyAbortAllTransactions(OperationContext* opCtx) {
         OperationContextSession sessionCtx(newOpCtx, std::move(killDetails.killToken));
 
         auto session = OperationContextSession::get(newOpCtx);
-        newOpCtx->setLogicalSessionId(session->getSessionId());
+        {
+            auto lk = stdx::lock_guard(*newOpCtx->getClient());
+            newOpCtx->setLogicalSessionId(session->getSessionId());
+        }
 
         auto txnRouter = TransactionRouter::get(newOpCtx);
         if (txnRouter.isInitialized()) {

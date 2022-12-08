@@ -1371,9 +1371,12 @@ void TenantMigrationRecipientService::Instance::_processCommittedTransactionEntr
     // 'fromTenantMigration' field when writing oplog entries. That field is used to help recipient
     // secondaries determine if a no-op entry is related to a transaction entry.
     tenantMigrationInfo(opCtx) = boost::make_optional<TenantMigrationInfo>(getMigrationUUID());
-    opCtx->setLogicalSessionId(sessionId);
-    opCtx->setTxnNumber(txnNumber);
-    opCtx->setInMultiDocumentTransaction();
+    {
+        auto lk = stdx::lock_guard(*opCtx->getClient());
+        opCtx->setLogicalSessionId(sessionId);
+        opCtx->setTxnNumber(txnNumber);
+        opCtx->setInMultiDocumentTransaction();
+    }
     auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
     auto ocs = mongoDSessionCatalog->checkOutSession(opCtx);
 

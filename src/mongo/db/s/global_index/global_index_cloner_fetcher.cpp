@@ -226,7 +226,10 @@ std::unique_ptr<Pipeline, PipelineDeleter> GlobalIndexClonerFetcher::_targetAggr
     // to prevent them from killing the cursor when it is idle locally. Due to the cursor's merging
     // behavior across all donor shards, it is possible for the cursor to be active on one donor
     // shard while idle for a long period on another donor shard.
-    opCtx->setLogicalSessionId(makeLogicalSessionId(opCtx));
+    {
+        auto lk = stdx::lock_guard(*opCtx->getClient());
+        opCtx->setLogicalSessionId(makeLogicalSessionId(opCtx));
+    }
 
     AggregateCommandRequest request(_nss, pipeline.serializeToBson());
     request.setCollectionUUID(_collUUID);
