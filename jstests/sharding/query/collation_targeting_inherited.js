@@ -2,6 +2,8 @@
 (function() {
 "use strict";
 
+load("jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js");
+
 const caseInsensitive = {
     locale: "en_US",
     strength: 2
@@ -201,14 +203,26 @@ assert.eq(1, explain.queryPlanner.winningPlan.shards.length);
 
 // FindAndModify.
 
-// Sharded findAndModify on strings with non-simple collation inherited from the collection
-// default should fail, because findAndModify must target a single shard.
-assert.throws(function() {
-    collCaseInsensitive.findAndModify({query: {a: "foo"}, update: {$set: {b: 1}}});
-});
-assert.throws(function() {
-    collCaseInsensitive.explain().findAndModify({query: {a: "foo"}, update: {$set: {b: 1}}});
-});
+// Sharded findAndModify that does not target a single shard can now be executed with a two phase
+// write protocol that will target at most 1 matching document.
+if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(testDB)) {
+    let res = collCaseInsensitive.findAndModify({query: {a: "foo"}, update: {$set: {b: 1}}});
+    assert(res.a === "foo" || res.a === "FOO");
+
+    // TODO: SERVER-69925 Implement explain for findAndModify.
+    // assert.throws(function() {
+    //     collCaseInsensitive.explain().findAndModify({query: {a: "foo"}, update: {$set: {b: 1}}});
+    // });
+} else {
+    // Sharded findAndModify on strings with non-simple collation inherited from the collection
+    // default should fail, because findAndModify must target a single shard.
+    assert.throws(function() {
+        collCaseInsensitive.findAndModify({query: {a: "foo"}, update: {$set: {b: 1}}});
+    });
+    assert.throws(function() {
+        collCaseInsensitive.explain().findAndModify({query: {a: "foo"}, update: {$set: {b: 1}}});
+    });
+}
 
 // Sharded findAndModify on strings with simple collation should succeed. This should be
 // single-shard.

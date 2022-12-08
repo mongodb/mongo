@@ -43,7 +43,8 @@ namespace write_without_shard_key {
 bool useTwoPhaseProtocol(OperationContext* opCtx,
                          NamespaceString ns,
                          bool isUpdateOrDelete,
-                         const BSONObj& query);
+                         const BSONObj& query,
+                         const BSONObj& collation);
 
 }  // namespace write_without_shard_key
 }  // namespace mongo

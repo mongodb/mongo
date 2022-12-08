@@ -415,18 +415,23 @@ StatusWith<bool> BatchWriteOp::targetBatch(
 
             bool isMultiWrite = false;
             BSONObj query;
+            BSONObj collation;
 
             if (writeItem.getOpType() == BatchedCommandRequest::BatchType_Update) {
-                isMultiWrite = writeItem.getUpdate().getMulti();
-                query = writeItem.getUpdate().getQ();
+                auto updateReq = writeItem.getUpdate();
+                isMultiWrite = updateReq.getMulti();
+                query = updateReq.getQ();
+                collation = updateReq.getCollation().value_or(BSONObj());
             } else {
-                isMultiWrite = writeItem.getDelete().getMulti();
-                query = writeItem.getDelete().getQ();
+                auto deleteReq = writeItem.getDelete();
+                isMultiWrite = deleteReq.getMulti();
+                query = deleteReq.getQ();
+                collation = deleteReq.getCollation().value_or(BSONObj());
             }
 
             if (!isMultiWrite &&
                 write_without_shard_key::useTwoPhaseProtocol(
-                    _opCtx, targeter.getNS(), true /* isUpdateOrDelete */, query)) {
+                    _opCtx, targeter.getNS(), true /* isUpdateOrDelete */, query, collation)) {
 
                 // Writes without shard key should be in their own batch.
                 if (!batchMap.empty()) {

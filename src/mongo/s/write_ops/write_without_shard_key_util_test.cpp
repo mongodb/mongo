@@ -80,12 +80,19 @@ protected:
 TEST_F(WriteWithoutShardKeyUtilTest, WriteQueryContainingFullShardKeyCanTargetSingleDocument) {
     RAIIServerParameterControllerForTest featureFlagController(
         "featureFlagUpdateOneWithoutShardKey", true);
-    auto useTwoPhaseProtocol = write_without_shard_key::useTwoPhaseProtocol(
-        getOpCtx(), kNss, true /* isUpdateOrDelete */, BSON("a" << 1 << "b" << 1));
+    auto useTwoPhaseProtocol =
+        write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
+                                                     kNss,
+                                                     true /* isUpdateOrDelete */,
+                                                     BSON("a" << 1 << "b" << 1),
+                                                     {} /* collation */);
     ASSERT_EQ(useTwoPhaseProtocol, false);
 
-    useTwoPhaseProtocol = write_without_shard_key::useTwoPhaseProtocol(
-        getOpCtx(), kNss, false /* isUpdateOrDelete */, BSON("a" << 1 << "b" << 1));
+    useTwoPhaseProtocol = write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
+                                                                       kNss,
+                                                                       false /* isUpdateOrDelete */,
+                                                                       BSON("a" << 1 << "b" << 1),
+                                                                       {} /* collation */);
     ASSERT_EQ(useTwoPhaseProtocol, false);
 }
 
@@ -94,11 +101,11 @@ TEST_F(WriteWithoutShardKeyUtilTest,
     RAIIServerParameterControllerForTest featureFlagController(
         "featureFlagUpdateOneWithoutShardKey", true);
     auto useTwoPhaseProtocol = write_without_shard_key::useTwoPhaseProtocol(
-        getOpCtx(), kNss, true /* isUpdateOrDelete */, BSON("a" << 1));
+        getOpCtx(), kNss, true /* isUpdateOrDelete */, BSON("a" << 1), {} /* collation */);
     ASSERT_EQ(useTwoPhaseProtocol, true);
 
     useTwoPhaseProtocol = write_without_shard_key::useTwoPhaseProtocol(
-        getOpCtx(), kNss, false /* isUpdateOrDelete */, BSON("a" << 1));
+        getOpCtx(), kNss, false /* isUpdateOrDelete */, BSON("a" << 1), {} /* collation */);
     ASSERT_EQ(useTwoPhaseProtocol, true);
 }
 
@@ -107,7 +114,7 @@ TEST_F(WriteWithoutShardKeyUtilTest,
     RAIIServerParameterControllerForTest featureFlagController(
         "featureFlagUpdateOneWithoutShardKey", true);
     auto useTwoPhaseProtocol = write_without_shard_key::useTwoPhaseProtocol(
-        getOpCtx(), kNss, true /* isUpdateOrDelete */, BSON("_id" << 1));
+        getOpCtx(), kNss, true /* isUpdateOrDelete */, BSON("_id" << 1), {} /* collation */);
     ASSERT_EQ(useTwoPhaseProtocol, false);
 }
 
@@ -116,11 +123,11 @@ TEST_F(WriteWithoutShardKeyUtilTest,
     RAIIServerParameterControllerForTest featureFlagController(
         "featureFlagUpdateOneWithoutShardKey", true);
     auto useTwoPhaseProtocol = write_without_shard_key::useTwoPhaseProtocol(
-        getOpCtx(), kNss, true /* isUpdateOrDelete */, BSON("x" << 1));
+        getOpCtx(), kNss, true /* isUpdateOrDelete */, BSON("x" << 1), {} /* collation */);
     ASSERT_EQ(useTwoPhaseProtocol, true);
 
     useTwoPhaseProtocol = write_without_shard_key::useTwoPhaseProtocol(
-        getOpCtx(), kNss, false /* isUpdateOrDelete */, BSON("x" << 1));
+        getOpCtx(), kNss, false /* isUpdateOrDelete */, BSON("x" << 1), {} /* collation */);
     ASSERT_EQ(useTwoPhaseProtocol, true);
 }
 
@@ -128,7 +135,7 @@ TEST_F(WriteWithoutShardKeyUtilTest, FindAndModifyQueryWithOnlyIdMustUseTwoPhase
     RAIIServerParameterControllerForTest featureFlagController(
         "featureFlagUpdateOneWithoutShardKey", true);
     auto useTwoPhaseProtocol = write_without_shard_key::useTwoPhaseProtocol(
-        getOpCtx(), kNss, false /* isUpdateOrDelete */, BSON("_id" << 1));
+        getOpCtx(), kNss, false /* isUpdateOrDelete */, BSON("_id" << 1), {} /* collation */);
     ASSERT_EQ(useTwoPhaseProtocol, true);
 }
 
@@ -136,7 +143,7 @@ TEST_F(WriteWithoutShardKeyUtilTest, FindAndModifyQueryWithoutShardKeyMustUseTwo
     RAIIServerParameterControllerForTest featureFlagController(
         "featureFlagUpdateOneWithoutShardKey", true);
     auto useTwoPhaseProtocol = write_without_shard_key::useTwoPhaseProtocol(
-        getOpCtx(), kNss, false /* isUpdateOrDelete */, BSON("x" << 1));
+        getOpCtx(), kNss, false /* isUpdateOrDelete */, BSON("x" << 1), {} /* collation */);
     ASSERT_EQ(useTwoPhaseProtocol, true);
 }
 
@@ -144,7 +151,7 @@ TEST_F(WriteWithoutShardKeyUtilTest, QueryWithFeatureFlagDisabledDoesNotUseTwoPh
     RAIIServerParameterControllerForTest featureFlagController(
         "featureFlagUpdateOneWithoutShardKey", false);
     auto useTwoPhaseProtocol = write_without_shard_key::useTwoPhaseProtocol(
-        getOpCtx(), kNss, false /* isUpdateOrDelete */, BSON("x" << 1));
+        getOpCtx(), kNss, false /* isUpdateOrDelete */, BSON("x" << 1), {} /* collation */);
     ASSERT_EQ(useTwoPhaseProtocol, false);
 }
 
@@ -170,8 +177,81 @@ TEST_F(UnshardedCollectionTest, UnshardedCollectionDoesNotUseTwoPhaseProtocol) {
     ASSERT(!cm.isSharded());
 
     auto useTwoPhaseProtocol = write_without_shard_key::useTwoPhaseProtocol(
-        getOpCtx(), kNss, true /* isUpdateOrDelete */, BSON("x" << 1));
+        getOpCtx(), kNss, true /* isUpdateOrDelete */, BSON("x" << 1), {} /* collation */);
     ASSERT_EQ(useTwoPhaseProtocol, false);
+}
+
+TEST_F(WriteWithoutShardKeyUtilTest,
+       WriteQueryWithFullShardKeyAndCollationWithCollatableTypesUsesTwoPhaseProtocol) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagUpdateOneWithoutShardKey", true);
+    auto useTwoPhaseProtocol =
+        write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
+                                                     kNss,
+                                                     true /* isUpdateOrDelete */,
+                                                     BSON("a"
+                                                          << "a"
+                                                          << "b"
+                                                          << "b"),
+                                                     BSON("collation"
+                                                          << "lowercase") /* collation */);
+    ASSERT_EQ(useTwoPhaseProtocol, true);
+}
+
+TEST_F(WriteWithoutShardKeyUtilTest,
+       WriteQueryWithFullShardKeyAndCollationWithoutCollatableTypesDoesNotUseTwoPhaseProtocol) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagUpdateOneWithoutShardKey", true);
+    auto useTwoPhaseProtocol =
+        write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
+                                                     kNss,
+                                                     true /* isUpdateOrDelete */,
+                                                     BSON("a" << 1 << "b" << 1),
+                                                     BSON("collation"
+                                                          << "lowercase") /* collation */);
+    ASSERT_EQ(useTwoPhaseProtocol, false);
+}
+
+TEST_F(WriteWithoutShardKeyUtilTest,
+       WriteQueryWithOnlyIdAndCollationWithCollatableTypeUsesTwoPhaseProtocol) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagUpdateOneWithoutShardKey", true);
+    auto useTwoPhaseProtocol =
+        write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
+                                                     kNss,
+                                                     true /* isUpdateOrDelete */,
+                                                     BSON("_id"
+                                                          << "hello"),
+                                                     BSON("collation"
+                                                          << "lowercase") /* collation */);
+    ASSERT_EQ(useTwoPhaseProtocol, true);
+}
+
+TEST_F(WriteWithoutShardKeyUtilTest,
+       WriteQueryWithOnlyIdAndCollationWithoutCollatableTypeDoesNotUseTwoPhaseProtocol) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagUpdateOneWithoutShardKey", true);
+    auto useTwoPhaseProtocol =
+        write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
+                                                     kNss,
+                                                     true /* isUpdateOrDelete */,
+                                                     BSON("_id" << 1),
+                                                     BSON("collation"
+                                                          << "lowercase") /* collation */);
+    ASSERT_EQ(useTwoPhaseProtocol, false);
+}
+
+TEST_F(WriteWithoutShardKeyUtilTest,
+       WriteQueryWithOnlyIdThatIsNotADirectEqualityUsesTwoPhaseProtocol) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagUpdateOneWithoutShardKey", true);
+    auto useTwoPhaseProtocol =
+        write_without_shard_key::useTwoPhaseProtocol(getOpCtx(),
+                                                     kNss,
+                                                     true /* isUpdateOrDelete */,
+                                                     BSON("_id" << BSON("$gt" << 1)),
+                                                     {} /* collation */);
+    ASSERT_EQ(useTwoPhaseProtocol, true);
 }
 
 }  // namespace

@@ -52,6 +52,6 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_uuid_mismatch_info',
-        '$BUILD_DIR/mongo/s/write_ops/write_without_shard_key_util',
+        'write_without_shard_key_util',
     ],
 )

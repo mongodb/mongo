@@ -503,8 +503,11 @@ public:
         if (cm.isSharded()) {
             const BSONObj query = cmdObjForShard.getObjectField("query");
 
-            if (write_without_shard_key::useTwoPhaseProtocol(
-                    opCtx, nss, false /* isUpdateOrDelete */, query)) {
+            if (write_without_shard_key::useTwoPhaseProtocol(opCtx,
+                                                             nss,
+                                                             false /* isUpdateOrDelete */,
+                                                             query,
+                                                             getCollation(cmdObjForShard))) {
                 _runCommandWithoutShardKey(opCtx,
                                            boost::none /* dbVersion */,
                                            nss,
