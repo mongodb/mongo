@@ -410,8 +410,8 @@ public:
             o->onEmptyCapped(opCtx, collectionName, uuid);
     }
 
-    void onUnpreparedTransactionCommit(OperationContext* opCtx,
-                                       TransactionOperations* transactionOperations) override {
+    void onUnpreparedTransactionCommit(
+        OperationContext* opCtx, const TransactionOperations& transactionOperations) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers)
             o->onUnpreparedTransactionCommit(opCtx, transactionOperations);

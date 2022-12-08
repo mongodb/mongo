@@ -118,7 +118,7 @@ public:
     std::function<void()> onTransactionPrepareFn = []() {};
 
     void onUnpreparedTransactionCommit(OperationContext* opCtx,
-                                       TransactionOperations* transactionOperations) override;
+                                       const TransactionOperations& transactionOperations) override;
     bool onUnpreparedTransactionCommitThrowsException = false;
     bool unpreparedTransactionCommitted = false;
     std::function<void(const std::vector<repl::ReplOperation>&)> onUnpreparedTransactionCommitFn =
@@ -182,8 +182,8 @@ void OpObserverMock::onTransactionPrepare(
     onTransactionPrepareFn();
 }
 
-void OpObserverMock::onUnpreparedTransactionCommit(OperationContext* opCtx,
-                                                   TransactionOperations* transactionOperations) {
+void OpObserverMock::onUnpreparedTransactionCommit(
+    OperationContext* opCtx, const TransactionOperations& transactionOperations) {
     ASSERT(opCtx->lockState()->inAWriteUnitOfWork());
 
     OpObserverNoop::onUnpreparedTransactionCommit(opCtx, transactionOperations);
@@ -193,7 +193,7 @@ void OpObserverMock::onUnpreparedTransactionCommit(OperationContext* opCtx,
             !onUnpreparedTransactionCommitThrowsException);
 
     unpreparedTransactionCommitted = true;
-    const auto& statements = transactionOperations->getOperationsForOpObserver();
+    const auto& statements = transactionOperations.getOperationsForOpObserver();
     onUnpreparedTransactionCommitFn(statements);
 }
 

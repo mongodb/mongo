@@ -118,8 +118,8 @@ public:
     bool transactionPrepared = false;
     std::function<void()> onTransactionPrepareFn = [this]() { transactionPrepared = true; };
 
-    void onUnpreparedTransactionCommit(OperationContext* opCtx,
-                                       TransactionOperations* transactionOperations) override {
+    void onUnpreparedTransactionCommit(
+        OperationContext* opCtx, const TransactionOperations& transactionOperations) override {
         ASSERT_TRUE(opCtx->lockState()->inAWriteUnitOfWork());
         OpObserverNoop::onUnpreparedTransactionCommit(opCtx, transactionOperations);
 

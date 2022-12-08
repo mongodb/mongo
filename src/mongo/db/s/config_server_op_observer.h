@@ -204,8 +204,8 @@ public:
                        const NamespaceString& collectionName,
                        const UUID& uuid) override {}
 
-    void onUnpreparedTransactionCommit(OperationContext* opCtx,
-                                       TransactionOperations* transactionOperations) override {}
+    void onUnpreparedTransactionCommit(
+        OperationContext* opCtx, const TransactionOperations& transactionOperations) override {}
 
     void onPreparedTransactionCommit(
         OperationContext* opCtx,

@@ -213,7 +213,7 @@ public:
                        const NamespaceString& collectionName,
                        const UUID& uuid) final;
     void onUnpreparedTransactionCommit(OperationContext* opCtx,
-                                       TransactionOperations* transactionOperations) final;
+                                       const TransactionOperations& transactionOperations) final;
     void onBatchedWriteStart(OperationContext* opCtx) final;
     void onBatchedWriteCommit(OperationContext* opCtx) final;
     void onBatchedWriteAbort(OperationContext* opCtx) final;

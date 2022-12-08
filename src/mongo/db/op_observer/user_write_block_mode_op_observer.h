@@ -227,7 +227,7 @@ public:
                        const UUID& uuid) final {}
 
     void onUnpreparedTransactionCommit(OperationContext* opCtx,
-                                       TransactionOperations* transactionOperations) final {}
+                                       const TransactionOperations& transactionOperations) final {}
 
     void onPreparedTransactionCommit(
         OperationContext* opCtx,

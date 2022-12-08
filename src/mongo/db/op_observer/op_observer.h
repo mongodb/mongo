@@ -414,8 +414,8 @@ public:
      * The 'transactionOperations' contains the list of CRUD operations (formerly 'statements') to
      * be applied in this transaction.
      */
-    virtual void onUnpreparedTransactionCommit(OperationContext* opCtx,
-                                               TransactionOperations* transactionOperations) = 0;
+    virtual void onUnpreparedTransactionCommit(
+        OperationContext* opCtx, const TransactionOperations& transactionOperations) = 0;
     /**
      * The onPreparedTransactionCommit method is called on the commit of a prepared transaction,
      * after the RecoveryUnit onCommit() is called.  It must not be called when no transaction is

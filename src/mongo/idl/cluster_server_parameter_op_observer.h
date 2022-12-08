@@ -201,7 +201,7 @@ public:
                        const UUID& uuid) final {}
 
     void onUnpreparedTransactionCommit(OperationContext* opCtx,
-                                       TransactionOperations* transactionOperations) final {}
+                                       const TransactionOperations& transactionOperations) final {}
 
     void onBatchedWriteStart(OperationContext* opCtx) final {}
 

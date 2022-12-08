@@ -1890,10 +1890,10 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
 
 }  // namespace
 
-void OpObserverImpl::onUnpreparedTransactionCommit(OperationContext* opCtx,
-                                                   TransactionOperations* transactionOperations) {
-    const auto& statements = transactionOperations->getOperationsForOpObserver();
-    auto numberOfPrePostImagesToWrite = transactionOperations->getNumberOfPrePostImagesToWrite();
+void OpObserverImpl::onUnpreparedTransactionCommit(
+    OperationContext* opCtx, const TransactionOperations& transactionOperations) {
+    const auto& statements = transactionOperations.getOperationsForOpObserver();
+    auto numberOfPrePostImagesToWrite = transactionOperations.getNumberOfPrePostImagesToWrite();
 
     invariant(opCtx->getTxnNumber());
 
@@ -1925,7 +1925,7 @@ void OpObserverImpl::onUnpreparedTransactionCommit(OperationContext* opCtx,
 
     // Serialize transaction statements to BSON and determine their assignment to "applyOps"
     // entries.
-    const auto applyOpsOplogSlotAndOperationAssignment = transactionOperations->getApplyOpsInfo(
+    const auto applyOpsOplogSlotAndOperationAssignment = transactionOperations.getApplyOpsInfo(
         oplogSlots,
         getMaxNumberOfTransactionOperationsInSingleOplogEntry(),
         getMaxSizeOfTransactionOperationsInSingleOplogEntryBytes(),
