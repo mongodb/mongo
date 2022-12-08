@@ -1559,6 +1559,22 @@ public:
     }
 
     ExplainPrinter transport(const ABT& n,
+                             const SortedMergeNode& node,
+                             std::vector<ExplainPrinter> childResults,
+                             ExplainPrinter bindResult,
+                             ExplainPrinter /*refsResult*/) {
+        ExplainPrinter printer("SortedMerge");
+        maybePrintProps(printer, node);
+        printer.separator(" []");
+        nodeCEPropsPrint(printer, n, node);
+        printer.setChildCount(childResults.size() + 2);
+        printCollationProperty(printer, node.getCollationReq(), false /*directToParent*/);
+        printer.fieldName("bindings", ExplainVersion::V3).print(bindResult);
+        printer.maybeReverse().fieldName("children", ExplainVersion::V3).print(childResults);
+        return printer;
+    }
+
+    ExplainPrinter transport(const ABT& n,
                              const NestedLoopJoinNode& node,
                              ExplainPrinter leftChildResult,
                              ExplainPrinter rightChildResult,

@@ -164,6 +164,20 @@ public:
         return {mergeJoinCost, _cardinalityEstimate};
     }
 
+
+    CostAndCEInternal operator()(const ABT& /*n*/, const SortedMergeNode& node) {
+        const ABTVector& children = node.nodes();
+        double totalCost = _coefficients.getSortedMergeStartupCost();
+        // The cost of a sorted merge is the sum of the cost of its children, plus the overhead of
+        // comparing the children (an incremental cost).
+        for (size_t childIdx = 0; childIdx < children.size(); childIdx++) {
+            const CostAndCEInternal childResult = deriveChild(children[childIdx], childIdx);
+            totalCost +=
+                childResult._cost + _coefficients.getSortedMergeIncrementalCost() * childResult._ce;
+        }
+        return {totalCost, _cardinalityEstimate};
+    }
+
     CostAndCEInternal operator()(const ABT& /*n*/, const UnionNode& node) {
         const ABTVector& children = node.nodes();
         // UnionNode with one child is optimized away before lowering, therefore

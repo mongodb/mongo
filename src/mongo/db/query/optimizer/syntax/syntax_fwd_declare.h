@@ -85,6 +85,7 @@ class RIDUnionNode;
 class BinaryJoinNode;
 class HashJoinNode;
 class MergeJoinNode;
+class SortedMergeNode;
 class NestedLoopJoinNode;
 class UnionNode;
 class GroupByNode;

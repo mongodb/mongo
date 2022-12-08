@@ -169,3 +169,11 @@ structs:
                 optional: false
                 type: double
                 stability: stable
+            sortedMergeIncrementalCost:
+                optional: false
+                type: double
+                stability: stable
+            sortedMergeStartupCost:
+                optional: false
+                type: double
+                stability: stable

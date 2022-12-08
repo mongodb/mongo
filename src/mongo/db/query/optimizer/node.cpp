@@ -565,6 +565,11 @@ MergeJoinNode::MergeJoinNode(ProjectionNameVector leftKeys,
         6624091, "Mismatched collation and join key size", _collation.size() == _leftKeys.size());
     assertNodeSort(getLeftChild());
     assertNodeSort(getRightChild());
+    for (const auto& collReq : _collation) {
+        tassert(7063704,
+                "MergeJoin collation requirement must be ascending or descending",
+                collReq == CollationOp::Ascending || collReq == CollationOp::Descending);
+    }
 }
 
 bool MergeJoinNode::operator==(const MergeJoinNode& other) const {
@@ -649,12 +654,13 @@ const ABT& NestedLoopJoinNode::getFilter() const {
 }
 
 /**
- * A helper that builds References object of UnionNode for reference tracking purposes.
+ * A helper that builds References object of UnionNode or SortedMergeNode for reference tracking
+ * purposes.
  *
  * Example: union outputs 3 projections: A,B,C and it has 4 children. Then the References object is
  * a vector of variables A,B,C,A,B,C,A,B,C,A,B,C. One group of variables per child.
  */
-static ABT buildUnionReferences(const ProjectionNameVector& names, const size_t numOfChildren) {
+static ABT buildUnionTypeReferences(const ProjectionNameVector& names, const size_t numOfChildren) {
     ABTVector variables;
     for (size_t outerIdx = 0; outerIdx < numOfChildren; ++outerIdx) {
         for (size_t idx = 0; idx < names.size(); ++idx) {
@@ -665,13 +671,54 @@ static ABT buildUnionReferences(const ProjectionNameVector& names, const size_t 
     return make<References>(std::move(variables));
 }
 
-UnionNode::UnionNode(ProjectionNameVector unionProjectionNames, ABTVector children)
-    : UnionNode(std::move(unionProjectionNames), UnionNodeChildren{std::move(children)}) {}
+// Helper function to get the projection names from a CollationRequirement as a vector instead of a
+// set, since we would like to keep the order.
+static ProjectionNameVector getAffectedProjectionNamesOrdered(
+    const properties::CollationRequirement& collReq) {
+    ProjectionNameVector result;
+    for (const auto& entry : collReq.getCollationSpec()) {
+        result.push_back(entry.first);
+    }
+    return result;
+}
 
-UnionNode::UnionNode(ProjectionNameVector unionProjectionNames, UnionNodeChildren children)
+SortedMergeNode::SortedMergeNode(properties::CollationRequirement collReq, ABTVector children)
+    : SortedMergeNode(std::move(collReq), NodeChildrenHolder{std::move(children)}) {}
+
+SortedMergeNode::SortedMergeNode(properties::CollationRequirement collReq,
+                                 NodeChildrenHolder children)
+    : Base(std::move(children._nodes),
+           buildSimpleBinder(getAffectedProjectionNamesOrdered(collReq)),
+           buildUnionTypeReferences(getAffectedProjectionNamesOrdered(collReq),
+                                    children._numOfNodes)),
+      _collationReq(collReq) {
+    for (auto& n : nodes()) {
+        assertNodeSort(n);
+    }
+    for (const auto& collReq : _collationReq.getCollationSpec()) {
+        tassert(7063703,
+                "SortedMerge collation requirement must be ascending or descending",
+                collReq.second == CollationOp::Ascending ||
+                    collReq.second == CollationOp::Descending);
+    }
+}
+
+const properties::CollationRequirement& SortedMergeNode::getCollationReq() const {
+    return _collationReq;
+}
+
+bool SortedMergeNode::operator==(const SortedMergeNode& other) const {
+    return _collationReq == other._collationReq && binder() == other.binder() &&
+        nodes() == other.nodes();
+}
+
+UnionNode::UnionNode(ProjectionNameVector unionProjectionNames, ABTVector children)
+    : UnionNode(std::move(unionProjectionNames), NodeChildrenHolder{std::move(children)}) {}
+
+UnionNode::UnionNode(ProjectionNameVector unionProjectionNames, NodeChildrenHolder children)
     : Base(std::move(children._nodes),
            buildSimpleBinder(unionProjectionNames),
-           buildUnionReferences(unionProjectionNames, children._numOfNodes)) {
+           buildUnionTypeReferences(unionProjectionNames, children._numOfNodes)) {
     tassert(
         6624007, "UnionNode must have a non-empty projection list", !unionProjectionNames.empty());
 

@@ -610,6 +610,48 @@ private:
     const ProjectionNameVector _rightKeys;
 };
 
+// This struct is a workaround to avoid a use-after-move problem while initializing the base
+// class and passing constructor arguments. Due to the way how the base class is designed, we
+// need to std::move the children vector as the first argument to the Base vector, but then
+// obtain the size of the moved vector while computing the last argument. So, we'll preserve
+// the children's vector size in this struct to avoid this situation. Used by SortedMergeNode and
+// UnionNode.
+struct NodeChildrenHolder {
+    NodeChildrenHolder(ABTVector children) : _nodes(std::move(children)) {
+        _numOfNodes = _nodes.size();
+    }
+
+    ABTVector _nodes;
+    size_t _numOfNodes;
+};
+
+/**
+ * Sorted Merge node.
+ * Used to merge an arbitrary number of sorted input streams.
+ */
+class SortedMergeNode final : public ABTOpDynamicArity<2>, public ExclusivelyPhysicalNode {
+    using Base = ABTOpDynamicArity<2>;
+
+public:
+    SortedMergeNode(properties::CollationRequirement collReq, ABTVector children);
+
+    const ExpressionBinder& binder() const {
+        const ABT& result = get<0>();
+        tassert(7063702, "Invalid binder type", result.is<ExpressionBinder>());
+        return *result.cast<ExpressionBinder>();
+    }
+
+    const properties::CollationRequirement& getCollationReq() const;
+
+    bool operator==(const SortedMergeNode& other) const;
+
+private:
+    SortedMergeNode(properties::CollationRequirement collReq, NodeChildrenHolder children);
+
+    // Describes how to merge the sorted streams.
+    properties::CollationRequirement _collationReq;
+};
+
 /**
  * Physical nested loop join (NLJ). Can express inner and outer joins, with an associated join
  * predicate.
@@ -670,21 +712,7 @@ public:
     }
 
 private:
-    // This struct is a workaround to avoid a use-after-move problem while initializing the base
-    // class and passing constructor arguments. Due to the way how the base class is designed, we
-    // need to std::move the children vector as the first argument to the Base ctor, but then
-    // obtain the size of the moved vector while computing the last argument. So, we'll preserve
-    // the children's vector size in this struct to avoid this situation.
-    struct UnionNodeChildren {
-        UnionNodeChildren(ABTVector children) : _nodes(std::move(children)) {
-            _numOfNodes = _nodes.size();
-        }
-
-        ABTVector _nodes;
-        size_t _numOfNodes;
-    };
-
-    UnionNode(ProjectionNameVector unionProjectionNames, UnionNodeChildren children);
+    UnionNode(ProjectionNameVector unionProjectionNames, NodeChildrenHolder children);
 };
 
 #define GROUPNODETYPE_OPNAMES(F) \
@@ -811,7 +839,7 @@ private:
 /**
  * Unique node.
  *
- * This is a physical node. It encodes an operation which will duplicate the child input using a
+ * This is a physical node. It encodes an operation which will deduplicate the child input using a
  * sequence of given projection names. It is similar to GroupBy using the given projections as a
  * compound grouping key.
  */

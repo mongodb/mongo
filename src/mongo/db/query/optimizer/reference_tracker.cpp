@@ -594,6 +594,49 @@ struct Collector {
     }
 
     CollectedInfo transport(const ABT& n,
+                            const SortedMergeNode& node,
+                            std::vector<CollectedInfo> childResults,
+                            CollectedInfo bindResult,
+                            CollectedInfo refsResult) {
+        CollectedInfo result{};
+
+        const auto& names = node.binder().names();
+
+        refsResult.assertEmptyDefs();
+
+        // Merge children but disregard any defined projections.
+        // Note that refsResult follows the structure as built by buildUnionTypeReferences, meaning
+        // it contains a free variable for each name for each child of the sorted merge and no other
+        // info.
+        size_t counter = 0;
+        for (auto& u : childResults) {
+            // Manually copy and resolve references of specific child. We do this manually because
+            // each Variable must be resolved by the appropriate child's definition.
+            for (const auto& name : names) {
+                tassert(7063706, "SortedMerge projection does not exist", u.defs.count(name) != 0);
+                u.useMap.emplace(&refsResult.freeVars[name][counter].get(), u.defs[name]);
+            }
+            u.defs.clear();
+            result.merge(std::move(u));
+            ++counter;
+        }
+
+        result.mergeNoDefs(std::move(bindResult));
+
+        // Propagate sorted merge projections. Note that these are the only defs propagated, since
+        // we clear the child defs before merging above.
+        const auto& defs = node.binder().exprs();
+        for (size_t idx = 0; idx < names.size(); ++idx) {
+            result.defs[names[idx]] = Definition{n.ref(), defs[idx].ref()};
+        }
+
+        result.nodeDefs[&node] = result.defs;
+
+        return result;
+    }
+
+
+    CollectedInfo transport(const ABT& n,
                             const UnionNode& unionNode,
                             std::vector<CollectedInfo> childResults,
                             CollectedInfo bindResult,
@@ -605,7 +648,7 @@ struct Collector {
         refsResult.assertEmptyDefs();
 
         // Merge children but disregard any defined projections.
-        // Note that refsResult follows the structure as built by buildUnionReferences, meaning
+        // Note that refsResult follows the structure as built by buildUnionTypeReferences, meaning
         // it contains a free variable for each name for each child of the union and no other info.
         size_t counter = 0;
         for (auto& u : childResults) {

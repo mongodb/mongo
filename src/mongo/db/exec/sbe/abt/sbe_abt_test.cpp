@@ -35,11 +35,14 @@
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/rewrites/path_lower.h"
+#include "mongo/db/query/optimizer/utils/unit_test_abt_literals.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::optimizer {
 namespace {
+
+using namespace unit_test_abt_literals;
 
 TEST_F(ABTSBE, Lower1) {
     auto tree = Constant::int64(100);
@@ -180,8 +183,6 @@ TEST_F(ABTSBE, Lower6) {
         }
     } while (changed);
 
-    // std::cout << ExplainGenerator::explain(tree);
-
     auto expr = SBEExpressionLowering{env, map}.optimize(tree);
 
     ASSERT(expr);
@@ -189,8 +190,6 @@ TEST_F(ABTSBE, Lower6) {
     auto compiledExpr = compileExpression(*expr);
     auto [resultTag, resultVal] = runCompiledExpression(compiledExpr.get());
     sbe::value::ValueGuard guard(resultTag, resultVal);
-
-    // std::cout << std::pair{resultTag, resultVal} << "\n";
 
     ASSERT_EQ(sbe::value::TypeTags::Object, resultTag);
 }
@@ -422,6 +421,161 @@ TEST_F(NodeSBE, Lower1) {
         std::cout << "\n";
     };
     sbePlan->close();
+}
+
+
+TEST_F(NodeSBE, Lower2) {
+    using namespace properties;
+
+    // Since we don't have rewrites for SortedMerge yet, we create a plan that will merge join RIDs
+    // from two equality index scans (which will produce sorted RIDs). Then we substitute in a
+    // SortedMerge for the MergeJoin in this plan, and lower that to SBE. We assert on this SBE
+    // plan.
+    // Eventually we will have rewrites for SortedMerge, so this test can be changed.
+    // TODO SERVER-70298: Remove manual swap of SortedMerge. We should be able to naturally rewrite
+    // to SortedMerge after this ticket is done.
+
+    auto scanNode = _scan("root", "test");
+    auto evalNode = _eval("pa", _evalp(_get("a", _id()), "root"_var), scanNode);
+    auto filterNode1 = _filter(_evalf(_traverse1(_cmp("Eq", "1"_cint64)), "pa"_var), evalNode);
+    auto filterNode2 =
+        _filter(_evalf(_get("b", _traverse1(_cmp("Eq", "2"_cint64))), "root"_var), filterNode1);
+    auto root = _root("pa")(std::move(filterNode2));
+
+    // Optimize the logical plan.
+    // We have to fake some metadata for this to work.
+    ScanDefOptions scanDefOptions = {
+        {"type", "mongod"}, {"database", "test"}, {"uuid", "11111111-1111-1111-1111-111111111111"}};
+    PrefixId prefixId;
+    auto phaseManager = makePhaseManager(
+        {OptPhase::MemoSubstitutionPhase,
+         OptPhase::MemoExplorationPhase,
+         OptPhase::MemoImplementationPhase},
+        prefixId,
+        {{{"test",
+           createScanDef(std::move(scanDefOptions),
+                         {{"index1", makeIndexDefinition("a", CollationOp::Ascending, false)},
+                          {"index2", makeIndexDefinition("b", CollationOp::Ascending, false)}})}}},
+        boost::none,
+        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
+    phaseManager.optimize(root);
+
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       pa\n"
+        "|   RefBlock: \n"
+        "|       Variable [pa]\n"
+        "MergeJoin []\n"
+        "|   |   |   Condition\n"
+        "|   |   |       rid_0 = rid_1\n"
+        "|   |   Collation\n"
+        "|   |       Ascending\n"
+        "|   Union []\n"
+        "|   |   BindBlock:\n"
+        "|   |       [rid_1]\n"
+        "|   |           Source []\n"
+        "|   Evaluation []\n"
+        "|   |   BindBlock:\n"
+        "|   |       [rid_1]\n"
+        "|   |           Variable [rid_0]\n"
+        "|   IndexScan [{'<rid>': rid_0}, scanDefName: test, indexDefName: index2, interval: "
+        "{=Const [2]}]\n"
+        "|       BindBlock:\n"
+        "|           [rid_0]\n"
+        "|               Source []\n"
+        "IndexScan [{'<indexKey> 0': pa, '<rid>': rid_0}, scanDefName: test, indexDefName: index1, "
+        "interval: {=Const [1]}]\n"
+        "    BindBlock:\n"
+        "        [pa]\n"
+        "            Source []\n"
+        "        [rid_0]\n"
+        "            Source []\n",
+        root);
+
+    // Find the MergeJoin, replace it with SortedMerge. To do this we need to remove the Union and
+    // Evaluation on the right side.
+    {
+        ABT& mergeJoinABT = root.cast<RootNode>()->getChild();
+        MergeJoinNode* mergeJoinNode = mergeJoinABT.cast<MergeJoinNode>();
+
+        // Remove the Union and Evaluation.
+        ABT& unionABT = mergeJoinNode->getRightChild();
+        UnionNode* unionNode = unionABT.cast<UnionNode>();
+        ABT& ixScanABT = unionNode->nodes().front().cast<EvaluationNode>()->getChild();
+        std::swap(unionABT, ixScanABT);
+
+        // Swap out the MergeJoin for SortedMerge.
+        ABT sortedMergeABT =
+            make<SortedMergeNode>(CollationRequirement({{"rid_0", CollationOp::Ascending}}),
+                                  ABTVector{std::move(mergeJoinNode->getLeftChild()),
+                                            std::move(mergeJoinNode->getRightChild())});
+        std::swap(mergeJoinABT, sortedMergeABT);
+
+        // mergeJoinABT now contains the SortedMerge.
+        SortedMergeNode* sortedMergeNode = mergeJoinABT.cast<SortedMergeNode>();
+
+        // Update nodeToGroupProps data.
+        auto& nodeToGroupProps = phaseManager.getNodeToGroupPropsMap();
+        // Make the metadata for the old MergeJoin use the SortedMerge now.
+        nodeToGroupProps.emplace(sortedMergeNode, nodeToGroupProps.find(mergeJoinNode)->second);
+        nodeToGroupProps.erase(mergeJoinNode);
+        // Update for the SortedMerge children.
+        auto unionProps = nodeToGroupProps.find(unionNode);
+        nodeToGroupProps.emplace(sortedMergeNode->nodes().back().cast<Node>(), unionProps->second);
+        nodeToGroupProps.emplace(sortedMergeNode->nodes().front().cast<Node>(), unionProps->second);
+    }
+
+    // Now we should have a plan with a SortedMerge in it.
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       pa\n"
+        "|   RefBlock: \n"
+        "|       Variable [pa]\n"
+        "SortedMerge []\n"
+        "|   |   |   collation: \n"
+        "|   |   |       rid_0: Ascending\n"
+        "|   |   BindBlock:\n"
+        "|   |       [rid_0]\n"
+        "|   |           Source []\n"
+        "|   IndexScan [{'<rid>': rid_0}, scanDefName: test, indexDefName: index2, interval: "
+        "{=Const [2]}]\n"
+        "|       BindBlock:\n"
+        "|           [rid_0]\n"
+        "|               Source []\n"
+        "IndexScan [{'<indexKey> 0': pa, '<rid>': rid_0}, scanDefName: test, indexDefName: index1, "
+        "interval: {=Const [1]}]\n"
+        "    BindBlock:\n"
+        "        [pa]\n"
+        "            Source []\n"
+        "        [rid_0]\n"
+        "            Source []\n",
+        root);
+
+    // Lower to SBE.
+    auto env = VariableEnvironment::build(root);
+    SlotVarMap map;
+    boost::optional<sbe::value::SlotId> ridSlot;
+    sbe::value::SlotIdGenerator ids;
+    SBENodeLowering g{env,
+                      map,
+                      ridSlot,
+                      ids,
+                      phaseManager.getMetadata(),
+                      phaseManager.getNodeToGroupPropsMap(),
+                      phaseManager.getRIDProjections(),
+                      false /*randomScan*/};
+    auto sbePlan = g.optimize(root);
+
+    ASSERT_EQ(
+        "[4] smerge [s4] [asc] [\n"
+        "    [s1] [s1] [3] ixseek ks(2ll, 0, 1ll, 1ll) ks(2ll, 0, 1ll, 2ll) none s1 none [s2 = 0] "
+        "@\"11111111-1111-1111-1111-111111111111\" @\"index1\" true , \n"
+        "    [s3] [s3] [3] ixseek ks(2ll, 0, 2ll, 1ll) ks(2ll, 0, 2ll, 2ll) none s3 none [] "
+        "@\"11111111-1111-1111-1111-111111111111\" @\"index2\" true \n"
+        "] ",
+        sbe::DebugPrinter().print(*sbePlan.get()));
 }
 
 TEST_F(NodeSBE, RequireRID) {

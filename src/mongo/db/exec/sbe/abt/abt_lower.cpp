@@ -41,6 +41,7 @@
 #include "mongo/db/exec/sbe/stages/project.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
 #include "mongo/db/exec/sbe/stages/sort.h"
+#include "mongo/db/exec/sbe/stages/sorted_merge.h"
 #include "mongo/db/exec/sbe/stages/union.h"
 #include "mongo/db/exec/sbe/stages/unique.h"
 #include "mongo/db/exec/sbe/stages/unwind.h"
@@ -504,6 +505,17 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const ExchangeNode& n,
                                              nodeProps._planNodeId);
 }
 
+static sbe::value::SortDirection collationOpToSBESortDirection(const CollationOp collOp) {
+    switch (collOp) {
+        case CollationOp::Ascending:
+        case CollationOp::Clustered:
+            return sbe::value::SortDirection::Ascending;
+        case CollationOp::Descending:
+            return sbe::value::SortDirection::Descending;
+    }
+    MONGO_UNREACHABLE;
+}
+
 std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const CollationNode& n,
                                                       const ABT& child,
                                                       const ABT& refs) {
@@ -521,20 +533,8 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const CollationNode& n,
                 it != _slotMap.end());
         orderBySlots.push_back(it->second);
 
-        switch (entry.second) {
-            case CollationOp::Ascending:
-            case CollationOp::Clustered:
-                // TODO: is there a more efficient way to compute clustered collation op than sort?
-                directions.push_back(sbe::value::SortDirection::Ascending);
-                break;
-
-            case CollationOp::Descending:
-                directions.push_back(sbe::value::SortDirection::Descending);
-                break;
-
-            default:
-                MONGO_UNREACHABLE;
-        }
+        // TODO: is there a more efficient way to compute clustered collation op than sort?
+        directions.push_back(collationOpToSBESortDirection(entry.second));
     }
 
     const auto& nodeProps = _nodeToGroupPropsMap.at(&n);
@@ -735,19 +735,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const MergeJoinNode& n,
 
     std::vector<sbe::value::SortDirection> sortDirs;
     for (const CollationOp op : n.getCollation()) {
-        switch (op) {
-            case CollationOp::Ascending:
-            case CollationOp::Clustered:
-                sortDirs.push_back(sbe::value::SortDirection::Ascending);
-                break;
-
-            case CollationOp::Descending:
-                sortDirs.push_back(sbe::value::SortDirection::Descending);
-                break;
-
-            default:
-                MONGO_UNREACHABLE;
-        }
+        sortDirs.push_back(collationOpToSBESortDirection(op));
     }
 
     // Add RID projection only from outer side.
@@ -769,10 +757,78 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const MergeJoinNode& n,
                                            planNodeId);
 }
 
+
+std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const SortedMergeNode& n,
+                                                      const ABTVector& children,
+                                                      const ABT& binder,
+                                                      const ABT& /*refs*/) {
+    const auto exprBinder = binder.cast<ExpressionBinder>();
+    uassert(7063705, "binder expected", exprBinder);
+    const auto& names = exprBinder->names();
+
+    const ProjectionCollationSpec& collSpec = n.getCollationReq().getCollationSpec();
+
+    std::vector<sbe::value::SortDirection> keyDirs;
+    for (const auto& collEntry : collSpec) {
+        keyDirs.push_back(collationOpToSBESortDirection(collEntry.second));
+    }
+
+    sbe::PlanStage::Vector loweredChildren;
+    std::vector<sbe::value::SlotVector> inputKeys;
+    std::vector<sbe::value::SlotVector> inputVals;
+    for (const ABT& child : children) {
+        // Use a fresh map to prevent same projections for every child being overwritten.
+        SlotVarMap localMap;
+        boost::optional<sbe::value::SlotId> localRIDSlot;
+        SBENodeLowering localLowering(_env,
+                                      localMap,
+                                      localRIDSlot,
+                                      _slotIdGenerator,
+                                      _metadata,
+                                      _nodeToGroupPropsMap,
+                                      _ridProjections,
+                                      _randomScan);
+        auto loweredChild = localLowering.optimize(child);
+        tassert(7063700, "Unexpected rid slot", !localRIDSlot);
+
+        loweredChildren.push_back(std::move(loweredChild));
+
+        // Find the slots for the collation keys. Also find slots for other values passed.
+        sbe::value::SlotVector childKeys(collSpec.size());
+        sbe::value::SlotVector childVals;
+        for (const auto& name : names) {
+            const auto it = std::find_if(
+                collSpec.begin(), collSpec.end(), [&](const auto& x) { return x.first == name; });
+            if (it != collSpec.end()) {
+                const size_t index = std::distance(collSpec.begin(), it);
+                childKeys.at(index) = localMap.at(name);
+            }
+            childVals.push_back(localMap.at(name));
+        }
+        inputKeys.emplace_back(std::move(childKeys));
+        inputVals.emplace_back(std::move(childVals));
+    }
+
+    sbe::value::SlotVector outputVals;
+    for (const auto& name : names) {
+        const auto outputSlot = _slotIdGenerator.generate();
+        _slotMap.emplace(name, outputSlot);
+        outputVals.push_back(outputSlot);
+    }
+
+    const PlanNodeId planNodeId = _nodeToGroupPropsMap.at(&n)._planNodeId;
+    return sbe::makeS<sbe::SortedMergeStage>(std::move(loweredChildren),
+                                             std::move(inputKeys),
+                                             std::move(keyDirs),
+                                             std::move(inputVals),
+                                             std::move(outputVals),
+                                             planNodeId);
+}
+
 std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const UnionNode& n,
                                                       const ABTVector& children,
                                                       const ABT& binder,
-                                                      const ABT& refs) {
+                                                      const ABT& /*refs*/) {
     auto unionBinder = binder.cast<ExpressionBinder>();
     uassert(6624229, "binder expected", unionBinder);
     const auto& names = unionBinder->names();

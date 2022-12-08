@@ -149,6 +149,11 @@ public:
                                          const ABT& rightChild,
                                          const ABT& refs);
 
+    std::unique_ptr<sbe::PlanStage> walk(const SortedMergeNode& n,
+                                         const ABTVector& children,
+                                         const ABT& binder,
+                                         const ABT& refs);
+
     std::unique_ptr<sbe::PlanStage> walk(const UnionNode& n,
                                          const ABTVector& children,
                                          const ABT& binder,

@@ -90,6 +90,9 @@ void initializeCoefficients(CostModelCoefficients& coefficients) {
 
     coefficients.setLimitSkipIncrementalCost(62.42111111 * nsToMs);
     coefficients.setLimitSkipStartupCost(655.1342592592522 * nsToMs);
+
+    coefficients.setSortedMergeIncrementalCost(0.2 * nsToMs);   // TODO: not yet calibrated
+    coefficients.setSortedMergeStartupCost(0.000001 * nsToMs);  // TODO: not yet calibrated
 }
 }  // namespace
 

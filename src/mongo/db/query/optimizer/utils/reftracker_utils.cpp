@@ -128,6 +128,13 @@ public:
         return extractFromABT(refs);
     }
 
+    ProjectionNameSet walk(const SortedMergeNode& /*node*/,
+                           const ABTVector& /*children*/,
+                           const ABT& /*binder*/,
+                           const ABT& refs) {
+        return extractFromABT(refs);
+    }
+
     ProjectionNameSet walk(const NestedLoopJoinNode& /*node*/,
                            const ABT& /*leftChild*/,
                            const ABT& /*rightChild*/,
