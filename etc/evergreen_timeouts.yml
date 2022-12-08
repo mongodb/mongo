@@ -10,6 +10,22 @@
 # in alphabetical order.
 
 overrides:
+  amazon-linux2-arm64-compile:
+    - task: server_discovery_and_monitoring_json_test
+      exec_timeout: 30  # 30 min.
+
+  enterprise-amazon2-arm64:
+  - task: config_fuzzer_replica_sets_jscore_passthrough
+    exec_timeout: 150  # 2.5 hours.
+
+  enterprise-amazon2022-arm64:
+  - task: config_fuzzer_replica_sets_jscore_passthrough
+    exec_timeout: 150  # 2.5 hours.
+
+  enterprise-rhel-70-64-bit:
+  - task: config_fuzzer_replica_sets_jscore_passthrough
+    exec_timeout: 150  # 2.5 hours.
+
   enterprise-macos:
   - task: replica_sets_jscore_passthrough
     exec_timeout: 150  # 2.5 hours
@@ -67,6 +83,10 @@ overrides:
   linux-64-debug:
   - task: auth
     exec_timeout: 60  # 1 hour.
+
+  linux-x86-dynamic-compile-required:
+    - task: server_discovery_and_monitoring_json_test
+      exec_timeout: 30  # 30 min.
 
   linux-64-debug-repeated-execution:
   - task: run_unittests
