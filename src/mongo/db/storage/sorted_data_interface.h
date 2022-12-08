@@ -90,10 +90,15 @@ public:
      * Inserts the given key into the index, which must have a RecordId appended to the end. Returns
      * DuplicateKey if `dupsAllowed` is false and the key already exists in the index with a
      * different RecordId. Returns OK if the key exists with the same RecordId.
+     *
+     * If `includeDuplicateRecordId` is kOn and DuplicateKey is returned, embeds the record id of
+     * the duplicate in the returned status.
      */
-    virtual Status insert(OperationContext* opCtx,
-                          const KeyString::Value& keyString,
-                          bool dupsAllowed) = 0;
+    virtual Status insert(
+        OperationContext* opCtx,
+        const KeyString::Value& keyString,
+        bool dupsAllowed,
+        IncludeDuplicateRecordId includeDuplicateRecordId = IncludeDuplicateRecordId::kOff) = 0;
 
     /**
      * Remove the entry from the index with the specified KeyString, which must have a RecordId

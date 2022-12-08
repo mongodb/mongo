@@ -48,13 +48,17 @@ MONGO_INIT_REGISTER_ERROR_EXTRA_INFO(DuplicateKeyErrorInfo);
 DuplicateKeyErrorInfo::DuplicateKeyErrorInfo(const BSONObj& keyPattern,
                                              const BSONObj& keyValue,
                                              const BSONObj& collation,
-                                             FoundValue&& foundValue)
+                                             FoundValue&& foundValue,
+                                             boost::optional<RecordId> duplicateRid)
     : _keyPattern(keyPattern.getOwned()),
       _keyValue(keyValue.getOwned()),
       _collation(collation.getOwned()),
       _foundValue(std::move(foundValue)) {
     if (auto foundValueObj = stdx::get_if<BSONObj>(&_foundValue)) {
         _foundValue = foundValueObj->getOwned();
+    }
+    if (duplicateRid) {
+        _duplicateRid = *duplicateRid;
     }
 }
 
@@ -105,6 +109,10 @@ void DuplicateKeyErrorInfo::serialize(BSONObjBuilder* bob) const {
             },
         },
         _foundValue);
+
+    if (_duplicateRid) {
+        _duplicateRid->serializeToken("duplicateRid", bob);
+    }
 }
 
 std::shared_ptr<const ErrorExtraInfo> DuplicateKeyErrorInfo::parse(const BSONObj& obj) {
@@ -146,8 +154,13 @@ std::shared_ptr<const ErrorExtraInfo> DuplicateKeyErrorInfo::parse(const BSONObj
         }
     }
 
+    boost::optional<RecordId> duplicateRid;
+    if (auto duplicateRidElt = obj["duplicateRid"]) {
+        duplicateRid = RecordId::deserializeToken(duplicateRidElt);
+    }
+
     return std::make_shared<DuplicateKeyErrorInfo>(
-        keyPattern, keyValue, collation, std::move(foundValue));
+        keyPattern, keyValue, collation, std::move(foundValue), duplicateRid);
 }
 
 }  // namespace mongo

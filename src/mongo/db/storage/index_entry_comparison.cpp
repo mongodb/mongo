@@ -168,7 +168,8 @@ Status buildDupKeyErrorStatus(const BSONObj& key,
                               const std::string& indexName,
                               const BSONObj& keyPattern,
                               const BSONObj& indexCollation,
-                              DuplicateKeyErrorInfo::FoundValue&& foundValue) {
+                              DuplicateKeyErrorInfo::FoundValue&& foundValue,
+                              const boost::optional<RecordId> duplicateRid) {
     const bool hasCollation = !indexCollation.isEmpty();
 
     StringBuilder sb;
@@ -242,10 +243,12 @@ Status buildDupKeyErrorStatus(const BSONObj& key,
         },
         foundValue);
 
-    return Status(
-        DuplicateKeyErrorInfo(
-            keyPattern, builderForErrorExtraInfo.obj(), indexCollation, std::move(foundValue)),
-        sb.str());
+    return Status(DuplicateKeyErrorInfo(keyPattern,
+                                        builderForErrorExtraInfo.obj(),
+                                        indexCollation,
+                                        std::move(foundValue),
+                                        duplicateRid),
+                  sb.str());
 }
 
 Status buildDupKeyErrorStatus(const KeyString::Value& keyString,

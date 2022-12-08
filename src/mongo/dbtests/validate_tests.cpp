@@ -2193,6 +2193,24 @@ public:
 
             ASSERT_EQ(1, results.indexResultsMap[indexName].keysRemovedFromRecordStore);
 
+            // Verify the older duplicate document appears in the lost-and-found as expected.
+            {
+                const NamespaceString lostAndFoundNss = NamespaceString(
+                    NamespaceString::kLocalDb, "lost_and_found." + coll()->uuid().toString());
+                AutoGetCollectionForRead autoColl(&_opCtx, lostAndFoundNss);
+                Snapshotted<BSONObj> result;
+                ASSERT(autoColl.getCollection()->findDoc(&_opCtx, RecordId(1), &result));
+                ASSERT_BSONOBJ_EQ(result.value(), fromjson("{_id:1, a:1}"));
+            }
+
+            // Verify the newer duplicate document still appears in the collection as expected.
+            {
+                AutoGetCollectionForRead autoColl(&_opCtx, _nss);
+                Snapshotted<BSONObj> result;
+                ASSERT(autoColl.getCollection()->findDoc(&_opCtx, RecordId(3), &result));
+                ASSERT_BSONOBJ_EQ(result.value(), fromjson("{_id:2, a:1}"));
+            }
+
             dumpOnErrorGuard.dismiss();
         }
 
@@ -2399,7 +2417,10 @@ public:
         }
 
         // Run validate with repair, expect missing index entry document is removed from record
-        // store and no action is taken on outdated missing index entry. Results should be valid.
+        // store and no action is taken on outdated missing index entry.
+        // Results will not be valid because IndexInfo.numKeys is not subtracted from when
+        // deleteDocument is called. TODO SERVER-62257: Update test to expect valid results when
+        // numKeys can be correctly updated.
         {
             ValidateResults results;
             BSONObjBuilder output;
@@ -2418,19 +2439,37 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(true, results.valid);
+            ASSERT_EQ(false, results.valid);
             ASSERT_EQ(true, results.repaired);
-            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(1), omitTransientWarningsFromCount(results));
+            ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
+            ASSERT_EQ(static_cast<size_t>(2), omitTransientWarningsFromCount(results));
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
             ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
-            ASSERT_EQ(0, results.numInsertedMissingIndexEntries);
+            ASSERT_EQ(1, results.numInsertedMissingIndexEntries);
             ASSERT_EQ(1, results.numDocumentsMovedToLostAndFound);
-            ASSERT_EQ(1, results.numOutdatedMissingIndexEntry);
+            ASSERT_EQ(0, results.numOutdatedMissingIndexEntry);
 
             ASSERT_EQ(1, results.indexResultsMap[indexNameA].keysRemovedFromRecordStore);
             ASSERT_EQ(0, results.indexResultsMap[indexNameB].keysRemovedFromRecordStore);
+
+            // Verify the older document appears in the lost-and-found as expected.
+            {
+                const NamespaceString lostAndFoundNss = NamespaceString(
+                    NamespaceString::kLocalDb, "lost_and_found." + coll()->uuid().toString());
+                AutoGetCollectionForRead autoColl(&_opCtx, lostAndFoundNss);
+                Snapshotted<BSONObj> result;
+                ASSERT(autoColl.getCollection()->findDoc(&_opCtx, RecordId(1), &result));
+                ASSERT_BSONOBJ_EQ(result.value(), fromjson("{_id:1, a:1, b:1}"));
+            }
+
+            // Verify the newer duplicate document still appears in the collection as expected.
+            {
+                AutoGetCollectionForRead autoColl(&_opCtx, _nss);
+                Snapshotted<BSONObj> result;
+                ASSERT(autoColl.getCollection()->findDoc(&_opCtx, RecordId(3), &result));
+                ASSERT_BSONOBJ_EQ(result.value(), fromjson("{_id:2, a:1, b:1}"));
+            }
 
             dumpOnErrorGuard.dismiss();
         }
@@ -2726,10 +2765,7 @@ public:
         }
 
         // Run validate with repair, expect duplicate missing index entry document is removed from
-        // record store and missing index entry is inserted into index. Results will not be valid
-        // because IndexInfo.numKeys is not subtracted from when deleteDocument is called.
-        // TODO SERVER-62257: Update test to expect valid results when numKeys can be correctly
-        // updated.
+        // record store and missing index entry is inserted into index. Results should be valid.
         {
             ValidateResults results;
             BSONObjBuilder output;
@@ -2748,19 +2784,37 @@ public:
                 StorageDebugUtil::printCollectionAndIndexTableEntries(&_opCtx, coll()->ns());
             });
 
-            ASSERT_EQ(false, results.valid);
+            ASSERT_EQ(true, results.valid);
             ASSERT_EQ(true, results.repaired);
-            ASSERT_EQ(static_cast<size_t>(1), results.errors.size());
-            ASSERT_EQ(static_cast<size_t>(2), omitTransientWarningsFromCount(results));
+            ASSERT_EQ(static_cast<size_t>(0), results.errors.size());
+            ASSERT_EQ(static_cast<size_t>(1), omitTransientWarningsFromCount(results));
             ASSERT_EQ(static_cast<size_t>(0), results.extraIndexEntries.size());
             ASSERT_EQ(static_cast<size_t>(0), results.missingIndexEntries.size());
             ASSERT_EQ(0, results.numRemovedExtraIndexEntries);
-            ASSERT_EQ(1, results.numInsertedMissingIndexEntries);
+            ASSERT_EQ(0, results.numInsertedMissingIndexEntries);
             ASSERT_EQ(1, results.numDocumentsMovedToLostAndFound);
-            ASSERT_EQ(0, results.numOutdatedMissingIndexEntry);
+            ASSERT_EQ(1, results.numOutdatedMissingIndexEntry);
 
             ASSERT_EQ(1, results.indexResultsMap[indexNameA].keysRemovedFromRecordStore);
             ASSERT_EQ(0, results.indexResultsMap[indexNameB].keysRemovedFromRecordStore);
+
+            // Verify the older duplicate document appears in the lost-and-found as expected.
+            {
+                const NamespaceString lostAndFoundNss = NamespaceString(
+                    NamespaceString::kLocalDb, "lost_and_found." + coll()->uuid().toString());
+                AutoGetCollectionForRead autoColl(&_opCtx, lostAndFoundNss);
+                Snapshotted<BSONObj> result;
+                ASSERT(autoColl.getCollection()->findDoc(&_opCtx, RecordId(1), &result));
+                ASSERT_BSONOBJ_EQ(result.value(), fromjson("{_id:1, a:1, b:1}"));
+            }
+
+            // Verify the newer duplicate document still appears in the collection as expected.
+            {
+                AutoGetCollectionForRead autoColl(&_opCtx, _nss);
+                Snapshotted<BSONObj> result;
+                ASSERT(autoColl.getCollection()->findDoc(&_opCtx, RecordId(3), &result));
+                ASSERT_BSONOBJ_EQ(result.value(), fromjson("{_id:2, a:1, b:1}"));
+            }
 
             dumpOnErrorGuard.dismiss();
         }

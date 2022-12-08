@@ -294,9 +294,16 @@ Status SortedDataIndexAccessMethod::insertKeysAndUpdateMultikeyPaths(
     const MultikeyPaths& multikeyPaths,
     const InsertDeleteOptions& options,
     KeyHandlerFn&& onDuplicateKey,
-    int64_t* numInserted) {
+    int64_t* numInserted,
+    IncludeDuplicateRecordId includeDuplicateRecordId) {
     // Insert the specified data keys into the index.
-    auto status = insertKeys(opCtx, coll, keys, options, std::move(onDuplicateKey), numInserted);
+    auto status = insertKeys(opCtx,
+                             coll,
+                             keys,
+                             options,
+                             std::move(onDuplicateKey),
+                             numInserted,
+                             includeDuplicateRecordId);
     if (!status.isOK()) {
         return status;
     }
@@ -317,7 +324,8 @@ Status SortedDataIndexAccessMethod::insertKeys(OperationContext* opCtx,
                                                const KeyStringSet& keys,
                                                const InsertDeleteOptions& options,
                                                KeyHandlerFn&& onDuplicateKey,
-                                               int64_t* numInserted) {
+                                               int64_t* numInserted,
+                                               IncludeDuplicateRecordId includeDuplicateRecordId) {
     // Initialize the 'numInserted' out-parameter to zero in case the caller did not already do so.
     if (numInserted) {
         *numInserted = 0;
@@ -344,14 +352,16 @@ Status SortedDataIndexAccessMethod::insertKeys(OperationContext* opCtx,
     }
     // Add all new keys into the index. The RecordId for each is already encoded in the KeyString.
     for (const auto& keyString : keys) {
-        auto status = _newInterface->insert(opCtx, keyString, dupsAllowed);
+        auto status =
+            _newInterface->insert(opCtx, keyString, dupsAllowed, includeDuplicateRecordId);
 
         // When duplicates are encountered and allowed, retry with dupsAllowed. Call
         // onDuplicateKey() with the inserted duplicate key.
         if (ErrorCodes::DuplicateKey == status.code() && options.dupsAllowed && !prepareUnique) {
             invariant(unique);
 
-            status = _newInterface->insert(opCtx, keyString, true /* dupsAllowed */);
+            status = _newInterface->insert(
+                opCtx, keyString, true /* dupsAllowed */, includeDuplicateRecordId);
             if (status.isOK() && onDuplicateKey) {
                 status = onDuplicateKey(keyString);
             }

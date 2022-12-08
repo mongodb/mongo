@@ -198,7 +198,8 @@ public:
 
     virtual Status insert(OperationContext* opCtx,
                           const KeyString::Value& keyString,
-                          bool dupsAllowed) {
+                          bool dupsAllowed,
+                          IncludeDuplicateRecordId includeDuplicateRecordId) {
         return Status::OK();
     }
 

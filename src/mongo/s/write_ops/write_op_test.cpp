@@ -72,9 +72,9 @@ protected:
     }
 
     static Status getMockNonRetriableError(CollectionGeneration& gen) {
-        return {
-            DuplicateKeyErrorInfo(BSON("mock" << 1), BSON("" << 1), BSONObj{}, stdx::monostate{}),
-            "Mock duplicate key error"};
+        return {DuplicateKeyErrorInfo(
+                    BSON("mock" << 1), BSON("" << 1), BSONObj{}, stdx::monostate{}, boost::none),
+                "Mock duplicate key error"};
     }
 
     WriteOp setupTwoShardTest(CollectionGeneration& gen,

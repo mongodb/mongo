@@ -37,6 +37,8 @@
 
 namespace mongo {
 
+enum class IncludeDuplicateRecordId { kOff, kOn };
+
 /**
  * Represents an error returned from the storage engine when an attempt to insert a
  * key into a unique index fails because the same key already exists.
@@ -52,7 +54,8 @@ public:
     explicit DuplicateKeyErrorInfo(const BSONObj& keyPattern,
                                    const BSONObj& keyValue,
                                    const BSONObj& collation,
-                                   FoundValue&& foundValue);
+                                   FoundValue&& foundValue,
+                                   boost::optional<RecordId> duplicateRid);
 
     void serialize(BSONObjBuilder* bob) const override;
 
@@ -70,6 +73,10 @@ public:
         return _keyValue;
     }
 
+    boost::optional<RecordId> getDuplicateRid() const {
+        return _duplicateRid;
+    }
+
 private:
     BSONObj _keyPattern;
     BSONObj _keyValue;
@@ -83,6 +90,9 @@ private:
     // the duplicate document. If the error came from a clustered collection, then the value will be
     // the duplicate document itself.
     FoundValue _foundValue;
+
+    // Optionally, the record id found at the cursor which produced the DuplicateKey error.
+    boost::optional<RecordId> _duplicateRid;
 };
 
 }  // namespace mongo

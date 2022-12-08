@@ -128,9 +128,11 @@ public:
                     const IndexDescriptor* desc,
                     bool isLogged);
 
-    virtual Status insert(OperationContext* opCtx,
-                          const KeyString::Value& keyString,
-                          bool dupsAllowed);
+    virtual Status insert(
+        OperationContext* opCtx,
+        const KeyString::Value& keyString,
+        bool dupsAllowed,
+        IncludeDuplicateRecordId includeDuplicateRecordId = IncludeDuplicateRecordId::kOff);
 
     virtual void unindex(OperationContext* opCtx,
                          const KeyString::Value& keyString,
@@ -196,10 +198,12 @@ public:
     }
 
 protected:
-    virtual Status _insert(OperationContext* opCtx,
-                           WT_CURSOR* c,
-                           const KeyString::Value& keyString,
-                           bool dupsAllowed) = 0;
+    virtual Status _insert(
+        OperationContext* opCtx,
+        WT_CURSOR* c,
+        const KeyString::Value& keyString,
+        bool dupsAllowed,
+        IncludeDuplicateRecordId includeDuplicateRecordId = IncludeDuplicateRecordId::kOff) = 0;
 
     virtual void _unindex(OperationContext* opCtx,
                           WT_CURSOR* c,
@@ -240,9 +244,11 @@ protected:
      * Returns true if the prefix key exists in the index with the same RecordId. Returns false if
      * the prefix key does not exist in the index. Should only be used for non-_id indexes.
      */
-    StatusWith<bool> _checkDups(OperationContext* opCtx,
-                                WT_CURSOR* c,
-                                const KeyString::Value& keyString);
+    StatusWith<bool> _checkDups(
+        OperationContext* opCtx,
+        WT_CURSOR* c,
+        const KeyString::Value& keyString,
+        IncludeDuplicateRecordId includeDuplicateRecordId = IncludeDuplicateRecordId::kOff);
 
     /*
      * Determines the data format version from application metadata and verifies compatibility.
@@ -315,7 +321,9 @@ protected:
     Status _insert(OperationContext* opCtx,
                    WT_CURSOR* c,
                    const KeyString::Value& keyString,
-                   bool dupsAllowed) override;
+                   bool dupsAllowed,
+                   IncludeDuplicateRecordId includeDuplicateRecordId =
+                       IncludeDuplicateRecordId::kOff) override;
 
     void _unindex(OperationContext* opCtx,
                   WT_CURSOR* c,
@@ -361,7 +369,9 @@ protected:
     Status _insert(OperationContext* opCtx,
                    WT_CURSOR* c,
                    const KeyString::Value& keyString,
-                   bool dupsAllowed) override;
+                   bool dupsAllowed,
+                   IncludeDuplicateRecordId includeDuplicateRecordId =
+                       IncludeDuplicateRecordId::kOff) override;
 
     void _unindex(OperationContext* opCtx,
                   WT_CURSOR* c,
@@ -373,7 +383,8 @@ protected:
      */
     Status _checkDups(OperationContext* opCtx,
                       WT_CURSOR* c,
-                      const KeyString::Value& keyString) = delete;
+                      const KeyString::Value& keyString,
+                      IncludeDuplicateRecordId includeDuplicateRecordId) = delete;
 };
 
 class WiredTigerIndexStandard : public WiredTigerIndex {
@@ -408,7 +419,9 @@ protected:
     Status _insert(OperationContext* opCtx,
                    WT_CURSOR* c,
                    const KeyString::Value& keyString,
-                   bool dupsAllowed) override;
+                   bool dupsAllowed,
+                   IncludeDuplicateRecordId includeDuplicateRecordId =
+                       IncludeDuplicateRecordId::kOff) override;
 
     void _unindex(OperationContext* opCtx,
                   WT_CURSOR* c,

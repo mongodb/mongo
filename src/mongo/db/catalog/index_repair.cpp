@@ -125,13 +125,19 @@ int repairMissingIndexEntry(OperationContext* opCtx,
     options.dupsAllowed = !index->descriptor()->unique();
     int64_t numInserted = 0;
 
+    Status insertStatus = Status::OK();
     writeConflictRetry(opCtx, "insertingMissingIndexEntries", nss.ns(), [&] {
         WriteUnitOfWork wunit(opCtx);
-        // Ignore return status because we will use numInserted to verify success.
-        accessMethod
-            ->insertKeysAndUpdateMultikeyPaths(
-                opCtx, coll, {ks}, {}, {}, options, nullptr, &numInserted)
-            .ignore();
+        insertStatus =
+            accessMethod->insertKeysAndUpdateMultikeyPaths(opCtx,
+                                                           coll,
+                                                           {ks},
+                                                           {},
+                                                           {},
+                                                           options,
+                                                           nullptr,
+                                                           &numInserted,
+                                                           IncludeDuplicateRecordId::kOn);
         wunit.commit();
     });
 
@@ -140,11 +146,14 @@ int repairMissingIndexEntry(OperationContext* opCtx,
     // The insertKeysAndUpdateMultikeyPaths() may fail when there are missing index entries for
     // duplicate documents.
     if (numInserted > 0) {
+        invariant(numInserted == 1);
         auto& indexResults = results->indexResultsMap[indexName];
         indexResults.keysTraversed += numInserted;
         results->numInsertedMissingIndexEntries += numInserted;
         results->repaired = true;
     } else {
+        invariant(insertStatus.code() == ErrorCodes::DuplicateKey);
+
         RecordId rid;
         if (keyFormat == KeyFormat::Long) {
             rid = KeyString::decodeRecordIdLongAtEnd(ks.getBuffer(), ks.getSize());
@@ -153,19 +162,46 @@ int repairMissingIndexEntry(OperationContext* opCtx,
             rid = KeyString::decodeRecordIdStrAtEnd(ks.getBuffer(), ks.getSize());
         }
 
+        auto dupKeyInfo = insertStatus.extraInfo<DuplicateKeyErrorInfo>();
+        auto dupKeyRid = dupKeyInfo->getDuplicateRid();
+
+        // Determine which document to remove, based on which rid is older.
+        RecordId& ridToMove = rid;
+        if (dupKeyRid && *dupKeyRid < rid) {
+            ridToMove = *dupKeyRid;
+        }
+
         // Move the duplicate document of the missing index entry from the record store to the lost
         // and found.
         Snapshotted<BSONObj> doc;
-        if (coll->findDoc(opCtx, rid, &doc)) {
+        if (coll->findDoc(opCtx, ridToMove, &doc)) {
+
             const NamespaceString lostAndFoundNss = NamespaceString(
                 NamespaceString::kLocalDb, "lost_and_found." + coll->uuid().toString());
 
-            auto moveStatus = moveRecordToLostAndFound(opCtx, nss, lostAndFoundNss, rid);
+            auto moveStatus = moveRecordToLostAndFound(opCtx, nss, lostAndFoundNss, ridToMove);
+
             if (moveStatus.isOK() && (moveStatus.getValue() > 0)) {
                 auto& indexResults = results->indexResultsMap[indexName];
                 indexResults.keysRemovedFromRecordStore++;
                 results->numDocumentsMovedToLostAndFound++;
                 results->repaired = true;
+
+                // If we moved the record that was already in the index, now neither of the
+                // duplicate records is in the index, so we need to add the newer record to the
+                // index.
+                if (dupKeyRid && ridToMove == *dupKeyRid) {
+                    writeConflictRetry(opCtx, "insertingMissingIndexEntries", nss.ns(), [&] {
+                        WriteUnitOfWork wunit(opCtx);
+                        insertStatus = accessMethod->insertKeysAndUpdateMultikeyPaths(
+                            opCtx, coll, {ks}, {}, {}, options, nullptr, nullptr);
+                        wunit.commit();
+                    });
+                    if (!insertStatus.isOK()) {
+                        results->errors.push_back(str::stream() << "unable to insert record " << rid
+                                                                << " to " << indexName);
+                    }
+                }
             } else {
                 results->errors.push_back(str::stream() << "unable to move record " << rid << " to "
                                                         << lostAndFoundNss.ns());
