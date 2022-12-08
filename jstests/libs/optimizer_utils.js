@@ -290,18 +290,37 @@ function assertValueOnPlanPath(value, doc, path) {
     assertValueOnPathFn(value, doc, path, navigateToPlanPath);
 }
 
-function runCommandWithCostModel(func, costModel) {
-    const oldCostModelOverrides = assert.commandWorked(db.adminCommand(
-        {'getParameter': 1, 'internalCostModelCoefficients': 1}))['internalCostModelCoefficients'];
-
-    const costModelJson = JSON.stringify(costModel);
-    assert.commandWorked(
-        db.adminCommand({'setParameter': 1, 'internalCostModelCoefficients': costModelJson}));
+function runWithParams(keyValPairs, fn) {
+    let prevVals = [];
 
     try {
-        return assert.commandWorked(func());
+        for (let i = 0; i < keyValPairs.length; i++) {
+            const flag = keyValPairs[i].key;
+            const valIn = keyValPairs[i].value;
+            const val = (typeof valIn === 'object') ? JSON.stringify(valIn) : valIn;
+
+            let getParamObj = {};
+            getParamObj["getParameter"] = 1;
+            getParamObj[flag] = 1;
+            const prevVal = db.adminCommand(getParamObj);
+            prevVals.push(prevVal[flag]);
+
+            let setParamObj = {};
+            setParamObj["setParameter"] = 1;
+            setParamObj[flag] = val;
+            assert.commandWorked(db.adminCommand(setParamObj));
+        }
+
+        return fn();
     } finally {
-        assert.commandWorked(db.adminCommand(
-            {'setParameter': 1, 'internalCostModelCoefficients': oldCostModelOverrides}));
+        for (let i = 0; i < keyValPairs.length; i++) {
+            const flag = keyValPairs[i].key;
+
+            let setParamObj = {};
+            setParamObj["setParameter"] = 1;
+            setParamObj[flag] = prevVals[i];
+
+            assert.commandWorked(db.adminCommand(setParamObj));
+        }
     }
 }

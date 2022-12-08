@@ -32,7 +32,7 @@
 #include "mongo/db/query/optimizer/cascades/rewriter_rules.h"
 #include "mongo/db/query/optimizer/props.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
-#include "mongo/db/query/optimizer/utils/ce_math.h"
+#include "mongo/db/query/optimizer/utils/interval_utils.h"
 #include "mongo/db/query/optimizer/utils/memo_utils.h"
 #include "mongo/db/query/optimizer/utils/reftracker_utils.h"
 
@@ -508,24 +508,23 @@ public:
                                             candidateIndexEntry,
                                             requiredCollation,
                                             ridProjName);
-                if (!availableDirections._forward && !availableDirections._backward) {
-                    // Failed to satisfy collation.
+                if (!availableDirections) {
+                    // Failed to satisfy collation requirement.
                     continue;
                 }
 
-                uassert(6624103,
-                        "Either forward or backward direction must be available.",
-                        availableDirections._forward || availableDirections._backward);
-
                 auto indexProjectionMap = candidateIndexEntry._fieldProjectionMap;
                 auto residualReqs = candidateIndexEntry._residualRequirements;
+                const auto& correlatedProjNames = candidateIndexEntry._correlatedProjNames;
                 removeRedundantResidualPredicates(
-                    requiredProjections, residualReqs, indexProjectionMap);
+                    requiredProjections, correlatedProjNames, residualReqs, indexProjectionMap);
 
-                CEType indexCE = currentGroupCE;
+                // Compute the selectivities of predicates covered by index bounds and by residual
+                // predicates.
                 ResidualRequirementsWithCE residualReqsWithCE;
                 std::vector<SelectivityType> indexPredSels;
-                if (!residualReqs.empty()) {
+                std::map<size_t, SelectivityType> indexPredSelMap;
+                {
                     PartialSchemaKeySet residualQueryKeySet;
                     for (const auto& [residualKey, residualReq, entryIndex] : residualReqs) {
                         auto entryIt = reqMap.cbegin();
@@ -539,57 +538,71 @@ public:
                         size_t entryIndex = 0;
                         for (const auto& [key, req] : reqMap) {
                             if (residualQueryKeySet.count(key) == 0) {
-                                indexPredSels.push_back(partialSchemaKeyCE.at(entryIndex).second /
-                                                        scanGroupCE);
+                                const SelectivityType sel =
+                                    partialSchemaKeyCE.at(entryIndex).second / scanGroupCE;
+                                indexPredSels.push_back(sel);
+                                indexPredSelMap.emplace(entryIndex, sel);
                             }
                             entryIndex++;
-                        }
-
-                        if (!indexPredSels.empty()) {
-                            indexCE = scanGroupCE * ce::conjExponentialBackoff(indexPredSels);
                         }
                     }
                 }
 
-                // TODO: SERVER-69027. Support RIN with multiple equality prefixes.
-                tassert(6624113,
-                        "For now we only support single equality prefix",
-                        candidateIndexEntry._intervals.size() == 1);
-                const auto& intervals = candidateIndexEntry._intervals.front();
-
-                ABT physNode = make<Blackhole>();
-                NodeCEMap nodeCEMap;
-
-                // TODO: consider pre-computing as part of the candidateIndexes structure.
-                const auto singularInterval = CompoundIntervalReqExpr::getSingularDNF(intervals);
-
-                // TODO SERVER-70298: Allow merge join of RIDs on interval level index intersection,
-                // in which case we may need to worry about deduping.
-                /* The following logic determines whether we need a unique stage to deduplicate the
-                RIDs returned by the query. If the caller doesn't need unique RIDs then you don't
-                need to provide them. if the index is non-multikey there are no duplicates. If there
-                is more than one interval in the BoolExpr, then the helper method that is called
-                currently creates Groupby+Union which will already deduplicate. Finally, if there
-                is only one interval, but it's a point interval, then the index won't have
-                duplicates.
+                /**
+                 * The following logic determines whether we need a unique stage to deduplicate the
+                 * RIDs returned by the query. If the caller doesn't need unique RIDs then you don't
+                 * need to provide them. if the index is non-multikey there are no duplicates. If
+                 * there is more than one interval in the BoolExpr, then the helper method that is
+                 * called currently creates Groupby+Union which will already deduplicate. Finally,
+                 * if there is only one interval, but it's a point interval, then the index won't
+                 * have duplicates.
+                 *
+                 * If there is more than one equality prefix, and any of them needs a unique stage,
+                 * we add one after we translate the combined eqPrefix plan.
+                 *
+                 * TODO SERVER-70298: Allow merge join of RIDs on interval level index intersection,
+                 * in which case we may need to worry about deduping.
                  */
-                const bool needsUniqueStage = singularInterval &&
-                    !areCompoundIntervalsEqualities(*singularInterval) && indexDef.isMultiKey() &&
-                    requirements.getDedupRID();
+                const auto& eqPrefixes = candidateIndexEntry._eqPrefixes;
+                bool needsUniqueStage = indexDef.isMultiKey() && requirements.getDedupRID();
+                if (needsUniqueStage) {
+                    // TODO: consider pre-computing in "computeCandidateIndexes()".
+                    bool noSimpleRanges = true;
+                    for (const auto& eqPrefix : eqPrefixes) {
+                        if (isSimpleRange(eqPrefix._interval)) {
+                            noSimpleRanges = false;
+                            break;
+                        }
+                    }
+                    if (noSimpleRanges) {
+                        needsUniqueStage = false;
+                    }
+                }
 
                 if (needsRID || needsUniqueStage) {
                     indexProjectionMap._ridProjection = ridProjName;
                 }
-                physNode = lowerIntervals(_prefixId,
-                                          ridProjName,
-                                          std::move(indexProjectionMap),
-                                          scanDefName,
-                                          indexDefName,
-                                          intervals,
-                                          !availableDirections._forward,
-                                          indexCE,
-                                          scanGroupCE,
-                                          nodeCEMap);
+
+                // Compute reversing per equality prefix.
+                std::vector<bool> reverseOrder;
+                for (const auto& entry : *availableDirections) {
+                    reverseOrder.push_back(!entry._forward);
+                }
+                invariant(eqPrefixes.size() == reverseOrder.size());
+
+                NodeCEMap nodeCEMap;
+                ABT physNode = lowerEqPrefixes(_prefixId,
+                                               ridProjName,
+                                               std::move(indexProjectionMap),
+                                               scanDefName,
+                                               indexDefName,
+                                               eqPrefixes,
+                                               reverseOrder,
+                                               correlatedProjNames.getVector(),
+                                               std::move(indexPredSelMap),
+                                               currentGroupCE,
+                                               scanGroupCE,
+                                               nodeCEMap);
 
                 lowerPartialSchemaRequirements(scanGroupCE,
                                                std::move(indexPredSels),
@@ -629,7 +642,7 @@ public:
             FieldProjectionMap fieldProjectionMap = scanParams->_fieldProjectionMap;
             ResidualRequirements residualReqs = scanParams->_residualRequirements;
             removeRedundantResidualPredicates(
-                requiredProjections, residualReqs, fieldProjectionMap);
+                requiredProjections, {} /*correlatedProjNames*/, residualReqs, fieldProjectionMap);
 
             if (indexReqTarget == IndexReqTarget::Complete && needsRID) {
                 fieldProjectionMap._ridProjection = ridProjName;
@@ -1281,35 +1294,48 @@ private:
     }
 
     struct IndexAvailableDirections {
-        // Keep track if we can match against forward or backward direction.
+        // For each equality prefix, keep track if we can match against forward or backward
+        // direction.
         bool _forward = true;
         bool _backward = true;
     };
 
-    IndexAvailableDirections indexSatisfiesCollation(
+    boost::optional<std::vector<IndexAvailableDirections>> indexSatisfiesCollation(
         const IndexCollationSpec& indexCollationSpec,
         const CandidateIndexEntry& candidateIndexEntry,
         const ProjectionCollationSpec& requiredCollationSpec,
         const ProjectionName& ridProjName) {
+        const auto& eqPrefixes = candidateIndexEntry._eqPrefixes;
         if (requiredCollationSpec.empty()) {
-            return {true, true};
+            // We are not constrained. Both forward and reverse available for each eq prefix.
+            return {{eqPrefixes.size(), IndexAvailableDirections{}}};
         }
 
-        IndexAvailableDirections result;
+        size_t currentEqPrefix = 0;
+        // Add result for first equality prefix.
+        std::vector<IndexAvailableDirections> result(1);
+
         size_t collationSpecIndex = 0;
         bool indexSuitable = true;
         const auto& fieldProjections = candidateIndexEntry._fieldProjectionMap._fieldProjections;
 
         const auto updateDirectionsFn = [&result](const CollationOp availableOp,
                                                   const CollationOp reqOp) {
-            result._forward &= collationOpsCompatible(availableOp, reqOp);
-            result._backward &= collationOpsCompatible(reverseCollationOp(availableOp), reqOp);
+            result.back()._forward &= collationOpsCompatible(availableOp, reqOp);
+            result.back()._backward &=
+                collationOpsCompatible(reverseCollationOp(availableOp), reqOp);
         };
 
         // Verify the index is compatible with our collation requirement, and can deliver the right
         // order of paths. Note: we are iterating to index one past the size. We assume there is an
         // implicit rid index field which is collated in increasing order.
         for (size_t indexField = 0; indexField < indexCollationSpec.size() + 1; indexField++) {
+            if (currentEqPrefix < eqPrefixes.size() - 1 &&
+                indexField == eqPrefixes.at(currentEqPrefix + 1)._startPos) {
+                currentEqPrefix++;
+                result.push_back(IndexAvailableDirections{});
+            }
+
             const auto& [reqProjName, reqOp] = requiredCollationSpec.at(collationSpecIndex);
 
             if (indexField < indexCollationSpec.size()) {
@@ -1356,7 +1382,7 @@ private:
                 updateDirectionsFn(CollationOp::Ascending, reqOp);
             }
 
-            if (!result._forward && !result._backward) {
+            if (!result.back()._forward && !result.back()._backward) {
                 indexSuitable = false;
                 break;
             }
@@ -1366,8 +1392,11 @@ private:
         }
 
         if (!indexSuitable || collationSpecIndex < requiredCollationSpec.size()) {
-            return {false, false};
+            return {};
         }
+
+        // Pad result to match the number of prefixes. Allow forward and back by default.
+        result.resize(eqPrefixes.size());
         return result;
     }
 

@@ -18,9 +18,9 @@ assert.commandWorked(t.insert({a: 5}));
 
 // Demonstrate local-global optimization.
 // TODO SERVER-71552 The tests freezes with new cost model.
-const res = runCommandWithCostModel(
-    () => t.explain("executionStats").aggregate([{$group: {_id: "$a", cnt: {$sum: 1}}}]),
-    {"groupByStartupCost": 1e-6});
+const res = runWithParams(
+    [{key: 'internalCostModelCoefficients', value: {"groupByStartupCost": 1e-6}}],
+    () => t.explain("executionStats").aggregate([{$group: {_id: "$a", cnt: {$sum: 1}}}]));
 assert.eq(5, res.executionStats.nReturned);
 
 assertValueOnPlanPath("Exchange", res, "child.nodeType");

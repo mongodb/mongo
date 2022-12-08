@@ -137,7 +137,6 @@ std::vector<BSONObj> runSBEAST(OperationContext* opCtx,
                       ids,
                       phaseManager.getMetadata(),
                       phaseManager.getNodeToGroupPropsMap(),
-                      phaseManager.getRIDProjections(),
                       false /*randomScan*/};
     auto sbePlan = g.optimize(tree);
     ASSERT_EQ(1, map.size());

@@ -260,6 +260,8 @@ static QueryHints getHintsFromQueryKnobs() {
     hints._fastIndexNullHandling = internalCascadesOptimizerFastIndexNullHandling.load();
     hints._disableYieldingTolerantPlans =
         internalCascadesOptimizerDisableYieldingTolerantPlans.load();
+    hints._minIndexEqPrefixes = internalCascadesOptimizerMinIndexEqPrefixes.load();
+    hints._maxIndexEqPrefixes = internalCascadesOptimizerMaxIndexEqPrefixes.load();
 
     return hints;
 }
@@ -313,7 +315,6 @@ static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> optimizeAndCreateExe
                       ids,
                       phaseManager.getMetadata(),
                       phaseManager.getNodeToGroupPropsMap(),
-                      phaseManager.getRIDProjections(),
                       false /*randomScan*/};
     auto sbePlan = g.optimize(abt);
     tassert(6624262, "Unexpected rid slot", !requireRID || ridSlot);

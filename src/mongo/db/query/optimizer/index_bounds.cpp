@@ -199,17 +199,27 @@ ResidualRequirementWithCE::ResidualRequirementWithCE(PartialSchemaKey key,
                                                      CEType ce)
     : _key(std::move(key)), _req(std::move(req)), _ce(ce) {}
 
+EqualityPrefixEntry::EqualityPrefixEntry(const size_t startPos)
+    : _startPos(startPos), _interval(CompoundIntervalReqExpr::makeSingularDNF()), _predPosSet() {}
+
+bool EqualityPrefixEntry::operator==(const EqualityPrefixEntry& other) const {
+    return _startPos == other._startPos && _interval == other._interval &&
+        _predPosSet == other._predPosSet;
+}
+
 CandidateIndexEntry::CandidateIndexEntry(std::string indexDefName)
     : _indexDefName(std::move(indexDefName)),
       _fieldProjectionMap(),
-      _intervals(),
+      _eqPrefixes(),
+      _correlatedProjNames(),
       _residualRequirements(),
       _fieldsToCollate(),
       _intervalPrefixSize(0) {}
 
 bool CandidateIndexEntry::operator==(const CandidateIndexEntry& other) const {
     return _indexDefName == other._indexDefName &&
-        _fieldProjectionMap == other._fieldProjectionMap && _intervals == other._intervals &&
+        _fieldProjectionMap == other._fieldProjectionMap && _eqPrefixes == other._eqPrefixes &&
+        _correlatedProjNames == other._correlatedProjNames &&
         _residualRequirements == other._residualRequirements &&
         _fieldsToCollate == other._fieldsToCollate &&
         _intervalPrefixSize == other._intervalPrefixSize;

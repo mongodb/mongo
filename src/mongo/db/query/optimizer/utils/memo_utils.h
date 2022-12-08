@@ -67,6 +67,7 @@ ABT extractLatestPlan(const cascades::Memo& memo, GroupIdType rootGroupId);
  */
 std::pair<ABT, NodeToGroupPropsMap> extractPhysicalPlan(MemoPhysicalNodeId id,
                                                         const Metadata& metadata,
+                                                        const RIDProjectionsMap& ridProjections,
                                                         const cascades::Memo& memo);
 
 }  // namespace mongo::optimizer

@@ -395,7 +395,6 @@ TEST_F(NodeSBE, Lower1) {
                       ids,
                       phaseManager.getMetadata(),
                       phaseManager.getNodeToGroupPropsMap(),
-                      phaseManager.getRIDProjections(),
                       false /*randomScan*/};
     auto sbePlan = g.optimize(tree);
     ASSERT_EQ(1, map.size());
@@ -564,7 +563,6 @@ TEST_F(NodeSBE, Lower2) {
                       ids,
                       phaseManager.getMetadata(),
                       phaseManager.getNodeToGroupPropsMap(),
-                      phaseManager.getRIDProjections(),
                       false /*randomScan*/};
     auto sbePlan = g.optimize(root);
 
@@ -638,7 +636,6 @@ TEST_F(NodeSBE, RequireRID) {
                       ids,
                       phaseManager.getMetadata(),
                       phaseManager.getNodeToGroupPropsMap(),
-                      phaseManager.getRIDProjections(),
                       false /*randomScan*/};
     auto sbePlan = g.optimize(tree);
     ASSERT_EQ(1, map.size());

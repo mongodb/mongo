@@ -1312,29 +1312,30 @@ public:
                 local.separator("}, ");
                 {
                     IntervalPrinter<CompoundIntervalReqExpr> intervalPrinter(*this);
-                    if (candidateIndexEntry._intervals.size() == 1) {
+                    if (candidateIndexEntry._eqPrefixes.size() == 1) {
                         local.fieldName("intervals", ExplainVersion::V3);
 
-                        ExplainPrinter intervals =
-                            intervalPrinter.print(candidateIndexEntry._intervals.front());
+                        ExplainPrinter intervals = intervalPrinter.print(
+                            candidateIndexEntry._eqPrefixes.front()._interval);
                         local.printSingleLevel(intervals, "" /*singleLevelSpacer*/);
                     } else {
-                        local.fieldName("intervals", ExplainVersion::V3);
+                        std::vector<ExplainPrinter> eqPrefixPrinters;
+                        for (const auto& entry : candidateIndexEntry._eqPrefixes) {
+                            ExplainPrinter eqPrefixPrinter;
+                            eqPrefixPrinter.fieldName("startPos", ExplainVersion::V3)
+                                .print(entry._startPos)
+                                .separator(", ");
 
-                        ExplainPrinter intervalVector;
-                        intervalVector.separator(" [");
-                        for (size_t i = 0; i < candidateIndexEntry._intervals.size(); i++) {
-                            const auto& entry = candidateIndexEntry._intervals.at(i);
-                            if (i > 0) {
-                                intervalVector.separator(", ");
-                            }
-                            ExplainPrinter intervals = intervalPrinter.print(entry);
-                            intervalVector
-                                .fieldName(str::stream() << "interval" << i, ExplainVersion::V3)
-                                .printSingleLevel(intervals, "" /*singleLevelSpacer*/);
+                            ExplainPrinter intervals = intervalPrinter.print(entry._interval);
+                            eqPrefixPrinter.separator("[")
+                                .fieldName("interval", ExplainVersion::V3)
+                                .printSingleLevel(intervals, "" /*singleLevelSpacer*/)
+                                .separator("]");
+
+                            eqPrefixPrinters.push_back(std::move(eqPrefixPrinter));
                         }
 
-                        local.printSingleLevel(intervalVector).separator("]");
+                        local.print(eqPrefixPrinters);
                     }
                 }
 

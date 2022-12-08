@@ -49,6 +49,9 @@ struct NodeProps {
     properties::LogicalProps _logicalProps;
     properties::PhysProps _physicalProps;
 
+    // Set if we have an RID projection name.
+    boost::optional<ProjectionName> _ridProjName;
+
     // Total cost of the best plan (includes the subtree).
     CostType _cost;
     // Local cost (excludes subtree).

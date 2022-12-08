@@ -148,15 +148,6 @@ ProjectionNameSet extractReferencedColumns(const properties::PhysProps& properti
     return PropertiesAffectedColumnsExtractor::extract(properties);
 }
 
-bool areCompoundIntervalsEqualities(const CompoundIntervalRequirement& intervals) {
-    for (const auto& interval : intervals) {
-        if (!interval.isEquality()) {
-            return false;
-        }
-    }
-    return true;
-}
-
 CollationSplitResult splitCollationSpec(const boost::optional<ProjectionName>& ridProjName,
                                         const ProjectionCollationSpec& collationSpec,
                                         const ProjectionNameSet& leftProjections,
@@ -1161,21 +1152,22 @@ static bool extendCompoundInterval(PrefixId& prefixId,
                                    const size_t indexField,
                                    const bool reverse,
                                    const IntervalReqExpr::Node& requiredInterval,
-                                   std::vector<CompoundIntervalReqExpr::Node>& intervals,
+                                   std::vector<EqualityPrefixEntry>& eqPrefixes,
+                                   ProjectionNameOrderPreservingSet& correlatedProjNames,
                                    FieldProjectionMap& fieldProjMap) {
-    while (!combineCompoundIntervalsDNF(intervals.back(), requiredInterval, reverse)) {
+    while (!combineCompoundIntervalsDNF(eqPrefixes.back()._interval, requiredInterval, reverse)) {
         // Should exit after at most one iteration.
 
         // Pad old prefix with open intervals to the end.
         padCompoundInterval(
             indexCollationSpec,
-            intervals.back(),
+            eqPrefixes.back()._interval,
             indexField,
             {indexCollationSpec.size() - indexField, IntervalReqExpr::makeSingularDNF()});
 
-        if (intervals.size() < maxIndexEqPrefixes) {
+        if (eqPrefixes.size() < maxIndexEqPrefixes) {
             // Begin new equality prefix.
-            intervals.push_back(CompoundIntervalReqExpr::makeSingularDNF());
+            eqPrefixes.emplace_back(indexField);
             // Pad new prefix with index fields processed so far.
 
             for (size_t i = 0; i < indexField; i++) {
@@ -1183,11 +1175,12 @@ static bool extendCompoundInterval(PrefixId& prefixId,
                 // previous fields.
                 const ProjectionName& tempProjName = getExistingOrTempProjForFieldName(
                     prefixId, FieldNameType{encodeIndexKeyName(i)}, fieldProjMap);
+                correlatedProjNames.emplace_back(tempProjName);
 
                 // Create point bounds using the projections.
                 const BoundRequirement eqBound{true /*inclusive*/, make<Variable>(tempProjName)};
                 padCompoundInterval(indexCollationSpec,
-                                    intervals.back(),
+                                    eqPrefixes.back()._interval,
                                     i,
                                     {IntervalReqExpr::makeSingularDNF(eqBound, eqBound)});
             }
@@ -1210,7 +1203,8 @@ static bool computeCandidateIndexEntry(PrefixId& prefixId,
                                        const IndexCollationSpec& indexCollationSpec,
                                        CandidateIndexEntry& entry) {
     auto& fieldProjMap = entry._fieldProjectionMap;
-    auto& intervals = entry._intervals;
+    auto& eqPrefixes = entry._eqPrefixes;
+    auto& correlatedProjNames = entry._correlatedProjNames;
 
     // Don't allow more than one Traverse predicate to fuse with the same Traverse in the index. For
     // each field of the index, track whether we are still allowed to fuse a Traverse predicate with
@@ -1218,7 +1212,7 @@ static bool computeCandidateIndexEntry(PrefixId& prefixId,
     std::vector<bool> allowFuseTraverse(indexCollationSpec.size(), true);
 
     // Add open interval for the first equality prefix.
-    intervals.push_back(CompoundIntervalReqExpr::makeSingularDNF());
+    eqPrefixes.emplace_back(0);
 
     for (size_t indexField = 0; indexField < indexCollationSpec.size(); indexField++) {
         const auto& indexCollationEntry = indexCollationSpec.at(indexField);
@@ -1236,11 +1230,17 @@ static bool computeCandidateIndexEntry(PrefixId& prefixId,
                                                             indexField,
                                                             reverse,
                                                             requiredInterval,
-                                                            intervals,
+                                                            eqPrefixes,
+                                                            correlatedProjNames,
                                                             fieldProjMap);
                 if (!success) {
-                    // Too many equality prefixes.
+                    // Too many equality prefixes. Attempt to satisfy remaining predicates as
+                    // residual.
                     break;
+                }
+                if (eqPrefixes.size() > 1 && entry._intervalPrefixSize == 0) {
+                    // Need to constrain at least one field per prefix.
+                    return false;
                 }
 
                 foundSuitableField = true;
@@ -1249,6 +1249,9 @@ static bool computeCandidateIndexEntry(PrefixId& prefixId,
                     allowFuseTraverse[indexField] = false;
                 }
                 entry._intervalPrefixSize++;
+
+                const size_t queryPredPos = std::distance(reqMap.cbegin(), indexKeyIt);
+                eqPrefixes.back()._predPosSet.insert(queryPredPos);
 
                 if (const auto& boundProjName = req.getBoundProjectionName()) {
                     // Include bounds projection into index spec.
@@ -1271,7 +1274,7 @@ static bool computeCandidateIndexEntry(PrefixId& prefixId,
         if (!foundSuitableField) {
             // We cannot constrain the current index field.
             padCompoundInterval(indexCollationSpec,
-                                intervals.back(),
+                                eqPrefixes.back()._interval,
                                 indexField,
                                 {IntervalReqExpr::makeSingularDNF()});
         }
@@ -1340,8 +1343,7 @@ CandidateIndexes computeCandidateIndexes(PrefixId& prefixId,
                                          const ProjectionName& scanProjectionName,
                                          const PartialSchemaRequirements& reqMap,
                                          const ScanDefinition& scanDef,
-                                         const bool fastNullHandling,
-                                         const size_t maxIndexEqPrefixes,
+                                         const QueryHints& hints,
                                          bool& hasEmptyInterval,
                                          const ConstFoldFn& constFold) {
     // Contains one instance for each unmatched key.
@@ -1357,7 +1359,7 @@ CandidateIndexes computeCandidateIndexes(PrefixId& prefixId,
             return {};
         }
 
-        if (!fastNullHandling && !req.getIsPerfOnly() && req.mayReturnNull(constFold)) {
+        if (!hints._fastIndexNullHandling && !req.getIsPerfOnly() && req.mayReturnNull(constFold)) {
             // We cannot use indexes to return values for fields if we have an interval with null
             // bounds.
             return {};
@@ -1366,19 +1368,19 @@ CandidateIndexes computeCandidateIndexes(PrefixId& prefixId,
 
     CandidateIndexes result;
     for (const auto& [indexDefName, indexDef] : scanDef.getIndexDefs()) {
-        for (size_t i = 1; i <= maxIndexEqPrefixes; i++) {
+        for (size_t i = hints._minIndexEqPrefixes; i <= hints._maxIndexEqPrefixes; i++) {
             CandidateIndexEntry entry(indexDefName);
             const bool success = computeCandidateIndexEntry(prefixId,
                                                             reqMap,
                                                             i,
                                                             unsatisfiedKeysInitial,
                                                             scanProjectionName,
-                                                            fastNullHandling,
+                                                            hints._fastIndexNullHandling,
                                                             constFold,
                                                             indexDef.getCollationSpec(),
                                                             entry);
 
-            if (success) {
+            if (success && entry._eqPrefixes.size() >= hints._minIndexEqPrefixes) {
                 result.push_back(std::move(entry));
             }
         }
@@ -1697,6 +1699,7 @@ void applyProjectionRenames(ProjectionRenames projectionRenames,
 }
 
 void removeRedundantResidualPredicates(const ProjectionNameOrderPreservingSet& requiredProjections,
+                                       const ProjectionNameOrderPreservingSet& correlatedProjNames,
                                        ResidualRequirements& residualReqs,
                                        FieldProjectionMap& fieldProjectionMap) {
     ProjectionNameSet residualTempProjections;
@@ -1728,8 +1731,8 @@ void removeRedundantResidualPredicates(const ProjectionNameOrderPreservingSet& r
     // Remove unused projections from the field projection map.
     auto& fieldProjMap = fieldProjectionMap._fieldProjections;
     for (auto it = fieldProjMap.begin(); it != fieldProjMap.end();) {
-        const ProjectionName& projName = it->second;
-        if (!requiredProjections.find(projName) && residualTempProjections.count(projName) == 0) {
+        if (const ProjectionName& projName = it->second; !requiredProjections.find(projName) &&
+            residualTempProjections.count(projName) == 0 && !correlatedProjNames.find(projName)) {
             fieldProjMap.erase(it++);
         } else {
             it++;
@@ -1999,15 +2002,16 @@ public:
         }
 
         ProjectionNameVector unionProjectionNames;
-        unionProjectionNames.push_back(*innerMap._ridProjection);
+        unionProjectionNames.push_back(_ridProjName);
         for (const auto& [fieldName, projectionName] : innerMap._fieldProjections) {
             unionProjectionNames.push_back(projectionName);
         }
 
-        ProjectionNameVector aggProjectionNames;
+        ProjectionNameVector outerProjNames;
         for (const auto& [fieldName, projectionName] : outerMap._fieldProjections) {
-            aggProjectionNames.push_back(projectionName);
+            outerProjNames.push_back(projectionName);
         }
+        ProjectionNameVector aggProjectionNames = outerProjNames;
 
         ABTVector aggExpressions;
         for (const auto& [fieldName, projectionName] : innerMap._fieldProjections) {
@@ -2037,7 +2041,7 @@ public:
         ABT result = make<UnionNode>(std::move(unionProjectionNames), std::move(inputs));
         _nodeCEMap.emplace(result.cast<Node>(), ce);
 
-        result = make<GroupByNode>(ProjectionNameVector{*innerMap._ridProjection},
+        result = make<GroupByNode>(ProjectionNameVector{_ridProjName},
                                    std::move(aggProjectionNames),
                                    std::move(aggExpressions),
                                    std::move(result));
@@ -2051,7 +2055,13 @@ public:
                                        makeSeq(make<Variable>(*sideSetProjectionName)))),
                 std::move(result));
             _nodeCEMap.emplace(result.cast<Node>(), ce);
+        } else if (!outerMap._ridProjection && !outerProjNames.empty()) {
+            // Prevent rid projection from leaking out if we do not require it, and also auxiliary
+            // left and right side projections.
+            result = make<UnionNode>(std::move(outerProjNames), makeSeq(std::move(result)));
+            _nodeCEMap.emplace(result.cast<Node>(), ce);
         }
+
         return result;
     }
 
@@ -2084,16 +2094,16 @@ private:
     std::vector<FieldProjectionMap> _fpmStack;
 };
 
-ABT lowerIntervals(PrefixId& prefixId,
-                   const ProjectionName& ridProjName,
-                   FieldProjectionMap indexProjectionMap,
-                   const std::string& scanDefName,
-                   const std::string& indexDefName,
-                   const CompoundIntervalReqExpr::Node& intervals,
-                   const bool reverseOrder,
-                   const CEType indexCE,
-                   const CEType scanGroupCE,
-                   NodeCEMap& nodeCEMap) {
+static ABT lowerIntervals(PrefixId& prefixId,
+                          const ProjectionName& ridProjName,
+                          FieldProjectionMap indexProjectionMap,
+                          const std::string& scanDefName,
+                          const std::string& indexDefName,
+                          const CompoundIntervalReqExpr::Node& intervals,
+                          const bool reverseOrder,
+                          const CEType indexCE,
+                          const CEType scanGroupCE,
+                          NodeCEMap& nodeCEMap) {
     IntervalLowerTransport lowerTransport(prefixId,
                                           ridProjName,
                                           std::move(indexProjectionMap),
@@ -2106,20 +2116,118 @@ ABT lowerIntervals(PrefixId& prefixId,
     return lowerTransport.lower(intervals);
 }
 
+ABT lowerEqPrefixes(PrefixId& prefixId,
+                    const ProjectionName& ridProjName,
+                    FieldProjectionMap indexProjectionMap,
+                    const std::string& scanDefName,
+                    const std::string& indexDefName,
+                    const std::vector<EqualityPrefixEntry>& eqPrefixes,
+                    const std::vector<bool>& reverseOrder,
+                    const ProjectionNameVector& correlatedProjNames,
+                    const std::map<size_t, SelectivityType>& indexPredSelMap,
+                    const CEType currentGroupCE,
+                    const CEType scanGroupCE,
+                    NodeCEMap& nodeCEMap) {
+    boost::optional<ABT> result;
+
+    for (size_t eqPrefixIndex = 0; eqPrefixIndex < eqPrefixes.size(); eqPrefixIndex++) {
+        const auto& eqPrefix = eqPrefixes.at(eqPrefixIndex);
+        const size_t startPos = eqPrefix._startPos;
+
+        FieldProjectionMap eqPrefixMap;
+        if (eqPrefixIndex == eqPrefixes.size() - 1) {
+            // If this is the last equality prefix, use the input field projection map but remove
+            // the prefix of correlated projections.
+
+            eqPrefixMap = indexProjectionMap;
+            for (size_t indexField = 0; indexField < startPos; indexField++) {
+                eqPrefixMap._fieldProjections.erase(FieldNameType{encodeIndexKeyName(indexField)});
+            }
+        } else {
+            // If this is not the last equality prefix, create a field projection map using the
+            // prefix of the correlated projections only.
+
+            const size_t nextStartPos = eqPrefixes.at(eqPrefixIndex + 1)._startPos;
+            for (size_t indexField = startPos; indexField < nextStartPos; indexField++) {
+                const FieldNameType indexKey{encodeIndexKeyName(indexField)};
+                eqPrefixMap._fieldProjections.emplace(
+                    indexKey, indexProjectionMap._fieldProjections.at(indexKey));
+            }
+        }
+
+        // Collect estimates for predicates satisfied with the current equality prefix.
+        // TODO: rationalize cardinality estimates: estimate number of unique groups.
+        CEType indexCE = currentGroupCE;
+        if (!eqPrefix._predPosSet.empty()) {
+            std::vector<SelectivityType> currentSels;
+            for (const size_t index : eqPrefix._predPosSet) {
+                if (const auto it = indexPredSelMap.find(index); it != indexPredSelMap.cend()) {
+                    currentSels.push_back(it->second);
+                }
+            }
+            if (!currentSels.empty()) {
+                indexCE = scanGroupCE * ce::conjExponentialBackoff(std::move(currentSels));
+            }
+        }
+
+        // Convert the prefix's into a tree of intervals.
+        ABT outer = lowerIntervals(prefixId,
+                                   ridProjName,
+                                   std::move(eqPrefixMap),
+                                   scanDefName,
+                                   indexDefName,
+                                   eqPrefix._interval,
+                                   reverseOrder.at(eqPrefixIndex),
+                                   indexCE,
+                                   scanGroupCE,
+                                   nodeCEMap);
+
+        if (result) {
+            // Compute correlation parameters based on the previous equality prefix.
+
+            ProjectionNameVector correlationVector;
+            ProjectionNameSet correlationSet;
+            for (size_t indexField = 0; indexField < startPos; indexField++) {
+                const auto& correlatedProjName = correlatedProjNames.at(indexField);
+                correlationVector.push_back(correlatedProjName);
+                correlationSet.insert(correlatedProjName);
+            }
+
+            ABT inner = make<UniqueNode>(std::move(correlationVector), std::move(*result));
+            nodeCEMap.emplace(inner.cast<Node>(), indexCE);
+
+            // TODO: SERVER-70639. Use a spool node for RIN plans.
+            outer = make<NestedLoopJoinNode>(JoinType::Inner,
+                                             std::move(correlationSet),
+                                             Constant::boolean(true),
+                                             std::move(inner),
+                                             std::move(outer));
+            nodeCEMap.emplace(outer.cast<Node>(), indexCE);
+        }
+
+        result = std::move(outer);
+    }
+
+    return std::move(*result);
+}
+
 /**
  * Checks if a path ends in a Traverse + PathId.
  */
 class PathEndsInTraverseId {
 public:
     bool transport(const optimizer::PathTraverse& node, bool childResult) {
-        return node.getPath().is<PathIdentity>() ? true : childResult;
+        return node.getPath().is<PathIdentity>() || childResult;
     }
+
     bool transport(const optimizer::PathGet& /*node*/, bool childResult) {
         return childResult;
     }
+
     bool transport(const optimizer::PathIdentity& /*node*/) {
         return false;
     }
+
     template <typename T, typename... Ts>
     bool transport(const T& node, Ts&&... /* args */) {
         uasserted(6749500, "Unexpected node in transport to check if path is $elemMatch.");

@@ -91,4 +91,16 @@ void normalizeIntervals(IntervalReqExpr::Node& intervals);
  */
 boost::optional<ABT> coerceIntervalToPathCompareEqMember(const IntervalReqExpr::Node& interval);
 
+
+/**
+ * Returns true if all components of the compound interval are equalities.
+ */
+bool areCompoundIntervalsEqualities(const CompoundIntervalRequirement& intervals);
+
+/**
+ * Returns true if the interval corresponds to a simple range (e.g >10 as opposed to a point
+ * equality or complex boolean expression of intervals).
+ */
+bool isSimpleRange(const CompoundIntervalReqExpr::Node& interval);
+
 }  // namespace mongo::optimizer

@@ -24,22 +24,14 @@ assert.commandWorked(t.createIndex({a: 1, b: 1, c: 1, d: 1}));
 assert.commandWorked(t.createIndex({a: 1, b: 1, d: 1}));
 assert.commandWorked(t.createIndex({a: 1, d: 1}));
 
-try {
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalCascadesOptimizerFastIndexNullHandling: true}));
+const res = runWithParams(
+    [{key: "internalCascadesOptimizerFastIndexNullHandling", value: true}],
+    () => t.explain("executionStats")
+              .aggregate([{$match: {a: {$eq: 0}, b: {$eq: 0}, c: {$eq: 0}}}, {$sort: {d: 1}}]));
+assert.eq(nDocs * 0.1, res.executionStats.nReturned);
 
-    const res = t.explain("executionStats").aggregate([
-        {$match: {a: {$eq: 0}, b: {$eq: 0}, c: {$eq: 0}}},
-        {$sort: {d: 1}}
-    ]);
-    assert.eq(nDocs * 0.1, res.executionStats.nReturned);
-
-    // Demonstrate we can pick the indexing covering most fields.
-    const indexNode = navigateToPlanPath(res, "child.leftChild");
-    assertValueOnPath("IndexScan", indexNode, "nodeType");
-    assertValueOnPath("a_1_b_1_c_1_d_1", indexNode, "indexDefName");
-} finally {
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalCascadesOptimizerFastIndexNullHandling: false}));
-}
+// Demonstrate we can pick the indexing covering most fields.
+const indexNode = navigateToPlanPath(res, "child.leftChild");
+assertValueOnPath("IndexScan", indexNode, "nodeType");
+assertValueOnPath("a_1_b_1_c_1_d_1", indexNode, "indexDefName");
 }());

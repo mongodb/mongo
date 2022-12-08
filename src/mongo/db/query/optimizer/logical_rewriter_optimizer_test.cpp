@@ -2260,7 +2260,7 @@ TEST(LogicalRewriter, RelaxComposeM) {
         optimized);
 }
 
-TEST(PhysRewriter, FilterIndexingRIN) {
+TEST(LogicalRewriter, SargableNodeRIN) {
     using namespace properties;
     using namespace unit_test_abt_literals;
     PrefixId prefixId;
@@ -2318,7 +2318,7 @@ TEST(PhysRewriter, FilterIndexingRIN) {
     ASSERT_EQ(3, ci.size());
 
     // We have one equality prefix for the first candidate index.
-    ASSERT_EQ(1, ci.at(0)._intervals.size());
+    ASSERT_EQ(1, ci.at(0)._eqPrefixes.size());
 
     // The first index field ("a") is constrained to 1, the remaining fields are not constrained.
     ASSERT_EQ(
@@ -2327,7 +2327,13 @@ TEST(PhysRewriter, FilterIndexingRIN) {
         "        {=Const [1], <fully open>, <fully open>, <fully open>, <fully open>}\n"
         "    }\n"
         "}\n",
-        ExplainGenerator::explainIntervalExpr(ci.at(0)._intervals.front()));
+        ExplainGenerator::explainIntervalExpr(ci.at(0)._eqPrefixes.front()._interval));
+
+    // No correlated projections.
+    ASSERT_EQ(0, ci.at(0)._correlatedProjNames.getVector().size());
+
+    // First eq prefix begins at index field 0.
+    ASSERT_EQ(0, ci.at(0)._eqPrefixes.front()._startPos);
 
     // We have two residual predicates for "c" and "e".
     ASSERT_EQ(
@@ -2340,7 +2346,7 @@ TEST(PhysRewriter, FilterIndexingRIN) {
 
 
     // The second candidate index has two equality prefixes.
-    ASSERT_EQ(2, ci.at(1)._intervals.size());
+    ASSERT_EQ(2, ci.at(1)._eqPrefixes.size());
 
     // The first index field ("a") is again constrained to 1, and the remaining ones are not.
     ASSERT_EQ(
@@ -2349,7 +2355,10 @@ TEST(PhysRewriter, FilterIndexingRIN) {
         "        {=Const [1], <fully open>, <fully open>, <fully open>, <fully open>}\n"
         "    }\n"
         "}\n",
-        ExplainGenerator::explainIntervalExpr(ci.at(1)._intervals.at(0)));
+        ExplainGenerator::explainIntervalExpr(ci.at(1)._eqPrefixes.at(0)._interval));
+
+    // Second eq prefix begins at index field 2.
+    ASSERT_EQ(2, ci.at(1)._eqPrefixes.at(1)._startPos);
 
     // The first two index fields are constrained to variables obtained from the first scan, the
     // third one ("c") is bound to "2". The last two fields are unconstrained.
@@ -2360,7 +2369,10 @@ TEST(PhysRewriter, FilterIndexingRIN) {
         "<fully open>}\n"
         "    }\n"
         "}\n",
-        ExplainGenerator::explainIntervalExpr(ci.at(1)._intervals.at(1)));
+        ExplainGenerator::explainIntervalExpr(ci.at(1)._eqPrefixes.at(1)._interval));
+
+    // Two correlated projections.
+    ASSERT_EQ(2, ci.at(1)._correlatedProjNames.getVector().size());
 
     // We have only one residual predicates for "e".
     ASSERT_EQ(
@@ -2371,7 +2383,10 @@ TEST(PhysRewriter, FilterIndexingRIN) {
 
 
     // The third candidate index has three equality prefixes.
-    ASSERT_EQ(3, ci.at(2)._intervals.size());
+    ASSERT_EQ(3, ci.at(2)._eqPrefixes.size());
+
+    // Four correlated projections.
+    ASSERT_EQ(4, ci.at(2)._correlatedProjNames.getVector().size());
 
     // The first index field ("a") is again constrained to 1.
     ASSERT_EQ(
@@ -2380,7 +2395,7 @@ TEST(PhysRewriter, FilterIndexingRIN) {
         "        {=Const [1], <fully open>, <fully open>, <fully open>, <fully open>}\n"
         "    }\n"
         "}\n",
-        ExplainGenerator::explainIntervalExpr(ci.at(2)._intervals.at(0)));
+        ExplainGenerator::explainIntervalExpr(ci.at(2)._eqPrefixes.at(0)._interval));
 
     // The first two index fields are constrained to variables obtained from the first scan, the
     // third one ("c") is bound to "2". The last two fields are unconstrained.
@@ -2391,7 +2406,7 @@ TEST(PhysRewriter, FilterIndexingRIN) {
         "<fully open>}\n"
         "    }\n"
         "}\n",
-        ExplainGenerator::explainIntervalExpr(ci.at(2)._intervals.at(1)));
+        ExplainGenerator::explainIntervalExpr(ci.at(2)._eqPrefixes.at(1)._interval));
 
     // The first 4 index fields are constrained to variables from the second scan, and the last one
     // to 4.
@@ -2402,7 +2417,7 @@ TEST(PhysRewriter, FilterIndexingRIN) {
         "=Variable [evalTemp_32], =Const [3]}\n"
         "    }\n"
         "}\n",
-        ExplainGenerator::explainIntervalExpr(ci.at(2)._intervals.at(2)));
+        ExplainGenerator::explainIntervalExpr(ci.at(2)._eqPrefixes.at(2)._interval));
 }
 
 }  // namespace

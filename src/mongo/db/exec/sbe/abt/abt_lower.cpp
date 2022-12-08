@@ -304,13 +304,10 @@ sbe::value::SlotVector SBENodeLowering::convertRequiredProjectionsToSlots(
     const sbe::value::SlotVector& toExclude) {
     using namespace properties;
 
-    const PhysProps& physProps = props._physicalProps;
-    auto projections = getPropertyConst<ProjectionRequirement>(physProps).getProjections();
-
-    if (removeRIDProjection && hasProperty<IndexingRequirement>(physProps)) {
-        const auto& scanDefName =
-            getPropertyConst<IndexingAvailability>(props._logicalProps).getScanDefName();
-        projections.erase(_ridProjections.at(scanDefName));
+    auto projections =
+        getPropertyConst<ProjectionRequirement>(props._physicalProps).getProjections();
+    if (removeRIDProjection && props._ridProjName) {
+        projections.erase(*props._ridProjName);
     }
 
     sbe::value::SlotSet toExcludeSet;
@@ -354,19 +351,16 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const RootNode& n,
     }
 
     if (const auto& props = _nodeToGroupPropsMap.at(&n);
-        hasProperty<ProjectionRequirement>(props._physicalProps) &&
-        hasProperty<IndexingAvailability>(props._logicalProps)) {
-        // If we required rid on the Root node, populate ridSlot.
-        const std::string& scanDefName =
-            getPropertyConst<IndexingAvailability>(props._logicalProps).getScanDefName();
-        const ProjectionName& ridProjName = _ridProjections.at(scanDefName);
-
-        const auto& projections =
-            getPropertyConst<ProjectionRequirement>(props._physicalProps).getProjections();
-        if (projections.find(ridProjName)) {
-            // Deliver the ridSlot separate from the slotMap.
-            _ridSlot = _slotMap.at(ridProjName);
-            finalMap.erase(ridProjName);
+        hasProperty<ProjectionRequirement>(props._physicalProps)) {
+        if (const auto& ridProjName = props._ridProjName) {
+            // If we required rid on the Root node, populate ridSlot.
+            const auto& projections =
+                getPropertyConst<ProjectionRequirement>(props._physicalProps).getProjections();
+            if (projections.find(*ridProjName)) {
+                // Deliver the ridSlot separate from the slotMap.
+                _ridSlot = _slotMap.at(*ridProjName);
+                finalMap.erase(*ridProjName);
+            }
         }
     }
 
@@ -648,22 +642,27 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const NestedLoopJoinNode& 
     auto outerStage = generateInternal(leftChild);
     auto innerStage = generateInternal(rightChild);
 
+    const auto& ridProjName = _nodeToGroupPropsMap.at(&n)._ridProjName;
+
     // List of correlated projections (bound in outer side and referred to in the inner side).
     sbe::value::SlotVector correlatedSlots;
+    bool ridProjNameCorrelated = false;
     for (const ProjectionName& projectionName : n.getCorrelatedProjectionNames()) {
+        if (ridProjName && projectionName == *ridProjName) {
+            ridProjNameCorrelated = true;
+        }
         correlatedSlots.push_back(_slotMap.at(projectionName));
     }
 
-    const auto& leftChildProps = _nodeToGroupPropsMap.at(n.getLeftChild().cast<Node>());
     auto expr = SBEExpressionLowering{_env, _slotMap}.optimize(filter);
 
-    auto outerProjects =
-        convertRequiredProjectionsToSlots(leftChildProps, false /*removeRIDProjection*/);
+    // If the rid is correlated, then obtain it from the left child, otherwise obtain it from the
+    // right child.
+    const auto& leftChildProps = _nodeToGroupPropsMap.at(n.getLeftChild().cast<Node>());
+    auto outerProjects = convertRequiredProjectionsToSlots(leftChildProps, !ridProjNameCorrelated);
 
     const auto& rightChildProps = _nodeToGroupPropsMap.at(n.getRightChild().cast<Node>());
-
-    auto innerProjects =
-        convertRequiredProjectionsToSlots(rightChildProps, true /*removeRIDProjection*/);
+    auto innerProjects = convertRequiredProjectionsToSlots(rightChildProps, ridProjNameCorrelated);
 
     sbe::JoinType joinType = [&]() {
         switch (n.getJoinType()) {
@@ -786,7 +785,6 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const SortedMergeNode& n,
                                       _slotIdGenerator,
                                       _metadata,
                                       _nodeToGroupPropsMap,
-                                      _ridProjections,
                                       _randomScan);
         auto loweredChild = localLowering.optimize(child);
         tassert(7063700, "Unexpected rid slot", !localRIDSlot);
@@ -846,7 +844,6 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const UnionNode& n,
                                       _slotIdGenerator,
                                       _metadata,
                                       _nodeToGroupPropsMap,
-                                      _ridProjections,
                                       _randomScan);
         auto loweredChild = localLowering.optimize(child);
         tassert(6624258, "Unexpected rid slot", !localRIDSlot);

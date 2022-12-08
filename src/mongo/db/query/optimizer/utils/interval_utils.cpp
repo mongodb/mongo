@@ -420,4 +420,21 @@ boost::optional<ABT> coerceIntervalToPathCompareEqMember(const IntervalReqExpr::
     return boost::none;
 }
 
+bool areCompoundIntervalsEqualities(const CompoundIntervalRequirement& intervals) {
+    for (const auto& interval : intervals) {
+        if (!interval.isEquality()) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool isSimpleRange(const CompoundIntervalReqExpr::Node& interval) {
+    if (const auto singularInterval = CompoundIntervalReqExpr::getSingularDNF(interval);
+        singularInterval && !areCompoundIntervalsEqualities(*singularInterval)) {
+        return true;
+    }
+    return false;
+}
+
 }  // namespace mongo::optimizer

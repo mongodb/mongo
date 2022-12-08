@@ -87,9 +87,11 @@ class MemoPhysicalPlanExtractor {
 public:
     explicit MemoPhysicalPlanExtractor(const cascades::Memo& memo,
                                        const Metadata& metadata,
+                                       const RIDProjectionsMap& ridProjections,
                                        NodeToGroupPropsMap& nodeToGroupPropsMap)
         : _memo(memo),
           _metadata(metadata),
+          _ridProjections(ridProjections),
           _nodeToGroupPropsMap(nodeToGroupPropsMap),
           _planNodeId(0) {}
 
@@ -119,11 +121,19 @@ public:
                 removeProperty<DistributionRequirement>(physProps);
             }
 
+            boost::optional<ProjectionName> ridProjName;
+            if (hasProperty<IndexingRequirement>(physProps)) {
+                const auto& scanDefName =
+                    getPropertyConst<IndexingAvailability>(logicalProps).getScanDefName();
+                ridProjName = _ridProjections.at(scanDefName);
+            }
+
             _nodeToGroupPropsMap.emplace(&node,
                                          NodeProps{_planNodeId++,
                                                    id,
                                                    std::move(logicalProps),
                                                    std::move(physProps),
+                                                   std::move(ridProjName),
                                                    nodeInfo._cost,
                                                    nodeInfo._localCost,
                                                    nodeInfo._adjustedCE});
@@ -145,6 +155,7 @@ private:
     // We don't own this.
     const cascades::Memo& _memo;
     const Metadata& _metadata;
+    const RIDProjectionsMap& _ridProjections;
     NodeToGroupPropsMap& _nodeToGroupPropsMap;
 
     int32_t _planNodeId;
@@ -152,9 +163,10 @@ private:
 
 std::pair<ABT, NodeToGroupPropsMap> extractPhysicalPlan(const MemoPhysicalNodeId id,
                                                         const Metadata& metadata,
+                                                        const RIDProjectionsMap& ridProjections,
                                                         const cascades::Memo& memo) {
     NodeToGroupPropsMap resultMap;
-    MemoPhysicalPlanExtractor extractor(memo, metadata, resultMap);
+    MemoPhysicalPlanExtractor extractor(memo, metadata, ridProjections, resultMap);
     ABT resultNode = extractor.extract(id);
     return {std::move(resultNode), std::move(resultMap)};
 }

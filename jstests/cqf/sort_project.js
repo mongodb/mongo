@@ -28,52 +28,54 @@ coll.insertMany([
 ]);
 
 const nDocs = 20;
-try {
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalCascadesOptimizerFastIndexNullHandling: true}));
-
-    {
-        // Covered plan. Also an index scan on all fields is cheaper than a collection scan.
-        // TODO SERVER-71553 The Cost Model is overriden to preserve IndexScan plan.
-        const res = runCommandWithCostModel(() => coll.explain("executionStats").aggregate([
+{
+    // Covered plan. Also an index scan on all fields is cheaper than a collection scan.
+    // TODO SERVER-71553 The Cost Model is overriden to preserve IndexScan plan.
+    const res = runWithParams(
+        [
+            {key: "internalCascadesOptimizerFastIndexNullHandling", value: true},
+            {key: 'internalCostModelCoefficients', value: {"indexScanStartupCost": 1e-9}}
+        ],
+        () => coll.explain("executionStats").aggregate([
             {'$project': {_id: 0, f_0: 1, f_1: 1, f_2: 1, f_3: 1, f_4: 1}}
-        ]),
-                                            {"indexScanStartupCost": 1e-9});
-        assert.eq(nDocs, res.executionStats.nReturned);
-        assertValueOnPlanPath("IndexScan", res, "child.child.nodeType");
-    }
+        ]));
+    assert.eq(nDocs, res.executionStats.nReturned);
+    assertValueOnPlanPath("IndexScan", res, "child.child.nodeType");
+}
 
-    {
-        // We need to fetch since we do not restrict the set of output fields.
-        const res = coll.explain("executionStats").aggregate([
-            {'$sort': {f_0: 1, f_1: 1, f_2: 1, f_3: 1, f_4: 1}}
-        ]);
-        assert.eq(nDocs, res.executionStats.nReturned);
-        assertValueOnPlanPath("Seek", res, "child.rightChild.child.nodeType");
-        assertValueOnPlanPath("IndexScan", res, "child.leftChild.nodeType");
-    }
+{
+    // We need to fetch since we do not restrict the set of output fields.
+    const res =
+        runWithParams([{key: "internalCascadesOptimizerFastIndexNullHandling", value: true}],
+                      () => coll.explain("executionStats").aggregate([
+                          {'$sort': {f_0: 1, f_1: 1, f_2: 1, f_3: 1, f_4: 1}}
+                      ]));
+    assert.eq(nDocs, res.executionStats.nReturned);
+    assertValueOnPlanPath("Seek", res, "child.rightChild.child.nodeType");
+    assertValueOnPlanPath("IndexScan", res, "child.leftChild.nodeType");
+}
 
-    {
-        // Covered plan.
-        const res = coll.explain("executionStats").aggregate([
-            {'$project': {_id: 0, f_0: 1, f_1: 1, f_2: 1, f_3: 1, f_4: 1}},
-            {'$sort': {f_0: 1, f_1: 1, f_2: 1, f_3: 1, f_4: 1}}
-        ]);
-        assert.eq(nDocs, res.executionStats.nReturned);
-        assertValueOnPlanPath("IndexScan", res, "child.child.nodeType");
-    }
+{
+    // Covered plan.
+    const res =
+        runWithParams([{key: "internalCascadesOptimizerFastIndexNullHandling", value: true}],
+                      () => coll.explain("executionStats").aggregate([
+                          {'$project': {_id: 0, f_0: 1, f_1: 1, f_2: 1, f_3: 1, f_4: 1}},
+                          {'$sort': {f_0: 1, f_1: 1, f_2: 1, f_3: 1, f_4: 1}}
+                      ]));
+    assert.eq(nDocs, res.executionStats.nReturned);
+    assertValueOnPlanPath("IndexScan", res, "child.child.nodeType");
+}
 
-    {
-        // Covered plan.
-        const res = coll.explain("executionStats").aggregate([
-            {'$sort': {f_0: 1, f_1: 1, f_2: 1, f_3: 1, f_4: 1}},
-            {'$project': {_id: 0, f_0: 1, f_1: 1, f_2: 1, f_3: 1, f_4: 1}}
-        ]);
-        assert.eq(nDocs, res.executionStats.nReturned);
-        assertValueOnPlanPath("IndexScan", res, "child.child.nodeType");
-    }
-} finally {
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalCascadesOptimizerFastIndexNullHandling: false}));
+{
+    // Covered plan.
+    const res =
+        runWithParams([{key: "internalCascadesOptimizerFastIndexNullHandling", value: true}],
+                      () => coll.explain("executionStats").aggregate([
+                          {'$sort': {f_0: 1, f_1: 1, f_2: 1, f_3: 1, f_4: 1}},
+                          {'$project': {_id: 0, f_0: 1, f_1: 1, f_2: 1, f_3: 1, f_4: 1}}
+                      ]));
+    assert.eq(nDocs, res.executionStats.nReturned);
+    assertValueOnPlanPath("IndexScan", res, "child.child.nodeType");
 }
 }());

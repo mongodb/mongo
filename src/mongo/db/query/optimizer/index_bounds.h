@@ -179,10 +179,30 @@ using ResidualRequirementsWithCE = std::vector<ResidualRequirementWithCE>;
 
 
 // A sequence of intervals corresponding to a compound bound, with one entry for each index key.
+// This is a physical primitive as it is tied to a specific index. It contains a sequence of simple
+// bounds which form a single equality prefix. As such the first 0+ entries are inclusive
+// (equalities), followed by 0/1 possibly exclusive ranges, followed by 0+ unconstrained entries
+// (MinKey to MaxKey). When the IndexNode is lowered we need to compute a global inclusion/exclusion
+// for the entire compound interval, and we do so by determining if there are ANY exclusive simple
+// low bounds or high bounds. In this case the compound bound is exclusive (on the low or the high
+// side respectively).
 using CompoundIntervalRequirement = std::vector<IntervalRequirement>;
 
 // Unions and conjunctions of individual compound intervals.
 using CompoundIntervalReqExpr = BoolExpr<CompoundIntervalRequirement>;
+
+struct EqualityPrefixEntry {
+    EqualityPrefixEntry(size_t startPos);
+
+    bool operator==(const EqualityPrefixEntry& other) const;
+
+    // Which one is the first index field in the prefix.
+    size_t _startPos;
+    // Contains the intervals we compute for each "equality prefix" of query predicates.
+    CompoundIntervalReqExpr::Node _interval;
+    // Set of positions of predicates (in the requirements map) which we encode with this prefix.
+    opt::unordered_set<size_t> _predPosSet;
+};
 
 /**
  * Used to pre-compute candidate indexes for SargableNodes.
@@ -220,8 +240,10 @@ struct CandidateIndexEntry {
     // Indicates which fields we are retrieving and how we assign them to projections.
     FieldProjectionMap _fieldProjectionMap;
 
-    // Contains the intervals we compute for each "equality prefix" of query predicates.
-    std::vector<CompoundIntervalReqExpr::Node> _intervals;
+    // Contains equality prefixes for this index.
+    std::vector<EqualityPrefixEntry> _eqPrefixes;
+    // If we have more than one equality prefix, contains the list of the correlated projections.
+    ProjectionNameOrderPreservingSet _correlatedProjNames;
 
     // Requirements which are not satisfied directly by the IndexScan. They are intended to be
     // sorted in their containing vector from most to least selective.

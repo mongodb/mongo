@@ -808,6 +808,20 @@ server_parameters:
     cpp_vartype: AtomicWord<bool>
     default: true
 
+  internalCascadesOptimizerMinIndexEqPrefixes:
+    description: "Controls the minimum number of equality prefixes in each candidate index."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalCascadesOptimizerMinIndexEqPrefixes"
+    cpp_vartype: AtomicWord<int>
+    default: 1
+
+  internalCascadesOptimizerMaxIndexEqPrefixes:
+    description: "Controls the maximum number of equality prefixes in each candidate index."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalCascadesOptimizerMaxIndexEqPrefixes"
+    cpp_vartype: AtomicWord<int>
+    default: 1
+
   internalCascadesOptimizerStdCoutDebugOutput:
     description: "Enables verbose, non-JSON, debug output for Cascades optimizer."
     set_at: [ startup, runtime ]

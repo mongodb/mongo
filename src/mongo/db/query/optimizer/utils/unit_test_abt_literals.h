@@ -255,6 +255,30 @@ inline auto _gb(ProjectionNameVector gbProjNames,
                                         std::move(input._n))};
 }
 
+inline auto _collation(std::vector<std::string> spec, NodeHolder input) {
+    ProjectionCollationSpec pcspec;
+    for (const auto& s : spec) {
+        if (const auto pos = s.find(':'); pos < s.size() - 1) {
+            const auto& projName = s.substr(0, pos);
+            const auto& collSpec = s.substr(pos + 1);
+
+            CollationOp op;
+            if (collSpec == "1") {
+                op = CollationOp::Ascending;
+            } else if (collSpec == "-1") {
+                op = CollationOp::Descending;
+            } else if (collSpec == "clustered") {
+                op = CollationOp::Clustered;
+            }
+
+            pcspec.emplace_back(std::move(projName), op);
+        }
+    }
+
+    return NodeHolder{make<CollationNode>(properties::CollationRequirement{std::move(pcspec)},
+                                          std::move(input._n))};
+}
+
 inline auto _union(ProjectionNameVector pns, std::vector<NodeHolder> inputs) {
     return NodeHolder{make<UnionNode>(std::move(pns), holdersToABTs(std::move(inputs)))};
 }
@@ -303,6 +327,10 @@ public:
                     std::vector<ExprHolder> exprs) {
         return advanceChildPtr<GroupByNode>(
             _gb(std::move(gbProjNames), std::move(aggProjNames), std::move(exprs), makeStub()));
+    }
+
+    NodeBuilder& collation(std::vector<std::string> spec) {
+        return advanceChildPtr<CollationNode>(_collation(std::move(spec), makeStub()));
     }
 
     template <typename... Ts>
@@ -524,6 +552,38 @@ public:
                 os << ", ";
             }
             os << explain(n);
+        }
+
+        return os << "})" << _nodeSeparator << childResult;
+    }
+
+    std::string transport(const CollationNode& node,
+                          std::string childResult,
+                          std::string refsResult) {
+        str::stream os;
+        os << ".collation({";
+
+        bool first = true;
+        for (const auto& [projName, op] : node.getProperty().getCollationSpec()) {
+            if (first) {
+                first = false;
+            } else {
+                os << ", ";
+            }
+
+            os << "\"" << projName << ":";
+            switch (op) {
+                case CollationOp::Ascending:
+                    os << "1";
+                    break;
+                case CollationOp::Descending:
+                    os << "-1";
+                    break;
+                case CollationOp::Clustered:
+                    os << "clustered";
+                    break;
+            }
+            os << "\"";
         }
 
         return os << "})" << _nodeSeparator << childResult;

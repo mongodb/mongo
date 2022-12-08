@@ -282,7 +282,9 @@ struct QueryHints {
     // prevent issues arising from yielding.
     bool _disableYieldingTolerantPlans = true;
 
-    // Controls the maximum number of equalityPrefixes we generate for a candidate index.
+    // Controls the minimum and maximum number of equalityPrefixes we generate for a candidate
+    // index. The minimum bound is only used for testing and in production should remain set to 1.
+    size_t _minIndexEqPrefixes = 1;
     size_t _maxIndexEqPrefixes = 1;
 };
 

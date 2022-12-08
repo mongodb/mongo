@@ -96,7 +96,6 @@ public:
                     sbe::value::SlotIdGenerator& ids,
                     const Metadata& metadata,
                     const NodeToGroupPropsMap& nodeToGroupPropsMap,
-                    const RIDProjectionsMap& ridProjections,
                     const bool randomScan)
         : _env(env),
           _slotMap(slotMap),
@@ -104,7 +103,6 @@ public:
           _slotIdGenerator(ids),
           _metadata(metadata),
           _nodeToGroupPropsMap(nodeToGroupPropsMap),
-          _ridProjections(ridProjections),
           _randomScan(randomScan) {}
 
     // The default noop transport.
@@ -204,7 +202,6 @@ private:
 
     const Metadata& _metadata;
     const NodeToGroupPropsMap& _nodeToGroupPropsMap;
-    const RIDProjectionsMap& _ridProjections;
 
     // If true, will create scan nodes using a random cursor to support sampling.
     // Currently only supported for single-threaded (non parallel-scanned) mongod collections.

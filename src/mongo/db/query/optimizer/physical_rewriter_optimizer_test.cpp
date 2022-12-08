@@ -1793,6 +1793,314 @@ TEST(PhysRewriter, FilterIndexingMaxKey) {
         optimized);
 }
 
+TEST(PhysRewriter, FilterIndexingRIN) {
+    using namespace properties;
+    using namespace unit_test_abt_literals;
+    PrefixId prefixId;
+
+    // Construct a query which tests "a" > 1 and "c" > 2 and "e" = 3.
+    ABT rootNode = NodeBuilder{}
+                       .root("root")
+                       .filter(_evalf(_get("a", _traverse1(_cmp("Gt", "1"_cint64))), "root"_var))
+                       .filter(_evalf(_get("c", _traverse1(_cmp("Gt", "2"_cint64))), "root"_var))
+                       .filter(_evalf(_get("e", _traverse1(_cmp("Eq", "3"_cint64))), "root"_var))
+                       .finish(_scan("root", "c1"));
+
+    auto phaseManager = makePhaseManager(
+        {OptPhase::MemoSubstitutionPhase,
+         OptPhase::MemoExplorationPhase,
+         OptPhase::MemoImplementationPhase},
+        prefixId,
+        {{{"c1",
+           createScanDef(
+               {},
+               {{"index1",
+                 IndexDefinition{{{makeNonMultikeyIndexPath("a"), CollationOp::Ascending},
+                                  {makeNonMultikeyIndexPath("b"), CollationOp::Ascending},
+                                  {makeNonMultikeyIndexPath("c"), CollationOp::Ascending},
+                                  {makeNonMultikeyIndexPath("d"), CollationOp::Ascending},
+                                  {makeNonMultikeyIndexPath("e"), CollationOp::Ascending}},
+                                 false /*isMultiKey*/,
+                                 {DistributionType::Centralized},
+                                 {}}}})}}},
+        boost::none /*costModel*/,
+        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
+
+    ABT optimized = std::move(rootNode);
+
+    // We need to apply those hints in order to coax the RIN plan.
+    phaseManager.getHints()._minIndexEqPrefixes = 3;
+    phaseManager.getHints()._maxIndexEqPrefixes = 3;
+    phaseManager.getHints()._disableScan = true;
+
+    phaseManager.optimize(optimized);
+    ASSERT_BETWEEN(8, 12, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+
+    // Demonstrate RIN plan which consists of three equality prefixes.
+    // TODO: SERVER-70639. Use a spool node for RIN plans.
+    ASSERT_EXPLAIN_V2_AUTO(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       root\n"
+        "|   RefBlock: \n"
+        "|       Variable [root]\n"
+        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
+        "|   |   Const [true]\n"
+        "|   LimitSkip []\n"
+        "|   |   limitSkip:\n"
+        "|   |       limit: 1\n"
+        "|   |       skip: 0\n"
+        "|   Seek [ridProjection: rid_0, {'<root>': root}, c1]\n"
+        "|   |   BindBlock:\n"
+        "|   |       [root]\n"
+        "|   |           Source []\n"
+        "|   RefBlock: \n"
+        "|       Variable [rid_0]\n"
+        "NestedLoopJoin [joinType: Inner, {evalTemp_57, evalTemp_58, evalTemp_59, evalTemp_60}]\n"
+        "|   |   Const [true]\n"
+        "|   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: "
+        "{=Variable [evalTemp_57], =Variable [evalTemp_58], =Variable [evalTemp_59], =Variable "
+        "[evalTemp_60], =Const [3]}]\n"
+        "|       BindBlock:\n"
+        "|           [rid_0]\n"
+        "|               Source []\n"
+        "Unique []\n"
+        "|   projections: \n"
+        "|       evalTemp_57\n"
+        "|       evalTemp_58\n"
+        "|       evalTemp_59\n"
+        "|       evalTemp_60\n"
+        "NestedLoopJoin [joinType: Inner, {evalTemp_57, evalTemp_58}]\n"
+        "|   |   Const [true]\n"
+        "|   IndexScan [{'<indexKey> 2': evalTemp_59, '<indexKey> 3': evalTemp_60}, scanDefName: "
+        "c1, indexDefName: index1, interval: {=Variable [evalTemp_57], =Variable [evalTemp_58], "
+        ">Const [2], <fully open>, <fully open>}]\n"
+        "|       BindBlock:\n"
+        "|           [evalTemp_59]\n"
+        "|               Source []\n"
+        "|           [evalTemp_60]\n"
+        "|               Source []\n"
+        "Unique []\n"
+        "|   projections: \n"
+        "|       evalTemp_57\n"
+        "|       evalTemp_58\n"
+        "IndexScan [{'<indexKey> 0': evalTemp_57, '<indexKey> 1': evalTemp_58}, scanDefName: c1, "
+        "indexDefName: index1, interval: {>Const [1], <fully open>, <fully open>, <fully open>, "
+        "<fully open>}]\n"
+        "    BindBlock:\n"
+        "        [evalTemp_57]\n"
+        "            Source []\n"
+        "        [evalTemp_58]\n"
+        "            Source []\n",
+        optimized);
+}
+
+TEST(PhysRewriter, FilterIndexingRIN1) {
+    using namespace properties;
+    using namespace unit_test_abt_literals;
+    PrefixId prefixId;
+
+    // Construct a query which tests "a" > 1 and "b" > 2, and sorts ascending on "a", then
+    // descending on "b".
+    ABT rootNode = NodeBuilder{}
+                       .root("root")
+                       .collation({"pa:1", "pb:-1"})
+                       .filter(_evalf(_traverse1(_cmp("Gt", "1"_cint64)), "pa"_var))
+                       .filter(_evalf(_traverse1(_cmp("Gt", "2"_cint64)), "pb"_var))
+                       .eval("pa", _evalp(_get("a", _id()), "root"_var))
+                       .eval("pb", _evalp(_get("b", _id()), "root"_var))
+                       .finish(_scan("root", "c1"));
+
+    auto phaseManager = makePhaseManager(
+        {OptPhase::MemoSubstitutionPhase,
+         OptPhase::MemoExplorationPhase,
+         OptPhase::MemoImplementationPhase},
+        prefixId,
+        {{{"c1",
+           createScanDef(
+               {},
+               {{"index1",
+                 IndexDefinition{{{makeNonMultikeyIndexPath("a"), CollationOp::Ascending},
+                                  {makeNonMultikeyIndexPath("b"), CollationOp::Ascending}},
+                                 false /*isMultiKey*/,
+                                 {DistributionType::Centralized},
+                                 {}}}})}}},
+        boost::none /*costModel*/,
+        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
+
+    ABT optimized = std::move(rootNode);
+
+    // We need to apply those hints in order to coax out the RIN plan.
+    phaseManager.getHints()._minIndexEqPrefixes = 2;
+    phaseManager.getHints()._maxIndexEqPrefixes = 2;
+    phaseManager.getHints()._disableScan = true;
+
+    phaseManager.optimize(optimized);
+    ASSERT_BETWEEN(10, 15, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+
+    // Observe how the index scan for the second equality prefix (on "b") is reversed while the
+    // first one (on "a") is not.
+    ASSERT_EXPLAIN_V2_AUTO(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       root\n"
+        "|   RefBlock: \n"
+        "|       Variable [root]\n"
+        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
+        "|   |   Const [true]\n"
+        "|   LimitSkip []\n"
+        "|   |   limitSkip:\n"
+        "|   |       limit: 1\n"
+        "|   |       skip: 0\n"
+        "|   Seek [ridProjection: rid_0, {'<root>': root}, c1]\n"
+        "|   |   BindBlock:\n"
+        "|   |       [root]\n"
+        "|   |           Source []\n"
+        "|   RefBlock: \n"
+        "|       Variable [rid_0]\n"
+        "NestedLoopJoin [joinType: Inner, {pa}]\n"
+        "|   |   Const [true]\n"
+        "|   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: "
+        "{=Variable [pa], >Const [2]}, reversed]\n"
+        "|       BindBlock:\n"
+        "|           [rid_0]\n"
+        "|               Source []\n"
+        "Unique []\n"
+        "|   projections: \n"
+        "|       pa\n"
+        "IndexScan [{'<indexKey> 0': pa}, scanDefName: c1, indexDefName: index1, interval: {>Const "
+        "[1], <fully open>}]\n"
+        "    BindBlock:\n"
+        "        [pa]\n"
+        "            Source []\n",
+        optimized);
+}
+
+TEST(PhysRewriter, FilterIndexingRIN2) {
+    using namespace properties;
+    using namespace unit_test_abt_literals;
+    PrefixId prefixId;
+
+    // Construct a query which tests "a" in [1, 2] U [3, 4] and "b" in [5, 6] U [7, 8].
+    ABT rootNode =
+        NodeBuilder{}
+            .root("root")
+            .filter(
+                _evalf(_get("a",
+                            _composea(_composem(_cmp("Gte", "1"_cint64), _cmp("Lte", "2"_cint64)),
+                                      _composem(_cmp("Gte", "3"_cint64), _cmp("Lte", "4"_cint64)))),
+                       "root"_var))
+            .filter(
+                _evalf(_get("b",
+                            _composea(_composem(_cmp("Gte", "5"_cint64), _cmp("Lte", "6"_cint64)),
+                                      _composem(_cmp("Gte", "7"_cint64), _cmp("Lte", "8"_cint64)))),
+                       "root"_var))
+            .finish(_scan("root", "c1"));
+
+    auto phaseManager = makePhaseManager(
+        {OptPhase::MemoSubstitutionPhase,
+         OptPhase::MemoExplorationPhase,
+         OptPhase::MemoImplementationPhase},
+        prefixId,
+        {{{"c1",
+           createScanDef(
+               {},
+               {{"index1",
+                 IndexDefinition{{{makeNonMultikeyIndexPath("a"), CollationOp::Ascending},
+                                  {makeNonMultikeyIndexPath("b"), CollationOp::Ascending}},
+                                 false /*isMultiKey*/,
+                                 {DistributionType::Centralized},
+                                 {}}}})}}},
+        boost::none /*costModel*/,
+        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
+
+    ABT optimized = std::move(rootNode);
+
+    // We need to apply those hints in order to coax out the RIN plan.
+    phaseManager.getHints()._minIndexEqPrefixes = 2;
+    phaseManager.getHints()._maxIndexEqPrefixes = 2;
+    phaseManager.getHints()._disableScan = true;
+
+    phaseManager.optimize(optimized);
+    ASSERT_BETWEEN(5, 10, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+
+    ASSERT_EXPLAIN_V2_AUTO(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       root\n"
+        "|   RefBlock: \n"
+        "|       Variable [root]\n"
+        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
+        "|   |   Const [true]\n"
+        "|   LimitSkip []\n"
+        "|   |   limitSkip:\n"
+        "|   |       limit: 1\n"
+        "|   |       skip: 0\n"
+        "|   Seek [ridProjection: rid_0, {'<root>': root}, c1]\n"
+        "|   |   BindBlock:\n"
+        "|   |       [root]\n"
+        "|   |           Source []\n"
+        "|   RefBlock: \n"
+        "|       Variable [rid_0]\n"
+        "NestedLoopJoin [joinType: Inner, {evalTemp_10}]\n"
+        "|   |   Const [true]\n"
+        "|   GroupBy []\n"
+        "|   |   |   groupings: \n"
+        "|   |   |       RefBlock: \n"
+        "|   |   |           Variable [rid_0]\n"
+        "|   |   aggregations: \n"
+        "|   Union []\n"
+        "|   |   |   BindBlock:\n"
+        "|   |   |       [rid_0]\n"
+        "|   |   |           Source []\n"
+        "|   |   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: "
+        "{=Variable [evalTemp_10], [Const [7], Const [8]]}]\n"
+        "|   |       BindBlock:\n"
+        "|   |           [rid_0]\n"
+        "|   |               Source []\n"
+        "|   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: "
+        "{=Variable [evalTemp_10], [Const [5], Const [6]]}]\n"
+        "|       BindBlock:\n"
+        "|           [rid_0]\n"
+        "|               Source []\n"
+        "Unique []\n"
+        "|   projections: \n"
+        "|       evalTemp_10\n"
+        "Union []\n"
+        "|   BindBlock:\n"
+        "|       [evalTemp_10]\n"
+        "|           Source []\n"
+        "GroupBy []\n"
+        "|   |   groupings: \n"
+        "|   |       RefBlock: \n"
+        "|   |           Variable [rid_0]\n"
+        "|   aggregations: \n"
+        "|       [evalTemp_10]\n"
+        "|           FunctionCall [$first]\n"
+        "|           Variable [disjunction_0]\n"
+        "Union []\n"
+        "|   |   BindBlock:\n"
+        "|   |       [disjunction_0]\n"
+        "|   |           Source []\n"
+        "|   |       [rid_0]\n"
+        "|   |           Source []\n"
+        "|   IndexScan [{'<indexKey> 0': disjunction_0, '<rid>': rid_0}, scanDefName: c1, "
+        "indexDefName: index1, interval: {[Const [3], Const [4]], <fully open>}]\n"
+        "|       BindBlock:\n"
+        "|           [disjunction_0]\n"
+        "|               Source []\n"
+        "|           [rid_0]\n"
+        "|               Source []\n"
+        "IndexScan [{'<indexKey> 0': disjunction_0, '<rid>': rid_0}, scanDefName: c1, "
+        "indexDefName: index1, interval: {[Const [1], Const [2]], <fully open>}]\n"
+        "    BindBlock:\n"
+        "        [disjunction_0]\n"
+        "            Source []\n"
+        "        [rid_0]\n"
+        "            Source []\n",
+        optimized);
+}
+
 TEST(PhysRewriter, SargableProjectionRenames) {
     using namespace properties;
 

@@ -507,10 +507,11 @@ struct Collector {
         const ProjectionNameSet& correlatedProjNames = node.getCorrelatedProjectionNames();
         {
             const ProjectionNameSet& leftProjections = leftChildResult.getProjections();
-            for (const ProjectionName& boundProjectionName : correlatedProjNames) {
+            for (const ProjectionName& projName : correlatedProjNames) {
                 tassert(6624099,
-                        "Correlated projections must exist in left child.",
-                        leftProjections.find(boundProjectionName) != leftProjections.cend());
+                        str::stream()
+                            << "Correlated projection must exist in left child: " << projName,
+                        leftProjections.find(projName) != leftProjections.cend());
             }
         }
 
@@ -746,6 +747,24 @@ struct Collector {
         result.mergeNoDefs(std::move(bindResult));
 
         result.nodeDefs[&unwindNode] = result.defs;
+
+        return result;
+    }
+
+    CollectedInfo transport(const ABT& n,
+                            const UniqueNode& uniqueNode,
+                            CollectedInfo childResult,
+                            CollectedInfo refsResult) {
+        CollectedInfo result{};
+
+        result.merge(std::move(refsResult));
+        result.merge(std::move(childResult));
+
+        for (const auto& name : uniqueNode.getProjections()) {
+            tassert(6624060, "Unique projection does not exist", result.defs.count(name) != 0);
+        }
+
+        result.nodeDefs[&uniqueNode] = result.defs;
 
         return result;
     }

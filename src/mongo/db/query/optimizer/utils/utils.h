@@ -138,11 +138,6 @@ properties::LogicalProps createInitialScanProps(const ProjectionName& projection
  */
 ProjectionNameSet extractReferencedColumns(const properties::PhysProps& properties);
 
-/**
- * Returns true if all components of the compound interval are equalities.
- */
-bool areCompoundIntervalsEqualities(const CompoundIntervalRequirement& intervals);
-
 struct CollationSplitResult {
     bool _validSplit = false;
     ProjectionCollationSpec _leftCollation;
@@ -267,8 +262,7 @@ CandidateIndexes computeCandidateIndexes(PrefixId& prefixId,
                                          const ProjectionName& scanProjectionName,
                                          const PartialSchemaRequirements& reqMap,
                                          const ScanDefinition& scanDef,
-                                         bool fastNullHandling,
-                                         size_t maxIndexEqPrefixes,
+                                         const QueryHints& hints,
                                          bool& hasEmptyInterval,
                                          const ConstFoldFn& constFold);
 
@@ -311,6 +305,7 @@ void applyProjectionRenames(ProjectionRenames projectionRenames,
                             });
 
 void removeRedundantResidualPredicates(const ProjectionNameOrderPreservingSet& requiredProjections,
+                                       const ProjectionNameOrderPreservingSet& correlatedProjNames,
                                        ResidualRequirements& residualReqs,
                                        FieldProjectionMap& fieldProjectionMap);
 
@@ -357,16 +352,23 @@ ABT lowerRIDIntersectMergeJoin(PrefixId& prefixId,
                                NodeCEMap& nodeCEMap,
                                ChildPropsType& childProps);
 
-ABT lowerIntervals(PrefixId& prefixId,
-                   const ProjectionName& ridProjName,
-                   FieldProjectionMap indexProjectionMap,
-                   const std::string& scanDefName,
-                   const std::string& indexDefName,
-                   const CompoundIntervalReqExpr::Node& intervals,
-                   bool reverseOrder,
-                   CEType indexCE,
-                   CEType scanGroupCE,
-                   NodeCEMap& nodeCEMap);
+/**
+ * Lowers a plan consisting of one or several equality prefixes. The subplans for each equality
+ * prefix are connected using correlated joins. The subplans for each prefix in turn are implemented
+ * as one or more index scans depending on the shape of the interval expression.
+ */
+ABT lowerEqPrefixes(PrefixId& prefixId,
+                    const ProjectionName& ridProjName,
+                    FieldProjectionMap indexProjectionMap,
+                    const std::string& scanDefName,
+                    const std::string& indexDefName,
+                    const std::vector<EqualityPrefixEntry>& eqPrefixes,
+                    const std::vector<bool>& reverseOrder,
+                    const ProjectionNameVector& correlatedProjNames,
+                    const std::map<size_t, SelectivityType>& indexPredSelMap,
+                    CEType currentGroupCE,
+                    CEType scanGroupCE,
+                    NodeCEMap& nodeCEMap);
 
 /**
  * This helper checks to see if we have a PathTraverse + PathId at the end of the path.

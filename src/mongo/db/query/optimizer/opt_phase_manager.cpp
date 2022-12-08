@@ -233,7 +233,8 @@ void OptPhaseManager::runMemoPhysicalRewrite(const OptPhase phase,
     tassert(6808706, "Optimization failed.", optGroupResult._success);
 
     _physicalNodeId = {rootGroupId, optGroupResult._index};
-    std::tie(input, _nodeToGroupPropsMap) = extractPhysicalPlan(_physicalNodeId, _metadata, _memo);
+    std::tie(input, _nodeToGroupPropsMap) =
+        extractPhysicalPlan(_physicalNodeId, _metadata, _ridProjections, _memo);
 
     env.rebuild(input);
     if (env.hasFreeVariables()) {

@@ -29,9 +29,11 @@ assert.commandWorked(t.createIndex({'b': 1}));
 
 // TODO SERVER-71553 The Cost Model is overriden to preserve MergeJoin plan.
 // In majority of cases it works well without Cost Model override, but in some rare cases it fails.
-let res = runCommandWithCostModel(
-    () => t.explain("executionStats").aggregate([{$match: {'a': 3, 'b': 3}}]),
-    {"mergeJoinStartupCost": 1e-9, "mergeJoinIncrementalCost": 1e-9});
+let res = runWithParams([{
+                            key: 'internalCostModelCoefficients',
+                            value: {"mergeJoinStartupCost": 1e-9, "mergeJoinIncrementalCost": 1e-9}
+                        }],
+                        () => t.explain("executionStats").aggregate([{$match: {'a': 3, 'b': 3}}]));
 assert.eq(nMatches, res.executionStats.nReturned);
 
 // Verify we can place a MergeJoin
@@ -42,9 +44,9 @@ assertValueOnPath("IndexScan", joinNode, "rightChild.children.0.child.nodeType")
 
 // One side is not equality, and we use a HashJoin.
 // TODO SERVER-71553 The Cost Model is overriden to preserve HashJoin plan.
-res = runCommandWithCostModel(
-    () => t.explain("executionStats").aggregate([{$match: {'a': {$lte: 3}, 'b': 3}}]),
-    {"hashJoinIncrementalCost": 1e-9});
+res = runWithParams(
+    [{key: 'internalCostModelCoefficients', value: {"hashJoinIncrementalCost": 1e-9}}],
+    () => t.explain("executionStats").aggregate([{$match: {'a': {$lte: 3}, 'b': 3}}]));
 assert.eq(nMatches, res.executionStats.nReturned);
 
 joinNode = navigateToPlanPath(res, "child.leftChild");
