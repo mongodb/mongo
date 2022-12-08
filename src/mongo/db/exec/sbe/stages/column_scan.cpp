@@ -608,6 +608,7 @@ void ColumnScanStage::close() {
     _coll.reset();
     _columnCursors.clear();
     _parentPathCursors.clear();
+    _denseColumnCursor.reset();
     _open = false;
 }
 
