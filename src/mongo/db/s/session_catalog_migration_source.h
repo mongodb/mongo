@@ -311,7 +311,7 @@ private:
     Mutex _newOplogMutex = MONGO_MAKE_LATCH("SessionCatalogMigrationSource::_newOplogMutex");
 
     // The average size of documents in config.transactions.
-    uint64_t _averageSessionDocSize;
+    uint64_t _averageSessionDocSize{0};
 
     // Stores oplog opTime of new writes that are coming in.
     std::list<std::pair<repl::OpTime, EntryAtOpTimeType>> _newWriteOpTimeList;
