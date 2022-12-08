@@ -527,6 +527,15 @@ enum class Builtin : uint8_t {
     toLower,
     coerceToString,
     concat,
+
+    // Agg function to concatenate arrays, failing when the accumulator reaches a specified size.
+    aggConcatArraysCapped,
+
+    // Agg functions to compute the set union of two arrays, failing when the accumulator reaches a
+    // specified size.
+    aggSetUnionCapped,
+    aggCollSetUnionCapped,
+
     acos,
     acosh,
     asin,
@@ -1137,6 +1146,14 @@ private:
     std::tuple<bool, value::TypeTags, value::Value> builtinTanh(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinRound(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinConcat(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinAggConcatArraysCapped(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinAggSetUnionCapped(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> builtinAggCollSetUnionCapped(ArityType arity);
+    std::tuple<bool, value::TypeTags, value::Value> aggSetUnionCappedImpl(
+        value::TypeTags tagNewElem,
+        value::Value valNewElem,
+        int32_t sizeCap,
+        CollatorInterface* collator);
     std::tuple<bool, value::TypeTags, value::Value> builtinIsMember(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinCollIsMember(ArityType arity);
     std::tuple<bool, value::TypeTags, value::Value> builtinIndexOfBytes(ArityType arity);

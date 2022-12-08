@@ -844,7 +844,14 @@ public:
         }
     }
 
-    void push_back(TypeTags tag, Value val);
+    /**
+     * Adds the given SBE value to the set if an equal value is not already present. Assumes
+     * ownership of the given value.
+     *
+     * Returns true if the value was newly inserted, otherwise returns false to indicate that an
+     * equal value was already present in the set.
+     */
+    bool push_back(TypeTags tag, Value val);
 
     auto& values() const noexcept {
         return _values;
