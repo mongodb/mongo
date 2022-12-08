@@ -32,7 +32,8 @@ assert.commandFailed(setParameter(adminDb, {"diagnosticDataCollectionStatsNamesp
 
 assert.eq(getParameter(adminDb, "diagnosticDataCollectionStatsNamespaces"), ["local.startup_log"]);
 
-// Validate that collection stats are collected for runtime collections
+// Validate that collection stats are collected for runtime collections and that we do not crash
+// for a non-existent collection
 assert.commandWorked(setParameter(
     adminDb,
     {"diagnosticDataCollectionStatsNamespaces": ["admin.system.version", "admin.does_not_exist"]}));
@@ -41,8 +42,7 @@ assert.soon(() => {
     jsTestLog("Collected: " + tojson(result));
     let collectionStats = result.data.collectionStats;
     return collectionStats.hasOwnProperty("admin.system.version") &&
-        collectionStats["admin.system.version"].ns == "admin.system.version" &&
-        collectionStats["admin.does_not_exist"].ns == "admin.does_not_exist" != undefined;
+        collectionStats["admin.system.version"].ns == "admin.system.version";
 });
 
 // Validate that when it is disabled, we stop collecting
