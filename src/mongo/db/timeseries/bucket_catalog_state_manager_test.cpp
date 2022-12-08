@@ -39,9 +39,9 @@ class BucketCatalogStateManagerTest : public BucketCatalog, public unittest::Tes
 public:
     BucketCatalogStateManagerTest() {}
 
-    void clearById(const OID& oid) {
-        directWriteStart(oid);
-        directWriteFinish(oid);
+    void clearById(const NamespaceString& ns, const OID& oid) {
+        directWriteStart(ns, oid);
+        directWriteFinish(ns, oid);
     }
 
     bool hasBeenCleared(Bucket* bucket) {
@@ -51,7 +51,6 @@ public:
 
     Bucket* createBucket(const CreationInfo& info) {
         auto ptr = _allocateBucket(&_stripes[info.stripe], withLock, info);
-        ptr->setNamespace(info.key.ns);
         ASSERT_FALSE(hasBeenCleared(ptr));
         return ptr;
     }
@@ -66,11 +65,15 @@ public:
     }
 
     void checkAndRemoveClearedBucket(Bucket* bucket, BucketKey bucketKey, WithLock withLock) {
-        auto a = _findBucket(
-            _stripes[_getStripeNumber(bucketKey)], withLock, bucket->id(), IgnoreBucketState::kYes);
+        auto a = _findBucket(_stripes[_getStripeNumber(bucketKey)],
+                             withLock,
+                             bucket->bucketId(),
+                             IgnoreBucketState::kYes);
         ASSERT(a == bucket);
-        auto b = _findBucket(
-            _stripes[_getStripeNumber(bucketKey)], withLock, bucket->id(), IgnoreBucketState::kNo);
+        auto b = _findBucket(_stripes[_getStripeNumber(bucketKey)],
+                             withLock,
+                             bucket->bucketId(),
+                             IgnoreBucketState::kNo);
         ASSERT(b == nullptr);
         _removeBucket(
             &_stripes[_getStripeNumber(bucketKey)], withLock, bucket, RemovalMode::kAbort);
@@ -329,7 +332,7 @@ TEST_F(BucketCatalogStateManagerTest, EraAdvancesAsExpected) {
     ASSERT_EQ(bucket2->getEra(), 1);
 
     // Era also advances when clearing by OID
-    clearById(OID());
+    clearById(ns1, OID());
     ASSERT_EQ(_bucketStateManager.getEra(), 4);
 }
 
@@ -500,7 +503,7 @@ TEST_F(BucketCatalogStateManagerTest, HasBeenClearedToleratesGapsInRegistry) {
 
     auto bucket1 = createBucket(info1);
     ASSERT_EQ(bucket1->getEra(), 0);
-    clearById(OID());
+    clearById(ns1, OID());
     ASSERT_EQ(_bucketStateManager.getEra(), 2);
     clear(ns1);
     ASSERT_EQ(_bucketStateManager.getEra(), 3);
@@ -508,9 +511,9 @@ TEST_F(BucketCatalogStateManagerTest, HasBeenClearedToleratesGapsInRegistry) {
 
     auto bucket2 = createBucket(info2);
     ASSERT_EQ(bucket2->getEra(), 3);
-    clearById(OID());
-    clearById(OID());
-    clearById(OID());
+    clearById(ns1, OID());
+    clearById(ns1, OID());
+    clearById(ns1, OID());
     ASSERT_EQ(_bucketStateManager.getEra(), 9);
     ASSERT_TRUE(hasBeenCleared(bucket1));
     ASSERT_FALSE(hasBeenCleared(bucket2));
@@ -525,7 +528,7 @@ TEST_F(BucketCatalogStateManagerTest, ArchivingBucketPreservesState) {
                                                     true};
 
     auto bucket = createBucket(info1);
-    auto bucketId = bucket->id();
+    auto bucketId = bucket->bucketId();
 
     ClosedBuckets closedBuckets;
     _archiveBucket(&_stripes[info1.stripe], WithLock::withoutLock(), bucket, &closedBuckets);
@@ -539,7 +542,7 @@ TEST_F(BucketCatalogStateManagerTest, AbortingBatchRemovesBucketState) {
                                                     true};
 
     auto bucket = createBucket(info1);
-    auto bucketId = bucket->id();
+    auto bucketId = bucket->bucketId();
 
     auto stats = _getExecutionStats(info1.key.ns);
     auto batch = std::make_shared<WriteBatch>(BucketHandle{bucketId, info1.stripe}, 0, stats);
@@ -553,7 +556,7 @@ TEST_F(BucketCatalogStateManagerTest, ClosingBucketGoesThroughPendingCompression
                                                     true};
 
     auto bucket = createBucket(info1);
-    auto bucketId = bucket->id();
+    auto bucketId = bucket->bucketId();
 
     ASSERT(_bucketStateManager.getBucketState(bucketId).value() == BucketState{});
 
@@ -571,7 +574,7 @@ TEST_F(BucketCatalogStateManagerTest, ClosingBucketGoesThroughPendingCompression
         CommitInfo commitInfo{};
         auto closedBucket = finish(batch, commitInfo);
         ASSERT(closedBucket.has_value());
-        ASSERT_EQ(closedBucket.value().bucketId, bucketId);
+        ASSERT_EQ(closedBucket.value().bucketId.oid, bucketId.oid);
 
         // Bucket should now be in pending compression state.
         ASSERT(_bucketStateManager.getBucketState(bucketId).has_value());
@@ -588,8 +591,8 @@ TEST_F(BucketCatalogStateManagerTest, DirectWriteStartInitializesBucketState) {
     RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
                                                     true};
 
-    auto bucketId = OID();
-    directWriteStart(bucketId);
+    auto bucketId = BucketId{ns1, OID()};
+    directWriteStart(ns1, bucketId.oid);
     auto state = _bucketStateManager.getBucketState(bucketId);
     ASSERT_TRUE(state.has_value());
     ASSERT_TRUE(state.value().isSet(BucketStateFlag::kPendingDirectWrite));
@@ -599,13 +602,13 @@ TEST_F(BucketCatalogStateManagerTest, DirectWriteFinishRemovesBucketState) {
     RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
                                                     true};
 
-    auto bucketId = OID();
-    directWriteStart(bucketId);
+    auto bucketId = BucketId{ns1, OID()};
+    directWriteStart(ns1, bucketId.oid);
     auto state = _bucketStateManager.getBucketState(bucketId);
     ASSERT_TRUE(state.has_value());
     ASSERT_TRUE(state.value().isSet(BucketStateFlag::kPendingDirectWrite));
 
-    directWriteFinish(bucketId);
+    directWriteFinish(ns1, bucketId.oid);
     state = _bucketStateManager.getBucketState(bucketId);
     ASSERT_FALSE(state.has_value());
 }

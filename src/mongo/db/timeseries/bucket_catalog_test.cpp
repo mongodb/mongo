@@ -570,7 +570,7 @@ TEST_F(BucketCatalogWithoutMetadataTest, CommitReturnsNewFields) {
                                          BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
     ASSERT(result.isOK());
     auto batch = result.getValue().batch;
-    auto oldId = batch->bucket().id;
+    auto oldId = batch->bucket().bucketId;
     _commit(batch, 0);
     ASSERT_EQ(2U, batch->newFieldNamesToBeInserted().size()) << batch->toBSON();
     ASSERT(batch->newFieldNamesToBeInserted().count(_timeField)) << batch->toBSON();
@@ -626,7 +626,7 @@ TEST_F(BucketCatalogWithoutMetadataTest, CommitReturnsNewFields) {
         BSON(_timeField << Date_t::now() << "a" << gTimeseriesBucketMaxCount),
         BucketCatalog::CombineWithInsertsFromOtherClients::kAllow);
     auto& batch2 = result2.getValue().batch;
-    ASSERT_NE(oldId, batch2->bucket().id);
+    ASSERT_NE(oldId, batch2->bucket().bucketId);
     _commit(batch2, 0);
     ASSERT_EQ(2U, batch2->newFieldNamesToBeInserted().size()) << batch2->toBSON();
     ASSERT(batch2->newFieldNamesToBeInserted().count(_timeField)) << batch2->toBSON();
@@ -730,7 +730,8 @@ TEST_F(BucketCatalogTest, ClearBucketWithPreparedBatchThrowsConflict) {
     ASSERT_EQ(batch->measurements().size(), 1);
     ASSERT_EQ(batch->numPreviouslyCommittedMeasurements(), 0);
 
-    ASSERT_THROWS(_bucketCatalog->directWriteStart(batch->bucket().id), WriteConflictException);
+    ASSERT_THROWS(_bucketCatalog->directWriteStart(_ns1, batch->bucket().bucketId.oid),
+                  WriteConflictException);
 
     _bucketCatalog->abort(batch, {ErrorCodes::TimeseriesBucketCleared, ""});
     ASSERT(batch->finished());
@@ -763,10 +764,11 @@ TEST_F(BucketCatalogTest, PrepareCommitOnClearedBatchWithAlreadyPreparedBatch) {
                       .getValue()
                       .batch;
     ASSERT_NE(batch1, batch2);
-    ASSERT_EQ(batch1->bucket().id, batch2->bucket().id);
+    ASSERT_EQ(batch1->bucket().bucketId, batch2->bucket().bucketId);
 
     // Now clear the bucket. Since there's a prepared batch it should conflict.
-    ASSERT_THROWS(_bucketCatalog->directWriteStart(batch1->bucket().id), WriteConflictException);
+    ASSERT_THROWS(_bucketCatalog->directWriteStart(_ns1, batch1->bucket().bucketId.oid),
+                  WriteConflictException);
 
     // Now try to prepare the second batch. Ensure it aborts the batch.
     ASSERT(batch2->claimCommitRights());
@@ -775,7 +777,8 @@ TEST_F(BucketCatalogTest, PrepareCommitOnClearedBatchWithAlreadyPreparedBatch) {
     ASSERT_EQ(batch2->getResult().getStatus(), ErrorCodes::TimeseriesBucketCleared);
 
     // Make sure we didn't clear the bucket state when we aborted the second batch.
-    ASSERT_THROWS(_bucketCatalog->directWriteStart(batch1->bucket().id), WriteConflictException);
+    ASSERT_THROWS(_bucketCatalog->directWriteStart(_ns1, batch1->bucket().bucketId.oid),
+                  WriteConflictException);
 
     // Make sure a subsequent insert, which opens a new bucket, doesn't corrupt the old bucket
     // state and prevent us from finishing the first batch.
@@ -790,7 +793,7 @@ TEST_F(BucketCatalogTest, PrepareCommitOnClearedBatchWithAlreadyPreparedBatch) {
                       .batch;
     ASSERT_NE(batch1, batch3);
     ASSERT_NE(batch2, batch3);
-    ASSERT_NE(batch1->bucket().id, batch3->bucket().id);
+    ASSERT_NE(batch1->bucket().bucketId, batch3->bucket().bucketId);
     // Clean up this batch
     ASSERT(batch3->claimCommitRights());
     _bucketCatalog->abort(batch3, {ErrorCodes::TimeseriesBucketCleared, ""});
@@ -940,8 +943,8 @@ TEST_F(BucketCatalogTest, AbortingBatchEnsuresBucketIsEventuallyClosed) {
                                BucketCatalog::CombineWithInsertsFromOtherClients::kDisallow)
                       .getValue()
                       .batch;
-    ASSERT_EQ(batch1->bucket().id, batch2->bucket().id);
-    ASSERT_EQ(batch1->bucket().id, batch3->bucket().id);
+    ASSERT_EQ(batch1->bucket().bucketId, batch2->bucket().bucketId);
+    ASSERT_EQ(batch1->bucket().bucketId, batch3->bucket().bucketId);
 
     ASSERT(batch1->claimCommitRights());
     ASSERT(batch2->claimCommitRights());
@@ -975,7 +978,7 @@ TEST_F(BucketCatalogTest, AbortingBatchEnsuresBucketIsEventuallyClosed) {
                                BucketCatalog::CombineWithInsertsFromOtherClients::kDisallow)
                       .getValue()
                       .batch;
-    ASSERT_NE(batch2->bucket().id, batch4->bucket().id);
+    ASSERT_NE(batch2->bucket().bucketId, batch4->bucket().bucketId);
 }
 
 TEST_F(BucketCatalogTest, DuplicateNewFieldNamesAcrossConcurrentBatches) {
@@ -1446,7 +1449,7 @@ TEST_F(BucketCatalogTest, TryInsertWillNotCreateBucketWhenWeShouldTryToReopen) {
         "featureFlagTimeseriesScalabilityImprovements", true};
     RAIIServerParameterControllerForTest memoryController{
         "timeseriesIdleBucketExpiryMemoryUsageThreshold",
-        200};  // An absurdly low limit that only allows us one open bucket at a time.
+        250};  // An absurdly low limit that only allows us one open bucket at a time.
     setGlobalFailPoint("alwaysUseSameBucketCatalogStripe",
                        BSON("mode"
                             << "alwaysOn"));
@@ -1481,7 +1484,7 @@ TEST_F(BucketCatalogTest, TryInsertWillNotCreateBucketWhenWeShouldTryToReopen) {
     ASSERT_OK(result.getStatus());
     auto batch = result.getValue().batch;
     ASSERT(batch);
-    auto bucketId = batch->bucket().id;
+    auto bucketId = batch->bucket().bucketId;
     ASSERT(batch->claimCommitRights());
     ASSERT_OK(_bucketCatalog->prepareCommit(batch));
     ASSERT_EQ(batch->measurements().size(), 1);
@@ -1500,7 +1503,7 @@ TEST_F(BucketCatalogTest, TryInsertWillNotCreateBucketWhenWeShouldTryToReopen) {
     ASSERT(!result.getValue().batch);
     ASSERT_TRUE(stdx::holds_alternative<BSONObj>(result.getValue().candidate));
 
-    // So should time forward.
+    // Time forward should not hint to re-open.
     result = _bucketCatalog->tryInsert(
         _opCtx,
         _ns1,
@@ -1511,7 +1514,7 @@ TEST_F(BucketCatalogTest, TryInsertWillNotCreateBucketWhenWeShouldTryToReopen) {
     ASSERT_OK(result.getStatus());
     ASSERT(result.getValue().closedBuckets.empty());
     ASSERT(!result.getValue().batch);
-    ASSERT_TRUE(stdx::holds_alternative<BSONObj>(result.getValue().candidate));
+    ASSERT_TRUE(stdx::holds_alternative<std::monostate>(result.getValue().candidate));
 
     // Now let's insert something with a different meta, so we open a new bucket, see we're past the
     // memory limit, and archive the existing bucket.
@@ -1526,7 +1529,7 @@ TEST_F(BucketCatalogTest, TryInsertWillNotCreateBucketWhenWeShouldTryToReopen) {
     ASSERT_EQ(1, _getExecutionStat(_ns1, kNumArchivedDueToMemoryThreshold));
     ASSERT_EQ(0, _getExecutionStat(_ns1, kNumClosedDueToMemoryThreshold));
     batch = result.getValue().batch;
-    ASSERT_NE(batch->bucket().id, bucketId);
+    ASSERT_NE(batch->bucket().bucketId, bucketId);
     ASSERT(batch);
     ASSERT(batch->claimCommitRights());
     ASSERT_OK(_bucketCatalog->prepareCommit(batch));
@@ -1546,7 +1549,7 @@ TEST_F(BucketCatalogTest, TryInsertWillNotCreateBucketWhenWeShouldTryToReopen) {
     ASSERT(result.getValue().closedBuckets.empty());
     ASSERT(!result.getValue().batch);
     ASSERT_TRUE(stdx::holds_alternative<OID>(result.getValue().candidate));
-    ASSERT_EQ(stdx::get<OID>(result.getValue().candidate), bucketId);
+    ASSERT_EQ(stdx::get<OID>(result.getValue().candidate), bucketId.oid);
 }
 
 TEST_F(BucketCatalogTest, TryInsertWillCreateBucketIfWeWouldCloseExistingBucket) {
@@ -1565,7 +1568,7 @@ TEST_F(BucketCatalogTest, TryInsertWillCreateBucketIfWeWouldCloseExistingBucket)
     ASSERT_OK(result.getStatus());
     auto batch = result.getValue().batch;
     ASSERT(batch);
-    auto bucketId = batch->bucket().id;
+    auto bucketId = batch->bucket().bucketId;
     ASSERT(batch->claimCommitRights());
     ASSERT_OK(_bucketCatalog->prepareCommit(batch));
     ASSERT_EQ(batch->measurements().size(), 1);
@@ -1583,7 +1586,7 @@ TEST_F(BucketCatalogTest, TryInsertWillCreateBucketIfWeWouldCloseExistingBucket)
     ASSERT_OK(result.getStatus());
     batch = result.getValue().batch;
     ASSERT(batch);
-    ASSERT_NE(batch->bucket().id, bucketId);
+    ASSERT_NE(batch->bucket().bucketId, bucketId);
     ASSERT(batch->claimCommitRights());
     ASSERT_OK(_bucketCatalog->prepareCommit(batch));
     ASSERT_EQ(batch->measurements().size(), 1);
@@ -1607,7 +1610,7 @@ TEST_F(BucketCatalogTest, InsertIntoReopenedBucket) {
     ASSERT_OK(result.getStatus());
     auto batch = result.getValue().batch;
     ASSERT(batch);
-    auto oldBucketId = batch->bucket().id;
+    auto oldBucketId = batch->bucket().bucketId;
     ASSERT(batch->claimCommitRights());
     ASSERT_OK(_bucketCatalog->prepareCommit(batch));
     ASSERT_EQ(batch->measurements().size(), 1);
@@ -1618,7 +1621,7 @@ TEST_F(BucketCatalogTest, InsertIntoReopenedBucket) {
             "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"}},
                                    "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"}}},
             "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"}}}})");
-    ASSERT_NE(bucketDoc["_id"].OID(), oldBucketId);
+    ASSERT_NE(bucketDoc["_id"].OID(), oldBucketId.oid);
     auto validator = [&](OperationContext * opCtx, const BSONObj& bucketDoc) -> auto {
         return autoColl->checkValidation(opCtx, bucketDoc);
     };
@@ -1638,7 +1641,7 @@ TEST_F(BucketCatalogTest, InsertIntoReopenedBucket) {
     ASSERT_OK(result.getStatus());
     batch = result.getValue().batch;
     ASSERT(batch);
-    ASSERT_EQ(batch->bucket().id, bucketDoc["_id"].OID());
+    ASSERT_EQ(batch->bucket().bucketId.oid, bucketDoc["_id"].OID());
     ASSERT(batch->claimCommitRights());
     ASSERT_OK(_bucketCatalog->prepareCommit(batch));
     ASSERT_EQ(batch->measurements().size(), 1);
@@ -1681,7 +1684,7 @@ TEST_F(BucketCatalogTest, CannotInsertIntoOutdatedBucket) {
     ASSERT_OK(result.getStatus());
     auto batch = result.getValue().batch;
     ASSERT(batch);
-    auto oldBucketId = batch->bucket().id;
+    auto oldBucketId = batch->bucket().bucketId;
     ASSERT(batch->claimCommitRights());
     ASSERT_OK(_bucketCatalog->prepareCommit(batch));
     ASSERT_EQ(batch->measurements().size(), 1);
@@ -1692,16 +1695,17 @@ TEST_F(BucketCatalogTest, CannotInsertIntoOutdatedBucket) {
             "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"}},
                                    "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"}}},
             "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"}}}})");
-    ASSERT_NE(bucketDoc["_id"].OID(), oldBucketId);
+    ASSERT_NE(bucketDoc["_id"].OID(), oldBucketId.oid);
     auto validator = [&](OperationContext * opCtx, const BSONObj& bucketDoc) -> auto {
         return autoColl->checkValidation(opCtx, bucketDoc);
     };
 
     // If we advance the catalog era, then we shouldn't use a bucket that was fetched during a
     // previous era.
+    const NamespaceString fakeNs{"test.foo"};
     const auto fakeId = OID();
-    _bucketCatalog->directWriteStart(fakeId);
-    _bucketCatalog->directWriteFinish(fakeId);
+    _bucketCatalog->directWriteStart(fakeNs, fakeId);
+    _bucketCatalog->directWriteFinish(fakeNs, fakeId);
 
     BucketCatalog::BucketFindResult findResult;
     findResult.bucketToReopen =

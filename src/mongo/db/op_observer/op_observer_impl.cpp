@@ -948,7 +948,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
     } else if (args.coll->ns().isTimeseriesBucketsCollection()) {
         if (args.updateArgs->source != OperationSource::kTimeseriesInsert) {
             OID bucketId = args.updateArgs->updatedDoc["_id"].OID();
-            timeseries::handleDirectWrite(opCtx, bucketId);
+            timeseries::handleDirectWrite(opCtx, args.coll->ns(), bucketId);
         }
     }
 }
@@ -968,7 +968,7 @@ void OpObserverImpl::aboutToDelete(OperationContext* opCtx,
 
     if (coll->ns().isTimeseriesBucketsCollection()) {
         OID bucketId = doc["_id"].OID();
-        timeseries::handleDirectWrite(opCtx, bucketId);
+        timeseries::handleDirectWrite(opCtx, coll->ns(), bucketId);
     }
 }
 

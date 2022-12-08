@@ -630,31 +630,12 @@ const reopenBucketsWhenSuitableIndexExistsNoMeta = function() {
     assert.commandWorked(
         testDB.createCollection(coll.getName(), {timeseries: {timeField: timeField}}));
 
-    const measurement1 = {[timeField]: ISODate("2022-08-26T19:19:00Z")};
-    const measurement2 = {[timeField]: ISODate("2022-09-26T19:19:00Z")};
-    const measurement3 = {[timeField]: ISODate("2022-10-26T19:19:00Z")};
+    const measurement1 = {[timeField]: ISODate("2022-09-26T19:19:00Z")};
+    const measurement2 = {[timeField]: ISODate("2022-08-26T19:19:00Z")};
+    const measurement3 = {[timeField]: ISODate("2022-07-26T19:19:00Z")};
 
     const closedBucketDoc1 = {
         "_id": ObjectId("16091c2c050b7495eaef4584"),
-        "control": {
-            "version": 1,
-            "min": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2022-08-26T19:19:00Z")
-            },
-            "max": {
-                "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2022-08-26T19:19:30Z")
-            },
-            "closed": false
-        },
-        "data": {
-            "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
-            "time": {"0": ISODate("2022-08-26T19:19:30Z")}
-        }
-    };
-    const closedBucketDoc2 = {
-        "_id": ObjectId("17091c2c050b7495eaef4585"),
         "control": {
             "version": 1,
             "min": {
@@ -672,23 +653,42 @@ const reopenBucketsWhenSuitableIndexExistsNoMeta = function() {
             "time": {"0": ISODate("2022-09-26T19:19:30Z")}
         }
     };
+    const closedBucketDoc2 = {
+        "_id": ObjectId("17091c2c050b7495eaef4585"),
+        "control": {
+            "version": 1,
+            "min": {
+                "_id": ObjectId("63091c30138e9261fd70a903"),
+                "time": ISODate("2022-08-26T19:19:00Z")
+            },
+            "max": {
+                "_id": ObjectId("63091c30138e9261fd70a903"),
+                "time": ISODate("2022-08-26T19:19:30Z")
+            },
+            "closed": false
+        },
+        "data": {
+            "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
+            "time": {"0": ISODate("2022-08-26T19:19:30Z")}
+        }
+    };
     const closedBucketDoc3 = {
         "_id": ObjectId("18091c2c050b7495eaef4586"),
         "control": {
             "version": 1,
             "min": {
                 "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2022-10-26T19:19:00Z")
+                "time": ISODate("2022-07-26T19:19:00Z")
             },
             "max": {
                 "_id": ObjectId("63091c30138e9261fd70a903"),
-                "time": ISODate("2022-10-26T19:19:30Z")
+                "time": ISODate("2022-07-26T19:19:30Z")
             },
             "closed": false
         },
         "data": {
             "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
-            "time": {"0": ISODate("2022-10-26T19:19:30Z")}
+            "time": {"0": ISODate("2022-07-26T19:19:30Z")}
         }
     };
 
@@ -727,4 +727,6 @@ const reopenBucketsWhenSuitableIndexExistsNoMeta = function() {
 
     jsTestLog("Exiting reopenBucketsWhenSuitableIndexExistsNoMeta.");
 }();
+
+coll.drop();
 })();

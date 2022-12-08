@@ -119,6 +119,6 @@ BSONObj generateReopeningFilters(const Date_t& time,
  *
  * To be called from an OpObserver, e.g. in aboutToDelete and onUpdate.
  */
-void handleDirectWrite(OperationContext* opCtx, const OID& bucketId);
+void handleDirectWrite(OperationContext* opCtx, const NamespaceString& ns, const OID& bucketId);
 
 }  // namespace mongo::timeseries

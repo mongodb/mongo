@@ -65,8 +65,34 @@ protected:
 
     class BucketStateManager;
 
+    /**
+     * Identifier to lookup bucket by namespace and OID, with pre-computed hash.
+     */
+    struct BucketId {
+        using Hash = std::size_t;
+
+        BucketId() = delete;
+        BucketId(const NamespaceString& nss, const OID& oid);
+
+        NamespaceString ns;
+        OID oid;
+        Hash hash;
+
+        bool operator==(const BucketId& other) const {
+            return oid == other.oid && ns == other.ns;
+        }
+        bool operator!=(const BucketId& other) const {
+            return !(*this == other);
+        }
+
+        template <typename H>
+        friend H AbslHashValue(H h, const BucketId& bucketId) {
+            return H::combine(std::move(h), bucketId.oid, bucketId.ns);
+        }
+    };
+
     struct BucketHandle {
-        const OID id;
+        const BucketId bucketId;
         const StripeNumber stripe;
     };
 
@@ -83,6 +109,7 @@ protected:
         AtomicWord<long long> numBucketsClosedDueToMemoryThreshold;
         AtomicWord<long long> numBucketsClosedDueToReopening;
         AtomicWord<long long> numBucketsArchivedDueToMemoryThreshold;
+        AtomicWord<long long> numBucketsArchivedDueToTimeBackward;
         AtomicWord<long long> numCommits;
         AtomicWord<long long> numWaits;
         AtomicWord<long long> numMeasurementsCommitted;
@@ -116,6 +143,7 @@ protected:
         void incNumBucketsClosedDueToMemoryThreshold(long long increment = 1);
         void incNumBucketsClosedDueToReopening(long long increment = 1);
         void incNumBucketsArchivedDueToMemoryThreshold(long long increment = 1);
+        void incNumBucketsArchivedDueToTimeBackward(long long increment = 1);
         void incNumCommits(long long increment = 1);
         void incNumWaits(long long increment = 1);
         void incNumMeasurementsCommitted(long long increment = 1);
@@ -158,14 +186,17 @@ public:
     public:
         ClosedBucket() = default;
         ~ClosedBucket();
-        ClosedBucket(
-            BucketStateManager*, const OID&, const std::string&, boost::optional<uint32_t>, bool);
+        ClosedBucket(BucketStateManager*,
+                     const BucketId&,
+                     const std::string&,
+                     boost::optional<uint32_t>,
+                     bool);
         ClosedBucket(ClosedBucket&&);
         ClosedBucket& operator=(ClosedBucket&&);
         ClosedBucket(const ClosedBucket&) = delete;
         ClosedBucket& operator=(const ClosedBucket&) = delete;
 
-        OID bucketId;
+        BucketId bucketId;
         std::string timeField;
         boost::optional<uint32_t> numMeasurements;
         bool eligibleForReopening = false;
@@ -403,7 +434,7 @@ public:
      * 'WriteConflictException'. This should be followed by a call to 'directWriteFinish' after the
      * write has been committed, rolled back, or otherwise finished.
      */
-    void directWriteStart(const OID& oid);
+    void directWriteStart(const NamespaceString& ns, const OID& oid);
 
     /**
      * Notifies the catalog that a pending direct write to the bucket document with the specified ID
@@ -412,7 +443,7 @@ public:
      * should have been cleared from the catalog, and it may be safely reopened from the on-disk
      * state.
      */
-    void directWriteFinish(const OID& oid);
+    void directWriteFinish(const NamespaceString& ns, const OID& oid);
 
     /**
      * Clears any bucket whose namespace satisfies the predicate.
@@ -549,12 +580,7 @@ protected:
      */
     struct BucketHasher {
         std::size_t operator()(const BucketKey& key) const;
-    };
-
-    /**
-     * Hasher to support using a pre-computed hash as a key without having to compute another hash.
-     */
-    struct PreHashed {
+        std::size_t operator()(const BucketId& bucketId) const;
         std::size_t operator()(const BucketKey::Hash& key) const;
     };
 
@@ -563,7 +589,8 @@ protected:
      * BucketCatalog.
      */
     struct ArchivedBucket {
-        OID bucketId;
+        ArchivedBucket() = delete;
+        BucketId bucketId;
         std::string timeField;
     };
 
@@ -578,7 +605,7 @@ protected:
 
         // All buckets currently in the catalog, including buckets which are full but not yet
         // committed.
-        stdx::unordered_map<OID, std::unique_ptr<Bucket>, OID::Hasher> allBuckets;
+        stdx::unordered_map<BucketId, std::unique_ptr<Bucket>, BucketHasher> allBuckets;
 
         // The current open bucket for each namespace and metadata pair.
         stdx::unordered_map<BucketKey, Bucket*, BucketHasher> openBuckets;
@@ -595,7 +622,7 @@ protected:
         // efficiently find an archived bucket that is a candidate for an incoming measurement.
         stdx::unordered_map<BucketKey::Hash,
                             std::map<Date_t, ArchivedBucket, std::greater<Date_t>>,
-                            PreHashed>
+                            BucketHasher>
             archivedBuckets;
     };
 
@@ -604,8 +631,23 @@ protected:
      */
     enum class RolloverAction {
         kNone,       // Keep bucket open
+        kArchive,    // Archive bucket
         kSoftClose,  // Close bucket so it remains eligible for reopening
         kHardClose,  // Permanently close bucket
+    };
+
+    /**
+     * Reasons why a bucket was rolled over.
+     */
+    enum class RolloverReason {
+        kNone,           // Not actually rolled over
+        kTimeForward,    // Measurement time would violate max span for this bucket
+        kTimeBackward,   // Measurement time was before bucket min time
+        kCount,          // Adding this measurement would violate max count
+        kSchemaChange,   // This measurement has a schema incompatible with existing measurements
+        kCachePressure,  // System is under cache pressure, and adding this measurement would make
+                         // the bucket larger than the dynamic size limit
+        kSize,  // Adding this measurement would make the bucket larger than the normal size limit
     };
 
     /**
@@ -658,7 +700,7 @@ protected:
         /**
          * Retrieves the bucket state if it is tracked in the catalog.
          */
-        boost::optional<BucketState> getBucketState(const OID& oid) const;
+        boost::optional<BucketState> getBucketState(const BucketId& bucketId) const;
 
         /**
          * Checks whether the bucket has been cleared before changing the bucket state as requested.
@@ -681,7 +723,8 @@ protected:
          * perform a noop (i.e. if upon inspecting the input, the change would be invalid), 'change'
          * may simply return its input state unchanged.
          */
-        boost::optional<BucketState> changeBucketState(const OID& id, const StateChangeFn& change);
+        boost::optional<BucketState> changeBucketState(const BucketId& bucketId,
+                                                       const StateChangeFn& change);
 
         /**
          * Appends statistics for observability.
@@ -692,7 +735,7 @@ protected:
         void _decrementEraCountHelper(uint64_t era);
         void _incrementEraCountHelper(uint64_t era);
         boost::optional<BucketState> _changeBucketStateHelper(WithLock withLock,
-                                                              const OID& id,
+                                                              const BucketId& bucketId,
                                                               const StateChangeFn& change);
 
         /**
@@ -707,7 +750,7 @@ protected:
          * bucket state isn't currently tracked.
          */
         boost::optional<BucketState> _markIndividualBucketCleared(WithLock catalogLock,
-                                                                  const OID& bucketId);
+                                                                  const BucketId& bucketId);
 
         /**
          * Removes clear operations from the clear registry that no longer need to be tracked.
@@ -725,7 +768,7 @@ protected:
         EraCountMap _countMap;
 
         // Bucket state for synchronization with direct writes
-        stdx::unordered_map<OID, BucketState, OID::Hasher> _bucketStates;
+        stdx::unordered_map<BucketId, BucketState, BucketHasher> _bucketStates;
 
         // Registry storing clear operations. Maps from era to a lambda function which takes in
         // information about a Bucket and returns whether the Bucket has been cleared.
@@ -742,9 +785,9 @@ protected:
     public:
         friend class BucketCatalog;
 
-        Bucket(const OID& id,
+        Bucket(const BucketId& bucketId,
                StripeNumber stripe,
-               BucketKey::Hash hash,
+               BucketKey::Hash keyHash,
                BucketStateManager* bucketStateManager);
 
         ~Bucket();
@@ -754,9 +797,20 @@ protected:
         void setEra(uint64_t era);
 
         /**
-         * Returns the ID for the underlying bucket.
+         * Returns the BucketId for the bucket.
          */
-        const OID& id() const;
+
+        const BucketId& bucketId() const;
+
+        /**
+         * Returns the OID for the underlying bucket.
+         */
+        const OID& oid() const;
+
+        /**
+         * Returns the namespace for the underlying bucket.
+         */
+        const NamespaceString& ns() const;
 
         /**
          * Returns the number of the stripe that owns the bucket.
@@ -787,11 +841,6 @@ protected:
          * Returns total number of measurements in the bucket.
          */
         uint32_t numMeasurements() const;
-
-        /**
-         * Sets the namespace of the bucket.
-         */
-        void setNamespace(const NamespaceString& ns);
 
         /**
          * Sets the rollover action, to determine what to do with a bucket when all measurements
@@ -838,16 +887,13 @@ protected:
 
     private:
         // The bucket ID for the underlying document
-        const OID _id;
+        const BucketId _bucketId;
 
         // The stripe which owns this bucket.
         const StripeNumber _stripe;
 
         // The pre-computed hash of the associated BucketKey
         const BucketKey::Hash _keyHash;
-
-        // The namespace that this bucket is used for.
-        NamespaceString _ns;
 
         // The metadata of the data that this bucket contains.
         BucketMetadata _metadata;
@@ -930,20 +976,23 @@ protected:
      */
     const Bucket* _findBucket(const Stripe& stripe,
                               WithLock stripeLock,
-                              const OID& id,
+                              const BucketId& bucketId,
                               IgnoreBucketState mode = IgnoreBucketState::kNo);
 
     /**
      * Retrieve a bucket for write use.
      */
-    Bucket* _useBucket(Stripe* stripe, WithLock stripeLock, const OID& id, IgnoreBucketState mode);
+    Bucket* _useBucket(Stripe* stripe,
+                       WithLock stripeLock,
+                       const BucketId& bucketId,
+                       IgnoreBucketState mode);
 
     /**
      * Retrieve a bucket for write use, updating the state in the process.
      */
     Bucket* _useBucketAndChangeState(Stripe* stripe,
                                      WithLock stripeLock,
-                                     const OID& id,
+                                     const BucketId& bucketId,
                                      const BucketStateManager::StateChangeFn& change);
 
     /**
@@ -979,13 +1028,26 @@ protected:
      * Given a rehydrated 'bucket', passes ownership of that bucket to the catalog, marking the
      * bucket as open.
      */
-    Bucket* _reopenBucket(Stripe* stripe,
-                          WithLock stripeLock,
-                          ExecutionStatsController stats,
-                          const BucketKey& key,
-                          std::unique_ptr<Bucket>&& bucket,
-                          std::uint64_t targetEra,
-                          ClosedBuckets* closedBuckets);
+    StatusWith<Bucket*> _reopenBucket(Stripe* stripe,
+                                      WithLock stripeLock,
+                                      ExecutionStatsController stats,
+                                      const BucketKey& key,
+                                      std::unique_ptr<Bucket>&& bucket,
+                                      std::uint64_t targetEra,
+                                      ClosedBuckets* closedBuckets);
+
+    /**
+     * Check to see if 'insert' can use existing bucket rather than reopening a candidate bucket. If
+     * true, chances are the caller raced with another thread to reopen the same bucket, but if
+     * false, there might be another bucket that had been cleared, or that has the same _id in a
+     * different namespace.
+     */
+    StatusWith<Bucket*> _reuseExistingBucket(Stripe* stripe,
+                                             WithLock stripeLock,
+                                             ExecutionStatsController* stats,
+                                             const BucketKey& key,
+                                             Bucket* existingBucket,
+                                             std::uint64_t targetEra);
 
     /**
      * Helper method to perform the heavy lifting for both 'tryInsert' and 'insert'. See
@@ -1004,15 +1066,16 @@ protected:
      * Given an already-selected 'bucket', inserts 'doc' to the bucket if possible. If not, and
      * 'mode' is set to 'kYes', we will create a new bucket and insert into that bucket.
      */
-    std::shared_ptr<WriteBatch> _insertIntoBucket(OperationContext* opCtx,
-                                                  Stripe* stripe,
-                                                  WithLock stripeLock,
-                                                  const BSONObj& doc,
-                                                  CombineWithInsertsFromOtherClients combine,
-                                                  AllowBucketCreation mode,
-                                                  CreationInfo* info,
-                                                  Bucket* bucket,
-                                                  ClosedBuckets* closedBuckets);
+    stdx::variant<std::shared_ptr<WriteBatch>, RolloverReason> _insertIntoBucket(
+        OperationContext* opCtx,
+        Stripe* stripe,
+        WithLock stripeLock,
+        const BSONObj& doc,
+        CombineWithInsertsFromOtherClients combine,
+        AllowBucketCreation mode,
+        CreationInfo* info,
+        Bucket* bucket,
+        ClosedBuckets* closedBuckets);
 
     /**
      * Wait for other batches to finish so we can prepare 'batch'
@@ -1055,9 +1118,11 @@ protected:
      * Identifies a previously archived bucket that may be able to accomodate the measurement
      * represented by 'info', if one exists.
      */
-    stdx::variant<std::monostate, OID, BSONObj> _getReopeningCandidate(Stripe* stripe,
-                                                                       WithLock stripeLock,
-                                                                       const CreationInfo& info);
+    stdx::variant<std::monostate, OID, BSONObj> _getReopeningCandidate(
+        Stripe* stripe,
+        WithLock stripeLock,
+        const CreationInfo& info,
+        bool allowQueryBasedReopening);
 
     /**
      * Aborts 'batch', and if the corresponding bucket still exists, proceeds to abort any other
@@ -1083,7 +1148,7 @@ protected:
      * Records that compression for the given bucket has been completed, and the BucketCatalog can
      * forget about the bucket.
      */
-    void _compressionDone(const OID& bucketId);
+    void _compressionDone(const BucketId& bucketId);
 
     /**
      * Adds the bucket to a list of idle buckets to be expired at a later date.
@@ -1114,13 +1179,14 @@ protected:
      * Determines if 'bucket' needs to be rolled over to accomodate 'doc'. If so, determines whether
      * to archive or close 'bucket'.
      */
-    RolloverAction _determineRolloverAction(OperationContext* opCtx,
-                                            const BSONObj& doc,
-                                            CreationInfo* info,
-                                            Bucket* bucket,
-                                            NewFieldNames* newFieldNamesToBeInserted,
-                                            int32_t* sizeToBeAdded,
-                                            AllowBucketCreation mode);
+    std::pair<RolloverAction, RolloverReason> _determineRolloverAction(
+        OperationContext* opCtx,
+        const BSONObj& doc,
+        CreationInfo* info,
+        Bucket* bucket,
+        NewFieldNames* newFieldNamesToBeInserted,
+        int32_t* sizeToBeAdded,
+        AllowBucketCreation mode);
 
     /**
      * Close the existing, full bucket and open a new one for the same metadata.
