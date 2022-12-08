@@ -1688,14 +1688,13 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
     opCtx->getWriteUnitOfWork()->prepare();
     p().needToWriteAbortEntry = true;
 
-    const auto& statements = completedTransactionOperations->getOperationsForOpObserver();
     tassert(6278510,
             "Operation assignments to applyOps entries should be present",
             applyOpsOplogSlotAndOperationAssignment);
 
     opObserver->onTransactionPrepare(opCtx,
                                      reservedSlots,
-                                     statements,
+                                     *completedTransactionOperations,
                                      *applyOpsOplogSlotAndOperationAssignment,
                                      p().transactionOperations.getNumberOfPrePostImagesToWrite(),
                                      wallClockTime);

@@ -1151,11 +1151,10 @@ protected:
         auto applyOpsAssignment =
             opObserver().preTransactionPrepare(opCtx(), reservedSlots, currentTime, txnOps);
         opCtx()->recoveryUnit()->setPrepareTimestamp(prepareOpTime.getTimestamp());
-        const auto& statements = txnOps->getOperationsForOpObserver();
         ASSERT(applyOpsAssignment);
         opObserver().onTransactionPrepare(opCtx(),
                                           reservedSlots,
-                                          statements,
+                                          *txnOps,
                                           *applyOpsAssignment,
                                           numberOfPrePostImagesToWrite,
                                           currentTime);

@@ -2082,7 +2082,7 @@ OpObserverImpl::preTransactionPrepare(OperationContext* opCtx,
 void OpObserverImpl::onTransactionPrepare(
     OperationContext* opCtx,
     const std::vector<OplogSlot>& reservedSlots,
-    const std::vector<repl::ReplOperation>& statements,
+    const TransactionOperations& transactionOperations,
     const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
     size_t numberOfPrePostImagesToWrite,
     Date_t wallClockTime) {
@@ -2090,6 +2090,8 @@ void OpObserverImpl::onTransactionPrepare(
     const auto prepareOpTime = reservedSlots.back();
     invariant(opCtx->getTxnNumber());
     invariant(!prepareOpTime.isNull());
+
+    const auto& statements = transactionOperations.getOperationsForOpObserver();
 
     // Don't write oplog entry on secondaries.
     if (!opCtx->writesAreReplicated()) {

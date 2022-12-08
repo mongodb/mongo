@@ -451,7 +451,7 @@ public:
     void onTransactionPrepare(
         OperationContext* opCtx,
         const std::vector<OplogSlot>& reservedSlots,
-        const std::vector<repl::ReplOperation>& statements,
+        const TransactionOperations& transactionOperations,
         const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
         size_t numberOfPrePostImagesToWrite,
         Date_t wallClockTime) override {
@@ -459,7 +459,7 @@ public:
         for (auto& observer : _observers) {
             observer->onTransactionPrepare(opCtx,
                                            reservedSlots,
-                                           statements,
+                                           transactionOperations,
                                            applyOpsOperationAssignment,
                                            numberOfPrePostImagesToWrite,
                                            wallClockTime);

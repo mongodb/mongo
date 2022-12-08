@@ -485,7 +485,8 @@ public:
      * 'reservedSlots' is a list of oplog slots reserved for the oplog entries in a transaction. The
      * last reserved slot represents the prepareOpTime used for the prepare oplog entry.
      *
-     * The 'statements' are the list of CRUD operations to be applied in this transaction.
+     * The 'transactionOperations' contains the list of CRUD operations to be applied in
+     * this transaction.
      *
      * The 'applyOpsOperationAssignment' contains a representation of "applyOps" entries and oplog
      * slots to be used for writing pre- and post- image oplog entries for a transaction. A value
@@ -501,7 +502,7 @@ public:
     virtual void onTransactionPrepare(
         OperationContext* opCtx,
         const std::vector<OplogSlot>& reservedSlots,
-        const std::vector<repl::ReplOperation>& statements,
+        const TransactionOperations& transactionOperations,
         const ApplyOpsOplogSlotAndOperationAssignment& applyOpsOperationAssignment,
         size_t numberOfPrePostImagesToWrite,
         Date_t wallClockTime) = 0;
