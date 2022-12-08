@@ -1747,15 +1747,6 @@ int logOplogEntries(
                     !(*prePostImageToWriteToImageCollection));
         }
 
-        if (isPartialTxn || (imageToWrite && !prepare)) {
-            // Partial transactions and unprepared transactions with pre or post image stored in the
-            // image collection create/reserve multiple oplog entries in the same WriteUnitOfWork.
-            // Because of this, such transactions will set multiple timestamps, violating the
-            // multi timestamp constraint. It's safe to ignore the multi timestamp constraints here
-            // as additional rollback logic is in place for this case.
-            opCtx->recoveryUnit()->ignoreAllMultiTimestampConstraints();
-        }
-
         // A 'prepare' oplog entry should never include a 'partialTxn' field.
         invariant(!(isPartialTxn && implicitPrepare));
         if (implicitPrepare) {
@@ -1930,6 +1921,7 @@ void OpObserverImpl::onUnpreparedTransactionCommit(
         getMaxNumberOfTransactionOperationsInSingleOplogEntry(),
         getMaxSizeOfTransactionOperationsInSingleOplogEntryBytes(),
         /*prepare=*/false);
+    invariant(!applyOpsOplogSlotAndOperationAssignment.prepare);
     const auto wallClockTime = getWallClockTimeForOpLog(opCtx);
 
     // Storage transaction commit is the last place inside a transaction that can throw an
@@ -1942,9 +1934,19 @@ void OpObserverImpl::onUnpreparedTransactionCommit(
     // OplogSlotReserver.
     invariant(opCtx->lockState()->isWriteLocked());
 
+    if (const auto& info = applyOpsOplogSlotAndOperationAssignment;
+        info.applyOpsEntries.size() > 1U ||           // partial transaction
+        info.numOperationsWithNeedsRetryImage > 0) {  // pre/post image to store in image collection
+        // Partial transactions and unprepared transactions with pre or post image stored in the
+        // image collection create/reserve multiple oplog entries in the same WriteUnitOfWork.
+        // Because of this, such transactions will set multiple timestamps, violating the
+        // multi timestamp constraint. It's safe to ignore the multi timestamp constraints here
+        // as additional rollback logic is in place for this case. See SERVER-48771.
+        opCtx->recoveryUnit()->ignoreAllMultiTimestampConstraints();
+    }
+
     // Log in-progress entries for the transaction along with the implicit commit.
     boost::optional<repl::ReplOperation::ImageBundle> imageToWrite;
-    invariant(!applyOpsOplogSlotAndOperationAssignment.prepare);
     int numOplogEntries = logOplogEntries(opCtx,
                                           statements,
                                           oplogSlots,
@@ -2030,6 +2032,16 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx) {
     // Writes to the oplog only require a Global intent lock. Guaranteed by
     // OplogSlotReserver.
     invariant(opCtx->lockState()->isWriteLocked());
+
+    // Batched writes do not violate the multiple timestamp constraint because they do not
+    // replicate over multiple applyOps oplog entries or write pre/post images to the
+    // image collection. However, multi-doc transactions may be replicated as a chain of
+    // applyOps oplog entries in addition to potentially writing to the image collection.
+    // Therefore, there are cases where the multiple timestamp constraint has to be relaxed
+    // in order to replicate multi-doc transactions.
+    // See onTransactionPrepare() and onUnpreparedTransactionCommit().
+    invariant(applyOpsOplogSlotAndOperationAssignment.numOperationsWithNeedsRetryImage == 0,
+              "batched writes must not contain pre/post images to store in image collection");
 
     const auto wallClockTime = getWallClockTimeForOpLog(opCtx);
     invariant(!applyOpsOplogSlotAndOperationAssignment.prepare);
@@ -2132,6 +2144,15 @@ void OpObserverImpl::onTransactionPrepare(
                     // Writes to the oplog only require a Global intent lock. Guaranteed by
                     // OplogSlotReserver.
                     invariant(opCtx->lockState()->isWriteLocked());
+
+                    if (applyOpsOperationAssignment.applyOpsEntries.size() > 1U) {
+                        // Partial transactions create/reserve multiple oplog entries in the same
+                        // WriteUnitOfWork. Because of this, such transactions will set multiple
+                        // timestamps, violating the multi timestamp constraint. It's safe to ignore
+                        // the multi timestamp constraints here as additional rollback logic is in
+                        // place for this case. See SERVER-48771.
+                        opCtx->recoveryUnit()->ignoreAllMultiTimestampConstraints();
+                    }
 
                     // We had reserved enough oplog slots for the worst case where each operation
                     // produced one oplog entry.  When operations are smaller and can be packed, we
