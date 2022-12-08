@@ -170,17 +170,14 @@ public:
                                  bool prepare) const;
 
     /**
-     * Returns pointer to vector of operations for integrating with
+     * Returns const reference to vector of operations for integrating with
      * BatchedWriteContext, TransactionParticipant, and OpObserver interfaces
      * for multi-doc transactions.
-     *
-     * Caller assumes responsibility for keeping contents referenced by the pointer
-     * in sync with statistics maintained in this container.
      *
      * This function can be removed when we have migrated callers of BatchedWriteContext
      * and TransactionParticipant to use the methods on this class directly.
      */
-    std::vector<TransactionOperation>* getMutableOperationsForOpObserver();
+    const std::vector<TransactionOperation>& getOperationsForOpObserver() const;
 
     /**
      * Returns copy of operations for TransactionParticipant testing.

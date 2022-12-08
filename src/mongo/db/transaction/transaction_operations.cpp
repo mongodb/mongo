@@ -257,9 +257,9 @@ TransactionOperations::ApplyOpsInfo TransactionOperations::getApplyOpsInfo(
             prepare};
 }
 
-std::vector<TransactionOperations::TransactionOperation>*
-TransactionOperations::getMutableOperationsForOpObserver() {
-    return &_transactionOperations;
+const std::vector<TransactionOperations::TransactionOperation>&
+TransactionOperations::getOperationsForOpObserver() const {
+    return _transactionOperations;
 }
 
 std::vector<TransactionOperations::TransactionOperation>

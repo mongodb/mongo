@@ -1688,7 +1688,7 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
     opCtx->getWriteUnitOfWork()->prepare();
     p().needToWriteAbortEntry = true;
 
-    const auto& statements = *(completedTransactionOperations->getMutableOperationsForOpObserver());
+    const auto& statements = completedTransactionOperations->getOperationsForOpObserver();
     tassert(6278510,
             "Operation assignments to applyOps entries should be present",
             applyOpsOplogSlotAndOperationAssignment);
@@ -1938,7 +1938,7 @@ void TransactionParticipant::Participant::commitPreparedTransaction(
             opCtx,
             commitOplogSlot,
             commitTimestamp,
-            *retrieveCompletedTransactionOperations(opCtx)->getMutableOperationsForOpObserver());
+            retrieveCompletedTransactionOperations(opCtx)->getOperationsForOpObserver());
 
         auto operationCount = p().transactionOperations.numOperations();
         auto oplogOperationBytes = p().transactionOperations.getTotalOperationBytes();

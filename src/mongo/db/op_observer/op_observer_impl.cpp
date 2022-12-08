@@ -1902,7 +1902,7 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
 
 void OpObserverImpl::onUnpreparedTransactionCommit(OperationContext* opCtx,
                                                    TransactionOperations* transactionOperations) {
-    auto statements = transactionOperations->getMutableOperationsForOpObserver();
+    const auto& statements = transactionOperations->getOperationsForOpObserver();
     auto numberOfPrePostImagesToWrite = transactionOperations->getNumberOfPrePostImagesToWrite();
 
     invariant(opCtx->getTxnNumber());
@@ -1913,20 +1913,20 @@ void OpObserverImpl::onUnpreparedTransactionCommit(OperationContext* opCtx,
 
     // It is possible that the transaction resulted in no changes.  In that case, we should
     // not write an empty applyOps entry.
-    if (statements->empty())
+    if (statements.empty())
         return;
 
     repl::OpTime commitOpTime;
     // Reserve all the optimes in advance, so we only need to get the optime mutex once.  We
     // reserve enough entries for all statements in the transaction.
     auto oplogSlots =
-        _oplogWriter->getNextOpTimes(opCtx, statements->size() + numberOfPrePostImagesToWrite);
+        _oplogWriter->getNextOpTimes(opCtx, statements.size() + numberOfPrePostImagesToWrite);
 
     // Throw TenantMigrationConflict error if the database for the transaction statements is being
     // migrated. We only need check the namespace of the first statement since a transaction's
     // statements must all be for the same tenant.
     tenant_migration_access_blocker::checkIfCanWriteOrThrow(
-        opCtx, statements->begin()->getNss().dbName(), oplogSlots.back().getTimestamp());
+        opCtx, statements.begin()->getNss().dbName(), oplogSlots.back().getTimestamp());
 
     if (MONGO_unlikely(hangAndFailUnpreparedCommitAfterReservingOplogSlot.shouldFail())) {
         hangAndFailUnpreparedCommitAfterReservingOplogSlot.pauseWhileSet(opCtx);
@@ -1946,7 +1946,7 @@ void OpObserverImpl::onUnpreparedTransactionCommit(OperationContext* opCtx,
     boost::optional<repl::ReplOperation::ImageBundle> imageToWrite;
     invariant(!applyOpsOplogSlotAndOperationAssignment.prepare);
     int numOplogEntries = logOplogEntries(opCtx,
-                                          *statements,
+                                          statements,
                                           oplogSlots,
                                           applyOpsOplogSlotAndOperationAssignment,
                                           &imageToWrite,
@@ -1957,7 +1957,7 @@ void OpObserverImpl::onUnpreparedTransactionCommit(OperationContext* opCtx,
     // transaction commit timestamp as driven (implicitly) by the last written "applyOps" oplog
     // entry.
     writeChangeStreamPreImagesForTransaction(
-        opCtx, *statements, applyOpsOplogSlotAndOperationAssignment, wallClockTime);
+        opCtx, statements, applyOpsOplogSlotAndOperationAssignment, wallClockTime);
 
     if (imageToWrite) {
         writeToImageCollection(opCtx, *opCtx->getLogicalSessionId(), *imageToWrite);
@@ -1965,7 +1965,7 @@ void OpObserverImpl::onUnpreparedTransactionCommit(OperationContext* opCtx,
 
     commitOpTime = oplogSlots[numOplogEntries - 1];
     invariant(!commitOpTime.isNull());
-    shardObserveTransactionPrepareOrUnpreparedCommit(opCtx, *statements, commitOpTime);
+    shardObserveTransactionPrepareOrUnpreparedCommit(opCtx, statements, commitOpTime);
 }
 
 void OpObserverImpl::onBatchedWriteStart(OperationContext* opCtx) {
@@ -1994,7 +1994,8 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx) {
     // Throw TenantMigrationConflict error if the database for the transaction statements is being
     // migrated. We only need check the namespace of the first statement since a transaction's
     // statements must all be for the same tenant.
-    const auto& firstOpNss = batchedOps->getMutableOperationsForOpObserver()->begin()->getNss();
+    const auto& statements = batchedOps->getOperationsForOpObserver();
+    const auto& firstOpNss = statements.begin()->getNss();
     tenant_migration_access_blocker::checkIfCanWriteOrThrow(
         opCtx, firstOpNss.dbName(), oplogSlots.back().getTimestamp());
 
@@ -2023,7 +2024,7 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx) {
     const auto wallClockTime = getWallClockTimeForOpLog(opCtx);
     invariant(!applyOpsOplogSlotAndOperationAssignment.prepare);
     logOplogEntries(opCtx,
-                    *(batchedOps->getMutableOperationsForOpObserver()),
+                    statements,
                     oplogSlots,
                     applyOpsOplogSlotAndOperationAssignment,
                     &noPrePostImage,
@@ -2071,9 +2072,9 @@ OpObserverImpl::preTransactionPrepare(OperationContext* opCtx,
         getMaxNumberOfTransactionOperationsInSingleOplogEntry(),
         getMaxSizeOfTransactionOperationsInSingleOplogEntryBytes(),
         /*prepare=*/true);
-    auto* statements = transactionOperations->getMutableOperationsForOpObserver();
+    const auto& statements = transactionOperations->getOperationsForOpObserver();
     writeChangeStreamPreImagesForTransaction(
-        opCtx, *statements, applyOpsOplogSlotAndOperationAssignment, wallClockTime);
+        opCtx, statements, applyOpsOplogSlotAndOperationAssignment, wallClockTime);
     return std::make_unique<OpObserver::ApplyOpsOplogSlotAndOperationAssignment>(
         std::move(applyOpsOplogSlotAndOperationAssignment));
 }

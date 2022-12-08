@@ -193,8 +193,8 @@ void OpObserverMock::onUnpreparedTransactionCommit(OperationContext* opCtx,
             !onUnpreparedTransactionCommitThrowsException);
 
     unpreparedTransactionCommitted = true;
-    auto statements = transactionOperations->getMutableOperationsForOpObserver();
-    onUnpreparedTransactionCommitFn(*statements);
+    const auto& statements = transactionOperations->getOperationsForOpObserver();
+    onUnpreparedTransactionCommitFn(statements);
 }
 
 void OpObserverMock::onPreparedTransactionCommit(

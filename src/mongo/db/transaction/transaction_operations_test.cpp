@@ -55,17 +55,16 @@ TEST(TransactionOperationsTest, Basic) {
     ASSERT(op.getPostImage().isEmpty());
     ASSERT_EQ(ops.getTotalOperationBytes(), opSize);
 
-    // The getMutableOperationsForOpObserver() method supports integration with
+    // The getOperationsForOpObserver() method supports integration with
     // existing BatchedWriteContext, TransactionParticipant usage and OpObserver
     // interfaces.
-    auto* mutableOps = ops.getMutableOperationsForOpObserver();
-    ASSERT_EQ(mutableOps->size(), ops.numOperations());
-    std::size_t mutableOpsTotalOperationBytes = 0;
-    for (const auto& mutableOp : *mutableOps) {
-        mutableOpsTotalOperationBytes +=
-            repl::DurableOplogEntry::getDurableReplOperationSize(mutableOp);
+    const auto& replOps = ops.getOperationsForOpObserver();
+    ASSERT_EQ(replOps.size(), ops.numOperations());
+    std::size_t replOpsTotalOperationBytes = 0;
+    for (const auto& replOp : replOps) {
+        replOpsTotalOperationBytes += repl::DurableOplogEntry::getDurableReplOperationSize(replOp);
     }
-    ASSERT_EQ(mutableOpsTotalOperationBytes, ops.getTotalOperationBytes());
+    ASSERT_EQ(replOpsTotalOperationBytes, ops.getTotalOperationBytes());
 
     // Use clear() to reset container state.
     ops.clear();

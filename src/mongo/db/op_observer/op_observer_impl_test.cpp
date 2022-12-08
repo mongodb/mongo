@@ -1151,7 +1151,7 @@ protected:
         auto applyOpsAssignment =
             opObserver().preTransactionPrepare(opCtx(), reservedSlots, currentTime, txnOps);
         opCtx()->recoveryUnit()->setPrepareTimestamp(prepareOpTime.getTimestamp());
-        const auto& statements = *(txnOps->getMutableOperationsForOpObserver());
+        const auto& statements = txnOps->getOperationsForOpObserver();
         ASSERT(applyOpsAssignment);
         opObserver().onTransactionPrepare(opCtx(),
                                           reservedSlots,
@@ -1373,8 +1373,8 @@ TEST_F(OpObserverTransactionTest, TransactionalPreparedCommitTest) {
             opCtx(),
             commitSlot,
             prepareTimestamp,
-            *(txnParticipant.retrieveCompletedTransactionOperations(opCtx())
-                  ->getMutableOperationsForOpObserver()));
+            txnParticipant.retrieveCompletedTransactionOperations(opCtx())
+                ->getOperationsForOpObserver());
     }
     repl::OplogInterfaceLocal oplogInterface(opCtx());
     auto oplogIter = oplogInterface.makeIterator();
@@ -1654,8 +1654,8 @@ TEST_F(OpObserverTransactionTest, CommittingPreparedTransactionWritesToTransacti
             opCtx(),
             commitSlot,
             prepareOpTime.getTimestamp(),
-            *(txnParticipant.retrieveCompletedTransactionOperations(opCtx())
-                  ->getMutableOperationsForOpObserver()));
+            txnParticipant.retrieveCompletedTransactionOperations(opCtx())
+                ->getOperationsForOpObserver());
     }
     assertTxnRecord(txnNum(), commitOpTime, DurableTxnStateEnum::kCommitted);
 }
@@ -3817,8 +3817,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, CommitPreparedTest) {
             opCtx(),
             commitSlot,
             commitTimestamp,
-            *(txnParticipant.retrieveCompletedTransactionOperations(opCtx())
-                  ->getMutableOperationsForOpObserver()));
+            txnParticipant.retrieveCompletedTransactionOperations(opCtx())
+                ->getOperationsForOpObserver());
     }
     oplogEntryObjs = getNOplogEntries(opCtx(), 3);
     const auto commitOplogObj = oplogEntryObjs.back();
@@ -4067,8 +4067,8 @@ TEST_F(OpObserverMultiEntryTransactionTest, CommitPreparedPackingTest) {
         opCtx(),
         commitSlot,
         commitTimestamp,
-        *(txnParticipant.retrieveCompletedTransactionOperations(opCtx())
-              ->getMutableOperationsForOpObserver()));
+        txnParticipant.retrieveCompletedTransactionOperations(opCtx())
+            ->getOperationsForOpObserver());
 
     oplogEntryObjs = getNOplogEntries(opCtx(), 2);
     const auto commitOplogObj = oplogEntryObjs.back();
