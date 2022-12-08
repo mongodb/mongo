@@ -214,8 +214,8 @@ public:
     std::unique_ptr<ApplyOpsOplogSlotAndOperationAssignment> preTransactionPrepare(
         OperationContext* opCtx,
         const std::vector<OplogSlot>& reservedSlots,
-        Date_t wallClockTime,
-        TransactionOperations* transactionOperations) final {
+        const TransactionOperations& transactionOperations,
+        Date_t wallClockTime) final {
         return nullptr;
     }
 

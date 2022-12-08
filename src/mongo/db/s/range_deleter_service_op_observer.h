@@ -220,8 +220,8 @@ private:
     std::unique_ptr<ApplyOpsOplogSlotAndOperationAssignment> preTransactionPrepare(
         OperationContext* opCtx,
         const std::vector<OplogSlot>& reservedSlots,
-        Date_t wallClockTime,
-        TransactionOperations* transactionOperations) override {
+        const TransactionOperations& transactionOperations,
+        Date_t wallClockTime) override {
         return nullptr;
     }
 

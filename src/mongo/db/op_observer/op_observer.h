@@ -475,8 +475,8 @@ public:
     virtual std::unique_ptr<ApplyOpsOplogSlotAndOperationAssignment> preTransactionPrepare(
         OperationContext* opCtx,
         const std::vector<OplogSlot>& reservedSlots,
-        Date_t wallClockTime,
-        TransactionOperations* transactionOperations) = 0;
+        const TransactionOperations& transactionOperations,
+        Date_t wallClockTime) = 0;
 
     /**
      * The onTransactionPrepare method is called when an atomic transaction is prepared. It must be

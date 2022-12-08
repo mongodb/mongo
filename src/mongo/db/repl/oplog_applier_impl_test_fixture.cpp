@@ -149,10 +149,11 @@ void OplogApplierImplOpObserver::onCollMod(OperationContext* opCtx,
 }
 
 std::unique_ptr<OpObserver::ApplyOpsOplogSlotAndOperationAssignment>
-OplogApplierImplOpObserver::preTransactionPrepare(OperationContext* opCtx,
-                                                  const std::vector<OplogSlot>& reservedSlots,
-                                                  Date_t wallClockTime,
-                                                  TransactionOperations* transactionOperations) {
+OplogApplierImplOpObserver::preTransactionPrepare(
+    OperationContext* opCtx,
+    const std::vector<OplogSlot>& reservedSlots,
+    const TransactionOperations& transactionOperations,
+    Date_t wallClockTime) {
     return std::make_unique<ApplyOpsOplogSlotAndOperationAssignment>(/*prepare=*/true);
 }
 

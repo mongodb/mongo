@@ -2065,14 +2065,14 @@ void OpObserverImpl::onPreparedTransactionCommit(
 std::unique_ptr<OpObserver::ApplyOpsOplogSlotAndOperationAssignment>
 OpObserverImpl::preTransactionPrepare(OperationContext* opCtx,
                                       const std::vector<OplogSlot>& reservedSlots,
-                                      Date_t wallClockTime,
-                                      TransactionOperations* transactionOperations) {
-    auto applyOpsOplogSlotAndOperationAssignment = transactionOperations->getApplyOpsInfo(
+                                      const TransactionOperations& transactionOperations,
+                                      Date_t wallClockTime) {
+    auto applyOpsOplogSlotAndOperationAssignment = transactionOperations.getApplyOpsInfo(
         reservedSlots,
         getMaxNumberOfTransactionOperationsInSingleOplogEntry(),
         getMaxSizeOfTransactionOperationsInSingleOplogEntryBytes(),
         /*prepare=*/true);
-    const auto& statements = transactionOperations->getOperationsForOpObserver();
+    const auto& statements = transactionOperations.getOperationsForOpObserver();
     writeChangeStreamPreImagesForTransaction(
         opCtx, statements, applyOpsOplogSlotAndOperationAssignment, wallClockTime);
     return std::make_unique<OpObserver::ApplyOpsOplogSlotAndOperationAssignment>(

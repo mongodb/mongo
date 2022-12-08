@@ -431,13 +431,13 @@ public:
     std::unique_ptr<ApplyOpsOplogSlotAndOperationAssignment> preTransactionPrepare(
         OperationContext* opCtx,
         const std::vector<OplogSlot>& reservedSlots,
-        Date_t wallClockTime,
-        TransactionOperations* transactionOperations) override {
+        const TransactionOperations& transactionOperations,
+        Date_t wallClockTime) override {
         std::unique_ptr<ApplyOpsOplogSlotAndOperationAssignment>
             applyOpsOplogSlotAndOperationAssignment;
         for (auto&& observer : _observers) {
             auto applyOpsAssignment = observer->preTransactionPrepare(
-                opCtx, reservedSlots, wallClockTime, transactionOperations);
+                opCtx, reservedSlots, transactionOperations, wallClockTime);
             tassert(6278501,
                     "More than one OpObserver returned operation to \"applyOps\" assignment",
                     !(applyOpsAssignment && applyOpsOplogSlotAndOperationAssignment));
