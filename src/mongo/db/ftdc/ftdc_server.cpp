@@ -181,8 +181,11 @@ FTDCSimpleInternalCommandCollector::FTDCSimpleInternalCommandCollector(StringDat
 }
 
 void FTDCSimpleInternalCommandCollector::collect(OperationContext* opCtx, BSONObjBuilder& builder) {
-    auto result = CommandHelpers::runCommandDirectly(opCtx, _request);
-    builder.appendElements(result);
+    if (auto result = CommandHelpers::runCommandDirectly(opCtx, _request);
+        result.hasElement("cursor"))
+        builder.appendElements(result["cursor"]["firstBatch"]["0"].Obj());
+    else
+        builder.appendElements(result);
 }
 
 std::string FTDCSimpleInternalCommandCollector::name() const {

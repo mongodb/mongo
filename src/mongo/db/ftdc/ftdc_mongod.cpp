@@ -82,8 +82,12 @@ public:
                 auto result = CommandHelpers::runCommandDirectly(
                     opCtx,
                     OpMsgRequest::fromDBAndBody(
-                        ns.db(), BSON("collStats" << ns.coll() << "waitForLock" << false)));
-                builder.append(nsStr, result);
+                        ns.db(),
+                        BSON("aggregate" << ns.coll() << "cursor" << BSONObj{} << "pipeline"
+                                         << BSON_ARRAY(BSON("$collStats" << BSON(
+                                                                "storageStats" << BSON(
+                                                                    "waitForLock" << false)))))));
+                builder.append(nsStr, result["cursor"]["firstBatch"]["0"].Obj());
 
             } catch (...) {
                 Status s = exceptionToStatus();
@@ -110,14 +114,16 @@ void registerMongoDCollectors(FTDCController* controller) {
             BSON("replSetGetStatus" << 1 << "initialSync" << 0)));
 
         // CollectionStats
-        controller->addPeriodicCollector(
-            std::make_unique<FTDCSimpleInternalCommandCollector>("collStats",
-                                                                 "local.oplog.rs.stats",
-                                                                 "local",
-                                                                 BSON("collStats"
-                                                                      << "oplog.rs"
-                                                                      << "waitForLock" << false
-                                                                      << "numericOnly" << true)));
+        controller->addPeriodicCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
+            "aggregate",
+            "local.oplog.rs.stats",
+            "local",
+            BSON("aggregate"
+                 << "oplog.rs"
+                 << "cursor" << BSONObj{} << "pipeline"
+                 << BSON_ARRAY(BSON("$collStats" << BSON(
+                                        "storageStats" << BSON(
+                                            "waitForLock" << false << "numericOnly" << true)))))));
         if (serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
             // GetDefaultRWConcern
             controller->addOnRotateCollector(std::make_unique<FTDCSimpleInternalCommandCollector>(
