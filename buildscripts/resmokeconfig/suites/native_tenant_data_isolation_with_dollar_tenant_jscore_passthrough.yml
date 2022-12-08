@@ -1,0 +1,48 @@
+config_variables:
+- &keyFile jstests/libs/authTestsKey
+- &keyFileData Thiskeyisonlyforrunningthesuitewithauthenticationdontuseitinanytestsdirectly
+- &authOptions
+  authenticationDatabase: local
+  authenticationMechanism: SCRAM-SHA-256
+  password: *keyFileData
+  username: __system
+
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/core/all.js
+
+executor:
+  archive:
+    tests: true
+  config:
+    shell_options:
+      # In order to use $tenant, connect mongod with user "_system" which can be authenticated with ActionType::useTenant.
+      <<: *authOptions
+      eval: |
+        jsTest.authenticate(db.getMongo());
+        testingReplication = true;
+        load('jstests/libs/override_methods/inject_dollar_tenant.js');
+      global_vars:
+        TestData: &TestData
+          tenant: "636d957b2646ddfaf9b5e13f"
+          auth: true
+          authMechanism: SCRAM-SHA-256
+          keyFile: *keyFile
+          keyFileData: *keyFileData
+          roleGraphInvalidationIsFatal: true
+  fixture:
+    class: ReplicaSetFixture
+    num_nodes: 3
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        multitenancySupport: true
+        featureFlagMongoStore: true
+        featureFlagRequireTenantID: true
+        logComponentVerbosity:
+          command: 2
+      auth: ''
+      keyFile: *keyFile
+    auth_options: *authOptions
