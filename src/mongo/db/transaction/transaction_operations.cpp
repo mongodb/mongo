@@ -217,7 +217,10 @@ TransactionOperations::ApplyOpsInfo TransactionOperations::getApplyOpsInfo(
     bool prepare) const {
     const auto& operations = _transactionOperations;
     if (operations.empty()) {
-        return {/*applyOpsEntries=*/{}, /*numberOfOplogSlotsUsed=*/0, prepare};
+        return {/*applyOpsEntries=*/{},
+                /*numberOfOplogSlotsUsed=*/0,
+                /*numOperationsWithNeedsRetryImage=*/0,
+                prepare};
     }
     tassert(6278504, "Insufficient number of oplogSlots", operations.size() <= oplogSlots.size());
 
@@ -228,6 +231,7 @@ TransactionOperations::ApplyOpsInfo TransactionOperations::getApplyOpsInfo(
         return *oplogSlotIter++;
     };
 
+    std::size_t numOperationsWithNeedsRetryImage = 0;
     auto hasNeedsRetryImage = [](const repl::ReplOperation& operation) {
         return static_cast<bool>(operation.getNeedsRetryImage());
     };
@@ -241,6 +245,8 @@ TransactionOperations::ApplyOpsInfo TransactionOperations::getApplyOpsInfo(
         if (opCountWithNeedsRetryImage > 0) {
             // Reserve a slot for a forged no-op entry.
             getNextOplogSlot();
+
+            numOperationsWithNeedsRetryImage += opCountWithNeedsRetryImage;
         }
         operationIt += applyOpsOperations.size();
         applyOpsEntries.emplace_back(
@@ -254,6 +260,7 @@ TransactionOperations::ApplyOpsInfo TransactionOperations::getApplyOpsInfo(
     }
     return {std::move(applyOpsEntries),
             /*numberOfOplogSlotsUsed=*/static_cast<std::size_t>(oplogSlotIter - oplogSlots.begin()),
+            /*numOperationsWithNeedsRetryImage=*/numOperationsWithNeedsRetryImage,
             prepare};
 }
 

@@ -215,6 +215,7 @@ TEST(TransactionOperationsTest, GetApplyOpsInfoEmptyOps) {
                                     /*prepare=*/false);
     ASSERT_EQ(info.applyOpsEntries.size(), 0);
     ASSERT_EQ(info.numberOfOplogSlotsUsed, 0);
+    ASSERT_EQ(info.numOperationsWithNeedsRetryImage, 0);
     ASSERT_FALSE(info.prepare);
 }
 
@@ -258,6 +259,7 @@ TEST(TransactionOperationsTest, GetApplyOpsInfoReturnsOneEntryContainingTwoOpera
 
     ASSERT_EQ(info.numberOfOplogSlotsUsed, 1U);
     ASSERT_EQ(info.applyOpsEntries.size(), 1U);
+    ASSERT_EQ(info.numOperationsWithNeedsRetryImage, 0);
     ASSERT_FALSE(info.prepare);
 
     ASSERT_EQ(info.applyOpsEntries[0].oplogSlot, oplogSlots[0]);  // first oplog slot
@@ -296,6 +298,7 @@ TEST(TransactionOperationsTest, GetApplyOpsInfoRespectsOperationCountLimit) {
 
     ASSERT_EQ(info.numberOfOplogSlotsUsed, 2U);
     ASSERT_EQ(info.applyOpsEntries.size(), 2U);
+    ASSERT_EQ(info.numOperationsWithNeedsRetryImage, 0);
     ASSERT_FALSE(info.prepare);
 
     // Check first applyOps entry.
@@ -340,6 +343,7 @@ TEST(TransactionOperationsTest, GetApplyOpsInfoRespectsOperationSizeLimit) {
 
     ASSERT_EQ(info.numberOfOplogSlotsUsed, 2U);
     ASSERT_EQ(info.applyOpsEntries.size(), 2U);
+    ASSERT_EQ(info.numOperationsWithNeedsRetryImage, 0);
     ASSERT_FALSE(info.prepare);
 
     // Check first applyOps entry.
@@ -403,6 +407,7 @@ TEST(TransactionOperationsTest, GetApplyOpsInfoAssignsPreImageSlotBeforeOperatio
 
     ASSERT_EQ(info.numberOfOplogSlotsUsed, 2U);
     ASSERT_EQ(info.applyOpsEntries.size(), 1U);
+    ASSERT_EQ(info.numOperationsWithNeedsRetryImage, 1U);
     ASSERT_FALSE(info.prepare);
 
     ASSERT_EQ(info.applyOpsEntries[0].oplogSlot, oplogSlots[1]);
@@ -435,6 +440,7 @@ TEST(TransactionOperationsTest, GetApplyOpsInfoAssignsLastOplogSlotForPrepare) {
     ASSERT_EQ(info.applyOpsEntries[0].oplogSlot, oplogSlots[1]);  // last oplog slot
     ASSERT_EQ(info.applyOpsEntries[0].operations.size(), 1U);
     ASSERT_BSONOBJ_EQ(info.applyOpsEntries[0].operations[0], op.toBSON());
+    ASSERT_EQ(info.numOperationsWithNeedsRetryImage, 0);
     ASSERT(info.prepare);
 }
 

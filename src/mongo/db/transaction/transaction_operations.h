@@ -71,19 +71,27 @@ public:
 
         ApplyOpsInfo(std::vector<ApplyOpsEntry> applyOpsEntries,
                      std::size_t numberOfOplogSlotsUsed,
+                     std::size_t numOperationsWithNeedsRetryImage,
                      bool prepare)
             : applyOpsEntries(std::move(applyOpsEntries)),
               numberOfOplogSlotsUsed(numberOfOplogSlotsUsed),
+              numOperationsWithNeedsRetryImage(numOperationsWithNeedsRetryImage),
               prepare(prepare) {}
 
         explicit ApplyOpsInfo(bool prepare)
-            : applyOpsEntries(), numberOfOplogSlotsUsed(0), prepare(prepare) {}
+            : applyOpsEntries(),
+              numberOfOplogSlotsUsed(0),
+              numOperationsWithNeedsRetryImage(0),
+              prepare(prepare) {}
 
         // Representation of "applyOps" oplog entries.
         std::vector<ApplyOpsEntry> applyOpsEntries;
 
         // Number of oplog slots utilized.
         std::size_t numberOfOplogSlotsUsed;
+
+        // Number of operations with 'needsRetryImage' set.
+        std::size_t numOperationsWithNeedsRetryImage;
 
         // Indicates if we are generating "applyOps" oplog entries for a prepared transaction.
         // This is derived from the 'prepared' parameter passed to the getApplyOpsInfo() function.
