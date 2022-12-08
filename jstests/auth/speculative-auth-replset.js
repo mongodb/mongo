@@ -115,13 +115,10 @@ Object.keys(initialMechStats).forEach(function(mech) {
     const logCounts = countAuthInLog(admin);
 
     assert.eq(logCounts.speculative,
-              newMechStats["SCRAM-SHA-256"].speculativeAuthenticate.successful);
+              newMechStats["SCRAM-SHA-256"].speculativeAuthenticate.successful -
+                  initialMechStats["SCRAM-SHA-256"].speculativeAuthenticate.successful);
 
-    // Subtract the initial mech stats for cluster authentication that were incremented
-    // during test setup, so we can assert on only the "real" cluster authetnication count
-    assert.eq(logCounts.cluster,
-              newMechStats["SCRAM-SHA-256"].clusterAuthenticate.successful -
-                  initialMechStats["SCRAM-SHA-256"].clusterAuthenticate.successful);
+    assert.eq(logCounts.cluster, newMechStats["SCRAM-SHA-256"].clusterAuthenticate.successful);
 
     assert.gt(logCounts.speculativeCluster,
               0,

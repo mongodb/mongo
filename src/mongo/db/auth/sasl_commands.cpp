@@ -38,6 +38,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/authenticate.h"
 #include "mongo/client/sasl_client_authenticate.h"
+#include "mongo/db/auth/authentication_metrics.h"
 #include "mongo/db/auth/authentication_session.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
@@ -148,7 +149,27 @@ SaslReply doSaslStep(OperationContext* opCtx,
     auto& mechanism = *mechanismPtr;
 
     // Passing in a payload and extracting a responsePayload
-    StatusWith<std::string> swResponse = mechanism.step(opCtx, payload.get());
+    StatusWith<std::string> swResponse = [&] {
+        ScopedCallbackTimer st([&](Duration<std::micro> elapsed) {
+            BSONObjBuilder bob;
+
+            auto currentStepOpt = mechanism.currentStep();
+            if (currentStepOpt != boost::none) {
+                bob << "step" << static_cast<int>(currentStepOpt.get());
+            }
+
+            auto totalStepOpt = mechanism.totalSteps();
+            if (totalStepOpt != boost::none) {
+                bob << "step_total" << static_cast<int>(totalStepOpt.get());
+            }
+
+            bob << "duration_micros" << elapsed.count();
+
+            session->metrics()->appendMetric(bob.obj());
+        });
+
+        return mechanism.step(opCtx, payload.get());
+    }();
 
     auto makeLogAttributes = [&]() {
         logv2::DynamicAttributes attrs;
@@ -236,6 +257,9 @@ SaslReply doSaslStart(OperationContext* opCtx,
 SaslReply runSaslStart(OperationContext* opCtx,
                        AuthenticationSession* session,
                        const SaslStartCommand& request) {
+
+    session->metrics()->restart();
+
     warnIfCompressed(opCtx);
     opCtx->markKillOnClientDisconnect();
 

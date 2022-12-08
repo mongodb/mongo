@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,40 +29,22 @@
 
 #pragma once
 
-#include "mongo/db/auth/sasl_mechanism_policies.h"
-#include "mongo/db/auth/sasl_mechanism_registry.h"
+#include "mongo/util/tick_source.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
-
-class SASLPlainServerMechanism : public MakeServerMechanism<PLAINPolicy> {
+template <typename F>
+class ScopedCallbackTimer {
 public:
-    explicit SASLPlainServerMechanism(std::string authenticationDatabase)
-        : MakeServerMechanism<PLAINPolicy>(std::move(authenticationDatabase)) {}
+    ScopedCallbackTimer(F onStop) : _onStop(std::move(onStop)) {}
 
-    boost::optional<unsigned int> currentStep() const override {
-        return (unsigned int)1;
-    }
-
-    boost::optional<unsigned int> totalSteps() const override {
-        return (unsigned int)1;
+    ~ScopedCallbackTimer() {
+        _onStop(_timer.elapsed());
     }
 
 private:
-    StatusWith<std::tuple<bool, std::string>> stepImpl(OperationContext* opCtx,
-                                                       StringData input) final;
+    F _onStop;
+    Timer _timer;
 };
-
-class PLAINServerFactory : public MakeServerFactory<SASLPlainServerMechanism> {
-public:
-    using MakeServerFactory<SASLPlainServerMechanism>::MakeServerFactory;
-    static constexpr bool isInternal = true;
-    bool canMakeMechanismForUser(const User* user) const final {
-        auto credentials = user->getCredentials();
-        return !credentials.isExternal &&
-            (credentials.scram<SHA1Block>().isValid() ||
-             credentials.scram<SHA256Block>().isValid());
-    }
-};
-
 
 }  // namespace mongo

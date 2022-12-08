@@ -341,6 +341,8 @@ AuthenticateReply authCommand(OperationContext* opCtx,
                     "db"_attr = dbname);
     }
 
+    session->metrics()->restart();
+
     auto& internalSecurityUser = (*internalSecurity.getUser())->getName();
     if (getTestCommandsEnabled() && dbname.db() == "admin" &&
         user == internalSecurityUser.getUser()) {
@@ -355,39 +357,18 @@ AuthenticateReply authCommand(OperationContext* opCtx,
     if (mechanism.empty()) {
         uasserted(ErrorCodes::BadValue, "Auth mechanism not specified");
     }
+
     session->setMechanismName(mechanism);
 
-    try {
-        _authenticate(opCtx, session, mechanism);
-        if (!serverGlobalParams.quiet.load()) {
-            LOGV2(20429,
-                  "Successfully authenticated",
-                  "client"_attr = client->getRemote(),
-                  "mechanism"_attr = mechanism,
-                  "user"_attr = session->getUserName(),
-                  "db"_attr = session->getDatabase());
-        }
+    _authenticate(opCtx, session, mechanism);
 
-        session->markSuccessful();
+    session->markSuccessful();
 
-        AuthenticateReply reply;
-        reply.setUser(session->getUserName());
-        reply.setDbname(session->getDatabase());
-        return reply;
+    AuthenticateReply reply;
+    reply.setUser(session->getUserName());
+    reply.setDbname(session->getDatabase());
 
-    } catch (const AssertionException& ex) {
-        if (!serverGlobalParams.quiet.load()) {
-            LOGV2(20428,
-                  "Failed to authenticate",
-                  "client"_attr = client->getRemote(),
-                  "mechanism"_attr = mechanism,
-                  "user"_attr = session->getUserName(),
-                  "db"_attr = session->getDatabase(),
-                  "error"_attr = ex.toStatus());
-        }
-
-        throw;
-    }
+    return reply;
 }
 
 class CmdAuthenticate final : public AuthenticateCmdVersion1Gen<CmdAuthenticate> {

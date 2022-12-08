@@ -263,6 +263,8 @@ public:
 
     void incSaslSupportedMechanismsReceived();
 
+    void incAuthenticationCumulativeTime(long long micros);
+
     void append(BSONObjBuilder*);
 
     void initializeMechanismMap(const std::vector<std::string>&);
@@ -285,7 +287,7 @@ private:
     using MechanismMap = std::map<std::string, MechanismData>;
 
     AtomicWord<long long> _saslSupportedMechanismsReceived;
-
+    AtomicWord<long long> _authenticationCumulativeMicros;
     // Mechanism maps are initialized at startup to contain all
     // mechanisms known to authenticationMechanisms setParam.
     // After that they are kept to a fixed size.

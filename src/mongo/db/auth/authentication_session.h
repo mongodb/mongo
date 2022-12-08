@@ -42,6 +42,17 @@ namespace mongo {
 
 class Client;
 
+class AuthMetricsRecorder {
+public:
+    void restart();
+    BSONObj capture();
+    void appendMetric(const BSONObj& metric);
+
+private:
+    Timer _timer;
+    BSONArrayBuilder _appendedMetrics;
+};
+
 /**
  * Type representing an ongoing authentication session.
  */
@@ -188,6 +199,14 @@ public:
     void markFailed(const Status& status);
 
     /**
+     * Returns the metrics recorder for this Authentication Session.
+     * The session retains ownership of this pointer.
+     */
+    AuthMetricsRecorder* metrics() {
+        return &_metricsRecorder;
+    }
+
+    /**
      * This function invokes a functor with a StepGuard on the stack and observes any exceptions
      * emitted.
      */
@@ -255,6 +274,7 @@ private:
     // certificate. If we have a authN mechanism, we use its principal name instead.
     UserName _userName;
     std::unique_ptr<ServerMechanismBase> _mech;
+    AuthMetricsRecorder _metricsRecorder;
 };
 
 }  // namespace mongo

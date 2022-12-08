@@ -29,14 +29,13 @@
 
 
 #include "mongo/db/auth/authentication_session.h"
-
 #include "mongo/client/authenticate.h"
 #include "mongo/db/audit.h"
+#include "mongo/db/auth/authentication_metrics.h"
 #include "mongo/db/client.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
-
 
 namespace mongo {
 namespace {
@@ -106,6 +105,24 @@ auto makeAppender(ServerMechanismBase* mech) {
     };
 }
 }  // namespace
+
+void AuthMetricsRecorder::appendMetric(const BSONObj& metric) {
+    _appendedMetrics.append(metric);
+}
+
+BSONObj AuthMetricsRecorder::capture() {
+
+    Duration<std::micro> _duration = _timer.elapsed();
+
+    authCounter.incAuthenticationCumulativeTime(_duration.count());
+
+    return BSON("conversation_duration"
+                << BSON("micros" << _duration.count() << "summary" << _appendedMetrics.done()));
+}
+
+void AuthMetricsRecorder::restart() {
+    _timer.reset();
+}
 
 AuthenticationSession::StepGuard::StepGuard(OperationContext* opCtx, StepType currentStep)
     : _opCtx(opCtx), _currentStep(currentStep) {
@@ -296,15 +313,18 @@ void AuthenticationSession::markSuccessful() {
                                           ErrorCodes::OK);
     audit::logAuthentication(_client, event);
 
-    LOGV2_DEBUG(5286306,
-                kDiagnosticLogLevel,
-                "Successfully authenticated",
-                "client"_attr = _client->getRemote(),
-                "isSpeculative"_attr = _isSpeculative,
-                "isClusterMember"_attr = _isClusterMember,
-                "mechanism"_attr = _mechName,
-                "user"_attr = _userName.getUser(),
-                "db"_attr = _userName.getDB());
+    BSONObj metrics = _metricsRecorder.capture();
+
+    LOGV2(5286306,
+          "Successfully authenticated",
+          "client"_attr = _client->getRemote(),
+          "isSpeculative"_attr = _isSpeculative,
+          "isClusterMember"_attr = _isClusterMember,
+          "mechanism"_attr = _mechName,
+          "user"_attr = _userName.getUser(),
+          "db"_attr = _userName.getDB(),
+          "result"_attr = Status::OK().code(),
+          "metrics"_attr = metrics);
 }
 
 void AuthenticationSession::markFailed(const Status& status) {
@@ -317,16 +337,19 @@ void AuthenticationSession::markFailed(const Status& status) {
                                           status.code());
     audit::logAuthentication(_client, event);
 
-    LOGV2_DEBUG(5286307,
-                kDiagnosticLogLevel,
-                "Failed to authenticate",
-                "client"_attr = _client->getRemote(),
-                "isSpeculative"_attr = _isSpeculative,
-                "isClusterMember"_attr = _isClusterMember,
-                "mechanism"_attr = _mechName,
-                "user"_attr = _userName.getUser(),
-                "db"_attr = _userName.getDB(),
-                "error"_attr = status);
+    BSONObj metrics = _metricsRecorder.capture();
+
+    LOGV2(5286307,
+          "Failed to authenticate",
+          "client"_attr = _client->getRemote(),
+          "isSpeculative"_attr = _isSpeculative,
+          "isClusterMember"_attr = _isClusterMember,
+          "mechanism"_attr = _mechName,
+          "user"_attr = _userName.getUser(),
+          "db"_attr = _userName.getDB(),
+          "error"_attr = status,
+          "result"_attr = status.code(),
+          "metrics"_attr = metrics);
 }
 
 }  // namespace mongo

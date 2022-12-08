@@ -103,7 +103,17 @@ void SASLServerMechanismRegistry::advertiseMechanismNamesForUser(OperationContex
     AuthorizationManager* authManager = AuthorizationManager::get(opCtx->getServiceContext());
 
     UserHandle user;
-    const auto swUser = authManager->acquireUser(opCtx, userName);
+
+    const auto swUser = [&] {
+        ScopedCallbackTimer timer([&](Microseconds elapsed) {
+            LOGV2(6788603,
+                  "Auth metrics report",
+                  "metric"_attr = "sasl_acquireUser",
+                  "micros"_attr = elapsed.count());
+        });
+        return authManager->acquireUser(opCtx, userName);
+    }();
+
     if (!swUser.isOK()) {
         auto& status = swUser.getStatus();
         if (status.code() == ErrorCodes::UserNotFound) {

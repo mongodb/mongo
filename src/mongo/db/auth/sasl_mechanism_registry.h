@@ -34,6 +34,7 @@
 #include <unordered_map>
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/auth/authentication_metrics.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
@@ -176,6 +177,7 @@ public:
      * and either returns an error, or a response to be sent back.
      */
     StatusWith<std::string> step(OperationContext* opCtx, StringData input) {
+
         auto result = stepImpl(opCtx, input);
         if (result.isOK()) {
             bool isSuccess;
@@ -205,6 +207,9 @@ public:
         // Be default, ignore any options provided.
         return Status::OK();
     }
+
+    virtual boost::optional<unsigned int> currentStep() const = 0;
+    virtual boost::optional<unsigned int> totalSteps() const = 0;
 
 protected:
     /**

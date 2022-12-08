@@ -30,7 +30,6 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/sasl_scram_server_conversation.h"
-
 #include <boost/algorithm/string/join.hpp>
 #include <boost/algorithm/string/replace.hpp>
 
@@ -44,11 +43,14 @@
 #include "mongo/db/auth/sasl_mechanism_policies.h"
 #include "mongo/db/auth/sasl_mechanism_registry.h"
 #include "mongo/db/auth/sasl_options.h"
+#include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/sequence_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 
 namespace mongo {
 
@@ -57,7 +59,8 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::step
     OperationContext* opCtx, StringData inputData) {
     _step++;
 
-    const int numSteps = (_skipEmptyExchange ? 2 : 3);
+    const unsigned int numSteps = _totalSteps();
+
     if (_step > numSteps || _step <= 0) {
         return Status(ErrorCodes::AuthenticationFailed,
                       str::stream() << "Invalid SCRAM authentication step: " << _step);
@@ -203,7 +206,16 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
     // The authentication database is also the source database for the user.
     auto authManager = AuthorizationManager::get(opCtx->getServiceContext());
 
-    auto swUser = authManager->acquireUser(opCtx, user);
+    auto swUser = [&]() {
+        ScopedCallbackTimer timer([&](Microseconds elapsed) {
+            LOGV2(6788604,
+                  "Auth metrics report",
+                  "metric"_attr = "acquireUser",
+                  "micros"_attr = elapsed.count());
+        });
+        return authManager->acquireUser(opCtx, user);
+    }();
+
     if (!swUser.isOK()) {
         return swUser.getStatus();
     }
@@ -251,7 +263,6 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
     // Create text-based nonce as base64 encoding of a binary blob of length multiple of 3
     const int nonceLenQWords = 3;
     uint64_t binaryNonce[nonceLenQWords];
-
     SecureRandom().fill(binaryNonce, sizeof(binaryNonce));
 
     _nonce = clientNonce +

@@ -10,11 +10,12 @@ const CA_CERT = 'jstests/libs/ca.pem';
 const SELF_SIGNED_CERT = 'jstests/libs/client-self-signed.pem';
 
 function hasX509AuthSucceeded(conn) {
-    if (checkLog.checkContainsOnce(conn, 'Successfully authenticated')) {
-        return true;
-    }
     if (checkLog.checkContainsOnce(conn, 'No verified subject name available from client')) {
         return false;
+    }
+
+    if (checkLog.checkContainsOnce(conn, 'Successfully authenticated')) {
+        return true;
     }
     print("Not yet clear what was the result...");
     return null;

@@ -67,6 +67,14 @@ public:
 
     Status setOptions(BSONObj options) final;
 
+    boost::optional<unsigned int> currentStep() const override {
+        return _step;
+    }
+
+    boost::optional<unsigned int> totalSteps() const override {
+        return _totalSteps();
+    }
+
 private:
     /**
      * Parse client-first-message and generate server-first-message
@@ -79,7 +87,11 @@ private:
     StatusWith<std::tuple<bool, std::string>> _secondStep(OperationContext* opCtx,
                                                           StringData input);
 
-    int _step{0};
+    unsigned int _totalSteps() const {
+        return _skipEmptyExchange ? 2 : 3;
+    }
+
+    unsigned int _step{0};
     std::string _authMessage;
 
     // The secrets to check the client proof against during the second step

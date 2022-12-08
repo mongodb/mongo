@@ -219,6 +219,10 @@ void AuthCounter::incSaslSupportedMechanismsReceived() {
     _saslSupportedMechanismsReceived.fetchAndAddRelaxed(1);
 }
 
+void AuthCounter::incAuthenticationCumulativeTime(long long micros) {
+    _authenticationCumulativeMicros.fetchAndAddRelaxed(micros);
+}
+
 void AuthCounter::MechanismCounterHandle::incSpeculativeAuthenticateReceived() {
     _data->speculativeAuthenticate.received.fetchAndAddRelaxed(1);
 }
@@ -310,6 +314,9 @@ void AuthCounter::append(BSONObjBuilder* b) {
     }
 
     mechsBuilder.done();
+
+    const auto totalAuthenticationTimeMicros = _authenticationCumulativeMicros.load();
+    b->append("totalAuthenticationTimeMicros", totalAuthenticationTimeMicros);
 }
 
 OpCounterServerStatusSection::OpCounterServerStatusSection(const std::string& sectionName,
