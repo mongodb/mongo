@@ -1610,7 +1610,7 @@ buildvariants:
 
   - name: linux-1-node-replSet-ese-gcm
     display_name: Linux 1-Node ReplSet ESE GCM Legacy
-    cron: "0 0 * * 4"  # 00:00 on Thursday
+    cron: "0 0 1 * *"  # 00:00 on the first of each month
     modules: *modules
     expansions:
       mongodb_setup: single-replica-ese-gcm
@@ -2176,10 +2176,6 @@ buildvariants:
     tasks:
       - name: schedule_patch_auto_tasks
       - name: schedule_variant_auto_tasks
-      - name: initialsync
-      - name: initialsync-fcbis
-      - name: initialsync-logkeeper-short
-      - name: initialsync-logkeeper-short-fcbis
       - name: initialsync-large
       - name: initialsync-large-fcbis
 
@@ -2820,7 +2816,7 @@ buildvariants:
 
   - name: linux-1-node-replSet-ese-gcm.2022-11
     display_name: Linux 1-Node ReplSet ESE GCM 2022-11
-    cron: "0 0 * * 4"  # 00:00 on Thursday
+    cron: "0 0 1 * *"  # 00:00 on the first of each month
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -3418,7 +3414,7 @@ buildvariants:
 
   - name: linux-3-node-replSet-initialsync.2022-11
     display_name: Linux 3-Node ReplSet Initial Sync 2022-11
-    cron: "0 0 * * 2,4"  # 00:00 on Tuesday,Thursday
+    cron: "0 0 * * 4"  # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -3437,10 +3433,6 @@ buildvariants:
     tasks:
       - name: schedule_patch_auto_tasks
       - name: schedule_variant_auto_tasks
-      - name: initialsync
-      - name: initialsync-fcbis
-      - name: initialsync-logkeeper-short
-      - name: initialsync-logkeeper-short-fcbis
       - name: initialsync-large
       - name: initialsync-large-fcbis
 
