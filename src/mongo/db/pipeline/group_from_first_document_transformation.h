@@ -42,13 +42,17 @@ namespace mongo {
  */
 class GroupFromFirstDocumentTransformation final : public TransformerInterface {
 public:
+    enum class ExpectedInput { kFirstDocument, kLastDocument };
+
     GroupFromFirstDocumentTransformation(
         const std::string& groupId,
         StringData originalStageName,
-        std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>> accumulatorExprs)
+        std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>> accumulatorExprs,
+        ExpectedInput expectedInput = ExpectedInput::kFirstDocument)
         : _accumulatorExprs(std::move(accumulatorExprs)),
           _groupId(groupId),
-          _originalStageName(originalStageName) {}
+          _originalStageName(originalStageName),
+          _expectedInput(expectedInput) {}
 
     TransformerType getType() const final {
         return TransformerType::kGroupFromFirstDocument;
@@ -64,6 +68,10 @@ public:
 
     StringData originalStageName() const {
         return _originalStageName;
+    }
+
+    ExpectedInput expectedInput() const {
+        return _expectedInput;
     }
 
     Document applyTransformation(const Document& input) final;
@@ -83,12 +91,14 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         const std::string& groupId,
         StringData originalStageName,
-        std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>> accumulatorExprs);
+        std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>> accumulatorExprs,
+        ExpectedInput expectedInput);
 
 private:
     std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>> _accumulatorExprs;
     std::string _groupId;
     StringData _originalStageName;
+    ExpectedInput _expectedInput;
 };
 
 }  // namespace mongo

@@ -2409,7 +2409,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
 
 bool turnIxscanIntoDistinctIxscan(QuerySolution* soln,
                                   const std::string& field,
-                                  bool strictDistinctOnly) {
+                                  bool strictDistinctOnly,
+                                  bool flipDistinctScanDirection) {
     auto root = soln->root();
 
     // We can attempt to convert a plan if it follows one of these patterns (starting from the
@@ -2530,8 +2531,10 @@ bool turnIxscanIntoDistinctIxscan(QuerySolution* soln,
 
     // Make a new DistinctNode. We will swap this for the ixscan in the provided solution.
     auto distinctNode = std::make_unique<DistinctNode>(indexScanNode->index);
-    distinctNode->direction = indexScanNode->direction;
-    distinctNode->bounds = indexScanNode->bounds;
+    distinctNode->direction =
+        flipDistinctScanDirection ? -indexScanNode->direction : indexScanNode->direction;
+    distinctNode->bounds =
+        flipDistinctScanDirection ? indexScanNode->bounds.reverse() : indexScanNode->bounds;
     distinctNode->queryCollator = indexScanNode->queryCollator;
     distinctNode->fieldNo = fieldNo;
 
@@ -2567,7 +2570,8 @@ namespace {
 QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
                                                    const CollectionPtr& collection,
                                                    size_t plannerOptions,
-                                                   const ParsedDistinct& parsedDistinct) {
+                                                   const ParsedDistinct& parsedDistinct,
+                                                   bool flipDistinctScanDirection) {
     QueryPlannerParams plannerParams;
     plannerParams.options = QueryPlannerParams::NO_TABLE_SCAN | plannerOptions;
 
@@ -2585,6 +2589,18 @@ QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
         if (desc->hidden())
             continue;
         if (desc->keyPattern().hasField(parsedDistinct.getKey())) {
+            if (flipDistinctScanDirection && ice->isMultikey(opCtx, collection)) {
+                // This ParsedDistinct was generated as a result of transforming a $group with $last
+                // accumulators using the GroupFromFirstTransformation. We cannot use a
+                // DISTINCT_SCAN if $last is being applied to an indexed field which is multikey,
+                // even if the 'parsedDistinct' key does not include multikey paths. This is because
+                // changing the sort direction also changes the comparison semantics for arrays,
+                // which means that flipping the scan may not exactly flip the order that we see
+                // documents in. In the case of using DISTINCT_SCAN for $group, that would mean that
+                // $first of the flipped scan may not be the same document as $last from the user's
+                // requested sort order.
+                continue;
+            }
             if (!mayUnwindArrays &&
                 isAnyComponentOfPathMultikey(desc->keyPattern(),
                                              ice->isMultikey(opCtx, collection),
@@ -2733,14 +2749,17 @@ getExecutorDistinctFromIndexSolutions(OperationContext* opCtx,
                                       std::vector<std::unique_ptr<QuerySolution>> solutions,
                                       PlanYieldPolicy::YieldPolicy yieldPolicy,
                                       ParsedDistinct* parsedDistinct,
+                                      bool flipDistinctScanDirection,
                                       size_t plannerOptions) {
     const auto& collection = *coll;
     const bool strictDistinctOnly = (plannerOptions & QueryPlannerParams::STRICT_DISTINCT_ONLY);
 
     // We look for a solution that has an ixscan we can turn into a distinctixscan
     for (size_t i = 0; i < solutions.size(); ++i) {
-        if (turnIxscanIntoDistinctIxscan(
-                solutions[i].get(), parsedDistinct->getKey(), strictDistinctOnly)) {
+        if (turnIxscanIntoDistinctIxscan(solutions[i].get(),
+                                         parsedDistinct->getKey(),
+                                         strictDistinctOnly,
+                                         flipDistinctScanDirection)) {
             // Build and return the SSR over solutions[i].
             std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
             std::unique_ptr<QuerySolution> currentSolution = std::move(solutions[i]);
@@ -2808,7 +2827,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorWith
 }  // namespace
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDistinct(
-    const CollectionPtr* coll, size_t plannerOptions, ParsedDistinct* parsedDistinct) {
+    const CollectionPtr* coll,
+    size_t plannerOptions,
+    ParsedDistinct* parsedDistinct,
+    bool flipDistinctScanDirection) {
     const auto& collection = *coll;
 
     auto expCtx = parsedDistinct->getQuery()->getExpCtx();
@@ -2843,8 +2865,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDist
     // We go through normal planning (with limited parameters) to see if we can produce
     // a soln with the above properties.
 
-    auto plannerParams =
-        fillOutPlannerParamsForDistinct(opCtx, collection, plannerOptions, *parsedDistinct);
+    auto plannerParams = fillOutPlannerParamsForDistinct(
+        opCtx, collection, plannerOptions, *parsedDistinct, flipDistinctScanDirection);
 
     // If there are no suitable indices for the distinct hack bail out now into regular planning
     // with no projection.
@@ -2897,8 +2919,13 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDist
     // STRICT_DISTINCT_ONLY flag is not set, we may get a DISTINCT_SCAN plan that filters out some
     // but not all duplicate values of the distinct field, meaning that the output from this
     // executor will still need deduplication.
-    executorWithStatus = getExecutorDistinctFromIndexSolutions(
-        opCtx, coll, std::move(solutions), yieldPolicy, parsedDistinct, plannerOptions);
+    executorWithStatus = getExecutorDistinctFromIndexSolutions(opCtx,
+                                                               coll,
+                                                               std::move(solutions),
+                                                               yieldPolicy,
+                                                               parsedDistinct,
+                                                               flipDistinctScanDirection,
+                                                               plannerOptions);
     if (!executorWithStatus.isOK() || executorWithStatus.getValue()) {
         // We either got a DISTINCT plan or a fatal error.
         return executorWithStatus;

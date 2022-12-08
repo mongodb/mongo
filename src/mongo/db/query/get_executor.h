@@ -270,7 +270,10 @@ bool turnIxscanIntoDistinctIxscan(QuerySolution* soln,
  * distinct.
  */
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDistinct(
-    const CollectionPtr* collection, size_t plannerOptions, ParsedDistinct* parsedDistinct);
+    const CollectionPtr* collection,
+    size_t plannerOptions,
+    ParsedDistinct* parsedDistinct,
+    bool flipDistinctScanDirection = false);
 
 /*
  * Get a PlanExecutor for a query executing as part of a count command.

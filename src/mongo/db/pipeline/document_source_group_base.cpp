@@ -63,6 +63,17 @@ std::string nextFileName() {
     return "extsort-doc-group." + std::to_string(documentSourceGroupFileCounter.fetchAndAdd(1));
 }
 
+/**
+ * Helper to check if all accumulated fields need the same document.
+ */
+bool accsNeedSameDoc(const std::vector<AccumulationStatement>& accumulatedFields,
+                     AccumulatorDocumentsNeeded docNeeded) {
+    return std::all_of(accumulatedFields.begin(), accumulatedFields.end(), [&](auto&& accumulator) {
+        const auto& doc = accumulator.makeAccumulator()->documentsNeeded();
+        return doc == docNeeded;
+    });
+}
+
 }  // namespace
 
 using boost::intrusive_ptr;
@@ -758,12 +769,14 @@ DocumentSourceGroupBase::rewriteGroupAsTransformOnFirstDocument() const {
 
     const auto groupId = fieldPath.tail().fullPath();
 
-    // We can't do this transformation if there are any non-$first accumulators.
-    for (auto&& accumulator : _accumulatedFields) {
-        if (AccumulatorDocumentsNeeded::kFirstDocument !=
-            accumulator.makeAccumulator()->documentsNeeded()) {
-            return nullptr;
-        }
+    // We do this transformation only if there are all $first, all $last, or no accumulators.
+    GroupFromFirstDocumentTransformation::ExpectedInput expectedInput;
+    if (accsNeedSameDoc(_accumulatedFields, AccumulatorDocumentsNeeded::kFirstDocument)) {
+        expectedInput = GroupFromFirstDocumentTransformation::ExpectedInput::kFirstDocument;
+    } else if (accsNeedSameDoc(_accumulatedFields, AccumulatorDocumentsNeeded::kLastDocument)) {
+        expectedInput = GroupFromFirstDocumentTransformation::ExpectedInput::kLastDocument;
+    } else {
+        return nullptr;
     }
 
     std::vector<std::pair<std::string, boost::intrusive_ptr<Expression>>> fields;
@@ -778,17 +791,17 @@ DocumentSourceGroupBase::rewriteGroupAsTransformOnFirstDocument() const {
         idField = ExpressionObject::create(pExpCtx.get(),
                                            {{_idFieldNames.front(), _idExpressions.front()}});
     }
-    fields.push_back(std::make_pair("_id", idField));
+    fields.emplace_back("_id", idField);
 
     for (auto&& accumulator : _accumulatedFields) {
-        fields.push_back(std::make_pair(accumulator.fieldName, accumulator.expr.argument));
+        fields.emplace_back(accumulator.fieldName, accumulator.expr.argument);
 
-        // Since we don't attempt this transformation for non-$first accumulators,
+        // Since we don't attempt this transformation for non-$first/$last accumulators,
         // the initializer should always be trivial.
     }
 
     return GroupFromFirstDocumentTransformation::create(
-        pExpCtx, groupId, getSourceName(), std::move(fields));
+        pExpCtx, groupId, getSourceName(), std::move(fields), expectedInput);
 }
 
 size_t DocumentSourceGroupBase::getMaxMemoryUsageBytes() const {

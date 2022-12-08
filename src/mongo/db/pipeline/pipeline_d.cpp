@@ -221,7 +221,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
     const QueryMetadataBitSet& metadataRequested,
     BSONObj sortObj,
     SkipThenLimit skipThenLimit,
-    boost::optional<std::string> groupIdForDistinctScan,
+    const GroupFromFirstDocumentTransformation* groupForDistinctScan,
     const AggregateCommandRequest* aggRequest,
     const QueryPlannerParams& plannerOpts,
     const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
@@ -284,13 +284,18 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
     // Mark the metadata that's requested by the pipeline on the CQ.
     cq.getValue()->requestAdditionalMetadata(metadataRequested);
 
-    if (groupIdForDistinctScan) {
+    if (groupForDistinctScan) {
         // When the pipeline includes a $group that groups by a single field
         // (groupIdForDistinctScan), we use getExecutorDistinct() to attempt to get an executor that
         // uses a DISTINCT_SCAN to scan exactly one document for each group. When that's not
         // possible, we return nullptr, and the caller is responsible for trying again without
         // passing a 'groupIdForDistinctScan' value.
-        ParsedDistinct parsedDistinct(std::move(cq.getValue()), *groupIdForDistinctScan);
+        ParsedDistinct parsedDistinct(std::move(cq.getValue()), groupForDistinctScan->groupId());
+
+        // If the GroupFromFirst transformation was generated for the $last case, we will need to
+        // flip the direction of any generated DISTINCT_SCAN to preserve the semantics of the query.
+        const bool flipDistinctScanDirection = groupForDistinctScan->expectedInput() ==
+            GroupFromFirstDocumentTransformation::ExpectedInput::kLastDocument;
 
         // Note that we request a "strict" distinct plan because:
         // 1) We do not want to have to de-duplicate the results of the plan.
@@ -301,7 +306,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
         auto distinctExecutor =
             getExecutorDistinct(&collections.getMainCollection(),
                                 plannerOpts.options | QueryPlannerParams::STRICT_DISTINCT_ONLY,
-                                &parsedDistinct);
+                                &parsedDistinct,
+                                flipDistinctScanDirection);
         if (!distinctExecutor.isOK()) {
             return distinctExecutor.getStatus().withContext(
                 "Unable to use distinct scan to optimize $group stage");
@@ -1706,7 +1712,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
                                                       deps.metadataDeps(),
                                                       sortObj,
                                                       SkipThenLimit{boost::none, boost::none},
-                                                      rewrittenGroupStage->groupId(),
+                                                      rewrittenGroupStage.get(),
                                                       aggRequest,
                                                       plannerOpts,
                                                       matcherFeatures,
@@ -1756,7 +1762,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
                                 deps.metadataDeps(),
                                 sortObj,
                                 skipThenLimit,
-                                boost::none, /* groupIdForDistinctScan */
+                                nullptr, /* groupForDistinctScan */
                                 aggRequest,
                                 plannerOpts,
                                 matcherFeatures,
