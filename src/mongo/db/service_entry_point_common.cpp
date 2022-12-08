@@ -2108,6 +2108,7 @@ DbResponse makeCommandResponse(std::shared_ptr<HandleRequest::ExecutionContext> 
     }
 
     DbResponse dbResponse;
+    CommandHelpers::checkForInternalError(replyBuilder, execContext->isInternalClient());
 
     if (OpMsg::isFlagSet(message, OpMsg::kExhaustSupported)) {
         auto responseObj = replyBuilder->getBodyBuilder().asTempObj();

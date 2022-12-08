@@ -808,6 +808,28 @@ void CommandHelpers::handleMarkKillOnClientDisconnect(OperationContext* opCtx,
         });
 }
 
+void CommandHelpers::checkForInternalError(rpc::ReplyBuilderInterface* replyBuilder,
+                                           bool isInternalClient) {
+    if (isInternalClient) {
+        return;
+    }
+
+    auto obj = replyBuilder->getBodyBuilder().asTempObj();
+    if (auto e = obj.getField("code"); MONGO_unlikely(!e.eoo())) {
+        const auto errorCode = static_cast<ErrorCodes::Error>(e.safeNumberInt());
+        try {
+            tassert(
+                errorCode,
+                fmt::format("Attempted to return an internal-only error to the client, errmsg: {}",
+                            obj.getStringField("errmsg")),
+                !ErrorCodes::isInternalOnly(errorCode));
+        } catch (...) {
+            // No need to throw as we only require the diagnostics provided by `tassert` and
+            // do not want to close the connection.
+        }
+    }
+}
+
 namespace {
 // We store the CommandInvocation as a shared_ptr on the OperationContext in case we need to persist
 // the invocation past the lifetime of the op. If so, this shared_ptr can be copied off to another

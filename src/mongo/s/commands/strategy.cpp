@@ -615,6 +615,11 @@ void ParseAndRunCommand::_parseCommand() {
     }
 }
 
+bool isInternalClient(OperationContext* opCtx) {
+    return (opCtx->getClient()->session() &&
+            (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient));
+}
+
 Status ParseAndRunCommand::RunInvocation::_setup() {
     auto invocation = _parc->_invocation;
     auto opCtx = _parc->_rec->getOpCtx();
@@ -707,14 +712,12 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
     // the client supplied a WC or not.
     bool clientSuppliedWriteConcern = !_parc->_wc->usedDefaultConstructedWC;
     bool customDefaultWriteConcernWasApplied = false;
-    bool isInternalClient =
-        (opCtx->getClient()->session() &&
-         (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient));
+    bool isInternalClientValue = isInternalClient(opCtx);
 
     if (supportsWriteConcern && !clientSuppliedWriteConcern &&
         (!TransactionRouter::get(opCtx) || command->isTransactionCommand()) &&
         !opCtx->getClient()->isInDirectClient()) {
-        if (isInternalClient) {
+        if (isInternalClientValue) {
             uassert(
                 5569900,
                 "received command without explicit writeConcern on an internalClient connection {}"_format(
@@ -762,7 +765,7 @@ Status ParseAndRunCommand::RunInvocation::_setup() {
                 provenance.setSource(ReadWriteConcernProvenance::Source::clientSupplied);
             } else if (customDefaultWriteConcernWasApplied) {
                 provenance.setSource(ReadWriteConcernProvenance::Source::customDefault);
-            } else if (opCtx->getClient()->isInDirectClient() || isInternalClient) {
+            } else if (opCtx->getClient()->isInDirectClient() || isInternalClientValue) {
                 provenance.setSource(ReadWriteConcernProvenance::Source::internalWriteDefault);
             } else {
                 provenance.setSource(ReadWriteConcernProvenance::Source::implicitDefault);
@@ -1281,6 +1284,8 @@ DbResponse ClientCommand::_produceResponse() {
     if (OpMsg::isFlagSet(m, OpMsg::kMoreToCome)) {
         return {};  // Don't reply.
     }
+
+    CommandHelpers::checkForInternalError(reply, isInternalClient(_rec->getOpCtx()));
 
     DbResponse dbResponse;
     if (OpMsg::isFlagSet(m, OpMsg::kExhaustSupported)) {

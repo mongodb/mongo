@@ -362,6 +362,13 @@ struct CommandHelpers {
      */
     static void handleMarkKillOnClientDisconnect(OperationContext* opCtx,
                                                  bool shouldMarkKill = true);
+
+    /**
+     * Provides diagnostics if the reply builder contains an internal-only error, and will cause
+     * deferred-fatality when testing diagnostics is enabled.
+     */
+    static void checkForInternalError(rpc::ReplyBuilderInterface* replyBuilder,
+                                      bool isInternalClient);
 };
 
 /**

@@ -27,7 +27,8 @@ error_categories:
     - CloseConnectionError
     - VersionedAPIError
     - ValidationError
-    # Codes for internal use only that must never be returned in a network response.
+    # Codes for internal use only. The codes can be passed between servers in a cluster, but must
+    # never be returned to the client in a network response.
     - InternalOnly
     - TenantMigrationError
     - TenantMigrationConflictError
@@ -328,8 +329,8 @@ error_codes:
     - {code: 280,name: ChangeStreamFatalError,categories: [NonResumableChangeStreamError]}
 
     # TransactionCoordinatorSteppingDown gets converted to InterruptedDueToReplStateChange
-    - {code: 281,name: TransactionCoordinatorSteppingDown,categories: [Interruption,InternalOnly]}
-    - {code: 282,name: TransactionCoordinatorReachedAbortDecision,categories: [Interruption,InternalOnly]}
+    - {code: 281,name: TransactionCoordinatorSteppingDown,categories: [Interruption]}
+    - {code: 282,name: TransactionCoordinatorReachedAbortDecision,categories: [Interruption]}
 
     - {code: 283,name: WouldChangeOwningShard,extra: WouldChangeOwningShardInfo}
     - {code: 284,name: ForTestingErrorExtraInfoWithExtraInfoInNamespace,
@@ -496,7 +497,7 @@ error_codes:
 
     - {code: 382, name: RemoteCommandExecutionError, extra: AsyncRPCErrorInfo, categories: [InternalOnly]}
 
-    - {code: 383, name: CollectionIsEmptyLocally, categories: [InternalOnly]}
+    - {code: 383, name: CollectionIsEmptyLocally}
 
     - {code: 384, name: ConnectionError, categories: [NetworkError,RetriableError,InternalOnly]}
 
