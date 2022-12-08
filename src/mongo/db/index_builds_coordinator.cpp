@@ -2875,8 +2875,23 @@ std::vector<BSONObj> IndexBuildsCoordinator::prepareSpecListForCreate(
 
     // During secondary oplog application, the index specs have already been normalized in the
     // oplog entries read from the primary. We should not be modifying the specs any further.
+    auto indexCatalog = collection->getIndexCatalog();
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     if (replCoord->getSettings().usingReplSets() && !replCoord->canAcceptWritesFor(opCtx, nss)) {
+        // A secondary node with a subset of the indexes already built will not vote for the commit
+        // quorum, which can stall the index build indefinitely on a replica set.
+        auto specsToBuild = indexCatalog->removeExistingIndexes(
+            opCtx, collection, indexSpecs, /*removeIndexBuildsToo=*/true);
+        if (indexSpecs.size() != specsToBuild.size()) {
+            LOGV2_WARNING(7176900,
+                          "Secondary node already has a subset of indexes built and will not "
+                          "participate in voting towards the commit quorum. Use the "
+                          "'setIndexCommitQuorum' command to adjust the commit quorum accordingly",
+                          logAttrs(nss),
+                          logAttrs(collection->uuid()),
+                          "requestedSpecs"_attr = indexSpecs,
+                          "specsToBuild"_attr = specsToBuild);
+        }
         return indexSpecs;
     }
 
@@ -2884,7 +2899,6 @@ std::vector<BSONObj> IndexBuildsCoordinator::prepareSpecListForCreate(
     auto normalSpecs = normalizeIndexSpecs(opCtx, collection, indexSpecs);
 
     // Remove any index specifications which already exist in the catalog.
-    auto indexCatalog = collection->getIndexCatalog();
     auto resultSpecs = indexCatalog->removeExistingIndexes(
         opCtx, collection, normalSpecs, true /*removeIndexBuildsToo*/);
 

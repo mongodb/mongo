@@ -234,6 +234,33 @@ var IndexBuildTest = class {
         assert.commandWorked(
             conn.adminCommand({configureFailPoint: 'hangAfterStartingIndexBuild', mode: 'off'}));
     }
+
+    /**
+     * Restarts the node in standalone mode to build the index in a rolling fashion.
+     */
+    static buildIndexOnNodeAsStandalone(rst, node, port, dbName, collName, indexSpec, indexName) {
+        jsTestLog('Restarting as standalone: ' + node.host);
+        rst.stop(node, /*signal=*/null, /*opts=*/null, {forRestart: true, waitpid: true});
+        const standalone = MongoRunner.runMongod({
+            restart: true,
+            dbpath: node.dbpath,
+            port: port,
+            setParameter: {
+                disableLogicalSessionCacheRefresh: true,
+                ttlMonitorEnabled: false,
+            },
+        });
+
+        jsTestLog('Building index on standalone: ' + standalone.host);
+        const standaloneDB = standalone.getDB(dbName);
+        const standaloneColl = standaloneDB.getCollection(collName);
+        assert.commandWorked(standaloneColl.createIndex(indexSpec, {name: indexName}));
+
+        jsTestLog('Restarting as replica set node: ' + node.host);
+        MongoRunner.stopMongod(standalone);
+        rst.restart(node);
+        rst.awaitReplication();
+    }
 };
 
 const ResumableIndexBuildTest = class {
