@@ -841,7 +841,7 @@ bool isInfinity(TypeTags tag, Value val) noexcept {
         (tag == TypeTags::NumberDecimal && bitcastTo<Decimal128>(val).isInfinite());
 }
 
-void ArraySet::push_back(TypeTags tag, Value val) {
+bool ArraySet::push_back(TypeTags tag, Value val) {
     if (tag != TypeTags::Nothing) {
         ValueGuard guard{tag, val};
         auto [it, inserted] = _values.insert({tag, val});
@@ -849,7 +849,11 @@ void ArraySet::push_back(TypeTags tag, Value val) {
         if (inserted) {
             guard.reset();
         }
+
+        return inserted;
     }
+
+    return false;
 }
 
 std::pair<TypeTags, Value> ArrayEnumerator::getViewOfValue() const {

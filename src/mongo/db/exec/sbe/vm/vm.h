@@ -636,6 +636,15 @@ enum class Builtin : uint8_t {
     coerceToString,
     concat,
     concatArrays,
+
+    // Agg function to concatenate arrays, failing when the accumulator reaches a specified size.
+    aggConcatArraysCapped,
+
+    // Agg functions to compute the set union of two arrays, failing when the accumulator reaches a
+    // specified size.
+    aggSetUnionCapped,
+    aggCollSetUnionCapped,
+
     acos,
     acosh,
     asin,
@@ -1200,6 +1209,14 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinRound(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinConcat(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinConcatArrays(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggConcatArraysCapped(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggSetUnionCapped(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggCollSetUnionCapped(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> aggSetUnionCappedImpl(
+        value::TypeTags tagNewElem,
+        value::Value valNewElem,
+        int32_t sizeCap,
+        CollatorInterface* collator);
     FastTuple<bool, value::TypeTags, value::Value> builtinIsMember(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinCollIsMember(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinIndexOfBytes(ArityType arity);
