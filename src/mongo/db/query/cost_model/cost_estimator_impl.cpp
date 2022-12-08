@@ -228,6 +228,19 @@ public:
         return {uniqueCost, _cardinalityEstimate};
     }
 
+    CostAndCEInternal operator()(const ABT& /*n*/, const SpoolProducerNode& node) {
+        CostAndCEInternal childResult = deriveChild(node.getChild(), 0);
+        // TODO: SERVER-71821: Calibration for Spool producer node.
+        const double cost = _coefficients.getDefaultStartupCost() + childResult._cost;
+        return {cost, _cardinalityEstimate};
+    }
+
+    CostAndCEInternal operator()(const ABT& /*n*/, const SpoolConsumerNode& node) {
+        // TODO: SERVER-71822: Calibration for Spool consumer node.
+        const double cost = _coefficients.getDefaultStartupCost();
+        return {cost, _cardinalityEstimate};
+    }
+
     CostAndCEInternal operator()(const ABT& /*n*/, const CollationNode& node) {
         CostAndCEInternal childResult = deriveChild(node.getChild(), 0);
         // TODO: consider RepetitionEstimate since this is a stateful operation.

@@ -1724,6 +1724,52 @@ public:
     }
 
     ExplainPrinter transport(const ABT& n,
+                             const SpoolProducerNode& node,
+                             ExplainPrinter childResult,
+                             ExplainPrinter filterResult,
+                             ExplainPrinter bindResult,
+                             ExplainPrinter refsResult) {
+        ExplainPrinter printer("SpoolProducer");
+        maybePrintProps(printer, node);
+
+        printer.separator(" [")
+            .fieldName("type", ExplainVersion::V3)
+            .print(SpoolProducerTypeEnum::toString[static_cast<int>(node.getType())])
+            .separator(", ")
+            .fieldName("id")
+            .print(node.getSpoolId())
+            .separator("]");
+
+        nodeCEPropsPrint(printer, n, node);
+        printer.setChildCount(3);
+        printer.fieldName("filter", ExplainVersion::V3).print(filterResult);
+        printer.fieldName("bindings", ExplainVersion::V3).print(bindResult);
+        printer.fieldName("child", ExplainVersion::V3).print(childResult);
+
+        return printer;
+    }
+
+    ExplainPrinter transport(const ABT& n,
+                             const SpoolConsumerNode& node,
+                             ExplainPrinter bindResult) {
+        ExplainPrinter printer("SpoolConsumer");
+        maybePrintProps(printer, node);
+
+        printer.separator(" [")
+            .fieldName("type", ExplainVersion::V3)
+            .print(SpoolConsumerTypeEnum::toString[static_cast<int>(node.getType())])
+            .separator(", ")
+            .fieldName("id")
+            .print(node.getSpoolId())
+            .separator("]");
+
+        nodeCEPropsPrint(printer, n, node);
+        printer.fieldName("bindings", ExplainVersion::V3).print(bindResult);
+
+        return printer;
+    }
+
+    ExplainPrinter transport(const ABT& n,
                              const CollationNode& node,
                              ExplainPrinter childResult,
                              ExplainPrinter refsResult) {

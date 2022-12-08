@@ -167,5 +167,13 @@ Decimal128 Constant::getValueDecimal() const {
     return bitcastTo<Decimal128>(_val);
 }
 
+bool Constant::isValueBool() const {
+    return _tag == TypeTags::Boolean;
+}
+
+bool Constant::getValueBool() const {
+    uassert(6624356, "Constant value type is not bool", isValueBool());
+    return bitcastTo<bool>(_val);
+}
 
 }  // namespace mongo::optimizer

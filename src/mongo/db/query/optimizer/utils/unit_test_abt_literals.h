@@ -33,6 +33,7 @@
 #include <typeinfo>
 
 #include "mongo/db/query/optimizer/node.h"
+#include "mongo/db/query/optimizer/utils/utils.h"
 
 
 namespace mongo::optimizer::unit_test_abt_literals {
@@ -66,14 +67,18 @@ using NodeHolder = ABTHolder<NodeTag>;
 /**
  * ABT Expressions
  */
-inline Operations getOpByName(StringData str) {
-    for (size_t i = 0; i < sizeof(OperationsEnum::toString) / sizeof(OperationsEnum::toString[0]);
-         i++) {
-        if (str == OperationsEnum::toString[i]) {
-            return static_cast<Operations>(i);
+template <class T, class T1>
+inline T getEnumByName(StringData str, const T1& toStr) {
+    for (size_t i = 0; i < sizeof(toStr) / sizeof(toStr[0]); i++) {
+        if (str == toStr[i]) {
+            return static_cast<T>(i);
         }
     }
     MONGO_UNREACHABLE;
+}
+
+inline Operations getOpByName(StringData str) {
+    return getEnumByName<Operations>(str, OperationsEnum::toString);
 }
 
 template <class T>
@@ -103,6 +108,11 @@ inline auto operator"" _cint64(const char* c, size_t len) {
 // Double constant.
 inline auto operator"" _cdouble(const char* c, size_t len) {
     return ExprHolder{Constant::fromDouble(std::stod({c, len}))};
+}
+
+// Boolean constant.
+inline auto _cbool(const bool val) {
+    return ExprHolder{Constant::boolean(val)};
 }
 
 // Variable.
@@ -236,6 +246,10 @@ inline auto _scan(ProjectionName pn, std::string scanDefName) {
     return NodeHolder{make<ScanNode>(std::move(pn), std::move(scanDefName))};
 }
 
+inline auto _coscan() {
+    return NodeHolder{make<CoScanNode>()};
+}
+
 inline auto _filter(ExprHolder expr, NodeHolder input) {
     return NodeHolder{make<FilterNode>(std::move(expr._n), std::move(input._n))};
 }
@@ -281,6 +295,31 @@ inline auto _collation(std::vector<std::string> spec, NodeHolder input) {
 
 inline auto _union(ProjectionNameVector pns, std::vector<NodeHolder> inputs) {
     return NodeHolder{make<UnionNode>(std::move(pns), holdersToABTs(std::move(inputs)))};
+}
+
+inline auto _ls(const int64_t limit, const int64_t skip, NodeHolder input) {
+    return NodeHolder{
+        make<LimitSkipNode>(properties::LimitSkipRequirement{limit, skip}, std::move(input._n))};
+}
+
+inline auto _spoolp(StringData type,
+                    int64_t spoolId,
+                    ProjectionNameVector pns,
+                    ExprHolder filter,
+                    NodeHolder child) {
+    return NodeHolder{make<SpoolProducerNode>(
+        getEnumByName<SpoolProducerType>(type, SpoolProducerTypeEnum::toString),
+        spoolId,
+        std::move(pns),
+        std::move(filter._n),
+        std::move(child._n))};
+}
+
+inline auto _spoolc(StringData type, int64_t spoolId, ProjectionNameVector pns) {
+    return NodeHolder{make<SpoolConsumerNode>(
+        getEnumByName<SpoolConsumerType>(type, SpoolConsumerTypeEnum::toString),
+        spoolId,
+        std::move(pns))};
 }
 
 /**
@@ -333,6 +372,25 @@ public:
         return advanceChildPtr<CollationNode>(_collation(std::move(spec), makeStub()));
     }
 
+    // This first input is stubbed.
+    NodeBuilder& un(ProjectionNameVector pns, std::vector<NodeHolder> additionalInputs) {
+        additionalInputs.insert(additionalInputs.begin(), makeStub());
+        return advanceChildPtr<UnionNode, FirstChildAccessor<UnionNode>>(
+            _union(std::move(pns), std::move(additionalInputs)));
+    }
+
+    NodeBuilder& ls(const int64_t limit, const int64_t skip) {
+        return advanceChildPtr<LimitSkipNode>(_ls(limit, skip, makeStub()));
+    }
+
+    NodeBuilder& spoolp(StringData type,
+                        int64_t spoolId,
+                        ProjectionNameVector pns,
+                        ExprHolder filter) {
+        return advanceChildPtr<SpoolProducerNode>(
+            _spoolp(type, spoolId, std::move(pns), std::move(filter), makeStub()));
+    }
+
     template <typename... Ts>
     NodeBuilder& root(Ts&&... pack) {
         return advanceChildPtr<RootNode>({_root(std::forward<Ts>(pack)...)(makeStub())});
@@ -344,11 +402,11 @@ private:
         return {make<ValueScanNode>(ProjectionNameVector{}, boost::none)};
     }
 
-    template <class T>
+    template <class T, class Accessor = DefaultChildAccessor<T>>
     NodeBuilder& advanceChildPtr(NodeHolder holder) {
         invariant(_prevChildPtr);
         *_prevChildPtr = std::move(holder._n);
-        _prevChildPtr = &_prevChildPtr->cast<T>()->getChild();
+        _prevChildPtr = &Accessor()(*_prevChildPtr);
         return *this;
     }
 
@@ -412,6 +470,10 @@ public:
      * ABT Expressions.
      */
     std::string transport(const Constant& expr) {
+        if (expr.isValueBool()) {
+            return str::stream() << "_cbool(" << (expr.getValueBool() ? "true" : "false") << ")";
+        }
+
         str::stream out;
         out << "\"" << expr.get() << "\"";
 
@@ -512,20 +574,34 @@ public:
      * ABT Nodes.
      */
     std::string transport(const ScanNode& node, std::string /*bindResult*/) {
-        return str::stream() << ".finish(_scan(\"" << node.getProjectionName() << "\", \""
-                             << node.getScanDefName() << "\"))";
+        return finish(str::stream() << "_scan(\"" << node.getProjectionName() << "\", \""
+                                    << node.getScanDefName() << "\")");
+    }
+
+    std::string transport(const CoScanNode& node) {
+        return finish("_coscan()");
+    }
+
+    std::string transport(const SpoolConsumerNode& node, std::string /*bindResult*/) {
+        str::stream os;
+        os << "_spoolc(\"" << SpoolConsumerTypeEnum::toString[static_cast<int>(node.getType())]
+           << "\""
+           << ", " << node.getSpoolId() << ", _varnames(";
+        printProjNames(os, node.binder().names());
+        os << "))";
+        return finish(os);
     }
 
     std::string transport(const FilterNode& node,
                           std::string childResult,
                           std::string filterResult) {
-        return str::stream() << ".filter(" << explain(node.getFilter()) << ")" << _nodeSeparator
-                             << childResult;
+        return str::stream() << ".filter(" << filterResult << ")" << _nodeSeparator << childResult;
     }
 
     std::string transport(const EvaluationNode& node,
                           std::string childResult,
                           std::string projResult) {
+        // We explain the projection directly to avoid explaining the binder.
         return str::stream() << ".eval(\"" << node.getProjectionName() << "\", "
                              << explain(node.getProjection()) << ")" << _nodeSeparator
                              << childResult;
@@ -589,6 +665,25 @@ public:
         return os << "})" << _nodeSeparator << childResult;
     }
 
+    std::string transport(const LimitSkipNode& node, std::string childResult) {
+        return str::stream() << ".ls(" << node.getProperty().getLimit() << ", "
+                             << node.getProperty().getSkip() << ")" << _nodeSeparator
+                             << childResult;
+    }
+
+    std::string transport(const SpoolProducerNode& node,
+                          std::string childResult,
+                          std::string filterResult,
+                          std::string /*bindResult*/,
+                          std::string /*refsResult*/) {
+        str::stream os;
+        os << ".spoolp(\"" << SpoolProducerTypeEnum::toString[static_cast<int>(node.getType())]
+           << "\""
+           << ", " << node.getSpoolId() << ", _varnames(";
+        printProjNames(os, node.binder().names());
+        return os << "), " << filterResult << ")" << _nodeSeparator << childResult;
+    }
+
     std::string transport(const RootNode& node, std::string childResult, std::string refsResult) {
         str::stream os;
         os << ".root(";
@@ -617,6 +712,10 @@ private:
             }
             os << "\"" << p << "\"";
         }
+    }
+
+    std::string finish(std::string nullaryNode) {
+        return str::stream() << ".finish(" << nullaryNode << ")";
     }
 
     const std::string _nodeSeparator;

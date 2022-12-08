@@ -266,39 +266,6 @@ struct ReorderDependencies {
     bool _hasNodeAndChildRef = false;
 };
 
-template <class NodeType>
-struct DefaultChildAccessor {
-    const ABT& operator()(const ABT& node) const {
-        return node.cast<NodeType>()->getChild();
-    }
-
-    ABT& operator()(ABT& node) const {
-        return node.cast<NodeType>()->getChild();
-    }
-};
-
-template <class NodeType>
-struct LeftChildAccessor {
-    const ABT& operator()(const ABT& node) const {
-        return node.cast<NodeType>()->getLeftChild();
-    }
-
-    ABT& operator()(ABT& node) const {
-        return node.cast<NodeType>()->getLeftChild();
-    }
-};
-
-template <class NodeType>
-struct RightChildAccessor {
-    const ABT& operator()(const ABT& node) const {
-        return node.cast<NodeType>()->getRightChild();
-    }
-
-    ABT& operator()(ABT& node) const {
-        return node.cast<NodeType>()->getRightChild();
-    }
-};
-
 template <class AboveType,
           class BelowType,
           template <class> class BelowChildAccessor = DefaultChildAccessor>

@@ -656,7 +656,9 @@ struct Collector {
             // Manually copy and resolve references of specific child. We do this manually because
             // each Variable must be resolved by the appropriate child's definition.
             for (const auto& name : names) {
-                tassert(6624031, "Union projection does not exist", u.defs.count(name) != 0);
+                tassert(6624031,
+                        str::stream() << "Union projection does not exist:  " << name,
+                        u.defs.count(name) != 0);
                 u.useMap.emplace(&refsResult.freeVars[name][counter].get(), u.defs[name]);
             }
             u.defs.clear();
@@ -767,6 +769,40 @@ struct Collector {
         result.nodeDefs[&uniqueNode] = result.defs;
 
         return result;
+    }
+
+    CollectedInfo transport(const ABT& n,
+                            const SpoolProducerNode& node,
+                            CollectedInfo childResult,
+                            CollectedInfo filterResult,
+                            CollectedInfo bindResult,
+                            CollectedInfo refsResult) {
+        CollectedInfo result{};
+
+        result.merge(std::move(refsResult));
+        result.merge(std::move(childResult));
+
+        const auto& binder = node.binder();
+        for (size_t i = 0; i < binder.names().size(); i++) {
+            const auto& name = binder.names().at(i);
+            tassert(6624138,
+                    str::stream() << "Spool projection does not exist: " << name,
+                    result.defs.count(name) != 0);
+
+            // Redefine projection.
+            result.defs[name] = Definition{n.ref(), binder.exprs()[i].ref()};
+        }
+
+        result.mergeNoDefs(std::move(bindResult));
+        result.mergeNoDefs(std::move(filterResult));
+
+        result.nodeDefs[&node] = result.defs;
+
+        return result;
+    }
+
+    CollectedInfo transport(const ABT& n, const SpoolConsumerNode& node, CollectedInfo bindResult) {
+        return collectForScan(n, node, node.binder(), {});
     }
 
     CollectedInfo collect(const ABT& n) {

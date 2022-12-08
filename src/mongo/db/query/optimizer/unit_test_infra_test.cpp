@@ -263,6 +263,8 @@ TEST(TestInfra, GenerateABTLiterals) {
     NodeBuilder{}                                         \
         .root("pc")                                       \
         .collation({"pa:1", "pc:-1"})                     \
+        .ls(1, 0)                                         \
+        .spoolp("Lazy", 1, _varnames("pa"), _cbool(true)) \
         .gb(_varnames("pa"), _varnames("pc"), {"pb"_var}) \
         .filter(_evalf(_cmp("Gt", "1"_cint64), "pb"_var)) \
         .eval("pb", _evalp(_get("b", _id()), "root"_var)) \

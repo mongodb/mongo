@@ -113,6 +113,62 @@ inline void maybeComposePaths(ABTVector& paths) {
 }
 
 /**
+ * Used to access and manipulate the child of a unary node.
+ */
+template <class NodeType>
+struct DefaultChildAccessor {
+    const ABT& operator()(const ABT& node) const {
+        return node.cast<NodeType>()->getChild();
+    }
+
+    ABT& operator()(ABT& node) const {
+        return node.cast<NodeType>()->getChild();
+    }
+};
+
+/**
+ * Used to access and manipulate the left child of a binary node.
+ */
+template <class NodeType>
+struct LeftChildAccessor {
+    const ABT& operator()(const ABT& node) const {
+        return node.cast<NodeType>()->getLeftChild();
+    }
+
+    ABT& operator()(ABT& node) const {
+        return node.cast<NodeType>()->getLeftChild();
+    }
+};
+
+/**
+ * Used to access and manipulate the right child of a binary node.
+ */
+template <class NodeType>
+struct RightChildAccessor {
+    const ABT& operator()(const ABT& node) const {
+        return node.cast<NodeType>()->getRightChild();
+    }
+
+    ABT& operator()(ABT& node) const {
+        return node.cast<NodeType>()->getRightChild();
+    }
+};
+
+/**
+ * Used to access and manipulate the first child of a n-ary node.
+ */
+template <class NodeType>
+struct FirstChildAccessor {
+    const ABT& operator()(const ABT& node) const {
+        return node.cast<NodeType>()->nodes().front();
+    }
+
+    ABT& operator()(ABT& node) {
+        return node.cast<NodeType>()->nodes().front();
+    }
+};
+
+/**
  * Used to vend out fresh projection names.
  */
 class PrefixId {

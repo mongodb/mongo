@@ -39,6 +39,7 @@
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
 #include "mongo/unittest/unittest.h"
 
+
 namespace mongo::optimizer {
 namespace {
 
@@ -675,6 +676,175 @@ TEST_F(NodeSBE, RequireRID) {
     sbePlan->close();
 
     ASSERT_EQ(1, resultSize);
+}
+
+/**
+ * This transport is used to populate default values into the NodeToGroupProps map to get around the
+ * fact that the plan was not obtained from the memo. At this point we are interested only in the
+ * planNodeIds being distinct.
+ */
+class PropsTransport {
+public:
+    template <typename T, typename... Ts>
+    void transport(const T& node, NodeToGroupPropsMap& propMap, Ts&&...) {
+        if constexpr (std::is_base_of_v<Node, T>) {
+            propMap.emplace(&node,
+                            NodeProps{_planNodeId++,
+                                      {-1, 0} /*groupId*/,
+                                      {} /*logicalProps*/,
+                                      {} /*physicalProps*/,
+                                      boost::none /*ridProjName*/,
+                                      CostType::kZero /*cost*/,
+                                      CostType::kZero /*localCost*/,
+                                      0.0 /*adjustedCE*/});
+        }
+    }
+
+    void updatePropsMap(const ABT& n, NodeToGroupPropsMap& propMap) {
+        algebra::transport<false>(n, *this, propMap);
+    }
+
+private:
+    int32_t _planNodeId = 0;
+};
+
+TEST_F(NodeSBE, SpoolFibonacci) {
+    using namespace unit_test_abt_literals;
+
+    PrefixId prefixId;
+    Metadata metadata{{}};
+
+    // Construct a spool-based recursive plan to compute the first 10 Fibonacci numbers. The main
+    // plan (first child of the union) sets up the initial conditions (val = 1, prev = 0, and it =
+    // 1), and the recursive subplan is computing the actual Fibonacci sequence and ensures we
+    // terminate after 10 numbers.
+    auto recursion =
+        NodeBuilder{}
+            .eval("val", _binary("Add", "valIn"_var, "valIn_prev"_var))
+            .eval("val_prev", "valIn"_var)
+            .eval("it", _binary("Add", "itIn"_var, "1"_cint64))
+            .filter(_binary("Lt", "itIn"_var, "10"_cint64))
+            .finish(_spoolc("Stack", 1 /*spoolId*/, _varnames("valIn", "valIn_prev", "itIn")));
+
+    auto tree = NodeBuilder{}
+                    .root("val")
+                    .spoolp("Lazy", 1 /*spoolId*/, _varnames("val", "val_prev", "it"), _cbool(true))
+                    .un(_varnames("val", "val_prev", "it"), {NodeHolder{std::move(recursion)}})
+                    .eval("val", "1"_cint64)
+                    .eval("val_prev", "0"_cint64)
+                    .eval("it", "1"_cint64)
+                    .ls(1, 0)
+                    .finish(_coscan());
+
+    ASSERT_EXPLAIN_V2_AUTO(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       val\n"
+        "|   RefBlock: \n"
+        "|       Variable [val]\n"
+        "SpoolProducer [Lazy, id: 1]\n"
+        "|   |   Const [true]\n"
+        "|   BindBlock:\n"
+        "|       [it]\n"
+        "|           Source []\n"
+        "|       [val]\n"
+        "|           Source []\n"
+        "|       [val_prev]\n"
+        "|           Source []\n"
+        "Union []\n"
+        "|   |   BindBlock:\n"
+        "|   |       [it]\n"
+        "|   |           Source []\n"
+        "|   |       [val]\n"
+        "|   |           Source []\n"
+        "|   |       [val_prev]\n"
+        "|   |           Source []\n"
+        "|   Evaluation []\n"
+        "|   |   BindBlock:\n"
+        "|   |       [val]\n"
+        "|   |           BinaryOp [Add]\n"
+        "|   |           |   Variable [valIn_prev]\n"
+        "|   |           Variable [valIn]\n"
+        "|   Evaluation []\n"
+        "|   |   BindBlock:\n"
+        "|   |       [val_prev]\n"
+        "|   |           Variable [valIn]\n"
+        "|   Evaluation []\n"
+        "|   |   BindBlock:\n"
+        "|   |       [it]\n"
+        "|   |           BinaryOp [Add]\n"
+        "|   |           |   Const [1]\n"
+        "|   |           Variable [itIn]\n"
+        "|   Filter []\n"
+        "|   |   BinaryOp [Lt]\n"
+        "|   |   |   Const [10]\n"
+        "|   |   Variable [itIn]\n"
+        "|   SpoolConsumer [Stack, id: 1]\n"
+        "|       BindBlock:\n"
+        "|           [itIn]\n"
+        "|               Source []\n"
+        "|           [valIn]\n"
+        "|               Source []\n"
+        "|           [valIn_prev]\n"
+        "|               Source []\n"
+        "Evaluation []\n"
+        "|   BindBlock:\n"
+        "|       [val]\n"
+        "|           Const [1]\n"
+        "Evaluation []\n"
+        "|   BindBlock:\n"
+        "|       [val_prev]\n"
+        "|           Const [0]\n"
+        "Evaluation []\n"
+        "|   BindBlock:\n"
+        "|       [it]\n"
+        "|           Const [1]\n"
+        "LimitSkip []\n"
+        "|   limitSkip:\n"
+        "|       limit: 1\n"
+        "|       skip: 0\n"
+        "CoScan []\n",
+        tree);
+
+    NodeToGroupPropsMap props;
+    PropsTransport{}.updatePropsMap(tree, props);
+
+    auto env = VariableEnvironment::build(tree);
+    SlotVarMap map;
+    boost::optional<sbe::value::SlotId> ridSlot;
+    sbe::value::SlotIdGenerator ids;
+    SBENodeLowering g{env, map, ridSlot, ids, metadata, props, false /*randomScan*/};
+    auto sbePlan = g.optimize(tree);
+    ASSERT_EQ(1, map.size());
+
+    auto opCtx = makeOperationContext();
+    sbe::CompileCtx ctx(std::make_unique<sbe::RuntimeEnvironment>());
+    sbePlan->prepare(ctx);
+
+    std::vector<sbe::value::SlotAccessor*> accessors;
+    for (auto& [name, slot] : map) {
+        accessors.emplace_back(sbePlan->getAccessor(ctx, slot));
+    }
+
+    sbePlan->attachToOperationContext(opCtx.get());
+    sbePlan->open(false);
+
+    std::vector<int64_t> results;
+    while (sbePlan->getNext() != sbe::PlanState::IS_EOF) {
+        const auto [resultTag, resultVal] = accessors.front()->getViewOfValue();
+        ASSERT_EQ(sbe::value::TypeTags::NumberInt64, resultTag);
+        results.push_back(resultVal);
+    };
+    sbePlan->close();
+
+    // Verify we are getting 10 Fibonacci numbers.
+    ASSERT_EQ(10, results.size());
+
+    ASSERT_EQ(1, results.at(0));
+    ASSERT_EQ(1, results.at(1));
+    for (size_t i = 2; i < 10; i++) {
+        ASSERT_EQ(results.at(i), results.at(i - 1) + results.at(i - 2));
+    }
 }
 
 }  // namespace

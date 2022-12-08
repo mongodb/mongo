@@ -172,6 +172,18 @@ public:
         return extractFromABT(refs);
     }
 
+    ProjectionNameSet walk(const SpoolProducerNode& /*node*/,
+                           const ABT& /*child*/,
+                           const ABT& /*filter*/,
+                           const ABT& /*binds*/,
+                           const ABT& refs) {
+        return extractFromABT(refs);
+    }
+
+    ProjectionNameSet walk(const SpoolConsumerNode& /*node*/, const ABT& /*binds*/) {
+        return {};
+    }
+
     ProjectionNameSet walk(const CollationNode& /*node*/, const ABT& /*child*/, const ABT& refs) {
         return extractFromABT(refs);
     }

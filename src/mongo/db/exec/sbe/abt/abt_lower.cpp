@@ -28,7 +28,6 @@
  */
 
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
-#include "mongo/db/exec/sbe/stages/bson_scan.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/stages/exchange.h"
 #include "mongo/db/exec/sbe/stages/filter.h"
@@ -42,10 +41,12 @@
 #include "mongo/db/exec/sbe/stages/scan.h"
 #include "mongo/db/exec/sbe/stages/sort.h"
 #include "mongo/db/exec/sbe/stages/sorted_merge.h"
+#include "mongo/db/exec/sbe/stages/spool.h"
 #include "mongo/db/exec/sbe/stages/union.h"
 #include "mongo/db/exec/sbe/stages/unique.h"
 #include "mongo/db/exec/sbe/stages/unwind.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
+
 
 namespace mongo::optimizer {
 
@@ -574,6 +575,61 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const UniqueNode& n,
 
     const PlanNodeId planNodeId = _nodeToGroupPropsMap.at(&n)._planNodeId;
     return sbe::makeS<sbe::UniqueStage>(std::move(input), std::move(keySlots), planNodeId);
+}
+
+std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const SpoolProducerNode& n,
+                                                      const ABT& child,
+                                                      const ABT& filter,
+                                                      const ABT& binder,
+                                                      const ABT& refs) {
+    auto input = generateInternal(child);
+
+    sbe::value::SlotVector vals;
+    for (const ProjectionName& projectionName : n.binder().names()) {
+        auto it = _slotMap.find(projectionName);
+        uassert(6624139,
+                str::stream() << "undefined variable: " << projectionName,
+                it != _slotMap.end());
+        vals.push_back(it->second);
+    }
+
+    const PlanNodeId planNodeId = _nodeToGroupPropsMap.at(&n)._planNodeId;
+    switch (n.getType()) {
+        case SpoolProducerType::Eager:
+            return sbe::makeS<sbe::SpoolEagerProducerStage>(
+                std::move(input), n.getSpoolId(), std::move(vals), planNodeId);
+
+        case SpoolProducerType::Lazy: {
+            auto expr = SBEExpressionLowering{_env, _slotMap}.optimize(filter);
+            return sbe::makeS<sbe::SpoolLazyProducerStage>(
+                std::move(input), n.getSpoolId(), std::move(vals), std::move(expr), planNodeId);
+        }
+    }
+
+    MONGO_UNREACHABLE;
+}
+
+std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const SpoolConsumerNode& n,
+                                                      const ABT& binder) {
+    sbe::value::SlotVector vals;
+    for (const ProjectionName& projectionName : n.binder().names()) {
+        auto slot = _slotIdGenerator.generate();
+        _slotMap.emplace(projectionName, slot);
+        vals.push_back(slot);
+    }
+
+    const PlanNodeId planNodeId = _nodeToGroupPropsMap.at(&n)._planNodeId;
+    switch (n.getType()) {
+        case SpoolConsumerType::Stack:
+            return sbe::makeS<sbe::SpoolConsumerStage<true /*isStack*/>>(
+                n.getSpoolId(), std::move(vals), planNodeId);
+
+        case SpoolConsumerType::Regular:
+            return sbe::makeS<sbe::SpoolConsumerStage<false /*isStack*/>>(
+                n.getSpoolId(), std::move(vals), planNodeId);
+    }
+
+    MONGO_UNREACHABLE;
 }
 
 std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const GroupByNode& n,

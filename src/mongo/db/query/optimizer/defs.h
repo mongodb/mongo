@@ -234,7 +234,7 @@ struct CostAndCE {
 
 MAKE_PRINTABLE_ENUM(CollationOp, COLLATIONOP_OPNAMES);
 MAKE_PRINTABLE_ENUM_STRING_ARRAY(CollationOpEnum, CollationOp, COLLATIONOP_OPNAMES);
-#undef PATHSYNTAX_OPNAMES
+#undef COLLATIONOP_OPNAMES
 
 using ProjectionCollationEntry = std::pair<ProjectionName, CollationOp>;
 using ProjectionCollationSpec = std::vector<ProjectionCollationEntry>;

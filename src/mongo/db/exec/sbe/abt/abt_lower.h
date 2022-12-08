@@ -108,9 +108,11 @@ public:
     // The default noop transport.
     template <typename T, typename... Ts>
     std::unique_ptr<sbe::PlanStage> walk(const T&, Ts&&...) {
-        if constexpr (std::is_base_of_v<ExclusivelyLogicalNode, T>) {
-            uasserted(6624238, "A physical plan should not contain exclusively logical nodes.");
-        }
+        // We should not be seeing a physical delegator node here.
+        static_assert(!canBePhysicalNode<T>() || std::is_same_v<MemoPhysicalDelegatorNode, T>,
+                      "Physical nodes need to implement lowering");
+
+        uasserted(6624238, "Unexpected node type.");
         return nullptr;
     }
 
@@ -126,6 +128,13 @@ public:
     std::unique_ptr<sbe::PlanStage> walk(const CollationNode& n, const ABT& child, const ABT& refs);
 
     std::unique_ptr<sbe::PlanStage> walk(const UniqueNode& n, const ABT& child, const ABT& refs);
+
+    std::unique_ptr<sbe::PlanStage> walk(const SpoolProducerNode& n,
+                                         const ABT& child,
+                                         const ABT& filter,
+                                         const ABT& binder,
+                                         const ABT& refs);
+    std::unique_ptr<sbe::PlanStage> walk(const SpoolConsumerNode& n, const ABT& binder);
 
     std::unique_ptr<sbe::PlanStage> walk(const GroupByNode& n,
                                          const ABT& child,

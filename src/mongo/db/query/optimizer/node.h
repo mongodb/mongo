@@ -722,7 +722,7 @@ private:
 
 MAKE_PRINTABLE_ENUM(GroupNodeType, GROUPNODETYPE_OPNAMES);
 MAKE_PRINTABLE_ENUM_STRING_ARRAY(GroupNodeTypeEnum, GroupNodeType, GROUPNODETYPE_OPNAMES);
-#undef PATHSYNTAX_OPNAMES
+#undef GROUPNODETYPE_OPNAMES
 
 /**
  * Group-by node.
@@ -857,6 +857,105 @@ public:
 
 private:
     ProjectionNameVector _projections;
+};
+
+#define SPOOL_PRODUCER_TYPE_OPNAMES(F) \
+    F(Eager)                           \
+    F(Lazy)
+
+MAKE_PRINTABLE_ENUM(SpoolProducerType, SPOOL_PRODUCER_TYPE_OPNAMES);
+MAKE_PRINTABLE_ENUM_STRING_ARRAY(SpoolProducerTypeEnum,
+                                 SpoolProducerType,
+                                 SPOOL_PRODUCER_TYPE_OPNAMES);
+#undef SPOOL_PRODUCER_TYPE_OPNAMES
+
+/**
+ * Spool producer node.
+ *
+ * This is a physical node. It buffers the values coming from its child in a shared buffer indexed
+ * by the "spoolId" field. This buffer in turn is accessed via a corresponding SpoolConsumer node.
+ * It can be used to implement recursive plans.
+ *
+ * We have two different modes of operation:
+ *    1. Eager: on startup it will read and store the entire input from its child into the buffer
+ * identified by the "spoolId" parameter. Then when asked for more data, it will return data from
+ * the buffer.
+ *    2. Lazy: by contrast to "eager", it will request each value from its child incrementally
+ * and store it into the shared buffer, and immediately propagate it to the parent.
+ */
+class SpoolProducerNode final : public ABTOpFixedArity<4>, public ExclusivelyPhysicalNode {
+    using Base = ABTOpFixedArity<4>;
+
+public:
+    SpoolProducerNode(SpoolProducerType type,
+                      int64_t spoolId,
+                      ProjectionNameVector projections,
+                      ABT filter,
+                      ABT child);
+
+    bool operator==(const SpoolProducerNode& other) const;
+
+    const ExpressionBinder& binder() const {
+        const ABT& result = get<2>();
+        tassert(6624126, "Invalid binder type", result.is<ExpressionBinder>());
+        return *result.cast<ExpressionBinder>();
+    }
+
+    SpoolProducerType getType() const;
+    int64_t getSpoolId() const;
+
+    const ABT& getFilter() const;
+
+    const ABT& getChild() const;
+    ABT& getChild();
+
+private:
+    const SpoolProducerType _type;
+    const int64_t _spoolId;
+};
+
+#define SPOOL_CONSUMER_TYPE_OPNAMES(F) \
+    F(Stack)                           \
+    F(Regular)
+
+MAKE_PRINTABLE_ENUM(SpoolConsumerType, SPOOL_CONSUMER_TYPE_OPNAMES);
+MAKE_PRINTABLE_ENUM_STRING_ARRAY(SpoolConsumerTypeEnum,
+                                 SpoolConsumerType,
+                                 SPOOL_CONSUMER_TYPE_OPNAMES);
+#undef SPOOL_CONSUMER_TYPE_OPNAMES
+
+/**
+ * Spool consumer node.
+ *
+ * This is a physical node. It delivers incoming values from a shared buffer (indexed by "spoolId").
+ * This shared buffer is populated by a corresponding SpoolProducer node.
+ *
+ * It has two modes of operation:
+ *   1. Stack: the consumer removes each value from the buffer as it is returned. The values are
+ * returned in reverse order (hence "stack") of insertion in the shared buffer.
+ *   2. Regular: the node will return the values in the same order in which they were inserted. The
+ * values are not removed from the buffer.
+ */
+class SpoolConsumerNode final : public ABTOpFixedArity<1>, public ExclusivelyPhysicalNode {
+    using Base = ABTOpFixedArity<1>;
+
+public:
+    SpoolConsumerNode(SpoolConsumerType type, int64_t spoolId, ProjectionNameVector projections);
+
+    bool operator==(const SpoolConsumerNode& other) const;
+
+    const ExpressionBinder& binder() const {
+        const ABT& result = get<0>();
+        tassert(6624135, "Invalid binder type", result.is<ExpressionBinder>());
+        return *result.cast<ExpressionBinder>();
+    }
+
+    SpoolConsumerType getType() const;
+    int64_t getSpoolId() const;
+
+private:
+    const SpoolConsumerType _type;
+    const int64_t _spoolId;
 };
 
 /**

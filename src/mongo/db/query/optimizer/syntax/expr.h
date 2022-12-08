@@ -98,6 +98,9 @@ public:
     bool isValueDecimal() const;
     Decimal128 getValueDecimal() const;
 
+    bool isValueBool() const;
+    bool getValueBool() const;
+
     bool isNumber() const {
         return sbe::value::isNumber(_tag);
     }

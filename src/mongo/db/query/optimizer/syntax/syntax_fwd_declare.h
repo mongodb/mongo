@@ -91,6 +91,8 @@ class UnionNode;
 class GroupByNode;
 class UnwindNode;
 class UniqueNode;
+class SpoolProducerNode;
+class SpoolConsumerNode;
 class CollationNode;
 class LimitSkipNode;
 class ExchangeNode;

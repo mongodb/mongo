@@ -828,6 +828,71 @@ const ABT& UniqueNode::getChild() const {
     return get<0>();
 }
 
+SpoolProducerNode::SpoolProducerNode(const SpoolProducerType type,
+                                     const int64_t spoolId,
+                                     ProjectionNameVector projections,
+                                     ABT filter,
+                                     ABT child)
+    : Base(std::move(child),
+           std::move(filter),
+           buildSimpleBinder(projections),
+           make<References>(projections)),
+      _type(type),
+      _spoolId(spoolId) {
+    assertNodeSort(getChild());
+    assertExprSort(getFilter());
+    tassert(
+        6624155, "Spool producer must have a non-empty projection list", !binder().names().empty());
+    tassert(6624120,
+            "Invalid combination of spool producer type and spool filter",
+            _type == SpoolProducerType::Lazy || filter == Constant::boolean(true));
+}
+
+bool SpoolProducerNode::operator==(const SpoolProducerNode& other) const {
+    return _type == other._type && _spoolId == other._spoolId && getFilter() == other.getFilter() &&
+        binder() == other.binder();
+}
+
+SpoolProducerType SpoolProducerNode::getType() const {
+    return _type;
+}
+
+int64_t SpoolProducerNode::getSpoolId() const {
+    return _spoolId;
+}
+
+const ABT& SpoolProducerNode::getFilter() const {
+    return get<1>();
+}
+
+const ABT& SpoolProducerNode::getChild() const {
+    return get<0>();
+}
+
+ABT& SpoolProducerNode::getChild() {
+    return get<0>();
+}
+
+SpoolConsumerNode::SpoolConsumerNode(const SpoolConsumerType type,
+                                     const int64_t spoolId,
+                                     ProjectionNameVector projections)
+    : Base(buildSimpleBinder(projections)), _type(type), _spoolId(spoolId) {
+    tassert(
+        6624125, "Spool consumer must have a non-empty projection list", !binder().names().empty());
+}
+
+bool SpoolConsumerNode::operator==(const SpoolConsumerNode& other) const {
+    return _type == other._type && _spoolId == other._spoolId && binder() == other.binder();
+}
+
+SpoolConsumerType SpoolConsumerNode::getType() const {
+    return _type;
+}
+
+int64_t SpoolConsumerNode::getSpoolId() const {
+    return _spoolId;
+}
+
 CollationNode::CollationNode(properties::CollationRequirement property, ABT child)
     : Base(std::move(child),
            buildReferences(extractReferencedColumns(properties::makePhysProps(property)))),
