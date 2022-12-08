@@ -66,7 +66,9 @@ const runTest = function({pipeline, eventFilter, wholeBucketFilter, expectedDocs
 
     const docs = coll.aggregate([...pipeline, {$sort: {time: 1}}]).toArray();
     assert.eq(docs.length, expectedDocs.length, "Incorrect docs: " + tojson(docs));
-    expectedDocs.forEach((doc, i) => {
+    docs.forEach((doc, i) => {
+        // Do not need to check document _id, since checking time is already unique.
+        delete doc._id;
         assert.docEq(doc, expectedDocs[i], "Incorrect docs: " + tojson(docs));
     });
 };

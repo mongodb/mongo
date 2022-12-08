@@ -57,7 +57,7 @@ const runTest = function({pipeline, behaviour, expectedDocs}) {
 
     const docs = coll.aggregate([...pipeline, {$sort: {a: 1, b: 1, _id: 1}}]).toArray();
     assert.eq(docs.length, expectedDocs.length, "Incorrect docs: " + tojson(docs));
-    expectedDocs.forEach((doc, i) => {
+    docs.forEach((doc, i) => {
         assert.docEq(doc, expectedDocs[i], "Incorrect docs: " + tojson(docs));
     });
 };
@@ -66,10 +66,10 @@ runTest({
     pipeline: [{$match: {a: {$gt: 5}}}, {$project: {b: 1}}],
     behaviour: {include: ['_id', 'a', 'b']},
     expectedDocs: [
-        {a: 6, b: 6, _id: 6},
-        {a: 7, b: 7, _id: 7},
-        {a: 8, b: 8, _id: 8},
-        {a: 9, b: 9, _id: 9},
+        {b: 6, _id: 6},
+        {b: 7, _id: 7},
+        {b: 8, _id: 8},
+        {b: 9, _id: 9},
     ],
 });
 
@@ -77,10 +77,10 @@ runTest({
     pipeline: [{$match: {a: {$gt: 5}}}, {$project: {_id: 0, b: 1}}],
     behaviour: {include: ['a', 'b']},
     expectedDocs: [
-        {a: 6, b: 6},
-        {a: 7, b: 7},
-        {a: 8, b: 8},
-        {a: 9, b: 9},
+        {b: 6},
+        {b: 7},
+        {b: 8},
+        {b: 9},
     ],
 });
 
