@@ -1695,18 +1695,8 @@ int logOplogEntries(
     OplogWriter* oplogWriter) {
     invariant(!stmts.empty());
 
-    // Storage transaction commit is the last place inside a transaction that can throw an
-    // exception. In order to safely allow exceptions to be thrown at that point, this function must
-    // be called from an outer WriteUnitOfWork in order to be rolled back upon reaching the
-    // exception.
-    invariant(opCtx->lockState()->inAWriteUnitOfWork());
-
     const auto txnParticipant = TransactionParticipant::get(opCtx);
     repl::OpTime prevWriteOpTime;
-
-    // Writes to the oplog only require a Global intent lock. Guaranteed by
-    // OplogSlotReserver.
-    invariant(opCtx->lockState()->isWriteLocked());
 
     if (txnParticipant) {
         // Prior to writing any applyOps oplog entries for a multi-document transaction, the
@@ -1942,6 +1932,16 @@ void OpObserverImpl::onUnpreparedTransactionCommit(OperationContext* opCtx,
         /*prepare=*/false);
     const auto wallClockTime = getWallClockTimeForOpLog(opCtx);
 
+    // Storage transaction commit is the last place inside a transaction that can throw an
+    // exception. In order to safely allow exceptions to be thrown at that point, this function must
+    // be called from an outer WriteUnitOfWork in order to be rolled back upon reaching the
+    // exception.
+    invariant(opCtx->lockState()->inAWriteUnitOfWork());
+
+    // Writes to the oplog only require a Global intent lock. Guaranteed by
+    // OplogSlotReserver.
+    invariant(opCtx->lockState()->isWriteLocked());
+
     // Log in-progress entries for the transaction along with the implicit commit.
     boost::optional<repl::ReplOperation::ImageBundle> imageToWrite;
     invariant(!applyOpsOplogSlotAndOperationAssignment.prepare);
@@ -2020,6 +2020,16 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx) {
     uassert(ErrorCodes::TransactionTooLarge,
             "batched writes must generate a single applyOps entry",
             applyOpsOplogSlotAndOperationAssignment.applyOpsEntries.size() == 1);
+
+    // Storage transaction commit is the last place inside a transaction that can throw an
+    // exception. In order to safely allow exceptions to be thrown at that point, this function must
+    // be called from an outer WriteUnitOfWork in order to be rolled back upon reaching the
+    // exception.
+    invariant(opCtx->lockState()->inAWriteUnitOfWork());
+
+    // Writes to the oplog only require a Global intent lock. Guaranteed by
+    // OplogSlotReserver.
+    invariant(opCtx->lockState()->isWriteLocked());
 
     const auto wallClockTime = getWallClockTimeForOpLog(opCtx);
     invariant(!applyOpsOplogSlotAndOperationAssignment.prepare);
@@ -2113,6 +2123,16 @@ void OpObserverImpl::onTransactionPrepare(
                 // It is possible that the transaction resulted in no changes, In that case, we
                 // should not write any operations other than the prepare oplog entry.
                 if (!statements.empty()) {
+                    // Storage transaction commit is the last place inside a transaction that can
+                    // throw an exception. In order to safely allow exceptions to be thrown at that
+                    // point, this function must be called from an outer WriteUnitOfWork in order to
+                    // be rolled back upon reaching the exception.
+                    invariant(opCtx->lockState()->inAWriteUnitOfWork());
+
+                    // Writes to the oplog only require a Global intent lock. Guaranteed by
+                    // OplogSlotReserver.
+                    invariant(opCtx->lockState()->isWriteLocked());
+
                     // We had reserved enough oplog slots for the worst case where each operation
                     // produced one oplog entry.  When operations are smaller and can be packed, we
                     // will waste the extra slots.  The implicit prepare oplog entry will still use
