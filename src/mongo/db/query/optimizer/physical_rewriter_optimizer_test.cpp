@@ -4157,20 +4157,12 @@ TEST(PhysRewriter, ObjectElemMatchResidual) {
 
     ABT optimized = rootNode;
     phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(25, 35, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+    ASSERT_BETWEEN(20, 30, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // We should pick the index, and do at least some filtering before the fetch.
     // We don't have index bounds, both because 'a' is not the first field of the index,
     // and because the predicates are on child fields 'a.b' and 'a.c'.
-    // Also, we can't satisfy 'a.b' and 'a.c' on the same scan, because that would force
-    // both predicates to match the same array-element of 'a'.
-
-    // TODO SERVER-70780 we could be simplifying the paths even more:
-    // ComposeA PathArr PathObj is true when the input is an array or object.
-    // But the other 'Get Traverse Compare' here can only be true when the input is an object.
-    // So the 'ComposeA PathArr PathObj' is redundant and we could remove it.
-
-    ASSERT_EXPLAIN_V2Compact_AUTO(
+    ASSERT_EXPLAIN_V2Compact(
         "Root []\n"
         "|   |   projections: \n"
         "|   |       root\n"
@@ -4179,6 +4171,10 @@ TEST(PhysRewriter, ObjectElemMatchResidual) {
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [root]\n"
+        // TODO SERVER-70780 we could be simplifying this path:
+        // ComposeA PathArr PathObj is true when the input is an array or object.
+        // But the other 'Get Traverse Compare' here can only be true when the input is an object.
+        // So the 'ComposeA PathArr PathObj' is redundant and we could remove it.
         "|   PathGet [a] PathTraverse [1] PathComposeM []\n"
         "|   |   PathComposeA []\n"
         "|   |   |   PathArr []\n"
@@ -4209,12 +4205,22 @@ TEST(PhysRewriter, ObjectElemMatchResidual) {
         "|       rid_0\n"
         "Filter []\n"
         "|   EvalFilter []\n"
-        "|   |   Variable [evalTemp_8]\n"
+        "|   |   Variable [evalTemp_14]\n"
+        "|   PathComposeA []\n"
+        "|   |   PathArr []\n"
+        "|   PathObj []\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [evalTemp_14]\n"
         "|   PathGet [c] PathTraverse [1] PathCompare [Eq] Const [1]\n"
-        "IndexScan [{'<indexKey> 1': evalTemp_8, '<rid>': rid_0}, scanDefName: c1, indexDefName: "
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [evalTemp_14]\n"
+        "|   PathGet [b] PathTraverse [1] PathCompare [Eq] Const [1]\n"
+        "IndexScan [{'<indexKey> 1': evalTemp_14, '<rid>': rid_0}, scanDefName: c1, indexDefName: "
         "index1, interval: {<fully open>, <fully open>}]\n"
         "    BindBlock:\n"
-        "        [evalTemp_8]\n"
+        "        [evalTemp_14]\n"
         "            Source []\n"
         "        [rid_0]\n"
         "            Source []\n",
@@ -6469,165 +6475,6 @@ TEST(PhysRewriter, PerfOnlyPreds2) {
         "            Source []\n",
         optimized);
 }
-
-TEST(PhysRewriter, ConjunctionTraverseMultikey1) {
-    using namespace properties;
-    using namespace unit_test_abt_literals;
-    PrefixId prefixId;
-
-    ABT root = NodeBuilder{}
-                   .root("root")
-                   .filter(_evalf(
-                       // Start with conjunction of two traverses, over the same field.
-                       // The two traverses don't have to match the same array element,
-                       // so it's important not to combine them into one traverse.
-                       _composem(_get("a", _traverse1(_get("x", _cmp("Eq", "1"_cint64)))),
-                                 _get("a", _traverse1(_get("y", _cmp("Eq", "1"_cint64))))),
-                       "root"_var))
-                   .finish(_scan("root", "c1"));
-
-    auto phaseManager = makePhaseManager(
-        {
-            OptPhase::MemoSubstitutionPhase,
-            OptPhase::MemoExplorationPhase,
-            OptPhase::MemoImplementationPhase,
-        },
-        prefixId,
-        Metadata{{{"c1",
-                   createScanDef({},
-                                 {{"index1",
-                                   makeIndexDefinition(
-                                       "a", CollationOp::Ascending, true /*isMultiKey*/)}})}}},
-        {} /*costModel*/,
-        DebugInfo{true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
-
-    ABT optimized = std::move(root);
-    phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(6, 10, phaseManager.getMemo().getStats()._physPlanExplorationCount);
-
-    // We end up with a multikey index scan. Each row in the index is an array-element of 'a'.
-    // We should not check (a conjunction of) both predicates on the same index scan,
-    // because that forces the same array element to match both, which is stricter than
-    // the original query.
-    // But at the same time, the index should help satisfy one predicate or the other.
-    ASSERT_EXPLAIN_V2_AUTO(
-        "Root []\n"
-        "|   |   projections: \n"
-        "|   |       root\n"
-        "|   RefBlock: \n"
-        "|       Variable [root]\n"
-        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
-        "|   |   Const [true]\n"
-        "|   Filter []\n"
-        "|   |   EvalFilter []\n"
-        "|   |   |   Variable [evalTemp_11]\n"
-        "|   |   PathTraverse [1]\n"
-        "|   |   PathGet [x]\n"
-        "|   |   PathCompare [Eq]\n"
-        "|   |   Const [1]\n"
-        "|   LimitSkip []\n"
-        "|   |   limitSkip:\n"
-        "|   |       limit: 1\n"
-        "|   |       skip: 0\n"
-        "|   Seek [ridProjection: rid_0, {'<root>': root, 'a': evalTemp_11}, c1]\n"
-        "|   |   BindBlock:\n"
-        "|   |       [evalTemp_11]\n"
-        "|   |           Source []\n"
-        "|   |       [root]\n"
-        "|   |           Source []\n"
-        "|   RefBlock: \n"
-        "|       Variable [rid_0]\n"
-        "Unique []\n"
-        "|   projections: \n"
-        "|       rid_0\n"
-        "Filter []\n"
-        "|   EvalFilter []\n"
-        "|   |   Variable [evalTemp_9]\n"
-        "|   PathGet [y]\n"
-        "|   PathCompare [Eq]\n"
-        "|   Const [1]\n"
-        "IndexScan [{'<indexKey> 0': evalTemp_9, '<rid>': rid_0}, scanDefName: c1, indexDefName: "
-        "index1, interval: {<fully open>}]\n"
-        "    BindBlock:\n"
-        "        [evalTemp_9]\n"
-        "            Source []\n"
-        "        [rid_0]\n"
-        "            Source []\n",
-        optimized);
-}
-
-TEST(PhysRewriter, ConjunctionTraverseMultikey2) {
-    using namespace properties;
-    using namespace unit_test_abt_literals;
-    PrefixId prefixId;
-
-    ABT root = NodeBuilder{}
-                   .root("root")
-                   .filter(_evalf(
-                       // Start with conjunction of two traverses, over the same field.
-                       // The two traverses don't have to match the same array element,
-                       // so it's important not to combine them into one traverse.
-                       _composem(_get("a", _traverse1(_cmp("Eq", "1"_cint64))),
-                                 _get("a", _traverse1(_get("x", _cmp("Eq", "1"_cint64))))),
-                       "root"_var))
-                   .finish(_scan("root", "c1"));
-
-    auto phaseManager = makePhaseManager(
-        {
-            OptPhase::MemoSubstitutionPhase,
-            OptPhase::MemoExplorationPhase,
-            OptPhase::MemoImplementationPhase,
-        },
-        prefixId,
-        Metadata{{{"c1",
-                   createScanDef({},
-                                 {{"index1",
-                                   makeIndexDefinition(
-                                       "a", CollationOp::Ascending, true /*isMultiKey*/)}})}}},
-        {} /*costModel*/,
-        DebugInfo{true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
-
-    ABT optimized = std::move(root);
-    phaseManager.optimize(optimized);
-    ASSERT_BETWEEN(6, 10, phaseManager.getMemo().getStats()._physPlanExplorationCount);
-
-    // If we use the index to satisfy {a: 1} then we can't also use it to satisfy {'a.x': 1},
-    // because that would be forcing the same array element to match both predicates.
-    ASSERT_EXPLAIN_V2_AUTO(
-        "Root []\n"
-        "|   |   projections: \n"
-        "|   |       root\n"
-        "|   RefBlock: \n"
-        "|       Variable [root]\n"
-        "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
-        "|   |   Const [true]\n"
-        "|   Filter []\n"
-        "|   |   EvalFilter []\n"
-        "|   |   |   Variable [evalTemp_5]\n"
-        "|   |   PathTraverse [1]\n"
-        "|   |   PathGet [x]\n"
-        "|   |   PathCompare [Eq]\n"
-        "|   |   Const [1]\n"
-        "|   LimitSkip []\n"
-        "|   |   limitSkip:\n"
-        "|   |       limit: 1\n"
-        "|   |       skip: 0\n"
-        "|   Seek [ridProjection: rid_0, {'<root>': root, 'a': evalTemp_5}, c1]\n"
-        "|   |   BindBlock:\n"
-        "|   |       [evalTemp_5]\n"
-        "|   |           Source []\n"
-        "|   |       [root]\n"
-        "|   |           Source []\n"
-        "|   RefBlock: \n"
-        "|       Variable [rid_0]\n"
-        "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {=Const [1"
-        "]}]\n"
-        "    BindBlock:\n"
-        "        [rid_0]\n"
-        "            Source []\n",
-        optimized);
-}
-
 
 }  // namespace
 }  // namespace mongo::optimizer

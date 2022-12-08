@@ -188,9 +188,12 @@ result = run({
                 "leftChild": {
                     "nodeType": "Unique",
                     "child": {
-                        "nodeType": "IndexScan",
-                        "indexDefName": "c_1",
-                        "interval": "[ [ ], BinData(0,\"\") )"
+                        "nodeType": "Filter",
+                        "child": {
+                            "nodeType": "IndexScan",
+                            "indexDefName": "c_1",
+                            "interval": "[ [ ], BinData(0,\"\") )"
+                        }
                     }
                 },
                 "rightChild": {
