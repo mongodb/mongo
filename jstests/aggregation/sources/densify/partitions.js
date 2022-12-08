@@ -437,22 +437,24 @@ function rangeTestTwo() {
 
 function rangeTestTwoDates() {
     coll.drop();
-    let testDocs = [];
-    let testExpected = [];
-    testDocs.push({val: new ISODate("2021-01-01"), part: 0});
-    testExpected.push({val: new ISODate("2021-01-01"), part: 0});
-    testDocs.push({val: new ISODate("2021-06-01"), part: 1});
-    testExpected.push({val: new ISODate("2021-06-01"), part: 1});
-    testDocs.push({val: new ISODate("2021-11-01"), part: 2});
-    testExpected.push({val: new ISODate("2021-11-01"), part: 2});
-    for (let densifyVal = 4; densifyVal < 8; densifyVal += 2) {
-        for (let partitionVal = 0; partitionVal <= 2; partitionVal++) {
-            testExpected.push({
-                val: new ISODate("2021-" + densifyVal.toString().padStart(2, '0') + "-01"),
-                part: partitionVal
-            });
-        }
-    }
+    const testDocs = [
+        {val: new ISODate("2021-01-01"), part: 0},
+        {val: new ISODate("2021-06-01"), part: 1},
+        {val: new ISODate("2021-11-01"), part: 2}
+    ];
+    const testExpected = [
+        {val: new ISODate("2021-01-01"), part: 0},
+        {val: new ISODate("2021-04-01"), part: 0},
+        {val: new ISODate("2021-04-01"), part: 1},
+        {val: new ISODate("2021-04-01"), part: 2},
+        {val: new ISODate("2021-06-01"), part: 0},
+        {val: new ISODate("2021-06-01"), part: 1},
+        {val: new ISODate("2021-06-01"), part: 2},
+        {val: new ISODate("2021-08-01"), part: 0},
+        {val: new ISODate("2021-08-01"), part: 1},
+        {val: new ISODate("2021-08-01"), part: 2},
+        {val: new ISODate("2021-11-01"), part: 2},
+    ];
     assert.commandWorked(coll.insert(testDocs));
     let result = coll.aggregate([
         {$project: {_id: 0}},
@@ -462,7 +464,7 @@ function rangeTestTwoDates() {
                 range: {
                     step: 2,
                     unit: "month",
-                    bounds: [new ISODate("2021-05-01"), new ISODate("2021-09-01")]
+                    bounds: [new ISODate("2021-04-01"), new ISODate("2021-09-01")]
                 },
                 partitionByFields: ["part"]
             }
