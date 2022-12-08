@@ -371,16 +371,17 @@ BSONObj writeFile(const BSONObj& args, void* data) {
 
     const boost::filesystem::path originalFilePath{filePathElem.String()};
     const boost::filesystem::path normalizedFilePath{originalFilePath.lexically_normal()};
+    const boost::filesystem::path absoluteFilePath{boost::filesystem::absolute(normalizedFilePath)};
 
     uassert(40343,
             "writeFile() can only write a file in a directory which already exists",
-            boost::filesystem::exists(normalizedFilePath.parent_path()));
+            boost::filesystem::exists(absoluteFilePath.parent_path()));
     uassert(40344,
             "writeFile() can only write to a file which does not yet exist",
-            !boost::filesystem::exists(normalizedFilePath));
+            !boost::filesystem::exists(absoluteFilePath));
     uassert(40345,
             "the file name must be compatible with POSIX and Windows",
-            boost::filesystem::portable_name(normalizedFilePath.filename().string()));
+            boost::filesystem::portable_name(absoluteFilePath.filename().string()));
 
     std::ios::openmode mode = std::ios::out;
 
@@ -395,14 +396,13 @@ BSONObj writeFile(const BSONObj& args, void* data) {
             mode |= std::ios::binary;
     }
 
-    boost::filesystem::ofstream ofs{normalizedFilePath, mode};
+    boost::filesystem::ofstream ofs{absoluteFilePath, mode};
     uassert(40346,
-            str::stream() << "failed to open file " << normalizedFilePath.string()
-                          << " for writing",
+            str::stream() << "failed to open file " << absoluteFilePath.string() << " for writing",
             ofs);
 
     ofs << fileContentElem.String();
-    uassert(40347, str::stream() << "failed to write to file " << normalizedFilePath.string(), ofs);
+    uassert(40347, str::stream() << "failed to write to file " << absoluteFilePath.string(), ofs);
 
     return undefinedReturn;
 }
