@@ -65,9 +65,10 @@ splitThread.join();
 // In some cases (ASAN builds) we could end up closing the connection before stopping the worker
 // thread. This race condition would result in HostUnreachable instead of
 // InterruptedDueToReplStateChange.
-assert.commandFailedWithCode(
-    splitThread.returnData(),
-    ErrorCodes.InterruptedDueToReplStateChange || ErrorCodes.HostUnreachable);
+const res = splitThread.returnData();
+assert(res.code == ErrorCodes.InterruptedDueToReplStateChange ||
+           res.code == ErrorCodes.HostUnreachable,
+       tojson(res.code));
 
 // Shut down all the other nodes.
 test.donor.nodes.filter(node => node.port != donorPrimary.port)
