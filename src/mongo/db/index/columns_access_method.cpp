@@ -532,4 +532,10 @@ void ColumnStoreAccessMethod::applyColumnDataSideWrite(OperationContext* opCtx,
     }
 }
 
+// static
+bool ColumnStoreAccessMethod::supportsBlockCompressor(StringData compressor) {
+    static const std::set<StringData> kSupportedCompressors = {
+        "none"_sd, "snappy"_sd, "zlib"_sd, "zstd"_sd};
+    return kSupportedCompressors.count(compressor) > 0;
+}
 }  // namespace mongo

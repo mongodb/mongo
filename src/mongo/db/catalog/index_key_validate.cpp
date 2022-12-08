@@ -41,6 +41,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index/column_key_generator.h"
+#include "mongo/db/index/columns_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/wildcard_key_generator.h"
 #include "mongo/db/index_names.h"
@@ -577,6 +578,27 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
                         .isOK() &&
                    !skipTTLIndexInvalidExpireAfterSecondsValidationForCreateIndex.shouldFail()) {
             isTTLIndexWithInvalidExpireAfterSeconds = true;
+        } else if (IndexDescriptor::kColumnStoreCompressorFieldName == indexSpecElemFieldName) {
+            if (IndexNames::findPluginName(indexSpec.getObjectField(
+                    IndexDescriptor::kKeyPatternFieldName)) != IndexNames::COLUMN) {
+                return {ErrorCodes::InvalidIndexSpecificationOption,
+                        str::stream()
+                            << "The field '" << indexSpecElemFieldName << "' is only allowed in '"
+                            << IndexDescriptor::kColumnStoreCompressorFieldName << "' indexes"};
+            }
+            if (indexSpecElem.type() != BSONType::String) {
+                return {ErrorCodes::TypeMismatch,
+                        str::stream()
+                            << "The field '" << IndexDescriptor::kColumnStoreCompressorFieldName
+                            << "' must be a string, but got " << typeName(indexSpecElem.type())};
+            }
+            if (!ColumnStoreAccessMethod::supportsBlockCompressor(
+                    indexSpecElem.valueStringData())) {
+                return {ErrorCodes::InvalidIndexSpecificationOption,
+                        str::stream() << "Unsupported value for "
+                                      << IndexDescriptor::kColumnStoreCompressorFieldName << ": "
+                                      << indexSpecElem.valueStringData()};
+            }
         } else {
             // We can assume field name is valid at this point. Validation of fieldname is handled
             // prior to this in validateIndexSpecFieldNames().

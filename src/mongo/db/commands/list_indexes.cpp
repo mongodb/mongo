@@ -98,7 +98,9 @@ static std::set<StringData> allowedFieldNames = {
     ListIndexesReplyItem::kVFieldName,
     ListIndexesReplyItem::kWeightsFieldName,
     ListIndexesReplyItem::kWildcardProjectionFieldName,
-    ListIndexesReplyItem::kColumnstoreProjectionFieldName};
+    ListIndexesReplyItem::kColumnstoreProjectionFieldName,
+    ListIndexesReplyItem::kColumnstoreCompressorFieldName,
+};
 
 /**
  * Returns index specs, with resolved namespace, from the catalog for this listIndexes request.

@@ -70,6 +70,6 @@ TEST(WiredTigerColumnStoreTest, MakeKeyRIDColumn) {
 
     ASSERT_EQ(expected, hexdump(out.data(), out.size()));
 }
-// TODO: SERVER-65976 Add tests for WT config string.
+// TODO: SERVER-64257 Add tests for WT config string.
 }  // namespace
 }  // namespace mongo

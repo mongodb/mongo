@@ -33,6 +33,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor_helpers.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index_cursor_generic.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index_util.h"
 #include "mongo/logv2/log.h"
@@ -48,8 +49,6 @@ StatusWith<std::string> WiredTigerColumnStore::generateCreateString(
 
     invariant(desc.getIndexType() == INDEX_COLUMN);
 
-    // TODO: SERVER-65976 Tune values used in WT config string.
-
     // Separate out a prefix and suffix in the default string. User configuration will override
     // values in the prefix, but not values in the suffix.
     sb << "type=file,internal_page_max=16k,leaf_page_max=16k,";
@@ -62,7 +61,9 @@ StatusWith<std::string> WiredTigerColumnStore::generateCreateString(
     sb << WiredTigerCustomizationHooks::get(getGlobalServiceContext())
               ->getTableCreateConfig(collectionNamespace.ns());
 
-    // TODO: SERVER-65976 User config goes here.
+    sb << "block_compressor="
+       << desc.compressor().value_or(WiredTigerGlobalOptions::kDefaultColumnStoreIndexCompressor)
+       << ",";
 
     // WARNING: No user-specified config can appear below this line. These options are required
     // for correct behavior of the server.
@@ -70,8 +71,6 @@ StatusWith<std::string> WiredTigerColumnStore::generateCreateString(
     // Indexes need to store the metadata for collation to work as expected.
     sb << "key_format=u,";
     sb << "value_format=u,";
-
-    // TODO: SERVER-65976 app_metadata goes here (none yet)
 
     if (WiredTigerUtil::useTableLogging(collectionNamespace)) {
         sb << "log=(enabled=true)";

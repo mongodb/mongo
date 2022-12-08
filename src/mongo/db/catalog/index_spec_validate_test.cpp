@@ -773,5 +773,56 @@ TEST(IndexSpecColumnStore, FailsWhenExclusionWithSubpath) {
     ASSERT_EQ(result.getStatus().code(), ErrorCodes::FailedToParse);
 }
 
+TEST(IndexSpecColumnStore, SucceedsWithCompressor) {
+    ASSERT_OK(validateIndexSpec(kDefaultOpCtx,
+                                BSON("key" << BSON("$**"
+                                                   << "columnstore")
+                                           << "name"
+                                           << "indexName"
+                                           << "columnstoreCompressor"
+                                           << "none")));
+
+    ASSERT_OK(validateIndexSpec(kDefaultOpCtx,
+                                BSON("key" << BSON("$**"
+                                                   << "columnstore")
+                                           << "name"
+                                           << "indexName"
+                                           << "columnstoreCompressor"
+                                           << "zstd")));
+}
+
+TEST(IndexSpecColumnStore, FailsWhenCompressorIsANumber) {
+    auto result = validateIndexSpec(kDefaultOpCtx,
+                                    BSON("key" << BSON("$**"
+                                                       << "columnstore")
+                                               << "name"
+                                               << "indexName"
+                                               << "columnstoreCompressor" << 1.23));
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::TypeMismatch);
+}
+
+TEST(IndexSpecColumnStore, FailsWhenCompressorIsAnObject) {
+    auto result = validateIndexSpec(kDefaultOpCtx,
+                                    BSON("key" << BSON("$**"
+                                                       << "columnstore")
+                                               << "name"
+                                               << "indexName"
+                                               << "columnstoreCompressor"
+                                               << BSON("compressor"
+                                                       << "zstd")));
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::TypeMismatch);
+}
+
+TEST(IndexSpecColumnStore, FailsWhenCompressorIsFictional) {
+    auto result = validateIndexSpec(kDefaultOpCtx,
+                                    BSON("key" << BSON("$**"
+                                                       << "columnstore")
+                                               << "name"
+                                               << "indexName"
+                                               << "columnstoreCompressor"
+                                               << "middleout"));
+    ASSERT_EQ(result.getStatus().code(), ErrorCodes::InvalidIndexSpecificationOption);
+}
+
 }  // namespace
 }  // namespace mongo

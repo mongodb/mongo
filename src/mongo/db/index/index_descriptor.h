@@ -91,6 +91,7 @@ public:
     static constexpr StringData kOriginalSpecFieldName = "originalSpec"_sd;
     static constexpr StringData kPrepareUniqueFieldName = "prepareUnique"_sd;
     static constexpr StringData kClusteredFieldName = "clustered"_sd;
+    static constexpr StringData kColumnStoreCompressorFieldName = "columnstoreCompressor"_sd;
 
     /**
      * infoObj is a copy of the index-describing BSONObj contained in the catalog.
@@ -233,6 +234,10 @@ public:
         return _prepareUnique;
     }
 
+    boost::optional<StringData> compressor() const {
+        return _compressor ? boost::make_optional<StringData>(*_compressor) : boost::none;
+    }
+
     /**
      * Returns true if the key pattern is for the _id index.
      * The _id index must have form exactly {_id : 1} or {_id : -1}.
@@ -299,6 +304,7 @@ private:
     BSONObj _collation;
     BSONObj _partialFilterExpression;
     bool _prepareUnique = false;
+    boost::optional<std::string> _compressor;
 
     // Many query stages require going from an IndexDescriptor to its IndexCatalogEntry, so for
     // now we need this.

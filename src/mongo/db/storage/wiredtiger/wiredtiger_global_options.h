@@ -39,6 +39,7 @@ namespace mongo {
 class WiredTigerGlobalOptions {
 public:
     static constexpr auto kDefaultTimeseriesCollectionCompressor = "zstd"_sd;
+    static constexpr auto kDefaultColumnStoreIndexCompressor = "zstd"_sd;
 
     WiredTigerGlobalOptions()
         : cacheSizeGB(0),

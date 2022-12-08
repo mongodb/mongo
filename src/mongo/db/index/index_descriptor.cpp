@@ -70,6 +70,7 @@ std::map<StringData, BSONElement> populateOptionsMapForEqualityCheck(const BSONO
         IndexDescriptor::kSparseFieldName,                 // checked specially
         IndexDescriptor::kWildcardProjectionFieldName,     // checked specially
         IndexDescriptor::kColumnStoreProjectionFieldName,  // checked specially
+        IndexDescriptor::kColumnStoreCompressorFieldName,  // not considered for equivalence
     };
 
     BSONObjIterator it(spec);
@@ -112,6 +113,7 @@ constexpr StringData IndexDescriptor::kUniqueFieldName;
 constexpr StringData IndexDescriptor::kHiddenFieldName;
 constexpr StringData IndexDescriptor::kWeightsFieldName;
 constexpr StringData IndexDescriptor::kPrepareUniqueFieldName;
+constexpr StringData IndexDescriptor::kColumnStoreCompressorFieldName;
 
 IndexDescriptor::IndexDescriptor(const std::string& accessMethodName, BSONObj infoObj)
     : _accessMethodName(accessMethodName),
@@ -146,6 +148,13 @@ IndexDescriptor::IndexDescriptor(const std::string& accessMethodName, BSONObj in
             "Index does not support the 'prepareUnique' field",
             feature_flags::gCollModIndexUnique.isEnabled(serverGlobalParams.featureCompatibility));
         _prepareUnique = prepareUniqueElement.trueValue();
+    }
+
+    if (BSONElement compressor = _infoObj[kColumnStoreCompressorFieldName]) {
+        invariant(compressor.type() == BSONType::String);
+        _compressor = compressor.valueStringData().toString();
+    } else {
+        _compressor = boost::none;
     }
 }
 

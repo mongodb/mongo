@@ -123,6 +123,15 @@ public:
 
     class BulkBuilder;
 
+    /**
+     * Returns true iff 'compressor' is a recognized name of a block compression module that is
+     * supported for use with the column store index.
+     *
+     * Actual support for the module depends on the storage engine, however. This method does _not_
+     * guarantee that creating a column store index with 'compressor' will always work.
+     */
+    static bool supportsBlockCompressor(StringData compressor);
+
 private:
     void _visitCellsForIndexInsert(OperationContext* opCtx,
                                    PooledFragmentBuilder& pooledFragmentBuilder,

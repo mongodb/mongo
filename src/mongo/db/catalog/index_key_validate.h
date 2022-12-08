@@ -77,6 +77,7 @@ static std::set<StringData> allowedFieldNames = {
     IndexDescriptor::kWeightsFieldName,
     IndexDescriptor::kOriginalSpecFieldName,
     IndexDescriptor::kPrepareUniqueFieldName,
+    IndexDescriptor::kColumnStoreCompressorFieldName,
     // Index creation under legacy writeMode can result in an index spec with an _id field.
     "_id"};
 
