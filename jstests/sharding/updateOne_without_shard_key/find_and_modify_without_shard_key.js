@@ -37,14 +37,21 @@ function verifyResult(testCase, res) {
         assert.commandFailedWithCode(res, testCase.errorCode);
     } else {
         assert.commandWorked(res);
-        assert.eq(1, res.lastErrorObject.n, res);
         assert.eq(testCase.resultDoc, testColl.findOne(testCase.resultDoc));
 
-        // Check for pre/post image in command response.
-        if (testCase.cmdObj.new) {
-            assert.eq(testCase.resultDoc, res.value, res.value);
+        // No document matched the query, no modification was made.
+        if (testCase.insertDoc.y != testCase.cmdObj.query.y) {
+            assert.eq(0, res.lastErrorObject.n, res);
+            assert.eq(false, res.lastErrorObject.updatedExisting);
         } else {
-            assert.eq(testCase.insertDoc, res.value, res.value);
+            assert.eq(1, res.lastErrorObject.n, res);
+
+            // Check for pre/post image in command response.
+            if (testCase.cmdObj.new) {
+                assert.eq(testCase.resultDoc, res.value, res.value);
+            } else {
+                assert.eq(testCase.insertDoc, res.value, res.value);
+            }
         }
     }
 
@@ -63,20 +70,25 @@ function verifySingleModification(testCase, res) {
         modifiedDocId = -1;  // No document should be modified, none will match on -1.
     } else {
         assert.commandWorked(res);
-        assert.eq(1, res.lastErrorObject.n, res);
 
-        // If this findAndModify removes a document, it must be found using the _id value from the
-        // response image. Otherwise, we can query on the non-null result doc.
-        modifiedDocId = res.value._id;
-        const query = testCase.resultDoc ? testCase.resultDoc : {_id: modifiedDocId};
-        print(tojson(query));
-        modifiedDoc = testColl.findOne(query);
-        print(tojson(modifiedDoc));
+        // No document matched the query.
+        if (testCase.insertDoc[0].y != testCase.cmdObj.query.y) {
+            assert.eq(0, res.lastErrorObject.n, res);
+            assert.eq(false, res.lastErrorObject.updatedExisting);
+
+            modifiedDocId = -1;  // No document should be modified, none will match on -1.
+        } else {
+            assert.eq(1, res.lastErrorObject.n, res);
+
+            // If this findAndModify removes a document, it must be found using the _id value from
+            // the response image. Otherwise, we can query on the non-null result doc.
+            modifiedDocId = res.value._id;
+            const query = testCase.resultDoc ? testCase.resultDoc : {_id: modifiedDocId};
+            modifiedDoc = testColl.findOne(query);
+        }
     }
 
     testCase.insertDoc.forEach(doc => {
-        print(tojson(doc));
-        print(tojson(doc._id));
         if (doc._id == modifiedDocId) {
             // This is the document that got modified. Check for pre/post image in command response.
             if (testCase.cmdObj.new) {
@@ -97,7 +109,6 @@ function verifySingleModification(testCase, res) {
 
 function runCommandAndVerify(testCase, additionalCmdFields = {}) {
     const cmdObjWithAdditionalFields = Object.assign({}, testCase.cmdObj, additionalCmdFields);
-    jsTest.log(tojson(cmdObjWithAdditionalFields));
 
     assert.commandWorked(testColl.insert(testCase.insertDoc));
     const res = st.getDB(dbName).runCommand(cmdObjWithAdditionalFields);
@@ -147,6 +158,16 @@ const testCases = [
         cmdObj: {
             findAndModify: collectionName,
             query: {y: 6},
+            update: {$inc: {y: 3}},
+        }
+    },
+    {
+        logMessage: "Query does not match, no update.",
+        insertDoc: {_id: 2, x: -2, y: 6},
+        resultDoc: {_id: 2, x: -2, y: 6},
+        cmdObj: {
+            findAndModify: collectionName,
+            query: {y: 5},
             update: {$inc: {y: 3}},
         }
     },
@@ -210,6 +231,17 @@ const testCases = [
             remove: true,
         }
     },
+    {
+        logMessage:
+            "Insert two documents, one on each shard, ensure neither is modified when query does not match.",
+        insertDoc: [{_id: 0, x: -2, y: 5}, {_id: 1, x: 2, y: 5}],
+        resultDoc: {y: 5},
+        cmdObj: {
+            findAndModify: collectionName,
+            query: {y: 4},
+            update: {$inc: {y: 3}},
+        }
+    },
 ];
 
 jsTest.log("Testing findAndModify without a shard key commands in various configurations.");
@@ -220,7 +252,11 @@ testCases.forEach(testCase => {
     const logicalSessionFields = {lsid: {id: UUID()}};
     runCommandAndVerify(testCase, logicalSessionFields);
 
-    const retryableWriteFields = {lsid: {id: UUID()}, txnNumber: NumberLong(0)};
+    const retryableWriteFields = {
+        lsid: {id: UUID()},
+        txnNumber: NumberLong(0),
+        stmtId: NumberInt(1)
+    };
     runCommandAndVerify(testCase, retryableWriteFields);
 
     const transactionFields =

@@ -682,6 +682,12 @@ private:
                 ClusterQueryWithoutShardKeyResponse queryResponse =
                     ClusterQueryWithoutShardKeyResponse::parseOwned(
                         IDLParserContext("_clusterQueryWithoutShardKeyResponse"), std::move(res));
+
+                // Return if query response is empty, there is no document to target.
+                if (!queryResponse.getTargetDoc()) {
+                    return SemiFuture<void>::makeReady();
+                }
+
                 sharedBlock->clusterWriteCommand = ClusterWriteWithoutShardKey(
                     sharedBlock->cmdObj,
                     std::string(*queryResponse.getShardId()) /* shardId */,
@@ -698,6 +704,20 @@ private:
                 return SemiFuture<void>::makeReady();
             });
 
+        BSONObj response;
+        if (sharedBlock->clusterWriteResponse.getResponse().isEmpty()) {
+            write_ops::FindAndModifyLastError lastError(0 /* n */);
+            lastError.setUpdatedExisting(false);
+
+            write_ops::FindAndModifyCommandReply findAndModifyResponse;
+            findAndModifyResponse.setLastErrorObject(std::move(lastError));
+            findAndModifyResponse.setValue(boost::none);
+
+            response = findAndModifyResponse.toBSON();
+        } else {
+            response = sharedBlock->clusterWriteResponse.getResponse();
+        }
+
         // Extract findAndModify command result from _clusterWriteWithoutShardKeyResponse.
         _contructResult(opCtx,
                         ShardId(sharedBlock->clusterWriteCommand.getShardId().toString()),
@@ -705,7 +725,7 @@ private:
                         dbVersion,
                         nss,
                         cmdObj,
-                        sharedBlock->clusterWriteResponse.getResponse(),
+                        response,
                         result);
     }
 
