@@ -122,13 +122,15 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/command_request_response',
-        '$BUILD_DIR/mongo/executor/hedge_options_util',
         '$BUILD_DIR/mongo/executor/scoped_task_executor',
         '$BUILD_DIR/mongo/executor/task_executor_interface',
         '$BUILD_DIR/mongo/s/client/shard_interface',
         '$BUILD_DIR/mongo/s/client/sharding_client',
         'coreshard',
         'mongos_server_parameters',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/executor/hedge_options_util',
     ],
 )
 
