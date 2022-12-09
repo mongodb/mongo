@@ -62,8 +62,8 @@ boost::intrusive_ptr<DocumentSourceGroup> DocumentSourceGroup::create(
     const boost::intrusive_ptr<Expression>& groupByExpression,
     std::vector<AccumulationStatement> accumulationStatements,
     boost::optional<size_t> maxMemoryUsageBytes) {
-    boost::intrusive_ptr<DocumentSourceGroup> groupStage(
-        new DocumentSourceGroup(expCtx, maxMemoryUsageBytes));
+    boost::intrusive_ptr<DocumentSourceGroup> groupStage =
+        new DocumentSourceGroup(expCtx, maxMemoryUsageBytes);
     groupStage->setIdExpression(groupByExpression);
     for (auto&& statement : accumulationStatements) {
         groupStage->addAccumulator(statement);

@@ -83,6 +83,30 @@ DocumentSourceStreamingGroup::DocumentSourceStreamingGroup(
     boost::optional<size_t> maxMemoryUsageBytes)
     : DocumentSourceGroupBase(kStageName, expCtx, maxMemoryUsageBytes), _sourceDepleted(false) {}
 
+boost::intrusive_ptr<DocumentSourceStreamingGroup> DocumentSourceStreamingGroup::create(
+    const boost::intrusive_ptr<ExpressionContext>& expCtx,
+    const boost::intrusive_ptr<Expression>& groupByExpression,
+    std::vector<size_t> monotonicExpressionIndexes,
+    std::vector<AccumulationStatement> accumulationStatements,
+    boost::optional<size_t> maxMemoryUsageBytes) {
+    boost::intrusive_ptr<DocumentSourceStreamingGroup> groupStage =
+        new DocumentSourceStreamingGroup(expCtx, maxMemoryUsageBytes);
+    groupStage->setIdExpression(groupByExpression);
+    for (auto&& statement : accumulationStatements) {
+        groupStage->addAccumulator(statement);
+    }
+    tassert(7026709,
+            "streaming group must have at least one monotonic id expression",
+            !monotonicExpressionIndexes.empty());
+    tassert(7026710,
+            "streaming group monotonic expression indexes must correspond to id expressions",
+            std::all_of(monotonicExpressionIndexes.begin(),
+                        monotonicExpressionIndexes.end(),
+                        [&](size_t i) { return i < groupStage->_idExpressions.size(); }));
+    groupStage->_monotonicExpressionIndexes = std::move(monotonicExpressionIndexes);
+    return groupStage;
+}
+
 boost::intrusive_ptr<DocumentSource> DocumentSourceStreamingGroup::createFromBson(
     BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& expCtx) {
     return createFromBsonWithMaxMemoryUsage(std::move(elem), expCtx, boost::none);
