@@ -128,6 +128,8 @@ saslClientEnv.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/server_status_core',
+        '$BUILD_DIR/mongo/db/server_options_core',  # For object_check.h
+        '$BUILD_DIR/mongo/shell/program_runner',
         '$BUILD_DIR/mongo/util/net/http_client',
     ],
     SYSLIBDEPS=saslLibs,

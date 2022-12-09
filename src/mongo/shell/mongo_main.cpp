@@ -66,6 +66,7 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/linenoise.h"
+#include "mongo/shell/program_runner.h"
 #include "mongo/shell/shell_options.h"
 #include "mongo/shell/shell_utils.h"
 #include "mongo/shell/shell_utils_launcher.h"
@@ -724,6 +725,7 @@ int mongo_main(int argc, char* argv[]) {
 #ifdef MONGO_CONFIG_SSL
         OCSPManager::start(serviceContext);
 #endif
+        shell_utils::ProgramRegistry::create(serviceContext);
 
         transport::AsioTransportLayer::Options opts;
         opts.enableIPv6 = shellGlobalParams.enableIPv6;

@@ -838,7 +838,5 @@ bool fileExists(const std::string& file) {
     }
 }
 
-
-Mutex& mongoProgramOutputMutex(*(new Mutex()));
 }  // namespace shell_utils
 }  // namespace mongo

@@ -90,10 +90,6 @@ private:
 
 extern ConnectionRegistry connectionRegistry;
 
-// This mutex helps the shell serialize output on exit, to avoid deadlocks at shutdown. So
-// it also protects the global dbexitCalled.
-extern Mutex& mongoProgramOutputMutex;
-
 // Helper to tell if a file exists cross platform
 // TODO: Remove this when we have a cross platform file utility library
 bool fileExists(const std::string& file);
