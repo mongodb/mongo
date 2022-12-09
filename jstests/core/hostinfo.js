@@ -13,15 +13,11 @@ function commonOSAsserts(hostinfo) {
 }
 
 function coresAsserts(hostinfo) {
-    assert.gt(
-        hostinfo.system.numPhysicalCores, 0, "Missing " + hostinfo.os.type + " physical cores");
+    assert.gt(hostinfo.extra.physicalCores, 0, "Missing " + hostinfo.os.type + " physical cores");
     assert.gt(hostinfo.system.numCores, 0, "Missing " + hostinfo.os.type + " logical cores");
-    assert.lte(hostinfo.system.numPhysicalCores,
+    assert.lte(hostinfo.extra.physicalCores,
                hostinfo.system.numCores,
                hostinfo.os.type + " physical cores not larger then logical cores");
-
-    assert.gt(hostinfo.system.numCpuSockets, 0, "Missing " + hostinfo.os.type + " Sockets");
-    assert.gt(hostinfo.system.numNumaNodes, 0, "Missing " + hostinfo.os.type + " NUMA Nodes");
 }
 
 assert.commandWorked(db.hostInfo());
