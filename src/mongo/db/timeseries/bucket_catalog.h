@@ -610,7 +610,7 @@ protected:
         stdx::unordered_map<BucketId, std::unique_ptr<Bucket>, BucketHasher> allBuckets;
 
         // The current open bucket for each namespace and metadata pair.
-        stdx::unordered_map<BucketKey, Bucket*, BucketHasher> openBuckets;
+        stdx::unordered_map<BucketKey, std::set<Bucket*>, BucketHasher> openBuckets;
 
         // Buckets that do not have any outstanding writes.
         using IdleList = std::list<Bucket*>;
@@ -1004,13 +1004,20 @@ protected:
     enum class AllowBucketCreation { kYes, kNo };
 
     /**
-     * Retrieve a bucket for write use if one exists. If none exists and 'mode' is set to kYes, then
-     * we will create a new bucket.
+     * Retrieve the open bucket for write use if one exists. If none exists and 'mode' is set to
+     * kYes, then we will create a new bucket.
      */
     Bucket* _useBucket(Stripe* stripe,
                        WithLock stripeLock,
                        const CreationInfo& info,
                        AllowBucketCreation mode);
+
+    /**
+     * Retrieve a previously closed bucket for write use if one exists in the catalog. Considers
+     * buckets that are pending closure or archival but which are still eligible to recieve new
+     * measurements.
+     */
+    Bucket* _useAlternateBucket(Stripe* stripe, WithLock stripeLock, const CreationInfo& info);
 
     /**
      * Given a bucket to reopen, performs validation and constructs the in-memory representation of

@@ -1405,7 +1405,18 @@ BucketCatalog::Bucket* BucketCatalog::_useBucket(Stripe* stripe,
                                                  : nullptr;
     }
 
-    Bucket* bucket = it->second;
+    auto& openSet = it->second;
+    Bucket* bucket = nullptr;
+    for (Bucket* potentialBucket : openSet) {
+        if (potentialBucket->_rolloverAction == RolloverAction::kNone) {
+            bucket = potentialBucket;
+            break;
+        }
+    }
+    if (!bucket) {
+        return mode == AllowBucketCreation::kYes ? _allocateBucket(stripe, stripeLock, info)
+                                                 : nullptr;
+    }
 
     if (auto state = _bucketStateManager.getBucketState(bucket);
         state && !state.value().conflictsWithInsertion()) {
@@ -1420,6 +1431,54 @@ BucketCatalog::Bucket* BucketCatalog::_useBucket(Stripe* stripe,
            getTimeseriesBucketClearedError(bucket->ns(), bucket->oid()));
 
     return mode == AllowBucketCreation::kYes ? _allocateBucket(stripe, stripeLock, info) : nullptr;
+}
+
+BucketCatalog::Bucket* BucketCatalog::_useAlternateBucket(Stripe* stripe,
+                                                          WithLock stripeLock,
+                                                          const CreationInfo& info) {
+    auto it = stripe->openBuckets.find(info.key);
+    if (it == stripe->openBuckets.end()) {
+        // No open bucket for this metadata.
+        return nullptr;
+    }
+
+    auto& openSet = it->second;
+    // In order to potentially erase elements of the set while we iterate it (via _abort), we need
+    // to advance the iterator before we call erase. This means we can't use the more
+    // straightforward range iteration, and use the somewhat awkward pattern below.
+    for (auto it = openSet.begin(); it != openSet.end();) {
+        Bucket* potentialBucket = *it++;
+
+        if (potentialBucket->_rolloverAction == RolloverAction::kNone ||
+            potentialBucket->_rolloverAction == RolloverAction::kHardClose) {
+            continue;
+        }
+
+        auto bucketTime = potentialBucket->getTime();
+        if (info.time - bucketTime >= Seconds(*info.options.getBucketMaxSpanSeconds()) ||
+            info.time < bucketTime) {
+            continue;
+        }
+
+        auto state = _bucketStateManager.getBucketState(potentialBucket);
+        invariant(state);
+        if (!state.value().conflictsWithInsertion()) {
+            invariant(!potentialBucket->_idleListEntry.has_value());
+            return potentialBucket;
+        }
+
+        // If we still have an entry for the bucket in the open set, but it conflicts with
+        // insertion, then it must have been cleared, and we can clean it up.
+        invariant(state.value().isSet(BucketStateFlag::kCleared));
+        _abort(stripe,
+               stripeLock,
+               potentialBucket,
+               nullptr,
+               getTimeseriesBucketClearedError(potentialBucket->bucketId().ns,
+                                               potentialBucket->bucketId().oid));
+    }
+
+    return nullptr;
 }
 
 StatusWith<std::unique_ptr<BucketCatalog::Bucket>> BucketCatalog::_rehydrateBucket(
@@ -1594,23 +1653,30 @@ StatusWith<BucketCatalog::Bucket*> BucketCatalog::_reopenBucket(Stripe* stripe,
 
     // If we already have an open bucket for this key, we need to close it.
     if (auto it = stripe->openBuckets.find(key); it != stripe->openBuckets.end()) {
-        stats.incNumBucketsClosedDueToReopening();
-        if (it->second->allCommitted()) {
-            auto* closedBucket = it->second;
-            constexpr bool eligibleForReopening = true;
-            closedBuckets->emplace_back(ClosedBucket{&_bucketStateManager,
-                                                     closedBucket->bucketId(),
-                                                     closedBucket->getTimeField().toString(),
-                                                     closedBucket->numMeasurements(),
-                                                     eligibleForReopening});
-            _removeBucket(stripe, stripeLock, it->second, RemovalMode::kClose);
-        } else {
-            it->second->setRolloverAction(RolloverAction::kSoftClose);
+        auto& openSet = it->second;
+        for (Bucket* existingBucket : openSet) {
+            if (existingBucket->_rolloverAction == RolloverAction::kNone) {
+                stats.incNumBucketsClosedDueToReopening();
+                if (existingBucket->allCommitted()) {
+                    constexpr bool eligibleForReopening = true;
+                    closedBuckets->emplace_back(
+                        ClosedBucket{&_bucketStateManager,
+                                     existingBucket->bucketId(),
+                                     existingBucket->getTimeField().toString(),
+                                     existingBucket->numMeasurements(),
+                                     eligibleForReopening});
+                    _removeBucket(stripe, stripeLock, existingBucket, RemovalMode::kClose);
+                } else {
+                    existingBucket->setRolloverAction(RolloverAction::kSoftClose);
+                }
+                // We should only have one open bucket at a time.
+                break;
+            }
         }
     }
 
     // Now actually mark this bucket as open.
-    stripe->openBuckets[key] = unownedBucket;
+    stripe->openBuckets[key].emplace(unownedBucket);
     stats.incNumBucketsReopened();
 
     _memoryUsage.addAndFetch(unownedBucket->_memoryUsage);
@@ -1772,6 +1838,30 @@ StatusWith<BucketCatalog::InsertResult> BucketCatalog::_insert(
         if (bucket->allCommitted()) {
             _markBucketIdle(&stripe, stripeLock, bucket);
         }
+
+        // If we were time forward or backward, we might be able to "reopen" a bucket we still have
+        // in memory that's set to be closed when pending operations finish.
+        if ((*reason == RolloverReason::kTimeBackward || *reason == RolloverReason::kTimeForward)) {
+            if (Bucket* alternate = _useAlternateBucket(&stripe, stripeLock, info)) {
+                insertionResult = _insertIntoBucket(opCtx,
+                                                    &stripe,
+                                                    stripeLock,
+                                                    doc,
+                                                    combine,
+                                                    mode,
+                                                    &info,
+                                                    alternate,
+                                                    &result.closedBuckets);
+                if (auto* batch = stdx::get_if<std::shared_ptr<WriteBatch>>(&insertionResult)) {
+                    result.batch = *batch;
+                    return std::move(result);
+                }
+
+                // We weren't able to insert into the other bucket, so fall through to the regular
+                // reopening procedure.
+            }
+        }
+
         bool allowQueryBasedReopening = (*reason == RolloverReason::kTimeBackward);
         result.candidate =
             _getReopeningCandidate(&stripe, stripeLock, info, allowQueryBasedReopening);
@@ -1884,8 +1974,16 @@ void BucketCatalog::_removeBucket(Stripe* stripe,
 
     // If the bucket was rolled over, then there may be a different open bucket for this metadata.
     auto openIt = stripe->openBuckets.find({bucket->ns(), bucket->_metadata});
-    if (openIt != stripe->openBuckets.end() && openIt->second == bucket) {
-        stripe->openBuckets.erase(openIt);
+    if (openIt != stripe->openBuckets.end()) {
+        auto& openSet = openIt->second;
+        auto bucketIt = openSet.find(bucket);
+        if (bucketIt != openSet.end()) {
+            if (openSet.size() == 1) {
+                stripe->openBuckets.erase(openIt);
+            } else {
+                openSet.erase(bucketIt);
+            }
+        }
     }
 
     // If we are cleaning up while archiving a bucket, then we want to preserve its state. Otherwise
@@ -2186,7 +2284,7 @@ BucketCatalog::Bucket* BucketCatalog::_allocateBucket(Stripe* stripe,
         std::make_unique<Bucket>(bucketId, info.stripe, info.key.hash, &_bucketStateManager));
     tassert(6130900, "Expected bucket to be inserted", inserted);
     Bucket* bucket = it->second.get();
-    stripe->openBuckets[info.key] = bucket;
+    stripe->openBuckets[info.key].emplace(bucket);
 
     auto state = _bucketStateManager.changeBucketState(
         bucketId,
