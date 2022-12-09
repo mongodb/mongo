@@ -181,7 +181,7 @@ class MongoDFixture(interface.Fixture):
 
     def get_driver_connection_url(self):
         """Return the driver connection URL."""
-        return "mongodb://" + self.get_internal_connection_string()
+        return "mongodb://" + self.get_internal_connection_string() + "/?directConnection=true"
 
 
 # The below parameters define the default 'logComponentVerbosity' object passed to mongod processes
