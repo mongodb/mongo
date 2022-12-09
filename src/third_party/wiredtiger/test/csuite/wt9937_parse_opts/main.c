@@ -104,13 +104,13 @@ typedef struct {
  *
  */
 static TEST_DRIVER driver[] = {
-  {{"parse_opts", "-b", "builddir", "-T", "21", NULL}, {"builddir", NULL, 0, 0, false, false, 21},
-    {NULL, 0, 0, 0}},
+  {{"parse_opts", "-b", "builddir", "-T", "21", NULL},
+    {"builddir", NULL, NONZERO, NONZERO, false, false, 21}, {NULL, 0, 0, 0}},
 
-  {{"parse_opts", "-bbuilddir", "-T21", NULL}, {"builddir", NULL, 0, 0, false, false, 21},
-    {NULL, 0, 0, 0}},
+  {{"parse_opts", "-bbuilddir", "-T21", NULL},
+    {"builddir", NULL, NONZERO, NONZERO, false, false, 21}, {NULL, 0, 0, 0}},
 
-  {{"parse_opts", "-T21", NULL}, {NULL, NULL, 0, 0, false, false, 21}, {NULL, 0, 0, 0}},
+  {{"parse_opts", "-T21", NULL}, {NULL, NULL, NONZERO, NONZERO, false, false, 21}, {NULL, 0, 0, 0}},
   /*
    * If -PT is used, the tiered_storage source is set to dir_store, even if -Po is not used. Also
    * when -PT is used, random seeds are initialized to some non-zero value.
