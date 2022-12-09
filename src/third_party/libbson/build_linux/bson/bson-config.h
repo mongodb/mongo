@@ -128,7 +128,7 @@
 /*
  * Define to 1 if you want extra aligned types in libbson
  */
-#define BSON_EXTRA_ALIGN 1
+#define BSON_EXTRA_ALIGN 0
 #if BSON_EXTRA_ALIGN != 1
 # undef BSON_EXTRA_ALIGN
 #endif
