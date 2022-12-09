@@ -1313,6 +1313,9 @@ std::size_t BucketCatalog::BucketHasher::operator()(const BucketKey::Hash& key) 
     return key;
 }
 
+BucketCatalog::ArchivedBucket::ArchivedBucket(const BucketId& b, const std::string& t)
+    : bucketId{b}, timeField{t} {}
+
 StatusWith<std::pair<BucketCatalog::BucketKey, Date_t>> BucketCatalog::_extractBucketingParameters(
     const NamespaceString& ns,
     const StringData::ComparatorInterface* comparator,

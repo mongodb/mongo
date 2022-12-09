@@ -590,6 +590,8 @@ protected:
      */
     struct ArchivedBucket {
         ArchivedBucket() = delete;
+        ArchivedBucket(const BucketId& bucketId, const std::string& timeField);
+
         BucketId bucketId;
         std::string timeField;
     };
