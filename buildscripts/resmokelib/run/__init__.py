@@ -1259,6 +1259,11 @@ def to_local_args(input_args=None):
                 else:
                     arg = format_option(arg_name, arg_value)
 
+                    # In evergreen we use additionalFeatureFlagsFile because the all_feature_flags.txt
+                    # file is generated at a previous step. Developers should use runAllFeatureFlagTests
+                    if arg == "--additionalFeatureFlagsFile=all_feature_flags.txt":
+                        arg = "--runAllFeatureFlagTests"
+
                     # We track the value for the --suites and --storageEngine command line options
                     # separately in order to more easily sort them to the front.
                     if arg_dest == "suite_files":
