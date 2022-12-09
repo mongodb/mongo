@@ -62,8 +62,11 @@ __pack_initn(WT_SESSION_IMPL *session, WT_PACK *pack, const char *fmt, size_t le
 {
     if (*fmt == '@' || *fmt == '<' || *fmt == '>')
         return (EINVAL);
-    if (*fmt == '.')
+    if (*fmt == '.') {
         ++fmt;
+        if (len > 0)
+            --len;
+    }
 
     pack->session = session;
     pack->cur = pack->orig = fmt;

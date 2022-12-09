@@ -30,11 +30,12 @@
 
 /*
  * check --
- *     TODO: Add a comment describing this function.
+ *     Pack data.
  */
-static void
+static int
 check(const char *fmt, ...)
 {
+    WT_DECL_RET;
     size_t len;
     char buf[200], *end, *p;
     va_list ap;
@@ -42,38 +43,50 @@ check(const char *fmt, ...)
     len = 0; /* -Werror=maybe-uninitialized */
 
     va_start(ap, fmt);
-    testutil_check(__wt_struct_sizev(NULL, &len, fmt, ap));
+    WT_TRET(__wt_struct_sizev(NULL, &len, fmt, ap));
     va_end(ap);
+
+    WT_RET(ret);
 
     if (len < 1 || len >= sizeof(buf))
         testutil_die(EINVAL, "Unexpected length from __wt_struct_sizev");
 
     va_start(ap, fmt);
-    testutil_check(__wt_struct_packv(NULL, buf, sizeof(buf), fmt, ap));
+    WT_TRET(__wt_struct_packv(NULL, buf, sizeof(buf), fmt, ap));
     va_end(ap);
+
+    WT_RET(ret);
 
     printf("%s ", fmt);
     for (p = buf, end = p + len; p < end; p++)
         printf("%02x", (u_char)*p & 0xff);
     printf("\n");
+
+    return (ret);
 }
 
 /*
  * main --
- *     TODO: Add a comment describing this function.
+ *     Test valid and invalid format strings to pack data.
  */
 int
-main(void)
+main(int argc, char *argv[])
 {
+    (void)argc;
+    (void)testutil_set_progname(argv);
     /*
      * Required on some systems to pull in parts of the library for which we have data references.
      */
     testutil_check(__wt_library_init());
 
-    check("iii", 0, 101, -99);
-    check("3i", 0, 101, -99);
-    check("iS", 42, "forty two");
-    check("s", "a big string");
+    testutil_check(check("iii", 0, 101, -99));
+    testutil_check(check("3i", 0, 101, -99));
+    testutil_check(check("iS", 42, "forty two"));
+    testutil_check(check("s", "a big string"));
+    testutil_check(check(".s", "valid format"));
+    testutil_assert(check(">s", "invalid format") == EINVAL);
+    testutil_assert(check("<s", "invalid format") == EINVAL);
+    testutil_assert(check("@s", "invalid format") == EINVAL);
 #if 0
 	/* TODO: need a WT_ITEM */
 	check("u", r"\x42" * 20)

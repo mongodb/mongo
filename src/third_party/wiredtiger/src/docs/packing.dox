@@ -20,8 +20,7 @@ If the first character is not one of these, '.' (big-endian, packed) is
 assumed: it naturally sorts in lexicographic order, and the packed format
 uses variable-sized encoding of values to reduce the data size.
 
-@notyet{little-endian format}
-Only the default big-endian, packed format is currently supported.
+Note: Only the default big-endian, packed format is currently supported.
 
 The remaining characters in the format string specify the type of each field
 to be packed into or unpacked from a byte array.  See @ref schema_column_types
