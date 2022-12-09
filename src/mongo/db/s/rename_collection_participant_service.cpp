@@ -56,30 +56,11 @@ const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
  * Drop the collection locally and clear stale metadata from cache collections.
  */
 void dropCollectionLocally(OperationContext* opCtx, const NamespaceString& nss) {
-    bool knownNss = [&]() {
-        try {
-            DropCollectionCoordinator::dropCollectionLocally(opCtx, nss, false /* fromMigrate */);
-            return true;
-        } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-            return false;
-        }
-    }();
-
+    DropCollectionCoordinator::dropCollectionLocally(opCtx, nss, false /* fromMigrate */);
     LOGV2_DEBUG(5515100,
                 1,
-                "Dropped target collection locally on renameCollection participant",
-                "namespace"_attr = nss,
-                "collectionExisted"_attr = knownNss);
-}
-
-void clearFilteringMetadata(OperationContext* opCtx, const NamespaceString& nss) {
-    // TODO (SERVER-71444): Fix to be interruptible or document exception.
-    UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
-    Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
-    Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
-    CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-        opCtx, nss, CSRAcquisitionMode::kExclusive)
-        ->clearFilteringMetadata(opCtx);
+                "Dropped target collection locally on renameCollection participant.",
+                "namespace"_attr = nss);
 }
 
 /*

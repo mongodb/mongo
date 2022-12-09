@@ -47,6 +47,25 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
+namespace {
+
+void dropCollectionHonouringFromMigrateFlag(OperationContext* opCtx,
+                                            const NamespaceString& nss,
+                                            const boost::optional<UUID>& collectionUUID,
+                                            bool fromMigrate) {
+    if (fromMigrate) {
+        mongo::sharding_ddl_util::ensureCollectionDroppedNoChangeEvent(opCtx, nss, collectionUUID);
+    } else {
+        DropReply unused;
+        uassertStatusOK(
+            dropCollection(opCtx,
+                           nss,
+                           &unused,
+                           DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
+    }
+}
+
+}  // namespace
 
 void DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
                                                       const NamespaceString& nss,
@@ -104,18 +123,18 @@ void DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
         }
     }
 
-    DropReply unused;
-    if (fromMigrate)
-        mongo::sharding_ddl_util::ensureCollectionDroppedNoChangeEvent(opCtx, nss, collectionUUID);
-    else
-        uassertStatusOK(
-            dropCollection(opCtx,
-                           nss,
-                           &unused,
-                           DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
+    try {
+        dropCollectionHonouringFromMigrateFlag(opCtx, nss, collectionUUID, fromMigrate);
+    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+        // Note that even if the namespace was not found we have to execute the code below!
+        LOGV2_DEBUG(5280920,
+                    1,
+                    "Namespace not found while trying to delete local collection",
+                    "namespace"_attr = nss);
+    }
 
-
-    // Force the refresh of the catalog cache to purge outdated information
+    // Force the refresh of the catalog cache to purge outdated information. Note also that this
+    // code is indirectly used to notify to secondary nodes to clear their filtering information.
     const auto catalog = Grid::get(opCtx)->catalogCache();
     uassertStatusOK(catalog->getCollectionRoutingInfoWithRefresh(opCtx, nss));
     CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, nss);

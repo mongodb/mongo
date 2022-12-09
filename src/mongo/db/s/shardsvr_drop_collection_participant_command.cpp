@@ -86,18 +86,8 @@ public:
 
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
-            try {
-                bool fromMigrate =
-                    request().getFromMigrate() ? request().getFromMigrate().value() : false;
-
-                DropCollectionCoordinator::dropCollectionLocally(opCtx, ns(), fromMigrate);
-            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-                LOGV2_DEBUG(5280920,
-                            1,
-                            "Namespace not found while trying to delete local collection",
-                            "namespace"_attr = ns());
-            }
-
+            bool fromMigrate = request().getFromMigrate().value_or(false);
+            DropCollectionCoordinator::dropCollectionLocally(opCtx, ns(), fromMigrate);
 
             // Since no write that generated a retryable write oplog entry with this sessionId and
             // txnNumber happened, we need to make a dummy write so that the session gets durably
