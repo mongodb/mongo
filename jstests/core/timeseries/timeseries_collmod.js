@@ -2,9 +2,8 @@
  * This tests which collMod options are allowed on a time-series collection.
  *
  * @tags: [
- *   # TODO (SERVER-71600): After handling multiversion scenarios, update tage to 'requires_fcv_61'.
  *   # Behavior clarified in binVersion 6.1
- *   requires_fcv_63,
+ *   requires_fcv_61,
  *   # collMod is not retryable
  *   requires_non_retryable_commands,
  *   # We need a timeseries collection.
