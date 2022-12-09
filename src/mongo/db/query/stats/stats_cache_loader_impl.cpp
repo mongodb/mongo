@@ -66,7 +66,7 @@ SemiFuture<StatsCacheVal> StatsCacheLoaderImpl::getStats(OperationContext* opCtx
             IDLParserContext ctx("StatsPath");
             BSONObj document = cursor->nextSafe().getOwned();
             auto parsedStats = StatsPath::parse(ctx, document);
-            StatsCacheVal statsPtr(ArrayHistogram::make(parsedStats.getStatistics()));
+            StatsCacheVal statsPtr(ArrayHistogram::makeArrayHistogram(parsedStats.getStatistics()));
             return makeReadyFutureWith([this, statsPtr] { return statsPtr; }).semi();
         }
 

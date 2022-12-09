@@ -80,22 +80,9 @@ struct Bucket {
  */
 class ScalarHistogram {
 public:
-    /**
-     * Factory method for constructing an empty scalar histogram.
-     */
-    static const ScalarHistogram make();
-
-    /**
-     * Factory method for constructing a scalar histogram from a stats IDL StatsHistogram.
-     */
-    static const ScalarHistogram make(const StatsHistogram& histogram);
-
-    /**
-     * Factory method for constructing a scalar histogram from bounds & buckets.
-     */
-    static const ScalarHistogram make(sbe::value::Array bounds,
-                                      std::vector<Bucket> buckets,
-                                      bool doValidation = true);
+    ScalarHistogram();
+    ScalarHistogram(const StatsHistogram& histogram);
+    ScalarHistogram(sbe::value::Array bounds, std::vector<Bucket> buckets);
 
     // Print a human-readable representation of a histogram.
     std::string toString() const;
@@ -124,13 +111,10 @@ public:
     static constexpr size_t kMaxBuckets = 100;
 
 private:
-    ScalarHistogram();
-    ScalarHistogram(sbe::value::Array bounds, std::vector<Bucket> buckets);
-
     // Bucket bounds representing the **highest** value in each bucket.
-    const sbe::value::Array _bounds;
+    sbe::value::Array _bounds;
 
-    const std::vector<Bucket> _buckets;
+    std::vector<Bucket> _buckets;
 };
 
 }  // namespace mongo::stats

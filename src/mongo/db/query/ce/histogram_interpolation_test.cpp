@@ -249,7 +249,7 @@ TEST(EstimatorTest, UniformIntStrEstimate) {
         {"MIb", 5, 45, 17}, {"Zgi", 3, 55, 22}, {"pZ", 6, 62, 25}, {"yUwxz", 5, 29, 12},
     }};
     const ScalarHistogram hist = createHistogram(data);
-    const auto arrHist = ArrayHistogram::make(
+    const ArrayHistogram arrHist(
         hist, TypeCounts{{value::TypeTags::NumberInt64, 254}, {value::TypeTags::StringSmall, 246}});
 
     // Predicates over value inside of the last numeric bucket.
@@ -279,14 +279,14 @@ TEST(EstimatorTest, UniformIntStrEstimate) {
 
     // Type bracketing: low value of different type than the bucket bound.
     // Query: [{$match: {a: {$eq: 100000000}}}].
-    expectedCard = estimateCardEq(*arrHist, lowTag, lowVal, true /* includeScalar */);
+    expectedCard = estimateCardEq(arrHist, lowTag, lowVal, true /* includeScalar */);
     ASSERT_APPROX_EQUAL(0.0, expectedCard, 0.1);  // Actual: 0.
 
     // No interpolation for inequality to values inside the first string bucket, fallback to half of
     // the bucket frequency.
 
     // Query: [{$match: {a: {$lt: '04e'}}}].
-    expectedCard = estimateCardRange(*arrHist,
+    expectedCard = estimateCardRange(arrHist,
                                      false /* lowInclusive */,
                                      lowTag,
                                      lowVal,
@@ -297,7 +297,7 @@ TEST(EstimatorTest, UniformIntStrEstimate) {
     ASSERT_APPROX_EQUAL(13.3, expectedCard, 0.1);  // Actual: 0.
 
     // Query: [{$match: {a: {$lte: '04e'}}}].
-    expectedCard = estimateCardRange(*arrHist,
+    expectedCard = estimateCardRange(arrHist,
                                      false /* lowInclusive */,
                                      lowTag,
                                      lowVal,
@@ -311,7 +311,7 @@ TEST(EstimatorTest, UniformIntStrEstimate) {
     std::tie(tag, value) = value::makeNewString("8B5"_sd);
 
     // Query: [{$match: {a: {$lt: '8B5'}}}].
-    expectedCard = estimateCardRange(*arrHist,
+    expectedCard = estimateCardRange(arrHist,
                                      false /* lowInclusive */,
                                      lowTag,
                                      lowVal,
@@ -322,7 +322,7 @@ TEST(EstimatorTest, UniformIntStrEstimate) {
     ASSERT_APPROX_EQUAL(13.3, expectedCard, 0.1);  // Actual: 24.
 
     // Query: [{$match: {a: {$lte: '8B5'}}}].
-    expectedCard = estimateCardRange(*arrHist,
+    expectedCard = estimateCardRange(arrHist,
                                      false /* lowInclusive */,
                                      lowTag,
                                      lowVal,
@@ -364,13 +364,13 @@ TEST(EstimatorTest, UniformIntArrayOnlyEstimate) {
     }};
     const ScalarHistogram uniqueHist = createHistogram(uniqueData);
 
-    const auto arrHist = ArrayHistogram::make(scalarHist,
-                                              TypeCounts{{value::TypeTags::Array, 100}},
-                                              uniqueHist,
-                                              minHist,
-                                              maxHist,
-                                              TypeCounts{{value::TypeTags::NumberInt64, 404}},
-                                              0);
+    const ArrayHistogram arrHist(scalarHist,
+                                 TypeCounts{{value::TypeTags::Array, 100}},
+                                 uniqueHist,
+                                 minHist,
+                                 maxHist,
+                                 TypeCounts{},
+                                 0);
 
     // Query in the middle of the domain: estimate from ArrayUnique histogram.
     value::TypeTags lowTag = value::TypeTags::NumberInt64;
@@ -379,7 +379,7 @@ TEST(EstimatorTest, UniformIntArrayOnlyEstimate) {
     value::Value highVal = 600;
 
     // Test interpolation for query: [{$match: {a: {$elemMatch: {$gt: 500, $lt: 600}}}}].
-    double expectedCard = estimateCardRange(*arrHist,
+    double expectedCard = estimateCardRange(arrHist,
                                             false /* lowInclusive */,
                                             lowTag,
                                             lowVal,
@@ -392,7 +392,7 @@ TEST(EstimatorTest, UniformIntArrayOnlyEstimate) {
     // Test interpolation for query: [{$match: {a: {$gt: 500, $lt: 600}}}].
     // Note: although there are no scalars, the estimate is different than the
     // above since we use different formulas.
-    expectedCard = estimateCardRange(*arrHist,
+    expectedCard = estimateCardRange(arrHist,
                                      false /* lowInclusive */,
                                      lowTag,
                                      lowVal,
@@ -407,7 +407,7 @@ TEST(EstimatorTest, UniformIntArrayOnlyEstimate) {
     highVal = 110;
 
     // Test interpolation for query: [{$match: {a: {$elemMatch: {$gt: 10, $lt: 110}}}}].
-    expectedCard = estimateCardRange(*arrHist,
+    expectedCard = estimateCardRange(arrHist,
                                      false /* lowInclusive */,
                                      lowTag,
                                      lowVal,
@@ -418,7 +418,7 @@ TEST(EstimatorTest, UniformIntArrayOnlyEstimate) {
     ASSERT_APPROX_EQUAL(24.1, expectedCard, 0.1);  // actual 29.
 
     // Test interpolation for query: [{$match: {a: {$gt: 10, $lt: 110}}}].
-    expectedCard = estimateCardRange(*arrHist,
+    expectedCard = estimateCardRange(arrHist,
                                      false /* lowInclusive */,
                                      lowTag,
                                      lowVal,
@@ -468,13 +468,13 @@ TEST(EstimatorTest, UniformIntMixedArrayEstimate) {
     const ScalarHistogram uniqueHist = createHistogram(uniqueData);
 
     TypeCounts typeCounts{{value::TypeTags::NumberInt64, 106}, {value::TypeTags::Array, 94}};
-    const auto arrHist = ArrayHistogram::make(scalarHist,
-                                              typeCounts,
-                                              uniqueHist,
-                                              minHist,
-                                              maxHist,
-                                              TypeCounts{{value::TypeTags::NumberInt64, 375}},
-                                              0);
+    const ArrayHistogram arrHist(scalarHist,
+                                 typeCounts,
+                                 uniqueHist,
+                                 minHist,
+                                 maxHist,
+                                 TypeCounts{{value::TypeTags::NumberInt64, 375}},
+                                 0);
 
     value::TypeTags lowTag = value::TypeTags::NumberInt64;
     value::Value lowVal = 500;
@@ -482,7 +482,7 @@ TEST(EstimatorTest, UniformIntMixedArrayEstimate) {
     value::Value highVal = 550;
 
     // Test interpolation for query: [{$match: {a: {$gt: 500, $lt: 550}}}].
-    double expectedCard = estimateCardRange(*arrHist,
+    double expectedCard = estimateCardRange(arrHist,
                                             false /* lowInclusive */,
                                             lowTag,
                                             lowVal,
@@ -493,7 +493,7 @@ TEST(EstimatorTest, UniformIntMixedArrayEstimate) {
     ASSERT_APPROX_EQUAL(92.9, expectedCard, 0.1);  // Actual: 94.
 
     // Test interpolation for query: [{$match: {a: {$elemMatch: {$gt: 500, $lt: 550}}}}].
-    expectedCard = estimateCardRange(*arrHist,
+    expectedCard = estimateCardRange(arrHist,
                                      false /* lowInclusive */,
                                      lowTag,
                                      lowVal,

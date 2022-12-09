@@ -199,7 +199,7 @@ TEST_F(HistogramTest, MaxDiffIntArrays) {
     auto rawData = genFixedValueArray(nElems, 1.0, 0.0);
     auto arrayData = nestArrays(rawData, 0 /* No empty arrays */);
 
-    auto estimator = createArrayEstimator(arrayData, nBuckets);
+    ArrayHistogram estimator = createArrayEstimator(arrayData, nBuckets);
 
     auto opCtx = makeOperationContext();
     {
@@ -208,7 +208,7 @@ TEST_F(HistogramTest, MaxDiffIntArrays) {
 
         const auto [tag, val] = makeInt64Value(2);
         value::ValueGuard vg(tag, val);
-        const double estimatedCard = estimateCardEq(*estimator, tag, val, true /* includeScalar
+        const double estimatedCard = estimateCardEq(estimator, tag, val, true /* includeScalar
         */);
 
         ASSERT_APPROX_EQUAL(4.0, estimatedCard, kTolerance);
@@ -221,7 +221,7 @@ TEST_F(HistogramTest, MaxDiffIntArrays) {
 
         const auto [tag, val] = makeInt64Value(3);
         value::ValueGuard vg(tag, val);
-        const double estimatedCard = estimateCardRange(*estimator,
+        const double estimatedCard = estimateCardRange(estimator,
                                                        false /*lowInclusive*/,
                                                        value::TypeTags::MinKey,
                                                        0,
@@ -242,7 +242,7 @@ TEST_F(HistogramTest, MaxDiffIntArrays) {
         const auto [highTag, highVal] = makeInt64Value(5);
         value::ValueGuard vgHigh(highTag, highVal);
 
-        const double estimatedCard = estimateCardRange(*estimator,
+        const double estimatedCard = estimateCardRange(estimator,
                                                        false /*lowInclusive*/,
                                                        lowTag,
                                                        lowVal,
@@ -267,8 +267,8 @@ TEST_F(HistogramTest, MaxDiffEmptyArrays) {
               << printValueArray(arrayData) << "\n"
               << std::flush;
 
-    const auto arrayHist = createArrayEstimator(arrayData, nBuckets);
-    ASSERT_EQ(arrayHist->getEmptyArrayCount(), emptyArrayCount);
+    ArrayHistogram arrayHist = createArrayEstimator(arrayData, nBuckets);
+    ASSERT_EQ(arrayHist.getEmptyArrayCount(), emptyArrayCount);
 }
 
 }  // namespace

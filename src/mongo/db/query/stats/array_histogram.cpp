@@ -39,171 +39,9 @@ TypeCounts mapStatsTypeCountToTypeCounts(std::vector<TypeTag> tc) {
     }
     return out;
 }
-
-void serializeTypeCounts(const TypeCounts& typeCounts, BSONObjBuilder& bob) {
-    BSONArrayBuilder typeCountBuilder(bob.subarrayStart("typeCount"));
-    for (const auto& [sbeType, count] : typeCounts) {
-        auto typeCount = BSON("typeName" << stats::serialize(sbeType) << "count" << count);
-        typeCountBuilder.append(typeCount);
-    }
-    typeCountBuilder.doneFast();
-}
-
-double getTagTypeCount(const TypeCounts& tc, sbe::value::TypeTags tag) {
-    auto tagIt = tc.find(tag);
-    if (tagIt != tc.end()) {
-        return tagIt->second;
-    }
-    return 0.0;
-}
-
-/**
- * By default, aggregates the total number of tag counts in the histogrma together.
- * If 'isHistogrammable' is set to true, then only counts histogrammable types.
- * Otherwise, if 'isHistogrammable' is set to false, then only counts non-histogrammable types.
- **/
-double getTotalCount(const TypeCounts& tc, boost::optional<bool> isHistogrammable = boost::none) {
-    double total = 0.0;
-    for (const auto& [tag, count] : tc) {
-        if (isHistogrammable || (*isHistogrammable == canEstimateTypeViaHistogram(tag))) {
-            total += count;
-        }
-    }
-    return total;
-}
-
-double getNumericTypeCount(const TypeCounts& tc) {
-    return getTagTypeCount(tc, sbe::value::TypeTags::NumberInt32) +
-        getTagTypeCount(tc, sbe::value::TypeTags::NumberInt64) +
-        getTagTypeCount(tc, sbe::value::TypeTags::NumberDouble) +
-        getTagTypeCount(tc, sbe::value::TypeTags::NumberDecimal);
-}
-
-double getStringTypeCount(const TypeCounts& tc) {
-    return getTagTypeCount(tc, sbe::value::TypeTags::StringSmall) +
-        getTagTypeCount(tc, sbe::value::TypeTags::StringBig) +
-        getTagTypeCount(tc, sbe::value::TypeTags::bsonString);
-}
-
-double getTypeBracketTypeCount(const TypeCounts& tc, sbe::value::TypeTags tag) {
-    if (sbe::value::isNumber(tag)) {
-        return getNumericTypeCount(tc);
-    } else if (sbe::value::isString(tag)) {
-        return getStringTypeCount(tc);
-    } else {
-        return getTagTypeCount(tc, tag);
-    }
-}
-
-void validateHistogramTypeCounts(const TypeCounts& tc, const ScalarHistogram& s) {
-    const auto& bounds = s.getBounds();
-    const auto& buckets = s.getBuckets();
-    size_t i = 0;
-    while (i < bounds.size()) {
-        // First, we have to aggregate all frequencies for the current type bracket.
-        const auto tagL = bounds.getAt(i).first;
-        double freq = 0.0;
-        for (; i < bounds.size(); i++) {
-            const auto tagR = bounds.getAt(i).first;
-            // Stop aggregating when the next bound belongs to a different type bracket.
-            if (!sameTypeBracket(tagL, tagR)) {
-                break;
-            } else {
-                const auto& bucketR = buckets[i];
-                freq += bucketR._equalFreq + bucketR._rangeFreq;
-            }
-        }
-
-        // We now have the expected frequency for this type bracket. Validate it against 'tc'.
-        double tcFreq = getTypeBracketTypeCount(tc, tagL);
-        if (tcFreq != freq) {
-            uasserted(7131014,
-                      str::stream()
-                          << "Type count frequency " << tcFreq << " did not match bucket frequency "
-                          << freq << " of type bracket for " << tagL);
-        }
-    }
-}
-
-struct ArrayFields {
-    const ScalarHistogram& arrayUnique;
-    const ScalarHistogram& arrayMin;
-    const ScalarHistogram& arrayMax;
-    const TypeCounts& typeCounts;
-    double emptyArrayCount;
-};
-
-void validate(const ScalarHistogram& scalar,
-              const TypeCounts& typeCounts,
-              boost::optional<ArrayFields> arrayFields,
-              double trueCount,
-              double falseCount) {
-    const double numArrays = getTagTypeCount(typeCounts, sbe::value::TypeTags::Array);
-    if (arrayFields) {
-        if (numArrays <= 0.0) {
-            uasserted(7131010, str::stream() << "Array histogram must have at least one array.");
-        }
-
-        // We must have the same number of histogrammable type brackets in all arrays, and each such
-        // type bracket must have a min value and a max value. Therefore, both the min and max
-        // array histograms should have the same cardinality. Note that this is not a true count of
-        // arrays since we could have multiple type-brackets per array.
-        const double minArrCard = arrayFields->arrayMin.getCardinality();
-        const double maxArrCard = arrayFields->arrayMax.getCardinality();
-        if (minArrCard != maxArrCard) {
-            uasserted(7131011,
-                      str::stream() << "Min array cardinality was " << minArrCard
-                                    << " while max array cardinality was " << maxArrCard);
-        }
-
-        // Ensure we have at least as many histogrammable types counted in our type counters as
-        // histogrammable type-brackets across all arrays (this is counted by 'minArrCard').
-        double arrayTypeCount = getTotalCount(arrayFields->typeCounts, true /* histogrammable*/);
-        if (minArrCard > arrayTypeCount) {
-            uasserted(7131012,
-                      str::stream() << "The array type counters count " << arrayTypeCount
-                                    << " array values, but the minimum number of arrays we must "
-                                       "have according to the min/max histograms is "
-                                    << minArrCard);
-        }
-
-        // There must be at least as many arrays as there are empty arrays.
-        if (numArrays < arrayFields->emptyArrayCount) {
-            uasserted(7131013,
-                      str::stream()
-                          << "The Array type counter counts " << numArrays
-                          << " arrays, but the minimum number of arrays we must have according to "
-                             "the empty array counter is "
-                          << arrayFields->emptyArrayCount);
-        }
-
-        // TODO SERVER-71057: validate array histograms once type counters only count each type in
-        // an array at most once per array. validateHistogramTypeCounts(getArrayTypeCounts(),
-        // getArrayUnique());
-    } else if (numArrays > 0) {
-        uasserted(7131000, "A scalar ArrayHistogram should not have any arrays in its counters.");
-    }
-
-    // Validate boolean counters.
-    const auto expectedBoolCount = trueCount + falseCount;
-    if (const auto boolCount = getTagTypeCount(typeCounts, sbe::value::TypeTags::Boolean);
-        boolCount != expectedBoolCount) {
-        uasserted(7131001,
-                  str::stream() << "Expected type count of booleans to be " << expectedBoolCount
-                                << ", was " << boolCount);
-    }
-
-    // Validate scalar type counts.
-    validateHistogramTypeCounts(typeCounts, scalar);
-}
-
 }  // namespace
 
-ArrayHistogram::ArrayHistogram()
-    : ArrayHistogram(ScalarHistogram::make(),
-                     {} /* Type counts. */,
-                     0.0 /* True count. */,
-                     0.0 /* False count. */) {}
+ArrayHistogram::ArrayHistogram() : ArrayHistogram(ScalarHistogram(), {}) {}
 
 ArrayHistogram::ArrayHistogram(ScalarHistogram scalar,
                                TypeCounts typeCounts,
@@ -222,7 +60,9 @@ ArrayHistogram::ArrayHistogram(ScalarHistogram scalar,
       _arrayUnique(std::move(arrayUnique)),
       _arrayMin(std::move(arrayMin)),
       _arrayMax(std::move(arrayMax)),
-      _arrayTypeCounts(std::move(arrayTypeCounts)) {}
+      _arrayTypeCounts(std::move(arrayTypeCounts)) {
+    invariant(isArray());
+}
 
 ArrayHistogram::ArrayHistogram(ScalarHistogram scalar,
                                TypeCounts typeCounts,
@@ -236,79 +76,29 @@ ArrayHistogram::ArrayHistogram(ScalarHistogram scalar,
       _arrayUnique(boost::none),
       _arrayMin(boost::none),
       _arrayMax(boost::none),
-      _arrayTypeCounts(boost::none) {}
-
-std::shared_ptr<const ArrayHistogram> ArrayHistogram::make() {
-    // No need to validate an empty histogram.
-    return std::shared_ptr<const ArrayHistogram>(new ArrayHistogram());
+      _arrayTypeCounts(boost::none) {
+    invariant(!isArray());
 }
 
-std::shared_ptr<const ArrayHistogram> ArrayHistogram::make(ScalarHistogram scalar,
-                                                           TypeCounts typeCounts,
-                                                           double trueCount,
-                                                           double falseCount,
-                                                           bool doValidation) {
-    if (doValidation) {
-        validate(scalar, typeCounts, boost::none, trueCount, falseCount);
-    }
-    return std::shared_ptr<const ArrayHistogram>(
-        new ArrayHistogram(std::move(scalar), std::move(typeCounts), trueCount, falseCount));
-}
-
-std::shared_ptr<const ArrayHistogram> ArrayHistogram::make(ScalarHistogram scalar,
-                                                           TypeCounts typeCounts,
-                                                           ScalarHistogram arrayUnique,
-                                                           ScalarHistogram arrayMin,
-                                                           ScalarHistogram arrayMax,
-                                                           TypeCounts arrayTypeCounts,
-                                                           double emptyArrayCount,
-                                                           double trueCount,
-                                                           double falseCount,
-                                                           bool doValidation) {
-    if (doValidation) {
-        validate(scalar,
-                 typeCounts,
-                 ArrayFields{arrayUnique, arrayMin, arrayMax, arrayTypeCounts, emptyArrayCount},
-                 trueCount,
-                 falseCount);
-    }
-    return std::shared_ptr<const ArrayHistogram>(new ArrayHistogram(std::move(scalar),
-                                                                    std::move(typeCounts),
-                                                                    std::move(arrayUnique),
-                                                                    std::move(arrayMin),
-                                                                    std::move(arrayMax),
-                                                                    std::move(arrayTypeCounts),
-                                                                    emptyArrayCount,
-                                                                    trueCount,
-                                                                    falseCount));
-}
-
-std::shared_ptr<const ArrayHistogram> ArrayHistogram::make(Statistics stats) {
-    // Note that we don't run validation when loading a histogram from the Statistics collection
-    // because we already validated this histogram before inserting it.
-    const auto scalar = ScalarHistogram::make(stats.getScalarHistogram());
-    const auto typeCounts = mapStatsTypeCountToTypeCounts(stats.getTypeCount());
-    double trueCount = stats.getTrueCount();
-    double falseCount = stats.getFalseCount();
-
-    // If we have ArrayStatistics, we will need to initialize the array-only fields.
+ArrayHistogram* ArrayHistogram::makeArrayHistogram(Statistics stats) {
     if (auto maybeArrayStats = stats.getArrayStatistics(); maybeArrayStats) {
-        return std::shared_ptr<const ArrayHistogram>(
-            new ArrayHistogram(std::move(scalar),
-                               std::move(typeCounts),
-                               ScalarHistogram::make(maybeArrayStats->getUniqueHistogram()),
-                               ScalarHistogram::make(maybeArrayStats->getMinHistogram()),
-                               ScalarHistogram::make(maybeArrayStats->getMaxHistogram()),
-                               mapStatsTypeCountToTypeCounts(maybeArrayStats->getTypeCount()),
-                               stats.getEmptyArrayCount(),
-                               trueCount,
-                               falseCount));
+        return new ArrayHistogram(stats.getScalarHistogram(),
+                                  mapStatsTypeCountToTypeCounts(stats.getTypeCount()),
+                                  maybeArrayStats->getUniqueHistogram(),
+                                  maybeArrayStats->getMinHistogram(),
+                                  maybeArrayStats->getMaxHistogram(),
+                                  mapStatsTypeCountToTypeCounts(maybeArrayStats->getTypeCount()),
+                                  stats.getEmptyArrayCount(),
+                                  stats.getTrueCount(),
+                                  stats.getFalseCount());
     }
 
     // If we don't have ArrayStatistics available, we should construct a histogram with only scalar
     // fields.
-    return std::shared_ptr<const ArrayHistogram>(
-        new ArrayHistogram(std::move(scalar), std::move(typeCounts), trueCount, falseCount));
+    return new ArrayHistogram(stats.getScalarHistogram(),
+                              mapStatsTypeCountToTypeCounts(stats.getTypeCount()),
+                              stats.getTrueCount(),
+                              stats.getFalseCount());
 }
 
 bool ArrayHistogram::isArray() const {
@@ -349,17 +139,17 @@ const ScalarHistogram& ArrayHistogram::getScalar() const {
 }
 
 const ScalarHistogram& ArrayHistogram::getArrayUnique() const {
-    tassert(7131002, "Only an array ArrayHistogram has a unique histogram.", isArray());
+    invariant(isArray());
     return *_arrayUnique;
 }
 
 const ScalarHistogram& ArrayHistogram::getArrayMin() const {
-    tassert(7131003, "Only an array ArrayHistogram has a min histogram.", isArray());
+    invariant(isArray());
     return *_arrayMin;
 }
 
 const ScalarHistogram& ArrayHistogram::getArrayMax() const {
-    tassert(7131004, "Only an array ArrayHistogram has a max histogram.", isArray());
+    invariant(isArray());
     return *_arrayMax;
 }
 
@@ -368,34 +158,30 @@ const TypeCounts& ArrayHistogram::getTypeCounts() const {
 }
 
 const TypeCounts& ArrayHistogram::getArrayTypeCounts() const {
-    tassert(7131005, "Only an array ArrayHistogram has array type counts.", isArray());
+    invariant(isArray());
     return *_arrayTypeCounts;
 }
 
 double ArrayHistogram::getArrayCount() const {
     if (isArray()) {
-        double arrayCount = getTypeCount(sbe::value::TypeTags::Array);
-        uassert(
-            6979503, "Histogram with array data must have at least one array.", arrayCount > 0.0);
+        auto findArray = _typeCounts.find(sbe::value::TypeTags::Array);
+        uassert(6979504,
+                "Histogram with array data must have a total array count.",
+                findArray != _typeCounts.end());
+        double arrayCount = findArray->second;
+        uassert(6979503, "Histogram with array data must have at least one array.", arrayCount > 0);
         return arrayCount;
     }
-    return 0.0;
+    return 0;
 }
 
-double ArrayHistogram::getTypeCount(sbe::value::TypeTags tag) const {
-    return getTagTypeCount(getTypeCounts(), tag);
-}
-
-double ArrayHistogram::getArrayTypeCount(sbe::value::TypeTags tag) const {
-    return getTagTypeCount(getArrayTypeCounts(), tag);
-}
-
-double ArrayHistogram::getTotalTypeCount() const {
-    return getTotalCount(getTypeCounts());
-}
-
-double ArrayHistogram::getTotalArrayTypeCount() const {
-    return getTotalCount(getArrayTypeCounts());
+void serializeTypeCounts(const TypeCounts& typeCounts, BSONObjBuilder& bob) {
+    BSONArrayBuilder typeCountBuilder(bob.subarrayStart("typeCount"));
+    for (const auto& [sbeType, count] : typeCounts) {
+        auto typeCount = BSON("typeName" << stats::serialize(sbeType) << "count" << count);
+        typeCountBuilder.append(typeCount);
+    }
+    typeCountBuilder.doneFast();
 }
 
 BSONObj ArrayHistogram::serialize() const {
@@ -428,18 +214,15 @@ BSONObj ArrayHistogram::serialize() const {
     return histogramBuilder.obj();
 }
 
-BSONObj makeStatistics(double documents,
-                       const std::shared_ptr<const ArrayHistogram> arrayHistogram) {
+BSONObj makeStatistics(double documents, const ArrayHistogram& arrayHistogram) {
     BSONObjBuilder builder;
     builder.appendNumber("documents", documents);
-    builder.appendElements(arrayHistogram->serialize());
+    builder.appendElements(arrayHistogram.serialize());
     builder.doneFast();
     return builder.obj();
 }
 
-BSONObj makeStatsPath(StringData path,
-                      double documents,
-                      const std::shared_ptr<const ArrayHistogram> arrayHistogram) {
+BSONObj makeStatsPath(StringData path, double documents, const ArrayHistogram& arrayHistogram) {
     BSONObjBuilder builder;
     builder.append("_id", path);
     builder.append("statistics", makeStatistics(documents, arrayHistogram));

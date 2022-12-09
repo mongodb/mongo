@@ -225,7 +225,7 @@ struct BucketData {
         : BucketData(Value(v), equalFreq, rangeFreq, ndv) {}
 };
 
-const stats::ScalarHistogram createHistogram(const std::vector<BucketData>& data);
-double estimateIntValCard(const stats::ScalarHistogram& hist, int v, EstimationType type);
+stats::ScalarHistogram createHistogram(const std::vector<BucketData>& data);
 
+double estimateIntValCard(const stats::ScalarHistogram& hist, int v, EstimationType type);
 }  // namespace mongo::optimizer::ce

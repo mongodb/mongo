@@ -82,8 +82,9 @@ StatsCatalog& StatsCatalog::get(OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
 }
 
-StatusWith<std::shared_ptr<const ArrayHistogram>> StatsCatalog::getHistogram(
-    OperationContext* opCtx, const NamespaceString& nss, const std::string& path) {
+StatusWith<std::shared_ptr<ArrayHistogram>> StatsCatalog::getHistogram(OperationContext* opCtx,
+                                                                       const NamespaceString& nss,
+                                                                       const std::string& path) {
     try {
         auto handle = _statsCache.acquire(opCtx, std::make_pair(nss, path));
         uassert(ErrorCodes::NamespaceNotFound,

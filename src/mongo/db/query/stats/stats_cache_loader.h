@@ -35,7 +35,7 @@
 
 namespace mongo::stats {
 using StatsPathString = std::pair<NamespaceString, std::string>;
-using StatsCacheVal = std::shared_ptr<const ArrayHistogram>;
+using StatsCacheVal = std::shared_ptr<ArrayHistogram>;
 
 class StatsCacheLoader {
 public:
