@@ -23,7 +23,7 @@ load("jstests/replsets/libs/tenant_migration_util.js");
 const tenantMigrationTest = new TenantMigrationTest(
     {name: jsTestName(), quickGarbageCollection: true, initiateRstWithHighElectionTimeout: false});
 
-const kTenantId = "testTenantId";
+const kTenantId = ObjectId().str;
 
 const donorRst = tenantMigrationTest.getDonorRst();
 const donorRstArgs = TenantMigrationUtil.createRstArgs(donorRst);

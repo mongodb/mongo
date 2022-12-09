@@ -36,7 +36,7 @@ donorRst.initiate();
 const tenantMigrationTest = new TenantMigrationTest(
     {name: jsTestName(), donorRst, sharedOptions: {setParameter: kGarbageCollectionParams}});
 
-const tenantId = "testTenantId";
+const tenantId = ObjectId().str;
 const migrationId = UUID();
 const migrationOpts = {
     migrationIdString: extractUUIDFromObject(migrationId),

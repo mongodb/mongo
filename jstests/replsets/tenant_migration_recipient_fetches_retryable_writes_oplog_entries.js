@@ -34,8 +34,8 @@ function runTest({storeFindAndModifyImagesInSideCollection = false}) {
         }
     });
 
-    const kTenantId = "testTenantId";
-    const kTenantId2 = "testTenantId2";
+    const kTenantId = ObjectId().str;
+    const kTenantId2 = ObjectId().str;
     const kDbName = `${kTenantId}_testDb`;
     const kDbName2 = `${kTenantId2}_testDb`;
     const kCollName = "testColl";

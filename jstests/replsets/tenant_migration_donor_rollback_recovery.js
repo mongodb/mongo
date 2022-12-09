@@ -22,7 +22,7 @@ load("jstests/replsets/libs/rollback_test.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
 
-const kTenantId = "testTenantId";
+const kTenantId = ObjectId().str;
 
 const kMaxSleepTimeMS = 250;
 

@@ -22,8 +22,8 @@ load("jstests/replsets/libs/tenant_migration_util.js");
 load("jstests/replsets/rslib.js");
 load("jstests/libs/uuid_util.js");
 
-const tenantId = "testTenantId";
-const otherTenantId = "otherTestTenantId";
+const tenantId = ObjectId().str;
+const otherTenantId = ObjectId().str;
 const transactionsNS = "config.transactions";
 const collName = "testColl";
 
@@ -131,6 +131,7 @@ jsTestLog("Running a migration");
 const migrationId = UUID();
 const migrationOpts = {
     migrationIdString: extractUUIDFromObject(migrationId),
+    tenantIds: [ObjectId(tenantId), ObjectId(otherTenantId)],
 };
 
 const fpAfterFetchingCommittedTransactions =

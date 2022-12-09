@@ -39,7 +39,7 @@ const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
-        tenantId: "slowCommands",
+        tenantId: ObjectId().str,
     };
 
     TenantMigrationTest.assertCommitted(

@@ -25,7 +25,7 @@ const tenantMigrationTest = new TenantMigrationTest({
     quickGarbageCollection: true,
 });
 
-const kTenantId = "testTenantId";
+const kTenantId = ObjectId().str;
 const kReadPreference = {
     mode: "primary"
 };

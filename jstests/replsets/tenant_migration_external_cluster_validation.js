@@ -47,7 +47,7 @@ function createUsers(rst) {
     rst.awaitReplication();
 }
 
-const kTenantId = "testTenantId";
+const kTenantId = ObjectId().str;
 const kDbName = kTenantId + "_" +
     "testDb";
 const kCollName = "testColl";

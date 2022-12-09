@@ -21,7 +21,7 @@ load("jstests/libs/uuid_util.js");
 const tenantMigrationTest = new TenantMigrationTest(
     {name: jsTestName(), sharedOptions: {nodes: 1}, quickGarbageCollection: true});
 
-const kTenantId = "testTenantId";
+const kTenantId = ObjectId().str;
 const kDbName = tenantMigrationTest.tenantDB(kTenantId, "testDB");
 const kCollName = "testColl";
 const kNs = `${kDbName}.${kCollName}`;

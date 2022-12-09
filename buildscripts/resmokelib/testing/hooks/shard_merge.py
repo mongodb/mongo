@@ -10,6 +10,8 @@ import uuid
 import bson
 import pymongo.errors
 
+from bson.objectid import ObjectId
+
 from buildscripts.resmokelib import errors
 from buildscripts.resmokelib.testing.fixtures import interface as fixture_interface
 from buildscripts.resmokelib.testing.fixtures import shard_merge
@@ -472,16 +474,20 @@ class _ShardMergeThread(threading.Thread):  # pylint: disable=too-many-instance-
         """
         cmd_obj = {
             "donorStartMigration":
-                1, "migrationId":
-                    bson.Binary(migration_opts.migration_id.bytes, 4), "recipientConnectionString":
-                        migration_opts.recipient_rs.get_driver_connection_url(), "readPreference":
-                            migration_opts.read_preference,
+                1,
+            "migrationId":
+                bson.Binary(migration_opts.migration_id.bytes, 4),
+            "recipientConnectionString":
+                migration_opts.recipient_rs.get_driver_connection_url(),
+            "readPreference":
+                migration_opts.read_preference,
             "donorCertificateForRecipient":
                 get_certificate_and_private_key("jstests/libs/tenant_migration_donor.pem"),
             "recipientCertificateForDonor":
                 get_certificate_and_private_key("jstests/libs/tenant_migration_recipient.pem"),
             "protocol":
-                "shard merge"
+                "shard merge",
+            "tenantIds": [ObjectId(migration_opts.tenant_id)],
         }
         donor_primary = migration_opts.get_donor_primary()
         # TODO(SERVER-68643) We no longer need to override the failpoint once milestone 3 is done

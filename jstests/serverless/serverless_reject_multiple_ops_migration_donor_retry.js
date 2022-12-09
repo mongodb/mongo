@@ -46,6 +46,8 @@ function retryMigrationAfterSplitCompletes(protocol) {
     };
     if (protocol != "shard merge") {
         firstMigrationOpts["tenantId"] = tenantIds[0].str;
+    } else {
+        firstMigrationOpts["tenantIds"] = tenantIds;
     }
     jsTestLog("Starting tenant migration");
     assert.commandFailedWithCode(test.startMigration(firstMigrationOpts),
@@ -72,6 +74,8 @@ function retryMigrationAfterSplitCompletes(protocol) {
     };
     if (protocol != "shard merge") {
         secondMigrationOpts["tenantId"] = tenantIds[0].str;
+    } else {
+        secondMigrationOpts["tenantIds"] = tenantIds;
     }
     jsTestLog("Starting tenant migration");
     assert.commandWorked(test.startMigration(secondMigrationOpts));

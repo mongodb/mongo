@@ -32,7 +32,7 @@ load("jstests/replsets/libs/tenant_migration_util.js");
     }
 
     jsTestLog("Test that a shard merge is aborted in the event of a donor failure");
-    const tenantId = "testTenantId";
+    const tenantId = ObjectId().str;
     const tenantDB = tenantMigrationTest.tenantDB(tenantId, "DB");
     const collName = "testColl";
 
@@ -48,7 +48,8 @@ load("jstests/replsets/libs/tenant_migration_util.js");
     const migrationUuid = UUID();
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationUuid),
-        readPreference: {mode: 'primary'}
+        readPreference: {mode: 'primary'},
+        tenantIds: [ObjectId(tenantId)],
     };
 
     jsTestLog(`Starting the tenant migration to wait in failpoint: ${failpoint}`);

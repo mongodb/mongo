@@ -31,7 +31,7 @@ const kCollName = "testColl";
 
 const kTenantDefinedDbName = "0";
 
-const kTenantID = "tenantId";
+const kTenantID = ObjectId().str;
 const migrationOpts = {
     migrationIdString: extractUUIDFromObject(UUID()),
     tenantId: kTenantID,
@@ -66,21 +66,21 @@ const testOptsMap = {};
  */
 function setupTestsBeforeMigration() {
     for (const [commandName, testCase] of Object.entries(testCases)) {
-        let baseDbName = kTenantID + "_" + commandName + "-inCommitted0";
+        let baseDbName = kTenantID + "_" + commandName + "-Committed-";
 
         if (testCase.skip) {
             print("Skipping " + commandName + ": " + testCase.skip);
             continue;
         }
 
-        let basicFullDb = baseDbName + "Basic-" + kTenantDefinedDbName;
+        let basicFullDb = baseDbName + "B-" + kTenantDefinedDbName;
         const basicTestOpts = makeTestOptionsForConcurrentWritesTest(
             donorPrimary, testCase, basicFullDb, kCollName, false, false);
         testOptsMap[basicFullDb] = basicTestOpts;
         setupTestForConcurrentWritesTest(testCase, kCollName, basicTestOpts);
 
         if (testCase.testInTransaction) {
-            let TxnFullDb = baseDbName + "Txn-" + kTenantDefinedDbName;
+            let TxnFullDb = baseDbName + "T-" + kTenantDefinedDbName;
             const txnTestOpts = makeTestOptionsForConcurrentWritesTest(
                 donorPrimary, testCase, TxnFullDb, kCollName, true, false);
             testOptsMap[TxnFullDb] = txnTestOpts;
@@ -88,7 +88,7 @@ function setupTestsBeforeMigration() {
         }
 
         if (testCase.testAsRetryableWrite) {
-            let retryableFullDb = baseDbName + "Retryable-" + kTenantDefinedDbName;
+            let retryableFullDb = baseDbName + "R-" + kTenantDefinedDbName;
             const retryableTestOpts = makeTestOptionsForConcurrentWritesTest(
                 donorPrimary, testCase, retryableFullDb, kCollName, false, true);
             testOptsMap[retryableFullDb] = retryableTestOpts;
@@ -102,21 +102,21 @@ function setupTestsBeforeMigration() {
  */
 function runTestsAfterMigration() {
     for (const [commandName, testCase] of Object.entries(testCases)) {
-        let baseDbName = kTenantID + "_" + commandName + "-inCommitted0";
+        let baseDbName = kTenantID + "_" + commandName + "-Committed-";
         if (testCase.skip) {
             continue;
         }
 
-        const basicTesTOpts = testOptsMap[baseDbName + "Basic-" + kTenantDefinedDbName];
+        const basicTesTOpts = testOptsMap[baseDbName + "B-" + kTenantDefinedDbName];
         testDoNotRejectWritesAfterMigrationAborted(testCase, basicTesTOpts);
 
         if (testCase.testInTransaction) {
-            const txnTesTOpts = testOptsMap[baseDbName + "Txn-" + kTenantDefinedDbName];
+            const txnTesTOpts = testOptsMap[baseDbName + "T-" + kTenantDefinedDbName];
             testDoNotRejectWritesAfterMigrationAborted(testCase, txnTesTOpts);
         }
 
         if (testCase.testAsRetryableWrite) {
-            const retryableTestOpts = testOptsMap[baseDbName + "Retryable-" + kTenantDefinedDbName];
+            const retryableTestOpts = testOptsMap[baseDbName + "R-" + kTenantDefinedDbName];
             testDoNotRejectWritesAfterMigrationAborted(testCase, retryableTestOpts);
         }
     }

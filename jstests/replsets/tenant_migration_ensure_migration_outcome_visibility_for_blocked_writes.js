@@ -58,7 +58,7 @@ function insertDocument(primaryHost, dbName, collName) {
     });
 
     const migrationId = UUID();
-    const tenantId = "migrationOutcome-committed";
+    const tenantId = ObjectId().str;
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
         recipientConnString: tenantMigrationTest.getRecipientConnString(),
@@ -115,7 +115,7 @@ function insertDocument(primaryHost, dbName, collName) {
         {name: jsTestName(), donorRst, sharedOptions: {setParameter: kGarbageCollectionParams}});
 
     const migrationId = UUID();
-    const tenantId = "migrationOutcome-aborted";
+    const tenantId = ObjectId().str;
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
         recipientConnString: tenantMigrationTest.getRecipientConnString(),

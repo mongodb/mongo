@@ -214,8 +214,8 @@ function runRollbackAfterLoneRecipientForgetMigrationCommand(tenantId) {
     tenantMigrationTest.stop();
 }
 
-runRollbackAfterMigrationCommitted('testTenantId-1');
-runRollbackAfterLoneRecipientForgetMigrationCommand('testTenantId-2');
+runRollbackAfterMigrationCommitted(ObjectId().str);
+runRollbackAfterLoneRecipientForgetMigrationCommand(ObjectId().str);
 
 recipientRst.stopSet();
 })();

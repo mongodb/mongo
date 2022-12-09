@@ -12,7 +12,7 @@
 load("jstests/replsets/libs/tenant_migration_util.js");
 load("jstests/libs/fail_point_util.js");
 
-function runTest(nodeOptions, expectedError) {
+function runTest(nodeOptions) {
     const rst = new ReplSetTest({nodes: 1, nodeOptions: nodeOptions});
     rst.startSet();
     rst.initiate();
@@ -52,9 +52,92 @@ function runTest(nodeOptions, expectedError) {
             recipientConnectionString: kDummyConnStr,
             readPreference: readPreference,
             donorCertificateForRecipient: migrationCertificates.donorCertificateForRecipient,
+            recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
+            tenantIds: [ObjectId()]
+        }),
+        ErrorCodes.InvalidOptions,
+        "Expected donorStartMigration to fail when protocol is 'shard merge' and node options " +
+            tojson(nodeOptions) + " are set, but did not");
+
+    // Assert that donorStartMigration fails with the expected code when tenantIds is missing.
+    assert.commandFailedWithCode(
+        adminDB.runCommand({
+            donorStartMigration: 1,
+            protocol: "shard merge",
+            migrationId: UUID(),
+            recipientConnectionString: kDummyConnStr,
+            readPreference: readPreference,
+            donorCertificateForRecipient: migrationCertificates.donorCertificateForRecipient,
             recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor
         }),
-        expectedError,
+        ErrorCodes.InvalidOptions,
+        "Expected donorStartMigration to fail when protocol is 'shard merge' and node options " +
+            tojson(nodeOptions) + " are set, but did not");
+
+    // Assert that donorStartMigration fails with the expected code when tenantId is provided.
+    assert.commandFailedWithCode(
+        adminDB.runCommand({
+            donorStartMigration: 1,
+            protocol: "shard merge",
+            migrationId: UUID(),
+            recipientConnectionString: kDummyConnStr,
+            readPreference: readPreference,
+            donorCertificateForRecipient: migrationCertificates.donorCertificateForRecipient,
+            recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
+            tenantIds: [ObjectId()],
+            tenantId: ObjectId().str
+        }),
+        ErrorCodes.InvalidOptions,
+        "Expected donorStartMigration to fail when protocol is 'shard merge' and node options " +
+            tojson(nodeOptions) + " are set, but did not");
+
+    // Assert that donorStartMigration fails with the expected code when tenantIds is not an
+    // ObjectId.
+    assert.commandFailedWithCode(
+        adminDB.runCommand({
+            donorStartMigration: 1,
+            protocol: "shard merge",
+            migrationId: UUID(),
+            recipientConnectionString: kDummyConnStr,
+            readPreference: readPreference,
+            donorCertificateForRecipient: migrationCertificates.donorCertificateForRecipient,
+            recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
+            tenantIds: ["admin"]
+        }),
+        ErrorCodes.BadValue,
+        "Expected donorStartMigration to fail when protocol is 'shard merge' and node options " +
+            tojson(nodeOptions) + " are set, but did not");
+
+    // Assert that donorStartMigration fails with the expected code when one of the tenantIds is
+    // empty.
+    assert.commandFailedWithCode(
+        adminDB.runCommand({
+            donorStartMigration: 1,
+            protocol: "shard merge",
+            migrationId: UUID(),
+            recipientConnectionString: kDummyConnStr,
+            readPreference: readPreference,
+            donorCertificateForRecipient: migrationCertificates.donorCertificateForRecipient,
+            recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
+            tenantIds: [{}, ObjectId()]
+        }),
+        ErrorCodes.BadValue,
+        "Expected donorStartMigration to fail when protocol is 'shard merge' and node options " +
+            tojson(nodeOptions) + " are set, but did not");
+
+    // Assert that donorStartMigration fails with the expected code when tenantIds is empty.
+    assert.commandFailedWithCode(
+        adminDB.runCommand({
+            donorStartMigration: 1,
+            protocol: "shard merge",
+            migrationId: UUID(),
+            recipientConnectionString: kDummyConnStr,
+            readPreference: readPreference,
+            donorCertificateForRecipient: migrationCertificates.donorCertificateForRecipient,
+            recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
+            tenantIds: []
+        }),
+        ErrorCodes.InvalidOptions,
         "Expected donorStartMigration to fail when protocol is 'shard merge' and node options " +
             tojson(nodeOptions) + " are set, but did not");
 
@@ -69,7 +152,7 @@ function runTest(nodeOptions, expectedError) {
             startMigrationDonorTimestamp: Timestamp(1, 1),
             recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor
         }),
-        expectedError,
+        ErrorCodes.InvalidOptions,
         "Expected recipientSyncData to fail when protocol is 'shard merge' and node options " +
             tojson(nodeOptions) + " are set, but did not");
 
@@ -77,8 +160,8 @@ function runTest(nodeOptions, expectedError) {
 }
 
 // Shard merge is not allowed when directoryperdb is enabled
-runTest({directoryperdb: ""}, ErrorCodes.InvalidOptions);
+runTest({directoryperdb: ""});
 
 // Shard merge is not allowed when directoryForIndexes is enabled
-runTest({"wiredTigerDirectoryForIndexes": ""}, ErrorCodes.InvalidOptions);
+runTest({"wiredTigerDirectoryForIndexes": ""});
 })();

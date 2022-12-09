@@ -19,9 +19,9 @@ load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
 
-const tenantId = "tenantId";
-const otherTenantId = "otherTenantId";
-const existingRecipientTenantId = "existingRecipientTenantId";
+const tenantId = ObjectId().str;
+const otherTenantId = ObjectId().str;
+const existingRecipientTenantId = ObjectId().str;
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
@@ -76,13 +76,14 @@ const waitInFailPoint = configureFailPoint(recipientPrimary, failpoint, {action:
 const migrationId = UUID();
 const migrationOpts = {
     migrationIdString: extractUUIDFromObject(migrationId),
+    tenantIds: [ObjectId(tenantId), ObjectId(otherTenantId)],
 };
 
 assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
 
 waitInFailPoint.wait();
 
-const newTenantId = "newTenantId";
+const newTenantId = ObjectId().str;
 tenantMigrationTest.insertDonorDB(tenantMigrationTest.tenantDB(newTenantId, "DB"), "testColl");
 
 [tenantId, otherTenantId].forEach(tenantId => {

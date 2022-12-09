@@ -76,8 +76,11 @@ public:
             const auto& cmd = request();
             const auto migrationProtocol = cmd.getProtocol().value_or(kDefaultMigrationProtocol);
             const auto& tenantId = cmd.getTenantId();
+            const auto& tenantIds = cmd.getTenantIds();
 
             tenant_migration_util::protocolTenantIdCompatibilityCheck(migrationProtocol, tenantId);
+            tenant_migration_util::protocolTenantIdsCompatibilityCheck(migrationProtocol,
+                                                                       tenantIds);
             tenant_migration_util::protocolStorageOptionsCompatibilityCheck(opCtx,
                                                                             migrationProtocol);
             tenant_migration_util::protocolReadPreferenceCompatibilityCheck(

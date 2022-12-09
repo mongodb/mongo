@@ -23,7 +23,7 @@ const donorRst = tenantMigrationTest.getDonorRst();
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 
-const tenantId = "testTenantId";
+const tenantId = ObjectId().str;
 const tenantDBName = tenantMigrationTest.tenantDB(tenantId, "testDB");
 const donorTenantDB = donorPrimary.getDB(tenantDBName);
 const collName = "testColl";

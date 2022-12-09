@@ -41,7 +41,7 @@ const kRecipientCertificateAndPrivateKey =
     jsTest.log("Test valid donor and recipient certificates");
     const {tenantMigrationTest, teardown} = setup();
     const migrationId = UUID();
-    const tenantId = "validCertificates";
+    const tenantId = ObjectId().str;
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
         tenantId: tenantId,
@@ -61,7 +61,7 @@ const kRecipientCertificateAndPrivateKey =
     jsTest.log("Test invalid donor certificate, no header and trailer");
     const {tenantMigrationTest, teardown} = setup();
     const migrationId = UUID();
-    const tenantId = "invalidDonorCertificateNoHeaderAndTrailer";
+    const tenantId = ObjectId().str;
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
         tenantId: tenantId,
@@ -85,7 +85,7 @@ const kRecipientCertificateAndPrivateKey =
     jsTest.log("Test invalid donor certificate, use private key as certificate");
     const {tenantMigrationTest, teardown} = setup();
     const migrationId = UUID();
-    const tenantId = "invalidDonorCertificatePrivateKeyAsCertificate";
+    const tenantId = ObjectId().str;
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
         tenantId: tenantId,
@@ -109,7 +109,7 @@ const kRecipientCertificateAndPrivateKey =
     jsTest.log("Test invalid donor private key, no header and trailer");
     const {tenantMigrationTest, teardown} = setup();
     const migrationId = UUID();
-    const tenantId = "invalidDonorPrivateKeyNoHeaderAndTrailer";
+    const tenantId = ObjectId().str;
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
         tenantId: tenantId,
@@ -133,7 +133,7 @@ const kRecipientCertificateAndPrivateKey =
     jsTest.log("Test invalid donor private key, use certificate as private key");
     const {tenantMigrationTest, teardown} = setup();
     const migrationId = UUID();
-    const tenantId = "invalidDonorPrivateKeyCertificateAsPrivateKey";
+    const tenantId = ObjectId().str;
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
         tenantId: tenantId,
@@ -157,7 +157,7 @@ const kRecipientCertificateAndPrivateKey =
     jsTest.log("Test invalid donor certificate and private key pair");
     const {tenantMigrationTest, teardown} = setup();
     const migrationId = UUID();
-    const tenantId = "invalidDonorCertificatePrivateKeyPair";
+    const tenantId = ObjectId().str;
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
         tenantId: tenantId,
@@ -181,7 +181,7 @@ const kRecipientCertificateAndPrivateKey =
     jsTest.log("Test expired donor certificate and key");
     const {tenantMigrationTest, teardown} = setup();
     const migrationId = UUID();
-    const tenantId = "expiredDonorCertificate";
+    const tenantId = ObjectId().str;
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
         tenantId: tenantId,
@@ -203,7 +203,7 @@ const kRecipientCertificateAndPrivateKey =
     jsTest.log("Test invalid recipient certificate, no header and trailer");
     const {tenantMigrationTest, teardown} = setup();
     const migrationId = UUID();
-    const tenantId = "invalidRecipientCertificateNoHeaderAndTrailer";
+    const tenantId = ObjectId().str;
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
         tenantId: tenantId,
@@ -227,7 +227,7 @@ const kRecipientCertificateAndPrivateKey =
     jsTest.log("Test invalid recipient certificate, use private key as certificate");
     const {tenantMigrationTest, teardown} = setup();
     const migrationId = UUID();
-    const tenantId = "invalidRecipientCertificatePrivateKeyAsCertificate";
+    const tenantId = ObjectId().str;
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
         tenantId: tenantId,
@@ -251,7 +251,7 @@ const kRecipientCertificateAndPrivateKey =
     jsTest.log("Test invalid recipient private key, no header and trailer");
     const {tenantMigrationTest, teardown} = setup();
     const migrationId = UUID();
-    const tenantId = "invalidRecipientPrivateKeyNoHeaderAndTrailer";
+    const tenantId = ObjectId().str;
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
         tenantId: tenantId,
@@ -275,7 +275,7 @@ const kRecipientCertificateAndPrivateKey =
     jsTest.log("Test invalid recipient private key, use certificate as private key");
     const {tenantMigrationTest, teardown} = setup();
     const migrationId = UUID();
-    const tenantId = "invalidRecipientPrivateKeyCertificateAsPrivateKey";
+    const tenantId = ObjectId().str;
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
         tenantId: tenantId,
@@ -299,7 +299,7 @@ const kRecipientCertificateAndPrivateKey =
     jsTest.log("Test expired recipient certificate and key");
     const {tenantMigrationTest, teardown} = setup();
     const migrationId = UUID();
-    const tenantId = "expiredRecipientCertificate";
+    const tenantId = ObjectId().str;
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
         tenantId: tenantId,
@@ -321,7 +321,7 @@ const kRecipientCertificateAndPrivateKey =
     jsTest.log("Test invalid recipient certificate and private key pair");
     const {tenantMigrationTest, teardown} = setup();
     const migrationId = UUID();
-    const tenantId = "invalidRecipientCertificatePrivateKeyPair";
+    const tenantId = ObjectId().str;
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
         tenantId: tenantId,
@@ -350,7 +350,7 @@ if (!TestData.auth) {
     jsTest.log("Test donor certificate without the required privileges");
     const {tenantMigrationTest, teardown} = setup();
     const migrationId = UUID();
-    const tenantId = "donorCertificateInsufficientPrivileges";
+    const tenantId = ObjectId().str;
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
         tenantId: tenantId,
@@ -372,7 +372,7 @@ if (!TestData.auth) {
     const {tenantMigrationTest, teardown} = setup();
     jsTest.log("Test recipient certificate without the required privileges");
     const migrationId = UUID();
-    const tenantId = "recipientCertificateInsufficientPrivileges";
+    const tenantId = ObjectId().str;
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
         tenantId: tenantId,

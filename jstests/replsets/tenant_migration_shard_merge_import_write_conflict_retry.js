@@ -36,7 +36,8 @@ const kDataDir =
     `${recipientPrimary.dbpath}/migrationTmpFiles.${extractUUIDFromObject(migrationId)}`;
 assert.eq(runNonMongoProgram("mkdir", "-p", kDataDir), 0);
 
-const dbName = "myDatabase";
+const tenantId = ObjectId();
+const dbName = `${tenantId.str}_myDatabase`;
 
 (function() {
 jsTestLog("Generate test data");
@@ -67,6 +68,7 @@ jsTestLog("Run migration");
 // but shard merge copies everything so we still expect myDatabase on the recipient, below.
 const migrationOpts = {
     migrationIdString: extractUUIDFromObject(migrationId),
+    tenantIds: [tenantId]
 };
 TenantMigrationTest.assertCommitted(
     tenantMigrationTest.runMigration(migrationOpts, {enableDonorStartMigrationFsync: true}));

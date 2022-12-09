@@ -20,14 +20,14 @@ load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/libs/uuid_util.js");  // For extractUUIDFromObject().
 load("jstests/replsets/rslib.js");
 
-const kTenantIdPrefix = "testTenantId";
 const kUnrelatedDbNameDonor = "unrelatedDBDonor";
 const kUnrelatedDbNameRecipient = "unrelatedDBRecipient";
 const collName = "foo";
-const tenantId = `${kTenantIdPrefix}-0`;
+const tenantId = ObjectId().str;
 const migrationId = UUID();
 const migrationOpts = {
     migrationIdString: extractUUIDFromObject(migrationId),
+    tenantIds: [ObjectId(tenantId)]
 };
 
 const tmt = new TenantMigrationTest({name: jsTestName()});

@@ -19,8 +19,6 @@ load("jstests/libs/parallelTester.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
 
-const kTenantIdPrefix = "testTenantId";
-
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
 function testTimeoutBlockingState() {
@@ -34,7 +32,7 @@ function testTimeoutBlockingState() {
     assert.commandWorked(
         donorPrimary.adminCommand({setParameter: 1, tenantMigrationBlockingStateTimeoutMS: 5000}));
 
-    const tenantId = `${kTenantIdPrefix}-blockingTimeout`;
+    const tenantId = ObjectId().str;
     const migrationId = UUID();
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),

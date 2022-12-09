@@ -23,7 +23,7 @@ load("jstests/libs/parallelTester.js");   // For Thread.
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
-const kTenantId = "testTenantId";
+const kTenantId = ObjectId().str;
 const kDbName = `${kTenantId}_testDb`;
 const kCollName = "testColl";
 

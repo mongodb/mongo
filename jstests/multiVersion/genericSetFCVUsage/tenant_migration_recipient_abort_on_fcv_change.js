@@ -19,7 +19,7 @@ load("jstests/replsets/libs/tenant_migration_util.js");
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
-const tenantId = "testTenantId";
+const tenantId = ObjectId().str;
 const dbName = tenantMigrationTest.tenantDB(tenantId, "testDB");
 const collName = "testColl";
 
@@ -27,7 +27,6 @@ const donorRst = tenantMigrationTest.getDonorRst();
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
 const donorDB = donorPrimary.getDB(dbName);
 
-const recipientRst = tenantMigrationTest.getRecipientRst();
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 const recipientDB = recipientPrimary.getDB(dbName);
 

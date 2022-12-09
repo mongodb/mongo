@@ -31,14 +31,16 @@ if (!TenantMigrationUtil.isShardMergeEnabled(donorPrimary.getDB("admin"))) {
 
 const failingMigrationOpts = {
     migrationIdString: extractUUIDFromObject(UUID()),
-    readPreference: {mode: "secondary"}
+    readPreference: {mode: "secondary"},
+    tenantIds: [ObjectId()]
 };
 assert.commandFailedWithCode(tenantMigrationTest.startMigration(failingMigrationOpts),
                              ErrorCodes.FailedToSatisfyReadPreference);
 
 const succeessfulMigrationOpts = {
     migrationIdString: extractUUIDFromObject(UUID()),
-    readPreference: {mode: "primary"}
+    readPreference: {mode: "primary"},
+    tenantIds: [ObjectId()]
 };
 assert.commandWorked(tenantMigrationTest.startMigration(succeessfulMigrationOpts));
 

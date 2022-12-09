@@ -18,8 +18,6 @@ load("jstests/libs/parallelTester.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
 
-const kTenantIdPrefix = "testTenantId";
-
 /**
  * Starts a migration and forces the write to insert the donor's state doc to abort on the first few
  * tries. Asserts that the migration still completes successfully.
@@ -37,7 +35,7 @@ function testAbortInitialState() {
     // record.
     let writeConflictFp = configureFailPoint(donorPrimary, "WTWriteConflictException");
 
-    const tenantId = `${kTenantIdPrefix}-initial`;
+    const tenantId = ObjectId().str;
     const migrationId = UUID();
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
@@ -85,7 +83,7 @@ function testAbortStateTransition(pauseFailPoint, setUpFailPoints, nextState) {
     const donorRst = tenantMigrationTest.getDonorRst();
 
     const donorPrimary = donorRst.getPrimary();
-    const tenantId = `${kTenantIdPrefix}-${nextState}`;
+    const tenantId = ObjectId().str;
 
     const migrationId = UUID();
     const migrationOpts = {

@@ -97,6 +97,23 @@ assert.commandFailedWithCode(
                                                             donorPrimary.getDB("admin"))),
     ErrorCodes.BadValue);
 
+// Test setting tenantIds field for protocol 'multitenant migrations'.
+assert.commandFailedWithCode(
+    donorPrimary.adminCommand(
+        TenantMigrationUtil.donorStartMigrationWithProtocol({
+            donorStartMigration: 1,
+            migrationId: UUID(),
+            recipientConnectionString:
+                tenantMigrationTest.getRecipientRst().getURL() + "," + donorPrimary.host,
+            tenantId,
+            tenantIds: [ObjectId(), ObjectId()],
+            readPreference,
+            donorCertificateForRecipient: migrationCertificates.donorCertificateForRecipient,
+            recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
+        },
+                                                            donorPrimary.getDB("admin"))),
+    ErrorCodes.BadValue);
+
 // Test migrating a tenant to a standalone recipient.
 assert.commandFailedWithCode(
     donorPrimary.adminCommand(

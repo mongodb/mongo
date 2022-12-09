@@ -508,8 +508,9 @@ const testFuncs = {
 
 for (const [testName, testFunc] of Object.entries(testFuncs)) {
     for (const [testCaseName, testCase] of Object.entries(testCases)) {
-        jsTest.log(`Testing ${testName} with testCase ${testCaseName}`);
-        const dbName = `${testCaseName}-${testName}_${kTenantDefinedDbName}`;
+        const tenantId = ObjectId().str;
+        jsTest.log(`Testing ${testName} with testCase ${testCaseName} with tenantId ${tenantId}`);
+        const dbName = `${tenantId}_${kTenantDefinedDbName}`;
         testFunc(testCase, dbName, kCollName);
     }
 }

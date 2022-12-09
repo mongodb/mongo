@@ -34,7 +34,7 @@ const kTenantDefinedDbName = "0";
 
 const kMaxTimeMS = 1 * 1000;
 
-const kTenantID = "tenantId";
+const kTenantID = ObjectId().str;
 const migrationOpts = {
     migrationIdString: extractUUIDFromObject(UUID()),
     tenantId: kTenantID,
@@ -59,14 +59,14 @@ const testOptsMap = {};
  */
 function setupTestsBeforeMigration() {
     for (const [commandName, testCase] of Object.entries(testCases)) {
-        let baseDbName = kTenantID + "_" + commandName + "-inCommitted0";
+        let baseDbName = kTenantID + "_" + commandName + "-Committed-";
 
         if (testCase.skip) {
             print("Skipping " + commandName + ": " + testCase.skip);
             continue;
         }
 
-        let basicFullDb = baseDbName + "Basic-" + kTenantDefinedDbName;
+        let basicFullDb = baseDbName + "B-" + kTenantDefinedDbName;
         const basicTestOpts = makeTestOptionsForConcurrentWritesTest(
             donorPrimary, testCase, basicFullDb, kCollName, false, false);
         testOptsMap[basicFullDb] = basicTestOpts;
@@ -74,7 +74,7 @@ function setupTestsBeforeMigration() {
         setupTestForConcurrentWritesTest(testCase, kCollName, basicTestOpts);
 
         if (testCase.testInTransaction) {
-            let TxnFullDb = baseDbName + "Txn-" + kTenantDefinedDbName;
+            let TxnFullDb = baseDbName + "T-" + kTenantDefinedDbName;
             const txnTestOpts = makeTestOptionsForConcurrentWritesTest(
                 donorPrimary, testCase, TxnFullDb, kCollName, true, false);
             testOptsMap[TxnFullDb] = txnTestOpts;
@@ -83,7 +83,7 @@ function setupTestsBeforeMigration() {
         }
 
         if (testCase.testAsRetryableWrite) {
-            let retryableFullDb = baseDbName + "Retryable-" + kTenantDefinedDbName;
+            let retryableFullDb = baseDbName + "R-" + kTenantDefinedDbName;
             const retryableTestOpts = makeTestOptionsForConcurrentWritesTest(
                 donorPrimary, testCase, retryableFullDb, kCollName, false, true);
             testOptsMap[retryableFullDb] = retryableTestOpts;
@@ -98,24 +98,24 @@ function setupTestsBeforeMigration() {
  */
 function runTestsWhileBlocking() {
     for (const [commandName, testCase] of Object.entries(testCases)) {
-        let baseDbName = kTenantID + "_" + commandName + "-inCommitted0";
+        let baseDbName = kTenantID + "_" + commandName + "-Committed-";
         if (testCase.skip) {
             continue;
         }
 
         testBlockWritesAfterMigrationEnteredBlocking_blocking(
-            testOptsMap[baseDbName + "Basic-" + kTenantDefinedDbName]);
+            testOptsMap[baseDbName + "B-" + kTenantDefinedDbName]);
         countBlockedWrites += 1;
 
         if (testCase.testInTransaction) {
             testBlockWritesAfterMigrationEnteredBlocking_blocking(
-                testOptsMap[baseDbName + "Txn-" + kTenantDefinedDbName]);
+                testOptsMap[baseDbName + "T-" + kTenantDefinedDbName]);
             countBlockedWrites += 1;
         }
 
         if (testCase.testAsRetryableWrite) {
             testBlockWritesAfterMigrationEnteredBlocking_blocking(
-                testOptsMap[baseDbName + "Retryable-" + kTenantDefinedDbName]);
+                testOptsMap[baseDbName + "R-" + kTenantDefinedDbName]);
             countBlockedWrites += 1;
         }
     }
@@ -126,23 +126,23 @@ function runTestsWhileBlocking() {
  */
 function runTestsAfterMigrationCommitted() {
     for (const [commandName, testCase] of Object.entries(testCases)) {
-        let baseDbName = kTenantID + "_" + commandName + "-inCommitted0";
+        let baseDbName = kTenantID + "_" + commandName + "-Committed-";
         if (testCase.skip) {
             continue;
         }
 
-        const basicTesTOpts = testOptsMap[baseDbName + "Basic-" + kTenantDefinedDbName];
+        const basicTesTOpts = testOptsMap[baseDbName + "B-" + kTenantDefinedDbName];
         testCase.assertCommandFailed(
             basicTesTOpts.primaryDB, basicTesTOpts.dbName, basicTesTOpts.collName);
 
         if (testCase.testInTransaction) {
-            const txnTesTOpts = testOptsMap[baseDbName + "Txn-" + kTenantDefinedDbName];
+            const txnTesTOpts = testOptsMap[baseDbName + "T-" + kTenantDefinedDbName];
             testCase.assertCommandFailed(
                 txnTesTOpts.primaryDB, txnTesTOpts.dbName, txnTesTOpts.collName);
         }
 
         if (testCase.testAsRetryableWrite) {
-            const retryableTestOpts = testOptsMap[baseDbName + "Retryable-" + kTenantDefinedDbName];
+            const retryableTestOpts = testOptsMap[baseDbName + "R-" + kTenantDefinedDbName];
             testCase.assertCommandFailed(
                 retryableTestOpts.primaryDB, retryableTestOpts.dbName, retryableTestOpts.collName);
         }

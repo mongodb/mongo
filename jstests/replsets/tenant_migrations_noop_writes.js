@@ -20,15 +20,13 @@ load("jstests/libs/write_concern_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
 load('jstests/libs/parallel_shell_helpers.js');
 
-const kTenantIdPrefix = "testTenantId";
 // During "shard merge" tenant migrations, writes to internal DBs are still allowed.
 const kUnrelatedDbName = "admin";
 const collName = "foo";
 const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
 
-let counter = 0;
 let makeTenantId = function() {
-    return kTenantIdPrefix + "-" + counter++;
+    return ObjectId().str;
 };
 
 function makeTestParams() {

@@ -69,7 +69,7 @@ commands:
         validator:
           callback: "tenant_migration_util::validateConnectionString"
       tenantId:
-        description: "The prefix from which the migrating database will be matched. The prefixes 'admin', 'local', 'config', and the empty string ('') are not allowed."
+        description: "The prefix from which the migrating database will be matched. The prefixes 'admin', 'local', 'config', and the empty string ('') are not allowed. Required for multitenant migration, must be empty for shard merge."
         type: string
         optional: true
         validator:
@@ -97,6 +97,12 @@ commands:
         optional: true
         validator:
           callback: "tenant_migration_util::validateProtocolFCVCompatibility"
+      tenantIds:
+        description: "The tenants to migrate. Required for shard merge, must be empty for multitenant migration."
+        optional: true
+        type: array<tenant_id>
+        validator:
+          callback: "tenant_migration_util::validateDatabasePrefix"
 
   donorForgetMigration:
     description: "Parser for the 'donorForgetMigration' command."

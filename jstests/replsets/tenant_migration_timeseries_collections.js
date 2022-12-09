@@ -20,7 +20,7 @@ const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
 
-const tenantId = "testTenantId";
+const tenantId = ObjectId().str;
 const tsDB = tenantMigrationTest.tenantDB(tenantId, "tsDB");
 const donorTSDB = donorPrimary.getDB(tsDB);
 assert.commandWorked(donorTSDB.createCollection("tsColl", {timeseries: {timeField: "time"}}));

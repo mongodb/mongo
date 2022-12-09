@@ -51,7 +51,7 @@ const tenantMigrationTest =
     new TenantMigrationTest({name: jsTestName(), recipientRst: recipientRst});
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
 
-const tenantId = "testTenantId";
+const tenantId = ObjectId().str;
 const dbName = tenantMigrationTest.tenantDB(tenantId, "testDB");
 
 // The first collection on donor side already has the multi-key index.

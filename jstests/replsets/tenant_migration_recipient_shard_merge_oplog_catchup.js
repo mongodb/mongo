@@ -42,10 +42,14 @@ const failpoint = "pauseTenantMigrationBeforeLeavingDataSyncState";
 const pauseTenantMigrationBeforeLeavingDataSyncState =
     configureFailPoint(donorPrimary, failpoint, {action: "hang"});
 
+const kTenant1 = ObjectId().str;
+const kTenant2 = ObjectId().str;
+
 const migrationUuid = UUID();
 const migrationOpts = {
     migrationIdString: extractUUIDFromObject(migrationUuid),
-    readPreference: {mode: 'primary'}
+    readPreference: {mode: 'primary'},
+    tenantIds: [ObjectId(kTenant1), ObjectId(kTenant2)]
 };
 
 jsTestLog(`Starting the tenant migration to wait in failpoint: ${failpoint}`);
@@ -62,10 +66,10 @@ assert.commandWorked(donorPrimary.getDB(tenantDB0)[collName].update({_id: 0}, {'
 assert.commandWorked(donorPrimary.getDB(tenantDB0)[collName].insert({_id: 1}));
 
 // Add new tenant collections.
-const tenantDB1 = tenantMigrationTest.tenantDB("TenantId1", "DB");
+const tenantDB1 = tenantMigrationTest.tenantDB(kTenant1, "DB");
 tenantMigrationTest.insertDonorDB(tenantDB1, collName);
 
-const tenantDB2 = tenantMigrationTest.tenantDB("TenantId2", "DB");
+const tenantDB2 = tenantMigrationTest.tenantDB(kTenant2, "DB");
 tenantMigrationTest.insertDonorDB(tenantDB2, collName);
 
 // Resume migration.

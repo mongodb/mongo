@@ -35,7 +35,7 @@ if (!TenantMigrationUtil.isShardMergeEnabled(recipientPrimary.getDB("admin"))) {
     return;
 }
 
-const tenantId = "testTenantId";
+const tenantId = ObjectId().str;
 const tenantDB = tenantMigrationTest.tenantDB(tenantId, "DB");
 const collName = "testColl";
 
@@ -56,7 +56,8 @@ const waitForTTLPassOnDonor = configureFailPoint(donorPrimary, "hangTTLMonitorBe
 const migrationUuid = UUID();
 const migrationOpts = {
     migrationIdString: extractUUIDFromObject(migrationUuid),
-    readPreference: {mode: 'primary'}
+    readPreference: {mode: 'primary'},
+    tenantIds: [ObjectId(tenantId)]
 };
 
 assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));

@@ -46,7 +46,7 @@ donorRst.initiate();
 const tenantMigrationTest =
     new TenantMigrationTest({name: jsTestName(), donorRst, enableRecipientTesting: false});
 
-const tenantId = "testTenantId";
+const tenantId = ObjectId().str;
 const migrationId = extractUUIDFromObject(UUID());
 const migrationOpts = {
     migrationIdString: migrationId,

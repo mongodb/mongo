@@ -68,17 +68,6 @@ inline Status validateDatabasePrefix(const std::string& tenantId) {
                  str::stream() << "cannot migrate databases for tenant \'" << tenantId << "'");
 }
 
-inline Status validateDatabasePrefix(const std::vector<std::string>& tenantsId) {
-    for (const auto& tenantId : tenantsId) {
-        auto status = validateDatabasePrefix(tenantId);
-        if (!status.isOK()) {
-            return status;
-        }
-    }
-
-    return Status::OK();
-}
-
 inline Status validateDatabasePrefix(const TenantId& tenantId) {
     auto tId = tenantId.toString();
     const bool isPrefixSupported = kUnsupportedTenantIds.find(tId) == kUnsupportedTenantIds.end() &&
@@ -180,6 +169,7 @@ inline Status validatePrivateKeyPEMPayload(const StringData& payload) {
 #endif
 }
 
+
 inline void protocolTenantIdCompatibilityCheck(const MigrationProtocolEnum& protocol,
                                                const boost::optional<StringData>& tenantId) {
     switch (protocol) {
@@ -195,6 +185,37 @@ inline void protocolTenantIdCompatibilityCheck(const MigrationProtocolEnum& prot
                     str::stream() << "'tenantId' is required for protocol '"
                                   << MigrationProtocol_serializer(protocol) << "'",
                     tenantId);
+            break;
+        }
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+inline void protocolTenantIdsCompatibilityCheck(
+    const MigrationProtocolEnum& protocol,
+    const boost::optional<std::vector<TenantId>>& tenantIds) {
+    if (serverGlobalParams.featureCompatibility.isLessThan(
+            multiversion::FeatureCompatibilityVersion::kVersion_6_3)) {
+        uassert(ErrorCodes::InvalidOptions,
+                "'tenantIds' is not supported for FCV below 6.3'",
+                !tenantIds);
+        return;
+    }
+
+    switch (protocol) {
+        case MigrationProtocolEnum::kShardMerge: {
+            uassert(ErrorCodes::InvalidOptions,
+                    str::stream() << "'tenantIds' is required for protocol '"
+                                  << MigrationProtocol_serializer(protocol) << "'",
+                    tenantIds && !tenantIds->empty());
+            break;
+        }
+        case MigrationProtocolEnum::kMultitenantMigrations: {
+            uassert(ErrorCodes::InvalidOptions,
+                    str::stream() << "'tenantId' must be empty for protocol '"
+                                  << MigrationProtocol_serializer(protocol) << "'",
+                    !tenantIds);
             break;
         }
         default:

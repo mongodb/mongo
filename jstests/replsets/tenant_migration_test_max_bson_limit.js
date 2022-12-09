@@ -41,7 +41,7 @@ jsTestLog("Testing that large write errors fit within the BSON size limit.");
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
-const tenantId = "bulkUnorderedInserts-committed";
+const tenantId = ObjectId().str;
 const migrationOpts = {
     migrationIdString: extractUUIDFromObject(UUID()),
     tenantId,

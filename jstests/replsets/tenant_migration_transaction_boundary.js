@@ -31,7 +31,7 @@ load("jstests/libs/uuid_util.js");
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
-const tenantId = "testTenantId";
+const tenantId = ObjectId().str;
 const tenantDB = tenantMigrationTest.tenantDB(tenantId, "testDB");
 const collName = "testColl";
 const tenantNS = `${tenantDB}.${collName}`;

@@ -38,8 +38,8 @@ if (!TenantMigrationUtil.isShardMergeEnabled(donorPrimary.getDB("admin"))) {
     return;
 }
 
-const kTenant1Id = "testTenantId1";
-const kTenant2Id = "testTenantId2";
+const kTenant1Id = ObjectId().str;
+const kTenant2Id = ObjectId().str;
 const kTenant1DbName = tenantMigrationTest.tenantDB(kTenant1Id, "testDB");
 const kTenant2DbName = tenantMigrationTest.tenantDB(kTenant2Id, "testDB");
 const kEmptyCollName = "testEmptyColl";
@@ -62,6 +62,7 @@ const migrationId = UUID();
 const migrationOpts = {
     migrationIdString: extractUUIDFromObject(migrationId),
     recipientConnString: tenantMigrationTest.getRecipientConnString(),
+    tenantIds: tojson([ObjectId(kTenant1Id), ObjectId(kTenant2Id)])
 };
 const donorRstArgs = TenantMigrationUtil.createRstArgs(tenantMigrationTest.getDonorRst());
 

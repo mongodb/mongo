@@ -33,7 +33,8 @@ const tenantMigrationTest = new TenantMigrationTest({
 const kRecipientTTLIndexName = "TenantMigrationRecipientTTLIndex";
 
 const kMigrationId = UUID();
-const kTenantId = 'testTenantId';
+const kTenantId = ObjectId().str;
+
 const migrationOpts = {
     migrationIdString: extractUUIDFromObject(kMigrationId),
     tenantId: kTenantId,

@@ -23,7 +23,7 @@ load("jstests/libs/parallelTester.js");  // for 'Thread'
 load("jstests/libs/uuid_util.js");
 load("jstests/replsets/rslib.js");  // for 'getLastOpTime'
 
-const kTenantId = "testTenantId";
+const kTenantId = ObjectId().str;
 const tenantMigrationTest =
     new TenantMigrationTest({name: jsTestName(), insertDataForTenant: kTenantId});
 

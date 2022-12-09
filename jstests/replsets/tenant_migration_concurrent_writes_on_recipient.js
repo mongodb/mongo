@@ -20,8 +20,6 @@ load("jstests/libs/uuid_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
 
-const kTenantId = "testTenantId";
-
 const tenantMigrationTest =
     new TenantMigrationTest({name: jsTestName(), quickGarbageCollection: true});
 
@@ -38,7 +36,7 @@ function cleanup(dbName) {
     const donorPrimary = donorRst.getPrimary();
     const recipientPrimary = tenantMigrationTest.getRecipientRst().getPrimary();
 
-    const tenantId = `${kTenantId}Commit`;
+    const tenantId = ObjectId().str;
     const donorDB = `${tenantId}_test`;
     tenantMigrationTest.insertDonorDB(donorDB, "test");
     const ns = `${tenantId}_testDb.testColl`;
@@ -105,7 +103,7 @@ function cleanup(dbName) {
 
     const recipientPrimary = tenantMigrationTest.getRecipientRst().getPrimary();
 
-    const tenantId = `${kTenantId}AbortBeforeReturnAfterReachingTs`;
+    const tenantId = ObjectId().str;
     const donorDB = `${tenantId}_test`;
     tenantMigrationTest.insertDonorDB(donorDB, "test");
     const ns = `${tenantId}_testDb.testColl`;
@@ -147,7 +145,7 @@ function cleanup(dbName) {
     const donorPrimary = tenantMigrationTest.getDonorRst().getPrimary();
     const recipientPrimary = tenantMigrationTest.getRecipientRst().getPrimary();
 
-    const tenantId = `${kTenantId}AbortAfterReturnAfterReachingTs`;
+    const tenantId = ObjectId().str;
     const donorDB = `${tenantId}_test`;
     tenantMigrationTest.insertDonorDB(donorDB, "test");
     const ns = `${tenantId}_testDb.testColl`;
@@ -155,7 +153,7 @@ function cleanup(dbName) {
 
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
-        tenantId: `${kTenantId}AbortAfterReturnAfterReachingTs`,
+        tenantId,
         recipientConnString: tenantMigrationTest.getRecipientConnString(),
     };
 

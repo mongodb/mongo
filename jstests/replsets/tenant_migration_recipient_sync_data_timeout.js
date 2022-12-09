@@ -19,8 +19,6 @@ load("jstests/replsets/libs/tenant_migration_test.js");
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
-const kTenantId = "testTenantId";
-
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 configureFailPoint(recipientPrimary, "failCommand", {
     failInternalCommands: true,
@@ -32,7 +30,7 @@ configureFailPoint(recipientPrimary, "failCommand", {
 const migrationId = UUID();
 const migrationOpts = {
     migrationIdString: extractUUIDFromObject(migrationId),
-    tenantId: kTenantId,
+    tenantId: ObjectId().str,
 };
 
 TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(migrationOpts));

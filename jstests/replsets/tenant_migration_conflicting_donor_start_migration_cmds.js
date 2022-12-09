@@ -47,16 +47,6 @@ function assertNoCertificateOrPrivateKey(string) {
     assert(!string.includes("PRIVATE KEY"), "found private key");
 }
 
-const kTenantIdPrefix = "testTenantId";
-let tenantCounter = 0;
-
-/**
- * Returns a tenantId that will not match any existing prefix.
- */
-function generateUniqueTenantId() {
-    return kTenantIdPrefix + tenantCounter++;
-}
-
 const {donor: donorNodeOptions} = TenantMigrationUtil.makeX509OptionsForTest();
 donorNodeOptions.setParameter = donorNodeOptions.setParameter || {};
 Object.assign(donorNodeOptions.setParameter, {
@@ -86,7 +76,7 @@ function teardown() {
 // Test that a retry of a donorStartMigration command joins the existing migration that has
 // completed but has not been garbage-collected.
 (() => {
-    const tenantId = `${generateUniqueTenantId()}RetryAfterMigrationCompletes`;
+    const tenantId = ObjectId().str;
     const migrationId = UUID();
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
@@ -110,7 +100,7 @@ function teardown() {
 
 // Test that a retry of a donorStartMigration command joins the ongoing migration.
 (() => {
-    const tenantId = `${generateUniqueTenantId()}RetryBeforeMigrationCompletes`;
+    const tenantId = ObjectId().str;
     const migrationId = UUID();
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
@@ -259,7 +249,7 @@ function testConcurrentConflictingMigrations({
     const makeTestParams = () => {
         const migrationOpts0 = {
             migrationIdString: extractUUIDFromObject(UUID()),
-            tenantId: generateUniqueTenantId() + "DiffMigrationId",
+            tenantId: ObjectId().str,
         };
         const migrationOpts1 = Object.extend({}, migrationOpts0, true);
         migrationOpts1.migrationIdString = extractUUIDFromObject(UUID());
@@ -289,10 +279,10 @@ function testConcurrentConflictingMigrations({
     const makeTestParams = () => {
         const migrationOpts0 = {
             migrationIdString: extractUUIDFromObject(UUID()),
-            tenantId: generateUniqueTenantId() + "DiffTenantId",
+            tenantId: ObjectId().str,
         };
         const migrationOpts1 = Object.extend({}, migrationOpts0, true);
-        migrationOpts1.tenantId = generateUniqueTenantId() + "DiffTenantId";
+        migrationOpts1.tenantId = ObjectId().str;
         return {
             tenantMigrationTest0: tenantMigrationTest,
             migrationOpts0,
@@ -313,7 +303,7 @@ function testConcurrentConflictingMigrations({
     const makeTestParams = () => {
         const migrationOpts0 = {
             migrationIdString: extractUUIDFromObject(UUID()),
-            tenantId: `${generateUniqueTenantId()}DiffRecipientConnString`,
+            tenantId: ObjectId().str,
         };
         // The recipient connection string will be populated by the TenantMigrationTest fixture, so
         // no need to set it here.
@@ -343,7 +333,7 @@ function testConcurrentConflictingMigrations({
     const makeTestParams = () => {
         const migrationOpts0 = {
             migrationIdString: extractUUIDFromObject(UUID()),
-            tenantId: generateUniqueTenantId() + "DiffReadPref",
+            tenantId: ObjectId().str,
         };
         const migrationOpts1 = Object.extend({}, migrationOpts0, true);
         migrationOpts1.readPreference = {mode: "secondary"};
@@ -374,7 +364,7 @@ const kExpiredRecipientCertificateAndPrivateKey = TenantMigrationUtil.getCertifi
     const makeTestParams = () => {
         const migrationOpts0 = {
             migrationIdString: extractUUIDFromObject(UUID()),
-            tenantId: generateUniqueTenantId() + "DiffDonorCertificate",
+            tenantId: ObjectId().str,
             donorCertificateForRecipient: kDonorCertificateAndPrivateKey,
             recipientCertificateForDonor: kRecipientCertificateAndPrivateKey
         };
@@ -398,7 +388,7 @@ const kExpiredRecipientCertificateAndPrivateKey = TenantMigrationUtil.getCertifi
     const makeTestParams = () => {
         const migrationOpts0 = {
             migrationIdString: extractUUIDFromObject(UUID()),
-            tenantId: generateUniqueTenantId() + "DiffRecipientCertificate",
+            tenantId: ObjectId().str,
             donorCertificateForRecipient: kDonorCertificateAndPrivateKey,
             recipientCertificateForDonor: kRecipientCertificateAndPrivateKey
         };

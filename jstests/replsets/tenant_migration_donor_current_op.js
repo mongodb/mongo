@@ -30,7 +30,7 @@ const migrationStates = {
     kAborted: 5
 };
 
-const kTenantId = 'testTenantId';
+const kTenantId = ObjectId().str;
 const kReadPreference = {
     mode: "primary"
 };

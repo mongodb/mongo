@@ -25,7 +25,7 @@ const {ServerlessLockType, getServerlessOperationLock} = TenantMigrationUtil;
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
 const kMaxSleepTimeMS = 1000;
-const kTenantId = 'testTenantId';
+const kTenantId = ObjectId().str;
 
 let donorPrimary = tenantMigrationTest.getDonorPrimary();
 

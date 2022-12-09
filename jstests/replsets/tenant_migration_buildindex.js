@@ -29,8 +29,8 @@ if (TenantMigrationUtil.isShardMergeEnabled(
     return;
 }
 
-const kTenantId = "testTenantId1";
-const kUnrelatedTenantId = "testTenantId2";
+const kTenantId = ObjectId().str;
+const kUnrelatedTenantId = ObjectId().str;
 const kDbName = tenantMigrationTest.tenantDB(kTenantId, "testDB");
 const kUnrelatedDbName = tenantMigrationTest.tenantDB(kUnrelatedTenantId, "testDB");
 const kEmptyCollName = "testEmptyColl";

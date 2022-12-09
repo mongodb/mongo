@@ -22,7 +22,7 @@ load("jstests/replsets/libs/tenant_migration_util.js");
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
-const kTenantId = "testTenantId";
+const kTenantId = ObjectId().str;
 const kDbName = kTenantId + "_testDb";
 const kCollName = "testColl";
 

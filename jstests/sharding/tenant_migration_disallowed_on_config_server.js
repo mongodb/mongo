@@ -30,7 +30,7 @@ let donorPrimary = donorRstConfig.getPrimary();
 
 let cmdObj = TenantMigrationUtil.donorStartMigrationWithProtocol({
     donorStartMigration: 1,
-    tenantId: "kTenantTest",
+    tenantId: ObjectId().str,
     migrationId: UUID(),
     recipientConnectionString: tenantMigrationTest.getRecipientConnString(),
     readPreference: {mode: "primary"}
@@ -54,7 +54,7 @@ cmdObj = {
     recipientSyncData: 1,
     migrationId: UUID(),
     donorConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
-    tenantId: "kTenantTest",
+    tenantId: ObjectId().str,
     readPreference: {mode: "primary"},
     startMigrationDonorTimestamp: Timestamp(1, 1)
 };
@@ -64,7 +64,7 @@ cmdObj = {
     recipientForgetMigration: 1,
     migrationId: UUID(),
     donorConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
-    tenantId: "kTenantTest",
+    tenantId: ObjectId().str,
     readPreference: {mode: "primary"},
 };
 assert.commandFailedWithCode(donorPrimary.adminCommand(cmdObj), ErrorCodes.IllegalOperation);

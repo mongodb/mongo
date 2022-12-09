@@ -37,7 +37,7 @@ if (!TenantMigrationUtil.isShardMergeEnabled(recipientPrimary.getDB("admin"))) {
     return;
 }
 
-const kTenantId = "testTenantId1";
+const kTenantId = ObjectId();
 
 function runVoteCmd(migrationId) {
     // Pretend the primary tells itself it has imported files. This may preempt the primary's real
@@ -66,6 +66,7 @@ const migrationId = UUID();
 const migrationOpts = {
     migrationIdString: extractUUIDFromObject(migrationId),
     recipientConnString: tenantMigrationTest.getRecipientConnString(),
+    tenantIds: tojson([kTenantId]),
 };
 
 const donorRstArgs = TenantMigrationUtil.createRstArgs(tenantMigrationTest.getDonorRst());
@@ -98,7 +99,7 @@ jsTestLog("Test that recipientVoteImportedFiles succeeds after migration commits
 voteShouldSucceed(migrationId);
 assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 jsTestLog("Await garbage collection");
-tenantMigrationTest.waitForMigrationGarbageCollection(migrationId, kTenantId);
+tenantMigrationTest.waitForMigrationGarbageCollection(migrationId, kTenantId.str);
 jsTestLog("Test that recipientVoteImportedFiles fails after migration is forgotten");
 voteShouldFail(migrationId);
 tenantMigrationTest.stop();

@@ -25,11 +25,9 @@ const kMigrationFpNames = [
     "abortTenantMigrationBeforeLeavingBlockingState",
     null,
 ];
-const kTenantId = "testTenantId";
-let testNum = 0;
 
 function makeTenantId() {
-    return kTenantId + testNum++;
+    return ObjectId().str;
 }
 
 function makeMigrationOpts(tenantMigrationTest, tenantId) {

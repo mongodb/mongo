@@ -23,8 +23,7 @@ load("jstests/replsets/libs/tenant_migration_util.js");
 const kGarbageCollectionDelayMS = 5 * 1000;
 const kDelayMS = 100000;  // Set some arbitrarily large blockTimeMS to let recipientSyncData command
                           // hang until we use kill op to kill it.
-const kTenantIdPrefix = "testTenantId";
-let testNum = 0;
+
 const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
 const garbageCollectionOpts = {
     // Set the delay before a donor state doc is garbage collected to be short to speed
@@ -34,7 +33,7 @@ const garbageCollectionOpts = {
 };
 
 function makeTenantId() {
-    return kTenantIdPrefix + testNum++;
+    return ObjectId().str;
 }
 
 {

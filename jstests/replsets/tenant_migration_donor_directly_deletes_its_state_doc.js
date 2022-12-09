@@ -37,7 +37,7 @@ load("jstests/replsets/libs/tenant_migration_test.js");
     assert.eq(0, donorStats.totalMigrationDonationsAborted);
 
     jsTest.log("Start a tenant migration.");
-    const tenantId = "testTenantId";
+    const tenantId = ObjectId().str;
     const migrationId = extractUUIDFromObject(UUID());
     const migrationOpts = {
         migrationIdString: migrationId,
@@ -110,7 +110,7 @@ load("jstests/replsets/libs/tenant_migration_test.js");
     assert.eq(0, donorStats.totalMigrationDonationsAborted);
 
     jsTest.log("Start a tenant migration.");
-    const tenantId = "testTenantId";
+    const tenantId = ObjectId().str;
     const migrationId = extractUUIDFromObject(UUID());
     const migrationOpts = {
         migrationIdString: migrationId,

@@ -76,7 +76,6 @@ function setup() {
     };
 }
 
-const kTenantIdPrefix = "testTenantId";
 const kDbName = "testDb";
 const kCollName = "testColl";
 
@@ -86,7 +85,7 @@ const kCollName = "testColl";
     const {tenantMigrationTest, donorRst, teardown} = setup();
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
     const donorsColl = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS);
-    const tenantId = kTenantIdPrefix + "LaggedSecondaryMigrationAborted";
+    const tenantId = ObjectId().str;
     const dbName = tenantId + "_" + kDbName;
     assert.commandWorked(
         donorPrimary.getDB(dbName).runCommand({insert: kCollName, documents: [{_id: 0}]}));
@@ -136,7 +135,7 @@ const kCollName = "testColl";
     const {tenantMigrationTest, donorRst, teardown} = setup();
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
     const donorsColl = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS);
-    const tenantId = kTenantIdPrefix + "LaggedSecondaryMigrationCommitted";
+    const tenantId = ObjectId().str;
     const dbName = tenantId + "_" + kDbName;
     assert.commandWorked(
         donorPrimary.getDB(dbName).runCommand({insert: kCollName, documents: [{_id: 0}]}));
@@ -183,7 +182,7 @@ const kCollName = "testColl";
     const {tenantMigrationTest, donorRst, teardown} = setup();
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
     const donorsColl = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS);
-    const tenantId = kTenantIdPrefix + "DropStateDocCollection";
+    const tenantId = ObjectId().str;
     const dbName = tenantId + "_" + kDbName;
     assert.commandWorked(
         donorPrimary.getDB(dbName).runCommand({insert: kCollName, documents: [{_id: 0}]}));

@@ -45,6 +45,8 @@ function cannotStartMigrationWhileShardSplitIsInProgress(protocol) {
     };
     if (protocol != "shard merge") {
         migrationOpts["tenantId"] = tenantIds[0].str;
+    } else {
+        migrationOpts["tenantIds"] = tenantIds;
     }
     jsTestLog("Starting tenant migration");
     assert.commandFailedWithCode(test.startMigration(migrationOpts),

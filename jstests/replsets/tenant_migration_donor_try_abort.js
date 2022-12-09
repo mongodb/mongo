@@ -20,7 +20,7 @@ load("jstests/libs/write_concern_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
 
-const kTenantId = "testTenantId";
+const kTenantId = ObjectId().str;
 const kDelayMS =
     500000;  // Using some arbitrarily large delay time in to make sure that the donor is not
              // waiting this long when it receives a donorAbortMigration command.

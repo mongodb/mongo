@@ -54,6 +54,8 @@ function canStartMigrationAfterSplitGarbageCollection(protocol) {
     };
     if (protocol != "shard merge") {
         migrationOpts["tenantId"] = tenantIds[0].str;
+    } else {
+        migrationOpts["tenantIds"] = tenantIds;
     }
     assert.commandWorked(test.startMigration(migrationOpts));
 

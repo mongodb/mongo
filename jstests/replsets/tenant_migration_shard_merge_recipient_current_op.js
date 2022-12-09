@@ -37,13 +37,14 @@ if (!TenantMigrationUtil.isShardMergeEnabled(
 }
 
 const kMigrationId = UUID();
-const kTenantId = 'testTenantId';
+const kTenantId = ObjectId().str;
 const kReadPreference = {
     mode: "primary"
 };
 const migrationOpts = {
     migrationIdString: extractUUIDFromObject(kMigrationId),
-    readPreference: kReadPreference
+    readPreference: kReadPreference,
+    tenantIds: [ObjectId(kTenantId)]
 };
 
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();

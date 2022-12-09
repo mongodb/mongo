@@ -421,8 +421,9 @@ const tenantMigrationTest = new TenantMigrationTest({
 });
 for (const [testName, testFunc] of Object.entries(testFuncs)) {
     for (const [testCaseName, testCase] of Object.entries(testCases)) {
-        jsTest.log("Testing " + testName + " with testCase " + testCaseName);
-        let tenantId = `${testCaseName}-${testName}`;
+        let tenantId = ObjectId().str;
+        jsTest.log("Testing " + testName + " with testCase " + testCaseName + " with tenantId " +
+                   tenantId);
         let migrationDb = `${tenantId}_test`;
         tenantMigrationTest.insertDonorDB(migrationDb, "test");
         let dbName = `${tenantId}_${kTenantDefinedDbName}`;

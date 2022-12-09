@@ -92,8 +92,6 @@ const testCases = TenantMigrationConcurrentWriteUtil.testCases;
 
 // Run test cases while the migration is blocked and then rejects after committed.
 for (const [commandName, testCase] of Object.entries(testCases)) {
-    let baseDbName = commandName + "-inBlockingThenCommitted0";
-
     if (testCase.skip) {
         print("Skipping " + commandName + ": " + testCase.skip);
         continue;
@@ -102,25 +100,27 @@ for (const [commandName, testCase] of Object.entries(testCases)) {
     runTestForConcurrentWritesTest(donorPrimary,
                                    testCase,
                                    testRejectBlockedWritesAfterMigrationCommitted,
-                                   baseDbName + "Basic_" + kTenantDefinedDbName,
+                                   ObjectId().str + "_BlockingCommitted-B-" + kTenantDefinedDbName,
                                    kCollName);
 
     if (testCase.testInTransaction) {
-        runTestForConcurrentWritesTest(donorPrimary,
-                                       testCase,
-                                       testRejectBlockedWritesAfterMigrationCommitted,
-                                       baseDbName + "Txn_" + kTenantDefinedDbName,
-                                       kCollName,
-                                       {testInTransaction: true});
+        runTestForConcurrentWritesTest(
+            donorPrimary,
+            testCase,
+            testRejectBlockedWritesAfterMigrationCommitted,
+            ObjectId().str + "_BlockingCommitted-T-" + kTenantDefinedDbName,
+            kCollName,
+            {testInTransaction: true});
     }
 
     if (testCase.testAsRetryableWrite) {
-        runTestForConcurrentWritesTest(donorPrimary,
-                                       testCase,
-                                       testRejectBlockedWritesAfterMigrationCommitted,
-                                       baseDbName + "Retryable_" + kTenantDefinedDbName,
-                                       kCollName,
-                                       {testAsRetryableWrite: true});
+        runTestForConcurrentWritesTest(
+            donorPrimary,
+            testCase,
+            testRejectBlockedWritesAfterMigrationCommitted,
+            ObjectId().str + "_BlockingCommitted-R-" + kTenantDefinedDbName,
+            kCollName,
+            {testAsRetryableWrite: true});
     }
 }
 

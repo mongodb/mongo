@@ -111,7 +111,7 @@ const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRs
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 
-const kTenantId = "testDb";
+const kTenantId = ObjectId().str;
 
 let configDonorsColl = donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS);
 

@@ -22,6 +22,18 @@ var TenantMigrationUtil = (function() {
     }
 
     /**
+     * Checks the FCV and the command object passed to see if tenantIds should be set for shard
+     * merge.
+     */
+    function shouldUseMergeTenantIds(cmd, db) {
+        const fcvDoc = assert.commandWorked(
+            db.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}));
+
+        return MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, "6.3") >=
+            0;
+    }
+
+    /**
      * Construct a donorStartMigration command object with protocol: "shard merge" if the feature
      * flag is enabled.
      */
@@ -31,12 +43,23 @@ var TenantMigrationUtil = (function() {
         // "multitenant migrations" if not provided.
         if (cmd["protocol"] === undefined && isShardMergeEnabled(db)) {
             const cmdCopy = Object.assign({}, cmd);
+
+            if (shouldUseMergeTenantIds(cmd, db)) {
+                cmdCopy.tenantIds = cmdCopy.tenantIds || [ObjectId(cmdCopy.tenantId)];
+            }
+
             delete cmdCopy.tenantId;
             cmdCopy.protocol = "shard merge";
             return cmdCopy;
+        } else if (cmd["protocol"] == "shard merge") {
+            const cmdCopy = Object.assign({}, cmd);
+            delete cmdCopy.tenantId;
+            return cmdCopy;
+        } else {
+            const cmdCopy = Object.assign({}, cmd);
+            delete cmdCopy.tenantIds;
+            return cmdCopy;
         }
-
-        return cmd;
     }
 
     /**
@@ -132,12 +155,13 @@ var TenantMigrationUtil = (function() {
             donorStartMigration: 1,
             migrationId: UUID(migrationOpts.migrationIdString),
             tenantId: migrationOpts.tenantId,
+            tenantIds: eval(migrationOpts.tenantIds),
             recipientConnectionString: migrationOpts.recipientConnString,
             readPreference: migrationOpts.readPreference || {mode: "primary"},
             donorCertificateForRecipient: migrationOpts.donorCertificateForRecipient ||
                 migrationCertificates.donorCertificateForRecipient,
             recipientCertificateForDonor: migrationOpts.recipientCertificateForDonor ||
-                migrationCertificates.recipientCertificateForDonor
+                migrationCertificates.recipientCertificateForDonor,
         };
 
         return TenantMigrationUtil.runTenantMigrationCommand(cmdObj, donorRst, {

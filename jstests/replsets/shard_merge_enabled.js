@@ -40,7 +40,8 @@ function runTest(downgradeFCV) {
             recipientConnectionString: kDummyConnStr,
             readPreference: readPreference,
             donorCertificateForRecipient: migrationCertificates.donorCertificateForRecipient,
-            recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor
+            recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
+            tenantIds: [ObjectId()]
         };
     }
 

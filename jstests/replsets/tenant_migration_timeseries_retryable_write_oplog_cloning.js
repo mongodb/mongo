@@ -56,7 +56,7 @@ function testOplogCloning(ordered) {
 
     const donorPrimary = donorRst.getPrimary();
 
-    const kTenantId = "testTenantId";
+    const kTenantId = ObjectId().str;
     const kDbName = kTenantId + "_" +
         "tsDb";
     const kCollName = "tsColl";

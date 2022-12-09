@@ -21,7 +21,7 @@ load("jstests/libs/uuid_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
 
-const kTenantId = "testTenantId";
+const kTenantId = ObjectId().str;
 const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});

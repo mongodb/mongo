@@ -36,8 +36,8 @@ if (!TenantMigrationUtil.isShardMergeEnabled(recipientPrimary.getDB("admin"))) {
 
 jsTestLog(
     "Test that recipient state is correctly set to 'learned filenames' after creating the backup cursor");
-const tenantId = "testTenantId";
-const tenantDB = tenantMigrationTest.tenantDB(tenantId, "DB");
+const tenantId = ObjectId();
+const tenantDB = tenantMigrationTest.tenantDB(tenantId.str, "DB");
 const collName = "testColl";
 
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
@@ -51,7 +51,8 @@ const waitInFailPoint = configureFailPoint(recipientPrimary, failpoint, {action:
 const migrationUuid = UUID();
 const migrationOpts = {
     migrationIdString: extractUUIDFromObject(migrationUuid),
-    readPreference: {mode: 'primary'}
+    readPreference: {mode: 'primary'},
+    tenantIds: [tenantId],
 };
 
 jsTestLog(`Starting the tenant migration to wait in failpoint: ${failpoint}`);
@@ -63,7 +64,7 @@ waitInFailPoint.wait();
 tenantMigrationTest.assertRecipientNodesInExpectedState({
     nodes: tenantMigrationTest.getRecipientRst().nodes,
     migrationId: migrationUuid,
-    tenantId,
+    tenantId: tenantId.str,
     expectedState: TenantMigrationTest.RecipientState.kLearnedFilenames,
     expectedAccessState: TenantMigrationTest.RecipientAccessState.kReject
 });

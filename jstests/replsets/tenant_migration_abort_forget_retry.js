@@ -22,11 +22,8 @@ load("jstests/libs/uuid_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
 
-const kTenantIdPrefix = "testTenantId";
-let testNum = 0;
-
 function makeTenantId() {
-    return kTenantIdPrefix + testNum++;
+    return ObjectId().str;
 }
 
 const tenantMigrationTest =

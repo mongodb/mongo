@@ -55,6 +55,8 @@ function cannotStartMigrationWhenThereIsAnExistingAccessBlocker(protocol) {
     };
     if (protocol != "shard merge") {
         migrationOpts["tenantId"] = tenantIds[0];
+    } else {
+        migrationOpts["tenantIds"] = tenantIds;
     }
     assert.commandFailed(test.startMigration(migrationOpts));
 
