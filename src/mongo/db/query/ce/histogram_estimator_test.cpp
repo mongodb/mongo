@@ -53,7 +53,7 @@ public:
     CEHistogramTester(std::string collName, double numRecords)
         : CETester(collName, numRecords), _stats{new CollectionStatisticsMock(numRecords)} {}
 
-    void addHistogram(const std::string& path, std::shared_ptr<ArrayHistogram> histogram) {
+    void addHistogram(const std::string& path, std::shared_ptr<const ArrayHistogram> histogram) {
         _stats->addHistogram(path, histogram);
     }
 
@@ -75,7 +75,7 @@ struct TestBucket {
 };
 using TestBuckets = std::vector<TestBucket>;
 
-ScalarHistogram getHistogramFromData(TestBuckets testBuckets) {
+const ScalarHistogram getHistogramFromData(TestBuckets testBuckets) {
     sbe::value::Array bounds;
     std::vector<Bucket> buckets;
 
@@ -97,7 +97,7 @@ ScalarHistogram getHistogramFromData(TestBuckets testBuckets) {
                              cumulativeNDV);
     }
 
-    return ScalarHistogram(std::move(bounds), std::move(buckets));
+    return ScalarHistogram::make(std::move(bounds), std::move(buckets));
 }
 
 TypeCounts getTypeCountsFromData(TestBuckets testBuckets) {
@@ -117,22 +117,22 @@ TypeCounts getTypeCountsFromData(TestBuckets testBuckets) {
     return typeCounts;
 }
 
-std::unique_ptr<ArrayHistogram> getArrayHistogramFromData(TestBuckets testBuckets,
-                                                          TypeCounts additionalScalarData = {}) {
+std::shared_ptr<const ArrayHistogram> getArrayHistogramFromData(
+    TestBuckets testBuckets, TypeCounts additionalScalarData = {}) {
     TypeCounts dataTypeCounts = getTypeCountsFromData(testBuckets);
     dataTypeCounts.merge(additionalScalarData);
-    return std::make_unique<ArrayHistogram>(getHistogramFromData(testBuckets),
-                                            std::move(dataTypeCounts));
+    return ArrayHistogram::make(getHistogramFromData(testBuckets), std::move(dataTypeCounts));
 }
 
-std::unique_ptr<ArrayHistogram> getArrayHistogramFromData(TestBuckets scalarBuckets,
-                                                          TestBuckets arrayUniqueBuckets,
-                                                          TestBuckets arrayMinBuckets,
-                                                          TestBuckets arrayMaxBuckets,
-                                                          TypeCounts arrayTypeCounts,
-                                                          double totalArrayCount,
-                                                          double emptyArrayCount = 0,
-                                                          TypeCounts additionalScalarData = {}) {
+std::shared_ptr<const ArrayHistogram> getArrayHistogramFromData(
+    TestBuckets scalarBuckets,
+    TestBuckets arrayUniqueBuckets,
+    TestBuckets arrayMinBuckets,
+    TestBuckets arrayMaxBuckets,
+    TypeCounts arrayTypeCounts,
+    double totalArrayCount,
+    double emptyArrayCount = 0,
+    TypeCounts additionalScalarData = {}) {
 
     // Set up scalar type counts.
     TypeCounts dataTypeCounts = getTypeCountsFromData(scalarBuckets);
@@ -142,13 +142,13 @@ std::unique_ptr<ArrayHistogram> getArrayHistogramFromData(TestBuckets scalarBuck
     // Set up histograms.
     auto arrayMinHist = getHistogramFromData(arrayMinBuckets);
     auto arrayMaxHist = getHistogramFromData(arrayMaxBuckets);
-    return std::make_unique<ArrayHistogram>(getHistogramFromData(scalarBuckets),
-                                            std::move(dataTypeCounts),
-                                            getHistogramFromData(arrayUniqueBuckets),
-                                            std::move(arrayMinHist),
-                                            std::move(arrayMaxHist),
-                                            std::move(arrayTypeCounts),
-                                            emptyArrayCount);
+    return ArrayHistogram::make(getHistogramFromData(scalarBuckets),
+                                std::move(dataTypeCounts),
+                                getHistogramFromData(arrayUniqueBuckets),
+                                std::move(arrayMinHist),
+                                std::move(arrayMaxHist),
+                                std::move(arrayTypeCounts),
+                                emptyArrayCount);
 }
 
 TEST(CEHistogramTest, AssertSmallMaxDiffHistogramEstimatesAtomicPredicates) {
@@ -258,7 +258,7 @@ TEST(CEHistogramTest, AssertSmallHistogramEstimatesComplexPredicates) {
 TEST(CEHistogramTest, SanityTestEmptyHistogram) {
     constexpr auto kCollCard = 0;
     CEHistogramTester t(collName, kCollCard);
-    t.addHistogram("empty", std::make_unique<ArrayHistogram>());
+    t.addHistogram("empty", ArrayHistogram::make());
 
     ASSERT_MATCH_CE(t, "{empty: {$eq: 1.0}}", 0.0);
     ASSERT_MATCH_CE(t, "{empty: {$lt: 1.0}, empty: {$gt: 0.0}}", 0.0);
@@ -504,7 +504,7 @@ TEST(CEHistogramTest, TestArrayHistogramOnAtomicPredicates) {
                 {Value(10), 1 /* frequency */},
             },
             {{sbe::value::TypeTags::NumberInt32, 13}},  // Array type counts.
-            3,                                          // 3 arrays total.
+            4,                                          // 4 arrays (including []).
             1                                           // 1 empty array.
             ));
 
@@ -529,20 +529,20 @@ TEST(CEHistogramTest, TestArrayHistogramOnAtomicPredicates) {
     ASSERT_EQ_ELEMMATCH_CE(t, 0.0 /* CE */, 0.0 /* $elemMatch CE */, "a", "{$gt: 10}");
     ASSERT_EQ_ELEMMATCH_CE(t, 1.0 /* CE */, 1.0 /* $elemMatch CE */, "a", "{$gte: 10}");
 
-    ASSERT_EQ_ELEMMATCH_CE(t, 5.0 /* CE */, 3.0 /* $elemMatch CE */, "a", "{$lte: 10}");
-    ASSERT_EQ_ELEMMATCH_CE(t, 4.0 /* CE */, 3.0 /* $elemMatch CE */, "a", "{$lt: 10}");
-    ASSERT_EQ_ELEMMATCH_CE(t, 4.0 /* CE */, 3.0 /* $elemMatch CE */, "a", "{$gt: 1}");
-    ASSERT_EQ_ELEMMATCH_CE(t, 5.0 /* CE */, 3.0 /* $elemMatch CE */, "a", "{$gte: 1}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 5.0 /* CE */, 4.0 /* $elemMatch CE */, "a", "{$lte: 10}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 4.0 /* CE */, 4.0 /* $elemMatch CE */, "a", "{$lt: 10}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 4.0 /* CE */, 4.0 /* $elemMatch CE */, "a", "{$gt: 1}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 5.0 /* CE */, 4.0 /* $elemMatch CE */, "a", "{$gte: 1}");
 
-    ASSERT_EQ_ELEMMATCH_CE(t, 4.0 /* CE */, 3.0 /* $elemMatch CE */, "a", "{$lte: 5}");
-    ASSERT_EQ_ELEMMATCH_CE(t, 4.0 /* CE */, 3.0 /* $elemMatch CE */, "a", "{$lt: 5}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 4.0 /* CE */, 4.0 /* $elemMatch CE */, "a", "{$lte: 5}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 4.0 /* CE */, 4.0 /* $elemMatch CE */, "a", "{$lt: 5}");
     ASSERT_EQ_ELEMMATCH_CE(t, 2.0 /* CE */, 2.0 /* $elemMatch CE */, "a", "{$gt: 5}");
-    ASSERT_EQ_ELEMMATCH_CE(t, 2.0 /* CE */, 2.40822 /* $elemMatch CE */, "a", "{$gte: 5}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 2.0 /* CE */, 2.55085 /* $elemMatch CE */, "a", "{$gte: 5}");
 
-    ASSERT_EQ_ELEMMATCH_CE(t, 2.45 /* CE */, 2.40822 /* $elemMatch CE */, "a", "{$gt: 2, $lt: 5}");
-    ASSERT_EQ_ELEMMATCH_CE(t, 3.27 /* CE */, 3.0 /* $elemMatch CE */, "a", "{$gte: 2, $lt: 5}");
-    ASSERT_EQ_ELEMMATCH_CE(t, 2.45 /* CE */, 3.0 /* $elemMatch CE */, "a", "{$gt: 2, $lte: 5}");
-    ASSERT_EQ_ELEMMATCH_CE(t, 3.27 /* CE */, 3.0 /* $elemMatch CE */, "a", "{$gte: 2, $lte: 5}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 2.45 /* CE */, 2.55085 /* $elemMatch CE */, "a", "{$gt: 2, $lt: 5}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 3.27 /* CE */, 4.0 /* $elemMatch CE */, "a", "{$gte: 2, $lt: 5}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 2.45 /* CE */, 3.40113 /* $elemMatch CE */, "a", "{$gt: 2, $lte: 5}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 3.27 /* CE */, 4.0 /* $elemMatch CE */, "a", "{$gte: 2, $lte: 5}");
 }
 
 TEST(CEHistogramTest, TestArrayHistogramOnCompositePredicates) {
@@ -1148,9 +1148,9 @@ TEST(CEHistogramTest, TestFallbackForNonConstIntervals) {
         BoundRequirement(true /*inclusive*/, make<Variable>("v3"))};
 
     const auto estInterval = [](const auto& interval) {
-        ArrayHistogram ah;
+        const auto ah = ArrayHistogram::make();
         return estimateIntervalCardinality(
-            ah, interval, 100 /* inputCardinality */, true /* includeScalar */);
+            *ah, interval, 100 /* inputCardinality */, true /* includeScalar */);
     };
 
     ASSERT_EQ(estInterval(intervalLowNonConst), -1.0);

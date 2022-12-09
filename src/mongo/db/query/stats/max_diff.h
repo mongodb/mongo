@@ -63,20 +63,21 @@ struct DataDistribution {
 };
 
 /**
-    Given a set of values sorted in BSON order, generate a data distribution consisting of
-    counts for each value with the values in sorted order
-*/
+ * Given a set of values sorted in BSON order, generate a data distribution consisting of counts for
+ * each value with the values in sorted order
+ */
 DataDistribution getDataDistribution(const std::vector<SBEValue>& sortedInput);
 
 /**
-    Given a data distribution, generate a scalar histogram with the supplied number of buckets
-*/
+ * Given a data distribution, generate a scalar histogram with the supplied number of buckets
+ */
 ScalarHistogram genMaxDiffHistogram(const DataDistribution& dataDistrib, size_t numBuckets);
 
 /**
-    Given a vector containing SBEValues, generate a set of statistics to summarize the supplied
-    data. Histograms will use the supplied number of buckets.
-*/
-ArrayHistogram createArrayEstimator(const std::vector<SBEValue>& arrayData, size_t nBuckets);
+ * Given a vector containing SBEValues, generate a set of statistics to summarize the supplied
+ * data. Histograms will use the supplied number of buckets.
+ */
+std::shared_ptr<const ArrayHistogram> createArrayEstimator(const std::vector<SBEValue>& arrayData,
+                                                           size_t nBuckets);
 
 }  // namespace mongo::stats

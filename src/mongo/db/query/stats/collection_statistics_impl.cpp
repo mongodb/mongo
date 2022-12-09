@@ -42,7 +42,7 @@ double CollectionStatisticsImpl::getCardinality() const {
 }
 
 void CollectionStatisticsImpl::addHistogram(const std::string& path,
-                                            std::shared_ptr<ArrayHistogram> histogram) const {
+                                            std::shared_ptr<const ArrayHistogram> histogram) const {
     _histograms[path] = histogram;
 }
 

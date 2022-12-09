@@ -47,7 +47,7 @@ public:
      * Adds a histogram along the given path.
      */
     void addHistogram(const std::string& path,
-                      std::shared_ptr<ArrayHistogram> histogram) const override;
+                      std::shared_ptr<const ArrayHistogram> histogram) const override;
 
     /**
      * Returns the histogram for the given field path, or nullptr if none exists.

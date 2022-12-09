@@ -34,7 +34,7 @@
 
 namespace mongo::stats {
 
-using Histograms = std::map<std::string, std::shared_ptr<ArrayHistogram>>;
+using Histograms = std::map<std::string, std::shared_ptr<const ArrayHistogram>>;
 
 class CollectionStatistics {
 public:
@@ -52,7 +52,7 @@ public:
      * Adds a histogram along the given path.
      */
     virtual void addHistogram(const std::string& path,
-                              std::shared_ptr<ArrayHistogram> histogram) const = 0;
+                              std::shared_ptr<const ArrayHistogram> histogram) const = 0;
 
     virtual ~CollectionStatistics() = default;
 };

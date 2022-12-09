@@ -66,7 +66,7 @@ TEST_F(StatsCacheLoaderTest, VerifyStatsLoadsScalar) {
     constexpr double numDocs = doubleCount + trueCount + falseCount;
     std::vector<Bucket> buckets{
         Bucket{1.0, 0.0, 1.0, 0.0, 1.0},
-        Bucket{2.0, 5.0, 8.0, 1.0, 2.0},
+        Bucket{2.0, 5.0, 8.0, 1.0, 3.0},
         Bucket{3.0, 4.0, 15.0, 2.0, 6.0},
     };
 
@@ -83,9 +83,9 @@ TEST_F(StatsCacheLoaderTest, VerifyStatsLoadsScalar) {
         {sbe::value::TypeTags::NumberDouble, doubleCount},
         {sbe::value::TypeTags::Boolean, trueCount + falseCount},
     };
-    ScalarHistogram sh(*bounds, buckets);
-    ArrayHistogram ah(sh, tc, trueCount, falseCount);
-    auto expectedSerialized = ah.serialize();
+    auto ah =
+        ArrayHistogram::make(ScalarHistogram::make(*bounds, buckets), tc, trueCount, falseCount);
+    auto expectedSerialized = ah->serialize();
 
     // Serialize histogram into a stats path.
     std::string path = "somePath";
@@ -147,13 +147,13 @@ TEST_F(StatsCacheLoaderTest, VerifyStatsLoadsArray) {
         // A non-empty array.
         SBEValue{sbe::value::TypeTags::Array, nonEmptyArrayVal},
     };
-    ArrayHistogram ah = createArrayEstimator(values, numDocs);
-    auto expectedSerialized = ah.serialize();
+    auto ah = createArrayEstimator(values, numDocs);
+    auto expectedSerialized = ah->serialize();
 
     // Sanity check counters.
-    ASSERT_EQ(ah.getTrueCount(), 2.0);
-    ASSERT_EQ(ah.getFalseCount(), 4.0);
-    ASSERT_EQ(ah.getEmptyArrayCount(), 3.0);
+    ASSERT_EQ(ah->getTrueCount(), 2.0);
+    ASSERT_EQ(ah->getFalseCount(), 4.0);
+    ASSERT_EQ(ah->getEmptyArrayCount(), 3.0);
 
     // Serialize histogram into a stats path.
     std::string path = "somePath";

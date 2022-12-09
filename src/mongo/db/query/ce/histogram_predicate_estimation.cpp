@@ -266,16 +266,10 @@ double getTypeCard(const ArrayHistogram& ah, value::TypeTags tag, bool includeSc
     // estimate the nested array case as counting all arrays, regardless of whether or not they are
     // nested.
     if (includeScalar && tag != value::TypeTags::Array) {
-        auto typeIt = ah.getTypeCounts().find(tag);
-        if (typeIt != ah.getTypeCounts().end()) {
-            count += typeIt->second;
-        }
+        count += ah.getTypeCount(tag);
     }
     if (ah.isArray()) {
-        auto typeIt = ah.getArrayTypeCounts().find(tag);
-        if (typeIt != ah.getArrayTypeCounts().end()) {
-            count += typeIt->second;
-        }
+        count += ah.getArrayTypeCount(tag);
     }
     return count;
 }
