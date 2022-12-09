@@ -85,10 +85,22 @@ DropReply DropCollectionCoordinator::dropCollectionLocally(OperationContext* opC
     }
 
     DropReply result;
-    uassertStatusOK(dropCollection(
-        opCtx, nss, &result, DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
+    try {
+        uassertStatusOK(
+            dropCollection(opCtx,
+                           nss,
+                           &result,
+                           DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
+    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+        // Note that even if the namespace was not found we have to execute the code below!
+        LOGV2_DEBUG(5280920,
+                    1,
+                    "Namespace not found while trying to delete local collection",
+                    "namespace"_attr = nss);
+    }
 
-    // Force the refresh of the catalog cache to purge outdated information
+    // Force the refresh of the catalog cache to purge outdated information. Note also that this
+    // code is indirectly used to notify to secondary nodes to clear their filtering information.
     const auto catalog = Grid::get(opCtx)->catalogCache();
     uassertStatusOK(catalog->getCollectionRoutingInfoWithRefresh(opCtx, nss));
     CatalogCacheLoader::get(opCtx).waitForCollectionFlush(opCtx, nss);
