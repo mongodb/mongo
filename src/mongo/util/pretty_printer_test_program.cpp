@@ -36,6 +36,15 @@
 #include "mongo/util/debugger.h"
 #include "mongo/util/decorable.h"
 
+
+#if defined(__clang__)
+#define clang_optnone __attribute__((optnone))
+#else
+#define clang_optnone
+#endif
+#pragma GCC push_options
+#pragma GCC optimize("O0")
+
 struct MyDecorable : mongo::Decorable<MyDecorable> {};
 
 class testClass {
@@ -54,7 +63,7 @@ auto str1 = MyDecorable::declareDecoration<std::string>();
 auto str2 = MyDecorable::declareDecoration<std::string>();
 
 MyDecorable d1;
-int main(int argc, char** argv) {
+int clang_optnone main(int argc, char** argv) {
 
     std::set<int> set_type = {1, 2, 3, 4};
     std::unique_ptr<int> up(new int);
@@ -63,12 +72,7 @@ int main(int argc, char** argv) {
     str2(d1) = "world";
     mongo::breakpoint();
 
-    for (auto vec : intVec(d1))
-        std::cout << vec << std::endl;
-    std::cout << str1(d1) << std::endl;
-    std::cout << str2(d1) << std::endl;
-    testClass::print_member();
-    std::cout << &up << std::endl;
-
     return 0;
 }
+
+#pragma GCC pop_options

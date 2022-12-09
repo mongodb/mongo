@@ -20,8 +20,8 @@ def detect_toolchain(progspace):
     if not os.path.exists(readelf_bin):
         readelf_bin = 'readelf'
 
-    gcc_version_regex = re.compile(r'.*GCC: \(GNU\) (\d+\.\d+\.\d+).*')
-    clang_version_regex = re.compile(r'.*clang version (\d+\.\d+\.\d+).*')
+    gcc_version_regex = re.compile(r'.*\]\s*GCC: \(GNU\) (\d+\.\d+\.\d+)\s*$')
+    clang_version_regex = re.compile(r'.*\]\s*MongoDB clang version (\d+\.\d+\.\d+).*')
 
     readelf_cmd = [readelf_bin, '-p', '.comment', progspace.filename]
     # take an educated guess as to where we could find the c++ printers, better than hardcoding
