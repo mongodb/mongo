@@ -504,6 +504,11 @@ TEST_F(NodeSBE, Lower2) {
         UnionNode* unionNode = unionABT.cast<UnionNode>();
         ABT& ixScanABT = unionNode->nodes().front().cast<EvaluationNode>()->getChild();
         std::swap(unionABT, ixScanABT);
+        // Swap the right leaf of the MergeJoin with Blackhole, so that it can be deleted. Without
+        // this it points to the IndexScan and cannot delete, since the IndexScan still exists under
+        // the new SortedMerge.
+        ABT blackHole = make<Blackhole>();
+        std::swap(unionNode->nodes().front().cast<EvaluationNode>()->getChild(), blackHole);
 
         // Swap out the MergeJoin for SortedMerge.
         ABT sortedMergeABT =
