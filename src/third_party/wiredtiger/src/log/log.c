@@ -1360,7 +1360,7 @@ __wt_log_acquire(WT_SESSION_IMPL *session, uint64_t recsize, WT_LOGSLOT *slot)
         WT_RET(__log_newfile(session, false, &created_log));
         F_CLR(log, WT_LOG_FORCE_NEWFILE);
         if (log->log_close_fh != NULL)
-            F_SET(slot, WT_SLOT_CLOSEFH);
+            F_SET_ATOMIC_16(slot, WT_SLOT_CLOSEFH);
     }
 
     /*
@@ -1899,12 +1899,6 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
         *freep = 1;
     release_buffered = WT_LOG_SLOT_RELEASED_BUFFERED(slot->slot_state);
     release_bytes = release_buffered + slot->slot_unbuffered;
-#ifdef HAVE_DIAGNOSTIC
-    slot->rel_sess = session;
-    slot->rel_flags = slot->flags;
-    WT_FULL_BARRIER();
-    WT_ASSERT(session, slot->rel_flags == slot->flags);
-#endif
 
     /*
      * Checkpoints can be configured based on amount of log written. Add in this log record to the
@@ -1927,7 +1921,7 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
      * the worker thread. The caller is responsible for freeing the slot in that case. Otherwise the
      * worker thread will free it.
      */
-    if (!F_ISSET(slot, WT_SLOT_FLUSH | WT_SLOT_SYNC_FLAGS)) {
+    if (!F_ISSET_ATOMIC_16(slot, WT_SLOT_FLUSH | WT_SLOT_SYNC_FLAGS)) {
         if (freep != NULL)
             *freep = 0;
         slot->slot_state = WT_LOG_SLOT_WRITTEN;
@@ -1954,15 +1948,15 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
 
     WT_ASSERT(session, slot != log->active_slot);
     __wt_cond_signal(session, log->log_write_cond);
-    F_CLR(slot, WT_SLOT_FLUSH);
+    F_CLR_ATOMIC_16(slot, WT_SLOT_FLUSH);
 
     /*
      * Signal the close thread if needed.
      */
-    if (F_ISSET(slot, WT_SLOT_CLOSEFH))
+    if (F_ISSET_ATOMIC_16(slot, WT_SLOT_CLOSEFH))
         __wt_cond_signal(session, conn->log_file_cond);
 
-    if (F_ISSET(slot, WT_SLOT_SYNC_DIRTY) && !F_ISSET(slot, WT_SLOT_SYNC) &&
+    if (F_ISSET_ATOMIC_16(slot, WT_SLOT_SYNC_DIRTY) && !F_ISSET_ATOMIC_16(slot, WT_SLOT_SYNC) &&
       (ret = __wt_fsync(session, log->log_fh, false)) != 0) {
         /*
          * Ignore ENOTSUP, but don't try again.
@@ -1976,7 +1970,7 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
      * Try to consolidate calls to fsync to wait less. Acquire a spin lock so that threads finishing
      * writing to the log will wait while the current fsync completes and advance log->sync_lsn.
      */
-    while (F_ISSET(slot, WT_SLOT_SYNC | WT_SLOT_SYNC_DIR)) {
+    while (F_ISSET_ATOMIC_16(slot, WT_SLOT_SYNC | WT_SLOT_SYNC_DIR)) {
         /*
          * We have to wait until earlier log files have finished their sync operations. The most
          * recent one will set the LSN to the beginning of our file.
@@ -1997,19 +1991,19 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
          * Check if we have to sync the parent directory. Some combinations of sync flags may result
          * in the log file not yet stable in its parent directory. Do that now if needed.
          */
-        if (F_ISSET(slot, WT_SLOT_SYNC_DIR))
+        if (F_ISSET_ATOMIC_16(slot, WT_SLOT_SYNC_DIR))
             WT_ERR(__log_fsync_dir(session, &sync_lsn, "log_release"));
 
         /*
          * Sync the log file if needed.
          */
-        if (F_ISSET(slot, WT_SLOT_SYNC))
+        if (F_ISSET_ATOMIC_16(slot, WT_SLOT_SYNC))
             WT_ERR(__log_fsync_file(session, &sync_lsn, "log_release", false));
 
         /*
          * Clear the flags before leaving the loop.
          */
-        F_CLR(slot, WT_SLOT_SYNC | WT_SLOT_SYNC_DIR);
+        F_CLR_ATOMIC_16(slot, WT_SLOT_SYNC | WT_SLOT_SYNC_DIR);
         locked = false;
         __wt_spin_unlock(session, &log->log_sync_lock);
     }
@@ -2597,11 +2591,6 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp, ui
     int64_t release_size;
     uint32_t fill_size, force, rdup_len;
     bool free_slot;
-#ifdef HAVE_DIAGNOSTIC
-    WT_LOGSLOT dbgslot[4];
-
-    memset(dbgslot, 0, sizeof(dbgslot));
-#endif
 
     conn = S2C(session);
     log = conn->log;
@@ -2676,9 +2665,7 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp, ui
      * The only time joining a slot should ever return an error is if it detects a panic.
      */
     __wt_log_slot_join(session, rdup_len, flags, &myslot);
-#ifdef HAVE_DIAGNOSTIC
-    dbgslot[0] = *myslot.slot;
-#endif
+
     /*
      * If the addition of this record crosses the buffer boundary, switch in a new slot.
      */
@@ -2697,16 +2684,10 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp, ui
         myslot.slot->slot_error = ret;
     WT_ASSERT(session, ret == 0);
     if (WT_LOG_SLOT_DONE(release_size)) {
-#ifdef HAVE_DIAGNOSTIC
-        dbgslot[1] = *myslot.slot;
-#endif
         WT_ERR(__wt_log_release(session, myslot.slot, &free_slot));
         if (free_slot)
             __wt_log_slot_free(session, myslot.slot);
     } else if (force) {
-#ifdef HAVE_DIAGNOSTIC
-        dbgslot[2] = *myslot.slot;
-#endif
         /*
          * If we are going to wait for this slot to get written, signal the log server thread.
          *
@@ -2724,10 +2705,6 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp, ui
             __wt_cond_wait(session, log->log_write_cond, 10000, NULL);
     } else if (LF_ISSET(WT_LOG_FSYNC)) {
         /* Wait for our writes to reach disk */
-#ifdef HAVE_DIAGNOSTIC
-        /* NOTE: the slot could be reused and contain unrelated information. Copy it anyway. */
-        dbgslot[3] = *myslot.slot;
-#endif
         while (__wt_log_cmp(&log->sync_lsn, &lsn) <= 0 && myslot.slot->slot_error == 0)
             __wt_cond_wait(session, log->log_sync_cond, 10000, NULL);
     }
