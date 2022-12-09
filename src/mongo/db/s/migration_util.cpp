@@ -366,16 +366,19 @@ BSONObj makeMigrationStatusDocumentSource(
     return builder.obj();
 }
 
-BSONObj makeMigrationStatusDocumentDestination(const NamespaceString& nss,
-                                               const ShardId& fromShard,
-                                               const ShardId& toShard,
-                                               const bool& isDonorShard,
-                                               const BSONObj& min,
-                                               const BSONObj& max,
-                                               long long sessionOplogEntriesMigrated) {
+BSONObj makeMigrationStatusDocumentDestination(
+    const NamespaceString& nss,
+    const ShardId& fromShard,
+    const ShardId& toShard,
+    const bool& isDonorShard,
+    const BSONObj& min,
+    const BSONObj& max,
+    boost::optional<long long> sessionOplogEntriesMigrated) {
     BSONObjBuilder builder =
         _makeMigrationStatusDocumentCommon(nss, fromShard, toShard, isDonorShard, min, max);
-    builder.append(kSessionOplogEntriesMigrated, sessionOplogEntriesMigrated);
+    if (sessionOplogEntriesMigrated) {
+        builder.append(kSessionOplogEntriesMigrated, sessionOplogEntriesMigrated.value());
+    }
     return builder.obj();
 }
 

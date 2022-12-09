@@ -84,13 +84,14 @@ BSONObj makeMigrationStatusDocumentSource(
  * }
  *
  */
-BSONObj makeMigrationStatusDocumentDestination(const NamespaceString& nss,
-                                               const ShardId& fromShard,
-                                               const ShardId& toShard,
-                                               const bool& isDonorShard,
-                                               const BSONObj& min,
-                                               const BSONObj& max,
-                                               long long sessionOplogEntriesMigrated);
+BSONObj makeMigrationStatusDocumentDestination(
+    const NamespaceString& nss,
+    const ShardId& fromShard,
+    const ShardId& toShard,
+    const bool& isDonorShard,
+    const BSONObj& min,
+    const BSONObj& max,
+    boost::optional<long long> sessionOplogEntriesMigrated);
 
 /**
  * Returns a chunk range with extended or truncated boundaries to match the number of fields in the

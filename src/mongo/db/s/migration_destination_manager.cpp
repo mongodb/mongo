@@ -455,14 +455,13 @@ BSONObj MigrationDestinationManager::getMigrationStatusReport(
     const CollectionShardingRuntime::ScopedCollectionShardingRuntime& scopedCsrLock) {
     stdx::lock_guard<Latch> lk(_mutex);
     if (_isActive(lk)) {
+        boost::optional<long long> sessionOplogEntriesMigrated;
+        if (_sessionMigration) {
+            sessionOplogEntriesMigrated = _sessionMigration->getSessionOplogEntriesMigrated();
+        }
+
         return migrationutil::makeMigrationStatusDocumentDestination(
-            _nss,
-            _fromShard,
-            _toShard,
-            false,
-            _min,
-            _max,
-            _sessionMigration->getSessionOplogEntriesMigrated());
+            _nss, _fromShard, _toShard, false, _min, _max, sessionOplogEntriesMigrated);
     } else {
         return BSONObj();
     }
