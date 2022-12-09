@@ -232,6 +232,8 @@ last-continuous:
     ticket: SERVER-69861
   - test_file: jstests/sharding/query/shard_refuses_cursor_ownership.js
     ticket: SERVER-65259
+  - test_file: jstests/sharding/drop_collection.js
+    ticket: SERVER-71689
   suites: null
 last-lts:
   all:
@@ -541,4 +543,6 @@ last-lts:
     ticket: SERVER-69861
   - test_file: jstests/sharding/query/shard_refuses_cursor_ownership.js
     ticket: SERVER-65259
+  - test_file: jstests/sharding/drop_collection.js
+    ticket: SERVER-71689
   suites: null

@@ -75,17 +75,8 @@ public:
 
             opCtx->setAlwaysInterruptAtStepDownOrUp();
 
-            try {
-                bool fromMigrate =
-                    request().getFromMigrate() ? request().getFromMigrate().value() : false;
-
-                DropCollectionCoordinator::dropCollectionLocally(opCtx, ns(), fromMigrate);
-            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-                LOGV2_DEBUG(5280920,
-                            1,
-                            "Namespace not found while trying to delete local collection",
-                            "namespace"_attr = ns());
-            }
+            bool fromMigrate = request().getFromMigrate().value_or(false);
+            DropCollectionCoordinator::dropCollectionLocally(opCtx, ns(), fromMigrate);
 
             // The txnParticipant will only be missing when the command was sent from a coordinator
             // running an old 5.0.0 binary that didn't attach a sessionId & txnNumber.
