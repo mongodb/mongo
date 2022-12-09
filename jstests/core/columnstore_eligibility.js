@@ -20,6 +20,7 @@
 
 load("jstests/libs/analyze_plan.js");
 load("jstests/libs/columnstore_util.js");  // For setUpServerForColumnStoreIndexTest.
+load("jstests/libs/fixture_helpers.js");   // For FixtureHelpers.isMongos.
 
 if (!setUpServerForColumnStoreIndexTest(db)) {
     return;
@@ -199,4 +200,41 @@ assert(planHasStage(db, explain, "COLUMN_SCAN"), explain);
 
 explain = coll.find({'a.b': 2}, {_id: 0, 'a.0.b.123': 1}).explain();
 assert(planHasStage(db, explain, "COLUMN_SCAN"), explain);
+
+// Test that a column store index on a subpath can be used and hinted when it covers the query.
+const subpath_idx_coll = db.columnstore_eligibility_subpath;
+subpath_idx_coll.drop();
+assert.commandWorked(subpath_idx_coll.insert({_id: 0, a: 1, b: 2}));
+assert.commandWorked(subpath_idx_coll.createIndex({"a.$**": "columnstore"}));
+
+// Index covers query, can be used.
+// Note that this is only applicable in non-sharded environments, as the index will not be able to
+// cover the query if we need the shard key.
+explain = subpath_idx_coll.find({a: 1}, {_id: 0, a: 1}).explain();
+assert(planHasStage(db, explain, "COLUMN_SCAN") || FixtureHelpers.isMongos(db), explain);
+
+// Index does not cover query.
+explain = subpath_idx_coll.find({b: 1}, {_id: 0, b: 1}).explain();
+assert(!planHasStage(db, explain, "COLUMN_SCAN"), explain);
+
+// Test hinting the subpath index. Sanity check - should use a traditional index without a hint.
+assert.commandWorked(subpath_idx_coll.createIndex({a: 1}));
+explain = subpath_idx_coll.find({a: 1}, {_id: 0, a: 1}).explain();
+assert(!planHasStage(db, explain, "COLUMN_SCAN"), explain);
+
+// Hint the subpath index.
+if (!FixtureHelpers.isMongos(db)) {
+    explain =
+        subpath_idx_coll.find({a: 1}, {_id: 0, a: 1}).hint({"a.$**": "columnstore"}).explain();
+    assert(planHasStage(db, explain, "COLUMN_SCAN"), explain);
+}
+
+// Hint when subpath index doesn't cover query.
+assert.commandFailedWithCode(db.runCommand({
+    find: subpath_idx_coll.getName(),
+    filter: {b: 1},
+    projection: {_id: 0, b: 1},
+    hint: {"a.$**": "columnstore"}
+}),
+                             6714002);
 }());

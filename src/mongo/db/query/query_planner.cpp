@@ -191,7 +191,6 @@ bool hintMatchesClusterKey(const boost::optional<ClusteredCollectionInfo>& clust
  * Returns whether the hintedIndex matches the columnstore index.
  */
 bool hintMatchesColumnStoreIndex(const BSONObj& hintObj, const ColumnIndexEntry& columnStoreIndex) {
-    // TODO SERVER-68400: Should be possible to have some other keypattern.
     return hintMatchesNameOrPattern(
         hintObj, columnStoreIndex.identifier.catalogName, columnStoreIndex.keyPattern);
 }

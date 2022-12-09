@@ -1343,4 +1343,29 @@ TEST_F(QueryPlannerColumnarTest, EmptyCollectionWithCollectionSizeThreshold) {
     assertSolutionExists(R"({proj: {spec: {a: 1}, node: {cscan: {dir: 1}}}})");
 }
 
+TEST_F(QueryPlannerColumnarTest, HintIndexWithNonStandardKeyPattern) {
+    addColumnStoreIndexAndEnableFilterSplitting(true,
+                                                ""_sd,
+                                                nullptr,
+                                                BSON("a.$**"
+                                                     << "columnstore"));
+    internalQueryMaxNumberOfFieldsToChooseUnfilteredColumnScan.store(0);
+
+    runQuerySortProjSkipLimitHint(BSONObj(),
+                                  BSONObj(),
+                                  BSON("a" << 1 << "_id" << 0),
+                                  0,
+                                  0,
+                                  BSON("a.$**"
+                                       << "columnstore"));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(R"({
+        column_scan: {
+            filtersByPath: {},
+            outputFields: ['a'],
+            matchFields: []
+        }
+    })");
+}
 }  // namespace mongo
