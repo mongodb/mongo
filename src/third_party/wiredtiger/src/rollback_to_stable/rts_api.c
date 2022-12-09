@@ -38,9 +38,11 @@ __rollback_to_stable_int(WT_SESSION_IMPL *session, bool no_ckpt)
     WT_TXN_GLOBAL *txn_global;
     wt_timestamp_t pinned_timestamp, rollback_timestamp;
     char ts_string[2][WT_TS_INT_STRING_SIZE];
+    bool dryrun;
 
     conn = S2C(session);
     txn_global = &conn->txn_global;
+    dryrun = conn->rts->dryrun;
 
     /*
      * Rollback to stable should ignore tombstones in the history store since it needs to scan the
@@ -95,7 +97,7 @@ __rollback_to_stable_int(WT_SESSION_IMPL *session, bool no_ckpt)
      * ensure that both in-memory and on-disk versions are the same unless caller requested for no
      * checkpoint.
      */
-    if (!F_ISSET(conn, WT_CONN_IN_MEMORY) && !no_ckpt)
+    if (!F_ISSET(conn, WT_CONN_IN_MEMORY) && !no_ckpt && !dryrun)
         WT_ERR(session->iface.checkpoint(&session->iface, "force=1"));
 
 err:
@@ -146,15 +148,37 @@ __rollback_to_stable_one(WT_SESSION_IMPL *session, const char *uri, bool *skipp)
 }
 
 /*
+ * __rollback_to_stable_finalize --
+ *     Reset a connection's RTS structure in preparation for the next call.
+ */
+static void
+__rollback_to_stable_finalize(WT_ROLLBACK_TO_STABLE *rts)
+{
+    rts->dryrun = false;
+}
+
+/*
  * __rollback_to_stable --
  *     Rollback the database to the stable timestamp.
  */
 static int
 __rollback_to_stable(WT_SESSION_IMPL *session, const char *cfg[], bool no_ckpt)
 {
+    WT_CONFIG_ITEM cval;
     WT_DECL_RET;
+    bool dryrun;
 
-    WT_UNUSED(cfg);
+    /*
+     * Explicit null-check because internal callers (startup/shutdown) do not enter via the API, and
+     * don't get default values installed in the config string.
+     */
+    dryrun = false;
+    if (cfg != NULL) {
+        ret = __wt_config_gets(session, cfg, "dryrun", &cval);
+        if (ret == 0)
+            dryrun = cval.val != 0;
+        WT_RET_NOTFOUND_OK(ret);
+    }
 
     /*
      * Don't use the connection's default session: we are working on data handles and (a) don't want
@@ -165,10 +189,14 @@ __rollback_to_stable(WT_SESSION_IMPL *session, const char *cfg[], bool no_ckpt)
     WT_RET(
       __wt_open_internal_session(S2C(session), "txn rollback_to_stable", true, 0, 0, &session));
 
+    S2C(session)->rts->dryrun = dryrun;
+
     WT_STAT_CONN_SET(session, txn_rollback_to_stable_running, 1);
     WT_WITH_CHECKPOINT_LOCK(
       session, WT_WITH_SCHEMA_LOCK(session, ret = __rollback_to_stable_int(session, no_ckpt)));
     WT_STAT_CONN_SET(session, txn_rollback_to_stable_running, 0);
+
+    __rollback_to_stable_finalize(S2C(session)->rts);
 
     WT_TRET(__wt_session_close_internal(session));
 
@@ -188,7 +216,10 @@ __wt_rollback_to_stable_init(WT_CONNECTION_IMPL *conn)
      */
     conn->rts = &conn->_rts;
 
-    /* Setup function pointers */
+    /* Setup function pointers. */
     conn->rts->rollback_to_stable = __rollback_to_stable;
     conn->rts->rollback_to_stable_one = __rollback_to_stable_one;
+
+    /* Setup variables. */
+    conn->rts->dryrun = false;
 }
