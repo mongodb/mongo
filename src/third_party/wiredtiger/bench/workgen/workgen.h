@@ -25,10 +25,10 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+#include <map>
 #include <ostream>
 #include <string>
 #include <vector>
-#include <map>
 
 // For convenience: A type exposed to Python that cannot be negative.
 typedef unsigned int uint_t;
@@ -301,11 +301,15 @@ struct Operation {
     std::vector<Operation> *_group;
     int _repeatgroup;
     double _timed;
+    // Indicates whether a table is selected randomly to be worked on.
+    bool _random_table;
 
     Operation();
     Operation(OpType optype, Table table, Key key, Value value);
     Operation(OpType optype, Table table, Key key);
     Operation(OpType optype, Table table);
+    // Operation working on random tables.
+    Operation(OpType optype, Key key, Value value);
     // Constructor with string applies to NOOP, SLEEP, CHECKPOINT
     Operation(OpType optype, const std::string& config);
     Operation(const Operation &other);
@@ -489,6 +493,8 @@ struct Workload {
 	}
 	os << "]";
     }
+    void create_table(const std::string& uri);
+    const std::vector<std::string> get_tables();
     int run(WT_CONNECTION *conn);
 };
 
