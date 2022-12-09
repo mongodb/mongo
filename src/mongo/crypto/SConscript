@@ -112,6 +112,7 @@ fleCryptoEnv.Library(
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/db/exec/document_value/document_value',
         '$BUILD_DIR/mongo/db/query/query_knobs',
+        '$BUILD_DIR/mongo/shell/kms_idl',
         '$BUILD_DIR/third_party/shim_libmongocrypt',
         'aead_encryption',
         'encrypted_field_config',
@@ -150,6 +151,7 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/base/secure_allocator',
+        '$BUILD_DIR/mongo/shell/kms_idl',
         '$BUILD_DIR/mongo/util/net/openssl_init' if ssl_provider == 'openssl' else [],
         'aead_encryption',
         'encrypted_field_config',

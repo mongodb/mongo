@@ -536,6 +536,16 @@ public:
         return getKeyById<FLEKeyType::Index>(uuid);
     }
 
+    /**
+     * Return raw, encrypted keys from the key store
+     */
+    virtual BSONObj getEncryptedKey(const UUID& uuid) = 0;
+
+    /**
+     * Returns the local kms key that protects the raw keys
+     */
+    virtual SymmetricKey& getKMSLocalKey() = 0;
+
 protected:
     virtual KeyMaterial getKey(const UUID& uuid) = 0;
 
@@ -560,18 +570,6 @@ public:
                                         FLEIndexKeyAndId indexKey,
                                         FLEUserKeyAndId userKey,
                                         FLECounter counter);
-
-
-    /**
-     * Explicit decrypt a single value into type and value
-     *
-     * Supports decrypting FLE2IndexedEqualityEncryptedValue
-     */
-    static std::pair<BSONType, std::vector<uint8_t>> decrypt(ConstDataRange cdr,
-                                                             FLEKeyVault* keyVault);
-
-    static std::pair<BSONType, std::vector<uint8_t>> decrypt(BSONElement element,
-                                                             FLEKeyVault* keyVault);
 
     static FLE2FindEqualityPayload parseFindPayload(ConstDataRange cdr);
 

@@ -152,6 +152,9 @@ public:
 #endif
 
     KeyMaterial getKey(const UUID& uuid) final;
+    BSONObj getEncryptedKey(const UUID& uuid) final;
+
+    SymmetricKey& getKMSLocalKey() final;
 
 protected:
     BSONObj _decryptResponsePayload(BSONObj& reply, StringData databaseName, bool isFLE2);
@@ -250,6 +253,7 @@ private:
         kEncryptedDBCacheSize};
     JS::Heap<JS::Value> _collection;
     JSContext* _cx;
+    boost::optional<SymmetricKey> _localKey;
 };
 
 using ImplicitEncryptedDBClientCallback =

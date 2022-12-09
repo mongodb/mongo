@@ -83,6 +83,7 @@ extern "C" {
 #include "mongo/logv2/log.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/platform/random.h"
+#include "mongo/shell/kms_gen.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
@@ -1578,25 +1579,6 @@ BSONObj toBSON(BSONType type, ConstDataRange cdr) {
     return elemWrapped.getOwned();
 }
 
-
-void decryptField(FLEKeyVault* keyVault,
-                  ConstDataRange cdr,
-                  BSONObjBuilder* builder,
-                  StringData fieldPath) {
-
-    auto pair = FLEClientCrypto::decrypt(cdr, keyVault);
-
-    if (pair.first == EOO) {
-        builder->appendBinData(
-            fieldPath.toString(), cdr.length(), BinDataType::Encrypt, cdr.data<char>());
-        return;
-    }
-
-    BSONObj obj = toBSON(pair.first, pair.second);
-
-    builder->appendAs(obj.firstElement(), fieldPath);
-}
-
 void collectIndexedFields(std::vector<EDCIndexedFields>* pFields,
                           ConstDataRange cdr,
                           StringData fieldPath) {
@@ -1728,6 +1710,144 @@ boost::multiprecision::uint128_t exp10ui128(int x) {
 
 double exp10Double(int x) {
     return pow(10, x);
+}
+
+void mongocryptLogHandler(mongocrypt_log_level_t level,
+                          const char* message,
+                          uint32_t message_len,
+                          void* ctx) {
+    switch (level) {
+        case MONGOCRYPT_LOG_LEVEL_FATAL:
+            LOGV2_FATAL(7132201, "libmongocrypt fatal error", "msg"_attr = message);
+            break;
+        case MONGOCRYPT_LOG_LEVEL_ERROR:
+            LOGV2_ERROR(7132202, "libmongocrypt error", "msg"_attr = message);
+            break;
+        case MONGOCRYPT_LOG_LEVEL_WARNING:
+            LOGV2_WARNING(7132203, "libmongocrypt warning", "msg"_attr = message);
+            break;
+        case MONGOCRYPT_LOG_LEVEL_INFO:
+            LOGV2(7132204, "libmongocrypt info", "msg"_attr = message);
+            break;
+        case MONGOCRYPT_LOG_LEVEL_TRACE:
+            LOGV2_DEBUG(7132205, 1, "libmongocrypt trace", "msg"_attr = message);
+            break;
+    }
+}
+
+void getKeys(mongocrypt_ctx_t* ctx, FLEKeyVault* keyVault) {
+    MongoCryptBinary output = MongoCryptBinary::create();
+    uassert(7132206, "mongocrypt_ctx_mongo_op failed", mongocrypt_ctx_mongo_op(ctx, output));
+
+    BSONObj doc = output.toBSON();
+    // Queries are of the shape:
+    //    { $or: [
+    //            { _id: { $in: [ UUID("12345678-1234-9876-1234-123456789012")
+    //                      ]
+    //                 }
+    //            },
+    //            {
+    //            keyAltNames: {
+    //                 $in: []
+    //                 }
+    //            }
+    //       ]
+    //  }
+    auto orElement = doc["$or"];
+    uassert(7132220, "failed to parse key query", !orElement.eoo());
+
+    auto firstElement = orElement["0"];
+    uassert(7132221, "failed to parse key query", !firstElement.eoo());
+
+    auto idElement = firstElement["_id"];
+    uassert(7132222, "failed to parse key query", !idElement.eoo());
+
+    auto inElement = idElement["$in"];
+    uassert(7132223, "failed to parse key query", !inElement.eoo());
+
+    auto keyElements = inElement.Array();
+
+    auto keys = std::vector<UUID>();
+    std::transform(keyElements.begin(),
+                   keyElements.end(),
+                   std::back_inserter(keys),
+                   [](auto element) { return UUID::fromCDR(element.uuid()); });
+
+    for (auto& key : keys) {
+        BSONObj keyDoc = keyVault->getEncryptedKey(key);
+        auto input = MongoCryptBinary::createFromBSONObj(keyDoc);
+        uassert(7132208, "mongocrypt_ctx_mongo_feed failed", mongocrypt_ctx_mongo_feed(ctx, input));
+    }
+
+    uassert(7132209, "mongocrypt_ctx_mongo_done failed", mongocrypt_ctx_mongo_done(ctx));
+}
+
+UniqueMongoCrypt createMongoCrypt() {
+    UniqueMongoCrypt crypt(mongocrypt_new());
+
+    mongocrypt_setopt_log_handler(crypt.get(), mongocryptLogHandler, nullptr);
+
+    return crypt;
+}
+
+BSONObj runStateMachineForDecryption(mongocrypt_ctx_t* ctx, FLEKeyVault* keyVault) {
+    mongocrypt_ctx_state_t state;
+    bool done = false;
+    BSONObj result;
+
+    MongoCryptStatus status = MongoCryptStatus::create();
+
+    while (!done) {
+        state = mongocrypt_ctx_state(ctx);
+        switch (state) {
+            case MONGOCRYPT_CTX_NEED_MONGO_COLLINFO:
+                // This state is responsible for retrieving a collection schema from mongod. It is
+                // not needed during decryption.
+                uasserted(7132211, "MONGOCRYPT_CTX_NEED_MONGO_COLLINFO not supported");
+                break;
+            case MONGOCRYPT_CTX_NEED_MONGO_MARKINGS:
+                // This state is responsible for sending a document to mongocryptd/crypt_shared_v1
+                // to be replace fields with encryption placeholders. It is not needed during
+                // decryption.
+                uasserted(7132212, "MONGOCRYPT_CTX_NEED_MONGO_MARKINGS not supported");
+                break;
+            case MONGOCRYPT_CTX_NEED_MONGO_KEYS: {
+                getKeys(ctx, keyVault);
+                break;
+            }
+            case MONGOCRYPT_CTX_NEED_KMS:
+                // This state is responsible for decrypting data keys encrypted by a KMS. This is
+                // not needed for local kms keys
+                uasserted(7132213, "MONGOCRYPT_CTX_NEED_KMS not supported");
+                break;
+            case MONGOCRYPT_CTX_READY: {
+                MongoCryptBinary output = MongoCryptBinary::create();
+                uassert(7132214,
+                        "mongocrypt_ctx_finalize failed",
+                        mongocrypt_ctx_finalize(ctx, output));
+                result = output.toBSON().getOwned();
+                break;
+            }
+            case MONGOCRYPT_CTX_DONE: {
+                done = true;
+                break;
+            }
+            case MONGOCRYPT_CTX_ERROR: {
+                mongocrypt_ctx_status(ctx, status);
+
+                uassertStatusOK(status.toStatus().withContext("decryptionStateMachine"));
+                break;
+            }
+            case MONGOCRYPT_CTX_NEED_KMS_CREDENTIALS:
+                // We don't handle KMS credentials
+                // fallthrough
+            default:
+                uasserted(7132216, "unsupported state machine state");
+                break;
+        }
+    }
+
+    return result;
 }
 
 }  // namespace
@@ -2001,95 +2121,24 @@ BSONObj FLEClientCrypto::generateCompactionTokens(const EncryptedFieldConfig& cf
     return tokensBuilder.obj();
 }
 
-std::pair<BSONType, std::vector<uint8_t>> FLEClientCrypto::decrypt(BSONElement element,
-                                                                   FLEKeyVault* keyVault) {
-    auto pair = fromEncryptedBinData(element);
-
-    return FLEClientCrypto::decrypt(pair.second, keyVault);
-}
-
-std::pair<BSONType, std::vector<uint8_t>> FLEClientCrypto::decrypt(ConstDataRange cdr,
-                                                                   FLEKeyVault* keyVault) {
-    auto pair = fromEncryptedConstDataRange(cdr);
-
-    if (pair.first == EncryptedBinDataType::kFLE2EqualityIndexedValue) {
-        auto indexKeyId =
-            uassertStatusOK(FLE2IndexedEqualityEncryptedValue::readKeyId(pair.second));
-
-        auto indexKey = keyVault->getIndexKeyById(indexKeyId);
-
-        auto serverDataToken =
-            FLELevel1TokenGenerator::generateServerDataEncryptionLevel1Token(indexKey.key);
-
-        auto ieev = uassertStatusOK(
-            FLE2IndexedEqualityEncryptedValue::decryptAndParse(serverDataToken, pair.second));
-
-        auto userCipherText = ieev.clientEncryptedValue;
-
-        auto userKeyId = uassertStatusOK(KeyIdAndValue::readKeyId(userCipherText));
-
-        auto userKey = keyVault->getUserKeyById(userKeyId);
-
-        auto userData = uassertStatusOK(KeyIdAndValue::decrypt(userKey.key, userCipherText));
-
-        return {ieev.bsonType, userData};
-    } else if (pair.first == EncryptedBinDataType::kFLE2RangeIndexedValue) {
-        auto indexKeyId = uassertStatusOK(FLE2IndexedRangeEncryptedValue::readKeyId(pair.second));
-
-        auto indexKey = keyVault->getIndexKeyById(indexKeyId);
-
-        auto serverDataToken =
-            FLELevel1TokenGenerator::generateServerDataEncryptionLevel1Token(indexKey.key);
-
-        auto ieev = uassertStatusOK(
-            FLE2IndexedRangeEncryptedValue::decryptAndParse(serverDataToken, pair.second));
-
-        auto userCipherText = ieev.clientEncryptedValue;
-
-        auto userKeyId = uassertStatusOK(KeyIdAndValue::readKeyId(userCipherText));
-
-        auto userKey = keyVault->getUserKeyById(userKeyId);
-
-        auto userData = uassertStatusOK(KeyIdAndValue::decrypt(userKey.key, userCipherText));
-
-        return {ieev.bsonType, userData};
-    } else if (pair.first == EncryptedBinDataType::kFLE2UnindexedEncryptedValue) {
-        return FLE2UnindexedEncryptedValue::deserialize(keyVault, cdr);
-    } else if (pair.first == EncryptedBinDataType::kRandom ||
-               pair.first == EncryptedBinDataType::kDeterministic) {
-        return {EOO, std::vector<uint8_t>()};
-    } else if (pair.first == EncryptedBinDataType::kFLE2FindEqualityPayload) {
-        // FLE Find Payloads only contain non-encrypted data that is related to encryption, so
-        // return the unencrypted body. The EOO BSONType signals to the caller that this should
-        // maintain the encryption subtype.
-        return {EOO, vectorFromCDR(pair.second)};
-    } else if (pair.first == EncryptedBinDataType::kFLE2FindRangePayload) {
-        return {EOO, vectorFromCDR(pair.second)};
-    } else if (pair.first == EncryptedBinDataType::kFLE2InsertUpdatePayload) {
-        return {EOO, vectorFromCDR(pair.second)};
-    } else if (pair.first == EncryptedBinDataType::kFLE2TransientRaw) {
-        return {EOO, vectorFromCDR(pair.second)};
-    } else {
-        uasserted(6373507, "Not supported");
-    }
-
-    return {EOO, std::vector<uint8_t>()};
-}
-
 BSONObj FLEClientCrypto::decryptDocument(BSONObj& doc, FLEKeyVault* keyVault) {
 
-    BSONObjBuilder builder;
+    auto crypt = createMongoCrypt();
 
-    // TODO - validate acceptable types - kFLE2UnindexedEncryptedValue or kFLE2EqualityIndexedValue
-    // kFLE2InsertUpdatePayload?
-    auto obj = transformBSON(
-        doc, [keyVault](ConstDataRange cdr, BSONObjBuilder* builder, StringData fieldPath) {
-            decryptField(keyVault, cdr, builder, fieldPath);
-        });
+    SymmetricKey& key = keyVault->getKMSLocalKey();
+    auto binary = MongoCryptBinary::createFromCDR(ConstDataRange(key.getKey(), key.getKeySize()));
+    uassert(7132217,
+            "mongocrypt_setopt_kms_provider_local failed",
+            mongocrypt_setopt_kms_provider_local(crypt.get(), binary));
 
-    builder.appendElements(obj);
+    uassert(7132218, "mongocrypt_init failed", mongocrypt_init(crypt.get()));
 
-    return builder.obj();
+    UniqueMongoCryptCtx ctx(mongocrypt_ctx_new(crypt.get()));
+    auto input = MongoCryptBinary::createFromBSONObj(doc);
+    mongocrypt_ctx_decrypt_init(ctx.get(), input);
+    BSONObj obj = runStateMachineForDecryption(ctx.get(), keyVault);
+
+    return obj;
 }
 
 void FLEClientCrypto::validateTagsArray(const BSONObj& doc) {
@@ -2126,9 +2175,6 @@ void FLEClientCrypto::validateDocument(const BSONObj& doc,
                 configField != configMap.end());
 
         auto [encryptedTypeBinding, subCdr] = fromEncryptedConstDataRange(field.second);
-
-        // Check we can decrypt it?
-        /* ignore */ FLEClientCrypto::decrypt(field.second, keyVault);
 
         if (configField->second.getQueries().has_value()) {
             if (hasQueryType(configField->second, QueryTypeEnum::Equality)) {

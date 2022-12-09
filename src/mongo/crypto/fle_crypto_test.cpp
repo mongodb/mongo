@@ -62,6 +62,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/rpc/object_check.h"
+#include "mongo/shell/kms_gen.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/unittest/unittest.h"
@@ -162,8 +163,33 @@ const FLEUserKey& getUserKey() {
 
 class TestKeyVault : public FLEKeyVault {
 public:
+    TestKeyVault() : _localKey(getLocalKey()) {}
+
+    static SymmetricKey getLocalKey() {
+        const uint8_t buf[]{0x32, 0x78, 0x34, 0x34, 0x2b, 0x78, 0x64, 0x75, 0x54, 0x61, 0x42, 0x42,
+                            0x6b, 0x59, 0x31, 0x36, 0x45, 0x72, 0x35, 0x44, 0x75, 0x41, 0x44, 0x61,
+                            0x67, 0x68, 0x76, 0x53, 0x34, 0x76, 0x77, 0x64, 0x6b, 0x67, 0x38, 0x74,
+                            0x70, 0x50, 0x70, 0x33, 0x74, 0x7a, 0x36, 0x67, 0x56, 0x30, 0x31, 0x41,
+                            0x31, 0x43, 0x77, 0x62, 0x44, 0x39, 0x69, 0x74, 0x51, 0x32, 0x48, 0x46,
+                            0x44, 0x67, 0x50, 0x57, 0x4f, 0x70, 0x38, 0x65, 0x4d, 0x61, 0x43, 0x31,
+                            0x4f, 0x69, 0x37, 0x36, 0x36, 0x4a, 0x7a, 0x58, 0x5a, 0x42, 0x64, 0x42,
+                            0x64, 0x62, 0x64, 0x4d, 0x75, 0x72, 0x64, 0x6f, 0x6e, 0x4a, 0x31, 0x64};
+
+        return SymmetricKey(&buf[0], sizeof(buf), 0, SymmetricKeyId("test"), 0);
+    }
+
     KeyMaterial getKey(const UUID& uuid) override;
+
+    BSONObj getEncryptedKey(const UUID& uuid) override;
+
+    SymmetricKey& getKMSLocalKey() {
+        return _localKey;
+    }
+
+private:
+    SymmetricKey _localKey;
 };
+
 
 KeyMaterial TestKeyVault::getKey(const UUID& uuid) {
     if (uuid == indexKeyId) {
@@ -178,6 +204,31 @@ KeyMaterial TestKeyVault::getKey(const UUID& uuid) {
         FAIL("not implemented");
         return KeyMaterial();
     }
+}
+
+KeyStoreRecord makeKeyStoreRecord(UUID id, ConstDataRange cdr) {
+    KeyStoreRecord ksr;
+    ksr.set_id(id);
+    auto now = Date_t::now();
+    ksr.setCreationDate(now);
+    ksr.setUpdateDate(now);
+    ksr.setStatus(0);
+    ksr.setKeyMaterial(cdr);
+
+    LocalMasterKey mk;
+
+    ksr.setMasterKey(mk.toBSON());
+    return ksr;
+}
+
+BSONObj TestKeyVault::getEncryptedKey(const UUID& uuid) {
+    auto dek = getKey(uuid);
+
+    std::vector<std::uint8_t> ciphertext(crypto::aeadCipherOutputLength(dek->size()));
+
+    uassertStatusOK(crypto::aeadEncryptLocalKMS(_localKey, *dek, {ciphertext}));
+
+    return makeKeyStoreRecord(uuid, ciphertext).toBSON();
 }
 
 TEST(FLETokens, TestVectors) {
@@ -972,7 +1023,7 @@ TEST(FLE_EDC, Allowed_Types) {
         {BSON("sample" << false), Bool},
         {BSON("sample" << true), Bool},
         {BSON("sample" << Date_t()), Date},
-        {BSON("sample" << BSONRegEx("value1", "value2")), RegEx},
+        {BSON("sample" << BSONRegEx("value1", "lu")), RegEx},
         {BSON("sample" << 123456), NumberInt},
         {BSON("sample" << Timestamp()), bsonTimestamp},
         {BSON("sample" << 12345678901234567LL), NumberLong},

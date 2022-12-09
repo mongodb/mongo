@@ -2578,6 +2578,7 @@ if wiredtiger:
         LIBDEPS=[
             '$BUILD_DIR/mongo/bson/util/bson_extract',
             '$BUILD_DIR/mongo/client/read_preference',
+            '$BUILD_DIR/mongo/crypto/aead_encryption',
             '$BUILD_DIR/mongo/crypto/encrypted_field_config',
             '$BUILD_DIR/mongo/crypto/fle_crypto',
             '$BUILD_DIR/mongo/db/auth/auth',
@@ -2615,6 +2616,7 @@ if wiredtiger:
             '$BUILD_DIR/mongo/executor/async_timer_mock',
             '$BUILD_DIR/mongo/rpc/command_status',
             '$BUILD_DIR/mongo/rpc/rpc',
+            '$BUILD_DIR/mongo/shell/kms_idl',
             '$BUILD_DIR/mongo/transport/transport_layer_mock',
             '$BUILD_DIR/mongo/util/clock_source_mock',
             '$BUILD_DIR/mongo/util/net/network',

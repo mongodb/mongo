@@ -693,7 +693,7 @@ DBClientBase* EncryptedDBClientBase::getRawConnection() {
     return _conn.get();
 }
 
-SecureVector<uint8_t> EncryptedDBClientBase::getKeyMaterialFromDisk(const UUID& uuid) {
+BSONObj EncryptedDBClientBase::getEncryptedKey(const UUID& uuid) {
     NamespaceString fullNameNS = getCollectionNS();
     FindCommandRequest findCmd{fullNameNS};
     findCmd.setFilter(BSON("_id" << uuid));
@@ -720,6 +720,15 @@ SecureVector<uint8_t> EncryptedDBClientBase::getKeyMaterialFromDisk(const UUID& 
     auto dataKey = keyStoreRecord.getKeyMaterial();
     uassert(ErrorCodes::BadValue, "Invalid data key.", dataKey.length() != 0);
 
+    return keyStoreRecord.toBSON();
+}
+
+SecureVector<uint8_t> EncryptedDBClientBase::getKeyMaterialFromDisk(const UUID& uuid) {
+    auto rawKey = getEncryptedKey(uuid);
+    auto keyStoreRecord = KeyStoreRecord::parse(IDLParserContext("root"), rawKey);
+
+    auto dataKey = keyStoreRecord.getKeyMaterial();
+
     std::unique_ptr<KMSService> kmsService = KMSServiceController::createFromDisk(
         _encryptionOptions.getKmsProviders().toBSON(), keyStoreRecord.getMasterKey());
     SecureVector<uint8_t> decryptedKey =
@@ -740,6 +749,18 @@ KeyMaterial EncryptedDBClientBase::getKey(const UUID& uuid) {
     km->resize(decryptedKey->size());
     std::copy(decryptedKey->data(), decryptedKey->data() + decryptedKey->size(), km->data());
     return km;
+}
+
+SymmetricKey& EncryptedDBClientBase::getKMSLocalKey() {
+    if (!_localKey.has_value()) {
+        std::unique_ptr<KMSService> kmsService =
+            KMSServiceController::createFromDisk(_encryptionOptions.getKmsProviders().toBSON(),
+                                                 BSON("provider"
+                                                      << "local"));
+        _localKey = std::move(kmsService->getMasterKey());
+    }
+
+    return _localKey.get();
 }
 
 #ifdef MONGO_CONFIG_SSL
