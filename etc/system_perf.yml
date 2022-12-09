@@ -21,6 +21,11 @@ variables:
         variant: compile-rhel70
       - name: schedule_global_auto_tasks
         variant: task_generation
+  _real_compile_amazon_linux2_arm64: &_compile_amazon_linux2_arm64
+      - name: compile
+        variant: compile-amazon-linux2-arm64
+      - name: schedule_global_auto_tasks
+        variant: task_generation
   _real_expansions: &_expansion_updates
       []
   ###
@@ -33,12 +38,15 @@ variables:
 #  _skip_compile_rhel70: &_compile_rhel70
 #      - name: schedule_global_auto_tasks
 #        variant: task_generation
+# _skip_compile_amazon_linux2_arm64: &_compile_amazon_linux2_arm64
+#     - name: schedule_global_auto_tasks
+#       variant: task_generation
 #  _skip_expansions: &_expansion_updates
-#      # This is the normal (amazon2) "compile" artifact from https://evergreen.mongodb.com/version/sys_perf_4.4_78207ca380688c73b1a217f23d5b7c8803bef9cd
+#      # This is the normal (amazon2) "compile" artifact from https://evergreen.mongodb.com/version/sys_perf_4.4_a756768c63d4580aa799c2f8778cbdfd1fbd048d
 #      - key: mdb_binary_for_client
-#        value: https://dsi-donot-remove.s3-us-west-2.amazonaws.com/compile_artifacts/mongodb-sys_perf_4.4_78207ca380688c73b1a217f23d5b7c8803bef9cd.tar.gz
+#        value: https://mciuploads.s3.amazonaws.com/dsi/sys_perf_4.4_a756768c63d4580aa799c2f8778cbdfd1fbd048d/a756768c63d4580aa799c2f8778cbdfd1fbd048d/linux/mongodb-sys_perf_4.4_a756768c63d4580aa799c2f8778cbdfd1fbd048d.tar.gz
 #      - key: mdb_binary_for_server
-#        value: https://dsi-donot-remove.s3-us-west-2.amazonaws.com/compile_artifacts/mongodb-sys_perf_4.4_78207ca380688c73b1a217f23d5b7c8803bef9cd.tar.gz
+#        value: https://mciuploads.s3.amazonaws.com/dsi/sys_perf_4.4_a756768c63d4580aa799c2f8778cbdfd1fbd048d/a756768c63d4580aa799c2f8778cbdfd1fbd048d/linux/mongodb-sys_perf_4.4_a756768c63d4580aa799c2f8778cbdfd1fbd048d.tar.gz
 ###
 
   _src_dir: &src_dir src/mongo
@@ -53,7 +61,6 @@ variables:
     - linkbench2
     - mongo-perf
     - YCSB
-    - benchmarks
     - py-tpcc
 
 
@@ -91,10 +98,6 @@ modules:
     repo: git@github.com:mongodb-labs/YCSB.git
     prefix: ${workdir}/src
     branch: production
-  - name: benchmarks
-    repo: git@github.com:mongodb-labs/benchmarks.git
-    prefix: ${workdir}/src
-    branch: master
   - name: py-tpcc
     repo: git@github.com:mongodb-labs/py-tpcc.git
     prefix: ${workdir}/src
@@ -148,7 +151,6 @@ functions:
           workloads: ${workloads_rev}
           mongo-perf: ${mongo-perf_rev}
           YCSB: ${YCSB_rev}
-          benchmarks: ${benchmarks_rev}
           py-tpcc: ${py-tpcc_rev}
           # mongo: ${mongo_rev}
     - command: expansions.write
@@ -352,7 +354,6 @@ functions:
           workloads: ${workloads_rev}
           mongo-perf: ${mongo-perf_rev}
           YCSB: ${YCSB_rev}
-          benchmarks: ${benchmarks_rev}
           py-tpcc: ${py-tpcc_rev}
     - command: expansions.write
       params:
@@ -830,7 +831,6 @@ buildvariants:
     name: compile-amazon2
     display_name: Compile
     modules: *modules
-    batchtime: 10080 # 7 days
     expansions: &compile-expansions
       platform: linux
       project_dir: &project_dir dsi
@@ -845,13 +845,34 @@ buildvariants:
         --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
         install-mongocryptd
     run_on:
-        - "amazon2-build"
+      - "amazon2-xlarge"
+    tasks:
+      - name: compile
+
+  - &compile-amazon-linux2-arm64
+    name: compile-amazon-linux2-arm64
+    display_name: Compile for Amazon Linux 2 arm64
+    modules: *modules
+    expansions:
+      <<: *compile-expansions
+      compile_flags: >-
+        --ssl
+        --separate-debug
+        MONGO_DISTMOD=amazon2
+        --release
+        -j$(grep -c ^processor /proc/cpuinfo)
+        CCFLAGS="-march=armv8-a+crc
+        -mtune=generic"
+        --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+        install-mongocryptd
+      compile-variant: -arm64
+    run_on:
+      - "amazon2-arm64"
     tasks:
       - name: compile
 
   - name: linux-standalone
-    display_name: Linux Standalone
-    batchtime: 10080 # 7 days
+    display_name: Linux Standalone Legacy
     modules: *modules
     expansions:
       mongodb_setup: standalone
@@ -886,7 +907,6 @@ buildvariants:
   - name: compile-rhel70
     display_name: Compile for Atlas-like
     modules: *modules
-    batchtime: 10080 # 7 days
     expansions:
       <<: *compile-expansions
       compile_flags: >-
@@ -903,8 +923,7 @@ buildvariants:
     - name: compile
 
   - name: linux-1-node-replSet
-    display_name: Linux 1-Node ReplSet
-    batchtime: 10080 # 7 days
+    display_name: Linux 1-Node ReplSet Legacy
     modules: *modules
     expansions:
       mongodb_setup: single-replica
@@ -940,12 +959,9 @@ buildvariants:
       - name: schedule_patch_auto_tasks
       - name: schedule_variant_auto_tasks
       - name: industry_benchmarks_wmajority
-      - name: sb_large_scale
-      - name: sb_timeseries
 
   - name: linux-standalone-audit
-    display_name: Linux Standalone Audit
-    batchtime: 10080 # 7 days
+    display_name: Linux Standalone Audit Legacy
     modules: *modules
     expansions:
       mongodb_setup: standalone-audit
@@ -965,8 +981,7 @@ buildvariants:
       - name: smoke_test
 
   - name: linux-1-node-replSet-fle
-    display_name: Linux 1-Node ReplSet FLE
-    batchtime: 10080 # 7 days
+    display_name: Linux 1-Node ReplSet FLE Legacy
     modules: *modules
     expansions:
       mongodb_setup: single-replica-fle
@@ -986,8 +1001,7 @@ buildvariants:
       - name: linkbench
 
   - name: linux-1-node-replSet-cwrwc
-    display_name: Linux 1-Node ReplSet CWRWC
-    batchtime: 10080 # 7 days
+    display_name: Linux 1-Node ReplSet CWRWC Legacy
     modules: *modules
     expansions:
       mongodb_setup: single-replica-cwrwc
@@ -1006,8 +1020,7 @@ buildvariants:
       - name: linkbench
 
   - name: linux-1-node-replSet-ese-cbc
-    display_name: Linux 1-Node ReplSet ESE CBC
-    batchtime: 10080 # 7 days
+    display_name: Linux 1-Node ReplSet ESE CBC Legacy
     modules: *modules
     expansions:
       mongodb_setup: single-replica-ese-cbc
@@ -1027,8 +1040,7 @@ buildvariants:
       - name: ycsb_60GB
 
   - name: linux-1-node-replSet-ese-gcm
-    display_name: Linux 1-Node ReplSet ESE GCM
-    batchtime: 10080 # 7 days
+    display_name: Linux 1-Node ReplSet ESE GCM Legacy
     modules: *modules
     expansions:
       mongodb_setup: single-replica-ese-gcm
@@ -1048,8 +1060,7 @@ buildvariants:
       - name: ycsb_60GB
 
   - name: linux-1-node-15gbwtcache
-    display_name: Linux 1-Node ReplSet 15 GB WiredTiger Cache
-    batchtime: 10080 # 7 days
+    display_name: Linux 1-Node ReplSet 15 GB WiredTiger Cache Legacy
     modules: *modules
     expansions:
       mongodb_setup: single-replica-15gbwtcache
@@ -1067,30 +1078,8 @@ buildvariants:
       - name: industry_benchmarks
       - name: smoke_test
 
-  # - name: linux-3-node-1dayhistory-15gbwtcache
-  #   display_name: Linux 3-Node ReplSet 1 Day History 15 GB WiredTiger Cache
-  #   batchtime: 5760  # 4 days
-  #   modules: *modules
-  #   expansions:
-  #     mongodb_setup: replica-1dayhistory-15gbwtcache
-  #     infrastructure_provisioning: replica
-  #     platform: linux
-  #     project_dir: *project_dir
-  #     authentication: enabled
-  #     storageEngine: wiredTiger
-  #   run_on:
-  #     - "rhel70-perf-replset"
-  #   depends_on: *_compile_amazon2
-  #   tasks:
-  #     - name: schedule_patch_auto_tasks
-  #     - name: schedule_variant_auto_tasks
-  #     - name: crud_workloads
-  #     - name: crud_workloads_majority
-  #     - name: smoke_test
-
   - name: linux-3-shard
-    display_name: Linux 3-Shard Cluster
-    batchtime: 10080 # 7 days
+    display_name: Linux 3-Shard Cluster Legacy
     modules: *modules
     expansions:
       mongodb_setup: shard
@@ -1119,8 +1108,7 @@ buildvariants:
       - name: change_streams_multi_mongos
 
   - name: linux-shard-lite
-    display_name: Linux Shard Lite Cluster
-    batchtime: 10080 # 7 days
+    display_name: Linux Shard Lite Cluster Legacy
     modules: *modules
     expansions:
       mongodb_setup: shard-lite
@@ -1156,8 +1144,7 @@ buildvariants:
       - name: smoke_test
 
   - name: linux-shard-lite-cwrwc
-    display_name: Linux Shard Lite Cluster CWRWC
-    batchtime: 10080 # 7 days
+    display_name: Linux Shard Lite Cluster CWRWC Legacy
     modules: *modules
     expansions:
       mongodb_setup: shard-lite-cwrwc
@@ -1176,8 +1163,7 @@ buildvariants:
       - name: linkbench
 
   - name: linux-shard-single
-    display_name: Linux Shard Single
-    batchtime: 5760  # 4 days
+    display_name: Linux Shard Single Legacy
     modules: *modules
     expansions:
       mongodb_setup: shard-single
@@ -1194,8 +1180,7 @@ buildvariants:
       - name: schedule_variant_auto_tasks
 
   - name: linux-3-node-replSet
-    display_name: Linux 3-Node ReplSet
-    batchtime: 2880  # 48 hours
+    display_name: Linux 3-Node ReplSet Legacy
     modules: *modules
     expansions:
       mongodb_setup: replica
@@ -1236,52 +1221,9 @@ buildvariants:
       - name: tpcc
       - name: linkbench
       - name: linkbench2
-      - name: sb_large_scale
-      - name: sb_timeseries
-
-  # - name: linux-3-node-replSet-last-continuous-fcv
-  #   display_name: Linux 3-Node ReplSet (Last Continuous FCV)
-  #   batchtime: 10080 # 7 days
-  #   modules: *modules
-  #   expansions:
-  #     setup: replica-last-continuous-fcv
-  #     cluster: replica
-  #     platform: linux
-  #     project_dir: *project_dir
-  #     authentication: enabled
-  #     storageEngine: wiredTiger
-  #   run_on:
-  #       - "rhel70-perf-replset"
-  #   depends_on:
-  #       - name: compile
-  #         variant: compile-amazon2
-  #       - name: genny_generate_all_tasks
-  #         variant: compile-amazon2
-  #   tasks: *3nodetasks
-
-  # - name: linux-3-node-replSet-last-lts-fcv
-  #   display_name: Linux 3-Node ReplSet (Last LTS FCV)
-  #   batchtime: 10080  # 7 days
-  #   modules: *modules
-  #   expansions:
-  #     setup: replica-last-lts-fcv
-  #     cluster: replica
-  #     platform: linux
-  #     project_dir: *project_dir
-  #     authentication: enabled
-  #     storageEngine: wiredTiger
-  #   run_on:
-  #       - "rhel70-perf-replset"
-  #   depends_on:
-  #       - name: compile
-  #         variant: compile-amazon2
-  #       - name: genny_generate_all_tasks
-  #         variant: compile-amazon2
-  #   tasks: *3nodetasks
 
   - name: linux-3-node-replSet-noflowcontrol
-    display_name: Linux 3-Node ReplSet (Flow Control off)
-    batchtime: 10080  # 7 days
+    display_name: Linux 3-Node ReplSet (Flow Control off) Legacy
     modules: *modules
     expansions:
       mongodb_setup: replica-noflowcontrol
@@ -1310,8 +1252,7 @@ buildvariants:
       - name: linkbench2
 
   - name: linux-3-node-replSet-ssl
-    display_name: Linux 3-Node ReplSet (SSL)
-    batchtime: 10080 # 7 days
+    display_name: Linux 3-Node ReplSet (SSL) Legacy
     modules: *modules
     expansions:
       mongodb_setup: replica-ssl
@@ -1329,33 +1270,8 @@ buildvariants:
       - name: industry_benchmarks
       - name: mixed_workloads
 
-  # - name: linux-3-node-replSet-maintenance-events
-  #   display_name: Linux 3-Node ReplSet (Maintenance Events)
-  #   batchtime: 5760  # 4 days
-  #   modules: *modules
-  #   expansions:
-  #     mongodb_setup: replica-maintenance-events
-  #     infrastructure_provisioning: replica
-  #     platform: linux
-  #     project_dir: *project_dir
-  #     authentication: enabled
-  #     storageEngine: wiredTiger
-  #   run_on:
-  #       - "rhel70-perf-replset"
-  #   depends_on: *_compile_amazon2
-  #   tasks:
-  #     - name: industry_benchmarks_stepdowns
-  #     - name: industry_benchmarks_rolling_restarts
-  #     - name: industry_benchmarks_non_retryable_writes_stepdowns
-  #     - name: industry_benchmarks_non_retryable_writes_rolling_restarts
-  #     - name: linkbench_stepdowns
-  #     - name: linkbench_rolling_restarts
-  #     - name: linkbench_non_retryable_writes_stepdowns
-  #     - name: linkbench_non_retryable_writes_rolling_restarts
-
   - name: linux-3-node-replSet-initialsync
-    display_name: Linux 3-Node ReplSet Initial Sync
-    batchtime: 10080 # 7 days
+    display_name: Linux 3-Node ReplSet Initial Sync Legacy
     modules: *modules
     expansions:
       mongodb_setup: replica-2node
@@ -1370,13 +1286,10 @@ buildvariants:
     tasks:
       - name: schedule_patch_auto_tasks
       - name: schedule_variant_auto_tasks
-      - name: initialsync
-      - name: initialsync-logkeeper-short
       - name: initialsync-large
 
   - name: linux-replSet-initialsync-logkeeper
-    display_name: Linux ReplSet Initial Sync LogKeeper
-    batchtime: 10080 # 7 days
+    display_name: Linux ReplSet Initial Sync LogKeeper Legacy
     modules: *modules
     expansions:
       mongodb_setup: initialsync-logkeeper
@@ -1399,7 +1312,6 @@ buildvariants:
   # patch builds.
   #- name: linux-replSet-initialsync-logkeeper-snapshot-update
   #  display_name: Linux ReplSet Initial Sync LogKeeper Snapshot Update
-  #  batchtime: 10080 # 7 days
   #  modules: *modules
   #  expansions:
   #    mongodb_setup: initialsync-logkeeper
@@ -1417,26 +1329,8 @@ buildvariants:
   #    - name: initialsync-logkeeper-snapshot-update
   #    - name: initialsync-logkeeper-short-s3-update
 
-  # - name: linux-replSet-auth-delay
-  #   display_name: Linux 3-Node ReplSet (Auth Delay)
-  #   batchtime: 10080 # 7 days
-  #   modules: *modules
-  #   expansions:
-  #     mongodb_setup: replica-auth-cluster-delay
-  #     infrastructure_provisioning: replica
-  #     platform: linux
-  #     project_dir: *project_dir
-  #     authentication: enabled
-  #     storageEngine: wiredTiger
-  #   run_on:
-  #       - "rhel70-perf-replset"
-  #   depends_on: *_compile_amazon2
-  #   tasks:
-  #     - name: schedule_variant_auto_tasks
-
   - name: atlas-like-M60
-    display_name: M60-Like 3-Node ReplSet
-    batchtime: 10080 # 7 days
+    display_name: M60-Like-old 3-Node ReplSet
     modules: *modules
     expansions:
       mongodb_setup: atlas-like-replica
@@ -1473,6 +1367,621 @@ buildvariants:
       - name: change_streams_latency
       - name: snapshot_reads
       - name: secondary_reads
+
+  - name: atlas-like-replica.2022-10
+    display_name: M60-like-replica.2022-10 3-Node ReplSet
+    modules: *modules
+    expansions:
+      mongodb_setup: atlas-like-replica.2022-10
+      infrastructure_provisioning: M60-like-replica.2022-10
+      infrastructure_provisioning_release: 2022-11
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile-variant: -arm64
+    run_on:
+      - "rhel70-perf-M60-like"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:  # Cannot use *3nodetasks because secondary_performance uses a special mongodb setup.
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: ycsb_60GB
       - name: linkbench
+      # TODO
+      # - name: tpcc
+      # - name: linkbench2
+
+  - name: atlas-M60-real
+    display_name: M60-Atlas ReplSet AWS
+    modules: *modules
+    expansions:
+      mongodb_setup: atlas
+      canaries: none
+      atlas_setup: M60-repl
+      use_custom_build: true
+      infrastructure_provisioning: workload_client
+      platform: linux
+      project_dir: *project_dir
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+      client_compile_variant: "" # Explicitly set this. Otherwise it will use the server version
+    run_on:
+      - "rhel70-perf-atlas-large"
+    depends_on:
+      - name: compile
+        variant: compile-amazon2
+      - name: schedule_global_auto_tasks
+        variant: task_generation
+      - name: compile
+        variant: compile-amazon-linux2-arm64
+      - name: schedule_global_auto_tasks
+        variant: task_generation
+    tasks: # Cannot use *3nodetasks because secondary_performance uses a special mongodb setup
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: ycsb_60GB
       - name: tpcc
+      - name: linkbench
       - name: linkbench2
+
+  - name: atlas-M60-real-azure
+    display_name: M60-Atlas ReplSet Azure
+    modules: *modules
+    expansions:
+      mongodb_setup: atlas
+      canaries: none
+      atlas_setup: M60-repl-azure
+      use_custom_build_azure: true
+      compile-variant: -rhel70
+      run_on_azure: true
+      infrastructure_provisioning: workload_client
+      platform: linux
+      project_dir: *project_dir
+      storageEngine: wiredTiger
+    run_on:
+      - "rhel70-perf-atlas-large"
+    depends_on:
+      - name: compile
+        variant: compile-amazon2
+      - name: schedule_global_auto_tasks
+        variant: task_generation
+      - name: compile
+        variant: compile-rhel70
+      - name: schedule_global_auto_tasks
+        variant: task_generation
+    tasks: # Cannot use *3nodetasks because secondary_performance uses a special mongodb setup
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: ycsb_60GB
+      - name: tpcc
+      - name: linkbench
+      - name: linkbench2
+
+  - name: linux-standalone.2022-11
+    display_name: Linux Standalone 2022-11
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: standalone
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks: &standalonetasks
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: dsi_integ_test_run_command_simple
+      - name: smoke_test
+      - name: industry_benchmarks
+      - name: ycsb_60GB
+      - name: crud_workloads
+      - name: genny_canaries
+      - name: cursor_manager
+      - name: mixed_workloads
+      - name: misc_workloads
+      - name: map_reduce_workloads
+      - name: non_sharded_workloads
+      - name: bestbuy_agg
+      - name: bestbuy_agg_merge_different_db
+      - name: bestbuy_agg_merge_same_db
+      - name: bestbuy_agg_merge_wordcount
+      - name: bestbuy_query
+
+  - name: linux-1-node-replSet.2022-11
+    display_name: Linux 1-Node ReplSet 2022-11
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: single-replica
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks: &1nodetasks
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: ycsb_60GB
+      - name: crud_workloads
+      - name: mixed_workloads
+      - name: misc_workloads
+      - name: map_reduce_workloads
+      - name: smoke_test
+      - name: non_sharded_workloads
+      - name: bestbuy_agg
+      - name: bestbuy_agg_merge_different_db
+      - name: bestbuy_agg_merge_same_db
+      - name: bestbuy_agg_merge_wordcount
+      - name: bestbuy_query
+      - name: change_streams_throughput
+      - name: change_streams_latency
+      - name: snapshot_reads
+      - name: linkbench
+      - name: linkbench2
+      - name: tpcc
+
+  - name: linux-standalone-audit.2022-11
+    display_name: Linux Standalone Audit 2022-11
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: standalone-audit
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks: &audit-tasks
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: crud_workloads
+      - name: smoke_test
+
+  - name: linux-1-node-replSet-fle.2022-11
+    display_name: Linux 1-Node ReplSet FLE 2022-11
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: single-replica-fle
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      fle: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: linkbench
+
+  - name: linux-1-node-replSet-ese-cbc.2022-11
+    display_name: Linux 1-Node ReplSet ESE CBC 2022-11
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: single-replica-ese-cbc
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: smoke_test
+      - name: ycsb_60GB
+
+  - name: linux-1-node-replSet-ese-gcm.2022-11
+    display_name: Linux 1-Node ReplSet ESE GCM 2022-11
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: single-replica-ese-gcm
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: smoke_test
+      - name: ycsb_60GB
+
+  - name: linux-1-node-15gbwtcache.2022-11
+    display_name: Linux 1-Node ReplSet 15 GB WiredTiger Cache 2022-11
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: single-replica-15gbwtcache
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: smoke_test
+      - name: ycsb_60GB
+
+  - name: linux-3-node-1dayhistory-15gbwtcache.2022-11
+    display_name: Linux 3-Node ReplSet 1 Day History 15 GB WiredTiger Cache 2022-11
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: replica-1dayhistory-15gbwtcache
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: replica
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-replset"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: crud_workloads
+      - name: smoke_test
+      - name: ycsb_60GB
+
+  - name: linux-3-shard.2022-11
+    display_name: Linux 3-Shard Cluster 2022-11
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: shard
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: shard
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-shard"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: crud_workloads
+      - name: mixed_workloads
+      - name: misc_workloads
+      - name: map_reduce_workloads
+      - name: smoke_test
+      - name: mongos_workloads
+      - name: mongos_large_catalog_workloads
+      - name: change_streams_throughput
+      - name: change_streams_latency
+      - name: change_streams_multi_mongos
+
+  - name: linux-shard-lite.2022-11
+    display_name: Linux Shard Lite Cluster 2022-11
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: shard-lite
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: shard-lite
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-shard-lite"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks: &shardlitetasks
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: bestbuy_agg
+      - name: bestbuy_agg_merge_different_db
+      - name: bestbuy_agg_merge_same_db
+      - name: bestbuy_agg_merge_target_hashed
+      - name: bestbuy_agg_merge_wordcount
+      - name: bestbuy_query
+      - name: change_streams_latency
+      - name: change_streams_throughput
+      - name: industry_benchmarks
+      - name: linkbench
+      - name: mixed_workloads
+      - name: mongos_workloads
+      - name: mongos_large_catalog_workloads
+      - name: move_chunk_large_chunk_map_workloads
+      - name: move_chunk_workloads
+      - name: move_chunk_waiting_workloads
+      - name: smoke_test
+
+  - name: linux-shard-lite-intel.2022-11
+    display_name: Linux Shard Lite Cluster Intel 2022-11
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: shard-lite
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: shard-lite-intel.2022-11
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+    run_on:
+      - "rhel70-perf-shard-lite"
+    depends_on: *_compile_amazon2
+    tasks: &shardlitetasks
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: mixed_workloads
+      - name: mongos_workloads
+      - name: move_chunk_workloads
+      - name: move_chunk_waiting_workloads
+      - name: smoke_test
+
+  - name: linux-shard-lite-read-concern-available.2022-11
+    display_name: Linux Shard Lite ReadConcern Available 2022-11
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: shard-lite-read-concern-available
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: shard-lite
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-shard-lite"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: linkbench
+
+  - name: linux-shard-single.2022-11
+    display_name: Linux Shard Single 2022-11
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: shard-single
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: shard-single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-shard-lite"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+
+  - name: linux-3-node-replSet.2022-11
+    display_name: Linux 3-Node ReplSet 2022-11
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: replica
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: replica
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-replset"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks: &3nodetasks
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: ycsb_60GB
+      - name: industry_benchmarks_secondary_reads
+      - name: crud_workloads
+      - name: mixed_workloads
+      - name: misc_workloads
+      - name: map_reduce_workloads
+      - name: refine_shard_key_transaction_stress
+      - name: smoke_test
+      - name: secondary_performance # Uses a special 2 node mongodb setup
+      - name: non_sharded_workloads
+      - name: bestbuy_agg
+      - name: bestbuy_agg_merge_different_db
+      - name: bestbuy_agg_merge_same_db
+      - name: bestbuy_agg_merge_wordcount
+      - name: bestbuy_query
+      - name: change_streams_throughput
+      - name: change_streams_latency
+      - name: snapshot_reads
+      - name: secondary_reads
+      - name: tpcc
+      - name: linkbench
+      - name: linkbench2
+
+  - name: linux-3-node-replSet-intel.2022-11
+    display_name: Linux 3-Node ReplSet Intel 2022-11
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: replica
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: replica-intel.2022-11
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+    run_on:
+      - "rhel70-perf-replset"
+    depends_on: *_compile_amazon2
+    tasks: &3nodetasks
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: ycsb_60GB
+      - name: crud_workloads
+      - name: mixed_workloads
+      - name: smoke_test
+      - name: linkbench
+      - name: linkbench2
+
+  - name: linux-3-node-replSet-notls.2022-11
+    display_name: Linux 3-Node ReplSet (No TLS) 2022-11
+    modules: *modules
+    expansions:
+      mongodb_setup: replica-tls-disabled
+      mongodb_setup_release: 2022-11
+      infrastructure_provisioning: replica
+      infrastructure_provisioning_release: 2022-11
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-replset"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: crud_workloads
+      - name: industry_benchmarks
+      - name: mixed_workloads
+
+  - name: linux-3-node-replSet-initialsync.2022-11
+    display_name: Linux 3-Node ReplSet Initial Sync  2022-11
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: replica-2node
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: replica
+      workload_setup: 2022-11
+      platform: linux
+      authentication: disabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+      project_dir: *project_dir
+    depends_on: *_compile_amazon_linux2_arm64
+    run_on:
+      - "rhel70-perf-replset"
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: initialsync-large
+
+  - name: linux-replSet-initialsync-logkeeper.2022-11
+    display_name: Linux ReplSet Initial Sync LogKeeper 2022-11
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: initialsync-logkeeper
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: initialsync-logkeeper
+      workload_setup: 2022-11
+      # EBS logkeeper snapshot with FCV set to 6.0
+      snapshotId: snap-0716ed59d18225693
+      platform: linux
+      authentication: disabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+      project_dir: *project_dir
+    run_on:
+      - "rhel70-perf-initialsync-logkeeper"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: initialsync-logkeeper
+
+  - name: linux-replSet-audit.2022-11
+    display_name: Linux 3-Node ReplSet Audit 2022-11
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: replica-audit
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: replica
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-replset"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
