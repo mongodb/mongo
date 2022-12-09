@@ -27,8 +27,21 @@
 
 global:
     cpp_namespace: mongo
+    cpp_includes:
+      - "mongo/db/s/sharding_runtime_d_params.h"
 
 server_parameters:
+    migrationConcurrency:
+        description: >-
+          The number of threads doing insertions on the recipient during a chunk migration and
+          also the number of _migrateClone requests that the recipient sends to the source in parallel.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: migrationConcurrency
+        validator:
+          callback: validateMigrationConcurrency
+        default: 1
+
     rangeDeleterBatchSize:
         description: >-
           The maximum number of documents in each batch to delete during the cleanup stage of chunk
@@ -57,7 +70,7 @@ server_parameters:
 
     receiveChunkWaitForRangeDeleterTimeoutMS:
         description: >-
-          Amount of time in milliseconds an incoming migration will wait for an intersecting range 
+          Amount of time in milliseconds an incoming migration will wait for an intersecting range
           with data in it to be cleared up before failing.
         set_at: [startup, runtime]
         cpp_vartype: AtomicWord<int>
