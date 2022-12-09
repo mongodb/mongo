@@ -259,11 +259,20 @@ public:
      * Does not require holding locks.
      *
      * Does not stop new index builds from starting. Caller must make that guarantee.
+     *
+     * TODO (SERVER-71669) Keep both methods until tenant migration uses TenantId object instead of
+     * a string. This include changes on both server side and our jstests.
      */
     void abortTenantIndexBuilds(OperationContext* opCtx,
                                 MigrationProtocolEnum protocol,
                                 StringData tenantId,
                                 const std::string& reason);
+
+    void abortTenantIndexBuilds(OperationContext* opCtx,
+                                MigrationProtocolEnum protocol,
+                                const boost::optional<TenantId>& tenantId,
+                                const std::string& reason);
+
     /**
      * Signals all of the index builds to abort and then waits until the index builds are no longer
      * running. The provided 'reason' will be used in the error message that the index builders
@@ -552,6 +561,12 @@ private:
     Status _dropIndexesForRepair(OperationContext* opCtx,
                                  CollectionWriter& collection,
                                  const std::vector<std::string>& indexNames);
+
+    void _abortTenantIndexBuilds(OperationContext* opCtx,
+                                 const std::vector<std::shared_ptr<ReplIndexBuildState>>& builds,
+                                 MigrationProtocolEnum protocol,
+                                 StringData tenantId,
+                                 const std::string& reason);
 
 protected:
     /**

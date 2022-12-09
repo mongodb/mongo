@@ -819,6 +819,16 @@ void IndexBuildsCoordinator::abortTenantIndexBuilds(OperationContext* opCtx,
         return activeIndexBuilds.filterIndexBuilds(indexBuildFilter);
     }();
 
+    _abortTenantIndexBuilds(opCtx, builds, protocol, tenantId, reason);
+}
+
+void IndexBuildsCoordinator::_abortTenantIndexBuilds(
+    OperationContext* opCtx,
+    const std::vector<std::shared_ptr<ReplIndexBuildState>>& builds,
+    MigrationProtocolEnum protocol,
+    StringData tenantId,
+    const std::string& reason) {
+
     std::vector<std::shared_ptr<ReplIndexBuildState>> buildsWaitingToFinish;
     buildsWaitingToFinish.reserve(builds.size());
     const auto indexBuildActionStr =
@@ -848,6 +858,27 @@ void IndexBuildsCoordinator::abortTenantIndexBuilds(OperationContext* opCtx,
         awaitNoIndexBuildInProgressForCollection(
             opCtx, replState->collectionUUID, replState->protocol);
     }
+}
+
+void IndexBuildsCoordinator::abortTenantIndexBuilds(OperationContext* opCtx,
+                                                    MigrationProtocolEnum protocol,
+                                                    const boost::optional<TenantId>& tenantId,
+                                                    const std::string& reason) {
+    const auto tenantIdStr = tenantId ? tenantId->toString() : "";
+    LOGV2(4886205,
+          "About to abort all index builders running for collections belonging to the given tenant",
+          "tenantId"_attr = tenantIdStr,
+          "reason"_attr = reason);
+
+    auto builds = [&]() -> std::vector<std::shared_ptr<ReplIndexBuildState>> {
+        auto indexBuildFilter = [=](const auto& replState) {
+            // Abort *all* index builds at the start of shard merge.
+            return repl::ClonerUtils::isDatabaseForTenant(replState.dbName, tenantId, protocol);
+        };
+        return activeIndexBuilds.filterIndexBuilds(indexBuildFilter);
+    }();
+
+    _abortTenantIndexBuilds(opCtx, builds, protocol, tenantIdStr, reason);
 }
 
 void IndexBuildsCoordinator::abortAllIndexBuildsForInitialSync(OperationContext* opCtx,
