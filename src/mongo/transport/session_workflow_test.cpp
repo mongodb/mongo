@@ -440,8 +440,7 @@ private:
         auto [p, f] = makePromiseFuture<DbResponse>();
         ExecutorFuture<void>(_threadPool)
             .then([this, opCtx, &request, p = std::move(p)]() mutable {
-                auto strand = ClientStrand::get(opCtx->getClient());
-                strand->run([&] { p.setWith([&] { return _processRequest(opCtx, request); }); });
+                p.setWith([&] { return _processRequest(opCtx, request); });
             })
             .getAsync([](auto&&) {});
         return std::move(f);
