@@ -213,13 +213,11 @@ void validateInsertUpdatePayloads(const std::vector<EncryptedField>& fields,
     }
 }
 
-std::pair<mongo::StatusWith<mongo::txn_api::CommitResult>,
-          std::shared_ptr<write_ops::InsertCommandReply>>
-insertSingleDocument(OperationContext* opCtx,
-                     const write_ops::InsertCommandRequest& insertRequest,
-                     BSONObj& document,
-                     int32_t* stmtId,
-                     GetTxnCallback getTxns) {
+std::pair<FLEBatchResult, write_ops::InsertCommandReply> processInsert(
+    OperationContext* opCtx,
+    const write_ops::InsertCommandRequest& insertRequest,
+    GetTxnCallback getTxns) {
+
     auto edcNss = insertRequest.getNamespace();
     auto ei = insertRequest.getEncryptionInformation().value();
 
@@ -228,11 +226,29 @@ insertSingleDocument(OperationContext* opCtx,
 
     auto efc = EncryptionInformationHelpers::getAndValidateSchema(edcNss, ei);
 
+    auto documents = insertRequest.getDocuments();
+    // TODO - how to check if a document will be too large???
+
+    uassert(6371202,
+            "Only single insert batches are supported in Queryable Encryption",
+            documents.size() == 1);
+
+    auto document = documents[0];
     EDCServerCollection::validateEncryptedFieldInfo(document, efc, bypassDocumentValidation);
     auto serverPayload = std::make_shared<std::vector<EDCServerPayloadInfo>>(
         EDCServerCollection::getEncryptedFieldInfo(document));
 
+    if (serverPayload->size() == 0) {
+        // No actual FLE2 indexed fields
+        return std::pair<FLEBatchResult, write_ops::InsertCommandReply>{
+            FLEBatchResult::kNotProcessed, write_ops::InsertCommandReply()};
+    }
+
     validateInsertUpdatePayloads(efc.getFields(), *serverPayload);
+
+    auto reply = std::make_shared<write_ops::InsertCommandReply>();
+
+    uint32_t stmtId = getStmtIdForWriteAt(insertRequest, 0);
 
     std::shared_ptr<txn_api::SyncTransactionWithRetries> trun = getTxns(opCtx);
 
@@ -241,8 +257,6 @@ insertSingleDocument(OperationContext* opCtx,
     auto ownedDocument = document.getOwned();
     auto insertBlock = std::make_tuple(edcNss, efc, serverPayload, stmtId);
     auto sharedInsertBlock = std::make_shared<decltype(insertBlock)>(insertBlock);
-
-    auto reply = std::make_shared<write_ops::InsertCommandReply>();
 
     auto swResult = trun->runNoThrow(
         opCtx,
@@ -282,63 +296,22 @@ insertSingleDocument(OperationContext* opCtx,
             return SemiFuture<void>::makeReady();
         });
 
-    return {swResult, reply};
-}
-
-std::pair<FLEBatchResult, write_ops::InsertCommandReply> processInsert(
-    OperationContext* opCtx,
-    const write_ops::InsertCommandRequest& insertRequest,
-    GetTxnCallback getTxns) {
-
-    auto documents = insertRequest.getDocuments();
-
-    std::vector<write_ops::WriteError> writeErrors;
-    int32_t stmtId = getStmtIdForWriteAt(insertRequest, 0);
-    uint32_t iter = 0;
-    uint32_t numDocs = 0;
-    write_ops::WriteCommandReplyBase writeBase;
-
-    for (auto& document : documents) {
-        const auto& [swResult, reply] =
-            insertSingleDocument(opCtx, insertRequest, document, &stmtId, getTxns);
-
-        writeBase.setElectionId(reply->getElectionId());
-
-        if (!swResult.isOK()) {
-            if (swResult.getStatus() == ErrorCodes::FLETransactionAbort) {
-                // FLETransactionAbort is used for control flow so it means we have a valid
-                // InsertCommandReply with write errors so we should return that.
-                const auto& errors = reply->getWriteErrors().get();
-                writeErrors.insert(writeErrors.end(), errors.begin(), errors.end());
-            }
-            writeErrors.push_back(write_ops::WriteError(iter, swResult.getStatus()));
-
-            // If the request is ordered (inserts are ordered by default) we will return
-            // early.
-            if (insertRequest.getOrdered()) {
-                break;
-            }
-        } else if (!swResult.getValue().getEffectiveStatus().isOK()) {
-            writeErrors.push_back(
-                write_ops::WriteError(iter, swResult.getValue().getEffectiveStatus()));
-            // If the request is ordered (inserts are ordered by default) we will return
-            // early.
-            if (insertRequest.getOrdered()) {
-                break;
-            }
-        } else {
-            numDocs++;
+    if (!swResult.isOK()) {
+        // FLETransactionAbort is used for control flow so it means we have a valid
+        // InsertCommandReply with write errors so we should return that.
+        if (swResult.getStatus() == ErrorCodes::FLETransactionAbort) {
+            return std::pair<FLEBatchResult, write_ops::InsertCommandReply>{
+                FLEBatchResult::kProcessed, *reply};
         }
-        iter++;
+
+        appendSingleStatusToWriteErrors(swResult.getStatus(), &reply->getWriteCommandReplyBase());
+    } else if (!swResult.getValue().getEffectiveStatus().isOK()) {
+        appendSingleStatusToWriteErrors(swResult.getValue().getEffectiveStatus(),
+                                        &reply->getWriteCommandReplyBase());
     }
 
-    write_ops::InsertCommandReply returnReply;
-
-    writeBase.setN(numDocs);
-    writeBase.setWriteErrors(writeErrors);
-    returnReply.setWriteCommandReplyBase(writeBase);
-
-    return {FLEBatchResult::kProcessed, returnReply};
+    return std::pair<FLEBatchResult, write_ops::InsertCommandReply>{FLEBatchResult::kProcessed,
+                                                                    *reply};
 }
 
 write_ops::DeleteCommandReply processDelete(OperationContext* opCtx,
@@ -872,19 +845,16 @@ StatusWith<write_ops::InsertCommandReply> processInsert(
     const NamespaceString& edcNss,
     std::vector<EDCServerPayloadInfo>& serverPayload,
     const EncryptedFieldConfig& efc,
-    int32_t* stmtId,
+    int32_t stmtId,
     BSONObj document,
     bool bypassDocumentValidation) {
 
-    if (serverPayload.empty()) {
-        return queryImpl->insertDocument(edcNss, document, stmtId, false);
-    }
-
-    processFieldsForInsert(queryImpl, edcNss, serverPayload, efc, stmtId, bypassDocumentValidation);
+    processFieldsForInsert(
+        queryImpl, edcNss, serverPayload, efc, &stmtId, bypassDocumentValidation);
 
     auto finalDoc = EDCServerCollection::finalizeForInsert(document, serverPayload);
 
-    return queryImpl->insertDocument(edcNss, finalDoc, stmtId, false);
+    return queryImpl->insertDocument(edcNss, finalDoc, &stmtId, false);
 }
 
 write_ops::DeleteCommandReply processDelete(FLEQueryInterface* queryImpl,
