@@ -187,7 +187,7 @@ function verifyCEForNDV(ndv) {
     };
 
     // Verify CE for all distinct values of each field across multiple types.
-    forceHistogramCE();
+    forceCE("histogram");
     for (const field of fields) {
         jsTestLog(`Testing histogram for ndv ${ndv} and field ${field}`);
 

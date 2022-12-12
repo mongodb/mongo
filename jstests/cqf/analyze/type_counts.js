@@ -109,7 +109,7 @@ runHistogramsTest(function testTypeCounts() {
     });
 
     // Verify type count CE.
-    forceHistogramCE();
+    forceCE("histogram");
     let hint = {a: 1};
 
     // TODO SERVER-70936: estimate boolean counts.
@@ -352,7 +352,7 @@ runHistogramsTest(function testTypeCounts() {
     });
 
     // Verify type count CE.
-    forceHistogramCE();
+    forceCE("histogram");
     hint = {"a.b": 1};
 
     // Test CE for histogrammable types.
@@ -551,7 +551,7 @@ runHistogramsTest(function testTypeCounts() {
     // Verify type count CE. Note that for non-$elemMatch preidcates, we include both array and
     // scalar type-counts, while for $elemMatch predicates, we include only array type counts in
     // our estimate.
-    forceHistogramCE();
+    forceCE("histogram");
     hint = {a: 1};
 
     // TODO SERVER-70936: estimate boolean counts.

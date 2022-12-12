@@ -324,3 +324,18 @@ function runWithParams(keyValPairs, fn) {
         }
     }
 }
+
+function round2(n) {
+    return (Math.round(n * 100) / 100);
+}
+
+/**
+ * Force cardinality estimation mode: "histogram", "heuristic", or "sampling". We need to force the
+ * use of the new optimizer.
+ */
+function forceCE(mode) {
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceBonsai"}));
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryCardinalityEstimatorMode: mode}));
+}

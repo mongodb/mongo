@@ -126,12 +126,19 @@ function runHistogramsTest(test) {
 }
 
 /**
- * We need to set the CE query knob to use histograms and force the use of the new optimizer to
- * ensure that we use histograms to estimate CE.
+ * Creates a single-field index for each field in the 'fields' array.
  */
-function forceHistogramCE() {
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryCardinalityEstimatorMode: "histogram"}));
-    assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceBonsai"}));
+function createIndexes(coll, fields) {
+    for (const field of fields) {
+        assert.commandWorked(coll.createIndex({[field]: 1}));
+    }
+}
+
+/**
+ * Creates statistics for each field in the 'fields' array.
+ */
+function analyzeFields(coll, fields) {
+    for (const field of fields) {
+        assert.commandWorked(db.runCommand({analyze: coll.getName(), key: field}));
+    }
 }

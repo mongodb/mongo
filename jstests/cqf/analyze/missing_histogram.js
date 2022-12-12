@@ -29,7 +29,7 @@ runHistogramsTest(function testEmptyAndMissingHistograms() {
     // Ensure we have no histogram.
     assert.eq(db.system.statistics[noHistogramColl.getName()].count(), 0);
 
-    forceHistogramCE();
+    forceCE("histogram");
 
     // We actually use heuristics because we don't generate histograms for empty collections;
     // however, our estimate should still be 0, because the collection is empty.

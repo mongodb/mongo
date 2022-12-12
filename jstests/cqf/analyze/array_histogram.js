@@ -112,7 +112,7 @@ runHistogramsTest(function verifyArrayHistograms() {
     createAndValidateHistogram({coll, expectedHistogram});
 
     // Verify CE.
-    forceHistogramCE();
+    forceCE("histogram");
 
     // Equality predicates.
     verifyCEForMatch(
