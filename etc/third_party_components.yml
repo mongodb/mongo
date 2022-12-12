@@ -78,6 +78,7 @@ components:
     release_monitoring_id: 6845
     local_directory_path: src/third_party/boost
     team_owner: "Service Architecture"
+    upgrade_suppression: TODO SERVER-70000
 
   concurrencytest:
     homepage_url: https://github.com/cgoldberg/concurrencytest
@@ -134,6 +135,7 @@ components:
     local_directory_path: src/third_party/gperftools
     team_owner: "Storage Execution"
     # TODO - fix the version number in Black Duck
+    upgrade_suppression: TODO SERVER-67432
 
   "ICU for C/C++ (ICU4C)":
     homepage_url: http://site.icu-project.org/
@@ -205,6 +207,7 @@ components:
     release_monitoring_id: 10712
     local_directory_path: src/third_party/libbson
     team_owner: "Security"
+    upgrade_suppression: TODO SERVER-72019
 
   "Mozilla Firefox":
     homepage_url: https://www.mozilla.org/en-US/firefox/organizations/
@@ -322,6 +325,7 @@ components:
     release_monitoring_id: 13639
     local_directory_path: src/third_party/valgrind
     team_owner: "Decision Automation Group"
+    upgrade_suppression: TODO SERVER-71860
 
   testtools:
     homepage_url: https://launchpad.net/testtools
@@ -337,6 +341,7 @@ components:
     release_monitoring_id: 5303
     local_directory_path: src/third_party/zlib
     team_owner: "Storage Execution"
+    upgrade_suppression: TODO SERVER-71858
 
   zstd:
     homepage_url: http://www.zstd.net/
