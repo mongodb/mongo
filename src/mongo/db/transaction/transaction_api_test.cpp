@@ -33,6 +33,7 @@
 
 #include "mongo/config.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/error_labels.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/operation_sharding_state.h"
@@ -142,12 +143,22 @@ class MockTransactionClient : public SEPTransactionClient {
 public:
     using SEPTransactionClient::SEPTransactionClient;
 
-    virtual void initialize(std::unique_ptr<TxnMetadataHooks> hooks,
-                            const CancellationToken& token) override {
+    virtual void initialize(std::unique_ptr<TxnHooks> hooks) override {
         _hooks = std::move(hooks);
     }
 
     virtual SemiFuture<BSONObj> runCommand(StringData dbName, BSONObj cmd) const override {
+        [&]() {
+            StringData cmdName = cmd.firstElementFieldNameStringData();
+            if (cmdName != AbortTransaction::kCommandName) {
+                // Only hang abort commands.
+                return;
+            }
+
+            stdx::unique_lock<Latch> ul(_hangNextAbortCommandMutex);
+            _hangNextAbortCommandCV.wait(ul, [&] { return !_hangNextAbortCommand; });
+        }();
+
         auto cmdBob = BSONObjBuilder(std::move(cmd));
         invariant(_hooks);
         _hooks->runRequestHook(&cmdBob);
@@ -201,12 +212,24 @@ public:
         _responses.push(res);
     }
 
+    void setHangNextAbortCommand(bool enable) {
+        stdx::lock_guard<Latch> lg(_hangNextAbortCommandMutex);
+        _hangNextAbortCommand = enable;
+
+        // Wake up any waiting threads.
+        _hangNextAbortCommandCV.notify_all();
+    }
+
 private:
-    std::unique_ptr<TxnMetadataHooks> _hooks;
+    std::unique_ptr<TxnHooks> _hooks;
     mutable StatusWith<BSONObj> _lastResponse{BSONObj()};
     mutable std::queue<StatusWith<BSONObj>> _responses;
     mutable std::vector<BSONObj> _sentRequests;
     bool _runningLocalTransaction{false};
+
+    mutable Mutex _hangNextAbortCommandMutex = MONGO_MAKE_LATCH("MockTransactionClient");
+    mutable stdx::condition_variable _hangNextAbortCommandCV;
+    bool _hangNextAbortCommand{false};
 };
 
 }  // namespace txn_api::details
@@ -316,6 +339,8 @@ protected:
 
         _opCtx = makeOperationContext();
 
+        // Use a thread pool with one max thread to verify the API can run truly asynchronously on
+        // its executor.
         ThreadPool::Options options;
         options.poolName = "TxnAPITest";
         options.minThreads = 1;
@@ -367,9 +392,12 @@ protected:
         return *_txnWithRetries;
     }
 
-    void resetTxnWithRetries(std::unique_ptr<MockResourceYielder> resourceYielder = nullptr) {
-        auto mockClient =
-            std::make_unique<txn_api::details::MockTransactionClient>(opCtx(), _executor, nullptr);
+    void resetTxnWithRetries(std::unique_ptr<MockResourceYielder> resourceYielder = nullptr,
+                             std::shared_ptr<executor::ThreadPoolTaskExecutor> executor = nullptr) {
+        auto executorToUse = executor ? executor : _executor;
+
+        auto mockClient = std::make_unique<txn_api::details::MockTransactionClient>(
+            opCtx(), executorToUse, nullptr);
         _mockClient = mockClient.get();
         if (resourceYielder) {
             _resourceYielder = resourceYielder.get();
@@ -384,7 +412,7 @@ protected:
         // pool. This ensures that we can predictably monitor txnNumber's value.
         _txnWithRetries = nullptr;
         _txnWithRetries = std::make_unique<txn_api::SyncTransactionWithRetries>(
-            opCtx(), _executor, std::move(resourceYielder), std::move(mockClient));
+            opCtx(), executorToUse, std::move(resourceYielder), std::move(mockClient));
     }
 
     void resetTxnWithRetriesWithClient(std::unique_ptr<txn_api::TransactionClient> txnClient) {
@@ -414,8 +442,7 @@ private:
 
 class MockClusterOperationTransactionClient : public txn_api::TransactionClient {
 public:
-    virtual void initialize(std::unique_ptr<txn_api::details::TxnMetadataHooks> hooks,
-                            const CancellationToken& token) {}
+    virtual void initialize(std::unique_ptr<txn_api::details::TxnHooks> hooks) {}
 
     virtual SemiFuture<BSONObj> runCommand(StringData dbName, BSONObj cmd) const {
         MONGO_UNREACHABLE;
@@ -669,6 +696,7 @@ TEST_F(TxnAPITest, OwnSession_AttachesWriteConcernOnAbort) {
             });
         ASSERT_EQ(swResult.getStatus(), ErrorCodes::InternalError);
 
+        waitForAllEarlierTasksToComplete();  // Wait for the final best effort abort to complete.
         expectSentAbort(txnNumber /* txnNumber */, writeConcern.toBSON());
     }
 }
@@ -774,7 +802,25 @@ TEST_F(TxnAPITest, OwnSession_AbortsOnError) {
         });
     ASSERT_EQ(swResult.getStatus(), ErrorCodes::InternalError);
 
+    waitForAllEarlierTasksToComplete();  // Wait for the final best effort abort to complete.
     expectSentAbort(0 /* txnNumber */, WriteConcernOptions().toBSON());
+}
+
+TEST_F(TxnAPITest, OwnSession_SkipsAbortIfNoCommandsWereRun) {
+    auto swResult = txnWithRetries().runNoThrow(
+        opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            // The abort response, the client should not receive this.
+            mockClient()->setNextCommandResponse(kResWithBadValueError);
+
+            uasserted(ErrorCodes::InternalError, "Mock error");
+            return SemiFuture<void>::makeReady();
+        });
+    ASSERT_EQ(swResult.getStatus(), ErrorCodes::InternalError);
+
+    // Would wait for the best effort abort if it was scheduled.
+    waitForAllEarlierTasksToComplete();
+    auto lastRequest = mockClient()->getLastSentRequest();
+    ASSERT(lastRequest.isEmpty());
 }
 
 TEST_F(TxnAPITest, OwnSession_SkipsCommitIfNoCommandsWereRun) {
@@ -783,11 +829,13 @@ TEST_F(TxnAPITest, OwnSession_SkipsCommitIfNoCommandsWereRun) {
             // The commit response, the client should not receive this.
             mockClient()->setNextCommandResponse(kResWithBadValueError);
 
-            uasserted(ErrorCodes::InternalError, "Mock error");
             return SemiFuture<void>::makeReady();
         });
-    ASSERT_EQ(swResult.getStatus(), ErrorCodes::InternalError);
+    ASSERT(swResult.getStatus().isOK());
+    ASSERT(swResult.getValue().getEffectiveStatus().isOK());
 
+    // Would wait for the best effort abort if it was scheduled.
+    waitForAllEarlierTasksToComplete();
     auto lastRequest = mockClient()->getLastSentRequest();
     ASSERT(lastRequest.isEmpty());
 }
@@ -1826,14 +1874,9 @@ TEST_F(TxnAPITest, OwnSession_StartTransactionRetryLimitOnTransientErrors) {
     // overrideTransactionApiMaxRetriesToThree sets the max retry attempts to 3.
     ASSERT_EQ(retryCount, 4);
 
-    auto lastRequest = mockClient()->getLastSentRequest();
-    assertTxnMetadata(lastRequest,
-                      3 /* txnNumber */,
-                      boost::none /* startTransaction */,
-                      boost::none /* readConcern */,
-                      WriteConcernOptions().toBSON() /* writeConcern */);
+    waitForAllEarlierTasksToComplete();  // Wait for the final best effort abort to complete.
+    expectSentAbort(3 /* txnNumber */, WriteConcernOptions().toBSON());
     assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
-    ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "abortTransaction"_sd);
 }
 
 TEST_F(TxnAPITest, OwnSession_CommitTransactionRetryLimitOnTransientErrors) {
@@ -2140,5 +2183,108 @@ TEST_F(TxnAPITest, FailoverAndShutdownErrorsAreFatalForLocalTransactionWCError) 
     // Verify the fatal for local logic doesn't apply to all transient or retriable errors.
     runTest(true, Status(ErrorCodes::HostUnreachable, "mock retriable error"));
 }
+
+TEST_F(TxnAPITest, DoesNotWaitForBestEffortAbortOnNonTransientError) {
+    // Start the transaction with an insert.
+    mockClient()->setNextCommandResponse(kOKInsertResponse);
+
+    // Hang the best effort abort that will be triggered after giving up on the transaction.
+    mockClient()->setHangNextAbortCommand(true);
+    mockClient()->setNextCommandResponse(kOKCommandResponse);
+
+    // Second attempt's insert and successful commit response.
+    mockClient()->setNextCommandResponse(kOKInsertResponse);
+    mockClient()->setNextCommandResponse(kOKCommandResponse);
+
+    auto swResult = txnWithRetries().runNoThrow(
+        opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            txnClient
+                .runCommand("user"_sd,
+                            BSON("insert"
+                                 << "foo"
+                                 << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                .get();
+
+            uasserted(ErrorCodes::InternalError, "Mock error");
+            return SemiFuture<void>::makeReady();
+        });
+    ASSERT_EQ(swResult.getStatus(), ErrorCodes::InternalError);
+
+    // The abort should be hung and not have been processed yet.
+    auto lastRequest = mockClient()->getLastSentRequest();
+    ASSERT_NE(lastRequest.firstElementFieldNameStringData(), "abortTransaction"_sd);
+
+    // Unblock the abort and verify it eventually runs.
+    mockClient()->setHangNextAbortCommand(false);
+    waitForAllEarlierTasksToComplete();
+    expectSentAbort(0 /* txnNumber */, WriteConcernOptions().toBSON());
+}
+
+TEST_F(TxnAPITest, WaitsForBestEffortAbortOnTransientError) {
+    // Use an executor with higher max threads so a best effort abort could actually run
+    // concurrently within the API. Otherwise the API would always wait for the best effort abort
+    // even if the wait wasn't explicit.
+    ThreadPool::Options options;
+    options.poolName = "TxnAPITest-WaitsForBestEffortAbortOnTransientError";
+    options.minThreads = 1;
+    options.maxThreads = 8;
+    auto executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
+        std::make_unique<ThreadPool>(std::move(options)),
+        executor::makeNetworkInterface("TxnAPITestNetwork"));
+    executor->startup();
+    resetTxnWithRetries(nullptr /* resourceYielder */, executor);
+
+    // Start the transaction with an insert.
+    mockClient()->setNextCommandResponse(kOKInsertResponse);
+
+    // Hang the best effort abort that will be triggered before retrying after we throw an error.
+    mockClient()->setHangNextAbortCommand(true);
+    mockClient()->setNextCommandResponse(kOKCommandResponse);
+
+    // Second attempt's insert and successful commit response.
+    mockClient()->setNextCommandResponse(kOKInsertResponse);
+    mockClient()->setNextCommandResponse(kOKCommandResponse);
+
+    auto future = stdx::async(stdx::launch::async, [&] {
+        int attempt = 0;
+        auto swResult = txnWithRetries().runNoThrow(
+            opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+                txnClient
+                    .runCommand("user"_sd,
+                                BSON("insert"
+                                     << "foo"
+                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                    .get();
+
+                // Throw a transient error once to trigger a best effort abort then retry.
+                uassert(ErrorCodes::HostUnreachable, "Mock network error", attempt++ > 0);
+
+                return SemiFuture<void>::makeReady();
+            });
+        ASSERT(swResult.getStatus().isOK());
+        ASSERT(swResult.getValue().getEffectiveStatus().isOK());
+    });
+
+    // The future should time out since it's blocked waiting for the best effort abort to finish.
+    ASSERT(stdx::future_status::ready != future.wait_for(Milliseconds(10).toSystemDuration()));
+
+    // The abort should be hung and not have been processed yet.
+    auto lastRequest = mockClient()->getLastSentRequest();
+    ASSERT_NE(lastRequest.firstElementFieldNameStringData(), "abortTransaction"_sd);
+
+    // Allow the abort to finish and it should unblock the API.
+    mockClient()->setHangNextAbortCommand(false);
+    future.get();
+
+    // After the abort finishes, the API should retry and successfully commit.
+    lastRequest = mockClient()->getLastSentRequest();
+    assertTxnMetadata(lastRequest,
+                      2 /* txnNumber */,
+                      boost::none /* startTransaction */,
+                      boost::none /* readConcern */,
+                      WriteConcernOptions().toBSON() /* writeConcern */);
+    ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
+}
+
 }  // namespace
 }  // namespace mongo

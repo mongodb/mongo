@@ -43,7 +43,7 @@
 
 namespace mongo::txn_api {
 namespace details {
-class TxnMetadataHooks;
+class TxnHooks;
 class TransactionWithRetries;
 }  // namespace details
 
@@ -91,8 +91,7 @@ public:
      * transaction metadata to requests and parsing it from responses. Must be called before any
      * commands have been sent and cannot be called more than once.
      */
-    virtual void initialize(std::unique_ptr<details::TxnMetadataHooks> hooks,
-                            const CancellationToken& token) = 0;
+    virtual void initialize(std::unique_ptr<details::TxnHooks> hooks) = 0;
 
     /**
      * Runs the given command as part of the transaction that owns this transaction client.
@@ -263,17 +262,14 @@ public:
                          std::unique_ptr<SEPTransactionClientBehaviors> behaviors)
         : _serviceContext(opCtx->getServiceContext()),
           _executor(executor),
-          _token(CancellationToken::uncancelable()),
           _behaviors(std::move(behaviors)) {}
 
     SEPTransactionClient(const SEPTransactionClient&) = delete;
     SEPTransactionClient operator=(const SEPTransactionClient&) = delete;
 
-    virtual void initialize(std::unique_ptr<details::TxnMetadataHooks> hooks,
-                            const CancellationToken& token) override {
+    virtual void initialize(std::unique_ptr<details::TxnHooks> hooks) override {
         invariant(!_hooks);
         _hooks = std::move(hooks);
-        _token = token;
     }
 
     virtual SemiFuture<BSONObj> runCommand(StringData dbName, BSONObj cmd) const override;
@@ -295,9 +291,8 @@ public:
 private:
     ServiceContext* const _serviceContext;
     std::shared_ptr<executor::TaskExecutor> _executor;
-    CancellationToken _token;
     std::unique_ptr<SEPTransactionClientBehaviors> _behaviors;
-    std::unique_ptr<details::TxnMetadataHooks> _hooks;
+    std::unique_ptr<details::TxnHooks> _hooks;
 };
 
 /**
@@ -334,9 +329,10 @@ public:
                 std::unique_ptr<TransactionClient> txnClient)
         : _executor(executor),
           _txnClient(std::move(txnClient)),
+          _token(token),
           _service(opCtx->getServiceContext()) {
         _primeTransaction(opCtx);
-        _txnClient->initialize(_makeTxnMetadataHooks(), token);
+        _txnClient->initialize(_makeTxnHooks());
     }
 
     /**
@@ -401,28 +397,66 @@ public:
     void primeForCommitRetry() noexcept;
 
     /**
+     * Prepares the transaction state to be cleaned up after a fatal error.
+     */
+    void primeForCleanup() noexcept;
+
+    /**
+     * True if the transaction must be cleaned up, which implies it cannot be continued.
+     */
+    bool needsCleanup() const noexcept;
+
+    /**
+     * Returns a cancellation token to be used by the transaction's client. May change depending on
+     * the state of the transaction, i.e. returns an uncancelable token in the kNeedsCleanup state.
+     */
+    CancellationToken getTokenForCommand() const;
+
+    /**
      * Returns the latest operationTime returned by a command in this transaction.
      */
     LogicalTime getOperationTime() const;
 
 private:
-    enum class TransactionState {
-        kInit,
-        kStarted,
-        kStartedCommit,
-        kRetryingCommit,
-        kStartedAbort,
-        kDone,
+    class TransactionState {
+    public:
+        enum StateFlag {
+            kInit,
+            kStarted,
+            kStartedCommit,
+            kRetryingCommit,
+            kStartedAbort,
+            kNeedsCleanup,
+        };
+
+        bool is(StateFlag state) const {
+            return _state == state;
+        }
+
+        bool isInCommit() const {
+            return _state == TransactionState::kStartedCommit ||
+                _state == TransactionState::kRetryingCommit;
+        }
+
+        /**
+         * Transitions the state and validates the transition is legal, crashing if it is not.
+         */
+        void transitionTo(StateFlag newState);
+
+        static std::string toString(StateFlag state);
+
+        std::string toString() const {
+            return toString(_state);
+        }
+
+    private:
+        bool _isLegalTransition(StateFlag oldState, StateFlag newState);
+
+        StateFlag _state = kInit;
     };
-    std::string _transactionStateToString(TransactionState txnState) const;
 
-    bool _isInCommit() const {
-        return _state == TransactionState::kStartedCommit ||
-            _state == TransactionState::kRetryingCommit;
-    }
-
-    std::unique_ptr<TxnMetadataHooks> _makeTxnMetadataHooks() {
-        return std::make_unique<TxnMetadataHooks>(*this);
+    std::unique_ptr<TxnHooks> _makeTxnHooks() {
+        return std::make_unique<TxnHooks>(*this);
     }
 
     BSONObj _reportStateForLog(WithLock) const;
@@ -442,6 +476,7 @@ private:
 
     const std::shared_ptr<executor::TaskExecutor> _executor;
     std::unique_ptr<TransactionClient> _txnClient;
+    CancellationToken _token;
     Callback _callback;
 
     boost::optional<Date_t> _opDeadline;
@@ -450,34 +485,45 @@ private:
     APIParameters _apiParameters;
     ExecutionContext _execContext;
 
-    // Protects the members below that are accessed by the TxnMetadataHooks, which are called by the
-    // user's callback and may run on a separate thread than the one that is driving the
-    // Transaction.
+    // Protects the members below that are accessed by the TxnHooks, which are called by the user's
+    // callback and may run on a separate thread than the one that is driving the Transaction.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("Transaction::_mutex");
 
     LogicalTime _lastOperationTime;
     bool _latestResponseHasTransientTransactionErrorLabel{false};
 
     OperationSessionInfo _sessionInfo;
-    TransactionState _state{TransactionState::kInit};
+    TransactionState _state;
     bool _acquiredSessionFromPool{false};
     ServiceContext* _service;
 };
 
 /**
- * Hooks called by each TransactionClient before sending a request and upon receiving a response
- * responsible for attaching relevant transaction metadata and updating the transaction's state
+ * Hooks used by each TransactionClient to interface with its associated Transaction.
  */
-class TxnMetadataHooks {
+class TxnHooks {
 public:
-    TxnMetadataHooks(details::Transaction& internalTxn) : _internalTxn(internalTxn) {}
+    TxnHooks(details::Transaction& internalTxn) : _internalTxn(internalTxn) {}
 
+    /**
+     * Called before sending a command in the TransactionClient.
+     */
     void runRequestHook(BSONObjBuilder* cmdBuilder) {
         _internalTxn.prepareRequest(cmdBuilder);
     }
 
+    /**
+     * Called after receiving a response to a command in the TransactionClient.
+     */
     void runReplyHook(const BSONObj& reply) {
         _internalTxn.processResponse(reply);
+    }
+
+    /**
+     * Called to get the cancellation token to be used for a command in the TransactionClient.
+     */
+    CancellationToken getTokenForCommand() {
+        return _internalTxn.getTokenForCommand();
     }
 
 private:
@@ -514,6 +560,12 @@ public:
     LogicalTime getOperationTime() const {
         return _internalTxn->getOperationTime();
     }
+
+    /**
+     * If the transaction needs to be cleaned up, i.e. aborted, this will schedule the necessary
+     * work without waiting for it to complete.
+     */
+    void scheduleCleanupIfNecessary();
 
 private:
     // Helper methods for running a transaction.

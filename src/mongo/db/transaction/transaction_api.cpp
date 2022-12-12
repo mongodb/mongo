@@ -115,6 +115,12 @@ StatusWith<CommitResult> SyncTransactionWithRetries::runNoThrow(OperationContext
     OperationTimeTracker::get(opCtx)->updateOperationTime(_txn->getOperationTime());
     repl::ReplClientInfo::forClient(opCtx->getClient())
         .setLastProxyWriteTimestampForward(_txn->getOperationTime().asTimestamp());
+
+    // Schedule cleanup tasks after the caller has finished waiting so the caller can't be blocked.
+    // Also schedule after getting the transaction's operation time so the best effort abort can't
+    // unnecessarily advance it.
+    _txn->scheduleCleanupIfNecessary();
+
     auto unyieldStatus = _resourceYielder ? _resourceYielder->unyieldNoThrow(opCtx) : Status::OK();
 
     if (!txnResult.isOK()) {
@@ -127,6 +133,85 @@ StatusWith<CommitResult> SyncTransactionWithRetries::runNoThrow(OperationContext
 }
 
 namespace details {
+
+void Transaction::TransactionState::transitionTo(StateFlag newState) {
+    invariant(_isLegalTransition(_state, newState),
+              str::stream() << "Current state: " << toString(_state)
+                            << ", Illegal attempted next state: " << toString(newState));
+    _state = newState;
+}
+
+std::string Transaction::TransactionState::toString(StateFlag state) {
+    switch (state) {
+        case StateFlag::kInit:
+            return "init";
+        case StateFlag::kStarted:
+            return "started";
+        case StateFlag::kStartedCommit:
+            return "started commit";
+        case StateFlag::kRetryingCommit:
+            return "retrying commit";
+        case StateFlag::kStartedAbort:
+            return "started abort";
+        case StateFlag::kNeedsCleanup:
+            return "needs cleanup";
+    }
+    MONGO_UNREACHABLE;
+}
+
+bool Transaction::TransactionState::_isLegalTransition(StateFlag oldState, StateFlag newState) {
+    switch (oldState) {
+        case kInit:
+            switch (newState) {
+                case kStarted:
+                case kNeedsCleanup:
+                    return true;
+                default:
+                    return false;
+            }
+            MONGO_UNREACHABLE;
+        case kStarted:
+            switch (newState) {
+                case kInit:
+                case kStartedCommit:
+                case kStartedAbort:
+                case kNeedsCleanup:
+                    return true;
+                default:
+                    return false;
+            }
+            MONGO_UNREACHABLE;
+        case kStartedCommit:
+            switch (newState) {
+                case kInit:
+                case kRetryingCommit:
+                    return true;
+                default:
+                    return false;
+            }
+            MONGO_UNREACHABLE;
+        case kRetryingCommit:
+            switch (newState) {
+                case kInit:
+                case kRetryingCommit:
+                    return true;
+                default:
+                    return false;
+            }
+            MONGO_UNREACHABLE;
+        case kStartedAbort:
+            switch (newState) {
+                case kInit:
+                    return true;
+                default:
+                    return false;
+            }
+            MONGO_UNREACHABLE;
+        case kNeedsCleanup:
+            return false;
+    }
+    MONGO_UNREACHABLE;
+}
 
 std::string execContextToString(Transaction::ExecutionContext execContext) {
     switch (execContext) {
@@ -152,24 +237,6 @@ std::string errorHandlingStepToString(Transaction::ErrorHandlingStep nextStep) {
             return "retry transaction";
         case Transaction::ErrorHandlingStep::kRetryCommit:
             return "retry commit";
-    }
-    MONGO_UNREACHABLE;
-}
-
-std::string Transaction::_transactionStateToString(TransactionState txnState) const {
-    switch (txnState) {
-        case TransactionState::kInit:
-            return "init";
-        case TransactionState::kStarted:
-            return "started";
-        case TransactionState::kStartedCommit:
-            return "started commit";
-        case TransactionState::kRetryingCommit:
-            return "retrying commit";
-        case TransactionState::kStartedAbort:
-            return "started abort";
-        case TransactionState::kDone:
-            return "done";
     }
     MONGO_UNREACHABLE;
 }
@@ -213,7 +280,8 @@ ExecutorFuture<void> TransactionWithRetries::_runBodyHandleErrors(int bodyAttemp
             if (nextStep == Transaction::ErrorHandlingStep::kDoNotRetry) {
                 iassert(bodyStatus);
             } else if (nextStep == Transaction::ErrorHandlingStep::kAbortAndDoNotRetry) {
-                return _bestEffortAbort().then([bodyStatus] { return bodyStatus; });
+                _internalTxn->primeForCleanup();
+                iassert(bodyStatus);
             } else if (nextStep == Transaction::ErrorHandlingStep::kRetryTransaction) {
                 return _bestEffortAbort().then([this, bodyStatus] {
                     _internalTxn->primeForTransactionRetry();
@@ -300,32 +368,20 @@ SemiFuture<BSONObj> SEPTransactionClient::runCommand(StringData dbName, BSONObj 
 
     BSONObjBuilder cmdBuilder(_behaviors->maybeModifyCommand(std::move(cmdObj)));
     _hooks->runRequestHook(&cmdBuilder);
-    auto modifiedCmdObj = cmdBuilder.obj();
-    bool isAbortTxnCmd = modifiedCmdObj.firstElementFieldNameStringData() == "abortTransaction";
 
     auto client = _serviceContext->makeClient("SEP-internal-txn-client");
     AlternativeClientRegion clientRegion(client);
 
     // Note that _token is only cancelled once the caller of the transaction no longer cares about
     // its result, so CancelableOperationContexts only being interrupted by ErrorCodes::Interrupted
-    // shouldn't impact any upstream retry logic. If a _bestEffortAbort() is invoked, a new
-    // cancelation token must be used in constructing the opCtx for running abortTransaction. This
-    // is because an operation that has already been interrupted would cancel the parent cancelation
-    // token and using that same token to send abortTransaction would fail to send abortTransaction,
-    // leaving the transaction open longer than necessary.
-    auto opCtxFactory = isAbortTxnCmd
-        ? CancelableOperationContextFactory(CancellationToken::uncancelable(), _executor)
-        : CancelableOperationContextFactory(_token, _executor);
+    // shouldn't impact any upstream retry logic.
+    auto opCtxFactory = CancelableOperationContextFactory(_hooks->getTokenForCommand(), _executor);
 
     auto cancellableOpCtx = opCtxFactory.makeOperationContext(&cc());
 
-    // abortTransaction should still be interruptible on stepdown/shutdown.
-    if (isAbortTxnCmd) {
-        cancellableOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-    }
     primeInternalClient(&cc());
 
-    auto opMsgRequest = OpMsgRequest::fromDBAndBody(dbName, modifiedCmdObj);
+    auto opMsgRequest = OpMsgRequest::fromDBAndBody(dbName, cmdBuilder.obj());
     auto requestMessage = opMsgRequest.serialize();
     return _behaviors->handleRequest(cancellableOpCtx.get(), requestMessage)
         .then([this](DbResponse dbResponse) {
@@ -409,7 +465,9 @@ SemiFuture<std::vector<BSONObj>> SEPTransactionClient::exhaustiveFind(
                     // an error upon fetching more documents.
                     return result != ErrorCodes::InternalTransactionsExhaustiveFindHasMore;
                 })
-                .on(_executor, _token)
+                // It's fine to use an uncancelable token here because the getMore commands in the
+                // AsyncTry will inherit the real token.
+                .on(_executor, CancellationToken::uncancelable())
                 .then([response = std::move(response)] { return std::move(*response); });
         })
         .semi();
@@ -440,10 +498,13 @@ SemiFuture<void> Transaction::abort() {
 }
 
 SemiFuture<BSONObj> Transaction::_commitOrAbort(StringData dbName, StringData cmdName) {
+    BSONObjBuilder cmdBuilder;
+    cmdBuilder.append(cmdName, 1);
+
     {
         stdx::lock_guard<Latch> lg(_mutex);
 
-        if (_state == TransactionState::kInit) {
+        if (_state.is(TransactionState::kInit)) {
             LOGV2_DEBUG(
                 5875903,
                 3,
@@ -453,19 +514,18 @@ SemiFuture<BSONObj> Transaction::_commitOrAbort(StringData dbName, StringData cm
             return BSON("ok" << 1);
         }
         uassert(5875902,
-                "Internal transaction not in progress, state: {}"_format(
-                    _transactionStateToString(_state)),
-                _state == TransactionState::kStarted ||
-                    // Allows retrying commit and the best effort abort after failing to commit.
-                    (_isInCommit() &&
-                     (cmdName == AbortTransaction::kCommandName ||
-                      cmdName == CommitTransaction::kCommandName)));
+                "Internal transaction not in progress, state: {}"_format(_state.toString()),
+                _state.is(TransactionState::kStarted) ||
+                    // Allows retrying commit.
+                    (_state.isInCommit() && cmdName == CommitTransaction::kCommandName) ||
+                    // Allows best effort abort to clean up after giving up.
+                    (_state.is(TransactionState::kNeedsCleanup) &&
+                     cmdName == AbortTransaction::kCommandName));
 
         if (cmdName == CommitTransaction::kCommandName) {
-            invariant(_state != TransactionState::kStartedAbort);
-            if (!_isInCommit()) {
+            if (!_state.isInCommit()) {
                 // Only transition if we aren't already retrying commit.
-                _state = TransactionState::kStartedCommit;
+                _state.transitionTo(TransactionState::kStartedCommit);
             }
 
             if (_execContext == ExecutionContext::kClientTransaction) {
@@ -473,29 +533,27 @@ SemiFuture<BSONObj> Transaction::_commitOrAbort(StringData dbName, StringData cm
                 return SemiFuture<BSONObj>::makeReady(BSON("ok" << 1));
             }
         } else if (cmdName == AbortTransaction::kCommandName) {
-            invariant(!_isInCommit());
-            _state = TransactionState::kStartedAbort;
+            if (!_state.is(TransactionState::kNeedsCleanup)) {
+                _state.transitionTo(TransactionState::kStartedAbort);
+            }
             invariant(_execContext != ExecutionContext::kClientTransaction);
         } else {
             MONGO_UNREACHABLE;
         }
-    }
 
-    BSONObjBuilder cmdBuilder;
-    cmdBuilder.append(cmdName, 1);
-    if (_state == TransactionState::kRetryingCommit) {
-        // Per the drivers transaction spec, retrying commitTransaction uses majority write concern
-        // to avoid double applying a transaction due to a transient NoSuchTransaction error
-        // response.
-        cmdBuilder.append(WriteConcernOptions::kWriteConcernField,
-                          CommandHelpers::kMajorityWriteConcern.toBSON());
-    } else {
-        cmdBuilder.append(WriteConcernOptions::kWriteConcernField, _writeConcern);
+        if (_state.is(TransactionState::kRetryingCommit)) {
+            // Per the drivers transaction spec, retrying commitTransaction uses majority write
+            // concern to avoid double applying a transaction due to a transient NoSuchTransaction
+            // error response.
+            cmdBuilder.append(WriteConcernOptions::kWriteConcernField,
+                              CommandHelpers::kMajorityWriteConcern.toBSON());
+        } else {
+            cmdBuilder.append(WriteConcernOptions::kWriteConcernField, _writeConcern);
+        }
     }
-    auto cmdObj = cmdBuilder.obj();
 
     return ExecutorFuture<void>(_executor)
-        .then([this, dbNameCopy = dbName.toString(), cmdObj = std::move(cmdObj)] {
+        .then([this, dbNameCopy = dbName.toString(), cmdObj = cmdBuilder.obj()] {
             return _txnClient->runCommand(dbNameCopy, cmdObj);
         })
         // Safe to inline because the continuation only holds state.
@@ -546,6 +604,9 @@ bool isRunningLocalTransaction(const TransactionClient& txnClient) {
 Transaction::ErrorHandlingStep Transaction::handleError(const StatusWith<CommitResult>& swResult,
                                                         int attemptCounter) const noexcept {
     stdx::lock_guard<Latch> lg(_mutex);
+    // Errors aborting are always ignored.
+    invariant(!_state.is(TransactionState::kNeedsCleanup) &&
+              !_state.is(TransactionState::kStartedAbort));
 
     LOGV2_DEBUG(5875905,
                 3,
@@ -569,8 +630,8 @@ Transaction::ErrorHandlingStep Transaction::handleError(const StatusWith<CommitR
 
     // If the op has a deadline, retry until it is reached regardless of the number of attempts.
     if (attemptCounter > getMaxRetries() && !_opDeadline) {
-        return _isInCommit() ? ErrorHandlingStep::kDoNotRetry
-                             : ErrorHandlingStep::kAbortAndDoNotRetry;
+        return _state.isInCommit() ? ErrorHandlingStep::kDoNotRetry
+                                   : ErrorHandlingStep::kAbortAndDoNotRetry;
     }
 
     // The transient transaction error label is always returned in command responses, even for
@@ -588,16 +649,16 @@ Transaction::ErrorHandlingStep Transaction::handleError(const StatusWith<CommitR
             // entire transaction. If there is a network error after a commit is sent, we can retry
             // the commit command to either recommit if the operation failed or get the result of
             // the successful commit.
-            if (_isInCommit()) {
+            if (_state.isInCommit()) {
                 return ErrorHandlingStep::kRetryCommit;
             }
             return ErrorHandlingStep::kRetryTransaction;
         }
-        return _isInCommit() ? ErrorHandlingStep::kDoNotRetry
-                             : ErrorHandlingStep::kAbortAndDoNotRetry;
+        return _state.isInCommit() ? ErrorHandlingStep::kDoNotRetry
+                                   : ErrorHandlingStep::kAbortAndDoNotRetry;
     }
 
-    if (_isInCommit()) {
+    if (_state.isInCommit()) {
         const auto& commitStatus = swResult.getValue().cmdStatus;
         const auto& commitWCStatus = swResult.getValue().wcError.toStatus();
 
@@ -613,6 +674,14 @@ Transaction::ErrorHandlingStep Transaction::handleError(const StatusWith<CommitR
     }
 
     return ErrorHandlingStep::kAbortAndDoNotRetry;
+}
+
+void TransactionWithRetries::scheduleCleanupIfNecessary() {
+    if (!_internalTxn->needsCleanup()) {
+        return;
+    }
+
+    _bestEffortAbort().getAsync([anchor = shared_from_this()](auto&&) {});
 }
 
 void Transaction::prepareRequest(BSONObjBuilder* cmdBuilder) {
@@ -638,8 +707,8 @@ void Transaction::prepareRequest(BSONObjBuilder* cmdBuilder) {
 
     _sessionInfo.serialize(cmdBuilder);
 
-    if (_state == TransactionState::kInit) {
-        _state = TransactionState::kStarted;
+    if (_state.is(TransactionState::kInit)) {
+        _state.transitionTo(TransactionState::kStarted);
         _sessionInfo.setStartTransaction(boost::none);
         cmdBuilder->append(repl::ReadConcernArgs::kReadConcernFieldName, _readConcern);
     }
@@ -689,7 +758,7 @@ void Transaction::primeForTransactionRetry() noexcept {
             // Advance txnNumber.
             _sessionInfo.setTxnNumber(*_sessionInfo.getTxnNumber() + 1);
             _sessionInfo.setStartTransaction(true);
-            _state = TransactionState::kInit;
+            _state.transitionTo(TransactionState::kInit);
             return;
         case ExecutionContext::kClientTransaction:
             // The outermost client handles retries, so we should never reach here.
@@ -699,9 +768,30 @@ void Transaction::primeForTransactionRetry() noexcept {
 
 void Transaction::primeForCommitRetry() noexcept {
     stdx::lock_guard<Latch> lg(_mutex);
-    invariant(_isInCommit());
     _latestResponseHasTransientTransactionErrorLabel = false;
-    _state = TransactionState::kRetryingCommit;
+    _state.transitionTo(TransactionState::kRetryingCommit);
+}
+
+void Transaction::primeForCleanup() noexcept {
+    stdx::lock_guard<Latch> lg(_mutex);
+    if (!_state.is(TransactionState::kInit)) {
+        // Only cleanup if we've sent at least one command.
+        _state.transitionTo(TransactionState::kNeedsCleanup);
+    }
+}
+
+bool Transaction::needsCleanup() const noexcept {
+    stdx::lock_guard<Latch> lg(_mutex);
+    return _state.is(TransactionState::kNeedsCleanup);
+}
+
+CancellationToken Transaction::getTokenForCommand() const {
+    if (needsCleanup()) {
+        // Use an uncancelable token when cleaning up so we can still do so after the transaction
+        // was cancelled. Note callers will never wait for an operation using this token.
+        return CancellationToken::uncancelable();
+    }
+    return _token;
 }
 
 BSONObj Transaction::reportStateForLog() const {
@@ -711,8 +801,7 @@ BSONObj Transaction::reportStateForLog() const {
 
 BSONObj Transaction::_reportStateForLog(WithLock) const {
     return BSON("execContext" << execContextToString(_execContext) << "sessionInfo"
-                              << _sessionInfo.toBSON() << "state"
-                              << _transactionStateToString(_state));
+                              << _sessionInfo.toBSON() << "state" << _state.toString());
 }
 
 void Transaction::_setSessionInfo(WithLock,
@@ -795,7 +884,7 @@ void Transaction::_primeTransaction(OperationContext* opCtx) {
 
         // Skip directly to the started state since we assume the client already started this
         // transaction.
-        _state = TransactionState::kStarted;
+        _state.transitionTo(TransactionState::kStarted);
     }
     _sessionInfo.setAutocommit(false);
 
