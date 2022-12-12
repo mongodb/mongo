@@ -56,7 +56,6 @@
 #include "mongo/db/pipeline/document_source_sample.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_sort.h"
-#include "mongo/db/pipeline/document_source_streaming_group.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
 #include "mongo/db/query/query_planner_common.h"
@@ -828,68 +827,6 @@ bool DocumentSourceInternalUnpackBucket::haveComputedMetaField() const {
             _bucketUnpacker.bucketSpec().metaField().value());
 }
 
-bool DocumentSourceInternalUnpackBucket::enableStreamingGroupIfPossible(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) {
-    // skip unpack stage
-    itr = std::next(itr);
-
-    FieldPath timeField = _bucketUnpacker.bucketSpec().timeField();
-    DocumentSourceGroup* groupStage = nullptr;
-    bool isSortedOnTime = false;
-    for (; itr != container->end(); ++itr) {
-        if (auto groupStagePtr = dynamic_cast<DocumentSourceGroup*>(itr->get())) {
-            groupStage = groupStagePtr;
-            break;
-        }
-        if (auto sortStagePtr = dynamic_cast<DocumentSourceSort*>(itr->get())) {
-            isSortedOnTime = sortStagePtr->getSortKeyPattern().front().fieldPath == timeField;
-        } else if (!itr->get()->constraints().preservesOrderAndMetadata) {
-            // If this is after the sort, the sort is invalidated. If it's before the sort, there's
-            // no harm in keeping the boolean false.
-            isSortedOnTime = false;
-        }
-        // We modify time field, so we can't proceed with optimization. It may be possible to
-        // proceed in some cases if the modification happens before the sort, but we won't worry
-        // about or bother with those - in large part because it is risky that it will change the
-        // type away from a date into something with more difficult/subtle semantics.
-        if (itr->get()->getModifiedPaths().canModify(timeField)) {
-            return false;
-        }
-    }
-
-    if (groupStage == nullptr || !isSortedOnTime) {
-        return false;
-    }
-
-    const auto& idFields = groupStage->getMutableIdFields();
-    std::vector<size_t> monotonicIdFields;
-    for (size_t i = 0; i < idFields.size(); ++i) {
-        // To enable streaming, we need id field expression to be clustered, so that all documents
-        // with the same value of this id field are in a single continious cluster. However this
-        // property is hard to check for, so we check for monotonicity instead, which is stronger.
-        idFields[i]->optimize();  // We optimize here to make use of constant folding.
-        auto monotonicState = idFields[i]->getMonotonicState(timeField);
-
-        // We don't add monotonic::State::Constant id fields, because they are useless when
-        // determining if a group batch is finished.
-        if (monotonicState == monotonic::State::Increasing ||
-            monotonicState == monotonic::State::Decreasing) {
-            monotonicIdFields.push_back(i);
-        }
-    }
-    if (monotonicIdFields.empty()) {
-        return false;
-    }
-
-    *itr =
-        DocumentSourceStreamingGroup::create(pExpCtx,
-                                             groupStage->getIdExpression(),
-                                             std::move(monotonicIdFields),
-                                             std::move(groupStage->getMutableAccumulatedFields()),
-                                             groupStage->getMaxMemoryUsageBytes());
-    return true;
-}
-
 template <TopBottomSense sense, bool single>
 bool extractFromAcc(const AccumulatorN* acc,
                     const boost::intrusive_ptr<Expression>& init,
@@ -1393,8 +1330,6 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
             return itr;
         }
     }
-
-    enableStreamingGroupIfPossible(itr, container);
 
     return container->end();
 }

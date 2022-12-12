@@ -970,56 +970,5 @@ TEST_F(OptimizePipeline, MatchWithGeoIntersectsOnMetaFieldIsPushedDown) {
                                "'time', metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}"),
                       serialized[1]);
 }
-
-TEST_F(OptimizePipeline, StreamingGroupIsEnabledWhenPossible) {
-    auto unpackSpecObj = fromjson(
-        "{$_internalUnpackBucket: {exclude: [], timeField: "
-        "'time', metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}");
-    auto groupSpecObj = fromjson(
-        "{$group: {_id: {hour: {$dateTrunc: {date: '$time', unit: 'hour'}}, symbol: "
-        "'$myMeta.symbol'}"
-        ", 'sum': {$sum: '$tradeAmount'}}}");
-    auto pipeline = Pipeline::parse(makeVector(unpackSpecObj,
-                                               fromjson("{$sort: {time: 1}}"),
-                                               fromjson("{$match: {'tradePrice': 100}}"),
-                                               groupSpecObj),
-                                    getExpCtx());
-
-    ASSERT_EQ(pipeline->getSources().size(), 4U);
-
-    pipeline->optimizePipeline();
-
-    auto serialized = pipeline->serializeToBson();
-    ASSERT_EQ(serialized.size(), 4U);
-
-    auto streamingGroupSpecObj = fromjson(
-        "{$_internalStreamingGroup: {_id: {hour: {$dateTrunc: {date: '$time', unit: {$const: "
-        "'hour'}}}, symbol: '$myMeta.symbol'}, 'sum': {$sum: '$tradeAmount'}, "
-        "'$monotonicIdFields': ['hour']}}");
-    ASSERT_BSONOBJ_EQ(streamingGroupSpecObj, serialized.back());
-}
-
-TEST_F(OptimizePipeline, StreamingGroupIsNotEnabledWhenTimeFieldIsModified) {
-    auto unpackSpecObj = fromjson(
-        "{$_internalUnpackBucket: {exclude: [], timeField: "
-        "'time', metaField: 'myMeta', bucketMaxSpanSeconds: 3600}}");
-    auto groupSpecObj = fromjson(
-        "{$group: {_id: {hour: '$time', symbol: '$myMeta.symbol'}, 'sum': {$sum: "
-        "'$tradeAmount'}}}");
-    auto pipeline = Pipeline::parse(
-        makeVector(unpackSpecObj,
-                   fromjson("{$addFields: {'time': {$dateTrunc: {date: '$time', unit: 'hour'}}}}"),
-                   fromjson("{$sort: {time: 1}}"),
-                   groupSpecObj),
-        getExpCtx());
-
-    ASSERT_EQ(pipeline->getSources().size(), 4U);
-
-    pipeline->optimizePipeline();
-
-    auto serialized = pipeline->serializeToBson();
-    ASSERT_EQ(serialized.size(), 4U);
-    ASSERT_BSONOBJ_EQ(groupSpecObj, serialized.back());
-}
 }  // namespace
 }  // namespace mongo
