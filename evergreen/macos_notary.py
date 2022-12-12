@@ -71,20 +71,9 @@ for archive in archives:
     print(f"Signing tool completed with exitcode: {p.returncode}")
     for line in iter(p.stdout.readline, b''):
         print(f'macnotary: {line.decode("utf-8").strip()}')
+    p.wait()
 
-    # TODO: BUILD-16161 (previously BUILD-14595) remove timeout when codesign doesn't frequently hang on macos hosts
-    timeout = 3600
-    timed_out = False
-    try:
-        p.wait(timeout=timeout)
-    except subprocess.TimeoutExpired:
-        print(f"ERROR: failed to finish signing in timeout period of {timeout} seconds. This most likely is related to hung codesign, see issues underlying BUILD-14595.")
-        timed_out = True
-        pass
-
-    if timed_out:
-        shutil.move(unsigned_archive, archive)
-    elif p.returncode != 0:
+    if p.returncode != 0:
         failed = True
         shutil.move(unsigned_archive, archive)
     else:
