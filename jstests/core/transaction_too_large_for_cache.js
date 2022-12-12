@@ -3,7 +3,7 @@
  *
  * @tags: [
  *   does_not_support_config_fuzzer,
- *   requires_fcv_63,
+ *   requires_fcv_62,
  *   requires_persistence,
  *   requires_non_retryable_writes,
  *   requires_wiredtiger,
