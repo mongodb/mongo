@@ -29,14 +29,19 @@
 
 #include "mongo/platform/basic.h"
 
+#include <string>
 #include <vector>
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/bulk_write_gen.h"
+#include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
-#include "mongo/util/uuid.h"
+#include "mongo/logv2/log.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
 
 namespace mongo {
 namespace {
@@ -49,6 +54,30 @@ public:
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
+    }
+
+    bool allowedWithSecurityToken() const final {
+        return true;
+    }
+
+    bool supportsRetryableWrite() const final {
+        return true;
+    }
+
+    bool allowedInTransactions() const final {
+        return true;
+    }
+
+    ReadWriteType getReadWriteType() const final {
+        return Command::ReadWriteType::kWrite;
+    }
+
+    bool collectsResourceConsumptionMetrics() const final {
+        return true;
+    }
+
+    bool shouldAffectCommandCounter() const final {
+        return false;
     }
 
     std::string help() const override {
@@ -68,7 +97,30 @@ public:
         }
 
         Reply typedRun(OperationContext* opCtx) final {
-            return Reply();
+            uassert(
+                ErrorCodes::CommandNotSupported,
+                "BulkWrite may not be run without featureFlagBulkWriteCommand enabled",
+                gFeatureFlagBulkWriteCommand.isEnabled(serverGlobalParams.featureCompatibility));
+
+            // Validate that every ops entry has a valid nsInfo index
+            auto& req = request();
+            auto ops = req.getOps();
+            auto nsInfo = req.getNsInfo();
+
+            for (auto& op : ops) {
+                unsigned int nsInfoIdx = op.getInsert();
+                uassert(ErrorCodes::BadValue,
+                        str::stream() << "BulkWrite ops entry " << op.toBSON()
+                                      << " has an invalid nsInfo index.",
+                        nsInfoIdx < nsInfo.size());
+            }
+
+            auto reply = Reply();
+            auto firstBatch = std::vector<BulkWriteReplyItem>();
+            firstBatch.emplace_back(1, 0);
+            reply.setCursor(BulkWriteCommandResponseCursor(0, firstBatch));
+
+            return reply;
         }
     };
 
