@@ -45,7 +45,6 @@
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/string_map.h"
-#include "mongo/util/testing_proctor.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -426,12 +425,6 @@ void IndexConsistency::addIndexKey(OperationContext* opCtx,
             auto search = _extraIndexEntries.find(key);
             if (search == _extraIndexEntries.end()) {
                 SimpleBSONObjSet infoSet = {info};
-                if (TestingProctor::instance().isEnabled() &&
-                    _validateState->nss() == NamespaceString("local", "replset.initialSyncId")) {
-                    invariant(false,
-                              "Validation failed with an extra index key on "
-                              "`local.replset.initialSyncId`.");
-                }
                 _extraIndexEntries.insert(std::make_pair(key, infoSet));
 
                 // Prints the collection document's and index entry's metadata.
