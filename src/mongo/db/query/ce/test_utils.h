@@ -235,6 +235,6 @@ struct BucketData {
 };
 
 stats::ScalarHistogram createHistogram(const std::vector<BucketData>& data);
-
 double estimateIntValCard(const stats::ScalarHistogram& hist, int v, EstimationType type);
+
 }  // namespace mongo::optimizer::ce

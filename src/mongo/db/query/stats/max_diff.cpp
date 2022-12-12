@@ -236,7 +236,7 @@ DataDistribution getDataDistribution(const std::vector<SBEValue>& sortedInput) {
 
 ScalarHistogram genMaxDiffHistogram(const DataDistribution& dataDistrib, size_t numBuckets) {
     if (dataDistrib._freq.empty()) {
-        return {};
+        return ScalarHistogram::make();
     }
 
     std::vector<ValFreq> topKBuckets = generateTopKBuckets(dataDistrib, numBuckets);
@@ -276,10 +276,11 @@ ScalarHistogram genMaxDiffHistogram(const DataDistribution& dataDistrib, size_t 
         startBucketIdx++;
     }
 
-    return {std::move(bounds), std::move(buckets)};
+    return ScalarHistogram::make(std::move(bounds), std::move(buckets));
 }
 
-ArrayHistogram createArrayEstimator(const std::vector<SBEValue>& arrayData, size_t nBuckets) {
+std::shared_ptr<const ArrayHistogram> createArrayEstimator(const std::vector<SBEValue>& arrayData,
+                                                           size_t nBuckets) {
     uassert(7120500, "A histogram must have at least one bucket.", nBuckets > 0);
 
     // Values that will be used as inputs to histogram generation code.
@@ -373,19 +374,20 @@ ArrayHistogram createArrayEstimator(const std::vector<SBEValue>& arrayData, size
     };
 
     if (isScalar) {
-        // If we don't have array elements, we do not include array fields in the final histogram.
-        return {makeHistogram(scalarData), std::move(typeCounts), trueCount, falseCount};
+        // If we don't have array elements, we don't include array fields in the final histogram.
+        return ArrayHistogram::make(
+            makeHistogram(scalarData), std::move(typeCounts), trueCount, falseCount);
     }
 
-    return {makeHistogram(scalarData),
-            std::move(typeCounts),
-            makeHistogram(arrayUniqueData),
-            makeHistogram(arrayMinData),
-            makeHistogram(arrayMaxData),
-            std::move(arrayTypeCounts),
-            emptyArrayCount,
-            trueCount,
-            falseCount};
+    return ArrayHistogram::make(makeHistogram(scalarData),
+                                std::move(typeCounts),
+                                makeHistogram(arrayUniqueData),
+                                makeHistogram(arrayMinData),
+                                makeHistogram(arrayMaxData),
+                                std::move(arrayTypeCounts),
+                                emptyArrayCount,
+                                trueCount,
+                                falseCount);
 }
 
 }  // namespace mongo::stats

@@ -190,18 +190,27 @@ stats::ScalarHistogram createHistogram(const std::vector<BucketData>& data) {
     double cumulativeFreq = 0.0;
     double cumulativeNDV = 0.0;
 
+    // Create a value vector & sort it.
+    std::vector<stats::SBEValue> values;
     for (size_t i = 0; i < data.size(); i++) {
-        const auto& item = data.at(i);
+        const auto& item = data[i];
         const auto [tag, val] = stage_builder::makeValue(item._v);
-        bounds.push_back(tag, val);
+        values.emplace_back(tag, val);
+    }
+    sortValueVector(values);
 
+    for (size_t i = 0; i < values.size(); i++) {
+        const auto& val = values[i];
+        const auto [tag, value] = copyValue(val.getTag(), val.getValue());
+        bounds.push_back(tag, value);
+
+        const auto& item = data[i];
         cumulativeFreq += item._equalFreq + item._rangeFreq;
         cumulativeNDV += item._ndv + 1.0;
         buckets.emplace_back(
             item._equalFreq, item._rangeFreq, cumulativeFreq, item._ndv, cumulativeNDV);
     }
-
-    return {std::move(bounds), std::move(buckets)};
+    return stats::ScalarHistogram::make(std::move(bounds), std::move(buckets));
 }
 
 double estimateIntValCard(const stats::ScalarHistogram& hist,

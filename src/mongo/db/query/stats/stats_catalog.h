@@ -60,9 +60,9 @@ public:
 
     ~StatsCatalog();
 
-    StatusWith<std::shared_ptr<ArrayHistogram>> getHistogram(OperationContext* opCtx,
-                                                             const NamespaceString& nss,
-                                                             const std::string& path);
+    StatusWith<std::shared_ptr<const ArrayHistogram>> getHistogram(OperationContext* opCtx,
+                                                                   const NamespaceString& nss,
+                                                                   const std::string& path);
 
     Status invalidatePath(const NamespaceString& nss, const std::string& path);
 

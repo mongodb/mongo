@@ -162,24 +162,24 @@ TEST(EstimatorArrayDataTest, Histogram1000ArraysSmall10Buckets) {
     typeCounts.insert({value::TypeTags::Array, 1000});
     arrayTypeCounts.insert({value::TypeTags::NumberInt32, 3996});
 
-    const ArrayHistogram arrHist(scalarHist,
-                                 typeCounts,
-                                 aUniqueHist,
-                                 aMinHist,
-                                 aMaxHist,
-                                 arrayTypeCounts,
-                                 0 /* emptyArrayCount */);
+    const auto arrHist = ArrayHistogram::make(scalarHist,
+                                              typeCounts,
+                                              aUniqueHist,
+                                              aMinHist,
+                                              aMaxHist,
+                                              arrayTypeCounts,
+                                              0 /* emptyArrayCount */);
 
     std::vector<QuerySpec> querySet{{10, 20, 35.7, 93.0, 37.8, 39.0},
                                     {10, 60, 103.3, 240.0, 158.0, 196.0},
-                                    {320, 330, 554.5, 746.0, 26.0, 30.0},
-                                    {320, 400, 672.9, 832.0, 231.5, 298.0},
+                                    {320, 330, 550.7, 746.0, 26.0, 30.0},
+                                    {320, 400, 669.1, 832.0, 231.5, 298.0},
                                     {980, 990, 88.8, 101.0, 36.5, 41.0},
                                     {970, 1050, 129.7, 141.0, 129.7, 141.0}};
 
     for (const auto q : querySet) {
         // $match query, includeScalar = true.
-        CEType estCard = estimateCardRange(arrHist,
+        CEType estCard = estimateCardRange(*arrHist,
                                            false /* lowInclusive */,
                                            value::TypeTags::NumberInt32,
                                            sbe::value::bitcastFrom<int32_t>(q.low),
@@ -190,7 +190,7 @@ TEST(EstimatorArrayDataTest, Histogram1000ArraysSmall10Buckets) {
         ASSERT_CE_APPROX_EQUAL(estCard, q.estMatch, 0.1);
 
         // $elemMatch query, includeScalar = false.
-        estCard = estimateCardRange(arrHist,
+        estCard = estimateCardRange(*arrHist,
                                     false /* lowInclusive */,
                                     value::TypeTags::NumberInt32,
                                     sbe::value::bitcastFrom<int32_t>(q.low),
@@ -253,13 +253,13 @@ TEST(EstimatorArrayDataTest, Histogram1000ArraysLarge10Buckets) {
     typeCounts.insert({value::TypeTags::Array, 1000});
     arrayTypeCounts.insert({value::TypeTags::NumberInt32, 8940});
 
-    const ArrayHistogram arrHist(scalarHist,
-                                 typeCounts,
-                                 aUniqueHist,
-                                 aMinHist,
-                                 aMaxHist,
-                                 arrayTypeCounts,
-                                 0 /* emptyArrayCount */);
+    const auto arrHist = ArrayHistogram::make(scalarHist,
+                                              typeCounts,
+                                              aUniqueHist,
+                                              aMinHist,
+                                              aMaxHist,
+                                              arrayTypeCounts,
+                                              0 /* emptyArrayCount */);
 
     std::vector<QuerySpec> querySet{{10, 20, 13.7, 39.0, 9.7, 26.0},
                                     {10, 60, 41.6, 108.0, 55.7, 101.0},
@@ -270,7 +270,7 @@ TEST(EstimatorArrayDataTest, Histogram1000ArraysLarge10Buckets) {
 
     for (const auto q : querySet) {
         // $match query, includeScalar = true.
-        CEType estCard = estimateCardRange(arrHist,
+        CEType estCard = estimateCardRange(*arrHist,
                                            false /* lowInclusive */,
                                            value::TypeTags::NumberInt32,
                                            sbe::value::bitcastFrom<int32_t>(q.low),
@@ -281,7 +281,7 @@ TEST(EstimatorArrayDataTest, Histogram1000ArraysLarge10Buckets) {
         ASSERT_CE_APPROX_EQUAL(estCard, q.estMatch, 0.1);
 
         // $elemMatch query, includeScalar = false.
-        estCard = estimateCardRange(arrHist,
+        estCard = estimateCardRange(*arrHist,
                                     false /* lowInclusive */,
                                     value::TypeTags::NumberInt32,
                                     sbe::value::bitcastFrom<int32_t>(q.low),

@@ -65,7 +65,7 @@ TEST(StatsPath, BasicValidStatsPath) {
     constexpr double numDocs = doubleCount + trueCount + falseCount;
     std::vector<Bucket> buckets{
         Bucket{1.0, 0.0, 1.0, 0.0, 1.0},
-        Bucket{2.0, 5.0, 8.0, 1.0, 2.0},
+        Bucket{2.0, 5.0, 8.0, 1.0, 3.0},
         Bucket{3.0, 4.0, 15.0, 2.0, 6.0},
     };
 
@@ -82,8 +82,8 @@ TEST(StatsPath, BasicValidStatsPath) {
         {sbe::value::TypeTags::NumberDouble, doubleCount},
         {sbe::value::TypeTags::Boolean, trueCount + falseCount},
     };
-    ScalarHistogram sh(*bounds, buckets);
-    ArrayHistogram ah(sh, tc, trueCount, falseCount);
+    const auto sh = ScalarHistogram::make(*bounds, buckets);
+    auto ah = ArrayHistogram::make(std::move(sh), tc, trueCount, falseCount);
 
     // Serialize to BSON.
     auto serializedPath = stats::makeStatsPath("somePath", numDocs, ah);
@@ -104,15 +104,8 @@ TEST(StatsPath, BasicValidEmptyStatsPath) {
     constexpr double numDocs = 0.0;
     std::vector<Bucket> buckets;
 
-    // Initialize histogram bounds.
-    auto [boundsTag, boundsVal] = sbe::value::makeNewArray();
-    sbe::value::ValueGuard boundsGuard{boundsTag, boundsVal};
-    auto bounds = sbe::value::getArrayView(boundsVal);
-
     // Create an empty scalar histogram.
-    TypeCounts tc;
-    ScalarHistogram sh(*bounds, buckets);
-    ArrayHistogram ah(sh, tc);
+    auto ah = ArrayHistogram::make(ScalarHistogram::make(), TypeCounts{});
 
     // Serialize to BSON.
     auto serializedPath = stats::makeStatsPath("someEmptyPath", numDocs, ah);

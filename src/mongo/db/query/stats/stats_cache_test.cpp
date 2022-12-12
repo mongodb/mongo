@@ -80,7 +80,7 @@ protected:
 };
 
 TEST(StatsCacheTest, StandaloneValueHandle) {
-    StatsCacheVal statsPtr(new ArrayHistogram());
+    StatsCacheVal statsPtr(ArrayHistogram::make());
     StatsCache::ValueHandle standaloneHandle(std::move(statsPtr));
     ASSERT(standaloneHandle.isValid());
 }

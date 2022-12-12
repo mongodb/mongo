@@ -41,30 +41,38 @@ using TypeCounts = std::map<sbe::value::TypeTags, double>;
 class ArrayHistogram {
 public:
     /**
-     * Factory method for constructing an ArrayHistogram using StatsPath IDL as input. Caller is
-     * responsible for freeing.
+     * Factory method for constructing an empty scalar histogram.
      */
-    static ArrayHistogram* makeArrayHistogram(Statistics stats);
+    static std::shared_ptr<const ArrayHistogram> make();
 
-    // Constructs an empty scalar histogram.
-    ArrayHistogram();
+    /**
+     * Factory method for constructing an ArrayHistogram using StatsPath IDL as input.
+     */
+    static std::shared_ptr<const ArrayHistogram> make(Statistics stats);
 
-    // Constructor for scalar field histograms.
-    ArrayHistogram(ScalarHistogram scalar,
-                   TypeCounts typeCounts,
-                   double trueCount = 0.0,
-                   double falseCount = 0.0);
+    /**
+     * Factory method for constructing a scalar histogram (no array fields).
+     */
+    static std::shared_ptr<const ArrayHistogram> make(ScalarHistogram scalar,
+                                                      TypeCounts typeCounts,
+                                                      double trueCount = 0.0,
+                                                      double falseCount = 0.0,
+                                                      bool validate = true);
 
-    // Constructor for array field histograms. We have to initialize all array fields in this case.
-    ArrayHistogram(ScalarHistogram scalar,
-                   TypeCounts typeCounts,
-                   ScalarHistogram arrayUnique,
-                   ScalarHistogram arrayMin,
-                   ScalarHistogram arrayMax,
-                   TypeCounts arrayTypeCounts,
-                   double emptyArrayCount = 0.0,
-                   double trueCount = 0.0,
-                   double falseCount = 0.0);
+    /**
+     * Factory method for constructing an array field histogram. All array fields must be
+     * initialized.
+     */
+    static std::shared_ptr<const ArrayHistogram> make(ScalarHistogram scalar,
+                                                      TypeCounts typeCounts,
+                                                      ScalarHistogram arrayUnique,
+                                                      ScalarHistogram arrayMin,
+                                                      ScalarHistogram arrayMax,
+                                                      TypeCounts arrayTypeCounts,
+                                                      double emptyArrayCount = 0.0,
+                                                      double trueCount = 0.0,
+                                                      double falseCount = 0.0,
+                                                      bool validate = true);
 
     // ArrayHistogram is neither copy-constructible nor copy-assignable.
     ArrayHistogram(const ArrayHistogram&) = delete;
@@ -108,7 +116,36 @@ public:
         return _falseCount;
     }
 
+    // Returns the count of a type as known by the respective type counter. If the type is not
+    // present in the TypeCounts map, returns 0.
+    double getTypeCount(sbe::value::TypeTags tag) const;
+    double getArrayTypeCount(sbe::value::TypeTags tag) const;
+
+    // Returns the sum of counts of all types known by the respective type counter.
+    double getTotalTypeCount() const;
+    double getTotalArrayTypeCount() const;
+
 private:
+    // Constructs an empty scalar histogram.
+    ArrayHistogram();
+
+    // Constructor for scalar field histograms.
+    ArrayHistogram(ScalarHistogram scalar,
+                   TypeCounts typeCounts,
+                   double trueCount = 0.0,
+                   double falseCount = 0.0);
+
+    // Constructor for array field histograms. We have to initialize all array fields in this case.
+    ArrayHistogram(ScalarHistogram scalar,
+                   TypeCounts typeCounts,
+                   ScalarHistogram arrayUnique,
+                   ScalarHistogram arrayMin,
+                   ScalarHistogram arrayMax,
+                   TypeCounts arrayTypeCounts,
+                   double emptyArrayCount = 0.0,
+                   double trueCount = 0.0,
+                   double falseCount = 0.0);
+
     /* Fields for all paths. */
 
     // Contains values which appeared originally as scalars on the path.
@@ -136,10 +173,12 @@ private:
 /**
  * Returns an owned BSON Object representing data matching mongo::Statistics IDL.
  */
-BSONObj makeStatistics(double documents, const ArrayHistogram& arrayHistogram);
+BSONObj makeStatistics(double documents, std::shared_ptr<const ArrayHistogram> arrayHistogram);
 
 /**
  * Returns an owned BSON Object representing data matching mongo::StatsPath IDL.
  */
-BSONObj makeStatsPath(StringData path, double documents, const ArrayHistogram& arrayHistogram);
+BSONObj makeStatsPath(StringData path,
+                      double documents,
+                      std::shared_ptr<const ArrayHistogram> arrayHistogram);
 }  // namespace mongo::stats

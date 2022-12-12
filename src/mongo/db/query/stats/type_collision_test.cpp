@@ -125,6 +125,6 @@ TEST(TypeCollisionTest, ZeroedCollidingTypesHistogram) {
 			bounds: [0.0, \"\", ObjectId('000000000000000000000000'), new Date(0), Timestamp(0, 0)]\
 		} \
 	}");
-    ASSERT_BSONOBJ_EQ(expected, ah.serialize());
+    ASSERT_BSONOBJ_EQ(expected, ah->serialize());
 }
 }  // namespace mongo::stats
