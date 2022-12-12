@@ -36,6 +36,17 @@ var workerThread = (function() {
         TestData = (TestData !== undefined) ? TestData : {};
 
         try {
+            // Running a callback passed through testData before running fsm worker theads.
+            // Can be added to yml files as the following example:
+            // fsmPreOverridesLoadedCallback: '
+            //     testingReplication = true;
+            //     load('jstests/libs/override_methods/network_error_and_txn_override.js');
+            //     ...
+            // '
+            if (typeof TestData.fsmPreOverridesLoadedCallback !== 'undefined') {
+                new Function(`${TestData.fsmPreOverridesLoadedCallback}`)();
+            }
+
             if (typeof db !== 'undefined') {
                 // The implicit database connection created within the thread's scope
                 // is unneeded, so forcibly clean it up.
