@@ -64,12 +64,10 @@ public:
      * otherwise since it is the responsibility of the caller to ensure that only one thread is
      * taking the critical section.
      */
-    void acquireRecoverableCriticalSectionBlockWrites(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        const BSONObj& reason,
-        const WriteConcernOptions& writeConcern,
-        const boost::optional<BSONObj>& additionalInfo = boost::none);
+    void acquireRecoverableCriticalSectionBlockWrites(OperationContext* opCtx,
+                                                      const NamespaceString& nss,
+                                                      const BSONObj& reason,
+                                                      const WriteConcernOptions& writeConcern);
 
     /**
      * Advances the recoverable critical section from the catch-up phase (i.e. blocking writes) to

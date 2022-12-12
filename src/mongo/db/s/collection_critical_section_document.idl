@@ -56,9 +56,3 @@ structs:
                 type: bool
                 description: "It states whether this critical section should block reads (CS in
                              commit phase) or not (CS in catch up phase)."
-            additionalInfo:
-                type: object 
-                description: "Additional information associated to the operation that entered the
-                             critical section.
-                             Only used for diagnostic purposes."
-                optional: true

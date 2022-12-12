@@ -589,9 +589,7 @@ TEST_F(ShardingRecoveryServiceTestOnSecondary, BlockAndUnblockOperationsOnDataba
     // is what a secondary node would receive when the primary node enters the commit phase of the
     // critical section.
     auto preImageDoc = doc.toBSON();
-    doc.setBlockReads(true);  // NOTE: This has no semantic effect as the critical section is
-                              // promoted to any update event on the document!
-                              // TODO (SERVER-71056): React to `blockReads` changes only.
+    doc.setBlockReads(true);
     {
         CollectionUpdateArgs updateArgs{preImageDoc};
         updateArgs.updatedDoc = doc.toBSON();
@@ -655,9 +653,7 @@ TEST_F(ShardingRecoveryServiceTestOnSecondary, BlockAndUnblockOperationsOnCollec
     // Simulate an update notification on the `config.collection_critical_sections` collection, that
     // is what a secondary node would receive when the primary node enters the commit phase of the
     // critical section.
-    doc.setBlockReads(true);  // NOTE: This has no semantic effect as the critical section is
-                              // promoted to any update event on the document!
-                              // TODO (SERVER-71056): React to `blockReads` changes only.
+    doc.setBlockReads(true);
     {
         CollectionUpdateArgs updateArgs{preImageDoc};
         updateArgs.updatedDoc = doc.toBSON();

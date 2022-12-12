@@ -292,6 +292,8 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
             !recoverable_critical_section_util::inRecoveryMode(opCtx)) {
             const auto collCSDoc = CollectionCriticalSectionDocument::parse(
                 IDLParserContext("ShardServerOpObserver"), insertedDoc);
+            invariant(!collCSDoc.getBlockReads());
+
             opCtx->recoveryUnit()->onCommit([opCtx,
                                              insertedNss = collCSDoc.getNss(),
                                              reason = collCSDoc.getReason().getOwned()](
@@ -462,6 +464,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
         !recoverable_critical_section_util::inRecoveryMode(opCtx)) {
         const auto collCSDoc = CollectionCriticalSectionDocument::parse(
             IDLParserContext("ShardServerOpObserver"), args.updateArgs->updatedDoc);
+        invariant(collCSDoc.getBlockReads());
 
         opCtx->recoveryUnit()->onCommit(
             [opCtx, updatedNss = collCSDoc.getNss(), reason = collCSDoc.getReason().getOwned()](

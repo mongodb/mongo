@@ -972,11 +972,7 @@ void CreateCollectionCoordinator::_acquireCriticalSections(OperationContext* opC
     // TODO SERVER-68084 call ShardingRecoveryService without the try/catch block
     try {
         ShardingRecoveryService::get(opCtx)->acquireRecoverableCriticalSectionBlockWrites(
-            opCtx,
-            originalNss(),
-            _critSecReason,
-            ShardingCatalogClient::kMajorityWriteConcern,
-            boost::none);
+            opCtx, originalNss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
     } catch (const ExceptionFor<ErrorCodes::CommandNotSupportedOnView>&) {
         if (_timeseriesNssResolvedByCommandHandler()) {
             throw;
