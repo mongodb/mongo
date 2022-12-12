@@ -275,15 +275,12 @@ struct Collector {
 
     template <typename T, typename... Ts>
     CollectedInfo transport(const ABT&, const T& op, Ts&&... ts) {
+        static_assert(!std::is_base_of_v<Node, T>, "Nodes must implement reference tracking");
+
         // The default behavior resolves free variables, merges known definitions and propagates
         // them up unmodified.
-        // TODO: SERVER-70880: Remove default ABT type handler in the reference tracker.
         CollectedInfo result{};
         (result.merge(std::forward<Ts>(ts)), ...);
-
-        if constexpr (std::is_base_of_v<Node, T>) {
-            result.nodeDefs[&op] = result.defs;
-        }
 
         return result;
     }
@@ -399,6 +396,12 @@ struct Collector {
         return collectForScan(n, node, node.binder(), std::move(refResult));
     }
 
+    CollectedInfo transport(const ABT& n, const CoScanNode& node) {
+        CollectedInfo result{};
+        result.nodeDefs[&node] = result.defs;
+        return result;
+    }
+
     CollectedInfo transport(const ABT& n,
                             const MemoLogicalDelegatorNode& memoLogicalDelegatorNode) {
         CollectedInfo result{};
@@ -415,6 +418,21 @@ struct Collector {
 
         result.nodeDefs[&memoLogicalDelegatorNode] = result.defs;
 
+        return result;
+    }
+
+    CollectedInfo transport(const ABT& n, const MemoPhysicalDelegatorNode& node) {
+        tasserted(7088004, "Should not be seeing memo physical delegator in this context");
+    }
+
+    CollectedInfo transport(const ABT& n,
+                            const FilterNode& filterNode,
+                            CollectedInfo childResult,
+                            CollectedInfo exprResult) {
+        CollectedInfo result{};
+        result.merge(std::move(childResult));
+        result.mergeNoDefs(std::move(exprResult));
+        result.nodeDefs[&filterNode] = result.defs;
         return result;
     }
 
@@ -614,7 +632,9 @@ struct Collector {
             // Manually copy and resolve references of specific child. We do this manually because
             // each Variable must be resolved by the appropriate child's definition.
             for (const auto& name : names) {
-                tassert(7063706, "SortedMerge projection does not exist", u.defs.count(name) != 0);
+                tassert(7063706,
+                        str::stream() << "SortedMerge projection does not exist: " << name,
+                        u.defs.count(name) != 0);
                 u.useMap.emplace(&refsResult.freeVars[name][counter].get(), u.defs[name]);
             }
             u.defs.clear();
@@ -734,11 +754,13 @@ struct Collector {
         CollectedInfo result{};
 
         // First resolve all variables from the inside point of view.
-        result.merge(std::move(refsResult));
+        result.mergeNoDefs(std::move(refsResult));
         result.merge(std::move(childResult));
 
         const auto& name = unwindNode.getProjectionName();
-        tassert(6624034, "Unwind projection does not exist", result.defs.count(name) != 0);
+        tassert(6624034,
+                str::stream() << "Unwind projection does not exist: " << name,
+                result.defs.count(name) != 0);
 
         // Redefine unwind projection.
         result.defs[name] = Definition{n.ref(), unwindNode.getProjection().ref()};
@@ -763,10 +785,80 @@ struct Collector {
         result.merge(std::move(childResult));
 
         for (const auto& name : uniqueNode.getProjections()) {
-            tassert(6624060, "Unique projection does not exist", result.defs.count(name) != 0);
+            tassert(6624060,
+                    str::stream() << "Unique projection does not exist: " << name,
+                    result.defs.count(name) != 0);
         }
 
         result.nodeDefs[&uniqueNode] = result.defs;
+
+        return result;
+    }
+
+    CollectedInfo transport(const ABT& n,
+                            const CollationNode& collationNode,
+                            CollectedInfo childResult,
+                            CollectedInfo refsResult) {
+        CollectedInfo result{};
+
+        result.mergeNoDefs(std::move(refsResult));
+        result.merge(std::move(childResult));
+
+        for (const auto& name : collationNode.getProperty().getAffectedProjectionNames()) {
+            tassert(7088001,
+                    str::stream() << "Collation projection does not exist: " << name,
+                    result.defs.count(name) != 0);
+        }
+
+        result.nodeDefs[&collationNode] = result.defs;
+
+        return result;
+    }
+
+    CollectedInfo transport(const ABT& n,
+                            const LimitSkipNode& limitSkipNode,
+                            CollectedInfo childResult) {
+        CollectedInfo result{};
+        result.merge(std::move(childResult));
+        result.nodeDefs[&limitSkipNode] = result.defs;
+        return result;
+    }
+
+    CollectedInfo transport(const ABT& n,
+                            const ExchangeNode& exchangeNode,
+                            CollectedInfo childResult,
+                            CollectedInfo refsResult) {
+        CollectedInfo result{};
+
+        result.mergeNoDefs(std::move(refsResult));
+        result.merge(std::move(childResult));
+
+        for (const auto& name : exchangeNode.getProperty().getAffectedProjectionNames()) {
+            tassert(7088002,
+                    str::stream() << "Exchange projection does not exist: " << name,
+                    result.defs.count(name) != 0);
+        }
+
+        result.nodeDefs[&exchangeNode] = result.defs;
+        return result;
+    }
+
+    CollectedInfo transport(const ABT& n,
+                            const RootNode& rootNode,
+                            CollectedInfo childResult,
+                            CollectedInfo refsResult) {
+        CollectedInfo result{};
+
+        result.mergeNoDefs(std::move(refsResult));
+        result.merge(std::move(childResult));
+
+        for (const auto& name : rootNode.getProperty().getAffectedProjectionNames()) {
+            tassert(7088003,
+                    str::stream() << "Root projection does not exist: " << name,
+                    result.defs.count(name) != 0);
+        }
+
+        result.nodeDefs[&rootNode] = result.defs;
 
         return result;
     }
