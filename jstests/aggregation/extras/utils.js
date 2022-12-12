@@ -22,6 +22,56 @@ function testExpressionWithCollation(coll, expression, result, collationSpec) {
     assert.eq(res[0].output, result, tojson(res));
 }
 
+function _getObjectSubtypeOrUndefined(o) {
+    function isNumberLong(v) {
+        return v instanceof NumberLong;
+    }
+    function isNumberInt(v) {
+        return v instanceof NumberInt;
+    }
+    function isNumberDecimal(v) {
+        return v instanceof NumberDecimal;
+    }
+    function isObjectId(v) {
+        return v instanceof ObjectId;
+    }
+    function isDate(v) {
+        return v instanceof Date;
+    }
+    function isTimestamp(v) {
+        return v instanceof Timestamp;
+    }
+    function isArray(v) {
+        return v instanceof Array;
+    }
+
+    const objectSubtypes = [
+        {typeName: "NumberLong", isSameSubtype: isNumberLong},
+        {typeName: "NumberInt", isSameSubtype: isNumberInt},
+        {typeName: "NumberDecimal", isSameSubtype: isNumberDecimal},
+        {typeName: "ObjectId", isSameSubtype: isObjectId},
+        {typeName: "Date", isSameSubtype: isDate},
+        {typeName: "Timestamp", isSameSubtype: isTimestamp},
+        {typeName: "Array", isSameSubtype: isArray},
+    ];
+
+    for (const subtype of objectSubtypes) {
+        if (subtype.isSameSubtype(o)) {
+            return subtype;
+        }
+    }
+    return undefined;
+}
+
+/**
+ * Compare using valueComparator if provided, or the default otherwise. Assumes al and ar have the
+ * same type.
+ */
+function _uncheckedCompare(al, ar, valueComparator) {
+    // bsonBinaryEqual would return false for NumberDecimal("0.1") and NumberDecimal("0.100").
+    return valueComparator ? valueComparator(al, ar) : (al === ar || bsonWoCompare(al, ar) === 0);
+}
+
 /**
  * Returns true if 'al' is the same as 'ar'. If the two are arrays, the arrays can be in any order.
  * Objects (either 'al' and 'ar' themselves, or embedded objects) must have all the same properties.
@@ -29,32 +79,46 @@ function testExpressionWithCollation(coll, expression, result, collationSpec) {
  * or == if not provided.
  */
 function anyEq(al, ar, verbose = false, valueComparator, fieldsToSkip = []) {
-    const debug = msg => verbose ? print(msg) : null;  // Helper to log 'msg' iff 'verbose' is true.
+    // Helper to log 'msg' iff 'verbose' is true.
+    const debug = msg => verbose ? print(msg) : null;
 
-    if (al instanceof Array) {
-        if (!(ar instanceof Array)) {
-            debug('anyEq: ar is not an array ' + tojson(ar));
-            return false;
-        }
+    if (al instanceof Object && ar instanceof Object) {
+        const alSubtype = _getObjectSubtypeOrUndefined(al);
+        if (alSubtype) {
+            // One of the supported subtypes, make sure ar is of the same type.
+            if (!alSubtype.isSameSubtype(ar)) {
+                debug('anyEq: ar is not instanceof ' + alSubtype.typeName + ' ' + tojson(ar));
+                return false;
+            }
 
-        if (!arrayEq(al, ar, verbose, valueComparator, fieldsToSkip)) {
-            debug(`anyEq: arrayEq(al, ar): false; al=${tojson(al)}, ar=${tojson(ar)}`);
-            return false;
-        }
-    } else if (al instanceof Object) {
-        // Be sure to explicitly check for Arrays, since Arrays are considered instances of Objects,
-        // and we do not want to consider [] to be equal to {}.
-        if (!(ar instanceof Object) || (ar instanceof Array)) {
-            debug('anyEq: ar is not an object ' + tojson(ar));
-            return false;
-        }
+            if (al instanceof Array) {
+                if (!arrayEq(al, ar, verbose, valueComparator, fieldsToSkip)) {
+                    debug(`anyEq: arrayEq(al, ar): false; al=${tojson(al)}, ar=${tojson(ar)}`);
+                    return false;
+                }
+            } else if (!_uncheckedCompare(al, ar, valueComparator)) {
+                debug(`anyEq: (al != ar): false; al=${tojson(al)}, ar=${tojson(ar)}`);
+                return false;
+            }
+        } else {
+            const arType = _getObjectSubtypeOrUndefined(ar);
+            if (arType) {
+                // If al was not of any of the subtypes, but ar is, then types are different.
+                debug('anyEq: al is ' + typeof al + ' but ar is ' + arType.typeName);
+                return false;
+            }
 
-        if (!documentEq(al, ar, verbose, valueComparator, fieldsToSkip)) {
-            debug(`anyEq: documentEq(al, ar): false; al=${tojson(al)}, ar=${tojson(ar)}`);
-            return false;
+            // Default to comparing object fields.
+            if (!documentEq(al, ar, verbose, valueComparator, fieldsToSkip)) {
+                debug(`anyEq: documentEq(al, ar): false; al=${tojson(al)}, ar=${tojson(ar)}`);
+                return false;
+            }
         }
-    } else if ((valueComparator && !valueComparator(al, ar)) || (!valueComparator && al !== ar)) {
-        // Neither an object nor an array, use the custom comparator if provided.
+    } else if (!_uncheckedCompare(al, ar, valueComparator)) {
+        // One of the operands, or both, is not an object. If one of them is not an object, but the
+        // other is, the default compare will return false. If both are not an object, default
+        // comparison should work fine. In all cases, if the value comparator is provided, it should
+        // be used, even for different types.
         debug(`anyEq: (al != ar): false; al=${tojson(al)}, ar=${tojson(ar)}`);
         return false;
     }
@@ -257,6 +321,8 @@ function resultsEq(rl, rr, verbose = false, fieldsToSkip = []) {
         for (let j = 0; j < rr.length; ++j) {
             if (!anyEq(rl[i], rr[j], verbose, null, fieldsToSkip))
                 continue;
+
+            debug(`resultsEq: search target found (${tojson(rl[i])}) (${tojson(rr[j])})`);
 
             // Because we made the copies above, we can edit these out of the arrays so we don't
             // check on them anymore.

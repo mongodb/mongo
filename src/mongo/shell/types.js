@@ -403,7 +403,7 @@ if (typeof NumberDecimal !== 'undefined') {
     };
 
     NumberDecimal.prototype.equals = function(other) {
-        return compareNumberDecimals(this, other);
+        return numberDecimalsEqual(this, other);
     };
 }
 
