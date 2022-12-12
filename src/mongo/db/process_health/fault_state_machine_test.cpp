@@ -358,6 +358,7 @@ TEST_F(FaultManagerTest, HealthCheckWithOffFacetCreatesNoFaultInOk) {
     configPtr->setIntensityForType(faultFacetType, HealthObserverIntensityEnum::kOff);
     manager().acceptTest(HealthCheckStatus(faultFacetType, Severity::kFailure, "error"));
     ASSERT_EQ(manager().getFaultState(), FaultState::kOk);
+    resetManager();
 }
 
 TEST_F(FaultManagerTest, DNSHealthCheckWithBadHostNameFailsAndGoodHostNameSuccess) {
