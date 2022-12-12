@@ -3663,6 +3663,7 @@ tasks:
       npm_command: initsync-fuzzer
       suite: initial_sync_fuzzer
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+      run_no_feature_flag_tests: "true"
 
 ## initial sync generational fuzzer ##
 - <<: *jstestfuzz_template
@@ -3691,6 +3692,7 @@ tasks:
       suite: generational_fuzzer
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
       npm_command: agg-fuzzer
+      run_no_feature_flag_tests: "true"
 
 ## Standalone generational fuzzer for multiversion aggregation expressions ##
 - <<: *jstestfuzz_template
@@ -3705,6 +3707,7 @@ tasks:
       suite: generational_fuzzer
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
       npm_command: agg-expr-fuzzer
+      run_no_feature_flag_tests: "true"
 
 ## Standalone generational fuzzer for checking optimized and unoptimized expression equivalence
 - <<: *jstestfuzz_template
@@ -3854,6 +3857,7 @@ tasks:
       npm_command: update-fuzzer
       suite: update_fuzzer
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+      run_no_feature_flag_tests: "true"
 
 ## jstestfuzz standalone update time-series generational fuzzer ##
 - <<: *jstestfuzz_template
@@ -3883,6 +3887,7 @@ tasks:
       npm_command: update-fuzzer
       suite: update_fuzzer_replication
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
+      run_no_feature_flag_tests: "true"
 
 ## rollback multiversion fuzzer ##
 - <<: *jstestfuzz_template
@@ -3899,6 +3904,7 @@ tasks:
       # Rollback suites create indexes with majority of nodes not available for replication. So, disabling
       # index build commit quorum.
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}, enableIndexBuildCommitQuorum: false}'"
+      run_no_feature_flag_tests: "true"
 
 ## rollback generational fuzzer ##
 - <<: *jstestfuzz_template
@@ -4211,6 +4217,7 @@ tasks:
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
       suite: jstestfuzz_replication
       npm_command: jstestfuzz
+      run_no_feature_flag_tests: "true"
 
 ## jstestfuzz initial sync replica set ##
 - <<: *jstestfuzz_template
@@ -4277,6 +4284,7 @@ tasks:
       resmoke_args: "--mongodSetParameters='{logComponentVerbosity: {command: 2}}'"
       suite: jstestfuzz_sharded
       npm_command: jstestfuzz
+      run_no_feature_flag_tests: "true"
 
 ## jstestfuzz sharded cluster causal consistency ##
 - <<: *jstestfuzz_template
@@ -4403,6 +4411,8 @@ tasks:
   tags: ["multiversion", "multiversion_sanity_check"]
   commands:
   - func: "generate resmoke tasks"
+    vars:
+      run_no_feature_flag_tests: "true"
 
 - <<: *gen_task_template
   name: replica_sets_jscore_multiversion_gen
@@ -4411,6 +4421,7 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       suite: replica_sets_jscore_passthrough
+      run_no_feature_flag_tests: "true"
 
 
 # Check that the mutational fuzzer can parse JS files modified in a patch build.
@@ -4650,12 +4661,15 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       suite: change_streams
+      run_no_feature_flag_tests: "true"
 
 - <<: *gen_task_template
   name: change_streams_downgrade_gen
   tags: ["multiversion_passthrough", "multiversion"]
   commands:
   - func: "generate resmoke tasks"
+    vars:
+      run_no_feature_flag_tests: "true"
 
 - <<: *task_template
   name: change_streams_mongos_sessions_passthrough
@@ -4709,6 +4723,7 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       suite: change_streams_sharded_collections_passthrough
+      run_no_feature_flag_tests: "true"
 
 - <<: *gen_task_template
   name: multiversion_future_git_tag_gen
@@ -5460,6 +5475,7 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       suite: sharded_collections_jscore_passthrough
+      run_no_feature_flag_tests: "true"
 
 - <<: *task_template
   name: sharding_jscore_passthrough
@@ -5475,6 +5491,7 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       suite: sharding_jscore_passthrough
+      run_no_feature_flag_tests: "true"
 
 - <<: *gen_task_template
   name: sharding_api_version_jscore_passthrough_gen
@@ -5760,6 +5777,7 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       suite: concurrency_replication
+      run_no_feature_flag_tests: "true"
 
 - <<: *gen_task_template
   name: concurrency_replication_causal_consistency_gen
@@ -5838,6 +5856,7 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       suite: concurrency_sharded_replication
+      run_no_feature_flag_tests: "true"
 
 - <<: *gen_task_template
   name: concurrency_sharded_replication_with_balancer_gen
@@ -6142,6 +6161,7 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       suite: replica_sets
+      run_no_feature_flag_tests: "true"
 
 - <<: *task_template
   name: sasl
@@ -6173,6 +6193,7 @@ tasks:
     vars:
       use_large_distro: "true"
       suite: sharding
+      run_no_feature_flag_tests: "true"
 
 - <<: *gen_task_template
   name: sharding_max_mirroring_gen
@@ -6240,6 +6261,7 @@ tasks:
     vars:
       use_large_distro: "true"
       multiversion_exclude_tags_version: last_lts
+      run_no_feature_flag_tests: "true"
 
 - <<: *gen_task_template
   name: sharding_opportunistic_secondary_targeting_gen
@@ -6350,6 +6372,7 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       multiversion_exclude_tags_version: last_continuous
+      run_no_feature_flag_tests: "true"
 
 - <<: *gen_task_template
   name: retryable_writes_downgrade_last_lts_gen
@@ -6358,12 +6381,15 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       multiversion_exclude_tags_version: last_lts
+      run_no_feature_flag_tests: "true"
 
 - <<: *gen_task_template
   name: sharded_retryable_writes_downgrade_gen
   tags: ["multiversion_passthrough", "multiversion"]
   commands:
   - func: "generate resmoke tasks"
+    vars:
+      run_no_feature_flag_tests: "true"
 
 - <<: *gen_task_template
   name: logical_session_cache_replication_default_refresh_jscore_passthrough_gen
