@@ -414,13 +414,9 @@ private:
     UUID _uuid{UUID::gen()};
 };
 
-// The 'pending' field must not be set in order for a range deletion task to succeed, but the
-// ShardServerOpObserver will submit the task for deletion upon seeing an insert without the
-// 'pending' field. The tests call removeDocumentsFromRange directly, so we want to avoid having
-// the op observer also submit the task. The ShardServerOpObserver will ignore replacement
-//  updates on the range deletions namespace though, so we can get around the issue by inserting
-// the task with the 'pending' field set, and then remove the field using a replacement update
-// after.
+// The range deleter service test util will register a task with the range deleter with pending set
+// to true, insert the task, and then remove the pending field. We must create the task with pending
+// set to true so that the removal of the pending field succeeds.
 RangeDeletionTask createRangeDeletionTask(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           const UUID& uuid,
@@ -431,6 +427,7 @@ RangeDeletionTask createRangeDeletionTask(OperationContext* opCtx,
     t.setNumOrphanDocs(numOrphans);
     const auto currentTime = VectorClock::get(opCtx)->getTime();
     t.setTimestamp(currentTime.clusterTime().asTimestamp());
+    t.setPending(true);
     return t;
 }
 
