@@ -473,17 +473,17 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes3) {
 }
 
 // Tests MultiBsonStreamCursor reading a large number of pipes with random-sized BSON objects and
-// randomized data. This test creates 100 threads that each write a pipe containing a randomized
+// randomized data. This test creates 20 threads that each write a pipe containing a randomized
 // average of 1K BSON objects, each object holding a string value of randomized average 1K in size
 // of random printable ASCII characters, plus field name and overhead. Thus it will scan an expected
-// ~100+ MB of data (~1+ MB per pipe).
+// ~20+ MB of data (~1+ MB per pipe).
 //
 // This test uses a fixed random seed so if it fails we can reproduce that easily. C++ does not
 // support multiple random number generators, so this reseeds the shared rand() generater with the
 // current time at the end as other tests in this file expect non-fixed seed randomosity.
 TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes4) {
-    std::srand(972134657);          // set a fixed random seed
-    constexpr int kNumPipes = 100;  // shadows the global
+    std::srand(972134657);         // set a fixed random seed
+    constexpr int kNumPipes = 20;  // shadows the global
     std::string pipePaths[kNumPipes];
     stdx::thread pipeThreads[kNumPipes];           // pipe producer threads
     PipeWaiter pw[kNumPipes];                      // pipe waiters

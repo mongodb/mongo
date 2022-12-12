@@ -126,16 +126,6 @@ void NamedPipeInput::doOpen() {
                       "NamedPipeInput::doOpen() waited for pipe longer than 1 sec",
                       "_pipeAbsolutePath"_attr = _pipeAbsolutePath);
     }
-
-    // Makes sure that the file is a named pipe.
-    struct stat pipeInfo;
-    uassert(ErrorCodes::FileNotOpen,
-            "Failed to get info on a named pipe, error: {}"_format(
-                getErrorMessage("stat", _pipeAbsolutePath)),
-            stat(_pipeAbsolutePath.c_str(), &pipeInfo) == 0);
-    uassert(ErrorCodes::FileNotOpen,
-            "{} is not a named pipe"_format(_pipeAbsolutePath),
-            S_ISFIFO(pipeInfo.st_mode));
 }
 
 int NamedPipeInput::doRead(char* data, int size) {
