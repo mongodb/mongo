@@ -63,6 +63,7 @@ MONGO_FAIL_POINT_DEFINE(hangTimeseriesInsertBeforeReopeningBucket);
 MONGO_FAIL_POINT_DEFINE(alwaysUseSameBucketCatalogStripe);
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesDirectModificationAfterStart);
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesDirectModificationBeforeFinish);
+MONGO_FAIL_POINT_DEFINE(hangWaitingForConflictingPreparedBatch);
 
 
 uint8_t numDigits(uint32_t num) {
@@ -1954,6 +1955,10 @@ void BucketCatalog::_waitToCommitBatch(Stripe* stripe, const std::shared_ptr<Wri
             }
         }
 
+        // We only hit this failpoint when there are conflicting prepared batches on the same
+        // bucket.
+        hangWaitingForConflictingPreparedBatch.pauseWhileSet();
+
         // We have to wait for someone else to finish.
         current->getResult().getStatus().ignore();  // We don't care about the result.
     }
@@ -2177,6 +2182,13 @@ void BucketCatalog::_abort(Stripe* stripe,
 
     if (doRemove) {
         _removeBucket(stripe, stripeLock, bucket, RemovalMode::kAbort);
+    } else {
+        _bucketStateManager.changeBucketState(
+            bucket->bucketId(),
+            [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
+                invariant(input.has_value());
+                return input.value().setFlag(BucketStateFlag::kCleared);
+            });
     }
 }
 
