@@ -1017,7 +1017,7 @@ void ByteCode::traverseP_nested(const CodeFragment* code,
 
     auto [tagArrOutput, valArrOutput] = value::makeNewArray();
     auto arrOutput = value::getArrayView(valArrOutput);
-    value::ValueGuard guard{tagInput, valArrOutput};
+    value::ValueGuard guard{tagArrOutput, valArrOutput};
 
     for (value::ArrayEnumerator enumerator(tagInput, valInput); !enumerator.atEnd();
          enumerator.advance()) {
