@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/s/config/sharding_catalog_manager.h"
@@ -55,6 +53,7 @@
 #include "mongo/db/feature_compatibility_version_parser.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/hello_gen.h"

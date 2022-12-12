@@ -30,8 +30,10 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/client/connection_string.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -44,4 +46,9 @@ void notifyChangeStreamsOnShardCollection(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           const UUID& uuid,
                                           BSONObj cmd);
+
+void notifyChangeStreamsOnAddShard(OperationContext* opCtx,
+                                   const ShardId& shardName,
+                                   const ConnectionString& connStr);
+
 }  // namespace mongo

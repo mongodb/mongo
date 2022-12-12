@@ -50,7 +50,6 @@
 
 
 namespace mongo {
-namespace {
 
 /**
  * Internal sharding command run on config servers to add a shard to the cluster.
@@ -138,5 +137,4 @@ public:
     }
 } configsvrAddShardCmd;
 
-}  // namespace
 }  // namespace mongo

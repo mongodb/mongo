@@ -34,7 +34,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_entry.h"
-#include "mongo/logv2/redaction.h"
 
 namespace mongo {
 
@@ -70,4 +69,8 @@ void notifyChangeStreamsOnShardCollection(OperationContext* opCtx,
             wunit.commit();
         });
 }
+
+void notifyChangeStreamsOnAddShard(OperationContext* opCtx,
+                                   const ShardId& shardName,
+                                   const ConnectionString& connStr) {}
 }  // namespace mongo
