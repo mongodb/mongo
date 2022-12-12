@@ -243,7 +243,7 @@ public:
     explicit Synchronization(std::string name)
         : Synchronization{std::move(name), _initRootDomain()} {}
     Synchronization(std::string name, std::shared_ptr<SyncDomain> domain)
-        : _name{std::move(name)}, _domain{std::move(domain)} {}
+        : _name{std::move(name)}, _mutex{_initMutex()}, _domain{std::move(domain)} {}
 
     Lock acquireLock() {
         return Lock(_mutex);
@@ -273,7 +273,7 @@ public:
 
 private:
     std::string _name;
-    MyMutex _mutex{_initMutex()};
+    MyMutex _mutex;
     stdx::condition_variable_any _cv;
     std::shared_ptr<SyncDomain> _domain;
 };
