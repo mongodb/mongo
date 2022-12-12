@@ -805,7 +805,11 @@ CollectionPtr CollectionCatalog::openCollection(OperationContext* opCtx,
         // Use the pendingCollection if there is no latestCollection or if the metadata of the
         // latestCollection doesn't match the durable catalogEntry.
         if (!latestCollection || !latestCollection->isMetadataEqual(metadata)) {
-            invariant(pendingCollection->isMetadataEqual(metadata));
+            // If the latest collection doesn't exist then the pending collection must exist as it's
+            // being created in this snapshot. Otherwise, if the latest collection is incompatible
+            // with this snapshot, then the change came from an uncommitted update by an operation
+            // operating on this snapshot.
+            invariant(pendingCollection && pendingCollection->isMetadataEqual(metadata));
             uncommittedCatalogUpdates.openCollection(opCtx, pendingCollection);
             return CollectionPtr(pendingCollection.get(), CollectionPtr::NoYieldTag{});
         }
