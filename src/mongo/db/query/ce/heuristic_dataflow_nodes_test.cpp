@@ -36,13 +36,13 @@
 
 namespace mongo::optimizer::ce {
 namespace {
-constexpr double kCollCard = 1000.0;
+constexpr CEType kCollCard{1000.0};
 const std::string kCollName = "test";
 
-constexpr double kOtherCollCard = 200.0;
+constexpr CEType kOtherCollCard{200.0};
 const std::string kOtherCollName = "otherTest";
 
-constexpr double kThirdCollCard = 50.0;
+constexpr CEType kThirdCollCard{50.0};
 const std::string kThirdCollName = "thirdTest";
 
 class DataflowCETester : public CETester {
@@ -114,7 +114,7 @@ TEST(CEDataflowTest, EstimateUnionNode) {
     // The following plans include a UnionNode.
     {
         DataflowCETester t;
-        t.setCollCard(2000);
+        t.setCollCard({2000.0});
         t.setIndexes(
             {{"indexA", makeIndexDefinition("a", CollationOp::Ascending, /* isMultiKey */ true)}});
         t.setDisableScan(true);
@@ -146,12 +146,12 @@ TEST(CEDataflowTest, EstimateLimitSkipNode) {
 
     // Verify that 'LimitSkipNode' estimate with only a skip set is max(inputCE - skip, 0).
     ASSERT_CE(t, "[{$skip: 0}]", kCollCard);
-    ASSERT_CE(t, "[{$skip: 1}]", kCollCard - 1.0);
-    ASSERT_CE(t, "[{$skip: 50}]", kCollCard - 50.0);
+    ASSERT_CE(t, "[{$skip: 1}]", kCollCard - CEType{1.0});
+    ASSERT_CE(t, "[{$skip: 50}]", kCollCard - CEType{50.0});
     ASSERT_CE(t, "[{$skip: 1000}]", 0.0);
     ASSERT_CE(t, "[{$skip: 10000}]", 0.0);
-    ASSERT_CE(t, "[{$match: {a: 1}}, {$skip: 1}]", matchCard - 1.0);
-    ASSERT_CE(t, "[{$match: {a: 1}}, {$skip: 5}]", matchCard - 5.0);
+    ASSERT_CE(t, "[{$match: {a: 1}}, {$skip: 1}]", matchCard - CEType{1.0});
+    ASSERT_CE(t, "[{$match: {a: 1}}, {$skip: 5}]", matchCard - CEType{5.0});
     ASSERT_CE(t, "[{$match: {a: 1}}, {$skip: 50}]", 0.0);
     ASSERT_CE(t, "[{$match: {a: 1}}, {$skip: 1000}]", 0.0);
 
@@ -164,8 +164,8 @@ TEST(CEDataflowTest, EstimateLimitSkipNode) {
     ASSERT_CE(t, "[{$skip: 1}, {$limit: 50}]", 50.0);
     ASSERT_CE(t, "[{$limit: 50}, {$skip: 50}]", 0.0);
     ASSERT_CE(t, "[{$skip: 50}, {$limit: 50}]", 50.0);
-    ASSERT_CE(t, "[{$limit: 1000}, {$skip: 50}]", kCollCard - 50.0);
-    ASSERT_CE(t, "[{$skip: 50}, {$limit: 1000}]", kCollCard - 50.0);
+    ASSERT_CE(t, "[{$limit: 1000}, {$skip: 50}]", kCollCard - CEType{50.0});
+    ASSERT_CE(t, "[{$skip: 50}, {$limit: 1000}]", kCollCard - CEType{50.0});
     ASSERT_CE(t, "[{$limit: 50}, {$skip: 1000}]", 0.0);
     ASSERT_CE(t, "[{$skip: 1000}, {$limit: 50}]", 0.0);
     ASSERT_CE(t, "[{$limit: 1000}, {$skip: 1000}]", 0.0);

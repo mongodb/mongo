@@ -41,8 +41,10 @@ namespace {
 struct CostAndCEInternal {
     CostAndCEInternal(double cost, CEType ce) : _cost(cost), _ce(ce) {
         uassert(7034000, "Invalid cost.", !std::isnan(cost) && cost >= 0.0);
-        uassert(7034001, "Invalid cardinality", std::isfinite(ce) && ce >= 0.0);
+        uassert(7034001, "Invalid cardinality", std::isfinite(ce._value) && ce >= 0.0);
     }
+
+    // TODO: SERVER-71799: Cost model manager to deliver costs via a strong type.
     double _cost;
     CEType _ce;
 };
@@ -52,7 +54,7 @@ public:
     CostAndCEInternal operator()(const ABT& /*n*/, const PhysicalScanNode& /*node*/) {
         // Default estimate for scan.
         const double collectionScanCost = _coefficients.getScanStartupCost() +
-            _coefficients.getScanIncrementalCost() * _cardinalityEstimate;
+            _coefficients.getScanIncrementalCost() * _cardinalityEstimate._value;
         return {collectionScanCost, _cardinalityEstimate};
     }
 
@@ -63,7 +65,7 @@ public:
 
     CostAndCEInternal operator()(const ABT& /*n*/, const IndexScanNode& node) {
         const double indexScanCost = _coefficients.getIndexScanStartupCost() +
-            _coefficients.getIndexScanIncrementalCost() * _cardinalityEstimate;
+            _coefficients.getIndexScanIncrementalCost() * _cardinalityEstimate._value;
         return {indexScanCost, _cardinalityEstimate};
     }
 
@@ -71,8 +73,8 @@ public:
         // SeekNode should deliver one result via cardinality estimate override.
         // TODO: consider using node.getProjectionMap()._fieldProjections.size() to make the cost
         // dependent on the size of the projection
-        const double seekCost =
-            _coefficients.getSeekStartupCost() + _coefficients.getSeekCost() * _cardinalityEstimate;
+        const double seekCost = _coefficients.getSeekStartupCost() +
+            _coefficients.getSeekCost() * _cardinalityEstimate._value;
         return {seekCost, _cardinalityEstimate};
     }
 
@@ -85,17 +87,23 @@ public:
         if (hasProperty<IndexingRequirement>(_physProps)) {
             const auto& indexingReq = getPropertyConst<IndexingRequirement>(_physProps);
             if (indexingReq.getIndexReqTarget() == IndexReqTarget::Seek) {
-                // If we are performing a seek, normalize against the scan group cardinality.
+                // If we are performing a seek, normalize against the scan group cardinality. The
+                // scan group estimate takes into account the size of the collection. Here we want
+                // to effectively isolate the selectivity of the residual predicates over the seek
+                // since the seek will return one document at a time (there is a limit applied over
+                // it). getAdjustedCE below will take into account the expected number of rid's
+                // delivered by the index side (via the repetition estimate).
+
                 const GroupIdType scanGroupId =
                     getPropertyConst<IndexingAvailability>(childLogicalProps).getScanGroupId();
                 if (scanGroupId == node.getGroupId()) {
-                    baseCE = 1.0;
+                    baseCE = {1.0};
                 } else {
                     const CEType scanGroupCE =
                         getPropertyConst<CardinalityEstimate>(_memo.getLogicalProps(scanGroupId))
                             .getEstimate();
                     if (scanGroupCE > 0.0) {
-                        baseCE /= scanGroupCE;
+                        baseCE /= scanGroupCE._value;
                     }
                 }
             }
@@ -114,7 +122,7 @@ public:
         if (!isTrivialExpr<EvalFilter>(node.getFilter())) {
             // Non-trivial filter.
             filterCost += _coefficients.getFilterStartupCost() +
-                _coefficients.getFilterIncrementalCost() * childResult._ce;
+                _coefficients.getFilterIncrementalCost() * childResult._ce._value;
         }
         return {filterCost, _cardinalityEstimate};
     }
@@ -125,7 +133,7 @@ public:
         if (!isTrivialExpr<EvalPath>(node.getProjection())) {
             // Non-trivial projection.
             evalCost += _coefficients.getEvalStartupCost() +
-                _coefficients.getEvalIncrementalCost() * _cardinalityEstimate;
+                _coefficients.getEvalIncrementalCost() * _cardinalityEstimate._value;
         }
         return {evalCost, _cardinalityEstimate};
     }
@@ -135,7 +143,7 @@ public:
         CostAndCEInternal rightChildResult = deriveChild(node.getRightChild(), 1);
         const double nestedLoopjoinCost = _coefficients.getNestedLoopJoinStartupCost() +
             _coefficients.getNestedLoopJoinIncrementalCost() *
-                (leftChildResult._ce + rightChildResult._ce) +
+                (leftChildResult._ce._value + rightChildResult._ce._value) +
             leftChildResult._cost + rightChildResult._cost;
         return {nestedLoopjoinCost, _cardinalityEstimate};
     }
@@ -147,7 +155,7 @@ public:
         // TODO: distinguish build side and probe side.
         const double hashJoinCost = _coefficients.getHashJoinStartupCost() +
             _coefficients.getHashJoinIncrementalCost() *
-                (leftChildResult._ce + rightChildResult._ce) +
+                (leftChildResult._ce._value + rightChildResult._ce._value) +
             leftChildResult._cost + rightChildResult._cost;
         return {hashJoinCost, _cardinalityEstimate};
     }
@@ -158,7 +166,7 @@ public:
 
         const double mergeJoinCost = _coefficients.getMergeJoinStartupCost() +
             _coefficients.getMergeJoinIncrementalCost() *
-                (leftChildResult._ce + rightChildResult._ce) +
+                (leftChildResult._ce._value + rightChildResult._ce._value) +
             leftChildResult._cost + rightChildResult._cost;
 
         return {mergeJoinCost, _cardinalityEstimate};
@@ -172,8 +180,8 @@ public:
         // comparing the children (an incremental cost).
         for (size_t childIdx = 0; childIdx < children.size(); childIdx++) {
             const CostAndCEInternal childResult = deriveChild(children[childIdx], childIdx);
-            totalCost +=
-                childResult._cost + _coefficients.getSortedMergeIncrementalCost() * childResult._ce;
+            totalCost += childResult._cost +
+                _coefficients.getSortedMergeIncrementalCost() * childResult._ce._value;
         }
         return {totalCost, _cardinalityEstimate};
     }
@@ -192,7 +200,8 @@ public:
         for (size_t childIdx = 0; childIdx < children.size(); childIdx++) {
             CostAndCEInternal childResult = deriveChild(children[childIdx], childIdx);
             const double childCost = childResult._cost +
-                (childIdx > 0 ? _coefficients.getUnionIncrementalCost() * childResult._ce : 0);
+                (childIdx > 0 ? _coefficients.getUnionIncrementalCost() * childResult._ce._value
+                              : 0);
             totalCost += childCost;
         }
         return {totalCost, _cardinalityEstimate};
@@ -207,8 +216,8 @@ public:
             groupByCost += childResult._cost;
         } else {
             // TODO: consider RepetitionEstimate since this is a stateful operation.
-            groupByCost +=
-                _coefficients.getGroupByIncrementalCost() * childResult._ce + childResult._cost;
+            groupByCost += _coefficients.getGroupByIncrementalCost() * childResult._ce._value +
+                childResult._cost;
         }
         return {groupByCost, _cardinalityEstimate};
     }
@@ -217,14 +226,15 @@ public:
         CostAndCEInternal childResult = deriveChild(node.getChild(), 0);
         // Unwind probably depends mostly on its output size.
         const double unwindCost =
-            _coefficients.getUnwindIncrementalCost() * _cardinalityEstimate + childResult._cost;
+            _coefficients.getUnwindIncrementalCost() * _cardinalityEstimate._value +
+            childResult._cost;
         return {unwindCost, _cardinalityEstimate};
     }
 
     CostAndCEInternal operator()(const ABT& /*n*/, const UniqueNode& node) {
         CostAndCEInternal childResult = deriveChild(node.getChild(), 0);
         const double uniqueCost = _coefficients.getUniqueStartupCost() +
-            _coefficients.getUniqueIncrementalCost() * childResult._ce + childResult._cost;
+            _coefficients.getUniqueIncrementalCost() * childResult._ce._value + childResult._cost;
         return {uniqueCost, _cardinalityEstimate};
     }
 
@@ -245,7 +255,7 @@ public:
         CostAndCEInternal childResult = deriveChild(node.getChild(), 0);
         // TODO: consider RepetitionEstimate since this is a stateful operation.
 
-        double logFactor = childResult._ce;
+        double logFactor = childResult._ce._value;
         double incrConst = _coefficients.getCollationIncrementalCost();
         if (hasProperty<LimitSkipRequirement>(_physProps)) {
             if (auto limit = getPropertyConst<LimitSkipRequirement>(_physProps).getAbsoluteLimit();
@@ -262,7 +272,7 @@ public:
                  ? 0.0
                  // TODO: The cost formula below is based on 1 field, mix of int and str. Instead we
                  // have to take into account the number and size of sorted fields.
-                 : incrConst * childResult._ce * std::log2(logFactor));
+                 : incrConst * childResult._ce._value * std::log2(logFactor));
         return {sortCost, _cardinalityEstimate};
     }
 
@@ -270,14 +280,14 @@ public:
         // Assumed to be free.
         CostAndCEInternal childResult = deriveChild(node.getChild(), 0);
         const double limitCost = _coefficients.getLimitSkipStartupCost() + childResult._cost +
-            _cardinalityEstimate * _coefficients.getLimitSkipIncrementalCost();
+            _cardinalityEstimate._value * _coefficients.getLimitSkipIncrementalCost();
         return {limitCost, _cardinalityEstimate};
     }
 
     CostAndCEInternal operator()(const ABT& /*n*/, const ExchangeNode& node) {
         CostAndCEInternal childResult = deriveChild(node.getChild(), 0);
         double localCost = _coefficients.getExchangeStartupCost() +
-            _coefficients.getExchangeIncrementalCost() * _cardinalityEstimate;
+            _coefficients.getExchangeIncrementalCost() * _cardinalityEstimate._value;
 
         switch (node.getProperty().getDistributionAndProjections()._type) {
             case DistributionType::Replicated:
@@ -306,7 +316,7 @@ public:
     template <typename T, typename... Ts>
     CostAndCEInternal operator()(const ABT& /*n*/, const T& /*node*/, Ts&&...) {
         static_assert(!canBePhysicalNode<T>(), "Physical node must implement its cost derivation.");
-        return {0.0, 0.0};
+        return {0.0, {0.0}};
     }
 
     static CostAndCEInternal derive(const Metadata& metadata,
@@ -380,7 +390,7 @@ private:
         uassert(7034003,
                 "Only MemoLogicalDelegatorNode can be missing from nodeCEMap.",
                 found || physNodeRef.is<MemoLogicalDelegatorNode>());
-        const CEType ce = (found ? it->second : 0.0);
+        const CEType ce = (found ? it->second : CEType{0.0});
 
         CostDerivation instance(metadata, memo, ce, physProps, childProps, nodeCEMap, coefficients);
         CostAndCEInternal costCEestimates = physNodeRef.visit(instance);
@@ -400,7 +410,7 @@ private:
         if (hasProperty<LimitSkipRequirement>(physProps)) {
             const auto limit = getPropertyConst<LimitSkipRequirement>(physProps).getAbsoluteLimit();
             if (result > limit) {
-                result = limit;
+                result = {static_cast<double>(limit)};
             }
         }
 

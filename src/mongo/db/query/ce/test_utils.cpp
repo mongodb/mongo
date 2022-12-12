@@ -43,7 +43,7 @@ namespace mongo::optimizer::ce {
 namespace value = sbe::value;
 
 CETester::CETester(std::string collName,
-                   double collCard,
+                   CEType collCard,
                    const OptPhaseManager::PhaseSet& optPhases)
     : _optPhases(optPhases), _hints(), _metadata({}), _collName(collName) {
     addCollection(collName, collCard);
@@ -130,9 +130,9 @@ CEType CETester::getCE(ABT& abt, std::function<bool(const ABT&)> nodePredicate) 
             // when estimating that node directly. Note that this check will fail if we are testing
             // histogram estimation and only using the MemoSubstitutionPhase because the memo always
             // uses heuristic estimation in this case.
-            ASSERT_APPROX_EQUAL(card, memoCE, kMaxCEError);
+            ASSERT_CE_APPROX_EQUAL(card, memoCE, kMaxCEError);
         } else {
-            if (std::abs(memoCE - card) > kMaxCEError) {
+            if (absCEDiff(memoCE, card) > kMaxCEError) {
                 std::cout << "ERROR: CE Group(" << groupId << ") " << card << " vs. " << memoCE
                           << std::endl;
                 std::cout << ExplainGenerator::explainV2(node) << std::endl;
@@ -161,7 +161,7 @@ ScanDefinition& CETester::getCollScanDefinition() {
 }
 
 
-void CETester::setCollCard(double card) {
+void CETester::setCollCard(CEType card) {
     auto& scanDef = getCollScanDefinition();
     addCollection(_collName, card, scanDef.getIndexDefs());
 }
@@ -172,7 +172,7 @@ void CETester::setIndexes(opt::unordered_map<std::string, IndexDefinition> index
 }
 
 void CETester::addCollection(std::string collName,
-                             double numRecords,
+                             CEType numRecords,
                              opt::unordered_map<std::string, IndexDefinition> indexes) {
     _metadata._scanDefs.insert_or_assign(collName,
                                          createScanDef({},

@@ -43,7 +43,7 @@ using PartialSchemaSelHints = ce::PartialSchemaSelHints;
 
 namespace {
 // Default selectivity of predicates used by HintedCE to force certain plans.
-constexpr double kDefaultSelectivity = 0.1;
+constexpr SelectivityType kDefaultSelectivity{0.1};
 
 TEST(PhysRewriter, PhysicalRewriterBasic) {
     using namespace properties;
@@ -2330,7 +2330,8 @@ TEST(PhysRewriter, CoveredScan) {
     PrefixId prefixId;
 
     PartialSchemaSelHints hints;
-    hints.emplace(PartialSchemaKey{"root", make<PathGet>("a", make<PathIdentity>())}, 0.01);
+    hints.emplace(PartialSchemaKey{"root", make<PathGet>("a", make<PathIdentity>())},
+                  SelectivityType{0.01});
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -3135,8 +3136,10 @@ TEST(PhysRewriter, CompoundIndex4Negative) {
     PrefixId prefixId;
 
     PartialSchemaSelHints hints;
-    hints.emplace(PartialSchemaKey{"root", make<PathGet>("a", make<PathIdentity>())}, 0.05);
-    hints.emplace(PartialSchemaKey{"root", make<PathGet>("b", make<PathIdentity>())}, 0.1);
+    hints.emplace(PartialSchemaKey{"root", make<PathGet>("a", make<PathIdentity>())},
+                  SelectivityType{0.05});
+    hints.emplace(PartialSchemaKey{"root", make<PathGet>("b", make<PathIdentity>())},
+                  SelectivityType{0.1});
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -4949,8 +4952,10 @@ TEST(PhysRewriter, IndexPartitioning1) {
     PrefixId prefixId;
 
     PartialSchemaSelHints hints;
-    hints.emplace(PartialSchemaKey{"root", make<PathGet>("a", make<PathIdentity>())}, 0.02);
-    hints.emplace(PartialSchemaKey{"root", make<PathGet>("b", make<PathIdentity>())}, 0.01);
+    hints.emplace(PartialSchemaKey{"root", make<PathGet>("a", make<PathIdentity>())},
+                  SelectivityType{0.02});
+    hints.emplace(PartialSchemaKey{"root", make<PathGet>("b", make<PathIdentity>())},
+                  SelectivityType{0.01});
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -6278,8 +6283,10 @@ TEST(PhysRewriter, PerfOnlyPreds1) {
     using namespace properties;
 
     PartialSchemaSelHints hints;
-    hints.emplace(PartialSchemaKey{"root", make<PathGet>("a", make<PathIdentity>())}, 0.01);
-    hints.emplace(PartialSchemaKey{"root", make<PathGet>("b", make<PathIdentity>())}, 0.02);
+    hints.emplace(PartialSchemaKey{"root", make<PathGet>("a", make<PathIdentity>())},
+                  SelectivityType{0.01});
+    hints.emplace(PartialSchemaKey{"root", make<PathGet>("b", make<PathIdentity>())},
+                  SelectivityType{0.02});
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -6368,8 +6375,10 @@ TEST(PhysRewriter, PerfOnlyPreds2) {
     using namespace properties;
 
     PartialSchemaSelHints hints;
-    hints.emplace(PartialSchemaKey{"root", make<PathGet>("a", make<PathIdentity>())}, 0.001);
-    hints.emplace(PartialSchemaKey{"root", make<PathGet>("b", make<PathIdentity>())}, 0.001);
+    hints.emplace(PartialSchemaKey{"root", make<PathGet>("a", make<PathIdentity>())},
+                  SelectivityType{0.001});
+    hints.emplace(PartialSchemaKey{"root", make<PathGet>("b", make<PathIdentity>())},
+                  SelectivityType{0.001});
 
     ABT scanNode = make<ScanNode>("root", "c1");
 

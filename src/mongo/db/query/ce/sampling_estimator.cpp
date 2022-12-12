@@ -197,7 +197,7 @@ public:
         if (canBeLogicalNode<T>()) {
             return _fallbackCE->deriveCE(metadata, memo, logicalProps, n.ref());
         }
-        return 0.0;
+        return {0.0};
     }
 
     CEType derive(const Metadata& metadata,
@@ -230,7 +230,7 @@ private:
         OPTIMIZER_DEBUG_LOG(6264805,
                             5,
                             "CE sampling estimated filter selectivity",
-                            "selectivity"_attr = *selectivity);
+                            "selectivity"_attr = selectivity->_value);
         return *selectivity * childResult;
     }
 
@@ -288,13 +288,13 @@ private:
             const auto [tag, value] = accessors.at(0)->getViewOfValue();
             if (tag == sbe::value::TypeTags::NumberInt64) {
                 // TODO: check if we get exactly one result from the groupby?
-                return static_cast<double>(value) / _sampleSize;
+                return {{static_cast<double>(value) / _sampleSize}};
             }
             return boost::none;
         };
 
         // If nothing passes the filter, estimate 0.0 selectivity. HashGroup will return 0 results.
-        return 0.0;
+        return {{0.0}};
     }
 
     struct NodeRefHash {

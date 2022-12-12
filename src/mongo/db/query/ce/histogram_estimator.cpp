@@ -90,7 +90,7 @@ public:
                      const cascades::Memo& memo,
                      const properties::LogicalProps& logicalProps,
                      CEType /*bindResult*/) {
-        return _stats->getCardinality();
+        return {_stats->getCardinality()};
     }
 
     /**
@@ -115,7 +115,7 @@ public:
                      CEType /*refsResult*/) {
         // Early out and return 0 since we don't expect to get more results.
         if (childResult == 0.0) {
-            return 0.0;
+            return {0.0};
         }
 
         // Initial first pass through the requirements map to extract information about each path.
@@ -168,26 +168,27 @@ public:
             conjunctRequirements.emplace(serializedPath, std::move(sc));
         }
 
-        std::vector<double> topLevelSelectivities;
+        std::vector<SelectivityType> topLevelSelectivities;
         for (const auto& [serializedPath, conjunctReq] : conjunctRequirements) {
-            const CEType totalCard = _stats->getCardinality();
+            const CEType totalCard{_stats->getCardinality()};
 
             if (conjunctReq.intervals.empty() && !conjunctReq.includeScalar) {
                 // In this case there is a single 'PathArr' interval for this field.
                 // The selectivity of this interval is: (count of all arrays) / totalCard
-                double pathArrSel = conjunctReq.histogram.getArrayCount() / totalCard;
+                SelectivityType pathArrSel =
+                    CEType{conjunctReq.histogram.getArrayCount()} / totalCard;
                 topLevelSelectivities.push_back(pathArrSel);
             }
 
             // Intervals are in DNF.
             for (const IntervalReqExpr::Node& intervalDNF : conjunctReq.intervals) {
-                std::vector<double> disjSelectivities;
+                std::vector<SelectivityType> disjSelectivities;
 
                 const auto disjuncts = intervalDNF.cast<IntervalReqExpr::Disjunction>()->nodes();
                 for (const auto& disjunct : disjuncts) {
                     const auto& conjuncts = disjunct.cast<IntervalReqExpr::Conjunction>()->nodes();
 
-                    std::vector<double> conjSelectivities;
+                    std::vector<SelectivityType> conjSelectivities;
                     for (const auto& conjunct : conjuncts) {
                         const auto& interval = conjunct.cast<IntervalReqExpr::Atom>()->getExpr();
                         auto cardinality =
@@ -201,7 +202,7 @@ public:
                                             "path"_attr = serializedPath,
                                             "interval"_attr =
                                                 ExplainGenerator::explainInterval(interval),
-                                            "ce"_attr = cardinality);
+                                            "ce"_attr = cardinality._value);
 
                         // We may still not have been able to estimate the interval using
                         // histograms, for instance if the interval bounds were non-Constant. In
@@ -233,7 +234,7 @@ public:
                                     "path"_attr = serializedPath,
                                     "intervalDNF"_attr =
                                         ExplainGenerator::explainIntervalExpr(intervalDNF),
-                                    "selectivity"_attr = backoff);
+                                    "selectivity"_attr = backoff._value);
                 topLevelSelectivities.push_back(backoff);
             }
         }
@@ -247,7 +248,7 @@ public:
                             5,
                             "Final estimate for SargableNode using histograms.",
                             "node"_attr = ExplainGenerator::explainV2(n),
-                            "cardinality"_attr = childResult);
+                            "cardinality"_attr = childResult._value);
         return childResult;
     }
 
@@ -275,7 +276,7 @@ public:
         if (canBeLogicalNode<T>()) {
             return _fallbackCE->deriveCE(metadata, memo, logicalProps, n.ref());
         }
-        return 0.0;
+        return {0.0};
     }
 
 private:

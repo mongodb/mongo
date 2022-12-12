@@ -44,7 +44,7 @@
 
 namespace mongo::optimizer::ce {
 namespace {
-constexpr double kCollCard = 10000.0;
+constexpr CEType kCollCard{10000.0};
 const std::string collName = "test";
 
 class HeuristicCETester : public CETester {
@@ -202,7 +202,7 @@ TEST(CEHeuristicTest, CEWithoutOptimizationTraverseSelectivityDoesNotAccumulate)
     HeuristicCETester ht(collName, kNoOptPhaseSet);
     auto ce1 = ht.getMatchCE(query);
     auto ce2 = ht.getMatchCE(queryWithLongPaths);
-    ASSERT_APPROX_EQUAL(ce1, ce2, kMaxCEError);
+    ASSERT_CE_APPROX_EQUAL(ce1, ce2, kMaxCEError);
 }
 
 TEST(CEHeuristicTest, CEWithoutOptimizationIntervalWithEqOnSameValue) {
@@ -619,7 +619,7 @@ TEST(CEHeuristicTest, CEWithoutOptimizationEquivalentConjunctions) {
     ht.setCollCard(kCollCard);
     auto ce1 = ht.getCE(rootNode1);
     auto ce2 = ht.getCE(rootNode2);
-    ASSERT_APPROX_EQUAL(ce1, ce2, kMaxCEError);
+    ASSERT_CE_APPROX_EQUAL(ce1, ce2, kMaxCEError);
 }
 
 TEST(CEHeuristicTest, CEAfterMemoSubstitutionPhase_Eq) {
@@ -731,7 +731,7 @@ TEST(CEHeuristicTest, CEAfterMemoSubstitutionPhase_DNF1pathComplex) {
         "{$and: [{a0: {$gt: 9}}, {a0: {$lt: 12}}]}"
         "]}";
     auto ce2 = ht.getMatchCE(query2);
-    ASSERT_APPROX_EQUAL(ce1, ce2, kMaxCEError);
+    ASSERT_CE_APPROX_EQUAL(ce1, ce2, kMaxCEError);
 }
 
 TEST(CEHeuristicTest, CEAfterMemoSubstitutionPhase_DNF2paths) {
@@ -777,7 +777,7 @@ TEST(CEHeuristicTest, CEAfterMemoSubstitutionExplorationPhases) {
 }
 
 TEST(CEHeuristicTest, CENotEquality) {
-    double collCard = kCollCard;
+    CEType collCard = kCollCard;
     HeuristicCETester opt(collName);
 
     // We avoid optimizing in order to verify heuristic estimate of FilterNode subtree. Note that we
@@ -788,20 +788,20 @@ TEST(CEHeuristicTest, CENotEquality) {
 
     // Equality selectivity is sqrt(kCollCard)/kCollCard = 0.01. When we see a UnaryOp [Not] above
     // this subtree, we invert the selectivity 1.0 - 0.01 = 0.99.
-    double ce = 100.0;
-    double inverseCE = collCard - ce;
+    CEType ce{100.0};
+    CEType inverseCE = collCard - ce;
     ASSERT_MATCH_CE(noOpt, "{a: {$eq: 1}}", ce);
     ASSERT_MATCH_CE(opt, "{a: {$not: {$eq: 1}}}", inverseCE);
     ASSERT_MATCH_CE(noOpt, "{'validate.long.path.estimate': {$eq: 1}}", ce);
     ASSERT_MATCH_CE(opt, "{'validate.long.path.estimate': {$not: {$eq: 1}}}", inverseCE);
 
     // Update cardinality to 25.
-    collCard = 25;
+    collCard = {25};
     opt.setCollCard(collCard);
     noOpt.setCollCard(collCard);
 
     // Selectivity is sqrt(25)/25.
-    ce = 5.0;
+    ce = {5.0};
     inverseCE = collCard - ce;
     ASSERT_MATCH_CE(noOpt, "{a: {$eq: 1}}", ce);
     ASSERT_MATCH_CE(opt, "{a: {$not: {$eq: 1}}}", inverseCE);
@@ -809,12 +809,12 @@ TEST(CEHeuristicTest, CENotEquality) {
     ASSERT_MATCH_CE(opt, "{'validate.long.path.estimate': {$not: {$eq: 1}}}", inverseCE);
 
     // Update cardinality to 9.
-    collCard = 9;
+    collCard = {9};
     opt.setCollCard(collCard);
     noOpt.setCollCard(collCard);
 
     // Selectivity is sqrt(3)/9.
-    ce = 3.0;
+    ce = {3.0};
     inverseCE = collCard - ce;
     ASSERT_MATCH_CE(noOpt, "{a: {$eq: 1}}", ce);
     ASSERT_MATCH_CE(opt, "{a: {$not: {$eq: 1}}}", inverseCE);
@@ -825,13 +825,13 @@ TEST(CEHeuristicTest, CENotEquality) {
 TEST(CEHeuristicTest, CENotOpenRange) {
     // Repeat the above test for open ranges; the $not cardinality estimate should add up with the
     // non-$not estimate to the collection cardinality.
-    double collCard = kCollCard;
+    CEType collCard = kCollCard;
     HeuristicCETester opt(collName);
     HeuristicCETester noOpt(collName, kNoOptPhaseSet);
 
     // Expect open-range selectivity for input card > 100 (0.33).
-    double ce = 3300;
-    double inverseCE = collCard - ce;
+    CEType ce = {3300};
+    CEType inverseCE = collCard - ce;
 
     ASSERT_MATCH_CE(noOpt, "{a: {$lt: 1}}", ce);
     ASSERT_MATCH_CE(opt, "{a: {$not: {$lt: 1}}}", inverseCE);
@@ -845,12 +845,12 @@ TEST(CEHeuristicTest, CENotOpenRange) {
     ASSERT_MATCH_CE(opt, "{'validate.long.path.estimate': {$not: {$gte: 1}}}", inverseCE);
 
     // Update cardinality to 25.
-    collCard = 25;
+    collCard = {25};
     opt.setCollCard(collCard);
     noOpt.setCollCard(collCard);
 
     // Expect open-range selectivity for input card in range (20, 100) (0.45).
-    ce = 11.25;
+    ce = {11.25};
     inverseCE = collCard - ce;
 
     ASSERT_MATCH_CE(noOpt, "{a: {$lt: 1}}", ce);
@@ -865,12 +865,12 @@ TEST(CEHeuristicTest, CENotOpenRange) {
     ASSERT_MATCH_CE(opt, "{'validate.long.path.estimate': {$not: {$gte: 1}}}", inverseCE);
 
     // Update cardinality to 10.
-    collCard = 10.0;
+    collCard = {10.0};
     opt.setCollCard(collCard);
     noOpt.setCollCard(collCard);
 
     // Expect open-range selectivity for input card < 20 (0.70).
-    ce = 7.0;
+    ce = {7.0};
     inverseCE = collCard - ce;
 
     ASSERT_MATCH_CE(noOpt, "{a: {$lt: 1}}", ce);
@@ -888,9 +888,9 @@ TEST(CEHeuristicTest, CENotOpenRange) {
 TEST(CEHeuristicTest, CENotClosedRange) {
     // Repeat the above test for closed ranges; the $not cardinality estimate should add up with the
     // non-$not estimate to the collection cardinality.
-    double collCard = kCollCard;
-    double ce = 1089.0;
-    double inverseCE = collCard - ce;
+    CEType collCard = kCollCard;
+    CEType ce = {1089.0};
+    CEType inverseCE = collCard - ce;
     HeuristicCETester opt(collName);
     HeuristicCETester noOpt(collName, kNoOptPhaseSet);
 
@@ -922,9 +922,9 @@ TEST(CEHeuristicTest, CENotClosedRange) {
      * < 100 to inputCard < 20, we choose different selectivities for the intervals in the second
      * FilterNode (0.50) than in the first (0.33).
      */
-    collCard = 25;
-    ce = 7.875;
-    inverseCE = 19.9375;
+    collCard = {25};
+    ce = {7.875};
+    inverseCE = {19.9375};
     opt.setCollCard(collCard);
     noOpt.setCollCard(collCard);
 
@@ -940,8 +940,8 @@ TEST(CEHeuristicTest, CENotClosedRange) {
     ASSERT_MATCH_CE(opt, "{'validate.long.path.estimate': {$not: {$gte: 10, $lt: 20}}}", inverseCE);
 
     // Update cardinality to 10.
-    collCard = 10.0;
-    ce = 4.9;
+    collCard = {10.0};
+    ce = {4.9};
     inverseCE = collCard - ce;
     opt.setCollCard(collCard);
     noOpt.setCollCard(collCard);

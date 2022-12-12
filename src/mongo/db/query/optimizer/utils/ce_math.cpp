@@ -40,45 +40,56 @@ bool validSelectivity(SelectivityType sel) {
 }
 
 bool validCardinality(CEType card) {
-    return (card >= kMinCard && card <= std::numeric_limits<CEType>::max());
+    return (card >= kMinCard && card <= std::numeric_limits<double>::max());
+}
+
+/**
+ * Conditionally negate selectivity.
+ */
+template <bool negate>
+constexpr SelectivityType maybeNegate(const SelectivityType s) {
+    return negateSel(s);
+}
+template <>
+constexpr SelectivityType maybeNegate<false>(const SelectivityType s) {
+    return s;
+}
+
+/**
+ * Computes conjunctive and disjunctive exponential backoff. We first take the extreme selectivities
+ * (the smallest for conjunction, or the largest for disjunction). We then multiply them together
+ * (inverting them for disjunction), and then for disjunction we invert the result, applying
+ * increasing decay factor for each larger/smaller selectivity.
+ */
+template <bool isConjunction,
+          class Comparator = typename std::conditional_t<isConjunction,
+                                                         std::less<SelectivityType>,
+                                                         std::greater<SelectivityType>>>
+SelectivityType expBackoffInternal(std::vector<SelectivityType> sels) {
+    const size_t actualMaxBackoffElements = std::min(sels.size(), kMaxBackoffElements);
+    std::partial_sort(
+        sels.begin(), sels.begin() + actualMaxBackoffElements, sels.end(), Comparator());
+
+    SelectivityType sel{1.0};
+    double f = 1.0;
+    for (size_t i = 0; i < actualMaxBackoffElements; i++, f /= 2.0) {
+        sel *= maybeNegate<!isConjunction>(sels[i]).pow(f);
+    }
+
+    return maybeNegate<!isConjunction>(sel);
 }
 
 SelectivityType conjExponentialBackoff(std::vector<SelectivityType> conjSelectivities) {
     uassert(6749501,
             "The array of conjunction selectivities may not be empty.",
             !conjSelectivities.empty());
-    size_t actualMaxBackoffElements = std::min(conjSelectivities.size(), kMaxBackoffElements);
-    std::partial_sort(conjSelectivities.begin(),
-                      conjSelectivities.begin() + actualMaxBackoffElements,
-                      conjSelectivities.end());
-    SelectivityType sel = conjSelectivities[0];
-    SelectivityType f = 1.0;
-    size_t i = 1;
-    while (i < actualMaxBackoffElements) {
-        f /= 2.0;
-        sel *= std::pow(conjSelectivities[i], f);
-        i++;
-    }
-    return sel;
+    return expBackoffInternal<true /*isConjunction*/>(std::move(conjSelectivities));
 }
 
 SelectivityType disjExponentialBackoff(std::vector<SelectivityType> disjSelectivities) {
     uassert(6749502,
             "The array of disjunction selectivities may not be empty.",
             !disjSelectivities.empty());
-    size_t actualMaxBackoffElements = std::min(disjSelectivities.size(), kMaxBackoffElements);
-    std::partial_sort(disjSelectivities.begin(),
-                      disjSelectivities.begin() + actualMaxBackoffElements,
-                      disjSelectivities.end(),
-                      std::greater<SelectivityType>());
-    SelectivityType sel = 1.0 - disjSelectivities[0];
-    SelectivityType f = 1.0;
-    size_t i = 1;
-    while (i < actualMaxBackoffElements) {
-        f /= 2.0;
-        sel *= std::pow(1 - disjSelectivities[i], f);
-        i++;
-    }
-    return 1.0 - sel;
+    return expBackoffInternal<false /*isConjunction*/>(std::move(disjSelectivities));
 }
 }  // namespace mongo::optimizer::ce

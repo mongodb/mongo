@@ -1661,7 +1661,7 @@ void sortResidualRequirements(ResidualRequirementsWithCE& residualReq) {
             multiplier++;
         }
 
-        costs.emplace_back(entry._ce * multiplier, index);
+        costs.emplace_back(entry._ce._value * multiplier, index);
     }
 
     std::sort(costs.begin(), costs.end());
@@ -1926,7 +1926,8 @@ public:
           _reverseOrder(reverseOrder),
           _scanGroupCE(scanGroupCE),
           _nodeCEMap(nodeCEMap) {
-        const SelectivityType indexSel = (scanGroupCE == 0.0) ? 0.0 : (indexCE / _scanGroupCE);
+        const SelectivityType indexSel =
+            (scanGroupCE == 0.0) ? SelectivityType{0.0} : (indexCE / _scanGroupCE);
         _estimateStack.push_back(indexSel);
         _fpmStack.push_back(std::move(indexProjectionMap));
     };
@@ -1941,17 +1942,19 @@ public:
 
     template <bool isConjunction>
     void prepare(const size_t childCount) {
-        SelectivityType childSel = 1.0;
+        SelectivityType childSel{1.0};
         if (childCount > 0) {
             // Here we are assuming that children in each conjunction and disjunction contribute
             // equally and independently to the parent's selectivity.
             // TODO: consider estimates per individual interval.
 
             const SelectivityType parentSel = _estimateStack.back();
+            const double childCountInv = 1.0 / childCount;
             if constexpr (isConjunction) {
-                childSel = (parentSel == 0.0) ? 0.0 : std::pow(parentSel, 1.0 / childCount);
+                childSel = {(parentSel == 0.0) ? SelectivityType{0.0}
+                                               : parentSel.pow(childCountInv)};
             } else {
-                childSel = parentSel / childCount;
+                childSel = parentSel * childCountInv;
             }
         }
         _estimateStack.push_back(childSel);
@@ -2015,7 +2018,7 @@ public:
                 input = make<EvaluationNode>(
                     sideIdProjectionName, Constant::int64(index), std::move(input));
                 // Not relevant for cost.
-                _nodeCEMap.emplace(input.cast<Node>(), 0.0);
+                _nodeCEMap.emplace(input.cast<Node>(), CEType{0.0});
             }
 
             aggExpressions.emplace_back(

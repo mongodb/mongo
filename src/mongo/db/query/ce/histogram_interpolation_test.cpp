@@ -255,24 +255,24 @@ TEST(EstimatorTest, UniformIntStrEstimate) {
     // Predicates over value inside of the last numeric bucket.
 
     // Query: [{$match: {a: {$eq: 993}}}].
-    double expectedCard = estimateIntValCard(hist, 993, EstimationType::kEqual);
-    ASSERT_APPROX_EQUAL(7.0, expectedCard, 0.1);  // Actual: 9.
+    CEType expectedCard{estimateIntValCard(hist, 993, EstimationType::kEqual)};
+    ASSERT_CE_APPROX_EQUAL(7.0, expectedCard, 0.1);  // Actual: 9.
 
     // Query: [{$match: {a: {$lt: 993}}}].
-    expectedCard = estimateIntValCard(hist, 993, EstimationType::kLess);
-    ASSERT_APPROX_EQUAL(241.4, expectedCard, 0.1);  // Actual: 241.
+    expectedCard = {estimateIntValCard(hist, 993, EstimationType::kLess)};
+    ASSERT_CE_APPROX_EQUAL(241.4, expectedCard, 0.1);  // Actual: 241.
 
     // Query: [{$match: {a: {$lte: 993}}}].
-    expectedCard = estimateIntValCard(hist, 993, EstimationType::kLessOrEqual);
-    ASSERT_APPROX_EQUAL(248.4, expectedCard, 0.1);  // Actual: 250.
+    expectedCard = {estimateIntValCard(hist, 993, EstimationType::kLessOrEqual)};
+    ASSERT_CE_APPROX_EQUAL(248.4, expectedCard, 0.1);  // Actual: 250.
 
     // Predicates over value inside of the first string bucket.
     auto [tag, value] = value::makeNewString("04e"_sd);
     value::ValueGuard vg(tag, value);
 
     // Query: [{$match: {a: {$eq: '04e'}}}].
-    expectedCard = estimate(hist, tag, value, EstimationType::kEqual).card;
-    ASSERT_APPROX_EQUAL(2.2, expectedCard, 0.1);  // Actual: 3.
+    expectedCard = {estimate(hist, tag, value, EstimationType::kEqual).card};
+    ASSERT_CE_APPROX_EQUAL(2.2, expectedCard, 0.1);  // Actual: 3.
 
     value::TypeTags lowTag = value::TypeTags::NumberInt64;
     value::Value lowVal = 100000000;
@@ -280,7 +280,7 @@ TEST(EstimatorTest, UniformIntStrEstimate) {
     // Type bracketing: low value of different type than the bucket bound.
     // Query: [{$match: {a: {$eq: 100000000}}}].
     expectedCard = estimateCardEq(arrHist, lowTag, lowVal, true /* includeScalar */);
-    ASSERT_APPROX_EQUAL(0.0, expectedCard, 0.1);  // Actual: 0.
+    ASSERT_CE_APPROX_EQUAL(0.0, expectedCard, 0.1);  // Actual: 0.
 
     // No interpolation for inequality to values inside the first string bucket, fallback to half of
     // the bucket frequency.
@@ -294,7 +294,7 @@ TEST(EstimatorTest, UniformIntStrEstimate) {
                                      tag,
                                      value,
                                      true /* includeScalar */);
-    ASSERT_APPROX_EQUAL(13.3, expectedCard, 0.1);  // Actual: 0.
+    ASSERT_CE_APPROX_EQUAL(13.3, expectedCard, 0.1);  // Actual: 0.
 
     // Query: [{$match: {a: {$lte: '04e'}}}].
     expectedCard = estimateCardRange(arrHist,
@@ -305,7 +305,7 @@ TEST(EstimatorTest, UniformIntStrEstimate) {
                                      tag,
                                      value,
                                      true /* includeScalar */);
-    ASSERT_APPROX_EQUAL(15.5, expectedCard, 0.1);  // Actual: 3.
+    ASSERT_CE_APPROX_EQUAL(15.5, expectedCard, 0.1);  // Actual: 3.
 
     // Value towards the end of the bucket gets the same half bucket estimate.
     std::tie(tag, value) = value::makeNewString("8B5"_sd);
@@ -319,7 +319,7 @@ TEST(EstimatorTest, UniformIntStrEstimate) {
                                      tag,
                                      value,
                                      true /* includeScalar */);
-    ASSERT_APPROX_EQUAL(13.3, expectedCard, 0.1);  // Actual: 24.
+    ASSERT_CE_APPROX_EQUAL(13.3, expectedCard, 0.1);  // Actual: 24.
 
     // Query: [{$match: {a: {$lte: '8B5'}}}].
     expectedCard = estimateCardRange(arrHist,
@@ -330,7 +330,7 @@ TEST(EstimatorTest, UniformIntStrEstimate) {
                                      tag,
                                      value,
                                      true /* includeScalar */);
-    ASSERT_APPROX_EQUAL(15.5, expectedCard, 0.1);  // Actual: 29.
+    ASSERT_CE_APPROX_EQUAL(15.5, expectedCard, 0.1);  // Actual: 29.
 }
 
 TEST(EstimatorTest, UniformIntArrayOnlyEstimate) {
@@ -379,7 +379,7 @@ TEST(EstimatorTest, UniformIntArrayOnlyEstimate) {
     value::Value highVal = 600;
 
     // Test interpolation for query: [{$match: {a: {$elemMatch: {$gt: 500, $lt: 600}}}}].
-    double expectedCard = estimateCardRange(arrHist,
+    CEType expectedCard = estimateCardRange(arrHist,
                                             false /* lowInclusive */,
                                             lowTag,
                                             lowVal,
@@ -387,7 +387,7 @@ TEST(EstimatorTest, UniformIntArrayOnlyEstimate) {
                                             highTag,
                                             highVal,
                                             false /* includeScalar */);
-    ASSERT_APPROX_EQUAL(27.0, expectedCard, 0.1);  // actual 21.
+    ASSERT_CE_APPROX_EQUAL(27.0, expectedCard, 0.1);  // actual 21.
 
     // Test interpolation for query: [{$match: {a: {$gt: 500, $lt: 600}}}].
     // Note: although there are no scalars, the estimate is different than the
@@ -400,7 +400,7 @@ TEST(EstimatorTest, UniformIntArrayOnlyEstimate) {
                                      highTag,
                                      highVal,
                                      true /* includeScalar */);
-    ASSERT_APPROX_EQUAL(92.0, expectedCard, 0.1);  // actual 92.
+    ASSERT_CE_APPROX_EQUAL(92.0, expectedCard, 0.1);  // actual 92.
 
     // Query at the end of the domain: more precise estimates from ArrayMin, ArrayMax histograms.
     lowVal = 10;
@@ -415,7 +415,7 @@ TEST(EstimatorTest, UniformIntArrayOnlyEstimate) {
                                      highTag,
                                      highVal,
                                      false /* includeScalar */);
-    ASSERT_APPROX_EQUAL(24.1, expectedCard, 0.1);  // actual 29.
+    ASSERT_CE_APPROX_EQUAL(24.1, expectedCard, 0.1);  // actual 29.
 
     // Test interpolation for query: [{$match: {a: {$gt: 10, $lt: 110}}}].
     expectedCard = estimateCardRange(arrHist,
@@ -426,7 +426,7 @@ TEST(EstimatorTest, UniformIntArrayOnlyEstimate) {
                                      highTag,
                                      highVal,
                                      true /* includeScalar */);
-    ASSERT_APPROX_EQUAL(27.8, expectedCard, 0.1);  // actual 31.
+    ASSERT_CE_APPROX_EQUAL(27.8, expectedCard, 0.1);  // actual 31.
 }
 
 TEST(EstimatorTest, UniformIntMixedArrayEstimate) {
@@ -482,7 +482,7 @@ TEST(EstimatorTest, UniformIntMixedArrayEstimate) {
     value::Value highVal = 550;
 
     // Test interpolation for query: [{$match: {a: {$gt: 500, $lt: 550}}}].
-    double expectedCard = estimateCardRange(arrHist,
+    CEType expectedCard = estimateCardRange(arrHist,
                                             false /* lowInclusive */,
                                             lowTag,
                                             lowVal,
@@ -490,7 +490,7 @@ TEST(EstimatorTest, UniformIntMixedArrayEstimate) {
                                             highTag,
                                             highVal,
                                             true /* includeScalar */);
-    ASSERT_APPROX_EQUAL(92.9, expectedCard, 0.1);  // Actual: 94.
+    ASSERT_CE_APPROX_EQUAL(92.9, expectedCard, 0.1);  // Actual: 94.
 
     // Test interpolation for query: [{$match: {a: {$elemMatch: {$gt: 500, $lt: 550}}}}].
     expectedCard = estimateCardRange(arrHist,
@@ -501,7 +501,7 @@ TEST(EstimatorTest, UniformIntMixedArrayEstimate) {
                                      highTag,
                                      highVal,
                                      false /* includeScalar */);
-    ASSERT_APPROX_EQUAL(11.0, expectedCard, 0.1);  // Actual: 8.
+    ASSERT_CE_APPROX_EQUAL(11.0, expectedCard, 0.1);  // Actual: 8.
 }
 
 }  // namespace

@@ -208,10 +208,9 @@ TEST_F(HistogramTest, MaxDiffIntArrays) {
 
         const auto [tag, val] = makeInt64Value(2);
         value::ValueGuard vg(tag, val);
-        const double estimatedCard = estimateCardEq(estimator, tag, val, true /* includeScalar
-        */);
+        const CEType estimatedCard = estimateCardEq(estimator, tag, val, true /*includeScalar*/);
 
-        ASSERT_APPROX_EQUAL(4.0, estimatedCard, kTolerance);
+        ASSERT_CE_APPROX_EQUAL(4.0, estimatedCard, kTolerance);
         ASSERT_EQ(4, actualCard);
     }
 
@@ -221,7 +220,7 @@ TEST_F(HistogramTest, MaxDiffIntArrays) {
 
         const auto [tag, val] = makeInt64Value(3);
         value::ValueGuard vg(tag, val);
-        const double estimatedCard = estimateCardRange(estimator,
+        const CEType estimatedCard = estimateCardRange(estimator,
                                                        false /*lowInclusive*/,
                                                        value::TypeTags::MinKey,
                                                        0,
@@ -230,7 +229,7 @@ TEST_F(HistogramTest, MaxDiffIntArrays) {
                                                        val,
                                                        true /* includeScalar */);
         ASSERT_EQ(6, actualCard);
-        ASSERT_APPROX_EQUAL(6.0, estimatedCard, kTolerance);
+        ASSERT_CE_APPROX_EQUAL(6.0, estimatedCard, kTolerance);
     }
 
     {
@@ -242,7 +241,7 @@ TEST_F(HistogramTest, MaxDiffIntArrays) {
         const auto [highTag, highVal] = makeInt64Value(5);
         value::ValueGuard vgHigh(highTag, highVal);
 
-        const double estimatedCard = estimateCardRange(estimator,
+        const CEType estimatedCard = estimateCardRange(estimator,
                                                        false /*lowInclusive*/,
                                                        lowTag,
                                                        lowVal,
@@ -252,7 +251,7 @@ TEST_F(HistogramTest, MaxDiffIntArrays) {
                                                        false /* includeScalar */);
 
         ASSERT_EQ(2, actualCard);
-        ASSERT_APPROX_EQUAL(3.15479, estimatedCard, kTolerance);
+        ASSERT_CE_APPROX_EQUAL(3.15479, estimatedCard, kTolerance);
     }
 }
 

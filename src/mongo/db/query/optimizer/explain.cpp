@@ -130,6 +130,12 @@ public:
         return *this;
     }
 
+    template <class TagType>
+    ExplainPrinterImpl& print(const StrongDoubleAlias<TagType>& t) {
+        print(t._value);
+        return *this;
+    }
+
     /**
      * Here and below: "other" printer(s) may be siphoned out.
      */
@@ -428,6 +434,11 @@ public:
     ExplainPrinterImpl& print(const StrongStringAlias<TagType>& s) {
         printStringInternal(s.value().toString());
         return *this;
+    }
+
+    template <class TagType>
+    ExplainPrinterImpl& print(const StrongDoubleAlias<TagType>& v) {
+        return print(v._value);
     }
 
     ExplainPrinterImpl& print(const char* s) {

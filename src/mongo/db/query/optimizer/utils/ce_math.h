@@ -38,11 +38,11 @@ namespace mongo::optimizer::ce {
 
 // Default cardinality when actual collection cardinality is unknown.
 // Mostly used by unit tests.
-constexpr CEType kDefaultCard = 1000.00;
+constexpr CEType kDefaultCard{1000.00};
 
-// Minimum estimated cardinality. In the absense of any statistics we can never
+// Minimum estimated cardinality. In the absence of any statistics we can never
 // assume there are less than this many matching documents.
-constexpr CEType kMinCard = 0.01;
+constexpr CEType kMinCard{0.01};
 
 /**
  * Specifies the maximum number of elements (selectivities) to use when estimating via
@@ -50,6 +50,9 @@ constexpr CEType kMinCard = 0.01;
  */
 const size_t kMaxBackoffElements = 4;
 
+constexpr SelectivityType negateSel(const SelectivityType sel) {
+    return SelectivityType{1.0} - sel;
+}
 
 bool validSelectivity(SelectivityType sel);
 
@@ -66,4 +69,14 @@ SelectivityType conjExponentialBackoff(std::vector<SelectivityType> conjSelectiv
  * exponential backoff.
  */
 SelectivityType disjExponentialBackoff(std::vector<SelectivityType> disjSelectivities);
+
+/**
+ * Utility function to compute join cardinality based on left and right inputs and selectivity.
+ */
+constexpr CEType computeJoinCE(const CEType left,
+                               const CEType right,
+                               const SelectivityType joinSel) {
+    return {left._value * right._value * joinSel._value};
+}
+
 }  // namespace mongo::optimizer::ce

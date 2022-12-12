@@ -41,7 +41,7 @@ namespace mongo::cost_model {
 TEST(CostEstimatorTest, PhysicalScanCost) {
     const double startupCost = 1;
     const double scanCost = 3;
-    const double ce = 1000;
+    const optimizer::CEType ce{1000.0};
 
     CostModelCoefficients costModel{};
     initializeTestCostModel(costModel);
@@ -74,10 +74,10 @@ TEST(CostEstimatorTest, PhysicalScanCost) {
         costEstimator.deriveCost(metadata, memo, physProps, scanNode.ref(), childProps, nodeCEMap);
 
     // Test the cost.
-    ASSERT_EQ(startupCost + scanCost * costAndCE._ce, costAndCE._cost.getCost());
+    ASSERT_EQ(startupCost + scanCost * costAndCE._ce._value, costAndCE._cost.getCost());
 
     // CE is not expected to be adjusted for the given set of PhysicalProperties.
-    ASSERT_EQ(ce, costAndCE._ce);
+    ASSERT_EQ(ce, costAndCE._ce._value);
 }
 
 /**
@@ -86,8 +86,8 @@ TEST(CostEstimatorTest, PhysicalScanCost) {
 TEST(CostEstimatorTest, PhysicalScanCostWithAdjustedCE) {
     const double startupCost = 1;
     const double scanCost = 3;
-    const double ce = 1000;
-    const double limitEstimateCE = 10;
+    const optimizer::CEType ce{1000.0};
+    const optimizer::CEType limitEstimateCE{10.0};
 
     CostModelCoefficients costModel{};
     initializeTestCostModel(costModel);
@@ -114,16 +114,16 @@ TEST(CostEstimatorTest, PhysicalScanCostWithAdjustedCE) {
         costEstimator.deriveCost(metadata, memo, physProps, scanNode.ref(), childProps, nodeCEMap);
 
     // Test the cost.
-    ASSERT_EQ(startupCost + scanCost * costAndCE._ce, costAndCE._cost.getCost());
+    ASSERT_EQ(startupCost + scanCost * costAndCE._ce._value, costAndCE._cost.getCost());
 
     // CE is expected to be adjusted.
-    ASSERT_EQ(limitEstimateCE, costAndCE._ce);
+    ASSERT_EQ(limitEstimateCE, costAndCE._ce._value);
 }
 
 TEST(CostEstimatorTest, IndexScanCost) {
     const double startupCost = 1;
     const double indexScanCost = 3;
-    const double ce = 1000;
+    const optimizer::CEType ce{1000.0};
 
     CostModelCoefficients costModel{};
     initializeTestCostModel(costModel);
@@ -154,7 +154,7 @@ TEST(CostEstimatorTest, IndexScanCost) {
         metadata, memo, physProps, indexScanNode.ref(), childProps, nodeCEMap);
 
     // Test the cost.
-    ASSERT_EQ(startupCost + indexScanCost * costAndCE._ce, costAndCE._cost.getCost());
+    ASSERT_EQ(startupCost + indexScanCost * costAndCE._ce._value, costAndCE._cost.getCost());
 }
 
 TEST(CostEstimatorTest, FilterAndEvaluationCost) {
@@ -162,7 +162,7 @@ TEST(CostEstimatorTest, FilterAndEvaluationCost) {
     const double filterCost = 2;
     const double scanCost = 3;
     const double evalCost = 4;
-    const double ce = 1000;
+    const optimizer::CEType ce{1000.0};
 
     CostModelCoefficients costModel{};
     initializeTestCostModel(costModel);
@@ -194,7 +194,7 @@ TEST(CostEstimatorTest, FilterAndEvaluationCost) {
                                                   optimizer::ABT::make<optimizer::Variable>("p1")),
         std::move(scanNode));
 
-    nodeCEMap[projectionNode.cast<optimizer::Node>()] = ce;
+    nodeCEMap.emplace(projectionNode.cast<optimizer::Node>(), ce);
 
     auto filterNode = optimizer::ABT::make<optimizer::FilterNode>(
         optimizer::ABT::make<optimizer::EvalFilter>(
@@ -202,14 +202,14 @@ TEST(CostEstimatorTest, FilterAndEvaluationCost) {
             optimizer::ABT::make<optimizer::Variable>("p1")),
         std::move(projectionNode));
 
-    nodeCEMap[filterNode.cast<optimizer::Node>()] = ce;
+    nodeCEMap.emplace(filterNode.cast<optimizer::Node>(), ce);
 
     auto costAndCE = costEstimator.deriveCost(
         metadata, memo, physProps, filterNode.ref(), childProps, nodeCEMap);
 
     // Test the cost. The cost should be the cost of FilterNode's child if FilterNode is "trivial".
     // Same rule applies to 'EvaluationNode'.
-    ASSERT_EQ(startupCost + scanCost * costAndCE._ce, costAndCE._cost.getCost());
+    ASSERT_EQ(startupCost + scanCost * costAndCE._ce._value, costAndCE._cost.getCost());
 
     // Test non-trivial EvaluationNode's cost should account for the cost of the node itself and its
     // child.
@@ -224,13 +224,13 @@ TEST(CostEstimatorTest, FilterAndEvaluationCost) {
             optimizer::ABT::make<optimizer::Variable>("scanProj1")),
         std::move(scanNodeForEval));
 
-    nodeCEMapForEval[evalNode.cast<optimizer::Node>()] = ce;
+    nodeCEMapForEval.emplace(evalNode.cast<optimizer::Node>(), ce);
 
     auto costAndCEEval = costEstimator.deriveCost(
         metadata, memo, physProps, evalNode.ref(), childProps, nodeCEMapForEval);
 
-    auto scanNodeCost = startupCost + scanCost * ce;
-    auto evalNodeCost = startupCost + evalCost * ce;
+    auto scanNodeCost = startupCost + scanCost * ce._value;
+    auto evalNodeCost = startupCost + evalCost * ce._value;
     ASSERT_EQ(scanNodeCost + evalNodeCost, costAndCEEval._cost.getCost());
 }
 
@@ -238,7 +238,7 @@ TEST(CostEstimatorTest, MergeJoinCost) {
     const double startupCost = 1;
     const double scanCost = 3;
     const double mergeJoinCost = 5;
-    const double ce = 1000;
+    const optimizer::CEType ce{1000.0};
 
     CostModelCoefficients costModel{};
     initializeTestCostModel(costModel);
@@ -255,7 +255,7 @@ TEST(CostEstimatorTest, MergeJoinCost) {
     auto scanNodeRight = optimizer::ABT::make<optimizer::PhysicalScanNode>(
         optimizer::FieldProjectionMap{{}, {}, {}}, "c1", false);
 
-    nodeCEMap[scanNodeRight.cast<optimizer::Node>()] = ce;
+    nodeCEMap.emplace(scanNodeRight.cast<optimizer::Node>(), ce);
 
     auto evalNodeLeft = optimizer::ABT::make<optimizer::EvaluationNode>(
         "evalProjA",
@@ -263,7 +263,7 @@ TEST(CostEstimatorTest, MergeJoinCost) {
                                                   optimizer::ABT::make<optimizer::Variable>("p1")),
         std::move(scanNodeLeft));
 
-    nodeCEMap[evalNodeLeft.cast<optimizer::Node>()] = ce;
+    nodeCEMap.emplace(evalNodeLeft.cast<optimizer::Node>(), ce);
 
     auto evalNodeRight = optimizer::ABT::make<optimizer::EvaluationNode>(
         "evalProjB",
@@ -271,7 +271,7 @@ TEST(CostEstimatorTest, MergeJoinCost) {
                                                   optimizer::ABT::make<optimizer::Variable>("p2")),
         std::move(scanNodeRight));
 
-    nodeCEMap[evalNodeRight.cast<optimizer::Node>()] = ce;
+    nodeCEMap.emplace(evalNodeRight.cast<optimizer::Node>(), ce);
 
     CostEstimatorImpl costEstimator{costModel};
 
@@ -286,7 +286,7 @@ TEST(CostEstimatorTest, MergeJoinCost) {
     // Test the cost of MergeJoin's children.
     auto leftChildCost = costEstimator.deriveCost(
         metadata, memo, physProps, evalNodeLeft.ref(), childProps, nodeCEMap);
-    auto expectedCostChild = startupCost + scanCost * ce;
+    auto expectedCostChild = startupCost + scanCost * ce._value;
 
     ASSERT_EQ(expectedCostChild, leftChildCost._cost.getCost());
 
@@ -301,13 +301,13 @@ TEST(CostEstimatorTest, MergeJoinCost) {
         std::vector<optimizer::CollationOp>{optimizer::CollationOp::Ascending},
         std::move(evalNodeLeft),
         std::move(evalNodeRight));
-    nodeCEMap[joinNode.cast<optimizer::Node>()] = ce;
+    nodeCEMap.emplace(joinNode.cast<optimizer::Node>(), ce);
 
     // Test the cost of MergeJoin. The cost should be based on the cost of MergeJoin's children and
     // itself.
     auto costAndCE =
         costEstimator.deriveCost(metadata, memo, physProps, joinNode.ref(), childProps, nodeCEMap);
-    ASSERT_EQ(expectedCostChild * 2 + startupCost + costAndCE._ce * 2 * mergeJoinCost,
+    ASSERT_EQ(expectedCostChild * 2 + startupCost + costAndCE._ce._value * 2 * mergeJoinCost,
               costAndCE._cost.getCost());
 }
 }  // namespace mongo::cost_model

@@ -35,35 +35,35 @@
 
 namespace mongo::optimizer::ce {
 // Invalid estimate - an arbitrary negative value used for initialization.
-constexpr SelectivityType kInvalidSel = -1.0;
+constexpr SelectivityType kInvalidSel{-1.0};
 
-constexpr SelectivityType kDefaultFilterSel = 0.1;
-constexpr SelectivityType kDefaultExistsSel = 0.70;
+constexpr SelectivityType kDefaultFilterSel{0.1};
+constexpr SelectivityType kDefaultExistsSel{0.70};
 
 // The selectivities used in the piece-wise function for open-range intervals.
 // Note that we assume a smaller input cardinality will result in a less selective range.
-constexpr SelectivityType kSmallCardOpenRangeSel = 0.70;
-constexpr SelectivityType kMediumCardOpenRangeSel = 0.45;
-constexpr SelectivityType kLargeCardOpenRangeSel = 0.33;
+constexpr SelectivityType kSmallCardOpenRangeSel{0.70};
+constexpr SelectivityType kMediumCardOpenRangeSel{0.45};
+constexpr SelectivityType kLargeCardOpenRangeSel{0.33};
 
 // The selectivities used in the piece-wise function for closed-range intervals.
 // Note that we assume a smaller input cardinality will result in a less selective range.
-constexpr SelectivityType kSmallCardClosedRangeSel = 0.50;
-constexpr SelectivityType kMediumCardClosedRangeSel = 0.33;
-constexpr SelectivityType kLargeCardClosedRangeSel = 0.20;
+constexpr SelectivityType kSmallCardClosedRangeSel{0.50};
+constexpr SelectivityType kMediumCardClosedRangeSel{0.33};
+constexpr SelectivityType kLargeCardClosedRangeSel{0.20};
 
 // Global and Local selectivity should multiply to the Complete selectivity.
-constexpr SelectivityType kDefaultCompleteGroupSel = 0.01;
-constexpr SelectivityType kDefaultLocalGroupSel = 0.02;
-constexpr SelectivityType kDefaultGlobalGroupSel = 0.5;
+constexpr SelectivityType kDefaultCompleteGroupSel{0.01};
+constexpr SelectivityType kDefaultLocalGroupSel{0.02};
+constexpr SelectivityType kDefaultGlobalGroupSel{0.5};
 
 // The following constants are the steps used in the piece-wise functions that select selectivies
 // based on input cardinality.
-constexpr CEType kSmallLimit = 20.0;
-constexpr CEType kMediumLimit = 100.0;
+constexpr CEType kSmallLimit{20.0};
+constexpr CEType kMediumLimit{100.0};
 
-// Assumed average number of elements in an array.
-constexpr CEType kDefaultAverageArraySize = 10.0;
+// Assumed average number of elements in an array. This is a unitless constant.
+constexpr double kDefaultAverageArraySize{10.0};
 
 /**
  * Default selectivity of equalities. To avoid super small selectivities for small
@@ -75,9 +75,9 @@ SelectivityType equalitySel(const CEType inputCard) {
     uassert(6716604, "Zero cardinality must be handled by the caller.", inputCard > 0.0);
     if (inputCard <= 1.0) {
         // If the input has < 1 values, it cannot be reduced any further by a condition.
-        return 1.0;
+        return {1.0};
     }
-    return std::sqrt(inputCard) / inputCard;
+    return {1.0 / std::sqrt(inputCard._value)};
 }
 
 /**
@@ -129,7 +129,7 @@ mongo::sbe::value::TypeTags boundType(const BoundRequirement& bound) {
 SelectivityType intervalSel(const IntervalRequirement& interval, const CEType inputCard) {
     SelectivityType sel = kInvalidSel;
     if (interval.isFullyOpen()) {
-        sel = 1.0;
+        sel = {1.0};
     } else if (interval.isEquality()) {
         sel = equalitySel(inputCard);
     } else if (interval.getHighBound().isPlusInf() || interval.getLowBound().isMinusInf() ||
@@ -148,16 +148,12 @@ SelectivityType intervalSel(const IntervalRequirement& interval, const CEType in
     return sel;
 }
 
-SelectivityType negationSel(SelectivityType sel) {
-    return 1.0 - sel;
-}
-
 SelectivityType operationSel(const Operations op, const CEType inputCard) {
     switch (op) {
         case Operations::Eq:
             return equalitySel(inputCard);
         case Operations::Neq:
-            return negationSel(equalitySel(inputCard));
+            return negateSel(equalitySel(inputCard));
         case Operations::EqMember:
             // Reached when the query has $in. We don't handle it yet.
             return kDefaultFilterSel;
@@ -196,7 +192,7 @@ SelectivityType intervalSel(const PathCompare& left,
                 const auto rightConst = right.getVal().cast<Constant>();
                 if (leftConst && rightConst && !(*leftConst == *rightConst)) {
                     // Equality comparison on different constants is a contradiction.
-                    return 0.0;
+                    return {0.0};
                 }
                 // We can't tell if the equalities result in a contradiction or not, so we use the
                 // default equality selectivity.
@@ -322,7 +318,7 @@ public:
                                           EvalFilterSelectivityResult childResult) {
         switch (node.op()) {
             case Operations::Not:
-                childResult.selectivity = negationSel(childResult.selectivity);
+                childResult.selectivity = negateSel(childResult.selectivity);
                 return childResult;
             case Operations::Neg:
                 // If we see negation (-) in a UnaryOp, we ignore it for CE purposes.
@@ -362,10 +358,6 @@ public:
     }
 
 private:
-    SelectivityType negationSel(const SelectivityType in) {
-        return 1.0 - in;
-    }
-
     SelectivityType conjunctionSel(const SelectivityType left, const SelectivityType right) {
         return left * right;
     }
@@ -386,7 +378,7 @@ public:
     }
 
     CEType transport(const ValueScanNode& node, CEType /*bindResult*/) {
-        return node.getArraySize();
+        return {static_cast<double>(node.getArraySize())};
     }
 
     CEType transport(const MemoLogicalDelegatorNode& node) {
@@ -398,7 +390,7 @@ public:
     CEType transport(const FilterNode& node, CEType childResult, CEType /*exprResult*/) {
         if (childResult == 0.0) {
             // Early out and return 0 since we don't expect to get more results.
-            return 0.0;
+            return {0.0};
         }
         if (node.getFilter() == Constant::boolean(true)) {
             // Trivially true filter.
@@ -406,7 +398,7 @@ public:
         }
         if (node.getFilter() == Constant::boolean(false)) {
             // Trivially false filter.
-            return 0.0;
+            return {0.0};
         }
 
         const SelectivityType sel =
@@ -426,10 +418,10 @@ public:
                      CEType /*refsResult*/) {
         // Early out and return 0 since we don't expect to get more results.
         if (childResult == 0.0) {
-            return 0.0;
+            return {0.0};
         }
 
-        SelectivityType topLevelSel = 1.0;
+        SelectivityType topLevelSel{1.0};
         std::vector<SelectivityType> topLevelSelectivities;
         for (const auto& [key, req] : node.getReqMap()) {
             if (req.getIsPerfOnly()) {
@@ -437,14 +429,14 @@ public:
                 continue;
             }
 
-            SelectivityType disjSel = 1.0;
+            SelectivityType disjSel{1.0};
             std::vector<SelectivityType> disjSelectivities;
             // Intervals are in DNF.
             const auto intervalDNF = req.getIntervals();
             const auto disjuncts = intervalDNF.cast<IntervalReqExpr::Disjunction>()->nodes();
             for (const auto& disjunct : disjuncts) {
                 const auto& conjuncts = disjunct.cast<IntervalReqExpr::Conjunction>()->nodes();
-                SelectivityType conjSel = 1.0;
+                SelectivityType conjSel{1.0};
                 std::vector<SelectivityType> conjSelectivities;
                 for (const auto& conjunct : conjuncts) {
                     const auto& interval = conjunct.cast<IntervalReqExpr::Atom>()->getExpr();
@@ -459,7 +451,7 @@ public:
         }
 
         if (topLevelSelectivities.empty()) {
-            return 1.0;
+            return {1.0};
         }
         // The elements of the PartialSchemaRequirements map represent an implicit conjunction.
         topLevelSel = conjExponentialBackoff(std::move(topLevelSelectivities));
@@ -492,11 +484,11 @@ public:
 
         SelectivityType selectivity = kDefaultFilterSel;
         if (filter == Constant::boolean(false)) {
-            selectivity = 0.0;
+            selectivity = {0.0};
         } else if (filter == Constant::boolean(true)) {
-            selectivity = 1.0;
+            selectivity = {1.0};
         }
-        return leftChildResult * rightChildResult * selectivity;
+        return computeJoinCE(leftChildResult, rightChildResult, selectivity);
     }
 
     CEType transport(const UnionNode& node,
@@ -504,7 +496,7 @@ public:
                      CEType /*bindResult*/,
                      CEType /*refsResult*/) {
         // Combine the CE of each child.
-        CEType result = 0;
+        CEType result{0.0};
         for (auto&& child : childResults) {
             result += child;
         }
@@ -548,11 +540,11 @@ public:
     CEType transport(const LimitSkipNode& node, CEType childResult) {
         const auto limit = node.getProperty().getLimit();
         const auto skip = node.getProperty().getSkip();
-        const auto cardAfterSkip = std::max(childResult - skip, 0.0);
+        const auto cardAfterSkip = (childResult > skip) ? (childResult._value - skip) : 0.0;
         if (limit < cardAfterSkip) {
-            return limit;
+            return {static_cast<double>(limit)};
         }
-        return cardAfterSkip;
+        return {cardAfterSkip};
     }
 
     CEType transport(const ExchangeNode& node, CEType childResult, CEType /*refsResult*/) {
@@ -571,7 +563,7 @@ public:
     template <typename T, typename... Ts>
     CEType transport(const T& /*node*/, Ts&&...) {
         static_assert(!canBeLogicalNode<T>(), "Logical node must implement its CE derivation.");
-        return 0.0;
+        return {0.0};
     }
 
     static CEType derive(const Metadata& metadata,

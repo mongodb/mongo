@@ -58,7 +58,7 @@ public:
         if (canBeLogicalNode<T>()) {
             return _heuristicCE.deriveCE(_metadata, _memo, _logicalProps, n.ref());
         }
-        return 0.0;
+        return {0.0};
     }
 
     static CEType derive(const Metadata& metadata,

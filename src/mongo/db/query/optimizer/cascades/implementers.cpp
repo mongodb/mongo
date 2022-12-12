@@ -139,11 +139,11 @@ public:
             ABT physicalSeek =
                 make<SeekNode>(ridProjName, std::move(fieldProjectionMap), node.getScanDefName());
             // If optimizing a Seek, override CE to 1.0.
-            nodeCEMap.emplace(physicalSeek.cast<Node>(), 1.0);
+            nodeCEMap.emplace(physicalSeek.cast<Node>(), CEType{1.0});
 
             ABT limitSkip =
                 make<LimitSkipNode>(LimitSkipRequirement{1, 0}, std::move(physicalSeek));
-            nodeCEMap.emplace(limitSkip.cast<Node>(), 1.0);
+            nodeCEMap.emplace(limitSkip.cast<Node>(), CEType{1.0});
 
             optimizeChildrenNoAssert(_queue,
                                      kDefaultPriority,
@@ -187,33 +187,33 @@ public:
         NodeCEMap nodeCEMap;
         ABT physNode = make<CoScanNode>();
         if (node.getArraySize() == 0) {
-            nodeCEMap.emplace(physNode.cast<Node>(), 0.0);
+            nodeCEMap.emplace(physNode.cast<Node>(), CEType{0.0});
 
             physNode = make<LimitSkipNode>(LimitSkipRequirement{0, 0}, std::move(physNode));
-            nodeCEMap.emplace(physNode.cast<Node>(), 0.0);
+            nodeCEMap.emplace(physNode.cast<Node>(), CEType{0.0});
 
             for (const ProjectionName& boundProjName : node.binder().names()) {
                 if (requiredProjections.find(boundProjName)) {
                     physNode = make<EvaluationNode>(
                         boundProjName, Constant::nothing(), std::move(physNode));
-                    nodeCEMap.emplace(physNode.cast<Node>(), 0.0);
+                    nodeCEMap.emplace(physNode.cast<Node>(), CEType{0.0});
                 }
             }
             if (needsRID) {
                 physNode = make<EvaluationNode>(
                     std::move(*ridProjName), Constant::nothing(), std::move(physNode));
-                nodeCEMap.emplace(physNode.cast<Node>(), 0.0);
+                nodeCEMap.emplace(physNode.cast<Node>(), CEType{0.0});
             }
         } else {
-            nodeCEMap.emplace(physNode.cast<Node>(), 1.0);
+            nodeCEMap.emplace(physNode.cast<Node>(), CEType{1.0});
 
             physNode = make<LimitSkipNode>(LimitSkipRequirement{1, 0}, std::move(physNode));
-            nodeCEMap.emplace(physNode.cast<Node>(), 1.0);
+            nodeCEMap.emplace(physNode.cast<Node>(), CEType{1.0});
 
             const ProjectionName valueScanProj{_prefixId.getNextId("valueScan")};
             physNode =
                 make<EvaluationNode>(valueScanProj, node.getValueArray(), std::move(physNode));
-            nodeCEMap.emplace(physNode.cast<Node>(), 1.0);
+            nodeCEMap.emplace(physNode.cast<Node>(), CEType{1.0});
 
             // Unwind the combined array constant and pick an element for each required projection
             // in sequence.
@@ -221,7 +221,7 @@ public:
                                         _prefixId.getNextId("valueScanPid"),
                                         false /*retainNonArrays*/,
                                         std::move(physNode));
-            nodeCEMap.emplace(physNode.cast<Node>(), 1.0);
+            nodeCEMap.emplace(physNode.cast<Node>(), CEType{1.0});
 
             const auto getElementFn = [&valueScanProj](const size_t index) {
                 return make<FunctionCall>(
@@ -238,7 +238,8 @@ public:
                     physNode = make<EvaluationNode>(boundProjName,
                                                     getElementFn(i + (node.getHasRID() ? 1 : 0)),
                                                     std::move(physNode));
-                    nodeCEMap.emplace(physNode.cast<Node>(), node.getArraySize());
+                    nodeCEMap.emplace(physNode.cast<Node>(),
+                                      CEType{static_cast<double>(node.getArraySize())});
                 }
             }
 
@@ -246,7 +247,8 @@ public:
                 // Obtain row id from first element of the array.
                 physNode = make<EvaluationNode>(
                     std::move(*ridProjName), getElementFn(0), std::move(physNode));
-                nodeCEMap.emplace(physNode.cast<Node>(), node.getArraySize());
+                nodeCEMap.emplace(physNode.cast<Node>(),
+                                  CEType{static_cast<double>(node.getArraySize())});
             }
         }
 
@@ -653,7 +655,7 @@ public:
 
             NodeCEMap nodeCEMap;
             ABT physNode = make<Blackhole>();
-            CEType baseCE = 0.0;
+            CEType baseCE{0.0};
 
             PhysicalRewriteType rule = PhysicalRewriteType::Uninitialized;
             if (indexReqTarget == IndexReqTarget::Complete) {
@@ -665,7 +667,7 @@ public:
                 nodeCEMap.emplace(physNode.cast<Node>(), baseCE);
                 rule = PhysicalRewriteType::SargableToPhysicalScan;
             } else {
-                baseCE = 1.0;
+                baseCE = {1.0};
 
                 // Try Seek with Limit 1.
                 physNode = make<SeekNode>(ridProjName, std::move(fieldProjectionMap), scanDefName);
@@ -827,11 +829,11 @@ public:
 
         if (!isIndex) {
             // Add repeated execution property to inner side.
-            CEType estimatedRepetitions = hasProperty<RepetitionEstimate>(_physProps)
+            double estimatedRepetitions = hasProperty<RepetitionEstimate>(_physProps)
                 ? getPropertyConst<RepetitionEstimate>(_physProps).getEstimate()
                 : 1.0;
             estimatedRepetitions *=
-                getPropertyConst<CardinalityEstimate>(leftLogicalProps).getEstimate();
+                getPropertyConst<CardinalityEstimate>(leftLogicalProps).getEstimate()._value;
             setPropertyOverwrite<RepetitionEstimate>(rightPhysProps,
                                                      RepetitionEstimate{estimatedRepetitions});
         }

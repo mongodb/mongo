@@ -212,7 +212,7 @@ GroupIdType IndexingRequirement::getSatisfiedPartialIndexesGroupId() const {
     return _satisfiedPartialIndexesGroupId;
 }
 
-RepetitionEstimate::RepetitionEstimate(const CEType estimate) : _estimate(estimate) {}
+RepetitionEstimate::RepetitionEstimate(const double estimate) : _estimate(estimate) {}
 
 bool RepetitionEstimate::operator==(const RepetitionEstimate& other) const {
     return _estimate == other._estimate;
@@ -222,7 +222,7 @@ ProjectionNameSet RepetitionEstimate::getAffectedProjectionNames() const {
     return {};
 }
 
-CEType RepetitionEstimate::getEstimate() const {
+double RepetitionEstimate::getEstimate() const {
     return _estimate;
 }
 

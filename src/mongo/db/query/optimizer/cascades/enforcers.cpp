@@ -123,7 +123,7 @@ public:
         PhysProps childProps = _physProps;
         removeProperty<LimitSkipRequirement>(childProps);
         setPropertyOverwrite<LimitEstimate>(
-            childProps, LimitEstimate{static_cast<CEType>(prop.getAbsoluteLimit())});
+            childProps, LimitEstimate{{static_cast<double>(prop.getAbsoluteLimit())}});
 
         ABT enforcer = make<LimitSkipNode>(prop, make<MemoLogicalDelegatorNode>(_groupId));
         optimizeChild<LimitSkipNode, PhysicalRewriteType::EnforceLimitSkip>(

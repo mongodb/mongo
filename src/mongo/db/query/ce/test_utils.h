@@ -39,7 +39,7 @@ namespace mongo::optimizer::ce {
 constexpr bool kCETestLogOnly = false;
 
 const double kMaxCEError = 0.01;
-const CEType kInvalidCardinality = -1.0;
+const CEType kInvalidCardinality{-1.0};
 
 const OptPhaseManager::PhaseSet kDefaultCETestPhaseSet{OptPhase::MemoSubstitutionPhase,
                                                        OptPhase::MemoExplorationPhase,
@@ -49,6 +49,15 @@ const OptPhaseManager::PhaseSet kOnlySubPhaseSet{OptPhase::MemoSubstitutionPhase
 
 const OptPhaseManager::PhaseSet kNoOptPhaseSet{};
 
+#define ASSERT_CE_APPROX_EQUAL(estimatedCE, expectedCE, kMaxCEError) \
+    ASSERT_APPROX_EQUAL(                                             \
+        static_cast<double>(estimatedCE), static_cast<double>(expectedCE), kMaxCEError)
+
+template <class T1, class T2>
+constexpr double absCEDiff(const T1 v1, const T2 v2) {
+    return std::abs(static_cast<double>(v1) - static_cast<double>(v2));
+}
+
 /**
  * Helpful macros for asserting that the CE of a $match predicate is approximately what we were
  * expecting.
@@ -56,12 +65,12 @@ const OptPhaseManager::PhaseSet kNoOptPhaseSet{};
 
 #define _ASSERT_CE(estimatedCE, expectedCE)                             \
     if constexpr (kCETestLogOnly) {                                     \
-        if (std::abs(estimatedCE - expectedCE) > kMaxCEError) {         \
+        if (absCEDiff(estimatedCE, expectedCE) > kMaxCEError) {         \
             std::cout << "ERROR: expected " << expectedCE << std::endl; \
         }                                                               \
         ASSERT_APPROX_EQUAL(1.0, 1.0, kMaxCEError);                     \
     } else {                                                            \
-        ASSERT_APPROX_EQUAL(estimatedCE, expectedCE, kMaxCEError);      \
+        ASSERT_CE_APPROX_EQUAL(estimatedCE, expectedCE, kMaxCEError);   \
     }
 #define _PREDICATE(field, predicate) (str::stream() << "{" << field << ": " << predicate "}")
 #define _ELEMMATCH_PREDICATE(field, predicate) \
@@ -72,7 +81,7 @@ const OptPhaseManager::PhaseSet kNoOptPhaseSet{};
 
 // This macro does the same as above but also sets the collection cardinality.
 #define ASSERT_CE_CARD(ce, pipeline, expectedCE, collCard) \
-    ce.setCollCard(collCard);                              \
+    ce.setCollCard({collCard});                            \
     ASSERT_CE(ce, pipeline, expectedCE)
 
 // This macro verifies the cardinality of a pipeline with a single $match predicate.
@@ -84,7 +93,7 @@ const OptPhaseManager::PhaseSet kNoOptPhaseSet{};
 
 // This macro does the same as above but also sets the collection cardinality.
 #define ASSERT_MATCH_CE_CARD(ce, predicate, expectedCE, collCard) \
-    ce.setCollCard(collCard);                                     \
+    ce.setCollCard({collCard});                                   \
     ASSERT_MATCH_CE(ce, predicate, expectedCE)
 
 // This macro tests cardinality of two versions of the predicate; with and without $elemMatch.
@@ -129,7 +138,7 @@ public:
      * 'numRecords' in the metadata.
      */
     CETester(std::string collName,
-             double numRecords,
+             CEType collCard,
              const OptPhaseManager::PhaseSet& optPhases = kDefaultCETestPhaseSet);
 
     /**
@@ -158,7 +167,7 @@ public:
     /**
      * Updates the cardinality of the collection '_collName'.
      */
-    void setCollCard(double card);
+    void setCollCard(CEType card);
 
     /**
      * Updates the indexes used by the collection '_collName'.
@@ -169,7 +178,7 @@ public:
      * Adds a ScanDefinition for an additional collection for the test.
      */
     void addCollection(std::string collName,
-                       double numRecords,
+                       CEType numRecords,
                        opt::unordered_map<std::string, IndexDefinition> indexes = {});
 
     /**

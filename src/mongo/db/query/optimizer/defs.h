@@ -37,7 +37,7 @@
 
 #include "mongo/db/query/optimizer/containers.h"
 #include "mongo/db/query/optimizer/utils/printable_enum.h"
-#include "mongo/db/query/optimizer/utils/strong_string_alias.h"
+#include "mongo/db/query/optimizer/utils/strong_alias.h"
 
 
 namespace mongo::optimizer {
@@ -182,8 +182,36 @@ private:
     const int _iterationLimit;
 };
 
-using CEType = double;
-using SelectivityType = double;
+
+struct SelectivityTag {
+    // Selectivity does not have units, it is a simple ratio.
+    static constexpr bool kUnitless = true;
+};
+using SelectivityType = StrongDoubleAlias<SelectivityTag>;
+
+struct CETag {
+    // Cardinality has units: it is measured in documents.
+    static constexpr bool kUnitless = false;
+};
+using CEType = StrongDoubleAlias<CETag>;
+
+// We can multiply a cardinality and a selectivity to obtain a cardinality.
+constexpr CEType operator*(const CEType v1, const SelectivityType v2) {
+    return {v1._value * v2._value};
+}
+constexpr CEType operator*(const SelectivityType v1, const CEType v2) {
+    return {v1._value * v2._value};
+}
+constexpr CEType& operator*=(CEType& v1, const SelectivityType v2) {
+    v1._value *= v2._value;
+    return v1;
+}
+
+// We can divide two cardinalities to obtain a selectivity.
+constexpr SelectivityType operator/(const CEType v1, const CEType v2) {
+    return {v1._value / v2._value};
+}
+
 
 class CostType {
     static constexpr double kPrecision = 0.00000001;

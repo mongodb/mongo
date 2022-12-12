@@ -439,11 +439,11 @@ public:
     }
 
     size_t operator()(const properties::PhysProperty&, const properties::RepetitionEstimate& prop) {
-        return computeHashSeq<6>(std::hash<CEType>()(prop.getEstimate()));
+        return computeHashSeq<6>(std::hash<double>()(prop.getEstimate()));
     }
 
     size_t operator()(const properties::PhysProperty&, const properties::LimitEstimate& prop) {
-        return computeHashSeq<7>(std::hash<CEType>()(prop.getEstimate()));
+        return computeHashSeq<7>(CEType::Hasher()(prop.getEstimate()));
     }
 
     static size_t computeHash(const properties::PhysProps& props) {

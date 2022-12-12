@@ -319,16 +319,17 @@ private:
  */
 class RepetitionEstimate final : public PhysPropertyTag {
 public:
-    RepetitionEstimate(CEType estimate);
+    RepetitionEstimate(double estimate);
 
     bool operator==(const RepetitionEstimate& other) const;
 
     ProjectionNameSet getAffectedProjectionNames() const;
 
-    CEType getEstimate() const;
+    double getEstimate() const;
 
 private:
-    CEType _estimate;
+    // The repetition estimate is a unitless constant (not a cardinality estimate).
+    double _estimate;
 };
 
 /**

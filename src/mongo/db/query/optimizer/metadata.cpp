@@ -162,7 +162,7 @@ ScanDefinition::ScanDefinition()
                      {} /*nonMultiKeyPathSet*/,
                      {DistributionType::Centralized},
                      true /*exists*/,
-                     -1.0 /*ce*/) {}
+                     {-1.0} /*ce*/) {}
 
 ScanDefinition::ScanDefinition(ScanDefOptions options,
                                opt::unordered_map<std::string, IndexDefinition> indexDefs,

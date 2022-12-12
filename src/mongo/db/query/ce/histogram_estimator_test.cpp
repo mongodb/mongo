@@ -50,8 +50,8 @@ std::string collName("test");
 
 class CEHistogramTester : public CETester {
 public:
-    CEHistogramTester(std::string collName, double numRecords)
-        : CETester(collName, numRecords), _stats{new CollectionStatisticsMock(numRecords)} {}
+    CEHistogramTester(std::string collName, CEType collCard)
+        : CETester(collName, collCard), _stats{new CollectionStatisticsMock(collCard._value)} {}
 
     void addHistogram(const std::string& path, std::shared_ptr<ArrayHistogram> histogram) {
         _stats->addHistogram(path, histogram);
@@ -152,7 +152,7 @@ std::unique_ptr<ArrayHistogram> getArrayHistogramFromData(TestBuckets scalarBuck
 }
 
 TEST(CEHistogramTest, AssertSmallMaxDiffHistogramEstimatesAtomicPredicates) {
-    constexpr auto kCollCard = 8;
+    constexpr CEType kCollCard{8.0};
     CEHistogramTester t(collName, kCollCard);
 
     // Construct a histogram with two buckets: one for 3 ints equal to 1, another for 5 strings
@@ -207,7 +207,7 @@ TEST(CEHistogramTest, AssertSmallMaxDiffHistogramEstimatesAtomicPredicates) {
 }
 
 TEST(CEHistogramTest, AssertSmallHistogramEstimatesComplexPredicates) {
-    constexpr auto kCollCard = 9;
+    constexpr CEType kCollCard{9.0};
     CEHistogramTester t(collName, kCollCard);
 
     // Construct a histogram with three int buckets for field 'a'.
@@ -256,7 +256,7 @@ TEST(CEHistogramTest, AssertSmallHistogramEstimatesComplexPredicates) {
 }
 
 TEST(CEHistogramTest, SanityTestEmptyHistogram) {
-    constexpr auto kCollCard = 0;
+    constexpr CEType kCollCard{0.0};
     CEHistogramTester t(collName, kCollCard);
     t.addHistogram("empty", std::make_unique<ArrayHistogram>());
 
@@ -267,14 +267,14 @@ TEST(CEHistogramTest, SanityTestEmptyHistogram) {
 }
 
 TEST(CEHistogramTest, TestOneBucketOneIntHistogram) {
-    constexpr auto kCollCard = 50;
+    constexpr CEType kCollCard{50.0};
     CEHistogramTester t(collName, kCollCard);
 
     // Create a histogram with a single bucket that contains exactly one int (42) with a frequency
     // of 50 (equal to the collection cardinality).
     t.addHistogram("soloInt",
                    getArrayHistogramFromData({
-                       {Value(42), kCollCard /* frequency */},
+                       {Value(42), kCollCard._value /* frequency */},
                    }));
 
     // Check against a variety of intervals that include 42 as a bound.
@@ -318,7 +318,7 @@ TEST(CEHistogramTest, TestOneBucketOneIntHistogram) {
 }
 
 TEST(CEHistogramTest, TestOneBoundIntRangeHistogram) {
-    constexpr auto kCollCard = 51;
+    constexpr CEType kCollCard{51.0};
     CEHistogramTester t(collName, kCollCard);
     t.addHistogram("intRange",
                    getArrayHistogramFromData({
@@ -415,18 +415,18 @@ TEST(CEHistogramTest, TestOneBoundIntRangeHistogram) {
 }
 
 TEST(CEHistogramTest, TestHistogramOnNestedPaths) {
-    constexpr auto kCollCard = 50;
+    constexpr CEType kCollCard{50.0};
     CEHistogramTester t(collName, kCollCard);
 
     // Create a histogram with a single bucket that contains exactly one int (42) with a frequency
     // of 50 (equal to the collection cardinality).
     t.addHistogram("path",
                    getArrayHistogramFromData({
-                       {Value(42), kCollCard /* frequency */},
+                       {Value(42), kCollCard._value /* frequency */},
                    }));
     t.addHistogram("a.histogram.path",
                    getArrayHistogramFromData({
-                       {Value(42), kCollCard /* frequency */},
+                       {Value(42), kCollCard._value /* frequency */},
                    }));
 
     ASSERT_MATCH_CE(t, "{\"not.a.histogram.path\": {$eq: 42}}", 7.071 /* heuristic */);
@@ -466,7 +466,7 @@ TEST(CEHistogramTest, TestHistogramOnNestedPaths) {
 }
 
 TEST(CEHistogramTest, TestArrayHistogramOnAtomicPredicates) {
-    constexpr auto kCollCard = 6;
+    constexpr CEType kCollCard{6.0};
     CEHistogramTester t(collName, kCollCard);
     t.addHistogram(
         "a",
@@ -546,7 +546,7 @@ TEST(CEHistogramTest, TestArrayHistogramOnAtomicPredicates) {
 }
 
 TEST(CEHistogramTest, TestArrayHistogramOnCompositePredicates) {
-    constexpr auto kCollCard = 175;
+    constexpr CEType kCollCard{175.0};
     CEHistogramTester t(collName, kCollCard);
 
     // A scalar histogram with values in the range [1,10], most of which are in the middle bucket.
@@ -586,7 +586,7 @@ TEST(CEHistogramTest, TestArrayHistogramOnCompositePredicates) {
                 {Value(10), 35 /* frequency */},
             },
             {{sbe::value::TypeTags::NumberInt32, 420}},  // Array type count = 3*35+5*35+1*35+3*35.
-            kCollCard,                                   // kCollCard arrays total.
+            kCollCard._value,                            // kCollCard arrays total.
             35                                           // 35 empty arrays
             ));
 
@@ -733,7 +733,7 @@ TEST(CEHistogramTest, TestArrayHistogramOnCompositePredicates) {
 }
 
 TEST(CEHistogramTest, TestMixedElemMatchAndNonElemMatch) {
-    constexpr auto kCollCard = 1;
+    constexpr CEType kCollCard{1.0};
     CEHistogramTester t(collName, kCollCard);
 
     // A very simple histogram encoding a collection with one document {a: [3, 10]}.
@@ -777,7 +777,7 @@ TEST(CEHistogramTest, TestMixedElemMatchAndNonElemMatch) {
 }
 
 TEST(CEHistogramTest, TestTypeCounters) {
-    constexpr double kCollCard = 1000.0;
+    constexpr CEType kCollCard{1000.0};
     CEHistogramTester t(collName, kCollCard);
 
     // This test is designed such that for each document, we have the following fields:
@@ -797,7 +797,7 @@ TEST(CEHistogramTest, TestTypeCounters) {
                                              {/* No array max buckets. */},
                                              {{sbe::value::TypeTags::Object, kNumObj},
                                               {sbe::value::TypeTags::Null, kNumNull}},
-                                             kCollCard));
+                                             kCollCard._value));
 
     // Count of each type in array type counters for field "mixed".
     constexpr double kNumObjMA = 50.0;
@@ -1031,7 +1031,7 @@ TEST(CEHistogramTest, TestTypeCounters) {
 TEST(CEHistogramTest, TestNestedArrayTypeCounterPredicates) {
     // This test validates the correct behaviour of both the nested-array type counter as well as
     // combinations of type counters and histogram estimates.
-    constexpr double kCollCard = 1000.0;
+    constexpr CEType kCollCard{1000.0};
     constexpr double kNumArr = 600.0;      // Total number of arrays.
     constexpr double kNumNestArr = 500.0;  // Frequency of nested arrays, e.g. [[1, 2, 3]].
     constexpr double kNumNonNestArr = 100.0;
@@ -1046,7 +1046,7 @@ TEST(CEHistogramTest, TestNestedArrayTypeCounterPredicates) {
     // Sanity test numbers.
     ASSERT_EQ(kNumArr1 + kNumArr2, kNumArr3);
     ASSERT_EQ(kNumNonNestArr + kNumNestArr, kNumArr);
-    ASSERT_EQ(kNumObj + kNumArr + kNum1 + kNum2 + kNum3, kCollCard);
+    ASSERT_EQ(kNumObj + kNumArr + kNum1 + kNum2 + kNum3, kCollCard._value);
 
     // Define histogram buckets.
     TestBuckets scalarBuckets{{Value(1), kNum1}, {Value(2), kNum2}, {Value(3), kNum3}};
@@ -1150,12 +1150,12 @@ TEST(CEHistogramTest, TestFallbackForNonConstIntervals) {
     const auto estInterval = [](const auto& interval) {
         ArrayHistogram ah;
         return estimateIntervalCardinality(
-            ah, interval, 100 /* inputCardinality */, true /* includeScalar */);
+            ah, interval, {100} /* inputCardinality */, true /* includeScalar */);
     };
 
-    ASSERT_EQ(estInterval(intervalLowNonConst), -1.0);
-    ASSERT_EQ(estInterval(intervalHighNonConst), -1.0);
-    ASSERT_EQ(estInterval(intervalEqNonConst), -1.0);
+    ASSERT_EQ(estInterval(intervalLowNonConst)._value, -1.0);
+    ASSERT_EQ(estInterval(intervalHighNonConst)._value, -1.0);
+    ASSERT_EQ(estInterval(intervalEqNonConst)._value, -1.0);
 }
 }  // namespace
 }  // namespace mongo::optimizer::ce

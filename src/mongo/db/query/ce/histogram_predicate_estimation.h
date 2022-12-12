@@ -74,7 +74,7 @@ EstimationResult estimate(const stats::ScalarHistogram& h,
  * Given an array histogram, an interval, and the input cardinality, estimates the cardinality of
  * the interval.
  */
-double estimateIntervalCardinality(const stats::ArrayHistogram& estimator,
+CEType estimateIntervalCardinality(const stats::ArrayHistogram& estimator,
                                    const IntervalRequirement& interval,
                                    CEType inputCardinality,
                                    bool includeScalar);
@@ -83,7 +83,7 @@ double estimateIntervalCardinality(const stats::ArrayHistogram& estimator,
  * Estimates the cardinality of an equality predicate given an ArrayHistogram and an SBE value and
  * type tag pair.
  */
-double estimateCardEq(const stats::ArrayHistogram& ah,
+CEType estimateCardEq(const stats::ArrayHistogram& ah,
                       sbe::value::TypeTags tag,
                       sbe::value::Value val,
                       bool includeScalar);
@@ -93,7 +93,7 @@ double estimateCardEq(const stats::ArrayHistogram& ah,
  * Set 'includeScalar' to true to indicate whether or not the provided range should include no-array
  * values. The other fields define the range of the estimation.
  */
-double estimateCardRange(const stats::ArrayHistogram& ah,
+CEType estimateCardRange(const stats::ArrayHistogram& ah,
                          bool lowInclusive,
                          sbe::value::TypeTags tagLow,
                          sbe::value::Value valLow,

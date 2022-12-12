@@ -42,6 +42,6 @@ ScanDefinition createScanDef(ScanDefOptions options,
                              const ConstFoldFn& constFold,
                              DistributionAndPaths distributionAndPaths,
                              bool exists = true,
-                             CEType ce = -1.0);
+                             CEType ce = CEType{-1.0});
 
 }  // namespace mongo::optimizer
