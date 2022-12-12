@@ -38,7 +38,9 @@
 #include "mongo/util/concurrency/priority_ticketholder.h"
 #include "mongo/util/concurrency/semaphore_ticketholder.h"
 #include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/util/latency_distribution.h"
 #include "mongo/util/tick_source_mock.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 namespace {
@@ -93,9 +95,14 @@ template <class TicketHolderImpl, AdmissionsPriority admissionsPriority>
 void BM_acquireAndRelease(benchmark::State& state) {
     static std::unique_ptr<TicketHolderFixture<TicketHolderImpl>> ticketHolder;
     static ServiceContext::UniqueServiceContext serviceContext;
+    static constexpr auto resolution = Microseconds{100};
+    static LatencyPercentileDistribution resultingDistribution(resolution);
+    static int numRemainingToMerge;
     {
         stdx::unique_lock lk(isReadyMutex);
         if (state.thread_index == 0) {
+            resultingDistribution = LatencyPercentileDistribution{resolution};
+            numRemainingToMerge = state.threads;
             serviceContext = ServiceContext::make();
             serviceContext->setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
             serviceContext->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
@@ -125,25 +132,58 @@ void BM_acquireAndRelease(benchmark::State& state) {
     }();
 
     TicketHolderFixture<TicketHolderImpl>* fixture = ticketHolder.get();
+    // We build the latency distribution locally in order to avoid synchronizing with other threads.
+    // All of them will be merged at the end instead.
+    LatencyPercentileDistribution localDistribution{resolution};
+
     for (auto _ : state) {
+        Timer timer;
+        Microseconds timeForAcquire;
         AdmissionContext admCtx;
         admCtx.setPriority(priority);
         auto opCtx = fixture->opCtxs[state.thread_index].get();
         {
-            auto ticket = fixture->ticketHolder->waitForTicket(opCtx, &admCtx, waitMode);
+            auto ticket =
+                fixture->ticketHolder->waitForTicketUntil(opCtx, &admCtx, Date_t::max(), waitMode);
+            timeForAcquire = timer.elapsed();
             state.PauseTiming();
             sleepmicros(1);
             acquired++;
             state.ResumeTiming();
+            // We reset the timer here to ignore the time spent doing artificial sleeping for time
+            // spent doing acquire and release. Release will be performed as part of the ticket
+            // destructor.
+            timer.reset();
         }
+        localDistribution.addEntry(timeForAcquire + timer.elapsed());
     }
     state.counters["Acquired"] = benchmark::Counter(acquired, benchmark::Counter::kIsRate);
     state.counters["AcquiredPerThread"] =
         benchmark::Counter(acquired, benchmark::Counter::kAvgThreadsRate);
+    // Merge all latency distributions in order to get the full view of all threads.
+    {
+        stdx::unique_lock lk(isReadyMutex);
+        resultingDistribution = resultingDistribution.mergeWith(localDistribution);
+        numRemainingToMerge--;
+        if (numRemainingToMerge > 0) {
+            isReadyCv.wait(lk, [&] { return numRemainingToMerge == 0; });
+        } else {
+            isReadyCv.notify_all();
+        }
+    }
     if (state.thread_index == 0) {
         ticketHolder.reset();
         serviceContext.reset();
         isReady = false;
+        state.counters["AcqRel50"] =
+            benchmark::Counter(resultingDistribution.getPercentile(0.5).count());
+        state.counters["AcqRel95"] =
+            benchmark::Counter(resultingDistribution.getPercentile(0.95).count());
+        state.counters["AcqRel99"] =
+            benchmark::Counter(resultingDistribution.getPercentile(0.99).count());
+        state.counters["AcqRel99.9"] =
+            benchmark::Counter(resultingDistribution.getPercentile(0.999).count());
+        state.counters["AcqRelMax"] = benchmark::Counter(resultingDistribution.getMax().count());
     }
 }
 
