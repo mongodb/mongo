@@ -41,6 +41,7 @@ function setUpServerForColumnStoreIndexTest(db) {
 
     setParameterOnAllHosts(nodes, "internalQueryColumnScanMinAvgDocSizeBytes", 0);
     setParameterOnAllHosts(nodes, "internalQueryColumnScanMinCollectionSizeBytes", 0);
+    setParameterOnAllHosts(nodes, "internalQueryColumnScanMinNumColumnFilters", 0);
 
     return true;
 }

@@ -69,7 +69,6 @@
 #include "mongo/db/query/util/set_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util_core.h"
-#include "mongo/util/processinfo.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -232,15 +231,43 @@ std::pair<DepsTracker, DepsTracker> computeDeps(const QueryPlannerParams& params
 }
 
 /**
- * Determines whether a column scan should be used given stats about the collection.
+ * Determines whether a column scan should be used given information about the query and collection.
+ * We are specifically interested in whether a column scan is likely to perform better than a
+ * collection scan. Column scan should be used if the following conditions are met:
  *
- * Column scan should not be used (i.e., would likely perform worse than a collection scan) if the
- * entire collection can fit in memory, or if the average document size is small.
+ * (|referenced fields| < maxNumFields) &&
+ * (|filtered fields| >= minNumColumnFilters ||
+ *     uncompressedCollectionSize >= minCollectionSize ||
+ *     avgDocSize >= minAvgDocSize)
  *
- * Both of these thresholds (collection size and average document size) can also be adjusted via
- * query knobs.
+ * In words: we will use column scan if the query is reading fewer than the max number of fields,
+ * and at least one of the following is true: we are pushing down filters on a large number of
+ * fields, the collection does not fit in memory, or the average document size is large.
+ *
+ * All of the thresholds listed (referenced fields, column filters, collection size, and average
+ * document size) can be adjusted via query knobs.
  */
-bool collectionSatisfiesCsiPlanningHeuristics(const QueryPlannerParams& plannerParams) {
+Status querySatisfiesCsiPlanningHeuristics(size_t nReferencedFields,
+                                           size_t nFilteredFields,
+                                           const QueryPlannerParams& plannerParams) {
+    // Check that we are reading fewer than the max number of fields allowed for column scan.
+    const int maxNumFields = nFilteredFields > 0
+        ? internalQueryMaxNumberOfFieldsToChooseFilteredColumnScan.load()
+        : internalQueryMaxNumberOfFieldsToChooseUnfilteredColumnScan.load();
+    if (static_cast<int>(nReferencedFields) > maxNumFields) {
+        return Status{ErrorCodes::Error{6430508},
+                      str::stream()
+                          << "query referenced too many fields to use column scan. nReferenced="
+                          << nReferencedFields << ", limit=" << maxNumFields};
+    }
+
+    const auto columnFilterThreshold = internalQueryColumnScanMinNumColumnFilters.load();
+    if (static_cast<int>(nFilteredFields) >= columnFilterThreshold) {
+        // We have enough column filters to make column scan worth it, regardless of the
+        // collection/document size.
+        return Status::OK();
+    }
+
     const auto numDocs = plannerParams.collectionStats.noOfRecords;
     const auto uncompressedDataSizeBytes = plannerParams.collectionStats.approximateDataSizeBytes;
 
@@ -249,19 +276,30 @@ bool collectionSatisfiesCsiPlanningHeuristics(const QueryPlannerParams& plannerP
     const auto collectionSizeThresholdBytes = [&]() {
         const auto configuredThresholdBytes = internalQueryColumnScanMinCollectionSizeBytes.load();
         // If there is no threshold specified (== -1), use available memory size.
-        return configuredThresholdBytes == -1
-            ? static_cast<long long>(ProcessInfo::getMemSizeMB()) * 1024 * 1024
-            : configuredThresholdBytes;
+        return configuredThresholdBytes == -1 ? plannerParams.availableMemoryBytes
+                                              : configuredThresholdBytes;
     }();
-    if (uncompressedDataSizeBytes < collectionSizeThresholdBytes) {
-        return false;
+    if (uncompressedDataSizeBytes >= collectionSizeThresholdBytes) {
+        // The collection is larger than memory/the configured threshold - use column scan.
+        return Status::OK();
     }
 
-    // Check if the average document size is greater than our threshold for using column scan.
+    // If we got here, the query/collection doesn't meet any of our other thresholds. Check if the
+    // average document size is greater than our threshold for using column scan.
     const auto docSizeThresholdBytes = internalQueryColumnScanMinAvgDocSizeBytes.load();
     auto avgDocSizeBytes =
         numDocs > 0 ? uncompressedDataSizeBytes / static_cast<double>(numDocs) : 0.0;
-    return avgDocSizeBytes >= docSizeThresholdBytes;
+    if (avgDocSizeBytes >= docSizeThresholdBytes) {
+        return Status::OK();
+    }
+
+    return {ErrorCodes::Error{6995600},
+            str::stream() << "query did not pass heuristics for using column scan. "
+                          << "nFilteredFields: " << nFilteredFields << " < "
+                          << columnFilterThreshold << ", collectionSizeBytes: "
+                          << uncompressedDataSizeBytes << " < " << collectionSizeThresholdBytes
+                          << ", avgDocSizeBytes: " << avgDocSizeBytes << " < "
+                          << docSizeThresholdBytes};
 }
 
 Status computeColumnScanIsPossibleStatus(const CanonicalQuery& query,
@@ -278,10 +316,6 @@ Status computeColumnScanIsPossibleStatus(const CanonicalQuery& query,
         return {ErrorCodes::InvalidOptions,
                 "A columnstore index can only be used with queries in the SBE engine, but the "
                 "query specified to force the classic engine"};
-    }
-    if (!collectionSatisfiesCsiPlanningHeuristics(params)) {
-        return {ErrorCodes::Error{6995600},
-                "Collection did not pass heuristics for using column scan"};
     }
     return Status::OK();
 }
@@ -310,25 +344,6 @@ std::unique_ptr<QuerySolution> makeColumnScanPlan(
                                               std::move(allFieldsReferenced),
                                               std::move(filterSplitByColumn),
                                               std::move(residualPredicate)));
-}
-
-/**
- * A helper function which applies a heuristic to determine if a COLUMN_SCAN plan would examine few
- * enough fields to be considered faster than a COLLSCAN.
- */
-Status checkColumnScanFieldLimits(
-    size_t nReferencedFields,
-    const StringMap<std::unique_ptr<MatchExpression>>& filterSplitByColumn) {
-
-    const int maxNumFields = filterSplitByColumn.size() > 0
-        ? internalQueryMaxNumberOfFieldsToChooseFilteredColumnScan.load()
-        : internalQueryMaxNumberOfFieldsToChooseUnfilteredColumnScan.load();
-    if (static_cast<int>(nReferencedFields) > maxNumFields) {
-        return Status{ErrorCodes::Error{6430508},
-                      str::stream() << "referenced too many fields. nReferenced="
-                                    << nReferencedFields << ", limit=" << maxNumFields};
-    }
-    return Status::OK();
 }
 
 bool checkProjectionCoversQuery(OrderedPathSet& fields, const ColumnIndexEntry& columnStoreIndex) {
@@ -427,12 +442,12 @@ StatusWith<std::unique_ptr<QuerySolution>> tryToBuildColumnScan(
     StringMap<std::unique_ptr<MatchExpression>> filterSplitByColumn;
     std::tie(filterSplitByColumn, residualPredicate) =
         expression::splitMatchExpressionForColumns(query.root());
-    auto fieldLimitStatus =
-        checkColumnScanFieldLimits(allFieldsReferenced.size(), filterSplitByColumn);
+    auto heuristicsStatus = querySatisfiesCsiPlanningHeuristics(
+        allFieldsReferenced.size(), filterSplitByColumn.size(), params);
 
-    if (fieldLimitStatus.isOK() || hintedIndex) {
-        // We have a hint, or few enough dependencies that we suspect a column scan is still
-        // better than a collection scan. Build it and return it.
+    if (heuristicsStatus.isOK() || hintedIndex) {
+        // We have a hint, or collection stats and dependencies that indicate a column scan is
+        // likely better than a collection scan. Build it and return it.
         return makeColumnScanPlan(query,
                                   params,
                                   columnStoreIndex,
@@ -442,7 +457,7 @@ StatusWith<std::unique_ptr<QuerySolution>> tryToBuildColumnScan(
                                   std::move(filterSplitByColumn),
                                   std::move(residualPredicate));
     }
-    return Status{ErrorCodes::Error{6298502}, "columnstore index is not applicable for this query"};
+    return heuristicsStatus;
 }
 
 bool collscanIsBounded(const CollectionScanNode* collscan) {

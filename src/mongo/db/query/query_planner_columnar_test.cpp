@@ -68,13 +68,24 @@ protected:
         params.collectionStats.approximateDataSizeBytes = 100000;
         internalQueryColumnScanMinCollectionSizeBytes.store(0);
         internalQueryColumnScanMinAvgDocSizeBytes.store(0);
+        internalQueryColumnScanMinNumColumnFilters.store(0);
     }
 
     void tearDown() final {
+        resetPlannerHeuristics();
+    }
+
+    void resetPlannerHeuristics() {
         internalQueryMaxNumberOfFieldsToChooseUnfilteredColumnScan.store(
             kInternalQueryMaxNumberOfFieldsToChooseUnfilteredColumnScanDefault);
         internalQueryMaxNumberOfFieldsToChooseFilteredColumnScan.store(
             kInternalQueryMaxNumberOfFieldsToChooseFilteredColumnScanDefault);
+        internalQueryColumnScanMinCollectionSizeBytes.store(
+            kInternalQueryColumnScanMinCollectionSizeBytesDefault);
+        internalQueryColumnScanMinAvgDocSizeBytes.store(
+            kInternalQueryColumnScanMinAvgDocSizeBytesDefault);
+        internalQueryColumnScanMinNumColumnFilters.store(
+            kInternalQueryColumnScanMinNumColumnFiltersDefault);
     }
 
     void addColumnStoreIndexAndEnableFilterSplitting(bool genPerColFilter = true,
@@ -112,11 +123,11 @@ protected:
                                                                            columnstoreProjection);
     }
 
-    long long collectionSizeBytes() {
+    double collectionSizeBytes() {
         return params.collectionStats.approximateDataSizeBytes;
     }
 
-    long long avgDocumentSizeBytes() {
+    double avgDocumentSizeBytes() {
         return static_cast<double>(params.collectionStats.approximateDataSizeBytes) /
             params.collectionStats.noOfRecords;
     }
@@ -1263,9 +1274,95 @@ TEST_F(QueryPlannerColumnarTest, ColumnIndexForCountWithPostAssemblyFilter) {
     })");
 }
 
-TEST_F(QueryPlannerColumnarTest, AvgDocSizeTooSmall) {
+TEST_F(QueryPlannerColumnarTest, PlanningHeuristics_NotMet) {
     addColumnStoreIndexAndEnableFilterSplitting();
-    internalQueryColumnScanMinAvgDocSizeBytes.store(avgDocumentSizeBytes() + 1);
+    resetPlannerHeuristics();
+    params.availableMemoryBytes = 10 * 1024;
+
+    // Update the collection's stats to just below the expected defaults.
+    params.collectionStats.approximateDataSizeBytes = params.availableMemoryBytes - 1;
+    params.collectionStats.noOfRecords =
+        collectionSizeBytes() / internalQueryColumnScanMinAvgDocSizeBytes.load() + 1;
+
+    runQuerySortProj(BSON("a" << 1), BSONObj(), BSON("a" << 1));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(R"({proj: {spec: {a: 1}, node: {cscan: {dir: 1}}}})");
+}
+
+TEST_F(QueryPlannerColumnarTest, PlanningHeuristics_AvgDocSizeLargeEnough) {
+    addColumnStoreIndexAndEnableFilterSplitting();
+    resetPlannerHeuristics();
+    params.availableMemoryBytes = 10 * 1024;
+
+    params.collectionStats.approximateDataSizeBytes = params.availableMemoryBytes - 1;
+    params.collectionStats.noOfRecords =
+        collectionSizeBytes() / internalQueryColumnScanMinAvgDocSizeBytes.load();
+
+    runQuerySortProj(BSON("a" << 1), BSONObj(), BSON("a" << 1));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(R"({
+        column_scan: {
+            filtersByPath: {a: {a: {$eq: 1}}},
+            outputFields: ['a', '_id'],
+            matchFields: ['a']
+        }
+    })");
+}
+
+TEST_F(QueryPlannerColumnarTest, PlanningHeuristics_CollectionLargeEnough) {
+    addColumnStoreIndexAndEnableFilterSplitting();
+    resetPlannerHeuristics();
+    params.availableMemoryBytes = 10 * 1024;
+
+    params.collectionStats.approximateDataSizeBytes = params.availableMemoryBytes;
+    params.collectionStats.noOfRecords =
+        collectionSizeBytes() / internalQueryColumnScanMinAvgDocSizeBytes.load() + 1;
+
+    runQuerySortProj(BSON("a" << 1), BSONObj(), BSON("a" << 1));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(R"({
+        column_scan: {
+            filtersByPath: {a: {a: {$eq: 1}}},
+            outputFields: ['a', '_id'],
+            matchFields: ['a']
+        }
+    })");
+}
+
+TEST_F(QueryPlannerColumnarTest, PlanningHeuristics_EnoughColumnFilters) {
+    addColumnStoreIndexAndEnableFilterSplitting();
+    resetPlannerHeuristics();
+    params.availableMemoryBytes = 10 * 1024;
+
+    params.collectionStats.approximateDataSizeBytes = params.availableMemoryBytes - 1;
+    params.collectionStats.noOfRecords =
+        collectionSizeBytes() / internalQueryColumnScanMinAvgDocSizeBytes.load() + 1;
+
+    runQuerySortProj(
+        BSON("a" << 3 << "b" << 4 << "c" << 5), BSONObj(), BSON("a" << 1 << "b" << 1 << "c" << 1));
+
+    assertNumSolutions(1U);
+    assertSolutionExists(R"({
+        column_scan: {
+            filtersByPath: {a: {a: {$eq: 3}}, b: {b: {$eq: 4}}, c: {c: {$eq: 5}}},
+            outputFields: ['_id', 'a', 'b', 'c'],
+            matchFields: ['a', 'b', 'c']
+        }
+    })");
+}
+
+TEST_F(QueryPlannerColumnarTest, PlanningHeuristics_EmptyCollection) {
+    addColumnStoreIndexAndEnableFilterSplitting();
+    // Set non-zero thresholds.
+    internalQueryColumnScanMinCollectionSizeBytes.store(1);
+    internalQueryColumnScanMinAvgDocSizeBytes.store(1);
+    internalQueryColumnScanMinNumColumnFilters.store(1);
+    // Update the collection's stats to be zero/empty.
+    params.collectionStats.noOfRecords = 0;
+    params.collectionStats.approximateDataSizeBytes = 0;
 
     runQuerySortProj(BSONObj(), BSONObj(), BSON("a" << 1));
 
@@ -1273,37 +1370,19 @@ TEST_F(QueryPlannerColumnarTest, AvgDocSizeTooSmall) {
     assertSolutionExists(R"({proj: {spec: {a: 1}, node: {cscan: {dir: 1}}}})");
 }
 
-TEST_F(QueryPlannerColumnarTest, AvgDocSizeLargeEnough) {
-    addColumnStoreIndexAndEnableFilterSplitting();
-    internalQueryColumnScanMinAvgDocSizeBytes.store(avgDocumentSizeBytes());
-
-    runQuerySortProj(BSONObj(), BSONObj(), BSON("a" << 1));
-
-    assertNumSolutions(1U);
-    assertSolutionExists(R"({
-        column_scan: {
-            filtersByPath: {},
-            outputFields: ['a', '_id'],
-            matchFields: []
-        }
-    })");
-}
-
-TEST_F(QueryPlannerColumnarTest, CollectionTooSmall) {
-    addColumnStoreIndexAndEnableFilterSplitting();
+TEST_F(QueryPlannerColumnarTest, PlanningHeuristics_HintOverridesHeuristics) {
+    addColumnStoreIndexAndEnableFilterSplitting(true, "csi");
     internalQueryColumnScanMinCollectionSizeBytes.store(collectionSizeBytes() + 1);
+    internalQueryColumnScanMinAvgDocSizeBytes.store(avgDocumentSizeBytes() + 1);
+    internalQueryColumnScanMinNumColumnFilters.store(1);
 
-    runQuerySortProj(BSONObj(), BSONObj(), BSON("a" << 1));
-
-    assertNumSolutions(1U);
-    assertSolutionExists(R"({proj: {spec: {a: 1}, node: {cscan: {dir: 1}}}})");
-}
-
-TEST_F(QueryPlannerColumnarTest, CollectionLargeEnough) {
-    addColumnStoreIndexAndEnableFilterSplitting();
-    internalQueryColumnScanMinCollectionSizeBytes.store(collectionSizeBytes());
-
-    runQuerySortProj(BSONObj(), BSONObj(), BSON("a" << 1));
+    runQuerySortProjSkipLimitHint(BSONObj(),
+                                  BSONObj(),
+                                  BSON("a" << 1),
+                                  0,
+                                  0,
+                                  BSON("$hint"
+                                       << "csi"));
 
     assertNumSolutions(1U);
     assertSolutionExists(R"({
@@ -1313,34 +1392,6 @@ TEST_F(QueryPlannerColumnarTest, CollectionLargeEnough) {
             matchFields: []
         }
     })");
-}
-
-TEST_F(QueryPlannerColumnarTest, EmptyCollectionWithAvgDocSizeThreshold) {
-    addColumnStoreIndexAndEnableFilterSplitting();
-    // Set a non-zero threshold.
-    internalQueryColumnScanMinAvgDocSizeBytes.store(avgDocumentSizeBytes());
-    // Update the collection's stats to be zero/empty.
-    params.collectionStats.noOfRecords = 0;
-    params.collectionStats.approximateDataSizeBytes = 0;
-
-    runQuerySortProj(BSONObj(), BSONObj(), BSON("a" << 1));
-
-    assertNumSolutions(1U);
-    assertSolutionExists(R"({proj: {spec: {a: 1}, node: {cscan: {dir: 1}}}})");
-}
-
-TEST_F(QueryPlannerColumnarTest, EmptyCollectionWithCollectionSizeThreshold) {
-    addColumnStoreIndexAndEnableFilterSplitting();
-    // Set a non-zero threshold.
-    internalQueryColumnScanMinCollectionSizeBytes.store(collectionSizeBytes());
-    // Update the collection's stats to be zero/empty.
-    params.collectionStats.noOfRecords = 0;
-    params.collectionStats.approximateDataSizeBytes = 0;
-
-    runQuerySortProj(BSONObj(), BSONObj(), BSON("a" << 1));
-
-    assertNumSolutions(1U);
-    assertSolutionExists(R"({proj: {spec: {a: 1}, node: {cscan: {dir: 1}}}})");
 }
 
 TEST_F(QueryPlannerColumnarTest, HintIndexWithNonStandardKeyPattern) {

@@ -47,6 +47,7 @@ const paramList = [
     {name: "internalCostModelCoefficients", value: '{"filterIncrementalCost": 1.0}'},
     {name: "internalQueryColumnScanMinAvgDocSizeBytes", value: 2048},
     {name: "internalQueryColumnScanMinCollectionSizeBytes", value: 2048},
+    {name: "internalQueryColumnScanMinNumColumnFilters", value: 5},
 ];
 
 const conn = MongoRunner.runMongod();

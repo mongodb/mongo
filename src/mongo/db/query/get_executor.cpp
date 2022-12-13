@@ -109,6 +109,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/util/processinfo.h"
 #include "mongo/util/str.h"
 #include "mongo/util/timer.h"
 
@@ -419,6 +420,9 @@ void fillOutPlannerParams(OperationContext* opCtx,
     }
 
     plannerParams->collectionStats = fillOutCollectionStats(opCtx, collection);
+
+    const auto kMB = 1024 * 1024;
+    plannerParams->availableMemoryBytes = static_cast<long long>(ProcessInfo::getMemSizeMB()) * kMB;
 }
 
 std::map<NamespaceString, SecondaryCollectionInfo> fillOutSecondaryCollectionsInformation(

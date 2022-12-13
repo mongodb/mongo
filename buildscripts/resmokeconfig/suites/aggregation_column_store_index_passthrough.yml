@@ -39,3 +39,4 @@ executor:
           mode: alwaysOn
         internalQueryColumnScanMinAvgDocSizeBytes: 0
         internalQueryColumnScanMinCollectionSizeBytes: 0
+        internalQueryColumnScanMinNumColumnFilters: 0

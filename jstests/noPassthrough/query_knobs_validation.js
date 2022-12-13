@@ -60,6 +60,9 @@ const expectedParamDefaults = {
     internalQuerySlotBasedExecutionDisableLookupPushdown: false,
     internalQuerySlotBasedExecutionDisableGroupPushdown: false,
     allowDiskUseByDefault: true,
+    internalQueryColumnScanMinAvgDocSizeBytes: 1024,
+    internalQueryColumnScanMinCollectionSizeBytes: -1,
+    internalQueryColumnScanMinNumColumnFilters: 3,
 };
 
 function assertDefaultParameterValues() {
@@ -257,6 +260,18 @@ assertSetParameterSucceeds("internalQueryFrameworkControl", "tryBonsai");
 assertSetParameterSucceeds("internalQueryFrameworkControl", "forceBonsai");
 assertSetParameterFails("internalQueryFrameworkControl", "tryCascades");
 assertSetParameterFails("internalQueryFrameworkControl", 1);
+
+assertSetParameterSucceeds("internalQueryColumnScanMinAvgDocSizeBytes", 100);
+assertSetParameterSucceeds("internalQueryColumnScanMinAvgDocSizeBytes", 0);
+assertSetParameterFails("internalQueryColumnScanMinAvgDocSizeBytes", -1);
+
+assertSetParameterSucceeds("internalQueryColumnScanMinCollectionSizeBytes", 100);
+assertSetParameterSucceeds("internalQueryColumnScanMinCollectionSizeBytes", -1);
+assertSetParameterFails("internalQueryColumnScanMinCollectionSizeBytes", -2);
+
+assertSetParameterSucceeds("internalQueryColumnScanMinNumColumnFilters", 100);
+assertSetParameterSucceeds("internalQueryColumnScanMinNumColumnFilters", 0);
+assertSetParameterFails("internalQueryColumnScanMinNumColumnFilters", -1);
 
 MongoRunner.stopMongod(conn);
 })();

@@ -22,63 +22,59 @@ const coll = db.columnstore_planning_heuristics;
 coll.drop();
 assert.commandWorked(coll.createIndex({"$**": "columnstore"}));
 
-function resetThresholds() {
-    setParameter(db, "internalQueryColumnScanMinAvgDocSizeBytes", 0);
-    setParameter(db, "internalQueryColumnScanMinCollectionSizeBytes", 0);
+// Reset the given params to values such that the related check is guaranteed NOT to pass in this
+// test. Since the heuristics are OR-ed together, this allows us to isolate a single threshold for
+// testing.
+function resetParameters(params) {
+    for (const paramName of params) {
+        setParameter(
+            db, paramName, 1024 * 1024 * 1024);  // any large number is enough for these tests
+    }
 }
 
-function assertColumnScanUsed(shouldUseColumnScan, msg) {
-    let explain = coll.find({}, {_id: 0, a: 1}).explain();
+function assertColumnScanUsed(filter, shouldUseColumnScan, thresholdName) {
+    const explain = coll.find(filter, {_id: 0, a: 1}).explain();
     assert(planHasStage(db, explain, "COLUMN_SCAN") == shouldUseColumnScan,
-           `${msg} but column scan was${(shouldUseColumnScan ? " not " : " ")}used: ${
-               tojson(explain)}`);
+           `Threshold met: ${thresholdName} but column scan was${
+               (shouldUseColumnScan ? " not " : " ")}used: ${tojson(explain)}`);
 }
+
+// Helper that sets the parameter to the specified value and ensures that column scan is used.
+function runParameterTest(paramName, paramValue, queryFilter = {}) {
+    setParameter(db, paramName, paramValue);
+    assertColumnScanUsed(queryFilter, true, paramName);
+    resetParameters([paramName]);
+}
+
+// Start with all thresholds set to non-passing values.
+resetParameters([
+    "internalQueryColumnScanMinNumColumnFilters",
+    "internalQueryColumnScanMinAvgDocSizeBytes",
+    "internalQueryColumnScanMinCollectionSizeBytes"
+]);
 
 // Test heuristics on an empty collection.
-setParameter(db, "internalQueryColumnScanMinAvgDocSizeBytes", 1);
-assertColumnScanUsed(false, "Collection is empty");
+assertColumnScanUsed({}, false, "none");  // No thresholds met.
+runParameterTest("internalQueryColumnScanMinNumColumnFilters", 0);
+runParameterTest("internalQueryColumnScanMinAvgDocSizeBytes", 0);
+runParameterTest("internalQueryColumnScanMinCollectionSizeBytes", 0);
 
-resetThresholds();
-
-setParameter(db, "internalQueryColumnScanMinCollectionSizeBytes", 1);
-assertColumnScanUsed(false, "Collection is empty");
-
-resetThresholds();
-
-// Now insert data, content doesn't matter for this test.
+// Test heuristics on a non-empty collection (content doesn't matter for this test).
 for (let i = 0; i < 20; ++i) {
-    coll.insert([{x: i}]);
+    coll.insert([{a: i}]);
 }
 
-// Test min average document size threshold.
-setParameter(db, "internalQueryColumnScanMinAvgDocSizeBytes", 1024 * 1024);
-assertColumnScanUsed(false, "Collection has documents that are too small to use column scan");
+assertColumnScanUsed({}, false, "none");  // No thresholds met.
+runParameterTest("internalQueryColumnScanMinNumColumnFilters", 1, {a: 1});
+runParameterTest("internalQueryColumnScanMinAvgDocSizeBytes", 1);
+runParameterTest("internalQueryColumnScanMinCollectionSizeBytes", 1);
 
-setParameter(db, "internalQueryColumnScanMinAvgDocSizeBytes", 1);
-assertColumnScanUsed(true, "Collection has documents large enough to use column scan");
-
-// Test min collection size threshold.
-resetThresholds();
-
-setParameter(db, "internalQueryColumnScanMinCollectionSizeBytes", 1024 * 1024);
-assertColumnScanUsed(false, "Collection is too small to use column scan");
-
-setParameter(db, "internalQueryColumnScanMinCollectionSizeBytes", 1);
-assertColumnScanUsed(true, "Collection is large enough to use column scan");
-
-// Use available memory as the threshold.
+// Special case - use available memory as the collection size threshold.
 setParameter(db, "internalQueryColumnScanMinCollectionSizeBytes", -1);
-assertColumnScanUsed(false, "Collection is too small to use column scan");
+assertColumnScanUsed({}, false, "none");
 
-// Test with both thresholds enabled.
-setParameter(db, "internalQueryColumnScanMinCollectionSizeBytes", 1);
-setParameter(db, "internalQueryColumnScanMinAvgDocSizeBytes", 1);
-assertColumnScanUsed(true, "Collection can use column scan");
-
-setParameter(db, "internalQueryColumnScanMinAvgDocSizeBytes", 1024 * 1024);
-assertColumnScanUsed(false, "Collection has documents that are too small to use column scan");
-
-setParameter(db, "internalQueryColumnScanMinAvgDocSizeBytes", 1);
-setParameter(db, "internalQueryColumnScanMinCollectionSizeBytes", 1024 * 1024);
-assertColumnScanUsed(false, "Collection is too small to use column scan");
+// Test that a hint will still allow us to use the index.
+const explain = coll.find({}, {_id: 0, a: 1}).hint({"$**": "columnstore"}).explain();
+assert(planHasStage(db, explain, "COLUMN_SCAN"),
+       `Hint should have overridden heuristics to use column scan: ${tojson(explain)}`);
 })();

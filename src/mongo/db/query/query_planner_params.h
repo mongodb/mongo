@@ -84,7 +84,8 @@ struct QueryPlannerParams {
         : options(options),
           indexFiltersApplied(false),
           maxIndexedSolutions(internalQueryPlannerMaxIndexedSolutions.load()),
-          clusteredCollectionCollator(nullptr) {}
+          clusteredCollectionCollator(nullptr),
+          availableMemoryBytes(0) {}
 
     enum Options {
         // You probably want to set this.
@@ -194,6 +195,9 @@ struct QueryPlannerParams {
     std::map<NamespaceString, SecondaryCollectionInfo> secondaryCollectionsInfo;
 
     boost::optional<TraversalPreference> traversalPreference = boost::none;
+
+    // Size of available memory in bytes.
+    long long availableMemoryBytes;
 };
 
 }  // namespace mongo

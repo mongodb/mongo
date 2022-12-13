@@ -1016,24 +1016,35 @@ server_parameters:
       expr: QueryTelemetryFieldNameRedactionStrategyEnum::kConstantRedactionStrategy
 
   internalQueryColumnScanMinCollectionSizeBytes:
-    description: "The min collection size threshold for which column scan will be allowed. If the
-      value is -1, decision will be made based on the available memory size. If it is set to 0
-      column scan will always be allowed by definition."
+    description: "The min collection size threshold for which column scan will always be allowed. If
+      the value is -1, decision will be made based on the size of available memory. If it is set to
+      0 column scan will always be allowed."
     set_at: [ startup, runtime ]
     cpp_varname: "internalQueryColumnScanMinCollectionSizeBytes"
     cpp_vartype: AtomicWord<long long>
-    default: 0
+    default: -1
     validator:
       gte: -1
     on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
   internalQueryColumnScanMinAvgDocSizeBytes:
-    description: "The min average document size threshold for which column scan will be allowed. If
-      it is set to 0 column scan will always be allowed by definition."
+    description: "The min average document size threshold for which column scan will always be
+      allowed. If it is set to 0 column scan will always be allowed."
     set_at: [ startup, runtime ]
     cpp_varname: "internalQueryColumnScanMinAvgDocSizeBytes"
     cpp_vartype: AtomicWord<long long>
     default: 1024
+    validator:
+      gte: 0
+    on_update: plan_cache_util::clearSbeCacheOnParameterChange
+
+  internalQueryColumnScanMinNumColumnFilters:
+    description: "The min number of column filters for which column scan will always be allowed. If
+      it is set to 0 column scan will always be allowed."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalQueryColumnScanMinNumColumnFilters"
+    cpp_vartype: AtomicWord<int>
+    default: 3
     validator:
       gte: 0
     on_update: plan_cache_util::clearSbeCacheOnParameterChange
