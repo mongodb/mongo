@@ -116,7 +116,7 @@ private:
         /**
          * The '_stats' object must outlive this 'ColumnCursor'.
          */
-        ColumnCursor(std::unique_ptr<ColumnStore::CursorForPath> cursor,
+        ColumnCursor(std::unique_ptr<ColumnStore::ColumnCursor> cursor,
                      ColumnScanStats::CursorStats& stats)
             : _cursor(std::move(cursor)), _stats(stats) {}
 
@@ -170,7 +170,7 @@ private:
                 _lastCell->value = StringData(_cellOwned.data(), _cellOwned.size());
             }
         }
-        ColumnStore::CursorForPath& cursor() {
+        ColumnStore::ColumnCursor& cursor() {
             return *_cursor;
         }
         bool includeInOutput() const {
@@ -197,7 +197,7 @@ private:
             _cellOwned.clear();
         }
 
-        std::unique_ptr<ColumnStore::CursorForPath> _cursor;
+        std::unique_ptr<ColumnStore::ColumnCursor> _cursor;
 
         boost::optional<FullCellView> _lastCell;
 

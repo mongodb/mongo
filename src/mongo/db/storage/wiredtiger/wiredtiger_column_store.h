@@ -111,17 +111,26 @@ public:
         return makeKey(path, id);
     }
 
+    const std::string& indexName() const {
+        return _indexName;
+    }
+
 private:
     const std::string& uri() const {
         return _uri;
     }
 
-    static std::string& makeKey(std::string& buffer, PathView, RowId);
     static std::string makeKey(PathView path, RowId rid) {
         std::string out;
-        makeKey(out, path, rid);
+        makeKeyInBuffer(out, path, rid);
         return out;
     }
+
+    /**
+     * Sets 'buffer' to the column key (path/rid). Then returns a reference to the newly set
+     * 'buffer'.
+     */
+    static std::string& makeKeyInBuffer(std::string& buffer, PathView, RowId);
 
     std::string _uri;
     uint64_t _tableId;

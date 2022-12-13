@@ -103,12 +103,13 @@ WiredTigerColumnStore::WiredTigerColumnStore(OperationContext* ctx,
       _desc(desc),
       _indexName(desc->indexName()) {}
 
-std::string& WiredTigerColumnStore::makeKey(std::string& buffer, PathView path, RowId rid) {
+std::string& WiredTigerColumnStore::makeKeyInBuffer(std::string& buffer, PathView path, RowId rid) {
     buffer.clear();
     buffer.reserve(path.size() + 1 /*NUL byte*/ + sizeof(RowId));
     buffer += path;
+    // If we end up reserving more values, as we've done with kRowIdPath, this check should be
+    // changed to include the newly reserved values.
     if (path != kRowIdPath) {
-        // If we end up reserving more values, the above check should be changed.
         buffer += '\0';
     }
     if (rid > 0) {
@@ -235,6 +236,7 @@ public:
         : WiredTigerIndexCursorGeneric(opCtx, true /* forward */), _idx(*idx) {
         _cursor.emplace(_idx.uri(), _idx._tableId, false, _opCtx);
     }
+
     boost::optional<FullCellView> next() override {
         if (_eof) {
             return {};
@@ -245,14 +247,22 @@ public:
 
         return curr();
     }
+
+    /**
+     * Seeks the cursor to the column key specified by the given 'path' and 'rid'. If the key is not
+     * found, then the next key in the same path will be returned; or the first entry in the
+     * following column; or boost::none if there are no further entries.
+     */
     boost::optional<FullCellView> seekAtOrPast(PathView path, RowId rid) override {
-        makeKey(_buffer, path, rid);
-        seekWTCursor();
+        // Initialize the _buffer with the column's key (path/rid).
+        makeKeyInBuffer(_buffer, path, rid);
+        seekWTCursorAtOrPast(_buffer);
         return curr();
     }
+
     boost::optional<FullCellView> seekExact(PathView path, RowId rid) override {
-        makeKey(_buffer, path, rid);
-        seekWTCursor(/*exactOnly*/ true);
+        makeKeyInBuffer(_buffer, path, rid);
+        seekWTCursorAtOrPast(_buffer, /*exactOnly*/ true);
         return curr();
     }
 
@@ -280,7 +290,8 @@ public:
         invariant(WiredTigerRecoveryUnit::get(_opCtx)->getSession() == _cursor->getSession());
 
         if (!_eof) {
-            _lastMoveSkippedKey = !seekWTCursor();
+            // Check if the exact search key stashed in _buffer was not found.
+            _lastMoveSkippedKey = !seekWTCursorAtOrPast(_buffer);
         }
     }
 
@@ -298,14 +309,20 @@ private:
     void resetCursor() {
         WiredTigerIndexCursorGeneric::resetCursor();
     }
-    bool seekWTCursor(bool exactOnly = false) {
+
+    /**
+     * Helper function to iterate the cursor to the given 'searchKey', or the closest key
+     * immediately after the 'searchKey' if 'searchKey' does not exist and 'exactOnly' is false.
+     * Returns true if an exact match is found.
+     */
+    bool seekWTCursorAtOrPast(const std::string& searchKey, bool exactOnly = false) {
         // Ensure an active transaction is open.
         WiredTigerRecoveryUnit::get(_opCtx)->getSession();
 
         WT_CURSOR* c = _cursor->get();
 
-        const WiredTigerItem keyItem(_buffer);
-        c->set_key(c, keyItem.Get());
+        const WiredTigerItem searchKeyItem(searchKey);
+        c->set_key(c, searchKeyItem.Get());
 
         int cmp = 0;
         int ret = wiredTigerPrepareConflictRetry(
@@ -315,19 +332,65 @@ private:
             return false;
         }
         invariantWTOK(ret, c->session);
+        _eof = false;
 
         auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
         metricsCollector.incrementOneCursorSeek(c->uri);
 
-        _eof = false;
-
-        // Make sure we land on a matching key at or after.
-        if (cmp < 0) {
+        // Make sure we land on a key matching the search key or a key immediately after.
+        //
+        // If this operation is ignoring prepared updates and WT::search_near() lands on a key that
+        // compares lower than the search key, calling next() is not guaranteed to return a key that
+        // compares greater than the search key. This is because ignoring prepare conflicts does not
+        // provide snapshot isolation and the call to next() may land on a newly-committed prepared
+        // entry. We must advance our cursor until we find a key that compares greater than the
+        // search key. See SERVER-56839.
+        //
+        // Note: the problem described above is currently not possible for column indexes because
+        // (a) There is a special path in the column index present with the "path" value 0xFF, which
+        // is greater than all other paths and (b) there is incidental behavior in the
+        // WT::search_near() function. To elaborate on (b), if WT::search_near() doesn't find an
+        // exact match, it will 'prefer' to return the following key/value, which is guaranteed to
+        // exist because of (a). However, the contract of search_near is that it may return either
+        // the previous or the next value.
+        //
+        // (a) is unlikely to change, but (b) is incidental behavior. To avoid relying on this, we
+        // iterate the cursor until we find a value that is greater than or equal to the search key.
+        const bool enforcingPrepareConflicts =
+            _opCtx->recoveryUnit()->getPrepareConflictBehavior() ==
+            PrepareConflictBehavior::kEnforce;
+        WT_ITEM curKey;
+        while (cmp < 0) {
             advanceWTCursor();
+
+            if (_eof) {
+                break;
+            }
+
+            if (!kDebugBuild && enforcingPrepareConflicts) {
+                break;
+            }
+
+            getKey(c, &curKey);
+            cmp = std::memcmp(
+                curKey.data, searchKeyItem.data, std::min(searchKeyItem.size, curKey.size));
+
+            LOGV2(6609700,
+                  "Column store index {idxName} cmp after advance: {cmp}",
+                  "cmp"_attr = cmp,
+                  "idxName"_attr = _idx.indexName());
+
+            if (enforcingPrepareConflicts) {
+                // If we are enforcing prepare conflicts, calling next() must always give us a key
+                // that compares greater than than our search key. An exact match is also possible
+                // in the case of _id indexes, because the recordid is not a part of the key.
+                dassert(cmp >= 0);
+            }
         }
 
         return cmp == 0;
     }
+
     void advanceWTCursor() {
         _eof = WiredTigerIndexCursorGeneric::advanceWTCursor();
     }
@@ -345,8 +408,9 @@ private:
         c->get_key(c, &key);
         size_t nullByteSize = 1;
         invariant(key.size >= 1);
-        if (static_cast<const char*>(key.data)[0] == '\xFF') {
-            // See also related comment in makeKey().
+        // If we end up reserving more values, like kRowIdPath, this check should be changed to
+        // include the newly reserved values.
+        if (static_cast<const char*>(key.data)[0] == '\xFF' /* kRowIdPath */) {
             nullByteSize = 0;
             out->path = PathView("\xFF"_sd);
         } else {
@@ -384,7 +448,7 @@ public:
         : _opCtx(opCtx), _cursor(idx->uri(), opCtx) {}
 
     void addCell(PathView path, RowId rid, CellView cell) override {
-        const std::string& key = makeKey(_buffer, path, rid);
+        const std::string& key = makeKeyInBuffer(_buffer, path, rid);
         WiredTigerItem keyItem(key.c_str(), key.size());
         _cursor->set_key(_cursor.get(), keyItem.Get());
 
