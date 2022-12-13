@@ -84,16 +84,17 @@ struct ProjectionTraversalVisitorContext {
         EvalExpr getInputEvalExpr() const {
             return inputExpr.clone();
         }
-        std::unique_ptr<sbe::EExpression> getInputExpr() const {
-            return getInputEvalExpr().extractExpr();
+
+        std::unique_ptr<sbe::EExpression> getInputExpr(optimizer::SlotVarMap& slotVarMap) const {
+            return getInputEvalExpr().extractExpr(slotVarMap);
         }
 
         EvalExpr extractInputEvalExpr() {
             return std::move(inputExpr);
         }
-        std::unique_ptr<sbe::EExpression> extractInputExpr() {
+        std::unique_ptr<sbe::EExpression> extractInputExpr(optimizer::SlotVarMap& slotVarMap) {
             auto evalExpr = extractInputEvalExpr();
-            return evalExpr.extractExpr();
+            return evalExpr.extractExpr(slotVarMap);
         }
 
         // The input expression for the current level. This is the parent sub-document for each of
@@ -374,7 +375,7 @@ public:
         auto lambdaFrame = _context->topLevel().lambdaFrame;
         tassert(6897005, "Expected lambda frame to be set", lambdaFrame);
 
-        auto childInputExpr = _context->topLevel().extractInputExpr();
+        auto childInputExpr = _context->topLevel().extractInputExpr(_context->state.slotVarMap);
 
         const bool containsComputedField = _context->topLevel().subtreeContainsComputedField;
 
@@ -394,7 +395,7 @@ public:
 
         auto args = sbe::makeEs(std::move(makeObjSpecExpr), childInputExpr->clone());
         for (auto& expr : projectExprs) {
-            args.push_back(expr.extractExpr());
+            args.push_back(expr.extractExpr(_context->state.slotVarMap));
         }
 
         auto innerExpr = sbe::makeE<sbe::EFunction>("makeBsonObj", std::move(args));
@@ -424,7 +425,7 @@ public:
 
         auto fromExpr = [&]() {
             if (_context->isLastLevel()) {
-                return _context->topLevel().getInputExpr();
+                return _context->topLevel().getInputExpr(_context->state.slotVarMap);
             }
             if (_context->numLevels() == 2 && _context->slots) {
                 auto name =
@@ -434,7 +435,7 @@ public:
                 }
             }
             return makeFunction("getField"_sd,
-                                _context->topLevel().getInputExpr(),
+                                _context->topLevel().getInputExpr(_context->state.slotVarMap),
                                 makeConstant(_context->topFrontField()));
         }();
 
@@ -520,7 +521,7 @@ public:
         auto lambdaFrame = _context->topLevel().lambdaFrame;
         tassert(6929406, "Expected lambda frame to be set", lambdaFrame);
 
-        auto childInputExpr = _context->topLevel().extractInputExpr();
+        auto childInputExpr = _context->topLevel().extractInputExpr(_context->state.slotVarMap);
 
         // We've finished extracting what we need from the child level, so pop if off the stack.
         _context->popLevel();
@@ -536,7 +537,7 @@ public:
 
         auto args = sbe::makeEs(std::move(makeObjSpecExpr), childInputExpr->clone());
         for (auto& expr : projectExprs) {
-            args.push_back(expr.extractExpr());
+            args.push_back(expr.extractExpr(_context->state.slotVarMap));
         }
 
         auto innerExpr = sbe::makeE<sbe::EFunction>("makeBsonObj", std::move(args));
@@ -548,7 +549,7 @@ public:
 
         auto fromExpr = [&]() {
             if (_context->isLastLevel()) {
-                return _context->topLevel().getInputExpr();
+                return _context->topLevel().getInputExpr(_context->state.slotVarMap);
             }
             if (_context->numLevels() == 2 && _context->slots) {
                 auto name =
@@ -558,7 +559,7 @@ public:
                 }
             }
             return makeFunction("getField"_sd,
-                                _context->topLevel().getInputExpr(),
+                                _context->topLevel().getInputExpr(_context->state.slotVarMap),
                                 makeConstant(_context->topFrontField()));
         }();
 
@@ -578,9 +579,10 @@ public:
     void visit(const projection_ast::ProjectionSliceASTNode* node) final {
         using namespace std::literals;
 
-        auto arrayFromField = makeFunction("getField"_sd,
-                                           _context->topLevel().getInputExpr(),
-                                           makeConstant(_context->topFrontField()));
+        auto arrayFromField =
+            makeFunction("getField"_sd,
+                         _context->topLevel().getInputExpr(_context->state.slotVarMap),
+                         makeConstant(_context->topFrontField()));
         auto binds = sbe::makeEs(std::move(arrayFromField));
         auto frameId = _context->state.frameId();
         sbe::EVariable arrayVariable{frameId, 0};
@@ -645,7 +647,7 @@ EvalExpr generateProjection(StageBuilderState& state,
     }
 
     auto frameId = state.frameId();
-    auto binds = sbe::makeEs(resultExpr.extractExpr());
+    auto binds = sbe::makeEs(resultExpr.extractExpr(state.slotVarMap));
     sbe::EVariable resultRef{frameId, 0};
 
     // $slice projectional operator has different path traversal semantics compared to other
@@ -663,6 +665,7 @@ EvalExpr generateProjection(StageBuilderState& state,
 
     auto sliceResultExpr = sliceContext.done();
 
-    return sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), sliceResultExpr.extractExpr());
+    return sbe::makeE<sbe::ELocalBind>(
+        frameId, std::move(binds), sliceResultExpr.extractExpr(state.slotVarMap));
 }
 }  // namespace mongo::stage_builder
