@@ -2010,20 +2010,23 @@ mobile_se = False
 if get_option('mobile-se') == 'on':
     mobile_se = True
 
-if env['TARGET_ARCH'] == 'i386':
-    # If we are using GCC or clang to target 32 bit, set the ISA minimum to 'nocona',
-    # and the tuning to 'generic'. The choice of 'nocona' is selected because it
-    #  -- includes MMX extenions which we need for tcmalloc on 32-bit
-    #  -- can target 32 bit
-    #  -- is at the time of this writing a widely-deployed 10 year old microarchitecture
-    #  -- is available as a target architecture from GCC 4.0+
-    # However, we only want to select an ISA, not the nocona specific scheduling, so we
-    # select the generic tuning. For installations where hardware and system compiler rev are
-    # contemporaries, the generic scheduling should be appropriate for a wide range of
-    # deployed hardware.
-
-    if env.ToolchainIs('GCC', 'clang'):
+if env.ToolchainIs('GCC', 'clang'):
+    if env['TARGET_ARCH'] == 'i386':
+        # If we are using GCC or clang to target 32 bit, set the ISA minimum to 'nocona',
+        # and the tuning to 'generic'. The choice of 'nocona' is selected because it
+        #  -- includes MMX extenions which we need for tcmalloc on 32-bit
+        #  -- can target 32 bit
+        #  -- is at the time of this writing a widely-deployed 10 year old microarchitecture
+        #  -- is available as a target architecture from GCC 4.0+
+        # However, we only want to select an ISA, not the nocona specific scheduling, so we
+        # select the generic tuning. For installations where hardware and system compiler rev are
+        # contemporaries, the generic scheduling should be appropriate for a wide range of
+        # deployed hardware.
         env.Append( CCFLAGS=['-march=nocona', '-mtune=generic'] )
+    elif env['TARGET_ARCH'] == 'aarch64':
+        # If we are using GCC or clang to target aarch64, set the arch to be armv8.2-a,
+        # This is to prevent a bug with WT see SERVER-71772 for more details
+        env.Append( CCFLAGS=['-march=armv8.2-a', '-mtune=generic'] )
 
 # Needed for auth tests since key files are stored in git with mode 644.
 if not env.TargetOSIs('windows'):
