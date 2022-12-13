@@ -1634,7 +1634,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         self._writer.write_empty_line()
 
-    def _gen_command_deserializer(self, struct, bson_object, tenant=_EMPTY_TENANT):
+    def _gen_command_deserializer(self, struct, bson_object, tenant):
         # type: (ast.Struct, str, str) -> None
         """Generate the command field deserializer."""
 
@@ -1649,7 +1649,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             # Generate namespace check now that "$db" has been read or defaulted
             struct_type_info.gen_namespace_check(self._writer, "_dbName", "commandElement")
 
-    def _gen_fields_deserializer_common(self, struct, bson_object, tenant=_EMPTY_TENANT):
+    def _gen_fields_deserializer_common(self, struct, bson_object, tenant):
         # type: (ast.Struct, str, str) -> _FieldUsageCheckerBase
         """Generate the C++ code to deserialize list of fields."""
         field_usage_check = _get_field_usage_checker(self._writer, struct)
@@ -1874,7 +1874,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             if struct.cpp_validator_func is not None:
                 self._writer.write_line(struct.cpp_validator_func + "(this);")
 
-            self._gen_command_deserializer(struct, variable_name)
+            self._gen_command_deserializer(struct, variable_name, "ctxt.getTenantId()")
 
     def gen_op_msg_request_deserializer_methods(self, struct):
         # type: (ast.Struct) -> None
