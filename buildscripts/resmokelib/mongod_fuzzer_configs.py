@@ -117,8 +117,8 @@ def generate_independent_parameters(rng):
     ret = {}
     ret["wiredTigerCursorCacheSize"] = rng.randint(-100, 100)
     ret["wiredTigerSessionCloseIdleTimeSecs"] = rng.randint(0, 300)
-    ret["wiredTigerConcurrentWriteTransactions"] = rng.randint(16, 256)
-    ret["wiredTigerConcurrentReadTransactions"] = rng.randint(16, 256)
+    ret["wiredTigerConcurrentWriteTransactions"] = rng.randint(5, 32)
+    ret["wiredTigerConcurrentReadTransactions"] = rng.randint(5, 32)
     ret["wiredTigerStressConfig"] = rng.choice([True, False])
     if rng.choice(3 * [True] + [False]):
         # The old retryable writes format is used by other variants. Weight towards turning on the
