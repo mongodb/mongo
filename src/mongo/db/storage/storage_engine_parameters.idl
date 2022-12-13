@@ -71,7 +71,7 @@ server_parameters:
     on_update: "TicketHolderManager::updateLowPriorityAdmissionBypassThreshold"
     # 0 means low priority operations will never be admitted when there are normal priority
     # operations waiting for ticket admission.
-    default: 500
+    default: 5000
     validator:
       gte: 0
 
