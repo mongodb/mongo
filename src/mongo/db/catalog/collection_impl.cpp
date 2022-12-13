@@ -368,14 +368,13 @@ void CollectionImpl::init(OperationContext* opCtx) {
 Status CollectionImpl::initFromExisting(OperationContext* opCtx,
                                         const std::shared_ptr<Collection>& collection,
                                         boost::optional<Timestamp> readTimestamp) {
-    LOGV2_DEBUG(
-        6825402, 1, "Initializing collection using shared state", logAttrs(collection->ns()));
-
     // We are per definition committed if we initialize from an existing collection.
     _cachedCommitted = true;
 
     if (collection) {
         // Use the shared state from the existing collection.
+        LOGV2_DEBUG(
+            6825402, 1, "Initializing collection using shared state", logAttrs(collection->ns()));
         _shared = static_cast<CollectionImpl*>(collection.get())->_shared;
     }
 
