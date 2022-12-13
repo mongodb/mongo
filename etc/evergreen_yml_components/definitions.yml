@@ -6934,6 +6934,9 @@ tasks:
   - *cleanup_environment
   - *set_up_venv
   - func: "run complete package test"
+    vars:
+      docker_username: ${dockerhub_username}
+      docker_password: ${dockerhub_password}
 
 - name: package
   tags: []

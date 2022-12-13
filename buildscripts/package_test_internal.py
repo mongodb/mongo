@@ -21,6 +21,10 @@ file_handler.setFormatter(formatter)
 root.addHandler(stdout_handler)
 root.addHandler(file_handler)
 
+DOCKER_SYSTEMCTL_REPO = "https://raw.githubusercontent.com/gdraheim/docker-systemctl-replacement"
+SYSTEMCTL_URL = DOCKER_SYSTEMCTL_REPO + "/master/files/docker/systemctl3.py"
+JOURNALCTL_URL = DOCKER_SYSTEMCTL_REPO + "/master/files/docker/journalctl3.py"
+
 
 def run_and_log(cmd: str, end_on_error: bool = True) -> 'subprocess.CompletedProcess[bytes]':
     proc = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)  # pylint: disable=subprocess-run-check
@@ -78,8 +82,8 @@ def run_zypper_test(packages: List[str]):
     run_and_log("zypper -n --no-gpg-checks install {}".format(install_together))
 
 
-def run_startup_test():
-    logging.info("Starting mongod.")
+def setup():
+    logging.info("Setting up test environment.")
 
     # TODO SERVER-70425: We can remove these once we have figured out why
     # packager.py sometimes uses distro files from older revisions.
@@ -96,16 +100,31 @@ def run_startup_test():
     # a non-forking service under systemd.
     run_and_log("sed -Ei '/fork:|pidFilePath:/d' /etc/mongod.conf")
 
-    # Overwrite the installed systemd with the emulator script and set up
-    # the required symlinks so it all works correctly.
     # TODO SERVER-70426: Remove these when we have a fake systemd package
     # that does all of this for us.
+    # Ensure that mongod doesn't start automatically so we can do it as a test.
+    run_and_log("mkdir -p /run/systemd/system")
+    run_and_log("mkdir -p $(pkg-config systemd --variable=systemdsystempresetdir)")
+    run_and_log(
+        "echo 'disable *' > $(pkg-config systemd --variable=systemdsystempresetdir)/00-test.preset")
+    # Install a systemd emulator script so we can test services the way they are
+    # actually installed on user systems.
+    run_and_log("wget -P /usr/bin " + SYSTEMCTL_URL)
+    run_and_log("wget -P /usr/bin " + JOURNALCTL_URL)
+    run_and_log("chmod +x /usr/bin/systemctl3.py /usr/bin/journalctl3.py")
+    # Overwrite the installed systemd with the emulator script and set up
+    # the required symlinks so it all works correctly.
     run_and_log("ln -sf /usr/bin/systemctl3.py /bin/systemctl")
     run_and_log("ln -sf /usr/bin/systemctl3.py /usr/bin/systemctl")
     run_and_log("ln -sf /usr/bin/systemctl3.py /bin/systemd")
     run_and_log("ln -sf /usr/bin/systemctl3.py /usr/bin/systemd")
     run_and_log("ln -sf /usr/bin/journalctl3.py /bin/journalctl")
     run_and_log("ln -sf /usr/bin/journalctl3.py /usr/bin/journalctl")
+
+
+def run_startup_test():
+    logging.info("Starting mongod.")
+
     run_and_log("systemctl enable mongod.service")
     run_and_log("systemctl start mongod.service")
 
@@ -130,6 +149,7 @@ else:
     logging.error("Found no supported package manager...Failing Test\n")
     sys.exit(1)
 
+setup()
 run_startup_test()
 
 sys.exit(0)
