@@ -1,7 +1,7 @@
 /**
  * Tests for the ingress handshake metrics.
  *
- * @tags: [requires_fcv_63, featureFlagConnHealthMetrics]
+ * @tags: [requires_fcv_63]
  */
 (function() {
 "use strict";

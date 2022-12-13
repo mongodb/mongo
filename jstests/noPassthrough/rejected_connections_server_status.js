@@ -1,5 +1,5 @@
 /**
- *  @tags: [requires_fcv_61, featureFlagConnHealthMetrics]
+ *  @tags: [requires_fcv_63]
  *
  * Tests that when the max number of connections mongod will accept has been reached (i.e.
  * maxConns), serverStatus labels subsequent connection attempts as rejected connections.

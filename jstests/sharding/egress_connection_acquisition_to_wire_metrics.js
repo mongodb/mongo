@@ -2,7 +2,7 @@
  * Tests that we are able to log the metrics corresponding to the time it takes from egress
  * connection acquisition to writing to the wire.
  *
- * @tags: [requires_fcv_63, featureFlagConnHealthMetrics]
+ * @tags: [requires_fcv_63]
  */
 (function() {
 "use strict";

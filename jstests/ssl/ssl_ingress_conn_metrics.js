@@ -1,7 +1,7 @@
 /**
  * Tests ingress connection metrics.
  *
- * @tags: [requires_fcv_61, featureFlagConnHealthMetrics]
+ * @tags: [requires_fcv_63]
  */
 
 "use strict";

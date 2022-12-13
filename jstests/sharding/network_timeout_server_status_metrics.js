@@ -1,5 +1,5 @@
 /**
- *  @tags: [requires_fcv_62, featureFlagConnHealthMetrics]
+ *  @tags: [requires_fcv_63]
  *
  * Tests that operations that fail while waiting to acquire a connection will timeout with a
  * particular error code and that the number of times this occurs and the cumulative time spent

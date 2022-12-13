@@ -2,7 +2,7 @@
  * Verify FTDC connection pool stats for connection reuse: connections used just once + cumulative
  * time connections are in-use, per-pool.
  *
- * @tags: [requires_sharding, requires_fcv_62, featureFlagConnHealthMetrics]
+ * @tags: [requires_sharding, requires_fcv_63]
  */
 
 load("jstests/libs/fail_point_util.js");
