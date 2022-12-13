@@ -295,7 +295,7 @@ TEST_F(ABTOptimizationTest, OptimizePipelineTests) {
 }
 
 TEST_F(ABTOptimizationTest, PartialIndex) {
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
     std::string scanDefName = "collection";
     ProjectionName scanProjName = prefixId.getNextId("scan");
 

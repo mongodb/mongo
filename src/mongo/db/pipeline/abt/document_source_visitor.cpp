@@ -146,7 +146,7 @@ public:
             groupByProjNames.push_back(groupByProjName);
 
             ABT groupByExpr = generateAggExpression(
-                idFields.at(fieldName.value()).get(), entry._rootProjection, groupByProjName);
+                idFields.at(fieldName.value()).get(), entry._rootProjection, _ctx.getPrefixId());
 
             _ctx.setNode<EvaluationNode>(entry._rootProjection,
                                          groupByProjName,
@@ -179,10 +179,10 @@ public:
             const FieldNameType fieldName{stmt.fieldName};
             aggProjFieldNames.push_back(fieldName);
 
-            ProjectionName aggOutputProjName{_ctx.getNextId(str::stream() << fieldName << "_agg")};
+            ProjectionName aggOutputProjName{_ctx.getNextId("field_agg")};
 
             ABT aggInputExpr = generateAggExpression(
-                stmt.expr.argument.get(), entry._rootProjection, aggOutputProjName);
+                stmt.expr.argument.get(), entry._rootProjection, _ctx.getPrefixId());
             if (!aggInputExpr.is<Constant>() && !aggInputExpr.is<Variable>()) {
                 // Generate nodes for complex projections, otherwise inline constants and variables
                 // into the group.
@@ -198,11 +198,9 @@ public:
             aggOutputProjNames.push_back(aggOutputProjName);
             if (stmt.makeAccumulator()->getOpName() == "$avg"_sd) {
                 // Express $avg as sum / count.
-                ProjectionName sumProjName{
-                    _ctx.getNextId(str::stream() << fieldName << "_sum_agg")};
+                ProjectionName sumProjName{_ctx.getNextId("field_sum_agg")};
                 aggLowLevelOutputProjNames.push_back(sumProjName);
-                ProjectionName countProjName{
-                    _ctx.getNextId(str::stream() << fieldName << "_count_agg")};
+                ProjectionName countProjName{_ctx.getNextId("field_count_agg")};
                 aggLowLevelOutputProjNames.push_back(countProjName);
                 avgProjNames.emplace_back(AvgProjNames{std::move(aggOutputProjName),
                                                        std::move(sumProjName),
@@ -419,7 +417,7 @@ public:
         ABT matchExpr = generateMatchExpression(source->getMatchExpression(),
                                                 true /*allowAggExpressions*/,
                                                 entry._rootProjection,
-                                                _ctx.getNextId("matchExpression"));
+                                                _ctx.getPrefixId());
 
         // If we have a top-level composition, flatten it into a chain of separate FilterNodes.
         const auto& composition =
@@ -517,9 +515,8 @@ public:
             : make<ValueScanNode>(ProjectionNameVector{scanProjName},
                                   createInitialScanProps(scanProjName, scanDefName));
 
-        PrefixId prefixId;
         ABT pipelineABT = translatePipelineToABT(
-            _metadata, pipeline, scanProjName, std::move(initialNode), prefixId);
+            _metadata, pipeline, scanProjName, std::move(initialNode), _ctx.getPrefixId());
 
         uassert(6624425, "Expected root node for union pipeline", pipelineABT.is<RootNode>());
         ABT pipelineABTWithoutRoot = pipelineABT.cast<RootNode>()->getChild();

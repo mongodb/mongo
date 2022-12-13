@@ -73,12 +73,6 @@ bool isSimplePath(const ABT& node) {
     return false;
 }
 
-ProjectionName PrefixId::getNextId(const StringData& prefix) {
-    std::ostringstream os;
-    os << prefix << "_" << _idCounterPerPrefix[prefix.toString()]++;
-    return ProjectionName{os.str()};
-}
-
 ProjectionNameOrderedSet convertToOrderedSet(ProjectionNameSet unordered) {
     ProjectionNameOrderedSet ordered;
     for (const ProjectionName& projection : unordered) {

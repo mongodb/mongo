@@ -45,7 +45,11 @@ namespace value = sbe::value;
 CETester::CETester(std::string collName,
                    CEType collCard,
                    const OptPhaseManager::PhaseSet& optPhases)
-    : _optPhases(optPhases), _hints(), _metadata({}), _collName(collName) {
+    : _optPhases(optPhases),
+      _prefixId(PrefixId::createForTests()),
+      _hints(),
+      _metadata({}),
+      _collName(collName) {
     addCollection(collName, collCard);
 }
 

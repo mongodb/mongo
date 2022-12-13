@@ -169,14 +169,49 @@ struct FirstChildAccessor {
 };
 
 /**
- * Used to vend out fresh projection names.
+ * Used to vend out fresh projection names. The method getNextId receives an optional prefix. If we
+ * are generating descriptive names, the variable name we return starts with the prefix and includes
+ * a prefix-specific counter. If we are not generating descriptive variable names, the prefix is
+ * ignored and instead we use a global counter instead and ignore the prefix.
  */
 class PrefixId {
+    using IdType = uint64_t;
+    using PrefixMapType = opt::unordered_map<std::string, IdType>;
+
 public:
-    ProjectionName getNextId(const StringData& prefix);
+    static PrefixId create(const bool useDescriptiveVarNames) {
+        return {useDescriptiveVarNames};
+    }
+    static PrefixId createForTests() {
+        return {true /*useDescripriveVarNames*/};
+    }
+
+    template <size_t N>
+    ProjectionName getNextId(const char (&prefix)[N]) {
+        if (std::holds_alternative<IdType>(_ids)) {
+            return ProjectionName{str::stream() << "p" << std::get<IdType>(_ids)++};
+        } else {
+            return ProjectionName{str::stream()
+                                  << prefix << "_" << std::get<PrefixMapType>(_ids)[prefix]++};
+        }
+    }
+
+    PrefixId(const PrefixId& other) = delete;
+    PrefixId(PrefixId&& other) = default;
+
+    PrefixId& operator=(const PrefixId& other) = delete;
+    PrefixId& operator=(PrefixId&& other) = default;
 
 private:
-    opt::unordered_map<std::string, uint64_t> _idCounterPerPrefix;
+    PrefixId(const bool useDescriptiveVarNames) {
+        if (useDescriptiveVarNames) {
+            _ids = {PrefixMapType{}};
+        } else {
+            _ids = {uint64_t{}};
+        }
+    }
+
+    std::variant<IdType, PrefixMapType> _ids;
 };
 
 ProjectionNameOrderedSet convertToOrderedSet(ProjectionNameSet unordered);

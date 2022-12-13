@@ -32,11 +32,13 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/query/optimizer/node.h"
+#include "mongo/db/query/optimizer/utils/utils.h"
+
 
 namespace mongo::optimizer {
 
 ABT generateAggExpression(const Expression* expr,
                           const ProjectionName& rootProjection,
-                          boost::optional<ProjectionName> uniqueIdPrefix);
+                          PrefixId& prefixId);
 
 }  // namespace mongo::optimizer

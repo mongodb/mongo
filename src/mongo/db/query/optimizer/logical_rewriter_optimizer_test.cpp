@@ -43,7 +43,7 @@ namespace mongo::optimizer {
 namespace {
 
 TEST(LogicalRewriter, RootNodeMerge) {
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("a", "test");
     ABT limitSkipNode1 =
@@ -250,7 +250,7 @@ TEST(LogicalRewriter, Memo) {
 
 TEST(LogicalRewriter, FilterProjectRewrite) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("ptest", "test");
     ABT collationNode = make<CollationNode>(
@@ -325,7 +325,7 @@ TEST(LogicalRewriter, FilterProjectRewrite) {
 
 TEST(LogicalRewriter, FilterProjectComplexRewrite) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("ptest", "test");
 
@@ -458,7 +458,7 @@ TEST(LogicalRewriter, FilterProjectComplexRewrite) {
 
 TEST(LogicalRewriter, FilterProjectGroupRewrite) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("ptest", "test");
 
@@ -526,7 +526,7 @@ TEST(LogicalRewriter, FilterProjectGroupRewrite) {
 
 TEST(LogicalRewriter, FilterProjectUnwindRewrite) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("ptest", "test");
 
@@ -602,7 +602,7 @@ TEST(LogicalRewriter, FilterProjectUnwindRewrite) {
 
 TEST(LogicalRewriter, FilterProjectExchangeRewrite) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("ptest", "test");
 
@@ -671,7 +671,7 @@ TEST(LogicalRewriter, FilterProjectExchangeRewrite) {
 
 TEST(LogicalRewriter, UnwindCollationRewrite) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("ptest", "test");
 
@@ -743,7 +743,7 @@ TEST(LogicalRewriter, UnwindCollationRewrite) {
 }
 
 TEST(LogicalRewriter, FilterUnionReorderSingleProjection) {
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
     ABT scanNode1 = make<ScanNode>("ptest1", "test1");
     ABT scanNode2 = make<ScanNode>("ptest2", "test2");
     // Create two eval nodes such that the two branches of the union share a projection.
@@ -865,7 +865,7 @@ TEST(LogicalRewriter, FilterUnionReorderSingleProjection) {
 }
 
 TEST(LogicalRewriter, MultipleFilterUnionReorder) {
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
     ABT scanNode1 = make<ScanNode>("ptest1", "test1");
     ABT scanNode2 = make<ScanNode>("ptest2", "test2");
 
@@ -1060,7 +1060,7 @@ TEST(LogicalRewriter, MultipleFilterUnionReorder) {
 }
 
 TEST(LogicalRewriter, FilterUnionUnionPushdown) {
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
     ABT scanNode1 = make<ScanNode>("ptest", "test1");
     ABT scanNode2 = make<ScanNode>("ptest", "test2");
     ABT unionNode = make<UnionNode>(ProjectionNameVector{"ptest"}, makeSeq(scanNode1, scanNode2));
@@ -1225,7 +1225,7 @@ TEST(LogicalRewriter, UnionPreservesCommonLogicalProps) {
                       2};
 
     // Run the reordering rewrite such that the scan produces a hash partition.
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
     auto phaseManager =
         makePhaseManager({OptPhase::MemoSubstitutionPhase, OptPhase::MemoExplorationPhase},
                          prefixId,
@@ -1442,7 +1442,7 @@ ABT sargableCETestSetup() {
 TEST(LogicalRewriter, SargableCE) {
     using namespace properties;
 
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
     ABT rootNode = sargableCETestSetup();
     auto phaseManager =
         makePhaseManager({OptPhase::MemoSubstitutionPhase, OptPhase::MemoExplorationPhase},
@@ -1544,7 +1544,7 @@ TEST(LogicalRewriter, SargableCE) {
 
 TEST(LogicalRewriter, RemoveNoopFilter) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("ptest", "test");
 
@@ -1579,7 +1579,7 @@ TEST(LogicalRewriter, RemoveNoopFilter) {
 
 TEST(LogicalRewriter, NotPushdownToplevelSuccess) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("scan_0", "coll");
 
@@ -1640,7 +1640,7 @@ TEST(LogicalRewriter, NotPushdownToplevelSuccess) {
 
 TEST(LogicalRewriter, NotPushdownToplevelFailureMultikey) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("scan_0", "coll");
 
@@ -1721,7 +1721,7 @@ TEST(LogicalRewriter, NotPushdownComposeM) {
                                   "scan_0"_var)))
             .finish(_scan("scan_0", "coll"));
 
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
     auto phaseManager = makePhaseManager({OptPhase::MemoSubstitutionPhase},
                                          prefixId,
                                          Metadata{{{"coll", createScanDef({}, {})}}},
@@ -1796,7 +1796,7 @@ TEST(LogicalRewriter, NotPushdownUnderLambdaSuccess) {
     ABT rootNode = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"scan_0"}},
                                   std::move(filterNode));
 
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
     auto phaseManager = makePhaseManager(
         {OptPhase::ConstEvalPre, OptPhase::MemoSubstitutionPhase},
         prefixId,
@@ -1879,7 +1879,7 @@ TEST(LogicalRewriter, NotPushdownUnderLambdaKeepOuterTraverse) {
     ABT rootNode = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"scan_0"}},
                                   std::move(filterNode));
 
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
     auto phaseManager = makePhaseManager(
         {OptPhase::ConstEvalPre, OptPhase::MemoSubstitutionPhase},
         prefixId,
@@ -1967,7 +1967,7 @@ TEST(LogicalRewriter, NotPushdownUnderLambdaFailsWithFreeVar) {
                 "scan_0"_var))
             .finish(_scan("scan_0", "coll"));
 
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
     auto phaseManager = makePhaseManager({OptPhase::ConstEvalPre, OptPhase::MemoSubstitutionPhase},
                                          prefixId,
                                          Metadata{{
@@ -2026,7 +2026,7 @@ TEST(LogicalRewriter, RemoveTraverseSplitComposeM) {
     ABT rootNode = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"scan_0"}},
                                   std::move(filterNode));
 
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
     auto phaseManager = makePhaseManager(
         {OptPhase::ConstEvalPre, OptPhase::MemoSubstitutionPhase},
         prefixId,
@@ -2100,7 +2100,7 @@ TEST(LogicalRewriter, TraverseComposeMTraverse) {
     ABT rootNode = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"scan_0"}},
                                   std::move(filterNode));
 
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
     auto phaseManager = makePhaseManager(
         {OptPhase::ConstEvalPre, OptPhase::MemoSubstitutionPhase},
         prefixId,
@@ -2208,7 +2208,7 @@ TEST(LogicalRewriter, RelaxComposeM) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode));
 
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
     auto phaseManager = makePhaseManager({OptPhase::MemoSubstitutionPhase},
                                          prefixId,
                                          {{{"c1", createScanDef({}, {})}}},
@@ -2263,7 +2263,7 @@ TEST(LogicalRewriter, RelaxComposeM) {
 TEST(LogicalRewriter, SargableNodeRIN) {
     using namespace properties;
     using namespace unit_test_abt_literals;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     // Construct a query which tests "a" = 1 and "b" = 2 and "c" = 3.
     ABT rootNode = NodeBuilder{}

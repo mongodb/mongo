@@ -145,7 +145,7 @@ public:
         uassert(6624246, "Cannot generate an agg expression in this context", _allowAggExpressions);
 
         ABT result = generateAggExpression(
-            expr->getExpression().get(), _ctx.getRootProjection(), _ctx.getUniqueIdPrefix());
+            expr->getExpression().get(), _ctx.getRootProjection(), _ctx.getPrefixId());
 
         if (auto filterPtr = result.cast<EvalFilter>();
             filterPtr != nullptr && filterPtr->getInput() == _ctx.getRootProjVar()) {
@@ -654,11 +654,9 @@ private:
 ABT generateMatchExpression(const MatchExpression* expr,
                             const bool allowAggExpressions,
                             const ProjectionName& rootProjection,
-                            boost::optional<ProjectionName> uniqueIdPrefix) {
-    ExpressionAlgebrizerContext ctx(false /*assertExprSort*/,
-                                    true /*assertPathSort*/,
-                                    rootProjection,
-                                    std::move(uniqueIdPrefix));
+                            PrefixId& prefixId) {
+    ExpressionAlgebrizerContext ctx(
+        false /*assertExprSort*/, true /*assertPathSort*/, rootProjection, prefixId);
     ABTMatchExpressionPreVisitor preVisitor(ctx);
     ABTMatchExpressionVisitor postVisitor(ctx, allowAggExpressions);
     MatchExpressionWalker walker(&preVisitor, nullptr /*inVisitor*/, &postVisitor);

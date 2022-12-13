@@ -673,7 +673,7 @@ TEST(Path, Fuse7) {
 }
 
 TEST(Path, Lower1) {
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     auto tree = make<EvalPath>(make<PathIdentity>(), make<Variable>("foo"));
     auto env = VariableEnvironment::build(tree);
@@ -695,7 +695,7 @@ TEST(Path, Lower1) {
 }
 
 TEST(Path, Lower2) {
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     auto tree = make<EvalPath>(make<PathConstant>(Constant::int64(10)), make<Variable>("foo"));
     auto env = VariableEnvironment::build(tree);
@@ -717,7 +717,7 @@ TEST(Path, Lower2) {
 }
 
 TEST(Path, Lower3) {
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     auto tree = make<EvalPath>(
         make<PathLambda>(make<LambdaAbstraction>(
@@ -742,7 +742,7 @@ TEST(Path, Lower3) {
 }
 
 TEST(Path, Lower4) {
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     auto tree = make<EvalPath>(
         make<PathGet>(
@@ -769,7 +769,7 @@ TEST(Path, Lower4) {
 }
 
 TEST(Path, Lower5) {
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     auto tree = make<EvalPath>(
         make<PathGet>(
@@ -806,7 +806,7 @@ TEST(Path, Lower5) {
 }
 
 TEST(Path, ProjElim1) {
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     auto scanNode = make<ScanNode>("root", "test");
 
@@ -852,7 +852,7 @@ TEST(Path, ProjElim1) {
 }
 
 TEST(Path, ProjElim2) {
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     auto scanNode = make<ScanNode>("root", "test");
 
@@ -934,7 +934,7 @@ TEST(Path, ProjElim3) {
 }
 
 TEST(Path, Lower6) {
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     auto tree = make<EvalPath>(
         make<PathGet>("fieldA", make<PathGet>("fieldB", make<PathDefault>(Constant::int64(0)))),
@@ -969,7 +969,7 @@ TEST(Path, Lower6) {
 }
 
 TEST(Path, Lower7) {
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     auto tree = make<EvalPath>(
         make<PathGet>(
@@ -995,7 +995,7 @@ TEST(Path, Lower7) {
 }
 
 TEST(Path, Lower8) {
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     auto tree = make<EvalPath>(
         make<PathComposeM>(make<PathIdentity>(), make<PathConstant>(Constant::int64(100))),
@@ -1019,7 +1019,7 @@ TEST(Path, Lower8) {
 }
 
 TEST(Path, Lower9) {
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     auto tree = make<EvalPath>(make<PathComposeM>(make<PathGet>("fieldA", make<PathIdentity>()),
                                                   make<PathConstant>(Constant::int64(100))),
@@ -1043,7 +1043,7 @@ TEST(Path, Lower9) {
 }
 
 TEST(Path, Lower10) {
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     auto tree = make<EvalPath>(
         make<PathField>(
@@ -1120,7 +1120,7 @@ TEST(Path, NoLambdaPathCompose) {
 }
 
 TEST(Path, NoDefaultSimplifyUnderFilter) {
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
     auto nonNothingCompare = make<PathCompare>(Operations::Gt, Constant::int64(70));
     auto pathDefault = make<PathDefault>(Constant::emptyObject());
 

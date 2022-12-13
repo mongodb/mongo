@@ -47,7 +47,7 @@ constexpr SelectivityType kDefaultSelectivity{0.1};
 
 TEST(PhysRewriter, PhysicalRewriterBasic) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("p1", "test");
 
@@ -246,7 +246,7 @@ TEST(PhysRewriter, PhysicalRewriterBasic) {
 
 TEST(PhysRewriter, GroupBy) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("ptest", "test");
 
@@ -326,7 +326,7 @@ TEST(PhysRewriter, GroupBy) {
 
 TEST(PhysRewriter, GroupBy1) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("ptest", "test");
 
@@ -390,7 +390,7 @@ TEST(PhysRewriter, GroupBy1) {
 
 TEST(PhysRewriter, Unwind) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("ptest", "test");
 
@@ -471,7 +471,7 @@ TEST(PhysRewriter, Unwind) {
 
 TEST(PhysRewriter, DuplicateFilter) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -531,7 +531,7 @@ TEST(PhysRewriter, DuplicateFilter) {
 
 TEST(PhysRewriter, FilterCollation) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -598,7 +598,7 @@ TEST(PhysRewriter, FilterCollation) {
 
 TEST(PhysRewriter, EvalCollation) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -646,7 +646,7 @@ TEST(PhysRewriter, EvalCollation) {
 
 TEST(PhysRewriter, FilterEvalCollation) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -725,7 +725,7 @@ TEST(PhysRewriter, FilterIndexing) {
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode));
 
     {
-        PrefixId prefixId;
+        auto prefixId = PrefixId::createForTests();
         auto phaseManager = makePhaseManager(
             {OptPhase::MemoSubstitutionPhase, OptPhase::MemoExplorationPhase},
             prefixId,
@@ -769,7 +769,7 @@ TEST(PhysRewriter, FilterIndexing) {
     }
 
     {
-        PrefixId prefixId;
+        auto prefixId = PrefixId::createForTests();
         auto phaseManager = makePhaseManager(
             {OptPhase::MemoSubstitutionPhase,
              OptPhase::MemoExplorationPhase,
@@ -812,7 +812,7 @@ TEST(PhysRewriter, FilterIndexing) {
     }
 
     {
-        PrefixId prefixId;
+        auto prefixId = PrefixId::createForTests();
         auto phaseManager = makePhaseManager(
             {OptPhase::MemoSubstitutionPhase,
              OptPhase::MemoExplorationPhase,
@@ -877,7 +877,7 @@ TEST(PhysRewriter, FilterIndexing1) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"p1"}}, std::move(filterNode));
 
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
     auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
@@ -943,7 +943,7 @@ TEST(PhysRewriter, FilterIndexing2) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode));
 
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
     auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
@@ -1024,7 +1024,7 @@ TEST(PhysRewriter, FilterIndexing2NonSarg) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode2));
 
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
     auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
@@ -1126,7 +1126,7 @@ TEST(PhysRewriter, FilterIndexing2NonSarg) {
 
 TEST(PhysRewriter, FilterIndexing3) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -1182,7 +1182,7 @@ TEST(PhysRewriter, FilterIndexing3) {
 
 TEST(PhysRewriter, FilterIndexing3MultiKey) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -1252,7 +1252,7 @@ TEST(PhysRewriter, FilterIndexing3MultiKey) {
 
 TEST(PhysRewriter, FilterIndexing4) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -1371,7 +1371,7 @@ TEST(PhysRewriter, FilterIndexing4) {
 
 TEST(PhysRewriter, FilterIndexing5) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -1461,7 +1461,7 @@ TEST(PhysRewriter, FilterIndexing5) {
 
 TEST(PhysRewriter, FilterIndexing6) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -1535,7 +1535,7 @@ TEST(PhysRewriter, FilterIndexing6) {
 
 TEST(PhysRewriter, FilterIndexingStress) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT result = make<ScanNode>("root", "c1");
 
@@ -1626,7 +1626,7 @@ TEST(PhysRewriter, FilterIndexingStress) {
 
 TEST(PhysRewriter, FilterIndexingVariable) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     // In the absence of full implementation of query parameterization, here we pretend we have a
     // function "getQueryParam" which will return a query parameter by index.
@@ -1747,7 +1747,7 @@ TEST(PhysRewriter, FilterIndexingMaxKey) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode2));
 
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
     auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
@@ -1796,7 +1796,7 @@ TEST(PhysRewriter, FilterIndexingMaxKey) {
 TEST(PhysRewriter, FilterIndexingRIN) {
     using namespace properties;
     using namespace unit_test_abt_literals;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     // Construct a query which tests "a" > 1 and "c" > 2 and "e" = 3.
     ABT rootNode = NodeBuilder{}
@@ -1898,7 +1898,7 @@ TEST(PhysRewriter, FilterIndexingRIN) {
 TEST(PhysRewriter, FilterIndexingRIN1) {
     using namespace properties;
     using namespace unit_test_abt_literals;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     // Construct a query which tests "a" > 1 and "b" > 2, and sorts ascending on "a", then
     // descending on "b".
@@ -1979,7 +1979,7 @@ TEST(PhysRewriter, FilterIndexingRIN1) {
 TEST(PhysRewriter, FilterIndexingRIN2) {
     using namespace properties;
     using namespace unit_test_abt_literals;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     // Construct a query which tests "a" in [1, 2] U [3, 4] and "b" in [5, 6] U [7, 8].
     ABT rootNode =
@@ -2124,7 +2124,7 @@ TEST(PhysRewriter, SargableProjectionRenames) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(evalNode2));
 
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
     auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase},
         prefixId,
@@ -2187,7 +2187,7 @@ TEST(PhysRewriter, SargableAcquireProjection) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(evalNode));
 
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
     auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase},
         prefixId,
@@ -2229,7 +2229,7 @@ TEST(PhysRewriter, SargableAcquireProjection) {
 
 TEST(PhysRewriter, FilterReorder) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT result = make<ScanNode>("root", "c1");
 
@@ -2327,7 +2327,7 @@ TEST(PhysRewriter, FilterReorder) {
 
 TEST(PhysRewriter, CoveredScan) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     PartialSchemaSelHints hints;
     hints.emplace(PartialSchemaKey{"root", make<PathGet>("a", make<PathIdentity>())},
@@ -2396,7 +2396,7 @@ TEST(PhysRewriter, CoveredScan) {
 
 TEST(PhysRewriter, EvalIndexing) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -2491,7 +2491,7 @@ TEST(PhysRewriter, EvalIndexing) {
 
 TEST(PhysRewriter, EvalIndexing1) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -2556,7 +2556,7 @@ TEST(PhysRewriter, EvalIndexing1) {
 
 TEST(PhysRewriter, EvalIndexing2) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -2631,7 +2631,7 @@ TEST(PhysRewriter, EvalIndexing2) {
 
 TEST(PhysRewriter, MultiKeyIndex) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     PartialSchemaSelHints hints;
     hints.emplace(PartialSchemaKey{"root", make<PathGet>("a", make<PathIdentity>())},
@@ -2849,7 +2849,7 @@ TEST(PhysRewriter, MultiKeyIndex) {
 
 TEST(PhysRewriter, CompoundIndex1) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -2935,7 +2935,7 @@ TEST(PhysRewriter, CompoundIndex1) {
 
 TEST(PhysRewriter, CompoundIndex2) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -3027,7 +3027,7 @@ TEST(PhysRewriter, CompoundIndex2) {
 
 TEST(PhysRewriter, CompoundIndex3) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -3133,7 +3133,7 @@ TEST(PhysRewriter, CompoundIndex3) {
 
 TEST(PhysRewriter, CompoundIndex4Negative) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     PartialSchemaSelHints hints;
     hints.emplace(PartialSchemaKey{"root", make<PathGet>("a", make<PathIdentity>())},
@@ -3215,7 +3215,7 @@ TEST(PhysRewriter, CompoundIndex5) {
     using namespace properties;
     using namespace unit_test_abt_literals;
 
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     // Test the following scenario: (a = 0 or a = 1) and (b = 2 or b = 3) over a compound index on
     // {a, b}.
@@ -3304,7 +3304,7 @@ TEST(PhysRewriter, CompoundIndex5) {
 
 TEST(PhysRewriter, IndexBoundsIntersect) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -3384,7 +3384,7 @@ TEST(PhysRewriter, IndexBoundsIntersect) {
 
 TEST(PhysRewriter, IndexBoundsIntersect1) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -3457,7 +3457,7 @@ TEST(PhysRewriter, IndexBoundsIntersect1) {
 
 TEST(PhysRewriter, IndexBoundsIntersect2) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -3533,7 +3533,7 @@ TEST(PhysRewriter, IndexBoundsIntersect2) {
 
 TEST(PhysRewriter, IndexBoundsIntersect3) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -3611,7 +3611,7 @@ TEST(PhysRewriter, IndexBoundsIntersect3) {
 
 TEST(PhysRewriter, IndexResidualReq) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -3728,7 +3728,7 @@ TEST(PhysRewriter, IndexResidualReq) {
 
 TEST(PhysRewriter, IndexResidualReq1) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -3818,7 +3818,7 @@ TEST(PhysRewriter, IndexResidualReq1) {
 
 TEST(PhysRewriter, IndexResidualReq2) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -3899,7 +3899,7 @@ TEST(PhysRewriter, IndexResidualReq2) {
 
 TEST(PhysRewriter, ElemMatchIndex) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -3971,7 +3971,7 @@ TEST(PhysRewriter, ElemMatchIndex) {
 
 TEST(PhysRewriter, ElemMatchIndex1) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -4057,7 +4057,7 @@ TEST(PhysRewriter, ElemMatchIndex1) {
 
 TEST(PhysRewriter, ElemMatchIndexNoArrays) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -4116,7 +4116,7 @@ TEST(PhysRewriter, ElemMatchIndexNoArrays) {
 
 TEST(PhysRewriter, ObjectElemMatchResidual) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -4226,7 +4226,7 @@ TEST(PhysRewriter, ObjectElemMatchResidual) {
 
 TEST(PhysRewriter, ObjectElemMatchBounds) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -4318,7 +4318,7 @@ TEST(PhysRewriter, ObjectElemMatchBounds) {
 
 TEST(PhysRewriter, NestedElemMatch) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "coll1");
 
@@ -4458,7 +4458,7 @@ TEST(PhysRewriter, PathObj) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode));
 
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
     auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
@@ -4511,7 +4511,7 @@ TEST(PhysRewriter, PathObj) {
 
 TEST(PhysRewriter, ArrayConstantIndex) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -4617,7 +4617,7 @@ TEST(PhysRewriter, ArrayConstantIndex) {
 
 TEST(PhysRewriter, ArrayConstantNoIndex) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -4698,7 +4698,7 @@ TEST(PhysRewriter, ArrayConstantNoIndex) {
 
 TEST(PhysRewriter, ParallelScan) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -4755,7 +4755,7 @@ TEST(PhysRewriter, ParallelScan) {
 
 TEST(PhysRewriter, HashPartitioning) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -4823,7 +4823,7 @@ TEST(PhysRewriter, HashPartitioning) {
 
 TEST(PhysRewriter, IndexPartitioning) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     PartialSchemaSelHints hints;
     hints.emplace(PartialSchemaKey{"root", make<PathGet>("a", make<PathIdentity>())},
@@ -4943,7 +4943,7 @@ TEST(PhysRewriter, IndexPartitioning) {
 
 TEST(PhysRewriter, IndexPartitioning1) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     PartialSchemaSelHints hints;
     hints.emplace(PartialSchemaKey{"root", make<PathGet>("a", make<PathIdentity>())},
@@ -5041,7 +5041,7 @@ TEST(PhysRewriter, IndexPartitioning1) {
 
 TEST(PhysRewriter, LocalGlobalAgg) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -5124,7 +5124,7 @@ TEST(PhysRewriter, LocalGlobalAgg) {
 
 TEST(PhysRewriter, LocalGlobalAgg1) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -5190,7 +5190,7 @@ TEST(PhysRewriter, LocalGlobalAgg1) {
 
 TEST(PhysRewriter, LocalLimitSkip) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -5317,7 +5317,7 @@ TEST(PhysRewriter, LocalLimitSkip) {
 
 TEST(PhysRewriter, CollationLimit) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -5439,7 +5439,7 @@ TEST(PhysRewriter, CollationLimit) {
 
 TEST(PhysRewriter, PartialIndex1) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -5531,7 +5531,7 @@ TEST(PhysRewriter, PartialIndex1) {
 
 TEST(PhysRewriter, PartialIndex2) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -5605,7 +5605,7 @@ TEST(PhysRewriter, PartialIndex2) {
 
 TEST(PhysRewriter, PartialIndexReject) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -5689,7 +5689,7 @@ TEST(PhysRewriter, PartialIndexReject) {
 
 TEST(PhysRewriter, RequireRID) {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 
@@ -5753,7 +5753,7 @@ TEST(PhysRewriter, RequireRID1) {
     ABT rootNode = make<RootNode>(ProjectionRequirement{ProjectionNameVector{"scan_0"}},
                                   std::move(filterNode));
 
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
     auto phaseManager = makePhaseManagerRequireRID(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
@@ -5816,7 +5816,7 @@ TEST(PhysRewriter, UnionRewrite) {
     ABT rootNode = make<RootNode>(ProjectionRequirement{ProjectionNameVector{"pUnion1"}},
                                   std::move(unionNode));
 
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
     auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
@@ -5886,7 +5886,7 @@ TEST(PhysRewriter, JoinRewrite) {
     ABT rootNode = make<RootNode>(ProjectionRequirement{ProjectionNameVector{"p11", "p21"}},
                                   std::move(joinNode));
 
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
     auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
@@ -5962,7 +5962,7 @@ TEST(PhysRewriter, JoinRewrite1) {
     ABT rootNode = make<RootNode>(ProjectionRequirement{ProjectionNameVector{"p1", "p2"}},
                                   std::move(joinNode));
 
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
     auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
@@ -6018,7 +6018,7 @@ TEST(PhysRewriter, RootInterval) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode));
 
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
     auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
@@ -6073,7 +6073,7 @@ TEST(PhysRewriter, EqMemberSargable) {
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode));
 
     {
-        PrefixId prefixId;
+        auto prefixId = PrefixId::createForTests();
         auto phaseManager = makePhaseManager(
             {OptPhase::MemoSubstitutionPhase},
             prefixId,
@@ -6117,7 +6117,7 @@ TEST(PhysRewriter, EqMemberSargable) {
     }
 
     {
-        PrefixId prefixId;
+        auto prefixId = PrefixId::createForTests();
         auto phaseManager = makePhaseManager(
             {OptPhase::MemoSubstitutionPhase,
              OptPhase::MemoExplorationPhase,
@@ -6218,7 +6218,7 @@ TEST(PhysRewriter, IndexSubfieldCovered) {
     ABT rootNode = make<RootNode>(ProjectionRequirement{ProjectionNameVector{"pa", "pb"}},
                                   std::move(filterNode3));
 
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
     auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
@@ -6305,7 +6305,7 @@ TEST(PhysRewriter, PerfOnlyPreds1) {
     ABT rootNode =
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"pa"}}, std::move(filterNode2));
 
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
     auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
@@ -6403,7 +6403,7 @@ TEST(PhysRewriter, PerfOnlyPreds2) {
     costModel.setIndexScanStartupCost(1e-6);
     costModel.setMergeJoinStartupCost(1e-6);
 
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
     auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
@@ -6482,7 +6482,7 @@ TEST(PhysRewriter, PerfOnlyPreds2) {
 TEST(PhysRewriter, ConjunctionTraverseMultikey1) {
     using namespace properties;
     using namespace unit_test_abt_literals;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT root = NodeBuilder{}
                    .root("root")
@@ -6576,7 +6576,7 @@ TEST(PhysRewriter, ConjunctionTraverseMultikey1) {
 TEST(PhysRewriter, ConjunctionTraverseMultikey2) {
     using namespace properties;
     using namespace unit_test_abt_literals;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT root = NodeBuilder{}
                    .root("root")

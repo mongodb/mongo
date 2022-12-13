@@ -238,7 +238,7 @@ ABT optimizeABT(ABT abt,
                 cost_model::CostModelCoefficients&& costModel,
                 PathToIntervalFn pathToInterval,
                 bool phaseManagerDisableScan) {
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     auto phaseManager = makePhaseManager(
         phaseSet, prefixId, metadata, std::move(costModel), DebugInfo::kDefaultForTests);
@@ -274,7 +274,7 @@ std::string ABTGoldenTestFixture::testABTTranslationAndOptimization(
 
     stream << std::endl << "-- OUTPUT:" << std::endl;
 
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
     ABT translated = translatePipeline(
         metadata, pipelineStr, prefixId.getNextId("scan"), scanDefName, prefixId, involvedNss);
 

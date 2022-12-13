@@ -65,7 +65,7 @@ public:
         auto expCtx = new ExpressionContextForTest(opCtx.get(), NamespaceString("test.bm"));
 
         Metadata metadata{{}};
-        PrefixId prefixId;
+        auto prefixId = PrefixId::createForTests();
         ProjectionName scanProjName{prefixId.getNextId("scan")};
 
         std::unique_ptr<Pipeline, PipelineDeleter> parsedPipeline =

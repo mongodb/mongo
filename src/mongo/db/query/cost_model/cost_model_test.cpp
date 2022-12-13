@@ -58,7 +58,7 @@ TEST(CostModel, IncreaseIndexScanCost) {
     {
         CostModelCoefficients costCoefs{};
         initializeTestCostModel(costCoefs, 100.0);
-        PrefixId prefixId;
+        auto prefixId = PrefixId::createForTests();
         auto phaseManager = makePhaseManager(
             {OptPhase::MemoSubstitutionPhase,
              OptPhase::MemoExplorationPhase,
@@ -104,7 +104,7 @@ TEST(CostModel, IncreaseIndexScanCost) {
         // Increasing the cost of IndexScan should result in a PhysicalScan plan.
         costCoefs.setIndexScanIncrementalCost(10000.0);
 
-        PrefixId prefixId;
+        auto prefixId = PrefixId::createForTests();
         auto phaseManager = makePhaseManager(
             {OptPhase::MemoSubstitutionPhase,
              OptPhase::MemoExplorationPhase,
@@ -165,7 +165,7 @@ TEST(CostModel, IncreaseJoinsCost) {
         make<RootNode>(ProjectionRequirement{ProjectionNameVector{"pa"}}, std::move(filterNode2));
 
     {
-        PrefixId prefixId;
+        auto prefixId = PrefixId::createForTests();
         CostModelCoefficients costCoefs{};
         initializeTestCostModel(costCoefs, 100.0);
         auto phaseManager = makePhaseManager(
@@ -220,7 +220,7 @@ TEST(CostModel, IncreaseJoinsCost) {
     }
 
     {
-        PrefixId prefixId;
+        auto prefixId = PrefixId::createForTests();
         CostModelCoefficients costCoefs{};
         initializeTestCostModel(costCoefs, 100.0);
         // Decreasing the cost of NestedLoopJoin should result in a NestedLoopJoin plan.
@@ -252,7 +252,7 @@ TEST(CostModel, IncreaseJoinsCost) {
     }
 
     {
-        PrefixId prefixId;
+        auto prefixId = PrefixId::createForTests();
         CostModelCoefficients costCoefs{};
         initializeTestCostModel(costCoefs, 100.0);
         // Increasing the cost of both MergeJoin and NestedLoopJoin should use neither of the two

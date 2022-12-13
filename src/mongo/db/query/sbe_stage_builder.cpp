@@ -597,7 +597,8 @@ namespace {
 std::unique_ptr<sbe::EExpression> abtToExpr(optimizer::ABT& abt, optimizer::SlotVarMap& slotMap) {
     auto env = optimizer::VariableEnvironment::build(abt);
 
-    optimizer::PrefixId prefixId;
+    // Do not use descriptive names here.
+    auto prefixId = optimizer::PrefixId::create(false /*useDescriptiveNames*/);
     // Convert paths into ABT expressions.
     optimizer::EvalPathLowering pathLower{prefixId, env};
     pathLower.optimize(abt);

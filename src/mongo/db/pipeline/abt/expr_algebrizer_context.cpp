@@ -31,17 +31,15 @@
 
 namespace mongo::optimizer {
 
-ExpressionAlgebrizerContext::ExpressionAlgebrizerContext(
-    const bool assertExprSort,
-    const bool assertPathSort,
-    const ProjectionName& rootProjection,
-    boost::optional<ProjectionName> uniqueIdPrefix)
+ExpressionAlgebrizerContext::ExpressionAlgebrizerContext(const bool assertExprSort,
+                                                         const bool assertPathSort,
+                                                         const ProjectionName& rootProjection,
+                                                         PrefixId& prefixId)
     : _assertExprSort(assertExprSort),
       _assertPathSort(assertPathSort),
       _rootProjection(rootProjection),
       _rootProjVar(make<Variable>(_rootProjection)),
-      _uniqueIdPrefix(std::move(uniqueIdPrefix)),
-      _prefixId() {}
+      _prefixId(prefixId) {}
 
 void ExpressionAlgebrizerContext::push(ABT node) {
     if (_assertExprSort) {
@@ -73,15 +71,8 @@ const ABT& ExpressionAlgebrizerContext::getRootProjVar() const {
     return _rootProjVar;
 }
 
-const boost::optional<ProjectionName>& ExpressionAlgebrizerContext::getUniqueIdPrefix() const {
-    return _uniqueIdPrefix;
-}
-
-ProjectionName ExpressionAlgebrizerContext::getNextId(const std::string& prefix) {
-    if (const auto& projName = _uniqueIdPrefix) {
-        return _prefixId.getNextId(str::stream() << *projName << "_" << prefix);
-    }
-    return _prefixId.getNextId(prefix);
+PrefixId& ExpressionAlgebrizerContext::getPrefixId() {
+    return _prefixId;
 }
 
 }  // namespace mongo::optimizer

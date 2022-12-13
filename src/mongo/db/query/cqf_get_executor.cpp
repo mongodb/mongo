@@ -77,6 +77,7 @@ static opt::unordered_map<std::string, optimizer::IndexDefinition> buildIndexSpe
     const CollectionPtr& collection,
     const boost::optional<BSONObj>& indexHint,
     const optimizer::ProjectionName& scanProjName,
+    PrefixId& prefixId,
     const DisableIndexOptions disableIndexOptions,
     bool& disableScan) {
     using namespace optimizer;
@@ -209,10 +210,8 @@ static opt::unordered_map<std::string, optimizer::IndexDefinition> buildIndexSpe
                 MatchExpressionParser::kBanAllSpecialFeatures);
 
             // We need a non-empty root projection name.
-            ABT exprABT = generateMatchExpression(expr.get(),
-                                                  false /*allowAggExpression*/,
-                                                  "<root>" /*rootProjection*/,
-                                                  boost::none /*uniquePrefix*/);
+            ABT exprABT = generateMatchExpression(
+                expr.get(), false /*allowAggExpression*/, "<root>" /*rootProjection*/, prefixId);
             exprABT = make<EvalFilter>(std::move(exprABT), make<Variable>(scanProjName));
 
             // TODO SERVER-70315: simplify partial filter expression.
@@ -403,6 +402,7 @@ static void populateAdditionalScanDefs(
                                                  collection,
                                                  indexHint,
                                                  scanProjName,
+                                                 prefixId,
                                                  disableIndexOptions,
                                                  disableScan);
         }
@@ -522,6 +522,7 @@ Metadata populateMetadata(boost::intrusive_ptr<ExpressionContext> expCtx,
                                              collection,
                                              indexHint,
                                              scanProjName,
+                                             prefixId,
                                              queryHints._disableIndexes,
                                              queryHints._disableScan);
     }
@@ -671,8 +672,12 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getSBEExecutorViaCascadesOp
     const std::string uuidStr = collectionExists ? collection->uuid().toString() : "<missing_uuid>";
     const std::string collNameStr = nss.coll().toString();
     const std::string scanDefName = collNameStr + "_" + uuidStr;
-    PrefixId prefixId;
+
+    // This is the instance we will use to generate variable names during translation and
+    // optimization.
+    auto prefixId = PrefixId::create(internalCascadesOptimizerUseDescriptiveVarNames.load());
     const ProjectionName& scanProjName = prefixId.getNextId("scan");
+
     QueryHints queryHints = getHintsFromQueryKnobs();
 
     ConstFoldFn constFold = ConstEval::constFold;

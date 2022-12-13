@@ -59,8 +59,8 @@ void ABTTransformerVisitor::visit(const GroupFromFirstDocumentTransformation* tr
 void ABTTransformerVisitor::visit(const ReplaceRootTransformation* transformer) {
     auto entry = _ctx.getNode();
     const ProjectionName projName{_ctx.getNextId("newRoot")};
-    ABT expr =
-        generateAggExpression(transformer->getExpression().get(), entry._rootProjection, projName);
+    ABT expr = generateAggExpression(
+        transformer->getExpression().get(), entry._rootProjection, _ctx.getPrefixId());
 
     _ctx.setNode<EvaluationNode>(projName, projName, std::move(expr), std::move(entry._node));
 }
@@ -160,7 +160,7 @@ void ABTTransformerVisitor::processComputedPaths(const projection_executor::Incl
         auto entry = _ctx.getNode();
         const ProjectionName getProjName{_ctx.getNextId("projGetPath")};
         ABT getExpr = generateAggExpression(
-            node.getExpressionForPath(computedPath).get(), rootProjection, getProjName);
+            node.getExpressionForPath(computedPath).get(), rootProjection, _ctx.getPrefixId());
 
         _ctx.setNode<EvaluationNode>(std::move(entry._rootProjection),
                                      getProjName,

@@ -31,6 +31,8 @@
 
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/optimizer/node.h"
+#include "mongo/db/query/optimizer/utils/utils.h"
+
 
 namespace mongo::optimizer {
 
@@ -40,7 +42,7 @@ namespace mongo::optimizer {
 ABT generateMatchExpression(const MatchExpression* expr,
                             bool allowAggExpressions,
                             const ProjectionName& rootProjection,
-                            boost::optional<ProjectionName> uniqueIdPrefix);
+                            PrefixId& prefixId);
 
 /**
  * Maximum number of paths conjunctions that we will decompose in match expressions during ABT

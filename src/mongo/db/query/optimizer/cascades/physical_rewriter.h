@@ -54,6 +54,7 @@ public:
 
     PhysicalRewriter(const Metadata& _metadata,
                      Memo& memo,
+                     PrefixId& prefixId,
                      GroupIdType rootGroupid,
                      const DebugInfo& debugInfo,
                      const QueryHints& hints,
@@ -75,7 +76,6 @@ public:
      */
     OptimizeGroupResult optimizeGroup(GroupIdType groupId,
                                       properties::PhysProps physProps,
-                                      PrefixId& prefixId,
                                       CostType costLimit);
 
 private:
@@ -84,17 +84,16 @@ private:
                                NodeCEMap nodeCEMap,
                                PhysicalRewriteType rule,
                                GroupIdType groupId,
-                               PrefixId& prefixId,
                                PhysOptimizationResult& bestResult);
 
     boost::optional<CostType> optimizeChildren(CostType nodeCost,
                                                ChildPropsType childProps,
-                                               PrefixId& prefixId,
                                                CostType costLimit);
 
     // We don't own any of this.
     const Metadata& _metadata;
     Memo& _memo;
+    PrefixId& _prefixId;
     const GroupIdType _rootGroupId;
     const CostEstimator& _costEstimator;
     const DebugInfo& _debugInfo;

@@ -47,7 +47,7 @@ using namespace unit_test_abt_literals;
 constexpr double kDefaultSelectivity = 0.1;
 
 DEATH_TEST_REGEX(Optimizer, HitIterationLimitInrunStructuralPhases, "Tripwire assertion.*6808700") {
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("scanProjection", "testColl");
     ABT evalNode = make<EvaluationNode>("evalProj1", Constant::int64(5), std::move(scanNode));
@@ -67,7 +67,7 @@ DEATH_TEST_REGEX(Optimizer,
                  LogicalWriterFailedToRewriteFixPointMemSubPhase,
                  "Tripwire assertion.*6808702") {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("ptest", "test");
     ABT collationNode = make<CollationNode>(
@@ -95,7 +95,7 @@ DEATH_TEST_REGEX(Optimizer,
                  LogicalWriterFailedToRewriteFixPointMemExpPhase,
                  "Tripwire assertion.*6808702") {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("ptest", "test");
     ABT collationNode = make<CollationNode>(
@@ -121,7 +121,7 @@ DEATH_TEST_REGEX(Optimizer,
 
 DEATH_TEST_REGEX(Optimizer, BadGroupID, "Tripwire assertion.*6808704") {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("ptest", "test");
     ABT collationNode = make<CollationNode>(
@@ -147,7 +147,7 @@ DEATH_TEST_REGEX(Optimizer, BadGroupID, "Tripwire assertion.*6808704") {
 
 DEATH_TEST_REGEX(Optimizer, EnvHasFreeVariables, "Tripwire assertion.*6808711") {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     auto rootNode = NodeBuilder{}
                         .root("p1", "p2")
@@ -168,7 +168,7 @@ DEATH_TEST_REGEX(Optimizer, EnvHasFreeVariables, "Tripwire assertion.*6808711") 
 
 DEATH_TEST_REGEX(Optimizer, RootHasNonexistentProjection, "Tripwire assertion.*7088003") {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     auto rootNode = NodeBuilder{}
                         .root("p1", "p2", "p3")
@@ -189,7 +189,7 @@ DEATH_TEST_REGEX(Optimizer, RootHasNonexistentProjection, "Tripwire assertion.*7
 
 DEATH_TEST_REGEX(Optimizer, FailedToRetrieveRID, "Tripwire assertion.*6808705") {
     using namespace properties;
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     ABT scanNode = make<ScanNode>("root", "c1");
 

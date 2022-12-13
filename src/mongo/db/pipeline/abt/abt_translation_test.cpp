@@ -205,8 +205,6 @@ TEST_F(ABTTranslationTest, SortTranslation) {
     testABTTranslationAndOptimization("$match sort", "[{$match: {'a': 10}}, {$sort: {'a': 1}}]");
 }
 
-}  // namespace
-
 TEST_F(ServiceContextTest, CanonicalQueryTranslation) {
     Metadata metadata({{"collection", createScanDef({}, {})}});
 
@@ -215,7 +213,7 @@ TEST_F(ServiceContextTest, CanonicalQueryTranslation) {
         fromjson("{find: 'collection', '$db': 'test', filter: {a: 10, b: 20, c:30}}"));
     auto statusWithCQ = CanonicalQuery::canonicalize(opCtx.get(), std::move(findCommand));
     ASSERT_OK(statusWithCQ.getStatus());
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     auto translation = translateCanonicalQueryToABT(metadata,
                                                     *(statusWithCQ.getValue()),
@@ -255,5 +253,72 @@ TEST_F(ServiceContextTest, CanonicalQueryTranslation) {
         "            Source []\n",
         translation);
 }
+
+TEST_F(ServiceContextTest, NonDescriptiveNames) {
+    auto prefixId = PrefixId::create(false /*useDescriptiveVarNames*/);
+    Metadata metadata({{"collection", createScanDef({}, {})}});
+
+    const std::string& pipeline = "[{$group: {_id: '$a.b', s: {$sum: {$multiply: ['$b', '$c']}}}}]";
+    const ProjectionName scanProjName = prefixId.getNextId("scan");
+
+    ABT translated =
+        translatePipeline(metadata, pipeline, scanProjName, "collection", prefixId, {});
+
+    // Observe projection names are not descriptive. They are of the form "pXXXX".
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       p4\n"
+        "|   RefBlock: \n"
+        "|       Variable [p4]\n"
+        "Evaluation []\n"
+        "|   BindBlock:\n"
+        "|       [p4]\n"
+        "|           EvalPath []\n"
+        "|           |   Const [{}]\n"
+        "|           PathComposeM []\n"
+        "|           |   PathField [s]\n"
+        "|           |   PathConstant []\n"
+        "|           |   Variable [p2]\n"
+        "|           PathField [_id]\n"
+        "|           PathConstant []\n"
+        "|           Variable [p1]\n"
+        "GroupBy []\n"
+        "|   |   groupings: \n"
+        "|   |       RefBlock: \n"
+        "|   |           Variable [p1]\n"
+        "|   aggregations: \n"
+        "|       [p2]\n"
+        "|           FunctionCall [$sum]\n"
+        "|           Variable [p3]\n"
+        "Evaluation []\n"
+        "|   BindBlock:\n"
+        "|       [p3]\n"
+        "|           BinaryOp [Mult]\n"
+        "|           |   EvalPath []\n"
+        "|           |   |   Variable [p0]\n"
+        "|           |   PathGet [c]\n"
+        "|           |   PathIdentity []\n"
+        "|           EvalPath []\n"
+        "|           |   Variable [p0]\n"
+        "|           PathGet [b]\n"
+        "|           PathIdentity []\n"
+        "Evaluation []\n"
+        "|   BindBlock:\n"
+        "|       [p1]\n"
+        "|           EvalPath []\n"
+        "|           |   Variable [p0]\n"
+        "|           PathGet [a]\n"
+        "|           PathTraverse [inf]\n"
+        "|           PathGet [b]\n"
+        "|           PathIdentity []\n"
+        "Scan [collection]\n"
+        "    BindBlock:\n"
+        "        [p0]\n"
+        "            Source []\n",
+        translated);
+}
+
+}  // namespace
 
 }  // namespace mongo::optimizer

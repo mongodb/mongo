@@ -145,7 +145,7 @@ TEST_F(ABTSBE, Lower5) {
 }
 
 TEST_F(ABTSBE, Lower6) {
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     auto [tagObj, valObj] = sbe::value::makeNewObject();
     auto obj = sbe::value::getObjectView(valObj);
@@ -196,7 +196,7 @@ TEST_F(ABTSBE, Lower6) {
 }
 
 TEST_F(ABTSBE, Lower7) {
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
 
     auto [tagArr, valArr] = sbe::value::makeNewArray();
     auto arr = sbe::value::getArrayView(valArr);
@@ -343,7 +343,7 @@ TEST_F(ABTSBE, LowerFunctionCallTypeMatch) {
 }
 
 TEST_F(NodeSBE, Lower1) {
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
     Metadata metadata{{}};
 
     OperationContextNoop noop;
@@ -446,7 +446,7 @@ TEST_F(NodeSBE, Lower2) {
     // We have to fake some metadata for this to work.
     ScanDefOptions scanDefOptions = {
         {"type", "mongod"}, {"database", "test"}, {"uuid", "11111111-1111-1111-1111-111111111111"}};
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
     auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase,
          OptPhase::MemoExplorationPhase,
@@ -586,7 +586,7 @@ TEST_F(NodeSBE, Lower2) {
 }
 
 TEST_F(NodeSBE, RequireRID) {
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
     Metadata metadata{{}};
 
     OperationContextNoop noop;
@@ -719,7 +719,7 @@ private:
 TEST_F(NodeSBE, SpoolFibonacci) {
     using namespace unit_test_abt_literals;
 
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
     Metadata metadata{{}};
 
     // Construct a spool-based recursive plan to compute the first 10 Fibonacci numbers. The main

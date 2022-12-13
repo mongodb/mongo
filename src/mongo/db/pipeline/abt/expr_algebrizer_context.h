@@ -42,7 +42,7 @@ public:
     ExpressionAlgebrizerContext(bool assertExprSort,
                                 bool assertPathSort,
                                 const ProjectionName& rootProjection,
-                                boost::optional<ProjectionName> uniqueIdPrefix);
+                                PrefixId& prefixId);
 
     /**
      * Push an ABT onto the stack. Optionally perform a check on the type of the ABT based on
@@ -67,12 +67,15 @@ public:
     const ProjectionName& getRootProjection() const;
     const ABT& getRootProjVar() const;
 
-    const boost::optional<ProjectionName>& getUniqueIdPrefix() const;
+    PrefixId& getPrefixId();
 
     /**
      * Returns a unique projection. It will be prefixed by 'uniqueIdPrefix'.
      */
-    ProjectionName getNextId(const std::string& prefix);
+    template <size_t N>
+    ProjectionName getNextId(const char (&prefix)[N]) {
+        return _prefixId.getNextId(prefix);
+    }
 
     void enterElemMatch(const MatchExpression::MatchType matchType) {
         _elemMatchStack.push_back(matchType);
@@ -116,8 +119,7 @@ private:
     const ABT _rootProjVar;
 
     // Used to vend out unique strings for projection names.
-    const boost::optional<ProjectionName> _uniqueIdPrefix;
-    PrefixId _prefixId;
+    PrefixId& _prefixId;
 
     // Used to track the parts of the expression tree that have so far been translated to ABT.
     // Maintained as a stack so parent expressions can easily compose the ABTs representing their

@@ -220,6 +220,7 @@ void OptPhaseManager::runMemoPhysicalRewrite(const OptPhase phase,
 
     PhysicalRewriter rewriter(_metadata,
                               _memo,
+                              _prefixId,
                               rootGroupId,
                               _debugInfo,
                               _hints,
@@ -229,7 +230,7 @@ void OptPhaseManager::runMemoPhysicalRewrite(const OptPhase phase,
                               logicalRewriter);
 
     auto optGroupResult =
-        rewriter.optimizeGroup(rootGroupId, std::move(physProps), _prefixId, CostType::kInfinity);
+        rewriter.optimizeGroup(rootGroupId, std::move(physProps), CostType::kInfinity);
     tassert(6808706, "Optimization failed.", optGroupResult._success);
 
     _physicalNodeId = {rootGroupId, optGroupResult._index};

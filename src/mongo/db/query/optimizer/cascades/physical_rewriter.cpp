@@ -106,6 +106,7 @@ private:
 
 PhysicalRewriter::PhysicalRewriter(const Metadata& metadata,
                                    Memo& memo,
+                                   PrefixId& prefixId,
                                    const GroupIdType rootGroupId,
                                    const DebugInfo& debugInfo,
                                    const QueryHints& hints,
@@ -115,6 +116,7 @@ PhysicalRewriter::PhysicalRewriter(const Metadata& metadata,
                                    std::unique_ptr<LogicalRewriter>& logicalRewriter)
     : _metadata(metadata),
       _memo(memo),
+      _prefixId(prefixId),
       _rootGroupId(rootGroupId),
       _costEstimator(costEstimator),
       _debugInfo(debugInfo),
@@ -147,7 +149,6 @@ void PhysicalRewriter::costAndRetainBestNode(std::unique_ptr<ABT> node,
                                              NodeCEMap nodeCEMap,
                                              const PhysicalRewriteType rule,
                                              const GroupIdType groupId,
-                                             PrefixId& prefixId,
                                              PhysOptimizationResult& bestResult) {
     const CostAndCE nodeCostAndCE = _costEstimator.deriveCost(
         _metadata, _memo, bestResult._physProps, node->ref(), childProps, nodeCEMap);
@@ -161,7 +162,7 @@ void PhysicalRewriter::costAndRetainBestNode(std::unique_ptr<ABT> node,
 
     const CostType childCostLimit =
         bestResult._nodeInfo ? bestResult._nodeInfo->_cost : bestResult._costLimit;
-    const auto cost = optimizeChildren(nodeCost, childProps, prefixId, childCostLimit);
+    const auto cost = optimizeChildren(nodeCost, childProps, childCostLimit);
     const bool improvement = cost && (!bestResult._nodeInfo || *cost < bestResult._nodeInfo->_cost);
 
     if (_debugInfo.hasDebugLevel(3)) {
@@ -196,7 +197,6 @@ void PhysicalRewriter::costAndRetainBestNode(std::unique_ptr<ABT> node,
  */
 boost::optional<CostType> PhysicalRewriter::optimizeChildren(const CostType nodeCost,
                                                              ChildPropsType childProps,
-                                                             PrefixId& prefixId,
                                                              const CostType costLimit) {
     const bool disableBranchAndBound = _hints._disableBranchAndBound;
 
@@ -210,7 +210,7 @@ boost::optional<CostType> PhysicalRewriter::optimizeChildren(const CostType node
 
         const CostType childCostLimit =
             disableBranchAndBound ? CostType::kInfinity : (costLimit - totalCost);
-        auto optGroupResult = optimizeGroup(groupId, std::move(props), prefixId, childCostLimit);
+        auto optGroupResult = optimizeGroup(groupId, std::move(props), childCostLimit);
         if (!optGroupResult._success) {
             return boost::none;
         }
@@ -240,7 +240,6 @@ PhysicalRewriter::OptimizeGroupResult::OptimizeGroupResult(const size_t index, c
 
 PhysicalRewriter::OptimizeGroupResult PhysicalRewriter::optimizeGroup(const GroupIdType groupId,
                                                                       PhysProps physProps,
-                                                                      PrefixId& prefixId,
                                                                       CostType costLimit) {
     const size_t localPlanExplorationCount = ++_memo._stats._physPlanExplorationCount;
     if (_debugInfo.hasDebugLevel(2)) {
@@ -367,7 +366,7 @@ PhysicalRewriter::OptimizeGroupResult PhysicalRewriter::optimizeGroup(const Grou
                         _memo,
                         _hints,
                         _ridProjections,
-                        prefixId,
+                        _prefixId,
                         bestResult._physProps,
                         queue,
                         logicalProps,
@@ -391,7 +390,6 @@ PhysicalRewriter::OptimizeGroupResult PhysicalRewriter::optimizeGroup(const Grou
                                   std::move(nodeCEMap),
                                   rewrite._rule,
                                   groupId,
-                                  prefixId,
                                   bestResult);
         }
     }

@@ -830,6 +830,14 @@ server_parameters:
     default: false
     test_only: true
 
+  internalCascadesOptimizerUseDescriptiveVarNames:
+    description: "Enables generation of descriptive variable names to aid debugging."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalCascadesOptimizerUseDescriptiveVarNames"
+    cpp_vartype: AtomicWord<bool>
+    default: false
+    test_only: true
+
   internalQueryFrameworkControl:
     description: "Knob to control the optimizer/execution engine to use."
     set_at: [ startup, runtime ]

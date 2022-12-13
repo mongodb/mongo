@@ -95,7 +95,7 @@ ABT createValueArray(const std::vector<std::string>& jsonVector) {
 std::vector<BSONObj> runSBEAST(OperationContext* opCtx,
                                const std::string& pipelineStr,
                                const std::vector<std::string>& jsonVector) {
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
     Metadata metadata{{}};
 
     auto pipeline = parsePipeline(pipelineStr, NamespaceString("test"), opCtx);

@@ -70,7 +70,8 @@ public:
         return _node;
     }
 
-    ProjectionName getNextId(const std::string& prefix) {
+    template <size_t N>
+    ProjectionName getNextId(const char (&prefix)[N]) {
         return _prefixId.getNextId(prefix);
     }
 

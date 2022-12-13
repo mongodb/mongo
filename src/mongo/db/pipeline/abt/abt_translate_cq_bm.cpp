@@ -59,7 +59,7 @@ public:
         auto nss = NamespaceString("test.bm");
 
         Metadata metadata{{}};
-        PrefixId prefixId;
+        auto prefixId = PrefixId::createForTests();
         ProjectionName scanProjName{prefixId.getNextId("scan")};
 
         auto findCommand = std::make_unique<FindCommandRequest>(nss);

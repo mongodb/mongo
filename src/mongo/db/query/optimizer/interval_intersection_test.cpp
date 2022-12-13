@@ -46,7 +46,7 @@ namespace {
 
 ABT optimizedQueryPlan(const std::string& query,
                        const opt::unordered_map<std::string, IndexDefinition>& indexes) {
-    PrefixId prefixId;
+    auto prefixId = PrefixId::createForTests();
     std::string scanDefName = "coll";
     Metadata metadata = {{{scanDefName, createScanDef({}, indexes)}}};
     ABT translated = translatePipeline(
