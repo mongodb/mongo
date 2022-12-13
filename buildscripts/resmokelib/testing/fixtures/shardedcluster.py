@@ -113,8 +113,7 @@ class ShardedClusterFixture(interface.Fixture):
 
     def get_shard_ids(self):
         """Get the list of shard ids in the cluster."""
-        client = self.mongo_client()
-        interface.authenticate(client, self.auth_options)
+        client = interface.build_client(self, self.auth_options)
         res = client.admin.command("listShards")
         return [shard_info["_id"] for shard_info in res["shards"]]
 
@@ -137,8 +136,7 @@ class ShardedClusterFixture(interface.Fixture):
             # Wait for the mongos.
             mongos.await_ready()
 
-        client = self.mongo_client()
-        interface.authenticate(client, self.auth_options)
+        client = interface.build_client(self, self.auth_options)
 
         # Turn off the balancer if it is not meant to be enabled.
         if not self.enable_balancer:
@@ -182,36 +180,34 @@ class ShardedClusterFixture(interface.Fixture):
             ) + ShardedClusterFixture.AWAIT_SHARDING_INITIALIZATION_TIMEOUT_SECS
             timeout_occurred = lambda: deadline - time.time() <= 0.0
 
-            mongod_clients = [(mongod.mongo_client(), mongod.port) for shard in self.shards
-                              for mongod in shard.nodes]
+            for shard in self.shards:
+                for mongod in shard.nodes:
 
-            for client, port in mongod_clients:
-                interface.authenticate(client, self.auth_options)
+                    client = interface.build_client(mongod, self.auth_options)
+                    port = mongod.port
 
-                while True:
-                    # The choice of namespace (local.fooCollection) does not affect the output.
-                    get_shard_version_result = client.admin.command(
-                        "getShardVersion", "local.fooCollection", check=False)
-                    if get_shard_version_result["ok"]:
-                        break
+                    while True:
+                        # The choice of namespace (local.fooCollection) does not affect the output.
+                        get_shard_version_result = client.admin.command(
+                            "getShardVersion", "local.fooCollection", check=False)
+                        if get_shard_version_result["ok"]:
+                            break
 
-                    if timeout_occurred():
-                        raise self.fixturelib.ServerFailure(
-                            "mongod on port: {} failed waiting for getShardVersion success after {} seconds"
-                            .format(port, interface.Fixture.AWAIT_READY_TIMEOUT_SECS))
-                    time.sleep(0.1)
+                        if timeout_occurred():
+                            raise self.fixturelib.ServerFailure(
+                                "mongod on port: {} failed waiting for getShardVersion success after {} seconds"
+                                .format(port, interface.Fixture.AWAIT_READY_TIMEOUT_SECS))
+                        time.sleep(0.1)
 
     def stop_balancer(self, timeout_ms=60000):
         """Stop the balancer."""
-        client = self.mongo_client()
-        interface.authenticate(client, self.auth_options)
+        client = interface.build_client(self, self.auth_options)
         client.admin.command({"balancerStop": 1}, maxTimeMS=timeout_ms)
         self.logger.info("Stopped the balancer")
 
     def start_balancer(self, timeout_ms=60000):
         """Start the balancer."""
-        client = self.mongo_client()
-        interface.authenticate(client, self.auth_options)
+        client = interface.build_client(self, self.auth_options)
         client.admin.command({"balancerStart": 1}, maxTimeMS=timeout_ms)
         self.logger.info("Started the balancer")
 

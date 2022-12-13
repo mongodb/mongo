@@ -488,14 +488,14 @@ class _InitialSyncThread(threading.Thread):
                 client = mongos_fixture.mongo_client()
             except pymongo.errors.AutoReconnect:
                 pass
-            for db in client.database_names():
+            for db in client.list_database_names():
                 self.logger.info("Waiting for mongos %s to retarget db: %s", mongos_conn_str, db)
                 start_time = time.time()
                 while True:
                     try:
-                        coll_names = client[db].collection_names()
+                        coll_names = client[db].list_collection_names()
                         break
-                    except pymongo.errors.NotMasterError:
+                    except pymongo.errors.NotPrimaryError:
                         pass
                     retarget_time = time.time() - start_time
                     if retarget_time >= 60:
@@ -508,7 +508,7 @@ class _InitialSyncThread(threading.Thread):
                         try:
                             client[db].command({"collStats": coll})
                             break
-                        except pymongo.errors.NotMasterError:
+                        except pymongo.errors.NotPrimaryError:
                             pass
                         retarget_time = time.time() - start_time
                         if retarget_time >= 60:

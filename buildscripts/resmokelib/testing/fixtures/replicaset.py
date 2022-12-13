@@ -153,8 +153,7 @@ class ReplicaSetFixture(interface.ReplFixture):
             members.append(member_config)
 
         repl_config = {"_id": self.replset_name, "protocolVersion": 1}
-        client = self.nodes[0].mongo_client()
-        interface.authenticate(client, self.auth_options)
+        client = interface.build_client(self.nodes[0], self.auth_options)
 
         if client.local.system.replset.count_documents(filter={}):
             # Skip initializing the replset if there is an existing configuration.
@@ -283,8 +282,7 @@ class ReplicaSetFixture(interface.ReplFixture):
 
     def await_last_op_committed(self, timeout_secs=None):
         """Wait for the last majority committed op to be visible."""
-        primary_client = self.get_primary().mongo_client()
-        interface.authenticate(primary_client, self.auth_options)
+        primary_client = interface.build_client(self.get_primary(), self.auth_options)
 
         primary_optime = get_last_optime(primary_client, self.fixturelib)
         up_to_date_nodes = set()
@@ -363,8 +361,7 @@ class ReplicaSetFixture(interface.ReplFixture):
 
         # Since this method is called at startup we expect the first node to be primary even when
         # self.all_nodes_electable is True.
-        primary_client = self.nodes[0].mongo_client()
-        interface.authenticate(primary_client, self.auth_options)
+        primary_client = interface.build_client(self.nodes[0], self.auth_options)
 
         # All nodes must be in primary/secondary state prior to this point. Perform a majority
         # write to ensure there is a committed operation on the set. The commit point will
@@ -377,8 +374,8 @@ class ReplicaSetFixture(interface.ReplFixture):
         for node in self.nodes:
             self.logger.info("Waiting for node on port %d to have a stable recovery timestamp.",
                              node.port)
-            client = node.mongo_client(read_preference=pymongo.ReadPreference.SECONDARY)
-            interface.authenticate(client, self.auth_options)
+            client = interface.build_client(node, self.auth_options,
+                                            read_preference=pymongo.ReadPreference.SECONDARY)
 
             client_admin = client["admin"]
 
@@ -435,8 +432,7 @@ class ReplicaSetFixture(interface.ReplFixture):
 
         self.logger.info("Waiting to remove all 'newlyAdded' fields")
         primary = self.get_primary()
-        client = primary.mongo_client()
-        interface.authenticate(client, self.auth_options)
+        client = interface.build_client(primary, self.auth_options)
         while self._should_await_newly_added_removals_longer(client):
             time.sleep(0.1)  # Wait a little bit before trying again.
         self.logger.info("All 'newlyAdded' fields removed")
@@ -531,8 +527,7 @@ class ReplicaSetFixture(interface.ReplFixture):
 
                 try:
                     if node.port not in clients:
-                        clients[node.port] = interface.authenticate(node.mongo_client(),
-                                                                    self.auth_options)
+                        clients[node.port] = interface.build_client(node, self.auth_options)
 
                     if fn(clients[node.port], node):
                         return node
@@ -613,7 +608,7 @@ class ReplicaSetFixture(interface.ReplFixture):
 
                 return self.nodes[chosen_index]
 
-        primary_client = interface.authenticate(primary.mongo_client(), auth_options)
+        primary_client = interface.build_client(primary, auth_options)
         retry_time_secs = self.AWAIT_REPL_TIMEOUT_MINS * 60
         retry_start_time = time.time()
 
@@ -654,7 +649,7 @@ class ReplicaSetFixture(interface.ReplFixture):
             self.logger.info(
                 "Attempting to step up the chosen secondary on port %d of replica set '%s'.",
                 node.port, self.replset_name)
-            client = interface.authenticate(node.mongo_client(), auth_options)
+            client = interface.build_client(node, auth_options)
             client.admin.command("replSetStepUp")
             return True
         except pymongo.errors.OperationFailure:

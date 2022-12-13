@@ -250,3 +250,6 @@ test_success.ninja
 
 # test report generation result
 report.json
+
+# suggested resmoke binary location
+dist-test/

@@ -158,7 +158,7 @@ class TenantMigrationFixture(interface.MultiClusterFixture):
     def _create_tenant_migration_donor_and_recipient_roles(self, rs):
         """Create a role for tenant migration donor and recipient."""
         primary = rs.get_primary()
-        primary_client = interface.authenticate(primary.mongo_client(), self.auth_options)
+        primary_client = interface.build_client(primary, self.auth_options)
 
         try:
             primary_client.admin.command({

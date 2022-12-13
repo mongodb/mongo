@@ -303,7 +303,7 @@ class _StepdownThread(threading.Thread):
             fixture.get_primary()
 
     def _create_client(self, node):
-        return fixture_interface.authenticate(node.mongo_client(), self._auth_options)
+        return fixture_interface.build_client(node, self._auth_options)
 
     def _step_down_all(self):
         for rs_fixture in self._rs_fixtures:
@@ -414,14 +414,14 @@ class _StepdownThread(threading.Thread):
                 client = self._create_client(mongos_fixture)
             except pymongo.errors.AutoReconnect:
                 pass
-            for db in client.database_names():
+            for db in client.list_database_names():
                 self.logger.info("Waiting for mongos %s to retarget db: %s", mongos_conn_str, db)
                 start_time = time.time()
                 while True:
                     try:
-                        coll_names = client[db].collection_names()
+                        coll_names = client[db].list_collection_names()
                         break
-                    except pymongo.errors.NotMasterError:
+                    except pymongo.errors.NotPrimaryError:
                         pass
                     retarget_time = time.time() - start_time
                     if retarget_time >= 60:
@@ -434,7 +434,7 @@ class _StepdownThread(threading.Thread):
                         try:
                             client[db].command({"collStats": coll})
                             break
-                        except pymongo.errors.NotMasterError:
+                        except pymongo.errors.NotPrimaryError:
                             pass
                         retarget_time = time.time() - start_time
                         if retarget_time >= 60:

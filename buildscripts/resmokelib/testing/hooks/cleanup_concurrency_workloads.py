@@ -59,7 +59,7 @@ class CleanupConcurrencyWorkloadsTestCase(interface.DynamicTestCase):
         """Execute drop databases hook."""
         same_db_name = None
         client = self._hook.fixture.mongo_client()
-        db_names = client.database_names()
+        db_names = client.list_database_names()
 
         exclude_dbs = copy.copy(self._hook.exclude_dbs)
         if self._hook.same_db_name:
@@ -84,7 +84,7 @@ class CleanupConcurrencyWorkloadsTestCase(interface.DynamicTestCase):
         if self._hook.same_collection_name and same_db_name:
             self.logger.info("Dropping all collections in db %s except for %s", same_db_name,
                              self._hook.same_collection_name)
-            colls = client[same_db_name].collection_names()
+            colls = client[same_db_name].list_collection_names()
             for coll in [coll for coll in colls if coll != self._hook.same_collection_name]:
                 self.logger.info("Dropping db %s collection %s", same_db_name, coll)
                 try:

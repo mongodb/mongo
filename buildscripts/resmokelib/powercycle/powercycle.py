@@ -1214,19 +1214,19 @@ def mongo_seed_docs(mongo, db_name, coll_name, num_docs):
             random.choice(string.ascii_letters) for _ in range(random.randint(1, max_length)))
 
     LOGGER.info("Seeding DB '%s' collection '%s' with %d documents, %d already exist", db_name,
-                coll_name, num_docs, mongo[db_name][coll_name].count())
+                coll_name, num_docs, mongo[db_name][coll_name].estimated_document_count())
     random.seed()
     base_num = 100000
     bulk_num = min(num_docs, 10000)
     bulk_loops = num_docs // bulk_num
     for _ in range(bulk_loops):
-        num_coll_docs = mongo[db_name][coll_name].count()
+        num_coll_docs = mongo[db_name][coll_name].estimated_document_count()
         if num_coll_docs >= num_docs:
             break
         mongo[db_name][coll_name].insert_many(
             [{"x": random.randint(0, base_num), "doc": rand_string(1024)} for _ in range(bulk_num)])
     LOGGER.info("After seeding there are %d documents in the collection",
-                mongo[db_name][coll_name].count())
+                mongo[db_name][coll_name].estimated_document_count())
     return 0
 
 

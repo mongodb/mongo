@@ -1,6 +1,6 @@
 # Core (we need these for most buildscripts)
 psutil <= 5.8.0
-pymongo >= 3.9, < 4.0
+pymongo == 4.3.3
 PyYAML >= 3.0.0, <= 6.0.0
 types-PyYAML ~= 6.0.5
 requests >= 2.0.0, <= 2.26.0

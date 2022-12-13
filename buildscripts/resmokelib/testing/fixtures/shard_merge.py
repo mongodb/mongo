@@ -159,7 +159,7 @@ class ShardMergeFixture(interface.MultiClusterFixture):  # pylint: disable=too-m
     def _create_shard_merge_donor_and_recipient_roles(self, rs):
         """Create a role for shard merge donor and recipient."""
         primary = rs.get_primary()
-        primary_client = interface.authenticate(primary.mongo_client(), self.auth_options)
+        primary_client = interface.build_client(primary, self.auth_options)
 
         try:
             primary_client.admin.command({

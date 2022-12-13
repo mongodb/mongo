@@ -138,8 +138,7 @@ class TalkDirectlyToShardsvrsFixture(interface.MultiClusterFixture):
             self.logger.info("Adding %s as a shard...", connection_string)
 
             config_primary = self.configsvr.get_primary()
-            config_primary_client = interface.authenticate(config_primary.mongo_client(),
-                                                           self.auth_options)
+            config_primary_client = interface.build_client(config_primary, self.auth_options)
 
             try:
                 config_primary_client.admin.command(

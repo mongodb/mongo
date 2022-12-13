@@ -21,7 +21,7 @@ from buildscripts.resmokelib.testing.hooks import bghook
 
 def validate(mdb, logger, acceptable_err_codes):
     """Return true if all collections are valid."""
-    for db in mdb.database_names():
+    for db in mdb.list_database_names():
         for coll in mdb.get_database(db).list_collection_names():
             res = mdb.get_database(db).command({"validate": coll}, check=False)
 

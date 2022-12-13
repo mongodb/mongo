@@ -35,7 +35,7 @@ import logging
 import os
 import sys
 from tempfile import TemporaryDirectory
-from typing import Dict, List, Set
+from typing import Any, Dict, List, Mapping, Set
 
 from pymongo import MongoClient
 
@@ -112,8 +112,8 @@ def list_commands_for_api(api_version: str, mongod_or_mongos: str, install_dir: 
     fixture.await_ready()
 
     try:
-        client = MongoClient(fixture.get_driver_connection_url())
-        reply = client.admin.command('listCommands')
+        client = MongoClient(fixture.get_driver_connection_url())  # type: MongoClient
+        reply = client.admin.command('listCommands')  # type: Mapping[str, Any]
         commands = {
             name
             for name, info in reply['commands'].items() if api_version in info['apiVersions']
