@@ -132,7 +132,7 @@ public:
                 Shard::RetryPolicy::kNoRetry);
 
             auto response = uassertStatusOK(ars.next().swResponse);
-            return Response(response.data);
+            return Response(response.data, shardId.toString());
         }
 
     private:

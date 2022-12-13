@@ -56,6 +56,9 @@ structs:
       response:
         description: "Response of the write command."
         type: object
+      shardId:
+        description: "The shard id of the target shard for the write."
+        type: string
 commands:
   _clusterQueryWithoutShardKey:
     command_name: _clusterQueryWithoutShardKey
