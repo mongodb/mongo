@@ -34,6 +34,7 @@
 
 #include "mongo/db/global_index.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/logv2/redaction.h"
@@ -78,7 +79,8 @@ BSONObj makeOplogEntryDoc(OpTime opTime,
     builder.append(OplogEntryBase::kTermFieldName, opTime.getTerm());
     builder.append(OplogEntryBase::kVersionFieldName, version);
     builder.append(OplogEntryBase::kOpTypeFieldName, OpType_serializer(opType));
-    if (nss.tenantId() && serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+    if (nss.tenantId() && gMultitenancySupport &&
+        serverGlobalParams.featureCompatibility.isVersionInitialized() &&
         gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)) {
         nss.tenantId()->serializeToBSON(OplogEntryBase::kTidFieldName, &builder);
     }
@@ -222,7 +224,7 @@ void ReplOperation::extractPrePostImageForTransaction(boost::optional<ImageBundl
 }
 
 void ReplOperation::setTid(boost::optional<mongo::TenantId> value) & {
-    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+    if (gMultitenancySupport && serverGlobalParams.featureCompatibility.isVersionInitialized() &&
         gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))
         DurableReplOperation::setTid(value);
 }
@@ -364,7 +366,7 @@ StatusWith<MutableOplogEntry> MutableOplogEntry::parse(const BSONObj& object) {
 }
 
 void MutableOplogEntry::setTid(boost::optional<mongo::TenantId> value) & {
-    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+    if (gMultitenancySupport && serverGlobalParams.featureCompatibility.isVersionInitialized() &&
         gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility))
         getDurableReplOperation().setTid(std::move(value));
 }
