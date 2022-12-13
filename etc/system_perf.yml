@@ -1730,9 +1730,9 @@ buildvariants:
       - name: snapshot_reads
       - name: linkbench
       - name: linkbench2
-      # - name: tsbs_load
-      # - name: tsbs_query
-      # - name: tsbs_query_manual_bucketing
+      - name: tsbs_load
+      - name: tsbs_query
+      - name: tsbs_query_manual_bucketing
       - name: tpcc
 
   - name: linux-standalone-audit.2022-11
@@ -2089,9 +2089,9 @@ buildvariants:
       - name: tpcc
       - name: linkbench
       - name: linkbench2
-      # - name: tsbs_load
-      # - name: tsbs_query
-      # - name: tsbs_query_manual_bucketing
+      - name: tsbs_load
+      - name: tsbs_query
+      - name: tsbs_query_manual_bucketing
 
   - name: linux-3-node-replSet-intel.2022-11
     display_name: Linux 3-Node ReplSet Intel 2022-11
@@ -2165,6 +2165,7 @@ buildvariants:
       # TODO: Enable in SERVER-66572.
       - name: linkbench
       - name: linkbench2
+      # Time-series collections are available since v5.0.
       # - name: tsbs_load
       # - name: tsbs_query
       # - name: tsbs_query_manual_bucketing
@@ -2214,6 +2215,7 @@ buildvariants:
       # TODO: Enable in SERVER-66572.
       - name: linkbench
       - name: linkbench2
+      # Time-series collections are available since v5.0.
       # - name: tsbs_load
       # - name: tsbs_query
       # - name: tsbs_query_manual_bucketing
