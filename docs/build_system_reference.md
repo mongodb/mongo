@@ -349,7 +349,7 @@ Graph Schema version:
 2
 
 Build invocation:
-"/home/ubuntu/venv/bin/python" "buildscripts/scons.py" "--variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars" "--cache=all" "--cache-dir=/home/ubuntu/scons-cache" "--link-model=dynamic" "--build-tools=next" "ICECC=icecc" "CCACHE=ccache" "-j200" "--cache-signature-mode=validate" "--cache-debug=-" "generate-libdeps-graph"
+"/home/ubuntu/venv/bin/python" "buildscripts/scons.py" "--variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars" "--cache=all" "--cache-dir=/home/ubuntu/scons-cache" "--link-model=dynamic" "--build-tools=next" "ICECC=icecc" "CCACHE=ccache" "-j200" "--cache-signature-mode=validate" "--cache-debug=-" "generate-libdeps-graph"
 
 Nodes in Graph: 867
 Edges in Graph: 90706

@@ -64,7 +64,7 @@ def main():
 
     ##############################
     else:
-        for toolchain in ['v3', 'v4']:
+        for toolchain in ['v4']:
             # possibly we want to add clang to the mix here, so leaving as an easy drop in
             for compiler in ['gcc']:
                 for link_model in ['dynamic', 'static']:

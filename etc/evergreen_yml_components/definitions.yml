@@ -2576,6 +2576,7 @@ tasks:
       separate_debug: off
       task_compile_flags: >-
         --build-profile=san
+        --linker=lld
         CCACHE=
         ICECC=
   - *f_expansions_write

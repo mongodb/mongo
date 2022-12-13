@@ -13,7 +13,7 @@ export MYPY="$(
   else
     PATH+=":${workdir}/venv_3/bin"
   fi
-  PATH+=':/opt/mongodbtoolchain/v3/bin'
+  PATH+=':/opt/mongodbtoolchain/v4/bin'
   which mypy
 )"
 echo "Found mypy executable at '$MYPY'"

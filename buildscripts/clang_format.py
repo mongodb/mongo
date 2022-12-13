@@ -56,6 +56,7 @@ CLANG_FORMAT_HTTP_LINUX_CACHE = "https://s3.amazonaws.com/boxes.10gen.com/build/
 
 CLANG_FORMAT_HTTP_DARWIN_CACHE = "https://s3.amazonaws.com/boxes.10gen.com/build/clang-format-7.0.1-x86_64-apple-darwin.tar.gz"
 
+# TODO: Move clang format to the v4 toolchain
 CLANG_FORMAT_TOOLCHAIN_PATH = "/opt/mongodbtoolchain/v3/bin/clang-format"
 
 # Path in the tarball to the clang-format binary

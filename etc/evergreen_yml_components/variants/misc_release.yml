@@ -17,7 +17,7 @@ buildvariants:
       --ssl
       MONGO_DISTMOD=amazon2
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     multiversion_platform: amazon2
     multiversion_edition: targeted
     has_packages: true
@@ -82,7 +82,7 @@ buildvariants:
       --ssl
       MONGO_DISTMOD=amazon2
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
@@ -141,7 +141,7 @@ buildvariants:
       --ssl
       MONGO_DISTMOD=amazon2
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux
     has_packages: true
     packager_script: packager.py
@@ -202,7 +202,7 @@ buildvariants:
       --ssl
       MONGO_DISTMOD=amazon2
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
@@ -320,7 +320,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: aarch64-amazon2022
-    compile_flags: --ssl MONGO_DISTMOD=amazon2022 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=amazon2022 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux
     has_packages: true
     packager_script: packager.py
@@ -373,7 +373,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: aarch64-enterprise-amazon2022
-    compile_flags: --ssl MONGO_DISTMOD=amazon2022 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=amazon2022 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     # TODO BUILD-13887 should fix uses_pykmip incompatibility.
     test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux,requires_ldap_pool,uses_pykmip,requires_v4_0
@@ -499,7 +499,7 @@ buildvariants:
       --ssl
       MONGO_DISTMOD=debian10
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     multiversion_platform: debian10
     multiversion_edition: targeted
     has_packages: true
@@ -562,7 +562,7 @@ buildvariants:
       --ssl
       MONGO_DISTMOD=debian10
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
       -Wl,--no-gnu-unique"
@@ -619,7 +619,7 @@ buildvariants:
       --ssl
       MONGO_DISTMOD=debian11
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     multiversion_platform: debian11
     multiversion_edition: targeted
     has_packages: true
@@ -681,7 +681,7 @@ buildvariants:
     compile_flags: >-
       --ssl MONGO_DISTMOD=debian11
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
@@ -736,7 +736,7 @@ buildvariants:
     compile_flags: >-
       --ssl MONGO_DISTMOD=rhel70
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     multiversion_platform: rhel70
     multiversion_edition: targeted
     has_packages: true
@@ -789,7 +789,7 @@ buildvariants:
     compile_flags: >-
       --ssl MONGO_DISTMOD=rhel70
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     compile_variant: rhel76_compile_rhel70
   tasks:
   - name: compile_and_archive_dist_test_then_package_TG
@@ -811,7 +811,7 @@ buildvariants:
       MONGO_DISTMOD=rhel80
       --opt=on
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     tooltags: ""
     build_mongoreplay: true
     test_flags: >-
@@ -838,7 +838,7 @@ buildvariants:
     compile_flags: >-
       --ssl MONGO_DISTMOD=rhel80
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     multiversion_platform: rhel80
     multiversion_edition: targeted
     has_packages: true
@@ -900,7 +900,7 @@ buildvariants:
     compile_flags: >-
       --ssl MONGO_DISTMOD=rhel80
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CFLAGS="-fno-gnu-unique"
@@ -1019,7 +1019,7 @@ buildvariants:
     compile_flags: >-
       --ssl MONGO_DISTMOD=rhel82
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     has_packages: true
     packager_script: packager.py
     packager_arch: aarch64
@@ -1078,7 +1078,7 @@ buildvariants:
     compile_flags: >-
       --ssl MONGO_DISTMOD=rhel82
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
       -Wl,--no-gnu-unique"
@@ -1137,7 +1137,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-rhel90
-    compile_flags: --ssl MONGO_DISTMOD=rhel90 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=rhel90 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     multiversion_platform: rhel90
     multiversion_edition: targeted
     has_packages: true
@@ -1192,7 +1192,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-rhel90
-    compile_flags: --ssl MONGO_DISTMOD=rhel90 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=rhel90 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     multiversion_platform: rhel90
     multiversion_edition: enterprise
@@ -1270,7 +1270,8 @@ buildvariants:
       --ssl
       MONGO_DISTMOD=suse12
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      DWARF_WIDTH=32
     multiversion_platform: suse12
     multiversion_edition: targeted
     has_packages: true
@@ -1333,7 +1334,8 @@ buildvariants:
       --ssl
       MONGO_DISTMOD=suse12
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      DWARF_WIDTH=32
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
@@ -1390,7 +1392,8 @@ buildvariants:
       --ssl
       MONGO_DISTMOD=suse15
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      DWARF_WIDTH=32
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
@@ -1440,7 +1443,8 @@ buildvariants:
       --ssl
       MONGO_DISTMOD=suse15
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      DWARF_WIDTH=32
     multiversion_platform: suse15
     multiversion_edition: targeted
     has_packages: true
@@ -1497,7 +1501,7 @@ buildvariants:
       --ocsp-stapling=off
       MONGO_DISTMOD=ubuntu1804
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     multiversion_platform: ubuntu1804
     multiversion_edition: targeted
     test_flags: --excludeWithAnyTags=requires_ocsp_stapling
@@ -1568,7 +1572,7 @@ buildvariants:
       --ocsp-stapling=off
       MONGO_DISTMOD=ubuntu1804
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
       -Wl,--no-gnu-unique"
@@ -1648,7 +1652,7 @@ buildvariants:
       --ocsp-stapling=off
       MONGO_DISTMOD=ubuntu1804
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
       -Wl,--no-gnu-unique"
@@ -1709,7 +1713,7 @@ buildvariants:
       --ocsp-stapling=off
       MONGO_DISTMOD=ubuntu1804
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     test_flags: --excludeWithAnyTags=requires_ocsp_stapling
     resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
@@ -1748,7 +1752,7 @@ buildvariants:
       --ssl
       MONGO_DISTMOD=ubuntu2204
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     multiversion_platform: ubuntu2204
     multiversion_edition: targeted
     has_packages: true
@@ -1804,7 +1808,7 @@ buildvariants:
       --ssl
       MONGO_DISTMOD=ubuntu2004
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     multiversion_platform: ubuntu2004
     multiversion_edition: targeted
     has_packages: true
@@ -1867,7 +1871,7 @@ buildvariants:
     compile_flags: >-
       --ssl MONGO_DISTMOD=ubuntu2004
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
@@ -1934,7 +1938,7 @@ buildvariants:
       --ssl
       MONGO_DISTMOD=ubuntu2204
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
@@ -2000,7 +2004,7 @@ buildvariants:
     compile_flags: >-
       --ssl MONGO_DISTMOD=ubuntu2004
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
@@ -2058,7 +2062,7 @@ buildvariants:
       --ssl
       MONGO_DISTMOD=ubuntu2004
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
     packager_script: packager.py
@@ -2096,7 +2100,7 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: arm64-enterprise-ubuntu2204
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu2204 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu2204 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
     resmoke_jobs_max: 4 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
@@ -2151,7 +2155,7 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: arm64-ubuntu2204
-    compile_flags: --ssl MONGO_DISTMOD=ubuntu2204 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    compile_flags: --ssl MONGO_DISTMOD=ubuntu2204 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     resmoke_jobs_max: 8 # Avoid starting too many mongod's on ARM test servers
     has_packages: true
     packager_script: packager.py

@@ -16,8 +16,6 @@ def detect_toolchain(progspace):
 
     readelf_bin = '/opt/mongodbtoolchain/v4/bin/readelf'
     if not os.path.exists(readelf_bin):
-        readelf_bin = '/opt/mongodbtoolchain/v3/bin/readelf'
-    if not os.path.exists(readelf_bin):
         readelf_bin = 'readelf'
 
     gcc_version_regex = re.compile(r'.*\]\s*GCC: \(GNU\) (\d+\.\d+\.\d+)\s*$')

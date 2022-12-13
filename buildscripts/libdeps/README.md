@@ -31,7 +31,7 @@ Which will give an output similar to this:
     1
 
     Build invocation:
-    "/usr/bin/python3.8" "buildscripts/scons.py" "--variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars" "--dbg=on" "--opt=on" "--enable-free-mon=on" "--enable-http-client=on" "--cache=all" "--cache-dir=/home/ubuntu/scons-cache" "--install-action=hardlink" "--link-model=dynamic" "--build-tools=next" "--ssl" "--modules=enterprise" "CCACHE=ccache" "ICECC=icecc" "-j50" "generate-libdeps-graph"
+    "/usr/bin/python3.8" "buildscripts/scons.py" "--variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars" "--dbg=on" "--opt=on" "--enable-free-mon=on" "--enable-http-client=on" "--cache=all" "--cache-dir=/home/ubuntu/scons-cache" "--install-action=hardlink" "--link-model=dynamic" "--build-tools=next" "--ssl" "--modules=enterprise" "CCACHE=ccache" "ICECC=icecc" "-j50" "generate-libdeps-graph"
 
     Nodes in Graph: 859
     Edges in Graph: 90843

@@ -13,8 +13,8 @@ if os.name == "nt":
 
 
 @patch("sys.argv", [
-    'buildscripts/scons.py', "CC=/opt/mongodbtoolchain/v3/bin/gcc",
-    "CXX=/opt/mongodbtoolchain/v3/bin/g++", "NINJA_PREFIX=test_success", "--ninja"
+    'buildscripts/scons.py', "CC=/opt/mongodbtoolchain/v4/bin/gcc",
+    "CXX=/opt/mongodbtoolchain/v4/bin/g++", "NINJA_PREFIX=test_success", "--ninja"
 ])
 @patch("atexit.register")
 class TestSconsAtExitMetricsCollection(unittest.TestCase):

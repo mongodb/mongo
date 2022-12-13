@@ -50,13 +50,13 @@ class SetUpEC2Instance(PowercycleCommand):
         # Third operation -
         # Set up virtualenv on remote.
         venv = powercycle_constants.VIRTUALENV_DIR
-        python = "/opt/mongodbtoolchain/v3/bin/python3" if "python" not in self.expansions else self.expansions[
+        python = "/opt/mongodbtoolchain/v4/bin/python3" if "python" not in self.expansions else self.expansions[
             "python"]
 
         cmds = f"python_loc=$(which {python})"
         cmds = f"{cmds}; remote_dir={remote_dir}"
         cmds = f"{cmds}; if [ \"Windows_NT\" = \"$OS\" ]; then python_loc=$(cygpath -w $python_loc); remote_dir=$(cygpath -w $remote_dir); fi"
-        cmds = f"{cmds}; virtualenv --python $python_loc --system-site-packages {venv}"
+        cmds = f"{cmds}; $python_loc -m venv --system-site-packages {venv}"
         cmds = f"{cmds}; activate=$(find {venv} -name 'activate')"
         cmds = f"{cmds}; . $activate"
         cmds = f"{cmds}; pip3 install -r $remote_dir/etc/pip/powercycle-requirements.txt"

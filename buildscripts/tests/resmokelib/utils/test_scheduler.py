@@ -32,10 +32,12 @@ class TestScheduler(unittest.TestCase):
         self.assertEqual(self.__scheduler.queue, [])
 
 
-class TestBuiltinScheduler(TestScheduler):
-    """Unit tests for the sched.scheduler class."""
-    scheduler = sched.scheduler
+# TODO(SERVER-72079) Either reneable this test to remove uses of scheduler.py
+# See ticket for more details
+# class TestBuiltinScheduler(TestScheduler):
+#     """Unit tests for the sched.scheduler class."""
+#     scheduler = sched.scheduler
 
-    def test_cancel_with_identical_time_and_priority(self):
-        with self.assertRaises(AssertionError):
-            super().test_cancel_with_identical_time_and_priority()
+#     def test_cancel_with_identical_time_and_priority(self):
+#         with self.assertRaises(AssertionError):
+#             super().test_cancel_with_identical_time_and_priority()

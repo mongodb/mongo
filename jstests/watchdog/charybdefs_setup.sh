@@ -22,6 +22,6 @@ git clone -b mongo_42 https://github.com/markbenvenuto/charybdefs.git
 cd charybdefs/mongo
 
 # Build and setup thrift and charybdefs
-PATH=/opt/mongodbtoolchain/v3/bin:$PATH bash ./build.sh
+PATH=/opt/mongodbtoolchain/v4/bin:$PATH bash ./build.sh
 
 echo Done - charybdefs_setup.sh

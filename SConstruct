@@ -1051,6 +1051,23 @@ env_vars.Add(
     default='',
 )
 
+
+def validate_dwarf_width(key, val, env):
+    if val == '32' or val == '64' or val == '':
+        return
+
+    print(f"Invalid DWARF_WIDTH '{val}'. Only valid versions are 32 or 64.")
+    Exit(1)
+
+
+env_vars.Add(
+    'DWARF_WIDTH',
+    help='Sets the DWARF addressing mode to either 32-bit or 64-bit (non-Windows)',
+    validator=validate_dwarf_width,
+    converter=lambda val: int(val) if val != '' else '',
+    default='',
+)
+
 env_vars.Add(
     'GITDIFFFLAGS',
     help='Sets flags for git diff',
@@ -3181,76 +3198,39 @@ def doConfigure(myenv):
         }
         """ % compiler_minimum_string)
     elif myenv.ToolchainIs('gcc'):
-        if get_option('cxx-std') == "20":
-            compiler_minimum_string = "GCC 11.2"
-            compiler_test_body = textwrap.dedent("""
-            #if !defined(__GNUC__) || defined(__clang__)
-            #error
-            #endif
+        compiler_minimum_string = "GCC 11.3"
+        compiler_test_body = textwrap.dedent("""
+        #if !defined(__GNUC__) || defined(__clang__)
+        #error
+        #endif
 
-            #if (__GNUC__ < 11) || (__GNUC__ == 11 && __GNUC_MINOR__ < 2)
-            #error %s or newer is required to build MongoDB
-            #endif
+        #if (__GNUC__ < 11) || (__GNUC__ == 11 && __GNUC_MINOR__ < 3)
+        #error %s or newer is required to build MongoDB
+        #endif
 
-            int main(int argc, char* argv[]) {
-                return 0;
-            }
-            """ % compiler_minimum_string)
-        else:
-            compiler_minimum_string = "GCC 8.2"
-            compiler_test_body = textwrap.dedent("""
-            #if !defined(__GNUC__) || defined(__clang__)
-            #error
-            #endif
+        int main(int argc, char* argv[]) {
+            return 0;
+        }
+        """ % compiler_minimum_string)
+    elif env.ToolchainIs('clang'):
+        compiler_minimum_string = "clang 12.0 (or Apple XCode 13.0)"
+        compiler_test_body = textwrap.dedent("""
+        #if !defined(__clang__)
+        #error
+        #endif
 
-            #if (__GNUC__ < 8) || (__GNUC__ == 8 && __GNUC_MINOR__ < 2)
-            #error %s or newer is required to build MongoDB
-            #endif
+        #if defined(__apple_build_version__)
+        #if __apple_build_version__ < 13000029
+        #error %s or newer is required to build MongoDB
+        #endif
+        #elif (__clang_major__ < 12) || (__clang_major__ == 12 && __clang_minor__ < 0)
+        #error %s or newer is required to build MongoDB
+        #endif
 
-            int main(int argc, char* argv[]) {
-                return 0;
-            }
-            """ % compiler_minimum_string)
-    elif myenv.ToolchainIs('clang'):
-        if get_option('cxx-std') == "20":
-            compiler_minimum_string = "clang 12.0 (or Apple XCode 13.0)"
-            compiler_test_body = textwrap.dedent("""
-            #if !defined(__clang__)
-            #error
-            #endif
-
-            #if defined(__apple_build_version__)
-            #if __apple_build_version__ < 13000029
-            #error %s or newer is required to build MongoDB
-            #endif
-            #elif (__clang_major__ < 12) || (__clang_major__ == 12 && __clang_minor__ < 0)
-            #error %s or newer is required to build MongoDB
-            #endif
-
-            int main(int argc, char* argv[]) {
-                return 0;
-            }
-            """ % (compiler_minimum_string, compiler_minimum_string))
-        else:
-            compiler_minimum_string = "clang 7.0 (or Apple XCode 13.0)"
-            compiler_test_body = textwrap.dedent("""
-            #if !defined(__clang__)
-            #error
-            #endif
-
-            #if defined(__apple_build_version__)
-            #if __apple_build_version__ < 13000029
-            #error %s or newer is required to build MongoDB
-            #endif
-            #elif (__clang_major__ < 7) || (__clang_major__ == 7 && __clang_minor__ < 0)
-            #error %s or newer is required to build MongoDB
-            #endif
-
-            int main(int argc, char* argv[]) {
-                return 0;
-            }
-            """ % (compiler_minimum_string, compiler_minimum_string))
-
+        int main(int argc, char* argv[]) {
+            return 0;
+        }
+        """ % (compiler_minimum_string, compiler_minimum_string))
     else:
         myenv.ConfError("Error: can't check compiler minimum; don't know this compiler...")
 
@@ -4353,9 +4333,23 @@ def doConfigure(myenv):
         if link_model.startswith("dynamic"):
             myenv.AddToLINKFLAGSIfSupported('-Wl,--gdb-index')
 
-        if myenv.AddToCCFLAGSIfSupported('-gdwarf64'):
-            myenv.AppendUnique(LINKFLAGS=['-gdwarf64'])
-        elif link_model != 'dynamic':
+        # Normalize DWARF_WIDTH to 64 by default if the user did not
+        # select an explicit value and we are on a platform where it
+        # is believed to be meaningful.
+        if not env['DWARF_WIDTH']:
+            if not myenv.TargetOSIs('macOS', 'darwin', 'windows'):
+                env['DWARF_WIDTH'] = 64
+
+        # Only pass -gdwarf{32,64} if an explicit value was selected
+        # or defaulted. Fail the build if we can't honor the
+        # selection.
+        if env['DWARF_WIDTH']:
+            if myenv.AddToCCFLAGSIfSupported('-gdwarf$DWARF_WIDTH'):
+                myenv.AppendUnique(LINKFLAGS=['-gdwarf$DWARF_WIDTH'])
+            else:
+                env.FatalError('Could not enable selected dwarf width')
+
+        if env['DWARF_WIDTH'] == 32 and link_model != 'dynamic':
             # This will create an extra section where debug types can be referred from,
             # reducing other section sizes. This helps most with big static links as there
             # will be lots of duplicate debug type info.
@@ -4363,7 +4357,8 @@ def doConfigure(myenv):
                 myenv.AppendUnique(LINKFLAGS=['-fdebug-types-section'])
 
         # Our build is already parallel.
-        myenv.AddToLINKFLAGSIfSupported('-Wl,--no-threads')
+        if not myenv.AddToLINKFLAGSIfSupported('-Wl,--no-threads'):
+            myenv.AddToLINKFLAGSIfSupported('--Wl,--threads=1')
 
         # Explicitly enable GNU build id's if the linker supports it.
         myenv.AddToLINKFLAGSIfSupported('-Wl,--build-id')

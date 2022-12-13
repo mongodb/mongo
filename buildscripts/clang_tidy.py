@@ -109,7 +109,7 @@ def main():
     parser.add_argument("-l", "--log-file", type=str, default="clang_tidy",
                         help="clang tidy log from evergreen")
     # TODO: Is there someway to get this without hardcoding this much
-    parser.add_argument("-y", "--clang-tidy-toolchain", type=str, default="v3")
+    parser.add_argument("-y", "--clang-tidy-toolchain", type=str, default="v4")
     parser.add_argument("-f", "--clang-tidy-cfg", type=str, default=".clang-tidy")
     args = parser.parse_args()
 

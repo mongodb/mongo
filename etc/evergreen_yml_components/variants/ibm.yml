@@ -19,7 +19,7 @@ buildvariants:
       --ssl
       MONGO_DISTMOD=rhel81
       -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
       -Wl,--no-gnu-unique"
@@ -73,7 +73,7 @@ buildvariants:
       --ssl
       MONGO_DISTMOD=rhel81
       -j$(echo "$(grep -c processor /proc/cpuinfo)/2" | bc)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -96,7 +96,7 @@ buildvariants:
       --ssl
       MONGO_DISTMOD=rhel72
       -j3
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
       -Wl,--no-gnu-unique"
@@ -158,7 +158,7 @@ buildvariants:
       --ssl
       MONGO_DISTMOD=rhel83
       -j3
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"

@@ -7,8 +7,8 @@ echo "|   Running a script to automatically install db-contrib-tool (https://git
 echo "+-----------------------------------------------------------------------------------------------------------+"
 echo
 
-if [[ -d "/opt/mongodbtoolchain/v3/bin" ]]; then
-  export PATH="/opt/mongodbtoolchain/v3/bin:$PATH"
+if [[ -d "/opt/mongodbtoolchain/v4/bin" ]]; then
+  export PATH="/opt/mongodbtoolchain/v4/bin:$PATH"
 fi
 
 rc_file=""

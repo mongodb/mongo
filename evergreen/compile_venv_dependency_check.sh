@@ -3,7 +3,7 @@ set -o errexit
 set -o verbose
 
 # Create virtual env
-/opt/mongodbtoolchain/v3/bin/virtualenv --python /opt/mongodbtoolchain/v3/bin/python3 ./compile_venv
+/opt/mongodbtoolchain/v4/bin/virtualenv --python /opt/mongodbtoolchain/v4/bin/python3 ./compile_venv
 source ./compile_venv/bin/activate
 
 # Try printing scons.py help message

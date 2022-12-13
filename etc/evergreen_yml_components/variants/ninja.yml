@@ -122,7 +122,7 @@ buildvariants:
   run_on:
   - rhel80-small
   expansions:
-    compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars --link-model=dynamic
+    compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --link-model=dynamic
     has_packages: false
   tasks:
   - name: compile_ninja_next_TG

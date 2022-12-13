@@ -7,6 +7,15 @@ env = env.Clone()
 optsEnv = env.Clone()
 optsEnv.InjectThirdParty(libraries=['yaml'])
 
+# TODO BUILD-16566
+# This warning cause false positives with the v4 toolchain gcc on Ubuntu 2022 ARM64
+# platforms, in short term we will disable the warning until we can figure out what the
+# underlying issue is. Once the toolchain is updated, the workaround below should be removed.
+if env.ToolchainIs('gcc') and env['TARGET_ARCH'] == 'aarch64':
+    no_misleading_indentation_flag = ['-Wno-misleading-indentation']
+else:
+    no_misleading_indentation_flag = []
+
 optsEnv.Library(
     target='options_parser',
     source=[
@@ -19,6 +28,7 @@ optsEnv.Library(
         'startup_options.cpp',
         'value.cpp',
     ],
+    CCFLAGS=no_misleading_indentation_flag + optsEnv.get('CCFLAGS', []),
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/third_party/shim_yaml',

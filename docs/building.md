@@ -8,9 +8,9 @@ way to get started, rather than building from source.
 To build MongoDB, you will need:
 
 * A modern C++ compiler capable of compiling C++17. One of the following is required:
-    * GCC 8.2 or newer
-    * Clang 7.0 (or Apple XCode 10.2 Clang) or newer
-    * Visual Studio 2019 version 16.4 or newer (See Windows section below for details)
+    * GCC 11.3 or newer
+    * Clang 12.0 (or Apple XCode 13.0 Clang) or newer
+    * Visual Studio 2022 version 17.0 or newer (See Windows section below for details)
 * On Linux and macOS, the libcurl library and header is required. MacOS includes libcurl.
     * Fedora/RHEL - `dnf install libcurl-devel`
     * Ubuntu/Debian - `libcurl-dev` is provided by three packages. Install one of them:
@@ -129,11 +129,8 @@ targets all built binaries will be in `build/install/bin` by default.
 Windows
 --------------
 
-See [the windows build
-manual](https://github.com/mongodb/mongo/wiki/Build-Mongodb-From-Source#windows-specific-instructions)
-
 Build requirements:
-* Visual Studio 2017 version 15.9 or newer
+* Visual Studio 2022 version 17.0 or newer
 * Python 3.7
 
 Or download a prebuilt binary for Windows at www.mongodb.org.
@@ -150,7 +147,7 @@ To install dependencies on Debian or Ubuntu systems:
 OS X
 --------------
 
-Install Xcode 10.2 or newer.
+Install Xcode 13.0 or newer.
 
 FreeBSD
 --------------
@@ -161,7 +158,7 @@ Install the following ports:
   * `lang/llvm70`
   * `lang/python`
 
-Add `CC=clang70 CXX=clang++70` to the `scons` options, when building.
+Add `CC=clang12 CXX=clang++12` to the `scons` options, when building.
 
 
 OpenBSD

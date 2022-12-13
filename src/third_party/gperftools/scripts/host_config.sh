@@ -72,7 +72,7 @@ fi
 mkdir -p $HOST_CONFIG/internal
 pushd $HOST_CONFIG/internal
 
-PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+PATH=/opt/mongodbtoolchain/v4/bin:$PATH
 env \
     ${ENV_CPPFLAGS:-} \
     ${ENV_CFLAGS:-} \

@@ -107,8 +107,11 @@ class SconsMetrics:
                 TOTAL_COMMAND_EXECUTION_TIME_REGEX, self.raw_report)
 
         if os.path.exists(cache_debug_log_file):
-            with open(cache_debug_log_file, "r") as fh:
-                self.final_cache_hit_ratio = self._parse_float(CACHE_HIT_RATIO_REGEX, fh.read())
+            try:
+                with open(cache_debug_log_file, "r") as fh:
+                    self.final_cache_hit_ratio = self._parse_float(CACHE_HIT_RATIO_REGEX, fh.read())
+            except Exception:  # pylint: disable=broad-except
+                self.final_cache_hit_ratio = 0.0
         else:
             self.final_cache_hit_ratio = 0.0
 

@@ -219,7 +219,7 @@ variables:
       --ssl
       MONGO_DISTMOD=rhel70
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
@@ -364,7 +364,7 @@ buildvariants:
       --dbg=on
       --opt=on
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --enable-free-mon=on
       --enable-http-client=on
       --link-model=dynamic
@@ -385,15 +385,15 @@ buildvariants:
   tasks:
   - name: tla_plus
 
-- &enterprise-rhel80-dynamic-v4gcc-debug-experimental-template
-  name: &enterprise-rhel80-dynamic-v4gcc-debug-experimental enterprise-rhel80-dynamic-v4gcc-debug-experimental
-  display_name: "~ Shared Library Enterprise RHEL 8.0 v4 Toolchain GCC DEBUG"
+- &enterprise-rhel80-dynamic-gcc-debug-experimental-template
+  name: &enterprise-rhel80-dynamic-gcc-cxx20-debug-experimental enterprise-rhel80-dynamic-gcc-cxx20-debug-experimental
+  display_name: "~ Shared Library Enterprise RHEL 8.0 Toolchain GCC C++20 DEBUG"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
   run_on:
   - rhel80-small
-  expansions: &enterprise-rhel80-dynamic-v4gcc-debug-experimental-expansions
+  expansions: &enterprise-rhel80-dynamic-gcc-debug-experimental-expansions
     additional_package_targets: >-
       archive-mongocryptd
       archive-mongocryptd-debug
@@ -404,14 +404,16 @@ buildvariants:
       --opt=on
       -j$(grep -c ^processor /proc/cpuinfo)
       --link-model=dynamic
-      --variables-files=etc/scons/mongodbtoolchain_testing_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --variables-files=etc/scons/scons_experimental_scheduler.vars
+      --cxx-std=20
     has_packages: false
     scons_cache_scope: shared
     scons_cache_mode: all
     large_distro_name: rhel80-medium
     num_scons_link_jobs_available: 0.99
-    compile_variant: *enterprise-rhel80-dynamic-v4gcc-debug-experimental
-  tasks: &enterprise-rhel80-dynamic-v4gcc-debug-experimental-tasks
+    compile_variant: *enterprise-rhel80-dynamic-gcc-cxx20-debug-experimental
+  tasks: &enterprise-rhel80-dynamic-gcc-debug-experimental-tasks
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
     - rhel80-xlarge
@@ -480,48 +482,20 @@ buildvariants:
     distros:
     - rhel80-xlarge
 
-- <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-template
-  name: &enterprise-rhel80-dynamic-v4clang-debug-experimental enterprise-rhel80-dynamic-v4clang-debug-experimental
-  display_name: "~ Shared Library Enterprise RHEL 8.0 v4 Toolchain Clang DEBUG"
+- <<: *enterprise-rhel80-dynamic-gcc-debug-experimental-template
+  name: &enterprise-rhel80-dynamic-clang-cxx20-debug-experimental enterprise-rhel80-dynamic-clang-cxx20-debug-experimental
+  display_name: "~ Shared Library Enterprise RHEL 8.0 Toolchain Clang C++20 DEBUG"
   expansions:
-    <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-expansions
+    <<: *enterprise-rhel80-dynamic-gcc-debug-experimental-expansions
     compile_flags: >-
       --dbg=on
       --opt=on
       -j$(grep -c ^processor /proc/cpuinfo)
       --link-model=dynamic
-      --variables-files=etc/scons/mongodbtoolchain_testing_clang.vars
-    compile_variant: *enterprise-rhel80-dynamic-v4clang-debug-experimental
-
-- <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-template
-  name: &enterprise-rhel80-dynamic-v4gcc-cxx20-debug-experimental enterprise-rhel80-dynamic-v4gcc-cxx20-debug-experimental
-  display_name: "~ Shared Library Enterprise RHEL 8.0 v4 Toolchain GCC C++20 DEBUG"
-  expansions:
-    <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-expansions
-    compile_flags: >-
-      --dbg=on
-      --opt=on
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --link-model=dynamic
-      --variables-files=etc/scons/mongodbtoolchain_testing_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
       --variables-files=etc/scons/scons_experimental_scheduler.vars
       --cxx-std=20
-    compile_variant: *enterprise-rhel80-dynamic-v4gcc-cxx20-debug-experimental
-
-- <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-template
-  name: &enterprise-rhel80-dynamic-v4clang-cxx20-debug-experimental enterprise-rhel80-dynamic-v4clang-cxx20-debug-experimental
-  display_name: "~ Shared Library Enterprise RHEL 8.0 v4 Toolchain Clang C++20 DEBUG"
-  expansions:
-    <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-expansions
-    compile_flags: >-
-      --dbg=on
-      --opt=on
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --link-model=dynamic
-      --variables-files=etc/scons/mongodbtoolchain_testing_clang.vars
-      --variables-files=etc/scons/scons_experimental_scheduler.vars
-      --cxx-std=20
-    compile_variant: *enterprise-rhel80-dynamic-v4clang-cxx20-debug-experimental
+    compile_variant: *enterprise-rhel80-dynamic-clang-cxx20-debug-experimental
 
 - name: &enterprise-rhel-80-64-bit-coverage enterprise-rhel-80-64-bit-coverage
   display_name: "~ Enterprise RHEL 8.0 DEBUG Code Coverage"
@@ -544,7 +518,7 @@ buildvariants:
       --ssl
       MONGO_DISTMOD=rhel80
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --link-model=dynamic
     large_distro_name: rhel80-medium
     multiversion_platform: rhel80
@@ -559,7 +533,7 @@ buildvariants:
     exec_timeout_secs: 32400 # 9 hour timeout
     timeout_secs: 18000 # 5 hour idle timeout
     use_scons_cache: false
-    gcov_tool: /opt/mongodbtoolchain/v3/bin/gcov
+    gcov_tool: /opt/mongodbtoolchain/v4/bin/gcov
     num_scons_link_jobs_available: 0.99
     compile_variant: *enterprise-rhel-80-64-bit-coverage
   tasks: &enterprise-rhel-80-64-bit-coverage-tasks
@@ -597,7 +571,7 @@ buildvariants:
       --ssl
       MONGO_DISTMOD=rhel80
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
       --link-model=dynamic
     large_distro_name: rhel80-medium
     multiversion_platform: rhel80
@@ -615,137 +589,62 @@ buildvariants:
     # llvm-cov is too old in the v3 toolchain to handle the same options that
     # gcov does. However, this version of clang still produces .gcda files that
     # the v3 gcov can read natively anyway, so we don't need it.
-    gcov_tool: /opt/mongodbtoolchain/v3/bin/gcov
+    gcov_tool: /opt/mongodbtoolchain/v4/bin/gcov
     num_scons_link_jobs_available: 0.99
     compile_variant: *enterprise-rhel-80-64-bit-coverage-clang
   tasks:
     *enterprise-rhel-80-64-bit-coverage-tasks
 
-- name: &enterprise-rhel-80-64-bit-coverage-experimental enterprise-rhel-80-64-bit-coverage-experimental
-  display_name: "~ Enterprise RHEL 8.0 DEBUG Code Coverage (v4)"
-  modules:
-    - enterprise
-  run_on:
-    - rhel80-medium
-  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
-  stepback: false
-  expansions:
-    additional_package_targets: >-
-      archive-mongocryptd
-      archive-mongocryptd-debug
-    test_flags: --excludeWithAnyTags=resource_intensive,incompatible_with_gcov
-    compile_flags: >-
-      --allocator=system
-      --dbg=on
-      --gcov
-      --opt=off
-      --ssl
-      MONGO_DISTMOD=rhel80
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v4_gcc.vars
-      --link-model=dynamic
-    large_distro_name: rhel80-medium
-    multiversion_platform: rhel80
-    multiversion_edition: enterprise
-    resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
-    # The gcov instrumentation saves the path the .gcno files were created in as the default path
-    # for the .gcda files. In Evergreen the path will start with /data/mci/[Hashed ID]/src/... where
-    # the hashed ID is unique per task run. GCOV_PREFIX_STRIP is the number of directory levels to
-    # strip from the top of the default path before appending to the GCOV_PREFIX (if any).
-    gcov_environment: GCOV_PREFIX=$(pwd) GCOV_PREFIX_STRIP=4
-    # Mixing --cache and --gcov doesn't work correctly yet. See SERVER-11084
-    exec_timeout_secs: 32400 # 9 hour timeout
-    timeout_secs: 18000 # 5 hour idle timeout
-    use_scons_cache: false
-    gcov_tool: /opt/mongodbtoolchain/v4/bin/gcov
-    num_scons_link_jobs_available: 0.99
-    compile_variant: *enterprise-rhel-80-64-bit-coverage-experimental
-  tasks:
-    *enterprise-rhel-80-64-bit-coverage-tasks
-
-- name: &enterprise-rhel-80-64-bit-coverage-clang-experimental enterprise-rhel-80-64-bit-coverage-clang-experimental
-  display_name: "~ Enterprise RHEL 8.0 DEBUG Code Coverage (v4 clang)"
-  modules:
-    - enterprise
-  run_on:
-    - rhel80-medium
-  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
-  stepback: false
-  expansions:
-    additional_package_targets: >-
-      archive-mongocryptd
-      archive-mongocryptd-debug
-    test_flags: --excludeWithAnyTags=resource_intensive,incompatible_with_gcov
-    compile_flags: >-
-      --allocator=system
-      --dbg=on
-      --gcov
-      --opt=debug
-      --ssl
-      MONGO_DISTMOD=rhel80
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v4_clang.vars
-      --link-model=dynamic
-    large_distro_name: rhel80-medium
-    multiversion_platform: rhel80
-    multiversion_edition: enterprise
-    resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
-    # The gcov instrumentation saves the path the .gcno files were created in as the default path
-    # for the .gcda files. In Evergreen the path will start with /data/mci/[Hashed ID]/src/... where
-    # the hashed ID is unique per task run. GCOV_PREFIX_STRIP is the number of directory levels to
-    # strip from the top of the default path before appending to the GCOV_PREFIX (if any).
-    gcov_environment: GCOV_PREFIX=$(pwd) GCOV_PREFIX_STRIP=4
-    # Mixing --cache and --gcov doesn't work correctly yet. See SERVER-11084
-    exec_timeout_secs: 32400 # 9 hour timeout
-    timeout_secs: 21600 # 7 hour idle timeout
-    use_scons_cache: false
-    gcov_tool: /opt/mongodbtoolchain/v4/bin/llvm-cov gcov
-    num_scons_link_jobs_available: 0.99
-    compile_variant: *enterprise-rhel-80-64-bit-coverage-clang-experimental
-  tasks:
-    *enterprise-rhel-80-64-bit-coverage-tasks
-
-#- <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-template
-#  name: enterprise-rhel80-dynamic-v4gcc-cxx20-debug-pm-1328-experimental
-#  display_name: "~ Shared Library Enterprise RHEL 8.0 v4 Toolchain GCC C++20 DEBUG + PM-1328"
-#  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
-#  expansions:
-#    <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-expansions
-#    compile_flags: --dbg=on --opt=on -j$(grep -c ^processor /proc/cpuinfo) --link-model=dynamic --variables-files=etc/scons/mongodbtoolchain_testing_gcc.vars --cxx-std=20 --experimental-optimization=* --experimental-runtime-hardening=* --disable-warnings-as-errors
-
-- <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-template
-  name: &enterprise-rhel80-dynamic-v4clang-cxx20-debug-pm-1328-experimental enterprise-rhel80-dynamic-v4clang-cxx20-debug-pm-1328-experimental
-  display_name: "~ Shared Library Enterprise RHEL 8.0 v4 Toolchain Clang C++20 DEBUG + PM-1328"
+- <<: *enterprise-rhel80-dynamic-gcc-debug-experimental-template
+  name: enterprise-rhel80-dynamic-gcc-cxx20-debug-pm-1328-experimental
+  display_name: "~ Shared Library Enterprise RHEL 8.0 GCC C++20 DEBUG + PM-1328"
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   expansions:
-    <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-expansions
+    <<: *enterprise-rhel80-dynamic-gcc-debug-experimental-expansions
     compile_flags: >-
       --dbg=on
       --opt=on
       -j$(grep -c ^processor /proc/cpuinfo)
       --link-model=dynamic
-      --variables-files=etc/scons/mongodbtoolchain_testing_clang.vars
-      --cxx-std=20
-      --experimental-optimization=*
-      --experimental-runtime-hardening=*
-    compile_variant: *enterprise-rhel80-dynamic-v4clang-cxx20-debug-pm-1328-experimental
-
-- <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-template
-  name: &enterprise-rhel80-v4gcc-cxx20-pm-1328-experimental enterprise-rhel80-v4gcc-cxx20-pm-1328-experimental
-  display_name: "~ Enterprise RHEL 8.0 v4 Toolchain GCC C++20 + PM-1328"
-  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
-  expansions:
-    <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-expansions
-    compile_flags: >-
-      --opt=on
-      -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_testing_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --cxx-std=20
       --experimental-optimization=*
       --experimental-runtime-hardening=*
       --disable-warnings-as-errors
-    compile_variant: *enterprise-rhel80-v4gcc-cxx20-pm-1328-experimental
-  tasks: &enterprise-rhel80-dynamic-v4gcc-debug-experimental-tasks-no-unittests
+
+- <<: *enterprise-rhel80-dynamic-gcc-debug-experimental-template
+  name: &enterprise-rhel80-dynamic-clang-cxx20-debug-pm-1328-experimental enterprise-rhel80-dynamic-clang-cxx20-debug-pm-1328-experimental
+  display_name: "~ Shared Library Enterprise RHEL 8.0 Clang C++20 DEBUG + PM-1328"
+  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
+  expansions:
+    <<: *enterprise-rhel80-dynamic-gcc-debug-experimental-expansions
+    compile_flags: >-
+      --dbg=on
+      --opt=on
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --link-model=dynamic
+      --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
+      --cxx-std=20
+      --experimental-optimization=*
+      --experimental-runtime-hardening=*
+    compile_variant: *enterprise-rhel80-dynamic-clang-cxx20-debug-pm-1328-experimental
+
+- <<: *enterprise-rhel80-dynamic-gcc-debug-experimental-template
+  name: &enterprise-rhel80-gcc-cxx20-pm-1328-experimental enterprise-rhel80-gcc-cxx20-pm-1328-experimental
+  display_name: "~ Enterprise RHEL 8.0 Toolchain GCC C++20 + PM-1328"
+  cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
+  expansions:
+    <<: *enterprise-rhel80-dynamic-gcc-debug-experimental-expansions
+    compile_flags: >-
+      --opt=on
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --cxx-std=20
+      --experimental-optimization=*
+      --experimental-runtime-hardening=*
+      --disable-warnings-as-errors
+    compile_variant: *enterprise-rhel80-gcc-cxx20-pm-1328-experimental
+  tasks: &enterprise-rhel80-dynamic-gcc-debug-experimental-tasks-no-unittests
     - name: compile_test_and_package_parallel_core_stream_TG
       distros:
       - rhel80-xlarge
@@ -812,21 +711,21 @@ buildvariants:
       - rhel80-xlarge
 
 
-- <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-template
-  name: &enterprise-rhel80-v4clang-cxx20-pm-1328-experimental enterprise-rhel80-v4clang-cxx20-pm-1328-experimental
-  display_name: "~ Enterprise RHEL 8.0 v4 Toolchain Clang C++20 + PM-1328"
+- <<: *enterprise-rhel80-dynamic-gcc-debug-experimental-template
+  name: &enterprise-rhel80-clang-cxx20-pm-1328-experimental enterprise-rhel80-clang-cxx20-pm-1328-experimental
+  display_name: "~ Enterprise RHEL 8.0 Toolchain Clang C++20 + PM-1328"
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   expansions:
-    <<: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-expansions
+    <<: *enterprise-rhel80-dynamic-gcc-debug-experimental-expansions
     compile_flags: >-
       --opt=on
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_testing_clang.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
       --cxx-std=20
       --experimental-optimization=*
       --experimental-runtime-hardening=*
-    compile_variant: *enterprise-rhel80-v4clang-cxx20-pm-1328-experimental
-  tasks: *enterprise-rhel80-dynamic-v4gcc-debug-experimental-tasks-no-unittests
+    compile_variant: *enterprise-rhel80-clang-cxx20-pm-1328-experimental
+  tasks: *enterprise-rhel80-dynamic-gcc-debug-experimental-tasks-no-unittests
 
 - name: &stm-daily-cron stm-daily-cron
   modules:
@@ -1364,13 +1263,13 @@ buildvariants:
     test_flags: --excludeWithAnyTags=uses_transactions
     # We need --allocator=system here to work around SERVER-27675
     compile_flags: >-
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       -j$(grep -c ^processor /proc/cpuinfo)
       LIBPATH="\$BUILD_ROOT/mongo-embedded-sdk-\$MONGO_VERSION/lib"
     cdriver_cmake_flags: >-
       -DCMAKE_BUILD_TYPE=RelWithDebInfo
-      -DCMAKE_C_COMPILER=/opt/mongodbtoolchain/v3/bin/gcc
-      -DCMAKE_CXX_COMPILER=/opt/mongodbtoolchain/v3/bin/g++
+      -DCMAKE_C_COMPILER=/opt/mongodbtoolchain/v4/bin/gcc
+      -DCMAKE_CXX_COMPILER=/opt/mongodbtoolchain/v4/bin/g++
       -DCMAKE_C_FLAGS="-flto"
       -DCMAKE_INSTALL_RPATH=\$ORIGIN/../lib
     disable_unit_tests: true
@@ -1499,7 +1398,7 @@ buildvariants:
       --ssl
       MONGO_DISTMOD=rhel80
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --link-model=dynamic
       --use-glibcxx-debug
       --dbg=on
@@ -1947,7 +1846,7 @@ buildvariants:
       --ssl
       MONGO_DISTMOD=rhel80
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     has_packages: true
@@ -2059,7 +1958,7 @@ buildvariants:
       --ssl
       MONGO_DISTMOD=rhel70
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --enterprise-features=hot_backups
       --link-model=dynamic
     compile_variant: *hot_backups-rhel-70-64-bit
@@ -2088,7 +1987,7 @@ buildvariants:
       --use-libunwind=off
       --opt=on
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --link-model=dynamic
     compile_variant: *enterprise-rhel-70-64-bit-no-libunwind
     has_packages: false
@@ -2143,7 +2042,7 @@ buildvariants:
       MONGO_DISTMOD=ubuntu1804
       --opt=on
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     tooltags: ""
     build_mongoreplay: true
     test_flags: >-
@@ -2173,7 +2072,7 @@ buildvariants:
       --ssl
       MONGO_DISTMOD=rhel72
       -j3
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --link-model=dynamic
     resmoke_jobs_max: 2
     has_packages: true
@@ -2194,16 +2093,6 @@ buildvariants:
     distros:
     - rhel72-zseries-build
   - name: generate_buildid_to_debug_symbols_mapping
-
-- name: &enterprise-rhel80-dynamic-clang-tidy-v4 enterprise-rhel80-dynamic-clang-tidy-v4
-  display_name: "Enterprise Clang Tidy v4 Toolchain"
-  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
-  run_on:
-  - rhel80-xxlarge
-  expansions:
-    clang_tidy_toolchain: v4
-  tasks:
-  - name: clang_tidy_TG
 
 - <<: *linux_x86_dynamic_debug_compile_variant_dependency
   name: &linux-debug-suggested linux-debug-suggested
@@ -2240,7 +2129,7 @@ buildvariants:
       --ssl
       MONGO_DISTMOD=rhel80
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     scons_cache_scope: shared
     compile_variant: *enterprise-rhel-80-benchmarks
   tasks:
@@ -2376,7 +2265,7 @@ buildvariants:
   - rhel80-build
   stepback: false
   expansions:
-    toolchain_version: v3
+    toolchain_version: stable
     additional_package_targets: >-
       archive-mongocryptd
       archive-mongocryptd-debug
@@ -2384,8 +2273,8 @@ buildvariants:
     # If you add anything to san_options, make sure the appropriate changes are
     # also made to SConstruct.
     san_options: >-
-      LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1:external_symbolizer_path=/opt/mongodbtoolchain/${toolchain_version}/bin/llvm-symbolizer"
-      ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/${toolchain_version}/bin/llvm-symbolizer"
+      LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
+      ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
     compile_variant: *rhel80-debug-asan-all-feature-flags
     compile_flags: >-
       --variables-files=etc/scons/mongodbtoolchain_${toolchain_version}_clang.vars
@@ -2464,13 +2353,6 @@ buildvariants:
 #  - name: unittest_shell_hang_analyzer_gen
 #  - name: server_selection_json_test_TG
 
-- <<: *rhel80-debug-asan-all-feature-flags-template
-  name: &rhel80-debug-v4asan-all-feature-flags-experimental rhel80-debug-v4asan-all-feature-flags-experimental
-  display_name: "~ Shared Library V4 Toolchain ASAN Enterprise RHEL 8.0 DEBUG (all feature flags)"
-  expansions:
-    compile_variant: *rhel80-debug-v4asan-all-feature-flags-experimental
-    toolchain_version: v4
-
 - name: &rhel80-debug-asan-classic-engine rhel80-debug-asan-classic-engine
   display_name: ~ ASAN Enterprise RHEL 8.0 DEBUG (Classic Engine)
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
@@ -2487,10 +2369,10 @@ buildvariants:
     # If you add anything to san_options, make sure the appropriate changes are
     # also made to SConstruct.
     san_options: >-
-      LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
-      ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
+      LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
+      ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
     compile_flags: >-
-      --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
       --dbg=on
       --opt=on
       --allocator=system
@@ -2566,14 +2448,14 @@ buildvariants:
   - rhel80-build
   stepback: false
   expansions:
-    toolchain_version: v3
+    toolchain_version: stable
     additional_package_targets: >-
       archive-mongocryptd
       archive-mongocryptd-debug
     lang_environment: LANG=C
     # If you add anything to san_options, make sure the appropriate changes are
     # also made to SConstruct.
-    san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/${toolchain_version}/bin/llvm-symbolizer"
+    san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
     compile_flags: >-
       --variables-files=etc/scons/mongodbtoolchain_${toolchain_version}_clang.vars
       --dbg=on
@@ -2649,13 +2531,6 @@ buildvariants:
 #  - name: server_discovery_and_monitoring_json_test_TG
 #  - name: server_selection_json_test_TG
 
-- <<: *rhel80-debug-ubsan-all-feature-flags-template
-  name: &rhel80-debug-v4ubsan-all-feature-flags-experimental rhel80-debug-v4ubsan-all-feature-flags-experimental
-  display_name: "~ Shared Library V4 Toolchain UBSAN Enterprise RHEL 8.0 DEBUG (all feature flags)"
-  expansions:
-    toolchain_version: v4
-    compile_variant: *rhel80-debug-v4ubsan-all-feature-flags-experimental
-
 - name: &rhel80-debug-ubsan-classic-engine rhel80-debug-ubsan-classic-engine
   display_name: "~ UBSAN Enterprise RHEL 8.0 DEBUG (Classic Engine)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
@@ -2671,10 +2546,10 @@ buildvariants:
     lang_environment: LANG=C
     # If you add anything to san_options, make sure the appropriate changes are
     # also made to SConstruct.
-    san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
+    san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
     compile_variant: *rhel80-debug-ubsan-classic-engine
     compile_flags: >-
-      --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
       --dbg=on
       --opt=on
       --sanitize=undefined
@@ -2747,9 +2622,9 @@ buildvariants:
     # If you add anything to san_options, make sure the appropriate changes are
     # also made to SConstruct.
     san_options: >-
-      UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
+      UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
       LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1"
-      ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v3/bin/llvm-symbolizer"
+      ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
     test_flags: --excludeWithAnyTags=requires_ocsp_stapling
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
     hang_analyzer_dump_core: false
@@ -2792,7 +2667,7 @@ buildvariants:
       archive-mongocryptd
       archive-mongocryptd-debug
     lang_environment: LANG=C
-    toolchain_version: v3
+    toolchain_version: stable
     compile_variant: *enterprise-rhel80-debug-tsan
     # If you add anything to san_options, make sure the appropriate
     # changes are also made to SConstruct.
@@ -2805,7 +2680,7 @@ buildvariants:
     # thread leaks, which we have because we don't do a clean shutdown
     # of the ServiceContext.
     #
-    san_options: TSAN_OPTIONS="halt_on_error=1:report_thread_leaks=0:die_after_fork=0:suppressions=etc/tsan.suppressions:external_symbolizer_path=/opt/mongodbtoolchain/${toolchain_version}/bin/llvm-symbolizer"
+    san_options: TSAN_OPTIONS="halt_on_error=1:report_thread_leaks=0:die_after_fork=0:suppressions=etc/tsan.suppressions:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
     compile_flags: >-
       --variables-files=etc/scons/mongodbtoolchain_${toolchain_version}_clang.vars
       --dbg=on
@@ -3012,20 +2887,6 @@ buildvariants:
     distros:
     - rhel80-xlarge
 
-- <<: *enterprise-rhel80-debug-tsan-template
-  name: &enterprise-rhel80-debug-v4tsan-experimental enterprise-rhel80-debug-v4tsan-experimental
-  display_name: "* V4 Toolchain TSAN Enterprise RHEL 8.0 DEBUG"
-  expansions:
-    toolchain_version: v4
-    compile_variant: *enterprise-rhel80-debug-v4tsan-experimental
-
-- <<: *enterprise-rhel80-debug-complete-tsan-template
-  name: &enterprise-rhel80-debug-complete-v4tsan-experimental enterprise-rhel80-debug-complete-v4tsan-experimental
-  display_name: "~ V4 Toolchain TSAN Enterprise RHEL 8.0 COMPLETE DEBUG"
-  expansions:
-    toolchain_version: v4
-    compile_variant: *enterprise-rhel80-debug-complete-v4tsan-experimental
-
 - name: &enterprise-rhel80-no-latch-64-bit enterprise-rhel80-no-latch-64-bit
   display_name: "~ Enterprise RHEL 8.0 (without Diagnostic Latches)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
@@ -3035,7 +2896,7 @@ buildvariants:
     compile_flags: >-
       MONGO_DISTMOD=rhel80
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --use-diagnostic-latches=off
       --link-model=dynamic
     scons_cache_mode: all
@@ -3064,7 +2925,7 @@ buildvariants:
       -j$(grep -c ^processor /proc/cpuinfo)
       --dbg=on
       --opt=off
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --detect-odr-violations
       --link-model=dynamic
     scons_cache_mode: all
@@ -3218,7 +3079,7 @@ buildvariants:
     compile_flags: >-
       MONGO_DISTMOD=rhel80
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --link-model=dynamic
     multiversion_platform: rhel80
     multiversion_edition: enterprise
@@ -3262,7 +3123,7 @@ buildvariants:
     compile_flags: >-
       MONGO_DISTMOD=rhel80
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --link-model=dynamic
     multiversion_platform: rhel80
     multiversion_edition: enterprise
@@ -3304,7 +3165,7 @@ buildvariants:
     compile_flags: >-
       MONGO_DISTMOD=rhel80
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --link-model=dynamic
     multiversion_platform: rhel80
     multiversion_edition: enterprise
@@ -3370,13 +3231,13 @@ buildvariants:
       --ssl
       MONGO_DISTMOD=rhel80
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --link-model=dynamic
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
       -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
-    clang_tidy_toolchain: v3
+    clang_tidy_toolchain: v4
     compile_variant: *commit-queue
   depends_on: []
   tasks:
@@ -3516,7 +3377,7 @@ buildvariants:
       --ssl
       --ocsp-stapling=off MONGO_DISTMOD=ubuntu1804
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_clang.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
       CCFLAGS="-fsanitize-coverage=trace-pc-guard"
       LIBS="voidstar"
     multiversion_platform: ubuntu1804
@@ -3580,13 +3441,13 @@ buildvariants:
       archive-mongocryptd
       archive-mongocryptd-debug
     lang_environment: LANG=C
-    toolchain_version: v3
+    toolchain_version: stable
     # If you add anything to san_options, make sure the appropriate changes are
     # also made to SConstruct.
     san_options: >-
-      UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/${toolchain_version}/bin/llvm-symbolizer"
+      UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
       LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1"
-      ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/${toolchain_version}/bin/llvm-symbolizer"
+      ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
     compile_flags: >-
       LINKFLAGS=-nostdlib++
       LIBS=stdc++
@@ -3608,10 +3469,3 @@ buildvariants:
   - *libfuzzertests
   tasks:
   - name: compile_archive_and_run_libfuzzertests_TG
-
-- <<: *rhel80-debug-aubsan-lite_fuzzer-template
-  name: &rhel80-debug-v4aubsan-lite_fuzzer-experimental rhel80-debug-v4aubsan-lite_fuzzer-experimental
-  display_name: "V4 Toolchain {A,UB}SAN Enterprise RHEL 8.0 FUZZER"
-  expansions:
-    toolchain_version: v4
-    compile_variant: *rhel80-debug-v4aubsan-lite_fuzzer-experimental

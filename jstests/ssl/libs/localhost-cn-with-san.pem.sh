@@ -4,7 +4,7 @@
 set -ev
 
 RDN="/C=US/ST=New York/L=New York City/O=MongoDB/OU=Kernel/CN=localhost"
-OPENSSL="/opt/mongodbtoolchain/v3/bin/openssl"
+OPENSSL="/opt/mongodbtoolchain/v4/bin/openssl"
 FILE="jstests/ssl/libs/localhost-cn-with-san"
 
 $OPENSSL req -new -subj "${RDN}" \
