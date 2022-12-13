@@ -1950,9 +1950,9 @@ buildvariants:
       - name: snapshot_reads
       - name: linkbench
       - name: linkbench2
-      # - name: tsbs_load
-      # - name: tsbs_query
-      # - name: tsbs_query_manual_bucketing
+      - name: tsbs_load
+      - name: tsbs_query
+      - name: tsbs_query_manual_bucketing
       - name: tpcc
       - name: tpch_1_normalized
       - name: tpch_1_denormalized
@@ -2317,9 +2317,9 @@ buildvariants:
       - name: tpch_1_denormalized
       - name: linkbench
       - name: linkbench2
-      # - name: tsbs_load
-      # - name: tsbs_query
-      # - name: tsbs_query_manual_bucketing
+      - name: tsbs_load
+      - name: tsbs_query
+      - name: tsbs_query_manual_bucketing
       - name: big_update_10k
 
   - name: linux-3-node-replSet-intel.2022-11
@@ -2396,9 +2396,9 @@ buildvariants:
       # TODO: Enable in SERVER-66572.
       - name: linkbench
       - name: linkbench2
-      # - name: tsbs_load
-      # - name: tsbs_query
-      # - name: tsbs_query_manual_bucketing
+      - name: tsbs_load
+      - name: tsbs_query
+      - name: tsbs_query_manual_bucketing
 
   - name: linux-3-node-replSet-last-lts-fcv.2022-11
     display_name: Linux 3-Node ReplSet (Last LTS FCV) 2022-11
@@ -2447,9 +2447,9 @@ buildvariants:
       # TODO: Enable in SERVER-66572.
       - name: linkbench
       - name: linkbench2
-      # - name: tsbs_load
-      # - name: tsbs_query
-      # - name: tsbs_query_manual_bucketing
+      - name: tsbs_load
+      - name: tsbs_query
+      - name: tsbs_query_manual_bucketing
 
   - name: linux-3-node-replSet-notls.2022-11
     display_name: Linux 3-Node ReplSet (No TLS) 2022-11
