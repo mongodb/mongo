@@ -1383,13 +1383,17 @@ int32_t readBytes(char* buf, int32_t count, std::ifstream& ifs) {
  * Writes a test named pipe of BSONobj's that are first read into memory from a BSON file, then
  * round-robinned into the pipe up to the requested number of objects. This is the same as function
  * WriteTestPipeObjects except the objects are read from a file instead of passed in as a BSONArray.
+ *
+ * args:
  *   "0": string; relative path of the pipe
  *   "1": number; number of BSON objects to write to the pipe
  *   "2": string; relative path to the file of BSON objects; these must fit in memory
  *   "3": OPTIONAL string; absolute path to the directory where named pipes exist. If not given,
  *        'kDefaultPipePath' is used.
+ *
+ * async: true, write asynchronously; false, write synchronously
  */
-BSONObj WriteTestPipeBsonFile(const BSONObj& args, void* unused) {
+BSONObj writeTestPipeBsonFileHelper(const BSONObj& args, bool async) {
     int nFields = args.nFields();
     uassert(ErrorCodes::FailedToParse,
             "Function requires 3 or 4 arguments but {} were given"_format(nFields),
@@ -1461,11 +1465,32 @@ BSONObj WriteTestPipeBsonFile(const BSONObj& args, void* unused) {
         }
     }  // while !eof
 
-    // Write the pipe asynchronously.
-    NamedPipeHelper::writeToPipeObjectsAsync(
-        std::move(pipeDir), pipePathElem.str(), objectsElem.numberLong(), bsonObjs);
+    // Write the pipe.
+    if (async) {
+        NamedPipeHelper::writeToPipeObjectsAsync(
+            std::move(pipeDir), pipePathElem.str(), objectsElem.numberLong(), std::move(bsonObjs));
+    } else {
+        NamedPipeHelper::writeToPipeObjects(
+            std::move(pipeDir), pipePathElem.str(), objectsElem.numberLong(), std::move(bsonObjs));
+    }
 
     return {};
+}
+
+/**
+ * Asynchronously writes a test named pipe of BSONobj's that are first read into memory from a BSON
+ * file. See writeTestPipeBsonFileHelper() header for more info.
+ */
+BSONObj WriteTestPipeBsonFile(const BSONObj& args, void* unused) {
+    return writeTestPipeBsonFileHelper(args, true);
+}
+
+/**
+ * Synchronously writes a test named pipe of BSONobj's that are first read into memory from a BSON
+ * file. See writeTestPipeBsonFileHelper() header for more info.
+ */
+BSONObj WriteTestPipeBsonFileSync(const BSONObj& args, void* unused) {
+    return writeTestPipeBsonFileHelper(args, false);
 }
 
 /**
@@ -1612,6 +1637,7 @@ void installShellUtilsLauncher(Scope& scope) {
     scope.injectNative("_readTestPipes", ReadTestPipes);
     scope.injectNative("_writeTestPipe", WriteTestPipe);
     scope.injectNative("_writeTestPipeBsonFile", WriteTestPipeBsonFile);
+    scope.injectNative("_writeTestPipeBsonFileSync", WriteTestPipeBsonFileSync);
     scope.injectNative("_writeTestPipeObjects", WriteTestPipeObjects);
 }
 }  // namespace shell_utils

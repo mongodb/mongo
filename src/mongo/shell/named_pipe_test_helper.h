@@ -40,11 +40,20 @@ namespace mongo {
 class NamedPipeHelper {
 public:
     static BSONObj readFromPipes(const std::vector<std::string>& pipeRelativePaths);
+    static void writeToPipe(std::string pipeDir,
+                            std::string pipeRelativePath,
+                            long objects,
+                            long stringMinSize,
+                            long stringMaxSize) noexcept;
     static void writeToPipeAsync(std::string pipeDir,
                                  std::string pipeRelativePath,
                                  long objects,
                                  long stringMinSize,
                                  long stringMaxSize);
+    static void writeToPipeObjects(std::string pipeDir,
+                                   std::string pipeRelativePath,
+                                   long objects,
+                                   std::vector<BSONObj> bsonObjs) noexcept;
     static void writeToPipeObjectsAsync(std::string pipeDir,
                                         std::string pipeRelativePath,
                                         long objects,
@@ -52,14 +61,5 @@ public:
 
 private:
     static std::string getString(int length);
-    static void writeToPipe(std::string pipeDir,
-                            std::string pipeRelativePath,
-                            long objects,
-                            long stringMinSize,
-                            long stringMaxSize) noexcept;
-    static void writeToPipeObjects(std::string pipeDir,
-                                   std::string pipeRelativePath,
-                                   long objects,
-                                   std::vector<BSONObj> bsonObjs) noexcept;
 };
 }  // namespace mongo
