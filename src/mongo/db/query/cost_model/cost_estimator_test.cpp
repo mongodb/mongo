@@ -146,7 +146,10 @@ TEST(CostEstimatorTest, IndexScanCost) {
 
     auto indexScanNode = optimizer::ABT::make<optimizer::IndexScanNode>(
         optimizer::FieldProjectionMap{{}, {optimizer::ProjectionName{"root"}}, {}},
-        optimizer::IndexSpecification{"c1", "a_1", {}, false});
+        "c1",
+        "a_1",
+        optimizer::CompoundIntervalRequirement{},
+        false);
     optimizer::ChildPropsType childProps{};
     optimizer::NodeCEMap nodeCEMap{{indexScanNode.cast<optimizer::Node>(), ce}};
 

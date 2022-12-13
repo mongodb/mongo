@@ -1943,8 +1943,7 @@ public:
 
     ABT transport(const CompoundIntervalReqExpr::Atom& node) {
         ABT physicalIndexScan = make<IndexScanNode>(
-            _fpmStack.back(),
-            IndexSpecification{_scanDefName, _indexDefName, node.getExpr(), _reverseOrder});
+            _fpmStack.back(), _scanDefName, _indexDefName, node.getExpr(), _reverseOrder);
         _nodeCEMap.emplace(physicalIndexScan.cast<Node>(), _scanGroupCE * _estimateStack.back());
         return physicalIndexScan;
     }

@@ -230,34 +230,4 @@ bool ScanParams::operator==(const ScanParams& other) const {
         _residualRequirements == other._residualRequirements;
 }
 
-IndexSpecification::IndexSpecification(std::string scanDefName,
-                                       std::string indexDefName,
-                                       CompoundIntervalRequirement interval,
-                                       bool reverseOrder)
-    : _scanDefName(std::move(scanDefName)),
-      _indexDefName(std::move(indexDefName)),
-      _interval(std::move(interval)),
-      _reverseOrder(reverseOrder) {}
-
-bool IndexSpecification::operator==(const IndexSpecification& other) const {
-    return _scanDefName == other._scanDefName && _indexDefName == other._indexDefName &&
-        _interval == other._interval && _reverseOrder == other._reverseOrder;
-}
-
-const std::string& IndexSpecification::getScanDefName() const {
-    return _scanDefName;
-}
-
-const std::string& IndexSpecification::getIndexDefName() const {
-    return _indexDefName;
-}
-
-const CompoundIntervalRequirement& IndexSpecification::getInterval() const {
-    return _interval;
-}
-
-bool IndexSpecification::isReverseOrder() const {
-    return _reverseOrder;
-}
-
 }  // namespace mongo::optimizer

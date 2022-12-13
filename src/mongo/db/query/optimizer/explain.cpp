@@ -1049,19 +1049,18 @@ public:
         printFieldProjectionMap(printer, node.getFieldProjectionMap());
         printer.separator("}, ");
 
-        const auto& spec = node.getIndexSpecification();
         printer.fieldName("scanDefName")
-            .print(spec.getScanDefName())
+            .print(node.getScanDefName())
             .separator(", ")
             .fieldName("indexDefName")
-            .print(spec.getIndexDefName())
+            .print(node.getIndexDefName())
             .separator(", ");
 
         printer.fieldName("interval").separator("{");
-        printInterval(printer, spec.getInterval());
+        printInterval(printer, node.getIndexInterval());
         printer.separator("}");
 
-        printBooleanFlag(printer, "reversed", spec.isReverseOrder());
+        printBooleanFlag(printer, "reversed", node.isIndexReverseOrder());
 
         printer.separator("]");
         nodeCEPropsPrint(printer, n, node);

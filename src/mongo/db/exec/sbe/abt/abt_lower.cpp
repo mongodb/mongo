@@ -1100,11 +1100,9 @@ std::unique_ptr<sbe::EExpression> SBENodeLowering::convertBoundsToExpr(
 
 std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const IndexScanNode& n, const ABT&) {
     const auto& fieldProjectionMap = n.getFieldProjectionMap();
-    const auto& indexSpec = n.getIndexSpecification();
-    const auto& interval = indexSpec.getInterval();
 
-    const std::string& indexDefName = n.getIndexSpecification().getIndexDefName();
-    const ScanDefinition& scanDef = _metadata._scanDefs.at(indexSpec.getScanDefName());
+    const std::string& indexDefName = n.getIndexDefName();
+    const ScanDefinition& scanDef = _metadata._scanDefs.at(n.getScanDefName());
     uassert(6624232, "Collection must exist to lower IndexScan", scanDef.exists());
     const IndexDefinition& indexDef = scanDef.getIndexDefs().at(indexDefName);
 
@@ -1133,6 +1131,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const IndexScanNode& n, co
         vars.push_back(slot);
     }
 
+    const auto& interval = n.getIndexInterval();
     auto lowerBoundExpr = convertBoundsToExpr(true /*isLower*/, indexDef, interval);
     auto upperBoundExpr = convertBoundsToExpr(false /*isLower*/, indexDef, interval);
     uassert(6624234,
@@ -1146,7 +1145,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const IndexScanNode& n, co
 
     return sbe::makeS<sbe::SimpleIndexScanStage>(nss.uuid().value(),
                                                  indexDefName,
-                                                 !indexSpec.isReverseOrder(),
+                                                 !n.isIndexReverseOrder(),
                                                  resultSlot,
                                                  ridSlot,
                                                  boost::none,

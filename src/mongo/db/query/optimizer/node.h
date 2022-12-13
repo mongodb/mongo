@@ -221,7 +221,11 @@ class IndexScanNode final : public ABTOpFixedArity<1>, public ExclusivelyPhysica
     using Base = ABTOpFixedArity<1>;
 
 public:
-    IndexScanNode(FieldProjectionMap fieldProjectionMap, IndexSpecification indexSpec);
+    IndexScanNode(FieldProjectionMap fieldProjectionMap,
+                  std::string scanDefName,
+                  std::string indexDefName,
+                  CompoundIntervalRequirement indexInterval,
+                  bool isIndexReverseOrder);
 
     bool operator==(const IndexScanNode& other) const;
 
@@ -232,11 +236,29 @@ public:
     }
 
     const FieldProjectionMap& getFieldProjectionMap() const;
-    const IndexSpecification& getIndexSpecification() const;
+
+    const std::string& getScanDefName() const;
+
+    const std::string& getIndexDefName() const;
+
+    const CompoundIntervalRequirement& getIndexInterval() const;
+
+    bool isIndexReverseOrder() const;
 
 private:
     const FieldProjectionMap _fieldProjectionMap;
-    const IndexSpecification _indexSpec;
+
+    // Name of the collection.
+    const std::string _scanDefName;
+
+    // The name of the index.
+    const std::string _indexDefName;
+
+    // The index interval.
+    const CompoundIntervalRequirement _indexInterval;
+
+    // Do we reverse the index order.
+    const bool _isIndexReverseOrder;
 };
 
 /**

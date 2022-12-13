@@ -269,34 +269,4 @@ struct ScanParams {
 
 using CandidateIndexes = std::vector<CandidateIndexEntry>;
 
-class IndexSpecification {
-public:
-    IndexSpecification(std::string scanDefName,
-                       std::string indexDefName,
-                       CompoundIntervalRequirement interval,
-                       bool reverseOrder);
-
-    bool operator==(const IndexSpecification& other) const;
-
-    const std::string& getScanDefName() const;
-    const std::string& getIndexDefName() const;
-
-    const CompoundIntervalRequirement& getInterval() const;
-
-    bool isReverseOrder() const;
-
-private:
-    // Name of the collection.
-    const std::string _scanDefName;
-
-    // The name of the index.
-    const std::string _indexDefName;
-
-    // The index interval.
-    CompoundIntervalRequirement _interval;
-
-    // Do we reverse the index order.
-    const bool _reverseOrder;
-};
-
 }  // namespace mongo::optimizer

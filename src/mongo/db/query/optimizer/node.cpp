@@ -183,22 +183,43 @@ bool CoScanNode::operator==(const CoScanNode& other) const {
     return true;
 }
 
-IndexScanNode::IndexScanNode(FieldProjectionMap fieldProjectionMap, IndexSpecification indexSpec)
+IndexScanNode::IndexScanNode(FieldProjectionMap fieldProjectionMap,
+                             std::string scanDefName,
+                             std::string indexDefName,
+                             CompoundIntervalRequirement indexInterval,
+                             bool isIndexReverseOrder)
     : Base(buildSimpleBinder(extractProjectionNamesForScan(fieldProjectionMap))),
       _fieldProjectionMap(std::move(fieldProjectionMap)),
-      _indexSpec(std::move(indexSpec)) {}
+      _scanDefName(std::move(scanDefName)),
+      _indexDefName(std::move(indexDefName)),
+      _indexInterval(std::move(indexInterval)),
+      _isIndexReverseOrder(isIndexReverseOrder) {}
 
 bool IndexScanNode::operator==(const IndexScanNode& other) const {
     // Scan spec does not participate, the indexSpec by itself should determine equality.
-    return _fieldProjectionMap == other._fieldProjectionMap && _indexSpec == other._indexSpec;
+    return _fieldProjectionMap == other._fieldProjectionMap && _scanDefName == other._scanDefName &&
+        _indexDefName == other._indexDefName && _indexInterval == other._indexInterval &&
+        _isIndexReverseOrder == other._isIndexReverseOrder;
 }
 
 const FieldProjectionMap& IndexScanNode::getFieldProjectionMap() const {
     return _fieldProjectionMap;
 }
 
-const IndexSpecification& IndexScanNode::getIndexSpecification() const {
-    return _indexSpec;
+const std::string& IndexScanNode::getScanDefName() const {
+    return _scanDefName;
+}
+
+const std::string& IndexScanNode::getIndexDefName() const {
+    return _indexDefName;
+}
+
+const CompoundIntervalRequirement& IndexScanNode::getIndexInterval() const {
+    return _indexInterval;
+}
+
+bool IndexScanNode::isIndexReverseOrder() const {
+    return _isIndexReverseOrder;
 }
 
 SeekNode::SeekNode(ProjectionName ridProjectionName,
