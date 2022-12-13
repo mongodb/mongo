@@ -355,7 +355,7 @@ public:
                               "Unexpected chunk",
                               "expected"_attr = n,
                               "observed"_attr = myn);
-                        dumpChunks(opCtx, nss.ns(), query, sort);
+                        dumpChunks(opCtx, nss, query, sort);
                         uassert(10040, "chunks out of order", n == myn);
                     }
 
@@ -418,11 +418,11 @@ public:
     }
 
     void dumpChunks(OperationContext* opCtx,
-                    const std::string& ns,
+                    const NamespaceString& ns,
                     const BSONObj& query,
                     const BSONObj& sort) {
         DBDirectClient client(opCtx);
-        FindCommandRequest findRequest{NamespaceString{ns}};
+        FindCommandRequest findRequest{ns};
         findRequest.setFilter(query);
         findRequest.setSort(sort);
         std::unique_ptr<DBClientCursor> c = client.find(std::move(findRequest));
