@@ -64,7 +64,7 @@ buildvariants:
   display_name: "! Enterprise RHEL 6.2"
   expansions:
     multiversion_platform: rhel62
-    burn_in_tag_buildvariants: enterprise-rhel-62-64-bit-majority-read-concern-off enterprise-rhel-62-64-bit-inmem
+    burn_in_tag_buildvariants: enterprise-rhel-70-64-bit-majority-read-concern-off enterprise-rhel-70-64-bit-inmem
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
@@ -80,25 +80,25 @@ buildvariants:
     multiversion_platform: rhel62
   tasks:
   - name: burn_in_tags_gen
-- name: enterprise-rhel-62-64-bit-majority-read-concern-off
-  display_name: "Enterprise RHEL 6.2 (majority read concern off)"
+- name: enterprise-rhel-70-64-bit-majority-read-concern-off
+  display_name: "Enterprise RHEL 7.0 (majority read concern off)"
   modules: ["enterprise"]
   run_on:
-  - rhel62-small
-  expansions: &enterprise-rhel-62-64-bit-majority-read-concern-off-expansions
+  - rhel70-small
+  expansions: &enterprise-rhel-70-64-bit-majority-read-concern-off-expansions
     multiversion_edition: enterprise
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - rhel62-large
+    - rhel70-large
   - name: aggregation_multiversion_fuzzer_gen
   - name: aggregation
-- name: enterprise-rhel-62-64-bit-inmem
+- name: enterprise-rhel-70-64-bit-inmem
   display_name: Enterprise RHEL 6.2 (inMemory)
   modules: ["enterprise"]
   run_on:
   - rhel62-small
-  expansions: &enterprise-rhel-62-64-bit-inmem-expansions
+  expansions: &enterprise-rhel-70-64-bit-inmem-expansions
     test_flags: >-
       --majorityReadConcern=off
       --excludeWithAnyTags=requires_majority_read_concern,uses_prepare_transaction,uses_multi_shard_transaction,uses_atclustertime
@@ -115,7 +115,7 @@ buildvariants:
     large_distro_name: rhel62-large
   tasks:
   - name: compile
-- name: enterprise-rhel-62-64-bit-inmem
+- name: enterprise-rhel-70-64-bit-inmem
   display_name: Enterprise RHEL 6.2 (inMemory)
   expansions:
     additional_targets: archive-mongocryptd archive-mongocryptd-debug
