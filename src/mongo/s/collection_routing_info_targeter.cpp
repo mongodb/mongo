@@ -625,7 +625,8 @@ StatusWith<std::vector<ShardEndpoint>> CollectionRoutingInfoTargeter::_targetQue
 
     std::vector<ShardEndpoint> endpoints;
     for (auto&& shardId : shardIds) {
-        endpoints.emplace_back(std::move(shardId), _cri.getShardVersion(shardId), boost::none);
+        ShardVersion shardVersion = _cri.getShardVersion(shardId);
+        endpoints.emplace_back(std::move(shardId), std::move(shardVersion), boost::none);
     }
 
     return endpoints;
