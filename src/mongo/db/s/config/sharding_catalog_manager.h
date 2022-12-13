@@ -411,7 +411,7 @@ public:
     void commitMovePrimary(OperationContext* opCtx,
                            const DatabaseName& dbName,
                            const DatabaseVersion& expectedDbVersion,
-                           const ShardId& toShard);
+                           const ShardId& toShardId);
 
     //
     // Collection Operations
