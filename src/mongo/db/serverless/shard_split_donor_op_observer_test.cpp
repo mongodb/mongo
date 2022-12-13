@@ -180,18 +180,15 @@ private:
         const std::vector<TenantId>& tenants,
         const std::function<void(std::shared_ptr<TenantMigrationAccessBlocker>)>& mtabVerifier) {
         for (const auto& tenantId : tenants) {
-            // TODO SERVER-71186 use tenantId directly instead of a string conversion.
-            auto mtab =
-                TenantMigrationAccessBlockerRegistry::get(_opCtx->getServiceContext())
-                    .getTenantMigrationAccessBlockerForTenantId(
-                        tenantId.toString(), TenantMigrationAccessBlocker::BlockerType::kDonor);
+            auto mtab = TenantMigrationAccessBlockerRegistry::get(_opCtx->getServiceContext())
+                            .getTenantMigrationAccessBlockerForTenantId(
+                                tenantId, TenantMigrationAccessBlocker::BlockerType::kDonor);
             mtabVerifier(mtab);
         }
 
         for (const auto& tenantId : tenants) {
-            // TODO SERVER-71186 use tenantId directly instead of a string conversion.
             TenantMigrationAccessBlockerRegistry::get(_opCtx->getServiceContext())
-                .remove(tenantId.toString(), TenantMigrationAccessBlocker::BlockerType::kDonor);
+                .remove(tenantId, TenantMigrationAccessBlocker::BlockerType::kDonor);
         }
     }
     // Creates a reasonable set of ReplSettings for most tests.  We need to be able to
@@ -258,10 +255,9 @@ TEST_F(ShardSplitDonorOpObserverTest, InsertValidAbortedDocument) {
     }
 
     for (const auto& tenant : _tenantIds) {
-        // TODO SERVER-71186 use tenantId directly instead of a string conversion.
         ASSERT_FALSE(TenantMigrationAccessBlockerRegistry::get(_opCtx->getServiceContext())
                          .getTenantMigrationAccessBlockerForTenantId(
-                             tenant.toString(), TenantMigrationAccessBlocker::BlockerType::kDonor));
+                             tenant, TenantMigrationAccessBlocker::BlockerType::kDonor));
     }
 }
 
@@ -489,11 +485,9 @@ TEST_F(ShardSplitDonorOpObserverTest, DeleteAbortedDocumentDoesNotRemoveBlockers
 
     // Verify blockers have not been removed
     for (const auto& tenantId : _tenantIds) {
-        // TODO SERVER-71186 use tenantId directly instead of a string conversion.
-        ASSERT_TRUE(
-            TenantMigrationAccessBlockerRegistry::get(_opCtx->getServiceContext())
-                .getTenantMigrationAccessBlockerForTenantId(
-                    tenantId.toString(), TenantMigrationAccessBlocker::BlockerType::kDonor));
+        ASSERT_TRUE(TenantMigrationAccessBlockerRegistry::get(_opCtx->getServiceContext())
+                        .getTenantMigrationAccessBlockerForTenantId(
+                            tenantId, TenantMigrationAccessBlocker::BlockerType::kDonor));
     }
 }
 
@@ -529,11 +523,9 @@ TEST_F(ShardSplitDonorOpObserverTest, DeleteCommittedDocumentRemovesBlockers) {
 
     // Verify blockers have been removed
     for (const auto& tenantId : _tenantIds) {
-        // TODO SERVER-71186 use tenantId directly instead of a string conversion.
-        ASSERT_FALSE(
-            TenantMigrationAccessBlockerRegistry::get(_opCtx->getServiceContext())
-                .getTenantMigrationAccessBlockerForTenantId(
-                    tenantId.toString(), TenantMigrationAccessBlocker::BlockerType::kDonor));
+        ASSERT_FALSE(TenantMigrationAccessBlockerRegistry::get(_opCtx->getServiceContext())
+                         .getTenantMigrationAccessBlockerForTenantId(
+                             tenantId, TenantMigrationAccessBlocker::BlockerType::kDonor));
     }
 }
 

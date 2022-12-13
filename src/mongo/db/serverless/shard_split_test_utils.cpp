@@ -43,9 +43,8 @@ ScopedTenantAccessBlocker::ScopedTenantAccessBlocker(const std::vector<TenantId>
 
 ScopedTenantAccessBlocker::~ScopedTenantAccessBlocker() {
     for (const auto& tenant : _tenants) {
-        // TODO SERVER-71186 use tenantId directly instead of a string conversion.
         TenantMigrationAccessBlockerRegistry::get(_opCtx->getServiceContext())
-            .remove(tenant.toString(), TenantMigrationAccessBlocker::BlockerType::kDonor);
+            .remove(tenant, TenantMigrationAccessBlocker::BlockerType::kDonor);
     }
 }
 

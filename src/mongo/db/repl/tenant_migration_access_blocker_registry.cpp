@@ -102,11 +102,15 @@ void TenantMigrationAccessBlockerRegistry::add(StringData tenantId,
     _tenantMigrationAccessBlockers.emplace(tenantId, mtabPair);
 }
 
+void TenantMigrationAccessBlockerRegistry::add(const TenantId& tenantId,
+                                               std::shared_ptr<TenantMigrationAccessBlocker> mtab) {
+    add(tenantId.toString(), mtab);
+}
+
 void TenantMigrationAccessBlockerRegistry::add(const std::vector<TenantId>& tenantIds,
                                                std::shared_ptr<TenantMigrationAccessBlocker> mtab) {
-    // TODO SERVER-71186 use tenantId directly instead of a string conversion.
     for (auto&& tenantId : tenantIds) {
-        add(tenantId.toString(), mtab);
+        add(tenantId, mtab);
     }
 }
 
@@ -160,6 +164,10 @@ void TenantMigrationAccessBlockerRegistry::remove(StringData tenantId, MtabType 
     }
 
     _remove(lg, tenantId, type);
+}
+
+void TenantMigrationAccessBlockerRegistry::remove(const TenantId& tenantId, MtabType type) {
+    remove(tenantId.toString(), type);
 }
 
 void TenantMigrationAccessBlockerRegistry::removeAccessBlockersForMigration(
@@ -309,6 +317,12 @@ TenantMigrationAccessBlockerRegistry::getTenantMigrationAccessBlockerForTenantId
         return it->second.getAccessBlocker(type);
     }
     return nullptr;
+}
+
+std::shared_ptr<TenantMigrationAccessBlocker>
+TenantMigrationAccessBlockerRegistry::getTenantMigrationAccessBlockerForTenantId(
+    const TenantId& tenantId, MtabType type) {
+    return getTenantMigrationAccessBlockerForTenantId(tenantId.toString(), type);
 }
 
 void TenantMigrationAccessBlockerRegistry::applyAll(TenantMigrationAccessBlocker::BlockerType type,
