@@ -207,6 +207,15 @@ public:
     using ClosedBuckets = std::vector<ClosedBucket>;
 
     /**
+     * A wrapper struct holding the before (compressed) and after (decompressed) state of a bucket
+     * document.
+     */
+    struct DecompressionResult {
+        BSONObj before;
+        BSONObj after;
+    };
+
+    /**
      * The basic unit of work for a bucket. Each insert will return a shared_ptr to a WriteBatch.
      * When a writer is finished with all their insertions, they should then take steps to ensure
      * each batch they wrote into is committed. To ensure a batch is committed, a writer should
@@ -249,6 +258,7 @@ public:
         const StringMap<std::size_t>& newFieldNamesToBeInserted() const;
         uint32_t numPreviouslyCommittedMeasurements() const;
         bool needToDecompressBucketBeforeInserting() const;
+        const DecompressionResult& decompressed() const;
 
         /**
          * Returns whether the batch has already been committed or aborted.
@@ -294,8 +304,9 @@ public:
         BSONObj _min;  // Batch-local min; full if first batch, updates otherwise.
         BSONObj _max;  // Batch-local max; full if first batch, updates otherwise.
         uint32_t _numPreviouslyCommittedMeasurements = 0;
-        StringMap<std::size_t> _newFieldNamesToBeInserted;    // Value is hash of string key
-        bool _needToDecompressBucketBeforeInserting = false;  // Bucket is compressed on-disk.
+        StringMap<std::size_t> _newFieldNamesToBeInserted;  // Value is hash of string key
+        boost::optional<DecompressionResult>
+            _decompressed;  // If set, bucket is compressed on-disk.
 
         AtomicWord<bool> _commitRights{false};
         SharedPromise<CommitInfo> _promise;
@@ -951,6 +962,10 @@ protected:
 
         // Approximate memory usage of this bucket.
         uint64_t _memoryUsage = sizeof(*this);
+
+        // If set, bucket is compressed on disk, and first prepared batch will need to decompress it
+        // before updating.
+        boost::optional<DecompressionResult> _decompressed;
     };
 
     /**

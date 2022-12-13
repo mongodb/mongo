@@ -1252,7 +1252,6 @@ TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertIncompatibleMeasureme
     _bucketCatalog->finish(batch, {});
 }
 
-/** TODO (SERVER-69907): Re-enable these tests
 TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertCompatibleMeasurement) {
     RAIIServerParameterControllerForTest featureFlag{"featureFlagTimeseriesScalabilityImprovements",
                                                      true};
@@ -1272,12 +1271,10 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertCompatibleMeasurement) 
         timeseries::compressBucket(bucketDoc,
                                    _timeField,
                                    _ns1,
-                                   eligibleForReopening=false,
-                                   validateDecompression=true);
+                                   /*eligibleForReopening*/ false,
+                                   /*validateDecompression*/ true);
     const BSONObj& compressedBucketDoc = compressionResult.compressedBucket.value();
 
-    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
-                                                    true};
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
     auto memUsageBefore = _bucketCatalog->memoryUsage();
     Status status =
@@ -1337,12 +1334,10 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertIncompatibleMeasurement
         timeseries::compressBucket(bucketDoc,
                                    _timeField,
                                    _ns1,
-                                   eligibleForReopening=false,
-                                   validateDecompression=true);
+                                   /*eligibleForReopening*/ false,
+                                   /*validateDecompression*/ true);
     const BSONObj& compressedBucketDoc = compressionResult.compressedBucket.value();
 
-    RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
-                                                    true};
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
     auto memUsageBefore = _bucketCatalog->memoryUsage();
     Status status =
@@ -1375,7 +1370,7 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertIncompatibleMeasurement
     ASSERT_EQ(batch->numPreviouslyCommittedMeasurements(), 0);
 
     _bucketCatalog->finish(batch, {});
-}*/
+}
 
 TEST_F(BucketCatalogTest, ArchivingUnderMemoryPressure) {
     RAIIServerParameterControllerForTest featureFlag{"featureFlagTimeseriesScalabilityImprovements",

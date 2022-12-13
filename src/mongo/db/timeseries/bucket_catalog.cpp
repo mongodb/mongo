@@ -794,7 +794,12 @@ uint32_t BucketCatalog::WriteBatch::numPreviouslyCommittedMeasurements() const {
 }
 
 bool BucketCatalog::WriteBatch::needToDecompressBucketBeforeInserting() const {
-    return _needToDecompressBucketBeforeInserting;
+    return _decompressed.has_value();
+}
+
+const BucketCatalog::DecompressionResult& BucketCatalog::WriteBatch::decompressed() const {
+    invariant(_decompressed.has_value());
+    return _decompressed.value();
 }
 
 bool BucketCatalog::WriteBatch::finished() const {
@@ -859,6 +864,13 @@ void BucketCatalog::WriteBatch::_prepareCommit(Bucket* bucket) {
         // add fields but are most likely just to update values.
         bucket->_memoryUsage += _min.objsize();
         bucket->_memoryUsage += _max.objsize();
+    }
+
+    if (bucket->_decompressed.has_value()) {
+        _decompressed = std::move(bucket->_decompressed);
+        bucket->_decompressed.reset();
+        bucket->_memoryUsage -=
+            (_decompressed.value().before.objsize() + _decompressed.value().after.objsize());
     }
 }
 
@@ -1527,10 +1539,6 @@ StatusWith<std::unique_ptr<BucketCatalog::Bucket>> BucketCatalog::_rehydrateBuck
         std::make_unique<Bucket>(bucketId, stripeNumber, key.hash, &_bucketStateManager);
 
     const bool isCompressed = timeseries::isCompressedBucket(bucketDoc);
-    if (isCompressed) {
-        // TODO (SERVER-69907): Allow opening compressed bucket
-        return Status{ErrorCodes::BadValue, "Reopening uncompressed buckets is not supported yet"};
-    }
 
     // Initialize the remaining member variables from the bucket document.
     bucket->_metadata = key.metadata;
@@ -1541,6 +1549,8 @@ StatusWith<std::unique_ptr<BucketCatalog::Bucket>> BucketCatalog::_rehydrateBuck
             return Status{ErrorCodes::BadValue, "Bucket could not be decompressed"};
         }
         bucket->_size = decompressed.value().objsize();
+        bucket->_decompressed = DecompressionResult{bucketDoc, decompressed.value()};
+        bucket->_memoryUsage += (decompressed.value().objsize() + bucketDoc.objsize());
     } else {
         bucket->_size = bucketDoc.objsize();
     }
@@ -1883,6 +1893,7 @@ BucketCatalog::_insertIntoBucket(OperationContext* opCtx,
                                  ClosedBuckets* closedBuckets) {
     NewFieldNames newFieldNamesToBeInserted;
     int32_t sizeToBeAdded = 0;
+    const auto previousMemoryUsage = bucket->_memoryUsage;
 
     bool isNewlyOpenedBucket = (bucket->_size == 0);
     if (!isNewlyOpenedBucket) {
@@ -1926,7 +1937,7 @@ BucketCatalog::_insertIntoBucket(OperationContext* opCtx,
             doc, info->options.getMetaField(), info->key.metadata.getComparator());
         invariant(updateStatus == timeseries::Schema::UpdateStatus::Updated);
     } else {
-        _memoryUsage.fetchAndSubtract(bucket->_memoryUsage);
+        _memoryUsage.fetchAndSubtract(previousMemoryUsage);
     }
     _memoryUsage.fetchAndAdd(bucket->_memoryUsage);
 

@@ -80,6 +80,7 @@
 #include "mongo/db/transaction/retryable_writes_stats.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction_validation.h"
+#include "mongo/db/update/document_diff_applier.h"
 #include "mongo/db/write_concern.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/redaction.h"
@@ -775,16 +776,40 @@ public:
             return result;
         }
 
-        write_ops::UpdateCommandRequest _makeTimeseriesDecompressionOp(
+        write_ops::UpdateCommandRequest _makeTimeseriesDecompressAndUpdateOp(
             OperationContext* opCtx,
-            const std::shared_ptr<BucketCatalog::WriteBatch>& batch) const {
+            std::shared_ptr<BucketCatalog::WriteBatch> batch,
+            const BSONObj& metadata,
+            std::vector<StmtId>&& stmtIds) const {
+            // Generate the diff and apply it against the previously decrompressed bucket document.
+            const bool mustCheckExistenceForInsertOperations =
+                static_cast<bool>(repl::tenantMigrationInfo(opCtx));
+            auto diff = makeTimeseriesUpdateOpEntry(opCtx, batch, metadata).getU().getDiff();
+            auto after = doc_diff::applyDiff(batch->decompressed().after,
+                                             diff,
+                                             nullptr,
+                                             mustCheckExistenceForInsertOperations)
+                             .postImage;
+
             auto bucketDecompressionFunc =
-                [&](const BSONObj& bucketDoc) -> boost::optional<BSONObj> {
-                return timeseries::decompressBucket(bucketDoc);
+                [before = std::move(batch->decompressed().before),
+                 after = std::move(after)](const BSONObj& bucketDoc) -> boost::optional<BSONObj> {
+                // Make sure the document hasn't changed since we read it into the BucketCatalog.
+                // This should not happen, but since we can double-check it here, we can guard
+                // against the missed update that would result from simply replacing with 'after'.
+                tassert(6990700,
+                        "Bucket document changed between initial read and update",
+                        bucketDoc.binaryEqual(before));
+
+                return after;
             };
 
-            return _makeTimeseriesTransformationOp(
-                opCtx, batch->bucket().bucketId.oid, bucketDecompressionFunc);
+            write_ops::UpdateCommandRequest op(
+                makeTimeseriesBucketsNamespace(ns()),
+                {makeTimeseriesTransformationOpEntry(
+                    opCtx, batch->bucket().bucketId.oid, std::move(bucketDecompressionFunc))});
+            op.setWriteCommandRequestBase(_makeTimeseriesWriteOpBase(std::move(stmtIds)));
+            return op;
         }
 
         /**
@@ -828,32 +853,12 @@ public:
                               << "Expected 1 insertion of document with _id '" << docId
                               << "', but found " << output.result.getValue().getN() << ".");
             } else {
-                if (batch->needToDecompressBucketBeforeInserting()) {
-                    const auto output = _performTimeseriesUpdate(
-                        opCtx, batch, metadata, _makeTimeseriesDecompressionOp(opCtx, batch));
-                    if ((output.result.isOK() && output.result.getValue().getNModified() != 1) ||
-                        output.result.getStatus().code() == ErrorCodes::WriteConflict) {
-                        bucketCatalog.abort(batch,
-                                            output.result.isOK()
-                                                ? Status{ErrorCodes::WriteConflict,
-                                                         "Could not update non-existent bucket"}
-                                                : output.result.getStatus());
-                        docsToRetry->push_back(index);
-                        opCtx->recoveryUnit()->abandonSnapshot();
-                        return true;
-                    } else if (auto error = generateError(
-                                   opCtx, output.result, start + index, errors->size())) {
-                        errors->emplace_back(std::move(*error));
-                        bucketCatalog.abort(batch, output.result.getStatus());
-                        return output.canContinue;
-                    }
-                }
+                auto op = batch->needToDecompressBucketBeforeInserting()
+                    ? _makeTimeseriesDecompressAndUpdateOp(
+                          opCtx, batch, metadata, std::move(stmtIds))
+                    : _makeTimeseriesUpdateOp(opCtx, batch, metadata, std::move(stmtIds));
+                auto const output = _performTimeseriesUpdate(opCtx, batch, metadata, op);
 
-                const auto output = _performTimeseriesUpdate(
-                    opCtx,
-                    batch,
-                    metadata,
-                    _makeTimeseriesUpdateOp(opCtx, batch, metadata, std::move(stmtIds)));
                 if ((output.result.isOK() && output.result.getValue().getNModified() != 1) ||
                     output.result.getStatus().code() == ErrorCodes::WriteConflict) {
                     bucketCatalog.abort(batch,
@@ -953,13 +958,18 @@ public:
                             std::move(stmtIds[batch.get()->bucket().bucketId.oid])));
                     } else {
                         if (batch.get()->needToDecompressBucketBeforeInserting()) {
-                            updateOps.push_back(_makeTimeseriesDecompressionOp(opCtx, batch));
+                            updateOps.push_back(_makeTimeseriesDecompressAndUpdateOp(
+                                opCtx,
+                                batch,
+                                metadata,
+                                std::move(stmtIds[batch.get()->bucket().bucketId.oid])));
+                        } else {
+                            updateOps.push_back(_makeTimeseriesUpdateOp(
+                                opCtx,
+                                batch,
+                                metadata,
+                                std::move(stmtIds[batch.get()->bucket().bucketId.oid])));
                         }
-                        updateOps.push_back(_makeTimeseriesUpdateOp(
-                            opCtx,
-                            batch,
-                            metadata,
-                            std::move(stmtIds[batch.get()->bucket().bucketId.oid])));
                     }
                 }
 
