@@ -64,6 +64,18 @@ public:
     const char* getSourceName() const final;
 
     /**
+     * Convenience method for creating a new $_internalStreamingGroup stage. If maxMemoryUsageBytes
+     * is boost::none, then it will actually use the value of
+     * internalDocumentSourceGroupMaxMemoryBytes.
+     */
+    static boost::intrusive_ptr<DocumentSourceStreamingGroup> create(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        const boost::intrusive_ptr<Expression>& groupByExpression,
+        std::vector<size_t> monotonicExpressionIndexes,
+        std::vector<AccumulationStatement> accumulationStatements,
+        boost::optional<size_t> maxMemoryUsageBytes = boost::none);
+
+    /**
      * Parses 'elem' into a $_internalStreamingGroup stage, or throws a AssertionException if 'elem'
      * was an invalid specification.
      */
