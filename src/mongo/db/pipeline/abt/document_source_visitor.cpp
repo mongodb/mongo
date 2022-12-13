@@ -658,7 +658,7 @@ ABT translatePipelineToABT(const Metadata& metadata,
     AlgebrizerContext ctx(prefixId, {scanProjName, std::move(initialNode)});
     ABTDocumentSourceVisitor visitor(ctx, metadata);
 
-    DocumentSourceWalker walker(nullptr /*preVisitor*/, &visitor);
+    DocumentSourceWalkerLegacy walker(nullptr /*preVisitor*/, &visitor);
     walker.walk(pipeline);
 
     auto entry = ctx.getNode();

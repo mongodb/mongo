@@ -1265,7 +1265,7 @@ boost::optional<bool> shouldForceEligibility() {
 
 bool isEligibleForBonsai(const Pipeline& pipeline) {
     ABTUnsupportedDocumentSourceVisitor visitor;
-    DocumentSourceWalker walker(nullptr /*preVisitor*/, &visitor);
+    DocumentSourceWalkerLegacy walker(nullptr /*preVisitor*/, &visitor);
 
     // The rudimentary walker may throw if it reaches a stage that it isn't aware about, so catch it
     // here and return ineligible.

@@ -72,7 +72,7 @@
 namespace mongo {
 
 template <class T>
-bool DocumentSourceWalker::visitHelper(const DocumentSource* source) {
+bool DocumentSourceWalkerLegacy::visitHelper(const DocumentSource* source) {
     const T* concrete = dynamic_cast<const T*>(source);
     if (concrete == nullptr) {
         return false;
@@ -82,7 +82,7 @@ bool DocumentSourceWalker::visitHelper(const DocumentSource* source) {
     return true;
 }
 
-void DocumentSourceWalker::walk(const Pipeline& pipeline) {
+void DocumentSourceWalkerLegacy::walk(const Pipeline& pipeline) {
     const Pipeline::SourceContainer& sources = pipeline.getSources();
 
     if (_postVisitor != nullptr) {
@@ -143,6 +143,16 @@ void DocumentSourceWalker::walk(const Pipeline& pipeline) {
     }
 
     // TODO: reverse for pre-visitor
+}
+
+void DocumentSourceWalker::walk(const Pipeline& pipeline) {
+    for (auto&& ds : pipeline.getSources()) {
+        // Perform double-dispatch based on the visitor context and document source types by
+        // consulting the registry.
+        auto func = _registry.getConstVisitorFunc(*_visitorCtx, *ds);
+        // Invoke the function pointer returned from the registry.
+        func(_visitorCtx, *ds);
+    }
 }
 
 }  // namespace mongo

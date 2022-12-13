@@ -32,17 +32,19 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/visitors/document_source_visitor.h"
+#include "mongo/db/pipeline/visitors/document_source_visitor_registry.h"
 
 namespace mongo {
 
 /**
+ * DEPRECATED: Use 'DocumentSourceWalker' instead.
  * A document source walker.
- * TODO: SERVER-62027. Implement a hash-table based resolution instead of sequential dynamic casts.
+ * TODO SERVER-71943: Delete this class.
  */
-class DocumentSourceWalker final {
+class DocumentSourceWalkerLegacy final {
 public:
-    DocumentSourceWalker(DocumentSourceConstVisitor* preVisitor,
-                         DocumentSourceConstVisitor* postVisitor)
+    DocumentSourceWalkerLegacy(DocumentSourceConstVisitor* preVisitor,
+                               DocumentSourceConstVisitor* postVisitor)
         : _preVisitor{preVisitor}, _postVisitor{postVisitor} {}
 
     void walk(const Pipeline& pipeline);
@@ -53,6 +55,27 @@ private:
 
     DocumentSourceConstVisitor* _preVisitor;
     DocumentSourceConstVisitor* _postVisitor;
+};
+
+/**
+ * A walker over a DocumentSource pipeline. See the DocumentSourceVisitorRegistry header for details
+ * about why this walker does not use the typical "visitor" interface.
+ */
+class DocumentSourceWalker final {
+public:
+    DocumentSourceWalker(const DocumentSourceVisitorRegistry& registry,
+                         DocumentSourceVisitorContextBase* ctx)
+        : _registry(registry), _visitorCtx(ctx) {}
+
+    /**
+     * Perform an pre-order traversal of the top-level document sources in the given pipeline (i.e.
+     * does not walk $lookup/$unionWith subpipelines).
+     */
+    void walk(const Pipeline& pipeline);
+
+private:
+    const DocumentSourceVisitorRegistry& _registry;
+    DocumentSourceVisitorContextBase* _visitorCtx;
 };
 
 }  // namespace mongo
