@@ -410,7 +410,7 @@ public:
             o->onEmptyCapped(opCtx, collectionName, uuid);
     }
 
-    void onTransactionStart(OperationContext* opCtx) {
+    void onTransactionStart(OperationContext* opCtx) override {
         ReservedTimes times{opCtx};
         for (auto& o : _observers) {
             o->onTransactionStart(opCtx);
