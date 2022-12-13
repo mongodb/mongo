@@ -267,6 +267,11 @@ public:
     Document getNext();
 
     /**
+     * Similar to the previous method, but return a BSON object instead.
+     */
+    BSONObj getNextBson();
+
+    /**
      * This method will extract the j-th measurement from the bucket. A precondition of this method
      * is that j >= 0 && j <= the number of measurements within the underlying bucket.
      */
@@ -400,6 +405,8 @@ private:
     // metadata Value in the reset phase and use it to materialize the metadata in each
     // measurement.
     Value _metaValue;
+
+    BSONElement _metaBSONElem;
 
     // Since the bucket min time is the same across all materialized measurements, we can cache the
     // value in the reset phase and use it to materialize as a metadata field in each measurement

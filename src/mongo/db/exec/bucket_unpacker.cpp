@@ -923,6 +923,11 @@ public:
                          const Value& metaValue,
                          bool includeTimeField,
                          bool includeMetaField) = 0;
+    virtual bool getNext(BSONObjBuilder& builder,
+                         const BucketSpec& spec,
+                         const BSONElement& metaValue,
+                         bool includeTimeField,
+                         bool includeMetaField) = 0;
     virtual void extractSingleMeasurement(MutableDocument& measurement,
                                           int j,
                                           const BucketSpec& spec,
@@ -972,6 +977,11 @@ public:
     bool getNext(MutableDocument& measurement,
                  const BucketSpec& spec,
                  const Value& metaValue,
+                 bool includeTimeField,
+                 bool includeMetaField) override;
+    bool getNext(BSONObjBuilder& builder,
+                 const BucketSpec& spec,
+                 const BSONElement& metaValue,
                  bool includeTimeField,
                  bool includeMetaField) override;
     void extractSingleMeasurement(MutableDocument& measurement,
@@ -1059,6 +1069,32 @@ bool BucketUnpackerV1::getNext(MutableDocument& measurement,
     return _timeFieldIter.more();
 }
 
+bool BucketUnpackerV1::getNext(BSONObjBuilder& builder,
+                               const BucketSpec& spec,
+                               const BSONElement& metaValue,
+                               bool includeTimeField,
+                               bool includeMetaField) {
+    auto&& timeElem = _timeFieldIter.next();
+    if (includeTimeField) {
+        builder.appendAs(timeElem, spec.timeField());
+    }
+
+    // Includes metaField when we're instructed to do so and metaField value exists.
+    if (includeMetaField && !metaValue.eoo()) {
+        builder.appendAs(metaValue, *spec.metaField());
+    }
+
+    const auto& currentIdx = timeElem.fieldNameStringData();
+    for (auto&& [colName, colIter] : _fieldIters) {
+        if (auto&& elem = *colIter; colIter.more() && elem.fieldNameStringData() == currentIdx) {
+            builder.appendAs(elem, colName);
+            colIter.advance(elem);
+        }
+    }
+
+    return _timeFieldIter.more();
+}
+
 void BucketUnpackerV1::extractSingleMeasurement(
     MutableDocument& measurement,
     int j,
@@ -1104,6 +1140,11 @@ public:
     bool getNext(MutableDocument& measurement,
                  const BucketSpec& spec,
                  const Value& metaValue,
+                 bool includeTimeField,
+                 bool includeMetaField) override;
+    bool getNext(BSONObjBuilder& builder,
+                 const BucketSpec& spec,
+                 const BSONElement& metaValue,
                  bool includeTimeField,
                  bool includeMetaField) override;
     void extractSingleMeasurement(MutableDocument& measurement,
@@ -1187,6 +1228,38 @@ bool BucketUnpackerV2::getNext(MutableDocument& measurement,
         if (!elem.eoo()) {
             measurement.addField(HashedFieldName{fieldColumn.column.name(), fieldColumn.hashedName},
                                  Value{elem});
+        }
+        ++fieldColumn.it;
+    }
+
+    return _timeColumn.it != _timeColumn.end;
+}
+
+bool BucketUnpackerV2::getNext(BSONObjBuilder& builder,
+                               const BucketSpec& spec,
+                               const BSONElement& metaValue,
+                               bool includeTimeField,
+                               bool includeMetaField) {
+    // Get element and increment iterator
+    const auto& timeElem = *_timeColumn.it;
+    if (includeTimeField) {
+        builder.appendAs(timeElem, spec.timeField());
+    }
+    ++_timeColumn.it;
+
+    // Includes metaField when we're instructed to do so and metaField value exists.
+    if (includeMetaField && !metaValue.eoo()) {
+        builder.appendAs(metaValue, *spec.metaField());
+    }
+
+    for (auto& fieldColumn : _fieldColumns) {
+        uassert(7026803,
+                "Bucket unexpectedly contained fewer values than count",
+                fieldColumn.it != fieldColumn.end);
+        const BSONElement& elem = *fieldColumn.it;
+        // EOO represents missing field
+        if (!elem.eoo()) {
+            builder.appendAs(elem, fieldColumn.column.name());
         }
         ++fieldColumn.it;
     }
@@ -1379,6 +1452,25 @@ Document BucketUnpacker::getNext() {
     return measurement.freeze();
 }
 
+BSONObj BucketUnpacker::getNextBson() {
+    tassert(7026800, "'getNextBson()' requires the bucket to be owned", _bucket.isOwned());
+    tassert(7026801, "'getNextBson()' was called after the bucket has been exhausted", hasNext());
+    tassert(7026802,
+            "'getNextBson()' cannot return max and min time as metadata",
+            !_includeMaxTimeAsMetadata && !_includeMinTimeAsMetadata);
+
+    BSONObjBuilder builder;
+    _hasNext = _unpackingImpl->getNext(
+        builder, _spec, _metaBSONElem, _includeTimeField, _includeMetaField);
+
+    // Add computed meta projections.
+    for (auto&& name : _spec.computedMetaProjFields()) {
+        builder.appendAs(_computedMetaProjections[name], name);
+    }
+
+    return builder.obj();
+}
+
 Document BucketUnpacker::extractSingleMeasurement(int j) {
     tassert(5422101,
             "'extractSingleMeasurment' expects j to be greater than or equal to zero and less than "
@@ -1421,7 +1513,8 @@ void BucketUnpacker::reset(BSONObj&& bucket, bool bucketMatchedQuery) {
             "The $_internalUnpackBucket stage requires the data region to have a timeField object",
             timeFieldElem);
 
-    _metaValue = Value{_bucket[timeseries::kBucketMetaFieldName]};
+    _metaBSONElem = _bucket[timeseries::kBucketMetaFieldName];
+    _metaValue = Value{_metaBSONElem};
     if (_spec.metaField()) {
         // The spec indicates that there might be a metadata region. Missing metadata in
         // measurements is expressed with missing metadata in a bucket. But we disallow undefined

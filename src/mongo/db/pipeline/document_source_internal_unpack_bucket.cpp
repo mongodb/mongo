@@ -545,18 +545,27 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(
 
 boost::optional<Document> DocumentSourceInternalUnpackBucket::getNextMatchingMeasure() {
     while (_bucketUnpacker.hasNext()) {
-        auto measure = _bucketUnpacker.getNext();
         if (_eventFilter) {
-            // MatchExpression only takes BSON documents, so we have to make one. As an
-            // optimization, only serialize the fields we need to do the match.
-            BSONObj measureBson = _eventFilterDeps.needWholeDocument
-                ? measure.toBson()
-                : document_path_support::documentToBsonWithPaths(measure, _eventFilterDeps.fields);
-            if (_bucketUnpacker.bucketMatchedQuery() || _eventFilter->matchesBSON(measureBson)) {
-                return measure;
+            if (_unpackToBson) {
+                auto measure = _bucketUnpacker.getNextBson();
+                if (_bucketUnpacker.bucketMatchedQuery() || _eventFilter->matchesBSON(measure)) {
+                    return Document(measure);
+                }
+            } else {
+                auto measure = _bucketUnpacker.getNext();
+                // MatchExpression only takes BSON documents, so we have to make one. As an
+                // optimization, only serialize the fields we need to do the match.
+                BSONObj measureBson = _eventFilterDeps.needWholeDocument
+                    ? measure.toBson()
+                    : document_path_support::documentToBsonWithPaths(measure,
+                                                                     _eventFilterDeps.fields);
+                if (_bucketUnpacker.bucketMatchedQuery() ||
+                    _eventFilter->matchesBSON(measureBson)) {
+                    return measure;
+                }
             }
         } else {
-            return measure;
+            return _bucketUnpacker.getNext();
         }
     }
     return {};
@@ -671,7 +680,7 @@ std::pair<BSONObj, bool> DocumentSourceInternalUnpackBucket::extractOrBuildProje
     // Attempt to get an inclusion $project representing the root-level dependencies of the pipeline
     // after the $_internalUnpackBucket. If this $project is not empty, then the dependency set was
     // finite.
-    auto deps = getRestPipelineDependencies(itr, container);
+    auto deps = getRestPipelineDependencies(itr, container, true /* includeEventFilter */);
     if (auto dependencyProj =
             deps.toProjectionWithoutMetadata(DepsTracker::TruncateToRootLevel::yes);
         !dependencyProj.isEmpty()) {
@@ -1142,10 +1151,12 @@ bool findSequentialDocumentCache(Pipeline::SourceContainer::iterator start,
 }
 
 DepsTracker DocumentSourceInternalUnpackBucket::getRestPipelineDependencies(
-    Pipeline::SourceContainer::iterator itr, Pipeline::SourceContainer* container) const {
+    Pipeline::SourceContainer::iterator itr,
+    Pipeline::SourceContainer* container,
+    bool includeEventFilter) const {
     auto deps = Pipeline::getDependenciesForContainer(
         pExpCtx, Pipeline::SourceContainer{std::next(itr), container->end()}, boost::none);
-    if (_eventFilter) {
+    if (_eventFilter && includeEventFilter) {
         match_expression::addDependencies(_eventFilter.get(), &deps);
     }
     return deps;
@@ -1278,7 +1289,7 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
     {
         // Check if the rest of the pipeline needs any fields. For example we might only be
         // interested in $count.
-        auto deps = getRestPipelineDependencies(itr, container);
+        auto deps = getRestPipelineDependencies(itr, container, true /* includeEventFilter */);
         if (deps.hasNoRequirements()) {
             _bucketUnpacker.setBucketSpec({_bucketUnpacker.bucketSpec().timeField(),
                                            _bucketUnpacker.bucketSpec().metaField(),
@@ -1339,6 +1350,13 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
         _eventFilterDeps = {};
         match_expression::addDependencies(_eventFilter.get(), &_eventFilterDeps);
         container->erase(std::next(itr));
+
+        // If the $match is not followed by other stages referencing fields (e.g. $count), we can
+        // unpack directly to BSON so that data doesn't need to be materialized to Document.
+        auto deps = getRestPipelineDependencies(itr, container, false /* includeEventFilter */);
+        if (deps.fields.empty()) {
+            _unpackToBson = true;
+        }
 
         // Create a loose bucket predicate and push it before the unpacking stage.
         if (predicates.loosePredicate) {

@@ -260,7 +260,8 @@ public:
     GetModPathsReturn getModifiedPaths() const final override;
 
     DepsTracker getRestPipelineDependencies(Pipeline::SourceContainer::iterator itr,
-                                            Pipeline::SourceContainer* container) const;
+                                            Pipeline::SourceContainer* container,
+                                            bool includeEventFilter) const;
 
 private:
     GetNextResult doGetNext() final;
@@ -289,6 +290,8 @@ private:
     DepsTracker _eventFilterDeps;
     std::unique_ptr<MatchExpression> _wholeBucketFilter;
     BSONObj _wholeBucketFilterBson;
+
+    bool _unpackToBson = false;
 
     bool _optimizedEndOfPipeline = false;
     bool _triedInternalizeProject = false;
