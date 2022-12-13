@@ -102,32 +102,36 @@ void FlowControlTicketholder::getTicket(OperationContext* opCtx,
     LOGV2_DEBUG(20519, 4, "Taking ticket.", "Available"_attr = _tickets);
     if (_tickets == 0) {
         ++stats->acquireWaitCount;
-    }
 
-    auto currentWaitTime = curTimeMicros64();
-    auto updateTotalTime = [&]() {
-        auto oldWaitTime = std::exchange(currentWaitTime, curTimeMicros64());
-        auto waitTimeDelta = currentWaitTime - oldWaitTime;
-        _totalTimeAcquiringMicros.fetchAndAddRelaxed(waitTimeDelta);
-        stats->timeAcquiringMicros += waitTimeDelta;
-    };
+        // Since tickets are only added every second, the fast clock source is good enough.
+        // We record the time in micros anyway to be consistent with other metrics like mutexes.
+        auto* clockSource = opCtx->getServiceContext()->getFastClockSource();
+        auto currentWaitTime = clockSource->now();
+        auto updateTotalTime = [&]() {
+            auto oldWaitTime = std::exchange(currentWaitTime, clockSource->now());
+            auto waitTimeDelta = currentWaitTime - oldWaitTime;
+            auto waitTimeDeltaMicros = durationCount<Microseconds>(waitTimeDelta);
+            _totalTimeAcquiringMicros.fetchAndAddRelaxed(waitTimeDeltaMicros);
+            stats->timeAcquiringMicros += waitTimeDeltaMicros;
+        };
 
-    stats->waiting = true;
-    ON_BLOCK_EXIT([&] {
-        // When this block exits, update the time one last time and note that getTicket() is no
-        // longer waiting.
-        updateTotalTime();
-        stats->waiting = false;
-    });
+        stats->waiting = true;
+        ON_BLOCK_EXIT([&] {
+            // When this block exits, update the time one last time and note that getTicket() is no
+            // longer waiting.
+            updateTotalTime();
+            stats->waiting = false;
+        });
 
-    // getTicket() should block until there are tickets or the Ticketholder is in shutdown
-    while (!opCtx->waitForConditionOrInterruptFor(
-        _cv, lk, Milliseconds(500), [&] { return _tickets > 0 || _inShutdown; })) {
-        updateTotalTime();
-    }
+        // getTicket() should block until there are tickets or the Ticketholder is in shutdown
+        while (!opCtx->waitForConditionOrInterruptFor(
+            _cv, lk, Milliseconds(500), [&] { return _tickets > 0 || _inShutdown; })) {
+            updateTotalTime();
+        }
 
-    if (_inShutdown) {
-        return;
+        if (_inShutdown) {
+            return;
+        }
     }
 
     ++stats->ticketsAcquired;
