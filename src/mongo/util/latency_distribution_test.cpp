@@ -43,8 +43,8 @@ TEST(LatencyDistributionTest, WorksWithInterpolation) {
         distribution.addEntry(resolution);
     }
 
-    ASSERT_EQ(distribution.getPercentile(0), Microseconds{0});
-    ASSERT_EQ(distribution.getPercentile(0.75), Microseconds{75});
+    ASSERT_EQ(distribution.getPercentile(0.0f), Microseconds{0});
+    ASSERT_EQ(distribution.getPercentile(0.75f), Microseconds{75});
 }
 
 TEST(LatencyDistributionTest, MergesWorkCorrectly) {
@@ -60,8 +60,8 @@ TEST(LatencyDistributionTest, MergesWorkCorrectly) {
     auto merged = distribution1.mergeWith(distribution2);
     ASSERT_EQ(merged.numEntries(), 200);
     ASSERT_EQ(merged.getMax(), Microseconds{200});
-    ASSERT_EQ(merged.getPercentile(0.6), Microseconds{120});
-    ASSERT_EQ(merged.getPercentile(0.5), Microseconds{100});
+    ASSERT_EQ(merged.getPercentile(0.6f), Microseconds{120});
+    ASSERT_EQ(merged.getPercentile(0.5f), Microseconds{100});
 }
 
 }  // namespace mongo
