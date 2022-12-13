@@ -200,6 +200,8 @@ public:
                        const NamespaceString& collectionName,
                        const UUID& uuid) final {}
 
+    void onTransactionStart(OperationContext* opCtx) final {}
+
     void onUnpreparedTransactionCommit(OperationContext* opCtx,
                                        const TransactionOperations& transactionOperations) final {}
 

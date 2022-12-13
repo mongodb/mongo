@@ -1881,6 +1881,8 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
 
 }  // namespace
 
+void OpObserverImpl::onTransactionStart(OperationContext* opCtx) {}
+
 void OpObserverImpl::onUnpreparedTransactionCommit(
     OperationContext* opCtx, const TransactionOperations& transactionOperations) {
     const auto& statements = transactionOperations.getOperationsForOpObserver();

@@ -180,6 +180,7 @@ public:
     void onEmptyCapped(OperationContext* opCtx,
                        const NamespaceString& collectionName,
                        const UUID& uuid) override {}
+    void onTransactionStart(OperationContext* opCtx) override {}
     void onUnpreparedTransactionCommit(
         OperationContext* opCtx, const TransactionOperations& transactionOperations) override {}
     void onBatchedWriteStart(OperationContext* opCtx) final {}

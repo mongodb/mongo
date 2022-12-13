@@ -208,6 +208,8 @@ private:
                        const NamespaceString& collectionName,
                        const UUID& uuid) override {}
 
+    void onTransactionStart(OperationContext* opCtx) override {}
+
     void onUnpreparedTransactionCommit(
         OperationContext* opCtx, const TransactionOperations& transactionOperations) override {}
 

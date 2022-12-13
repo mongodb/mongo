@@ -407,6 +407,12 @@ public:
                                const UUID& uuid) = 0;
 
     /**
+     * The onTransaction Start method is called at the beginning of a multi-document transaction.
+     * It must not be called when the transaction is already in progress.
+     */
+    virtual void onTransactionStart(OperationContext* opCtx) = 0;
+
+    /**
      * The onUnpreparedTransactionCommit method is called on the commit of an unprepared
      * transaction, before the RecoveryUnit onCommit() is called.  It must not be called when no
      * transaction is active.
