@@ -63,6 +63,7 @@ MONGO_FAIL_POINT_DEFINE(hangTimeseriesInsertBeforeReopeningBucket);
 MONGO_FAIL_POINT_DEFINE(alwaysUseSameBucketCatalogStripe);
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesDirectModificationAfterStart);
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesDirectModificationBeforeFinish);
+MONGO_FAIL_POINT_DEFINE(hangWaitingForConflictingPreparedBatch);
 
 
 uint8_t numDigits(uint32_t num) {
@@ -1721,7 +1722,12 @@ StatusWith<BucketCatalog::Bucket*> BucketCatalog::_reuseExistingBucket(
             return input.has_value() ? input.value() : BucketState{};
         });
     if (state.has_value() && state.value().isSet(BucketStateFlag::kCleared)) {
-        _removeBucket(stripe, stripeLock, existingBucket, RemovalMode::kAbort);
+        _abort(stripe,
+               stripeLock,
+               existingBucket,
+               nullptr,
+               getTimeseriesBucketClearedError(existingBucket->_bucketId.ns,
+                                               existingBucket->_bucketId.oid));
         conflicts = true;
     }
     if (conflicts) {
@@ -1965,6 +1971,10 @@ void BucketCatalog::_waitToCommitBatch(Stripe* stripe, const std::shared_ptr<Wri
             }
         }
 
+        // We only hit this failpoint when there are conflicting prepared batches on the same
+        // bucket.
+        hangWaitingForConflictingPreparedBatch.pauseWhileSet();
+
         // We have to wait for someone else to finish.
         current->getResult().getStatus().ignore();  // We don't care about the result.
     }
@@ -2177,7 +2187,7 @@ void BucketCatalog::_abort(Stripe* stripe,
                            // user is doing with it, but we need to keep the bucket around until
                            // that batch is finished.
     if (auto& prepared = bucket->_preparedBatch) {
-        if (prepared == batch) {
+        if (batch && prepared == batch) {
             // We own the prepared batch, so we can go ahead and abort it and remove the bucket.
             prepared->_abort(status);
             prepared.reset();
@@ -2188,6 +2198,13 @@ void BucketCatalog::_abort(Stripe* stripe,
 
     if (doRemove) {
         _removeBucket(stripe, stripeLock, bucket, RemovalMode::kAbort);
+    } else {
+        _bucketStateManager.changeBucketState(
+            bucket->bucketId(),
+            [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
+                invariant(input.has_value());
+                return input.value().setFlag(BucketStateFlag::kCleared);
+            });
     }
 }
 
