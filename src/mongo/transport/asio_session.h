@@ -76,7 +76,7 @@ inline Future<void> futurize(const std::error_code& ec) {
     return Result::makeReady();
 }
 
-class TransportLayerASIO::ASIOSession final : public Session {
+class TransportLayerASIO::AsioSession final : public Session {
 public:
     using GenericSocket = asio::generic::stream_protocol::socket;
 
@@ -84,16 +84,16 @@ public:
 
     // If the socket is disconnected while any of these options are being set, this constructor
     // may throw, but it is guaranteed to throw a mongo DBException.
-    ASIOSession(TransportLayerASIO* tl,
+    AsioSession(TransportLayerASIO* tl,
                 GenericSocket socket,
                 bool isIngressSession,
                 Endpoint endpoint = Endpoint(),
                 std::shared_ptr<const SSLConnectionContext> transientSSLContext = nullptr);
 
-    ASIOSession(const ASIOSession&) = delete;
-    ASIOSession& operator=(const ASIOSession&) = delete;
+    AsioSession(const AsioSession&) = delete;
+    AsioSession& operator=(const AsioSession&) = delete;
 
-    ~ASIOSession() {
+    ~AsioSession() {
         end();
     }
 

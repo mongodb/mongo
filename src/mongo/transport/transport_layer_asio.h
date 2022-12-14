@@ -235,17 +235,17 @@ public:
 
 private:
     class BatonASIO;
-    class ASIOSession;
+    class AsioSession;
     class ASIOReactor;
 
-    using ASIOSessionHandle = std::shared_ptr<ASIOSession>;
-    using ConstASIOSessionHandle = std::shared_ptr<const ASIOSession>;
+    using AsioSessionHandle = std::shared_ptr<AsioSession>;
+    using ConstAsioSessionHandle = std::shared_ptr<const AsioSession>;
     using GenericAcceptor = asio::basic_socket_acceptor<asio::generic::stream_protocol>;
 
     void _acceptConnection(GenericAcceptor& acceptor);
 
     template <typename Endpoint>
-    StatusWith<ASIOSessionHandle> _doSyncConnect(
+    StatusWith<AsioSessionHandle> _doSyncConnect(
         Endpoint endpoint,
         const HostAndPort& peer,
         const Milliseconds& timeout,

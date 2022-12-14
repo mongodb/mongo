@@ -114,7 +114,7 @@ access rights.
 The _transport layer_ calls appropriate TLS functions inside of its own related functions. 
 [`TransportLayerManager::connect`](https://github.com/mongodb/mongo/blob/master/src/mongo/transport/transport_layer_manager.h#L66) 
 will make a call to 
-[`ASIOSession::handshakeSSLForEgress`](https://github.com/mongodb/mongo/blob/master/src/mongo/transport/transport_layer_asio.cpp#L496)
+[`AsioSession::handshakeSSLForEgress`](https://github.com/mongodb/mongo/blob/master/src/mongo/transport/transport_layer_asio.cpp#L496)
 when it needs to speak TLS. This works the same for 
 [`asyncConnect`](https://github.com/mongodb/mongo/blob/master/src/mongo/transport/transport_layer.h#L85) as well.
 [`TransportLayerManager`](../../transport/transport_layer_manager.h) provides these and

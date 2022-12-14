@@ -602,7 +602,7 @@ StatusWith<SessionHandle> TransportLayerASIO::connect(
     }
 
     std::error_code ec;
-    ASIOSession::GenericSocket sock(*_egressReactor);
+    AsioSession::GenericSocket sock(*_egressReactor);
     WrappedResolver resolver(*_egressReactor);
 
     Date_t timeBefore = Date_t::now();
@@ -699,12 +699,12 @@ StatusWith<SessionHandle> TransportLayerASIO::connect(
 }
 
 template <typename Endpoint>
-StatusWith<TransportLayerASIO::ASIOSessionHandle> TransportLayerASIO::_doSyncConnect(
+StatusWith<TransportLayerASIO::AsioSessionHandle> TransportLayerASIO::_doSyncConnect(
     Endpoint endpoint,
     const HostAndPort& peer,
     const Milliseconds& timeout,
     boost::optional<TransientSSLParams> transientSSLParams) {
-    ASIOSession::GenericSocket sock(*_egressReactor);
+    AsioSession::GenericSocket sock(*_egressReactor);
     std::error_code ec;
 
     const auto protocol = endpoint->protocol();
@@ -763,10 +763,10 @@ StatusWith<TransportLayerASIO::ASIOSessionHandle> TransportLayerASIO::_doSyncCon
             transientSSLContext = std::move(statusOrContext.getValue());
         }
 #endif
-        return std::make_shared<ASIOSession>(
+        return std::make_shared<AsioSession>(
             this, std::move(sock), false, *endpoint, transientSSLContext);
     } catch (const asio::system_error& e) {
-        return errorCodeToStatus(e.code(), "syncConnect ASIOSession constructor");
+        return errorCodeToStatus(e.code(), "syncConnect AsioSession constructor");
     } catch (const DBException& e) {
         return e.toStatus();
     }
@@ -809,12 +809,12 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(
         Promise<SessionHandle> promise;
 
         Mutex mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "AsyncConnectState::mutex");
-        ASIOSession::GenericSocket socket;
+        AsioSession::GenericSocket socket;
         ASIOReactorTimer timeoutTimer;
         WrappedResolver resolver;
         WrappedEndpoint resolvedEndpoint;
         const HostAndPort peer;
-        TransportLayerASIO::ASIOSessionHandle session;
+        TransportLayerASIO::AsioSessionHandle session;
         ReactorHandle reactor;
     };
 
@@ -919,13 +919,13 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(
             stdx::unique_lock<Latch> lk(connector->mutex);
             connector->session = [&] {
                 try {
-                    return std::make_shared<ASIOSession>(this,
+                    return std::make_shared<AsioSession>(this,
                                                          std::move(connector->socket),
                                                          false,
                                                          *connector->resolvedEndpoint,
                                                          transientSSLContext);
                 } catch (const asio::system_error& e) {
-                    iasserted(errorCodeToStatus(e.code(), "asyncConnect ASIOSession constructor"));
+                    iasserted(errorCodeToStatus(e.code(), "asyncConnect AsioSession constructor"));
                 }
             }();
             connector->session->ensureAsync();
@@ -1494,7 +1494,7 @@ bool isTcp(Protocol&& p) {
 
 void TransportLayerASIO::_acceptConnection(GenericAcceptor& acceptor) {
     auto acceptCb = [this, &acceptor](const std::error_code& ec,
-                                      ASIOSession::GenericSocket peerSocket) mutable {
+                                      AsioSession::GenericSocket peerSocket) mutable {
         Timer timer;
         transportLayerASIOhangDuringAcceptCallback.pauseWhileSet();
 
@@ -1523,8 +1523,8 @@ void TransportLayerASIO::_acceptConnection(GenericAcceptor& acceptor) {
 #endif
 
         try {
-            std::shared_ptr<ASIOSession> session(
-                new ASIOSession(this, std::move(peerSocket), true));
+            std::shared_ptr<AsioSession> session(
+                new AsioSession(this, std::move(peerSocket), true));
             if (session->isFromLoadBalancer()) {
                 session->parseProxyProtocolHeader(_acceptorReactor)
                     .getAsync([this, session = std::move(session)](Status s) {

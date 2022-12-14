@@ -603,20 +603,20 @@ private:
 /**
  * Have `TransportLayerASIO` make a egress connection and observe behavior when
  * that connection is immediately reset by the peer. Test that if this happens
- * during the `ASIOSession` constructor, that the thrown `asio::system_error`
+ * during the `AsioSession` constructor, that the thrown `asio::system_error`
  * is handled safely (translated to a Status holding a SocketException).
  */
 TEST(TransportLayerASIO, EgressConnectionResetByPeerDuringSessionCtor) {
     // Under TFO, no SYN is sent until the client has data to send.  For this
     // test, we need the server to respond when the client hits the failpoint
-    // in the ASIOSession ctor. So we have to disable TFO.
+    // in the AsioSession ctor. So we have to disable TFO.
     auto savedTFOClient = std::exchange(transport::gTCPFastOpenClient, false);
     ScopeGuard savedTFOClientRestore = [&] { transport::gTCPFastOpenClient = savedTFOClient; };
     // The `server` accepts connections, only to immediately reset them.
     TestFixture tf;
     asio::io_context ioContext;
 
-    // `fp` pauses the `ASIOSession` constructor immediately prior to its
+    // `fp` pauses the `AsioSession` constructor immediately prior to its
     // `setsockopt` sequence, to allow time for the peer reset to propagate.
     FailPoint& fp = transport::transportLayerASIOSessionPauseBeforeSetSocketOption;
 
@@ -636,7 +636,7 @@ TEST(TransportLayerASIO, EgressConnectionResetByPeerDuringSessionCtor) {
     using namespace unittest::match;
     // On MacOS, calling `setsockopt` on a peer-reset connection yields an
     // `EINVAL`. On Linux and Windows, the `setsockopt` completes successfully.
-    // Either is okay, but the `ASIOSession` ctor caller is expected to handle
+    // Either is okay, but the `AsioSession` ctor caller is expected to handle
     // `asio::system_error` and convert it to `SocketException`.
     ASSERT_THAT(tf.tla()
                     .connect({"localhost", server.port()},
@@ -1147,8 +1147,8 @@ DEATH_TEST_F(BatonASIOLinuxTest, AddAnAlreadyAddedSession, "invariant") {
     baton->addSession(*session, transport::NetworkingBaton::Type::In).getAsync([](Status) {});
 }
 
-// This could be considered a test for either `ASIOSession` or `BatonASIOLinux`, as it's testing the
-// interaction between the two when `ASIOSession` calls `addSession` and `cancelAsyncOperations` on
+// This could be considered a test for either `AsioSession` or `BatonASIOLinux`, as it's testing the
+// interaction between the two when `AsioSession` calls `addSession` and `cancelAsyncOperations` on
 // the networking baton. This is currently added to the `BatonASIOLinuxTest` fixture to utilize the
 // existing infrastructure.
 TEST_F(BatonASIOLinuxTest, CancelAsyncOperationsInterruptsOngoingOperations) {

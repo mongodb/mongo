@@ -391,7 +391,7 @@ std::list<Promise<void>> TransportLayerASIO::BatonASIO::_poll(stdx::unique_lock<
 
 Future<void> TransportLayerASIO::BatonASIO::_addSession(Session& session, short events) try {
     auto pf = makePromiseFuture<void>();
-    TransportSession ts{checked_cast<ASIOSession&>(session).getSocket().native_handle(),
+    TransportSession ts{checked_cast<AsioSession&>(session).getSocket().native_handle(),
                         events,
                         std::move(pf.promise)};
     _safeExecute(stdx::unique_lock(_mutex),
