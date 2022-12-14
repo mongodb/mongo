@@ -36,6 +36,7 @@
 #define __STDC_FORMAT_MACROS
 #endif
 
+#include <algorithm>
 #include <iomanip>
 #include <iostream>
 #include <fstream>
@@ -416,8 +417,8 @@ Context::operator=(const Context &other)
 
 ContextInternal::ContextInternal()
     : _tint(), _table_names(), _table_runtime(nullptr), _runtime_alloced(0), _tint_last(0),
-      _dyn_tint(), _dyn_table_names(), _dyn_table_runtime(), _dyn_tint_last(0), _context_count(0),
-      _dyn_mutex(new std::mutex())
+      _dyn_tint(), _dyn_table_names(), _dyn_table_runtime(), _dyn_tint_last(0), _dyn_table_in_use(),
+      _dyn_tables_delete(), _context_count(0), _dyn_mutex(new std::mutex())
 {
     uint32_t count = workgen_atomic_add32(&context_count, 1);
     if (count != 1)
@@ -992,8 +993,22 @@ ThreadRunner::op_run(Operation *op)
         if (num_tables == 0)
             goto err;
 
-        tint = (random_value() % num_tables);
-        table_uri = _icontext->_dyn_table_names.at(tint);
+        // Select a random key.
+        auto it = _icontext->_dyn_tint.begin();
+        std::advance(it, random_value() % _icontext->_dyn_tint.size());
+        const std::string uri(it->first);
+
+        // Make sure the table is not marked for deletion.
+        bool marked_deleted =
+          std::find(_icontext->_dyn_tables_delete.begin(), _icontext->_dyn_tables_delete.end(),
+            uri) != _icontext->_dyn_tables_delete.end();
+        if (!marked_deleted) {
+            ++_icontext->_dyn_table_in_use[uri];
+            table_uri = uri;
+            tint = _icontext->_dyn_tint[uri];
+        } else {
+            goto err;
+        }
     } else {
         tint = op->_table._internal->_tint;
         table_uri = op->_table._uri;
@@ -1215,6 +1230,14 @@ err:
         }
         _in_transaction = false;
     }
+
+    // For operations on random tables, if a table has been selected, decrement the reference
+    // counter.
+    if (op->_random_table && !table_uri.empty()) {
+        const std::lock_guard<std::mutex> lock(*_icontext->_dyn_mutex);
+        --_icontext->_dyn_table_in_use[table_uri];
+    }
+
     return (ret);
 }
 
@@ -2348,10 +2371,17 @@ Workload::run(WT_CONNECTION *conn)
 }
 
 void
-Workload::create_table(const std::string &uri)
+Workload::add_table(const std::string &uri)
 {
     WorkloadRunner runner(this);
-    runner.create_table(uri);
+    runner.add_table(uri);
+}
+
+void
+Workload::remove_table(const std::string &uri)
+{
+    WorkloadRunner runner(this);
+    runner.remove_table(uri);
 }
 
 WorkloadRunner::WorkloadRunner(Workload *workload)
@@ -2379,8 +2409,35 @@ Workload::get_tables()
     return uris;
 }
 
+const std::vector<std::string>
+Workload::garbage_collection()
+{
+    ContextInternal *icontext = _context->_internal;
+    const std::lock_guard<std::mutex> lock(*icontext->_dyn_mutex);
+    std::vector<std::string> uris;
+
+    for (size_t i = 0; i != icontext->_dyn_tables_delete.size();) {
+        // The table might still be in use.
+        const std::string uri(icontext->_dyn_tables_delete.at(i));
+        if (icontext->_dyn_table_in_use[uri] != 0) {
+            ++i;
+            continue;
+        }
+
+        // Delete all local data related to the table.
+        icontext->_dyn_table_in_use.erase(uri);
+        icontext->_dyn_tables_delete.erase(icontext->_dyn_tables_delete.begin() + i);
+        tint_t tint = icontext->_dyn_tint.at(uri);
+        icontext->_dyn_tint.erase(uri);
+        icontext->_dyn_table_names.erase(tint);
+        icontext->_dyn_table_runtime.erase(tint);
+        uris.push_back(uri);
+    }
+    return uris;
+}
+
 void
-WorkloadRunner::create_table(const std::string &uri)
+WorkloadRunner::add_table(const std::string &uri)
 {
     ContextInternal *icontext = _workload->_context->_internal;
     const std::lock_guard<std::mutex> lock(*icontext->_dyn_mutex);
@@ -2394,10 +2451,36 @@ WorkloadRunner::create_table(const std::string &uri)
     icontext->_dyn_tint[uri] = tint;
     icontext->_dyn_table_names[tint] = uri;
 
-    ASSERT(tint == icontext->_dyn_table_runtime.size());
-    icontext->_dyn_table_runtime.push_back(TableRuntime());
+    ASSERT(icontext->_dyn_table_runtime.count(tint) == 0);
+    icontext->_dyn_table_runtime[tint] = TableRuntime();
 
     ++icontext->_dyn_tint_last;
+}
+
+void
+WorkloadRunner::remove_table(const std::string &uri)
+{
+    ContextInternal *icontext = _workload->_context->_internal;
+
+    if (icontext->_tint.count(uri) > 0) {
+        const std::string err_msg(
+          "The table " + uri + " cannot be deleted, it is part of the static set.");
+        THROW(err_msg);
+    }
+
+    const std::lock_guard<std::mutex> lock(*icontext->_dyn_mutex);
+
+    if (icontext->_dyn_tint.count(uri) == 0) {
+        const std::string err_msg("The table " + uri + " does not exist.");
+        THROW(err_msg);
+    }
+
+    // Mark the table for deletion.
+    bool found = std::find(icontext->_dyn_tables_delete.begin(), icontext->_dyn_tables_delete.end(),
+                   uri) != icontext->_dyn_tables_delete.end();
+    if (!found) {
+        icontext->_dyn_tables_delete.push_back(uri);
+    }
 }
 
 int

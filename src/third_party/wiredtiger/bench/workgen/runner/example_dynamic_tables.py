@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 
-# This workload simulates the continuous creation of tables.
+# This workload simulates the continuous creation and deletion of tables.
 
 import threading as pythread
 import random
@@ -65,11 +65,22 @@ def create(session, workload, table_config):
     try:
         session.create(table_name, table_config)
         # This indicates Workgen a new table exists.
-        workload.create_table(table_name)
+        workload.add_table(table_name)
         tables.append(table_name)
     # Collision may occur.
     except RuntimeError as e:
         assert "already exists" in str(e).lower()
+
+def drop(workload, table_name):
+    global tables
+
+    try:
+        # Mark the table for deletion in Workgen.
+        workload.remove_table(table_name)
+        # Delete local data.
+        tables.remove(table_name)
+    except RuntimeError as e:
+        assert "it is part of the static set" in str(e).lower()
 
 context = Context()
 connection = context.wiredtiger_open("create")
@@ -106,12 +117,45 @@ workload.options.run_time = 10
 workload_thread = ThreadWithReturnValue(target=workload.run, args=([connection]))
 workload_thread.start()
 
-# Create tables while the workload is running.
+# Create and drop tables while the workload is running.
+tables_to_delete = []
 while workload_thread.is_alive():
     create(session, workload, table_config)
+
+    # Select a random table to drop.
+    if len(tables):
+        idx = random.randint(0, len(tables) - 1)
+        uri = tables[idx]
+        # Mark it for deletion.
+        drop(workload, uri)
+
+    # Trigger the Workgen garbage collection.
+    tables_to_delete += workload.garbage_collection()
+    deleted_tables = []
+    for t in tables_to_delete:
+        try:
+            session.drop(t)
+            # If the WiredTiger call is successful, this table has been removed safely from all
+            # layers.
+            deleted_tables.append(t)
+        except WiredTigerError as e:
+            assert "device or resource busy" in str(e).lower()
+
+    # Update the list of tables pending deletion.
+    for t in deleted_tables:
+        tables_to_delete.remove(t)
+
     time.sleep(1)
 
 assert workload_thread.join() == 0
+
+# It is possible that Python and Workgen are not matching at this point in terms of tables. Since
+# Workgen cannot remove a table that is still being used, it may have kept reference to it.
+# Now the workload is finished, call the garbage collector on Workgen, nothing should be blocking
+# the deletion of tables that are supposed to be removed.
+# Note that we are not checking what's on disk, we don't need to use what garbage_collection
+# returns.
+workload.garbage_collection()
 
 # Check tables match between Python and Workgen.
 workgen_tables = workload.get_tables()
