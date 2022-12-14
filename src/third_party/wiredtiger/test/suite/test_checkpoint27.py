@@ -50,7 +50,7 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         ('unnamed', dict(first_checkpoint=None)),
     ]
     scenarios = make_scenarios(format_values, name_values)
-        
+
 
     def large_updates(self, uri, ds, nrows, value, ts):
         cursor = self.session.open_cursor(uri)
@@ -99,7 +99,6 @@ class test_checkpoint(wttest.WiredTigerTestCase):
         if ts is not None:
             cfg += ',debug=(checkpoint_read_timestamp=' + self.timestamp_str(ts) + ')'
         cursor = self.session.open_cursor(ds.uri, None, cfg)
-        #self.session.begin_transaction()
         count = 0
         firstread = True
         self.evict_metadata()
@@ -109,7 +108,6 @@ class test_checkpoint(wttest.WiredTigerTestCase):
             if firstread:
                 firstread = False
                 self.evict_metadata()
-        #self.session.rollback_transaction()
         self.assertEqual(count, nrows)
         cursor.close()
 
@@ -148,8 +146,7 @@ class test_checkpoint(wttest.WiredTigerTestCase):
 
         # Now read the checkpoint.
         # It seems to be necessary to do one or two full scans of the checkpoint before the
-        # metadata eviction works. Don't understand why. (XXX -- if anyone knows what's going
-        # on, please let me know and update the test.)
+        # metadata eviction works. Don't understand why, see WT-10236.
         self.check(ds, self.first_checkpoint, nrows, value_a, 15)
         self.check(ds, self.first_checkpoint, nrows, value_b, 25)
 
