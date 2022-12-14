@@ -190,7 +190,7 @@ let testCases = {
     emptycapped: {skip: "primary only"},
     enableSharding: {skip: "primary only"},
     endSessions: {skip: "does not return user data"},
-    explain: {skip: "TODO SERVER-30068"},
+    explain: {skip: "test case to be added"},
     features: {skip: "does not return user data"},
     filemd5: {skip: "does not return user data"},
     find: {
