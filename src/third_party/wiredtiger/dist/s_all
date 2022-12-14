@@ -91,10 +91,10 @@ run "python verbose.py"
 run "sh ./s_copyright"
 if [ $fast -eq 0 ]; then
     run "sh ./s_style -F"
-    run "./s_clang-format -F"
+    run "./s_clang_format -F"
 else
     run "sh ./s_style"
-    run "./s_clang-format"
+    run "./s_clang_format"
 fi
 run "python prototypes.py"
 run "sh ./s_typedef -b"

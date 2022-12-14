@@ -69,4 +69,4 @@ def compare_srcfile(tmp, src):
 #    Format a source file.
 def format_srcfile(src):
     src = os.path.abspath(src)
-    subprocess.check_call(['./s_clang-format', src])
+    subprocess.check_call(['./s_clang_format', src])

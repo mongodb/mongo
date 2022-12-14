@@ -42,7 +42,7 @@ build() {
         -e 'p' \
         -e '}' \
         -e 'd' < $f) > $t
-    ./s_clang-format "${PWD}/$t"
+    ./s_clang_format "${PWD}/$t"
     cmp $t $f > /dev/null 2>&1 ||
         (echo "Building $f" && rm -f $f && cp $t $f)
 }

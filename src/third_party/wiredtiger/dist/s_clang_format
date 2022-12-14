@@ -73,7 +73,7 @@ case $# in
 esac
 
 if $exclude; then
-    for f in `cat dist/s_clang-format.list`; do
+    for f in `cat dist/s_clang_format.list`; do
         search=`echo "$search" | sed "\#$f#d"`
     done
 fi
