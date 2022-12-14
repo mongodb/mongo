@@ -102,12 +102,8 @@ function runCommandForConcurrentWritesTest(testOpts, expectedError) {
 }
 
 function createCollectionAndInsertDocsForConcurrentWritesTest(
-    primaryDB, collName, isCapped, numDocs = TenantMigrationConcurrentWriteUtil.kNumInitialDocs) {
+    primaryDB, collName, numDocs = TenantMigrationConcurrentWriteUtil.kNumInitialDocs) {
     const createCollCommand = {create: collName};
-    if (isCapped) {
-        createCollCommand.capped = true;
-        createCollCommand.size = kMaxSize;
-    }
     assert.commandWorked(primaryDB.runCommand(createCollCommand));
 
     let bulk = primaryDB[collName].initializeUnorderedBulkOp();
@@ -164,8 +160,7 @@ function runTestForConcurrentWritesTest(
     jsTest.log("Testing testOpts: " + tojson(testOpts) + " with testFunc " + testFunc.name);
 
     if (testCase.explicitlyCreateCollection) {
-        createCollectionAndInsertDocsForConcurrentWritesTest(
-            testOpts.primaryDB, collName, testCase.isCapped);
+        createCollectionAndInsertDocsForConcurrentWritesTest(testOpts.primaryDB, collName);
     }
 
     if (testCase.setUp) {
@@ -180,8 +175,7 @@ function runTestForConcurrentWritesTest(
 
 function setupTestForConcurrentWritesTest(testCase, collName, testOpts) {
     if (testCase.explicitlyCreateCollection) {
-        createCollectionAndInsertDocsForConcurrentWritesTest(
-            testOpts.primaryDB, collName, testCase.isCapped);
+        createCollectionAndInsertDocsForConcurrentWritesTest(testOpts.primaryDB, collName);
     }
 
     if (testCase.setUp) {
@@ -195,7 +189,7 @@ const isNotSupportedInServerless = "not supported in serverless cluster";
 const isAuthCommand = "is an auth command";
 const isOnlySupportedOnStandalone = "is only supported on standalone";
 const isOnlySupportedOnShardedCluster = "is only supported on sharded cluster";
-const isDeprecated = "is only deprecated";
+const isDeprecated = "is deprecated";
 
 TenantMigrationConcurrentWriteUtil.kTestDoc = {
     x: -1
@@ -256,7 +250,6 @@ function indexExists(db, collName, targetIndex) {
             bsonWoCompare(index.expireAfterSeconds, targetIndex.expireAfterSeconds) === 0);
 }
 
-TenantMigrationConcurrentWriteUtil.kMaxSize = 1024;  // max size of capped collections.
 TenantMigrationConcurrentWriteUtil.kNumInitialDocs =
     2;  // num initial docs to insert into test collections.
 TenantMigrationConcurrentWriteUtil.kTxnNumber = NumberLong(0);
@@ -340,39 +333,11 @@ TenantMigrationConcurrentWriteUtil.testCases = {
     applyOps: {skip: isNotSupportedInServerless},
     authenticate: {skip: isAuthCommand},
     buildInfo: {skip: isNotWriteCommand},
-    captrunc: {
-        skip: isNotWriteCommand,           // TODO (SERVER-49834)
-        explicitlyCreateCollection: true,  // creates a collection with kNumInitialDocs > 1 docs.
-        isCapped: true,
-        command: function(dbName, collName) {
-            return {captrunc: collName, n: 1};
-        },
-        assertCommandSucceeded: function(db, dbName, collName) {
-            assert.eq(countDocs(db, collName, {}), 1);
-        },
-        assertCommandFailed: function(db, dbName, collName) {
-            assert.eq(countDocs(db, collName, {}), kNumInitialDocs);
-        }
-    },
+    captrunc: {skip: isNotSupportedInServerless},
     checkShardingIndex: {skip: isNotRunOnUserDatabase},
     cleanupOrphaned: {skip: isNotRunOnUserDatabase},
     clearLog: {skip: isNotRunOnUserDatabase},
-    cloneCollectionAsCapped: {
-        explicitlyCreateCollection: true,
-        command: function(dbName, collName) {
-            return {
-                cloneCollectionAsCapped: collName,
-                toCollection: collName + "CloneCollectionAsCapped",
-                size: TenantMigrationConcurrentWriteUtil.kMaxSize
-            };
-        },
-        assertCommandSucceeded: function(db, dbName, collName) {
-            assert(collectionExists(db, collName + "CloneCollectionAsCapped"));
-        },
-        assertCommandFailed: function(db, dbName, collName) {
-            assert(!collectionExists(db, collName + "CloneCollectionAsCapped"));
-        }
-    },
+    cloneCollectionAsCapped: {skip: isNotSupportedInServerless},
     collMod: {
         explicitlyCreateCollection: true,
         setUp: createTestIndex,
@@ -426,31 +391,12 @@ TenantMigrationConcurrentWriteUtil.testCases = {
             assert.eq(countDocs(db, collName), 0);
         }
     },
-    compact: {
-        skip: isNotWriteCommand,  // TODO (SERVER-49834)
-        explicitlyCreateCollection: true,
-        command: function(dbName, collName) {
-            return {compact: collName, force: true};
-        },
-        assertCommandSucceeded: function(db, dbName, collName) {},
-        assertCommandFailed: function(db, dbName, collName) {}
-    },
+    compact: {skip: isNotSupportedInServerless},
     configureFailPoint: {skip: isNotRunOnUserDatabase},
     connPoolStats: {skip: isNotRunOnUserDatabase},
     connPoolSync: {skip: isNotRunOnUserDatabase},
     connectionStatus: {skip: isNotRunOnUserDatabase},
-    convertToCapped: {
-        explicitlyCreateCollection: true,
-        command: function(dbName, collName) {
-            return {convertToCapped: collName, size: TenantMigrationConcurrentWriteUtil.kMaxSize};
-        },
-        assertCommandSucceeded: function(db, dbName, collName) {
-            assert(db[collName].stats().capped);
-        },
-        assertCommandFailed: function(db, dbName, collName) {
-            assert(!db[collName].stats().capped);
-        }
-    },
+    convertToCapped: {skip: isNotSupportedInServerless},
     coordinateCommitTransaction: {skip: isNotRunOnUserDatabase},
     count: {skip: isNotWriteCommand},
     cpuload: {skip: isNotRunOnUserDatabase},
@@ -564,19 +510,7 @@ TenantMigrationConcurrentWriteUtil.testCases = {
     dropRole: {skip: isAuthCommand},
     dropUser: {skip: isAuthCommand},
     echo: {skip: isNotRunOnUserDatabase},
-    emptycapped: {
-        explicitlyCreateCollection: true,
-        setUp: insertTestDoc,
-        command: function(dbName, collName) {
-            return {emptycapped: collName};
-        },
-        assertCommandSucceeded: function(db, dbName, collName) {
-            assert.eq(countDocs(db, collName, TenantMigrationConcurrentWriteUtil.kTestDoc), 0);
-        },
-        assertCommandFailed: function(db, dbName, collName) {
-            assert.eq(countDocs(db, collName, TenantMigrationConcurrentWriteUtil.kTestDoc), 1);
-        }
-    },
+    emptycapped: {skip: isNotSupportedInServerless},
     endSessions: {skip: isNotRunOnUserDatabase},
     explain: {skip: isNotRunOnUserDatabase},
     features: {skip: isNotRunOnUserDatabase},
