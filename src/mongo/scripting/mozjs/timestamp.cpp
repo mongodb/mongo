@@ -53,17 +53,17 @@ const JSFunctionSpec TimestampInfo::methods[2] = {
 const char* const TimestampInfo::className = "Timestamp";
 
 namespace {
-// Checks that argument 'idx' of 'args' is a number in the range of an unsigned 32-bit integer,
-// or uasserts a complaint about an invalid value for 'name'.
-double getTimestampArg(JSContext* cx, JS::CallArgs args, int idx, std::string name) {
-    int64_t maxArgVal = std::numeric_limits<uint32_t>::max();
-    if (!args.get(idx).isNumber())
+// Checks that a JavaScript value is a number in the range of an unsigned 32-bit integer. The 'name'
+// is used to describe the parameter that failed validation in the error message to the user.
+double getTimestampComponent(JSContext* cx, JS::HandleValue component, std::string name) {
+    int64_t maxValue = std::numeric_limits<uint32_t>::max();
+    if (!component.isNumber())
         uasserted(ErrorCodes::BadValue, str::stream() << name << " must be a number");
-    int64_t val = ValueWriter(cx, args.get(idx)).toInt64();
-    if (val < 0 || val > maxArgVal) {
+    int64_t val = ValueWriter(cx, component).toInt64();
+    if (val < 0 || val > maxValue) {
         uasserted(ErrorCodes::BadValue,
-                  str::stream() << name << " must be non-negative and not greater than "
-                                << maxArgVal << ", got " << val);
+                  str::stream() << name << " must be non-negative and not greater than " << maxValue
+                                << ", got " << val);
     }
     return val;
 }
@@ -80,13 +80,35 @@ void TimestampInfo::construct(JSContext* cx, JS::CallArgs args) {
         o.setNumber(InternedString::t, 0);
         o.setNumber(InternedString::i, 0);
     } else if (args.length() == 2) {
-        o.setNumber(InternedString::t, getTimestampArg(cx, args, 0, "Timestamp time (seconds)"));
-        o.setNumber(InternedString::i, getTimestampArg(cx, args, 1, "Timestamp increment"));
+        o.setNumber(InternedString::t,
+                    getTimestampComponent(cx, args.get(0), "Timestamp time (seconds)"));
+        o.setNumber(InternedString::i,
+                    getTimestampComponent(cx, args.get(1), "Timestamp increment"));
     } else {
         uasserted(ErrorCodes::BadValue, "Timestamp needs 0 or 2 arguments");
     }
 
     args.rval().setObjectOrNull(thisv);
+}
+
+Timestamp TimestampInfo::getValidatedValue(JSContext* cx, JS::HandleObject obj) {
+    ObjectWrapper wrapper(cx, obj);
+
+    uassert(6900900,
+            "Malformed timestamp in JavaScript: missing timestamp field, 't'",
+            wrapper.hasOwnField("t"));
+    uassert(6900901,
+            "Malformed timestamp in JavaScript: missing increment field, 'i'",
+            wrapper.hasOwnField("i"));
+
+    JS::RootedValue time(cx);
+    wrapper.getValue("t", &time);
+
+    JS::RootedValue increment(cx);
+    wrapper.getValue("i", &increment);
+
+    return {static_cast<uint32_t>(getTimestampComponent(cx, time, "Timestamp time (seconds)")),
+            static_cast<uint32_t>(getTimestampComponent(cx, increment, "Timestamp increment"))};
 }
 
 void TimestampInfo::Functions::toJSON::call(JSContext* cx, JS::CallArgs args) {

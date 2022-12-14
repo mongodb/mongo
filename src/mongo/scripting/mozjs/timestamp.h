@@ -54,6 +54,8 @@ struct TimestampInfo : public BaseInfo {
     static const JSFunctionSpec methods[2];
 
     static const char* const className;
+
+    static Timestamp getValidatedValue(JSContext* cx, JS::HandleObject obj);
 };
 
 }  // namespace mozjs

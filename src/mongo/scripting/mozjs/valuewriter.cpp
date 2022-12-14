@@ -298,13 +298,12 @@ void ValueWriter::toBinData(std::function<void(const BSONBinData&)> withBinData)
 
 Timestamp ValueWriter::toTimestamp() {
     JS::RootedObject obj(_context, _value.toObjectOrNull());
-    ObjectWrapper wrapper(_context, obj);
 
     uassert(ErrorCodes::BadValue,
             "Unable to write Timestamp value.",
             getScope(_context)->getProto<TimestampInfo>().getJSClass() == JS::GetClass(obj));
 
-    return Timestamp(wrapper.getNumber("t"), wrapper.getNumber("i"));
+    return TimestampInfo::getValidatedValue(_context, obj);
 }
 
 JSRegEx ValueWriter::toRegEx() {
@@ -459,7 +458,7 @@ void ValueWriter::_writeObject(BSONObjBuilder* b,
             }
 
             if (scope->getProto<TimestampInfo>().getJSClass() == jsclass) {
-                Timestamp ot(o.getNumber("t"), o.getNumber("i"));
+                Timestamp ot = TimestampInfo::getValidatedValue(_context, obj);
                 b->append(sd, ot);
 
                 return;
