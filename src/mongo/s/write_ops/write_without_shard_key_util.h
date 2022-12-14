@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/s/request_types/cluster_commands_without_shard_key_gen.h"
 
 namespace mongo {
 namespace write_without_shard_key {
@@ -45,6 +46,27 @@ bool useTwoPhaseProtocol(OperationContext* opCtx,
                          bool isUpdateOrDelete,
                          const BSONObj& query,
                          const BSONObj& collation);
+
+/**
+ * Runs and returns the result of running a write without a shard key using the two phase protocol.
+ * At a high level, the two phase protocol involves two phases:
+ *
+ * 1. Read Phase:
+ * Using the query from the original write request, we broadcast the query to all of the shards (a
+ * subset of shards if we have a partial shard key) and select one of the shards that has a matching
+ * document and designate that shard as the executor of the write.
+ *
+ * 2. Write Phase:
+ * Using the information about the shard chosen in the first phase, send the write directly to the
+ * shard to execute.
+ *
+ * Both phases are run transactionally using an internal transaction.
+ *
+ **/
+StatusWith<ClusterWriteWithoutShardKeyResponse> runTwoPhaseWriteProtocol(OperationContext* opCtx,
+                                                                         NamespaceString nss,
+                                                                         BSONObj cmdObj,
+                                                                         int stmtId);
 
 }  // namespace write_without_shard_key
 }  // namespace mongo

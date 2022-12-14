@@ -647,86 +647,41 @@ private:
                                            const NamespaceString& nss,
                                            const BSONObj& cmdObj,
                                            BSONObjBuilder* result) {
-        // Shared state for the transaction below.
-        struct SharedBlock {
-            SharedBlock(NamespaceString nss_, BSONObj cmdObj_) : nss(nss_), cmdObj(cmdObj_) {}
-            NamespaceString nss;
-            BSONObj cmdObj;
-            ClusterQueryWithoutShardKey clusterQueryCommand;
-            ClusterWriteWithoutShardKey clusterWriteCommand;
-            ClusterWriteWithoutShardKeyResponse clusterWriteResponse;
-        };
 
         auto parsedRequest = write_ops::FindAndModifyCommandRequest::parse(
             IDLParserContext("ClusterFindAndModify"), cmdObj);
 
-        auto sharedBlock = std::make_shared<SharedBlock>(nss, cmdObj);
-        sharedBlock->clusterQueryCommand =
-            ClusterQueryWithoutShardKey(cmdObj, parsedRequest.getStmtId().value_or(0));
-
-        auto txn = txn_api::SyncTransactionWithRetries(
-            opCtx,
-            Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
-            TransactionRouterResourceYielder::makeForLocalHandoff());
-
-        txn.run(
-            opCtx, [sharedBlock](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
-                BSONObj res = txnClient
-                                  .runCommand(sharedBlock->nss.db(),
-                                              sharedBlock->clusterQueryCommand.toBSON(BSONObj()))
-                                  .get();
-                uassertStatusOK(getStatusFromCommandResult(res));
-
-                // Use _clusterQueryWithoutShardKeyResponse to construct
-                // _clusterWriteWithoutShardKeyCommand.
-                ClusterQueryWithoutShardKeyResponse queryResponse =
-                    ClusterQueryWithoutShardKeyResponse::parseOwned(
-                        IDLParserContext("_clusterQueryWithoutShardKeyResponse"), std::move(res));
-
-                // Return if query response is empty, there is no document to target.
-                if (!queryResponse.getTargetDoc()) {
-                    return SemiFuture<void>::makeReady();
-                }
-
-                sharedBlock->clusterWriteCommand = ClusterWriteWithoutShardKey(
-                    sharedBlock->cmdObj,
-                    std::string(*queryResponse.getShardId()) /* shardId */,
-                    *queryResponse.getTargetDoc() /* targetDocId */);
-
-                auto writeRes = txnClient
-                                    .runCommand(sharedBlock->nss.db(),
-                                                sharedBlock->clusterWriteCommand.toBSON(BSONObj()))
-                                    .get();
-
-                uassertStatusOK(getStatusFromCommandResult(writeRes));
-                sharedBlock->clusterWriteResponse = ClusterWriteWithoutShardKeyResponse::parseOwned(
-                    IDLParserContext("_clusterWriteWithoutShardKeyResponse"), std::move(writeRes));
-                return SemiFuture<void>::makeReady();
-            });
+        auto swRes = write_without_shard_key::runTwoPhaseWriteProtocol(
+            opCtx, nss, cmdObj, parsedRequest.getStmtId().value_or(0));
 
         BSONObj response;
-        if (sharedBlock->clusterWriteResponse.getResponse().isEmpty()) {
-            write_ops::FindAndModifyLastError lastError(0 /* n */);
-            lastError.setUpdatedExisting(false);
+        if (swRes.isOK()) {
+            if (swRes.getValue().getResponse().isEmpty()) {
+                write_ops::FindAndModifyLastError lastError(0 /* n */);
+                lastError.setUpdatedExisting(false);
 
-            write_ops::FindAndModifyCommandReply findAndModifyResponse;
-            findAndModifyResponse.setLastErrorObject(std::move(lastError));
-            findAndModifyResponse.setValue(boost::none);
+                write_ops::FindAndModifyCommandReply findAndModifyResponse;
+                findAndModifyResponse.setLastErrorObject(std::move(lastError));
+                findAndModifyResponse.setValue(boost::none);
 
-            response = findAndModifyResponse.toBSON();
+                response = findAndModifyResponse.toBSON();
+            } else {
+                response = swRes.getValue().getResponse();
+            }
+
+            // Extract findAndModify command result from the result of the two phase write protocol.
+            _contructResult(opCtx,
+                            ShardId(swRes.getValue().getShardId().toString()),
+                            boost::none /* shardVersion */,
+                            dbVersion,
+                            nss,
+                            cmdObj,
+                            response,
+                            result);
         } else {
-            response = sharedBlock->clusterWriteResponse.getResponse();
+            // TODO: SERVER-71379 Exhaustively test all error cases for _clusterQuery &
+            // _clusterWrite during f&m two phase protocol
         }
-
-        // Extract findAndModify command result from _clusterWriteWithoutShardKeyResponse.
-        _contructResult(opCtx,
-                        ShardId(sharedBlock->clusterWriteCommand.getShardId().toString()),
-                        boost::none /* shardVersion */,
-                        dbVersion,
-                        nss,
-                        cmdObj,
-                        response,
-                        result);
     }
 
     // Command invocation to be used if a shard key is specified or the collection is unsharded.

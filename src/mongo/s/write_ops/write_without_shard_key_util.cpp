@@ -26,14 +26,18 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#include "mongo/s/write_ops/write_without_shard_key_util.h"
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/transaction/transaction_api.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/request_types/cluster_commands_without_shard_key_gen.h"
+#include "mongo/s/transaction_router_resource_yielder.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -151,6 +155,77 @@ bool useTwoPhaseProtocol(OperationContext* opCtx,
     }
 
     return true;
+}
+
+StatusWith<ClusterWriteWithoutShardKeyResponse> runTwoPhaseWriteProtocol(OperationContext* opCtx,
+                                                                         NamespaceString nss,
+                                                                         BSONObj cmdObj,
+                                                                         int stmtId) {
+
+    // Shared state for the transaction below.
+    struct SharedBlock {
+        SharedBlock(NamespaceString nss_, BSONObj cmdObj_, int stmtId_)
+            : nss(std::move(nss_)), cmdObj(cmdObj_), stmtId(stmtId_) {}
+        NamespaceString nss;
+        BSONObj cmdObj;
+        int stmtId;
+        ClusterWriteWithoutShardKeyResponse clusterWriteResponse;
+    };
+
+    auto txn = txn_api::SyncTransactionWithRetries(
+        opCtx,
+        Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
+        TransactionRouterResourceYielder::makeForLocalHandoff());
+
+    auto sharedBlock = std::make_shared<SharedBlock>(nss, cmdObj, stmtId);
+    auto swResult = txn.runNoThrow(
+        opCtx, [sharedBlock](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+            ClusterQueryWithoutShardKey clusterQueryWithoutShardKeyCommand(sharedBlock->cmdObj,
+                                                                           sharedBlock->stmtId);
+            auto queryRes = txnClient
+                                .runCommand(sharedBlock->nss.db(),
+                                            clusterQueryWithoutShardKeyCommand.toBSON({}))
+                                .get();
+            uassertStatusOK(getStatusFromCommandResult(queryRes));
+
+            ClusterQueryWithoutShardKeyResponse queryResponse =
+                ClusterQueryWithoutShardKeyResponse::parseOwned(
+                    IDLParserContext("_clusterQueryWithoutShardKeyResponse"), std::move(queryRes));
+
+            // If there's no matching document and upsert:false, then no modification needs to be
+            // made.
+            if (!queryResponse.getTargetDoc()) {
+                return SemiFuture<void>::makeReady();
+            }
+
+            BSONObjBuilder bob(sharedBlock->cmdObj);
+            ClusterWriteWithoutShardKey clusterWriteWithoutShardKeyCommand(
+                bob.obj(),
+                std::string(*queryResponse.getShardId()) /* shardId */,
+                *queryResponse.getTargetDoc() /* targetDocId */);
+
+            auto writeRes = txnClient
+                                .runCommand(sharedBlock->nss.db(),
+                                            clusterWriteWithoutShardKeyCommand.toBSON(BSONObj()))
+                                .get();
+            uassertStatusOK(getStatusFromCommandResult(writeRes));
+
+            sharedBlock->clusterWriteResponse = ClusterWriteWithoutShardKeyResponse::parseOwned(
+                IDLParserContext("_clusterWriteWithoutShardKeyResponse"), std::move(writeRes));
+            return SemiFuture<void>::makeReady();
+        });
+
+    if (swResult.isOK()) {
+        if (swResult.getValue().getEffectiveStatus().isOK()) {
+            return StatusWith<ClusterWriteWithoutShardKeyResponse>(
+                sharedBlock->clusterWriteResponse);
+        } else {
+            return StatusWith<ClusterWriteWithoutShardKeyResponse>(
+                swResult.getValue().getEffectiveStatus());
+        }
+    } else {
+        return StatusWith<ClusterWriteWithoutShardKeyResponse>(swResult.getStatus());
+    }
 }
 }  // namespace write_without_shard_key
 }  // namespace mongo
