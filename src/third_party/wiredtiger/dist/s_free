@@ -9,10 +9,10 @@ find ../src -name '*.c' -o -name '*_inline.h' | grep -v 'utilities' | xargs egre
 
 len=`cat $t | wc -l`
 test "$len" -ne "1" && {
-	echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-	echo 'Calls to the C library version of free. Only __wt_free_int allowed.'
-	echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-	cat $t
-	exit 1
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+    echo 'Calls to the C library version of free. Only __wt_free_int allowed.'
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+    cat $t
+    exit 1
 }
 exit 0

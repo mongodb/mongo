@@ -34,10 +34,10 @@ done
 shift `expr $OPTIND - 1`
 
 if [ ! -d "$DOC_DIR" ]; then
-	echo "Invalid Git doc repository $DOC_DIR"
+    echo "Invalid Git doc repository $DOC_DIR"
 fi
 if [ ! -f "$RELEASE_DIR/$RELEASE_PACKAGE" ]; then
-	echo "Invalid release package: $RELEASE_DIR/$RELEASE_PACKAGE"
+    echo "Invalid release package: $RELEASE_DIR/$RELEASE_PACKAGE"
 fi
 
 pkgver="$WIREDTIGER_VERSION"
@@ -56,7 +56,7 @@ PREV_VERSION_PATCH=`echo $prevrel | cut -d '.' -f 3`
 # Update the release versions on the landing page.
 sed -e "s/$oldrel/$pkgver/" $DOCFILE > $tmp && mv $tmp $DOCFILE
 if [ $OLD_VERSION_MINOR != $WIREDTIGER_VERSION_MINOR ]; then
-	sed -e "s/$prevrel/$oldrel/" $DOCFILE > $tmp && mv $tmp $DOCFILE
+    sed -e "s/$prevrel/$oldrel/" $DOCFILE > $tmp && mv $tmp $DOCFILE
 fi
 
 echo "Rebuild documentation root"

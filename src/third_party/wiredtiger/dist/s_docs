@@ -9,8 +9,8 @@ test -n "$WT_RELEASE_BUILD" && exit 0
 
 # We require doxygen which may not be installed.
 type doxygen > /dev/null 2>&1 || {
-	echo "$0 skipped: doxygen not found"
-	exit 0
+    echo "$0 skipped: doxygen not found"
+    exit 0
 }
 
 # Don't create Python bytecode files, we don't run this regularly and it gets flagged by git as an
@@ -23,188 +23,188 @@ e=0
 
 wtperf_config()
 {
-	# The Linux ed command writes line numbers to stderr, redirect both
-	# stdout and stderr to keep things quiet.
-	#
-	# The OS X cpp program injects line number output in the middle of lines
-	# and doesn't stringify #XXX entries; use the -E option to the compiler
-	# instead.
-	cat ../bench/wtperf/wtperf_opt.i |
-	${CC:-cc} -E -DOPT_DEFINE_DOXYGEN - | python wtperf_config.py > $t
-	(echo '/START_AUTO_GENERATED_WTPERF_CONFIGURATION/+3,/STOP_AUTO_GENERATED_WTPERF_CONFIGURATION/-1d'
-	 echo 'i'
-	 echo ''
-	 echo '.'
-	 echo ".r $t"
-	 echo 'a'
-	 echo ''
-	 echo '.'
-	 echo 'w'
-	 echo 'q') | ed ../src/docs/wtperf.dox 1>/dev/null 2>/dev/null
+    # The Linux ed command writes line numbers to stderr, redirect both
+    # stdout and stderr to keep things quiet.
+    #
+    # The OS X cpp program injects line number output in the middle of lines
+    # and doesn't stringify #XXX entries; use the -E option to the compiler
+    # instead.
+    cat ../bench/wtperf/wtperf_opt.i |
+    ${CC:-cc} -E -DOPT_DEFINE_DOXYGEN - | python wtperf_config.py > $t
+    (echo '/START_AUTO_GENERATED_WTPERF_CONFIGURATION/+3,/STOP_AUTO_GENERATED_WTPERF_CONFIGURATION/-1d'
+     echo 'i'
+     echo ''
+     echo '.'
+     echo ".r $t"
+     echo 'a'
+     echo ''
+     echo '.'
+     echo 'w'
+     echo 'q') | ed ../src/docs/wtperf.dox 1>/dev/null 2>/dev/null
 }
 
 glossarychk()
 {
-	(cd ../src/docs && grep '^<tr><td>' arch-glossary.dox | cut -d'>' -f3 | sed -e 's/<.*//') > $t
-	sort -f $t > $t2
-	if ! diff $t $t2; then
-		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-		echo "arch-glossary.dox entries out of order"
-		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-		e=1
-	fi
+    (cd ../src/docs && grep '^<tr><td>' arch-glossary.dox | cut -d'>' -f3 | sed -e 's/<.*//') > $t
+    sort -f $t > $t2
+    if ! diff $t $t2; then
+        echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+        echo "arch-glossary.dox entries out of order"
+        echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+        e=1
+    fi
 }
 
 structurechk()
 {
-	# sections are a global name space for doxygen, and must be uniquely
-	# named or you can get the wrong results.  For example, if you have
-	# "@section foo ABC" and "@section foo DEF", they will both appear as
-	# "ABC" or "DEF".
-	(cd ../src/docs &&
-	sed -n 's/@section \([^ ]*\)/\1/p' *.dox | sort | uniq -d) > $t
-	test -s $t && {
-		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-		echo '@section references that are not uniquely named'
-		sed -e 's/^/	/' < $t
-		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-		e=1
-	}
-	# we want a simple tree structure for navigation, otherwise
-	# clicking in the navigation tree can jump to a different point in
-	# the tree
-	(cd ../src/docs &&
-	sed -n 's/@subpage \([^ ]*\)/\1/p' *.dox | sort | uniq -d) > $t
-	test -s $t && {
-		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-		echo 'multiple @subpage references for the same page'
-		sed -e 's/^/	/' < $t
-		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-		e=1
-	}
+    # sections are a global name space for doxygen, and must be uniquely
+    # named or you can get the wrong results.  For example, if you have
+    # "@section foo ABC" and "@section foo DEF", they will both appear as
+    # "ABC" or "DEF".
+    (cd ../src/docs &&
+    sed -n 's/@section \([^ ]*\)/\1/p' *.dox | sort | uniq -d) > $t
+    test -s $t && {
+        echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+        echo '@section references that are not uniquely named'
+        sed -e 's/^/	/' < $t
+        echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+        e=1
+    }
+    # we want a simple tree structure for navigation, otherwise
+    # clicking in the navigation tree can jump to a different point in
+    # the tree
+    (cd ../src/docs &&
+    sed -n 's/@subpage \([^ ]*\)/\1/p' *.dox | sort | uniq -d) > $t
+    test -s $t && {
+        echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+        echo 'multiple @subpage references for the same page'
+        sed -e 's/^/	/' < $t
+        echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+        e=1
+    }
 }
 
 spellchk()
 {
-	# If aspell has been installed, run a spell check.
-	type aspell > /dev/null 2>&1 || return
+    # If aspell has been installed, run a spell check.
+    type aspell > /dev/null 2>&1 || return
 
-	(cd ../src/docs &&
-	# - Separate quoted newlines "line\nline" so "nline" is not reported.
-	# - Specifically ignore anything tagged @sic.
-	# - Specifically hide certain valid uses of the strings "curprev",
-	#   "curnext", "dsk", and "vrfy" so we can refer to the source files
-	#   and their function names in the architecture docs without making
-	#   "vrfy" and "dsk" legal spelling words.
-	sed \
-		-e 's/\("[^"]*\)\\n\([^"]*"\)/\1 \2/' \
-		-e 's/[@\\]sic  *\([^ ]*\) //g' \
-		-e 's/bt_curnext\.c/filename.c/g' \
-		-e 's/bt_curprev\.c/filename.c/g' \
-		-e 's/bt_vrfy\.c/filename.c/g' \
-		-e 's/bt_vrfy_dsk\.c/filename.c/g' \
-		-e 's/__verify_dsk_/__verify_disk_/g' \
-		-e 's/__wt_dsk_/__wt_disk_/g' \
-		-e 's/__wt_verify_dsk/__wt_verify_disk/g' \
-	   *.dox | tee yogbert | \
-	aspell --encoding=iso-8859-1 --lang=en_US --personal=./spell.ok list) |
-	sort -u > $t
-	test -s $t && {
-		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-		echo 'Documentation spelling notes'
-		echo 'Update src/docs/spell.ok to remove warnings.'
-		sed -e 's/^/	/' < $t
-		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-		e=1
-	}
+    (cd ../src/docs &&
+    # - Separate quoted newlines "line\nline" so "nline" is not reported.
+    # - Specifically ignore anything tagged @sic.
+    # - Specifically hide certain valid uses of the strings "curprev",
+    #   "curnext", "dsk", and "vrfy" so we can refer to the source files
+    #   and their function names in the architecture docs without making
+    #   "vrfy" and "dsk" legal spelling words.
+    sed \
+        -e 's/\("[^"]*\)\\n\([^"]*"\)/\1 \2/' \
+        -e 's/[@\\]sic  *\([^ ]*\) //g' \
+        -e 's/bt_curnext\.c/filename.c/g' \
+        -e 's/bt_curprev\.c/filename.c/g' \
+        -e 's/bt_vrfy\.c/filename.c/g' \
+        -e 's/bt_vrfy_dsk\.c/filename.c/g' \
+        -e 's/__verify_dsk_/__verify_disk_/g' \
+        -e 's/__wt_dsk_/__wt_disk_/g' \
+        -e 's/__wt_verify_dsk/__wt_verify_disk/g' \
+       *.dox | tee yogbert | \
+    aspell --encoding=iso-8859-1 --lang=en_US --personal=./spell.ok list) |
+    sort -u > $t
+    test -s $t && {
+        echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+        echo 'Documentation spelling notes'
+        echo 'Update src/docs/spell.ok to remove warnings.'
+        sed -e 's/^/	/' < $t
+        echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+        e=1
+    }
 }
 
 valid_build()
 {
-	# Complain if there are pages we don't reference directly.
-	sed -n '/<table.*directory/,/\/table/p' < ../docs/pages.html | \
-	    grep href > /dev/null && {
-		echo 'Unreferenced page: see docs/pages.html for the list.'
-		e=1
-	}
+    # Complain if there are pages we don't reference directly.
+    sed -n '/<table.*directory/,/\/table/p' < ../docs/pages.html | \
+        grep href > /dev/null && {
+        echo 'Unreferenced page: see docs/pages.html for the list.'
+        e=1
+    }
 
-	classf=`ls ../docs/struct___* 2>/dev/null`
-	for c in $classf; do
-		echo "$c: Add class to PREDEFINED in src/docs/$doxyfile, then remove docs/*.{html,js} and rebuild"
-	done
+    classf=`ls ../docs/struct___* 2>/dev/null`
+    for c in $classf; do
+        echo "$c: Add class to PREDEFINED in src/docs/$doxyfile, then remove docs/*.{html,js} and rebuild"
+    done
 
-	# Complain if \c markdown isn't right.
-	grep '=</code>(' ../docs/*.html > $t
-	test -s $t && {
-	    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-	    echo "Some <code> markup fragments are not correctly quoted, the output switched into"
-	    echo "typewrite format and then switched out of typewrite format before the fragment"
-	    echo "was complete. Probably a \\\c command that didn't span a parenthesis character."
-	    echo
-	    cat $t
-	    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-	    e=1
-	}
+    # Complain if \c markdown isn't right.
+    grep '=</code>(' ../docs/*.html > $t
+    test -s $t && {
+        echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+        echo "Some <code> markup fragments are not correctly quoted, the output switched into"
+        echo "typewrite format and then switched out of typewrite format before the fragment"
+        echo "was complete. Probably a \\\c command that didn't span a parenthesis character."
+        echo
+        cat $t
+        echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+        e=1
+    }
 }
 
 check_docs_data()
 {
-	python docs.py > $t
-	test -s $t && {
-		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-		echo 'Documentation data errors in docs_data.py'
-		sed -e 's/^/	/' < $t
-		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
-		e=1
-	}
+    python docs.py > $t
+    test -s $t && {
+        echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+        echo 'Documentation data errors in docs_data.py'
+        sed -e 's/^/	/' < $t
+        echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+        e=1
+    }
 }
 
 build()
 {
-	# Build from scratch on demand.
-	[ "$1" -eq 0 ] || (cd .. && rm -rf docs && mkdir docs)
+    # Build from scratch on demand.
+    [ "$1" -eq 0 ] || (cd .. && rm -rf docs && mkdir docs)
 
-	# Run doxygen to generate warnings for the base HTML documentation.
-	#
-	# We omit Python because warnings are expected there (the code generated
-	# by swig does not have named arguments, but we want to document them
-	# as if they do.
-	(cd ../src/docs &&
-	    (eval cat $doxyfile $filter ; cat <<EOF
+    # Run doxygen to generate warnings for the base HTML documentation.
+    #
+    # We omit Python because warnings are expected there (the code generated
+    # by swig does not have named arguments, but we want to document them
+    # as if they do.
+    (cd ../src/docs &&
+        (eval cat $doxyfile $filter ; cat <<EOF
 QUIET=YES
 EOF
 ) | doxygen -
-	test -s doxygen.log && cat doxygen.log) > $t 2>&1
-	test -s $t && {
-		cat $t
-		e=1
-	}
+    test -s doxygen.log && cat doxygen.log) > $t 2>&1
+    test -s $t && {
+        cat $t
+        e=1
+    }
 
-	# Copy any needed javascript
-	cp ../src/docs/js/* ../docs/
+    # Copy any needed javascript
+    cp ../src/docs/js/* ../docs/
 
-	# Fix up bad links doxygen generates in navtree.js
-	(cd ../docs &&
-	    sed -i~ -e 's,/\.html,/,' -e 's,\.html\.html,.html,' navtree.js &&
-	    rm -f navtree.js~)
+    # Fix up bad links doxygen generates in navtree.js
+    (cd ../docs &&
+        sed -i~ -e 's,/\.html,/,' -e 's,\.html\.html,.html,' navtree.js &&
+        rm -f navtree.js~)
 
-	# Any cmapx files that are generated by plantuml need to be referred to
-	CMAPX=`find ../src/docs/ -type f -name "*.cmapx" 2>/dev/null`
-	if [ "$CMAPX" != '' ]; then
-		(cd ../docs
-		for f in $CMAPX; do
-			b=`echo $f | sed -e 's:.*/::' -e 's/.cmapx$//'`
-			for html in `grep -l $b.png *.html`; do
-				# There's an image in this HTML file that has a map file
-				# generated by plantuml.  Refer to the map by its name
-				# and insert the contents of the map into the HTML source.
-				sed -e "/<img.*=\"$b[.]png\"/s/\(\"$b[.]png\"\)/\1 usemap=\"#${b}_map\"/" \
-				    -e "/<img.*=\"$b[.]png\"/r $f" $html > $html.NEW
-				mv $html.NEW $html
-			done
-		done
-		)
-	fi
+    # Any cmapx files that are generated by plantuml need to be referred to
+    CMAPX=`find ../src/docs/ -type f -name "*.cmapx" 2>/dev/null`
+    if [ "$CMAPX" != '' ]; then
+        (cd ../docs
+        for f in $CMAPX; do
+            b=`echo $f | sed -e 's:.*/::' -e 's/.cmapx$//'`
+            for html in `grep -l $b.png *.html`; do
+                # There's an image in this HTML file that has a map file
+                # generated by plantuml.  Refer to the map by its name
+                # and insert the contents of the map into the HTML source.
+                sed -e "/<img.*=\"$b[.]png\"/s/\(\"$b[.]png\"\)/\1 usemap=\"#${b}_map\"/" \
+                    -e "/<img.*=\"$b[.]png\"/r $f" $html > $html.NEW
+                mv $html.NEW $html
+            done
+        done
+        )
+    fi
 }
 
 # Do not build the documentation if doxygen version is not compatible.
@@ -222,31 +222,31 @@ additional_languages=1
 filter="|sed '/PROJECT_BRIEF/s,=.*,=\"$WIREDTIGER_VERSION\",'"
 filter="$filter| sed '/PROJECT_NUMBER/s,=.*,=\"Version $WIREDTIGER_VERSION\",'"
 while :
-	do case "$1" in
-	-a)	# Build from scratch
-		clean=1
-		shift;;
-	-l)	# Generate the top-level landing page in ../docs/top
-		filter="$filter| sed '/GENERATE_MAN/s,=.*,=NO,';"
-		filter="$filter cat top/$doxyfile"
-		additional_languages=0
-		shift;;
-	-p)	# Generate PDFs
-		filter="$filter| sed '/GENERATE_LATEX/s,=.*,=YES,'"
-		shift;;
-	-t)	# Include the TODO list
-		filter="$filter| sed '/GENERATE_TODOLIST/s,=.*,=YES,'"
-		shift;;
-	-v)	# Override the version with <slug> <version string>
-		filter="$filter| sed '/HTML_HEADER/s,=.*,= style/header-web.html,'"
-		shift
-		filter="$filter| sed '/PROJECT_BRIEF/s,=.*,=\"$1\",'"
-		shift
-		filter="$filter| sed '/PROJECT_NUMBER/s,=.*,=\"$1\",'"
-		shift;;
-	*)
-		break;;
-	esac
+    do case "$1" in
+    -a)    # Build from scratch
+        clean=1
+        shift;;
+    -l)    # Generate the top-level landing page in ../docs/top
+        filter="$filter| sed '/GENERATE_MAN/s,=.*,=NO,';"
+        filter="$filter cat top/$doxyfile"
+        additional_languages=0
+        shift;;
+    -p)    # Generate PDFs
+        filter="$filter| sed '/GENERATE_LATEX/s,=.*,=YES,'"
+        shift;;
+    -t)    # Include the TODO list
+        filter="$filter| sed '/GENERATE_TODOLIST/s,=.*,=YES,'"
+        shift;;
+    -v)    # Override the version with <slug> <version string>
+        filter="$filter| sed '/HTML_HEADER/s,=.*,= style/header-web.html,'"
+        shift
+        filter="$filter| sed '/PROJECT_BRIEF/s,=.*,=\"$1\",'"
+        shift
+        filter="$filter| sed '/PROJECT_NUMBER/s,=.*,=\"$1\",'"
+        shift;;
+    *)
+        break;;
+    esac
 done
 
 # Generate the list of wtperf configuration options.

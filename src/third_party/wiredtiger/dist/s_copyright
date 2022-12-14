@@ -13,44 +13,44 @@ c5=__wt.copyright.5
 
 check()
 {
-	# Skip files in which WiredTiger holds no rights.
-	if `egrep "skip	$1" dist/s_copyright.list > /dev/null`; then
-		return;
-	fi
+    # Skip files in which WiredTiger holds no rights.
+    if `egrep "skip	$1" dist/s_copyright.list > /dev/null`; then
+        return;
+    fi
 
-	# It's okay if the file doesn't exist: we may be running in a release
-	# tree with some files removed.
-	test -f $1 || return
+    # It's okay if the file doesn't exist: we may be running in a release
+    # tree with some files removed.
+    test -f $1 || return
 
-	# Check for a correct copyright header.
-	if `sed -e 2,5p -e 6q -e d $1 | diff - dist/$c1 > /dev/null` ; then
-		return;
-	fi
-	if `sed -e 2,4p -e 5q -e d $1 | diff - dist/$c2 > /dev/null` ; then
-		return;
-	fi
-	if `sed -e 3,6p -e 7q -e d $1 | diff - dist/$c3 > /dev/null` ; then
-		return;
-	fi
-	if `sed -e 3,5p -e 6q -e d $1 | diff - dist/$c4 > /dev/null` ; then
-		return;
-	fi
-	if `sed -e 1,3p -e 4q -e d $1 | diff - dist/$c4 > /dev/null` ; then
-		return;
-	fi
-	if `sed -e 2,7p -e 8q -e d $1 | diff - dist/$c5 > /dev/null` ; then
-		return;
-	fi
+    # Check for a correct copyright header.
+    if `sed -e 2,5p -e 6q -e d $1 | diff - dist/$c1 > /dev/null` ; then
+        return;
+    fi
+    if `sed -e 2,4p -e 5q -e d $1 | diff - dist/$c2 > /dev/null` ; then
+        return;
+    fi
+    if `sed -e 3,6p -e 7q -e d $1 | diff - dist/$c3 > /dev/null` ; then
+        return;
+    fi
+    if `sed -e 3,5p -e 6q -e d $1 | diff - dist/$c4 > /dev/null` ; then
+        return;
+    fi
+    if `sed -e 1,3p -e 4q -e d $1 | diff - dist/$c4 > /dev/null` ; then
+        return;
+    fi
+    if `sed -e 2,7p -e 8q -e d $1 | diff - dist/$c5 > /dev/null` ; then
+        return;
+    fi
 
-	echo "$1: copyright information is incorrect"
-	exit 1
+    echo "$1: copyright information is incorrect"
+    exit 1
 }
 
 # s_copyright is re-entrant, calling itself with individual file names.
 # Any single argument call is a file name, check its copyright.
 if [ $# -ne 0 ]; then
-	check $1
-	exit 0
+    check $1
+    exit 0
 fi
 
 trap 'rm -f $c1 $c2 $c3 $c4 $c5' 0 1 2 3 13 15
@@ -60,7 +60,7 @@ year='present'
 cat > $c1 <<ENDOFTEXT
  * Copyright (c) 2014-$year MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
- *	All rights reserved.
+ *    All rights reserved.
  *
  * See the file LICENSE for redistribution information.
 ENDOFTEXT
@@ -76,7 +76,7 @@ ENDOFTEXT
 cat > $c3 <<ENDOFTEXT
 # Copyright (c) 2014-$year MongoDB, Inc.
 # Copyright (c) 2008-2014 WiredTiger, Inc.
-#	All rights reserved.
+#    All rights reserved.
 #
 # See the file LICENSE for redistribution information.
 ENDOFTEXT
@@ -91,7 +91,7 @@ ENDOFTEXT
 cat > $c5 <<ENDOFTEXT
  * Copyright (c) 2014-$year MongoDB, Inc.
  * Copyright (c) 2008-2014 WiredTiger, Inc.
- *	All rights reserved.
+ *    All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -102,24 +102,24 @@ ENDOFTEXT
 xp=""
 echo date | xargs -P 20 >/dev/null 2>&1
 if test $? -eq 0; then
-	xp="-P 20"
+    xp="-P 20"
 fi
 
 # Search for files, skipping some well-known 3rd party directories.
 (cd .. && find [a-z]* -name '*.[ch]' \
-	-o -name '*.cxx' \
-	-o -name '*.cpp' \
-	-o -name '*.in' \
-	-o -name '*.py' \
-	-o -name '*.swig' |
+    -o -name '*.cxx' \
+    -o -name '*.cpp' \
+    -o -name '*.in' \
+    -o -name '*.py' \
+    -o -name '*.swig' |
     sed	-e '/Makefile.in/d' \
-	-e '/^cmake\//d' \
-	-e '/checksum\/power8\//d' \
-	-e '/checksum\/zseries\//d' \
-	-e '/\/3rdparty\//d' \
-	-e '/\/node_modules\//d' \
-	-e '/dist\/__/d' \
-	-e 's/^\.\///' |
+    -e '/^cmake\//d' \
+    -e '/checksum\/power8\//d' \
+    -e '/checksum\/zseries\//d' \
+    -e '/\/3rdparty\//d' \
+    -e '/\/node_modules\//d' \
+    -e '/dist\/__/d' \
+    -e 's/^\.\///' |
     xargs $xp -n 1 -I{} sh dist/s_copyright {})
 
 # One-offs.
@@ -134,10 +134,10 @@ string3="printf.*Copyright \(c\) 2008-$year MongoDB, Inc."
 string4="Public Domain 2014-$year MongoDB, Inc."
 special_copyright()
 {
-	cnt=`egrep "$3" ../$1 | wc -l`
-	if test $cnt -ne $2; then
-		echo "$1: copyright information is incorrect"
-	fi
+    cnt=`egrep "$3" ../$1 | wc -l`
+    if test $cnt -ne $2; then
+        echo "$1: copyright information is incorrect"
+    fi
 }
 
 special_copyright LICENSE 1 "$string1"

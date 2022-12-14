@@ -20,14 +20,14 @@ test -z "$scan" || compiler="${SCANCOMPILER:-clang}"
 if test -z "$scan" &&
     test -x /usr/bin/clang &&
     test -x /usr/bin/scan-build; then
-	compiler="/usr/bin/clang"
-	scan="/usr/bin/scan-build"
+    compiler="/usr/bin/clang"
+    scan="/usr/bin/scan-build"
 fi
 
 if test -z "$scan"; then
-	echo "$0: no clang compiler and scan-build programs found"
-	echo "$0: set \$SCANCOMPILER=/path/clang and \$SCANBUILD=/path/scan-build to continue"
-	exit 1
+    echo "$0: no clang compiler and scan-build programs found"
+    echo "$0: set \$SCANCOMPILER=/path/clang and \$SCANBUILD=/path/scan-build to continue"
+    exit 1
 fi
 echo "$0: compiler: $compiler"
 echo "$0: scan-build: $scan"

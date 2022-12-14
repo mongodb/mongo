@@ -14,13 +14,13 @@ tidy="$CLANGTIDY"
 
 if test -z "$tidy" &&
     test -x /usr/lib/llvm-3.9/bin/clang-tidy; then
-	tidy="/usr/lib/llvm-3.9/bin/clang-tidy"
+    tidy="/usr/lib/llvm-3.9/bin/clang-tidy"
 fi
 
 if test -z "$tidy"; then
-	echo "$0: no clang-tidy programs found"
-	echo "$0: set \$CLANGTIDY=/path/clang-tidy to continue"
-	exit 1
+    echo "$0: no clang-tidy programs found"
+    echo "$0: set \$CLANGTIDY=/path/clang-tidy to continue"
+    exit 1
 fi
 echo "$0: clang-tidy: $tidy"
 

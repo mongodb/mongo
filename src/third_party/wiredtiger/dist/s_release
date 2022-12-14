@@ -10,7 +10,7 @@ mkdir -p $RELEASE_DIR
 
 pkgver="$1"
 if test -z "$pkgver" ; then
-	pkgver="$WIREDTIGER_VERSION"
+    pkgver="$WIREDTIGER_VERSION"
 fi
 PKG="wiredtiger-$pkgver"
 DEST="$RELEASE_DIR/$PKG"
@@ -18,11 +18,11 @@ DEST="$RELEASE_DIR/$PKG"
 rm -rf $DEST ; mkdir -p $DEST
 
 if [ -d ../.git ] ; then
-	echo "Running 'git archive' to copy the tree"
-	(cd .. && git archive HEAD) | (cd $DEST && tar xf -)
+    echo "Running 'git archive' to copy the tree"
+    (cd .. && git archive HEAD) | (cd $DEST && tar xf -)
 else
-	echo "$0 must be run in a Git tree"
-	exit 1
+    echo "$0 must be run in a Git tree"
+    exit 1
 fi
 
 echo "Running 'dist/s_all' in the release tree"

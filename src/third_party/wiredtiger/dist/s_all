@@ -7,8 +7,8 @@ trap 'rm -f $t *.pyc __tmp __wt.* __s_all_tmp*' 0 1 2 3 13 15
 
 # We require python which may not be installed.
 type python > /dev/null 2>&1 || {
-	echo 's_all: python not found'
-	exit 1
+    echo 's_all: python not found'
+    exit 1
 }
 
 echo 'dist/s_all run started...'
@@ -18,24 +18,25 @@ force=
 reconf=0
 errmode=0
 errfound=0
+
 while :
-	do case "$1" in
-	-A)	# Reconfigure the library build.
-		reconf=1
-		shift;;
-	-E)	# Return an error code on failure
-		errmode=1
-		shift;;
-	-f)	# Force versions to be updated
-		force="-f"
-		shift;;
-	-F) # Run fast.
+    do case "$1" in
+    -A)    # Reconfigure the library build.
+        reconf=1
+        shift;;
+    -E)    # Return an error code on failure
+        errmode=1
+        shift;;
+    -f)    # Force versions to be updated
+        force="-f"
+        shift;;
+    -F) # Run fast.
         echo "dist/s_all running in fast mode..."
-		fast=0
-		shift;;
-	*)
-		break;;
-	esac
+        fast=0
+        shift;;
+    *)
+        break;;
+    esac
 done
 
 echo "Updating files that include the package version" &&
@@ -43,38 +44,38 @@ echo "Updating files that include the package version" &&
 
 errchk()
 {
-	if ! `test -s $2`; then
-		return
-	fi
+    if ! `test -s $2`; then
+        return
+    fi
 
-	# Return if evergreen validate runs sucessfully.
-	if echo "$1" | grep -q evergreen && [ "$(cat "$2")" = "../test/evergreen.yml is valid" ] ; then
-		rm -f "$2"
-		return
-	fi
+    # Return if evergreen validate runs sucessfully.
+    if echo "$1" | grep -q evergreen && [ "$(cat "$2")" = "../test/evergreen.yml is valid" ] ; then
+        rm -f "$2"
+        return
+    fi
 
-	echo "####################### MESSAGE ############################"
-	echo "s_all run of: \"$1\" resulted in:"
-	sed -e 's/^/    /' $2
-	echo "#######################"
+    echo "####################### MESSAGE ############################"
+    echo "s_all run of: \"$1\" resulted in:"
+    sed -e 's/^/    /' $2
+    echo "#######################"
 
-	# If the test was skipped, ignore the failure.
-	if ! `grep "$1.*skipped" $2 > /dev/null`; then
-	    errfound=1;
-	fi
+    # If the test was skipped, ignore the failure.
+    if ! `grep "$1.*skipped" $2 > /dev/null`; then
+        errfound=1;
+    fi
 
-	# Ignore errors if the script is marked warning-only
-	if [ "$3" = "--warning-only" ]; then
-		errfound=0;
-	fi
+    # Ignore errors if the script is marked warning-only
+    if [ "$3" = "--warning-only" ]; then
+        errfound=0;
+    fi
 
-	rm -f $2
+    rm -f $2
 }
 
 run()
 {
-	2>&1 $1 > $t
-	errchk "$1" $t "$2"
+    2>&1 $1 > $t
+    errchk "$1" $t "$2"
 }
 
 # Non parallelizable scripts. The following scripts either modify files or
@@ -101,7 +102,7 @@ run "python test_tag.py"
 # The s_mentions script requires bash.
 run "./s_mentions" "--warning-only"
 if [ $(command -v evergreen) ] && [ -f ~/.evergreen.yml ]; then
-	run "evergreen validate -p wiredtiger ../test/evergreen.yml"
+    run "evergreen validate -p wiredtiger ../test/evergreen.yml"
 fi
 
 COMMANDS="
@@ -129,22 +130,22 @@ COMMANDS="
 xp=""
 echo date | xargs -P 20 >/dev/null 2>&1
 if test $? -eq 0; then
-	xp="-P 20"
+    xp="-P 20"
 fi
 echo "$COMMANDS" | xargs $xp -I{} /bin/sh -c {}
 
 for f in `find . -name ${t_pfx}\*`; do
-	if `test -s $f`; then
-		LOCAL_NAME=`basename $f`
-		# Find original command and trim redirect garbage
-		FAILED_CMD=`echo "$COMMANDS" | grep $LOCAL_NAME | \
-		    sed -e 's/ >.*//' -e 's/.* //'`
-		errchk "$FAILED_CMD" $f
-	fi
+    if `test -s $f`; then
+        LOCAL_NAME=`basename $f`
+        # Find original command and trim redirect garbage
+        FAILED_CMD=`echo "$COMMANDS" | grep $LOCAL_NAME | \
+            sed -e 's/ >.*//' -e 's/.* //'`
+        errchk "$FAILED_CMD" $f
+    fi
 done
 
 echo 'dist/s_all run finished'
 if test $errmode -ne 0; then
-	exit $errfound;
+    exit $errfound;
 fi
 exit 0

@@ -20,8 +20,8 @@ l=`(cd .. &&
         -e '/support\/stat\.c/d'`
 
 for f in $l ; do
-	expand -t8 < ../$f | awk -- \
-	    "{if(length(\$0) > 100) printf(\"%s:%d\\n\", \"$f\", NR)}"
+    expand -t8 < ../$f | awk -- \
+        "{if(length(\$0) > 100) printf(\"%s:%d\\n\", \"$f\", NR)}"
 done
 
 exit 0

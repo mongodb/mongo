@@ -8,22 +8,22 @@ f=../README
 
 force=no
 while :
-	do case "$1" in
-	-f)	# Force versions to be updated
-		force=yes
-		shift;;
-	*)
-		break;;
-	esac
+    do case "$1" in
+    -f)    # Force versions to be updated
+        force=yes
+        shift;;
+    *)
+        break;;
+    esac
 done
 
 # If the version hasn't changed and we aren't forcing the issue, we're done.
 # Don't generate a new README file just because the date changed unless forced:
 # that happens all the time.
 if test "$force" = no ; then
-	cnt=`(sed -e q < $f; echo "$WIREDTIGER_VERSION_STRING") |
-	    sed -e 's/:.*//' | sort -u | wc -l`
-	test $cnt -eq 1 && exit 0
+    cnt=`(sed -e q < $f; echo "$WIREDTIGER_VERSION_STRING") |
+        sed -e 's/:.*//' | sort -u | wc -l`
+    test $cnt -eq 1 && exit 0
 fi
 
 cat << END_TEXT > $t
@@ -33,25 +33,25 @@ This is version $WIREDTIGER_VERSION of WiredTiger.
 
 WiredTiger release packages and documentation can be found at:
 
-	https://source.wiredtiger.com
+    https://source.wiredtiger.com
 
 The WiredTiger source code can be found at:
 
-	https://github.com/wiredtiger/wiredtiger
+    https://github.com/wiredtiger/wiredtiger
 
 WiredTiger uses JIRA for issue management:
 
-	https://jira.mongodb.org/browse/WT
+    https://jira.mongodb.org/browse/WT
 
 Please do not report issues through GitHub.
 
 WiredTiger licensing information can be found at:
 
-	https://source.wiredtiger.com/license.html
+    https://source.wiredtiger.com/license.html
 
 For general questions and discussion, there's a WiredTiger group:
 
-	https://groups.google.com/group/wiredtiger-users
+    https://groups.google.com/group/wiredtiger-users
 END_TEXT
 
 cmp $t $f > /dev/null 2>&1 ||
