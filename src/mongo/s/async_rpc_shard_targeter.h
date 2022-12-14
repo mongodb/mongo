@@ -57,7 +57,7 @@ public:
                     ExecutorPtr executor)
         : _shardId(shardId), _opCtx(opCtx), _readPref(readPref), _executor(executor){};
 
-    SemiFuture<std::vector<HostAndPort>> resolve(CancellationToken t) override final {
+    SemiFuture<std::vector<HostAndPort>> resolve(CancellationToken t) override {
         return getShard()
             .thenRunOn(_executor)
             .then([this, t](std::shared_ptr<Shard> shard) {
@@ -80,6 +80,10 @@ public:
 
     SemiFuture<std::shared_ptr<Shard>> getShard() {
         return Grid::get(_opCtx)->shardRegistry()->getShard(_executor, _shardId);
+    }
+
+    ShardId getShardId() {
+        return _shardId;
     }
 
 private:

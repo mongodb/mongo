@@ -144,9 +144,10 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
 
                 for (size_t i = 0; i < hostsToTarget; i++) {
                     std::unique_ptr<Targeter> t = std::make_unique<FixedTargeter>(targets[i]);
+                    auto options = std::make_shared<AsyncRPCOptions<CommandType>>(
+                        cmd, exec, hedgeCancellationToken.token());
                     requests.emplace_back(
-                        sendCommand(cmd, opCtx, std::move(t), exec, hedgeCancellationToken.token())
-                            .thenRunOn(exec));
+                        sendCommand(options, opCtx, std::move(t)).thenRunOn(exec));
                 }
 
                 /**

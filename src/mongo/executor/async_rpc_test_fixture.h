@@ -41,6 +41,7 @@
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/rpc/topology_version_gen.h"
+#include "mongo/s/session_catalog_router.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
@@ -91,7 +92,7 @@ private:
     std::deque<Milliseconds> _retryDelays;
 };
 
-class AsyncRPCTestFixture : public LockerNoopServiceContextTest {
+class AsyncRPCTestFixture : public ServiceContextTest {
 public:
     void setUp() override {
         ServiceContextTest::setUp();
@@ -188,4 +189,50 @@ public:
 
     Status _status;
 };
+
+class ShardIdTargeterForTest : public ShardIdTargeter {
+public:
+    ShardIdTargeterForTest(ShardId shardId,
+                           OperationContext* opCtx,
+                           ReadPreferenceSetting readPref,
+                           ExecutorPtr executor,
+                           std::vector<HostAndPort> resolvedHosts)
+        : ShardIdTargeter(shardId, opCtx, readPref, executor) {
+        _resolvedHosts = resolvedHosts;
+    };
+
+    SemiFuture<std::vector<HostAndPort>> resolve(CancellationToken t) override final {
+        return SemiFuture<std::vector<HostAndPort>>::makeReady(_resolvedHosts);
+    }
+
+private:
+    std::vector<HostAndPort> _resolvedHosts;
+};
+
+class AsyncRPCTxnTestFixture : public AsyncRPCTestFixture {
+public:
+    void setUp() override {
+        AsyncRPCTestFixture::setUp();
+        _opCtxHolder = makeOperationContext();
+        getOpCtx()->setLogicalSessionId(makeLogicalSessionIdForTest());
+        _routerOpCtxSession.emplace(getOpCtx());
+    }
+
+    OperationContext* getOpCtx() {
+        return _opCtxHolder.get();
+    }
+
+    void tearDown() override {
+        AsyncRPCTestFixture::tearDown();
+    }
+
+    const LogicalSessionId& getSessionId() {
+        return *getOpCtx()->getLogicalSessionId();
+    }
+
+private:
+    ServiceContext::UniqueOperationContext _opCtxHolder;
+    boost::optional<mongo::RouterOperationContextSession> _routerOpCtxSession;
+};
+
 }  // namespace mongo::async_rpc

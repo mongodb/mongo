@@ -49,10 +49,6 @@ namespace {
  */
 class TaskExecutorCursorFixture : public ThreadPoolExecutorTest {
 public:
-    TaskExecutorCursorFixture() {
-        serviceCtx->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
-    }
-
     void setUp() override {
         ThreadPoolExecutorTest::setUp();
 

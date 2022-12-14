@@ -72,12 +72,9 @@ public:
         std::shared_ptr<RetryPolicy> retryPolicy = std::make_shared<NeverRetryPolicy>()) {
         HelloCommand hello;
         initializeCommand(hello);
-        return sendCommand(hello,
-                           _opCtx.get(),
-                           std::make_unique<FixedTargeter>(target),
-                           getExecutorPtr(),
-                           _cancellationToken,
-                           retryPolicy);
+        auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
+            hello, getExecutorPtr(), _cancellationToken, retryPolicy);
+        return sendCommand(options, _opCtx.get(), std::make_unique<FixedTargeter>(target));
     }
 
     ExecutorFuture<AsyncRPCResponse<HelloCommandReply>> sendHelloCommandToLocalHost() {

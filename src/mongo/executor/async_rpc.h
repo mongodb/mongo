@@ -40,6 +40,8 @@
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/async_rpc_shard_targeter.h"
+#include "mongo/s/transaction_router.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
@@ -77,6 +79,19 @@ struct AsyncRPCResponse {
 template <>
 struct AsyncRPCResponse<void> {
     HostAndPort targetUsed;
+};
+
+template <typename CommandType>
+struct AsyncRPCOptions {
+    AsyncRPCOptions(CommandType cmd,
+                    std::shared_ptr<executor::TaskExecutor> exec,
+                    CancellationToken token,
+                    std::shared_ptr<RetryPolicy> retryPolicy = std::make_shared<NeverRetryPolicy>())
+        : cmd{cmd}, exec{exec}, token{token}, retryPolicy{retryPolicy} {}
+    CommandType cmd;
+    std::shared_ptr<executor::TaskExecutor> exec;
+    CancellationToken token;
+    std::shared_ptr<RetryPolicy> retryPolicy;
 };
 
 /**
@@ -141,36 +156,36 @@ struct RetryDelayAsBackoff {
 
 template <typename CommandType>
 ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendCommandWithRunner(
-    CommandType cmd,
+    BSONObj cmdBSON,
+    std::shared_ptr<AsyncRPCOptions<CommandType>> options,
     detail::AsyncRPCRunner* runner,
     OperationContext* opCtx,
-    std::unique_ptr<Targeter> targeter,
-    std::shared_ptr<executor::TaskExecutor> exec,
-    CancellationToken token,
-    std::shared_ptr<RetryPolicy> retryPolicy = std::make_shared<NeverRetryPolicy>()) {
+    std::unique_ptr<Targeter> targeter) {
     using ReplyType = AsyncRPCResponse<typename CommandType::Reply>;
     auto tryBody = [=, targeter = std::move(targeter)] {
         // Execute the command after extracting the db name and bson from the CommandType.
         // Wrapping this function allows us to separate the CommandType parsing logic from the
         // implementation details of executing the remote command asynchronously.
-        return runner->_sendCommand(
-            cmd.getDbName().db(), cmd.toBSON({}), targeter.get(), opCtx, exec, token);
+        return runner->_sendCommand(options->cmd.getDbName().db(),
+                                    cmdBSON,
+                                    targeter.get(),
+                                    opCtx,
+                                    options->exec,
+                                    options->token);
     };
-    auto resFuture = AsyncTry<decltype(tryBody)>(std::move(tryBody))
-                         .until([token, retryPolicy, cmd](
-                                    StatusWith<detail::AsyncRPCInternalResponse> swResponse) {
-                             bool shouldStopRetry = token.isCanceled() ||
-                                 !retryPolicy->recordAndEvaluateRetry(swResponse.getStatus());
-                             return shouldStopRetry;
-                         })
-                         .withBackoffBetweenIterations(RetryDelayAsBackoff(retryPolicy.get()))
-                         .on(exec, CancellationToken::uncancelable());
-
+    auto resFuture =
+        AsyncTry<decltype(tryBody)>(std::move(tryBody))
+            .until([options](StatusWith<detail::AsyncRPCInternalResponse> swResponse) {
+                bool shouldStopRetry = options->token.isCanceled() ||
+                    !options->retryPolicy->recordAndEvaluateRetry(swResponse.getStatus());
+                return shouldStopRetry;
+            })
+            .withBackoffBetweenIterations(RetryDelayAsBackoff(options->retryPolicy.get()))
+            .on(options->exec, CancellationToken::uncancelable());
     return std::move(resFuture)
         .then([](detail::AsyncRPCInternalResponse r) -> ReplyType {
             auto res = CommandType::Reply::parseSharingOwnership(IDLParserContext("AsyncRPCRunner"),
                                                                  r.response);
-
             return {res, r.targetUsed};
         })
         .unsafeToInlineFuture()
@@ -192,7 +207,7 @@ ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendCommandWithRun
                 return Status{AsyncRPCErrorInfo(s),
                               "Remote command execution failed due to executor shutdown"};
             })
-        .thenRunOn(exec);
+        .thenRunOn(options->exec);
 }
 }  // namespace detail
 
@@ -223,15 +238,12 @@ ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendCommandWithRun
  */
 template <typename CommandType>
 ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendCommand(
-    CommandType cmd,
+    std::shared_ptr<AsyncRPCOptions<CommandType>> options,
     OperationContext* opCtx,
-    std::unique_ptr<Targeter> targeter,
-    std::shared_ptr<executor::TaskExecutor> exec,
-    CancellationToken token,
-    std::shared_ptr<RetryPolicy> retryPolicy = std::make_shared<NeverRetryPolicy>()) {
+    std::unique_ptr<Targeter> targeter) {
     auto runner = detail::AsyncRPCRunner::get(opCtx->getServiceContext());
-    return detail::sendCommandWithRunner(
-        cmd, runner, opCtx, std::move(targeter), exec, token, retryPolicy);
+    auto cmdBSON = options->cmd.toBSON({});
+    return detail::sendCommandWithRunner(cmdBSON, options, runner, opCtx, std::move(targeter));
 }
 
 /**
@@ -241,18 +253,58 @@ ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendCommand(
  */
 template <typename CommandType>
 ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendCommand(
-    CommandType cmd,
+    std::shared_ptr<AsyncRPCOptions<CommandType>> options,
     ServiceContext* const svcCtx,
-    std::unique_ptr<Targeter> targeter,
-    std::shared_ptr<executor::TaskExecutor> exec,
-    CancellationToken token,
-    std::shared_ptr<RetryPolicy> retryPolicy = std::make_shared<NeverRetryPolicy>()) {
+    std::unique_ptr<Targeter> targeter) {
     // Execute the command after extracting the db name and bson from the CommandType.
     // Wrapping this function allows us to separate the CommandType parsing logic from the
     // implementation details of executing the remote command asynchronously.
     auto runner = detail::AsyncRPCRunner::get(svcCtx);
-    return detail::sendCommandWithRunner(
-        cmd, runner, nullptr, std::move(targeter), exec, token, retryPolicy);
+    auto cmdBSON = options->cmd.toBSON({});
+    return detail::sendCommandWithRunner(cmdBSON, options, runner, nullptr, std::move(targeter));
+}
+
+/**
+ * This function operates the same to `sendCommand` above, but will attach transaction metadata
+ * from the opCtx to the command BSONObject metadata before sending to the targeted shardId.
+ */
+template <typename CommandType>
+ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendTxnCommand(
+    std::shared_ptr<AsyncRPCOptions<CommandType>> options,
+    OperationContext* opCtx,
+    std::unique_ptr<ShardIdTargeter> targeter) {
+    using ReplyType = AsyncRPCResponse<typename CommandType::Reply>;
+    // Execute the command after extracting the db name and bson from the CommandType.
+    // Wrapping this function allows us to separate the CommandType parsing logic from the
+    // implementation details of executing the remote command asynchronously.
+    auto runner = detail::AsyncRPCRunner::get(opCtx->getServiceContext());
+    auto cmdBSON = options->cmd.toBSON({});
+    const auto shardId = targeter->getShardId();
+    if (auto txnRouter = TransactionRouter::get(opCtx); txnRouter) {
+        cmdBSON = txnRouter.attachTxnFieldsIfNeeded(opCtx, targeter->getShardId(), cmdBSON);
+    }
+    return detail::sendCommandWithRunner(cmdBSON, options, runner, opCtx, std::move(targeter))
+        .onCompletion([opCtx, shardId](StatusWith<ReplyType> swResponse) -> StatusWith<ReplyType> {
+            auto txnRouter = TransactionRouter::get(opCtx);
+            if (!txnRouter) {
+                return swResponse;
+            }
+            if (swResponse.isOK()) {
+                // TODO (SERVER-72082): Make sure TxnResponseMetadata is appended to the BSON
+                // that we are passing into 'processParticipantResponse'.
+                txnRouter.processParticipantResponse(
+                    opCtx, shardId, swResponse.getValue().response.toBSON());
+            } else {
+                auto extraInfo = swResponse.getStatus().template extraInfo<AsyncRPCErrorInfo>();
+                if (extraInfo->isRemote()) {
+                    auto remoteError = extraInfo->asRemote();
+                    txnRouter.processParticipantResponse(
+                        opCtx, shardId, remoteError.getResponseObj());
+                }
+            }
+            return swResponse;
+        })
+        .thenRunOn(options->exec);
 }
 }  // namespace mongo::async_rpc
 #undef MONGO_LOGV2_DEFAULT_COMPONENT

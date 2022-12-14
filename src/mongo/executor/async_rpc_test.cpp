@@ -50,7 +50,16 @@
 #include "mongo/util/net/hostandport.h"
 #include <memory>
 
+#include "mongo/logv2/log.h"
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
+
 namespace mongo {
+const HostAndPort kTestConfigShardHost = HostAndPort("FakeConfigHost", 12345);
+const std::vector<ShardId> kTestShardIds = {
+    ShardId("FakeShard1"), ShardId("FakeShard2"), ShardId("FakeShard3")};
+const std::vector<HostAndPort> kTestShardHosts = {HostAndPort("FakeShard1Host", 12345),
+                                                  HostAndPort("FakeShard2Host", 12345),
+                                                  HostAndPort("FakeShard3Host", 12345)};
 namespace async_rpc {
 namespace {
 /*
@@ -63,8 +72,10 @@ TEST_F(AsyncRPCTestFixture, SuccessfulHello) {
     initializeCommand(helloCmd);
 
     auto opCtxHolder = makeOperationContext();
-    ExecutorFuture<AsyncRPCResponse<HelloCommandReply>> resultFuture = sendCommand(
-        helloCmd, opCtxHolder.get(), std::move(targeter), getExecutorPtr(), _cancellationToken);
+    auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
+        helloCmd, getExecutorPtr(), _cancellationToken);
+    ExecutorFuture<AsyncRPCResponse<HelloCommandReply>> resultFuture =
+        sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["hello"]);
@@ -97,13 +108,10 @@ TEST_F(AsyncRPCTestFixture, RetryOnSuccessfulHelloAdditionalAttempts) {
     testPolicy->pushRetryDelay(retryDelay);
 
     auto opCtxHolder = makeOperationContext();
+    auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
+        helloCmd, getExecutorPtr(), _cancellationToken, testPolicy);
     ExecutorFuture<AsyncRPCResponse<HelloCommandReply>> resultFuture =
-        sendCommand(helloCmd,
-                    opCtxHolder.get(),
-                    std::move(targeter),
-                    getExecutorPtr(),
-                    _cancellationToken,
-                    testPolicy);
+        sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
     const auto onCommandFunc = [&](const auto& request) {
         ASSERT(request.cmdObj["hello"]);
@@ -142,13 +150,10 @@ TEST_F(AsyncRPCTestFixture, DynamicDelayBetweenRetries) {
     testPolicy->pushRetryDelay(retryDelays[2]);
 
     auto opCtxHolder = makeOperationContext();
+    auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
+        helloCmd, getExecutorPtr(), _cancellationToken, testPolicy);
     ExecutorFuture<AsyncRPCResponse<HelloCommandReply>> resultFuture =
-        sendCommand(helloCmd,
-                    opCtxHolder.get(),
-                    std::move(targeter),
-                    getExecutorPtr(),
-                    _cancellationToken,
-                    testPolicy);
+        sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
     const auto onCommandFunc = [&](const auto& request) {
         ASSERT(request.cmdObj["hello"]);
@@ -185,13 +190,10 @@ TEST_F(AsyncRPCTestFixture, DoNotRetryOnErrorAccordingToPolicy) {
     testPolicy->setMaxNumRetries(zeroRetries);
 
     auto opCtxHolder = makeOperationContext();
+    auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
+        helloCmd, getExecutorPtr(), _cancellationToken, testPolicy);
     ExecutorFuture<AsyncRPCResponse<HelloCommandReply>> resultFuture =
-        sendCommand(helloCmd,
-                    opCtxHolder.get(),
-                    std::move(targeter),
-                    getExecutorPtr(),
-                    _cancellationToken,
-                    testPolicy);
+        sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["hello"]);
@@ -215,8 +217,9 @@ TEST_F(AsyncRPCTestFixture, LocalError) {
     initializeCommand(helloCmd);
 
     auto opCtxHolder = makeOperationContext();
-    auto resultFuture = sendCommand(
-        helloCmd, opCtxHolder.get(), std::move(targeter), getExecutorPtr(), _cancellationToken);
+    auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
+        helloCmd, getExecutorPtr(), _cancellationToken);
+    auto resultFuture = sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["hello"]);
@@ -246,8 +249,9 @@ TEST_F(AsyncRPCTestFixture, RemoteError) {
     initializeCommand(helloCmd);
 
     auto opCtxHolder = makeOperationContext();
-    auto resultFuture = sendCommand(
-        helloCmd, opCtxHolder.get(), std::move(targeter), getExecutorPtr(), _cancellationToken);
+    auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
+        helloCmd, getExecutorPtr(), _cancellationToken);
+    auto resultFuture = sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["hello"]);
@@ -277,11 +281,16 @@ TEST_F(AsyncRPCTestFixture, SuccessfulFind) {
     NamespaceString nss(testDbName);
 
     FindCommandRequest findCmd(nss);
-    auto resultFuture = sendCommand(
-        findCmd, opCtxHolder.get(), std::move(targeter), getExecutorPtr(), _cancellationToken);
+    auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
+        findCmd, getExecutorPtr(), _cancellationToken);
+    auto resultFuture = sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["find"]);
+        ASSERT(!request.cmdObj["startTransaction"]);
+        ASSERT(!request.cmdObj["coordinator"]);
+        ASSERT(!request.cmdObj["autocommit"]);
+        ASSERT(!request.cmdObj["txnNumber"]);
         // The BSON documents in this cursor response are created here.
         // When async_rpc::sendCommand parses the response, it participates
         // in ownership of the underlying data, so it will participate in
@@ -309,8 +318,10 @@ TEST_F(AsyncRPCTestFixture, WriteConcernError) {
         BSON("ok" << 1 << "writeConcernError" << writeConcernError);
 
     auto opCtxHolder = makeOperationContext();
-    ExecutorFuture<AsyncRPCResponse<HelloCommandReply>> resultFuture = sendCommand(
-        helloCmd, opCtxHolder.get(), std::move(targeter), getExecutorPtr(), _cancellationToken);
+    auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
+        helloCmd, getExecutorPtr(), _cancellationToken);
+    ExecutorFuture<AsyncRPCResponse<HelloCommandReply>> resultFuture =
+        sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["hello"]);
@@ -348,8 +359,10 @@ TEST_F(AsyncRPCTestFixture, WriteError) {
                                            << "Document failed validation");
     const BSONObj resWithWriteError = BSON("ok" << 1 << "writeErrors" << BSON_ARRAY(writeError));
     auto opCtxHolder = makeOperationContext();
-    ExecutorFuture<AsyncRPCResponse<HelloCommandReply>> resultFuture = sendCommand(
-        helloCmd, opCtxHolder.get(), std::move(targeter), getExecutorPtr(), _cancellationToken);
+    auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
+        helloCmd, getExecutorPtr(), _cancellationToken);
+    ExecutorFuture<AsyncRPCResponse<HelloCommandReply>> resultFuture =
+        sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["hello"]);
@@ -383,8 +396,9 @@ TEST_F(AsyncRPCTestFixture, ExecutorShutdown) {
     HelloCommand helloCmd;
     initializeCommand(helloCmd);
     auto opCtxHolder = makeOperationContext();
-    auto resultFuture = sendCommand(
-        helloCmd, opCtxHolder.get(), std::move(targeter), getExecutorPtr(), _cancellationToken);
+    auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
+        helloCmd, getExecutorPtr(), _cancellationToken);
+    auto resultFuture = sendCommand(options, opCtxHolder.get(), std::move(targeter));
     getExecutorPtr()->shutdown();
     auto error = resultFuture.getNoThrow().getStatus();
     // The error returned by our API should always be RemoteCommandExecutionError
@@ -439,8 +453,9 @@ TEST_F(AsyncRPCTestFixture, ParseAndSeralizeNoop) {
     initializeCommand(helloCmd);
 
     auto opCtxHolder = makeOperationContext();
-    auto resultFuture = sendCommand(
-        helloCmd, opCtxHolder.get(), std::move(targeter), getExecutorPtr(), _cancellationToken);
+    auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
+        helloCmd, getExecutorPtr(), _cancellationToken);
+    auto resultFuture = sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["hello"]);
@@ -477,9 +492,9 @@ TEST_F(AsyncRPCTestFixture, FailedTargeting) {
     HelloCommand helloCmd;
     initializeCommand(helloCmd);
     auto opCtxHolder = makeOperationContext();
-
-    auto resultFuture = sendCommand(
-        helloCmd, opCtxHolder.get(), std::move(targeter), getExecutorPtr(), _cancellationToken);
+    auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
+        helloCmd, getExecutorPtr(), _cancellationToken);
+    auto resultFuture = sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
     auto error = resultFuture.getNoThrow().getStatus();
     // The error returned by our API should always be RemoteCommandExecutionError
@@ -493,6 +508,175 @@ TEST_F(AsyncRPCTestFixture, FailedTargeting) {
     ASSERT_EQ(extraInfo->asLocal(), targeterFailStatus);
 }
 
+TEST_F(AsyncRPCTestFixture, SendTxnCommandWithoutTxnRouterAppendsNoTxnFields) {
+    ShardId shardId("shard");
+    ReadPreferenceSetting readPref;
+    std::vector<HostAndPort> testHost = {kTestShardHosts[0]};
+    // Use a mock ShardIdTargeter to avoid calling into the ShardRegistry to get a target shard.
+    auto opCtxHolder = makeOperationContext();
+    auto targeter = std::make_unique<ShardIdTargeterForTest>(
+        shardId, opCtxHolder.get(), readPref, getExecutorPtr(), testHost);
+    DatabaseName testDbName = DatabaseName("testdb", boost::none);
+    NamespaceString nss(testDbName);
+
+    FindCommandRequest findCmd(nss);
+    auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
+        findCmd, getExecutorPtr(), _cancellationToken);
+    auto resultFuture = sendTxnCommand(options, opCtxHolder.get(), std::move(targeter));
+
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["find"]);
+        ASSERT(!request.cmdObj["startTransaction"]);
+        ASSERT(!request.cmdObj["coordinator"]);
+        ASSERT(!request.cmdObj["autocommit"]);
+        ASSERT(!request.cmdObj["txnNumber"]);
+        // The BSON documents in this cursor response are created here.
+        // When async_rpc::sendCommand parses the response, it participates
+        // in ownership of the underlying data, so it will participate in
+        // owning the data in the cursor response.
+        return CursorResponse(nss, 0LL, {BSON("x" << 1)})
+            .toBSON(CursorResponse::ResponseType::InitialResponse);
+    });
+
+    CursorInitialReply res = std::move(resultFuture).get().response;
+    ASSERT_BSONOBJ_EQ(res.getCursor()->getFirstBatch()[0], BSON("x" << 1));
+}
+
+TEST_F(AsyncRPCTxnTestFixture, MultipleSendTxnCommand) {
+    ShardId shardId("shard");
+    ReadPreferenceSetting readPref;
+    std::vector<HostAndPort> testHost = {kTestShardHosts[0]};
+    // Use a mock ShardIdTargeter to avoid calling into the ShardRegistry to get a target shard.
+    auto targeter = std::make_unique<ShardIdTargeterForTest>(
+        shardId, getOpCtx(), readPref, getExecutorPtr(), testHost);
+    DatabaseName testDbName = DatabaseName("testdb", boost::none);
+    NamespaceString nss(testDbName);
+
+    // Set up the transaction metadata.
+    TxnNumber txnNum{3};
+    getOpCtx()->setTxnNumber(txnNum);
+    auto txnRouter = TransactionRouter::get(getOpCtx());
+    txnRouter.beginOrContinueTxn(getOpCtx(), txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(getOpCtx());
+
+    FindCommandRequest findCmd(nss);
+    auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
+        findCmd, getExecutorPtr(), _cancellationToken);
+    auto resultFuture = sendTxnCommand(options, getOpCtx(), std::move(targeter));
+
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["find"]);
+        ASSERT(request.cmdObj["startTransaction"].Bool());
+        ASSERT(request.cmdObj["coordinator"].Bool());
+        ASSERT(!request.cmdObj["autocommit"].Bool());
+        ASSERT_EQUALS(request.cmdObj["txnNumber"].numberLong(), 3LL);
+        // The BSON documents in this cursor response are created here.
+        // When async_rpc::sendCommand parses the response, it participates
+        // in ownership of the underlying data, so it will participate in
+        // owning the data in the cursor response.
+        return CursorResponse(nss, 0LL, {BSON("x" << 1)})
+            .toBSON(CursorResponse::ResponseType::InitialResponse);
+    });
+
+    CursorInitialReply res = std::move(resultFuture).get().response;
+    ASSERT_BSONOBJ_EQ(res.getCursor()->getFirstBatch()[0], BSON("x" << 1));
+
+    // // Issue a follow-up find command in the same transaction.
+    FindCommandRequest secondFindCmd(nss);
+    auto secondCmdOptions = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
+        secondFindCmd, getExecutorPtr(), _cancellationToken);
+    auto secondTargeter = std::make_unique<ShardIdTargeterForTest>(
+        shardId, getOpCtx(), readPref, getExecutorPtr(), testHost);
+    auto secondResultFuture =
+        sendTxnCommand(secondCmdOptions, getOpCtx(), std::move(secondTargeter));
+
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["find"]);
+        ASSERT(!request.cmdObj["startTransaction"]);
+        ASSERT(request.cmdObj["coordinator"].Bool());
+        ASSERT(!request.cmdObj["autocommit"].Bool());
+        ASSERT_EQUALS(request.cmdObj["txnNumber"].numberLong(), 3LL);
+        return CursorResponse(nss, 0LL, {BSON("x" << 2)})
+            .toBSON(CursorResponse::ResponseType::InitialResponse);
+    });
+
+    CursorInitialReply secondRes = std::move(secondResultFuture).get().response;
+    ASSERT_BSONOBJ_EQ(secondRes.getCursor()->getFirstBatch()[0], BSON("x" << 2));
+}
+
+TEST_F(AsyncRPCTxnTestFixture, SendTxnCommandReturnsRemoteError) {
+    ShardId shardId("shard");
+    ReadPreferenceSetting readPref;
+    std::vector<HostAndPort> testHost = {kTestShardHosts[0]};
+    // Use a mock ShardIdTargeter to avoid calling into the ShardRegistry to get a target shard.
+    auto targeter = std::make_unique<ShardIdTargeterForTest>(
+        shardId, getOpCtx(), readPref, getExecutorPtr(), testHost);
+    DatabaseName testDbName = DatabaseName("testdb", boost::none);
+    NamespaceString nss(testDbName);
+
+    // Set up the transaction metadata.
+    TxnNumber txnNum{3};
+    getOpCtx()->setTxnNumber(txnNum);
+    auto txnRouter = TransactionRouter::get(getOpCtx());
+    txnRouter.beginOrContinueTxn(getOpCtx(), txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(getOpCtx());
+
+    FindCommandRequest findCmd(nss);
+    auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
+        findCmd, getExecutorPtr(), _cancellationToken);
+    auto resultFuture = sendTxnCommand(options, getOpCtx(), std::move(targeter));
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["find"]);
+        ASSERT(request.cmdObj["startTransaction"].Bool());
+        ASSERT(request.cmdObj["coordinator"].Bool());
+        ASSERT(!request.cmdObj["autocommit"].Bool());
+        ASSERT_EQUALS(request.cmdObj["txnNumber"].numberLong(), 3LL);
+        return createErrorResponse(Status(ErrorCodes::BadValue, "mock"));
+    });
+
+    auto error = resultFuture.getNoThrow().getStatus();
+    ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);
+    auto extraInfo = error.extraInfo<AsyncRPCErrorInfo>();
+    ASSERT(extraInfo);
+    ASSERT(extraInfo->isRemote());
+}
+
+TEST_F(AsyncRPCTxnTestFixture, SendTxnCommandReturnsLocalError) {
+    ShardId shardId("shard");
+    ReadPreferenceSetting readPref;
+    std::vector<HostAndPort> testHost = {kTestShardHosts[0]};
+    // Use a mock ShardIdTargeter to avoid calling into the ShardRegistry to get a target shard.
+    auto targeter = std::make_unique<ShardIdTargeterForTest>(
+        shardId, getOpCtx(), readPref, getExecutorPtr(), testHost);
+    DatabaseName testDbName = DatabaseName("testdb", boost::none);
+    NamespaceString nss(testDbName);
+
+    // Set up the transaction metadata.
+    TxnNumber txnNum{3};
+    getOpCtx()->setTxnNumber(txnNum);
+    auto txnRouter = TransactionRouter::get(getOpCtx());
+    txnRouter.beginOrContinueTxn(getOpCtx(), txnNum, TransactionRouter::TransactionActions::kStart);
+    txnRouter.setDefaultAtClusterTime(getOpCtx());
+
+    FindCommandRequest findCmd(nss);
+    auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
+        findCmd, getExecutorPtr(), _cancellationToken);
+    auto resultFuture = sendTxnCommand(options, getOpCtx(), std::move(targeter));
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["find"]);
+        ASSERT(request.cmdObj["startTransaction"].Bool());
+        ASSERT(request.cmdObj["coordinator"].Bool());
+        ASSERT(!request.cmdObj["autocommit"].Bool());
+        ASSERT_EQUALS(request.cmdObj["txnNumber"].numberLong(), 3LL);
+        return Status(ErrorCodes::NetworkTimeout, "mock");
+    });
+
+    auto error = resultFuture.getNoThrow().getStatus();
+    ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);
+    auto extraInfo = error.extraInfo<AsyncRPCErrorInfo>();
+    ASSERT(extraInfo);
+    ASSERT(extraInfo->isLocal());
+}
 
 TEST_F(AsyncRPCTestFixture, AttemptedTargetCorrectlyPropogatedWithLocalError) {
     HelloCommand helloCmd;
@@ -501,8 +685,9 @@ TEST_F(AsyncRPCTestFixture, AttemptedTargetCorrectlyPropogatedWithLocalError) {
     auto targeter = std::make_unique<FixedTargeter>(target);
 
     auto opCtxHolder = makeOperationContext();
-    auto resultFuture = sendCommand(
-        helloCmd, opCtxHolder.get(), std::move(targeter), getExecutorPtr(), _cancellationToken);
+    auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
+        helloCmd, getExecutorPtr(), _cancellationToken);
+    auto resultFuture = sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["hello"]);
@@ -528,8 +713,9 @@ TEST_F(AsyncRPCTestFixture, NoAttemptedTargetIfTargetingFails) {
 
 
     auto opCtxHolder = makeOperationContext();
-    auto resultFuture = sendCommand(
-        helloCmd, opCtxHolder.get(), std::move(targeter), getExecutorPtr(), _cancellationToken);
+    auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
+        helloCmd, getExecutorPtr(), _cancellationToken);
+    auto resultFuture = sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
     auto error = resultFuture.getNoThrow().getStatus();
     ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);
@@ -549,8 +735,9 @@ TEST_F(AsyncRPCTestFixture, RemoteErrorAttemptedTargetMatchesActual) {
 
 
     auto opCtxHolder = makeOperationContext();
-    auto resultFuture = sendCommand(
-        helloCmd, opCtxHolder.get(), std::move(targeter), getExecutorPtr(), _cancellationToken);
+    auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
+        helloCmd, getExecutorPtr(), _cancellationToken);
+    auto resultFuture = sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
     onCommand([&](const auto& request) {
         ASSERT(request.cmdObj["hello"]);
