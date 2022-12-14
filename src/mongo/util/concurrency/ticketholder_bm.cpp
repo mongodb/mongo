@@ -176,13 +176,13 @@ void BM_acquireAndRelease(benchmark::State& state) {
         serviceContext.reset();
         isReady = false;
         state.counters["AcqRel50"] =
-            benchmark::Counter(resultingDistribution.getPercentile(0.5).count());
+            benchmark::Counter(resultingDistribution.getPercentile(0.5f).count());
         state.counters["AcqRel95"] =
-            benchmark::Counter(resultingDistribution.getPercentile(0.95).count());
+            benchmark::Counter(resultingDistribution.getPercentile(0.95f).count());
         state.counters["AcqRel99"] =
-            benchmark::Counter(resultingDistribution.getPercentile(0.99).count());
+            benchmark::Counter(resultingDistribution.getPercentile(0.99f).count());
         state.counters["AcqRel99.9"] =
-            benchmark::Counter(resultingDistribution.getPercentile(0.999).count());
+            benchmark::Counter(resultingDistribution.getPercentile(0.999f).count());
         state.counters["AcqRelMax"] = benchmark::Counter(resultingDistribution.getMax().count());
     }
 }
