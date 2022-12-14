@@ -160,10 +160,9 @@ struct MatchExpressionVisitorContext {
                 projectCurrentExprToOutputSlot(this);
             }
             invariant(frame.exprsCount() == 1);
-            frame.setStage(makeFilter<false>(
-                frame.extractStage(),
-                stateHelper.getBool(frame.popExpr().extractExpr(state.slotVarMap)),
-                planNodeId));
+            frame.setStage(makeFilter<false>(frame.extractStage(),
+                                             stateHelper.getBool(frame.popExpr().extractExpr()),
+                                             planNodeId));
         }
 
         if (outputSlot && stateHelper.stateContainsValue()) {
@@ -226,11 +225,8 @@ struct MatchExpressionVisitorContext {
 void projectCurrentExprToOutputSlot(MatchExpressionVisitorContext* context) {
     tassert(5291405, "Output slot is not empty", !context->outputSlot);
     auto& frame = context->evalStack.topFrame();
-    auto [projectedExprSlot, stage] = projectEvalExpr(frame.popExpr(),
-                                                      frame.extractStage(),
-                                                      context->planNodeId,
-                                                      context->state.slotIdGenerator,
-                                                      context->state.slotVarMap);
+    auto [projectedExprSlot, stage] = projectEvalExpr(
+        frame.popExpr(), frame.extractStage(), context->planNodeId, context->state.slotIdGenerator);
     context->outputSlot = projectedExprSlot;
     frame.pushExpr(projectedExprSlot);
     frame.setStage(std::move(stage));
@@ -411,7 +407,6 @@ EvalExprStagePair generatePathTraversal(EvalStage inputStage,
                                         PlanNodeId planNodeId,
                                         sbe::value::SlotIdGenerator* slotIdGenerator,
                                         sbe::value::FrameIdGenerator* frameIdGenerator,
-                                        optimizer::SlotVarMap& varSlotMap,
                                         const MakePredicateFn& makePredicate,
                                         LeafTraversalMode mode,
                                         const FilterStateHelper& stateHelper) {
@@ -557,8 +552,7 @@ EvalExprStagePair generatePathTraversal(EvalStage inputStage,
     std::tie(innerExpr, innerBranch) = isLeafField
         // Base case: Evaluate the predicate. Predicate returns boolean value, we need to convert it
         // to state using 'stateHelper.makePredicateCombinator'.
-        ? stateHelper.makePredicateCombinator(makePredicate(innerInputSlot, std::move(innerBranch)),
-                                              varSlotMap)
+        ? stateHelper.makePredicateCombinator(makePredicate(innerInputSlot, std::move(innerBranch)))
         // Recursive case.
         : generatePathTraversal(std::move(innerBranch),
                                 innerInputSlot,
@@ -568,7 +562,6 @@ EvalExprStagePair generatePathTraversal(EvalStage inputStage,
                                 planNodeId,
                                 slotIdGenerator,
                                 frameIdGenerator,
-                                varSlotMap,
                                 makePredicate,
                                 mode,
                                 stateHelper);
@@ -589,7 +582,7 @@ EvalExprStagePair generatePathTraversal(EvalStage inputStage,
                                   stateHelper.makeInitialState(stateHelper.getBool(state.clone())),
                                   state.clone());
                           },
-                          innerExpr.extractExpr(varSlotMap));
+                          innerExpr.extractExpr());
     }
 
     sbe::value::SlotId innerResultSlot;
@@ -597,8 +590,7 @@ EvalExprStagePair generatePathTraversal(EvalStage inputStage,
         projectEvalExpr(std::move(innerExpr),
                         std::move(innerBranch),  // NOLINT(bugprone-use-after-move)
                         planNodeId,
-                        slotIdGenerator,
-                        varSlotMap);
+                        slotIdGenerator);
 
     // Generate the traverse stage for the current nested level. There are several cases covered
     // during this phase:
@@ -709,8 +701,7 @@ void generatePredicateImpl(MatchExpressionVisitorContext* context,
             // slot" that holds the value of the ElemMatchValueMatchExpression's field path.
             auto result = makePredicate(*frame.data().inputSlot, frame.extractStage());
             if (useCombinator) {
-                return context->stateHelper.makePredicateCombinator(std::move(result),
-                                                                    context->state.slotVarMap);
+                return context->stateHelper.makePredicateCombinator(std::move(result));
             }
             return result;
         }
@@ -729,8 +720,7 @@ void generatePredicateImpl(MatchExpressionVisitorContext* context,
                     // we can just evaluate the predicate on the slot directly and return.
                     auto result = makePredicate(*slot, frame.extractStage());
                     if (useCombinator) {
-                        return context->stateHelper.makePredicateCombinator(
-                            std::move(result), context->state.slotVarMap);
+                        return context->stateHelper.makePredicateCombinator(std::move(result));
                     }
                     return result;
                 }
@@ -772,7 +762,6 @@ void generatePredicateImpl(MatchExpressionVisitorContext* context,
                                      context->planNodeId,
                                      context->state.slotIdGenerator,
                                      context->state.frameIdGenerator,
-                                     context->state.slotVarMap,
                                      makePredicate,
                                      mode,
                                      context->stateHelper);
@@ -857,8 +846,7 @@ void generateComparison(MatchExpressionVisitorContext* context,
                         sbe::EPrimBinary::Op binaryOp) {
     auto makePredicateExpr =
         [context, expr, binaryOp](const sbe::EVariable& var) -> std::unique_ptr<sbe::EExpression> {
-        return generateComparisonExpr(context->state, expr, binaryOp, var)
-            .extractExpr(context->state.slotVarMap);
+        return generateComparisonExpr(context->state, expr, binaryOp, var).extractExpr();
     };
 
     // A 'kArrayAndItsElements' traversal mode matches the following semantics: when the path we are
@@ -899,8 +887,7 @@ void generateBitTest(MatchExpressionVisitorContext* context,
                      const sbe::BitTestBehavior& bitOp) {
     auto makePredicateExpr =
         [context, expr, bitOp](const sbe::EVariable& var) -> std::unique_ptr<sbe::EExpression> {
-        return generateBitTestExpr(context->state, expr, bitOp, var)
-            .extractExpr(context->state.slotVarMap);
+        return generateBitTestExpr(context->state, expr, bitOp, var).extractExpr();
     };
 
     generatePredicateExpr(
@@ -950,7 +937,6 @@ void buildLogicalExpression(sbe::EPrimBinary::Op op,
                                                               std::move(branches),
                                                               context->planNodeId,
                                                               context->state.slotIdGenerator,
-                                                              context->state.slotVarMap,
                                                               context->stateHelper);
     frame.pushExpr(std::move(expr));
 
@@ -1262,8 +1248,7 @@ public:
                 invariant(frame.exprsCount() > 0);
                 frame.setStage(
                     makeFilter<false>(frame.extractStage(),
-                                      _context->stateHelper.getBool(
-                                          frame.popExpr().extractExpr(_context->state.slotVarMap)),
+                                      _context->stateHelper.getBool(frame.popExpr().extractExpr()),
                                       _context->planNodeId));
             }
             return;
@@ -1304,8 +1289,7 @@ public:
             auto [predicateSlot, predicateStage] = projectEvalExpr(std::move(expr),
                                                                    std::move(stage),
                                                                    _context->planNodeId,
-                                                                   _context->state.slotIdGenerator,
-                                                                   _context->state.slotVarMap);
+                                                                   _context->state.slotIdGenerator);
 
             auto isObjectOrArrayExpr =
                 makeBinaryOp(sbe::EPrimBinary::logicOr,
@@ -1363,14 +1347,12 @@ public:
                                              std::move(childStages),
                                              _context->planNodeId,
                                              _context->state.slotIdGenerator,
-                                             _context->state.slotVarMap,
                                              _context->stateHelper);
 
         auto filterPair = projectEvalExpr(std::move(filterExpr),
                                           std::move(filterStage),
                                           _context->planNodeId,
-                                          _context->state.slotIdGenerator,
-                                          _context->state.slotVarMap);
+                                          _context->state.slotIdGenerator);
 
         // We're using 'kDoNotTraverseLeaf' traverse mode, so we're guaranteed that 'makePredcate'
         // will only be called once, so it's safe to bind the reference to 'filterStage' subtree
@@ -1440,8 +1422,7 @@ public:
                                        _context->slots);
 
         // We need to convert the result of the '{$expr: ..}' expression to a boolean value.
-        auto logicExpr = makeFillEmptyFalse(
-            makeFunction("coerceToBool", expr.extractExpr(_context->state.slotVarMap)));
+        auto logicExpr = makeFillEmptyFalse(makeFunction("coerceToBool", expr.extractExpr()));
 
         frame.pushExpr(_context->stateHelper.makeState(std::move(logicExpr)));
     }
@@ -1609,8 +1590,7 @@ public:
         auto makePredicateExpr =
             [context = _context,
              expr](const sbe::EVariable& var) -> std::unique_ptr<sbe::EExpression> {
-            return generateModExpr(context->state, expr, var)
-                .extractExpr(context->state.slotVarMap);
+            return generateModExpr(context->state, expr, var).extractExpr();
         };
 
         generatePredicateExpr(
@@ -1627,8 +1607,8 @@ public:
         // This matches the behaviour of classic engine, which does not pass 'MatchDetails' object
         // to children of NOR and thus does not get any information on 'elemMatchKey' from them.
         auto& frame = _context->evalStack.topFrame();
-        frame.pushExpr(_context->stateHelper.makeState(makeNot(_context->stateHelper.getBool(
-            frame.popExpr().extractExpr(_context->state.slotVarMap)))));
+        frame.pushExpr(_context->stateHelper.makeState(
+            makeNot(_context->stateHelper.getBool(frame.popExpr().extractExpr()))));
     }
 
     void visit(const NotMatchExpression* expr) final {
@@ -1638,8 +1618,8 @@ public:
         // Here we discard the index value of the state even if it was set by expressions below NOT.
         // This matches the behaviour of classic engine, which does not pass 'MatchDetails' object
         // to children of NOT and thus does not get any information on 'elemMatchKey' from them.
-        frame.pushExpr(_context->stateHelper.makeState(makeNot(_context->stateHelper.getBool(
-            frame.popExpr().extractExpr(_context->state.slotVarMap)))));
+        frame.pushExpr(_context->stateHelper.makeState(
+            makeNot(_context->stateHelper.getBool(frame.popExpr().extractExpr()))));
     }
 
     void visit(const OrMatchExpression* expr) final {
@@ -1650,8 +1630,7 @@ public:
         auto makePredicateExpr =
             [context = _context,
              expr](const sbe::EVariable& var) -> std::unique_ptr<sbe::EExpression> {
-            return generateRegexExpr(context->state, expr, var)
-                .extractExpr(context->state.slotVarMap);
+            return generateRegexExpr(context->state, expr, var).extractExpr();
         };
 
         generatePredicateExpr(
@@ -1719,8 +1698,7 @@ public:
         auto& frame = _context->evalStack.topFrame();
         auto resultExpr =
             generateWhereExpr(_context->state, expr, sbe::EVariable{*frame.data().inputSlot});
-        frame.pushExpr(
-            _context->stateHelper.makeState(resultExpr.extractExpr(_context->state.slotVarMap)));
+        frame.pushExpr(_context->stateHelper.makeState(resultExpr.extractExpr()));
     }
 
     void visit(const WhereNoOpMatchExpression* expr) final {}
@@ -1747,8 +1725,7 @@ public:
             invariant(frame.exprsCount() > 0);
             frame.setStage(
                 makeFilter<false>(frame.extractStage(),
-                                  _context->stateHelper.getBool(
-                                      frame.popExpr().extractExpr(_context->state.slotVarMap)),
+                                  _context->stateHelper.getBool(frame.popExpr().extractExpr()),
                                   _context->planNodeId));
             return;
         }

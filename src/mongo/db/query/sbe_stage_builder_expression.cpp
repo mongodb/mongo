@@ -92,55 +92,29 @@ struct ExpressionVisitorContext {
         invariant(exprStack.size() >= arity);
     }
 
-    /**
-     * Return whether the last @arity items in the stack are not holding EExpression objects.
-     */
-    bool hasAllAbtEligibleEntries(size_t arity) {
-        bool allAbt = true;
-        auto it = exprStack.crbegin();
-        for (size_t i = 0; it != exprStack.crend() && i < arity; i++, it++) {
-            allAbt &= it->hasABT() || it->hasSlot();
-        }
-        return allAbt;
-    }
-
     std::unique_ptr<sbe::EExpression> popExpr() {
         tassert(6987500, "tried to pop from empty EvalExpr stack", !exprStack.empty());
 
-        auto expr = std::move(exprStack.back());
-        exprStack.pop_back();
-        return expr.extractExpr(state.slotVarMap);
+        auto expr = std::move(exprStack.top());
+        exprStack.pop();
+        return expr.extractExpr();
     }
 
     void pushExpr(EvalExpr expr) {
-        exprStack.emplace_back(std::move(expr));
-    }
-
-    optimizer::ABT popABTExpr() {
-        tassert(6987504, "tried to pop from empty EvalExpr stack", !exprStack.empty());
-
-        auto expr = std::move(exprStack.back());
-        exprStack.pop_back();
-        return expr.extractABT(state.slotVarMap);
+        exprStack.push(std::move(expr));
     }
 
     EvalExpr done() {
         tassert(6987501, "expected exactly one EvalExpr on the stack", exprStack.size() == 1);
 
-        auto expr = std::move(exprStack.back());
-        exprStack.pop_back();
+        auto expr = std::move(exprStack.top());
+        exprStack.pop();
         return expr;
-    }
-
-    optimizer::ProjectionName registerVariable(sbe::value::SlotId slotId) {
-        auto varName = stage_builder::makeVariableName(slotId);
-        state.slotVarMap.emplace(varName, slotId);
-        return varName;
     }
 
     StageBuilderState& state;
 
-    std::vector<EvalExpr> exprStack;
+    std::stack<EvalExpr> exprStack;
 
     EvalExpr rootExpr;
 
@@ -233,89 +207,6 @@ std::unique_ptr<sbe::EExpression> generateTraverse(
                             std::move(inputExpr),
                             std::move(lambdaExpr),
                             makeConstant(sbe::value::TypeTags::NumberInt32, 1));
-    }
-}
-
-/**
- * Version of the generateTraverse helper functions that process ABT trees instead of EExpression
- * ones.
- */
-optimizer::ABT generateTraverseHelper(
-    ExpressionVisitorContext* context,
-    boost::optional<optimizer::ABT>&& inputExpr,
-    const FieldPath& fp,
-    size_t level,
-    sbe::value::FrameIdGenerator* frameIdGenerator,
-    boost::optional<sbe::value::SlotId> topLevelFieldSlot = boost::none) {
-    using namespace std::literals;
-
-    invariant(level < fp.getPathLength());
-    tassert(6950802,
-            "Expected an input expression or top level field",
-            inputExpr.has_value() || topLevelFieldSlot.has_value());
-
-    // Generate an expression to read a sub-field at the current nested level.
-    auto fieldName = makeABTConstant(fp.getFieldName(level));
-    auto fieldExpr = topLevelFieldSlot
-        ? optimizer::make<optimizer::Variable>(context->registerVariable(*topLevelFieldSlot))
-        : makeABTFunction("getField"_sd, std::move(*inputExpr), std::move(fieldName));
-
-    if (level == fp.getPathLength() - 1) {
-        // For the last level, we can just return the field slot without the need for a
-        // traverse stage.
-        return fieldExpr;
-    }
-
-    // Generate nested traversal.
-    auto lambdaFrameId = frameIdGenerator->generate();
-    auto lambdaParamName = makeLocalVariableName(lambdaFrameId, 0);
-    boost::optional<optimizer::ABT> lambdaParam =
-        optimizer::make<optimizer::Variable>(lambdaParamName);
-
-    auto resultExpr =
-        generateTraverseHelper(context, std::move(lambdaParam), fp, level + 1, frameIdGenerator);
-
-    auto lambdaExpr =
-        optimizer::make<optimizer::LambdaAbstraction>(lambdaParamName, std::move(resultExpr));
-
-    // Generate the traverse stage for the current nested level.
-    return makeABTFunction(
-        "traverseP"_sd, std::move(fieldExpr), std::move(lambdaExpr), optimizer::Constant::int32(1));
-}
-
-optimizer::ABT generateTraverse(
-    ExpressionVisitorContext* context,
-    boost::optional<optimizer::ABT>&& inputExpr,
-    bool expectsDocumentInputOnly,
-    const FieldPath& fp,
-    sbe::value::FrameIdGenerator* frameIdGenerator,
-    boost::optional<sbe::value::SlotId> topLevelFieldSlot = boost::none) {
-    size_t level = 0;
-
-    if (expectsDocumentInputOnly) {
-        // When we know for sure that 'inputExpr' will be a document and _not_ an array (such as
-        // when accessing a field on the root document), we can generate a simpler expression.
-        return generateTraverseHelper(
-            context, std::move(inputExpr), fp, level, frameIdGenerator, topLevelFieldSlot);
-    } else {
-        tassert(6950803, "Expected an input expression", inputExpr.has_value());
-        // The general case: the value in the 'inputExpr' may be an array that will require
-        // traversal.
-        auto lambdaFrameId = frameIdGenerator->generate();
-        auto lambdaParamName = makeLocalVariableName(lambdaFrameId, 0);
-        boost::optional<optimizer::ABT> lambdaParam =
-            optimizer::make<optimizer::Variable>(lambdaParamName);
-
-        auto resultExpr =
-            generateTraverseHelper(context, std::move(lambdaParam), fp, level, frameIdGenerator);
-
-        auto lambdaExpr =
-            optimizer::make<optimizer::LambdaAbstraction>(lambdaParamName, std::move(resultExpr));
-
-        return makeABTFunction("traverseP"_sd,
-                               std::move(*inputExpr),
-                               std::move(lambdaExpr),
-                               optimizer::Constant::int32(1));
     }
 }
 
@@ -781,7 +672,7 @@ public:
 
     void visit(const ExpressionConstant* expr) final {
         auto [tag, val] = makeValue(expr->getValue());
-        _context->pushExpr(makeABTConstant(tag, val));
+        _context->pushExpr(sbe::makeE<sbe::EConstant>(tag, val));
     }
 
     void visit(const ExpressionAbs* expr) final {
@@ -989,77 +880,6 @@ public:
     }
     void visit(const ExpressionCompare* expr) final {
         _context->ensureArity(2);
-        // Build an ABT node if both operands are stored as either a slot or an ABT expression, and
-        // the comparison doesn't involve a collation, because binary operations in ABT don't
-        // support it yet.
-        if (!_context->state.data->env->getSlotIfExists("collator"_sd) &&
-            _context->hasAllAbtEligibleEntries(2)) {
-            auto rhs = _context->popABTExpr();
-            auto lhs = _context->popABTExpr();
-            auto lhsRef = makeLocalVariableName(_context->state.frameIdGenerator->generate(), 0);
-            auto rhsRef = makeLocalVariableName(_context->state.frameIdGenerator->generate(), 0);
-
-            auto comparisonOperator = [expr]() {
-                switch (expr->getOp()) {
-                    case ExpressionCompare::CmpOp::EQ:
-                        return optimizer::Operations::Eq;
-                    case ExpressionCompare::CmpOp::NE:
-                        return optimizer::Operations::Neq;
-                    case ExpressionCompare::CmpOp::GT:
-                        return optimizer::Operations::Gt;
-                    case ExpressionCompare::CmpOp::GTE:
-                        return optimizer::Operations::Gte;
-                    case ExpressionCompare::CmpOp::LT:
-                        return optimizer::Operations::Lt;
-                    case ExpressionCompare::CmpOp::LTE:
-                        return optimizer::Operations::Lte;
-                    case ExpressionCompare::CmpOp::CMP:
-                        return optimizer::Operations::Cmp3w;
-                }
-                MONGO_UNREACHABLE;
-            }();
-
-            // We use the "cmp3w" primitive for every comparison, because it "type brackets" its
-            // comparisons (for example, a number will always compare as less than a string). The
-            // other comparison primitives are designed for comparing values of the same type.
-            auto cmp3w =
-                optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Cmp3w,
-                                                     optimizer::make<optimizer::Variable>(lhsRef),
-                                                     optimizer::make<optimizer::Variable>(rhsRef));
-            auto cmp = (comparisonOperator == optimizer::Operations::Cmp3w)
-                ? std::move(cmp3w)
-                : optimizer::make<optimizer::BinaryOp>(
-                      comparisonOperator, std::move(cmp3w), optimizer::Constant::int32(0));
-
-            // If either operand evaluates to "Nothing", then the entire operation expressed by
-            // 'cmp' will also evaluate to "Nothing". MQL comparisons, however, treat "Nothing" as
-            // if it is a value that is less than everything other than MinKey. (Notably, two
-            // expressions that evaluate to "Nothing" are considered equal to each other.) We also
-            // need to explicitly check for 'bsonUndefined' type because it is considered equal to
-            // "Nothing" according to MQL semantics.
-            auto generateExists = [&](const optimizer::ProjectionName& var) {
-                auto undefinedTypeMask = static_cast<int32_t>(getBSONTypeMask(BSONType::Undefined));
-                return optimizer::make<optimizer::BinaryOp>(
-                    optimizer::Operations::And,
-                    makeABTFunction("exists"_sd, optimizer::make<optimizer::Variable>(var)),
-                    makeABTFunction("typeMatch"_sd,
-                                    optimizer::make<optimizer::Variable>(var),
-                                    optimizer::Constant::int32(~undefinedTypeMask)));
-            };
-
-            auto nothingFallbackCmp = optimizer::make<optimizer::BinaryOp>(
-                comparisonOperator, generateExists(lhsRef), generateExists(rhsRef));
-
-            auto cmpWithFallback = optimizer::make<optimizer::BinaryOp>(
-                optimizer::Operations::FillEmpty, std::move(cmp), std::move(nothingFallbackCmp));
-
-            _context->pushExpr(optimizer::make<optimizer::Let>(
-                lhsRef, lhs, optimizer::make<optimizer::Let>(rhsRef, rhs, cmpWithFallback)));
-
-            return;
-        }
-        // Fallback to generate an SBE EExpression node.
-
         sbe::EExpression::Vector operands(2);
         for (auto it = operands.rbegin(); it != operands.rend(); ++it) {
             *it = _context->popExpr();
@@ -2024,10 +1844,8 @@ public:
                         expr->getFieldPath().getPathLength() != 1 && !expr->isVariableReference());
                 if (auto optionalSlot = it->second.getSlot(); optionalSlot) {
                     _context->pushExpr(*optionalSlot);
-                } else if (it->second.hasABT()) {
-                    _context->pushExpr(it->second.extractABT(_context->state.slotVarMap));
                 } else {
-                    auto preGeneratedExpr = it->second.extractExpr(_context->state.slotVarMap);
+                    auto preGeneratedExpr = it->second.extractExpr();
                     _context->pushExpr(preGeneratedExpr->clone());
                     it->second = std::move(preGeneratedExpr);
                 }
@@ -2055,7 +1873,7 @@ public:
             } else if (expr->getVariableId() == Variables::kRemoveId) {
                 // For the field paths that begin with "$$REMOVE", we always produce Nothing,
                 // so no traversal is necessary.
-                _context->pushExpr(optimizer::Constant::nothing());
+                _context->pushExpr(sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Nothing, 0));
                 return;
             } else {
                 auto it = Variables::kIdToBuiltinVarName.find(expr->getVariableId());
@@ -2094,24 +1912,13 @@ public:
                 !inputExpr.isNull() || topLevelFieldSlot.has_value());
 
         // Dereference a dotted path, which may contain arrays requiring implicit traversal.
-        if (inputExpr.hasExpr()) {
-            auto resultExpr = generateTraverse(inputExpr.extractExpr(_context->state.slotVarMap),
-                                               expectsDocumentInputOnly,
-                                               *fp,
-                                               _context->state.frameIdGenerator,
-                                               topLevelFieldSlot);
+        auto resultExpr = generateTraverse(inputExpr.extractExpr(),
+                                           expectsDocumentInputOnly,
+                                           *fp,
+                                           _context->state.frameIdGenerator,
+                                           topLevelFieldSlot);
 
-            _context->pushExpr(std::move(resultExpr));
-        } else {
-            auto resultExpr = generateTraverse(_context,
-                                               inputExpr.extractABT(_context->state.slotVarMap),
-                                               expectsDocumentInputOnly,
-                                               *fp,
-                                               _context->state.frameIdGenerator,
-                                               topLevelFieldSlot);
-
-            _context->pushExpr(std::move(resultExpr));
-        }
+        _context->pushExpr(std::move(resultExpr));
     }
     void visit(const ExpressionFilter* expr) final {
         // Remove index tracking current child of $filter expression, since it is not used anymore.
@@ -3121,25 +2928,10 @@ private:
             // Empty $and and $or always evaluate to their logical operator's identity value: true
             // and false, respectively.
             auto logicIdentityVal = (logicOp == sbe::EPrimBinary::logicAnd);
-            _context->pushExpr(optimizer::Constant::boolean(logicIdentityVal));
+            _context->pushExpr(sbe::makeE<sbe::EConstant>(
+                sbe::value::TypeTags::Boolean, sbe::value::bitcastFrom<bool>(logicIdentityVal)));
             return;
         }
-
-        if (_context->hasAllAbtEligibleEntries(numChildren)) {
-            std::vector<optimizer::ABT> exprs;
-            for (size_t i = 0; i < numChildren; ++i) {
-                exprs.emplace_back(
-                    makeFillEmptyFalse(makeABTFunction("coerceToBool", _context->popABTExpr())));
-            }
-            std::reverse(exprs.begin(), exprs.end());
-
-            _context->pushExpr(makeBalancedBooleanOpTree(logicOp == sbe::EPrimBinary::logicAnd
-                                                             ? optimizer::Operations::And
-                                                             : optimizer::Operations::Or,
-                                                         std::move(exprs)));
-            return;
-        }
-        // Fallback to generate an SBE EExpression node.
 
         std::vector<std::unique_ptr<sbe::EExpression>> exprs;
         for (size_t i = 0; i < numChildren; ++i) {

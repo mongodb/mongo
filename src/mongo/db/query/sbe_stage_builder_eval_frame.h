@@ -31,12 +31,9 @@
 
 #include <stack>
 
-#include "mongo/db/exec/sbe/abt/abt_lower.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
-#include "mongo/db/query/optimizer/node.h"
-#include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/stdx/variant.h"
 
 namespace mongo::stage_builder {
@@ -48,77 +45,52 @@ namespace mongo::stage_builder {
  */
 class EvalExpr {
 public:
-    EvalExpr() : _storage{false} {}
+    EvalExpr() : _exprOrSlot{std::unique_ptr<sbe::EExpression>{}} {}
 
-    EvalExpr(EvalExpr&& e) : _storage(std::move(e._storage)) {
+    EvalExpr(EvalExpr&& e) : _exprOrSlot(std::move(e._exprOrSlot)) {
         e.reset();
     }
 
-    EvalExpr(std::unique_ptr<sbe::EExpression>&& e) : _storage(std::move(e)) {}
+    EvalExpr(std::unique_ptr<sbe::EExpression>&& e) : _exprOrSlot(std::move(e)) {}
 
-    EvalExpr(sbe::value::SlotId s) : _storage(s) {}
-
-    EvalExpr(const optimizer::ABT& a) : _storage(a) {}
-
-    EvalExpr(optimizer::ABT&& a) : _storage(std::move(a)) {}
+    EvalExpr(sbe::value::SlotId s) : _exprOrSlot(s) {}
 
     EvalExpr& operator=(EvalExpr&& e) {
         if (this == &e) {
             return *this;
         }
 
-        _storage = std::move(e._storage);
+        _exprOrSlot = std::move(e._exprOrSlot);
         e.reset();
         return *this;
     }
 
     EvalExpr& operator=(std::unique_ptr<sbe::EExpression>&& e) {
-        _storage = std::move(e);
+        _exprOrSlot = std::move(e);
         e.reset();
         return *this;
     }
 
     EvalExpr& operator=(sbe::value::SlotId s) {
-        _storage = s;
-        return *this;
-    }
-
-    EvalExpr& operator=(optimizer::ABT&& a) {
-        _storage = std::move(a);
+        _exprOrSlot = s;
         return *this;
     }
 
     boost::optional<sbe::value::SlotId> getSlot() const {
-        return hasSlot() ? boost::make_optional(stdx::get<sbe::value::SlotId>(_storage))
+        return hasSlot() ? boost::make_optional(stdx::get<sbe::value::SlotId>(_exprOrSlot))
                          : boost::none;
     }
 
     bool hasSlot() const {
-        return stdx::holds_alternative<sbe::value::SlotId>(_storage);
-    }
-
-    bool hasExpr() const {
-        return stdx::holds_alternative<std::unique_ptr<sbe::EExpression>>(_storage);
-    }
-
-    bool hasABT() const {
-        return stdx::holds_alternative<optimizer::ABT>(_storage);
+        return stdx::holds_alternative<sbe::value::SlotId>(_exprOrSlot);
     }
 
     EvalExpr clone() const {
         if (hasSlot()) {
-            return stdx::get<sbe::value::SlotId>(_storage);
+            return stdx::get<sbe::value::SlotId>(_exprOrSlot);
         }
 
-        if (hasABT()) {
-            return stdx::get<optimizer::ABT>(_storage);
-        }
-
-        if (stdx::holds_alternative<bool>(_storage)) {
-            return EvalExpr{};
-        }
-
-        const auto& expr = stdx::get<std::unique_ptr<sbe::EExpression>>(_storage);
+        const auto& expr = stdx::get<std::unique_ptr<sbe::EExpression>>(_exprOrSlot);
         if (expr) {
             return expr->clone();
         }
@@ -127,7 +99,7 @@ public:
     }
 
     bool isNull() const {
-        return stdx::holds_alternative<bool>(_storage);
+        return !hasSlot() && !stdx::get<std::unique_ptr<sbe::EExpression>>(_exprOrSlot);
     }
 
     explicit operator bool() const {
@@ -135,27 +107,19 @@ public:
     }
 
     void reset() {
-        _storage = false;
+        _exprOrSlot = std::unique_ptr<sbe::EExpression>{};
     }
 
-    /**
-     * Extract the expression on top of the stack as an SBE EExpression node. If the expression is
-     * stored as an ABT node, it is lowered into an SBE expression, using the provided map to
-     * convert variable names into slot ids.
-     */
-    std::unique_ptr<sbe::EExpression> extractExpr(optimizer::SlotVarMap& varMap);
+    std::unique_ptr<sbe::EExpression> extractExpr() {
+        if (hasSlot()) {
+            return sbe::makeE<sbe::EVariable>(stdx::get<sbe::value::SlotId>(_exprOrSlot));
+        }
 
-    /**
-     * Extract the expression on top of the stack as an ABT node. If the expression is stored as a
-     * slot id, the mapping between the generated ABT node and the slot id is recorded in the map.
-     * Throws an exception if the expression is stored as an SBE EExpression.
-     */
-    optimizer::ABT extractABT(optimizer::SlotVarMap& varMap);
+        return std::move(stdx::get<std::unique_ptr<sbe::EExpression>>(_exprOrSlot));
+    }
 
 private:
-    // The bool type as the first option is used to represent the empty storage.
-    stdx::variant<bool, std::unique_ptr<sbe::EExpression>, sbe::value::SlotId, optimizer::ABT>
-        _storage;
+    stdx::variant<std::unique_ptr<sbe::EExpression>, sbe::value::SlotId> _exprOrSlot;
 };
 
 /**
