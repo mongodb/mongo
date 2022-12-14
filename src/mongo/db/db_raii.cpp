@@ -610,7 +610,8 @@ EmplaceAutoGetCollectionForRead::EmplaceAutoGetCollectionForRead(
       _options(std::move(options)) {}
 
 void EmplaceAutoGetCollectionForRead::emplace(boost::optional<AutoGetCollection>& autoColl) const {
-    autoColl.emplace(_opCtx, _nsOrUUID, _collectionLockMode, _options);
+    autoColl.emplace(
+        _opCtx, _nsOrUUID, _collectionLockMode, _options, AutoGetCollection::ForReadTag{});
 }
 
 AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,

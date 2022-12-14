@@ -193,6 +193,18 @@ public:
                       LockMode modeColl,
                       Options options = {});
 
+    /**
+     * Special constructor when this class is instantiated from AutoGetCollectionForRead. Used to
+     * indicate that the intent is to perform reads only. We cannot use the LockMode to determine
+     * this as multi-document transactions use MODE_IX for reads.
+     */
+    struct ForReadTag {};
+    AutoGetCollection(OperationContext* opCtx,
+                      const NamespaceStringOrUUID& nsOrUUID,
+                      LockMode modeColl,
+                      Options options,
+                      ForReadTag read);
+
     AutoGetCollection(AutoGetCollection&&) = default;
 
     explicit operator bool() const {
@@ -257,6 +269,11 @@ public:
     Collection* getWritableCollection(OperationContext* opCtx);
 
 protected:
+    AutoGetCollection(OperationContext* opCtx,
+                      const NamespaceStringOrUUID& nsOrUUID,
+                      LockMode modeColl,
+                      Options options,
+                      bool verifyWriteEligible);
     // Ordering matters, the _collLocks should destruct before the _autoGetDb releases the
     // rstl/global/database locks.
     AutoGetDb _autoDb;

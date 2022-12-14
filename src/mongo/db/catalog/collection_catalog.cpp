@@ -447,6 +447,14 @@ std::shared_ptr<const CollectionCatalog> CollectionCatalog::latest(ServiceContex
 }
 
 std::shared_ptr<const CollectionCatalog> CollectionCatalog::get(OperationContext* opCtx) {
+    const auto& stashed = stashedCatalog(opCtx->recoveryUnit()->getSnapshot());
+    if (stashed)
+        return stashed;
+
+    return latest(opCtx);
+}
+
+std::shared_ptr<const CollectionCatalog> CollectionCatalog::latest(OperationContext* opCtx) {
     // If there is a batched catalog write ongoing and we are the one doing it return this instance
     // so we can observe our own writes. There may be other callers that reads the CollectionCatalog
     // without any locks, they must see the immutable regular instance.
@@ -454,9 +462,6 @@ std::shared_ptr<const CollectionCatalog> CollectionCatalog::get(OperationContext
         return batchedCatalogWriteInstance;
     }
 
-    const auto& stashed = stashedCatalog(opCtx->recoveryUnit()->getSnapshot());
-    if (stashed)
-        return stashed;
     return latest(opCtx->getServiceContext());
 }
 
@@ -1327,6 +1332,29 @@ boost::optional<UUID> CollectionCatalog::lookupUUIDByNSS(OperationContext* opCtx
         return it->second->isCommitted() ? uuid : boost::none;
     }
     return boost::none;
+}
+
+bool CollectionCatalog::containsCollection(OperationContext* opCtx,
+                                           const CollectionPtr& collection) const {
+    // Any writable Collection instance created under MODE_X lock is considered to belong to this
+    // catalog instance
+    auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
+    const auto& entries = uncommittedCatalogUpdates.entries();
+    auto entriesIt = std::find_if(entries.begin(),
+                                  entries.end(),
+                                  [&collection](const UncommittedCatalogUpdates::Entry& entry) {
+                                      return entry.collection.get() == collection.get();
+                                  });
+    if (entriesIt != entries.end() &&
+        entriesIt->action != UncommittedCatalogUpdates::Entry::Action::kOpenedCollection)
+        return true;
+
+    // Verify that we store the same instance in this catalog
+    auto it = _catalog.find(collection->uuid());
+    if (it == _catalog.end())
+        return false;
+
+    return it->second.get() == collection.get();
 }
 
 CollectionCatalog::CatalogIdLookup CollectionCatalog::lookupCatalogIdByNSS(

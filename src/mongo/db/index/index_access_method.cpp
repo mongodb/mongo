@@ -1189,14 +1189,16 @@ Status SortedDataIndexAccessMethod::_indexKeysOrWriteToSideTable(
         }
     } else {
         // Ensure that our snapshot is compatible with the index's minimum visibile snapshot.
-        const auto minVisibleTimestamp = _indexCatalogEntry->getMinimumVisibleSnapshot();
-        const auto readTimestamp =
-            opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx).value_or(
-                opCtx->recoveryUnit()->getCatalogConflictingTimestamp());
-        if (minVisibleTimestamp && !readTimestamp.isNull() &&
-            readTimestamp < *minVisibleTimestamp) {
-            throwWriteConflictException(
-                "Unable to read from a snapshot due to pending catalog changes.");
+        if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV()) {
+            const auto minVisibleTimestamp = _indexCatalogEntry->getMinimumVisibleSnapshot();
+            const auto readTimestamp =
+                opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx).value_or(
+                    opCtx->recoveryUnit()->getCatalogConflictingTimestamp());
+            if (minVisibleTimestamp && !readTimestamp.isNull() &&
+                readTimestamp < *minVisibleTimestamp) {
+                throwWriteConflictException(
+                    "Unable to read from a snapshot due to pending catalog changes.");
+            }
         }
 
         int64_t numInserted = 0;
@@ -1258,12 +1260,16 @@ void SortedDataIndexAccessMethod::_unindexKeysOrWriteToSideTable(
     options.dupsAllowed = options.dupsAllowed || checkRecordId == CheckRecordId::On;
 
     // Ensure that our snapshot is compatible with the index's minimum visibile snapshot.
-    const auto minVisibleTimestamp = _indexCatalogEntry->getMinimumVisibleSnapshot();
-    const auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx).value_or(
-        opCtx->recoveryUnit()->getCatalogConflictingTimestamp());
-    if (minVisibleTimestamp && !readTimestamp.isNull() && readTimestamp < *minVisibleTimestamp) {
-        throwWriteConflictException(
-            "Unable to read from a snapshot due to pending catalog changes.");
+    if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV()) {
+        const auto minVisibleTimestamp = _indexCatalogEntry->getMinimumVisibleSnapshot();
+        const auto readTimestamp =
+            opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx).value_or(
+                opCtx->recoveryUnit()->getCatalogConflictingTimestamp());
+        if (minVisibleTimestamp && !readTimestamp.isNull() &&
+            readTimestamp < *minVisibleTimestamp) {
+            throwWriteConflictException(
+                "Unable to read from a snapshot due to pending catalog changes.");
+        }
     }
 
     int64_t removed = 0;

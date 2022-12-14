@@ -11,6 +11,8 @@
 (function() {
 "use strict";
 
+load("jstests/libs/feature_flag_util.js");
+
 const name = "transaction_write_with_snapshot_unavailable";
 const replTest = new ReplSetTest({name: name, nodes: 1});
 replTest.startSet();
@@ -24,6 +26,13 @@ const collNameB = collName + "B";
 const primary = replTest.getPrimary();
 const primaryDB = primary.getDB(dbName);
 
+if (FeatureFlagUtil.isEnabled(primaryDB, "PointInTimeCatalogLookups")) {
+    // With the PointInTimeCatalogLookups feature this test doesn't make sense as the
+    // SnapshotUnavailable error will be removed
+    replTest.stopSet();
+    return;
+}
+
 assert.commandWorked(primaryDB[collName].insertOne({}, {writeConcern: {w: "majority"}}));
 
 function testOp(cmd) {
@@ -31,8 +40,7 @@ function testOp(cmd) {
     let session = primary.startSession();
     let sessionDB = session.getDatabase(name);
 
-    jsTestLog(
-        `Testing that SnapshotUnavailable during ${op} is labelled TransientTransactionError`);
+    jsTestLog(`Testing that WriteConflict during ${op} is labelled TransientTransactionError`);
 
     session.startTransaction({readConcern: {level: "snapshot"}});
     assert.commandWorked(sessionDB.runCommand({insert: collName, documents: [{}]}));

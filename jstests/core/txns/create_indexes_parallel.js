@@ -12,6 +12,7 @@
 
 load("jstests/libs/auto_retry_transaction_in_sharding.js");
 load("jstests/libs/create_index_txn_helpers.js");
+load("jstests/libs/feature_flag_util.js");
 
 let doParallelCreateIndexesTest = function(explicitCollectionCreate, multikeyIndex) {
     const dbName = 'test_txns_create_indexes_parallel';
@@ -92,13 +93,25 @@ let doParallelCreateIndexesTest = function(explicitCollectionCreate, multikeyInd
     assert.eq(secondSessionColl.find({}).itcount(), 1);
     assert.eq(secondSessionColl.getIndexes().length, 2);
 
-    // createIndexes takes minimum visible snapshots of new collections into consideration when
-    // checking for existing indexes.
-    assert.commandFailedWithCode(
-        sessionColl.runCommand({createIndexes: collName, indexes: [conflictingIndexSpecs]}),
-        ErrorCodes.SnapshotUnavailable);
-    assert.commandFailedWithCode(session.abortTransaction_forTesting(),
-                                 ErrorCodes.NoSuchTransaction);
+    if (FeatureFlagUtil.isEnabled(db, "PointInTimeCatalogLookups")) {
+        // createIndexes cannot observe the index created in the other transaction so the command
+        // will succeed and we will instead throw WCE when trying to commit the transaction.
+        retryOnceOnTransientAndRestartTxnOnMongos(session, () => {
+            assert.commandWorked(sessionColl.runCommand(
+                {createIndexes: collName, indexes: [conflictingIndexSpecs]}));
+        }, {writeConcern: {w: "majority"}});
+
+        assert.commandFailedWithCode(session.commitTransaction_forTesting(),
+                                     ErrorCodes.WriteConflict);
+    } else {
+        // createIndexes takes minimum visible snapshots of new collections into consideration when
+        // checking for existing indexes.
+        assert.commandFailedWithCode(
+            sessionColl.runCommand({createIndexes: collName, indexes: [conflictingIndexSpecs]}),
+            ErrorCodes.SnapshotUnavailable);
+        assert.commandFailedWithCode(session.abortTransaction_forTesting(),
+                                     ErrorCodes.NoSuchTransaction);
+    }
 
     assert.eq(sessionColl.find({}).itcount(), 1);
     assert.eq(sessionColl.getIndexes().length, 2);

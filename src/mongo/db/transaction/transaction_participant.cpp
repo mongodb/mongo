@@ -1088,6 +1088,9 @@ TransactionParticipant::Participant::onConflictingInternalTransactionCompletion(
 
 void TransactionParticipant::Participant::_setReadSnapshot(OperationContext* opCtx,
                                                            repl::ReadConcernArgs readConcernArgs) {
+    bool pitLookupFeatureEnabled =
+        feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV();
+
     if (readConcernArgs.getArgsAtClusterTime()) {
         // Read concern code should have already set the timestamp on the recovery unit.
         const auto readTimestamp = readConcernArgs.getArgsAtClusterTime()->asTimestamp();
@@ -1121,7 +1124,7 @@ void TransactionParticipant::Participant::_setReadSnapshot(OperationContext* opC
         // _catalogConflictTimestamp. Currently, only oplog application on secondaries can run
         // inside a transaction, thus `writesAreReplicated` is a suitable proxy to single out
         // transactions on primaries.
-        if (opCtx->writesAreReplicated()) {
+        if (!pitLookupFeatureEnabled && opCtx->writesAreReplicated()) {
             // Since this snapshot may reflect oplog holes, record the most visible timestamp before
             // opening a storage transaction. This timestamp will be used later to detect any
             // changes in the catalog after a storage transaction is opened.
@@ -1130,7 +1133,28 @@ void TransactionParticipant::Participant::_setReadSnapshot(OperationContext* opC
         }
     }
 
-    opCtx->recoveryUnit()->preallocateSnapshot();
+
+    if (pitLookupFeatureEnabled) {
+        // Allocate the snapshot together with a consistent CollectionCatalog instance. As we have
+        // no critical section we use optimistic concurrency control and check that there was no
+        // write to the CollectionCatalog while we allocated the storage snapshot. Stash the catalog
+        // instance so collection lookups within this transaction are consistent with the snapshot.
+        auto catalog = CollectionCatalog::get(opCtx);
+        while (true) {
+            opCtx->recoveryUnit()->preallocateSnapshot();
+            auto after = CollectionCatalog::get(opCtx);
+            if (catalog == after) {
+                // Catalog did not change, break out of the retry loop and use this instance
+                break;
+            }
+            // Catalog change detected, reallocate the snapshot and try again.
+            opCtx->recoveryUnit()->abandonSnapshot();
+            catalog = std::move(after);
+        }
+        CollectionCatalog::stash(opCtx, std::move(catalog));
+    } else {
+        opCtx->recoveryUnit()->preallocateSnapshot();
+    }
 }
 
 TransactionParticipant::OplogSlotReserver::OplogSlotReserver(OperationContext* opCtx,
@@ -1520,10 +1544,6 @@ void TransactionParticipant::Participant::unstashTransactionResources(OperationC
     invariant(!opCtx->lockState()->isRSTLLocked());
     invariant(!opCtx->lockState()->inAWriteUnitOfWork());
 
-    // Stashed transaction resources do not exist for this in-progress multi-document
-    // transaction. Set up the transaction resources on the opCtx.
-    opCtx->setWriteUnitOfWork(std::make_unique<WriteUnitOfWork>(opCtx));
-
     // If maxTransactionLockRequestTimeoutMillis is set, then we will ensure no
     // future lock request waits longer than maxTransactionLockRequestTimeoutMillis
     // to acquire a lock. This is to avoid deadlocks and minimize non-transaction
@@ -1548,6 +1568,11 @@ void TransactionParticipant::Participant::unstashTransactionResources(OperationC
 
     // This begins the storage transaction and so we do it after acquiring the global lock.
     _setReadSnapshot(opCtx, repl::ReadConcernArgs::get(opCtx));
+
+    // Stashed transaction resources do not exist for this in-progress multi-document transaction.
+    // Set up the transaction resources on the opCtx. Must be done after setting up the read
+    // snapshot.
+    opCtx->setWriteUnitOfWork(std::make_unique<WriteUnitOfWork>(opCtx));
 
     // The Client lock must not be held when executing this failpoint as it will block currentOp
     // execution.

@@ -33,10 +33,12 @@
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/repl/collection_utils.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/fail_point.h"
 
@@ -56,7 +58,8 @@ void verifyDbAndCollection(OperationContext* opCtx,
                            const NamespaceStringOrUUID& nsOrUUID,
                            const NamespaceString& resolvedNss,
                            CollectionPtr& coll,
-                           Database* db) {
+                           Database* db,
+                           bool verifyWriteEligible) {
     invariant(!nsOrUUID.uuid() || coll,
               str::stream() << "Collection for " << resolvedNss.ns()
                             << " disappeared after successfully resolving " << nsOrUUID.toString());
@@ -78,9 +81,31 @@ void verifyDbAndCollection(OperationContext* opCtx,
         return;
     }
 
-    // If we are in a transaction, we cannot yield and wait when there are pending catalog changes.
-    // Instead, we must return an error in such situations. We ignore this restriction for the
-    // oplog, since it never has pending catalog changes.
+    // Verify that we are using the latest instance if we intend to perform writes.
+    if (feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV() && verifyWriteEligible) {
+        auto latest = CollectionCatalog::latest(opCtx);
+        if (!latest->containsCollection(opCtx, coll)) {
+            throwWriteConflictException(str::stream()
+                                        << "Unable to write to collection '" << coll->ns()
+                                        << "' due to catalog changes; please "
+                                           "retry the operation");
+        }
+        if (opCtx->recoveryUnit()->isActive()) {
+            const auto mySnapshot = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
+            if (mySnapshot && *mySnapshot < coll->getMinimumValidSnapshot()) {
+                throwWriteConflictException(str::stream()
+                                            << "Unable to write to collection '" << coll->ns()
+                                            << "' due to snapshot timestamp " << *mySnapshot
+                                            << " being older than collection minimum "
+                                            << *coll->getMinimumValidSnapshot()
+                                            << "; please retry the operation");
+            }
+        }
+    }
+
+    // If we are in a transaction, we cannot yield and wait when there are pending catalog
+    // changes. Instead, we must return an error in such situations. We ignore this restriction
+    // for the oplog, since it never has pending catalog changes.
     if (opCtx->inMultiDocumentTransaction() && resolvedNss != NamespaceString::kRsOplogNamespace) {
         if (auto minSnapshot = coll->getMinimumVisibleSnapshot()) {
             auto mySnapshot =
@@ -236,6 +261,25 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
                                      const NamespaceStringOrUUID& nsOrUUID,
                                      LockMode modeColl,
                                      Options options)
+    : AutoGetCollection(opCtx,
+                        nsOrUUID,
+                        modeColl,
+                        std::move(options),
+                        /*verifyWriteEligible=*/modeColl != MODE_IS) {}
+
+AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
+                                     const NamespaceStringOrUUID& nsOrUUID,
+                                     LockMode modeColl,
+                                     Options options,
+                                     ForReadTag reader)
+    : AutoGetCollection(
+          opCtx, nsOrUUID, modeColl, std::move(options), /*verifyWriteEligible=*/false) {}
+
+AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
+                                     const NamespaceStringOrUUID& nsOrUUID,
+                                     LockMode modeColl,
+                                     Options options,
+                                     bool verifyWriteEligible)
     : _autoDb([&] {
           auto& deadline = options._deadline;
 
@@ -316,7 +360,8 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
     _resolvedNss = catalog->resolveNamespaceStringOrUUID(opCtx, nsOrUUID);
     _coll = catalog->lookupCollectionByNamespace(opCtx, _resolvedNss);
     checkCollectionUUIDMismatch(opCtx, _resolvedNss, _coll, options._expectedUUID);
-    verifyDbAndCollection(opCtx, modeColl, nsOrUUID, _resolvedNss, _coll, _autoDb.getDb());
+    verifyDbAndCollection(
+        opCtx, modeColl, nsOrUUID, _resolvedNss, _coll, _autoDb.getDb(), verifyWriteEligible);
     for (auto& secondaryNssOrUUID : secondaryNssOrUUIDs) {
         auto secondaryResolvedNss =
             catalog->resolveNamespaceStringOrUUID(opCtx, secondaryNssOrUUID);
@@ -328,7 +373,8 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
                               secondaryNssOrUUID,
                               secondaryResolvedNss,
                               secondaryColl,
-                              databaseHolder->getDb(opCtx, *secondaryDbName));
+                              databaseHolder->getDb(opCtx, *secondaryDbName),
+                              verifyWriteEligible);
     }
 
     if (_coll) {

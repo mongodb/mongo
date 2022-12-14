@@ -114,13 +114,25 @@ public:
     };
 
     /**
-     * Returns a CollectionCatalog instance. Normally returns the latest stored instance but returns
-     * the stashed or batch write instance if set for this operation/snapshot.
+     * Returns a CollectionCatalog instance capable of returning Collection instances consistent
+     * with the storage snapshot. Is the same as latest() below if no snapshot is opened.
+     *
+     * Is the default method of acquiring a CollectionCatalog instance.
      */
     static std::shared_ptr<const CollectionCatalog> get(OperationContext* opCtx);
 
     /**
-     * Returns the latest stored CollectionCatalog instance. Bypasses stashing and batched writing.
+     * Returns a CollectionCatalog instance that reflects the latest state of the server.
+     *
+     * Used to confirm whether Collection instances are write eligiable.
+     */
+    static std::shared_ptr<const CollectionCatalog> latest(OperationContext* opCtx);
+
+    /**
+     * Like latest() above.
+     *
+     * Bypasses batched writing and should not be used in a context where there might be an ongoing
+     * batched write.
      */
     static std::shared_ptr<const CollectionCatalog> latest(ServiceContext* svcCtx);
 
@@ -401,6 +413,11 @@ public:
      */
     boost::optional<UUID> lookupUUIDByNSS(OperationContext* opCtx,
                                           const NamespaceString& nss) const;
+
+    /**
+     * Returns true if this CollectionCatalog contains the provided collection instance
+     */
+    bool containsCollection(OperationContext* opCtx, const CollectionPtr& collection) const;
 
     /**
      * Returns the CatalogId for a given 'nss' at timestamp 'ts'.
