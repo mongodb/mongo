@@ -45,7 +45,9 @@
 #include "mongo/db/catalog/index_catalog_impl.h"
 #include "mongo/db/coll_mod_gen.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/cluster_server_parameter_cmds_gen.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
+#include "mongo/db/commands/set_cluster_parameter_invocation.h"
 #include "mongo/db/commands/set_feature_compatibility_version_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db_raii.h"
@@ -832,29 +834,49 @@ private:
         }
 
         invariant(serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
+
+        std::unique_ptr<ServerParameterService> parameterService =
+            std::make_unique<ClusterParameterService>();
+        DBDirectClient client(opCtx);
+        ClusterParameterDBClientService dbService(client);
+        SetClusterParameterInvocation invocation{std::move(parameterService), dbService};
+
+        auto reset = [&](ServerParameter* sp,
+                         const std::string& name,
+                         const boost::optional<TenantId>& tenantId) {
+            // Reset the server parameter in order to get its default value.
+            uassertStatusOK(sp->reset(tenantId));
+            BSONObjBuilder builder;
+            sp->append(opCtx, &builder, name, tenantId);
+            BSONObj obj = builder.obj();
+
+            // Reformat into what's expect for setClusterParameter.
+            BSONObj objForSetCluster =
+                BSON(obj["_id"].String() << obj.filterFieldsUndotted(
+                         BSON("_id" << 1 << "clusterParameterTime" << 1), false));
+            SetClusterParameter setClusterParameterRequest(objForSetCluster);
+            setClusterParameterRequest.setDbName(DatabaseName(tenantId, NamespaceString::kAdminDb));
+
+            // Invoke using ignoreIsEnabled, as we don't want invoke to throw an error due to the
+            // parameter being disabled on the current version (which it is).
+            invocation.invoke(opCtx,
+                              setClusterParameterRequest,
+                              boost::none,
+                              CommandHelpers::kMajorityWriteConcern,
+                              true /* ignoreIsEnabled */);
+        };
+
         const auto& [fromVersion, _] =
             getTransitionFCVFromAndTo(serverGlobalParams.featureCompatibility.getVersion());
-
         auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
-        std::vector<write_ops::DeleteOpEntry> deletes;
-        for (const auto& [name, sp] : clusterParameters->getMap()) {
+        for (auto const& [name, sp] : clusterParameters->getMap()) {
             if (sp->isEnabledOnVersion(fromVersion) && !sp->isEnabledOnVersion(requestedVersion)) {
-                deletes.emplace_back(
-                    write_ops::DeleteOpEntry(BSON("_id" << name), false /*multi*/));
+
+                for (const auto& tenantId : tenantIds) {
+                    reset(sp, name, tenantId);
+                }
+                reset(sp, name, boost::none);
             }
-        }
-        if (deletes.size() > 0) {
-            DBDirectClient client(opCtx);
-            // Delete disabled parameters' values from all cluster parameter collections.
-            for (const auto& tenantId : tenantIds) {
-                write_ops::DeleteCommandRequest deleteOp(
-                    NamespaceString::makeClusterParametersNSS(tenantId));
-                deleteOp.setDeletes(deletes);
-                write_ops::checkWriteErrors(client.remove(deleteOp));
-            }
-            write_ops::DeleteCommandRequest deleteOp(NamespaceString::kClusterParametersNamespace);
-            deleteOp.setDeletes(deletes);
-            write_ops::checkWriteErrors(client.remove(deleteOp));
         }
     }
 

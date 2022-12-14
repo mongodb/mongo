@@ -156,13 +156,22 @@ function runDowngradeUpgradeTestForCWSP(conn, isMongod, verifyStateCallback) {
         configOptions: options,
         shardOptions: options
     });
-    function verifyParameterState(sp, expectExists) {
+    function verifyParameterState(sp, expectEnabled) {
         for (let node of [s.configRS.getPrimary(), s.rs0.getPrimary()]) {
             const out = assert.commandWorked(node.adminCommand({getClusterParameter: "*"}));
-            assertParamExistenceInGetParamStar(out, sp, expectExists);
+            assertParamExistenceInGetParamStar(out, sp, expectEnabled);
 
             const cpColl = node.getDB('config').clusterParameters;
-            assert.eq(cpColl.find({"_id": sp}).itcount(), expectExists ? 1 : 0);
+            const res = cpColl.find({"_id": sp}).toArray();
+            assert.eq(res.length, 1);
+            // When disabled, we expect the stored value to always be the default (0 for the
+            // parameters we are testing). Otherwise, it can be the default or not, but our tests
+            // always have it set to a different value than the default
+            if (expectEnabled) {
+                assert.neq(res[0].intData, 0);
+            } else {
+                assert.eq(res[0].intData, 0);
+            }
         }
     }
     // mongos is unaware of FCV

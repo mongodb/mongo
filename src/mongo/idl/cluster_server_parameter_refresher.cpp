@@ -51,7 +51,7 @@ Seconds loadInterval() {
     return Seconds(clusterServerParameterRefreshIntervalSecs.load());
 }
 
-StatusWith<TenantIdMap<std::map<std::string, BSONObj>>> getClusterParametersFromConfigServer(
+StatusWith<TenantIdMap<std::vector<BSONObj>>> getClusterParametersFromConfigServer(
     OperationContext* opCtx, const LogicalTime& latestTime) {
     BSONObjBuilder queryObjBuilder;
     BSONObjBuilder clusterParameterTimeObjBuilder =
@@ -72,7 +72,7 @@ StatusWith<TenantIdMap<std::map<std::string, BSONObj>>> getClusterParametersFrom
     }
     auto tenantIds = std::move(swTenantIds.getValue());
 
-    TenantIdMap<std::map<std::string, BSONObj>> allDocs;
+    TenantIdMap<std::vector<BSONObj>> allDocs;
     for (const auto& tenantId : tenantIds) {
         auto swFindResponse = configServers->exhaustiveFindOnConfig(
             opCtx,
@@ -88,12 +88,7 @@ StatusWith<TenantIdMap<std::map<std::string, BSONObj>>> getClusterParametersFrom
         if (!swFindResponse.isOK()) {
             return swFindResponse.getStatus();
         }
-        std::map<std::string, BSONObj> docsMap;
-        for (const auto& doc : swFindResponse.getValue().docs) {
-            auto name = doc["_id"].String();
-            docsMap.insert({std::move(name), doc});
-        }
-        allDocs.insert({std::move(tenantId), std::move(docsMap)});
+        allDocs.emplace(tenantId, swFindResponse.getValue().docs);
     }
 
     return allDocs;
@@ -145,61 +140,50 @@ Status ClusterServerParameterRefresher::refreshParameters(OperationContext* opCt
     // Set each in-memory cluster parameter that was returned in the response. Then, advance the
     // latest clusterParameterTime to the latest one returned if all of the cluster parameters are
     // successfully set in-memory.
-    Timestamp latestTime;
+    Timestamp latestTime = _latestClusterParameterTime.asTimestamp();
     bool isSuccessful = true;
-    Status status = Status::OK();
+    Status setStatus = Status::OK();
     ServerParameterSet* clusterParameterCache = ServerParameterSet::getClusterParameterSet();
 
-    auto clusterParameterDocs = std::move(swClusterParameterDocs.getValue());
+    TenantIdMap<std::vector<BSONObj>> clusterParameterDocs =
+        std::move(swClusterParameterDocs.getValue());
     std::vector<BSONObj> allUpdatedParameters;
 
     for (const auto& [tenantId, tenantParamDocs] : clusterParameterDocs) {
         std::vector<BSONObj> updatedParameters;
         updatedParameters.reserve(tenantParamDocs.size());
-        for (const auto& [name, sp] : clusterParameterCache->getMap()) {
-            if (!sp->isEnabled()) {
-                continue;
-            }
+        for (const auto& clusterParameterDoc : tenantParamDocs) {
+            Timestamp clusterParameterTime =
+                clusterParameterDoc["clusterParameterTime"_sd].timestamp();
+            latestTime = (clusterParameterTime > latestTime) ? clusterParameterTime : latestTime;
+
+            auto clusterParameterName = clusterParameterDoc["_id"_sd].String();
+            ServerParameter* sp = clusterParameterCache->get(clusterParameterName);
+
             BSONObjBuilder oldClusterParameterBob;
-            sp->append(opCtx, &oldClusterParameterBob, name, tenantId);
+            sp->append(opCtx, &oldClusterParameterBob, clusterParameterName, tenantId);
 
-            auto it = tenantParamDocs.find(name);
-            if (it == tenantParamDocs.end()) {
-                // Reset the local parameter to its default value.
-                status = sp->reset(tenantId);
-            } else {
-                // Set the local parameter to the pulled value.
-                const auto& clusterParameterDoc = it->second;
-                Timestamp clusterParameterTime =
-                    clusterParameterDoc["clusterParameterTime"_sd].timestamp();
-                latestTime =
-                    (clusterParameterTime > latestTime) ? clusterParameterTime : latestTime;
-
-                status = sp->set(clusterParameterDoc, tenantId);
-            }
-
-            if (!status.isOK()) {
+            setStatus = sp->set(clusterParameterDoc, tenantId);
+            if (!setStatus.isOK()) {
                 LOGV2_WARNING(6226402,
-                              "Could not (re)set in-memory cluster server parameter",
-                              "parameter"_attr = name,
+                              "Could not set in-memory cluster server parameter",
+                              "parameter"_attr = clusterParameterName,
                               "tenantId"_attr = tenantId,
-                              "presentOnConfigSvr"_attr = it != tenantParamDocs.end(),
-                              "reason"_attr = status.reason());
+                              "reason"_attr = setStatus.reason());
                 isSuccessful = false;
             }
 
             BSONObjBuilder updatedClusterParameterBob;
-            sp->append(opCtx, &updatedClusterParameterBob, name, tenantId);
+            sp->append(opCtx, &updatedClusterParameterBob, clusterParameterName, tenantId);
             BSONObj updatedClusterParameterBSON = updatedClusterParameterBob.obj().getOwned();
 
             audit::logUpdateCachedClusterParameter(opCtx->getClient(),
                                                    oldClusterParameterBob.obj().getOwned(),
                                                    updatedClusterParameterBSON,
                                                    tenantId);
-            if (it != tenantParamDocs.end()) {
-                updatedParameters.emplace_back(
-                    updatedClusterParameterBSON.removeField("clusterParameterTime"_sd));
-            }
+
+            updatedParameters.emplace_back(
+                updatedClusterParameterBSON.removeField("clusterParameterTime"_sd));
         }
         auto tenantIdStr = tenantId ? tenantId->toString() : "none";
         allUpdatedParameters.emplace_back(
@@ -214,7 +198,7 @@ Status ClusterServerParameterRefresher::refreshParameters(OperationContext* opCt
                     "clusterParameterDocuments"_attr = allUpdatedParameters);
     }
 
-    return status;
+    return setStatus;
 }
 
 void ClusterServerParameterRefresher::start(ServiceContext* serviceCtx, OperationContext* opCtx) {
