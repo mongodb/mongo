@@ -104,6 +104,14 @@ config_bool(
 )
 
 config_bool(
+    HAVE_CALL_LOG
+    "Enable call log generation"
+    DEFAULT OFF
+    DEPENDS "HAVE_DIAGNOSTIC"
+    DEPENDS_ERROR ON "Call log requires diagnostic build to be enabled"
+)
+
+config_bool(
     NON_BARRIER_DIAGNOSTIC_YIELDS
     "Don't set a full barrier when yielding threads in diagnostic mode. Requires diagnostic mode to be enabled."
     DEFAULT OFF

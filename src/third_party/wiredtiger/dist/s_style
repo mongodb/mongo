@@ -235,6 +235,7 @@ else
        ! expr "$f" : 'examples/.*' > /dev/null &&
        ! expr "$f" : 'ext/.*' > /dev/null &&
        ! expr "$f" : '.*py' > /dev/null &&
+       ! expr "$f" : '.*cpp' > /dev/null &&
        ! expr "$f" : 'src/include/ctype.i' > /dev/null; then
         if egrep '(#include.*["</]ctype.h[">]|\b(is(alnum|alpha|cntrl|digit|graph|lower|print|punct|space|upper|xdigit)|to(lower|toupper))\()' $f > $t; then
             test -s $t && {

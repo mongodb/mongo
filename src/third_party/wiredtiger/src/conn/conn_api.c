@@ -1305,6 +1305,10 @@ __conn_open_session(WT_CONNECTION *wt_conn, WT_EVENT_HANDLER *event_handler, con
     *wt_sessionp = &session_ret->iface;
 
 err:
+#ifdef HAVE_CALL_LOG
+    if (session_ret != NULL)
+        WT_TRET(__wt_call_log_open_session(session_ret, ret));
+#endif
     API_END_RET_NOTFOUND_MAP(session, ret);
 }
 
@@ -1324,6 +1328,9 @@ __conn_query_timestamp(WT_CONNECTION *wt_conn, char *hex_timestamp, const char *
     CONNECTION_API_CALL(conn, session, query_timestamp, config, cfg);
     ret = __wt_txn_query_timestamp(session, hex_timestamp, cfg, true);
 err:
+#ifdef HAVE_CALL_LOG
+    WT_TRET(__wt_call_log_query_timestamp(session, config, hex_timestamp, ret, true));
+#endif
     API_END_RET(session, ret);
 }
 
@@ -1343,6 +1350,9 @@ __conn_set_timestamp(WT_CONNECTION *wt_conn, const char *config)
     CONNECTION_API_CALL(conn, session, set_timestamp, config, cfg);
     ret = __wt_txn_global_set_timestamp(session, cfg);
 err:
+#ifdef HAVE_CALL_LOG
+    WT_TRET(__wt_call_log_set_timestamp(session, config, ret));
+#endif
     API_END_RET(session, ret);
 }
 
@@ -2949,6 +2959,11 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
 #ifndef WT_STANDALONE_BUILD
     /* Explicitly set the flag to indicate whether the database that was not shutdown cleanly. */
     conn->unclean_shutdown = false;
+#endif
+
+#ifdef HAVE_CALL_LOG
+    /* Set up the call log file. */
+    WT_ERR(__wt_conn_call_log_setup(session));
 #endif
 
     /*
