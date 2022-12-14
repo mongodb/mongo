@@ -841,6 +841,9 @@ config_directio(void)
      * child process termination, but it's not worth the effort.
      */
     DIO_CHECK("ops.salvage", OPS_SALVAGE);
+
+    /* Direct I/O needs buffer alignment to be set automatically. */
+    DIO_CHECK("buffer_alignment", BUFFER_ALIGNMENT);
 }
 
 /*

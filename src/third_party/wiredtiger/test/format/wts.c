@@ -266,10 +266,14 @@ create_database(const char *home, WT_CONNECTION **connp)
     /* Encryption. */
     CONFIG_APPEND(p, ",encryption=(name=%s)", encryptor());
 
-/* Miscellaneous. */
+    /* Miscellaneous. */
+    if (GV(BUFFER_ALIGNMENT)) {
 #ifdef HAVE_POSIX_MEMALIGN
-    CONFIG_APPEND(p, ",buffer_alignment=512");
+        CONFIG_APPEND(p, ",buffer_alignment=512");
+#else
+        WARN("%s", "Ignoring buffer_alignment=1, missing HAVE_POSIX_MEMALIGN support")
 #endif
+    }
 
     if (GV(DISK_MMAP))
         CONFIG_APPEND(p, ",mmap=1");

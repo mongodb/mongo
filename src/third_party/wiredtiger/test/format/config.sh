@@ -123,6 +123,8 @@ CONFIG configuration_list[] = {
 
 {"btree.value_min", "minimum value size", C_TABLE | C_TYPE_ROW | C_TYPE_VAR, 0, 20, 4096}
 
+{"buffer_alignment", "buffer alignment (off | on), on configures to 512", C_BOOL, 5, 0, 0}
+
 {"cache", "cache size (MB)", 0x0, 1, 100, 100 * 1024}
 
 {"cache.evict_max", "maximum number of eviction workers", 0x0, 0, 5, 100}

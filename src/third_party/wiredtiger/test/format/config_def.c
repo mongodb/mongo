@@ -81,6 +81,9 @@ CONFIG configuration_list[] = {
   {"btree.value_min", "minimum value size",
     C_TABLE | C_TYPE_ROW | C_TYPE_VAR, 0, 20, 4096, V_TABLE_BTREE_VALUE_MIN},
 
+  {"buffer_alignment", "buffer alignment (off | on), on configures to 512",
+    C_BOOL, 5, 0, 0, V_GLOBAL_BUFFER_ALIGNMENT},
+
   {"cache", "cache size (MB)",
     0x0, 1, 100, 100 * 1024, V_GLOBAL_CACHE},
 
