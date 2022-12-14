@@ -52,9 +52,6 @@ PACKAGE_MANAGER_COMMANDS = {
 OS_DOCKER_LOOKUP = {
     'amazon': None,
     'amzn64': None,
-    # TODO(SERVER-69982) This can be re-enabled when the ticket is fixed
-    # 'amazon': ('amazonlinux:1', "yum", frozenset(["python38", "wget", "pkgconfig", "systemd"]), "python3"),
-    # 'amzn64': ('amazonlinux:1', "yum", frozenset(["python38", "wget", "pkgconfig", "systemd"]), "python3"),
     'amazon2': ('amazonlinux:2', "yum", frozenset(["python3", "wget", "pkgconfig", "systemd"]),
                 "python3"),
     'amazon2022': ('amazonlinux:2022', "yum", frozenset(["python3", "wget", "pkgconfig",
