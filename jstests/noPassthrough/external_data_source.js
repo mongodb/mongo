@@ -129,29 +129,6 @@ assert.throwsWithCode(() => {
         });
 }, 7039004);
 
-// Not a pipe
-if (hostInfo.os.type != "Windows") {
-    const notPipe = "not_a_pipe";
-    const notPipeFullPath = kDefaultPipePath + notPipe;
-
-    // Makes sure that 'notPipeFullPath' does not exist.
-    if (pathExists(notPipeFullPath)) {
-        removeFile(notPipeFullPath);
-    }
-
-    assert(mkdir(notPipeFullPath).created, `Failed to create ${notPipeFullPath}`);
-    assert.throwsWithCode(() => {
-        db.coll.aggregate([], {
-            $_externalDataSources: [{
-                collName: "coll",
-                dataSources:
-                    [{url: kUrlProtocolFile + notPipe, storageType: "pipe", fileType: "bson"}]
-            }]
-        });
-    }, ErrorCodes.FileNotOpen);
-    assert(removeFile(notPipeFullPath));
-}
-
 (function testSampleStageOverExternalDataSourceNotOptimized() {
     const explain = db.coll.explain().aggregate([{$sample: {size: 10}}], {
         $_externalDataSources: [{
