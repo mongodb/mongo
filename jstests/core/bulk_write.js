@@ -66,7 +66,6 @@ assert.commandFailedWithCode(db.adminCommand({bulkWrite: 1, nsInfo: [{ns: "mydb.
 // Missing nsInfo
 assert.commandFailedWithCode(
     db.adminCommand({bulkWrite: 1, ops: [{insert: 0, document: {skey: "MongoDB"}}]}), [40414]);
-})();
 
 // Test valid arguments with invalid values
 assert.commandFailedWithCode(db.adminCommand({
@@ -94,3 +93,4 @@ assert.commandFailedWithCode(
     db.adminCommand(
         {bulkWrite: 1, ops: [{insert: 0, document: {skey: "MongoDB"}}], nsInfo: "test"}),
     [ErrorCodes.TypeMismatch]);
+})();
