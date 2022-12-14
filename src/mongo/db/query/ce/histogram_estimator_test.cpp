@@ -33,6 +33,7 @@
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/db/query/stats/collection_statistics_mock.h"
+#include "mongo/db/query/stats/max_diff.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::optimizer::ce {
@@ -1156,6 +1157,83 @@ TEST(CEHistogramTest, TestFallbackForNonConstIntervals) {
     ASSERT_EQ(estInterval(intervalLowNonConst)._value, -1.0);
     ASSERT_EQ(estInterval(intervalHighNonConst)._value, -1.0);
     ASSERT_EQ(estInterval(intervalEqNonConst)._value, -1.0);
+}
+
+TEST(CEHistogramTest, TestHistogramNeq) {
+    constexpr double collCard = 10.0;
+
+    CEHistogramTester t("test", {collCard});
+    {
+        std::vector<stats::SBEValue> values;
+        for (double v = 0; v < collCard; v++) {
+            values.push_back(stage_builder::makeValue(Value(v)));
+            values.push_back(stage_builder::makeValue(Value(BSON_ARRAY(v))));
+        }
+
+        auto ah = stats::createArrayEstimator(values, collCard /* Number of buckets. */);
+        t.addHistogram("a", ah);
+        t.setIndexes(
+            {{"indexA", makeIndexDefinition("a", CollationOp::Ascending, /* isMultiKey */ true)}});
+
+        if (kCETestLogOnly) {
+            std::cout << ah->serialize() << std::endl;
+        }
+    }
+
+    {
+        std::vector<stats::SBEValue> values;
+        std::string s = "charA";
+        for (double v = 0; v < collCard; v++) {
+            s[4] += (char)v;
+            values.push_back(stage_builder::makeValue(Value(s)));
+            values.push_back(stage_builder::makeValue(Value(BSON_ARRAY(s))));
+        }
+
+        auto ah = stats::createArrayEstimator(values, collCard /* Number of buckets. */);
+        t.addHistogram("b", ah);
+        t.setIndexes(
+            {{"indexB", makeIndexDefinition("b", CollationOp::Ascending, /* isMultiKey */ true)}});
+
+        if (kCETestLogOnly) {
+            std::cout << ah->serialize() << std::endl;
+        }
+    }
+
+    // In the scalar case, we generate 10 buckets, with each unique value as a boundary value with
+    // cardinality 1. In the array case, we do the same for min/max/unique. Unfortunately, we are
+    // not always able to generate sargable nodes, so we generally fall back to heuristic
+    // estimation.
+
+    CEType eqCE{2.0};
+    CEType eqElemCE{1.0};
+    CEType eqHeu{6.83772};
+    CEType eqHeuNotNe{3.16228};
+    ASSERT_EQ_ELEMMATCH_CE(t, eqCE, eqElemCE, "a", "{$eq: 5}");
+    ASSERT_EQ_ELEMMATCH_CE(t, eqHeu, eqHeu, "a", "{$not: {$eq: 5}}");
+    ASSERT_EQ_ELEMMATCH_CE(t, eqHeuNotNe, eqElemCE, "a", "{$not: {$ne: 5}}");
+    ASSERT_EQ_ELEMMATCH_CE(t, eqHeu, eqHeu, "a", "{$ne: 5}");
+
+    ASSERT_EQ_ELEMMATCH_CE(t, eqCE, eqElemCE, "b", "{$eq: 'charB'}");
+    ASSERT_EQ_ELEMMATCH_CE(t, eqHeu, eqHeu, "b", "{$not: {$eq: 'charB'}}");
+    ASSERT_EQ_ELEMMATCH_CE(t, eqHeuNotNe, eqElemCE, "b", "{$not: {$ne: 'charB'}}");
+    ASSERT_EQ_ELEMMATCH_CE(t, eqHeu, eqHeu, "b", "{$ne: 'charB'}");
+
+    // Test conjunctions where both fields have histograms. Note that when both ops are $ne, we
+    // never use histogram estimation because the optimizer only generates filetr nodes (no sargable
+    // nodes).
+    CEType neNeCE{4.22282};
+    CEType neEqCE{0.585786};
+    ASSERT_MATCH_CE(t, "{$and: [{a: {$ne: 7}}, {b: {$ne: 'charB'}}]}", neNeCE);
+    ASSERT_MATCH_CE(t, "{$and: [{a: {$ne: 7}}, {b: {$eq: 'charB'}}]}", neEqCE);
+    ASSERT_MATCH_CE(t, "{$and: [{a: {$ne: 7}}, {b: {$ne: 'charB'}}]}", neNeCE);
+    ASSERT_MATCH_CE(t, "{$and: [{a: {$ne: 7}}, {b: {$eq: 'charB'}}]}", neEqCE);
+
+    // Test conjunctions where only one field has a histogram (fallback to heuristics).
+    neEqCE = {1.384};
+    ASSERT_MATCH_CE(t, "{$and: [{a: {$ne: 7}}, {noHist: {$ne: 'charB'}}]}", neNeCE);
+    ASSERT_MATCH_CE(t, "{$and: [{a: {$ne: 7}}, {noHist: {$eq: 'charB'}}]}", neEqCE);
+    ASSERT_MATCH_CE(t, "{$and: [{a: {$ne: 7}}, {noHist: {$ne: 'charB'}}]}", neNeCE);
+    ASSERT_MATCH_CE(t, "{$and: [{a: {$ne: 7}}, {noHist: {$eq: 'charB'}}]}", neEqCE);
 }
 }  // namespace
 }  // namespace mongo::optimizer::ce

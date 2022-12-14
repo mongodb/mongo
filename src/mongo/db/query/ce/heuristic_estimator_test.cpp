@@ -790,10 +790,21 @@ TEST(CEHeuristicTest, CENotEquality) {
     // this subtree, we invert the selectivity 1.0 - 0.01 = 0.99.
     CEType ce{100.0};
     CEType inverseCE = collCard - ce;
-    ASSERT_MATCH_CE(noOpt, "{a: {$eq: 1}}", ce);
-    ASSERT_MATCH_CE(opt, "{a: {$not: {$eq: 1}}}", inverseCE);
+    CEType ece{57.4456};
+    CEType eInverseCE{3242.55};
+    ASSERT_EQ_ELEMMATCH_CE(opt, ce, ece /* $elemMatch */, "a", "{$eq: 1}");
+    ASSERT_EQ_ELEMMATCH_CE(opt, ce, ece /* $elemMatch */, "a", "{$not: {$ne: 1}}");
+    ASSERT_EQ_ELEMMATCH_CE(opt, inverseCE, eInverseCE /* $elemMatch */, "a", "{$not: {$eq: 1}}");
+    ASSERT_EQ_ELEMMATCH_CE(opt, inverseCE, eInverseCE /* $elemMatch */, "a", "{$ne: 1}");
     ASSERT_MATCH_CE(noOpt, "{'validate.long.path.estimate': {$eq: 1}}", ce);
     ASSERT_MATCH_CE(opt, "{'validate.long.path.estimate': {$not: {$eq: 1}}}", inverseCE);
+
+    CEType neNeCE{9800.5};
+    CEType neEqCE{90};
+    ASSERT_MATCH_CE(opt, "{$and: [{f1: {$ne: 7}}, {f1: {$ne: 'abc'}}]}", neNeCE);
+    ASSERT_MATCH_CE(opt, "{$and: [{f1: {$ne: 7}}, {f1: {$eq: 'abc'}}]}", neEqCE);
+    ASSERT_MATCH_CE(opt, "{$and: [{f1: {$ne: 7}}, {f2: {$ne: 'abc'}}]}", neNeCE);
+    ASSERT_MATCH_CE(opt, "{$and: [{f1: {$ne: 7}}, {f2: {$eq: 'abc'}}]}", neEqCE);
 
     // Update cardinality to 25.
     collCard = {25};
@@ -803,10 +814,21 @@ TEST(CEHeuristicTest, CENotEquality) {
     // Selectivity is sqrt(25)/25.
     ce = {5.0};
     inverseCE = collCard - ce;
-    ASSERT_MATCH_CE(noOpt, "{a: {$eq: 1}}", ce);
-    ASSERT_MATCH_CE(opt, "{a: {$not: {$eq: 1}}}", inverseCE);
+    ece = {3.3541};
+    eInverseCE = {7.8959};
+    ASSERT_EQ_ELEMMATCH_CE(opt, ce, ece /* $elemMatch */, "a", "{$eq: 1}");
+    ASSERT_EQ_ELEMMATCH_CE(opt, ce, ece /* $elemMatch */, "a", "{$not: {$ne: 1}}");
+    ASSERT_EQ_ELEMMATCH_CE(opt, inverseCE, eInverseCE /* $elemMatch */, "a", "{$not: {$eq: 1}}");
+    ASSERT_EQ_ELEMMATCH_CE(opt, inverseCE, eInverseCE /* $elemMatch */, "a", "{$ne: 1}");
     ASSERT_MATCH_CE(noOpt, "{'validate.long.path.estimate': {$eq: 1}}", ce);
     ASSERT_MATCH_CE(opt, "{'validate.long.path.estimate': {$not: {$eq: 1}}}", inverseCE);
+
+    neNeCE = {15.5279};
+    neEqCE = {2.76393};
+    ASSERT_MATCH_CE(opt, "{$and: [{f1: {$ne: 7}}, {f1: {$ne: 'abc'}}]}", neNeCE);
+    ASSERT_MATCH_CE(opt, "{$and: [{f1: {$ne: 7}}, {f1: {$eq: 'abc'}}]}", neEqCE);
+    ASSERT_MATCH_CE(opt, "{$and: [{f1: {$ne: 7}}, {f2: {$ne: 'abc'}}]}", neNeCE);
+    ASSERT_MATCH_CE(opt, "{$and: [{f1: {$ne: 7}}, {f2: {$eq: 'abc'}}]}", neEqCE);
 
     // Update cardinality to 9.
     collCard = {9};
@@ -816,10 +838,21 @@ TEST(CEHeuristicTest, CENotEquality) {
     // Selectivity is sqrt(3)/9.
     ce = {3.0};
     inverseCE = collCard - ce;
-    ASSERT_MATCH_CE(noOpt, "{a: {$eq: 1}}", ce);
-    ASSERT_MATCH_CE(opt, "{a: {$not: {$eq: 1}}}", inverseCE);
+    ece = {2.50998};
+    eInverseCE = {3.79002};
+    ASSERT_EQ_ELEMMATCH_CE(opt, ce, ece /* $elemMatch */, "a", "{$eq: 1}");
+    ASSERT_EQ_ELEMMATCH_CE(opt, ce, ece /* $elemMatch */, "a", "{$not: {$ne: 1}}");
+    ASSERT_EQ_ELEMMATCH_CE(opt, inverseCE, eInverseCE /* $elemMatch */, "a", "{$not: {$eq: 1}}");
+    ASSERT_EQ_ELEMMATCH_CE(opt, inverseCE, eInverseCE /* $elemMatch */, "a", "{$ne: 1}");
     ASSERT_MATCH_CE(noOpt, "{'validate.long.path.estimate': {$eq: 1}}", ce);
     ASSERT_MATCH_CE(opt, "{'validate.long.path.estimate': {$not: {$eq: 1}}}", inverseCE);
+
+    neNeCE = {3.55051};
+    neEqCE = {1.26795};
+    ASSERT_MATCH_CE(opt, "{$and: [{f1: {$ne: 7}}, {f1: {$ne: 'abc'}}]}", neNeCE);
+    ASSERT_MATCH_CE(opt, "{$and: [{f1: {$ne: 7}}, {f1: {$eq: 'abc'}}]}", neEqCE);
+    ASSERT_MATCH_CE(opt, "{$and: [{f1: {$ne: 7}}, {f2: {$ne: 'abc'}}]}", neNeCE);
+    ASSERT_MATCH_CE(opt, "{$and: [{f1: {$ne: 7}}, {f2: {$eq: 'abc'}}]}", neEqCE);
 }
 
 TEST(CEHeuristicTest, CENotOpenRange) {
