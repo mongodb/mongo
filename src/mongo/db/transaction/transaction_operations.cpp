@@ -294,7 +294,7 @@ std::size_t TransactionOperations::logOplogEntries(
     auto applyOpsIter = applyOpsOperationAssignment.applyOpsEntries.begin();
     auto prepare = applyOpsOperationAssignment.prepare;
     while (stmtsIter != _transactionOperations.end()) {
-        tassert(7089900,
+        tassert(6278509,
                 "Not enough \"applyOps\" entries",
                 applyOpsIter != applyOpsOperationAssignment.applyOpsEntries.end());
         const auto& applyOpsEntry = *applyOpsIter++;
@@ -318,7 +318,7 @@ std::size_t TransactionOperations::logOplogEntries(
         auto isPartialTxn = !lastOp;
 
         if (imageToWrite) {
-            uassert(7089901,
+            uassert(6054002,
                     str::stream() << NamespaceString::kConfigImagesNamespace
                                   << " can only store the pre or post image of one "
                                      "findAndModify operation for each "

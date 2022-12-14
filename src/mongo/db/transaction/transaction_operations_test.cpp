@@ -1013,7 +1013,7 @@ TEST(TransactionOperationsTest, LogOplogEntriesMultiplePrePostImagesInDifferentE
     ASSERT_THROWS_CODE(ops.logOplogEntries(
                            oplogSlots, info, kWallClockTime, doNothingLogApplyOpsFn, &imageToWrite),
                        AssertionException,
-                       7089901);
+                       6054002);
 }
 
 }  // namespace
