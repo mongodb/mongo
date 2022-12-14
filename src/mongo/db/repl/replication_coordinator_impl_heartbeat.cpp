@@ -1074,6 +1074,7 @@ void ReplicationCoordinatorImpl::_heartbeatReconfigFinish(
     if (contentChanged) {
         _externalState->notifyOtherMemberDataChanged();
     }
+    ReplicaSetAwareServiceRegistry::get(_service).onSetCurrentConfig(opCtx.get());
     _performPostMemberStateUpdateAction(action);
     if (MONGO_unlikely(waitForPostActionCompleteInHbReconfig.shouldFail())) {
         // Used in tests that wait for the post member state update action to complete.

@@ -103,6 +103,7 @@ public:
                                                    const UUID& collectionUUID) const;
 
 private:
+    void onSetCurrentConfig(OperationContext* opCtx) override final {}
     void onInitialDataAvailable(OperationContext* opCtx,
                                 bool isMajorityDataAvailable) override final {}
     void onStepUpBegin(OperationContext* opCtx, long long term) override final {}

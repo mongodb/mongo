@@ -75,6 +75,9 @@ namespace mongo {
  *     void onStartup(OperationContext* opCtx) final {
  *         // ...
  *     }
+ *     void onSetCurrentConfig(OperationContext* opCtx) final {
+ *         // ...
+ *     }
  *     void onShutdown() final {
  *         // ...
  *     }
@@ -116,6 +119,13 @@ public:
      * reads and writes to unreplicated collections are permitted.
      */
     virtual void onStartup(OperationContext* opCtx) = 0;
+
+    /**
+     * Called when the ReplicationCoordinator sets its replica set config, e.g. after processing
+     * replSetInitiate, reconfiguring via heartbeat, or processing replSetReconfig. May be called
+     * multiple times and not necessarily in the order the configs were processed.
+     */
+    virtual void onSetCurrentConfig(OperationContext* opCtx) = 0;
 
     /**
      * Called when either initial sync or startup recovery have completed.
@@ -206,6 +216,7 @@ public:
     static ReplicaSetAwareServiceRegistry& get(ServiceContext* serviceContext);
 
     void onStartup(OperationContext* opCtx) final;
+    void onSetCurrentConfig(OperationContext* opCtx) final;
     void onInitialDataAvailable(OperationContext* opCtx, bool isMajorityDataAvailable) final;
     void onShutdown() final;
     void onStepUpBegin(OperationContext* opCtx, long long term) final;

@@ -140,6 +140,8 @@ public:
 private:
     bool shouldRegisterReplicaSetAwareService() const override final;
 
+    void onSetCurrentConfig(OperationContext* opCtx) override final {}
+
     void onInitialDataAvailable(OperationContext* opCtx,
                                 bool isMajorityDataAvailable) override final {}
 

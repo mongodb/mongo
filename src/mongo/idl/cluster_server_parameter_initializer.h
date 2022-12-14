@@ -82,6 +82,8 @@ public:
     // Virtual methods coming from the ReplicaSetAwareService
     void onStartup(OperationContext* opCtx) override final {}
 
+    void onSetCurrentConfig(OperationContext* opCtx) override final {}
+
     /**
      * Called after startup recovery or initial sync is complete.
      */

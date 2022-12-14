@@ -79,6 +79,7 @@ private:
     void _reapInternalTransactions(ServiceContext* service);
 
     void onStartup(OperationContext* opCtx) override final;
+    void onSetCurrentConfig(OperationContext* opCtx) final {}
     void onShutdown() override final;
 
     void onStepUpComplete(OperationContext* opCtx, long long term) override final {

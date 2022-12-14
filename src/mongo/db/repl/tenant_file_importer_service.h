@@ -90,6 +90,8 @@ private:
 
     void onStartup(OperationContext*) final {}
 
+    void onSetCurrentConfig(OperationContext* opCtx) final {}
+
     void onStepUpBegin(OperationContext*, long long) final {}
 
     void onStepUpComplete(OperationContext*, long long) final {}

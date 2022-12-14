@@ -112,6 +112,7 @@ private:
 
     // Virtual methods coming from the ReplicaSetAwareService
     void onStartup(OperationContext* opCtx) override final {}
+    void onSetCurrentConfig(OperationContext* opCtx) override final;
     void onInitialDataAvailable(OperationContext* opCtx,
                                 bool isMajorityDataAvailable) override final;
     void onShutdown() override final {}

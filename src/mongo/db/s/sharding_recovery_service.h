@@ -127,6 +127,7 @@ private:
     void recoverIndexesCatalog(OperationContext* opCtx);
 
     void onStartup(OperationContext* opCtx) override final {}
+    void onSetCurrentConfig(OperationContext* opCtx) final {}
     void onShutdown() override final {}
     void onStepUpBegin(OperationContext* opCtx, long long term) override final {}
     void onStepUpComplete(OperationContext* opCtx, long long term) override final {}

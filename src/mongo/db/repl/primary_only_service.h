@@ -578,6 +578,7 @@ public:
                                        std::vector<BSONObj>* ops) noexcept;
 
     void onStartup(OperationContext*) final;
+    void onSetCurrentConfig(OperationContext* opCtx) final {}
     void onInitialDataAvailable(OperationContext* opCtx, bool isMajorityDataAvailable) final {}
     void onShutdown() final;
     void onStepUpBegin(OperationContext*, long long term) final {}

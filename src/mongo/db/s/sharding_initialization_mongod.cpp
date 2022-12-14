@@ -488,6 +488,11 @@ void ShardingInitializationMongoD::updateShardIdentityConfigString(
     }
 }
 
+void ShardingInitializationMongoD::onSetCurrentConfig(OperationContext* opCtx) {
+    // TODO SERVER-72088: Use the connection string from the config to construct a ShardRemote for
+    // the config server when in catalog shard mode.
+}
+
 void ShardingInitializationMongoD::onInitialDataAvailable(OperationContext* opCtx,
                                                           bool isMajorityDataAvailable) {
     // This function may take the global lock.

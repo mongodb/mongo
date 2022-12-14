@@ -58,6 +58,12 @@ void ReplicaSetAwareServiceRegistry::onStartup(OperationContext* opCtx) {
     });
 }
 
+void ReplicaSetAwareServiceRegistry::onSetCurrentConfig(OperationContext* opCtx) {
+    std::for_each(_services.begin(), _services.end(), [&](ReplicaSetAwareInterface* service) {
+        service->onSetCurrentConfig(opCtx);
+    });
+}
+
 void ReplicaSetAwareServiceRegistry::onInitialDataAvailable(OperationContext* opCtx,
                                                             bool isMajorityDataAvailable) {
     std::for_each(_services.begin(), _services.end(), [&](ReplicaSetAwareInterface* service) {
