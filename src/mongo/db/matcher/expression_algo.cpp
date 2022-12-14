@@ -568,12 +568,8 @@ std::unique_ptr<MatchExpression> splitMatchExpressionForColumns(
                 : std::make_unique<AndMatchExpression>(std::move(newChildren));
         }
 
-        case MatchExpression::NOT: {
-            // (TODO SERVER-69610) need expr translation to enable pushing down $not
-            return me->shallowClone();
-        }
-
         // We don't currently handle any of these cases, but some may be possible in the future.
+        case MatchExpression::NOT:
         case MatchExpression::ALWAYS_FALSE:
         case MatchExpression::ALWAYS_TRUE:
         case MatchExpression::ELEM_MATCH_OBJECT:

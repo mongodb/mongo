@@ -698,10 +698,6 @@ std::unique_ptr<sbe::EExpression> generatePerColumnPredicate(StageBuilderState& 
                 makeConstant(sbe::value::TypeTags::NumberInt64,
                              sbe::value::bitcastFrom<int64_t>(ts.getBSONTypeMask())));
         }
-        case MatchExpression::NOT: {
-            uasserted(6733604, "(TODO SERVER-69610) need expr translation to enable $not");
-        }
-
         default:
             uasserted(6733605,
                       std::string("Expression ") + me->serialize().toString() +
