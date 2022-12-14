@@ -65,18 +65,14 @@ public:
     std::unique_ptr<IndexCatalog> clone() const override;
 
     // must be called before used
-    Status init(OperationContext* opCtx, Collection* collection) override;
+    void init(OperationContext* opCtx, Collection* collection) override;
 
     /**
      * Must be called before used.
-     *
-     * When initializing an index that exists in 'preexistingIndexes', the IndexCatalogEntry will be
-     * taken from there instead of initializing a new IndexCatalogEntry.
      */
-    Status initFromExisting(OperationContext* opCtx,
-                            Collection* collection,
-                            const IndexCatalogEntryContainer& preexistingIndexes,
-                            boost::optional<Timestamp> readTimestamp) override;
+    void initFromExisting(OperationContext* opCtx,
+                          Collection* collection,
+                          boost::optional<Timestamp> readTimestamp) override;
 
     // ---- accessors -----
 
@@ -314,11 +310,10 @@ private:
     /**
      * Helper for init() and initFromExisting().
      */
-    Status _init(OperationContext* opCtx,
-                 Collection* collection,
-                 const IndexCatalogEntryContainer& preexistingIndexes,
-                 boost::optional<Timestamp> readTimestamp,
-                 bool fromExisting);
+    void _init(OperationContext* opCtx,
+               Collection* collection,
+               boost::optional<Timestamp> readTimestamp,
+               bool fromExisting);
 
     /**
      * In addition to IndexNames::findPluginName, validates that it is a known index type.

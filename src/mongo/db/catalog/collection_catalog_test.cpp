@@ -1384,8 +1384,8 @@ TEST_F(CollectionCatalogTimestampTest, OpenEarlierCollectionWithIndex) {
     auto indexDescPast = coll->getIndexCatalog()->findIndexByName(opCtx.get(), "x_1");
     auto indexDescLatest = latestColl->getIndexCatalog()->findIndexByName(newOpCtx.get(), "x_1");
     ASSERT_BSONOBJ_EQ(indexDescPast->infoObj(), indexDescLatest->infoObj());
-    ASSERT_EQ(coll->getIndexCatalog()->getEntryShared(indexDescPast),
-              latestColl->getIndexCatalog()->getEntryShared(indexDescLatest));
+    ASSERT_EQ(coll->getIndexCatalog()->getEntryShared(indexDescPast)->getSharedIdent(),
+              latestColl->getIndexCatalog()->getEntryShared(indexDescLatest)->getSharedIdent());
 }
 
 TEST_F(CollectionCatalogTimestampTest, OpenLatestCollectionWithIndex) {
@@ -1424,8 +1424,8 @@ TEST_F(CollectionCatalogTimestampTest, OpenLatestCollectionWithIndex) {
     auto indexDesc = coll->getIndexCatalog()->findIndexByName(opCtx.get(), "x_1");
     auto indexDescCurrent = currentColl->getIndexCatalog()->findIndexByName(opCtx.get(), "x_1");
     ASSERT_BSONOBJ_EQ(indexDesc->infoObj(), indexDescCurrent->infoObj());
-    ASSERT_EQ(coll->getIndexCatalog()->getEntryShared(indexDesc),
-              currentColl->getIndexCatalog()->getEntryShared(indexDescCurrent));
+    ASSERT_EQ(coll->getIndexCatalog()->getEntryShared(indexDesc)->getSharedIdent(),
+              currentColl->getIndexCatalog()->getEntryShared(indexDescCurrent)->getSharedIdent());
 }
 
 TEST_F(CollectionCatalogTimestampTest, OpenEarlierCollectionWithDropPendingIndex) {
@@ -1485,16 +1485,104 @@ TEST_F(CollectionCatalogTimestampTest, OpenEarlierCollectionWithDropPendingIndex
     auto indexDescY = coll->getIndexCatalog()->findIndexByName(opCtx.get(), "y_1");
 
     auto indexEntryX = coll->getIndexCatalog()->getEntryShared(indexDescX);
-    auto indexEntryY = coll->getIndexCatalog()->getEntryShared(indexDescY);
+    auto indexEntryXIdent = indexEntryX->getSharedIdent();
+    auto indexEntryYIdent = coll->getIndexCatalog()->getEntryShared(indexDescY)->getSharedIdent();
 
     // Check use_count(). 2 in the unit test, 1 in the opened collection.
-    ASSERT_EQ(3, indexEntryX.use_count());
+    ASSERT_EQ(3, indexEntryXIdent.use_count());
 
     // Check use_count(). 1 in the unit test, 1 in the opened collection.
-    ASSERT_EQ(2, indexEntryY.use_count());
+    ASSERT_EQ(2, indexEntryYIdent.use_count());
 
-    // Verify that "x_1" was retrieved from the drop pending map for the opened collection.
-    ASSERT_EQ(index, indexEntryX);
+    // Verify that "x_1"'s ident was retrieved from the drop pending map for the opened collection.
+    ASSERT_EQ(index->getSharedIdent(), indexEntryXIdent);
+}
+
+TEST_F(CollectionCatalogTimestampTest,
+       OpenEarlierCollectionWithDropPendingIndexDoesNotCrashWhenCheckingMultikey) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    const NamespaceString nss("a.b");
+
+    const std::string xIndexName{"x_1"};
+    const std::string yIndexName{"y_1"};
+    const std::string zIndexName{"z_1"};
+
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+
+    const Timestamp createXIndexTs = Timestamp(20, 20);
+    const Timestamp createYIndexTs = Timestamp(21, 21);
+    const Timestamp createZIndexTs = Timestamp(22, 22);
+
+    const Timestamp dropYIndexTs = Timestamp(30, 30);
+    const Timestamp tsBetweenDroppingYAndZ = Timestamp(31, 31);
+    const Timestamp dropZIndexTs = Timestamp(33, 33);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name" << xIndexName << "key" << BSON("x" << 1)),
+                createXIndexTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name" << yIndexName << "key" << BSON("y" << 1)),
+                createYIndexTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name" << zIndexName << "key" << BSON("z" << 1)),
+                createZIndexTs);
+
+    // Maintain a shared_ptr to "z_1", so it's not expired in drop pending map. This is required so
+    // that this index entry's ident will be re-used when openCollection is called.
+    std::shared_ptr<const IndexCatalogEntry> index = [&] {
+        auto latestColl = CollectionCatalog::get(opCtx.get())
+                              ->lookupCollectionByNamespaceForRead(opCtx.get(), nss);
+        auto desc = latestColl->getIndexCatalog()->findIndexByName(opCtx.get(), zIndexName);
+        return latestColl->getIndexCatalog()->getEntryShared(desc);
+    }();
+
+    dropIndex(opCtx.get(), nss, yIndexName, dropYIndexTs);
+    dropIndex(opCtx.get(), nss, zIndexName, dropZIndexTs);
+
+    // Open the collection after the first index drop but before the second. This ensures we get a
+    // version of the collection whose indexes are {x, z} in the durable catalog, while the
+    // metadata for the in-memory latest collection contains indexes {x, {}, {}} (where {}
+    // corresponds to a default-constructed object). The index catalog entry for the z index will be
+    // contained in the drop pending reaper. So the CollectionImpl object created by openCollection
+    // will reuse index idents for indexes x and z.
+    //
+    // This test originally reproduced a bug where:
+    //     * The index catalog entry object for z contained an _indexOffset of 2, because of its
+    //       location in the latest catalog entry's metadata.indexes array
+    //     * openCollection would re-use the index catalog entry for z (with _indexOffset=2), but
+    //       it would store this entry at position 1 in its metadata.indexes array
+    //     * Something would try to check if the index was multikey, and it would use the offset of
+    //       2 contained in the IndexCatalogEntry, but this was incorrect for the CollectionImpl
+    //       object, so it would fire an invariant.
+    const Timestamp readTimestamp = tsBetweenDroppingYAndZ;
+    OneOffRead oor(opCtx.get(), readTimestamp);
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
+    auto coll =
+        CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, readTimestamp);
+    ASSERT(coll);
+    ASSERT_EQ(coll->getIndexCatalog()->numIndexesReady(), 2);
+
+    // Collection is not shared from the latest instance. This has to be done in an  alternative
+    // client as we already have an open snapshot from an earlier point-in-time above.
+    auto newClient = opCtx->getServiceContext()->makeClient("AlternativeClient");
+    AlternativeClientRegion acr(newClient);
+    auto newOpCtx = cc().makeOperationContext();
+    auto latestColl = CollectionCatalog::get(newOpCtx.get())
+                          ->lookupCollectionByNamespaceForRead(newOpCtx.get(), nss);
+
+    ASSERT_NE(coll.get(), latestColl.get());
+
+    auto indexDescZ = coll->getIndexCatalog()->findIndexByName(opCtx.get(), zIndexName);
+    auto indexEntryZ = coll->getIndexCatalog()->getEntryShared(indexDescZ);
+    auto indexEntryZIsMultikey = indexEntryZ->isMultikey(newOpCtx.get(), coll);
+
+    ASSERT_FALSE(indexEntryZIsMultikey);
 }
 
 TEST_F(CollectionCatalogTimestampTest, OpenEarlierAlreadyDropPendingCollection) {

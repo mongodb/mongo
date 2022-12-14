@@ -211,21 +211,47 @@ bool doesMinMaxHaveMixedSchemaData(const BSONObj& min, const BSONObj& max) {
     return false;
 }
 
-bool isIndexCompatible(std::shared_ptr<IndexCatalogEntry> index,
-                       boost::optional<Timestamp> readTimestamp) {
-    if (!index) {
-        return false;
-    }
-    if (!readTimestamp) {
-        return true;
+StatusWith<std::shared_ptr<Ident>> findSharedIdentForIndex(OperationContext* opCtx,
+                                                           StorageEngine* storageEngine,
+                                                           Collection* collection,
+                                                           RecordId catalogId,
+                                                           const StringData& indexName) {
+    // First check the index catalog of the existing collection for the index entry.
+    auto latestEntry = [&]() -> std::shared_ptr<IndexCatalogEntry> {
+        if (!collection)
+            return nullptr;
+
+        auto desc = collection->getIndexCatalog()->findIndexByName(opCtx, indexName);
+        if (!desc)
+            return nullptr;
+        return collection->getIndexCatalog()->getEntryShared(desc);
+    }();
+
+    if (latestEntry) {
+        return latestEntry->getSharedIdent();
     }
 
-    boost::optional<Timestamp> minVisibleSnapshot = index->getMinimumVisibleSnapshot();
-    if (!minVisibleSnapshot) {
-        // Index is valid in all snapshots.
-        return true;
+    // TODO(SERVER-72111): Remove the need for this durable catalog lookup.
+    const std::string ident =
+        DurableCatalog::get(opCtx)->getIndexIdent(opCtx, catalogId, indexName);
+
+    // Next check the CollectionCatalog for a compatible drop pending index.
+    auto dropPendingEntry = CollectionCatalog::get(opCtx)->findDropPendingIndex(ident);
+
+    // The index entries are incompatible with the read timestamp, but we need to use the same
+    // shared ident to prevent the reaper from dropping idents prematurely.
+    if (dropPendingEntry) {
+        return dropPendingEntry->getSharedIdent();
     }
-    return readTimestamp >= *minVisibleSnapshot;
+
+    // The index ident is expired, but it could still be drop pending. Mark it as in use if
+    // possible.
+    auto newIdent = storageEngine->markIdentInUse(ident);
+    if (newIdent) {
+        return newIdent;
+    }
+    return {ErrorCodes::SnapshotTooOld,
+            str::stream() << "Index ident " << ident << " is being dropped or is already dropped."};
 }
 
 }  // namespace
@@ -361,7 +387,7 @@ void CollectionImpl::init(OperationContext* opCtx) {
         }
     }
 
-    uassertStatusOK(getIndexCatalog()->init(opCtx, this));
+    getIndexCatalog()->init(opCtx, this);
     _initialized = true;
 }
 
@@ -387,67 +413,28 @@ Status CollectionImpl::initFromExisting(OperationContext* opCtx,
     _initCommon(opCtx);
 
     auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
-    stdx::unordered_map<std::string, std::shared_ptr<Ident>> sharedIdents;
+    StringDataMap<std::shared_ptr<Ident>> sharedIdents;
 
     // Determine which indexes from the existing collection can be shared with this newly
     // initialized collection. The remaining indexes will be initialized by the IndexCatalog.
-    IndexCatalogEntryContainer preexistingIndexes;
     for (const auto& index : _metadata->indexes) {
-        if (!isIndexReady(index.nameStringData())) {
+        const auto indexName = index.nameStringData();
+        if (!isIndexReady(indexName)) {
             continue;
         }
-        // First check the index catalog of the existing collection for the index entry.
-        auto latestEntry = [&]() -> std::shared_ptr<IndexCatalogEntry> {
-            if (!collection)
-                return nullptr;
-
-            auto desc =
-                collection->getIndexCatalog()->findIndexByName(opCtx, index.nameStringData());
-            if (!desc)
-                return nullptr;
-            return collection->getIndexCatalog()->getEntryShared(desc);
-        }();
-
-        if (isIndexCompatible(latestEntry, readTimestamp)) {
-            preexistingIndexes.add(std::move(latestEntry));
-            continue;
+        auto swIndexIdent =
+            findSharedIdentForIndex(opCtx, storageEngine, collection.get(), _catalogId, indexName);
+        if (!swIndexIdent.isOK()) {
+            return swIndexIdent.getStatus();
         }
-
-        const std::string indexName = index.nameStringData().toString();
-        const std::string ident =
-            DurableCatalog::get(opCtx)->getIndexIdent(opCtx, _catalogId, index.nameStringData());
-
-        // Next check the CollectionCatalog for a compatible drop pending index.
-        auto dropPendingEntry = CollectionCatalog::get(opCtx)->findDropPendingIndex(ident);
-        if (isIndexCompatible(dropPendingEntry, readTimestamp)) {
-            preexistingIndexes.add(std::move(dropPendingEntry));
-            continue;
-        }
-
-        // The index entries are incompatible with the read timestamp, but we need to use the same
-        // shared ident to prevent the reaper from dropping idents prematurely.
-        if (latestEntry || dropPendingEntry) {
-            sharedIdents.emplace(indexName,
-                                 latestEntry ? latestEntry->getSharedIdent()
-                                             : dropPendingEntry->getSharedIdent());
-            continue;
-        }
-
-        // The index ident is expired, but it could still be drop pending. Mark it as in use if
-        // possible.
-        auto newIdent = storageEngine->markIdentInUse(ident);
-        if (!newIdent) {
-            return {ErrorCodes::SnapshotTooOld,
-                    str::stream() << "Index ident " << ident
-                                  << " is being dropped or is already dropped."};
-        }
-        sharedIdents.emplace(indexName, newIdent);
+        sharedIdents.emplace(indexName, swIndexIdent.getValue());
     }
 
-    uassertStatusOK(
-        getIndexCatalog()->initFromExisting(opCtx, this, preexistingIndexes, readTimestamp));
+    getIndexCatalog()->initFromExisting(opCtx, this, readTimestamp);
 
-    // Update the idents for the newly initialized indexes.
+    // Update the idents for the newly initialized indexes. We must reuse the same shared_ptr<Ident>
+    // objects from existing indexes to prevent the index idents from being dropped by the drop
+    // pending ident reaper while this collection is still using them.
     for (const auto& sharedIdent : sharedIdents) {
         auto desc = getIndexCatalog()->findIndexByName(opCtx, sharedIdent.first);
         invariant(desc);

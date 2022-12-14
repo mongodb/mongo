@@ -184,23 +184,20 @@ std::unique_ptr<IndexCatalog> IndexCatalogImpl::clone() const {
     return std::make_unique<IndexCatalogImpl>(*this);
 }
 
-Status IndexCatalogImpl::init(OperationContext* opCtx, Collection* collection) {
-    return _init(
-        opCtx, collection, /*preexistingIndexes=*/{}, /*readTimestamp=*/boost::none, false);
+void IndexCatalogImpl::init(OperationContext* opCtx, Collection* collection) {
+    _init(opCtx, collection, /*readTimestamp=*/boost::none, false);
 };
 
-Status IndexCatalogImpl::initFromExisting(OperationContext* opCtx,
-                                          Collection* collection,
-                                          const IndexCatalogEntryContainer& preexistingIndexes,
-                                          boost::optional<Timestamp> readTimestamp) {
-    return _init(opCtx, collection, preexistingIndexes, readTimestamp, true);
+void IndexCatalogImpl::initFromExisting(OperationContext* opCtx,
+                                        Collection* collection,
+                                        boost::optional<Timestamp> readTimestamp) {
+    _init(opCtx, collection, readTimestamp, true);
 };
 
-Status IndexCatalogImpl::_init(OperationContext* opCtx,
-                               Collection* collection,
-                               const IndexCatalogEntryContainer& preexistingIndexes,
-                               boost::optional<Timestamp> readTimestamp,
-                               bool fromExisting) {
+void IndexCatalogImpl::_init(OperationContext* opCtx,
+                             Collection* collection,
+                             boost::optional<Timestamp> readTimestamp,
+                             bool fromExisting) {
     vector<string> indexNames;
     collection->getAllIndexes(&indexNames);
     const bool replSetMemberInStandaloneMode =
@@ -216,31 +213,6 @@ Status IndexCatalogImpl::_init(OperationContext* opCtx,
         const string& indexName = indexNames[i];
         BSONObj spec = collection->getIndexSpec(indexName).getOwned();
         BSONObj keyPattern = spec.getObjectField("key");
-
-        if (fromExisting) {
-            // Only ready indexes need to be included when init'ing from an existing collection
-            // for a point-in-time read.
-            if (!collection->isIndexReady(indexName)) {
-                continue;
-            }
-            auto preexistingIt = std::find_if(
-                preexistingIndexes.begin(),
-                preexistingIndexes.end(),
-                [&](const std::shared_ptr<IndexCatalogEntry>& preexistingEntry) {
-                    return spec.woCompare(preexistingEntry->descriptor()->infoObj()) == 0;
-                });
-            if (preexistingIt != preexistingIndexes.end()) {
-                std::shared_ptr<IndexCatalogEntry> existingEntry = *preexistingIt;
-                LOGV2_DEBUG(6825404,
-                            1,
-                            "Adding preexisting index entry",
-                            logAttrs(collection->ns()),
-                            "index"_attr = existingEntry->descriptor()->infoObj());
-
-                _readyIndexes.add(std::move(existingEntry));
-                continue;
-            }
-        }
 
         auto descriptor = std::make_unique<IndexDescriptor>(_getAccessMethodName(keyPattern), spec);
 
@@ -336,8 +308,6 @@ Status IndexCatalogImpl::_init(OperationContext* opCtx,
         // an existing collection.
         CollectionQueryInfo::get(collection).init(opCtx, collection);
     }
-
-    return Status::OK();
 }
 
 std::unique_ptr<IndexCatalog::IndexIterator> IndexCatalogImpl::getIndexIterator(

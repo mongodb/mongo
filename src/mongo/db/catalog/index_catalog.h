@@ -215,18 +215,14 @@ public:
     virtual std::unique_ptr<IndexCatalog> clone() const = 0;
 
     // Must be called before used.
-    virtual Status init(OperationContext* opCtx, Collection* collection) = 0;
+    virtual void init(OperationContext* opCtx, Collection* collection) = 0;
 
     /**
      * Must be called before used.
-     *
-     * When initializing an index that exists in 'preexistingIndexes', the IndexCatalogEntry will be
-     * taken from there instead of initializing a new IndexCatalogEntry.
      */
-    virtual Status initFromExisting(OperationContext* opCtx,
-                                    Collection* collection,
-                                    const IndexCatalogEntryContainer& preexistingIndexes,
-                                    boost::optional<Timestamp> readTimestamp) = 0;
+    virtual void initFromExisting(OperationContext* opCtx,
+                                  Collection* collection,
+                                  boost::optional<Timestamp> readTimestamp) = 0;
 
     // ---- accessors -----
 
