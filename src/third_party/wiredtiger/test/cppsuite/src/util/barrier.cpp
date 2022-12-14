@@ -27,6 +27,7 @@
  */
 
 #include "barrier.h"
+#include "src/common/logger.h"
 
 namespace test_harness {
 barrier::barrier(std::size_t thread_count)
@@ -44,7 +45,9 @@ barrier::wait()
         _count = _threshold;
         _cond.notify_all();
     } else {
-        _cond.wait(lock, [this, lock_gen] { return lock_gen != _generation; });
+        if (!_cond.wait_for(lock, std::chrono::seconds(_sync_timeout),
+              [this, lock_gen] { return lock_gen != _generation; }))
+            logger::log_msg(LOG_WARN, "Barrier timed out!");
     }
 }
 } // namespace test_harness

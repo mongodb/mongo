@@ -54,5 +54,8 @@ class barrier {
     std::size_t _threshold;
     std::size_t _count;
     std::size_t _generation;
+
+    /* Timeout for the synchronization wait. */
+    const int _sync_timeout = 600;
 };
 } // namespace test_harness
