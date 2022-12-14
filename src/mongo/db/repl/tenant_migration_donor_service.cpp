@@ -979,6 +979,11 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
                 executor, recipientTargeterRS, token);
         })
         .then([this, self = shared_from_this(), executor, token] {
+            pauseTenantMigrationDonorAfterMarkingStateGarbageCollectable.pauseWhileSet();
+            {
+                stdx::lock_guard<Latch> lg(_mutex);
+                setPromiseOkIfNotReady(lg, _forgetMigrationDurablePromise);
+            }
             return _waitForGarbageCollectionDelayThenDeleteStateDoc(executor, token);
         })
         .onCompletion([this,
@@ -1530,11 +1535,6 @@ TenantMigrationDonorService::Instance::_waitForForgetMigrationThenMarkMigrationG
         })
         .then([this, self = shared_from_this(), executor, token](repl::OpTime opTime) {
             return _waitForMajorityWriteConcern(executor, std::move(opTime), token);
-        })
-        .then([this, self = shared_from_this()] {
-            pauseTenantMigrationDonorAfterMarkingStateGarbageCollectable.pauseWhileSet();
-            stdx::lock_guard<Latch> lg(_mutex);
-            setPromiseOkIfNotReady(lg, _forgetMigrationDurablePromise);
         });
 }
 
