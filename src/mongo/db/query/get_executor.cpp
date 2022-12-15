@@ -419,10 +419,14 @@ void fillOutPlannerParams(OperationContext* opCtx,
         plannerParams->clusteredCollectionCollator = collection->getDefaultCollator();
     }
 
-    plannerParams->collectionStats = fillOutCollectionStats(opCtx, collection);
+    if (!plannerParams->columnStoreIndexes.empty()) {
+        // Fill out statistics needed for column scan query planning.
+        plannerParams->collectionStats = fillOutCollectionStats(opCtx, collection);
 
-    const auto kMB = 1024 * 1024;
-    plannerParams->availableMemoryBytes = static_cast<long long>(ProcessInfo::getMemSizeMB()) * kMB;
+        const auto kMB = 1024 * 1024;
+        plannerParams->availableMemoryBytes =
+            static_cast<long long>(ProcessInfo::getMemSizeMB()) * kMB;
+    }
 }
 
 std::map<NamespaceString, SecondaryCollectionInfo> fillOutSecondaryCollectionsInformation(
@@ -798,27 +802,6 @@ public:
         return buildMultiPlan(std::move(solutions));
     }
 
-    /**
-     * Fills out planner parameters if not already filled.
-     */
-    void initializePlannerParamsIfNeeded() {
-        if (_plannerParamsInitialized) {
-            return;
-        }
-
-        auto& mainColl = getMainCollection();
-        if (mainColl) {
-            fillOutPlannerParams(_opCtx, mainColl, _cq, &_plannerParams);
-        }
-
-        _plannerParamsInitialized = true;
-    }
-
-    const QueryPlannerParams& plannerParams() const {
-        invariant(_plannerParamsInitialized);
-        return _plannerParams;
-    }
-
 protected:
     static constexpr bool ShouldDeferExecutionTreeGeneration = DeferExecutionTreeGeneration;
 
@@ -849,6 +832,18 @@ protected:
         } else {
             result->emplace(std::move(solution));
         }
+    }
+
+    /**
+     * Fills out planner parameters if not already filled.
+     */
+    void initializePlannerParamsIfNeeded() {
+        if (_plannerParamsInitialized) {
+            return;
+        }
+        fillOutPlannerParams(_opCtx, getMainCollection(), _cq, &_plannerParams);
+
+        _plannerParamsInitialized = true;
     }
 
     /**
@@ -1479,6 +1474,23 @@ bool shouldPlanningResultUseSbe(bool sbeFull,
 }
 
 /**
+ * Checks the index catalog for the main collection and returns true if a non-hidden column store
+ * index is found.
+ */
+bool isColumnStoreIndexPresent(OperationContext* opCtx,
+                               const MultipleCollectionAccessor& collections) {
+    if (const auto& mainColl = collections.getMainCollection()) {
+        std::vector<const IndexDescriptor*> csiIndexes;
+        mainColl->getIndexCatalog()->findIndexByType(opCtx, IndexNames::COLUMN, csiIndexes);
+        return std::any_of(csiIndexes.begin(), csiIndexes.end(), [](const auto* descriptor) {
+            return !descriptor->hidden();
+        });
+    }
+
+    return false;
+}
+
+/**
  * Attempts to create a slot-based executor for the query, if the query plan is eligible for SBE
  * execution. This function has three possible return values:
  *
@@ -1509,9 +1521,8 @@ attemptToGetSlotBasedExecutor(
         opCtx, yieldPolicy, &collections.getMainCollection(), canonicalQuery->nss());
     SlotBasedPrepareExecutionHelper helper{
         opCtx, collections, canonicalQuery.get(), sbeYieldPolicy.get(), plannerParams.options};
-    helper.initializePlannerParamsIfNeeded();
 
-    const bool csiPresent = !helper.plannerParams().columnStoreIndexes.empty();
+    const bool csiPresent = isColumnStoreIndexPresent(opCtx, collections);
     const bool sbeFull = feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV();
     const bool aggSpecificStagesPushedDown = !canonicalQuery->pipeline().empty();
 
