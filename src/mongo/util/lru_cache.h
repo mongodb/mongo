@@ -159,9 +159,6 @@ public:
     REQUIRES(IsComparable<KeyType>)
     const_iterator cfind(const KeyType& key) const {
         auto it = _map.find(key);
-        // TODO(SERVER-28890): Remove the function-style cast when MSVC's
-        // `std::list< ... >::iterator` implementation doesn't conflict with their `/Zc:ternary`
-        // flag support .
         return (it == _map.end()) ? end() : const_iterator(it->second);
     }
 
