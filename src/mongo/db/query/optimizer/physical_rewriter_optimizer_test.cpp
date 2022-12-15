@@ -6050,6 +6050,66 @@ TEST(PhysRewriter, RootInterval) {
         optimized);
 }
 
+TEST(PhysRewriter, ResidualFilterPathIsBalanced) {
+    using namespace properties;
+    using namespace unit_test_abt_literals;
+
+    ABT root =
+        NodeBuilder{}
+            .root("root")
+            .filter(_evalf(_get("a",
+                                _traverse1(_composea(
+                                    _composea(_cmp("Eq", "0"_cint64), _cmp("Eq", "1"_cint64)),
+                                    _composea(_cmp("Eq", "2"_cint64), _cmp("Eq", "3"_cint64))))),
+                           "root"_var))
+            .finish(_scan("root", "c1"));
+
+    auto prefixId = PrefixId::createForTests();
+    auto phaseManager = makePhaseManager(
+        {OptPhase::MemoSubstitutionPhase,
+         OptPhase::MemoExplorationPhase,
+         OptPhase::MemoImplementationPhase},
+        prefixId,
+        {{{"c1", createScanDef({}, {})}}},
+        boost::none /*costModel*/,
+        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
+
+    ABT optimized = root;
+    phaseManager.optimize(optimized);
+
+    // The FilterNode is first converted to a SargableNode, then it's converted back to a FilterNode
+    // because it can't be satisfied with an index. The path under the resulting FilterNode should
+    // be balanced.
+    ASSERT_EXPLAIN_V2(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       root\n"
+        "|   RefBlock: \n"
+        "|       Variable [root]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [evalTemp_0]\n"
+        "|   PathTraverse [1]\n"
+        "|   PathComposeA []\n"
+        "|   |   PathComposeA []\n"
+        "|   |   |   PathCompare [Eq]\n"
+        "|   |   |   Const [2]\n"
+        "|   |   PathCompare [Eq]\n"
+        "|   |   Const [1]\n"
+        "|   PathComposeA []\n"
+        "|   |   PathCompare [Eq]\n"
+        "|   |   Const [3]\n"
+        "|   PathCompare [Eq]\n"
+        "|   Const [0]\n"
+        "PhysicalScan [{'<root>': root, 'a': evalTemp_0}, c1]\n"
+        "    BindBlock:\n"
+        "        [evalTemp_0]\n"
+        "            Source []\n"
+        "        [root]\n"
+        "            Source []\n",
+        optimized);
+}
+
 TEST(PhysRewriter, EqMemberSargable) {
     using namespace properties;
 

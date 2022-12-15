@@ -1548,21 +1548,16 @@ public:
         return result;
     }
 
-    template <class Element>
-    ABT composeChildren(ABTVector childResults) {
-        ABT result = make<PathIdentity>();
-        for (ABT& n : childResults) {
-            maybeComposePath<Element>(result, std::move(n));
-        }
-        return result;
-    }
-
     ABT transport(const IntervalReqExpr::Conjunction& node, ABTVector childResults) {
-        return composeChildren<PathComposeM>(std::move(childResults));
+        // Construct a balanced multiplicative composition tree.
+        maybeComposePaths<PathComposeM>(childResults);
+        return std::move(childResults.front());
     }
 
     ABT transport(const IntervalReqExpr::Disjunction& node, ABTVector childResults) {
-        return composeChildren<PathComposeA>(std::move(childResults));
+        // Construct a balanced additive composition tree.
+        maybeComposePaths<PathComposeA>(childResults);
+        return std::move(childResults.front());
     }
 
     ABT lower(const IntervalReqExpr::Node& intervals) {
