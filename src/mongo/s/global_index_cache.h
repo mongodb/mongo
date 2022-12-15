@@ -55,6 +55,14 @@ public:
 
     void remove(const StringData& name, const CollectionIndexes& collectionIndexes);
 
+    template <typename Callable>
+    void forEachGlobalIndex(Callable&& handler) const {
+        for (auto it = _indexes.begin(); it != _indexes.end(); it++) {
+            if (!handler(it->second))
+                return;
+        }
+    }
+
 private:
     CollectionIndexes _collectionIndexes;
     IndexCatalogTypeMap _indexes;

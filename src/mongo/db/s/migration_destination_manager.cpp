@@ -310,11 +310,16 @@ void replaceGlobalIndexesInShardIfNeeded(OperationContext* opCtx,
         return;
     }
 
-    auto [collection, indexes] = Grid::get(opCtx)->catalogClient()->getCollectionAndGlobalIndexes(
-        opCtx, nss, {repl::ReadConcernLevel::kSnapshotReadConcern});
-    if (collection.getIndexVersion()) {
+    auto optGii = Grid::get(opCtx)->catalogCache()->getCollectionIndexInfoWithRefresh(opCtx, nss);
+
+    if (optGii) {
+        std::vector<IndexCatalogType> indexes;
+        optGii->forEachGlobalIndex([&](const auto& index) {
+            indexes.push_back(index);
+            return true;
+        });
         replaceGlobalIndexes(
-            opCtx, nss, uuid, collection.getIndexVersion()->indexVersion(), indexes);
+            opCtx, nss, uuid, optGii->getCollectionIndexes().indexVersion(), indexes);
     } else {
         clearGlobalIndexes(opCtx, nss, uuid);
     }
