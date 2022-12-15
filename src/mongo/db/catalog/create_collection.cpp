@@ -504,17 +504,6 @@ Status _createCollection(
         }
 
         if (auto clusteredIndex = collectionOptions.clusteredIndex) {
-            bool clusteredIndexesEnabled =
-                feature_flags::gClusteredIndexes.isEnabled(serverGlobalParams.featureCompatibility);
-            if (!clusteredIndexesEnabled && !clustered_util::requiresLegacyFormat(nss)) {
-                // The 'clusteredIndex' option is only supported in legacy format for specific
-                // internal collections when the gClusteredIndexes flag is disabled.
-                return Status(ErrorCodes::InvalidOptions,
-                              str::stream()
-                                  << "The 'clusteredIndex' option is not supported for namespace "
-                                  << nss);
-            }
-
             if (clustered_util::requiresLegacyFormat(nss) != clusteredIndex->getLegacyFormat()) {
                 return Status(ErrorCodes::Error(5979703),
                               "The 'clusteredIndex' legacy format {clusteredIndex: <bool>} is only "
@@ -591,8 +580,7 @@ CollectionOptions clusterByDefaultIfNecessary(const NamespaceString& nss,
     if (MONGO_unlikely(clusterAllCollectionsByDefault.shouldFail()) &&
         !collectionOptions.isView() && !collectionOptions.clusteredIndex.has_value() &&
         (!idIndex || idIndex->isEmpty()) && !collectionOptions.capped &&
-        !clustered_util::requiresLegacyFormat(nss) &&
-        feature_flags::gClusteredIndexes.isEnabled(serverGlobalParams.featureCompatibility)) {
+        !clustered_util::requiresLegacyFormat(nss)) {
         // Capped, clustered collections differ in behavior significantly from normal
         // capped collections. Notably, they allow out-of-order insertion.
         //

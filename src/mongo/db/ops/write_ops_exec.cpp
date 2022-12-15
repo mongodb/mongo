@@ -242,11 +242,8 @@ void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
                 unsafeCreateCollection(opCtx);
             WriteUnitOfWork wuow(opCtx);
             CollectionOptions defaultCollectionOptions;
-            if (auto fp = globalFailPointRegistry().find("clusterAllCollectionsByDefault"); fp &&
-                fp->shouldFail() &&
-                feature_flags::gClusteredIndexes.isEnabled(
-                    serverGlobalParams.featureCompatibility) &&
-                !clustered_util::requiresLegacyFormat(ns)) {
+            if (auto fp = globalFailPointRegistry().find("clusterAllCollectionsByDefault");
+                fp && fp->shouldFail() && !clustered_util::requiresLegacyFormat(ns)) {
                 defaultCollectionOptions.clusteredIndex =
                     clustered_util::makeDefaultClusteredIdIndex();
             }

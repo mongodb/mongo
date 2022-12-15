@@ -260,19 +260,10 @@ public:
             }
 
             if (cmd.getExpireAfterSeconds()) {
-                if (feature_flags::gClusteredIndexes.isEnabled(
-                        serverGlobalParams.featureCompatibility)) {
-                    uassert(ErrorCodes::InvalidOptions,
-                            "'expireAfterSeconds' is only supported on time-series collections or "
-                            "when the 'clusteredIndex' option is specified",
-                            cmd.getTimeseries() || cmd.getClusteredIndex());
-                } else {
-                    uassert(ErrorCodes::InvalidOptions,
-                            "'expireAfterSeconds' is only supported on time-series collections",
-                            cmd.getTimeseries() ||
-                                (cmd.getClusteredIndex() &&
-                                 cmd.getNamespace().isTimeseriesBucketsCollection()));
-                }
+                uassert(ErrorCodes::InvalidOptions,
+                        "'expireAfterSeconds' is only supported on time-series collections or "
+                        "when the 'clusteredIndex' option is specified",
+                        cmd.getTimeseries() || cmd.getClusteredIndex());
             }
 
             // Validate _id index spec and fill in missing fields.

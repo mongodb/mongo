@@ -155,11 +155,6 @@ server_parameters:
         default: 16776216 # BSONObjMaxUserSize - 1000
 
 feature_flags:
-    featureFlagClusteredIndexes:
-        description: "When enabled, support non time-series collections with clustered indexes"
-        cpp_varname: feature_flags::gClusteredIndexes
-        default: true
-        version: 5.3
     featureFlagTimeseriesMetricIndexes:
         description: "When enabled, support secondary indexes on time-series measurements"
         cpp_varname: feature_flags::gTimeseriesMetricIndexes

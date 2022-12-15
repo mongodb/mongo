@@ -44,7 +44,6 @@ res =
 assert.eq(options, res.cursor.firstBatch[0].options);
 assert.commandWorked(testDB.dropDatabase());
 
-// Fails with different error code depending on whether featureFlagClusteredIndexes is enabled.
 assert.commandFailedWithCode(testDB.createCollection(bucketsCollName, {clusteredIndex: {}}),
                              [ErrorCodes.TypeMismatch, 40414]);
 assert.commandFailedWithCode(testDB.createCollection(bucketsCollName, {clusteredIndex: 'a'}),
@@ -54,16 +53,13 @@ assert.commandFailedWithCode(
                             {clusteredIndex: true, idIndex: {key: {_id: 1}, name: '_id_'}}),
     ErrorCodes.InvalidOptions);
 
-// Fails with different error code depending on whether featureFlagClusteredIndexes is enabled.
 assert.commandFailedWithCode(testDB.createCollection(tsCollName, {clusteredIndex: true}),
                              [ErrorCodes.InvalidOptions, 5979703]);
 assert.commandFailedWithCode(testDB.createCollection('test', {clusteredIndex: true}),
                              [ErrorCodes.InvalidOptions, 5979703]);
 
 // Using the 'expireAfterSeconds' option on any namespace other than a time-series namespace or a
-// clustered time-series buckets namespace should fail (provdided featureFlagClusteredIndexes is
-// disabled). Otherwise, collection creation must specify the clusteredIndex option to use
-// expireAfterSeconds.
+// clustered time-series buckets namespace should fail.
 assert.commandFailedWithCode(testDB.createCollection('test', {expireAfterSeconds: 10}),
                              ErrorCodes.InvalidOptions);
 assert.commandFailedWithCode(testDB.createCollection(bucketsCollName, {expireAfterSeconds: 10}),
