@@ -2690,6 +2690,7 @@ buildvariants:
       --ssl
       --enable-free-mon=on
       --use-libunwind=off
+      --link-model=dynamic
       -j$(grep -c ^processor /proc/cpuinfo)
     # Avoid starting too many mongod's under TSAN build.
     resmoke_jobs_factor: 0.3
