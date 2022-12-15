@@ -1748,7 +1748,6 @@ buildvariants:
       - name: mixed_workloads
       - name: mongos_workloads
       - name: mongos_large_catalog_workloads
-      - name: move_chunk_large_chunk_map_workloads
       - name: move_chunk_workloads
       - name: move_chunk_waiting_workloads
       - name: smoke_test
