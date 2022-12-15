@@ -82,6 +82,12 @@ public:
      */
     Database* ensureDbExists(OperationContext* opCtx);
 
+    /**
+     * Returns the database reference, after attempting to refresh it if it was null. Does not
+     * create the database, so after this call the referece might still be null.
+     */
+    Database* refreshDbReferenceIfNull(OperationContext* opCtx);
+
 private:
     DatabaseName _dbName;
 

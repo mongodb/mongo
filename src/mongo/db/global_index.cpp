@@ -189,10 +189,8 @@ void dropContainer(OperationContext* opCtx, const UUID& indexUUID) {
     // Drop the container.
     return writeConflictRetry(opCtx, "dropGlobalIndexContainer", nss.ns(), [&]() {
         AutoGetCollection autoColl(opCtx, nss, MODE_X);
-        if (!autoColl || !autoColl.getDb()) {
+        if (!autoColl) {
             // Idempotent command, return OK if the collection is non-existing.
-            // TODO (SERVER-70438): remove database valid check. It is possible for
-            // AutoGetCollection to contain a valid collection pointer but a null database pointer.
             return;
         }
 

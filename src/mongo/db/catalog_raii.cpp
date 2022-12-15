@@ -231,6 +231,16 @@ Database* AutoGetDb::ensureDbExists(OperationContext* opCtx) {
     return _db;
 }
 
+Database* AutoGetDb::refreshDbReferenceIfNull(OperationContext* opCtx) {
+    if (!_db) {
+        auto databaseHolder = DatabaseHolder::get(opCtx);
+        _db = databaseHolder->getDb(opCtx, _dbName);
+        catalog_helper::assertMatchingDbVersion(opCtx, _dbName.toStringWithTenantId());
+    }
+    return _db;
+}
+
+
 CollectionNamespaceOrUUIDLock::CollectionNamespaceOrUUIDLock(OperationContext* opCtx,
                                                              const NamespaceStringOrUUID& nsOrUUID,
                                                              LockMode mode,
@@ -359,6 +369,16 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
     // Check that the collections are all safe to use.
     _resolvedNss = catalog->resolveNamespaceStringOrUUID(opCtx, nsOrUUID);
     _coll = catalog->lookupCollectionByNamespace(opCtx, _resolvedNss);
+
+    if (_coll) {
+        // It is possible for an operation to have created the database and collection after this
+        // AutoGetCollection initialized its AutoGetDb, but before it has performed the collection
+        // lookup. Thus, it is possible for AutoGetDb to hold nullptr while _coll is a valid
+        // pointer. This would be unexpected, as for a collection to exist the database must exist.
+        // We ensure the database reference is valid by refreshing it.
+        _autoDb.refreshDbReferenceIfNull(opCtx);
+    }
+
     checkCollectionUUIDMismatch(opCtx, _resolvedNss, _coll, options._expectedUUID);
     verifyDbAndCollection(
         opCtx, modeColl, nsOrUUID, _resolvedNss, _coll, _autoDb.getDb(), verifyWriteEligible);
