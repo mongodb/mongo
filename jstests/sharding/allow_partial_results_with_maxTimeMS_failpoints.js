@@ -30,6 +30,38 @@ function isError(res) {
     return !res.hasOwnProperty('ok') || !res['ok'];
 }
 
+class MultiController {
+    constructor(controllerList) {
+        this.controllerList = controllerList;
+    }
+
+    enable() {
+        for (const c of this.controllerList) {
+            c.enable();
+        }
+    }
+
+    disable() {
+        for (const c of this.controllerList) {
+            c.disable();
+        }
+    }
+}
+
+class NeverTimeoutController {
+    constructor(mongoInstance) {
+        this.mongoInstance = mongoInstance;
+    }
+
+    enable() {
+        this.fp = configureFailPoint(this.mongoInstance, "maxTimeNeverTimeOut", {}, "alwaysOn");
+    }
+
+    disable() {
+        this.fp.off();
+    }
+}
+
 // Set up a 2-shard single-node replicaset cluster with MongoBridge.
 const st = new ShardingTest({name: jsTestName(), shards: 2, useBridge: true, rs: {nodes: 1}});
 
@@ -78,6 +110,12 @@ function runQueryWithTimeout(doAllowPartialResults, timeout) {
     });
 }
 
+const neverTimeout = new MultiController([
+    new NeverTimeoutController(st.shard0),
+    new NeverTimeoutController(st.shard1),
+    new NeverTimeoutController(st.s)
+]);
+
 // Set ampleTimeMS to at least 2000ms, plus ten times the basic query runtime.
 // This timeout must provide ample time for our queries to run to completion, even on passthrough
 // suites with resource contention.
@@ -102,7 +140,8 @@ function runQuery(doAllowPartialResults) {
 
 // Simulate mongos timeout during getMore.
 function getMoreMongosTimeout(allowPartialResults, batchSize) {
-    // Get the first batch.
+    // Get the first batch.  Disable MaxTimeMSExpired during the intial find.
+    neverTimeout.enable();
     const res = assert.commandWorked(coll.runCommand({
         find: collName,
         filter: {$where: whereCode()},
@@ -110,6 +149,7 @@ function getMoreMongosTimeout(allowPartialResults, batchSize) {
         batchSize: batchSize,
         maxTimeMS: ampleTimeMS
     }));
+    neverTimeout.disable();
     assert(!res.cursor.hasOwnProperty("partialResultsReturned"));
     assert.gt(res.cursor.id, 0);
     // Stop mongos and run getMore.
@@ -207,24 +247,6 @@ class NetworkFailureController {
     }
 }
 
-class MultiFailureController {
-    constructor(failureControllerList) {
-        this.controllerList = failureControllerList;
-    }
-
-    enable() {
-        for (const c of this.controllerList) {
-            c.enable();
-        }
-    }
-
-    disable() {
-        for (const c of this.controllerList) {
-            c.disable();
-        }
-    }
-}
-
 class FindWhereSleepController {
     constructor(shard) {
         this.shard = shard;
@@ -248,18 +270,17 @@ class FindWhereSleepController {
 
 const shard0Failpoint = new MaxTimeMSFailpointFailureController(st.shard0);
 const shard1Failpoint = new MaxTimeMSFailpointFailureController(st.shard1);
-const allShardsFailpoint = new MultiFailureController([shard0Failpoint, shard1Failpoint]);
+const allShardsFailpoint = new MultiController([shard0Failpoint, shard1Failpoint]);
 
 const shard0NetworkFailure = new NetworkFailureController(st.rs0);
 const shard1NetworkFailure = new NetworkFailureController(st.rs1);
-const allshardsNetworkFailure =
-    new MultiFailureController([shard0NetworkFailure, shard1NetworkFailure]);
+const allshardsNetworkFailure = new MultiController([shard0NetworkFailure, shard1NetworkFailure]);
 
 const shard0SleepFailure = new FindWhereSleepController(st.shard0);
 const shard1SleepFailure = new FindWhereSleepController(st.shard1);
-const allShardsSleepFailure = new MultiFailureController([shard0SleepFailure, shard1SleepFailure]);
+const allShardsSleepFailure = new MultiController([shard0SleepFailure, shard1SleepFailure]);
 
-const allshardsMixedFailures = new MultiFailureController([shard0NetworkFailure, shard1Failpoint]);
+const allshardsMixedFailures = new MultiController([shard0NetworkFailure, shard1Failpoint]);
 
 // Due to the hack with sleepFailures below, this has to be the innermost parameterizing function.
 function withEachSingleShardFailure(callback) {
@@ -286,6 +307,11 @@ function withEachAllShardFailure(callback) {
 
 function getMoreShardTimeout(allowPartialResults, failureController, batchSize) {
     // Get the first batch.
+
+    // We are giving this query ample time and no failures are enabled so we don't expect a timeout
+    // on the initial find.  However, to be safe, set failpoints to ensure that MaxTimeMS is
+    // ignored for the initial find, to avoid failing in cases of resource contention (BF-26792).
+    neverTimeout.enable();
     const res = assert.commandWorked(coll.runCommand({
         find: collName,
         filter: {$where: whereCode()},
@@ -297,8 +323,10 @@ function getMoreShardTimeout(allowPartialResults, failureController, batchSize) 
         batchSize: batchSize,
         maxTimeMS: ampleTimeMS
     }));
+    neverTimeout.disable();
     assert.eq(undefined, res.cursor.partialResultsReturned);
     assert.gt(res.cursor.id, 0);
+
     // Stop a shard and run getMore.
     failureController.enable();
     let numReturned = batchSize;  // One batch was returned so far.
