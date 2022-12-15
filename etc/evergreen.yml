@@ -89,6 +89,8 @@ variables:
     # This is added because of EVG-18211.
     # Without this we are adding extra dependencies on evergreen and it is causing strain
     omit_generated_tasks: true
+  - name: version_burn_in_gen
+    variant: generate-tasks-for-version
 
 - &linux_x86_dynamic_debug_compile_variant_dependency
   depends_on:
@@ -119,6 +121,8 @@ variables:
     # This is added because of EVG-18211.
     # Without this we are adding extra dependencies on evergreen and it is causing strain
     omit_generated_tasks: true
+  - name: version_burn_in_gen
+    variant: generate-tasks-for-version
 
 - &linux_x86_generic_expansions
   multiversion_platform: rhel80
@@ -1516,6 +1520,16 @@ buildvariants:
     test_flags: >-
       --additionalFeatureFlagsFile all_feature_flags.txt
       --excludeWithAnyTags=incompatible_with_shard_merge
+  depends_on:
+  - name: archive_dist_test
+    variant: *linux_x86_dynamic_compile_variant_name
+  - name: version_gen
+    variant: generate-tasks-for-version
+    # This is added because of EVG-18211.
+    # Without this we are adding extra dependencies on evergreen and it is causing strain
+    omit_generated_tasks: true
+  - name: version_burn_in_gen
+    variant: generate-tasks-for-version
   tasks:
   - name: cqf
   - name: cqf_disabled_pipeline_opt
