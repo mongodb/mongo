@@ -339,12 +339,12 @@ protected:
      */
     void assertSampledReadQueryDocument(const UUID& sampleId,
                                         const NamespaceString& nss,
-                                        SampledReadCommandNameEnum cmdName,
+                                        SampledCommandNameEnum cmdName,
                                         const BSONObj& filter,
                                         const BSONObj& collation) {
         auto doc = _getConfigDocument(NamespaceString::kConfigSampledQueriesNamespace, sampleId);
         auto parsedQueryDoc =
-            SampledReadQueryDocument::parse(IDLParserContext("QueryAnalysisWriterTest"), doc);
+            SampledQueryDocument::parse(IDLParserContext("QueryAnalysisWriterTest"), doc);
 
         ASSERT_EQ(parsedQueryDoc.getNs(), nss);
         ASSERT_EQ(parsedQueryDoc.getCollectionUuid(), getCollectionUUID(nss));
@@ -363,11 +363,11 @@ protected:
     template <typename CommandRequestType>
     void assertSampledWriteQueryDocument(const UUID& sampleId,
                                          const NamespaceString& nss,
-                                         SampledWriteCommandNameEnum cmdName,
+                                         SampledCommandNameEnum cmdName,
                                          const CommandRequestType& expectedCmd) {
         auto doc = _getConfigDocument(NamespaceString::kConfigSampledQueriesNamespace, sampleId);
         auto parsedQueryDoc =
-            SampledWriteQueryDocument::parse(IDLParserContext("QueryAnalysisWriterTest"), doc);
+            SampledQueryDocument::parse(IDLParserContext("QueryAnalysisWriterTest"), doc);
 
         ASSERT_EQ(parsedQueryDoc.getNs(), nss);
         ASSERT_EQ(parsedQueryDoc.getCollectionUuid(), getCollectionUUID(nss));
@@ -484,7 +484,7 @@ TEST_F(QueryAnalysisWriterTest, FindQuery) {
 
         ASSERT_EQ(getSampledQueryDocumentsCount(nss0), 1);
         assertSampledReadQueryDocument(
-            sampleId, nss0, SampledReadCommandNameEnum::kFind, filter, collation);
+            sampleId, nss0, SampledCommandNameEnum::kFind, filter, collation);
 
         deleteSampledQueryDocuments();
     };
@@ -508,7 +508,7 @@ TEST_F(QueryAnalysisWriterTest, CountQuery) {
 
         ASSERT_EQ(getSampledQueryDocumentsCount(nss0), 1);
         assertSampledReadQueryDocument(
-            sampleId, nss0, SampledReadCommandNameEnum::kCount, filter, collation);
+            sampleId, nss0, SampledCommandNameEnum::kCount, filter, collation);
 
         deleteSampledQueryDocuments();
     };
@@ -532,7 +532,7 @@ TEST_F(QueryAnalysisWriterTest, DistinctQuery) {
 
         ASSERT_EQ(getSampledQueryDocumentsCount(nss0), 1);
         assertSampledReadQueryDocument(
-            sampleId, nss0, SampledReadCommandNameEnum::kDistinct, filter, collation);
+            sampleId, nss0, SampledCommandNameEnum::kDistinct, filter, collation);
 
         deleteSampledQueryDocuments();
     };
@@ -556,7 +556,7 @@ TEST_F(QueryAnalysisWriterTest, AggregateQuery) {
 
         ASSERT_EQ(getSampledQueryDocumentsCount(nss0), 1);
         assertSampledReadQueryDocument(
-            sampleId, nss0, SampledReadCommandNameEnum::kAggregate, filter, collation);
+            sampleId, nss0, SampledCommandNameEnum::kAggregate, filter, collation);
 
         deleteSampledQueryDocuments();
     };
@@ -590,7 +590,7 @@ TEST_F(QueryAnalysisWriterTest, UpdateQueriesMarkedForSampling) {
     for (const auto& [sampleId, expectedSampledCmd] : expectedSampledCmds) {
         assertSampledWriteQueryDocument(sampleId,
                                         expectedSampledCmd.getNamespace(),
-                                        SampledWriteCommandNameEnum::kUpdate,
+                                        SampledCommandNameEnum::kUpdate,
                                         expectedSampledCmd);
     }
 }
@@ -618,7 +618,7 @@ TEST_F(QueryAnalysisWriterTest, DeleteQueriesMarkedForSampling) {
     for (const auto& [sampleId, expectedSampledCmd] : expectedSampledCmds) {
         assertSampledWriteQueryDocument(sampleId,
                                         expectedSampledCmd.getNamespace(),
-                                        SampledWriteCommandNameEnum::kDelete,
+                                        SampledCommandNameEnum::kDelete,
                                         expectedSampledCmd);
     }
 }
@@ -646,7 +646,7 @@ TEST_F(QueryAnalysisWriterTest, FindAndModifyQueryUpdateMarkedForSampling) {
     ASSERT_EQ(getSampledQueryDocumentsCount(nss0), 1);
     assertSampledWriteQueryDocument(sampleId,
                                     expectedSampledCmd.getNamespace(),
-                                    SampledWriteCommandNameEnum::kFindAndModify,
+                                    SampledCommandNameEnum::kFindAndModify,
                                     expectedSampledCmd);
 }
 
@@ -666,7 +666,7 @@ TEST_F(QueryAnalysisWriterTest, FindAndModifyQueryRemoveMarkedForSampling) {
     ASSERT_EQ(getSampledQueryDocumentsCount(nss0), 1);
     assertSampledWriteQueryDocument(sampleId,
                                     expectedSampledCmd.getNamespace(),
-                                    SampledWriteCommandNameEnum::kFindAndModify,
+                                    SampledCommandNameEnum::kFindAndModify,
                                     expectedSampledCmd);
 }
 
@@ -699,16 +699,16 @@ TEST_F(QueryAnalysisWriterTest, MultipleQueriesAndCollections) {
     ASSERT_EQ(getSampledQueryDocumentsCount(nss0), 1);
     assertSampledWriteQueryDocument(deleteSampleId,
                                     expectedSampledDeleteCmd.getNamespace(),
-                                    SampledWriteCommandNameEnum::kDelete,
+                                    SampledCommandNameEnum::kDelete,
                                     expectedSampledDeleteCmd);
     ASSERT_EQ(getSampledQueryDocumentsCount(nss1), 2);
     assertSampledWriteQueryDocument(updateSampleId,
                                     expectedSampledUpdateCmd.getNamespace(),
-                                    SampledWriteCommandNameEnum::kUpdate,
+                                    SampledCommandNameEnum::kUpdate,
                                     expectedSampledUpdateCmd);
     assertSampledReadQueryDocument(countSampleId,
                                    nss1,
-                                   SampledReadCommandNameEnum::kCount,
+                                   SampledCommandNameEnum::kCount,
                                    originalCountFilter,
                                    originalCountCollation);
 }
@@ -737,7 +737,7 @@ TEST_F(QueryAnalysisWriterTest, DuplicateQueries) {
     ASSERT_EQ(getSampledQueryDocumentsCount(nss0), 1);
     assertSampledReadQueryDocument(findSampleId,
                                    nss0,
-                                   SampledReadCommandNameEnum::kFind,
+                                   SampledCommandNameEnum::kFind,
                                    originalFindFilter,
                                    originalFindCollation);
 
@@ -752,16 +752,16 @@ TEST_F(QueryAnalysisWriterTest, DuplicateQueries) {
     ASSERT_EQ(getSampledQueryDocumentsCount(nss0), 3);
     assertSampledWriteQueryDocument(updateSampleId,
                                     expectedSampledUpdateCmd.getNamespace(),
-                                    SampledWriteCommandNameEnum::kUpdate,
+                                    SampledCommandNameEnum::kUpdate,
                                     expectedSampledUpdateCmd);
     assertSampledReadQueryDocument(findSampleId,
                                    nss0,
-                                   SampledReadCommandNameEnum::kFind,
+                                   SampledCommandNameEnum::kFind,
                                    originalFindFilter,
                                    originalFindCollation);
     assertSampledReadQueryDocument(countSampleId,
                                    nss0,
-                                   SampledReadCommandNameEnum::kCount,
+                                   SampledCommandNameEnum::kCount,
                                    originalCountFilter,
                                    originalCountCollation);
 }
@@ -787,7 +787,7 @@ TEST_F(QueryAnalysisWriterTest, QueriesMultipleBatches_MaxBatchSize) {
     ASSERT_EQ(getSampledQueryDocumentsCount(nss0), numQueries);
     for (const auto& [sampleId, filter, collation] : expectedSampledCmds) {
         assertSampledReadQueryDocument(
-            sampleId, nss0, SampledReadCommandNameEnum::kAggregate, filter, collation);
+            sampleId, nss0, SampledCommandNameEnum::kAggregate, filter, collation);
     }
 }
 
@@ -810,7 +810,7 @@ TEST_F(QueryAnalysisWriterTest, QueriesMultipleBatches_MaxBSONObjSize) {
     ASSERT_EQ(getSampledQueryDocumentsCount(nss0), numQueries);
     for (const auto& [sampleId, filter, collation] : expectedSampledCmds) {
         assertSampledReadQueryDocument(
-            sampleId, nss0, SampledReadCommandNameEnum::kAggregate, filter, collation);
+            sampleId, nss0, SampledCommandNameEnum::kAggregate, filter, collation);
     }
 }
 
@@ -837,10 +837,10 @@ TEST_F(QueryAnalysisWriterTest, FlushAfterAddReadIfExceedsSizeLimit) {
 
     ASSERT_EQ(getSampledQueryDocumentsCount(nss0), 1);
     assertSampledReadQueryDocument(
-        sampleId0, nss0, SampledReadCommandNameEnum::kFind, filter0, collation0);
+        sampleId0, nss0, SampledCommandNameEnum::kFind, filter0, collation0);
     ASSERT_EQ(getSampledQueryDocumentsCount(nss1), 1);
     assertSampledReadQueryDocument(
-        sampleId1, nss1, SampledReadCommandNameEnum::kAggregate, filter1, collation1);
+        sampleId1, nss1, SampledCommandNameEnum::kAggregate, filter1, collation1);
 }
 
 TEST_F(QueryAnalysisWriterTest, FlushAfterAddUpdateIfExceedsSizeLimit) {
@@ -866,7 +866,7 @@ TEST_F(QueryAnalysisWriterTest, FlushAfterAddUpdateIfExceedsSizeLimit) {
     for (const auto& [sampleId, expectedSampledCmd] : expectedSampledCmds) {
         assertSampledWriteQueryDocument(sampleId,
                                         expectedSampledCmd.getNamespace(),
-                                        SampledWriteCommandNameEnum::kUpdate,
+                                        SampledCommandNameEnum::kUpdate,
                                         expectedSampledCmd);
     }
 }
@@ -894,7 +894,7 @@ TEST_F(QueryAnalysisWriterTest, FlushAfterAddDeleteIfExceedsSizeLimit) {
     for (const auto& [sampleId, expectedSampledCmd] : expectedSampledCmds) {
         assertSampledWriteQueryDocument(sampleId,
                                         expectedSampledCmd.getNamespace(),
-                                        SampledWriteCommandNameEnum::kDelete,
+                                        SampledCommandNameEnum::kDelete,
                                         expectedSampledCmd);
     }
 }
@@ -931,12 +931,12 @@ TEST_F(QueryAnalysisWriterTest, FlushAfterAddFindAndModifyIfExceedsSizeLimit) {
     ASSERT_EQ(getSampledQueryDocumentsCount(nss0), 1);
     assertSampledWriteQueryDocument(sampleId0,
                                     expectedSampledCmd0.getNamespace(),
-                                    SampledWriteCommandNameEnum::kFindAndModify,
+                                    SampledCommandNameEnum::kFindAndModify,
                                     expectedSampledCmd0);
     ASSERT_EQ(getSampledQueryDocumentsCount(nss1), 1);
     assertSampledWriteQueryDocument(sampleId1,
                                     expectedSampledCmd1.getNamespace(),
-                                    SampledWriteCommandNameEnum::kFindAndModify,
+                                    SampledCommandNameEnum::kFindAndModify,
                                     expectedSampledCmd1);
 }
 
@@ -990,7 +990,7 @@ TEST_F(QueryAnalysisWriterTest, AddQueriesBackAfterWriteError) {
     ASSERT_EQ(getSampledQueryDocumentsCount(nss0), numQueries);
     for (const auto& sampleId : sampleIds0) {
         assertSampledReadQueryDocument(
-            sampleId, nss0, SampledReadCommandNameEnum::kFind, originalFilter, originalCollation);
+            sampleId, nss0, SampledCommandNameEnum::kFind, originalFilter, originalCollation);
     }
 }
 
@@ -1014,7 +1014,7 @@ TEST_F(QueryAnalysisWriterTest, RemoveDuplicatesFromBufferAfterWriteError) {
     ASSERT_EQ(getSampledQueryDocumentsCount(nss0), numQueries0);
     for (const auto& sampleId : sampleIds0) {
         assertSampledReadQueryDocument(
-            sampleId, nss0, SampledReadCommandNameEnum::kFind, originalFilter, originalCollation);
+            sampleId, nss0, SampledCommandNameEnum::kFind, originalFilter, originalCollation);
     }
 
     auto numQueries1 = 5;
@@ -1063,7 +1063,7 @@ TEST_F(QueryAnalysisWriterTest, RemoveDuplicatesFromBufferAfterWriteError) {
     ASSERT_EQ(getSampledQueryDocumentsCount(nss1), numQueries1);
     for (const auto& sampleId : sampleIds1) {
         assertSampledReadQueryDocument(
-            sampleId, nss1, SampledReadCommandNameEnum::kFind, originalFilter, originalCollation);
+            sampleId, nss1, SampledCommandNameEnum::kFind, originalFilter, originalCollation);
     }
 }
 

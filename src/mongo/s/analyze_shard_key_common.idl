@@ -40,19 +40,14 @@ enums:
       kFull: "full"
       kOff: "off"
 
-  SampledReadCommandName:
-    description: "The command name of a sampled read query."
+  SampledCommandName:
+    description: "The command name of a sampled read and write query."
     type: string
     values:
       kFind: "find"
       kAggregate: "aggregate"
       kCount: "count"
       kDistinct: "distinct"
-
-  SampledWriteCommandName:
-    description: "The command name of a sampled write query."
-    type: string
-    values:
       kInsert: "insert"
       kUpdate: "update"
       kDelete: "delete"

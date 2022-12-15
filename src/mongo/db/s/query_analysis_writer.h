@@ -171,7 +171,7 @@ public:
 private:
     ExecutorFuture<void> _addReadQuery(const UUID& sampleId,
                                        const NamespaceString& nss,
-                                       SampledReadCommandNameEnum cmdName,
+                                       SampledCommandNameEnum cmdName,
                                        const BSONObj& filter,
                                        const BSONObj& collation);
 

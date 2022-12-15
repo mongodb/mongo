@@ -461,33 +461,33 @@ ExecutorFuture<void> QueryAnalysisWriter::addFindQuery(const UUID& sampleId,
                                                        const NamespaceString& nss,
                                                        const BSONObj& filter,
                                                        const BSONObj& collation) {
-    return _addReadQuery(sampleId, nss, SampledReadCommandNameEnum::kFind, filter, collation);
+    return _addReadQuery(sampleId, nss, SampledCommandNameEnum::kFind, filter, collation);
 }
 
 ExecutorFuture<void> QueryAnalysisWriter::addCountQuery(const UUID& sampleId,
                                                         const NamespaceString& nss,
                                                         const BSONObj& filter,
                                                         const BSONObj& collation) {
-    return _addReadQuery(sampleId, nss, SampledReadCommandNameEnum::kCount, filter, collation);
+    return _addReadQuery(sampleId, nss, SampledCommandNameEnum::kCount, filter, collation);
 }
 
 ExecutorFuture<void> QueryAnalysisWriter::addDistinctQuery(const UUID& sampleId,
                                                            const NamespaceString& nss,
                                                            const BSONObj& filter,
                                                            const BSONObj& collation) {
-    return _addReadQuery(sampleId, nss, SampledReadCommandNameEnum::kDistinct, filter, collation);
+    return _addReadQuery(sampleId, nss, SampledCommandNameEnum::kDistinct, filter, collation);
 }
 
 ExecutorFuture<void> QueryAnalysisWriter::addAggregateQuery(const UUID& sampleId,
                                                             const NamespaceString& nss,
                                                             const BSONObj& filter,
                                                             const BSONObj& collation) {
-    return _addReadQuery(sampleId, nss, SampledReadCommandNameEnum::kAggregate, filter, collation);
+    return _addReadQuery(sampleId, nss, SampledCommandNameEnum::kAggregate, filter, collation);
 }
 
 ExecutorFuture<void> QueryAnalysisWriter::_addReadQuery(const UUID& sampleId,
                                                         const NamespaceString& nss,
-                                                        SampledReadCommandNameEnum cmdName,
+                                                        SampledCommandNameEnum cmdName,
                                                         const BSONObj& filter,
                                                         const BSONObj& collation) {
     invariant(_executor);
@@ -509,7 +509,7 @@ ExecutorFuture<void> QueryAnalysisWriter::_addReadQuery(const UUID& sampleId,
             }
 
             auto cmd = SampledReadCommand{filter.getOwned(), collation.getOwned()};
-            auto doc = SampledReadQueryDocument{sampleId, nss, *collUuid, cmdName, cmd.toBSON()};
+            auto doc = SampledQueryDocument{sampleId, nss, *collUuid, cmdName, cmd.toBSON()};
             stdx::lock_guard<Latch> lk(_mutex);
             _queries.add(doc.toBSON());
         })
@@ -547,11 +547,11 @@ ExecutorFuture<void> QueryAnalysisWriter::addUpdateQuery(
                 return;
             }
 
-            auto doc = SampledWriteQueryDocument{sampledUpdateCmd.sampleId,
-                                                 sampledUpdateCmd.nss,
-                                                 *collUuid,
-                                                 SampledWriteCommandNameEnum::kUpdate,
-                                                 std::move(sampledUpdateCmd.cmd)};
+            auto doc = SampledQueryDocument{sampledUpdateCmd.sampleId,
+                                            sampledUpdateCmd.nss,
+                                            *collUuid,
+                                            SampledCommandNameEnum::kUpdate,
+                                            std::move(sampledUpdateCmd.cmd)};
             stdx::lock_guard<Latch> lk(_mutex);
             _queries.add(doc.toBSON());
         })
@@ -589,11 +589,11 @@ ExecutorFuture<void> QueryAnalysisWriter::addDeleteQuery(
                 return;
             }
 
-            auto doc = SampledWriteQueryDocument{sampledDeleteCmd.sampleId,
-                                                 sampledDeleteCmd.nss,
-                                                 *collUuid,
-                                                 SampledWriteCommandNameEnum::kDelete,
-                                                 std::move(sampledDeleteCmd.cmd)};
+            auto doc = SampledQueryDocument{sampledDeleteCmd.sampleId,
+                                            sampledDeleteCmd.nss,
+                                            *collUuid,
+                                            SampledCommandNameEnum::kDelete,
+                                            std::move(sampledDeleteCmd.cmd)};
             stdx::lock_guard<Latch> lk(_mutex);
             _queries.add(doc.toBSON());
         })
@@ -633,11 +633,11 @@ ExecutorFuture<void> QueryAnalysisWriter::addFindAndModifyQuery(
                 return;
             }
 
-            auto doc = SampledWriteQueryDocument{sampledFindAndModifyCmd.sampleId,
-                                                 sampledFindAndModifyCmd.nss,
-                                                 *collUuid,
-                                                 SampledWriteCommandNameEnum::kFindAndModify,
-                                                 std::move(sampledFindAndModifyCmd.cmd)};
+            auto doc = SampledQueryDocument{sampledFindAndModifyCmd.sampleId,
+                                            sampledFindAndModifyCmd.nss,
+                                            *collUuid,
+                                            SampledCommandNameEnum::kFindAndModify,
+                                            std::move(sampledFindAndModifyCmd.cmd)};
             stdx::lock_guard<Latch> lk(_mutex);
             _queries.add(doc.toBSON());
         })
