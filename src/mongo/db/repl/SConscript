@@ -2051,3 +2051,15 @@ env.Library(
         '$BUILD_DIR/mongo/executor/task_executor_interface',
     ],
 )
+
+env.Library(
+    target='split_prepare_session_manager',
+    source=[
+        'split_prepare_session_manager.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/session/logical_session_id',
+        '$BUILD_DIR/mongo/db/session/logical_session_id_helpers',
+    ],
+)
