@@ -407,6 +407,51 @@ BSONObj writeFile(const BSONObj& args, void* data) {
     return undefinedReturn;
 }
 
+/**
+ * Writes an array of bson objects one after another. The format is readable by the `bsondump` tool.
+ */
+BSONObj writeBsonArrayToFile(const BSONObj& args, void* data) {
+    uassert(7196709, "writeBsonArrayToFile needs 2 arguments", args.nFields() == 2);
+
+    BSONObjIterator it(args);
+    auto filePathElem = it.next();
+    uassert(7196708, "first argument must be a string", filePathElem.type() == BSONType::String);
+
+    auto fileContentElem = it.next();
+    uassert(
+        7196707, "second argument must be a BSON array", fileContentElem.type() == BSONType::Array);
+
+    const boost::filesystem::path originalFilePath{filePathElem.String()};
+    const boost::filesystem::path normalizedFilePath{originalFilePath.lexically_normal()};
+    const boost::filesystem::path absoluteFilePath{boost::filesystem::absolute(normalizedFilePath)};
+
+    uassert(7196706,
+            "bsonArrayToFile() can only write a file in a directory which already exists",
+            boost::filesystem::exists(absoluteFilePath.parent_path()));
+    uassert(7196705,
+            "bsonArrayToFile() can only write to a file which does not yet exist",
+            !boost::filesystem::exists(absoluteFilePath));
+    uassert(7196704,
+            "the file name must be compatible with POSIX and Windows",
+            boost::filesystem::portable_name(absoluteFilePath.filename().string()));
+
+    std::ios::openmode mode = std::ios::out | std::ios::binary;
+    boost::filesystem::ofstream ofs{absoluteFilePath, mode};
+    uassert(7196703,
+            str::stream() << "failed to open file " << normalizedFilePath.string()
+                          << " for writing",
+            ofs);
+
+    for (const auto& obj : fileContentElem.Obj()) {
+        ofs.write(obj.Obj().objdata(), obj.objsize());
+        uassert(7196702, "Error writing to file", !ofs.bad());
+    }
+    ofs.flush();
+    uassert(7196701, str::stream() << "failed to write to file " << absoluteFilePath.string(), ofs);
+
+    return undefinedReturn;
+}
+
 BSONObj getHostName(const BSONObj& a, void* data) {
     uassert(13411, "getHostName accepts no arguments", a.nFields() == 0);
     char buf[260];  // HOST_NAME_MAX is usually 255
@@ -578,6 +623,7 @@ void installShellUtilsExtended(Scope& scope) {
     scope.injectNative("_copyFileRange", copyFileRange);
     scope.injectNative("_readDumpFile", readDumpFile);
     scope.injectNative("_getEnv", shellGetEnv);
+    scope.injectNative("writeBsonArrayToFile", writeBsonArrayToFile);
 }
 
 }  // namespace shell_utils
