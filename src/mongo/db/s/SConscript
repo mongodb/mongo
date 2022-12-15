@@ -410,6 +410,7 @@ env.Library(
         'add_shard_cmd.cpp',
         'analyze_shard_key_cmd.cpp',
         'analyze_shard_key_cmd_util.cpp',
+        'analyze_shard_key_read_write_distribution.cpp',
         'auto_split_vector_command.cpp',
         'check_sharding_index_command.cpp',
         'cleanup_orphaned_cmd.cpp',
@@ -664,6 +665,7 @@ env.CppUnitTest(
     target='db_s_shard_server_test',
     source=[
         'active_migrations_registry_test.cpp',
+        'analyze_shard_key_read_write_distribution_test.cpp',
         'auto_split_vector_test.cpp',
         'balancer/balance_stats_test.cpp',
         'chunk_split_state_driver_test.cpp',

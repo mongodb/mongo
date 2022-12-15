@@ -1,0 +1,695 @@
+/**
+ *    Copyright (C) 2022-present MongoDB, Inc.
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the Server Side Public License, version 1,
+ *    as published by MongoDB, Inc.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    Server Side Public License for more details.
+ *
+ *    You should have received a copy of the Server Side Public License
+ *    along with this program. If not, see
+ *    <http://www.mongodb.com/licensing/server-side-public-license>.
+ *
+ *    As a special exception, the copyright holders give permission to link the
+ *    code of portions of this program with the OpenSSL library under certain
+ *    conditions as described in each individual source file and distribute
+ *    linked combinations including the program with the OpenSSL library. You
+ *    must comply with the Server Side Public License in all respects for
+ *    all of the code used other than as permitted herein. If you modify file(s)
+ *    with this exception, you may extend this exception to your version of the
+ *    file(s), but you are not obligated to do so. If you do not wish to do so,
+ *    delete this exception statement from your version. If you delete this
+ *    exception statement from all source files in the program, then also delete
+ *    it in the license file.
+ */
+
+#include "mongo/db/s/analyze_shard_key_read_write_distribution.h"
+
+#include "mongo/db/hasher.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/s/shard_server_test_fixture.h"
+#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/logv2/log.h"
+#include "mongo/s/analyze_shard_key_documents_gen.h"
+#include "mongo/unittest/death_test.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
+namespace mongo {
+namespace analyze_shard_key {
+namespace {
+
+const auto kSampledReadCommandNames =
+    std::vector<SampledCommandNameEnum>{SampledCommandNameEnum::kFind,
+                                        SampledCommandNameEnum::kAggregate,
+                                        SampledCommandNameEnum::kCount,
+                                        SampledCommandNameEnum::kDistinct};
+
+struct ReadTargetMetricsBundle {
+    int64_t numTargetedOneShard = 0;
+    int64_t numTargetedMultipleShards = 0;
+    int64_t numTargetedAllShards = 0;
+    std::vector<int64_t> numDispatchedByRange;
+};
+
+struct ChunkSplitInfo {
+    ShardKeyPattern shardKeyPattern;
+    std::vector<BSONObj> splitPoints;
+};
+
+struct ReadWriteDistributionTest : public ShardServerTestFixture {
+protected:
+    /**
+     * Returns a CollectionRoutingInfoTargeter with the given shard key pattern, split points and
+     * default collator.
+     */
+    CollectionRoutingInfoTargeter makeCollectionRoutingInfoTargeter(
+        const ChunkSplitInfo& chunkSplitInfo,
+        std::unique_ptr<CollatorInterface> defaultCollator = nullptr) const {
+        auto splitPointsIncludingEnds(chunkSplitInfo.splitPoints);
+        splitPointsIncludingEnds.insert(splitPointsIncludingEnds.begin(),
+                                        chunkSplitInfo.shardKeyPattern.getKeyPattern().globalMin());
+        splitPointsIncludingEnds.push_back(
+            chunkSplitInfo.shardKeyPattern.getKeyPattern().globalMax());
+
+        const Timestamp timestamp{Timestamp(100, 1)};
+        ChunkVersion version({OID::gen(), timestamp}, {1, 0});
+
+        std::vector<ChunkType> chunks;
+        for (size_t i = 1; i < splitPointsIncludingEnds.size(); ++i) {
+            ChunkType chunk(collUuid,
+                            {chunkSplitInfo.shardKeyPattern.getKeyPattern().extendRangeBound(
+                                 splitPointsIncludingEnds[i - 1], false),
+                             chunkSplitInfo.shardKeyPattern.getKeyPattern().extendRangeBound(
+                                 splitPointsIncludingEnds[i], false)},
+                            version,
+                            ShardId{str::stream() << (i - 1)});
+            chunk.setName(OID::gen());
+
+            chunks.push_back(chunk);
+            version.incMajor();
+        }
+
+        auto routingTableHistory =
+            RoutingTableHistory::makeNew(nss,
+                                         collUuid,
+                                         chunkSplitInfo.shardKeyPattern.getKeyPattern(),
+                                         std::move(defaultCollator) /* collator */,
+                                         false /* unique */,
+                                         OID::gen(),
+                                         timestamp,
+                                         boost::none /* timeseriesFields */,
+                                         boost::none /* reshardingFields */,
+                                         boost::none /* maxChunkSizeBytes */,
+                                         true /* allowMigrations */,
+                                         chunks);
+
+        auto cm = ChunkManager(ShardId("dummyPrimaryShard"),
+                               DatabaseVersion(UUID::gen(), timestamp),
+                               RoutingTableHistoryValueHandle(std::make_shared<RoutingTableHistory>(
+                                   std::move(routingTableHistory))),
+                               boost::none);
+        return CollectionRoutingInfoTargeter(
+            CollectionRoutingInfo{std::move(cm), boost::optional<GlobalIndexesCache>(boost::none)});
+    }
+
+    SampledCommandNameEnum getRandomSampledReadCommandName() const {
+        return kSampledReadCommandNames[std::rand() % kSampledReadCommandNames.size()];
+    }
+
+    SampledQueryDocument makeSampledReadQueryDocument(SampledCommandNameEnum cmdName,
+                                                      const BSONObj& filter,
+                                                      const BSONObj& collation = BSONObj()) const {
+        auto cmd = SampledReadCommand{filter, collation};
+        return {UUID::gen(), nss, collUuid, cmdName, cmd.toBSON()};
+    }
+
+    SampledQueryDocument makeSampledUpdateQueryDocument(
+        const std::vector<write_ops::UpdateOpEntry>& updateOps) const {
+        write_ops::UpdateCommandRequest cmd(nss);
+        cmd.setUpdates(updateOps);
+        return {UUID::gen(),
+                nss,
+                collUuid,
+                SampledCommandNameEnum::kUpdate,
+                cmd.toBSON(BSON("$db" << nss.db().toString()))};
+    }
+
+    SampledQueryDocument makeSampledDeleteQueryDocument(
+        const std::vector<write_ops::DeleteOpEntry>& deleteOps) const {
+        write_ops::DeleteCommandRequest cmd(nss);
+        cmd.setDeletes(deleteOps);
+        return {UUID::gen(),
+                nss,
+                collUuid,
+                SampledCommandNameEnum::kDelete,
+                cmd.toBSON(BSON("$db" << nss.db().toString()))};
+    }
+
+    SampledQueryDocument makeSampledFindAndModifyQueryDocument(
+        const BSONObj& filter,
+        const write_ops::UpdateModification& update,
+        bool upsert,
+        bool remove,
+        const BSONObj& collation = BSONObj()) const {
+        write_ops::FindAndModifyCommandRequest cmd(nss);
+        cmd.setQuery(filter);
+        cmd.setUpdate(update);
+        cmd.setUpsert(upsert);
+        cmd.setRemove(remove);
+        cmd.setCollation(collation);
+        return {UUID::gen(),
+                nss,
+                collUuid,
+                SampledCommandNameEnum::kFindAndModify,
+                cmd.toBSON(BSON("$db" << nss.db().toString()))};
+    }
+
+    void assertTargetMetricsForReadQuery(const CollectionRoutingInfoTargeter& targeter,
+                                         const SampledQueryDocument& queryDoc,
+                                         const ReadTargetMetricsBundle& expectedMetrics) const {
+        ReadDistributionMetricsCalculator readDistributionCalculator(targeter);
+        readDistributionCalculator.addQuery(operationContext(), queryDoc);
+
+        auto metrics = readDistributionCalculator.getMetrics();
+        ASSERT_EQ(*metrics.getNumTargetedOneShard(), expectedMetrics.numTargetedOneShard);
+        ASSERT_EQ(*metrics.getNumTargetedMultipleShards(),
+                  expectedMetrics.numTargetedMultipleShards);
+        ASSERT_EQ(*metrics.getNumTargetedAllShards(), expectedMetrics.numTargetedAllShards);
+        ASSERT_EQ(*metrics.getNumDispatchedByRange(), expectedMetrics.numDispatchedByRange);
+    }
+
+    const NamespaceString nss{"testDb", "testColl"};
+    const UUID collUuid = UUID::gen();
+
+    // Define two set of ChunkSplintInfo's for testing.
+
+    // 'chunkSplitInfoRangeSharding0' and 'chunkSplitInfoHashedSharding0' make the collection have
+    // chunks for the following shard key ranges:
+    // {a.x: MinKey, b.y: Minkey} -> {a.x: -100, b.y: "A"}
+    // {a.x: -100, b.y: "A"} -> {a.x: 100, b.y: "A"}
+    // {a.x: 100, b.y: "A"} -> {a.x: MaxKey, b.y: MaxKey}
+    const std::vector<BSONObj> splitPoints0 = {BSON("a.x" << -100 << "b.y"
+                                                          << "A"),
+                                               BSON("a.x" << 100 << "b.y"
+                                                          << "A")};
+    const ChunkSplitInfo chunkSplitInfoRangeSharding0{
+        ShardKeyPattern{BSON("a.x" << 1 << "b.y" << 1)}, splitPoints0};
+    const ChunkSplitInfo chunkSplitInfoHashedSharding0{
+        ShardKeyPattern{BSON("a.x" << 1 << "b.y"
+                                   << "hashed")},
+        std::vector<BSONObj>{
+            BSON("a.x" << splitPoints0[0]["a.x"].Int() << "b.y"
+                       << BSONElementHasher::hash64(splitPoints0[0]["b.y"],
+                                                    BSONElementHasher::DEFAULT_HASH_SEED)),
+            BSON("a.x" << splitPoints0[1]["a.x"].Int() << "b.y"
+                       << BSONElementHasher::hash64(splitPoints0[1]["b.y"],
+                                                    BSONElementHasher::DEFAULT_HASH_SEED))}};
+
+    // 'chunkSplitInfoRangeSharding1' and 'chunkSplitInfoHashedSharding1' make the collection
+    // have chunks for the following shard key ranges:
+    // {a: MinKey, b.y: Minkey} -> {a: {x: -100}, b.y: "A"}
+    // {a: {x: -100}, b.y: "A"} -> {a: {x: 100}, b.y: "A"}
+    // {a: {x: 100}, b.y: "A"} -> {a: MaxKey, b.y: MaxKey}
+    const std::vector<BSONObj> splitPoints1 = {BSON("a" << BSON("x" << -100) << "b.y"
+                                                        << "A"),
+                                               BSON("a" << BSON("x" << 100) << "b.y"
+                                                        << "A")};
+    const ChunkSplitInfo chunkSplitInfoRangeSharding1{ShardKeyPattern{BSON("a" << 1 << "b.y" << 1)},
+                                                      splitPoints1};
+    const ChunkSplitInfo chunkSplitInfoHashedSharding1{
+        ShardKeyPattern{BSON("a" << 1 << "b.y"
+                                 << "hashed")},
+        std::vector<BSONObj>{
+            BSON("a" << splitPoints1[0]["a"].wrap() << "b.y"
+                     << BSONElementHasher::hash64(splitPoints1[0]["b.y"],
+                                                  BSONElementHasher::DEFAULT_HASH_SEED)),
+            BSON("a" << splitPoints1[1]["a"].wrap() << "b.y"
+                     << BSONElementHasher::hash64(splitPoints1[1]["b.y"],
+                                                  BSONElementHasher::DEFAULT_HASH_SEED))}};
+
+    const BSONObj emptyCollation = {};
+    const BSONObj simpleCollation = CollationSpec::kSimpleSpec;
+    // Using a case-insensitive collation would cause a collatable point-query involving a chunk
+    // bound to touch more than one chunk.
+    const BSONObj caseInsensitiveCollation =
+        BSON(Collation::kLocaleFieldName << "en_US"
+                                         << "strength" << 1 << "caseLevel" << false);
+};
+
+TEST_F(ReadWriteDistributionTest, ReadDistributionNoQueries) {
+    auto targeter = makeCollectionRoutingInfoTargeter(chunkSplitInfoRangeSharding0);
+    ReadDistributionMetricsCalculator readDistributionCalculator(targeter);
+    auto metrics = readDistributionCalculator.getMetrics();
+
+    auto sampleSize = metrics.getSampleSize();
+    ASSERT_EQ(sampleSize.getTotal(), 0);
+    ASSERT_EQ(sampleSize.getFind(), 0);
+    ASSERT_EQ(sampleSize.getAggregate(), 0);
+    ASSERT_EQ(sampleSize.getCount(), 0);
+    ASSERT_EQ(sampleSize.getDistinct(), 0);
+
+    ASSERT_FALSE(metrics.getNumTargetedOneShard());
+    ASSERT_FALSE(metrics.getNumTargetedMultipleShards());
+    ASSERT_FALSE(metrics.getNumTargetedAllShards());
+    ASSERT_FALSE(metrics.getNumDispatchedByRange());
+}
+
+TEST_F(ReadWriteDistributionTest, ReadDistributionSampleSize) {
+    auto targeter = makeCollectionRoutingInfoTargeter(chunkSplitInfoRangeSharding0);
+    ReadDistributionMetricsCalculator readDistributionCalculator(targeter);
+
+    // Add one find query.
+    auto filter0 = BSON("a.x" << 0);
+    readDistributionCalculator.addQuery(
+        operationContext(), makeSampledReadQueryDocument(SampledCommandNameEnum::kFind, filter0));
+
+    // Add two aggregate queries.
+    auto filter1 = BSON("a.x" << 1);
+    readDistributionCalculator.addQuery(
+        operationContext(),
+        makeSampledReadQueryDocument(SampledCommandNameEnum::kAggregate, filter1));
+    auto filter2 = BSON("a.x" << 2);
+    readDistributionCalculator.addQuery(
+        operationContext(),
+        makeSampledReadQueryDocument(SampledCommandNameEnum::kAggregate, filter2));
+
+    // Add three count queries.
+    auto filter3 = BSON("a.x" << 3);
+    readDistributionCalculator.addQuery(
+        operationContext(), makeSampledReadQueryDocument(SampledCommandNameEnum::kCount, filter3));
+    auto filter4 = BSON("a.x" << 4);
+    readDistributionCalculator.addQuery(
+        operationContext(), makeSampledReadQueryDocument(SampledCommandNameEnum::kCount, filter4));
+    auto filter5 = BSON("a.x" << 5);
+    readDistributionCalculator.addQuery(
+        operationContext(), makeSampledReadQueryDocument(SampledCommandNameEnum::kCount, filter5));
+
+    // Add one distinct query.
+    auto filter6 = BSON("a.x" << 6);
+    readDistributionCalculator.addQuery(
+        operationContext(),
+        makeSampledReadQueryDocument(SampledCommandNameEnum::kDistinct, filter6));
+
+    auto metrics = readDistributionCalculator.getMetrics();
+    auto sampleSize = metrics.getSampleSize();
+    ASSERT_EQ(sampleSize.getTotal(), 7);
+    ASSERT_EQ(sampleSize.getFind(), 1);
+    ASSERT_EQ(sampleSize.getAggregate(), 2);
+    ASSERT_EQ(sampleSize.getCount(), 3);
+    ASSERT_EQ(sampleSize.getDistinct(), 1);
+}
+
+DEATH_TEST_F(ReadWriteDistributionTest, ReadDistributionCannotAddUpdateQuery, "invariant") {
+    auto targeter = makeCollectionRoutingInfoTargeter(chunkSplitInfoRangeSharding0);
+    ReadDistributionMetricsCalculator readDistributionCalculator(targeter);
+
+    auto filter = BSON("a.x" << 0);
+    auto updateOp = write_ops::UpdateOpEntry(
+        filter, write_ops::UpdateModification(BSON("$set" << BSON("c" << 0))));
+    readDistributionCalculator.addQuery(operationContext(),
+                                        makeSampledUpdateQueryDocument({updateOp}));
+}
+
+DEATH_TEST_F(ReadWriteDistributionTest, ReadDistributionCannotAddDeleteQuery, "invariant") {
+    auto targeter = makeCollectionRoutingInfoTargeter(chunkSplitInfoRangeSharding0);
+    ReadDistributionMetricsCalculator readDistributionCalculator(targeter);
+
+    auto filter = BSON("a.x" << 0);
+    auto deleteOp = write_ops::DeleteOpEntry(filter, false /* multi */);
+    readDistributionCalculator.addQuery(operationContext(),
+                                        makeSampledDeleteQueryDocument({deleteOp}));
+}
+
+DEATH_TEST_F(ReadWriteDistributionTest, ReadDistributionCannotAddFindAndModifyQuery, "invariant") {
+    auto targeter = makeCollectionRoutingInfoTargeter(chunkSplitInfoRangeSharding0);
+    ReadDistributionMetricsCalculator readDistributionCalculator(targeter);
+
+    auto filter = BSON("a.x" << 0);
+    auto updateMod = write_ops::UpdateModification(BSON("$set" << BSON("c" << 0)));
+    readDistributionCalculator.addQuery(
+        operationContext(),
+        makeSampledFindAndModifyQueryDocument(
+            filter, updateMod, false /* upsert */, false /* remove */));
+}
+
+class ReadDistributionFilterByShardKeyEqualityTest : public ReadWriteDistributionTest {
+protected:
+    void assertTargetMetrics(const CollectionRoutingInfoTargeter& targeter,
+                             const SampledQueryDocument& queryDoc,
+                             const std::vector<int64_t>& numDispatchedByRange,
+                             bool hasSimpleCollation,
+                             bool hasCollatableType) const {
+        ReadTargetMetricsBundle metrics;
+        if (hasSimpleCollation || !hasCollatableType) {
+            metrics.numTargetedOneShard = 1;
+        } else {
+            metrics.numTargetedMultipleShards = 1;
+        }
+        metrics.numDispatchedByRange = numDispatchedByRange;
+        assertTargetMetricsForReadQuery(targeter, queryDoc, metrics);
+    }
+};
+
+TEST_F(ReadDistributionFilterByShardKeyEqualityTest, ShardKeyEqualityOrdered) {
+    auto targeter = makeCollectionRoutingInfoTargeter(chunkSplitInfoRangeSharding0);
+    auto filters = std::vector<BSONObj>{BSON("a.x" << -100 << "b.y"
+                                                   << "A"),
+                                        BSON("a" << BSON("x" << 0) << "b.y"
+                                                 << "A"),
+                                        BSON("a" << BSON("x" << 0) << "b"
+                                                 << BSON("y"
+                                                         << "A")),
+                                        BSON("a" << BSON("x" << 0) << "b"
+                                                 << BSON("y"
+                                                         << "A"))};
+    auto numDispatchedByRange = std::vector<int64_t>({0, 1, 0});
+    auto hasSimpleCollation = true;
+    auto hasCollatableType = true;
+
+    for (const auto& filter : filters) {
+        assertTargetMetrics(targeter,
+                            makeSampledReadQueryDocument(getRandomSampledReadCommandName(), filter),
+                            numDispatchedByRange,
+                            hasSimpleCollation,
+                            hasCollatableType);
+    }
+}
+
+TEST_F(ReadDistributionFilterByShardKeyEqualityTest, ShardKeyEqualityNotOrdered) {
+    auto targeter = makeCollectionRoutingInfoTargeter(chunkSplitInfoRangeSharding0);
+    auto filter = BSON("b.y"
+                       << "A"
+                       << "a.x" << 0);
+    auto numDispatchedByRange = std::vector<int64_t>({0, 1, 0});
+    auto hasSimpleCollation = true;
+    auto hasCollatableType = true;
+    assertTargetMetrics(targeter,
+                        makeSampledReadQueryDocument(getRandomSampledReadCommandName(), filter),
+                        numDispatchedByRange,
+                        hasSimpleCollation,
+                        hasCollatableType);
+}
+
+TEST_F(ReadDistributionFilterByShardKeyEqualityTest, ShardKeyEqualityAdditionalFields) {
+    auto targeter = makeCollectionRoutingInfoTargeter(chunkSplitInfoRangeSharding0);
+    auto filter = BSON("_id" << 0 << "a.x" << 100 << "b.y"
+                             << "A");
+    auto numDispatchedByRange = std::vector<int64_t>({0, 0, 1});
+    auto hasSimpleCollation = true;
+    auto hasCollatableType = true;
+    assertTargetMetrics(targeter,
+                        makeSampledReadQueryDocument(getRandomSampledReadCommandName(), filter),
+                        numDispatchedByRange,
+                        hasSimpleCollation,
+                        hasCollatableType);
+}
+
+TEST_F(ReadDistributionFilterByShardKeyEqualityTest,
+       ShardKeyEqualityNonSimpleCollation_ShardKeyContainsCollatableFields) {
+    auto hasSimpleCollation = false;
+    auto hasCollatableType = true;
+
+    auto assertMetrics = [&](const ChunkSplitInfo& chunkSplitInfo,
+                             const BSONObj& filter,
+                             const std::vector<int64_t>& numDispatchedByRange) {
+        // The collection has a non-simple default collation and the query specifies an empty
+        // collation.
+        auto targeter0 = makeCollectionRoutingInfoTargeter(
+            chunkSplitInfo,
+            uassertStatusOK(CollatorFactoryInterface::get(getServiceContext())
+                                ->makeFromBSON(caseInsensitiveCollation)));
+        assertTargetMetrics(
+            targeter0,
+            makeSampledReadQueryDocument(getRandomSampledReadCommandName(), filter, emptyCollation),
+            numDispatchedByRange,
+            hasSimpleCollation,
+            hasCollatableType);
+
+        // The collection has a simple default collation and the query specifies a non-simple
+        // collation.
+        auto targeter1 = makeCollectionRoutingInfoTargeter(
+            chunkSplitInfo,
+            uassertStatusOK(
+                CollatorFactoryInterface::get(getServiceContext())->makeFromBSON(simpleCollation)));
+        assertTargetMetrics(targeter1,
+                            makeSampledReadQueryDocument(getRandomSampledReadCommandName(),
+                                                         filter,
+                                                         caseInsensitiveCollation),
+                            numDispatchedByRange,
+                            hasSimpleCollation,
+                            hasCollatableType);
+
+        // The collection doesn't have a default collation and the query specifies a non-simple
+        // collation.
+        auto targeter2 = makeCollectionRoutingInfoTargeter(chunkSplitInfo);
+        assertTargetMetrics(targeter2,
+                            makeSampledReadQueryDocument(getRandomSampledReadCommandName(),
+                                                         filter,
+                                                         caseInsensitiveCollation),
+                            numDispatchedByRange,
+                            hasSimpleCollation,
+                            hasCollatableType);
+    };
+
+    auto filter = BSON("a.x" << -100 << "b.y"
+                             << "A");
+    auto numDispatchedByRange = std::vector<int64_t>({1, 1, 0});
+    assertMetrics(chunkSplitInfoRangeSharding0, filter, numDispatchedByRange);
+    assertMetrics(chunkSplitInfoHashedSharding0, filter, numDispatchedByRange);
+}
+
+TEST_F(ReadDistributionFilterByShardKeyEqualityTest,
+       ShardKeyEqualityNonSimpleCollation_ShardKeyDoesNotContainCollatableFields) {
+    auto filter = BSON("a.x" << -100 << "b.y" << 0);
+    auto numDispatchedByRange = std::vector<int64_t>({1, 0, 0});
+    auto hasSimpleCollation = false;
+    auto hasCollatableType = false;
+
+    // The collection has a non-simple default collation and the query specifies an empty
+    // collation.
+    auto targeter0 = makeCollectionRoutingInfoTargeter(
+        chunkSplitInfoRangeSharding0,
+        uassertStatusOK(CollatorFactoryInterface::get(getServiceContext())
+                            ->makeFromBSON(caseInsensitiveCollation)));
+    assertTargetMetrics(
+        targeter0,
+        makeSampledReadQueryDocument(getRandomSampledReadCommandName(), filter, emptyCollation),
+        numDispatchedByRange,
+        hasSimpleCollation,
+        hasCollatableType);
+
+    // The collection has a simple default collation and the query specifies a non-simple
+    // collation.
+    auto targeter1 = makeCollectionRoutingInfoTargeter(
+        chunkSplitInfoRangeSharding0,
+        uassertStatusOK(
+            CollatorFactoryInterface::get(getServiceContext())->makeFromBSON(simpleCollation)));
+    assertTargetMetrics(targeter1,
+                        makeSampledReadQueryDocument(
+                            getRandomSampledReadCommandName(), filter, caseInsensitiveCollation),
+                        numDispatchedByRange,
+                        hasSimpleCollation,
+                        hasCollatableType);
+
+    // The collection doesn't have a default collation and the query specifies a non-simple
+    // collation.
+    auto targeter2 = makeCollectionRoutingInfoTargeter(chunkSplitInfoRangeSharding0);
+    assertTargetMetrics(targeter2,
+                        makeSampledReadQueryDocument(
+                            getRandomSampledReadCommandName(), filter, caseInsensitiveCollation),
+                        numDispatchedByRange,
+                        hasSimpleCollation,
+                        hasCollatableType);
+}
+
+TEST_F(ReadDistributionFilterByShardKeyEqualityTest, ShardKeyEqualitySimpleCollation) {
+    auto filter = BSON("a.x" << -100 << "b.y"
+                             << "A");
+    auto numDispatchedByRange = std::vector<int64_t>({0, 1, 0});
+    auto hasSimpleCollation = true;
+    auto hasCollatableType = true;
+
+    // The collection has a simple default collation and the query specifies an empty collation.
+    auto targeter0 = makeCollectionRoutingInfoTargeter(
+        chunkSplitInfoRangeSharding0,
+        uassertStatusOK(
+            CollatorFactoryInterface::get(getServiceContext())->makeFromBSON(simpleCollation)));
+    assertTargetMetrics(
+        targeter0,
+        makeSampledReadQueryDocument(getRandomSampledReadCommandName(), filter, emptyCollation),
+        numDispatchedByRange,
+        hasSimpleCollation,
+        hasCollatableType);
+
+    // The collection has a non-simple default collation and the query specifies a simple
+    // collation.
+    auto targeter1 = makeCollectionRoutingInfoTargeter(
+        chunkSplitInfoRangeSharding0,
+        uassertStatusOK(CollatorFactoryInterface::get(getServiceContext())
+                            ->makeFromBSON(caseInsensitiveCollation)));
+    assertTargetMetrics(
+        targeter1,
+        makeSampledReadQueryDocument(getRandomSampledReadCommandName(), filter, simpleCollation),
+        numDispatchedByRange,
+        hasSimpleCollation,
+        hasCollatableType);
+
+    // The collection doesn't have a default collation and the query specifies a simple
+    // collation.
+    auto targeter2 = makeCollectionRoutingInfoTargeter(chunkSplitInfoRangeSharding0);
+    assertTargetMetrics(
+        targeter2,
+        makeSampledReadQueryDocument(getRandomSampledReadCommandName(), filter, simpleCollation),
+        numDispatchedByRange,
+        hasSimpleCollation,
+        hasCollatableType);
+
+    // The collection doesn't have a default collation and the query specifies an empty
+    // collation.
+    auto targeter3 = makeCollectionRoutingInfoTargeter(chunkSplitInfoRangeSharding0);
+    assertTargetMetrics(
+        targeter3,
+        makeSampledReadQueryDocument(getRandomSampledReadCommandName(), filter, emptyCollation),
+        numDispatchedByRange,
+        hasSimpleCollation,
+        hasCollatableType);
+}
+
+class ReadDistributionFilterByShardKeyRangeTest : public ReadWriteDistributionTest {
+protected:
+    void assertTargetMetrics(const CollectionRoutingInfoTargeter& targeter,
+                             const SampledQueryDocument& queryDoc,
+                             const std::vector<int64_t>& numDispatchedByRange) const {
+        ReadTargetMetricsBundle metrics;
+        metrics.numTargetedMultipleShards = 1;
+        metrics.numDispatchedByRange = numDispatchedByRange;
+        assertTargetMetricsForReadQuery(targeter, queryDoc, metrics);
+    }
+};
+
+TEST_F(ReadDistributionFilterByShardKeyRangeTest, ShardKeyPrefixEqualityDotted) {
+    auto targeter = makeCollectionRoutingInfoTargeter(chunkSplitInfoRangeSharding0);
+    auto filter = BSON("a.x" << 0);
+    auto numDispatchedByRange = std::vector<int64_t>({0, 1, 0});
+    assertTargetMetrics(targeter,
+                        makeSampledReadQueryDocument(getRandomSampledReadCommandName(), filter),
+                        numDispatchedByRange);
+}
+
+TEST_F(ReadDistributionFilterByShardKeyRangeTest, ShardKeyPrefixEqualityNotDotted) {
+    auto targeter = makeCollectionRoutingInfoTargeter(chunkSplitInfoRangeSharding1);
+    auto filter = BSON("a" << BSON("x" << 0));
+    auto numDispatchedByRange = std::vector<int64_t>({0, 1, 0});
+    assertTargetMetrics(targeter,
+                        makeSampledReadQueryDocument(getRandomSampledReadCommandName(), filter),
+                        numDispatchedByRange);
+}
+
+TEST_F(ReadDistributionFilterByShardKeyRangeTest, ShardKeyPrefixRangeMinKey) {
+    auto targeter = makeCollectionRoutingInfoTargeter(chunkSplitInfoRangeSharding0);
+    auto filter = BSON("a.x" << BSON("$lt" << 1));
+    auto numDispatchedByRange = std::vector<int64_t>({1, 1, 0});
+    assertTargetMetrics(targeter,
+                        makeSampledReadQueryDocument(getRandomSampledReadCommandName(), filter),
+                        numDispatchedByRange);
+}
+
+TEST_F(ReadDistributionFilterByShardKeyRangeTest, ShardKeyPrefixRangeMaxKey) {
+    auto targeter = makeCollectionRoutingInfoTargeter(chunkSplitInfoRangeSharding0);
+    auto filter = BSON("a.x" << BSON("$gte" << 2));
+    auto numDispatchedByRange = std::vector<int64_t>({0, 1, 1});
+    assertTargetMetrics(targeter,
+                        makeSampledReadQueryDocument(getRandomSampledReadCommandName(), filter),
+                        numDispatchedByRange);
+}
+
+TEST_F(ReadDistributionFilterByShardKeyRangeTest, ShardKeyPrefixRangeNoMinOrMaxKey) {
+    auto targeter = makeCollectionRoutingInfoTargeter(chunkSplitInfoRangeSharding0);
+    auto filter = BSON("a.x" << BSON("$gte" << -3 << "$lt" << 3));
+    auto numDispatchedByRange = std::vector<int64_t>({0, 1, 0});
+    assertTargetMetrics(targeter,
+                        makeSampledReadQueryDocument(getRandomSampledReadCommandName(), filter),
+                        numDispatchedByRange);
+}
+
+TEST_F(ReadDistributionFilterByShardKeyRangeTest, FullShardKeyRange) {
+    auto targeter = makeCollectionRoutingInfoTargeter(chunkSplitInfoRangeSharding0);
+    auto filter = BSON("a.x" << BSON("$gte" << -4 << "$lt" << 4) << "b.y"
+                             << BSON("$gte"
+                                     << "A"
+                                     << "$lt"
+                                     << "Z"));
+    auto numDispatchedByRange = std::vector<int64_t>({0, 1, 0});
+    assertTargetMetrics(targeter,
+                        makeSampledReadQueryDocument(getRandomSampledReadCommandName(), filter),
+                        numDispatchedByRange);
+}
+
+TEST_F(ReadDistributionFilterByShardKeyRangeTest, ShardKeyNonEquality) {
+    auto targeter = makeCollectionRoutingInfoTargeter(chunkSplitInfoRangeSharding0);
+    auto filter = BSON("a.x" << BSON("$ne" << 5));
+    auto numDispatchedByRange = std::vector<int64_t>({1, 1, 1});
+    assertTargetMetrics(targeter,
+                        makeSampledReadQueryDocument(getRandomSampledReadCommandName(), filter),
+                        numDispatchedByRange);
+}
+
+class ReadDistributionNotFilterByShardKeyTest : public ReadWriteDistributionTest {
+protected:
+    void assertTargetMetrics(const CollectionRoutingInfoTargeter& targeter,
+                             const SampledQueryDocument& queryDoc) const {
+        ReadTargetMetricsBundle metrics;
+        metrics.numTargetedAllShards = 1;
+        metrics.numDispatchedByRange = std::vector<int64_t>({1, 1, 1});
+        assertTargetMetricsForReadQuery(targeter, queryDoc, metrics);
+    }
+};
+
+TEST_F(ReadDistributionNotFilterByShardKeyTest, ShardKeySuffixEquality) {
+    auto targeter = makeCollectionRoutingInfoTargeter(chunkSplitInfoRangeSharding0);
+    auto filter = BSON("b.y"
+                       << "A");
+    assertTargetMetrics(targeter,
+                        makeSampledReadQueryDocument(getRandomSampledReadCommandName(), filter));
+}
+
+TEST_F(ReadDistributionNotFilterByShardKeyTest, NoShardKey) {
+    auto targeter = makeCollectionRoutingInfoTargeter(chunkSplitInfoRangeSharding0);
+    auto filter = BSON("_id" << 1);
+    assertTargetMetrics(targeter,
+                        makeSampledReadQueryDocument(getRandomSampledReadCommandName(), filter));
+}
+
+TEST_F(ReadDistributionNotFilterByShardKeyTest, ShardKeyPrefixEqualityNotDotted) {
+    auto targeter = makeCollectionRoutingInfoTargeter(chunkSplitInfoRangeSharding0);
+    // This query filters by "a" (exact match) not "a.x" (the shard key prefix). Currently, this
+    // is handled as a query not filtering by the shard key. As a result, it still targets all
+    // the chunks although it only matches the data in the chunk {a.x: -100, b.y: "A"} -> {a.x:
+    // 100, b.y: "A"}. Please see
+    // ReadDistributionFilterByShardKeyRangeTest/ShardKeyPrefixEqualityDotted for the case where
+    // the query filters by "a.x".
+    auto filter = BSON("a" << BSON("x" << 0));
+    assertTargetMetrics(targeter,
+                        makeSampledReadQueryDocument(getRandomSampledReadCommandName(), filter));
+}
+
+TEST_F(ReadDistributionNotFilterByShardKeyTest, ShardKeyPrefixEqualityDotted) {
+    auto targeter = makeCollectionRoutingInfoTargeter(chunkSplitInfoRangeSharding1);
+    // This query filters by "a.x" not "a" (the shard key prefix). Currently, this is handled as
+    // a query not filtering by the shard key. As a result, it still targets all the chunks
+    // although it only matches the data in the chunk {a.x: -100, b.y: "A"} -> {a.x: 100, b.y:
+    // "A"}.
+    auto filter = BSON("a.x" << 0);
+    assertTargetMetrics(targeter,
+                        makeSampledReadQueryDocument(getRandomSampledReadCommandName(), filter));
+}
+
+}  // namespace
+}  // namespace analyze_shard_key
+}  // namespace mongo

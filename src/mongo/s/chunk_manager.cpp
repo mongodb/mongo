@@ -501,10 +501,6 @@ void ChunkManager::getShardIdsForRange(const BSONObj& min,
                                        const BSONObj& max,
                                        std::set<ShardId>* shardIds,
                                        std::set<ChunkRange>* chunkRanges) const {
-    if (chunkRanges) {
-        invariant(chunkRanges->empty());
-    }
-
     // If our range is [MinKey, MaxKey], we can simply return all shard ids right away. However,
     // this optimization does not apply when we are reading from a snapshot because _shardVersions
     // contains shards with chunks and is built based on the last refresh. Therefore, it is
