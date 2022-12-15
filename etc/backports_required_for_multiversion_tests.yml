@@ -230,6 +230,8 @@ last-continuous:
     ticket: SERVER-71477
   - test_file: src/mongo/db/modules/enterprise/jstests/fcbis/fcbis_election_during_storage_change.js
     ticket: SERVER-69861
+  - test_file: jstests/sharding/query/shard_refuses_cursor_ownership.js
+    ticket: SERVER-65259
   suites: null
 last-lts:
   all:
@@ -537,4 +539,6 @@ last-lts:
     ticket: SERVER-71477
   - test_file: src/mongo/db/modules/enterprise/jstests/fcbis/fcbis_election_during_storage_change.js
     ticket: SERVER-69861
+  - test_file: jstests/sharding/query/shard_refuses_cursor_ownership.js
+    ticket: SERVER-65259
   suites: null
