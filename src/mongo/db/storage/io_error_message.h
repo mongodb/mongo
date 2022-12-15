@@ -30,6 +30,7 @@
 #pragma once
 
 #include <fmt/format.h>
+#include <system_error>
 
 #include "mongo/util/errno_util.h"
 
@@ -37,7 +38,8 @@ namespace mongo {
 namespace {
 inline std::string getErrorMessage(StringData op, const std::string& path) {
     using namespace fmt::literals;
-    return "Failed to {} {}: {}"_format(op, path, errorMessage(lastSystemError()));
+    std::error_code ec = lastSystemError();
+    return "Failed to {} {}: error code = {}, {}"_format(op, path, ec.value(), errorMessage(ec));
 }
 }  // namespace
 }  // namespace mongo

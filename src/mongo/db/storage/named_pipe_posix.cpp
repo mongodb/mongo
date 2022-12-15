@@ -31,6 +31,7 @@
 
 #include "mongo/db/storage/named_pipe.h"
 
+#include <cstdio>
 #include <fmt/format.h>
 #include <string>
 #include <sys/stat.h>
@@ -47,9 +48,23 @@
 namespace mongo {
 using namespace fmt::literals;
 
+namespace {
+// Removes the named pipe and logs an info message if there's an error. The info message should be
+// fine since this is a test-only implementation.
+void removeAndLog(const char* pipeAbsolutePath) {
+    if (remove(pipeAbsolutePath) < 0) {
+        LOGV2_INFO(7097000,
+                   "Failed to remove",
+                   "error"_attr = getErrorMessage("remove", pipeAbsolutePath));
+    }
+}
+}  // namespace
+
 NamedPipeOutput::NamedPipeOutput(const std::string& pipeDir, const std::string& pipeRelativePath)
     : _pipeAbsolutePath(pipeDir + pipeRelativePath), _ofs() {
-    remove(_pipeAbsolutePath.c_str());
+    // Just in case that uncleaned-up named pipe is still there. This is a test-only implementation
+    // and so, it should be fine to just remove it.
+    removeAndLog(_pipeAbsolutePath.c_str());
     uassert(7005005,
             "Failed to create a named pipe, error: {}"_format(
                 getErrorMessage("mkfifo", _pipeAbsolutePath)),
@@ -58,7 +73,8 @@ NamedPipeOutput::NamedPipeOutput(const std::string& pipeDir, const std::string& 
 
 NamedPipeOutput::~NamedPipeOutput() {
     close();
-    remove(_pipeAbsolutePath.c_str());
+    // Makes sure that the named pipe is removed.
+    removeAndLog(_pipeAbsolutePath.c_str());
 }
 
 void NamedPipeOutput::open() {
