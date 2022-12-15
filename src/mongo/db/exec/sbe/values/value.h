@@ -100,7 +100,7 @@ using IndexKeysInclusionSet = std::bitset<Ordering::kMaxCompoundIndexKeys>;
 
 namespace value {
 class SortSpec;
-class MakeObjSpec;
+struct MakeObjSpec;
 struct CsiCell;
 
 static constexpr size_t kNewUUIDLength = 16;

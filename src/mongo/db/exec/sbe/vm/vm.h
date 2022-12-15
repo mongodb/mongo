@@ -1058,6 +1058,7 @@ private:
 
     template <typename T>
     void runTagCheck(const uint8_t*& pcPointer, T&& predicate);
+
     void runTagCheck(const uint8_t*& pcPointer, value::TypeTags tagRhs);
 
     MONGO_COMPILER_ALWAYS_INLINE
@@ -1284,6 +1285,12 @@ private:
                                                              int64_t binSize,
                                                              TimeZone timezone,
                                                              DayOfWeek startOfWeek);
+
+    std::pair<value::TypeTags, value::Value> produceBsonObject(const value::MakeObjSpec* mos,
+                                                               value::TypeTags rootTag,
+                                                               value::Value rootVal,
+                                                               size_t startIdx);
+
     FastTuple<bool, value::TypeTags, value::Value> builtinSplit(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinDate(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinDateWeekYear(ArityType arity);

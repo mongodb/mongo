@@ -84,6 +84,10 @@ inline size_t estimate(S) {
     return 0;
 }
 
+inline size_t estimate(const StringData& str) {
+    return 0;
+}
+
 // Calculate the size of a SpecificStats's derived class.
 // We need a template argument here rather than passing const SpecificStats&
 // as we need to know the exact type to properly compute the size of the object.

@@ -5151,6 +5151,138 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSortKeyComponent
     return {false, outTag, outVal};
 }
 
+std::pair<value::TypeTags, value::Value> ByteCode::produceBsonObject(const value::MakeObjSpec* mos,
+                                                                     value::TypeTags rootTag,
+                                                                     value::Value rootVal,
+                                                                     const size_t startIdx) {
+    auto& allFieldsMap = mos->allFieldsMap;
+    auto& fieldBehavior = mos->fieldBehavior;
+    auto& fields = mos->fields;
+    auto& projects = mos->projects;
+
+    const bool isInclusion = fieldBehavior == value::MakeObjSpec::FieldBehavior::keep;
+
+    auto isFieldProjectedOrRestricted = [&](StringData sv) {
+        // If 'bloomFilter' is initialized, check to see if it can answer our query.
+        if (allFieldsMap.size() <= 64) {
+            size_t bloomIdx = mos->computeBloomIdx1(sv.rawData(), sv.size());
+            size_t fieldIdx = mos->bloomFilter[bloomIdx];
+            size_t k = 0;
+
+            for (;; ++k) {
+                if (MONGO_likely(fieldIdx >= 2)) {
+                    // If fieldIdx >= 2, that means that we may have a match. If 'sv' matches a
+                    // string in 'fields', then we return '!isInclusion' (because if isInclusion is
+                    // true then the field is not restricted or projected, and if isInclusion is
+                    // false then the field is restricted). If 'sv' matches a string in 'projects',
+                    // we return 'true' (because the field is projected).
+                    //
+                    // If 'sv' doesn't match any of the strings in 'fields' or 'projects', then we
+                    // return 'isInclusion' (because if isInclusion is true then the field is
+                    // restricted, and if isInclusion is false then the field not restricted or
+                    // projected).
+                    auto singleName = (fieldIdx - 2 >= mos->fields.size())
+                        ? StringData(mos->projects[fieldIdx - 2 - mos->fields.size()])
+                        : StringData(mos->fields[fieldIdx - 2]);
+
+                    return sv == singleName ? (!isInclusion || fieldIdx - 2 >= mos->fields.size())
+                                            : isInclusion;
+                } else if (MONGO_likely(fieldIdx == 0)) {
+                    // If fieldIdx == 0, then we can deduce that 'sv' is not present in either
+                    // vector and we return 'isInclusion'.
+                    return isInclusion;
+                }
+
+                // If fieldIdx == 1, then we can't determine if 'sv' is present in either vector.
+                if (k == 0) {
+                    // If this was our first attempt, try again using computeBloomIdx2().
+                    bloomIdx = mos->computeBloomIdx2(sv.rawData(), sv.size(), bloomIdx);
+                    fieldIdx = mos->bloomFilter[bloomIdx];
+                } else {
+                    // After two attempts, give up and search for 'sv' in 'allFieldsMap'.
+                    break;
+                }
+            }
+        }
+
+        auto key = StringMapHasher{}.hashed_key(sv);
+
+        bool foundKey = false;
+        bool projected = false;
+        bool restricted = false;
+
+        if (auto it = allFieldsMap.find(key); it != allFieldsMap.end()) {
+            foundKey = true;
+            projected = it->second != std::numeric_limits<size_t>::max();
+            restricted = !isInclusion;
+        }
+
+        if (!foundKey) {
+            restricted = isInclusion;
+        }
+
+        return projected || restricted;
+    };
+
+    UniqueBSONObjBuilder bob;
+
+    if (value::isObject(rootTag)) {
+        size_t nFieldsIfInclusion = fields.size();
+
+        if (rootTag == value::TypeTags::bsonObject) {
+            if (!(nFieldsIfInclusion == 0 && isInclusion)) {
+                auto be = value::bitcastTo<const char*>(rootVal);
+                const auto end = be + ConstDataView(be).read<LittleEndian<uint32_t>>();
+
+                // Skip document length.
+                be += 4;
+                while (be != end - 1) {
+                    auto sv = bson::fieldNameAndLength(be);
+                    auto nextBe = bson::advance(be, sv.size());
+
+                    if (!isFieldProjectedOrRestricted(sv)) {
+                        bob.append(BSONElement(be, sv.size() + 1, nextBe - be));
+                        --nFieldsIfInclusion;
+                    }
+
+                    if (nFieldsIfInclusion == 0 && isInclusion) {
+                        break;
+                    }
+
+                    be = nextBe;
+                }
+            }
+        } else if (rootTag == value::TypeTags::Object) {
+            if (!(nFieldsIfInclusion == 0 && isInclusion)) {
+                auto objRoot = value::getObjectView(rootVal);
+                for (size_t idx = 0; idx < objRoot->size(); ++idx) {
+                    auto sv = StringData(objRoot->field(idx));
+
+                    if (!isFieldProjectedOrRestricted(sv)) {
+                        auto [tag, val] = objRoot->getAt(idx);
+                        bson::appendValueToBsonObj(bob, objRoot->field(idx), tag, val);
+                        --nFieldsIfInclusion;
+                    }
+
+                    if (nFieldsIfInclusion == 0 && isInclusion) {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    for (size_t idx = 0; idx < projects.size(); ++idx) {
+        auto argIdx = startIdx + idx;
+        auto [_, tag, val] = getFromStack(argIdx);
+        bson::appendValueToBsonObj(bob, projects[idx], tag, val);
+    }
+
+    bob.doneFast();
+    char* data = bob.bb().release().release();
+    return {value::TypeTags::bsonObject, value::bitcastFrom<char*>(data)};
+}
+
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinMakeBsonObj(ArityType arity) {
     tassert(6897002,
             str::stream() << "Unsupported number of arguments passed to makeBsonObj(): " << arity,
@@ -5165,13 +5297,9 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinMakeBsonObj(Arit
 
     auto mos = value::getMakeObjSpecView(mosVal);
 
-    // For produceBsonObject()'s 'getArg' parameter, we pass in a lambda that will retrieve the
-    // value of each projected field from the VM stack.
-    auto [tag, val] = mos->produceBsonObject(
-        objTag, objVal, [&](size_t idx) -> std::pair<value::TypeTags, value::Value> {
-            auto [_, tag, val] = getFromStack(2 + idx);
-            return {tag, val};
-        });
+    const size_t startIdx = 2;
+
+    auto [tag, val] = produceBsonObject(mos, objTag, objVal, startIdx);
 
     return {true, tag, val};
 }
@@ -6030,6 +6158,7 @@ MONGO_COMPILER_NORETURN void ByteCode::runFailInstruction() {
 
     uasserted(code, message);
 }
+
 template <typename T>
 void ByteCode::runTagCheck(const uint8_t*& pcPointer, T&& predicate) {
     auto [popParam, offsetParam] = decodeParam(pcPointer);

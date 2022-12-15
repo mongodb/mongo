@@ -1060,7 +1060,7 @@ PlanState ParallelScanStage::getNext() {
         for (auto& [name, accessor] : _fieldAccessors) {
             accessor->reset();
         }
-        while (*be != 0) {
+        while (be != end - 1) {
             auto sv = bson::fieldNameAndLength(be);
             if (auto it = _fieldAccessors.find(sv); it != _fieldAccessors.end()) {
                 // Found the field so convert it to Value.
