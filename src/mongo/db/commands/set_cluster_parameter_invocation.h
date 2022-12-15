@@ -80,8 +80,7 @@ public:
     bool invoke(OperationContext*,
                 const SetClusterParameter&,
                 boost::optional<Timestamp>,
-                const WriteConcernOptions&,
-                bool ignoreIsEnabled = false);
+                const WriteConcernOptions&);
 
     // Validate new parameter passed to setClusterParameter and generate the query and update fields
     // for the on-disk update.
@@ -90,8 +89,7 @@ public:
                                                    const boost::optional<Timestamp>& paramTime,
                                                    ServerParameter* sp,
                                                    StringData parameterName,
-                                                   const boost::optional<TenantId>& tenantId,
-                                                   bool ignoreIsEnabled = false);
+                                                   const boost::optional<TenantId>& tenantId);
 
 private:
     std::unique_ptr<ServerParameterService> _sps;

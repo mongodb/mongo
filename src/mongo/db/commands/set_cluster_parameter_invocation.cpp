@@ -48,16 +48,19 @@ namespace mongo {
 bool SetClusterParameterInvocation::invoke(OperationContext* opCtx,
                                            const SetClusterParameter& cmd,
                                            boost::optional<Timestamp> paramTime,
-                                           const WriteConcernOptions& writeConcern,
-                                           bool ignoreIsEnabled) {
+                                           const WriteConcernOptions& writeConcern) {
 
     BSONObj cmdParamObj = cmd.getCommandParameter();
     StringData parameterName = cmdParamObj.firstElement().fieldName();
     ServerParameter* serverParameter = _sps->get(parameterName);
     auto tenantId = cmd.getDbName().tenantId();
 
-    auto [query, update] = normalizeParameter(
-        opCtx, cmdParamObj, paramTime, serverParameter, parameterName, tenantId, ignoreIsEnabled);
+    uassert(ErrorCodes::BadValue,
+            str::stream() << "Server parameter: '" << serverParameter->name() << "' is disabled",
+            serverParameter->isEnabled());
+
+    auto [query, update] =
+        normalizeParameter(opCtx, cmdParamObj, paramTime, serverParameter, parameterName, tenantId);
 
     BSONObjBuilder oldValueBob;
     serverParameter->append(opCtx, &oldValueBob, parameterName.toString(), tenantId);
@@ -76,8 +79,7 @@ std::pair<BSONObj, BSONObj> SetClusterParameterInvocation::normalizeParameter(
     const boost::optional<Timestamp>& paramTime,
     ServerParameter* sp,
     StringData parameterName,
-    const boost::optional<TenantId>& tenantId,
-    bool ignoreIsEnabled) {
+    const boost::optional<TenantId>& tenantId) {
     BSONElement commandElement = cmdParamObj.firstElement();
     uassert(ErrorCodes::IllegalOperation,
             "Cluster parameter value must be an object",
@@ -85,7 +87,7 @@ std::pair<BSONObj, BSONObj> SetClusterParameterInvocation::normalizeParameter(
 
     uassert(ErrorCodes::IllegalOperation,
             str::stream() << "Server parameter: '" << sp->name() << "' is disabled",
-            ignoreIsEnabled || sp->isEnabled());
+            sp->isEnabled());
 
     Timestamp clusterTime = paramTime ? *paramTime : _dbService.getUpdateClusterTime(opCtx);
 
