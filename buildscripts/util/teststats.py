@@ -2,6 +2,7 @@
 
 from collections import defaultdict
 from collections import namedtuple
+from json import JSONDecodeError
 
 from typing import NamedTuple, List
 import requests
@@ -118,6 +119,9 @@ def get_stats_from_s3(project: str, task: str, variant: str) -> List[HistoricalT
     session.mount('https://', HTTPAdapter(max_retries=retries))
 
     response = session.get(f"{TESTS_STATS_S3_LOCATION}/{project}/{variant}/{task}")
-    data = response.json()
 
-    return [HistoricalTestInformation(**item) for item in data]
+    try:
+        data = response.json()
+        return [HistoricalTestInformation(**item) for item in data]
+    except JSONDecodeError:
+        return []

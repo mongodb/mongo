@@ -1,7 +1,12 @@
 """Unit tests for the util.teststats module."""
 
 import datetime
+from json import JSONDecodeError
 import unittest
+from unittest.mock import patch
+
+from mock.mock import MagicMock
+from requests import Session
 
 import buildscripts.util.teststats as teststats_utils
 
@@ -87,3 +92,51 @@ class TestTestStats(unittest.TestCase):
             num_pass=num_pass,
             num_fail=0,
         )
+
+
+class TestGetStatsFromS3(unittest.TestCase):
+    @patch.object(Session, 'get')
+    def test_get_stats_from_s3_returns_data(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.json.return_value = [
+            {
+                "test_name": "jstests/noPassthroughWithMongod/geo_near_random1.js",
+                "num_pass": 74,
+                "num_fail": 0,
+                "avg_duration_pass": 23.16216216216216,
+            },
+            {
+                "test_name": "shell_advance_cluster_time:ValidateCollections",
+                "num_pass": 74,
+                "num_fail": 0,
+                "avg_duration_pass": 1.662162162162162,
+            },
+        ]
+        mock_get.return_value = mock_response
+
+        result = teststats_utils.get_stats_from_s3("project", "task", "variant")
+
+        self.assertEqual(result, [
+            teststats_utils.HistoricalTestInformation(
+                test_name="jstests/noPassthroughWithMongod/geo_near_random1.js",
+                num_pass=74,
+                num_fail=0,
+                avg_duration_pass=23.16216216216216,
+            ),
+            teststats_utils.HistoricalTestInformation(
+                test_name="shell_advance_cluster_time:ValidateCollections",
+                num_pass=74,
+                num_fail=0,
+                avg_duration_pass=1.662162162162162,
+            ),
+        ])
+
+    @patch.object(Session, 'get')
+    def test_get_stats_from_s3_json_decode_error(self, mock_get):
+        mock_response = MagicMock()
+        mock_response.json.side_effect = JSONDecodeError("msg", "doc", 0)
+        mock_get.return_value = mock_response
+
+        result = teststats_utils.get_stats_from_s3("project", "task", "variant")
+
+        self.assertEqual(result, [])
