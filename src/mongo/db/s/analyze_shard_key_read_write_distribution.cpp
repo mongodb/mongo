@@ -223,5 +223,107 @@ void ReadDistributionMetricsCalculator::addQuery(OperationContext* opCtx,
     _incrementMetricsForQuery(opCtx, cmd.getFilter(), cmd.getCollation());
 }
 
+WriteSampleSize WriteDistributionMetricsCalculator::_getSampleSize() const {
+    WriteSampleSize sampleSize;
+    sampleSize.setTotal(_numUpdate + _numDelete + _numFindAndModify);
+    sampleSize.setUpdate(_numUpdate);
+    sampleSize.setDelete(_numDelete);
+    sampleSize.setFindAndModify(_numFindAndModify);
+    return sampleSize;
+}
+
+WriteDistributionMetrics WriteDistributionMetricsCalculator::getMetrics() const {
+    auto metrics = DistributionMetricsCalculator::_getMetrics();
+    if (metrics.getSampleSize().getTotal() > 0) {
+        metrics.setNumShardKeyUpdates(_numShardKeyUpdates);
+        metrics.setNumSingleWritesWithoutShardKey(_numSingleWritesWithoutShardKey);
+        metrics.setNumMultiWritesWithoutShardKey(_numMultiWritesWithoutShardKey);
+    }
+    return metrics;
+}
+
+void WriteDistributionMetricsCalculator::addQuery(OperationContext* opCtx,
+                                                  const SampledQueryDocument& doc) {
+    switch (doc.getCmdName()) {
+        case SampledCommandNameEnum::kUpdate: {
+            auto cmd = write_ops::UpdateCommandRequest::parse(
+                IDLParserContext("WriteDistributionMetricsCalculator"), doc.getCmd());
+            _addUpdateQuery(opCtx, cmd);
+            break;
+        }
+        case SampledCommandNameEnum::kDelete: {
+            auto cmd = write_ops::DeleteCommandRequest::parse(
+                IDLParserContext("WriteDistributionMetricsCalculator"), doc.getCmd());
+            _addDeleteQuery(opCtx, cmd);
+            break;
+        }
+        case SampledCommandNameEnum::kFindAndModify: {
+            auto cmd = write_ops::FindAndModifyCommandRequest::parse(
+                IDLParserContext("WriteDistributionMetricsCalculator"), doc.getCmd());
+            _addFindAndModifyQuery(opCtx, cmd);
+            break;
+        }
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
+
+void WriteDistributionMetricsCalculator::_addUpdateQuery(
+    OperationContext* opCtx, const write_ops::UpdateCommandRequest& cmd) {
+    for (const auto& updateOp : cmd.getUpdates()) {
+        _numUpdate++;
+        _incrementMetricsForQuery(opCtx,
+                                  updateOp.getQ(),
+                                  write_ops::collationOf(updateOp),
+                                  updateOp.getMulti(),
+                                  cmd.getLegacyRuntimeConstants(),
+                                  cmd.getLet());
+    }
+}
+
+void WriteDistributionMetricsCalculator::_addDeleteQuery(
+    OperationContext* opCtx, const write_ops::DeleteCommandRequest& cmd) {
+    for (const auto& deleteOp : cmd.getDeletes()) {
+        _numDelete++;
+        _incrementMetricsForQuery(opCtx,
+                                  deleteOp.getQ(),
+                                  write_ops::collationOf(deleteOp),
+                                  deleteOp.getMulti(),
+                                  cmd.getLegacyRuntimeConstants(),
+                                  cmd.getLet());
+    }
+}
+
+void WriteDistributionMetricsCalculator::_addFindAndModifyQuery(
+    OperationContext* opCtx, const write_ops::FindAndModifyCommandRequest& cmd) {
+    _numFindAndModify++;
+    _incrementMetricsForQuery(opCtx,
+                              cmd.getQuery(),
+                              cmd.getCollation().value_or(BSONObj()),
+                              false /* isMulti */,
+                              cmd.getLegacyRuntimeConstants(),
+                              cmd.getLet());
+}
+
+void WriteDistributionMetricsCalculator::_incrementMetricsForQuery(
+    OperationContext* opCtx,
+    const BSONObj& filter,
+    const BSONObj& collation,
+    bool isMulti,
+    const boost::optional<LegacyRuntimeConstants>& runtimeConstants,
+    const boost::optional<BSONObj>& letParameters) {
+    auto shardKey = DistributionMetricsCalculator::_incrementMetricsForQuery(
+        opCtx, filter, collation, runtimeConstants, letParameters);
+
+    if (shardKey.isEmpty()) {
+        // Increment metrics about writes without shard key.
+        if (isMulti) {
+            _incrementMultiWritesWithoutShardKey();
+        } else {
+            _incrementSingleWritesWithoutShardKey();
+        }
+    }
+}
+
 }  // namespace analyze_shard_key
 }  // namespace mongo

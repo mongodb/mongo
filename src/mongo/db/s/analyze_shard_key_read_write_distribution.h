@@ -144,5 +144,53 @@ private:
     int64_t _numDistinct = 0;
 };
 
+class WriteDistributionMetricsCalculator
+    : public DistributionMetricsCalculator<WriteDistributionMetrics, WriteSampleSize> {
+public:
+    WriteDistributionMetricsCalculator(const CollectionRoutingInfoTargeter& targeter)
+        : DistributionMetricsCalculator(targeter) {}
+
+    void addQuery(OperationContext* opCtx, const SampledQueryDocument& doc) override;
+
+    WriteDistributionMetrics getMetrics() const override;
+
+private:
+    WriteSampleSize _getSampleSize() const override;
+
+    void _addUpdateQuery(OperationContext* opCtx, const write_ops::UpdateCommandRequest& cmd);
+
+    void _addDeleteQuery(OperationContext* opCtx, const write_ops::DeleteCommandRequest& cmd);
+
+    void _addFindAndModifyQuery(OperationContext* opCtx,
+                                const write_ops::FindAndModifyCommandRequest& cmd);
+
+    void _incrementShardKeyUpdates() {
+        _numShardKeyUpdates++;
+    }
+
+    void _incrementSingleWritesWithoutShardKey() {
+        _numSingleWritesWithoutShardKey++;
+    }
+
+    void _incrementMultiWritesWithoutShardKey() {
+        _numMultiWritesWithoutShardKey++;
+    }
+
+    void _incrementMetricsForQuery(OperationContext* opCtx,
+                                   const BSONObj& filter,
+                                   const BSONObj& collation,
+                                   bool isMulti,
+                                   const boost::optional<LegacyRuntimeConstants>& runtimeConstants,
+                                   const boost::optional<BSONObj>& letParameters);
+
+    int64_t _numUpdate = 0;
+    int64_t _numDelete = 0;
+    int64_t _numFindAndModify = 0;
+
+    int64_t _numShardKeyUpdates = 0;
+    int64_t _numSingleWritesWithoutShardKey = 0;
+    int64_t _numMultiWritesWithoutShardKey = 0;
+};
+
 }  // namespace analyze_shard_key
 }  // namespace mongo
