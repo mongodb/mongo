@@ -364,6 +364,9 @@ buildvariants:
   expansions:
     use_wt_develop: true
     resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
+    large_distro_name: rhel80-medium
+    max_sub_suites: "5"
+    target_resmoke_time: "15"
     compile_flags: >-
       --dbg=on
       --opt=on
@@ -3410,6 +3413,7 @@ buildvariants:
   display_name: "~ Enterprise Windows (Benchmarks)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   expansions:
+    <<: *enterprise-windows-nopush-expansions-template
     compile_variant: *enterprise-windows-benchmarks
   tasks:
   - name: compile_upload_benchmarks_TG
