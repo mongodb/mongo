@@ -48,10 +48,12 @@ errchk()
         return
     fi
 
-    # Return if evergreen validate runs sucessfully.
-    if echo "$1" | grep -q evergreen && [ "$(cat "$2")" = "../test/evergreen.yml is valid" ] ; then
-        rm -f "$2"
-        return
+    # Return if evergreen validate runs successfully.
+    if echo "$1" | grep -q "evergreen"; then
+        if  cat "$2" | grep -q ".yml is valid"; then
+            rm -f "$2"
+            return
+        fi
     fi
 
     echo "####################### MESSAGE ############################"
@@ -102,7 +104,10 @@ run "python test_tag.py"
 # The s_mentions script requires bash.
 run "./s_mentions" "--warning-only"
 if [ $(command -v evergreen) ] && [ -f ~/.evergreen.yml ]; then
-    run "evergreen validate -p wiredtiger ../test/evergreen.yml"
+    run "cd .."
+    run "evergreen validate -p wiredtiger test/evergreen.yml"
+    run "evergreen validate -p wiredtiger test/evergreen_develop.yml"
+    run "cd dist"
 fi
 
 COMMANDS="
