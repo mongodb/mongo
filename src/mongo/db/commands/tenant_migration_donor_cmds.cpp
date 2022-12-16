@@ -91,6 +91,7 @@ public:
                                                   cmd.getRecipientConnectionString().toString(),
                                                   cmd.getReadPreference(),
                                                   tenantId.value_or("").toString());
+            stateDoc.setTenantIds(tenantIds);
 
             if (!repl::tenantMigrationDisableX509Auth) {
                 uassert(ErrorCodes::InvalidOptions,

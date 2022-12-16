@@ -325,6 +325,7 @@ TenantMigrationDonorService::Instance::Instance(ServiceContext* const serviceCon
       _recipientUri(
           uassertStatusOK(MongoURI::parse(_stateDoc.getRecipientConnectionString().toString()))),
       _tenantId(_stateDoc.getTenantId()),
+      _tenantIds(_stateDoc.getTenantIds() ? *_stateDoc.getTenantIds() : std::vector<TenantId>()),
       _protocol(_stateDoc.getProtocol().value_or(MigrationProtocolEnum::kMultitenantMigrations)),
       _recipientConnectionString(_stateDoc.getRecipientConnectionString()),
       _readPreference(_stateDoc.getReadPreference()),
@@ -790,8 +791,9 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientSyncDa
     commonData.setRecipientCertificateForDonor(_recipientCertificateForDonor);
     if (_protocol == MigrationProtocolEnum::kMultitenantMigrations) {
         commonData.setTenantId(boost::optional<StringData>(_tenantId));
+    } else {
+        commonData.setTenantIds(_tenantIds);
     }
-
 
     commonData.setProtocol(_protocol);
     request.setMigrationRecipientCommonData(commonData);
@@ -832,6 +834,8 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientForget
     commonData.setRecipientCertificateForDonor(_recipientCertificateForDonor);
     if (_protocol == MigrationProtocolEnum::kMultitenantMigrations) {
         commonData.setTenantId(boost::optional<StringData>(_tenantId));
+    } else {
+        commonData.setTenantIds(_tenantIds);
     }
 
     commonData.setProtocol(_protocol);
@@ -847,6 +851,23 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientForget
         return async_rpc::unpackRPCStatusIgnoringWriteConcernAndWriteErrors(status).addContext(
             "Tenant migration recipient command failed");
     });
+}
+
+void TenantMigrationDonorService::Instance::validateTenantIdsForProtocol() {
+    switch (_protocol) {
+        case MigrationProtocolEnum::kShardMerge:
+            uassert(ErrorCodes::InvalidOptions,
+                    "The field tenantIds must be set and not empty for protocol 'shard merge'",
+                    !_tenantIds.empty());
+            break;
+        case MigrationProtocolEnum::kMultitenantMigrations:
+            uassert(ErrorCodes::InvalidOptions,
+                    "The field tenantIds must not be set for protocol 'multitenant migration'",
+                    _tenantIds.empty());
+            break;
+        default:
+            MONGO_UNREACHABLE;
+    }
 }
 
 CancellationToken TenantMigrationDonorService::Instance::_initAbortMigrationSource(
@@ -905,13 +926,16 @@ SemiFuture<void> TenantMigrationDonorService::Instance::run(
 
     return ExecutorFuture(**executor)
         .then([this, self = shared_from_this(), executor, token] {
+            // Validate the field is correctly set
+            validateTenantIdsForProtocol();
+
             LOGV2(6104900,
                   "Entering 'aborting index builds' state.",
                   "migrationId"_attr = _migrationUuid,
                   "tenantId"_attr = _tenantId);
             // Note we do not use the abort migration token here because the donorAbortMigration
-            // command waits for a decision to be persisted which will not happen if inserting the
-            // initial state document fails.
+            // command waits for a decision to be persisted which will not happen if inserting
+            // the initial state document fails.
             return _enterAbortingIndexBuildsState(executor, token);
         })
         .then([this, self = shared_from_this(), executor, abortToken] {

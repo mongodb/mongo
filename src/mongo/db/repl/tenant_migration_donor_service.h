@@ -276,6 +276,11 @@ public:
             return recipientCmdThreadPoolLimits;
         }
 
+        /**
+         * Validate if the value of _tenantIds is correct for the given _protocol.
+         */
+        void validateTenantIdsForProtocol();
+
         /*
          * Initializes _abortMigrationSource and returns a token from it. The source will be
          * immediately canceled if an abort has already been requested.
@@ -292,6 +297,7 @@ public:
         // This data is provided in the initial state doc and never changes.  We keep copies to
         // avoid having to obtain the mutex to access them.
         const std::string _tenantId;
+        const std::vector<TenantId> _tenantIds;
         const MigrationProtocolEnum _protocol;
         const std::string _recipientConnectionString;
         const ReadPreferenceSetting _readPreference;

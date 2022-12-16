@@ -158,6 +158,10 @@ function testStats(node, {
             .next();
     assert.eq(donorDoc.state, "blocking");
     assert.eq(donorDoc.blockTimestamp, blockOplogEntry.ts);
+    if (TenantMigrationUtil.isShardMergeEnabled(donorPrimary.getDB("admin"))) {
+        assert.eq(donorDoc.protocol, "shard merge");
+        assert.eq(donorDoc.tenantIds, [ObjectId(kTenantId)]);
+    }
 
     // Verify that donorForgetMigration fails since the decision has not been made.
     assert.commandFailedWithCode(

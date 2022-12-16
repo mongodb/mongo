@@ -50,6 +50,7 @@ function runTest(downgradeFCV) {
             recipientSyncData: 1,
             protocol: "shard merge",
             migrationId: UUID(),
+            tenantIds: [ObjectId()],
             donorConnectionString: kDummyConnStr,
             readPreference: readPreference,
             startMigrationDonorTimestamp: Timestamp(1, 1),
@@ -62,6 +63,7 @@ function runTest(downgradeFCV) {
             recipientForgetMigration: 1,
             protocol: "shard merge",
             migrationId: UUID(),
+            tenantIds: [ObjectId()],
             donorConnectionString: kDummyConnStr,
             readPreference: readPreference,
             recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor

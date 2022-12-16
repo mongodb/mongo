@@ -142,6 +142,18 @@ assert.commandFailedWithCode(recipientPrimary.adminCommand({
 }),
                              ErrorCodes.InvalidOptions);
 
+// Test setting tenantIds field for protocol 'multitenant migration'.
+assert.commandFailedWithCode(recipientPrimary.adminCommand({
+    recipientSyncData: 1,
+    migrationId: UUID(),
+    tenantIds: [ObjectId()],
+    donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
+    startMigrationDonorTimestamp: Timestamp(1, 1),
+    readPreference,
+    recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
+}),
+                             ErrorCodes.InvalidOptions);
+
 // Test unsupported database prefixes.
 unsupportedtenantIds.forEach((invalidTenantId) => {
     assert.commandFailedWithCode(recipientPrimary.adminCommand({

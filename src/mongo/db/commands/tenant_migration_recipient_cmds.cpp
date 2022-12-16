@@ -75,8 +75,11 @@ public:
             const auto& cmd = request();
             const auto migrationProtocol = cmd.getProtocol().value_or(kDefaultMigrationProtocol);
             const auto& tenantId = cmd.getTenantId();
+            const auto& tenantIds = cmd.getTenantIds();
 
             tenant_migration_util::protocolTenantIdCompatibilityCheck(migrationProtocol, tenantId);
+            tenant_migration_util::protocolTenantIdsCompatibilityCheck(migrationProtocol,
+                                                                       tenantIds);
             tenant_migration_util::protocolStorageOptionsCompatibilityCheck(opCtx,
                                                                             migrationProtocol);
             tenant_migration_util::protocolReadPreferenceCompatibilityCheck(
@@ -88,7 +91,7 @@ public:
                                                       tenantId.value_or("").toString(),
                                                       cmd.getStartMigrationDonorTimestamp(),
                                                       cmd.getReadPreference());
-
+            stateDoc.setTenantIds(tenantIds);
 
             if (!repl::tenantMigrationDisableX509Auth) {
                 uassert(ErrorCodes::InvalidOptions,
@@ -247,8 +250,11 @@ public:
             const auto& cmd = request();
             const auto migrationProtocol = cmd.getProtocol().value_or(kDefaultMigrationProtocol);
             const auto& tenantId = cmd.getTenantId();
+            const auto& tenantIds = cmd.getTenantIds();
 
             tenant_migration_util::protocolTenantIdCompatibilityCheck(migrationProtocol, tenantId);
+            tenant_migration_util::protocolTenantIdsCompatibilityCheck(migrationProtocol,
+                                                                       tenantIds);
 
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
             auto recipientService =
@@ -268,6 +274,7 @@ public:
                                                       tenantId.value_or("").toString(),
                                                       kUnusedStartMigrationTimestamp,
                                                       cmd.getReadPreference());
+            stateDoc.setTenantIds(tenantIds);
             if (!repl::tenantMigrationDisableX509Auth) {
                 uassert(ErrorCodes::InvalidOptions,
                         str::stream() << "'" << Request::kRecipientCertificateForDonorFieldName

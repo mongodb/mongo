@@ -108,6 +108,7 @@ unsupportedtenantIds.forEach((invalidTenantId) => {
         migrationId: UUID(),
         donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
         tenantId: invalidTenantId,
+        tenantIds: [ObjectId()],
         protocol: 'shard merge',
         startMigrationDonorTimestamp: Timestamp(1, 1),
         readPreference,
@@ -121,6 +122,7 @@ assert.commandFailedWithCode(recipientPrimary.adminCommand({
     recipientSyncData: 1,
     migrationId: UUID(),
     protocol: 'shard merge',
+    tenantIds: [ObjectId()],
     donorConnectionString: tenantMigrationTest.getRecipientRst().getURL(),
     startMigrationDonorTimestamp: Timestamp(1, 1),
     readPreference,
@@ -133,6 +135,7 @@ assert.commandFailedWithCode(recipientPrimary.adminCommand({
     recipientSyncData: 1,
     migrationId: UUID(),
     protocol: 'shard merge',
+    tenantIds: [ObjectId()],
     donorConnectionString: `${tenantMigrationTest.getDonorRst().getURL()},${recipientPrimary.host}`,
     startMigrationDonorTimestamp: Timestamp(1, 1),
     readPreference,
@@ -145,6 +148,7 @@ assert.commandFailedWithCode(recipientPrimary.adminCommand({
     recipientSyncData: 1,
     migrationId: UUID(),
     protocol: 'shard merge',
+    tenantIds: [ObjectId()],
     donorConnectionString: recipientPrimary.host,
     startMigrationDonorTimestamp: Timestamp(1, 1),
     readPreference,
@@ -159,6 +163,7 @@ nullTimestamps.forEach((nullTs) => {
         recipientSyncData: 1,
         migrationId: UUID(),
         protocol: 'shard merge',
+        tenantIds: [ObjectId()],
         donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
         startMigrationDonorTimestamp: Timestamp(1, 1),
         readPreference,
@@ -168,5 +173,29 @@ nullTimestamps.forEach((nullTs) => {
                                  ErrorCodes.BadValue);
 });
 
+// Test without tenantIds
+assert.commandFailedWithCode(recipientPrimary.adminCommand({
+    recipientSyncData: 1,
+    migrationId: UUID(),
+    protocol: 'shard merge',
+    donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
+    startMigrationDonorTimestamp: Timestamp(1, 1),
+    readPreference,
+    recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
+}),
+                             ErrorCodes.InvalidOptions);
+
+// Test with an empty tenantIds list
+assert.commandFailedWithCode(recipientPrimary.adminCommand({
+    recipientSyncData: 1,
+    migrationId: UUID(),
+    protocol: 'shard merge',
+    tenantIds: [],
+    donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
+    startMigrationDonorTimestamp: Timestamp(1, 1),
+    readPreference,
+    recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
+}),
+                             ErrorCodes.InvalidOptions);
 tenantMigrationTest.stop();
 })();

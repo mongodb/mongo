@@ -145,6 +145,10 @@ structs:
                 description: "Which migration protocol to use."
                 type: MigrationProtocol
                 optional: true
+            tenantIds:
+                type: array<tenant_id>
+                optional: true
+                description: "The tenants list for Shard Merge."
 
     tenantMigrationRecipientDocument:
         description: "Represents an in-progress tenant migration on the migration recipient."
@@ -266,3 +270,7 @@ structs:
                 description: >-
                     The wall-clock time at which the state machine document is initialized.
                 optional: true
+            tenantIds:
+                type: array<tenant_id>
+                optional: true
+                description: "The tenants list for Shard Merge."
