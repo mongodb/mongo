@@ -56,10 +56,6 @@ public:
         return AllowedOnSecondary::kNever;
     }
 
-    bool allowedWithSecurityToken() const final {
-        return true;
-    }
-
     bool supportsRetryableWrite() const final {
         return true;
     }

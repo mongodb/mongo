@@ -1,5 +1,10 @@
 /**
- * Tests bulk write command for valid / invalid input
+ * Tests bulk write command for valid / invalid input.
+ *
+ * The test runs commands that are not allowed with security token: bulkWrite.
+ * @tags: [
+ *   not_allowed_with_security_token,
+ * ]
  */
 (function() {
 "use strict";

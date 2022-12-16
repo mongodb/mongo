@@ -98,7 +98,6 @@ const kCmdsAllowedWithSecurityToken = new Set([
     `availableQueryOptions`,
     `buildinfo`,
     `buildinfo`,
-    `bulkWrite`,
     `collMod`,
     `collStats`,
     `collstats`,
