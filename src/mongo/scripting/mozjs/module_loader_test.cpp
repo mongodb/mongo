@@ -87,5 +87,16 @@ TEST(ModuleLoaderTest, ImportInInteractiveFails) {
         });
 }
 
+TEST(ModuleLoaderTest, TopLevelAwaitWorks) {
+    mongo::ScriptEngine::setup();
+    std::unique_ptr<mongo::Scope> scope(mongo::getGlobalScriptEngine()->newScope());
+    auto code = "async function test() { return 42; } await test();"_sd;
+    ASSERT_DOES_NOT_THROW(scope->exec(code,
+                                      "root_module",
+                                      true /* printResult */,
+                                      true /* reportError */,
+                                      true /* assertOnError , timeout*/));
+}
+
 }  // namespace mozjs
 }  // namespace mongo

@@ -41,6 +41,7 @@
 #include <js/Initialization.h>
 #include <js/Modules.h>
 #include <js/Object.h>
+#include <js/Promise.h>
 #include <js/SourceText.h>
 #include <js/TypeDecls.h>
 #include <js/friend/ErrorMessages.h>
@@ -120,6 +121,16 @@ bool closeToMaxMemory() {
 
 thread_local MozJSImplScope::ASANHandles* currentASANHandles = nullptr;
 
+
+void MozJSImplScope::EnvironmentPreparer::invoke(JS::HandleObject global, Closure& closure) {
+    invariant(JS_IsGlobalObject(global));
+    invariant(!JS_IsExceptionPending(_context));
+
+    JSAutoRealm ac(_context, global);
+    auto scope = getScope(_context);
+    // Log any error state in the JS context.
+    (void)scope->_checkErrorState(closure(_context), true, false);
+}
 
 // You may wonder what the point is to making this thread local
 // variable atomic. We found that without making this atomic, in
@@ -466,7 +477,7 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine, boost::optional<int> j
       _statusProto(_context),
       _timestampProto(_context),
       _uriProto(_context) {
-
+    _environmentPreparer = std::make_unique<EnvironmentPreparer>(_context);
     _moduleLoader = std::make_unique<ModuleLoader>();
     uassert(ErrorCodes::JSInterpreterFailure, "Failed to create ModuleLoader", _moduleLoader);
     uassert(ErrorCodes::JSInterpreterFailure,
@@ -503,6 +514,7 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine, boost::optional<int> j
 }
 
 MozJSImplScope::~MozJSImplScope() {
+    invariant(!_promiseResult.has_value());
     currentJSScope = nullptr;
 
     for (auto&& x : _funcs) {
@@ -651,6 +663,66 @@ void MozJSImplScope::_MozJSCreateFunction(StringData raw, JS::MutableHandleValue
     uassert(10232, "not a function", fun.isObject() && js::IsFunctionObject(fun.toObjectOrNull()));
 }
 
+bool MozJSImplScope::onSyncPromiseResolved(JSContext* cx, unsigned argc, JS::Value* vp) {
+    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+    auto scope = getScope(cx);
+    scope->_promiseResult.emplace(args[0]);
+    args.rval().setUndefined();
+    return true;
+}
+
+bool MozJSImplScope::onSyncPromiseRejected(JSContext* cx, unsigned argc, JS::Value* vp) {
+    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+    JS::HandleValue error = args.get(0);
+    auto scope = getScope(cx);
+    scope->_status = jsExceptionToStatus(cx, error, ErrorCodes::JSInterpreterFailure, "");
+    return true;
+}
+
+// Block synchronously awaiting the result of a Promise. This is okay because the test runner is
+// single threaded, but we should remove this if that invariant ever changes.
+bool MozJSImplScope::awaitPromise(JSContext* cx,
+                                  JS::HandleObject promise,
+                                  JS::MutableHandleValue out) {
+    JS::RootedObject resolved(
+        cx,
+        JS_GetFunctionObject(js::NewFunctionWithReserved(
+            cx, MozJSImplScope::onSyncPromiseResolved, 1, 0, "async resolved")));
+
+    if (!resolved) {
+        return false;
+    }
+
+    JS::RootedObject rejected(
+        cx,
+        JS_GetFunctionObject(js::NewFunctionWithReserved(
+            cx, MozJSImplScope::onSyncPromiseRejected, 1, 0, "async rejected")));
+    if (!rejected) {
+        return false;
+    }
+
+    JS::AddPromiseReactions(cx, promise, resolved, rejected);
+
+    auto scope = getScope(cx);
+    JS::RootedValue pOut(cx);
+    do {
+        if (scope->_checkErrorState(true)) {
+            break;
+        }
+
+        js::RunJobs(cx);
+    } while (JS::GetPromiseState(promise) == JS::PromiseState::Pending);
+
+    if (JS::GetPromiseState(promise) == JS::PromiseState::Rejected) {
+        return false;
+    }
+
+    invariant(scope->_promiseResult.has_value());
+    out.set(*scope->_promiseResult);
+    scope->_promiseResult = boost::none;
+    return true;
+}
+
 BSONObj MozJSImplScope::callThreadArgs(const BSONObj& args) {
     // The _runSafely() function is called for all codepaths of executing JavaScript other than
     // callThreadArgs(). We intentionally don't unwrap the JSInterpreterFailureWithStack error
@@ -691,8 +763,18 @@ BSONObj MozJSImplScope::callThreadArgs(const BSONObj& args) {
 
     JS::RootedObject rout(_context, JS_NewPlainObject(_context));
     ObjectWrapper wout(_context, rout);
-    wout.setValue("ret", out);
 
+    if (out.isObject()) {
+        JS::RootedObject maybePromise(_context, &out.toObject());
+        if (JS::IsPromiseObject(maybePromise)) {
+            JS::RootedValue pOut(_context);
+            (void)_checkErrorState(awaitPromise(_context, maybePromise, &pOut), false, true);
+            wout.setValue("ret", pOut);
+            return wout.toBSON();
+        }
+    }
+
+    wout.setValue("ret", out);
     return wout.toBSON();
 }
 
@@ -826,7 +908,8 @@ bool shouldTryExecAsModule(JSContext* cx, const std::string& name, bool success)
     }
 
     return report->errorNumber == JSMSG_IMPORT_DECL_AT_TOP_LEVEL ||
-        report->errorNumber == JSMSG_EXPORT_DECL_AT_TOP_LEVEL;
+        report->errorNumber == JSMSG_EXPORT_DECL_AT_TOP_LEVEL ||
+        report->errorNumber == JSMSG_AWAIT_OUTSIDE_ASYNC_OR_MODULE;
 }
 
 bool MozJSImplScope::exec(StringData code,
@@ -874,14 +957,12 @@ bool MozJSImplScope::exec(StringData code,
                 JS::RootedScript script(_context, scriptPtr);
                 success = JS_ExecuteScript(_context, script, &out);
             } else {
-                JS::Rooted<JS::Value> returnValue(_context);
                 JS::RootedObject module(_context, modulePtr);
-
                 success = JS::ModuleInstantiate(_context, module);
                 if (success) {
-                    success = JS::ModuleEvaluate(_context, module, &returnValue);
+                    success = JS::ModuleEvaluate(_context, module, &out);
                     if (success) {
-                        JS::RootedObject evaluationPromise(_context, &returnValue.toObject());
+                        JS::RootedObject evaluationPromise(_context, &out.toObject());
                         success = JS::ThrowOnModuleEvaluationFailure(_context, evaluationPromise);
                     }
                 }

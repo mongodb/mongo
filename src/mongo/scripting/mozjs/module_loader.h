@@ -49,6 +49,10 @@ private:
     static JSObject* moduleResolveHook(JSContext* cx,
                                        JS::HandleValue referencingPrivate,
                                        JS::HandleObject moduleRequest);
+    static bool dynamicModuleImportHook(JSContext* cx,
+                                        JS::HandleValue referencingPrivate,
+                                        JS::HandleObject moduleRequest,
+                                        JS::HandleObject promise);
 
     JSObject* loadRootModule(JSContext* cx,
                              const std::string& path,
@@ -56,6 +60,10 @@ private:
     JSObject* resolveImportedModule(JSContext* cx,
                                     JS::HandleValue referencingPrivate,
                                     JS::HandleObject moduleRequest);
+    bool importModuleDynamically(JSContext* cx,
+                                 JS::HandleValue referencingPrivate,
+                                 JS::HandleObject moduleRequest,
+                                 JS::HandleObject promise);
     JSObject* loadAndParse(JSContext* cx,
                            JS::HandleString path,
                            JS::HandleValue referencingPrivate);

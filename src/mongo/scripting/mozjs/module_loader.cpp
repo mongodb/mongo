@@ -44,7 +44,9 @@ bool ModuleLoader::init(JSContext* cx, const boost::filesystem::path& loadPath) 
     invariant(loadPath.is_absolute());
     _loadPath = loadPath.string();
 
-    JS::SetModuleResolveHook(JS_GetRuntime(cx), ModuleLoader::moduleResolveHook);
+    JSRuntime* rt = JS_GetRuntime(cx);
+    JS::SetModuleResolveHook(rt, ModuleLoader::moduleResolveHook);
+    JS::SetModuleDynamicImportHook(rt, ModuleLoader::dynamicModuleImportHook);
     return true;
 }
 
@@ -97,13 +99,60 @@ JSObject* ModuleLoader::moduleResolveHook(JSContext* cx,
 JSObject* ModuleLoader::resolveImportedModule(JSContext* cx,
                                               JS::HandleValue referencingPrivate,
                                               JS::HandleObject moduleRequest) {
-
     JS::Rooted<JSString*> path(cx, resolveAndNormalize(cx, moduleRequest, referencingPrivate));
     if (!path) {
         return nullptr;
     }
 
     return loadAndParse(cx, path, referencingPrivate);
+}
+
+// static
+bool ModuleLoader::dynamicModuleImportHook(JSContext* cx,
+                                           JS::HandleValue referencingPrivate,
+                                           JS::HandleObject moduleRequest,
+                                           JS::HandleObject promise) {
+    auto scope = getScope(cx);
+    return scope->getModuleLoader()->importModuleDynamically(
+        cx, referencingPrivate, moduleRequest, promise);
+}
+
+bool ModuleLoader::importModuleDynamically(JSContext* cx,
+                                           JS::HandleValue referencingPrivate,
+                                           JS::HandleObject moduleRequest,
+                                           JS::HandleObject promise) {
+    JS::RootedString loadPath(cx, JS_NewStringCopyN(cx, _loadPath.c_str(), _loadPath.size()));
+    JS::RootedObject info(cx, createScriptPrivateInfo(cx, loadPath, nullptr));
+    JS::RootedValue newReferencingPrivate(cx, JS::ObjectValue(*info));
+
+    // The dynamic `import` method returns a Promise, and thus allows us to perform module loading
+    // dynamically in the engine. The test runner is single threaded, so there is no benefit to us
+    // loading asynchronously. We will continue to return a Promise (per the contract), but perform
+    // loading synchronously.
+    JS::RootedValue rval(cx);
+    bool ok = [&]() {
+        JS::Rooted<JSString*> path(cx,
+                                   resolveAndNormalize(cx, moduleRequest, newReferencingPrivate));
+        if (!path) {
+            return false;
+        }
+
+        JS::RootedObject module(cx, loadAndParse(cx, path, newReferencingPrivate));
+        if (!module) {
+            return false;
+        }
+
+        if (!JS::ModuleInstantiate(cx, module)) {
+            return false;
+        }
+
+        return JS::ModuleEvaluate(cx, module, &rval);
+    }();
+
+    JSObject* evaluationObject = ok ? &rval.toObject() : nullptr;
+    JS::RootedObject evaluationPromise(cx, evaluationObject);
+    return JS::FinishDynamicModuleImport(
+        cx, evaluationPromise, newReferencingPrivate, moduleRequest, promise);
 }
 
 /**

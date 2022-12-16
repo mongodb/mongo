@@ -414,6 +414,20 @@ private:
 
     void setCompileOptions(JS::CompileOptions* co);
 
+    static bool onSyncPromiseResolved(JSContext* cx, unsigned argc, JS::Value* vp);
+    static bool onSyncPromiseRejected(JSContext* cx, unsigned argc, JS::Value* vp);
+    static bool awaitPromise(JSContext* cx, JS::HandleObject promise, JS::MutableHandleValue out);
+
+    // SpiderMonkey requires that an environment preparer is installed in order to dynamically load
+    // modules.
+    struct EnvironmentPreparer final : public js::ScriptEnvironmentPreparer {
+        JSContext* _context;
+        explicit EnvironmentPreparer(JSContext* cx) : _context(cx) {
+            js::SetScriptEnvironmentPreparer(cx, this);
+        }
+        void invoke(JS::HandleObject global, Closure& closure) override;
+    };
+
     ASANHandles _asanHandles;
     MozJSScriptEngine* _engine;
     MozRuntime _mr;
@@ -442,6 +456,8 @@ private:
     bool _inReportError;
 
     std::unique_ptr<ModuleLoader> _moduleLoader;
+    std::unique_ptr<EnvironmentPreparer> _environmentPreparer;
+    boost::optional<JS::HandleValue> _promiseResult;
 
     WrapType<BinDataInfo> _binDataProto;
     WrapType<BSONInfo> _bsonProto;
