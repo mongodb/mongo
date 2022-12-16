@@ -57,6 +57,15 @@ public:
         return !ClusterRole::operator==(other);
     }
 
+    // Returns true if this mongod was started with --shardsvr or --configsvr in a catalog shard
+    // topology, false otherwise.
+    bool isShardRole();
+    // Returns true if this mongod was started with --shardsvr, false otherwise.
+    bool isExclusivelyShardRole();
+    // Returns true if this mongod was started with --configServer in a non-catalog shard topology,
+    // false otherwise.
+    bool isExclusivelyConfigSvrRole();
+
 private:
     Value _value;
 };

@@ -61,7 +61,7 @@ public:
         Response typedRun(OperationContext* opCtx) {
             uassert(ErrorCodes::IllegalOperation,
                     "configQueryAnalyzer command is not supported on a shardsvr mongod",
-                    serverGlobalParams.clusterRole != ClusterRole::ShardServer);
+                    !serverGlobalParams.clusterRole.isExclusivelyShardRole());
 
             const auto& nss = ns();
             const auto mode = request().getMode();

@@ -96,16 +96,18 @@ bool ShardingState::enabled() const {
 }
 
 Status ShardingState::canAcceptShardedCommands() const {
-    if (serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
+    if (!serverGlobalParams.clusterRole.isShardRole()) {
         return {ErrorCodes::NoShardingEnabled,
-                "Cannot accept sharding commands if not started with --shardsvr"};
-    } else if (!enabled()) {
+                "Cannot accept sharding commands if node does not have shard role"};
+    }
+
+    if (!enabled()) {
         return {ErrorCodes::ShardingStateNotInitialized,
                 "Cannot accept sharding commands if sharding state has not "
                 "been initialized with a shardIdentity document"};
-    } else {
-        return Status::OK();
     }
+
+    return Status::OK();
 }
 
 ShardId ShardingState::shardId() {

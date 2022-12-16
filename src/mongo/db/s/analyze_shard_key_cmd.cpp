@@ -70,7 +70,8 @@ public:
         Response typedRun(OperationContext* opCtx) {
             uassert(ErrorCodes::IllegalOperation,
                     "analyzeShardKey command is not supported on a configsvr mongod",
-                    serverGlobalParams.clusterRole != ClusterRole::ConfigServer);
+                    serverGlobalParams.clusterRole == ClusterRole::None ||
+                        serverGlobalParams.clusterRole.isShardRole());
 
             const auto& nss = ns();
             const auto& key = request().getKey();

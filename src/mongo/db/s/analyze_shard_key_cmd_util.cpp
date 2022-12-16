@@ -416,7 +416,7 @@ MonotonicityTypeEnum calculateMonotonicity(OperationContext* opCtx,
  */
 boost::optional<int64_t> getNumOrphanDocuments(OperationContext* opCtx,
                                                const NamespaceString& nss) {
-    if (serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
+    if (!serverGlobalParams.clusterRole.isShardRole()) {
         return boost::none;
     }
 

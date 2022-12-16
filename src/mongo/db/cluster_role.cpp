@@ -41,4 +41,17 @@ bool ClusterRole::operator==(const ClusterRole& other) const {
 
     return _value == other._value;
 }
+
+bool ClusterRole::isShardRole() {
+    return _value == ClusterRole::ShardServer ||
+        (gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV() && _value == ClusterRole::ConfigServer);
+}
+
+bool ClusterRole::isExclusivelyShardRole() {
+    return _value == ClusterRole::ShardServer;
+}
+
+bool ClusterRole::isExclusivelyConfigSvrRole() {
+    return _value == ClusterRole::ConfigServer && !gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV();
+}
 }  // namespace mongo

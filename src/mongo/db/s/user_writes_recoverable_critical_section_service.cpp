@@ -172,7 +172,8 @@ const ReplicaSetAwareServiceRegistry::Registerer<UserWritesRecoverableCriticalSe
         "UserWritesRecoverableCriticalSectionService");
 
 bool UserWritesRecoverableCriticalSectionService::shouldRegisterReplicaSetAwareService() const {
-    return serverGlobalParams.clusterRole != ClusterRole::ConfigServer;
+    return serverGlobalParams.clusterRole == ClusterRole::None ||
+        serverGlobalParams.clusterRole.isShardRole();
 }
 
 void UserWritesRecoverableCriticalSectionService::

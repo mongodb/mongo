@@ -720,6 +720,14 @@ TEST(ClusterRole, Equality) {
     ASSERT_TRUE(ClusterRole(ClusterRole::ShardServer) != ClusterRole::ConfigServer);
     ASSERT_TRUE(ClusterRole(ClusterRole::ShardServer) == ClusterRole::ShardServer);
 
+    ASSERT_TRUE(ClusterRole(ClusterRole::ShardServer).isShardRole());
+    ASSERT_FALSE(ClusterRole(ClusterRole::ConfigServer).isShardRole());
+
+    ASSERT_TRUE(ClusterRole(ClusterRole::ShardServer).isExclusivelyShardRole());
+    ASSERT_FALSE(ClusterRole(ClusterRole::ConfigServer).isExclusivelyShardRole());
+
+    ASSERT_TRUE(ClusterRole(ClusterRole::ConfigServer).isExclusivelyConfigSvrRole());
+
     RAIIServerParameterControllerForTest controller("featureFlagCatalogShard", true);
 
     ASSERT_TRUE(ClusterRole(ClusterRole::None) == ClusterRole::None);
@@ -733,6 +741,14 @@ TEST(ClusterRole, Equality) {
     ASSERT_TRUE(ClusterRole(ClusterRole::ShardServer) != ClusterRole::None);
     ASSERT_TRUE(ClusterRole(ClusterRole::ShardServer) != ClusterRole::ConfigServer);
     ASSERT_TRUE(ClusterRole(ClusterRole::ShardServer) == ClusterRole::ShardServer);
+
+    ASSERT_TRUE(ClusterRole(ClusterRole::ShardServer).isShardRole());
+    ASSERT_TRUE(ClusterRole(ClusterRole::ConfigServer).isShardRole());
+
+    ASSERT_TRUE(ClusterRole(ClusterRole::ShardServer).isExclusivelyShardRole());
+    ASSERT_FALSE(ClusterRole(ClusterRole::ConfigServer).isExclusivelyShardRole());
+
+    ASSERT_FALSE(ClusterRole(ClusterRole::ConfigServer).isExclusivelyConfigSvrRole());
 }
 
 #if !defined(_WIN32) && !(defined(__APPLE__) && TARGET_OS_TV)

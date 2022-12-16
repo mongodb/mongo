@@ -42,7 +42,7 @@ public:
     ReadWriteConcernDefaultsServerStatus() : ServerStatusSection("defaultRWConcern") {}
 
     bool includeByDefault() const override {
-        return serverGlobalParams.clusterRole != ClusterRole::ShardServer;
+        return !serverGlobalParams.clusterRole.isExclusivelyShardRole();
     }
 
     BSONObj generateSection(OperationContext* opCtx,
