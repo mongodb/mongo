@@ -2,6 +2,7 @@
 from collections import defaultdict
 from dataclasses import dataclass
 from itertools import chain
+from json import JSONDecodeError
 from typing import NamedTuple, List, Callable, Optional
 import requests
 from requests.adapters import HTTPAdapter, Retry
@@ -168,9 +169,12 @@ class HistoricTaskData(object):
         session.mount('https://', HTTPAdapter(max_retries=retries))
 
         response = session.get(f"{TESTS_STATS_S3_LOCATION}/{project}/{variant}/{task}")
-        data = response.json()
 
-        return [HistoricalTestInformation(**item) for item in data]
+        try:
+            data = response.json()
+            return [HistoricalTestInformation(**item) for item in data]
+        except JSONDecodeError:
+            return []
 
     @classmethod
     def from_s3(cls, project: str, task: str, variant: str) -> "HistoricTaskData":
