@@ -260,8 +260,7 @@ ReadWriteConcernDefaults::RWConcernDefaultAndTime ReadWriteConcernDefaults::getD
             cached.setDefaultWriteConcernSource(DefaultWriteConcernSourceEnum::kGlobal);
         } else {
             cached.setDefaultWriteConcernSource(DefaultWriteConcernSourceEnum::kImplicit);
-            if (_implicitDefaultWriteConcernMajority &&
-                _implicitDefaultWriteConcernMajority.value()) {
+            if (_implicitDefaultWriteConcernMajority.loadRelaxed()) {
                 cached.setDefaultWriteConcern(
                     WriteConcernOptions(WriteConcernOptions::kMajority,
                                         WriteConcernOptions::SyncMode::UNSET,
@@ -275,13 +274,14 @@ ReadWriteConcernDefaults::RWConcernDefaultAndTime ReadWriteConcernDefaults::getD
 
 void ReadWriteConcernDefaults::setImplicitDefaultWriteConcernMajority(
     bool newImplicitDefaultWCMajority) {
-    invariant(!_implicitDefaultWriteConcernMajority ||
-              repl::enableDefaultWriteConcernUpdatesForInitiate.load());
-    _implicitDefaultWriteConcernMajority = newImplicitDefaultWCMajority;
+    LOGV2(7063400,
+          "Updating implicit default writeConcern majority",
+          "newImplicitDefaultWCMajority"_attr = newImplicitDefaultWCMajority);
+    _implicitDefaultWriteConcernMajority.store(newImplicitDefaultWCMajority);
 }
 
-boost::optional<bool> ReadWriteConcernDefaults::getImplicitDefaultWriteConcernMajority_forTest() {
-    return _implicitDefaultWriteConcernMajority;
+bool ReadWriteConcernDefaults::getImplicitDefaultWriteConcernMajority_forTest() {
+    return _implicitDefaultWriteConcernMajority.loadRelaxed();
 }
 
 boost::optional<ReadWriteConcernDefaults::ReadConcern>
@@ -330,7 +330,7 @@ ReadWriteConcernDefaults::ReadWriteConcernDefaults(ServiceContext* service,
 
           return options;
       }()),
-      _implicitDefaultWriteConcernMajority(boost::none) {
+      _implicitDefaultWriteConcernMajority(false) {
     _threadPool.startup();
 }
 
