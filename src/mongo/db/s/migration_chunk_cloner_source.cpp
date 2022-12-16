@@ -1015,13 +1015,15 @@ Status MigrationChunkClonerSource::_storeCurrentRecordId(OperationContext* opCtx
 
     // For clustered collection, an index on '_id' is not required.
     if (totalRecs > 0 && !collection->isClustered()) {
-        const auto idIdx = collection->getIndexCatalog()->findIdIndex(opCtx)->getEntry();
-        if (!idIdx) {
+        const auto idIdx = collection->getIndexCatalog()->findIdIndex(opCtx);
+        if (!idIdx || !idIdx->getEntry()) {
             return {ErrorCodes::IndexNotFound,
                     str::stream() << "can't find index '_id' in storeCurrentRecordId for "
                                   << nss().ns()};
         }
-        averageObjectIdSize = idIdx->accessMethod()->getSpaceUsedBytes(opCtx) / totalRecs;
+
+        averageObjectIdSize =
+            idIdx->getEntry()->accessMethod()->getSpaceUsedBytes(opCtx) / totalRecs;
     }
 
     if (isLargeChunk) {
