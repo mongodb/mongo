@@ -27,13 +27,13 @@ var $config = (function() {
 
             // Start the transaction and run an operation on 'startColl'.
             session.startTransaction();
-            assertWhenOwnColl.eq(1, startColl.find({_id: "startTxnDoc"}).itcount());
 
             // Run the specified operation on 'ddlColl'. Another thread may have performed a DDL
             // operation on 'ddlColl' since the transaction started. The operation may fail with one
             // of the allowed error codes, but it must not crash the server.
             let success = false;
             try {
+                assertWhenOwnColl.eq(1, startColl.find({_id: "startTxnDoc"}).itcount());
                 op(ddlColl);
                 success = true;
             } catch (e) {

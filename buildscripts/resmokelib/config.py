@@ -65,7 +65,7 @@ DEFAULTS = {
     "exclude_with_any_tags": None,
     "flow_control": None,
     "flow_control_tickets": None,
-    "fuzz_mongod_configs": False,
+    "fuzz_mongod_configs": None,
     "config_fuzz_seed": None,
     "genny_executable": None,
     "include_with_any_tags": None,
@@ -355,7 +355,7 @@ EXCLUDED_TAG = "__TEMPORARILY_DISABLED__"
 # If true, then a test failure or error will cause resmoke.py to exit and not run any more tests.
 FAIL_FAST = None
 
-FUZZ_MONGOD_CONFIGS = False
+FUZZ_MONGOD_CONFIGS = None
 CONFIG_FUZZ_SEED = None
 
 # Executable file for genny, passed in as a command line arg.

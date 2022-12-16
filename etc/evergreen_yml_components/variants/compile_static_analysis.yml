@@ -110,7 +110,9 @@ buildvariants:
 
 - <<: *generic_linux_compile_params
   name: &linux-debug-aubsan-compile-required linux-debug-aubsan-compile-required
-  display_name: "! Linux x86 Shared Library {A,UB}SAN Compile"
+  display_name: "! Linux x86 Shared Library {A,UB}SAN Enterprise Compile"
+  modules:
+  - enterprise
   expansions:
     <<: *generic_linux_compile_expansions
     separate_debug: off

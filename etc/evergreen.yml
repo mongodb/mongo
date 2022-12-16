@@ -256,17 +256,7 @@ variables:
   - name: auth_audit_gen
   - name: auth_gen
   - name: causally_consistent_jscore_txns_passthrough
-  - name: config_fuzzer_concurrency
-  - name: config_fuzzer_simulate_crash_concurrency_replication
-    distros:
-    - rhel70-large
-  - name: config_fuzzer_concurrency_replication
-    distros:
-    - rhel70-large
-  - name: config_fuzzer_jsCore
-  - name: config_fuzzer_replica_sets_jscore_passthrough
-    distros:
-    - rhel70-large
+  - name: .config_fuzzer !.large
   - name: .encrypt !.sharding !.replica_sets !.aggregation !.jscore
   - name: external_auth
   - name: external_auth_aws
@@ -1353,6 +1343,10 @@ buildvariants:
   - name: .concurrency .large !.ubsan !.no_txns !.debug_only
     distros:
     - rhel80-medium
+  - name: .config_fuzzer !.large
+  - name: .config_fuzzer .large
+    distros:
+    - rhel80-medium
   - name: disk_wiredtiger
   - name: .encrypt
   - name: idl_tests
@@ -1451,9 +1445,11 @@ buildvariants:
   - name: .concurrency .large !.ubsan !.no_txns !.debug_only !.no_debug_mode
     distros:
     - rhel80-medium
-  - name: config_fuzzer_concurrency
-  - name: config_fuzzer_jsCore
-  - name: config_fuzzer_replica_sets_jscore_passthrough
+  - name: .config_fuzzer !.large
+  - name: .config_fuzzer .large
+    distros:
+    - rhel80-medium
+  - name: .config_fuzzer_stress
     distros:
     - rhel80-large
   - name: disk_wiredtiger
@@ -1586,17 +1582,7 @@ buildvariants:
   - name: .concurrency .large !.ubsan !.no_txns !.debug_only
     distros:
     - rhel80-medium
-  - name: config_fuzzer_concurrency
-  - name: config_fuzzer_simulate_crash_concurrency_replication
-    distros:
-    - rhel80-large
-  - name: config_fuzzer_concurrency_replication
-    distros:
-    - rhel80-large
-  - name: config_fuzzer_jsCore
-  - name: config_fuzzer_replica_sets_jscore_passthrough
-    distros:
-    - rhel80-large
+  - name: .config_fuzzer !.large
   - name: disk_wiredtiger
   - name: .encrypt
   - name: feature_flag_multiversion_gen
@@ -2253,11 +2239,13 @@ buildvariants:
   - name: .clustered_collections
   - name: .concurrency !.large !.ubsan !.no_txns !.debug_only
   - name: .concurrency .large !.ubsan !.no_txns !.debug_only
-  - name: config_fuzzer_concurrency
-  - name: config_fuzzer_simulate_crash_concurrency_replication
-  - name: config_fuzzer_concurrency_replication
-  - name: config_fuzzer_jsCore
-  - name: config_fuzzer_replica_sets_jscore_passthrough
+  - name: .config_fuzzer !.large
+  - name: .config_fuzzer .large
+    distros:
+    - amazon2-arm64-large
+  - name: .config_fuzzer_stress
+    distros:
+    - amazon2-arm64-large
   - name: disk_wiredtiger
   - name: .encrypt
   - name: feature_flag_multiversion_gen
@@ -2697,6 +2685,22 @@ buildvariants:
   - name: jsCore_txns
   - name: jsCore_column_store_indexes
 
+- <<: *rhel80-debug-aubsan-lite-template
+  name: &rhel80-debug-aubsan-lite-all-feature-flags-suggested rhel80-debug-aubsan-lite-all-feature-flags-suggested
+  display_name: "* Shared Library {A,UB}SAN Enterprise RHEL 8.0 DEBUG (all feature flags)"
+  cron: "0 4 * * *" # From the ${project_required_suggested_cron} parameter
+  expansions:
+    <<: *aubsan-lite-required-expansions
+    # To force disable feature flags even on the all feature flags variant, please use this file:
+    # buildscripts/resmokeconfig/fully_disabled_feature_flags.yml
+    test_flags: >-
+      --excludeWithAnyTags=requires_ocsp_stapling
+      --excludeWithAnyTags=incompatible_with_shard_merge
+      --additionalFeatureFlagsFile all_feature_flags.txt
+  tasks:
+  - name: .config_fuzzer
+  - name: .config_fuzzer_stress
+
 - &enterprise-rhel80-debug-tsan-template
   name: &enterprise-rhel80-debug-tsan enterprise-rhel80-debug-tsan
   display_name: "* TSAN Enterprise RHEL 8.0 DEBUG"
@@ -2754,6 +2758,8 @@ buildvariants:
   - name: buildscripts_test
   # - name: resmoke_end2end_tests # Not passing
   # - name: unittest_shell_hang_analyzer_gen # Not passing
+  # - name: .config_fuzzer # Not passing
+  - name: config_fuzzer_jsCore
   - name: cqf
   - name: cqf_disabled_pipeline_opt
   - name: cqf_passthrough
@@ -2766,16 +2772,6 @@ buildvariants:
   # - name: .concurrency .large !.ubsan !.no_txns !.debug_only # Not passing
   #   distros:
   #   - rhel80-medium
-  # - name: config_fuzzer_concurrency # Not passing
-  # - name: config_fuzzer_simulate_crash_concurrency_replication # Not passing
-  #   distros:
-  #   - rhel80-large
-  # - name: config_fuzzer_concurrency_replication # Not passing
-  #   distros:
-  #   - rhel80-large
-  - name: config_fuzzer_jsCore
-    distros:
-    - rhel80-large
   - name: disk_wiredtiger
   # - name: .encrypt # Not passing
   # - name: idl_tests # Not relevant for TSAN
@@ -2875,13 +2871,7 @@ buildvariants:
   - name: .concurrency .large !.ubsan !.no_txns !.debug_only !.compute_mode
     distros:
     - rhel80-medium
-  - name: config_fuzzer_concurrency
-  - name: config_fuzzer_simulate_crash_concurrency_replication
-    distros:
-    - rhel80-large
-  - name: config_fuzzer_concurrency_replication
-    distros:
-    - rhel80-large
+  - name: .config_fuzzer
   - name: .encrypt
   - name: initial_sync_fuzzer_gen
   - name: .integration

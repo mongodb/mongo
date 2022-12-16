@@ -7,7 +7,9 @@
  * @tags: [
  *  requires_fcv_60,
  *  uses_transactions,
- *  kills_random_sessions
+ *  kills_random_sessions,
+ *  # The default linearizable readConcern timeout is too low and may cause tests to fail.
+ *  does_not_support_config_fuzzer,
  * ]
  */
 

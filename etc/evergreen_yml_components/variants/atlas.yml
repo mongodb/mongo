@@ -46,17 +46,7 @@ buildvariants:
   - name: auth_audit_gen
   - name: auth_gen
   - name: causally_consistent_jscore_txns_passthrough
-  - name: config_fuzzer_concurrency
-  - name: config_fuzzer_simulate_crash_concurrency_replication
-    distros:
-    - rhel70-large
-  - name: config_fuzzer_concurrency_replication
-    distros:
-    - rhel70-large
-  - name: config_fuzzer_jsCore
-  - name: config_fuzzer_replica_sets_jscore_passthrough
-    distros:
-    - rhel70-large
+  - name: .config_fuzzer !.large
   - name: .encrypt !.sharding !.replica_sets !.aggregation !.jscore
   - name: external_auth
   - name: external_auth_aws

@@ -9,7 +9,9 @@
  *  requires_fcv_60,
  *  requires_sharding,
  *  uses_transactions,
- *  antithesis_incompatible
+ *  antithesis_incompatible,
+ *  # startCommit times out
+ *  does_not_support_config_fuzzer,
  * ]
  */
 load('jstests/concurrency/fsm_libs/extend_workload.js');

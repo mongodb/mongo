@@ -232,15 +232,8 @@ buildvariants:
   - name: .concurrency .large !.ubsan !.no_txns !.debug_only
     distros:
     - amazon2-arm64-large
-  - name: config_fuzzer_concurrency
-  - name: config_fuzzer_simulate_crash_concurrency_replication
-    distros:
-    - amazon2-arm64-large
-  - name: config_fuzzer_concurrency_replication
-    distros:
-    - amazon2-arm64-large
-  - name: config_fuzzer_jsCore
-  - name: config_fuzzer_replica_sets_jscore_passthrough
+  - name: .config_fuzzer !.large
+  - name: .config_fuzzer .large
     distros:
     - amazon2-arm64-large
   - name: disk_wiredtiger
@@ -405,15 +398,8 @@ buildvariants:
   - name: .concurrency .large !.ubsan !.no_txns !.debug_only
     distros:
     - amazon2022-arm64-large
-  - name: config_fuzzer_concurrency
-  - name: config_fuzzer_simulate_crash_concurrency_replication
-    distros:
-    - amazon2022-arm64-large
-  - name: config_fuzzer_concurrency_replication
-    distros:
-    - amazon2022-arm64-large
-  - name: config_fuzzer_jsCore
-  - name: config_fuzzer_replica_sets_jscore_passthrough
+  - name: .config_fuzzer !.large
+  - name: .config_fuzzer .large
     distros:
     - amazon2022-arm64-large
   - name: disk_wiredtiger
@@ -1199,15 +1185,8 @@ buildvariants:
   - name: auth_audit_gen
   - name: auth_gen
   - name: causally_consistent_jscore_txns_passthrough
-  - name: config_fuzzer_concurrency
-  - name: config_fuzzer_simulate_crash_concurrency_replication
-    distros:
-    - rhel90-large
-  - name: config_fuzzer_concurrency_replication
-    distros:
-    - rhel90-large
-  - name: config_fuzzer_jsCore
-  - name: config_fuzzer_replica_sets_jscore_passthrough
+  - name: .config_fuzzer !.large
+  - name: .config_fuzzer .large
     distros:
     - rhel90-large
   - name: .encrypt !.sharding !.replica_sets !.aggregation !.jscore

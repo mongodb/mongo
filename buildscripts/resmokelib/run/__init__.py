@@ -265,7 +265,8 @@ class TestRunner(Subcommand):
             local_args = strip_fuzz_config_params(local_args)
             local_resmoke_invocation = (
                 f"{os.path.join('buildscripts', 'resmoke.py')} {' '.join(local_args)}"
-                f" --fuzzMongodConfigs --configFuzzSeed={str(config.CONFIG_FUZZ_SEED)}")
+                f" --fuzzMongodConfigs={config.FUZZ_MONGOD_CONFIGS} --configFuzzSeed={str(config.CONFIG_FUZZ_SEED)}"
+            )
 
             self._resmoke_logger.info("Fuzzed mongodSetParameters:\n%s",
                                       config.MONGOD_SET_PARAMETERS)
@@ -946,8 +947,11 @@ class RunPlugin(PluginInterface):
                                             help="The transport layer used by jstests")
 
         mongodb_server_options.add_argument(
-            "--fuzzMongodConfigs", dest="fuzz_mongod_configs", action="store_true",
-            help="Will randomly choose storage configs that were not specified.")
+            "--fuzzMongodConfigs", dest="fuzz_mongod_configs",
+            help="Randomly chooses server parameters that were not specified. Use 'stress' to fuzz "
+            "all configs including stressful storage configurations that may significantly "
+            "slow down the server. Use 'normal' to only fuzz non-stressful configurations. ",
+            metavar="MODE", choices=('normal', 'stress'))
 
         mongodb_server_options.add_argument("--configFuzzSeed", dest="config_fuzz_seed",
                                             metavar="PATH",

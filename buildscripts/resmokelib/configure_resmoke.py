@@ -307,7 +307,7 @@ or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py
             _config.CONFIG_FUZZ_SEED = int(_config.CONFIG_FUZZ_SEED)
         _config.MONGOD_SET_PARAMETERS, _config.WT_ENGINE_CONFIG, _config.WT_COLL_CONFIG, \
         _config.WT_INDEX_CONFIG = mongod_fuzzer_configs.fuzz_set_parameters(
-            _config.CONFIG_FUZZ_SEED, _config.MONGOD_SET_PARAMETERS)
+            _config.FUZZ_MONGOD_CONFIGS, _config.CONFIG_FUZZ_SEED, _config.MONGOD_SET_PARAMETERS)
         _config.EXCLUDE_WITH_ANY_TAGS.extend(["uses_compact"])
 
     _config.MONGOS_EXECUTABLE = _expand_user(config.pop("mongos_executable"))
@@ -377,13 +377,13 @@ or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py
     # Wiredtiger options. Prevent fuzzed wt configs from being overwritten unless user specifies it.
     wt_engine_config = config.pop("wt_engine_config")
     if wt_engine_config:
-        _config.WT_ENGINE_CONFIG = config.pop("wt_engine_config")
+        _config.WT_ENGINE_CONFIG = wt_engine_config
     wt_coll_config = config.pop("wt_coll_config")
     if wt_coll_config:
-        _config.WT_COLL_CONFIG = config.pop("wt_coll_config")
+        _config.WT_COLL_CONFIG = wt_coll_config
     wt_index_config = config.pop("wt_index_config")
     if wt_index_config:
-        _config.WT_INDEX_CONFIG = config.pop("wt_index_config")
+        _config.WT_INDEX_CONFIG = wt_index_config
 
     # Benchmark/Benchrun options.
     _config.BENCHMARK_FILTER = config.pop("benchmark_filter")

@@ -5121,63 +5121,115 @@ tasks:
 
 - <<: *task_template
   name: config_fuzzer_jsCore
-  tags: []
+  tags: ["config_fuzzer"]
   commands:
   - func: "do setup"
   - func: "run tests"
     vars:
       suite: core
       resmoke_args: >-
-        --fuzzMongodConfigs
+        --fuzzMongodConfigs=normal
         --excludeWithAnyTags=does_not_support_config_fuzzer
 
 - <<: *task_template
   name: config_fuzzer_concurrency
-  tags: []
+  tags: ["config_fuzzer"]
   commands:
   - func: "do setup"
   - func: "run tests"
     vars:
       suite: concurrency
       resmoke_args: >-
-        --fuzzMongodConfigs
+        --fuzzMongodConfigs=normal
         --excludeWithAnyTags=does_not_support_config_fuzzer
 
 - <<: *task_template
-  name: config_fuzzer_simulate_crash_concurrency_replication
-  tags: []
+  name: config_fuzzer_simulate_crash_concurrency_replication_gen
+  tags: ["config_fuzzer", "large"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
     vars:
       suite: simulate_crash_concurrency_replication
       resmoke_args: >-
-        --fuzzMongodConfigs
+        --fuzzMongodConfigs=normal
         --excludeWithAnyTags=does_not_support_config_fuzzer
+      use_large_distro: "true"
 
 - <<: *task_template
-  name: config_fuzzer_concurrency_replication
-  tags: []
+  name: config_fuzzer_concurrency_replication_gen
+  tags: ["config_fuzzer", "large"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
     vars:
       suite: concurrency_replication
       resmoke_args: >-
-        --fuzzMongodConfigs
+        --fuzzMongodConfigs=normal
         --excludeWithAnyTags=does_not_support_config_fuzzer
+      use_large_distro: "true"
+
+- <<: *gen_task_template
+  name: config_fuzzer_concurrency_sharded_replication_gen
+  tags: ["config_fuzzer", "large"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      suite: concurrency_sharded_replication
+      resmoke_args: >-
+        --fuzzMongodConfigs=normal
+        --excludeWithAnyTags=does_not_support_config_fuzzer
+      use_large_distro: "true"
 
 - <<: *task_template
-  name: config_fuzzer_replica_sets_jscore_passthrough
-  tags: []
+  name: config_fuzzer_stress_concurrency_replication_gen
+  tags: ["config_fuzzer_stress"]
   commands:
-  - func: "do setup"
-  - func: "run tests"
+  - func: "generate resmoke tasks"
+    vars:
+      suite: concurrency_replication
+      resmoke_args: >-
+        --fuzzMongodConfigs=stress
+        --excludeWithAnyTags=does_not_support_config_fuzzer
+      use_large_distro: "true"
+      exec_timeout_secs: 14400 # 4 hours
+      timeout_secs: 14400 # 4 hours
+
+- <<: *gen_task_template
+  name: config_fuzzer_stress_concurrency_sharded_replication_gen
+  tags: ["config_fuzzer_stress"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      suite: concurrency_sharded_replication
+      resmoke_args: >-
+        --fuzzMongodConfigs=stress
+        --excludeWithAnyTags=does_not_support_config_fuzzer
+      use_large_distro: "true"
+      exec_timeout_secs: 14400 # 4 hours
+      timeout_secs: 14400 # 4 hours
+
+- <<: *task_template
+  name: config_fuzzer_replica_sets_jscore_passthrough_gen
+  tags: ["config_fuzzer", "large"]
+  commands:
+  - func: "generate resmoke tasks"
     vars:
       suite: replica_sets_jscore_passthrough
       resmoke_args: >-
-        --fuzzMongodConfigs
+        --fuzzMongodConfigs=normal
         --excludeWithAnyTags=does_not_support_config_fuzzer
+      use_large_distro: "true"
+
+- <<: *task_template
+  name: config_fuzzer_sharding_jscore_passthrough_gen
+  tags: ["config_fuzzer", "large"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      suite: sharding_jscore_passthrough
+      resmoke_args: >-
+        --fuzzMongodConfigs=normal
+        --excludeWithAnyTags=does_not_support_config_fuzzer
+      use_large_distro: "true"
 
 - <<: *task_template
   name: jsCore_ese

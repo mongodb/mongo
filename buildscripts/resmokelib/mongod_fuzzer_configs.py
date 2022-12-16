@@ -4,7 +4,7 @@ import random
 from buildscripts.resmokelib import utils
 
 
-def generate_eviction_configs(rng):
+def generate_eviction_configs(rng, mode):
     """Generate random configurations for wiredTigerEngineConfigString parameter."""
     eviction_checkpoint_target = rng.randint(1, 99)
     eviction_target = rng.randint(50, 95)
@@ -47,7 +47,7 @@ def generate_eviction_configs(rng):
     # The setting is trigerring bugs, disabled until they get resolved.
     # dbg_rollback_error = rng.choice([0, rng.randint(250, 1500)])
     dbg_rollback_error = 0
-    dbg_slow_checkpoint = rng.choice(['true', 'false'])
+    dbg_slow_checkpoint = 'false' if mode != 'stress' else rng.choice(['true', 'false'])
 
     return "debug_mode=(eviction={0},realloc_exact={1},rollback_error={2}, slow_checkpoint={3}),"\
            "eviction_checkpoint_target={4},eviction_dirty_target={5},eviction_dirty_trigger={6},"\
@@ -112,14 +112,14 @@ def generate_flow_control_parameters(rng):
     return configs
 
 
-def generate_independent_parameters(rng):
+def generate_independent_parameters(rng, mode):
     """Return a dictionary with values for each independent parameter."""
     ret = {}
     ret["wiredTigerCursorCacheSize"] = rng.randint(-100, 100)
     ret["wiredTigerSessionCloseIdleTimeSecs"] = rng.randint(0, 300)
     ret["wiredTigerConcurrentWriteTransactions"] = rng.randint(5, 32)
     ret["wiredTigerConcurrentReadTransactions"] = rng.randint(5, 32)
-    ret["wiredTigerStressConfig"] = rng.choice([True, False])
+    ret["wiredTigerStressConfig"] = False if mode != 'stress' else rng.choice([True, False])
     if rng.choice(3 * [True] + [False]):
         # The old retryable writes format is used by other variants. Weight towards turning on the
         # new retryable writes format on in this one.
@@ -130,12 +130,12 @@ def generate_independent_parameters(rng):
     return ret
 
 
-def fuzz_set_parameters(seed, user_provided_params):
+def fuzz_set_parameters(mode, seed, user_provided_params):
     """Randomly generate mongod configurations and wiredTigerConnectionString."""
     rng = random.Random(seed)
 
     ret = {}
-    params = [generate_flow_control_parameters(rng), generate_independent_parameters(rng)]
+    params = [generate_flow_control_parameters(rng), generate_independent_parameters(rng, mode)]
     for dct in params:
         for key, value in dct.items():
             ret[key] = value
@@ -143,5 +143,5 @@ def fuzz_set_parameters(seed, user_provided_params):
     for key, value in utils.load_yaml(user_provided_params).items():
         ret[key] = value
 
-    return utils.dump_yaml(ret), generate_eviction_configs(rng), generate_table_configs(rng), \
+    return utils.dump_yaml(ret), generate_eviction_configs(rng, mode), generate_table_configs(rng), \
         generate_table_configs(rng)
