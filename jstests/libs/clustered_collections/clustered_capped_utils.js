@@ -280,7 +280,7 @@ var ClusteredCappedUtils = class {
         const oneDayInSeconds = 60 * 60 * 24;
         const tenDaysInMilliseconds = 10 * oneDayInSeconds * 1000;
         const tenDaysAgo = new Date(new Date() - tenDaysInMilliseconds);
-        const earlierTenDaysAgo = new Date(tenDaysAgo.getTime - 1);
+        const earlierTenDaysAgo = new Date(tenDaysAgo.getTime() - 1);
 
         // Create clustered capped collection and insert soon-to-be-expired documents.
         assert.commandWorked(db.createCollection(collName, {
@@ -324,7 +324,16 @@ var ClusteredCappedUtils = class {
                     .sort({$natural: -1})
                     .limit(1)
                     .toArray();
-            assert.eq(2, ops[0].o.applyOps.length);
+            assert.lte(ops[0].o.applyOps.length, 2);
+            if (ops[0].o.applyOps.length === 1) {
+                // The batch got split in two separate executions.
+                const pendingId =
+                    ops[0].o.applyOps[0].o._id === tenDaysAgo ? earlierTenDaysAgo : tenDaysAgo;
+                assert.eq(1,
+                          db.getSiblingDB("local")
+                              .oplog.rs.find({op: "d", ns: ns, "o._id": pendingId})
+                              .itcount());
+            }
         } else {
             assert.eq(1,
                       db.getSiblingDB("local")
