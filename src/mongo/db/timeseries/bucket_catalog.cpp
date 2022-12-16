@@ -1521,6 +1521,13 @@ StatusWith<std::unique_ptr<BucketCatalog::Bucket>> BucketCatalog::_rehydrateBuck
         return result.second;
     }
 
+    auto controlField = bucketDoc.getObjectField(timeseries::kBucketControlFieldName);
+    auto closedElem = controlField.getField(timeseries::kBucketControlClosedFieldName);
+    if (closedElem.booleanSafe()) {
+        return {ErrorCodes::BadValue,
+                "Bucket has been marked closed and is not eligible for reopening"};
+    }
+
     BSONElement metadata;
     auto metaFieldName = options.getMetaField();
     if (metaFieldName) {
@@ -1555,7 +1562,6 @@ StatusWith<std::unique_ptr<BucketCatalog::Bucket>> BucketCatalog::_rehydrateBuck
     } else {
         bucket->_size = bucketDoc.objsize();
     }
-    auto controlField = bucketDoc.getObjectField(timeseries::kBucketControlFieldName);
     bucket->_minTime = controlField.getObjectField(timeseries::kBucketControlMinFieldName)
                            .getField(options.getTimeField())
                            .Date();

@@ -1194,6 +1194,57 @@ TEST_F(BucketCatalogTest, ReopenMalformedBucket) {
     }
 }
 
+TEST_F(BucketCatalogTest, ReopenClosedBuckets) {
+    RAIIServerParameterControllerForTest featureFlag{"featureFlagTimeseriesScalabilityImprovements",
+                                                     true};
+
+    AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
+
+    {
+        // control.closed: true
+        BSONObj closedBucket = ::mongo::fromjson(
+            R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
+            "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
+                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3},
+                                   "closed": true},
+            "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "1":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "2":{"$date":"2022-06-06T15:34:30.000Z"}},
+                    "a":{"0":1,"1":2,"2":3},
+                    "b":{"0":1,"1":2,"2":3}}})");
+        ASSERT_NOT_OK(_bucketCatalog->reopenBucket(_opCtx, autoColl.getCollection(), closedBucket));
+    }
+
+    {
+        // control.closed: false
+        BSONObj openBucket = ::mongo::fromjson(
+            R"({"_id":{"$oid":"629e1e680958e279dc29a518"},
+            "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
+                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3},
+                                   "closed": false},
+            "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "1":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "2":{"$date":"2022-06-06T15:34:30.000Z"}},
+                    "a":{"0":1,"1":2,"2":3},
+                    "b":{"0":1,"1":2,"2":3}}})");
+        ASSERT_OK(_bucketCatalog->reopenBucket(_opCtx, autoColl.getCollection(), openBucket));
+    }
+
+    {
+        // No control.closed
+        BSONObj openBucket = ::mongo::fromjson(
+            R"({"_id":{"$oid":"629e1e680958e279dc29a517"},
+            "control":{"version":1,"min":{"time":{"$date":"2022-06-06T15:34:00.000Z"},"a":1,"b":1},
+                                   "max":{"time":{"$date":"2022-06-06T15:34:30.000Z"},"a":3,"b":3}},
+            "data":{"time":{"0":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "1":{"$date":"2022-06-06T15:34:30.000Z"},
+                            "2":{"$date":"2022-06-06T15:34:30.000Z"}},
+                    "a":{"0":1,"1":2,"2":3},
+                    "b":{"0":1,"1":2,"2":3}}})");
+        ASSERT_OK(_bucketCatalog->reopenBucket(_opCtx, autoColl.getCollection(), openBucket));
+    }
+}
+
 TEST_F(BucketCatalogTest, ReopenUncompressedBucketAndInsertCompatibleMeasurement) {
     RAIIServerParameterControllerForTest featureFlag{"featureFlagTimeseriesScalabilityImprovements",
                                                      true};
@@ -1319,7 +1370,7 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertCompatibleMeasurement) 
         timeseries::compressBucket(bucketDoc,
                                    _timeField,
                                    _ns1,
-                                   /*eligibleForReopening*/ false,
+                                   /*eligibleForReopening*/ true,
                                    /*validateDecompression*/ true);
     const BSONObj& compressedBucketDoc = compressionResult.compressedBucket.value();
 
@@ -1382,7 +1433,7 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertIncompatibleMeasurement
         timeseries::compressBucket(bucketDoc,
                                    _timeField,
                                    _ns1,
-                                   /*eligibleForReopening*/ false,
+                                   /*eligibleForReopening*/ true,
                                    /*validateDecompression*/ true);
     const BSONObj& compressedBucketDoc = compressionResult.compressedBucket.value();
 
