@@ -112,15 +112,10 @@ runHistogramsTest(function testTypeCounts() {
     forceCE("histogram");
     let hint = {a: 1};
 
-    // TODO SERVER-70936: estimate boolean counts.
-    // verifyCEForMatch({coll, predicate: {a: true}, expected: [{_id: 0, a: true}], ce: 1, hint});
-    // verifyCEForMatch({
-    //     coll,
-    //     predicate: {a: false},
-    //     expected: [{_id: 1, a: false}, {_id: 2, a: false}],
-    //     ce: 2,
-    //     hint
-    // });
+    // Estimate boolean counts.
+    verifyCEForMatch({coll, predicate: {a: true}, expected: [{_id: 0, a: true}], hint});
+    verifyCEForMatch(
+        {coll, predicate: {a: false}, expected: [{_id: 1, a: false}, {_id: 2, a: false}], hint});
 
     // If we hint the index {a: 1} for this query, we don't get an IndexScan plan; instead, we fail
     // to optimize. It looks like we can't test CE for this case because we only generate a
@@ -402,7 +397,23 @@ runHistogramsTest(function testTypeCounts() {
         hint
     });
 
-    // TODO SERVER-70936: estimate boolean counts.
+    verifyCEForMatch({
+        coll,
+        predicate: {"a.b": true},
+        expected: [
+            {_id: 0, a: {b: true}},
+            {_id: 1, a: {b: true}},
+        ],
+        hint
+    });
+    verifyCEForMatch({
+        coll,
+        predicate: {"a.b": false},
+        expected: [
+            {_id: 2, a: {b: false}},
+        ],
+        hint
+    });
 
     // Currently, we always estimate any object predicate as the total count of objects.
     verifyCEForMatch(
@@ -554,7 +565,34 @@ runHistogramsTest(function testTypeCounts() {
     forceCE("histogram");
     hint = {a: 1};
 
-    // TODO SERVER-70936: estimate boolean counts.
+    // Estimate boolean counts. Note that we have 10 boolean arrays, so that gets added to the
+    // counter estimates.
+    verifyCEForMatch({
+        coll,
+        predicate: {"a": true},
+        expected: [
+            {_id: 0, a: true},
+            {_id: 2, a: [true]},
+            {_id: 4, a: [true, false]},
+            {_id: 6, a: [[false, false], true]},
+            {_id: 27, a: [null, true, false, [], [1, 2, 3], ["a", "b", "c"], {a: 1}, {}]},
+        ],
+        ce: 11,
+        hint
+    });
+    verifyCEForMatch({
+        coll,
+        predicate: {"a": false},
+        expected: [
+            {_id: 1, a: false},
+            {_id: 3, a: [false]},
+            {_id: 4, a: [true, false]},
+            {_id: 5, a: [false, false, false]},
+            {_id: 27, a: [null, true, false, [], [1, 2, 3], ["a", "b", "c"], {a: 1}, {}]},
+        ],
+        ce: 11,
+        hint
+    });
 
     // Currently, we always estimate any object predicate as the total count of objects.
     verifyCEForMatch({

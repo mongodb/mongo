@@ -252,25 +252,44 @@ EstimationResult estimate(const ScalarHistogram& h,
 /**
  * Returns how many values of the given type are known by the array histogram.
  */
-double getTypeCard(const ArrayHistogram& ah, value::TypeTags tag, bool includeScalar) {
+double getTypeCard(const ArrayHistogram& ah,
+                   value::TypeTags tag,
+                   value::Value val,
+                   bool includeScalar) {
     double count = 0.0;
 
-    // TODO SERVER-70936: booleans are estimated by different type counters (unless in arrays).
-    if (tag == sbe::value::TypeTags::Boolean) {
-        uasserted(7051101, "Cannot estimate boolean types yet with histogram CE.");
+    if (includeScalar) {
+        // Include scalar type count estimate.
+        switch (tag) {
+            case value::TypeTags::Boolean: {
+                // In the case of booleans, we have separate true/false counters we can use.
+                const bool estTrue = value::bitcastTo<bool>(val);
+                if (estTrue) {
+                    count += ah.getTrueCount();
+                } else {
+                    count += ah.getFalseCount();
+                }
+                break;
+            }
+            case value::TypeTags::Array: {
+                // Note that if we are asked by the optimizer to estimate an interval whose bounds
+                // are arrays, this means we are trying to estimate equality on nested arrays. In
+                // this case, we do not want to include the "scalar" type counter for the array
+                // type, because this will cause us to estimate the nested array case as counting
+                // all arrays, regardless of whether or not they are nested.
+                break;
+            }
+            // TODO SERVER-71377: Use both missing & null counters for null equality.
+            // case value::TypeTags::Null: {}
+            default: { count += ah.getTypeCount(tag); }
+        }
     }
 
-    // Note that if we are asked by the optimizer to estimate an interval whose bounds are  arrays,
-    // this means we are trying to estimate equality on nested arrays. In this case, we do not want
-    // to include the "scalar" type counter for the array type, because this will cause us to
-    // estimate the nested array case as counting all arrays, regardless of whether or not they are
-    // nested.
-    if (includeScalar && tag != value::TypeTags::Array) {
-        count += ah.getTypeCount(tag);
-    }
     if (ah.isArray()) {
+        // Include array type count estimate.
         count += ah.getArrayTypeCount(tag);
     }
+
     return count;
 }
 
@@ -436,7 +455,7 @@ CEType estimateIntervalCardinality(const ArrayHistogram& ah,
         }
 
         // Otherwise, we return the cardinality for the type of the intervals.
-        return {getTypeCard(ah, tag, includeScalar)};
+        return {getTypeCard(ah, tag, val, includeScalar)};
     }
 
     // Otherwise, we have a range.
@@ -476,9 +495,9 @@ CEType estimateIntervalCardinality(const ArrayHistogram& ah,
     // non-histogrammable types. Otherwise, we need to figure out which type(s) are included by this
     // range.
     if (lowTag == highTag || isIntervalSubsetOfType(interval, lowTag)) {
-        return {getTypeCard(ah, lowTag, includeScalar)};
+        return {getTypeCard(ah, lowTag, lowVal, includeScalar)};
     } else if (isIntervalSubsetOfType(interval, highTag)) {
-        return {getTypeCard(ah, highTag, includeScalar)};
+        return {getTypeCard(ah, highTag, highVal, includeScalar)};
     }
 
     // If we reach here, we've given up estimating, because our interval intersected both high & low

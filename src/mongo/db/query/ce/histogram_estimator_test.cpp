@@ -119,10 +119,14 @@ TypeCounts getTypeCountsFromData(TestBuckets testBuckets) {
 }
 
 std::shared_ptr<const ArrayHistogram> getArrayHistogramFromData(
-    TestBuckets testBuckets, TypeCounts additionalScalarData = {}) {
+    TestBuckets testBuckets,
+    TypeCounts additionalScalarData = {},
+    double trueCount = 0,
+    double falseCount = 0) {
     TypeCounts dataTypeCounts = getTypeCountsFromData(testBuckets);
     dataTypeCounts.merge(additionalScalarData);
-    return ArrayHistogram::make(getHistogramFromData(testBuckets), std::move(dataTypeCounts));
+    return ArrayHistogram::make(
+        getHistogramFromData(testBuckets), std::move(dataTypeCounts), trueCount, falseCount);
 }
 
 std::shared_ptr<const ArrayHistogram> getArrayHistogramFromData(
@@ -133,7 +137,9 @@ std::shared_ptr<const ArrayHistogram> getArrayHistogramFromData(
     TypeCounts arrayTypeCounts,
     double totalArrayCount,
     double emptyArrayCount = 0,
-    TypeCounts additionalScalarData = {}) {
+    TypeCounts additionalScalarData = {},
+    double trueCount = 0,
+    double falseCount = 0) {
 
     // Set up scalar type counts.
     TypeCounts dataTypeCounts = getTypeCountsFromData(scalarBuckets);
@@ -149,7 +155,24 @@ std::shared_ptr<const ArrayHistogram> getArrayHistogramFromData(
                                 std::move(arrayMinHist),
                                 std::move(arrayMaxHist),
                                 std::move(arrayTypeCounts),
-                                emptyArrayCount);
+                                emptyArrayCount,
+                                trueCount,
+                                falseCount);
+}
+
+void addHistogramFromValues(CEHistogramTester& t,
+                            const std::string& fieldName,
+                            const std::vector<stats::SBEValue>& values,
+                            double numBuckets) {
+    auto ah = stats::createArrayEstimator(values, numBuckets);
+    t.addHistogram(fieldName, ah);
+    t.setIndexes(
+        {{"index_" + fieldName,
+          makeIndexDefinition(FieldNameType{fieldName}, CollationOp::Ascending, ah->isArray())}});
+
+    if (kCETestLogOnly) {
+        std::cout << ah->serialize() << std::endl;
+    }
 }
 
 TEST(CEHistogramTest, AssertSmallMaxDiffHistogramEstimatesAtomicPredicates) {
@@ -787,38 +810,52 @@ TEST(CEHistogramTest, TestTypeCounters) {
     // 3. mixed: Mixed histogram with no buckets, only type-counted data, both scalars and arrays.
     constexpr double kNumObj = 200.0;
     constexpr double kNumNull = 300.0;
+    constexpr double kNumFalse = 100.0;
+    constexpr double kNumTrue = 400.0;
+    constexpr double kNumBool = kNumFalse + kNumTrue;
     t.addHistogram("scalar",
                    getArrayHistogramFromData({/* No histogram data. */},
                                              {{sbe::value::TypeTags::Object, kNumObj},
-                                              {sbe::value::TypeTags::Null, kNumNull}}));
+                                              {sbe::value::TypeTags::Null, kNumNull},
+                                              {sbe::value::TypeTags::Boolean, kNumBool}},
+                                             kNumTrue,
+                                             kNumFalse));
     t.addHistogram("array",
                    getArrayHistogramFromData({/* No scalar buckets. */},
                                              {/* No array unique buckets. */},
                                              {/* No array min buckets. */},
                                              {/* No array max buckets. */},
                                              {{sbe::value::TypeTags::Object, kNumObj},
-                                              {sbe::value::TypeTags::Null, kNumNull}},
+                                              {sbe::value::TypeTags::Null, kNumNull},
+                                              {sbe::value::TypeTags::Boolean, kNumBool}},
                                              kCollCard._value));
 
     // Count of each type in array type counters for field "mixed".
     constexpr double kNumObjMA = 50.0;
     constexpr double kNumNullMA = 100.0;
     // For the purposes of this test, we have one array of each value of a non-histogrammable type.
-    constexpr double kNumArr = kNumObjMA + kNumNullMA;
+    constexpr double kNumBoolMA = 250.0;
+    constexpr double kNumArr = kNumObjMA + kNumNullMA + kNumBoolMA;
     const TypeCounts mixedArrayTC{{sbe::value::TypeTags::Object, kNumObjMA},
-                                  {sbe::value::TypeTags::Null, kNumNullMA}};
+                                  {sbe::value::TypeTags::Null, kNumNullMA},
+                                  {sbe::value::TypeTags::Boolean, kNumBoolMA}};
 
     // Count of each type in scalar type counters for field "mixed".
     constexpr double kNumObjMS = 150.0;
     constexpr double kNumNullMS = 200.0;
+    constexpr double kNumFalseMS = 150.0;
+    constexpr double kNumTrueMS = 100.0;
+    constexpr double kNumBoolMS = kNumFalseMS + kNumTrueMS;
     const TypeCounts mixedScalarTC{{sbe::value::TypeTags::Object, kNumObjMS},
-                                   {sbe::value::TypeTags::Null, kNumNullMS}};
+                                   {sbe::value::TypeTags::Null, kNumNullMS},
+                                   {sbe::value::TypeTags::Boolean, kNumBoolMS}};
 
     // Quick sanity check of test setup for the "mixed" histogram. The idea is that we want a
     // portion of objects inside arrays, and the rest as scalars, but we want the total count of
-    // objects to be
+    // types to be the same.
     ASSERT_EQ(kNumObjMA + kNumObjMS, kNumObj);
     ASSERT_EQ(kNumNullMA + kNumNullMS, kNumNull);
+    ASSERT_EQ(kNumBoolMA + kNumBoolMS, kNumBool);
 
     t.addHistogram("mixed",
                    getArrayHistogramFromData({/* No scalar buckets. */},
@@ -828,7 +865,9 @@ TEST(CEHistogramTest, TestTypeCounters) {
                                              mixedArrayTC,
                                              kNumArr,
                                              0 /* Empty array count. */,
-                                             mixedScalarTC));
+                                             mixedScalarTC,
+                                             kNumTrueMS,
+                                             kNumFalseMS));
 
     // Set up indexes.
     t.setIndexes({{"scalarIndex",
@@ -887,9 +926,9 @@ TEST(CEHistogramTest, TestTypeCounters) {
     // Note that for ranges including null (e.g. {$lt: null}) we don't generate any SargableNodes.
     ASSERT_EQ_ELEMMATCH_CE(t, kNumNull, 0.0, "scalar", "{$eq: null}");
 
-    // TODO SERVER-70936: Add tests for booleans.
-    // ASSERT_EQ_ELEMMATCH_CE(t, kNumBool, 0.0, "scalar", "{$eq: true}");
-    // ASSERT_EQ_ELEMMATCH_CE(t, kNumBool, 0.0, "scalar", "{$eq: false}");
+    // Test boolean count estimate.
+    ASSERT_EQ_ELEMMATCH_CE(t, kNumTrue, 0.0, "scalar", "{$eq: true}");
+    ASSERT_EQ_ELEMMATCH_CE(t, kNumFalse, 0.0, "scalar", "{$eq: false}");
 
     // Tests for array type counts only.
     // For object-only intervals in an array histogram, if we're using $elemMatch on an object-only
@@ -938,9 +977,9 @@ TEST(CEHistogramTest, TestTypeCounters) {
     // Note that for ranges including null (e.g. {$lt: null}) we don't generate any SargableNodes.
     ASSERT_EQ_ELEMMATCH_CE(t, kNumNull, kNumNull, "array", "{$eq: null}");
 
-    // TODO SERVER-70936: Add tests for booleans.
-    // ASSERT_EQ_ELEMMATCH_CE(t, kNumBool, kNumBool, "array", "{$eq: true}");
-    // ASSERT_EQ_ELEMMATCH_CE(t, kNumBool, kNumBool, "array", "{$eq: false}");
+    // Test boolean count estimate.
+    ASSERT_EQ_ELEMMATCH_CE(t, kNumBool, kNumBool, "array", "{$eq: true}");
+    ASSERT_EQ_ELEMMATCH_CE(t, kNumBool, kNumBool, "array", "{$eq: false}");
 
     // Tests for mixed type counts only. Regular match predicates should be estimated as the sum of
     // the scalar and array counts (e.g. for objects, 'kNumObj'), while elemMatch predicates
@@ -988,9 +1027,9 @@ TEST(CEHistogramTest, TestTypeCounters) {
     // Note that for ranges including null (e.g. {$lt: null}) we don't generate any SargableNodes.
     ASSERT_EQ_ELEMMATCH_CE(t, kNumNull, kNumNullMA, "mixed", "{$eq: null}");
 
-    // TODO SERVER-70936: Add tests for booleans.
-    // ASSERT_EQ_ELEMMATCH_CE(t, kNumBool, kNumBoolMA, "mixed", "{$eq: true}");
-    // ASSERT_EQ_ELEMMATCH_CE(t, kNumBool, kNumBoolMA, "mixed", "{$eq: false}");
+    // Test boolean count estimate.
+    ASSERT_EQ_ELEMMATCH_CE(t, kNumTrueMS + kNumBoolMA, kNumBoolMA, "mixed", "{$eq: true}");
+    ASSERT_EQ_ELEMMATCH_CE(t, kNumFalseMS + kNumBoolMA, kNumBoolMA, "mixed", "{$eq: false}");
 
     // Test combinations of the three fields/ type counters.
     constexpr double k3ObjCard =
@@ -1074,9 +1113,8 @@ TEST(CEHistogramTest, TestNestedArrayTypeCounterPredicates) {
         {{"index", makeIndexDefinition("na", CollationOp::Ascending, /* isMultiKey */ true)}});
 
     // Some equality tests on types that are not present in the type counters should return 0.0.
-    // TODO SERVER-70936: Add tests for booleans.
-    // ASSERT_EQ_ELEMMATCH_CE(t, 0.0, 0.0, "na", "{$eq: false}");
-    // ASSERT_EQ_ELEMMATCH_CE(t, 0.0, 0.0, "na", "{$eq: true}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 0.0, 0.0, "na", "{$eq: false}");
+    ASSERT_EQ_ELEMMATCH_CE(t, 0.0, 0.0, "na", "{$eq: true}");
     ASSERT_EQ_ELEMMATCH_CE(t, 0.0, 0.0, "na", "{$eq: null}");
     // We don't have any objects in arrays, so don't count them.
     ASSERT_EQ_ELEMMATCH_CE(t, kNumObj, 0.0, "na", "{$eq: {a: 1}}");
@@ -1160,43 +1198,27 @@ TEST(CEHistogramTest, TestFallbackForNonConstIntervals) {
 }
 
 TEST(CEHistogramTest, TestHistogramNeq) {
-    constexpr double collCard = 10.0;
+    constexpr double kCollCard = 10.0;
 
-    CEHistogramTester t("test", {collCard});
+    CEHistogramTester t("test", {kCollCard});
     {
         std::vector<stats::SBEValue> values;
-        for (double v = 0; v < collCard; v++) {
+        for (double v = 0; v < kCollCard; v++) {
             values.push_back(stage_builder::makeValue(Value(v)));
             values.push_back(stage_builder::makeValue(Value(BSON_ARRAY(v))));
         }
-
-        auto ah = stats::createArrayEstimator(values, collCard /* Number of buckets. */);
-        t.addHistogram("a", ah);
-        t.setIndexes(
-            {{"indexA", makeIndexDefinition("a", CollationOp::Ascending, /* isMultiKey */ true)}});
-
-        if (kCETestLogOnly) {
-            std::cout << ah->serialize() << std::endl;
-        }
+        addHistogramFromValues(t, "a", values, kCollCard);
     }
 
     {
         std::vector<stats::SBEValue> values;
         std::string s = "charA";
-        for (double v = 0; v < collCard; v++) {
+        for (double v = 0; v < kCollCard; v++) {
             s[4] += (char)v;
             values.push_back(stage_builder::makeValue(Value(s)));
             values.push_back(stage_builder::makeValue(Value(BSON_ARRAY(s))));
         }
-
-        auto ah = stats::createArrayEstimator(values, collCard /* Number of buckets. */);
-        t.addHistogram("b", ah);
-        t.setIndexes(
-            {{"indexB", makeIndexDefinition("b", CollationOp::Ascending, /* isMultiKey */ true)}});
-
-        if (kCETestLogOnly) {
-            std::cout << ah->serialize() << std::endl;
-        }
+        addHistogramFromValues(t, "b", values, kCollCard);
     }
 
     // In the scalar case, we generate 10 buckets, with each unique value as a boundary value with
@@ -1234,6 +1256,49 @@ TEST(CEHistogramTest, TestHistogramNeq) {
     ASSERT_MATCH_CE(t, "{$and: [{a: {$ne: 7}}, {noHist: {$eq: 'charB'}}]}", neEqCE);
     ASSERT_MATCH_CE(t, "{$and: [{a: {$ne: 7}}, {noHist: {$ne: 'charB'}}]}", neNeCE);
     ASSERT_MATCH_CE(t, "{$and: [{a: {$ne: 7}}, {noHist: {$eq: 'charB'}}]}", neEqCE);
+}
+
+TEST(CEHistogramTest, TestHistogramConjTypeCount) {
+    constexpr double kCollCard = 40.0;
+    CEHistogramTester t("test", {kCollCard});
+    {
+        std::vector<stats::SBEValue> values;
+        for (double v = 0; v < 10.0; v++) {
+            values.push_back(stage_builder::makeValue(Value(true)));
+            values.push_back(stage_builder::makeValue(Value(false)));
+            values.push_back(stage_builder::makeValue(Value(false)));
+            // Remaining values in coll for 'tc' are missing.
+            values.push_back({value::TypeTags::Nothing, 0});
+        }
+        addHistogramFromValues(t, "tc", values, kCollCard);
+    }
+
+    {
+        std::vector<stats::SBEValue> values;
+        for (double v = 0; v < 10.0; v++) {
+            values.push_back(stage_builder::makeValue(Value(v)));
+            // Remaining values in coll for 'i' are missing.
+            values.push_back({value::TypeTags::Nothing, 0});
+            values.push_back({value::TypeTags::Nothing, 0});
+            values.push_back({value::TypeTags::Nothing, 0});
+        }
+        addHistogramFromValues(t, "i", values, kCollCard);
+    }
+
+    // 8.0 values of "i" match (0-7), and each is a bucket boundary.
+    ASSERT_MATCH_CE(t, "{i: {$lt: 8}}", 8.0);
+
+    // We estimate this correctly as the number of true values.
+    ASSERT_MATCH_CE(t, "{tc: {$eq: true}}", 10.0);
+
+    // We estimate this correctly as the number of false values.
+    ASSERT_MATCH_CE(t, "{tc: {$eq: false}}", 20.0);
+
+    // We then apply exponential backoff to combine the estimates of the histogram & type counters.
+    // CE = 8/40*sqrt(10/40)*40
+    ASSERT_MATCH_CE(t, "{$and: [{i: {$lt: 8}}, {tc: {$eq: true}}]}", 4.0);
+    // CE = 8/40*sqrt(20/40)*40
+    ASSERT_MATCH_CE(t, "{$and: [{i: {$lt: 8}}, {tc: {$eq: false}}]}", 5.65685);
 }
 }  // namespace
 }  // namespace mongo::optimizer::ce
