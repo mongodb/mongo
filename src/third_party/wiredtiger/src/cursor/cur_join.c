@@ -538,7 +538,7 @@ __curjoin_extract_insert(WT_CURSOR *cursor)
     WT_ASSERT(session, ikey.size > 0);
     --ikey.size;
 
-    ret = __curjoin_entry_in_range(session, cextract->entry, &ikey, false);
+    ret = __curjoin_entry_in_range(session, cextract->entry, &ikey, NULL);
     if (ret == WT_NOTFOUND)
         ret = 0;
     else if (ret == 0)
