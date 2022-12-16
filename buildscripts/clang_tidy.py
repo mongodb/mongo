@@ -18,17 +18,23 @@ import yaml
 
 
 def _clang_tidy_executor(clang_tidy_filename: str, clang_tidy_binary: str,
-                         clang_tidy_cfg: Dict[str, Any], output_dir: str,
-                         show_stdout: bool) -> Tuple[str, Optional[str]]:
+                         clang_tidy_cfg: Dict[str, Any], output_dir: str, show_stdout: bool,
+                         mongo_check_module: str = '') -> Tuple[str, Optional[str]]:
 
     clang_tidy_parent_dir = output_dir / clang_tidy_filename.parent
     os.makedirs(clang_tidy_parent_dir, exist_ok=True)
 
     output_filename_base = clang_tidy_parent_dir / clang_tidy_filename.name
     output_filename_fixes = output_filename_base.with_suffix(".yml")
+
+    if mongo_check_module:
+        load_module_option = ['-load', mongo_check_module]
+    else:
+        load_module_option = []
+
     clang_tidy_command = [
-        clang_tidy_binary, clang_tidy_filename, f"-export-fixes={output_filename_fixes}",
-        f"-config={json.dumps(clang_tidy_cfg)}"
+        clang_tidy_binary, *load_module_option, clang_tidy_filename,
+        f"-export-fixes={output_filename_fixes}", f"-config={json.dumps(clang_tidy_cfg)}"
     ]
     proc = subprocess.run(clang_tidy_command, capture_output=True, check=False)
     files_to_parse = None
@@ -108,12 +114,20 @@ def main():
                         help="Log errors to console")
     parser.add_argument("-l", "--log-file", type=str, default="clang_tidy",
                         help="clang tidy log from evergreen")
+    parser.add_argument("-m", "--check-module", type=str,
+                        default="build/install/lib/libmongo_tidy_checks.so",
+                        help="Path to load the custom mongo checks module.")
     # TODO: Is there someway to get this without hardcoding this much
     parser.add_argument("-y", "--clang-tidy-toolchain", type=str, default="v4")
     parser.add_argument("-f", "--clang-tidy-cfg", type=str, default=".clang-tidy")
     args = parser.parse_args()
 
     clang_tidy_binary = f'/opt/mongodbtoolchain/{args.clang_tidy_toolchain}/bin/clang-tidy'
+
+    if os.path.exists(args.check_module):
+        mongo_tidy_check_module = args.check_module
+    else:
+        mongo_tidy_check_module = ''
 
     with open(args.compile_commands) as compile_commands:
         compile_commands = json.load(compile_commands)
@@ -147,7 +161,8 @@ def main():
         for clang_tidy_filename in files_to_tidy:
             clang_tidy_executor_futures.append(
                 executor.submit(_clang_tidy_executor, clang_tidy_filename, clang_tidy_binary,
-                                clang_tidy_cfg, args.output_dir, args.show_stdout))
+                                clang_tidy_cfg, args.output_dir, args.show_stdout,
+                                mongo_tidy_check_module))
 
         for future in futures.as_completed(clang_tidy_executor_futures):
             clang_tidy_errors_futures.append(future.result()[0])

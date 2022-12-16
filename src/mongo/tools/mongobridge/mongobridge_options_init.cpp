@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/tools/mongobridge_options.h"
+#include "mongo/tools/mongobridge/mongobridge_options.h"
 
 #include <iostream>
 

@@ -28,7 +28,7 @@
  */
 
 
-#include "mongo/tools/mongobridge_options.h"
+#include "mongo/tools/mongobridge/mongobridge_options.h"
 
 #include <algorithm>
 #include <iostream>

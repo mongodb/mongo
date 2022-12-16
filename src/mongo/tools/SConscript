@@ -1,33 +1,13 @@
-# -*- mode: python; -*-
-
-Import('env')
-Import('get_option')
+Import("env")
 
 env = env.Clone()
 
-yamlEnv = env.Clone()
-yamlEnv.InjectThirdParty(libraries=['yaml'])
-
-mongobridge = env.Program(
-    target="mongobridge",
-    source=[
-        "bridge.cpp",
-        "bridge_commands.cpp",
-        "mongobridge_options.cpp",
-        "mongobridge_options.idl",
-        "mongobridge_options_init.cpp",
+env.SConscript(
+    dirs=[
+        'mongobridge',
+        'mongo_tidy_checks',
     ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/dbmessage',
-        '$BUILD_DIR/mongo/rpc/rpc',
-        '$BUILD_DIR/mongo/transport/message_compressor',
-        '$BUILD_DIR/mongo/transport/message_compressor_options_server',
-        '$BUILD_DIR/mongo/transport/service_entry_point',
-        '$BUILD_DIR/mongo/transport/service_executor',
-        '$BUILD_DIR/mongo/transport/transport_layer',
-        '$BUILD_DIR/mongo/util/net/network',
-        '$BUILD_DIR/mongo/util/options_parser/options_parser_init',
-        '$BUILD_DIR/mongo/util/signal_handlers',
+    exports=[
+        'env',
     ],
-    AIB_COMPONENT='dist-test',
 )

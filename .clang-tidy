@@ -52,8 +52,8 @@ Checks:          '-*,
                   -bugprone-string-literal-with-embedded-nul,
                   -bugprone-suspicious-missing-comma,
                   -bugprone-suspicious-semicolon,
-                  -bugprone-undefined-memory-manipulation,                              
-                  -bugprone-unused-return-value,             
+                  -bugprone-undefined-memory-manipulation,
+                  -bugprone-unused-return-value,
                   -cert-err34-c,
                   -cert-err52-cpp,
                   -cert-err60-cpp,
@@ -110,7 +110,7 @@ Checks:          '-*,
                   '
 WarningsAsErrors: '*'
 HeaderFilterRegex: '(mongo/.*|build/.*)'
-CheckOptions:    
+CheckOptions:
   - key:             bugprone-assert-side-effect.AssertMacros
     value:           assert
   - key:             bugprone-assert-side-effect.CheckFunctionCalls

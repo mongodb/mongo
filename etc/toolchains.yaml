@@ -5,7 +5,7 @@ toolchains:
     - v3
     - v4
   version_aliases:
-    stable: v3
+    stable: v4
     testing: v4
   releases:
     default:
