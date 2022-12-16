@@ -413,10 +413,26 @@ private:
  */
 struct OpMsgRequestBuilder {
 public:
-    static OpMsgRequest create(StringData db, BSONObj body, const BSONObj& extraFields = {});
+    /**
+     * Creates an OpMsgRequest object.
+     * If tenant id exists in db name, then a "$tenant" will be appended to the OpMsgRequest
+     * object's body.
+     * Do not use if creating an OpMsgRequest in order to run a command directly (i.e.
+     * CommandHelpers::runCommandDirectly). This function does not set a ValidatedTenancyScope on
+     * the request itself, which will lead to the request being parsed incorrectly.
+     */
     static OpMsgRequest create(const DatabaseName& dbName,
                                BSONObj body,
                                const BSONObj& extraFields = {});
+
+    /**
+     * Creates an OpMsgRequest object and directly sets a validated tenancy scope on it.
+     */
+    static OpMsgRequest createWithValidatedTenancyScope(
+        const DatabaseName& dbName,
+        boost::optional<auth::ValidatedTenancyScope> validatedTenancyScope,
+        BSONObj body,
+        const BSONObj& extraFields = {});
 };
 
 }  // namespace mongo

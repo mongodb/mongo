@@ -115,11 +115,11 @@ public:
         : _tenantOrUser(std::move(tenant)) {}
 
     /**
-     * Backdoor API for use by FLE Query Analysis to setup a validated tenant without a security
-     * context.
+     * Backdoor API to setup a validated tenant. For use only when a security context is not
+     * available.
      */
-    struct TrustedFLEQueryAnalysisTag {};
-    explicit ValidatedTenancyScope(TenantId tenant, TrustedFLEQueryAnalysisTag)
+    struct TrustedForInnerOpMsgRequestTag {};
+    explicit ValidatedTenancyScope(TenantId tenant, TrustedForInnerOpMsgRequestTag)
         : _tenantOrUser(std::move(tenant)) {}
 
 private:

@@ -176,7 +176,9 @@ public:
             }
 
             auto viewAggCmd =
-                OpMsgRequest::fromDBAndBody(nss.db(), viewAggregation.getValue()).body;
+                OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                    nss.dbName(), request.validatedTenancyScope, viewAggregation.getValue())
+                    .body;
             auto viewAggRequest = aggregation_request_helper::parseFromBSON(
                 opCtx,
                 nss,
@@ -262,9 +264,15 @@ public:
             auto viewAggregation = parsedDistinct.asAggregationCommand();
             uassertStatusOK(viewAggregation.getStatus());
 
-            BSONObj aggResult = CommandHelpers::runCommandDirectly(
-                opCtx,
-                OpMsgRequest::fromDBAndBody(dbName.db(), std::move(viewAggregation.getValue())));
+            using VTS = auth::ValidatedTenancyScope;
+            boost::optional<VTS> vts = boost::none;
+            if (dbName.tenantId()) {
+                vts = VTS(dbName.tenantId().value(), VTS::TrustedForInnerOpMsgRequestTag{});
+            }
+            auto aggRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                dbName, vts, std::move(viewAggregation.getValue()));
+
+            BSONObj aggResult = CommandHelpers::runCommandDirectly(opCtx, aggRequest);
             uassertStatusOK(ViewResponseFormatter(aggResult).appendAsDistinctResponse(&result));
             return true;
         }

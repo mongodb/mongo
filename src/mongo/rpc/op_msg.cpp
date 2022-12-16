@@ -253,7 +253,7 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
 }
 
 OpMsgRequest OpMsgRequest::fromDBAndBody(StringData db, BSONObj body, const BSONObj& extraFields) {
-    return OpMsgRequestBuilder::create(db, std::move(body), extraFields);
+    return OpMsgRequestBuilder::create({boost::none, db}, std::move(body), extraFields);
 }
 
 boost::optional<TenantId> parseDollarTenant(const BSONObj body) {
@@ -291,8 +291,31 @@ void OpMsgRequest::setDollarTenant(const TenantId& tenant) {
     body = bodyBuilder.obj();
 }
 
-OpMsgRequest OpMsgRequestBuilder::create(StringData db, BSONObj body, const BSONObj& extraFields) {
-    return create({boost::none, db}, std::move(body), extraFields);
+OpMsgRequest OpMsgRequestBuilder::createWithValidatedTenancyScope(
+    const DatabaseName& dbName,
+    boost::optional<auth::ValidatedTenancyScope> validatedTenancyScope,
+    BSONObj body,
+    const BSONObj& extraFields) {
+    auto dollarTenant = parseDollarTenant(body);
+    OpMsgRequest request;
+    request.body = ([&] {
+        BSONObjBuilder bodyBuilder(std::move(body));
+        bodyBuilder.appendElements(extraFields);
+        if (dollarTenant) {
+            // If already having $tenant, never include the prefix in $db.
+            bodyBuilder.append("$db", dbName.db());
+        } else if (validatedTenancyScope && !validatedTenancyScope->hasAuthenticatedUser()) {
+            // Add $tenant into the body if the validated tenant id comes from $tenant.
+            bodyBuilder.append("$db", dbName.db());
+            appendDollarTenant(bodyBuilder, validatedTenancyScope->tenantId());
+        } else {
+            bodyBuilder.append("$db", DatabaseNameUtil::serialize(dbName));
+        }
+        return bodyBuilder.obj();
+    }());
+
+    request.validatedTenancyScope = validatedTenancyScope;
+    return request;
 }
 
 OpMsgRequest OpMsgRequestBuilder::create(const DatabaseName& dbName,

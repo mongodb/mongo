@@ -201,16 +201,18 @@ long long DBDirectClient::count(const NamespaceStringOrUUID nsOrUuid,
                                 boost::optional<BSONObj> readConcernObj,
                                 const boost::optional<TenantId>& dollarTenant) {
     invariant(!readConcernObj, "passing readConcern to DBDirectClient functions is not supported");
-    DirectClientScope directClientScope(_opCtx);
     BSONObj cmdObj = _countCmd(nsOrUuid, query, options, limit, skip, boost::none, dollarTenant);
 
     auto& dbName = (nsOrUuid.uuid() ? nsOrUuid.dbName().value() : (*nsOrUuid.nss()).dbName());
-
     auto request = OpMsgRequestBuilder::create(dbName, cmdObj);
-    auto result = CommandHelpers::runCommandDirectly(_opCtx, request);
+
+    // Calls runCommand instead of runCommandDirectly to ensure the tenant inforamtion of this
+    // command gets validated and is used for parsing the command request.
+    auto response = runCommand(request);
+    auto& result = response->getCommandReply();
 
     uassertStatusOK(getStatusFromCommandResult(result));
-    return static_cast<unsigned long long>(result["n"].numberLong());
+    return result["n"].numberLong();
 }
 
 }  // namespace mongo

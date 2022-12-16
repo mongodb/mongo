@@ -311,7 +311,9 @@ public:
                     uassertStatusOK(query_request_helper::asAggregationCommand(findCommand));
 
                 auto viewAggCmd =
-                    OpMsgRequest::fromDBAndBody(_dbName.db(), viewAggregationCommand).body;
+                    OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                        _dbName, _request.validatedTenancyScope, viewAggregationCommand)
+                        .body;
 
                 // Create the agg request equivalent of the find operation, with the explain
                 // verbosity included.
@@ -534,9 +536,8 @@ public:
                 const auto& findCommand = cq->getFindCommandRequest();
                 auto viewAggregationCommand =
                     uassertStatusOK(query_request_helper::asAggregationCommand(findCommand));
-                auto aggRequest =
-                    OpMsgRequestBuilder::create(_dbName, std::move(viewAggregationCommand));
-                aggRequest.validatedTenancyScope = _request.validatedTenancyScope;
+                auto aggRequest = OpMsgRequestBuilder::createWithValidatedTenancyScope(
+                    _dbName, _request.validatedTenancyScope, std::move(viewAggregationCommand));
                 BSONObj aggResult = CommandHelpers::runCommandDirectly(opCtx, aggRequest);
                 auto status = getStatusFromCommandResult(aggResult);
                 if (status.code() == ErrorCodes::InvalidPipelineOperator) {

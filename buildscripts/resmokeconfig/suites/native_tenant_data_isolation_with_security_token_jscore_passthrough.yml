@@ -63,17 +63,6 @@ selector:
   # In a multitenancy environment the catalog will always return tenant-prefixed entries, and the
   # override we use in this suite checks for the absence of a prefix breaking the list_catalog tests.
   - jstests/core/list_catalog.js
-  # TODO SERVER-70921: these tests cannot work as the tenant information is missed when running find, count and distinct command against views.
-  - jstests/core/timeseries/timeseries_index_partial.js
-  - jstests/core/txns/view_reads_in_transaction.js
-  - jstests/core/views/views_aggregation.js
-  - jstests/core/views/views_collation.js
-  - jstests/core/views/views_count.js
-  - jstests/core/views/views_distinct_with_arrays.js
-  - jstests/core/views/views_find.js
-  - jstests/core/views/views_drop.js
-  - jstests/core/views/views_distinct.js
-  - jstests/core/views/dbref_projection.js
   # TODO SERVER-71470: this test cannot work as aggregate with $lookup query on multiple collections drops off the tenant informaton.
   - jstests/core/txns/aggregation_in_transaction.js
 
