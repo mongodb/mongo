@@ -102,15 +102,24 @@ if (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db.getMongo())) {
     }),
                                  ErrorCodes.InvalidOptions);
 
-    // Tries to set bucketMaxSpanSeconds and bucketRoundingSeconds with different values, but with
-    // the same current values. Should pass but no changes should be made.
+    // Expect setting the bucketMaxSpanSeconds corresponding to the granularity default value to
+    // succeed.
     assert.commandWorked(db.runCommand({
         "collMod": collName,
+        "timeseries": {"granularity": "hours", "bucketMaxSpanSeconds": bucketMaxSpanSecondsHours}
+    }));
+
+    // Tries to set bucketMaxSpanSeconds and bucketRoundingSeconds with different values
+    // corresponding to the granularity default values. This should fail since they are not equal.
+    assert.commandFailedWithCode(db.runCommand({
+        "collMod": collName,
         "timeseries": {
+            "granularity": "hours",
             "bucketMaxSpanSeconds": bucketMaxSpanSecondsHours,
             "bucketRoundingSeconds": bucketRoundingSecondsHours
         }
-    }));
+    }),
+                                 ErrorCodes.InvalidOptions);
 
     // Tries to set bucketMaxSpanSeconds and bucketRoundingSeconds with different values.
     assert.commandFailedWithCode(db.runCommand({
@@ -138,11 +147,7 @@ if (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db.getMongo())) {
     // value. This accepts the 3 parameters because they are the same as the current set values.
     assert.commandWorked(db.runCommand({
         "collMod": collName,
-        "timeseries": {
-            "granularity": "hours",
-            "bucketMaxSpanSeconds": bucketMaxSpanSecondsHours,
-            "bucketRoundingSeconds": bucketRoundingSecondsHours
-        }
+        "timeseries": {"granularity": "hours", "bucketMaxSpanSeconds": bucketMaxSpanSecondsHours}
     }));
 
     // Successfully sets the bucketMaxSpanSeconds and bucketRoundingSeconds to a higher value for a

@@ -96,7 +96,6 @@ if (!TimeseriesTest.timeseriesScalabilityImprovementsEnabled(testDB)) {
             timeField: timeFieldName,
             granularity: 'minutes',
             bucketMaxSpanSeconds: bucketMaxSpanSecondsFromMinutes,
-            bucketRoundingSeconds: buckeRoundingSecondsFromMinutes,
         }
     });
 }
@@ -139,7 +138,6 @@ if (!TimeseriesTest.timeseriesScalabilityImprovementsEnabled(testDB)) {
             metaField: metaFieldName,
             granularity: 'minutes',
             bucketMaxSpanSeconds: bucketMaxSpanSecondsFromMinutes,
-            bucketRoundingSeconds: buckeRoundingSecondsFromMinutes,
         },
         storageEngine: {wiredTiger: {}},
         indexOptionDefaults: {storageEngine: {wiredTiger: {}}},

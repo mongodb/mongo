@@ -134,17 +134,12 @@ const checkBucketCount = function(count = 1) {
     checkDowngradeSucceeds();
 }
 
-// 2. We expect to successfully downgrade if the 'bucketMaxSpanSeconds' and 'bucketRoundingSeconds'
-// correspond to a granularity.
+// 2. We expect to successfully downgrade if 'bucketMaxSpanSeconds' corresponds to a granularity.
 {
     resetCollection({granularity: 'seconds', bucketMaxSpanSeconds: secondsMaxSpan});
     checkDowngradeSucceeds();
 
-    resetCollection({
-        granularity: 'seconds',
-        bucketMaxSpanSeconds: secondsMaxSpan,
-        bucketRoundingSeconds: secondsRoundingSeconds
-    });
+    resetCollection({granularity: 'seconds', bucketMaxSpanSeconds: secondsMaxSpan});
     checkDowngradeSucceeds();
 
     resetCollection({granularity: 'minutes', bucketMaxSpanSeconds: minutesMaxSpan});

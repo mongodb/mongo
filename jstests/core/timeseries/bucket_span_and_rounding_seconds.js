@@ -85,8 +85,6 @@ const verifyCreateCommandFails = function(secondsOptions = {}, errorCode) {
             timeseries: {
                 timeField: timeFieldName,
                 granularity: granularityTime,
-                bucketRoundingSeconds:
-                    TimeseriesTest.getBucketRoundingSecondsFromGranularity(granularityTime),
                 bucketMaxSpanSeconds:
                     TimeseriesTest.getBucketMaxSpanSecondsFromGranularity(granularityTime)
             }
