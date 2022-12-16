@@ -43,11 +43,24 @@ namespace mongo::sbe {
 
 class HashAggStageTest : public PlanStageTestFixture {
 public:
+    void setUp() override {
+        PlanStageTestFixture::setUp();
+        _globalLock = std::make_unique<Lock::GlobalLock>(operationContext(), MODE_IS);
+    }
+
+    void tearDown() override {
+        _globalLock.reset();
+        PlanStageTestFixture::tearDown();
+    }
+
     void performHashAggWithSpillChecking(
         BSONArray inputArr,
         BSONArray expectedOutputArray,
         bool shouldSpill = false,
         std::unique_ptr<mongo::CollatorInterfaceMock> optionalCollator = nullptr);
+
+private:
+    std::unique_ptr<Lock::GlobalLock> _globalLock;
 };
 
 void HashAggStageTest::performHashAggWithSpillChecking(

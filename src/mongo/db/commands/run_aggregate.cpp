@@ -689,6 +689,14 @@ Status runAggregate(OperationContext* opCtx,
     // The UUID of the collection for the execution namespace of this aggregation.
     boost::optional<UUID> uuid;
 
+    // All cursors share the ownership to 'extDataSrcGuard'. Once all cursors are destroyed,
+    // 'extDataSrcGuard' will also be destroyed and any virtual collections will be dropped by
+    // the destructor of ExternalDataSourceScopeGuard. We obtain a reference before taking locks so
+    // that the virtual collections will be dropped after releasing our read locks, avoiding a lock
+    // upgrade.
+    std::shared_ptr<ExternalDataSourceScopeGuard> extDataSrcGuard =
+        std::make_shared<ExternalDataSourceScopeGuard>(std::move(externalDataSourceGuard));
+
     // If emplaced, AutoGetCollectionForReadCommand will throw if the sharding version for this
     // connection is out of date. If the namespace is a view, the lock will be released before
     // re-running the expanded aggregation.
@@ -1038,8 +1046,6 @@ Status runAggregate(OperationContext* opCtx,
             p.deleteUnderlying();
         }
     });
-    auto extDataSrcGuard =
-        std::make_shared<ExternalDataSourceScopeGuard>(std::move(externalDataSourceGuard));
     for (auto&& exec : execs) {
         ClientCursorParams cursorParams(
             std::move(exec),
@@ -1057,9 +1063,6 @@ Status runAggregate(OperationContext* opCtx,
 
         pin->incNBatches();
         cursors.emplace_back(pin.getCursor());
-        // All cursors share the ownership to 'extDataSrcGuard' and if the last cursor is destroyed,
-        // 'extDataSrcGuard' is also destroyed and created virtual collections are dropped by the
-        // destructor of ExternalDataSourceScopeGuard.
         ExternalDataSourceScopeGuard::get(pin.getCursor()) = extDataSrcGuard;
         pins.emplace_back(std::move(pin));
     }

@@ -51,6 +51,7 @@ std::tuple<sbe::value::SlotVector,
            boost::intrusive_ptr<ExpressionContext>>
 SbeStageBuilderTestFixture::buildPlanStage(
     std::unique_ptr<QuerySolution> querySolution,
+    MultipleCollectionAccessor& colls,
     bool hasRecordId,
     std::unique_ptr<ShardFiltererFactoryInterface> shardFiltererInterface,
     std::unique_ptr<CollatorInterface> collator) {
@@ -67,7 +68,6 @@ SbeStageBuilderTestFixture::buildPlanStage(
 
     CollectionMock coll(_nss);
     CollectionPtr collPtr(&coll);
-    MultipleCollectionAccessor& colls = _collections;
     if (shardFiltererInterface) {
         auto shardFilterer = shardFiltererInterface->makeShardFilterer(operationContext());
         collPtr.setShardKeyPattern(shardFilterer->getKeyPattern().toBSON());

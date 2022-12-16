@@ -50,6 +50,7 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+#include "mongo/util/testing_proctor.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -424,6 +425,13 @@ void LockerImpl::lockGlobal(OperationContext* opCtx, LockMode mode, Date_t deadl
                     _acquireTicket(opCtx, mode, deadline));
         }
         _modeForTicket = mode;
+    } else if (TestingProctor::instance().isEnabled() && !isModeCovered(mode, _modeForTicket)) {
+        LOGV2_FATAL(
+            6614500,
+            "Ticket held does not cover requested mode for global lock. Global lock upgrades are "
+            "not allowed",
+            "held"_attr = modeName(_modeForTicket),
+            "requested"_attr = modeName(mode));
     }
 
     const LockResult result = _lockBegin(opCtx, resourceIdGlobal, mode);

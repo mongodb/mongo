@@ -572,7 +572,7 @@ TEST_F(ShardingRecoveryServiceTestOnSecondary, BlockAndUnblockOperationsOnDataba
         inserts.emplace_back(doc.toBSON());
 
         WriteUnitOfWork wuow(opCtx());
-        AutoGetDb db(opCtx(), dbName.dbName(), MODE_IS);
+        AutoGetDb db(opCtx(), dbName.dbName(), MODE_IX);
         opObserver().onInserts(
             opCtx(), criticalSectionColl(), inserts.begin(), inserts.end(), false);
         wuow.commit();
@@ -596,7 +596,7 @@ TEST_F(ShardingRecoveryServiceTestOnSecondary, BlockAndUnblockOperationsOnDataba
         OplogUpdateEntryArgs update(&updateArgs, criticalSectionColl());
 
         WriteUnitOfWork wuow(opCtx());
-        AutoGetDb db(opCtx(), dbName.dbName(), MODE_IS);
+        AutoGetDb db(opCtx(), dbName.dbName(), MODE_IX);
         opObserver().onUpdate(opCtx(), update);
         wuow.commit();
     }
@@ -612,7 +612,7 @@ TEST_F(ShardingRecoveryServiceTestOnSecondary, BlockAndUnblockOperationsOnDataba
     // is what a secondary node would receive when the primary node leaves the critical section.
     {
         WriteUnitOfWork wuow(opCtx());
-        AutoGetDb db(opCtx(), dbName.dbName(), MODE_IS);
+        AutoGetDb db(opCtx(), dbName.dbName(), MODE_IX);
         opObserver().aboutToDelete(opCtx(), criticalSectionColl(), doc.toBSON());
         opObserver().onDelete(opCtx(), criticalSectionColl(), kUninitializedStmtId, {});
         wuow.commit();
@@ -637,7 +637,7 @@ TEST_F(ShardingRecoveryServiceTestOnSecondary, BlockAndUnblockOperationsOnCollec
         inserts.emplace_back(doc.toBSON());
 
         WriteUnitOfWork wuow(opCtx());
-        AutoGetCollection coll(opCtx(), collNss, MODE_IS);
+        AutoGetCollection coll(opCtx(), collNss, MODE_IX);
         opObserver().onInserts(
             opCtx(), criticalSectionColl(), inserts.begin(), inserts.end(), false);
         wuow.commit();
@@ -660,7 +660,7 @@ TEST_F(ShardingRecoveryServiceTestOnSecondary, BlockAndUnblockOperationsOnCollec
         OplogUpdateEntryArgs update(&updateArgs, criticalSectionColl());
 
         WriteUnitOfWork wuow(opCtx());
-        AutoGetCollection coll(opCtx(), collNss, MODE_IS);
+        AutoGetCollection coll(opCtx(), collNss, MODE_IX);
         opObserver().onUpdate(opCtx(), update);
         wuow.commit();
     }
@@ -676,7 +676,7 @@ TEST_F(ShardingRecoveryServiceTestOnSecondary, BlockAndUnblockOperationsOnCollec
     // is what a secondary node would receive when the primary node leaves the critical section.
     {
         WriteUnitOfWork wuow(opCtx());
-        AutoGetCollection coll(opCtx(), collNss, MODE_IS);
+        AutoGetCollection coll(opCtx(), collNss, MODE_IX);
         opObserver().aboutToDelete(opCtx(), criticalSectionColl(), doc.toBSON());
         opObserver().onDelete(opCtx(), criticalSectionColl(), kUninitializedStmtId, {});
         wuow.commit();
@@ -697,7 +697,7 @@ TEST_F(ShardingRecoveryServiceTestonInitialData, BlockAndUnblockOperationsOnData
     // entering the catch-up phase of the critical section for a database, then react to an
     // hypothetical availability of initial data.
     {
-        AutoGetDb db(opCtx(), dbName.dbName(), MODE_IS);
+        AutoGetDb db(opCtx(), dbName.dbName(), MODE_IX);
         writeReadCriticalSectionDocument(dbName, dbOpReason, false /* blockReads */);
     }
     ShardingRecoveryService::get(opCtx())->onInitialDataAvailable(opCtx(), false);
@@ -713,7 +713,7 @@ TEST_F(ShardingRecoveryServiceTestonInitialData, BlockAndUnblockOperationsOnData
     // entering the commit phase of the critical section for the database, then react to an
     // hypothetical availability of initial data.
     {
-        AutoGetDb db(opCtx(), dbName.dbName(), MODE_IS);
+        AutoGetDb db(opCtx(), dbName.dbName(), MODE_IX);
         writeReadCriticalSectionDocument(dbName, dbOpReason, true /* blockReads */);
     }
     ShardingRecoveryService::get(opCtx())->onInitialDataAvailable(opCtx(), false);
@@ -729,7 +729,7 @@ TEST_F(ShardingRecoveryServiceTestonInitialData, BlockAndUnblockOperationsOnData
     // leaving the critical section for the database, then react to an hypothetical availability of
     // initial data.
     {
-        AutoGetDb db(opCtx(), dbName.dbName(), MODE_IS);
+        AutoGetDb db(opCtx(), dbName.dbName(), MODE_IX);
         deleteReadCriticalSectionDocument(dbName, dbOpReason);
     }
     ShardingRecoveryService::get(opCtx())->onInitialDataAvailable(opCtx(), false);
@@ -747,7 +747,7 @@ TEST_F(ShardingRecoveryServiceTestonInitialData, BlockAndUnblockOperationsOnColl
     // entering the catch-up phase of the critical section for a collection, then react to an
     // hypothetical  availability of initial data.
     {
-        AutoGetCollection coll(opCtx(), collNss, MODE_IS);
+        AutoGetCollection coll(opCtx(), collNss, MODE_IX);
         writeReadCriticalSectionDocument(collNss, collOpReason, false /* blockReads */);
     }
     ShardingRecoveryService::get(opCtx())->onInitialDataAvailable(opCtx(), false);
@@ -763,7 +763,7 @@ TEST_F(ShardingRecoveryServiceTestonInitialData, BlockAndUnblockOperationsOnColl
     // entering the commit phase of the critical section for the collection, then react to an
     // hypothetical  availability of initial data.
     {
-        AutoGetCollection coll(opCtx(), collNss, MODE_IS);
+        AutoGetCollection coll(opCtx(), collNss, MODE_IX);
         writeReadCriticalSectionDocument(collNss, collOpReason, true /* blockReads */);
     }
     ShardingRecoveryService::get(opCtx())->onInitialDataAvailable(opCtx(), false);
@@ -779,7 +779,7 @@ TEST_F(ShardingRecoveryServiceTestonInitialData, BlockAndUnblockOperationsOnColl
     // leaving the critical section for the collection, then react to an hypothetical  availability
     // of initial data.
     {
-        AutoGetCollection coll(opCtx(), collNss, MODE_IS);
+        AutoGetCollection coll(opCtx(), collNss, MODE_IX);
         deleteReadCriticalSectionDocument(collNss, collOpReason);
     }
     ShardingRecoveryService::get(opCtx())->onInitialDataAvailable(opCtx(), false);
@@ -799,7 +799,7 @@ TEST_F(ShardingRecoveryServiceTestAfterRollback, BlockAndUnblockOperationsOnData
     // entering the catch-up phase of the critical section for a database, then react to an
     // hypothetical replication rollback.
     {
-        AutoGetDb db(opCtx(), dbName.dbName(), MODE_IS);
+        AutoGetDb db(opCtx(), dbName.dbName(), MODE_IX);
         writeReadCriticalSectionDocument(dbName, dbOpReason, false /* blockReads */);
     }
     ShardingRecoveryService::get(opCtx())->recoverStates(
@@ -816,7 +816,7 @@ TEST_F(ShardingRecoveryServiceTestAfterRollback, BlockAndUnblockOperationsOnData
     // entering the commit phase of the critical section for the database, then react to an
     // hypothetical replication rollback.
     {
-        AutoGetDb db(opCtx(), dbName.dbName(), MODE_IS);
+        AutoGetDb db(opCtx(), dbName.dbName(), MODE_IX);
         writeReadCriticalSectionDocument(dbName, dbOpReason, true /* blockReads */);
     }
     ShardingRecoveryService::get(opCtx())->recoverStates(
@@ -833,7 +833,7 @@ TEST_F(ShardingRecoveryServiceTestAfterRollback, BlockAndUnblockOperationsOnData
     // leaving the critical section for the database, then react to an hypothetical replication
     // rollback.
     {
-        AutoGetDb db(opCtx(), dbName.dbName(), MODE_IS);
+        AutoGetDb db(opCtx(), dbName.dbName(), MODE_IX);
         deleteReadCriticalSectionDocument(dbName, dbOpReason);
     }
     ShardingRecoveryService::get(opCtx())->recoverStates(
@@ -852,7 +852,7 @@ TEST_F(ShardingRecoveryServiceTestAfterRollback, BlockAndUnblockOperationsOnColl
     // entering the catch-up phase of the critical section for a collection, then react to an
     // hypothetical replication rollback.
     {
-        AutoGetCollection coll(opCtx(), collNss, MODE_IS);
+        AutoGetCollection coll(opCtx(), collNss, MODE_IX);
         writeReadCriticalSectionDocument(collNss, collOpReason, false /* blockReads */);
     }
     ShardingRecoveryService::get(opCtx())->recoverStates(
@@ -869,7 +869,7 @@ TEST_F(ShardingRecoveryServiceTestAfterRollback, BlockAndUnblockOperationsOnColl
     // entering the commit phase of the critical section for the collection, then react to an
     // hypothetical replication rollback.
     {
-        AutoGetCollection coll(opCtx(), collNss, MODE_IS);
+        AutoGetCollection coll(opCtx(), collNss, MODE_IX);
         writeReadCriticalSectionDocument(collNss, collOpReason, true /* blockReads */);
     }
     ShardingRecoveryService::get(opCtx())->recoverStates(
@@ -886,7 +886,7 @@ TEST_F(ShardingRecoveryServiceTestAfterRollback, BlockAndUnblockOperationsOnColl
     // leaving the critical section for the collection, then react to an hypothetical replication
     // rollback.
     {
-        AutoGetCollection coll(opCtx(), collNss, MODE_IS);
+        AutoGetCollection coll(opCtx(), collNss, MODE_IX);
         deleteReadCriticalSectionDocument(collNss, collOpReason);
     }
     ShardingRecoveryService::get(opCtx())->recoverStates(

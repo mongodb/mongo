@@ -172,7 +172,7 @@ protected:
         std::function<void(std::unique_ptr<SeekableRecordCursor>)> verifyFunction) {
         initializePipelineTest(shardKey, recipientShard, collectionData, configData);
         auto opCtx = operationContext();
-        AutoGetCollection tempColl{opCtx, tempNss, MODE_IS};
+        AutoGetCollection tempColl{opCtx, tempNss, MODE_IX};
         while (_cloner->doOneBatch(operationContext(), *_pipeline)) {
             ASSERT_EQ(tempColl->numRecords(opCtx), _metrics->getDocumentsProcessedCount());
             ASSERT_EQ(tempColl->dataSize(opCtx), _metrics->getBytesWrittenCount());

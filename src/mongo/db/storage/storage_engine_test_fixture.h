@@ -58,6 +58,7 @@ public:
 
     StatusWith<DurableCatalog::EntryIdentifier> createCollection(OperationContext* opCtx,
                                                                  NamespaceString ns) {
+        Lock::GlobalWrite lk(opCtx);
         AutoGetDb db(opCtx, ns.dbName(), LockMode::MODE_X);
         CollectionOptions options;
         options.uuid = UUID::gen();
@@ -76,7 +77,6 @@ public:
             _storageEngine->getCatalog()->getMetaData(opCtx, catalogId),
             std::move(rs));
 
-        Lock::GlobalWrite lk(opCtx);
         CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
             catalog.registerCollection(
                 opCtx, options.uuid.get(), std::move(coll), /*ts=*/boost::none);

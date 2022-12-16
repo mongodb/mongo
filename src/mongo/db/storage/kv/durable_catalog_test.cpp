@@ -94,6 +94,7 @@ public:
 
     CollectionCatalogIdAndUUID createCollection(const NamespaceString& nss,
                                                 CollectionOptions options) {
+        Lock::GlobalWrite lk(operationContext());
         Lock::DBLock dbLk(operationContext(), nss.dbName(), MODE_IX);
         Lock::CollectionLock collLk(operationContext(), nss, MODE_IX);
 
@@ -116,7 +117,6 @@ public:
             getCatalog()->getMetaData(operationContext(), catalogId),
             std::move(coll.second));
 
-        Lock::GlobalWrite lk(operationContext());
         CollectionCatalog::write(operationContext(), [&](CollectionCatalog& catalog) {
             catalog.registerCollection(operationContext(),
                                        options.uuid.value(),

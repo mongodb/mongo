@@ -68,41 +68,25 @@ public:
     }
 
     void tearDown() override {
-        _localCollLock.reset();
-        _foreignCollLock.reset();
         SbeStageBuilderTestFixture::tearDown();
     }
 
-    void insertDocuments(const NamespaceString& nss,
-                         std::unique_ptr<AutoGetCollection>& lock,
-                         const std::vector<BSONObj>& docs) {
+    void insertDocuments(const NamespaceString& nss, const std::vector<BSONObj>& docs) {
         std::vector<InsertStatement> inserts{docs.begin(), docs.end()};
-        lock = std::make_unique<AutoGetCollection>(operationContext(), nss, LockMode::MODE_IX);
 
+        AutoGetCollection agc(operationContext(), nss, LockMode::MODE_IX);
         {
             WriteUnitOfWork wuow{operationContext()};
-            ASSERT_OK(collection_internal::insertDocuments(operationContext(),
-                                                           lock.get()->getCollection(),
-                                                           inserts.begin(),
-                                                           inserts.end(),
-                                                           nullptr /* opDebug */));
+            ASSERT_OK(collection_internal::insertDocuments(
+                operationContext(), *agc, inserts.begin(), inserts.end(), nullptr /* opDebug */));
             wuow.commit();
         }
-
-        // Before we read, lock the collection in MODE_IS.
-        lock = std::make_unique<AutoGetCollection>(operationContext(), nss, LockMode::MODE_IS);
     }
 
     void insertDocuments(const std::vector<BSONObj>& localDocs,
                          const std::vector<BSONObj>& foreignDocs) {
-        insertDocuments(_nss, _localCollLock, localDocs);
-        insertDocuments(_foreignNss, _foreignCollLock, foreignDocs);
-
-        _collections = MultipleCollectionAccessor(operationContext(),
-                                                  &_localCollLock->getCollection(),
-                                                  _nss,
-                                                  false /* isAnySecondaryNamespaceAViewOrSharded */,
-                                                  {_foreignNss});
+        insertDocuments(_nss, localDocs);
+        insertDocuments(_foreignNss, foreignDocs);
     }
 
     struct CompiledTree {
@@ -114,6 +98,7 @@ public:
 
     // Constructs ready-to-execute SBE tree for $lookup specified by the arguments.
     CompiledTree buildLookupSbeTree(EqLookupNode::LookupStrategy strategy,
+                                    MultipleCollectionAccessor& colls,
                                     const std::string& localKey,
                                     const std::string& foreignKey,
                                     const std::string& asKey) {
@@ -134,6 +119,7 @@ public:
 
         // Convert logical solution into the physical SBE plan.
         auto [resultSlots, stage, data, _] = buildPlanStage(std::move(solution),
+                                                            colls,
                                                             false /*hasRecordId*/,
                                                             nullptr /*shard filterer*/,
                                                             nullptr /*collator*/);
@@ -164,7 +150,16 @@ public:
                       << std::endl;
         }
 
-        auto tree = buildLookupSbeTree(strategy, localKey, foreignKey, asKey);
+        AutoGetCollection localColl(operationContext(), _nss, LockMode::MODE_IS);
+        AutoGetCollection foreignColl(operationContext(), _foreignNss, LockMode::MODE_IS);
+
+        MultipleCollectionAccessor colls(operationContext(),
+                                         &localColl.getCollection(),
+                                         _nss,
+                                         false /* isAnySecondaryNamespaceAViewOrSharded */,
+                                         {_foreignNss});
+
+        auto tree = buildLookupSbeTree(strategy, colls, localKey, foreignKey, asKey);
         auto& stage = tree.stage;
 
         size_t i = 0;
@@ -258,8 +253,6 @@ protected:
 
 private:
     const NamespaceString _foreignNss{"testdb.sbe_stage_builder_foreign"};
-    std::unique_ptr<AutoGetCollection> _localCollLock = nullptr;
-    std::unique_ptr<AutoGetCollection> _foreignCollLock = nullptr;
 };
 
 TEST_F(LookupStageBuilderTest, NestedLoopJoin_Basic) {

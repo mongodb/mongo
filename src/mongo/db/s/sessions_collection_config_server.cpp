@@ -121,7 +121,7 @@ void SessionsCollectionConfigServer::setupSessionsCollection(OperationContext* o
     _shardCollectionIfNeeded(opCtx);
     _generateIndexesIfNeeded(opCtx);
 
-    AutoGetCollection autoColl(opCtx, NamespaceString::kLogicalSessionsNamespace, MODE_IS);
+    AutoGetCollection autoColl(opCtx, NamespaceString::kLogicalSessionsNamespace, MODE_IX);
     if (const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
         replCoord->canAcceptWritesFor(opCtx, NamespaceString::kLogicalSessionsNamespace)) {
         auto filterQuery =

@@ -77,14 +77,28 @@ public:
                stage_builder::PlanStageData,
                boost::intrusive_ptr<ExpressionContext>>
     buildPlanStage(std::unique_ptr<QuerySolution> querySolution,
+                   MultipleCollectionAccessor& colls,
                    bool hasRecordId,
                    std::unique_ptr<ShardFiltererFactoryInterface> shardFiltererFactoryInterface,
                    std::unique_ptr<CollatorInterface> collator = nullptr);
 
+    std::tuple<sbe::value::SlotVector,
+               std::unique_ptr<sbe::PlanStage>,
+               stage_builder::PlanStageData,
+               boost::intrusive_ptr<ExpressionContext>>
+    buildPlanStage(std::unique_ptr<QuerySolution> querySolution,
+                   bool hasRecordId,
+                   std::unique_ptr<ShardFiltererFactoryInterface> shardFiltererFactoryInterface,
+                   std::unique_ptr<CollatorInterface> collator = nullptr) {
+        auto nullColl = MultipleCollectionAccessor(CollectionPtr::null);
+        return buildPlanStage(std::move(querySolution),
+                              nullColl,
+                              hasRecordId,
+                              std::move(shardFiltererFactoryInterface),
+                              std::move(collator));
+    }
+
 protected:
-    // Collections needed by this test fixture. Subclasses must manually set this if they require
-    // test collections.
-    MultipleCollectionAccessor _collections{CollectionPtr::null};
     const NamespaceString _nss = NamespaceString{"testdb.sbe_stage_builder"};
 };
 

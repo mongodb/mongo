@@ -458,6 +458,11 @@ public:
                                           rpc::ReplyBuilderInterface* reply,
                                           ClientCursorPin& cursorPin,
                                           CurOp* curOp) {
+            // Get a reference to the shared_ptr so that we drop the virtual collections (via the
+            // destructor) after deleting our cursors and releasing our read locks.
+            std::shared_ptr<ExternalDataSourceScopeGuard> extDataSourceScopeGuard =
+                ExternalDataSourceScopeGuard::get(cursorPin.getCursor());
+
             // Cursors come in one of two flavors:
             //
             // - Cursors which read from a single collection, such as those generated via the

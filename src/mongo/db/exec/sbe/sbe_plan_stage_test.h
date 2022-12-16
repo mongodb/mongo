@@ -88,11 +88,9 @@ public:
     void setUp() override {
         CatalogTestFixture::setUp();
         _slotIdGenerator.reset(new value::SlotIdGenerator());
-        _globalLock.reset(new Lock::GlobalLock{operationContext(), MODE_IS});
     }
 
     void tearDown() override {
-        _globalLock.reset(nullptr);
         _slotIdGenerator.reset();
         CatalogTestFixture::tearDown();
     }
@@ -246,7 +244,6 @@ public:
 
 private:
     std::unique_ptr<value::SlotIdGenerator> _slotIdGenerator;
-    std::unique_ptr<Lock::GlobalLock> _globalLock{nullptr};
 };
 
 }  // namespace mongo::sbe

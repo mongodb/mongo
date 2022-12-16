@@ -1870,7 +1870,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenExistingCollectionAndIndexesWithReape
         // Open the collection using shared state after a single index was dropped.
         OneOffRead oor(opCtx.get(), dropXIndexTs);
 
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_IX);
         auto openedColl =
             CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, dropXIndexTs);
         ASSERT(openedColl);
@@ -1967,7 +1967,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenNewCollectionAndIndexesWithReaper) {
         // Open the collection before any index drops.
         OneOffRead oor(opCtx.get(), createIndexTs);
 
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_IX);
         auto openedColl =
             CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, createIndexTs);
         ASSERT(openedColl);
@@ -1982,7 +1982,7 @@ TEST_F(CollectionCatalogTimestampTest, OpenNewCollectionAndIndexesWithReaper) {
         // Open the collection after the 'x' index was dropped.
         OneOffRead oor(opCtx.get(), dropXIndexTs);
 
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_IX);
         auto openedColl =
             CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, dropXIndexTs);
         ASSERT(openedColl);
