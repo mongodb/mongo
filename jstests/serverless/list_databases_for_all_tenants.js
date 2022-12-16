@@ -228,7 +228,7 @@ function runTestInvalidCommands(primary) {
         ErrorCodes.Unauthorized);
 }
 
-function runTestsWithMultiTenancySupport(featureFlagRequireTenantID) {
+function runTestsWithMultiTenancySupport() {
     const rst = new ReplSetTest({
         nodes: 2,
         nodeOptions: {
@@ -236,7 +236,6 @@ function runTestsWithMultiTenancySupport(featureFlagRequireTenantID) {
             setParameter: {
                 multitenancySupport: true,
                 featureFlagSecurityToken: true,
-                featureFlagRequireTenantID: featureFlagRequireTenantID
             }
         }
     });
@@ -267,7 +266,6 @@ function runTestNoMultiTenancySupport() {
             setParameter: {
                 multitenancySupport: false,
                 featureFlagSecurityToken: true,
-                featureFlagRequireTenantID: false
             }
         }
     });
@@ -287,7 +285,6 @@ function runTestNoMultiTenancySupport() {
     rst.stopSet();
 }
 
-runTestsWithMultiTenancySupport(true);
-runTestsWithMultiTenancySupport(false);
+runTestsWithMultiTenancySupport();
 runTestNoMultiTenancySupport();
 }());
