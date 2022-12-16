@@ -28,7 +28,6 @@
  */
 
 #include "mongo/db/s/sessions_collection_config_server.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/repl/replication_coordinator.h"
 
 #include "mongo/logv2/log.h"
@@ -121,9 +120,9 @@ void SessionsCollectionConfigServer::setupSessionsCollection(OperationContext* o
     _shardCollectionIfNeeded(opCtx);
     _generateIndexesIfNeeded(opCtx);
 
-    AutoGetCollection autoColl(opCtx, NamespaceString::kLogicalSessionsNamespace, MODE_IX);
+    Lock::GlobalLock lock(opCtx, MODE_IX);
     if (const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
-        replCoord->canAcceptWritesFor(opCtx, NamespaceString::kLogicalSessionsNamespace)) {
+        replCoord->canAcceptWritesFor(opCtx, CollectionType::ConfigNS)) {
         auto filterQuery =
             BSON("_id" << NamespaceString::kLogicalSessionsNamespace.ns()
                        << CollectionType::kMaxChunkSizeBytesFieldName << BSON("$exists" << false));
