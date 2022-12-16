@@ -4,6 +4,8 @@
 (function() {
 "use strict";
 
+load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
 
@@ -33,7 +35,11 @@ function testDiskUse(cmd) {
 // stage needs to spill to disk if the memory limit is reached.
 assert.commandWorked(viewsDB.adminCommand(
     {setParameter: 1, internalQueryMaxBlockingSortMemoryUsageBytes: memoryLimitMb * 1024 * 1024}));
-testDiskUse({count: "largeView"});
+
+// In SBE the $sort will not cause spilling because it's only the integers being sorted on.
+if (!checkSBEEnabled(viewsDB)) {
+    testDiskUse({count: "largeView"});
+}
 
 // The 'distinct' command executes the view definition pipeline containing the '$sort' stage. This
 // stage needs to spill to disk if the memory limit is reached.

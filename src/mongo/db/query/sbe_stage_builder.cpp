@@ -2540,6 +2540,26 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         childReqs.clear(kResult);
     }
 
+    if (!groupNode->needWholeDocument) {
+        // If the group node doesn't have any dependency (e.g. $count) or if the dependency can be
+        // satisfied by the child node (e.g. covered index scan), we can clear the kResult
+        // requirement for the child.
+        if (groupNode->requiredFields.empty()) {
+            childReqs.clear(kResult);
+        } else if (childNode->getType() == StageType::STAGE_PROJECTION_COVERED) {
+            auto pn = static_cast<const ProjectionNodeCovered*>(childNode);
+            std::set<std::string> providedFieldSet;
+            for (auto&& elt : pn->coveredKeyObj) {
+                providedFieldSet.emplace(elt.fieldNameStringData());
+            }
+            if (std::all_of(groupNode->requiredFields.begin(),
+                            groupNode->requiredFields.end(),
+                            [&](const std::string& f) { return providedFieldSet.count(f); })) {
+                childReqs.clear(kResult);
+            }
+        }
+    }
+
     // Builds the child and gets the child result slot.
     auto [childStage, childOutputs] = build(childNode, childReqs);
 
