@@ -898,8 +898,8 @@ TEST_F(RenameRangeDeletionsTest, BasicRenameRangeDeletionsTest) {
 }
 
 /**
+ * TODO SERVER-72176: re-enable this test
  *  Same as BasicRenameRangeDeletionsTest, but also tests idempotency of single utility functions
- */
 TEST_F(RenameRangeDeletionsTest, IdempotentRenameRangeDeletionsTest) {
     const auto numTasks = 10;
     std::vector<RangeDeletionTask> tasks;
@@ -948,6 +948,7 @@ TEST_F(RenameRangeDeletionsTest, IdempotentRenameRangeDeletionsTest) {
         NamespaceString::kRangeDeletionForRenameNamespace);
     ASSERT_EQ(0, forRenameStore.count(_opCtx, BSONObj()));
 }
+*/
 
 }  // namespace
 }  // namespace mongo
