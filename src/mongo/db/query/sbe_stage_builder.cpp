@@ -788,15 +788,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     }
 
     // Tag which of the paths should be included into the output.
-    DepsTracker residual;
-    if (csn->postAssemblyFilter) {
-        match_expression::addDependencies(csn->postAssemblyFilter.get(), &residual);
-    }
     std::vector<bool> includeInOutput(paths.size(), false);
     OrderedPathSet fieldsToProject;  // projection when falling back to the row store
     for (size_t i = 0; i < paths.size(); i++) {
-        if (csn->outputFields.find(paths[i]) != csn->outputFields.end() ||
-            residual.fields.find(paths[i]) != residual.fields.end()) {
+        if (csn->outputFields.find(paths[i]) != csn->outputFields.end()) {
             includeInOutput[i] = true;
             fieldsToProject.insert(paths[i]);
         }

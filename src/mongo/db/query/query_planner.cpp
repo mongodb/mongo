@@ -448,6 +448,15 @@ StatusWith<std::unique_ptr<QuerySolution>> tryToBuildColumnScan(
     if (heuristicsStatus.isOK() || hintedIndex) {
         // We have a hint, or collection stats and dependencies that indicate a column scan is
         // likely better than a collection scan. Build it and return it.
+
+        // Since the residual predicate must be applied after the column scan, we need to include
+        // the dependencies among the output fields.
+        DepsTracker residualDeps;
+        if (residualPredicate) {
+            match_expression::addDependencies(residualPredicate.get(), &residualDeps);
+            outputDeps.fields = set_util::setUnion(outputDeps.fields, residualDeps.fields);
+        }
+
         return makeColumnScanPlan(query,
                                   params,
                                   columnStoreIndex,

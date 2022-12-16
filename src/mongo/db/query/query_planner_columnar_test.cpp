@@ -545,15 +545,10 @@ TEST_F(QueryPlannerColumnarTest, MultiplePredicatesAllowedWithColumnStoreIndex) 
     runQuerySortProj(BSON("a" << 2 << "b" << 3), BSONObj(), BSON("a" << 1 << "_id" << 0));
     assertNumSolutions(1U);
     assertSolutionExists(R"({
-        proj: {
-            spec: {a: 1, _id: 0},
-            node: {
-                column_scan: {
-                    filtersByPath: {a: {a: {$eq: 2}}, b: {b: {$eq: 3}}},
-                    outputFields: ['a'],
-                    matchFields: ['a', 'b']
-                }
-            }
+        column_scan: {
+            filtersByPath: {a: {a: {$eq: 2}}, b: {b: {$eq: 3}}},
+            outputFields: ['a'],
+            matchFields: ['a', 'b']
         }
     })");
 }
@@ -614,15 +609,10 @@ TEST_F(QueryPlannerColumnarTest, NumberOfFieldsComputedUsingSetSize) {
                      BSON("a" << 1 << "b" << 1 << "_id" << 0));
     assertNumSolutions(1U);
     assertSolutionExists(R"({
-        proj: {
-            spec: {a: 1, b: 1, _id: 0},
-            node: {
-                column_scan: {
-                    filtersByPath: {a: {a: {$eq: 2}}, b: {b: {$eq: 3}}, c: {c: {$eq: 4}}},
-                    outputFields: ['a', 'b'],
-                    matchFields: ['a', 'b', 'c']
-                }
-            }
+        column_scan: {
+            filtersByPath: {a: {a: {$eq: 2}}, b: {b: {$eq: 3}}, c: {c: {$eq: 4}}},
+            outputFields: ['a', 'b'],
+            matchFields: ['a', 'b', 'c']
         }
     })");
 }
@@ -637,19 +627,14 @@ TEST_F(QueryPlannerColumnarTest, ComplexPredicateSplitDemo) {
     runQuerySortProj(complexPredicate, BSONObj(), BSON("a" << 1 << "_id" << 0));
     assertNumSolutions(1U);
     assertSolutionExists(R"({
-        proj: {
-            spec: {a: 1, _id: 0},
-            node: {
-                column_scan: {
-                    filtersByPath: {
-                        a: {a: {$gte: 0}},
-                        'addresses.zip': {'addresses.zip': {$eq: '12345'}},
-                        unsubscribed: {unsubscribed: {$eq: false}}
-                    },
-                    outputFields: ['a'],
-                    matchFields: ['a', 'addresses.zip', 'unsubscribed']
-                }
-            }
+        column_scan: {
+            filtersByPath: {
+                a: {a: {$gte: 0}},
+                'addresses.zip': {'addresses.zip': {$eq: '12345'}},
+                unsubscribed: {unsubscribed: {$eq: false}}
+            },
+            outputFields: ['a'],
+            matchFields: ['a', 'addresses.zip', 'unsubscribed']
         }
     })");
 }
@@ -676,7 +661,7 @@ TEST_F(QueryPlannerColumnarTest, ComplexPredicateSplitsIntoParts) {
                         'addresses.zip': {'addresses.zip': {$eq: '12345'}},
                         unsubscribed: {unsubscribed: false}
                     },
-                    outputFields: ['a'],
+                    outputFields: ['a', 'specialAddress', 'doNotContact'],
                     postAssemblyFilter: {
                         specialAddress: {$exists: false},
                         doNotContact: {$exists: false}
@@ -747,15 +732,10 @@ TEST_F(QueryPlannerColumnarTest, MatchGroupTest) {
 
     assertNumSolutions(1U);
     assertSolutionExists(R"({
-        proj: {
-            spec: {foo: 1, x: 1, _id: 0},
-            node: {
-                column_scan: {
-                    filtersByPath: {name: {name: {$eq: 'bob'}}},
-                    outputFields: ['foo', 'x'],
-                    matchFields: ['name']
-                }
-            }
+        column_scan: {
+            filtersByPath: {name: {name: {$eq: 'bob'}}},
+            outputFields: ['foo', 'x'],
+            matchFields: ['name']
         }
     })");
 
@@ -1031,7 +1011,7 @@ TEST_F(QueryPlannerColumnarTest, UseColumnStoreWithExtraFields) {
                         'addresses.zip': {'addresses.zip': {$eq: '12345'}},
                         unsubscribed: {unsubscribed: false}
                     },
-                    outputFields: ['a'],
+                    outputFields: ['a', 'specialAddress', 'doNotContact'],
                     postAssemblyFilter: {
                         specialAddress: {$exists: false},
                         doNotContact: {$exists: false}
@@ -1267,7 +1247,7 @@ TEST_F(QueryPlannerColumnarTest, ColumnIndexForCountWithPostAssemblyFilter) {
     assertSolutionExists(R"({
         column_scan: {
             filtersByPath: {},
-            outputFields: [],
+            outputFields: ['a', 'b'],
             matchFields: ['a', 'b'],
             postAssemblyFilter: {$or: [{a: 3}, {b: 4}]}
         }
@@ -1416,6 +1396,65 @@ TEST_F(QueryPlannerColumnarTest, HintIndexWithNonStandardKeyPattern) {
             filtersByPath: {},
             outputFields: ['a'],
             matchFields: []
+        }
+    })");
+}
+
+TEST_F(QueryPlannerColumnarTest, NonOutputPathFilterDoesNotNeedProjection) {
+    addColumnStoreIndexAndEnableFilterSplitting();
+
+    runQuerySortProj(BSON("b" << 1), BSONObj(), BSON("a" << 1 << "_id" << 0));
+    assertSolutionExists(R"({
+        column_scan: {
+            filtersByPath: {
+                b: {b: {$eq: 1}}
+            },
+            outputFields: ['a'],
+            matchFields: ['b']
+        }
+    })");
+}
+
+TEST_F(QueryPlannerColumnarTest, FullyOutputPostAssemblyFilterDoesNotNeedProjection) {
+    addColumnStoreIndexAndEnableFilterSplitting();
+
+    runQuerySortProj(
+        BSON("a" << BSON("$exists" << false) << "b" << 1), BSONObj(), BSON("a" << 1 << "_id" << 0));
+    assertSolutionExists(R"({
+        column_scan: {
+            filtersByPath: {
+                b: {b: {$eq: 1}}
+            },
+            outputFields: ['a'],
+            postAssemblyFilter: {
+                a: {$exists: false}
+            },
+            matchFields:
+                ['a', 'b']
+        }
+    })");
+}
+
+TEST_F(QueryPlannerColumnarTest, NonOutputPostAssemblyFilterNeedsProjection) {
+    addColumnStoreIndexAndEnableFilterSplitting();
+
+    runQuerySortProj(
+        BSON("a" << BSON("$exists" << false)), BSONObj(), BSON("b" << 1 << "_id" << 0));
+    assertSolutionExists(R"({
+        proj: {
+            spec: {b: 1, _id: 0},
+            node: {
+                column_scan: {
+                    filtersByPath: {
+                    },
+                    outputFields: ['a', 'b'],
+                    postAssemblyFilter: {
+                        a: {$exists: false}
+                    },
+                    matchFields:
+                        ['a']
+                }
+            }
         }
     })");
 }

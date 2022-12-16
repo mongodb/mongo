@@ -172,6 +172,19 @@ function runAllAggregations() {
         rowstoreFetches: 1
     });
 
+    // $match with no group, and non-output filter that can't be pushed down.
+    test({
+        agg: [{$match: {e: {$exists: false}}}, {$project: {_id: 1, b: 1}}],
+        requiresRowStoreExpr: false,
+        rowstoreFetches: 2
+    });
+    // $match with no group, and non-output filter that can be pushed down.
+    test({
+        agg: [{$match: {e: {$exists: true}}}, {$project: {_id: 1, b: 1}}],
+        requiresRowStoreExpr: true,
+        rowstoreFetches: 1
+    });
+
     // Nested paths.
     // The BrowserUsageByDistinctUserQuery that motivated this ticket is an example of this.
     test({
