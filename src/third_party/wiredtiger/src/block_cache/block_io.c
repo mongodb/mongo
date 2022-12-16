@@ -68,7 +68,7 @@ __wt_blkcache_read(WT_SESSION_IMPL *session, WT_ITEM *buf, const uint8_t *addr, 
     compressor = btree->compressor;
     encryptor = btree->kencryptor == NULL ? NULL : btree->kencryptor->encryptor;
     blkcache_found = found = false;
-    skip_cache_put = (blkcache->type == BLKCACHE_UNCONFIGURED);
+    skip_cache_put = (blkcache->type == WT_BLKCACHE_UNCONFIGURED);
 
     /*
      * If anticipating a compressed or encrypted block, start with a scratch buffer and convert into
@@ -90,7 +90,7 @@ __wt_blkcache_read(WT_SESSION_IMPL *session, WT_ITEM *buf, const uint8_t *addr, 
     }
 
     /* Check the block cache. */
-    if (!found && blkcache->type != BLKCACHE_UNCONFIGURED) {
+    if (!found && blkcache->type != WT_BLKCACHE_UNCONFIGURED) {
         __wt_blkcache_get(session, addr, addr_size, &blkcache_item, &found, &skip_cache_put);
         if (found) {
             blkcache_found = true;
@@ -131,7 +131,7 @@ __wt_blkcache_read(WT_SESSION_IMPL *session, WT_ITEM *buf, const uint8_t *addr, 
      * block-cache blocks are never encrypted.
      */
     dsk = ip->data;
-    if (!blkcache_found || blkcache->type != BLKCACHE_DRAM) {
+    if (!blkcache_found || blkcache->type != WT_BLKCACHE_DRAM) {
         if (F_ISSET(dsk, WT_PAGE_ENCRYPTED)) {
             if (encryptor == NULL || encryptor->decrypt == NULL)
                 WT_ERR(__blkcache_read_corrupt(session, WT_ERROR, addr, addr_size,
@@ -404,7 +404,7 @@ __wt_blkcache_write(WT_SESSION_IMPL *session, WT_ITEM *buf, uint8_t *addr, size_
      *
      * Ignore the final checkpoint writes.
      */
-    if (blkcache->type == BLKCACHE_UNCONFIGURED)
+    if (blkcache->type == WT_BLKCACHE_UNCONFIGURED)
         ;
     else if (!blkcache->cache_on_checkpoint && checkpoint_io)
         WT_STAT_CONN_INCR(session, block_cache_bypass_chkpt);

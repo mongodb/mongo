@@ -432,7 +432,7 @@ __bm_free(WT_BM *bm, WT_SESSION_IMPL *session, const uint8_t *addr, size_t addr_
     blkcache = &S2C(session)->blkcache;
 
     /* Evict the freed block from the block cache */
-    if (blkcache->type != BLKCACHE_UNCONFIGURED)
+    if (blkcache->type != WT_BLKCACHE_UNCONFIGURED)
         __wt_blkcache_remove(session, addr, addr_size);
 
     return (__wt_block_free(session, bm->block, addr, addr_size));
