@@ -60,7 +60,7 @@ choose_num(int min, int max, const std::string &cli_str)
     std::string text_line;
     int choice;
 
-    do {
+    while (true) {
         std::cout << "\n" << cli_str << " ";
         std::getline(std::cin, text_line);
 
@@ -69,14 +69,13 @@ choose_num(int min, int max, const std::string &cli_str)
         text_stream >> choice;
 
         /* Validate the number of choice. */
-        if (choice < min || choice > max)
+        if (choice >= min && choice <= max)
+            return choice;
+        else
             print_border_msg(
               "Choose a number between " + std::to_string(min) + " and " + std::to_string(max),
               RED);
-
-    } while (choice < min || choice > max);
-
-    return (choice);
+    }
 }
 
 const std::string
