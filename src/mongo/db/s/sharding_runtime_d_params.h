@@ -31,6 +31,7 @@
 
 #include "fmt/core.h"
 #include "mongo/base/status.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/processinfo.h"
 
@@ -43,7 +44,8 @@ inline Status validateMigrationConcurrency(const int& migrationConcurrency) {
                       "concurrency feature flag"};
     }
     int maxConcurrency = ProcessInfo::getNumCores();
-    if (migrationConcurrency <= 0 || migrationConcurrency > maxConcurrency) {
+    if (migrationConcurrency <= 0 ||
+        (migrationConcurrency > maxConcurrency && !getTestCommandsEnabled())) {
         return Status{
             ErrorCodes::InvalidOptions,
             fmt::format(
