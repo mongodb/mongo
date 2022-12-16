@@ -1280,6 +1280,64 @@ TEST_F(WriteDistributionFilterByShardKeyRangeTest, ShardKeyNonEquality) {
                         numDispatchedByRange);
 }
 
+class WriteDistributionFilterByShardKeyRangeReplacementUpdateTest
+    : public ReadWriteDistributionTest {
+protected:
+    SampledQueryDocument makeSampledUpdateQueryDocument(const BSONObj& filter,
+                                                        const BSONObj& updateMod,
+                                                        bool upsert) const {
+        auto updateOp = write_ops::UpdateOpEntry(filter, write_ops::UpdateModification(updateMod));
+        updateOp.setMulti(false);  // replacement-style update cannot be multi.
+        updateOp.setUpsert(upsert);
+        return ReadWriteDistributionTest::makeSampledUpdateQueryDocument({updateOp});
+    }
+};
+
+TEST_F(WriteDistributionFilterByShardKeyRangeReplacementUpdateTest, NotUpsert) {
+    auto assertTargetMetrics = [&](const CollectionRoutingInfoTargeter& targeter,
+                                   const SampledQueryDocument& queryDoc,
+                                   const std::vector<int64_t> numDispatchedByRange) {
+        WriteTargetMetricsBundle metrics;
+        metrics.numTargetedOneShard = 1;
+        metrics.numDispatchedByRange = numDispatchedByRange;
+        assertTargetMetricsForWriteQuery(targeter, queryDoc, metrics);
+    };
+
+    auto targeter = makeCollectionRoutingInfoTargeter(chunkSplitInfoRangeSharding0);
+    auto filter = BSON("a.x" << BSON("$lt" << 0));
+    auto updateMod = BSON("a" << BSON("x" << 0) << "b"
+                              << BSON("y"
+                                      << "A")
+                              << "c" << 0);
+    auto numDispatchedByRange = std::vector<int64_t>({0, 1, 0});
+    assertTargetMetrics(targeter,
+                        makeSampledUpdateQueryDocument(filter, updateMod, false /* upsert */),
+                        numDispatchedByRange);
+}
+
+TEST_F(WriteDistributionFilterByShardKeyRangeReplacementUpdateTest, Upsert) {
+    auto assertTargetMetrics = [&](const CollectionRoutingInfoTargeter& targeter,
+                                   const SampledQueryDocument& queryDoc,
+                                   const std::vector<int64_t> numDispatchedByRange) {
+        WriteTargetMetricsBundle metrics;
+        metrics.numTargetedMultipleShards = 1;
+        metrics.numDispatchedByRange = numDispatchedByRange;
+        metrics.numSingleWritesWithoutShardKey = 1;
+        assertTargetMetricsForWriteQuery(targeter, queryDoc, metrics);
+    };
+
+    auto targeter = makeCollectionRoutingInfoTargeter(chunkSplitInfoRangeSharding0);
+    auto filter = BSON("a.x" << BSON("$lt" << 0));
+    auto updateMod = BSON("a" << BSON("x" << 0) << "b"
+                              << BSON("y"
+                                      << "A")
+                              << "c" << 0);
+    auto numDispatchedByRange = std::vector<int64_t>({1, 1, 0});
+    assertTargetMetrics(targeter,
+                        makeSampledUpdateQueryDocument(filter, updateMod, true /* upsert */),
+                        numDispatchedByRange);
+}
+
 class WriteDistributionNotFilterByShardKeyTest : public ReadWriteDistributionTest {
 protected:
     void assertTargetMetrics(const CollectionRoutingInfoTargeter& targeter,
@@ -1378,6 +1436,60 @@ TEST_F(WriteDistributionNotFilterByShardKeyTest, ShardKeyPrefixEqualityDotted) {
     }
     assertTargetMetrics(
         targeter, makeSampledFindAndModifyQueryDocument(filter, updateMod), false /* multi */);
+}
+
+class WriteDistributionNotFilterByShardKeyReplacementUpdateTest : public ReadWriteDistributionTest {
+protected:
+    SampledQueryDocument makeSampledUpdateQueryDocument(const BSONObj& filter,
+                                                        const BSONObj& updateMod,
+                                                        bool upsert) const {
+        auto updateOp = write_ops::UpdateOpEntry(filter, write_ops::UpdateModification(updateMod));
+        updateOp.setMulti(false);  // replacement-style update cannot be multi.
+        updateOp.setUpsert(upsert);
+        return ReadWriteDistributionTest::makeSampledUpdateQueryDocument({updateOp});
+    }
+};
+
+TEST_F(WriteDistributionNotFilterByShardKeyReplacementUpdateTest, NotUpsert) {
+    auto assertTargetMetrics = [&](const CollectionRoutingInfoTargeter& targeter,
+                                   const SampledQueryDocument& queryDoc,
+                                   const std::vector<int64_t> numDispatchedByRange) {
+        WriteTargetMetricsBundle metrics;
+        metrics.numTargetedOneShard = 1;
+        metrics.numDispatchedByRange = numDispatchedByRange;
+        assertTargetMetricsForWriteQuery(targeter, queryDoc, metrics);
+    };
+
+    auto targeter = makeCollectionRoutingInfoTargeter(chunkSplitInfoRangeSharding0);
+    auto filter = BSON("_id" << 0);
+    auto updateMod = BSON("_id" << 0 << "a" << BSON("x" << 0) << "b"
+                                << BSON("y"
+                                        << "A")
+                                << "c" << 0);
+    auto numDispatchedByRange = std::vector<int64_t>({0, 1, 0});
+    assertTargetMetrics(targeter,
+                        makeSampledUpdateQueryDocument(filter, updateMod, false /* upsert */),
+                        numDispatchedByRange);
+}
+
+TEST_F(WriteDistributionNotFilterByShardKeyReplacementUpdateTest, Upsert) {
+    auto assertTargetMetrics = [&](const CollectionRoutingInfoTargeter& targeter,
+                                   const SampledQueryDocument& queryDoc) {
+        WriteTargetMetricsBundle metrics;
+        metrics.numTargetedAllShards = 1;
+        metrics.numDispatchedByRange = std::vector<int64_t>({1, 1, 1});
+        metrics.numSingleWritesWithoutShardKey = 1;
+        assertTargetMetricsForWriteQuery(targeter, queryDoc, metrics);
+    };
+
+    auto targeter = makeCollectionRoutingInfoTargeter(chunkSplitInfoRangeSharding0);
+    auto filter = BSON("_id" << 0);
+    auto updateMod = BSON("_id" << 0 << "a" << BSON("x" << 0) << "b"
+                                << BSON("y"
+                                        << "A")
+                                << "c" << 0);
+    assertTargetMetrics(targeter,
+                        makeSampledUpdateQueryDocument(filter, updateMod, true /* upsert */));
 }
 
 }  // namespace

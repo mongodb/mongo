@@ -131,12 +131,18 @@ template <typename DistributionMetricsType, typename SampleSizeType>
 BSONObj
 DistributionMetricsCalculator<DistributionMetricsType, SampleSizeType>::_incrementMetricsForQuery(
     OperationContext* opCtx,
-    const BSONObj& filter,
+    const BSONObj& primaryFilter,
     const BSONObj& collation,
+    const BSONObj& secondaryFilter,
     const boost::optional<LegacyRuntimeConstants>& runtimeConstants,
     const boost::optional<BSONObj>& letParameters) {
+    auto filter = primaryFilter;
     auto shardKey = uassertStatusOK(
-        _getShardKeyPattern().extractShardKeyFromQuery(opCtx, _targeter.getNS(), filter));
+        _getShardKeyPattern().extractShardKeyFromQuery(opCtx, _targeter.getNS(), primaryFilter));
+    if (shardKey.isEmpty() && !secondaryFilter.isEmpty()) {
+        filter = secondaryFilter;
+        shardKey = _getShardKeyPattern().extractShardKeyFromDoc(secondaryFilter);
+    }
 
     // Increment metrics about range targeting.
     auto&& cif = [&]() {
@@ -272,8 +278,16 @@ void WriteDistributionMetricsCalculator::_addUpdateQuery(
     OperationContext* opCtx, const write_ops::UpdateCommandRequest& cmd) {
     for (const auto& updateOp : cmd.getUpdates()) {
         _numUpdate++;
+        auto primaryFilter = updateOp.getQ();
+        // If this is a non-upsert replacement update, the replacement document can be used as a
+        // filter.
+        auto secondaryFilter = !updateOp.getUpsert() &&
+                updateOp.getU().type() == write_ops::UpdateModification::Type::kReplacement
+            ? updateOp.getU().getUpdateReplacement()
+            : BSONObj();
         _incrementMetricsForQuery(opCtx,
-                                  updateOp.getQ(),
+                                  primaryFilter,
+                                  secondaryFilter,
                                   write_ops::collationOf(updateOp),
                                   updateOp.getMulti(),
                                   cmd.getLegacyRuntimeConstants(),
@@ -285,8 +299,11 @@ void WriteDistributionMetricsCalculator::_addDeleteQuery(
     OperationContext* opCtx, const write_ops::DeleteCommandRequest& cmd) {
     for (const auto& deleteOp : cmd.getDeletes()) {
         _numDelete++;
+        auto primaryFilter = deleteOp.getQ();
+        auto secondaryFilter = BSONObj();
         _incrementMetricsForQuery(opCtx,
-                                  deleteOp.getQ(),
+                                  primaryFilter,
+                                  secondaryFilter,
                                   write_ops::collationOf(deleteOp),
                                   deleteOp.getMulti(),
                                   cmd.getLegacyRuntimeConstants(),
@@ -297,8 +314,11 @@ void WriteDistributionMetricsCalculator::_addDeleteQuery(
 void WriteDistributionMetricsCalculator::_addFindAndModifyQuery(
     OperationContext* opCtx, const write_ops::FindAndModifyCommandRequest& cmd) {
     _numFindAndModify++;
+    auto primaryFilter = cmd.getQuery();
+    auto secondaryFilter = BSONObj();
     _incrementMetricsForQuery(opCtx,
-                              cmd.getQuery(),
+                              primaryFilter,
+                              secondaryFilter,
                               cmd.getCollation().value_or(BSONObj()),
                               false /* isMulti */,
                               cmd.getLegacyRuntimeConstants(),
@@ -307,13 +327,14 @@ void WriteDistributionMetricsCalculator::_addFindAndModifyQuery(
 
 void WriteDistributionMetricsCalculator::_incrementMetricsForQuery(
     OperationContext* opCtx,
-    const BSONObj& filter,
+    const BSONObj& primaryFilter,
+    const BSONObj& secondaryFilter,
     const BSONObj& collation,
     bool isMulti,
     const boost::optional<LegacyRuntimeConstants>& runtimeConstants,
     const boost::optional<BSONObj>& letParameters) {
     auto shardKey = DistributionMetricsCalculator::_incrementMetricsForQuery(
-        opCtx, filter, collation, runtimeConstants, letParameters);
+        opCtx, primaryFilter, collation, secondaryFilter, runtimeConstants, letParameters);
 
     if (shardKey.isEmpty()) {
         // Increment metrics about writes without shard key.

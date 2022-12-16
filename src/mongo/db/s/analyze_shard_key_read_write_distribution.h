@@ -92,14 +92,18 @@ protected:
     }
 
     /**
-     * The helper for 'addQuery'. Increments the metrics for the query with the given filter,
-     * collation, run-time contants and let parameters (the last two are only applicable to writes).
+     * The helper for 'addQuery'. Increments the metrics for the query with the given filter(s),
+     * collation, run-time contants and let parameters. The secondary filter is only applicable to
+     * non-upsert replacement updates, and the run-time constants and let parameters are only
+     * applicable to writes.
+     *
      * If the query filters by shard key equality, returns the shard key value.
      */
     BSONObj _incrementMetricsForQuery(
         OperationContext* opCtx,
-        const BSONObj& filter,
+        const BSONObj& primaryfilter,
         const BSONObj& collation,
+        const BSONObj& secondaryFilter = BSONObj(),
         const boost::optional<LegacyRuntimeConstants>& runtimeConstants = boost::none,
         const boost::optional<BSONObj>& letParameters = boost::none);
 
@@ -177,7 +181,8 @@ private:
     }
 
     void _incrementMetricsForQuery(OperationContext* opCtx,
-                                   const BSONObj& filter,
+                                   const BSONObj& primaryFilter,
+                                   const BSONObj& secondaryFilter,
                                    const BSONObj& collation,
                                    bool isMulti,
                                    const boost::optional<LegacyRuntimeConstants>& runtimeConstants,
