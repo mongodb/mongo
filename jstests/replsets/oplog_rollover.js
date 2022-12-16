@@ -81,18 +81,28 @@ function doTest(storageEngine) {
         const awaitCheckpointer = function(timestamp) {
             assert.soon(
                 () => {
-                    const primaryTimestamp =
-                        assert.commandWorked(primary.adminCommand({replSetGetStatus: 1}))
-                            .lastStableRecoveryTimestamp;
-                    const secondaryTimestamp =
-                        assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}))
-                            .lastStableRecoveryTimestamp;
-                    jsTestLog("Awaiting last stable recovery timestamp " +
-                              `(primary: ${tojson(primaryTimestamp)}, secondary: ${
-                                  tojson(secondaryTimestamp)}) ` +
-                              `target: ${tojson(timestamp)}`);
-                    return ((timestampCmp(primaryTimestamp, timestamp) >= 0) &&
-                            (timestampCmp(secondaryTimestamp, timestamp) >= 0));
+                    const primaryReplSetStatus =
+                        assert.commandWorked(primary.adminCommand({replSetGetStatus: 1}));
+                    const primaryRecoveryTimestamp =
+                        primaryReplSetStatus.lastStableRecoveryTimestamp;
+                    const primaryDurableTimestamp = primaryReplSetStatus.optimes.durableOpTime.ts;
+                    const secondaryReplSetStatus =
+                        assert.commandWorked(secondary.adminCommand({replSetGetStatus: 1}));
+                    const secondaryRecoveryTimestamp =
+                        secondaryReplSetStatus.lastStableRecoveryTimestamp;
+                    const secondaryDurableTimestamp =
+                        secondaryReplSetStatus.optimes.durableOpTime.ts;
+                    jsTestLog(
+                        "Awaiting durable & last stable recovery timestamp " +
+                        `(primary last stable recovery: ${tojson(primaryRecoveryTimestamp)}, ` +
+                        `primary durable: ${tojson(primaryDurableTimestamp)}, ` +
+                        `secondary last stable recovery: ${tojson(secondaryRecoveryTimestamp)}, ` +
+                        `secondary durable: ${tojson(secondaryDurableTimestamp)}) ` +
+                        `target: ${tojson(timestamp)}`);
+                    return ((timestampCmp(primaryRecoveryTimestamp, timestamp) >= 0) &&
+                            (timestampCmp(primaryDurableTimestamp, timestamp) >= 0) &&
+                            (timestampCmp(secondaryDurableTimestamp, timestamp) >= 0) &&
+                            (timestampCmp(secondaryRecoveryTimestamp, timestamp) >= 0));
                 },
                 "Timeout waiting for checkpointing to catch up",
                 ReplSetTest.kDefaultTimeoutMS,
