@@ -1,0 +1,235 @@
+Metadata: [
+	{
+		"collectionName" : "index_scan_1000",
+		"fields" : [
+			{
+				"fieldName" : "choice",
+				"data_type" : "string",
+				"indexed" : true
+			},
+			{
+				"fieldName" : "mixed1",
+				"data_type" : "string",
+				"indexed" : false
+			},
+			{
+				"fieldName" : "uniform1",
+				"data_type" : "string",
+				"indexed" : false
+			},
+			{
+				"fieldName" : "choice2",
+				"data_type" : "string",
+				"indexed" : false
+			},
+			{
+				"fieldName" : "mixed2",
+				"data_type" : "string",
+				"indexed" : false
+			}
+		],
+		"compound_indexes" : [ ],
+		"cardinality" : 1000
+	},
+	{
+		"collectionName" : "physical_scan_1000",
+		"fields" : [
+			{
+				"fieldName" : "choice1",
+				"data_type" : "string",
+				"indexed" : false
+			},
+			{
+				"fieldName" : "mixed1",
+				"data_type" : "string",
+				"indexed" : false
+			},
+			{
+				"fieldName" : "uniform1",
+				"data_type" : "string",
+				"indexed" : false
+			},
+			{
+				"fieldName" : "choice",
+				"data_type" : "string",
+				"indexed" : false
+			},
+			{
+				"fieldName" : "mixed2",
+				"data_type" : "string",
+				"indexed" : false
+			},
+			{
+				"fieldName" : "payload",
+				"data_type" : "string",
+				"indexed" : false
+			}
+		],
+		"compound_indexes" : [ ],
+		"cardinality" : 1000
+	},
+	{
+		"collectionName" : "physical_scan_5000",
+		"fields" : [
+			{
+				"fieldName" : "choice1",
+				"data_type" : "string",
+				"indexed" : false
+			},
+			{
+				"fieldName" : "mixed1",
+				"data_type" : "string",
+				"indexed" : false
+			},
+			{
+				"fieldName" : "uniform1",
+				"data_type" : "string",
+				"indexed" : false
+			},
+			{
+				"fieldName" : "choice",
+				"data_type" : "string",
+				"indexed" : false
+			},
+			{
+				"fieldName" : "mixed2",
+				"data_type" : "string",
+				"indexed" : false
+			},
+			{
+				"fieldName" : "payload",
+				"data_type" : "string",
+				"indexed" : false
+			}
+		],
+		"compound_indexes" : [ ],
+		"cardinality" : 5000
+	},
+	{
+		"collectionName" : "c_int_05_100",
+		"fields" : [
+			{
+				"fieldName" : "in1",
+				"data_type" : "integer",
+				"indexed" : true
+			},
+			{
+				"fieldName" : "mixed1",
+				"data_type" : "string",
+				"indexed" : false
+			},
+			{
+				"fieldName" : "uniform1",
+				"data_type" : "string",
+				"indexed" : false
+			},
+			{
+				"fieldName" : "in2",
+				"data_type" : "integer",
+				"indexed" : true
+			},
+			{
+				"fieldName" : "mixed2",
+				"data_type" : "string",
+				"indexed" : false
+			}
+		],
+		"compound_indexes" : [ ],
+		"cardinality" : 100
+	},
+	{
+		"collectionName" : "c_arr_01_100",
+		"fields" : [
+			{
+				"fieldName" : "as",
+				"data_type" : "integer",
+				"indexed" : true
+			}
+		],
+		"compound_indexes" : [ ],
+		"cardinality" : 100
+	}
+]
+Loading 5 collections.
+
+Inserting collection: physical_scan_5000
+Inserting collection: c_arr_01_100
+Inserting collection: physical_scan_1000
+Inserting collection: c_int_05_100
+Inserting collection: index_scan_1000
+Testing collection index_scan_1000
+Indexes: [
+	{
+		"v" : 2,
+		"key" : {
+			"_id" : 1
+		},
+		"name" : "_id_"
+	},
+	{
+		"v" : 2,
+		"key" : {
+			"choice" : 1
+		},
+		"name" : "choice_1"
+	}
+]
+Expected cardinality: 1000
+Actual cardinality: 1000
+
+Testing collection physical_scan_1000
+Indexes: [ { "v" : 2, "key" : { "_id" : 1 }, "name" : "_id_" } ]
+Expected cardinality: 1000
+Actual cardinality: 1000
+
+Testing collection physical_scan_5000
+Indexes: [ { "v" : 2, "key" : { "_id" : 1 }, "name" : "_id_" } ]
+Expected cardinality: 5000
+Actual cardinality: 5000
+
+Testing collection c_int_05_100
+Indexes: [
+	{
+		"v" : 2,
+		"key" : {
+			"_id" : 1
+		},
+		"name" : "_id_"
+	},
+	{
+		"v" : 2,
+		"key" : {
+			"in1" : 1
+		},
+		"name" : "in1_1"
+	},
+	{
+		"v" : 2,
+		"key" : {
+			"in2" : 1
+		},
+		"name" : "in2_1"
+	}
+]
+Expected cardinality: 100
+Actual cardinality: 100
+
+Testing collection c_arr_01_100
+Indexes: [
+	{
+		"v" : 2,
+		"key" : {
+			"_id" : 1
+		},
+		"name" : "_id_"
+	},
+	{
+		"v" : 2,
+		"key" : {
+			"as" : 1
+		},
+		"name" : "as_1"
+	}
+]
+Expected cardinality: 100
+Actual cardinality: 100

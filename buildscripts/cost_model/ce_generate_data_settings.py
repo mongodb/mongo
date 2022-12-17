@@ -25,13 +25,14 @@
 # exception statement from all source files in the program, then also delete
 # it in the license file.
 #
-"""Calibration configuration."""
+"""Configuration of data generation for CE accuracy testing."""
 
+from pathlib import Path
 import random
 import config
 from random_generator import RangeGenerator, DataType, RandomDistribution, ArrayRandomDistribution
 
-__all__ = ['main_config', 'distributions']
+__all__ = ['database_config', 'data_generator_config']
 
 # A string value to fill up collections and not used in queries.
 HIDDEN_STRING_VALUE = '__hidden_string_value'
@@ -113,9 +114,10 @@ lengths_distr = RandomDistribution.uniform(RangeGenerator(DataType.INTEGER, 1, 1
 distributions['array_small'] = ArrayRandomDistribution(lengths_distr, distributions['int_normal'])
 
 # Database settings
-database = config.DatabaseConfig(connection_string='mongodb://localhost',
-                                 database_name='abt_calibration', dump_path='~/data/dump',
-                                 restore_from_dump=config.RestoreMode.NEVER, dump_on_exit=False)
+database_config = config.DatabaseConfig(
+    connection_string='mongodb://localhost', database_name='ce_accuracy_test', dump_path=Path(
+        '..', '..', 'jstests', 'query_golden', 'libs', 'data'),
+    restore_from_dump=config.RestoreMode.NEVER, dump_on_exit=False)
 
 
 # Collection template settings
@@ -165,17 +167,17 @@ def create_physical_scan_collection_template(name: str,
                                  distribution=distributions["string_choice"], indexed=False),
             config.FieldTemplate(name="mixed2", data_type=config.DataType.STRING,
                                  distribution=distributions["string_mixed"], indexed=False),
-        ], compound_indexes=[], cardinalities=[1000, 5000, 10000])
+        ], compound_indexes=[], cardinalities=[1000, 5000])
 
     if payload_size > 0:
-        payload_distr = random_strings_distr(payload_size, 1000)
+        payload_distr = random_strings_distr(payload_size, 100)
         template.fields.append(
             config.FieldTemplate(name="payload", data_type=config.DataType.STRING,
                                  distribution=payload_distr, indexed=False))
     return template
 
 
-collection_caridinalities = list(range(10000, 50001, 10000))
+collection_cardinalities = [100]  #list(range(100, 301, 100))
 
 c_int_05 = config.CollectionTemplate(
     name="c_int_05", fields=[
@@ -189,62 +191,20 @@ c_int_05 = config.CollectionTemplate(
                              distribution=distributions["int_normal"], indexed=True),
         config.FieldTemplate(name="mixed2", data_type=config.DataType.STRING,
                              distribution=distributions["string_mixed"], indexed=False),
-    ], compound_indexes=[], cardinalities=collection_caridinalities)
+    ], compound_indexes=[], cardinalities=collection_cardinalities)
 
 c_arr_01 = config.CollectionTemplate(
     name="c_arr_01", fields=[
         config.FieldTemplate(name="as", data_type=config.DataType.INTEGER,
                              distribution=distributions["array_small"], indexed=True)
-    ], compound_indexes=[], cardinalities=collection_caridinalities)
+    ], compound_indexes=[], cardinalities=collection_cardinalities)
 
-index_scan = create_index_scan_collection_template('index_scan', 1000000)
+index_scan = create_index_scan_collection_template('index_scan', 1000)
 
-physical_scan = create_physical_scan_collection_template('physical_scan', 2000)
+physical_scan = create_physical_scan_collection_template('physical_scan', 64)
 
 # Data Generator settings
-data_generator = config.DataGeneratorConfig(
-    enabled=True, create_indexes=True, batch_size=10000,
+data_generator_config = config.DataGeneratorConfig(
+    enabled=True, create_indexes=False, batch_size=10000,
     collection_templates=[index_scan, physical_scan, c_int_05, c_arr_01],
     write_mode=config.WriteMode.REPLACE, collection_name_with_card=True)
-
-# Workload Execution settings
-workload_execution = config.WorkloadExecutionConfig(
-    enabled=True, output_collection_name='calibrationData', write_mode=config.WriteMode.REPLACE,
-    warmup_runs=3, runs=30)
-
-
-def make_filter_by_note(note_value: any):
-    def impl(df):
-        return df[df.note == note_value]
-
-    return impl
-
-
-abt_nodes = [
-    config.AbtNodeCalibrationConfig(type='PhysicalScan',
-                                    filter_function=make_filter_by_note('PhysicalScan')),
-    config.AbtNodeCalibrationConfig(type='IndexScan',
-                                    filter_function=make_filter_by_note('IndexScan')),
-    config.AbtNodeCalibrationConfig(type='Seek', filter_function=make_filter_by_note('IndexScan')),
-    config.AbtNodeCalibrationConfig(type='Filter',
-                                    filter_function=make_filter_by_note('PhysicalScan')),
-    config.AbtNodeCalibrationConfig(type='Evaluation',
-                                    filter_function=make_filter_by_note('Evaluation')),
-    config.AbtNodeCalibrationConfig(type='NestedLoopJoin'),
-    config.AbtNodeCalibrationConfig(type='HashJoin'),
-    config.AbtNodeCalibrationConfig(type='MergeJoin'),
-    config.AbtNodeCalibrationConfig(type='Union'),
-    config.AbtNodeCalibrationConfig(type='LimitSkip',
-                                    filter_function=make_filter_by_note('LimitSkip')),
-    config.AbtNodeCalibrationConfig(type='GroupBy'),
-    config.AbtNodeCalibrationConfig(type='Unwind'),
-    config.AbtNodeCalibrationConfig(type='Unique'),
-]
-
-# Calibrator settings
-abt_calibrator = config.AbtCalibratorConfig(
-    enabled=True, test_size=0.2, input_collection_name=workload_execution.output_collection_name,
-    trace=False, nodes=abt_nodes)
-
-main_config = config.Config(database=database, data_generator=data_generator,
-                            abt_calibrator=abt_calibrator, workload_execution=workload_execution)

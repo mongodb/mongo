@@ -95,8 +95,10 @@ class DataGenerator:
             if self.config.write_mode == WriteMode.REPLACE:
                 await coll.drop()
             tasks.append(asyncio.create_task(self._populate_collection(coll, coll_info)))
-            tasks.append(asyncio.create_task(create_single_field_indexes(coll, coll_info.fields)))
-            tasks.append(asyncio.create_task(create_compound_indexes(coll, coll_info)))
+            if self.config.create_indexes:
+                tasks.append(
+                    asyncio.create_task(create_single_field_indexes(coll, coll_info.fields)))
+                tasks.append(asyncio.create_task(create_compound_indexes(coll, coll_info)))
 
         for task in tasks:
             await task

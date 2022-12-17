@@ -227,7 +227,7 @@ def make_config():
     col_end2end = create_end2end_collection_template('end2end', 2000000)
 
     data_generator_config = config.DataGeneratorConfig(
-        enabled=True, batch_size=10000, collection_templates=[col_end2end],
+        enabled=True, create_indexes=True, batch_size=10000, collection_templates=[col_end2end],
         write_mode=config.WriteMode.REPLACE, collection_name_with_card=True)
 
     workload_execution_config = config.WorkloadExecutionConfig(

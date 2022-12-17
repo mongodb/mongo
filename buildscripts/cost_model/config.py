@@ -73,6 +73,7 @@ class DataGeneratorConfig:
     """Data Generator configuration."""
 
     enabled: bool
+    create_indexes: bool
     collection_templates: list[CollectionTemplate]
     collection_name_with_card: bool
     write_mode: WriteMode
