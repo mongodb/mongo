@@ -30,6 +30,8 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
 #include "mongo/db/s/sessions_collection_config_server.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/repl/replication_coordinator.h"
 
 #include "mongo/logv2/log.h"
 #include "mongo/s/client/shard_registry.h"
@@ -115,20 +117,25 @@ void SessionsCollectionConfigServer::setupSessionsCollection(OperationContext* o
     static constexpr int64_t kDesiredDocsInChunks = 1000;
     static constexpr int64_t kMaxChunkSizeBytes =
         kAverageSessionDocSizeBytes * kDesiredDocsInChunks;
-    auto filterQuery =
-        BSON("_id" << NamespaceString::kLogicalSessionsNamespace.ns()
-                   << CollectionType::kMaxChunkSizeBytesFieldName << BSON("$exists" << false));
-    auto updateQuery = BSON("$set" << BSON(CollectionType::kMaxChunkSizeBytesFieldName
-                                           << kMaxChunkSizeBytes
-                                           << CollectionType::kNoAutoSplitFieldName << true));
 
-    uassertStatusOK(Grid::get(opCtx)->catalogClient()->updateConfigDocument(
-        opCtx,
-        CollectionType::ConfigNS,
-        filterQuery,
-        updateQuery,
-        false,
-        ShardingCatalogClient::kMajorityWriteConcern));
+    Lock::GlobalLock lock(opCtx, MODE_IX);
+    if (const auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+        replCoord->canAcceptWritesFor(opCtx, CollectionType::ConfigNS)) {
+        auto filterQuery =
+            BSON("_id" << NamespaceString::kLogicalSessionsNamespace.ns()
+                       << CollectionType::kMaxChunkSizeBytesFieldName << BSON("$exists" << false));
+        auto updateQuery = BSON("$set" << BSON(CollectionType::kMaxChunkSizeBytesFieldName
+                                               << kMaxChunkSizeBytes
+                                               << CollectionType::kNoAutoSplitFieldName << true));
+
+        uassertStatusOK(Grid::get(opCtx)->catalogClient()->updateConfigDocument(
+            opCtx,
+            CollectionType::ConfigNS,
+            filterQuery,
+            updateQuery,
+            false,
+            ShardingCatalogClient::kLocalWriteConcern));
+    }
 }
 
 }  // namespace mongo
