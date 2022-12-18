@@ -1052,7 +1052,7 @@ __wt_debug_cursor_page(void *cursor_arg, const char *ofile)
     }
 
     WT_WITH_BTREE(
-      session, CUR2BT(cbt), ret = __wt_debug_page(session, NULL, cbt->ref, ofile, false));
+      session, CUR2BT(cbt), ret = __wt_debug_page(session, NULL, cbt->ref, ofile, true));
 
     if (did_hs_checkpoint)
         session->hs_checkpoint = NULL;
