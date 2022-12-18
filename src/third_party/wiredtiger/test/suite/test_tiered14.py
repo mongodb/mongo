@@ -128,7 +128,7 @@ class test_tiered14(wttest.WiredTigerTestCase, TieredConfigMixin):
                     self.progress('check')
                     ds.check()
             except Exception as e:
-                self.progress('Failed at position {} in {}: {}'.format(idx, ops, str(e)))
+                self.progress('Failed at position {} in {}: {}'.format(self.position, ops, str(e)))
                 raise(e)
 
     # Test tiered storage with checkpoints and flush_tier calls.

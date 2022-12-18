@@ -97,11 +97,7 @@ __tiered_dhandle_setup(WT_SESSION_IMPL *session, WT_TIERED *tiered, uint32_t i, 
         else if (type == WT_DHANDLE_TYPE_TIERED)
             id = WT_TIERED_INDEX_LOCAL;
         else if (type == WT_DHANDLE_TYPE_TIERED_TREE)
-            /*
-             * FIXME-WT-7731: this type can be removed. For now, there is nothing to do for this
-             * type.
-             */
-            goto err;
+            id = WT_TIERED_INDEX_SHARED;
         else
             WT_ERR_MSG(
               session, EINVAL, "Unknown or unsupported tiered dhandle type %" PRIu32, type);
@@ -133,7 +129,7 @@ __tiered_init_tiers(WT_SESSION_IMPL *session, WT_TIERED *tiered, WT_CONFIG_ITEM 
     WT_CONFIG_ITEM ckey, cval;
     WT_DECL_ITEM(tmp);
     WT_DECL_RET;
-    WT_TIERED_TIERS *local_tier;
+    WT_TIERED_TIERS *tier;
     uint32_t object_id;
     const char *cfg, *name;
 
@@ -171,11 +167,19 @@ __tiered_init_tiers(WT_SESSION_IMPL *session, WT_TIERED *tiered, WT_CONFIG_ITEM 
             session, tiered, WT_TIERED_INDEX_INVALID, (const char *)tmp->data));
         WT_ERR(ret);
     }
-    local_tier = &tiered->tiers[WT_TIERED_INDEX_LOCAL];
-    if (local_tier->name == NULL) {
+    /* Set up the name for any tier that needs it. */
+    tier = &tiered->tiers[WT_TIERED_INDEX_LOCAL];
+    if (tier->name == NULL) {
         WT_ERR(__wt_tiered_name(
-          session, &tiered->iface, tiered->current_id, WT_TIERED_NAME_LOCAL, &local_tier->name));
-        F_SET(local_tier, WT_TIERS_OP_READ | WT_TIERS_OP_WRITE);
+          session, &tiered->iface, tiered->current_id, WT_TIERED_NAME_LOCAL, &tier->name));
+        F_SET(tier, WT_TIERS_OP_READ | WT_TIERS_OP_WRITE);
+    }
+    /* Set up the tiered name if we're not on the first object. */
+    tier = &tiered->tiers[WT_TIERED_INDEX_SHARED];
+    if (tier != NULL && tier->name == NULL && tiered->current_id != 1) {
+        WT_ERR(__wt_tiered_name(
+          session, &tiered->iface, tiered->current_id, WT_TIERED_NAME_SHARED, &tier->name));
+        F_SET(tier, WT_TIERS_OP_FLUSH | WT_TIERS_OP_READ);
     }
     WT_ERR_NOTFOUND_OK(ret, false);
 err:
@@ -391,8 +395,10 @@ __tiered_create_tier_tree(WT_SESSION_IMPL *session, WT_TIERED *tiered)
 
     WT_ERR(__wt_schema_create(session, name, config));
     this_tier = &tiered->tiers[WT_TIERED_INDEX_SHARED];
-    WT_ASSERT(session, this_tier->name == NULL);
-    this_tier->name = name;
+    if (this_tier->name == NULL)
+        this_tier->name = name;
+    else
+        WT_ASSERT(session, strcmp(this_tier->name, name) == 0);
     F_SET(this_tier, WT_TIERS_OP_FLUSH | WT_TIERS_OP_READ);
 
     if (0)
@@ -733,6 +739,7 @@ __tiered_open(WT_SESSION_IMPL *session, const char *cfg[])
     tiered->obj_config = metaconf;
     metaconf = NULL;
     __wt_verbose(session, WT_VERB_TIERED, "TIERED_OPEN: obj_config %s", tiered->obj_config);
+    __wt_verbose(session, WT_VERB_TIERED, "TIERED_OPEN: tiered config %s", config);
 
     WT_ERR(__wt_config_getones(session, config, "key_format", &cval));
     WT_ERR(__wt_strndup(session, cval.str, cval.len, &tiered->key_format));
