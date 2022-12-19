@@ -473,20 +473,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
     invariant(!csn->stopApplyingFilterAfterFirstMatch || csn->filter);
 
     if (csn->filter) {
-        auto relevantSlots = sbe::makeSV(resultSlot, recordIdSlot);
-        if (tsSlot) {
-            relevantSlots.push_back(*tsSlot);
+        auto filterExpr = generateFilter(state, csn->filter.get(), resultSlot, nullptr);
+        if (!filterExpr.isNull()) {
+            stage = sbe::makeS<sbe::FilterStage<false>>(
+                std::move(stage), filterExpr.extractExpr(state.slotVarMap), csn->nodeId());
         }
-
-        relevantSlots.insert(relevantSlots.end(), fieldSlots.begin(), fieldSlots.end());
-
-        auto [_, outputStage] = generateFilter(state,
-                                               csn->filter.get(),
-                                               {std::move(stage), std::move(relevantSlots)},
-                                               resultSlot,
-                                               nullptr /* planStageSlots */,
-                                               csn->nodeId());
-        stage = outputStage.extractStage(csn->nodeId());
 
         // We may be requested to stop applying the filter after the first match. This can happen
         // if the query is just a lower bound on 'ts' on a forward scan. In this case every document
@@ -658,16 +649,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
         // 'generateOptimizedOplogScan()'.
         invariant(!csn->stopApplyingFilterAfterFirstMatch);
 
-        auto relevantSlots = sbe::makeSV(resultSlot, recordIdSlot);
-        relevantSlots.insert(relevantSlots.end(), fieldSlots.begin(), fieldSlots.end());
-
-        auto [_, outputStage] = generateFilter(state,
-                                               csn->filter.get(),
-                                               {std::move(stage), std::move(relevantSlots)},
-                                               resultSlot,
-                                               &outputs,
-                                               csn->nodeId());
-        stage = outputStage.extractStage(csn->nodeId());
+        auto filterExpr = generateFilter(state, csn->filter.get(), resultSlot, &outputs);
+        if (!filterExpr.isNull()) {
+            stage = sbe::makeS<sbe::FilterStage<false>>(
+                std::move(stage), filterExpr.extractExpr(state.slotVarMap), csn->nodeId());
+        }
     }
 
     return {std::move(stage), std::move(outputs)};

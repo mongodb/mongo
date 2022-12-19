@@ -41,9 +41,8 @@ namespace mongo::stage_builder {
 class PlanStageSlots;
 
 /**
- * This function generates an SBE plan stage tree implementing a filter expression represented by
- * 'root'. The 'stage' parameter provides the input subtree to build on top of. The 'inputSlot'
- * and 'slots' parameters specify the input(s) that the filter should use.
+ * This function generates an EvalExpr that implements the filter expression represented by 'root'.
+ * The 'inputExpr' and 'slots' parameters specify the input(s) that the filter should use.
  *
  * The 'isFilterOverIxscan' parameter controls if we should search for kField slots in 'slots' that
  * correspond to the full paths needed by the filter. Typically 'isFilterOverIxscan' is false unless
@@ -53,25 +52,15 @@ class PlanStageSlots;
  * key field names ('keyFields') that lists the names of all the kField slots that are needed by
  * 'root'.
  *
- * This function returns a pair containing an optional<SlotId> and an EvalStage. If 'trackIndex' is
- * false then the optional<SlotId> will always be boost::none. If 'trackIndex' is true, then this
- * optional<SlotId> will be set to a slot that holds information about the index of the matching
- * element if an array traversal was performed. (If multiple array traversals were performed, it is
- * undefined which traversal will report the index of the matching array element.)
- *
- * Note that this function does not allow both 'isFilterOverIxscan' and 'trackIndex' to be true. If
- * they are both true, then this function will throw an exception.
+ * This function returns an EvalExpr. If 'root' is an AND with no children, this function will
+ * return a null EvalExpr to indicate that there is no filter condition.
  */
-std::pair<boost::optional<sbe::value::SlotId>, EvalStage> generateFilter(
-    StageBuilderState& state,
-    const MatchExpression* root,
-    EvalStage stage,
-    boost::optional<sbe::value::SlotId> inputSlot,
-    const PlanStageSlots* slots,
-    PlanNodeId planNodeId,
-    const std::vector<std::string>& keyFields = {},
-    bool isFilterOverIxscan = false,
-    bool trackIndex = false);
+EvalExpr generateFilter(StageBuilderState& state,
+                        const MatchExpression* root,
+                        EvalExpr inputExpr,
+                        const PlanStageSlots* slots,
+                        const std::vector<std::string>& keyFields = {},
+                        bool isFilterOverIxscan = false);
 
 /**
  * Converts the list of equalities inside the given $in expression ('expr') into an SBE array, which
@@ -101,21 +90,21 @@ std::pair<sbe::value::TypeTags, sbe::value::Value> convertBitTestBitPositions(
 EvalExpr generateComparisonExpr(StageBuilderState& state,
                                 const ComparisonMatchExpression* expr,
                                 sbe::EPrimBinary::Op binaryOp,
-                                const sbe::EVariable& var);
+                                EvalExpr inputExpr);
 EvalExpr generateInExpr(StageBuilderState& state,
                         const InMatchExpression* expr,
-                        const sbe::EVariable& var);
+                        EvalExpr inputExpr);
 EvalExpr generateBitTestExpr(StageBuilderState& state,
                              const BitTestMatchExpression* expr,
                              const sbe::BitTestBehavior& bitOp,
-                             const sbe::EVariable& var);
+                             EvalExpr inputExpr);
 EvalExpr generateModExpr(StageBuilderState& state,
                          const ModMatchExpression* expr,
-                         const sbe::EVariable& var);
+                         EvalExpr inputExpr);
 EvalExpr generateRegexExpr(StageBuilderState& state,
                            const RegexMatchExpression* expr,
-                           const sbe::EVariable& var);
+                           EvalExpr inputExpr);
 EvalExpr generateWhereExpr(StageBuilderState& state,
                            const WhereMatchExpression* expr,
-                           const sbe::EVariable& var);
+                           EvalExpr inputExpr);
 }  // namespace mongo::stage_builder

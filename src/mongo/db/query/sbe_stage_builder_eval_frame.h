@@ -138,6 +138,10 @@ public:
         _storage = false;
     }
 
+    std::unique_ptr<sbe::EExpression> getExpr(optimizer::SlotVarMap& varMap) const {
+        return clone().extractExpr(varMap);
+    }
+
     /**
      * Extract the expression on top of the stack as an SBE EExpression node. If the expression is
      * stored as an ABT node, it is lowered into an SBE expression, using the provided map to
@@ -226,116 +230,6 @@ private:
     sbe::value::SlotVector _outSlots;
 };
 
-/**
- * To support non-leaf operators in general, SBE builders maintain a stack of EvalFrames. An
- * EvalFrame holds a subtree to build on top of (stage), a stack of expressions (exprs) and extra
- * data useful for particular builder (data).
- * Initially there is only one EvalFrame on the stack which holds the main tree. Non-leaf operators
- * can decide to push an EvalFrame on the stack before each of their children is evaluated if
- * desired. If a non-leaf operator pushes one or more EvalFrames onto the stack, it is responsible
- * for removing these EvalFrames from the stack later.
- */
-template <typename T>
-class EvalFrame {
-public:
-    template <typename... Args>
-    EvalFrame(EvalStage stage, Args&&... args)
-        : _data{std::forward<Args>(args)...}, _stage(std::move(stage)) {}
-
-    const EvalExpr& topExpr() const {
-        invariant(!_exprs.empty());
-        return _exprs.top();
-    }
-
-    void pushExpr(EvalExpr expr) {
-        _exprs.push(std::move(expr));
-    }
-
-    EvalExpr popExpr() {
-        invariant(!_exprs.empty());
-        auto expr = std::move(_exprs.top());
-        _exprs.pop();
-        return expr;
-    }
-
-    size_t exprsCount() const {
-        return _exprs.size();
-    }
-
-    const T& data() const {
-        return _data;
-    }
-
-    T& data() {
-        return _data;
-    }
-
-    void setStage(EvalStage stage) {
-        _stage = std::move(stage);
-    }
-
-    const EvalStage& getStage() const {
-        return _stage;
-    }
-
-    EvalStage extractStage() {
-        return std::move(_stage);
-    }
-
-private:
-    T _data;
-    EvalStage _stage;
-    std::stack<EvalExpr> _exprs;
-};
-
-/**
- * Empty struct for 'data' field in case builder does not need to carry any additional data with
- * each frame.
- */
-struct NoExtraFrameData {};
-
 using EvalExprStagePair = std::pair<EvalExpr, EvalStage>;
-
-template <typename Data = NoExtraFrameData>
-class EvalStack {
-public:
-    using Frame = EvalFrame<Data>;
-
-    EvalStack() = default;
-
-    template <typename... Args>
-    void emplaceFrame(Args&&... args) {
-        stack.emplace(std::forward<Args>(args)...);
-    }
-
-    Frame& topFrame() {
-        invariant(!stack.empty());
-        return stack.top();
-    }
-
-    const Frame& topFrame() const {
-        invariant(!stack.empty());
-        return stack.top();
-    }
-
-    EvalExprStagePair popFrame() {
-        invariant(framesCount() > 0);
-        auto& frame = topFrame();
-
-        invariant(frame.exprsCount() == 1);
-        auto expr = frame.popExpr();
-        auto stage = frame.extractStage();
-
-        stack.pop();
-        return {std::move(expr), std::move(stage)};
-    }
-
-    size_t framesCount() const {
-        return stack.size();
-    }
-
-private:
-    std::stack<Frame> stack;
-};
 
 }  // namespace mongo::stage_builder

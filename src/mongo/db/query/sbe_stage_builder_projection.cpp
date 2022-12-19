@@ -84,9 +84,8 @@ struct ProjectionTraversalVisitorContext {
         EvalExpr getInputEvalExpr() const {
             return inputExpr.clone();
         }
-
         std::unique_ptr<sbe::EExpression> getInputExpr(optimizer::SlotVarMap& slotVarMap) const {
-            return getInputEvalExpr().extractExpr(slotVarMap);
+            return inputExpr.getExpr(slotVarMap);
         }
 
         EvalExpr extractInputEvalExpr() {

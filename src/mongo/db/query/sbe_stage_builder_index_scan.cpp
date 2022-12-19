@@ -717,7 +717,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
 
     // Determine the set of fields from the index required to apply the filter and union those with
     // the set of fields from the index required by the parent stage.
-    auto [indexFilterFieldBitset, indexFilterFieldNames] = [&]() {
+    auto [filterFieldBitset, filterFields] = [&]() {
         if (ixn->filter) {
             DepsTracker tracker;
             match_expression::addDependencies(ixn->filter.get(), &tracker);
@@ -725,7 +725,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
         }
         return std::make_pair(sbe::IndexKeysInclusionSet{}, std::vector<std::string>{});
     }();
-    auto fieldBitset = originalFieldBitset | indexFilterFieldBitset;
+    auto fieldBitset = originalFieldBitset | filterFieldBitset;
     auto fieldAndSortKeyBitset = fieldBitset | sortKeyBitset;
 
     // Add the access method corresponding to 'indexName' to 'iamMap' if needed.
@@ -839,21 +839,13 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
     }
 
     if (ixn->filter) {
-        // Relevant slots must include slots for all index keys in case they are needed by parent
-        // stages (for instance, covered shard filter).
-        auto relevantSlots = getSlotsToForward(reqs, outputs);
-
-        auto [_, outputStage] = generateFilter(state,
-                                               ixn->filter.get(),
-                                               {std::move(stage), std::move(relevantSlots)},
-                                               boost::none,
-                                               &outputs,
-                                               ixn->nodeId(),
-                                               indexFilterFieldNames,
-                                               true /* useKeySlots */,
-                                               false /* trackIndex */);
-
-        stage = outputStage.extractStage(ixn->nodeId());
+        const bool isOverIxscan = true;
+        auto filterExpr =
+            generateFilter(state, ixn->filter.get(), {}, &outputs, filterFields, isOverIxscan);
+        if (!filterExpr.isNull()) {
+            stage = sbe::makeS<sbe::FilterStage<false>>(
+                std::move(stage), filterExpr.extractExpr(state.slotVarMap), ixn->nodeId());
+        }
     }
 
     return {std::move(stage), std::move(outputs)};
@@ -968,7 +960,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
 
     // Determine the set of fields from the index required to apply the filter and union those
     // with the set of fields from the index required by the parent stage.
-    auto [indexFilterFieldBitset, indexFilterFieldNames] = [&]() {
+    auto [filterFieldBitset, filterFields] = [&]() {
         if (ixn->filter) {
             DepsTracker tracker;
             match_expression::addDependencies(ixn->filter.get(), &tracker);
@@ -976,7 +968,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
         }
         return std::make_pair(sbe::IndexKeysInclusionSet{}, std::vector<std::string>{});
     }();
-    auto fieldBitset = originalFieldBitset | indexFilterFieldBitset;
+    auto fieldBitset = originalFieldBitset | filterFieldBitset;
     auto fieldAndSortKeyBitset = fieldBitset | sortKeyBitset;
 
     auto outputFieldAndSortKeySlots =
@@ -1150,21 +1142,13 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
     }
 
     if (ixn->filter) {
-        // Relevant slots must include slots for all index keys in case they are needed by parent
-        // stages (for instance, covered shard filter).
-        auto relevantSlots = getSlotsToForward(reqs, outputs);
-
-        auto [_, outputStage] = generateFilter(state,
-                                               ixn->filter.get(),
-                                               {std::move(stage), std::move(relevantSlots)},
-                                               boost::none,
-                                               &outputs,
-                                               ixn->nodeId(),
-                                               indexFilterFieldNames,
-                                               true /* useKeySlots */,
-                                               false /* trackIndex */);
-
-        stage = outputStage.extractStage(ixn->nodeId());
+        const bool isOverIxscan = true;
+        auto filterExpr =
+            generateFilter(state, ixn->filter.get(), {}, &outputs, filterFields, isOverIxscan);
+        if (!filterExpr.isNull()) {
+            stage = sbe::makeS<sbe::FilterStage<false>>(
+                std::move(stage), filterExpr.extractExpr(state.slotVarMap), ixn->nodeId());
+        }
     }
 
     state.data->indexBoundsEvaluationInfos.emplace_back(

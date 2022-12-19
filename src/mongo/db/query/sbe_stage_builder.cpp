@@ -596,39 +596,41 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 namespace {
 std::unique_ptr<sbe::EExpression> generatePerColumnPredicate(StageBuilderState& state,
                                                              const MatchExpression* me,
-                                                             const sbe::EVariable& inputVar) {
+                                                             EvalExpr expr) {
     switch (me->matchType()) {
         // These are always safe since they will never match documents missing their field, or where
         // the element is an object or array.
         case MatchExpression::REGEX:
-            return generateRegexExpr(state, checked_cast<const RegexMatchExpression*>(me), inputVar)
+            return generateRegexExpr(
+                       state, checked_cast<const RegexMatchExpression*>(me), std::move(expr))
                 .extractExpr(state.slotVarMap);
         case MatchExpression::MOD:
-            return generateModExpr(state, checked_cast<const ModMatchExpression*>(me), inputVar)
+            return generateModExpr(
+                       state, checked_cast<const ModMatchExpression*>(me), std::move(expr))
                 .extractExpr(state.slotVarMap);
         case MatchExpression::BITS_ALL_SET:
             return generateBitTestExpr(state,
                                        checked_cast<const BitTestMatchExpression*>(me),
                                        sbe::BitTestBehavior::AllSet,
-                                       inputVar)
+                                       std::move(expr))
                 .extractExpr(state.slotVarMap);
         case MatchExpression::BITS_ALL_CLEAR:
             return generateBitTestExpr(state,
                                        checked_cast<const BitTestMatchExpression*>(me),
                                        sbe::BitTestBehavior::AllClear,
-                                       inputVar)
+                                       std::move(expr))
                 .extractExpr(state.slotVarMap);
         case MatchExpression::BITS_ANY_SET:
             return generateBitTestExpr(state,
                                        checked_cast<const BitTestMatchExpression*>(me),
                                        sbe::BitTestBehavior::AnySet,
-                                       inputVar)
+                                       std::move(expr))
                 .extractExpr(state.slotVarMap);
         case MatchExpression::BITS_ANY_CLEAR:
             return generateBitTestExpr(state,
                                        checked_cast<const BitTestMatchExpression*>(me),
                                        sbe::BitTestBehavior::AnyClear,
-                                       inputVar)
+                                       std::move(expr))
                 .extractExpr(state.slotVarMap);
         case MatchExpression::EXISTS:
             return makeConstant(sbe::value::TypeTags::Boolean, true);
@@ -636,46 +638,46 @@ std::unique_ptr<sbe::EExpression> generatePerColumnPredicate(StageBuilderState& 
             return generateComparisonExpr(state,
                                           checked_cast<const ComparisonMatchExpression*>(me),
                                           sbe::EPrimBinary::less,
-                                          inputVar)
+                                          std::move(expr))
                 .extractExpr(state.slotVarMap);
         case MatchExpression::GT:
             return generateComparisonExpr(state,
                                           checked_cast<const ComparisonMatchExpression*>(me),
                                           sbe::EPrimBinary::greater,
-                                          inputVar)
+                                          std::move(expr))
                 .extractExpr(state.slotVarMap);
         case MatchExpression::EQ:
             return generateComparisonExpr(state,
                                           checked_cast<const ComparisonMatchExpression*>(me),
                                           sbe::EPrimBinary::eq,
-                                          inputVar)
+                                          std::move(expr))
                 .extractExpr(state.slotVarMap);
         case MatchExpression::LTE:
             return generateComparisonExpr(state,
                                           checked_cast<const ComparisonMatchExpression*>(me),
                                           sbe::EPrimBinary::lessEq,
-                                          inputVar)
+                                          std::move(expr))
                 .extractExpr(state.slotVarMap);
         case MatchExpression::GTE:
             return generateComparisonExpr(state,
                                           checked_cast<const ComparisonMatchExpression*>(me),
                                           sbe::EPrimBinary::greaterEq,
-                                          inputVar)
+                                          std::move(expr))
                 .extractExpr(state.slotVarMap);
         case MatchExpression::MATCH_IN: {
-            auto expr = checked_cast<const InMatchExpression*>(me);
+            const auto* ime = checked_cast<const InMatchExpression*>(me);
             tassert(6988583,
                     "Push-down of non-scalar values in $in is not supported.",
-                    !expr->hasNonScalarOrNonEmptyValues());
-            return generateInExpr(state, expr, inputVar).extractExpr(state.slotVarMap);
+                    !ime->hasNonScalarOrNonEmptyValues());
+            return generateInExpr(state, ime, std::move(expr)).extractExpr(state.slotVarMap);
         }
         case MatchExpression::TYPE_OPERATOR: {
-            const auto& expr = checked_cast<const TypeMatchExpression*>(me);
-            const MatcherTypeSet& ts = expr->typeSet();
+            const auto* tme = checked_cast<const TypeMatchExpression*>(me);
+            const MatcherTypeSet& ts = tme->typeSet();
 
             return makeFunction(
                 "typeMatch",
-                inputVar.clone(),
+                expr.extractExpr(state.slotVarMap),
                 makeConstant(sbe::value::TypeTags::NumberInt64,
                              sbe::value::bitcastFrom<int64_t>(ts.getBSONTypeMask())));
         }
@@ -691,10 +693,10 @@ std::unique_ptr<sbe::EExpression> generateLeafExpr(StageBuilderState& state,
                                                    const MatchExpression* me,
                                                    sbe::FrameId lambdaFrameId,
                                                    sbe::value::SlotId inputSlot) {
-    sbe::EVariable lambdaParam = sbe::EVariable{lambdaFrameId, 0};
+    auto lambdaParam = makeVariable(lambdaFrameId, 0);
 
     auto lambdaExpr = sbe::makeE<sbe::ELocalLambda>(
-        lambdaFrameId, generatePerColumnPredicate(state, me, lambdaParam));
+        lambdaFrameId, generatePerColumnPredicate(state, me, std::move(lambdaParam)));
 
     const MatchExpression::MatchType mt = me->matchType();
     auto traverserName = (mt == MatchExpression::EXISTS || mt == MatchExpression::TYPE_OPERATOR)
@@ -847,18 +849,13 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 
     // Generate post assembly filter.
     if (csn->postAssemblyFilter) {
-        auto relevantSlots = sbe::makeSV(reconstructedRecordSlot);
-        if (ridSlot) {
-            relevantSlots.push_back(*ridSlot);
-        }
+        auto filterExpr = generateFilter(
+            _state, csn->postAssemblyFilter.get(), reconstructedRecordSlot, &outputs);
 
-        auto [_, outputStage] = generateFilter(_state,
-                                               csn->postAssemblyFilter.get(),
-                                               {std::move(stage), std::move(relevantSlots)},
-                                               reconstructedRecordSlot,
-                                               &outputs,
-                                               csn->nodeId());
-        stage = outputStage.extractStage(csn->nodeId());
+        if (!filterExpr.isNull()) {
+            stage = sbe::makeS<sbe::FilterStage<false>>(
+                std::move(stage), filterExpr.extractExpr(_state.slotVarMap), csn->nodeId());
+        }
     }
 
     return {std::move(stage), std::move(outputs)};
@@ -960,21 +957,16 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     }
 
     for (size_t i = 0; i < topLevelFields.size(); ++i) {
-        outputs.set(std::make_pair(PlanStageSlots::kField, topLevelFields[i]),
+        outputs.set(std::make_pair(PlanStageSlots::kField, std::move(topLevelFields[i])),
                     topLevelFieldSlots[i]);
     }
 
     if (fn->filter) {
-        auto forwardingReqs = reqs.copy().set(kResult).setFields(std::move(topLevelFields));
-        auto relevantSlots = getSlotsToForward(forwardingReqs, outputs);
-
-        auto [_, outputStage] = generateFilter(_state,
-                                               fn->filter.get(),
-                                               {std::move(stage), std::move(relevantSlots)},
-                                               resultSlot,
-                                               &outputs,
-                                               root->nodeId());
-        stage = outputStage.extractStage(root->nodeId());
+        auto filterExpr = generateFilter(_state, fn->filter.get(), resultSlot, &outputs);
+        if (!filterExpr.isNull()) {
+            stage = sbe::makeS<sbe::FilterStage<false>>(
+                std::move(stage), filterExpr.extractExpr(_state.slotVarMap), root->nodeId());
+        }
     }
 
     auto fieldsSet = StringSet{fields.begin(), fields.end()};
@@ -1721,8 +1713,6 @@ SlotBasedStageBuilder::buildProjectionDefault(const QuerySolutionNode* root,
 
     auto [stage, outputs] = build(pn->children[0].get(), childReqs);
 
-    auto relevantSlots = getSlotsToForward(childReqs, outputs);
-
     auto projectionExpr = generateProjection(_state, &projection, outputs.get(kResult), &outputs);
     auto [resultSlot, resultStage] = projectEvalExpr(std::move(projectionExpr),
                                                      EvalStage{std::move(stage), {}},
@@ -1821,7 +1811,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         }
     }
 
-    childReqs.setFields(fields);
+    childReqs.setFields(std::move(fields));
 
     sbe::PlanStage::Vector inputStages;
     std::vector<sbe::value::SlotVector> inputSlots;
@@ -1849,16 +1839,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     }
 
     if (orn->filter) {
-        auto forwardingReqs = reqs.copy().set(kResult).setFields(std::move(fields));
-        auto relevantSlots = getSlotsToForward(forwardingReqs, outputs);
-
-        auto [_, outputStage] = generateFilter(_state,
-                                               orn->filter.get(),
-                                               {std::move(stage), std::move(relevantSlots)},
-                                               outputs.get(kResult),
-                                               &outputs,
-                                               root->nodeId());
-        stage = outputStage.extractStage(root->nodeId());
+        auto resultSlot = outputs.get(kResult);
+        auto filterExpr = generateFilter(_state, orn->filter.get(), resultSlot, &outputs);
+        if (!filterExpr.isNull()) {
+            stage = sbe::makeS<sbe::FilterStage<false>>(
+                std::move(stage), filterExpr.extractExpr(_state.slotVarMap), root->nodeId());
+        }
     }
 
     outputs.clearNonRequiredSlots(reqs);
