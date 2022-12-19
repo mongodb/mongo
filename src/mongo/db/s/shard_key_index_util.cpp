@@ -137,6 +137,13 @@ bool isLastNonHiddenShardKeyIndex(OperationContext* opCtx,
                                   const IndexCatalog* indexCatalog,
                                   const std::string& indexName,
                                   const BSONObj& shardKey) {
+    const auto index = indexCatalog->findIndexByName(opCtx, indexName);
+    if (!index ||
+        !isCompatibleWithShardKey(
+            opCtx, collection, index->getEntry(), shardKey, false /* requireSingleKey */)) {
+        return false;
+    }
+
     return !_findShardKeyPrefixedIndex(
                 opCtx, collection, indexCatalog, indexName, shardKey, false /* requireSingleKey */)
                 .is_initialized();
