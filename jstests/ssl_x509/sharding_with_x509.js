@@ -3,6 +3,8 @@
 (function() {
 'use strict';
 
+load("jstests/libs/log.js");  // For findMatchingLogLine.
+
 var x509_options = {
     sslMode: "requireSSL",
     sslPEMKeyFile: "jstests/libs/server.pem",
@@ -33,6 +35,18 @@ st.s.getDB('admin').auth('admin', 'pwd');
 var coll = st.s.getCollection("test.foo");
 
 st.shardColl(coll, {insert: 1}, false);
+
+// Authenticate the config server and verify that a log line concerning a username change does not
+// appear on the config server since we are doing intercluster auth using X509.
+st.c0.getDB('admin').auth('admin', 'pwd');
+const globalLog = assert.commandWorked(st.c0.adminCommand({getLog: "global"}));
+const fieldMatcher = {
+    msg: "Different user name was supplied to saslSupportedMechs"
+};
+assert.eq(
+    null,
+    findMatchingLogLine(globalLog.log, fieldMatcher),
+    "Found log line concerning \"Different user name was supplied to saslSupportedMechs\" when we did not expect to.");
 
 print("starting insertion phase");
 

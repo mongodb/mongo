@@ -40,7 +40,9 @@ namespace mongo {
 namespace {
 constexpr auto kDiagnosticLogLevel = 3;
 
-Status crossVerifyUserNames(const UserName& oldUser, const UserName& newUser) noexcept {
+Status crossVerifyUserNames(const UserName& oldUser,
+                            const UserName& newUser,
+                            const bool isMechX509) noexcept {
     if (oldUser.getFullName().empty()) {
         return Status::OK();
     }
@@ -60,8 +62,14 @@ Status crossVerifyUserNames(const UserName& oldUser, const UserName& newUser) no
         return Status::OK();
     }
 
-    if (oldUser.getUser() != newUser.getUser()) {
-        return {ErrorCodes::ProtocolError, "Attempt to switch user during SASL authentication."};
+    // In the case where we are executing X509 authentication, we want to allow the user to change
+    // from __system (which, if this is the case, means that the initial hello command specified
+    // the saslSupportedMechs field) to the user specified in the certificate for X509.
+    bool isSystemX509BypassingNameConstraints = oldUser.getUser() == "__system" && isMechX509;
+    if (oldUser.getUser() != newUser.getUser() && !isSystemX509BypassingNameConstraints) {
+        return {ErrorCodes::ProtocolError,
+                str::stream() << "Attempt to switch user during SASL authentication from "
+                              << oldUser.getUser() << " to " << newUser.getUser()};
     }
 
     return Status::OK();
@@ -197,8 +205,9 @@ void AuthenticationSession::setMechanismName(StringData mechanismName) {
     }
 }
 
-void AuthenticationSession::_verifyUserNameFromSaslSupportedMechanisms(const UserName& userName) {
-    if (auto status = crossVerifyUserNames(_ssmUserName, userName); !status.isOK()) {
+void AuthenticationSession::_verifyUserNameFromSaslSupportedMechanisms(const UserName& userName,
+                                                                       const bool isMechX509) {
+    if (auto status = crossVerifyUserNames(_ssmUserName, userName, isMechX509); !status.isOK()) {
         LOGV2(5286202,
               "Different user name was supplied to saslSupportedMechs",
               "error"_attr = status);
@@ -215,16 +224,19 @@ void AuthenticationSession::_verifyUserNameFromSaslSupportedMechanisms(const Use
 }
 
 void AuthenticationSession::setUserNameForSaslSupportedMechanisms(UserName userName) {
-    _verifyUserNameFromSaslSupportedMechanisms(userName);
-
+    _verifyUserNameFromSaslSupportedMechanisms(userName, false /* isMechX509 */);
     _ssmUserName = userName;
 }
 
-void AuthenticationSession::updateUserName(UserName userName) {
-    LOGV2_DEBUG(5286203, kDiagnosticLogLevel, "Updating user name", "userName"_attr = userName);
+void AuthenticationSession::updateUserName(UserName userName, bool isMechX509) {
+    LOGV2_DEBUG(5286203,
+                kDiagnosticLogLevel,
+                "Updating user name for session",
+                "userName"_attr = userName,
+                "oldName"_attr = _userName);
 
-    _verifyUserNameFromSaslSupportedMechanisms(userName);
-    uassertStatusOK(crossVerifyUserNames(_userName, userName));
+    _verifyUserNameFromSaslSupportedMechanisms(userName, isMechX509);
+    uassertStatusOK(crossVerifyUserNames(_userName, userName, isMechX509));
     _userName = userName;
 }
 
@@ -259,7 +271,8 @@ void AuthenticationSession::_finish() {
         if (_mech->isClusterMember()) {
             setAsClusterMember();
         }
-        updateUserName({_mech->getPrincipalName(), _mech->getAuthenticationDatabase()});
+        updateUserName({_mech->getPrincipalName(), _mech->getAuthenticationDatabase()},
+                       _mechName == auth::kMechanismMongoX509);
     }
 }
 
