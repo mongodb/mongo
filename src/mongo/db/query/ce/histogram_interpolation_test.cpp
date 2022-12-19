@@ -369,7 +369,8 @@ TEST(EstimatorTest, UniformIntArrayOnlyEstimate) {
                                               uniqueHist,
                                               minHist,
                                               maxHist,
-                                              TypeCounts{{value::TypeTags::NumberInt64, 404}},
+                                              // There are 100 non-empty int-only arrays.
+                                              TypeCounts{{value::TypeTags::NumberInt64, 100}},
                                               0);
 
     // Query in the middle of the domain: estimate from ArrayUnique histogram.
@@ -473,7 +474,8 @@ TEST(EstimatorTest, UniformIntMixedArrayEstimate) {
                                               uniqueHist,
                                               minHist,
                                               maxHist,
-                                              TypeCounts{{value::TypeTags::NumberInt64, 375}},
+                                              // There are 94 non-empty int-only arrays.
+                                              TypeCounts{{value::TypeTags::NumberInt64, 94}},
                                               0);
 
     value::TypeTags lowTag = value::TypeTags::NumberInt64;

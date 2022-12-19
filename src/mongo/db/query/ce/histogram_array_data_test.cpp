@@ -160,7 +160,7 @@ TEST(EstimatorArrayDataTest, Histogram1000ArraysSmall10Buckets) {
     TypeCounts arrayTypeCounts;
     // Dataset generated as 1000 arrays of size between 3 to 5.
     typeCounts.insert({value::TypeTags::Array, 1000});
-    arrayTypeCounts.insert({value::TypeTags::NumberInt32, 3996});
+    arrayTypeCounts.insert({value::TypeTags::NumberInt32, 1000});
 
     const auto arrHist = ArrayHistogram::make(scalarHist,
                                               typeCounts,
@@ -251,7 +251,7 @@ TEST(EstimatorArrayDataTest, Histogram1000ArraysLarge10Buckets) {
     TypeCounts arrayTypeCounts;
     // Dataset generated as 1000 arrays of size between 8 to 10.
     typeCounts.insert({value::TypeTags::Array, 1000});
-    arrayTypeCounts.insert({value::TypeTags::NumberInt32, 8940});
+    arrayTypeCounts.insert({value::TypeTags::NumberInt32, 1000});
 
     const auto arrHist = ArrayHistogram::make(scalarHist,
                                               typeCounts,

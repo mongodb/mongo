@@ -38,6 +38,13 @@
 namespace mongo::stats {
 using TypeCounts = std::map<sbe::value::TypeTags, double>;
 
+/**
+ * By default, aggregates the total number of tag counts in the histogram together.
+ * If 'isHistogrammable' is set to true, then only counts histogrammable types.
+ * Otherwise, if 'isHistogrammable' is set to false, then only counts non-histogrammable types.
+ **/
+double getTotalCount(const TypeCounts& tc, boost::optional<bool> isHistogrammable = boost::none);
+
 class ArrayHistogram {
 public:
     /**

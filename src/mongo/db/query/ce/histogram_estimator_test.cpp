@@ -527,9 +527,9 @@ TEST(CEHistogramTest, TestArrayHistogramOnAtomicPredicates) {
                 {Value(6), 1 /* frequency */},
                 {Value(10), 1 /* frequency */},
             },
-            {{sbe::value::TypeTags::NumberInt32, 13}},  // Array type counts.
-            4,                                          // 4 arrays (including []).
-            1                                           // 1 empty array.
+            {{sbe::value::TypeTags::NumberInt32, 3}},  // Array type counts (3 arrays with ints).
+            4,                                         // 4 arrays (including []).
+            1                                          // 1 empty array.
             ));
 
     // Test simple predicates against 'a'. Note: in the $elemMatch case, we exclude scalar
@@ -609,7 +609,7 @@ TEST(CEHistogramTest, TestArrayHistogramOnCompositePredicates) {
                 {Value(6), 35 /* frequency */},
                 {Value(10), 35 /* frequency */},
             },
-            {{sbe::value::TypeTags::NumberInt32, 420}},  // Array type count = 3*35+5*35+1*35+3*35.
+            {{sbe::value::TypeTags::NumberInt32, 140}},  // Arrays with ints = 4*35 = 140.
             kCollCard._value,                            // kCollCard arrays total.
             35                                           // 35 empty arrays
             ));
@@ -648,9 +648,9 @@ TEST(CEHistogramTest, TestArrayHistogramOnCompositePredicates) {
                 {Value(6), 17 /* frequency */},
                 {Value(10), 17 /* frequency */},
             },
-            {{sbe::value::TypeTags::NumberInt32, 289}},  // Array type count = 3*17+5*17+6*17+3*17
-            88,                                          // kCollCard arrays total.
-            20                                           // 20 empty arrays.
+            {{sbe::value::TypeTags::NumberInt32, 68}},  // Arrays with ints = 17*4 = 68.
+            88,                                         // kCollCard arrays total.
+            20                                          // 20 empty arrays.
             ));
 
     // Test cardinality of individual predicates.
@@ -776,8 +776,8 @@ TEST(CEHistogramTest, TestMixedElemMatchAndNonElemMatch) {
                                                  // Array max buckets.
                                                  {Value(10), 1 /* frequency */},
                                              },
-                                             {{sbe::value::TypeTags::NumberInt32, 2}},
-                                             // Array type counts.
+                                             // We only have one array with ints.
+                                             {{sbe::value::TypeTags::NumberInt32, 1}},
                                              1,
                                              0));
 

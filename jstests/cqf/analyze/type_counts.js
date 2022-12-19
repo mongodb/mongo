@@ -98,7 +98,7 @@ runHistogramsTest(function testTypeCounts() {
                         }],
                         bounds: [3]
                     },
-                    typeCount: [{typeName: "NumberDouble", count: 3}],
+                    typeCount: [{typeName: "NumberDouble", count: 1}],
                 },
                 emptyArrayCount: 4,
                 trueCount: 1,
@@ -335,7 +335,7 @@ runHistogramsTest(function testTypeCounts() {
                         ],
                         bounds: [2, 3]
                     },
-                    typeCount: [{typeName: "NumberDouble", count: 5}],
+                    typeCount: [{typeName: "NumberDouble", count: 2}],
                 },
                 emptyArrayCount: 1,
                 trueCount: 2,
@@ -479,7 +479,6 @@ runHistogramsTest(function testTypeCounts() {
     ];
     assert.commandWorked(coll.insertMany(docs));
 
-    // TODO SERVER-71057: Only count types once per array.
     createAndValidateHistogram({
         coll,
         expectedHistogram: {
@@ -543,11 +542,11 @@ runHistogramsTest(function testTypeCounts() {
                         bounds: ["c"]
                     },
                     typeCount: [
-                        {typeName: "StringSmall", count: 3},
-                        {typeName: "Boolean", count: 10},
-                        {typeName: "Null", count: 5},
-                        {typeName: "Object", count: 6},
-                        {typeName: "Array", count: 13},
+                        {typeName: "StringSmall", count: 1},
+                        {typeName: "Boolean", count: 6},
+                        {typeName: "Null", count: 3},
+                        {typeName: "Object", count: 4},
+                        {typeName: "Array", count: 11},
                     ],
                 },
                 emptyArrayCount: 1,
@@ -558,14 +557,14 @@ runHistogramsTest(function testTypeCounts() {
         }
     });
 
-    // Verify type count CE. Note that for non-$elemMatch preidcates, we include both array and
+    // Verify type count CE. Note that for non-$elemMatch predicates, we include both array and
     // scalar type-counts, while for $elemMatch predicates, we include only array type counts in
     // our estimate.
     forceCE("histogram");
     hint = {a: 1};
 
-    // Estimate boolean counts. Note that we have 10 boolean arrays, so that gets added to the
-    // counter estimates.
+    // Estimate boolean counts. Note that we have 6 boolean arrays, so that gets added to the
+    // counter estimate.
     verifyCEForMatch({
         coll,
         predicate: {"a": true},
@@ -576,7 +575,7 @@ runHistogramsTest(function testTypeCounts() {
             {_id: 6, a: [[false, false], true]},
             {_id: 27, a: [null, true, false, [], [1, 2, 3], ["a", "b", "c"], {a: 1}, {}]},
         ],
-        ce: 11,
+        ce: 7,
         hint
     });
     verifyCEForMatch({
@@ -589,7 +588,7 @@ runHistogramsTest(function testTypeCounts() {
             {_id: 5, a: [false, false, false]},
             {_id: 27, a: [null, true, false, [], [1, 2, 3], ["a", "b", "c"], {a: 1}, {}]},
         ],
-        ce: 11,
+        ce: 7,
         hint
     });
 
@@ -602,17 +601,17 @@ runHistogramsTest(function testTypeCounts() {
             {_id: 10, a: [{}]},
             {_id: 27, a: [null, true, false, [], [1, 2, 3], ["a", "b", "c"], {a: 1}, {}]},
         ],
-        ce: 8,
+        ce: 6,
         hint
     });
     verifyCEForMatch({
         coll,
         predicate: {a: {a: 1}},
         expected: [{_id: 27, a: [null, true, false, [], [1, 2, 3], ["a", "b", "c"], {a: 1}, {}]}],
-        ce: 8,
+        ce: 6,
         hint
     });
-    verifyCEForMatch({coll, predicate: {a: {b: 1}}, expected: [{_id: 12, a: {b: 1}}], ce: 8, hint});
+    verifyCEForMatch({coll, predicate: {a: {b: 1}}, expected: [{_id: 12, a: {b: 1}}], ce: 6, hint});
 
     // In the $elemMatch case for object predicates, we only include the array object counter value
     // in our estimate.
@@ -623,22 +622,22 @@ runHistogramsTest(function testTypeCounts() {
             {_id: 10, a: [{}]},
             {_id: 27, a: [null, true, false, [], [1, 2, 3], ["a", "b", "c"], {a: 1}, {}]},
         ],
-        ce: 6,
+        ce: 4,
         hint
     });
     verifyCEForMatch({
         coll,
         predicate: {a: {$elemMatch: {$eq: {a: 1}}}},
         expected: [{_id: 27, a: [null, true, false, [], [1, 2, 3], ["a", "b", "c"], {a: 1}, {}]}],
-        ce: 6,
+        ce: 4,
         hint
     });
     verifyCEForMatch(
-        {coll, predicate: {a: {$elemMatch: {$eq: {b: 1}}}}, expected: [], ce: 6, hint});
+        {coll, predicate: {a: {$elemMatch: {$eq: {b: 1}}}}, expected: [], ce: 4, hint});
 
     // We are estimating the following predicates as two intervals joined by a conjunction:
-    //  1. [{}, {}] - estimated as the sum of scalar and array type counts 6 + 2 = 8.
-    //  2. [[{}], [{}]] - estimated as the count of nested arrays, 13.
+    //  1. [{}, {}] - estimated as the sum of scalar and array type counts 4 + 2 = 6.
+    //  2. [[{}], [{}]] - estimated as the count of nested arrays, 11.
     // The disjunction selectivities are then combined via exponential backoff. This estimate can be
     // found at the union of the two index scan nodes in the plan. However, the root node estimate
     // differs due to the filter node & group by node above the union, so we directly verify the
@@ -651,7 +650,7 @@ runHistogramsTest(function testTypeCounts() {
             {_id: 11, a: [[{}]]},
         ],
         getNodeCEs: getUnionNodeCE,
-        CEs: [15.323],
+        CEs: [12.931],
         hint
     });
     verifyCEForMatchNodes({
@@ -659,7 +658,7 @@ runHistogramsTest(function testTypeCounts() {
         predicate: {a: [{c: 1}]},
         expected: [{_id: 13, a: [{c: 1}]}],
         getNodeCEs: getUnionNodeCE,
-        CEs: [15.323],
+        CEs: [12.931],
         hint
     });
     verifyCEForMatchNodes({
@@ -667,7 +666,7 @@ runHistogramsTest(function testTypeCounts() {
         predicate: {a: [{d: 1}]},
         expected: [{_id: 15, a: [[{d: 1}]]}],
         getNodeCEs: getUnionNodeCE,
-        CEs: [15.323],
+        CEs: [12.931],
         hint
     });
 
@@ -687,20 +686,20 @@ runHistogramsTest(function testTypeCounts() {
             {_id: 20, a: [["a", "b", "c"]]},
             {_id: 27, a: [null, true, false, [], [1, 2, 3], ["a", "b", "c"], {a: 1}, {}]},
         ],
-        ce: 13,
+        ce: 11,
         hint
     });
     verifyCEForMatch({
         coll,
         predicate: {a: {$elemMatch: {$eq: [["a", "b", "c"]]}}},
         expected: [{_id: 21, a: [[["a", "b", "c"]]]}],
-        ce: 13,
+        ce: 11,
         hint
     });
 
     // In the following cases, we have two intervals:
     //  1. ["a", "a"] - This is estimated as 1 based on the array buckets.
-    //  2. [["a", "b", "c"], ["a", "b", "c"]] - this is estimated as the count of nested arrays: 13.
+    //  2. [["a", "b", "c"], ["a", "b", "c"]] - this is estimated as the count of nested arrays: 11.
     // The selectivities are then combined by disjunctive exponential backoff. Once again, we can
     // find this estimate in the Union node.
     verifyCEForMatchNodes({
@@ -712,7 +711,7 @@ runHistogramsTest(function testTypeCounts() {
             {_id: 27, a: [null, true, false, [], [1, 2, 3], ["a", "b", "c"], {a: 1}, {}]},
         ],
         getNodeCEs: getUnionNodeCE,
-        CEs: [13.270],
+        CEs: [11.306],
         hint
     });
     verifyCEForMatchNodes({
@@ -720,7 +719,7 @@ runHistogramsTest(function testTypeCounts() {
         predicate: {a: ["a"]},
         expected: [],
         getNodeCEs: getUnionNodeCE,
-        CEs: [13.270],
+        CEs: [11.306],
         hint
     });
 
@@ -732,7 +731,7 @@ runHistogramsTest(function testTypeCounts() {
         predicate: {a: [["a", "b", "c"]]},
         expected: [{_id: 20, a: [["a", "b", "c"]]}, {_id: 21, a: [[["a", "b", "c"]]]}],
         getNodeCEs: getUnionNodeCE,
-        CEs: [17.021],
+        CEs: [14.754],
         hint
     });
     verifyCEForMatchNodes({
@@ -740,12 +739,11 @@ runHistogramsTest(function testTypeCounts() {
         predicate: {a: [[["a", "b", "c"]]]},
         expected: [{_id: 21, a: [[["a", "b", "c"]]]}],
         getNodeCEs: getUnionNodeCE,
-        CEs: [17.021],
+        CEs: [14.754],
         hint
     });
 
     // Verify null CE.
-    // TODO SERVER-71057: Only count each null once per array.
     verifyCEForMatch({
         coll,
         predicate: {a: null},
@@ -756,7 +754,6 @@ runHistogramsTest(function testTypeCounts() {
             {_id: 25, a: [null, null, null]},
             {_id: 27, a: [null, true, false, [], [1, 2, 3], ["a", "b", "c"], {a: 1}, {}]},
         ],
-        ce: 7,
         hint
     });
     verifyCEForMatch({
@@ -767,7 +764,7 @@ runHistogramsTest(function testTypeCounts() {
             {_id: 25, a: [null, null, null]},
             {_id: 27, a: [null, true, false, [], [1, 2, 3], ["a", "b", "c"], {a: 1}, {}]},
         ],
-        ce: 5,
+        ce: 3,
         hint
     });
 
@@ -780,7 +777,8 @@ runHistogramsTest(function testTypeCounts() {
     //     {_id: 27, a: [null, true, false, [], [1, 2, 3], ["a", "b", "c"], {a: 1}, {}]},
     // ], ce: 14, hint});
 
-    // In the following case, we expect to count only nested empty arrays.
+    // In the following case, we expect to count only nested empty arrays (so we estimate it as the
+    // count of all nested arrays).
     verifyCEForMatch({
         coll,
         predicate: {a: {$elemMatch: {$eq: []}}},
@@ -788,7 +786,7 @@ runHistogramsTest(function testTypeCounts() {
             {_id: 17, a: [[]]},
             {_id: 27, a: [null, true, false, [], [1, 2, 3], ["a", "b", "c"], {a: 1}, {}]},
         ],
-        ce: 13,
+        ce: 11,
         hint
     });
 

@@ -222,8 +222,8 @@ TEST(EstimatorTest, IntStrArrayEstimate) {
     TypeCounts typeCounts{{value::TypeTags::NumberInt64, 388},
                           {value::TypeTags::StringSmall, 319},
                           {value::TypeTags::Array, 293}};
-    TypeCounts arrayTypeCounts{{value::TypeTags::NumberInt64, 874},
-                               {value::TypeTags::StringSmall, 340}};
+    TypeCounts arrayTypeCounts{{value::TypeTags::NumberInt64, 282},
+                               {value::TypeTags::StringSmall, 222}};
     const auto arrHist = ArrayHistogram::make(scalarHist,
                                               typeCounts,
                                               uniqueHist,

@@ -249,6 +249,6 @@ runHistogramsTest(function testScalarHistograms() {
     verifyCEForNDV(1);
     verifyCEForNDV(2);
     verifyCEForNDV(3);
-    verifyCEForNDV(10);
+    verifyCEForNDV(4);
 });
 }());

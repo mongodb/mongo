@@ -131,3 +131,13 @@ env.CppUnitTest(
         'stats_test_utils',
     ],
 )
+
+env.CppUnitTest(
+    target="type_count_test",
+    source=[
+        "type_count_test.cpp",
+    ],
+    LIBDEPS=[
+        'stats_test_utils',
+    ],
+)

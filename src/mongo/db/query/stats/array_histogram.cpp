@@ -57,21 +57,6 @@ double getTagTypeCount(const TypeCounts& tc, sbe::value::TypeTags tag) {
     return 0.0;
 }
 
-/**
- * By default, aggregates the total number of tag counts in the histogrma together.
- * If 'isHistogrammable' is set to true, then only counts histogrammable types.
- * Otherwise, if 'isHistogrammable' is set to false, then only counts non-histogrammable types.
- **/
-double getTotalCount(const TypeCounts& tc, boost::optional<bool> isHistogrammable = boost::none) {
-    double total = 0.0;
-    for (const auto& [tag, count] : tc) {
-        if (isHistogrammable || (*isHistogrammable == canEstimateTypeViaHistogram(tag))) {
-            total += count;
-        }
-    }
-    return total;
-}
-
 double getNumericTypeCount(const TypeCounts& tc) {
     return getTagTypeCount(tc, sbe::value::TypeTags::NumberInt32) +
         getTagTypeCount(tc, sbe::value::TypeTags::NumberInt64) +
@@ -95,33 +80,153 @@ double getTypeBracketTypeCount(const TypeCounts& tc, sbe::value::TypeTags tag) {
     }
 }
 
-void validateHistogramTypeCounts(const TypeCounts& tc, const ScalarHistogram& s) {
-    const auto& bounds = s.getBounds();
-    const auto& buckets = s.getBuckets();
-    size_t i = 0;
-    while (i < bounds.size()) {
-        // First, we have to aggregate all frequencies for the current type bracket.
-        const auto tagL = bounds.getAt(i).first;
-        double freq = 0.0;
-        for (; i < bounds.size(); i++) {
-            const auto tagR = bounds.getAt(i).first;
-            // Stop aggregating when the next bound belongs to a different type bracket.
-            if (!sameTypeBracket(tagL, tagR)) {
-                break;
-            } else {
-                const auto& bucketR = buckets[i];
-                freq += bucketR._equalFreq + bucketR._rangeFreq;
+/**
+ * Helper class to iterate over all of a histogram's type-brackets and their frequencies in order.
+ */
+class TypeBracketFrequencyIterator {
+public:
+    TypeBracketFrequencyIterator(const ScalarHistogram& histogram) : histogram(histogram) {}
+
+    bool hasNext() {
+        return _bracket < histogram.getBounds().size();
+    }
+
+    /**
+     * Iterates over the bounds & buckets one type-bracket at the time, starting from the first
+     * bucket/bound. It sums up the frequencies of all the buckets in the current type-bracket, then
+     * updates the internal counter so the next call to this function will return the left-most type
+     * tag and total frequency of the next type-bracket in the histogram as a pair {tag, frequency}.
+     * Once there are no more type-brackets left in the histogram, this will return the tag Nothing
+     * with a frequency of 0.0, and 'hasNext()' will return false.
+     */
+    std::pair<sbe::value::TypeTags, double> getNext() {
+        const auto& bounds = histogram.getBounds();
+        const auto& buckets = histogram.getBuckets();
+        if (hasNext()) {
+            // Update tag & frequency for the left-most bucket in the current type-bracket.
+            const auto tagL = bounds.getAt(_bracket).first;
+            const auto& bucketL = buckets[_bracket];
+            double freq = bucketL._equalFreq + bucketL._rangeFreq;
+
+            // Increment the bucket counter to look at the next bucket.
+            _bracket++;
+
+            // Aggregate all frequencies for the current type bracket.
+            for (; hasNext(); _bracket++) {
+                // Get the tag for the next bucket.
+                const auto tagR = bounds.getAt(_bracket).first;
+                if (!sameTypeBracket(tagL, tagR)) {
+                    // Stop aggregating when the next bound belongs to a different type bracket.
+                    return {tagL, freq};
+                } else {
+                    // This is the rightmost bucket in the current type-bracket (so far). Update the
+                    // frequency counter and look at the next bucket.
+                    const auto& bucketR = buckets[_bracket];
+                    freq += bucketR._equalFreq + bucketR._rangeFreq;
+                }
             }
+
+            // This was the last type-bracket in the histogram. There are no more buckets left.
+            return {tagL, freq};
+        }
+        return {sbe::value::TypeTags::Nothing, 0.0};
+    }
+
+    void reset() {
+        _bracket = 0;
+    }
+
+    const ScalarHistogram& histogram;
+
+private:
+    size_t _bracket = 0;
+};
+
+/**
+ * Validates the type counts per type bracket compared to those in the scalar histogram. If
+ * 'lowBound' is set to false, these frequencies must be equal; otherwise, the type counts must be a
+ * lower bound on the counts in the histogram.
+ */
+void validateHistogramTypeCounts(const TypeCounts& tc,
+                                 const ScalarHistogram& s,
+                                 bool lowBound = false) {
+    // Ensure that all histogrammable type brackets are accounted for in the histogram.
+    TypeBracketFrequencyIterator it{s};
+    sbe::value::TypeTags tag;
+    double freq;
+    while (it.hasNext()) {
+        std::tie(tag, freq) = it.getNext();
+        const double tcFreq = getTypeBracketTypeCount(tc, tag);
+
+        // If 'lowBound' is set, having more entries in the histogram than in the type counts is
+        // considered valid.
+        const bool invalid = lowBound ? (tcFreq > freq) : (tcFreq != freq);
+        if (invalid) {
+            uasserted(7105700,
+                      str::stream() << "Type count frequency " << tcFreq << " of type bracket for "
+                                    << tag << " did not match histogram frequency " << freq);
+        }
+    }
+
+    // Ensure that all histogrammable type counts are accounted for in the type counters.
+    const double totalTC = getTotalCount(tc, true /* histogrammable*/);
+    const double totalCard = s.getCardinality();
+    const bool invalid = lowBound ? (totalTC > totalCard) : (totalTC != totalCard);
+    if (invalid) {
+        uasserted(7105701,
+                  str::stream() << "The type counters count " << totalTC
+                                << " values, but the histogram frequency is " << totalCard);
+    }
+}
+
+/**
+ * Validates the bucket counts per type bracket compared to those in the scalar histogram. If
+ * 'lowBound' is set to false, these frequencies must be equal; otherwise, the frequencies of 'ls'
+ * must be a lower bound of the counts in the 'rs' histogram.
+ */
+void validateHistogramFrequencies(const ScalarHistogram& ls,
+                                  const ScalarHistogram& rs,
+                                  bool lowBound = false) {
+    // Ensure that the total cardinality of the histograms is comparatively correct.
+    const double cardL = ls.getCardinality();
+    const double cardR = rs.getCardinality();
+    const bool invalid = lowBound ? (cardL > cardR) : (cardL != cardR);
+    if (invalid) {
+        uasserted(7105702,
+                  str::stream() << "The histogram cardinalities " << cardL << " and " << cardR
+                                << " did not match.");
+    }
+
+    // Validate all type brackets in both histograms against each other.
+    TypeBracketFrequencyIterator itL{ls};
+    TypeBracketFrequencyIterator itR{rs};
+    sbe::value::TypeTags tagL, tagR;
+    double freqL, freqR;
+    while (itL.hasNext() && itR.hasNext()) {
+        std::tie(tagL, freqL) = itL.getNext();
+        std::tie(tagR, freqR) = itR.getNext();
+
+        if (tagL != tagR) {
+            // Regardless of whether or not 'ls' has fewer entries than 'rs', both must have the
+            // same number of type-brackets.
+            uasserted(7105703,
+                      str::stream() << "Histograms had different type-brackets " << tagL << " and "
+                                    << tagR << " at the same bound position.");
         }
 
-        // We now have the expected frequency for this type bracket. Validate it against 'tc'.
-        double tcFreq = getTypeBracketTypeCount(tc, tagL);
-        if (tcFreq != freq) {
-            uasserted(7131014,
+        // If 'lowBound' is set, having more entries in the histogram than in the type counts is
+        // considered valid.
+        const bool invalid = lowBound ? (freqL > freqR) : (freqL != freqR);
+        if (invalid) {
+            uasserted(7105704,
                       str::stream()
-                          << "Type count frequency " << tcFreq << " did not match bucket frequency "
-                          << freq << " of type bracket for " << tagL);
+                          << "Histogram frequencies frequencies " << freqL << " and " << freqR
+                          << " of type bracket for " << tagL << " did not match.");
         }
+    }
+
+    if (itL.hasNext()) {
+        uasserted(7105705, "One histogram had more type-brackets than the other.");
     }
 }
 
@@ -144,32 +249,9 @@ void validate(const ScalarHistogram& scalar,
             uasserted(7131010, str::stream() << "Array histogram must have at least one array.");
         }
 
-        // We must have the same number of histogrammable type brackets in all arrays, and each such
-        // type bracket must have a min value and a max value. Therefore, both the min and max
-        // array histograms should have the same cardinality. Note that this is not a true count of
-        // arrays since we could have multiple type-brackets per array.
-        const double minArrCard = arrayFields->arrayMin.getCardinality();
-        const double maxArrCard = arrayFields->arrayMax.getCardinality();
-        if (minArrCard != maxArrCard) {
-            uasserted(7131011,
-                      str::stream() << "Min array cardinality was " << minArrCard
-                                    << " while max array cardinality was " << maxArrCard);
-        }
-
-        // Ensure we have at least as many histogrammable types counted in our type counters as
-        // histogrammable type-brackets across all arrays (this is counted by 'minArrCard').
-        double arrayTypeCount = getTotalCount(arrayFields->typeCounts, true /* histogrammable*/);
-        if (minArrCard > arrayTypeCount) {
-            uasserted(7131012,
-                      str::stream() << "The array type counters count " << arrayTypeCount
-                                    << " array values, but the minimum number of arrays we must "
-                                       "have according to the min/max histograms is "
-                                    << minArrCard);
-        }
-
         // There must be at least as many arrays as there are empty arrays.
         if (numArrays < arrayFields->emptyArrayCount) {
-            uasserted(7131013,
+            uasserted(7131011,
                       str::stream()
                           << "The Array type counter counts " << numArrays
                           << " arrays, but the minimum number of arrays we must have according to "
@@ -177,9 +259,25 @@ void validate(const ScalarHistogram& scalar,
                           << arrayFields->emptyArrayCount);
         }
 
-        // TODO SERVER-71057: validate array histograms once type counters only count each type in
-        // an array at most once per array. validateHistogramTypeCounts(getArrayTypeCounts(),
-        // getArrayUnique());
+        // Validate array histograms based on array type counters. Since there is one entry per type
+        // bracket per array in the min/max histograms, ensure that there are at least as many
+        // histogrammable entries in the array type counts. Since we first validate that min & max
+        // are equivalent, we only compare min type brackets with the type counters.
+        validateHistogramFrequencies(arrayFields->arrayMax, arrayFields->arrayMin);
+        validateHistogramTypeCounts(arrayFields->typeCounts,
+                                    arrayFields->arrayMin,
+                                    true /* Type counts are a lower bound. */);
+
+        // This is similarly true for unique histograms, only their counts are larger. Furthermore,
+        // the min/max histograms are a "lower bound" on the scalar histograms. Only check the min
+        // histogram since it has already been dteermined to be equivalent to the max histogram.
+        validateHistogramTypeCounts(arrayFields->typeCounts,
+                                    arrayFields->arrayUnique,
+                                    true /* Type counts are a lower bound. */);
+        validateHistogramFrequencies(arrayFields->arrayMin,
+                                     arrayFields->arrayUnique,
+                                     true /* Type counts are a lower bound. */);
+
     } else if (numArrays > 0) {
         uasserted(7131000, "A scalar ArrayHistogram should not have any arrays in its counters.");
     }
@@ -198,6 +296,16 @@ void validate(const ScalarHistogram& scalar,
 }
 
 }  // namespace
+
+double getTotalCount(const TypeCounts& tc, boost::optional<bool> isHistogrammable) {
+    double total = 0.0;
+    for (const auto& [tag, count] : tc) {
+        if (!isHistogrammable || (*isHistogrammable == canEstimateTypeViaHistogram(tag))) {
+            total += count;
+        }
+    }
+    return total;
+}
 
 ArrayHistogram::ArrayHistogram()
     : ArrayHistogram(ScalarHistogram::make(),
