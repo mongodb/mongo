@@ -170,6 +170,59 @@ jsTest.log(
     assertDatabaseDropped(db.getName());
 }
 
+const db = getNewDb();
+const conn = st.rs0.getPrimary().getDB(db.getName());
+const fcvDoc = conn.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
+if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, '6.3') >= 0) {
+    jsTest.log(
+        "Tests that dropping a database also removes all associated zones for nonexisting and " +
+        "unsharded collections.");
+    {
+        const coll = db['shardedColl'];
+        const unshardedColl = db['unshardedColl'];
+        const zoneName = 'zone';
+
+        st.shardColl(coll, {x: 1});
+        assertDatabaseExists(db.getName());
+
+        // Create an unsharded collection
+        assert.commandWorked(unshardedColl.insert({x: 3}));
+
+        // Append zones for a sharded collection, unsharded collection, a nonexisting collection and
+        // a collection from another database.
+        st.addShardTag(st.shard0.shardName, zoneName);
+        assert.commandWorked(st.s.adminCommand(
+            {updateZoneKeyRange: coll.getFullName(), min: {x: 0}, max: {x: 10}, zone: zoneName}));
+        assert.commandWorked(st.s.adminCommand({
+            updateZoneKeyRange: unshardedColl.getFullName(),
+            min: {x: 10},
+            max: {x: 15},
+            zone: zoneName
+        }));
+        assert.commandWorked(st.s.adminCommand({
+            updateZoneKeyRange: db.getName() + '.nonexisting',
+            min: {x: 15},
+            max: {x: 20},
+            zone: zoneName
+        }));
+        assert.commandWorked(st.s.adminCommand(
+            {updateZoneKeyRange: 'otherDb.coll', min: {x: 20}, max: {x: 25}, zone: zoneName}));
+
+        // Assert that has been added some entries on 'config.tags'
+        assert.eq(3, configDB.tags.countDocuments({ns: getDbPrefixRegExp(db.getName())}));
+
+        // Drop the database
+        assert.commandWorked(db.dropDatabase());
+        assertDatabaseDropped(db.getName());
+
+        // Assert that there are no zones left for database
+        assert.eq(0, configDB.tags.countDocuments({ns: getDbPrefixRegExp(db.getName())}));
+
+        // Assert that there is one zone from another database that has not been deleted.
+        assert.eq(1, configDB.tags.countDocuments({ns: getDbPrefixRegExp('otherDb')}));
+    }
+}
+
 jsTest.log("Tests that dropping a database doesn't affects other database with the same prefix.");
 // Original bug SERVER-3471
 {
