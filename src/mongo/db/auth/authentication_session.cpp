@@ -154,12 +154,13 @@ AuthenticationSession::StepGuard::StepGuard(OperationContext* opCtx, StepType cu
         maybeSession.emplace(client);
     };
 
-    auto startActiveSession = [&] {
+    auto startActiveSession = [&](const std::vector<StepType>& allowedLastSteps) {
         if (maybeSession) {
             invariant(maybeSession->_lastStep);
             auto lastStep = *maybeSession->_lastStep;
-            if (lastStep == StepType::kSaslSupportedMechanisms) {
-                // We can follow saslSupportedMechanisms with saslStart or authenticate.
+
+            if (std::find(allowedLastSteps.begin(), allowedLastSteps.end(), lastStep) !=
+                allowedLastSteps.end()) {
                 return;
             }
         }
@@ -174,12 +175,27 @@ AuthenticationSession::StepGuard::StepGuard(OperationContext* opCtx, StepType cu
         } break;
         case StepType::kSpeculativeAuthenticate:
         case StepType::kSpeculativeSaslStart: {
-            startActiveSession();
+            std::vector<StepType> allowedLastSteps{StepType::kSaslSupportedMechanisms};
+            startActiveSession(allowedLastSteps);
             maybeSession->_isSpeculative = true;
         } break;
         case StepType::kAuthenticate:
         case StepType::kSaslStart: {
-            startActiveSession();
+            std::vector<StepType> allowedLastSteps{StepType::kSaslSupportedMechanisms,
+                                                   StepType::kSpeculativeAuthenticate,
+                                                   StepType::kSpeculativeSaslStart};
+            startActiveSession(allowedLastSteps);
+
+            // If the last step was speculative auth, then we reset the session such that it
+            // persists from a failed speculative auth to the conclusion of a normal authentication.
+            bool lastStepWasSpec = maybeSession->_lastStep &&
+                (*maybeSession->_lastStep == StepType::kSpeculativeAuthenticate ||
+                 *maybeSession->_lastStep == StepType::kSpeculativeSaslStart);
+            if (lastStepWasSpec) {
+                maybeSession->_isSpeculative = false;
+                maybeSession->_mechName = "";
+                maybeSession->_mech = nullptr;
+            }
         } break;
         case StepType::kSaslContinue: {
             uassert(ErrorCodes::ProtocolError, "No SASL session state found", maybeSession);

@@ -144,6 +144,13 @@ public:
     }
 
     /**
+     * This returns the last processed step of this session.
+     */
+    boost::optional<StepType> getLastStep() const {
+        return _lastStep;
+    }
+
+    /**
      * Set the mechanism name for this session.
      *
      * If the mechanism name is not recognized, this will throw.
@@ -218,7 +225,15 @@ public:
         try {
             return std::forward<F>(f)(session);
         } catch (const DBException& ex) {
-            session->markFailed(ex.toStatus());
+            bool specAuthFailed = ex.toStatus().code() == ErrorCodes::Error::AuthenticationFailed &&
+                (state == StepType::kSpeculativeAuthenticate ||
+                 state == StepType::kSpeculativeSaslStart);
+            // If speculative authentication failed, then we do not want to mark the session as
+            // failed in order to allow the session to persist into another authentication
+            // attempt. If we ran into an exception for another reason, mark the session as failed.
+            if (!specAuthFailed) {
+                session->markFailed(ex.toStatus());
+            }
             throw;
         } catch (...) {
             // Swallow other errors.
