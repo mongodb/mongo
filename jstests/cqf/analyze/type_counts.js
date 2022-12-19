@@ -203,7 +203,7 @@ runHistogramsTest(function testTypeCounts() {
     verifyCEForMatch({coll, predicate: {a: {c: 3}}, expected: [{_id: 10, a: {c: 3}}], ce: 3, hint});
     verifyCEForMatch({coll, predicate: {a: {notInColl: 1}}, expected: [], ce: 3, hint});
 
-    // Test null predicate match. TODO SERVER-71377: make estimate include missing values.
+    // Test null predicate match.
     verifyCEForMatch({
         coll,
         predicate: {a: null},
@@ -214,7 +214,6 @@ runHistogramsTest(function testTypeCounts() {
             {_id: 6, b: 2},
             {_id: 7},
         ],
-        ce: 3,
         hint
     });
 
@@ -422,7 +421,7 @@ runHistogramsTest(function testTypeCounts() {
         {coll, predicate: {"a.b": {c: 1}}, expected: [{_id: 15, a: {b: {c: 1}}}], ce: 2, hint});
     verifyCEForMatch({coll, predicate: {"a.b": {c: 2}}, expected: [], ce: 2, hint});
 
-    // Test null predicate match. TODO SERVER-71377: make estimate include missing values.
+    // Test null predicate match.
     verifyCEForMatch({
         coll,
         predicate: {"a.b": null},
@@ -437,14 +436,13 @@ runHistogramsTest(function testTypeCounts() {
             {_id: 10, "a.b": 1},
             {_id: 11, "a.b.c": 1},
         ],
-        ce: 1,
         hint
     });
 
     // Set up a collection to test CE for nested arrays and non-histogrammable types in arrays.
     coll.drop();
     assert.commandWorked(coll.createIndex({a: 1}));
-    assert.commandWorked(coll.insertMany([
+    const docs = [
         /* Booleans. */
         {_id: 0, a: true},
         {_id: 1, a: false},
@@ -478,7 +476,8 @@ runHistogramsTest(function testTypeCounts() {
         {_id: 26, a: [[null]]},
         /* Mixed array type-counts. */
         {_id: 27, a: [null, true, false, [], [1, 2, 3], ["a", "b", "c"], {a: 1}, {}]},
-    ]));
+    ];
+    assert.commandWorked(coll.insertMany(docs));
 
     // TODO SERVER-71057: Only count types once per array.
     createAndValidateHistogram({
@@ -745,7 +744,7 @@ runHistogramsTest(function testTypeCounts() {
         hint
     });
 
-    // Verify null CE. TODO SERVER-71377: make estimate include missing values.
+    // Verify null CE.
     // TODO SERVER-71057: Only count each null once per array.
     verifyCEForMatch({
         coll,
@@ -757,7 +756,7 @@ runHistogramsTest(function testTypeCounts() {
             {_id: 25, a: [null, null, null]},
             {_id: 27, a: [null, true, false, [], [1, 2, 3], ["a", "b", "c"], {a: 1}, {}]},
         ],
-        ce: 6,
+        ce: 7,
         hint
     });
     verifyCEForMatch({
@@ -791,6 +790,42 @@ runHistogramsTest(function testTypeCounts() {
         ],
         ce: 13,
         hint
+    });
+
+    // Now create histograms on the same collection for paths that don't exist on any documents.
+    const statistics = {
+        typeCount: [
+            {typeName: "Nothing", count: 28},
+        ],
+        scalarHistogram: {buckets: [], bounds: []},
+        emptyArrayCount: 0,
+        trueCount: 0,
+        falseCount: 0,
+        documents: 28,
+    };
+    createAndValidateHistogram({coll, expectedHistogram: {_id: "notAPath", statistics}});
+    createAndValidateHistogram({coll, expectedHistogram: {_id: "notAPathEither", statistics}});
+
+    // Verify type count CE. Note that for non-$elemMatch preidcates, we include both array and
+    // scalar type-counts, while for $elemMatch predicates, we include only array type counts in
+    // our estimate.
+    forceCE("histogram");
+
+    // Note: the hint is omitted because if we hint on a 'notAPath' index, optimization fails by
+    // running out of memory.
+    verifyCEForMatch({coll, predicate: {notAPath: {$eq: null}}, expected: docs});
+    verifyCEForMatch({coll, predicate: {notAPath: {$elemMatch: {$eq: null}}}, expected: []});
+    verifyCEForMatch({coll, predicate: {notAPathEither: {$eq: 1}}, expected: []});
+    verifyCEForMatch({coll, predicate: {notAPathEither: {$elemMatch: {$eq: 1}}}, expected: []});
+    verifyCEForMatch({
+        coll,
+        predicate: {$and: [{notAPath: {$eq: null}}, {notAPathEither: {$eq: null}}]},
+        expected: docs
+    });
+    verifyCEForMatch({
+        coll,
+        predicate: {$and: [{notAPath: {$eq: 1}}, {notAPathEither: {$eq: 1}}]},
+        expected: []
     });
 });
 }());

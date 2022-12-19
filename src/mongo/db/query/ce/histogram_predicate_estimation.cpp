@@ -279,8 +279,12 @@ double getTypeCard(const ArrayHistogram& ah,
                 // all arrays, regardless of whether or not they are nested.
                 break;
             }
-            // TODO SERVER-71377: Use both missing & null counters for null equality.
-            // case value::TypeTags::Null: {}
+            case value::TypeTags::Null: {
+                // The predicate {$eq: null} matches both missing and null values.
+                count += ah.getTypeCount(value::TypeTags::Nothing);
+                count += ah.getTypeCount(value::TypeTags::Null);
+                break;
+            }
             default: { count += ah.getTypeCount(tag); }
         }
     }
