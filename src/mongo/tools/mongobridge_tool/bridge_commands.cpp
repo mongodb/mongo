@@ -29,7 +29,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/tools/mongobridge/bridge_commands.h"
+#include "mongo/tools/mongobridge_tool/bridge_commands.h"
 
 #include "mongo/base/init.h"
 #include "mongo/base/status.h"

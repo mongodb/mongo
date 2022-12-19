@@ -4,7 +4,7 @@ env = env.Clone()
 
 env.SConscript(
     dirs=[
-        'mongobridge',
+        'mongobridge_tool',
         'mongo_tidy_checks',
     ],
     exports=[
