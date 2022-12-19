@@ -15,13 +15,6 @@
  * ]
  */
 
-function assertAsyncCommitted(splitThread) {
-    const data = splitThread.returnData();
-
-    assert.commandWorked(data);
-    assert.eq(data.state, "committed");
-}
-
 (function() {
 'use strict';
 
@@ -226,7 +219,7 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
     bulkWriteThread.join();
     splitThread.join();
 
-    assertAsyncCommitted(splitThread);
+    assert.commandWorked(splitThread.returnData());
 
     let bulkWriteRes = bulkWriteThread.returnData();
     let writeErrors = bulkWriteRes.res.writeErrors;
@@ -388,7 +381,7 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
     bulkWriteThread.join();
     splitThread.join();
 
-    assertAsyncCommitted(splitThread);
+    assert.commandWorked(splitThread.returnData());
 
     const bulkWriteRes = bulkWriteThread.returnData();
     const writeErrors = bulkWriteRes.res.writeErrors;
@@ -499,7 +492,7 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
     bulkWriteThread.join();
     splitThread.join();
 
-    assertAsyncCommitted(splitThread);
+    assert.commandWorked(splitThread.returnData());
 
     let bulkWriteRes = bulkWriteThread.returnData();
     assert.eq(bulkWriteRes.res.code, ErrorCodes.Interrupted, tojson(bulkWriteRes));
@@ -546,9 +539,9 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
     bulkWriteThread.join();
     splitThread.join();
 
-    assertAsyncCommitted(splitThread);
+    assert.commandWorked(splitThread.returnData());
 
-    let bulkWriteRes = bulkWriteThread.returnData();
+    const bulkWriteRes = bulkWriteThread.returnData();
     assert.eq(bulkWriteRes.res.code, ErrorCodes.Interrupted, tojson(bulkWriteRes));
     assert.eq(
         bulkWriteRes.res.errmsg,

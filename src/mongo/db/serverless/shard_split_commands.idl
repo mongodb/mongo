@@ -40,13 +40,11 @@ structs:
         description: "Response for the `commitShardSplit` command."
         strict: false
         fields:
-            state:
-                type: ShardSplitDonorState
-                description: "The state of the shard split operation."
-            abortReason:
-                type: object
-                description: "The error that caused the shard split operation to abort."
-                optional: true
+            blockOpTime:
+                type: optime
+                description: >-
+                    The opTime at which writes and causal reads against the data being migrated
+                    started blocking.
 
 commands:
   commitShardSplit:
@@ -81,7 +79,7 @@ commands:
       migrationId:
         description: "Unique identifier for the shard split operation."
         type: uuid
-  
+
   forgetShardSplit:
     description: "Parser for the `forgetShardSplit` command."
     command_name: forgetShardSplit

@@ -177,9 +177,7 @@ runTestsWhileBlocking();
 blockFp.off();
 splitThread.join();
 
-const data = splitThread.returnData();
-assert.commandWorked(data);
-assert.eq(data.state, "committed");
+assert.commandWorked(splitThread.returnData());
 
 // run test after blocking is over and the migration committed.
 runTestsAfterMigrationCommitted();

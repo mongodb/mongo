@@ -85,6 +85,7 @@ public:
     struct DurableState {
         ShardSplitDonorStateEnum state;
         boost::optional<Status> abortReason;
+        boost::optional<repl::OpTime> blockOpTime;
     };
 
     DonorStateMachine(ServiceContext* serviceContext,

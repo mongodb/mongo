@@ -84,13 +84,9 @@ public:
                         (state.abortReason ? state.abortReason->toString() : ""),
                     state.state != ShardSplitDonorStateEnum::kAborted);
 
-            Response response(state.state);
-            if (state.abortReason) {
-                BSONObjBuilder bob;
-
-                state.abortReason->serializeErrorToBSON(&bob);
-                response.setAbortReason(bob.obj());
-            }
+            Response response;
+            invariant(state.blockOpTime.has_value());
+            response.setBlockOpTime(*state.blockOpTime);
 
             return response;
         }

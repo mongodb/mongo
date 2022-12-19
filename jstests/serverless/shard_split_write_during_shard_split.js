@@ -43,7 +43,6 @@ blockingFP.off();
 splitThread.join();
 const result = splitThread.returnData();
 assert.eq(result.ok, 1);
-assert.eq(result.state, "committed");
 
 writeThread.join();
 const writeResults = writeThread.returnData();

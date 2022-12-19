@@ -15,8 +15,13 @@ test.donor.awaitSecondaryNodes();
 
 const donorPrimary = test.getDonorPrimary();
 const operation = test.createSplitOperation(tenantIds);
-assert.commandWorked(operation.commit());
+const result = assert.commandWorked(operation.commit());
 assertMigrationState(donorPrimary, operation.migrationId, "committed");
+
+// Confirm blockOpTime in result matches the state document before forgetting the operation
+const stateDoc = findSplitOperation(donorPrimary, operation.migrationId);
+assert.eq(stateDoc.blockOpTime.ts, result.blockOpTime.ts);
+
 operation.forget();
 
 const status = donorPrimary.adminCommand({serverStatus: 1});

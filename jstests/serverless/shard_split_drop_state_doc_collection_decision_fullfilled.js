@@ -76,10 +76,7 @@ function testDroppingStateDocCollections(
     const operation2 =
         retryWithDifferentMigrationId ? test.createSplitOperation(tenantIds) : operation;
     migrationId = operation2.migrationId;
-    const runMigrationRes = operation2.commit();
-
-    assert.commandWorked(runMigrationRes);
-    assert.eq(runMigrationRes.state, "committed");
+    assert.commandWorked(operation2.commit());
 
     operation2.forget();
 
