@@ -42,7 +42,7 @@ singleNodeConfig.version++;
 
 jsTestLog("Force reconfig down to a single node.");
 assert.commandWorked(primary.adminCommand({replSetReconfig: singleNodeConfig, force: true}));
-assert(isConfigCommitted(primary));
+assert.soon(() => isConfigCommitted(primary));
 
 jsTestLog("Do a write on primary and commit it in the current config.");
 assert.commandWorked(coll.insert({x: 1}, {writeConcern: {w: "majority"}}));
@@ -74,7 +74,7 @@ assert.soon(() => isConfigCommitted(primary));
 // Now that we can commit the op in the new config, reconfig should succeed.
 twoNodeConfig.version = rst.getReplSetConfigFromNode().version + 1;
 assert.commandWorked(primary.adminCommand({replSetReconfig: twoNodeConfig}));
-assert(isConfigCommitted(primary));
+assert.soon(() => isConfigCommitted(primary));
 rst.awaitReplication();
 
 rst.stopSet();
