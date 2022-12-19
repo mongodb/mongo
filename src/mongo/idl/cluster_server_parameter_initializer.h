@@ -31,7 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
 
 namespace mongo {
@@ -101,18 +101,30 @@ private:
                                            StringData mode,
                                            OnEntry onEntry,
                                            const boost::optional<TenantId>& tenantId) try {
+
+        // If the RecoveryUnit already had an open snapshot, keep the snapshot open. Otherwise
+        // abandon the snapshot when exiting the function.
+        ScopeGuard scopeGuard([&] { opCtx->recoveryUnit()->abandonSnapshot(); });
+        if (opCtx->recoveryUnit()->isActive()) {
+            scopeGuard.dismiss();
+        }
+
+        AutoGetCollectionForRead coll(opCtx, NamespaceString::makeClusterParametersNSS(tenantId));
+        if (!coll) {
+            return;
+        }
+
         std::vector<Status> failures;
 
-        DBDirectClient client(opCtx);
-
-        FindCommandRequest findRequest{NamespaceString::makeClusterParametersNSS(tenantId)};
-        client.find(std::move(findRequest), [&](BSONObj doc) {
+        auto cursor = coll->getCursor(opCtx);
+        for (auto doc = cursor->next(); doc; doc = cursor->next()) {
             try {
-                onEntry(opCtx, doc, mode, tenantId);
+                onEntry(opCtx, doc.get().data.toBson(), mode, tenantId);
             } catch (const DBException& ex) {
                 failures.push_back(ex.toStatus());
             }
-        });
+        }
+
         if (!failures.empty()) {
             StringBuilder msg;
             for (const auto& failure : failures) {
