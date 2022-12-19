@@ -36,6 +36,7 @@ function validateHiddenIndexBehaviour() {
 
 // Check that command will fail when we try to hide the only shard key index of the collection
 function validateOneShardKeyHiddenIndexBehaviour() {
+    assert.commandFailedWithCode(coll.hideIndex({skey: 1}), ErrorCodes.InvalidOptions);
     assert.commandFailedWithCode(coll.hideIndex("skey_1"), ErrorCodes.InvalidOptions);
     assert.commandFailedWithCode(
         testDb.runCommand({"collMod": coll.getName(), "index": {"name": "skey_1", "hidden": true}}),
@@ -48,6 +49,11 @@ function validateDifferentHiddenIndexesBehaviour() {
     // Create index on skey
     assert.commandWorked(coll.createIndex({skey: 1, anotherkey: 1}));
 
+    // Check that is possible to hide a shard key index using its key pattern
+    assert.commandWorked(coll.hideIndex({skey: 1}));
+    assert.commandWorked(coll.unhideIndex({skey: 1}));
+
+    // Check that is possible to hide a shard key index using its name
     assert.commandWorked(testDb.runCommand(
         {"collMod": coll.getName(), "index": {"name": "skey_1", "hidden": true}}));
 

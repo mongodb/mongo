@@ -300,7 +300,7 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(Operati
                     if (isLastNonHiddenShardKeyIndex(opCtx,
                                                      coll,
                                                      coll->getIndexCatalog(),
-                                                     indexName.toString(),
+                                                     cmrIndex->idx->indexName(),
                                                      shardedColl.getKeyPattern().toBSON())) {
                         return {ErrorCodes::InvalidOptions,
                                 "Cannot hide the only compatible index for this collection's shard "

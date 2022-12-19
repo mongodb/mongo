@@ -290,6 +290,8 @@ last-continuous:
     ticket: SERVER-71667
   - test_file: jstests/sharding/drop_collection.js
     ticket: SERVER-71689
+  - test_file: jstests/sharding/hidden_index.js
+    ticket: SERVER-71638
   suites: null
 last-lts:
   all:
@@ -655,4 +657,6 @@ last-lts:
     ticket: SERVER-71667
   - test_file: jstests/sharding/drop_collection.js
     ticket: SERVER-71689
+  - test_file: jstests/sharding/hidden_index.js
+    ticket: SERVER-71638
   suites: null
