@@ -120,52 +120,53 @@ void AccumulatorInternalJsReduce::processInternal(const Value& input, bool mergi
 Value AccumulatorInternalJsReduce::getValue(bool toBeMerged) {
     if (_values.size() < 1) {
         return Value{};
-    } else if (mrSingleReduceOptimizationEnabled && _values.size() == 1) {
+    }
+    Value result;
+    if (mrSingleReduceOptimizationEnabled && _values.size() == 1) {
         // This optimization existed in the old Pre-4.4 MapReduce implementation. If the flag is
         // set, then we should replicate the optimization. See SERVER-68766 for more details.
-        return _values[0];
-    }
+        result = std::move(_values[0]);
+    } else {
+        const auto keySize = _key.getApproximateSize();
 
-    const auto keySize = _key.getApproximateSize();
+        // Keep reducing until we have exactly one value.
+        while (true) {
+            BSONArrayBuilder bsonValues;
+            size_t numLeft = _values.size();
+            for (; numLeft > 0; numLeft--) {
+                Value val = _values[numLeft - 1];
 
-    Value result;
-    // Keep reducing until we have exactly one value.
-    while (true) {
-        BSONArrayBuilder bsonValues;
-        size_t numLeft = _values.size();
-        for (; numLeft > 0; numLeft--) {
-            Value val = _values[numLeft - 1];
-
-            // Do not insert if doing so would exceed the the maximum allowed BSONObj size.
-            if (bsonValues.len() + keySize + val.getApproximateSize() > BSONObjMaxUserSize) {
-                // If we have reached the threshold for maximum allowed BSONObj size and only have a
-                // single value then no progress will be made on reduce. We must fail when this
-                // scenario is encountered.
-                size_t numNextReduce = _values.size() - numLeft;
-                uassert(31392, "Value too large to reduce", numNextReduce > 1);
-                break;
+                // Do not insert if doing so would exceed the the maximum allowed BSONObj size.
+                if (bsonValues.len() + keySize + val.getApproximateSize() > BSONObjMaxUserSize) {
+                    // If we have reached the threshold for maximum allowed BSONObj size and only
+                    // have a single value then no progress will be made on reduce. We must fail
+                    // when this scenario is encountered.
+                    size_t numNextReduce = _values.size() - numLeft;
+                    uassert(31392, "Value too large to reduce", numNextReduce > 1);
+                    break;
+                }
+                bsonValues << val;
             }
-            bsonValues << val;
-        }
 
-        auto expCtx = getExpressionContext();
-        auto reduceFunc = makeJsFunc(expCtx, _funcSource);
+            auto expCtx = getExpressionContext();
+            auto reduceFunc = makeJsFunc(expCtx, _funcSource);
 
-        // Function signature: reduce(key, values).
-        BSONObj params = BSON_ARRAY(_key << bsonValues.arr());
-        // For reduce, the key and values are both passed as 'params' so there's no need to set
-        // 'this'.
-        BSONObj thisObj;
-        Value reduceResult =
-            expCtx->getJsExecWithScope()->callFunction(reduceFunc, params, thisObj);
-        if (numLeft == 0) {
-            result = reduceResult;
-            break;
-        } else {
-            // Remove all values which have been reduced.
-            _values.resize(numLeft);
-            // Include most recent result in the set of values to be reduced.
-            _values.push_back(reduceResult);
+            // Function signature: reduce(key, values).
+            BSONObj params = BSON_ARRAY(_key << bsonValues.arr());
+            // For reduce, the key and values are both passed as 'params' so there's no need to set
+            // 'this'.
+            BSONObj thisObj;
+            Value reduceResult =
+                expCtx->getJsExecWithScope()->callFunction(reduceFunc, params, thisObj);
+            if (numLeft == 0) {
+                result = reduceResult;
+                break;
+            } else {
+                // Remove all values which have been reduced.
+                _values.resize(numLeft);
+                // Include most recent result in the set of values to be reduced.
+                _values.push_back(reduceResult);
+            }
         }
     }
 
