@@ -56,7 +56,8 @@ public:
 
         PrivilegeVector requiredPrivileges(bool isMongos,
                                            bool bypassDocumentValidation) const override {
-            return {};
+            return {Privilege(ResourcePattern::forClusterResource(), ActionType::telemetryRead)};
+            ;
         }
 
         bool allowedToPassthroughFromMongos() const final {

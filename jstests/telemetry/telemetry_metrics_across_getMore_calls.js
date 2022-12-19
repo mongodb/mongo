@@ -1,7 +1,8 @@
 /**
  * Test that the telemetry metrics are updated correctly across getMores.
  */
-load("jstests/libs/profiler.js");  // For getLatestProfilerEntry.
+load("jstests/libs/profiler.js");           // For getLatestProfilerEntry.
+load("jstests/libs/feature_flag_util.js");  // For FeatureFlagUtil.
 
 (function() {
 "use strict";

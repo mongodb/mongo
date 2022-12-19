@@ -432,7 +432,6 @@ var authCommandsLib = {
               roles: roles_clusterManager,
           }]
         },
-
         {
           testname: "applyOps_empty",
           command: {applyOps: []},
@@ -6088,6 +6087,16 @@ var authCommandsLib = {
                         }
                     ]
                 }, */
+        {
+            // Test that only clusterManager has permission to run $telemetry
+            testname: "testTelemetryReadPrivilege",
+            command: {aggregate: 1, pipeline: [{$telemetry: {}}], cursor: {}},
+            skipSharded: false,
+            skipTest: (conn) => {
+                return !TestData.setParameters.featureFlagTelemetry;
+            },
+            testcases: [{runOnDb: adminDbName, roles: roles_clusterManager}]
+        },
         {
           testname: "top",
           command: {top: 1},
