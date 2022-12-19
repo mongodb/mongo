@@ -156,7 +156,7 @@ public:
      * The database will be validated against the current database for this session.
      */
     void updateDatabase(StringData database) {
-        updateUserName(UserName("", database.toString()));
+        updateUserName(UserName("", database.toString()), false /* isMechX509 */);
     }
 
     /**
@@ -164,7 +164,7 @@ public:
      *
      * The user name will be validated against the current user name for this session.
      */
-    void updateUserName(UserName userName);
+    void updateUserName(UserName userName, bool isMechX509);
 
     /**
      * Set the last user name used with `saslSupportedMechs` for this session.
@@ -254,7 +254,7 @@ private:
     static boost::optional<AuthenticationSession>& _get(Client* client);
 
     void _finish();
-    void _verifyUserNameFromSaslSupportedMechanisms(const UserName& user);
+    void _verifyUserNameFromSaslSupportedMechanisms(const UserName& user, bool isMechX509);
 
     Client* const _client;
 

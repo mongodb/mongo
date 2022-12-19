@@ -162,7 +162,7 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
     auto user = [&] {
         if (session->getUserName().empty()) {
             auto user = UserName(clientName.toString(), session->getDatabase().toString());
-            session->updateUserName(user);
+            session->updateUserName(user, true /* isMechX509 */);
             return user;
         } else {
             uassert(ErrorCodes::AuthenticationFailed,
@@ -266,9 +266,9 @@ AuthenticateReply authCommand(OperationContext* opCtx,
         // Allows authenticating as the internal user against the admin database.  This is to
         // support the auth passthrough test framework on mongos (since you can't use the local
         // database on a mongos, so you can't auth as the internal user without this).
-        session->updateUserName(internalSecurityUser);
+        session->updateUserName(internalSecurityUser, mechanism == auth::kMechanismMongoX509);
     } else {
-        session->updateUserName(UserName{user, dbname});
+        session->updateUserName(UserName{user, dbname}, mechanism == auth::kMechanismMongoX509);
     }
 
     if (mechanism.empty()) {
