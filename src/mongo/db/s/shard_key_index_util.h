@@ -98,8 +98,8 @@ boost::optional<ShardKeyIndex> findShardKeyPrefixedIndex(OperationContext* opCtx
                                                          std::string* errMsg = nullptr);
 
 /**
- * Returns true if the given index name is the last remaining not hidden index that is compatible
- * with the shard key index.
+ * Returns true if the given index exists and it is the last non-hidden index compatible with the
+ * shard key. False otherwise.
  */
 bool isLastNonHiddenShardKeyIndex(OperationContext* opCtx,
                                   const CollectionPtr& collection,
