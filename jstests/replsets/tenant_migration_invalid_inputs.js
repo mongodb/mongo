@@ -9,7 +9,7 @@
  *   incompatible_with_windows_tls,
  *   incompatible_with_shard_merge,
  *   requires_persistence,
- *   requires_fcv_51,
+ *   requires_fcv_63,
  *   serverless,
  * ]
  */

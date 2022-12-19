@@ -25,7 +25,7 @@ var TenantMigrationUtil = (function() {
      * Checks the FCV and the command object passed to see if tenantIds should be set for shard
      * merge.
      */
-    function shouldUseMergeTenantIds(cmd, db) {
+    function shouldUseMergeTenantIds(db) {
         const fcvDoc = assert.commandWorked(
             db.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}));
 
@@ -44,7 +44,7 @@ var TenantMigrationUtil = (function() {
         if (cmd["protocol"] === undefined && isShardMergeEnabled(db)) {
             const cmdCopy = Object.assign({}, cmd);
 
-            if (shouldUseMergeTenantIds(cmd, db)) {
+            if (shouldUseMergeTenantIds(db)) {
                 cmdCopy.tenantIds = cmdCopy.tenantIds || [ObjectId(cmdCopy.tenantId)];
             }
 
