@@ -354,7 +354,8 @@ Status DatabaseImpl::dropView(OperationContext* opCtx, NamespaceString viewName)
 
 Status DatabaseImpl::dropCollection(OperationContext* opCtx,
                                     NamespaceString nss,
-                                    repl::OpTime dropOpTime) const {
+                                    repl::OpTime dropOpTime,
+                                    bool markFromMigrate) const {
     // Cannot drop uncommitted collections.
     invariant(!UncommittedCatalogUpdates::isCreatedCollection(opCtx, nss));
 
@@ -397,7 +398,7 @@ Status DatabaseImpl::dropCollection(OperationContext* opCtx,
         }
     }
 
-    return dropCollectionEvenIfSystem(opCtx, nss, dropOpTime);
+    return dropCollectionEvenIfSystem(opCtx, nss, dropOpTime, markFromMigrate);
 }
 
 Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,

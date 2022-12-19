@@ -50,17 +50,21 @@ enum class DropCollectionSystemCollectionMode {
  * Drops the collection "collectionName" and populates "reply" with statistics about what
  * was removed. Aborts in-progress index builds on the collection if two phase index builds are
  * supported. Throws if the expectedUUID does not match the UUID of the collection being dropped.
+ * When fromMigrate is set, the related oplog entry will be marked accordingly using the
+ * 'fromMigrate' field to reduce its visibility (e.g. in change streams).
  */
 Status dropCollection(OperationContext* opCtx,
                       const NamespaceString& collectionName,
                       const boost::optional<UUID>& expectedUUID,
                       DropReply* reply,
-                      DropCollectionSystemCollectionMode systemCollectionMode);
+                      DropCollectionSystemCollectionMode systemCollectionMode,
+                      bool fromMigrate = false);
 
 Status dropCollection(OperationContext* opCtx,
                       const NamespaceString& collectionName,
                       DropReply* reply,
-                      DropCollectionSystemCollectionMode systemCollectionMode);
+                      DropCollectionSystemCollectionMode systemCollectionMode,
+                      bool fromMigrate = false);
 
 /**
  * Drops the collection "collectionName" only if its uuid is not matching "expectedUUID".
