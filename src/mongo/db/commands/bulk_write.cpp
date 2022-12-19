@@ -32,10 +32,13 @@
 #include <string>
 #include <vector>
 
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/bulk_write_gen.h"
+#include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -98,12 +101,12 @@ public:
                 "BulkWrite may not be run without featureFlagBulkWriteCommand enabled",
                 gFeatureFlagBulkWriteCommand.isEnabled(serverGlobalParams.featureCompatibility));
 
-            // Validate that every ops entry has a valid nsInfo index
+            // Validate that every ops entry has a valid nsInfo index.
             auto& req = request();
-            auto ops = req.getOps();
-            auto nsInfo = req.getNsInfo();
+            const auto& ops = req.getOps();
+            const auto& nsInfo = req.getNsInfo();
 
-            for (auto& op : ops) {
+            for (const auto& op : ops) {
                 unsigned int nsInfoIdx = op.getInsert();
                 uassert(ErrorCodes::BadValue,
                         str::stream() << "BulkWrite ops entry " << op.toBSON()
@@ -117,6 +120,48 @@ public:
             reply.setCursor(BulkWriteCommandResponseCursor(0, firstBatch));
 
             return reply;
+        }
+
+        void doCheckAuthorization(OperationContext* opCtx) const final try {
+            auto session = AuthorizationSession::get(opCtx->getClient());
+            const auto& ops = request().getOps();
+            const auto& nsInfo = request().getNsInfo();
+
+            std::vector<Privilege> privileges;
+            privileges.reserve(nsInfo.size());
+            ActionSet actions;
+            if (request().getBypassDocumentValidation()) {
+                actions.addAction(ActionType::bypassDocumentValidation);
+            }
+
+            // Create initial Privilege entry for each nsInfo entry.
+            for (const auto& ns : nsInfo) {
+                privileges.emplace_back(ResourcePattern::forExactNamespace(ns.getNs()), actions);
+            }
+
+            // Iterate over each op and assign the appropriate actions to the namespace privilege.
+            for (const auto& op : ops) {
+                unsigned int nsInfoIdx = op.getInsert();
+                uassert(ErrorCodes::BadValue,
+                        str::stream() << "BulkWrite ops entry " << op.toBSON()
+                                      << " has an invalid nsInfo index.",
+                        nsInfoIdx < nsInfo.size());
+
+                auto& privilege = privileges[nsInfoIdx];
+                ActionSet newActions;
+
+                // TODO SERVER-72092 Make this logic handle different types of `op`.
+                newActions.addAction(ActionType::insert);
+                privilege.addActions(newActions);
+            }
+
+            // Make sure all privileges are authorized.
+            uassert(ErrorCodes::Unauthorized,
+                    "unauthorized",
+                    session->isAuthorizedForPrivileges(privileges));
+        } catch (const DBException& ex) {
+            NotPrimaryErrorTracker::get(opCtx->getClient()).recordError(ex.code());
+            throw;
         }
     };
 

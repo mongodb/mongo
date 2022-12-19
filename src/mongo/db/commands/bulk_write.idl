@@ -158,7 +158,10 @@ commands:
         namespace: ignored
         api_version: "1"
         access_check:
-            none: true
+            simple:
+                privilege:
+                    resource_pattern: exact_namespace
+                    action_type: [bypassDocumentValidation, find, insert, update, remove]
         reply_type: BulkWriteCommandReply
         fields:
             ops:

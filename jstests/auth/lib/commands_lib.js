@@ -2221,6 +2221,47 @@ var authCommandsLib = {
           ]
         },
         {
+          testname: "bulkWrite_insert",
+          command: {
+            bulkWrite: 1,
+            ops: [
+              {insert: 0, document: {skey: "MongoDB"}}, 
+              {insert: 1, document: {skey: "MongoDB"}}],
+            nsInfo: [{ns: firstDbName + ".coll"}, {ns: secondDbName + ".coll1"}]
+          },
+          skipSharded: true,
+          testcases: [{
+            runOnDb: adminDbName,
+            privileges: [{resource: {db: firstDbName, collection: "coll"}, actions: ['insert']},
+                         {resource: {db: secondDbName, collection: "coll1"}, actions: ['insert']}]
+          }]
+        },
+        {
+          testname: "bulkWrite_insertBypassDocumentValidation",
+          command: {
+            bulkWrite: 1,
+            ops: [
+              {insert: 0, document: {skey: "MongoDB"}}, 
+              {insert: 1, document: {skey: "MongoDB"}}],
+            nsInfo: [{ns: firstDbName + ".coll"}, {ns: secondDbName + ".coll1"}],
+            bypassDocumentValidation: true,
+          },
+          skipSharded: true,
+          testcases: [{
+            runOnDb: adminDbName,
+            privileges: [
+              {
+                resource: {db: firstDbName, collection: "coll"}, 
+                actions: ['insert', 'bypassDocumentValidation']
+              },
+              {
+                resource: {db: secondDbName, collection: "coll1"}, 
+                actions: ['insert', 'bypassDocumentValidation']
+              }
+            ]
+          }]
+        },
+        {
           testname: "checkShardingIndex_firstDb",
           command: {checkShardingIndex: firstDbName + ".x", keyPattern: {_id: 1}},
           skipSharded: true,
