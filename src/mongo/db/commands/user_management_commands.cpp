@@ -1467,7 +1467,8 @@ UsersInfoReply CmdUMCTyped<UsersInfoCommand, UMCInfoParams>::Invocation::typedRu
         auto bodyBuilder = replyBuilder.getBodyBuilder();
         CommandHelpers::appendSimpleCommandStatus(bodyBuilder, true);
         bodyBuilder.doneFast();
-        auto response = CursorResponse::parseFromBSONThrowing(replyBuilder.releaseBody());
+        auto response =
+            CursorResponse::parseFromBSONThrowing(dbname.tenantId(), replyBuilder.releaseBody());
         DBClientCursor cursor(&client,
                               response.getNSS(),
                               response.getCursorId(),

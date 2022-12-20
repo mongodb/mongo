@@ -425,11 +425,13 @@ SemiFuture<std::vector<BSONObj>> SEPTransactionClient::exhaustiveFind(
     const FindCommandRequest& cmd) const {
     return runCommand(cmd.getDbName().db(), cmd.toBSON({}))
         .thenRunOn(_executor)
-        .then([this, batchSize = cmd.getBatchSize()](BSONObj reply) {
+        .then([this, batchSize = cmd.getBatchSize(), tenantId = cmd.getDbName().tenantId()](
+                  BSONObj reply) {
             auto cursorResponse = std::make_shared<CursorResponse>(
-                uassertStatusOK(CursorResponse::parseFromBSON(reply)));
+                uassertStatusOK(CursorResponse::parseFromBSON(reply, nullptr, tenantId)));
             auto response = std::make_shared<std::vector<BSONObj>>();
             return AsyncTry([this,
+                             tenantId,
                              batchSize = batchSize,
                              cursorResponse = std::move(cursorResponse),
                              response]() mutable {
@@ -450,11 +452,11 @@ SemiFuture<std::vector<BSONObj>> SEPTransactionClient::exhaustiveFind(
 
                        return runCommand(cursorResponse->getNSS().db(), getMoreRequest.toBSON({}))
                            .thenRunOn(_executor)
-                           .then([response, cursorResponse](BSONObj reply) {
+                           .then([response, cursorResponse, tenantId](BSONObj reply) {
                                // We keep the state of cursorResponse to be able to check the
                                // cursorId in the next iteration.
-                               *cursorResponse =
-                                   uassertStatusOK(CursorResponse::parseFromBSON(reply));
+                               *cursorResponse = uassertStatusOK(
+                                   CursorResponse::parseFromBSON(reply, nullptr, tenantId));
                                uasserted(ErrorCodes::InternalTransactionsExhaustiveFindHasMore,
                                          "More documents to fetch");
                            })

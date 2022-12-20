@@ -1,4 +1,10 @@
 // Test MQL expressions which can match against the whole array stored in the field.
+//
+// @tags: [
+//     # Uses $where operator
+//     requires_scripting
+// ]
+
 (function() {
 "use strict";
 

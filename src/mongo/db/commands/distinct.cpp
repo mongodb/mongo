@@ -273,7 +273,8 @@ public:
                 dbName, vts, std::move(viewAggregation.getValue()));
 
             BSONObj aggResult = CommandHelpers::runCommandDirectly(opCtx, aggRequest);
-            uassertStatusOK(ViewResponseFormatter(aggResult).appendAsDistinctResponse(&result));
+            uassertStatusOK(ViewResponseFormatter(aggResult).appendAsDistinctResponse(
+                &result, dbName.tenantId()));
             return true;
         }
 

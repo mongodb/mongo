@@ -3,6 +3,8 @@
 //   requires_fastcount,
 //   requires_javascript,
 //   requires_non_retryable_commands,
+//   # Uses $where operator
+//   requires_scripting,
 // ]
 
 t = db.jstests_js3;

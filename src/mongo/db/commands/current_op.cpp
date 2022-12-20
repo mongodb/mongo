@@ -96,7 +96,8 @@ public:
         CommandHelpers::appendSimpleCommandStatus(bodyBuilder, true);
         bodyBuilder.doneFast();
 
-        return CursorResponse::parseFromBSON(replyBuilder.releaseBody());
+        return CursorResponse::parseFromBSON(
+            replyBuilder.releaseBody(), nullptr, request.getNamespace().tenantId());
     }
 
     virtual void appendToResponse(BSONObjBuilder* result) const final {

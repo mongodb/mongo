@@ -4,6 +4,8 @@
  * @tags: [
  *     requires_fastcount,
  *     assumes_against_mongod_not_mongos,
+ *     # Reliance on the $where operator
+ *     requires_scripting,
  * ]
  */
 

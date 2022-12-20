@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/tenant_id.h"
 
 namespace mongo {
 class BSONObjBuilder;
@@ -53,7 +54,7 @@ public:
      * If '_response' is not a valid cursor-based response from the aggregation command, a non-OK
      * status is returned and 'resultBuilder' will not be modified.
      */
-    Status appendAsCountResponse(BSONObjBuilder* resultBuilder);
+    Status appendAsCountResponse(BSONObjBuilder* resultBuilder, boost::optional<TenantId> tenantId);
 
     /**
      * Appends fields to 'resultBuilder' as if '_response' were a response from the distinct
@@ -62,7 +63,8 @@ public:
      * If '_response' is not a valid cursor-based response from the aggregation command, a non-OK
      * status is returned and 'resultBuilder' will not be modified.
      */
-    Status appendAsDistinctResponse(BSONObjBuilder* resultBuilder);
+    Status appendAsDistinctResponse(BSONObjBuilder* resultBuilder,
+                                    boost::optional<TenantId> tenantId);
 
 private:
     BSONObj _response;

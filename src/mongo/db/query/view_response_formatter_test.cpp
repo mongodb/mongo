@@ -35,6 +35,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/view_response_formatter.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -47,7 +48,7 @@ TEST(ViewResponseFormatter, FormatInitialCountResponseSuccessfully) {
     CursorResponse cr(testNss, testCursor, {BSON("count" << 7)});
     ViewResponseFormatter formatter(cr.toBSON(CursorResponse::ResponseType::InitialResponse));
     BSONObjBuilder builder;
-    ASSERT_OK(formatter.appendAsCountResponse(&builder));
+    ASSERT_OK(formatter.appendAsCountResponse(&builder, boost::none));
     ASSERT_BSONOBJ_EQ(fromjson("{'n': 7, ok: 1}"), builder.obj());
 }
 
@@ -55,15 +56,33 @@ TEST(ViewResponseFormatter, FormatSubsequentCountResponseSuccessfully) {
     CursorResponse cr(testNss, testCursor, {BSON("count" << 7)});
     ViewResponseFormatter formatter(cr.toBSON(CursorResponse::ResponseType::SubsequentResponse));
     BSONObjBuilder builder;
-    ASSERT_OK(formatter.appendAsCountResponse(&builder));
+    ASSERT_OK(formatter.appendAsCountResponse(&builder, boost::none));
     ASSERT_BSONOBJ_EQ(fromjson("{'n': 7, ok: 1}"), builder.obj());
+}
+
+TEST(ViewResponseFormatter, FormatInitialCountResponseWithTenantIdSuccessfully) {
+    const TenantId tenantId(OID::gen());
+    const NamespaceString nss(tenantId, testNss.toString());
+
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+
+    for (bool flagStatus : {false, true}) {
+        RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
+                                                                   flagStatus);
+
+        CursorResponse cr(nss, testCursor, {BSON("count" << 7)});
+        ViewResponseFormatter formatter(cr.toBSON(CursorResponse::ResponseType::InitialResponse));
+        BSONObjBuilder builder;
+        ASSERT_OK(formatter.appendAsCountResponse(&builder, tenantId));
+        ASSERT_BSONOBJ_EQ(fromjson("{'n': 7, ok: 1}"), builder.obj());
+    }
 }
 
 TEST(ViewResponseFormatter, FormatEmptyInitialCountResponseSuccessfully) {
     CursorResponse cr(testNss, testCursor, {});
     ViewResponseFormatter formatter(cr.toBSON(CursorResponse::ResponseType::InitialResponse));
     BSONObjBuilder builder;
-    ASSERT_OK(formatter.appendAsCountResponse(&builder));
+    ASSERT_OK(formatter.appendAsCountResponse(&builder, boost::none));
     ASSERT_BSONOBJ_EQ(fromjson("{'n': 0, ok: 1}"), builder.obj());
 }
 
@@ -71,14 +90,14 @@ TEST(ViewResponseFormatter, FormatEmptySubsequentCountResponseSuccessfully) {
     CursorResponse cr(testNss, testCursor, {});
     ViewResponseFormatter formatter(cr.toBSON(CursorResponse::ResponseType::SubsequentResponse));
     BSONObjBuilder builder;
-    ASSERT_OK(formatter.appendAsCountResponse(&builder));
+    ASSERT_OK(formatter.appendAsCountResponse(&builder, boost::none));
     ASSERT_BSONOBJ_EQ(fromjson("{'n': 0, ok: 1}"), builder.obj());
 }
 
 TEST(ViewResponseFormatter, FormatFailedCountResponseFails) {
     ViewResponseFormatter formatter(fromjson("{ok: 0, errmsg: 'bad value', code: 2}"));
     BSONObjBuilder builder;
-    ASSERT_NOT_OK(formatter.appendAsCountResponse(&builder));
+    ASSERT_NOT_OK(formatter.appendAsCountResponse(&builder, boost::none));
     ASSERT_BSONOBJ_EQ(builder.obj(), BSONObj());
 }
 
@@ -86,7 +105,7 @@ TEST(ViewResponseFormatter, FormatInitialDistinctResponseSuccessfully) {
     CursorResponse cr(testNss, testCursor, {fromjson("{_id: null, distinct: [5, 9]}")});
     ViewResponseFormatter formatter(cr.toBSON(CursorResponse::ResponseType::InitialResponse));
     BSONObjBuilder builder;
-    ASSERT_OK(formatter.appendAsDistinctResponse(&builder));
+    ASSERT_OK(formatter.appendAsDistinctResponse(&builder, boost::none));
     ASSERT_BSONOBJ_EQ(fromjson("{values: [5, 9], ok: 1}"), builder.obj());
 }
 
@@ -94,15 +113,33 @@ TEST(ViewResponseFormatter, FormatSubsequentDistinctResponseSuccessfully) {
     CursorResponse cr(testNss, testCursor, {fromjson("{_id: null, distinct: [5, 9]}")});
     ViewResponseFormatter formatter(cr.toBSON(CursorResponse::ResponseType::SubsequentResponse));
     BSONObjBuilder builder;
-    ASSERT_OK(formatter.appendAsDistinctResponse(&builder));
+    ASSERT_OK(formatter.appendAsDistinctResponse(&builder, boost::none));
     ASSERT_BSONOBJ_EQ(fromjson("{values: [5, 9], ok: 1}"), builder.obj());
+}
+
+TEST(ViewResponseFormatter, FormatInitialDistinctResponseWithTenantIdSuccessfully) {
+    const TenantId tenantId(OID::gen());
+    const NamespaceString nss(tenantId, testNss.toString());
+
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+
+    for (bool flagStatus : {false, true}) {
+        RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
+                                                                   flagStatus);
+
+        CursorResponse cr(nss, testCursor, {fromjson("{_id: null, distinct: [5, 9]}")});
+        ViewResponseFormatter formatter(cr.toBSON(CursorResponse::ResponseType::InitialResponse));
+        BSONObjBuilder builder;
+        ASSERT_OK(formatter.appendAsDistinctResponse(&builder, tenantId));
+        ASSERT_BSONOBJ_EQ(fromjson("{values: [5, 9], ok: 1}"), builder.obj());
+    }
 }
 
 TEST(ViewResponseFormatter, FormatEmptyDistinctValuesSuccessfully) {
     CursorResponse cr(testNss, testCursor, {fromjson("{_id: null, distinct: []}")});
     ViewResponseFormatter formatter(cr.toBSON(CursorResponse::ResponseType::InitialResponse));
     BSONObjBuilder builder;
-    ASSERT_OK(formatter.appendAsDistinctResponse(&builder));
+    ASSERT_OK(formatter.appendAsDistinctResponse(&builder, boost::none));
     ASSERT_BSONOBJ_EQ(fromjson("{values: [], ok: 1}"), builder.obj());
 }
 
@@ -110,14 +147,14 @@ TEST(ViewResponseFormatter, FormatEmptyDistinctBatchSuccessfully) {
     CursorResponse cr(testNss, testCursor, {});
     ViewResponseFormatter formatter(cr.toBSON(CursorResponse::ResponseType::InitialResponse));
     BSONObjBuilder builder;
-    ASSERT_OK(formatter.appendAsDistinctResponse(&builder));
+    ASSERT_OK(formatter.appendAsDistinctResponse(&builder, boost::none));
     ASSERT_BSONOBJ_EQ(fromjson("{values: [], ok: 1}"), builder.obj());
 }
 
 TEST(ViewResponseFormatter, FormatFailedDistinctResponseFails) {
     ViewResponseFormatter formatter(fromjson("{ok: 0, errmsg: 'bad value', code: 2}"));
     BSONObjBuilder builder;
-    ASSERT_NOT_OK(formatter.appendAsDistinctResponse(&builder));
+    ASSERT_NOT_OK(formatter.appendAsDistinctResponse(&builder, boost::none));
     ASSERT_BSONOBJ_EQ(builder.obj(), BSONObj());
 }
 

@@ -178,7 +178,8 @@ std::vector<StatusWith<CursorResponse>> CursorResponse::parseFromBSONMany(
 }
 
 StatusWith<CursorResponse> CursorResponse::parseFromBSON(const BSONObj& cmdResponse,
-                                                         const BSONObj* ownedObj) {
+                                                         const BSONObj* ownedObj,
+                                                         boost::optional<TenantId> tenantId) {
     Status cmdStatus = getStatusFromCommandResult(cmdResponse);
     if (!cmdStatus.isOK()) {
         return cmdStatus;
@@ -306,7 +307,7 @@ StatusWith<CursorResponse> CursorResponse::parseFromBSON(const BSONObj& cmdRespo
                               << writeConcernError.type()};
     }
 
-    return {{NamespaceString(fullns),
+    return {{NamespaceStringUtil::deserialize(tenantId, fullns),
              cursorId,
              std::move(batch),
              atClusterTimeElem ? atClusterTimeElem.timestamp() : boost::optional<Timestamp>{},
@@ -324,7 +325,7 @@ void CursorResponse::addToBSON(CursorResponse::ResponseType responseType,
     BSONObjBuilder cursorBuilder(builder->subobjStart(kCursorField));
 
     cursorBuilder.append(kIdField, _cursorId);
-    cursorBuilder.append(kNsField, _nss.ns());
+    cursorBuilder.append(kNsField, NamespaceStringUtil::serialize(_nss));
 
     const char* batchFieldName =
         (responseType == ResponseType::InitialResponse) ? kBatchFieldInitial : kBatchField;

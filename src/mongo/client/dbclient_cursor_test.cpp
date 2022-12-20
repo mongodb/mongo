@@ -31,6 +31,7 @@
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -193,34 +194,43 @@ TEST_F(DBClientCursorTest, DBClientCursorGetMoreWithTenant) {
     const TenantId tenantId(OID::gen());
     const NamespaceString nss(tenantId, "test", "coll");
     FindCommandRequest findCmd{nss};
-    DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, false);
-    cursor.setBatchSize(2);
 
-    // Set up mock 'find' response.
-    const long long cursorId = 42;
-    Message findResponseMsg = mockFindResponse(nss, cursorId, {docObj(1), docObj(2)});
-    conn.setCallResponse(findResponseMsg);
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
 
-    // Trigger a find command.
-    ASSERT(cursor.init());
+    for (bool flagStatus : {false, true}) {
+        RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
+                                                                   flagStatus);
 
-    // First batch from the initial find command.
-    ASSERT_BSONOBJ_EQ(docObj(1), cursor.next());
-    ASSERT_BSONOBJ_EQ(docObj(2), cursor.next());
-    ASSERT_FALSE(cursor.moreInCurrentBatch());
+        DBClientCursor cursor(&conn, findCmd, ReadPreferenceSetting{}, false);
+        cursor.setBatchSize(2);
+        ASSERT_EQ(cursor.getNamespaceString(), nss);
 
-    // Set a terminal getMore response with cursorId 0.
-    auto getMoreResponseMsg = mockGetMoreResponse(nss, 0, {docObj(3), docObj(4)});
-    conn.setCallResponse(getMoreResponseMsg);
+        // Set up mock 'find' response.
+        const long long cursorId = 42;
+        Message findResponseMsg = mockFindResponse(nss, cursorId, {docObj(1), docObj(2)});
+        conn.setCallResponse(findResponseMsg);
 
-    // Trigger a subsequent getMore command.
-    ASSERT_TRUE(cursor.more());
+        // Trigger a find command.
+        ASSERT(cursor.init());
 
-    // Second batch from the getMore command.
-    ASSERT_BSONOBJ_EQ(docObj(3), cursor.next());
-    ASSERT_BSONOBJ_EQ(docObj(4), cursor.next());
-    ASSERT_FALSE(cursor.moreInCurrentBatch());
-    ASSERT_TRUE(cursor.isDead());
+        // First batch from the initial find command.
+        ASSERT_BSONOBJ_EQ(docObj(1), cursor.next());
+        ASSERT_BSONOBJ_EQ(docObj(2), cursor.next());
+        ASSERT_FALSE(cursor.moreInCurrentBatch());
+
+        // Set a terminal getMore response with cursorId 0.
+        auto getMoreResponseMsg = mockGetMoreResponse(nss, 0, {docObj(3), docObj(4)});
+        conn.setCallResponse(getMoreResponseMsg);
+
+        // Trigger a subsequent getMore command.
+        ASSERT_TRUE(cursor.more());
+
+        // Second batch from the getMore command.
+        ASSERT_BSONOBJ_EQ(docObj(3), cursor.next());
+        ASSERT_BSONOBJ_EQ(docObj(4), cursor.next());
+        ASSERT_FALSE(cursor.moreInCurrentBatch());
+        ASSERT_TRUE(cursor.isDead());
+    }
 }
 
 TEST_F(DBClientCursorTest, DBClientCursorHandlesOpMsgExhaustCorrectly) {

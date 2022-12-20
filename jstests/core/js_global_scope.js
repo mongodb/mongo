@@ -8,6 +8,8 @@
 //   # variables in multiversion setup, so we just disable the test from multiversion suites
 //   # instead.
 //   multiversion_incompatible,
+//   # Uses $where operator
+//   requires_scripting,
 // ]
 (function() {
 "use strict";

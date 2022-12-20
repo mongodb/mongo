@@ -34,6 +34,7 @@
 #include "mongo/rpc/op_msg_rpc_impls.h"
 
 #include "mongo/db/pipeline/resume_token.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -306,6 +307,70 @@ TEST(CursorResponseTest, roundTripThroughCursorResponseBuilderWithPartialResults
     ASSERT(!cursorBuilderIt.more());
 }
 
+TEST(CursorResponseTest,
+     roundTripThroughCursorResponseBuilderWithPartialResultsReturnedWithTenantId) {
+    CursorResponseBuilder::Options options;
+    options.isInitialResponse = true;
+    TenantId tid(OID::gen());
+    NamespaceString nss(tid, "db.coll");
+
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+
+    for (bool flagStatus : {false, true}) {
+        RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
+                                                                   flagStatus);
+
+        rpc::OpMsgReplyBuilder builder;
+        BSONObj okStatus = BSON("ok" << 1);
+        BSONObj testDoc = BSON("_id" << 1);
+        BSONObj expectedBody =
+            BSON("cursor" << BSON("firstBatch" << BSON_ARRAY(testDoc) << "partialResultsReturned"
+                                               << true << "id" << CursorId(123) << "ns"
+                                               << NamespaceStringUtil::serialize(nss)));
+
+        // Use CursorResponseBuilder to serialize the cursor response to OpMsgReplyBuilder.
+        CursorResponseBuilder crb(&builder, options);
+        crb.append(testDoc);
+        crb.setPartialResultsReturned(true);
+        crb.done(CursorId(123), nss);
+
+        // Confirm that the resulting BSONObj response matches the expected body.
+        auto msg = builder.done();
+        auto opMsg = OpMsg::parse(msg);
+        ASSERT_BSONOBJ_EQ(expectedBody, opMsg.body);
+
+        // Append {"ok": 1} to the opMsg body so that it can be parsed by CursorResponse.
+        auto swCursorResponse =
+            CursorResponse::parseFromBSON(opMsg.body.addField(okStatus["ok"]), nullptr, tid);
+        ASSERT_OK(swCursorResponse.getStatus());
+
+        // Confirm the CursorReponse parsed from CursorResponseBuilder output has the correct
+        // content.
+        CursorResponse response = std::move(swCursorResponse.getValue());
+        ASSERT_EQ(response.getCursorId(), CursorId(123));
+
+        ASSERT_EQ(response.getNSS(), nss);
+        ASSERT_EQ(response.getBatch().size(), 1U);
+        ASSERT_BSONOBJ_EQ(response.getBatch()[0], testDoc);
+        ASSERT_EQ(response.getPartialResultsReturned(), true);
+
+        // Re-serialize a BSONObj response from the CursorResponse.
+        auto cursorResBSON = response.toBSONAsInitialResponse();
+
+        // Confirm that the BSON serialized by the CursorResponse is the same as that serialized by
+        // the CursorResponseBuilder. Field ordering differs between the two, so compare
+        // per-element.
+        BSONObjIteratorSorted cursorResIt(cursorResBSON["cursor"].Obj());
+        BSONObjIteratorSorted cursorBuilderIt(opMsg.body["cursor"].Obj());
+        while (cursorResIt.more()) {
+            ASSERT(cursorBuilderIt.more());
+            ASSERT_EQ(cursorResIt.next().woCompare(cursorBuilderIt.next()), 0);
+        }
+        ASSERT(!cursorBuilderIt.more());
+    }
+}
+
+
 TEST(CursorResponseTest, parseFromBSONHandleErrorResponse) {
     StatusWith<CursorResponse> result =
         CursorResponse::parseFromBSON(BSON("ok" << 0 << "code" << 123 << "errmsg"
@@ -390,6 +455,32 @@ TEST(CursorResponseTest, addToBSONSubsequentResponse) {
                               << "nextBatch" << BSON_ARRAY(BSON("_id" << 1) << BSON("_id" << 2)))
                  << "ok" << 1.0);
     ASSERT_BSONOBJ_EQ(responseObj, expectedResponse);
+}
+
+TEST(CursorResponseTest, addToBSONInitialResponseWithTenantId) {
+    TenantId tid(OID::gen());
+    NamespaceString nss(tid, "testdb.testcoll");
+
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+
+    for (bool flagStatus : {false, true}) {
+        RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
+                                                                   flagStatus);
+
+        std::vector<BSONObj> batch = {BSON("_id" << 1), BSON("_id" << 2)};
+        CursorResponse response(nss, CursorId(123), batch);
+
+        BSONObjBuilder builder;
+        response.addToBSON(CursorResponse::ResponseType::InitialResponse, &builder);
+        BSONObj responseObj = builder.obj();
+
+        BSONObj expectedResponse =
+            BSON("cursor" << BSON("id" << CursorId(123) << "ns"
+                                       << NamespaceStringUtil::serialize(nss) << "firstBatch"
+                                       << BSON_ARRAY(BSON("_id" << 1) << BSON("_id" << 2)))
+                          << "ok" << 1.0);
+        ASSERT_BSONOBJ_EQ(responseObj, expectedResponse);
+    }
 }
 
 TEST(CursorResponseTest, serializePostBatchResumeToken) {

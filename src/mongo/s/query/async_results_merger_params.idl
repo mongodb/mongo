@@ -46,6 +46,7 @@ types:
         cpp_type: CursorResponse
         serializer: CursorResponse::toBSONAsInitialResponse
         deserializer: CursorResponse::parseFromBSONThrowing
+        deserialize_with_tenant: true
 
 structs:
     RemoteCursor:

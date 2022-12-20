@@ -279,7 +279,8 @@ public:
 
             BSONObj aggResult = CommandHelpers::runCommandDirectly(opCtx, aggRequest);
 
-            uassertStatusOK(ViewResponseFormatter(aggResult).appendAsCountResponse(&result));
+            uassertStatusOK(
+                ViewResponseFormatter(aggResult).appendAsCountResponse(&result, dbName.tenantId()));
             return true;
         }
 

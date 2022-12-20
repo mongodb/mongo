@@ -186,14 +186,17 @@ public:
      * Constructs a CursorResponse from the command BSON response. If 'cmdResponse' is not owned,
      * the second argument should be the object that owns the response.
      */
-    static StatusWith<CursorResponse> parseFromBSON(const BSONObj& cmdResponse,
-                                                    const BSONObj* ownedObj = nullptr);
+    static StatusWith<CursorResponse> parseFromBSON(
+        const BSONObj& cmdResponse,
+        const BSONObj* ownedObj = nullptr,
+        boost::optional<TenantId> tenantId = boost::none);
 
     /**
      * A throwing version of 'parseFromBSON'.
      */
-    static CursorResponse parseFromBSONThrowing(const BSONObj& cmdResponse) {
-        return uassertStatusOK(parseFromBSON(cmdResponse));
+    static CursorResponse parseFromBSONThrowing(boost::optional<TenantId> tenantId,
+                                                const BSONObj& cmdResponse) {
+        return uassertStatusOK(parseFromBSON(cmdResponse, nullptr, tenantId));
     }
 
     /**

@@ -47,6 +47,7 @@
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
@@ -177,8 +178,8 @@ RemoteCursor makeRemoteCursor(ShardId shardId, HostAndPort host, CursorResponse 
 }
 
 void checkSerializedAsyncResultsMergerParams(const AsyncResultsMergerParams& params,
-                                             const AsyncResultsMergerParams& serializedParam) {
-    static const NamespaceString testNss = NamespaceString(boost::none, kMergeCursorNsStr);
+                                             const AsyncResultsMergerParams& serializedParam,
+                                             const NamespaceString& testNss) {
     ASSERT_TRUE(params.getSort());
     ASSERT_BSONOBJ_EQ(*params.getSort(), *serializedParam.getSort());
     ASSERT_EQ(params.getCompareWholeSortKey(), serializedParam.getCompareWholeSortKey());
@@ -221,7 +222,7 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldBeAbleToParseSerializedARMParams) {
     ASSERT(newSpec["$mergeCursors"].type() == BSONType::Object);
     auto newParams = AsyncResultsMergerParams::parse(IDLParserContext("$mergeCursors test"),
                                                      newSpec["$mergeCursors"].Obj());
-    checkSerializedAsyncResultsMergerParams(params, newParams);
+    checkSerializedAsyncResultsMergerParams(params, newParams, getTenantIdNss());
 
     // Test that the $mergeCursors stage will accept the serialized format of
     // AsyncResultsMergerParams.
@@ -468,7 +469,7 @@ TEST_F(DocumentSourceMergeCursorsMultiTenancyTest, ShouldBeAbleToParseSerialized
     // Check that the namespace contains the tenantid prefix.
     ASSERT_EQ(newParams.toBSON()["nss"].str(), expectedTenantNsStr);
     ASSERT_EQ(newParams.getNss(), getTenantIdNss());
-    checkSerializedAsyncResultsMergerParams(params, newParams);
+    checkSerializedAsyncResultsMergerParams(params, newParams, getTenantIdNss());
 
     // Test that the $mergeCursors stage will accept the serialized format of
     // AsyncResultsMergerParams.
@@ -522,7 +523,7 @@ TEST_F(DocumentSourceMergeCursorsMultiTenancyAndFeatureFlagTest,
     // Check that the namespace doesn't contain the tenantid prefix.
     ASSERT_EQ(newParams.toBSON()["nss"].str(), kMergeCursorNsStr);
     ASSERT_EQ(newParams.getNss(), getTenantIdNss());
-    checkSerializedAsyncResultsMergerParams(params, newParams);
+    checkSerializedAsyncResultsMergerParams(params, newParams, getTenantIdNss());
 
     // Test that the $mergeCursors stage will accept the serialized format of
     // AsyncResultsMergerParams.

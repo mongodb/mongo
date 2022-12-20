@@ -169,7 +169,7 @@ public:
 
             result.resetToEmpty();
             ViewResponseFormatter formatter(aggResult);
-            auto formatStatus = formatter.appendAsCountResponse(&result);
+            auto formatStatus = formatter.appendAsCountResponse(&result, boost::none);
             uassertStatusOK(formatStatus);
 
             return true;
