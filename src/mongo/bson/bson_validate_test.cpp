@@ -580,11 +580,21 @@ TEST(BSONValidateFast, BoolValuesAreValidated) {
     ASSERT_OK(validateBSON(obj));
     const BSONElement x = obj["x"];
     // Legal, because we know that the BufBuilder gave
-    // us back some heap memory, which isn't oringinally const.
+    // us back some heap memory, which isn't originally const.
     auto writable = const_cast<char*>(x.value());
-    for (int val = std::numeric_limits<char>::min();
-         val != (int(std::numeric_limits<char>::max()) + 1);
-         ++val) {
+    // The next few lines may look non-optimal and strange, however the assignment of a
+    // signed char to int is not safe, generally speaking. Recall that the numeric_limits
+    // library returns the limit as the type requested and that the signedness of char is
+    // platform-dependent. We know in this case that all values of a byte need to be
+    // tested, so we can hardcode the limits ourselves to sidestep casting issues and
+    // warnings from clang-tidy.
+    //
+    // Loop iteration will be the following for platforms with:
+    //    signed char: -128->127
+    //  unsigned char: 128->255, 0->127
+    int signed_char_min = -128;
+    int signed_char_max = 127;
+    for (int val = signed_char_min; val != signed_char_max + 1; ++val) {
         *writable = static_cast<char>(val);
         if ((val == 0) || (val == 1)) {
             ASSERT_OK(validateBSON(obj));

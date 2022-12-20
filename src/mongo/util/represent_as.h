@@ -208,6 +208,9 @@ boost::optional<Output> representAs(Input number) try {
         } else {
             return {};
         }
+    } else if constexpr ((std::is_same_v<int, Output> && std::is_same_v<signed char, Input>) ||
+                         (std::is_same_v<int, Output> && std::is_same_v<char, Input>)) {
+        return static_cast<Output>(static_cast<unsigned char>(number));
     } else {
         // If number is NaN and Output can also represent NaN, return NaN
         // Note: We need to specifically handle NaN here because of the way
