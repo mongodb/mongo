@@ -35,7 +35,6 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/remove_chunks_gen.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/transaction/transaction_participant.h"
@@ -95,13 +94,13 @@ public:
                 // Write with localWriteConcern because we cannot wait for replication with a
                 // session checked out. The command will wait for majority WC on the epilogue after
                 // the session has been checked in.
-                const auto catalogClient =
-                    ShardingCatalogManager::get(newOpCtxPtr.get())->localCatalogClient();
-                uassertStatusOK(catalogClient->removeConfigDocuments(
-                    newOpCtxPtr.get(),
-                    ChunkType::ConfigNS,
-                    BSON(ChunkType::collectionUUID << collectionUUID),
-                    ShardingCatalogClient::kLocalWriteConcern));
+                uassertStatusOK(
+                    Grid::get(newOpCtxPtr.get())
+                        ->catalogClient()
+                        ->removeConfigDocuments(newOpCtxPtr.get(),
+                                                ChunkType::ConfigNS,
+                                                BSON(ChunkType::collectionUUID << collectionUUID),
+                                                ShardingCatalogClient::kLocalWriteConcern));
             }
 
             // Since we no write happened on this txnNumber, we need to make a dummy write so that

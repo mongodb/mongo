@@ -137,6 +137,7 @@
 #include "mongo/db/s/collection_sharding_state_factory_shard.h"
 #include "mongo/db/s/collection_sharding_state_factory_standalone.h"
 #include "mongo/db/s/config/configsvr_coordinator_service.h"
+#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/config_server_op_observer.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/op_observer_sharding_impl.h"
@@ -739,7 +740,23 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         }
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            initializeGlobalShardingStateForConfigServer(startupOpCtx.get());
+            initializeGlobalShardingStateForMongoD(
+                startupOpCtx.get(), ShardId::kConfigServerId, ConnectionString::forLocal());
+
+            // ShardLocal to use for explicitly local commands on the config server.
+            auto localConfigShard =
+                Grid::get(serviceContext)->shardRegistry()->createLocalConfigShard();
+            auto localCatalogClient = std::make_unique<ShardingCatalogClientImpl>(localConfigShard);
+
+            ShardingCatalogManager::create(
+                startupOpCtx->getServiceContext(),
+                makeShardingTaskExecutor(executor::makeNetworkInterface("AddShard-TaskExecutor")),
+                std::move(localConfigShard),
+                std::move(localCatalogClient));
+
+            if (!gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV()) {
+                Grid::get(startupOpCtx.get())->setShardingInitialized();
+            }
         }
 
         if (serverGlobalParams.clusterRole == ClusterRole::None &&

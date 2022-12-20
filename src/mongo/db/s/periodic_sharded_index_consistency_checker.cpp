@@ -35,7 +35,6 @@
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
@@ -126,8 +125,7 @@ void PeriodicShardedIndexConsistencyChecker::_launchShardedIndexConsistencyCheck
 
             try {
                 long long numShardedCollsWithInconsistentIndexes = 0;
-                const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
-                auto collections = catalogClient->getCollections(
+                auto collections = Grid::get(opCtx)->catalogClient()->getCollections(
                     opCtx, {}, repl::ReadConcernLevel::kLocalReadConcern);
 
                 for (const auto& coll : collections) {

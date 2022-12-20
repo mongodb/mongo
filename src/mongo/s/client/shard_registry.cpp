@@ -33,7 +33,6 @@
 #include "mongo/s/client/shard_registry.h"
 
 #include "mongo/client/replica_set_monitor.h"
-#include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/vector_clock_metadata_hook.h"
@@ -66,7 +65,7 @@ using CallbackArgs = executor::TaskExecutor::CallbackArgs;
 
 ShardRegistry::ShardRegistry(ServiceContext* service,
                              std::unique_ptr<ShardFactory> shardFactory,
-                             const boost::optional<ConnectionString>& configServerCS,
+                             const ConnectionString& configServerCS,
                              std::vector<ShardRemovalHook> shardRemovalHooks)
     : _service(service),
       _shardFactory(std::move(shardFactory)),
@@ -89,12 +88,7 @@ ShardRegistry::ShardRegistry(ServiceContext* service,
                  const Time& timeInStore) { return _lookup(opCtx, key, cachedData, timeInStore); },
           1 /* cacheSize */)) {
 
-    if (_initConfigServerCS) {
-        invariant(_initConfigServerCS->isValid());
-    } else {
-        invariant(gFeatureFlagConfigServerAlwaysShardRemote.isEnabledAndIgnoreFCV());
-    }
-
+    invariant(_initConfigServerCS.isValid());
     _threadPool.startup();
 }
 
@@ -105,24 +99,24 @@ ShardRegistry::~ShardRegistry() {
 void ShardRegistry::init() {
     invariant(!_isInitialized.load());
 
+    LOGV2_DEBUG(5123000,
+                1,
+                "Initializing ShardRegistry",
+                "configServers"_attr = _initConfigServerCS.toString());
+
     /* The creation of the config shard object will intialize the associated RSM monitor that in
      * turn will call ShardRegistry::updateReplSetHosts(). Hence the config shard object MUST be
      * created after the ShardRegistry is fully constructed. This is why `_configShardData`
      * is initialized here rather than in the ShardRegistry constructor.
      */
-    if (_initConfigServerCS) {
-        LOGV2_DEBUG(
-            5123000, 1, "Initializing ShardRegistry", "configServers"_attr = _initConfigServerCS);
-
+    {
         stdx::lock_guard<Latch> lk(_mutex);
-        _initConfigShard(lk, *_initConfigServerCS);
-        _isInitialized.store(true);
-    } else {
-        LOGV2_DEBUG(
-            7208800,
-            1,
-            "Deferring ShardRegistry initialization until local replica set config is known");
+        _configShardData = ShardRegistryData::createWithConfigShardOnly(
+            _shardFactory->createShard(ShardId::kConfigServerId, _initConfigServerCS));
+        _latestConnStrings[_initConfigServerCS.getSetName()] = _initConfigServerCS;
     }
+
+    _isInitialized.store(true);
 }
 
 ShardRegistry::Cache::LookupResult ShardRegistry::_lookup(OperationContext* opCtx,
@@ -277,10 +271,7 @@ ConnectionString ShardRegistry::getConfigServerConnectionString() const {
 
 std::shared_ptr<Shard> ShardRegistry::getConfigShard() const {
     stdx::lock_guard<Latch> lk(_mutex);
-    auto configShard = _configShardData.findShard(ShardId::kConfigServerId);
-    // Note this should only throw if the local node has not learned its replica set config yet.
-    uassert(ErrorCodes::NotYetInitialized, "Config shard has not been set up yet", configShard);
-    return configShard;
+    return _configShardData.findShard(ShardId::kConfigServerId);
 }
 
 StatusWith<std::shared_ptr<Shard>> ShardRegistry::getShard(OperationContext* opCtx,
@@ -407,6 +398,7 @@ void ShardRegistry::updateReplSetHosts(const ConnectionString& givenConnString,
             auto newData = ShardRegistryData::createFromExisting(
                 _configShardData, newConnString, _shardFactory.get());
             _configShardData = newData;
+
         } else {
             auto value = _rsmIncrement.addAndFetch(1);
             LOGV2_DEBUG(4620252,
@@ -418,7 +410,17 @@ void ShardRegistry::updateReplSetHosts(const ConnectionString& givenConnString,
     }
 
     // Schedule a lookup, to incorporate the new connection string.
-    _scheduleLookup();
+    _getDataAsync()
+        .thenRunOn(Grid::get(_service)->getExecutorPool()->getFixedExecutor())
+        .ignoreValue()
+        .getAsync([](const Status& status) {
+            if (!status.isOK()) {
+                LOGV2(4620201,
+                      "Error running reload of ShardRegistry for RSM update, caused by {error}",
+                      "Error running reload of ShardRegistry for RSM update",
+                      "error"_attr = redact(status));
+            }
+        });
 }
 
 std::unique_ptr<Shard> ShardRegistry::createConnection(const ConnectionString& connStr) const {
@@ -553,41 +555,6 @@ std::shared_ptr<Shard> ShardRegistry::getShardForHostNoReload(const HostAndPort&
     }
 
     return data->findByHostAndPort(host);
-}
-
-void ShardRegistry::_scheduleLookup() {
-    _getDataAsync()
-        .thenRunOn(Grid::get(_service)->getExecutorPool()->getFixedExecutor())
-        .ignoreValue()
-        .getAsync([](const Status& status) {
-            if (!status.isOK()) {
-                LOGV2(4620201,
-                      "Error running reload of ShardRegistry for RSM update, caused by {error}",
-                      "Error running reload of ShardRegistry for RSM update",
-                      "error"_attr = redact(status));
-            }
-        });
-}
-
-void ShardRegistry::_initConfigShard(WithLock wl, const ConnectionString& configCS) {
-    _configShardData = ShardRegistryData::createWithConfigShardOnly(
-        _shardFactory->createShard(ShardId::kConfigServerId, configCS));
-    _latestConnStrings[configCS.getSetName()] = configCS;
-}
-
-void ShardRegistry::initConfigShardIfNecessary(const ConnectionString& configCS) {
-    {
-        stdx::lock_guard<Latch> lk(_mutex);
-        if (_isInitialized.load()) {
-            return;
-        }
-
-        _initConfigShard(lk, configCS);
-        _isInitialized.store(true);
-    }
-
-    // Lookup can succeed now that the registry has a real config shard, so schedule one right away.
-    _scheduleLookup();
 }
 
 ////////////// ShardRegistryData //////////////////

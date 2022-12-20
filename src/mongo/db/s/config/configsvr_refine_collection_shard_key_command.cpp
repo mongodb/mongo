@@ -74,7 +74,7 @@ public:
             repl::ReadConcernArgs::get(opCtx) =
                 repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
-            const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
+            const auto catalogClient = Grid::get(opCtx)->catalogClient();
 
             // Validate the given namespace is (i) sharded, (ii) doesn't already have the proposed
             // key, and (iii) has the same epoch as the router that received

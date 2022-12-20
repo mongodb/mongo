@@ -37,6 +37,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_config_version.h"
+#include "mongo/s/grid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -63,7 +64,6 @@ OID ClusterIdentityLoader::getClusterId() {
 }
 
 Status ClusterIdentityLoader::loadClusterId(OperationContext* opCtx,
-                                            ShardingCatalogClient* catalogClient,
                                             const repl::ReadConcernLevel& readConcernLevel) {
     stdx::unique_lock<Latch> lk(_mutex);
     if (_initializationState == InitializationState::kInitialized) {
@@ -82,7 +82,7 @@ Status ClusterIdentityLoader::loadClusterId(OperationContext* opCtx,
     _initializationState = InitializationState::kLoading;
 
     lk.unlock();
-    auto loadStatus = _fetchClusterIdFromConfig(opCtx, catalogClient, readConcernLevel);
+    auto loadStatus = _fetchClusterIdFromConfig(opCtx, readConcernLevel);
     lk.lock();
 
     invariant(_initializationState == InitializationState::kLoading);
@@ -97,9 +97,8 @@ Status ClusterIdentityLoader::loadClusterId(OperationContext* opCtx,
 }
 
 StatusWith<OID> ClusterIdentityLoader::_fetchClusterIdFromConfig(
-    OperationContext* opCtx,
-    ShardingCatalogClient* catalogClient,
-    const repl::ReadConcernLevel& readConcernLevel) {
+    OperationContext* opCtx, const repl::ReadConcernLevel& readConcernLevel) {
+    auto catalogClient = Grid::get(opCtx)->catalogClient();
     auto loadResult = catalogClient->getConfigVersion(opCtx, readConcernLevel);
     if (!loadResult.isOK()) {
         return loadResult.getStatus().withContext("Error loading clusterID");

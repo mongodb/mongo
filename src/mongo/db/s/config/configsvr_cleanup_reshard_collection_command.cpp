@@ -90,7 +90,7 @@ public:
             repl::ReadConcernArgs::get(opCtx) =
                 repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
-            const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
+            const auto catalogClient = Grid::get(opCtx)->catalogClient();
             auto collEntry = catalogClient->getCollection(opCtx, ns());
             if (!collEntry.getReshardingFields()) {
                 // If the collection entry doesn't have resharding fields, we assume that the

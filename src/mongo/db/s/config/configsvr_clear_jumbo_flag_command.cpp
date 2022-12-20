@@ -63,7 +63,7 @@ public:
             repl::ReadConcernArgs::get(opCtx) =
                 repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
-            const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
+            const auto catalogClient = Grid::get(opCtx)->catalogClient();
 
             CollectionType collType;
             try {

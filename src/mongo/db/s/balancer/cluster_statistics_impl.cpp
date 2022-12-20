@@ -37,7 +37,6 @@
 #include "mongo/base/status_with.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/read_preference.h"
-#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/client/shard_registry.h"
@@ -116,9 +115,8 @@ StatusWith<std::vector<ShardStatistics>> ClusterStatisticsImpl::_getStats(
     // db.serverStatus() (mem.mapped) to all shards.
     //
     // TODO: skip unresponsive shards and mark information as stale.
-    const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
-    auto shardsStatus =
-        catalogClient->getAllShards(opCtx, repl::ReadConcernLevel::kMajorityReadConcern);
+    auto shardsStatus = Grid::get(opCtx)->catalogClient()->getAllShards(
+        opCtx, repl::ReadConcernLevel::kMajorityReadConcern);
     if (!shardsStatus.isOK()) {
         return shardsStatus.getStatus();
     }

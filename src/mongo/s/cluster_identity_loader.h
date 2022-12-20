@@ -34,7 +34,6 @@
 #include "mongo/bson/oid.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/platform/mutex.h"
-#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/hierarchical_acquisition.h"
 
@@ -74,9 +73,7 @@ public:
      * If another thread is already in the process of loading the cluster ID, concurrent calls will
      * wait for that thread to finish and then return its results.
      */
-    Status loadClusterId(OperationContext* opCtx,
-                         ShardingCatalogClient* catalogClient,
-                         const repl::ReadConcernLevel& readConcernLevel);
+    Status loadClusterId(OperationContext* opCtx, const repl::ReadConcernLevel& readConcernLevel);
 
     /**
      * Called if the config.version document is rolled back.  Notifies the ClusterIdentityLoader
@@ -96,7 +93,6 @@ private:
      * the version document, and returns it.
      */
     StatusWith<OID> _fetchClusterIdFromConfig(OperationContext* opCtx,
-                                              ShardingCatalogClient* catalogClient,
                                               const repl::ReadConcernLevel& readConcernLevel);
 
     Mutex _mutex =

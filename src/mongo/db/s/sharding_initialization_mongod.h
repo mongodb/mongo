@@ -106,11 +106,6 @@ public:
         _initFunc = std::move(func);
     }
 
-    /**
-     * Installs a listener for RSM change notifications.
-     */
-    void installReplicaSetChangeListener(ServiceContext* service);
-
 private:
     void _initializeShardingEnvironmentOnShardServer(OperationContext* opCtx,
                                                      const ShardIdentity& shardIdentity);
@@ -146,11 +141,6 @@ private:
  */
 void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
                                             const ShardId& shardId,
-                                            const boost::optional<ConnectionString>& configCS);
-
-/**
- * Initialize the sharding components for a config server.
- */
-void initializeGlobalShardingStateForConfigServer(OperationContext* opCtx);
+                                            const ConnectionString& configCS);
 
 }  // namespace mongo

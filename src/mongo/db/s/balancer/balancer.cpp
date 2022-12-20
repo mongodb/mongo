@@ -382,9 +382,8 @@ Status Balancer::rebalanceSingleChunk(OperationContext* opCtx,
         return refreshStatus;
     }
 
-    const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
-    auto coll =
-        catalogClient->getCollection(opCtx, nss, repl::ReadConcernLevel::kMajorityReadConcern);
+    auto coll = Grid::get(opCtx)->catalogClient()->getCollection(
+        opCtx, nss, repl::ReadConcernLevel::kMajorityReadConcern);
     auto maxChunkSize =
         coll.getMaxChunkSizeBytes().value_or(balancerConfig->getMaxChunkSizeBytes());
 
@@ -409,9 +408,8 @@ Status Balancer::moveSingleChunk(OperationContext* opCtx,
         return moveAllowedStatus;
     }
 
-    const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
-    auto coll =
-        catalogClient->getCollection(opCtx, nss, repl::ReadConcernLevel::kMajorityReadConcern);
+    auto coll = Grid::get(opCtx)->catalogClient()->getCollection(
+        opCtx, nss, repl::ReadConcernLevel::kMajorityReadConcern);
     const auto maxChunkSize = getMaxChunkSizeBytes(opCtx, coll);
 
     MoveChunkSettings settings(maxChunkSize, secondaryThrottle, waitForDelete);
@@ -428,9 +426,8 @@ Status Balancer::moveRange(OperationContext* opCtx,
                            const NamespaceString& nss,
                            const ConfigsvrMoveRange& request,
                            bool issuedByRemoteUser) {
-    const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
-    auto coll =
-        catalogClient->getCollection(opCtx, nss, repl::ReadConcernLevel::kMajorityReadConcern);
+    auto coll = Grid::get(opCtx)->catalogClient()->getCollection(
+        opCtx, nss, repl::ReadConcernLevel::kMajorityReadConcern);
     const auto maxChunkSize = getMaxChunkSizeBytes(opCtx, coll);
 
     const auto [fromShardId, min] = [&]() {
@@ -657,7 +654,6 @@ void Balancer::_mainThread() {
     Client::initThread("Balancer");
     auto opCtx = cc().makeOperationContext();
     auto shardingContext = Grid::get(opCtx.get());
-    const auto catalogClient = ShardingCatalogManager::get(opCtx.get())->localCatalogClient();
 
     LOGV2(21856, "CSRS balancer is starting");
 
@@ -771,7 +767,7 @@ void Balancer::_mainThread() {
                 // Collect and apply up-to-date configuration values on the cluster collections.
                 {
                     OperationContext* ctx = opCtx.get();
-                    auto allCollections = catalogClient->getCollections(ctx, {});
+                    auto allCollections = Grid::get(ctx)->catalogClient()->getCollections(ctx, {});
                     for (const auto& coll : allCollections) {
                         _defragmentationPolicy->startCollectionDefragmentation(ctx, coll);
                     }
@@ -1024,7 +1020,7 @@ int Balancer::_moveChunks(OperationContext* opCtx,
                           const MigrateInfoVector& chunksToRebalance,
                           const MigrateInfoVector& chunksToDefragment) {
     auto balancerConfig = Grid::get(opCtx)->getBalancerConfiguration();
-    auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
+    auto catalogClient = Grid::get(opCtx)->catalogClient();
 
     // If the balancer was disabled since we started this round, don't start new chunk moves
     if (_stopRequested() || !balancerConfig->shouldBalance() ||
@@ -1041,7 +1037,7 @@ int Balancer::_moveChunks(OperationContext* opCtx,
                 return *migrateInfo.optMaxChunkSizeBytes;
             }
 
-            auto coll = catalogClient->getCollection(
+            auto coll = Grid::get(opCtx)->catalogClient()->getCollection(
                 opCtx, migrateInfo.nss, repl::ReadConcernLevel::kMajorityReadConcern);
             return coll.getMaxChunkSizeBytes().value_or(balancerConfig->getMaxChunkSizeBytes());
         }();
@@ -1160,10 +1156,9 @@ SharedSemiFuture<void> Balancer::applyLegacyChunkSizeConstraintsOnClusterData(
 
 BalancerCollectionStatusResponse Balancer::getBalancerStatusForNs(OperationContext* opCtx,
                                                                   const NamespaceString& ns) {
-    const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
     CollectionType coll;
     try {
-        coll = catalogClient->getCollection(opCtx, ns, {});
+        coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, ns, {});
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
         uasserted(ErrorCodes::NamespaceNotSharded, "Collection unsharded or undefined");
     }

@@ -51,8 +51,8 @@ UUID retrieveReshardingUUID(OperationContext* opCtx, const NamespaceString& ns) 
     repl::ReadConcernArgs::get(opCtx) =
         repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
-    const auto collEntry =
-        ShardingCatalogManager::get(opCtx)->localCatalogClient()->getCollection(opCtx, ns);
+    const auto catalogClient = Grid::get(opCtx)->catalogClient();
+    const auto collEntry = catalogClient->getCollection(opCtx, ns);
 
     uassert(ErrorCodes::NoSuchReshardCollection,
             "Could not find resharding-related metadata that matches the given namespace",

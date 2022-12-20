@@ -187,26 +187,19 @@ public:
      */
     ShardRegistry(ServiceContext* service,
                   std::unique_ptr<ShardFactory> shardFactory,
-                  const boost::optional<ConnectionString>& configServerCS,
+                  const ConnectionString& configServerCS,
                   std::vector<ShardRemovalHook> shardRemovalHooks = {});
 
     ~ShardRegistry();
 
     /**
-     * Initializes ShardRegistry with config shard, if a connection string was provided at
-     * construction.
+     * Initializes ShardRegistry with config shard.
      *
      * The creation of the config shard object will intialize the associated RSM monitor that in
      * turn will call ShardRegistry::updateReplSetHosts(). Hence the config shard object MUST be
      * created after the ShardRegistry is fully constructed.
      */
     void init();
-
-    /**
-     * Sets up the registry's config shard from the given connection string. Only takes effect if
-     * the registry has not already done this.
-     */
-    void initConfigShardIfNecessary(const ConnectionString& configCS);
 
     /**
      * Startup the periodic reloader of the ShardRegistry.
@@ -419,11 +412,6 @@ private:
     SharedSemiFuture<Cache::ValueHandle> _getDataAsync();
 
     /**
-     * Triggers a reload without waiting for it to complete.
-     */
-    void _scheduleLookup();
-
-    /**
      * Gets the latest-cached copy of the ShardRegistryData.  Never fetches from the config servers.
      * Only used by the "NoReload" accessors.
      * TODO SERVER-50206: Remove usage of this non-causally consistent accessor.
@@ -438,8 +426,6 @@ private:
 
     void _initializeCacheIfNecessary() const;
 
-    void _initConfigShard(WithLock, const ConnectionString& configCS);
-
     SharedSemiFuture<Cache::ValueHandle> _reloadAsync();
 
     ServiceContext* _service{nullptr};
@@ -453,7 +439,7 @@ private:
      * Specified in the ShardRegistry c-tor. It's used only in init() to initialize the config
      * shard.
      */
-    const boost::optional<ConnectionString> _initConfigServerCS;
+    const ConnectionString _initConfigServerCS;
 
     /**
      * A list of callbacks to be called asynchronously when it has been discovered that a shard was
