@@ -31,25 +31,37 @@ global:
 
 imports:
     - "mongo/db/basic_types.idl"
-    - "mongo/crypto/fle_stats.idl"
 
 structs:
-    CompactStructuredEncryptionDataCommandReply:
-        description: "Reply from the {compactStructuredEncryptedData: ...} command"
-        strict: true
-        is_command_reply: true
+    ECOCStats:
+        description: "Stats about records in ECOC compact touched"
         fields:
-            stats: CompactStats
+            read:
+                type: exactInt64
+                default: 0
+            deleted:
+                type: exactInt64
+                default: 0
 
-commands:
-    compactStructuredEncryptionData :
-        description: "Parser for the 'compactStructuredEncryptionData' command"
-        command_name: compactStructuredEncryptionData
-        api_version: ""
-        namespace: concatenate_with_db
-        strict: true
-        reply_type: CompactStructuredEncryptionDataCommandReply
+    ECStats:
+        description: "Stats about records in ECC & ESC compact touched"
         fields:
-            compactionTokens:
-                description: "Map of field path to ECOCToken"
-                type: object
+            read:
+                type: exactInt64
+                default: 0
+            inserted:
+                type: exactInt64
+                default: 0
+            updated:
+                type: exactInt64
+                default: 0
+            deleted:
+                type: exactInt64
+                default: 0
+
+    CompactStats:
+        description: "Stats about records in ECC, ECOC, and ESC compact touched"
+        fields:
+           ecoc: ECOCStats
+           ecc: ECStats
+           esc: ECStats

@@ -75,6 +75,7 @@ extern "C" {
 #include "mongo/crypto/fle_data_frames.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/crypto/fle_fields_util.h"
+#include "mongo/crypto/fle_stats.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/crypto/symmetric_key.h"
 #include "mongo/db/basic_types_gen.h"
@@ -659,6 +660,8 @@ boost::optional<uint64_t> emuBinaryCommon(const FLEStateCollectionReader& reader
                                           tagTokenT tagToken,
                                           valueTokenT valueToken) {
 
+    auto tracker = FLEStatusSection::get().makeEmuBinaryTracker();
+
     // Default search parameters
     uint64_t lambda = 0;
     boost::optional<uint64_t> i = 0;
@@ -725,6 +728,7 @@ boost::optional<uint64_t> emuBinaryCommon(const FLEStateCollectionReader& reader
 #endif
 
     for (uint64_t j = 1; j <= maxIterations; j++) {
+        tracker.recordSuboperation();
         // 9a
         median = ceil(static_cast<double>(max - min) / 2) + min;
 
