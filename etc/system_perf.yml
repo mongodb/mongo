@@ -950,13 +950,24 @@ tasks:
           test_control_params: |
             {scale: 5}
 
-# TODO PERF-3094: Remove this task.
+# TODO PERF-3094: Remove these charts_events tasks.
   - name: column_store_index_charts_events_1G
     priority: 5
     commands:
       - func: f_run_dsi_workload
         vars:
-          test_control: "charts_events_1G"
+          test_control: "charts_events"
+          test_control_params: |
+            {scale: 1}
+
+  - name: column_store_index_charts_events_15G
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "charts_events"
+          test_control_params: |
+            {scale: 15}
 
   - name: non_sharded_workloads
     priority: 5
@@ -1299,6 +1310,7 @@ buildvariants:
       - name: tpch_10_normalized
       - name: tpch_10_denormalized
       - name: column_store_index_charts_events_1G
+      - name: column_store_index_charts_events_15G
       - name: ssb_column_store_comparison
 
   - name: linux-standalone-classic-query-engine
@@ -2472,6 +2484,7 @@ buildvariants:
       - name: tpch_10_normalized
       - name: tpch_10_denormalized
       - name: column_store_index_charts_events_1G
+      - name: column_store_index_charts_events_15G
       - name: ssb_column_store_comparison
 
   - name: linux-standalone-classic-query-engine.2022-11
