@@ -291,27 +291,6 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(Operati
             cmrIndex->idx = indexes[0];
         }
 
-        if (cmdIndex.getHidden()) {
-            // Checks if it is possible to drop the shard key, so it could be possible to hide it
-            if (auto catalogClient = Grid::get(opCtx)->catalogClient()) {
-                try {
-                    auto shardedColl = catalogClient->getCollection(opCtx, nss);
-
-                    if (isLastNonHiddenShardKeyIndex(opCtx,
-                                                     coll,
-                                                     coll->getIndexCatalog(),
-                                                     cmrIndex->idx->indexName(),
-                                                     shardedColl.getKeyPattern().toBSON())) {
-                        return {ErrorCodes::InvalidOptions,
-                                "Cannot hide the only compatible index for this collection's shard "
-                                "key"};
-                    }
-                } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-                    // The collection is unsharded or doesn't exist.
-                }
-            }
-        }
-
         if (cmdIndex.getExpireAfterSeconds()) {
             parsed.numModifications++;
             BSONElement oldExpireSecs = cmrIndex->idx->infoObj().getField("expireAfterSeconds");
@@ -372,6 +351,28 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(Operati
             // are critical to most collection operations.
             if (cmrIndex->idx->isIdIndex()) {
                 return {ErrorCodes::BadValue, "can't hide _id index"};
+            }
+
+            // If the index is not hidden and we are trying to hide it, check if it is possible
+            // to drop the shard key index, so it could be possible to hide it.
+            if (!cmrIndex->idx->hidden() && *cmdIndex.getHidden()) {
+                if (auto catalogClient = Grid::get(opCtx)->catalogClient()) {
+                    try {
+                        auto shardedColl = catalogClient->getCollection(opCtx, nss);
+
+                        if (isLastNonHiddenShardKeyIndex(opCtx,
+                                                         coll,
+                                                         coll->getIndexCatalog(),
+                                                         cmrIndex->idx->indexName(),
+                                                         shardedColl.getKeyPattern().toBSON())) {
+                            return {ErrorCodes::InvalidOptions,
+                                    "Can't hide the only compatible index for this collection's "
+                                    "shard key"};
+                        }
+                    } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                        // The collection is unsharded or doesn't exist.
+                    }
+                }
             }
 
             // Hiding a hidden index or unhiding a visible index should be treated as a no-op.
