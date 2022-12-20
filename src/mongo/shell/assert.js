@@ -845,12 +845,10 @@ assert = (function() {
 
     assert.commandWorkedOrFailedWithCode = function commandWorkedOrFailedWithCode(
         res, errorCodeSet, msg) {
-        try {
-            // First check if the command worked.
-            return assert.commandWorked(res, msg);
-        } catch (e) {
-            // If the command did not work, assert it failed with one of the specified codes.
+        if (!res.ok) {
             return assert.commandFailedWithCode(res, errorCodeSet, msg);
+        } else {
+            return assert.commandWorked(res, msg);
         }
     };
 
