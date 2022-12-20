@@ -167,7 +167,7 @@ public:
         }
 
         NamespaceString ns() const override {
-            return NamespaceString(request().getDbName(), "");
+            return NamespaceStringUtil::deserialize(request().getDbName(), "");
         }
     };
 } setDefaultRWConcernCommand;
@@ -219,7 +219,7 @@ public:
         }
 
         NamespaceString ns() const override {
-            return NamespaceString(request().getDbName(), "");
+            return NamespaceStringUtil::deserialize(request().getDbName(), "");
         }
     };
 } getDefaultRWConcernCommand;

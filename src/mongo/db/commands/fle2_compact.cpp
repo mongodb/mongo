@@ -487,10 +487,10 @@ EncryptedStateCollectionsNamespaces::createFromDataCollection(const Collection& 
 
     namespaces.edcNss = edc.ns();
     namespaces.escNss =
-        NamespaceString(db, cfg.getEscCollection().value_or_eval([&f]() { return f("state"_sd); }));
+       NamespaceStringUtil::deserialize(db, cfg.getEscCollection().value_or_eval([&f]() { return f("state"_sd); }));
     namespaces.eccNss =
-        NamespaceString(db, cfg.getEccCollection().value_or_eval([&f]() { return f("cache"_sd); }));
-    namespaces.ecocNss = NamespaceString(
+       NamespaceStringUtil::deserialize(db, cfg.getEccCollection().value_or_eval([&f]() { return f("cache"_sd); }));
+    namespaces.ecocNss =NamespaceStringUtil::deserialize(
         db, cfg.getEcocCollection().value_or_eval([&f]() { return f("compaction"_sd); }));
 
     if (!missingColl.empty()) {
@@ -501,7 +501,7 @@ EncryptedStateCollectionsNamespaces::createFromDataCollection(const Collection& 
     }
 
     namespaces.ecocRenameNss =
-        NamespaceString(db, namespaces.ecocNss.coll().toString().append(".compact"));
+       NamespaceStringUtil::deserialize(db, namespaces.ecocNss.coll().toString().append(".compact"));
     return namespaces;
 }
 

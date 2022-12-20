@@ -105,11 +105,11 @@ Status AuthzManagerExternalStateLocal::getStoredAuthorizationVersion(OperationCo
 namespace {
 
 NamespaceString getUsersCollection(const boost::optional<TenantId>& tenant) {
-    return NamespaceString(tenant, NamespaceString::kAdminDb, NamespaceString::kSystemUsers);
+    return NamespaceStringUtil::deserialize(tenant, NamespaceString::kAdminDb, NamespaceString::kSystemUsers);
 }
 
 NamespaceString getRolesCollection(const boost::optional<TenantId>& tenant) {
-    return NamespaceString(tenant, NamespaceString::kAdminDb, NamespaceString::kSystemRoles);
+    return NamespaceStringUtil::deserialize(tenant, NamespaceString::kAdminDb, NamespaceString::kSystemRoles);
 }
 
 void serializeResolvedRoles(BSONObjBuilder* user,
@@ -254,7 +254,7 @@ Status AuthzManagerExternalStateLocal::hasAnyUserDocuments(
     OperationContext* opCtx, const boost::optional<TenantId>& tenantId) {
     BSONObj userBSONObj;
     return findOne(opCtx,
-                   NamespaceString(tenantId, AuthorizationManager::usersCollectionNamespace.ns()),
+                  NamespaceStringUtil::deserialize(tenantId, AuthorizationManager::usersCollectionNamespace.ns()),
                    BSONObj(),
                    &userBSONObj);
 }

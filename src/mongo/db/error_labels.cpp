@@ -120,7 +120,7 @@ bool ErrorLabelBuilder::isResumableChangeStreamError() const {
                                                      : CurOp::get(_opCtx)->originatingCommand());
 
     // Get the namespace string from CurOp. We will need it to build the LiteParsedPipeline.
-    const auto nss = NamespaceString{CurOp::get(_opCtx)->getNS()};
+    const auto nss = NamespaceStringUtil::deserialize(CurOp::get(_opCtx)->getNS());
 
     bool apiStrict = APIParameters::get(_opCtx).getAPIStrict().value_or(false);
     // Do enough parsing to confirm that this is a well-formed pipeline with a $changeStream.

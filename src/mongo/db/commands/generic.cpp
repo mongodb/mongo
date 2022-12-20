@@ -83,7 +83,7 @@ public:
             return false;
         }
         NamespaceString ns() const override {
-            return NamespaceString(request().getDbName());
+            return NamespaceStringUtil::deserialize(request().getDbName());
         }
         Reply typedRun(OperationContext* opCtx) final {
             // IMPORTANT: Don't put anything in here that might lock db - including authentication
@@ -115,7 +115,7 @@ public:
         void doCheckAuthorization(OperationContext* opCtx) const override {}
 
         NamespaceString ns() const override {
-            return NamespaceString(request().request.getDatabase());
+            return NamespaceStringUtil::deserialize(request().request.getDatabase());
         }
 
         void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* result) override {
@@ -285,7 +285,7 @@ public:
         }
 
         NamespaceString ns() const final {
-            return NamespaceString(request().getDbName(), "");
+            return NamespaceStringUtil::deserialize(request().getDbName(), "");
         }
     };
 

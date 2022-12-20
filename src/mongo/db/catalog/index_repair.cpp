@@ -176,7 +176,7 @@ int repairMissingIndexEntry(OperationContext* opCtx,
         Snapshotted<BSONObj> doc;
         if (coll->findDoc(opCtx, ridToMove, &doc)) {
 
-            const NamespaceString lostAndFoundNss = NamespaceString(
+            const NamespaceString lostAndFoundNss = NamespaceStringUtil::deserialize(
                 NamespaceString::kLocalDb, "lost_and_found." + coll->uuid().toString());
 
             auto moveStatus = moveRecordToLostAndFound(opCtx, nss, lostAndFoundNss, ridToMove);

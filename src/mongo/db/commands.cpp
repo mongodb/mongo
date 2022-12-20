@@ -209,7 +209,7 @@ void CommandHelpers::auditLogAuthEvent(OperationContext* opCtx,
                 _nss = _invocation->ns();
                 _name = _invocation->definition()->getName();
             } else {
-                _nss = NamespaceString(request.getDatabase());
+                _nss = NamespaceStringUtil::deserialize(request.getDatabase());
                 _name = request.getCommandName().toString();
             }
         }
@@ -269,7 +269,7 @@ std::string CommandHelpers::parseNsFullyQualified(const BSONObj& cmdObj) {
     uassert(ErrorCodes::BadValue,
             str::stream() << "collection name has invalid type " << typeName(first.type()),
             first.canonicalType() == canonicalizeBSONType(mongo::String));
-    const NamespaceString nss(first.valueStringData());
+    const NamespaceString nss = NamespaceStringUtil::deserialize(first.valueStringData());
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "Invalid namespace specified '" << nss.ns() << "'",
             nss.isValid());
@@ -290,7 +290,7 @@ NamespaceString CommandHelpers::parseNsCollectionRequired(const DatabaseName& db
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "collection name has invalid type " << typeName(first.type()),
             first.canonicalType() == canonicalizeBSONType(mongo::String));
-    const NamespaceString nss(dbName, first.valueStringData());
+    const NamespaceString nss = NamespaceStringUtil::deserialize(dbName, first.valueStringData());
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "Invalid namespace specified '" << nss.ns() << "'",
             nss.isValid());
@@ -320,15 +320,15 @@ NamespaceString CommandHelpers::parseNsFromCommand(const DatabaseName& dbName,
                                                    const BSONObj& cmdObj) {
     BSONElement first = cmdObj.firstElement();
     if (first.type() != mongo::String)
-        return NamespaceString(dbName);
-    return NamespaceString(dbName, cmdObj.firstElement().valueStringData());
+        return NamespaceStringUtil::deserialize(dbName);
+    return NamespaceStringUtil::deserialize(dbName, cmdObj.firstElement().valueStringData());
 }
 
 ResourcePattern CommandHelpers::resourcePatternForNamespace(const std::string& ns) {
     if (!NamespaceString::validCollectionComponent(ns)) {
         return ResourcePattern::forDatabaseName(ns);
     }
-    return ResourcePattern::forExactNamespace(NamespaceString(ns));
+    return ResourcePattern::forExactNamespace(NamespaceStringUtil::deserialize(boost::none, ns));
 }
 
 Command* CommandHelpers::findCommand(StringData name) {
@@ -631,7 +631,7 @@ bool CommandHelpers::shouldActivateFailCommandFailPoint(const BSONObj& data,
         return false;  // only activate failpoint on connection with a certain appName
     }
 
-    if (data.hasField("namespace") && (nss != NamespaceString(data.getStringField("namespace")))) {
+    if (data.hasField("namespace") && (nss !=NamespaceStringUtil::deserialize(data.getStringField("namespace")))) {
         return false;
     }
 

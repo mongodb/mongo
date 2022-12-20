@@ -114,7 +114,7 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
         findCommand.getAllowDiskUse().value_or(allowDiskUseByDefault.load()),
         false,  // bypassDocumentValidation
         false,  // isMapReduceCommand
-        findCommand.getNamespaceOrUUID().nss().value_or(NamespaceString()),
+        findCommand.getNamespaceOrUUID().nss().value_or(NamespaceStringUtil::deserialize()),
         findCommand.getLegacyRuntimeConstants(),
         std::move(collator),
         nullptr,  // mongoProcessInterface
@@ -244,7 +244,7 @@ public:
 
         NamespaceString ns() const override {
             // TODO get the ns from the parsed QueryRequest.
-            return NamespaceString(CommandHelpers::parseNsFromCommand(_dbName, _request.body));
+            return NamespaceStringUtil::deserialize(CommandHelpers::parseNsFromCommand(_dbName, _request.body));
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const final {

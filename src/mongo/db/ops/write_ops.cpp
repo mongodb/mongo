@@ -449,7 +449,7 @@ InsertCommandRequest InsertOp::parse(const OpMsgRequest& request) {
 InsertCommandRequest InsertOp::parseLegacy(const Message& msgRaw) {
     DbMessage msg(msgRaw);
 
-    InsertCommandRequest op(NamespaceString(msg.getns()));
+    InsertCommandRequest op(NamespaceStringUtil::deserialize(msg.getns()));
 
     {
         WriteCommandRequestBase writeCommandBase;

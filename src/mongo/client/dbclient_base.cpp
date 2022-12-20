@@ -665,7 +665,7 @@ OpMsgRequest createInsertRequest(const string& ns,
                                  const vector<BSONObj>& v,
                                  bool ordered,
                                  boost::optional<BSONObj> writeConcernObj) {
-    auto nss = NamespaceString(ns);
+    auto nss = NamespaceStringUtil::deserialize(boost::none, ns);
     BSONObjBuilder cmdBuilder;
     cmdBuilder.append("insert", nss.coll());
     cmdBuilder.append("ordered", ordered);
@@ -684,7 +684,7 @@ OpMsgRequest createUpdateRequest(const string& ns,
                                  bool upsert,
                                  bool multi,
                                  boost::optional<BSONObj> writeConcernObj) {
-    auto nss = NamespaceString(ns);
+    auto nss = NamespaceStringUtil::deserialize(boost::none, ns);
 
     BSONObjBuilder cmdBuilder;
     cmdBuilder.append("update", nss.coll());
@@ -704,7 +704,7 @@ OpMsgRequest createRemoveRequest(const string& ns,
                                  bool removeMany,
                                  boost::optional<BSONObj> writeConcernObj) {
     const int limit = removeMany ? 0 : 1;
-    auto nss = NamespaceString(ns);
+    auto nss = NamespaceStringUtil::deserialize(boost::none, ns);
 
     BSONObjBuilder cmdBuilder;
     cmdBuilder.append("delete", nss.coll());

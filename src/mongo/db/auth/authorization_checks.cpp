@@ -225,7 +225,7 @@ Status checkAuthForCreate(OperationContext* opCtx,
 
         // Parse the viewOn namespace and the pipeline. If no pipeline was specified, use the empty
         // pipeline.
-        NamespaceString viewOnNs(ns.db(), optViewOn.value());
+        NamespaceString viewOnNs = NamespaceStringUtil::deserialize(ns.db(), optViewOn.value());
         auto pipeline = cmd.getPipeline().get_value_or(std::vector<BSONObj>());
         BSONArrayBuilder pipelineArray;
         for (const auto& stage : pipeline) {
@@ -266,7 +266,7 @@ Status checkAuthForCollMod(OperationContext* opCtx,
             "Must specify both 'viewOn' and 'pipeline' when modifying a view and auth is enabled");
     }
     if (hasViewOn) {
-        NamespaceString viewOnNs(ns.db(), cmdObj["viewOn"].checkAndGetStringData());
+        NamespaceString viewOnNs = NamespaceStringUtil::deserialize(ns.db(), cmdObj["viewOn"].checkAndGetStringData());
         auto viewPipeline = BSONArray(cmdObj["pipeline"].Obj());
         return checkAuthForCreateOrModifyView(
             opCtx, authSession, ns, viewOnNs, viewPipeline, isMongos);

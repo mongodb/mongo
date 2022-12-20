@@ -50,7 +50,7 @@ void logWriteConflictAndBackoff(int attempt, StringData operation, StringData ns
                   static_cast<size_t>(attempt),
                   "Caught WriteConflictException",
                   "operation"_attr = operation,
-                  logAttrs(NamespaceString(ns)));
+                  logAttrs(NamespaceStringUtil::deserialize(boost::none, ns)));
 }
 
 namespace {
@@ -84,7 +84,7 @@ void handleTemporarilyUnavailableException(OperationContext* opCtx,
                     "reason"_attr = e.reason(),
                     "attempts"_attr = attempts,
                     "operation"_attr = opStr,
-                    logAttrs(NamespaceString(ns)));
+                    logAttrs(NamespaceStringUtil::deserialize(boost::none, ns)));
         temporarilyUnavailableErrorsEscaped.increment(1);
         throw e;
     }
@@ -99,7 +99,7 @@ void handleTemporarilyUnavailableException(OperationContext* opCtx,
                 "attempts"_attr = attempts,
                 "operation"_attr = opStr,
                 "sleepFor"_attr = sleepFor,
-                logAttrs(NamespaceString(ns)));
+                logAttrs(NamespaceStringUtil::deserialize(boost::none, ns)));
     opCtx->sleepFor(sleepFor);
 }
 

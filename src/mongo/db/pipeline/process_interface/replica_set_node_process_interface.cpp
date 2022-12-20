@@ -143,7 +143,7 @@ void ReplicaSetNodeProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
             originalIndexes);
     }
     // internalRenameIfOptionsAndIndexesMatch can only be run against the admin DB.
-    NamespaceString adminNs{NamespaceString::kAdminDb};
+    NamespaceString adminNs = NamespaceStringUtil::deserialize(NamespaceString::kAdminDb);
     auto cmd = CommonMongodProcessInterface::_convertRenameToInternalRename(
         opCtx, sourceNs, targetNs, originalCollectionOptions, originalIndexes);
     uassertStatusOK(_executeCommandOnPrimary(opCtx, adminNs, cmd));
@@ -152,7 +152,7 @@ void ReplicaSetNodeProcessInterface::renameIfOptionsAndIndexesHaveNotChanged(
 void ReplicaSetNodeProcessInterface::createCollection(OperationContext* opCtx,
                                                       const DatabaseName& dbName,
                                                       const BSONObj& cmdObj) {
-    NamespaceString dbNs = NamespaceString(dbName, StringData(""));
+    NamespaceString dbNs =NamespaceStringUtil::deserialize(dbName, StringData(""));
     if (_canWriteLocally(opCtx, dbNs)) {
         return NonShardServerProcessInterface::createCollection(opCtx, dbName, cmdObj);
     }

@@ -174,7 +174,7 @@ std::vector<CollectionImportMetadata> wiredTigerRollbackToStableAndGetMetadata(
         WT_ITEM catalogValue;
         uassertWTOK(mdbCatalogCursor->get_value(mdbCatalogCursor, &catalogValue), session);
         BSONObj rawCatalogEntry(static_cast<const char*>(catalogValue.data));
-        NamespaceString ns{rawCatalogEntry["ns"].String()};
+        NamespaceString ns = NamespaceStringUtil::deserialize(rawCatalogEntry["ns"].String());
         if (!shouldImport(ns)) {
             LOGV2_DEBUG(6113801, 1, "Not importing donor collection", "ns"_attr = ns);
             continue;

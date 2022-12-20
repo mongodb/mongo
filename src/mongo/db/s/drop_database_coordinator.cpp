@@ -128,7 +128,7 @@ void removeDatabaseFromConfigAndUpdatePlacementHistory(
                 const auto currentTime = VectorClock::get(opCtx)->getTime();
                 const auto currentTimestamp = currentTime.clusterTime().asTimestamp();
 
-                NamespacePlacementType placementInfo(NamespaceString(dbName), currentTimestamp, {});
+                NamespacePlacementType placementInfo(NamespaceStringUtil::deserialize(dbName), currentTimestamp, {});
 
                 write_ops::InsertCommandRequest insertPlacementEntry(
                     NamespaceString::kConfigsvrPlacementHistoryNamespace, {placementInfo.toBSON()});

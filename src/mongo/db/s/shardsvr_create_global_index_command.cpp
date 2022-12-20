@@ -80,7 +80,7 @@ public:
         }
 
         NamespaceString ns() const final {
-            return NamespaceString(request().getDbName(), "");
+            return NamespaceStringUtil::deserialize(request().getDbName(), "");
         }
 
         void typedRun(OperationContext* opCtx) {

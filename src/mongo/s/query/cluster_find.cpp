@@ -790,7 +790,7 @@ StatusWith<CursorResponse> ClusterFind::runGetMore(OperationContext* opCtx,
             : Status(ErrorCodes::Unauthorized, "User not authorized to access cursor");
     };
 
-    NamespaceString nss(cmd.getDbName(), cmd.getCollection());
+    NamespaceString nss = NamespaceStringUtil::deserialize(cmd.getDbName(), cmd.getCollection());
     int64_t cursorId = cmd.getCommandParameter();
 
     auto pinnedCursor = cursorManager->checkOutCursor(cursorId, opCtx, authChecker);

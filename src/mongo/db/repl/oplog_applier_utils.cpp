@@ -64,7 +64,7 @@ CachedCollectionProperties::getCollectionProperties(OperationContext* opCtx,
 
     CollectionProperties collProperties;
     if (auto collection = CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
-            opCtx, NamespaceString(ns.key()))) {
+            opCtx,NamespaceStringUtil::deserialize(ns.key()))) {
         collProperties.isCapped = collection->isCapped();
         collProperties.isClustered = collection->isClustered();
         collProperties.collator = collection->getDefaultCollator();
@@ -208,7 +208,7 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
     auto op = entryOrGroupedInserts.getOp();
     // Count each log op application as a separate operation, for reporting purposes
     CurOp individualOp(opCtx);
-    const NamespaceString nss(op.getNss());
+    const NamespaceString nss = op.getNss();
     auto opType = op.getOpType();
 
     if ((gMultitenancySupport && serverGlobalParams.featureCompatibility.isVersionInitialized() &&

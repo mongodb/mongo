@@ -50,7 +50,7 @@ Status validateCollectionStatsNamespaces(const std::vector<std::string> value,
                                          const boost::optional<TenantId>& tenantId) {
     try {
         for (const auto& nsStr : value) {
-            NamespaceString ns(nsStr);
+            NamespaceString ns = NamespaceStringUtil::deserialize(nsStr);
 
             if (!ns.isValid()) {
                 return Status(ErrorCodes::BadValue,
@@ -78,7 +78,7 @@ public:
         for (const auto& nsStr : namespaces) {
 
             try {
-                NamespaceString ns(nsStr);
+                NamespaceString ns = NamespaceStringUtil::deserialize(nsStr);
                 auto result = CommandHelpers::runCommandDirectly(
                     opCtx,
                     OpMsgRequest::fromDBAndBody(

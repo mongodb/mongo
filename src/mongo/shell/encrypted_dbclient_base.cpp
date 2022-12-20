@@ -564,7 +564,7 @@ void EncryptedDBClientBase::compact(JSContext* cx, JS::CallArgs args) {
         uasserted(ErrorCodes::BadValue, "1st param to compact has to be a string");
     }
     std::string fullName = mozjs::ValueWriter(cx, args.get(0)).toString();
-    NamespaceString nss(fullName);
+    NamespaceString nss = NamespaceStringUtil::deserialize(fullName);
     uassert(
         ErrorCodes::BadValue, str::stream() << "Invalid namespace: " << fullName, nss.isValid());
 
@@ -646,7 +646,7 @@ NamespaceString EncryptedDBClientBase::getCollectionNS() {
         uasserted(ErrorCodes::BadValue, "Collection object is incomplete.");
     }
     std::string fullName = mozjs::ValueWriter(_cx, fullNameRooted).toString();
-    NamespaceString fullNameNS = NamespaceString(fullName);
+    NamespaceString fullNameNS =NamespaceStringUtil::deserialize(fullName);
     uassert(ErrorCodes::BadValue,
             str::stream() << "Invalid namespace: " << fullName,
             fullNameNS.isValid());
@@ -786,7 +786,7 @@ void createCollectionObject(JSContext* cx,
                             JS::MutableHandleValue collection) {
     invariant(!client.isNull() && !client.isUndefined());
 
-    auto ns = NamespaceString(nsString);
+    auto ns =NamespaceStringUtil::deserialize(nsString);
     uassert(ErrorCodes::BadValue,
             "Invalid keystore namespace.",
             ns.isValid() && NamespaceString::validCollectionName(ns.coll()));

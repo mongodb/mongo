@@ -96,7 +96,7 @@ struct HandleRequest : public std::enable_shared_from_this<HandleRequest> {
     static NamespaceString getNamespaceString(const DbMessage& dbmsg) {
         if (!dbmsg.messageShouldHaveNs())
             return {};
-        return NamespaceString(dbmsg.getns());
+        return NamespaceStringUtil::deserialize(dbmsg.getns());
     }
 
     const std::shared_ptr<RequestExecutionContext> rec;

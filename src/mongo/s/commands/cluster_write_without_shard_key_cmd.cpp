@@ -106,7 +106,7 @@ public:
                   "clientWriteRequest"_attr = writeCmd,
                   "shardId"_attr = shardId);
 
-            const NamespaceString nss(
+            const NamespaceString nss = NamespaceStringUtil::deserialize(
                 CommandHelpers::parseNsCollectionRequired(ns().dbName(), writeCmd));
             const auto targetDocId = request().getTargetDocId();
             const auto commandName = writeCmd.firstElementFieldNameStringData();
@@ -137,7 +137,7 @@ public:
 
     private:
         NamespaceString ns() const override {
-            return NamespaceString(request().getDbName());
+            return NamespaceStringUtil::deserialize(request().getDbName());
         }
 
         bool supportsWriteConcern() const override {

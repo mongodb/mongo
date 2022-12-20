@@ -258,7 +258,7 @@ MONGO_FAIL_POINT_DEFINE(hangDuringQuiesceMode);
 MONGO_FAIL_POINT_DEFINE(pauseWhileKillingOperationsAtShutdown);
 MONGO_FAIL_POINT_DEFINE(hangBeforeShutdown);
 
-const NamespaceString startupLogCollectionName("local.startup_log");
+const NamespaceString startupLogCollectionName = NamespaceStringUtil::deserialize("local.startup_log");
 
 #ifdef _WIN32
 const ntservice::NtServiceDefaultStrings defaultServiceStrings = {

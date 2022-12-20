@@ -62,8 +62,8 @@ public:
         db.dropCollection(_ns);
     }
 
-    NamespaceString nss() {
-        return NamespaceString(_ns);
+    NamespaceString nss = NamespaceStringUtil::deserialize() {
+        return NamespaceStringUtil::deserialize(_ns);
     }
 
     const char* ns() {

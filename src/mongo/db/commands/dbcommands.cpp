@@ -133,7 +133,7 @@ public:
             return true;
         }
         NamespaceString ns() const final {
-            return NamespaceString(request().getDbName());
+            return NamespaceStringUtil::deserialize(request().getDbName());
         }
         void doCheckAuthorization(OperationContext* opCtx) const final {
             uassert(ErrorCodes::Unauthorized,
@@ -262,7 +262,7 @@ public:
         NamespaceString ns() const final {
             const auto& tenant = request().getDbName().tenantId();
             const auto& nss = request().getCommandParameter();
-            return NamespaceString(tenant, nss.db(), nss.coll());
+            return NamespaceStringUtil::deserialize(tenant, nss.db(), nss.coll());
         }
 
         Reply typedRun(OperationContext* opCtx) {
@@ -623,7 +623,7 @@ public:
         }
 
         NamespaceString ns() const final {
-            return NamespaceString(request().getDbName());
+            return NamespaceStringUtil::deserialize(request().getDbName());
         }
 
         Reply typedRun(OperationContext* opCtx) {

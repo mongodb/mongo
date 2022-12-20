@@ -43,7 +43,7 @@ namespace mongo {
 
 using std::string;
 
-const NamespaceString TagsType::ConfigNS("config.tags");
+const NamespaceString TagsType::ConfigNS = NamespaceStringUtil::deserialize("config.tags");
 
 const BSONField<std::string> TagsType::ns("ns");
 const BSONField<std::string> TagsType::tag("tag");
@@ -66,7 +66,7 @@ StatusWith<TagsType> TagsType::fromBSON(const BSONObj& source) {
             return status;
         }
 
-        tags._ns = NamespaceString(tagsNs);
+        tags._ns =NamespaceStringUtil::deserialize(tagsNs);
     }
 
     {

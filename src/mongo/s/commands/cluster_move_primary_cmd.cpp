@@ -88,7 +88,7 @@ public:
         uassert(ErrorCodes::InvalidNamespace,
                 "'movePrimary' must be of type String",
                 nsElt.type() == BSONType::String);
-        return NamespaceString(dbName.tenantId(), nsElt.str());
+        return NamespaceStringUtil::deserialize(dbName.tenantId(), nsElt.str());
     }
 
     virtual bool run(OperationContext* opCtx,
@@ -104,7 +104,7 @@ public:
         ON_BLOCK_EXIT([opCtx, db] { Grid::get(opCtx)->catalogCache()->purgeDatabase(db); });
 
         ShardMovePrimary movePrimaryRequest;
-        movePrimaryRequest.set_shardsvrMovePrimary(NamespaceString(db));
+        movePrimaryRequest.set_shardsvrMovePrimary(NamespaceStringUtil::deserialize(db));
         movePrimaryRequest.setTo(toShard);
 
         auto catalogCache = Grid::get(opCtx)->catalogCache();

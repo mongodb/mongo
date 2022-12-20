@@ -725,7 +725,7 @@ QueryPlannerAnalysis::determineLookupStrategy(
     const std::map<NamespaceString, SecondaryCollectionInfo>& collectionsInfo,
     bool allowDiskUse,
     const CollatorInterface* collator) {
-    auto foreignCollItr = collectionsInfo.find(NamespaceString(foreignCollName));
+    auto foreignCollItr = collectionsInfo.find(NamespaceStringUtil::deserialize(foreignCollName));
     tassert(5842600,
             str::stream() << "Expected collection info, but found none; target collection: "
                           << foreignCollName,

@@ -50,7 +50,7 @@ public:
     }
 
     NamespaceString parseNs(const DatabaseName& dbName, const BSONObj& cmdObj) const override {
-        return NamespaceString(dbName.tenantId(), CommandHelpers::parseNsFullyQualified(cmdObj));
+        return NamespaceStringUtil::deserialize(dbName.tenantId(), CommandHelpers::parseNsFullyQualified(cmdObj));
     }
 
     bool supportsWriteConcern(const BSONObj& cmd) const override {
@@ -73,7 +73,7 @@ public:
              const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        const NamespaceString nss(parseNs(dbName, cmdObj));
+        const NamespaceString nss = NamespaceStringUtil::deserialize(parseNs(dbName, cmdObj));
         uassert(ErrorCodes::IllegalOperation,
                 "Performing splitVector across dbs isn't supported via mongos",
                 nss.dbName() == dbName);

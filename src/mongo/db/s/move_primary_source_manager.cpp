@@ -142,7 +142,7 @@ Status MovePrimarySourceManager::clone(OperationContext* opCtx) {
     auto clonedCollsArray = cloneCommandResponse.getValue().response["clonedColls"];
     for (const auto& elem : clonedCollsArray.Obj()) {
         if (elem.type() == String) {
-            _clonedColls.push_back(NamespaceString(elem.String()));
+            _clonedColls.push_back(NamespaceStringUtil::deserialize(elem.String()));
         }
     }
 

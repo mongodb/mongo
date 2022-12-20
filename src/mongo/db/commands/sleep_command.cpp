@@ -91,7 +91,7 @@ public:
             opCtx->sleepFor(Milliseconds(millis));
             return;
         }
-        auto nss = NamespaceString(ns);
+        auto nss = NamespaceStringUtil::deserialize(boost::none, ns);
         uassert(
             50961, "lockTarget is not a valid namespace", NamespaceString::validDBName(nss.db()));
 

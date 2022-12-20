@@ -79,7 +79,7 @@ public:
                                  const BSONObj&) const override {
         if (!AuthorizationSession::get(opCtx->getClient())
                  ->isAuthorizedForActionsOnResource(
-                     ResourcePattern::forExactNamespace(NamespaceString("config", "settings")),
+                     ResourcePattern::forExactNamespace(NamespaceStringUtil::deserialize("config", "settings")),
                      _authorizationAction)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }

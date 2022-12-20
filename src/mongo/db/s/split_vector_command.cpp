@@ -82,7 +82,7 @@ public:
     }
 
     NamespaceString parseNs(const DatabaseName& dbName, const BSONObj& cmdObj) const override {
-        return NamespaceString(dbName.tenantId(), CommandHelpers::parseNsFullyQualified(cmdObj));
+        return NamespaceStringUtil::deserialize(dbName.tenantId(), CommandHelpers::parseNsFullyQualified(cmdObj));
     }
 
     bool errmsgRun(OperationContext* opCtx,
@@ -91,7 +91,7 @@ public:
                    string& errmsg,
                    BSONObjBuilder& result) override {
 
-        const NamespaceString nss(parseNs({boost::none, dbname}, jsobj));
+        const NamespaceString nss = NamespaceString(parseNs({boost::none, dbname}, jsobj));
         BSONObj keyPattern = jsobj.getObjectField("keyPattern");
 
         if (keyPattern.isEmpty()) {

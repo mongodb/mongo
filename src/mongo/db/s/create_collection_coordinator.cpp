@@ -394,7 +394,7 @@ void insertCollectionAndPlacementEntries(OperationContext* opCtx,
                 uassertStatusOK(insertCollectionEntryResponse.toStatus());
 
                 NamespacePlacementType placementInfo(
-                    NamespaceString(coll->getNss()),
+                   NamespaceStringUtil::deserialize(coll->getNss()),
                     placementVersion.getTimestamp(),
                     std::vector<mongo::ShardId>(shardIds->cbegin(), shardIds->cend()));
                 placementInfo.setUuid(coll->getUuid());

@@ -82,7 +82,7 @@ public:
         uassert(ErrorCodes::BadValue,
                 str::stream() << "namespace has invalid type " << typeName(first.type()),
                 first.canonicalType() == canonicalizeBSONType(mongo::String));
-        return NamespaceString(dbName.tenantId(), first.valueStringData());
+        return NamespaceStringUtil::deserialize(dbName.tenantId(), first.valueStringData());
     }
 
     bool run(OperationContext* opCtx,

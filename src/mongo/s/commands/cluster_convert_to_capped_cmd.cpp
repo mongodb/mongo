@@ -107,7 +107,7 @@ public:
              const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        const NamespaceString nss(parseNs(dbName, cmdObj));
+        const NamespaceString nss = NamespaceStringUtil::deserialize(parseNs(dbName, cmdObj));
         const auto cri =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
         uassert(ErrorCodes::IllegalOperation,

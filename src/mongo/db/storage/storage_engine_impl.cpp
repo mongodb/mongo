@@ -156,7 +156,7 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx,
         WriteUnitOfWork uow(opCtx);
 
         auto status = _engine->createRecordStore(
-            opCtx, NamespaceString(kCatalogInfo), kCatalogInfo, CollectionOptions());
+            opCtx,NamespaceStringUtil::deserialize(kCatalogInfo), kCatalogInfo, CollectionOptions());
 
         // BadValue is usually caused by invalid configuration string.
         // We still fassert() but without a stack trace.
@@ -168,7 +168,7 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx,
     }
 
     _catalogRecordStore = _engine->getRecordStore(
-        opCtx, NamespaceString(kCatalogInfo), kCatalogInfo, CollectionOptions());
+        opCtx,NamespaceStringUtil::deserialize(kCatalogInfo), kCatalogInfo, CollectionOptions());
     if (shouldLog(::mongo::logv2::LogComponent::kStorageRecovery, kCatalogLogLevel)) {
         LOGV2_FOR_RECOVERY(4615631, kCatalogLogLevel.toInt(), "loadCatalog:");
         _dumpCatalog(opCtx);
@@ -531,7 +531,7 @@ bool StorageEngineImpl::_handleInternalIdent(OperationContext* opCtx,
     // When starting up after a clean shutdown and resumable index builds are supported, find the
     // internal idents that contain the relevant information to resume each index build and recover
     // the state.
-    auto rs = _engine->getRecordStore(opCtx, NamespaceString(""), ident, CollectionOptions());
+    auto rs = _engine->getRecordStore(opCtx,NamespaceStringUtil::deserialize(""), ident, CollectionOptions());
 
     auto cursor = rs->getCursor(opCtx);
     auto record = cursor->next();
@@ -1092,7 +1092,7 @@ StorageEngineImpl::makeTemporaryRecordStoreForResumableIndexBuild(OperationConte
 
 std::unique_ptr<TemporaryRecordStore> StorageEngineImpl::makeTemporaryRecordStoreFromExistingIdent(
     OperationContext* opCtx, StringData ident) {
-    auto rs = _engine->getRecordStore(opCtx, NamespaceString(""), ident, CollectionOptions());
+    auto rs = _engine->getRecordStore(opCtx,NamespaceStringUtil::deserialize(""), ident, CollectionOptions());
     return std::make_unique<DeferredDropRecordStore>(std::move(rs), this);
 }
 

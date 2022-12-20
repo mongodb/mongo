@@ -86,7 +86,7 @@ public:
         }
 
         if (!as->isAuthorizedForActionsOnResource(
-                ResourcePattern::forExactNamespace(NamespaceString("local", "oplog.rs")),
+                ResourcePattern::forExactNamespace(NamespaceStringUtil::deserialize("local", "oplog.rs")),
                 ActionType::collStats)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }

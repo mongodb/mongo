@@ -749,7 +749,7 @@ Status _collModInternal(OperationContext* opCtx,
     auto nss = coll.getNss();
     auto dbName = nss.dbName();
     Lock::CollectionLock systemViewsLock(
-        opCtx, NamespaceString(dbName, NamespaceString::kSystemDotViewsCollectionName), MODE_X);
+        opCtx,NamespaceStringUtil::deserialize(dbName, NamespaceString::kSystemDotViewsCollectionName), MODE_X);
 
     Database* const db = coll.getDb();
 
@@ -829,7 +829,7 @@ Status _collModInternal(OperationContext* opCtx,
                 view->setPipeline(*cmd.getPipeline());
 
             if (!viewOn.empty())
-                view->setViewOn(NamespaceString(dbName, viewOn));
+                view->setViewOn(NamespaceStringUtil::deserialize(dbName, viewOn));
 
             BSONArrayBuilder pipeline;
             for (auto& item : view->pipeline()) {

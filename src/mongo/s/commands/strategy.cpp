@@ -583,7 +583,7 @@ void ParseAndRunCommand::_parseCommand() {
     // namespace db.$cmd.
     _ns.emplace(_invocation->ns().toString());
     auto nss =
-        (request.getDatabase() == *_ns ? NamespaceString(*_ns, "$cmd") : NamespaceString(*_ns));
+        (request.getDatabase() == *_ns ?NamespaceStringUtil::deserialize(*_ns, "$cmd") :NamespaceStringUtil::deserialize(*_ns));
 
     // Fill out all currentOp details.
     CurOp::get(opCtx)->setGenericOpRequestDetails(opCtx, nss, command, request.body, _opType);

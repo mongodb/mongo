@@ -58,7 +58,7 @@ inline bool isDonatedFilesCollection(const NamespaceString& ns) {
 }
 
 inline NamespaceString getDonatedFilesNs(const UUID& migrationUUID) {
-    return NamespaceString(NamespaceString::kConfigDb,
+    return NamespaceStringUtil::deserialize(NamespaceString::kConfigDb,
                            kDonatedFilesPrefix + migrationUUID.toString());
 }
 

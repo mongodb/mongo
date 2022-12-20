@@ -63,7 +63,7 @@ const StringData kIdIdxName = "_id_"_sd;
 }  // namespace
 
 NamespaceString OplogBufferCollection::getDefaultNamespace() {
-    return NamespaceString(kDefaultOplogCollectionNamespace);
+    return NamespaceStringUtil::deserialize(kDefaultOplogCollectionNamespace);
 }
 
 std::tuple<BSONObj, Timestamp> OplogBufferCollection::addIdToDocument(const BSONObj& orig) {

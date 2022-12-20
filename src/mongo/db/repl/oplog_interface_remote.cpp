@@ -81,7 +81,7 @@ std::string OplogInterfaceRemote::toString() const {
 }
 
 std::unique_ptr<OplogInterface::Iterator> OplogInterfaceRemote::makeIterator() const {
-    FindCommandRequest findRequest{NamespaceString{_collectionName}};
+    FindCommandRequest findRequest{NamespaceStringUtil::deserialize(_collectionName)};
     findRequest.setProjection(BSON("ts" << 1 << "t" << 1LL));
     findRequest.setSort(BSON("$natural" << -1));
     findRequest.setBatchSize(_batchSize);

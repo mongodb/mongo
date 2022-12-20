@@ -233,7 +233,7 @@ public:
         if (collectionName.empty())
             collectionName = "fs";
         collectionName += ".chunks";
-        return NamespaceString(dbName, collectionName);
+        return NamespaceStringUtil::deserialize(dbName, collectionName);
     }
 
     Status checkAuthForOperation(OperationContext* opCtx,
@@ -256,7 +256,7 @@ public:
              const DatabaseName& dbName,
              const BSONObj& jsobj,
              BSONObjBuilder& result) override {
-        const NamespaceString nss(parseNs(dbName, jsobj));
+        const NamespaceString nss = NamespaceStringUtil::deserialize(parseNs(dbName, jsobj));
 
         md5digest d;
         md5_state_t st;

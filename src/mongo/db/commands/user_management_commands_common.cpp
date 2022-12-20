@@ -464,7 +464,7 @@ void checkAuthForTypedCommand(OperationContext* opCtx,
             str::stream() << "Not authorized to read " << tempUsersColl,
             tempUsersColl.empty() ||
                 as->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forExactNamespace(NamespaceString(tempUsersColl)),
+                    ResourcePattern::forExactNamespace(NamespaceStringUtil::deserialize(tempUsersColl)),
                     ActionType::find));
 
     auto tempRolesColl = request.getTempRolesCollection();
@@ -472,7 +472,7 @@ void checkAuthForTypedCommand(OperationContext* opCtx,
             str::stream() << "Not authorized to read " << tempRolesColl,
             tempRolesColl.empty() ||
                 as->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forExactNamespace(NamespaceString(tempRolesColl)),
+                    ResourcePattern::forExactNamespace(NamespaceStringUtil::deserialize(tempRolesColl)),
                     ActionType::find));
 }
 

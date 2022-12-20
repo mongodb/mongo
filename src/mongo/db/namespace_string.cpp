@@ -343,7 +343,7 @@ NamespaceString NamespaceString::makeCollectionlessAggregateNSS(const DatabaseNa
 
 NamespaceString NamespaceString::makeChangeCollectionNSS(
     const boost::optional<TenantId>& tenantId) {
-    return NamespaceString{tenantId, kConfigDb, kChangeCollectionName};
+    return NamespaceString(tenantId, kConfigDb, kChangeCollectionName);
 }
 
 NamespaceString NamespaceString::makeGlobalIndexNSS(const UUID& id) {
@@ -353,7 +353,7 @@ NamespaceString NamespaceString::makeGlobalIndexNSS(const UUID& id) {
 
 NamespaceString NamespaceString::makePreImageCollectionNSS(
     const boost::optional<TenantId>& tenantId) {
-    return NamespaceString{tenantId, kConfigDb, kPreImagesCollectionName};
+    return NamespaceString(tenantId, kConfigDb, kPreImagesCollectionName);
 }
 
 std::string NamespaceString::getSisterNS(StringData local) const {

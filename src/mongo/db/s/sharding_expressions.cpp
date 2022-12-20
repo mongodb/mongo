@@ -56,7 +56,7 @@ Value ExpressionInternalOwningShard::evaluate(const Document& root, Variables* v
     }
 
     // Retrieve the values from the incoming document.
-    NamespaceString ns(getExpressionContext()->ns.tenantId(), input["ns"_sd].getStringData());
+    NamespaceString ns = NamespaceStringUtil::deserialize(getExpressionContext()->ns.tenantId(), input["ns"_sd].getStringData());
     const auto shardVersionObj = input["shardVersion"_sd].getDocument().toBson();
     const auto shardVersion = ShardVersion::parse(BSON("" << shardVersionObj).firstElement());
     const auto shardKeyVal = input["shardKeyVal"_sd].getDocument().toBson();

@@ -245,8 +245,8 @@ bool loggedCommandOperatesOnAuthzData(const NamespaceString& nss, const BSONObj&
     } else if (cmdName == "dropDatabase") {
         return true;
     } else if (cmdName == "renameCollection") {
-        const NamespaceString fromNamespace(cmdObj.firstElement().valueStringDataSafe());
-        const NamespaceString toNamespace(cmdObj.getStringField("to"));
+        const NamespaceString fromNamespace = NamespaceStringUtil::deserialize(cmdObj.firstElement().valueStringDataSafe());
+        const NamespaceString toNamespace = NamespaceStringUtil::deserialize(cmdObj.getStringField("to"));
 
         if (fromNamespace.isAdminDB() || toNamespace.isAdminDB()) {
             return isAuthzCollection(fromNamespace.coll()) || isAuthzCollection(toNamespace.coll());

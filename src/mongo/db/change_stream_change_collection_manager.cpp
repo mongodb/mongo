@@ -190,7 +190,7 @@ private:
             if (auto opTypeFieldElem = oplogDoc[repl::OplogEntry::kOpTypeFieldName];
                 opTypeFieldElem &&
                 opTypeFieldElem.String() == repl::OpType_serializer(repl::OpTypeEnum::kDelete)) {
-                return !NamespaceString(nssFieldElem.String()).isChangeCollection();
+                return !NamespaceStringUtil::deserialize(nssFieldElem.String()).isChangeCollection();
             }
         }
 

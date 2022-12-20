@@ -87,7 +87,7 @@ public:
         }
         result.append("cst", BSONArray(pipelineCst.toBson()));
 
-        auto nss = NamespaceString{dbName, ""};
+        auto nss = NamespaceStringUtil::deserialize(dbName, ""};
         auto expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr /*collator*/, nss);
         auto pipeline = cst_pipeline_translation::translatePipeline(pipelineCst, expCtx);
         result.append("ds", pipeline->serializeToBson());

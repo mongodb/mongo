@@ -62,10 +62,10 @@ ReplicationConsistencyMarkersImpl::ReplicationConsistencyMarkersImpl(
     StorageInterface* storageInterface)
     : ReplicationConsistencyMarkersImpl(
           storageInterface,
-          NamespaceString(ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace),
-          NamespaceString(
+         NamespaceStringUtil::deserialize(ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace),
+         NamespaceStringUtil::deserialize(
               ReplicationConsistencyMarkersImpl::kDefaultOplogTruncateAfterPointNamespace),
-          NamespaceString(ReplicationConsistencyMarkersImpl::kDefaultInitialSyncIdNamespace)) {}
+         NamespaceStringUtil::deserialize(ReplicationConsistencyMarkersImpl::kDefaultInitialSyncIdNamespace)) {}
 
 ReplicationConsistencyMarkersImpl::ReplicationConsistencyMarkersImpl(
     StorageInterface* storageInterface,

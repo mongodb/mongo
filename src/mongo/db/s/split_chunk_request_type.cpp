@@ -120,7 +120,7 @@ StatusWith<SplitChunkRequest> SplitChunkRequest::parseFromConfigCommand(const BS
         return status.isOK() && field;
     }();
 
-    auto request = SplitChunkRequest(NamespaceString(ns),
+    auto request = SplitChunkRequest(NamespaceStringUtil::deserialize(boost::none, ns),
                                      std::move(shardName),
                                      std::move(epoch),
                                      std::move(timestamp),

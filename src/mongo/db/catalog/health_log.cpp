@@ -77,5 +77,5 @@ bool HealthLog::log(const HealthLogEntry& entry) {
     return _writer.insertDocument(builder.obj());
 }
 
-const NamespaceString HealthLog::nss("local", "system.healthlog");
+const NamespaceString HealthLog::nss = NamespaceStringUtil::deserialize("local", "system.healthlog");
 }  // namespace mongo

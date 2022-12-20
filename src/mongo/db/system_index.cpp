@@ -64,7 +64,7 @@ std::string v3SystemRolesIndexName;
 IndexSpec v3SystemUsersIndexSpec;
 IndexSpec v3SystemRolesIndexSpec;
 
-const NamespaceString sessionCollectionNamespace("config.system.sessions");
+const NamespaceString sessionCollectionNamespace = NamespaceStringUtil::deserialize("config.system.sessions");
 
 MONGO_INITIALIZER(AuthIndexKeyPatterns)(InitializerContext*) {
     v1SystemUsersKeyPattern = BSON("user" << 1 << "userSource" << 1);

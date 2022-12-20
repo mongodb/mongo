@@ -168,7 +168,7 @@ Status _createView(OperationContext* opCtx,
         // Operations all lock system.views in the end to prevent deadlock.
         Lock::CollectionLock systemViewsLock(
             opCtx,
-            NamespaceString(nss.dbName(), NamespaceString::kSystemDotViewsCollectionName),
+           NamespaceStringUtil::deserialize(nss.dbName(), NamespaceString::kSystemDotViewsCollectionName),
             MODE_X);
 
         auto db = autoDb.ensureDbExists(opCtx);
@@ -189,7 +189,7 @@ Status _createView(OperationContext* opCtx,
 
         // Cannot directly create a view on a system.buckets collection, only by creating a
         // time-series collection.
-        auto viewOnNss = NamespaceString{collectionOptions.viewOn};
+        auto viewOnNss = NamespaceStringUtil::deserialize(collectionOptions.viewOn);
         uassert(ErrorCodes::InvalidNamespace,
                 "Cannot create view on a system.buckets namespace except by creating a time-series "
                 "collection",
@@ -409,7 +409,7 @@ Status _createTimeseries(OperationContext* opCtx,
             AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
         Lock::CollectionLock systemDotViewsLock(
             opCtx,
-            NamespaceString(ns.dbName(), NamespaceString::kSystemDotViewsCollectionName),
+           NamespaceStringUtil::deserialize(ns.dbName(), NamespaceString::kSystemDotViewsCollectionName),
             MODE_X);
         auto db = autoColl.ensureDbExists(opCtx);
 

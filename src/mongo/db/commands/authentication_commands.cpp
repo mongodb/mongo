@@ -100,7 +100,7 @@ public:
         }
 
         NamespaceString ns() const final {
-            return NamespaceString(request().getDbName());
+            return NamespaceStringUtil::deserialize(request().getDbName());
         }
 
         void doCheckAuthorization(OperationContext*) const final {}
@@ -303,7 +303,7 @@ public:
         }
 
         NamespaceString ns() const final {
-            return NamespaceString(request().getDbName());
+            return NamespaceStringUtil::deserialize(request().getDbName());
         }
 
         Reply typedRun(OperationContext* opCtx) final {

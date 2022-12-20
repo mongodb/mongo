@@ -595,7 +595,7 @@ void ShardingRecoveryService::recoverIndexesCatalog(OperationContext* opCtx) {
 
     while (cursor->more()) {
         auto doc = cursor->nextSafe();
-        auto nss = NamespaceString(doc[CollectionType::kNssFieldName].String());
+        auto nss =NamespaceStringUtil::deserialize(doc[CollectionType::kNssFieldName].String());
         auto indexVersion = doc[CollectionType::kIndexVersionFieldName].timestamp();
         for (const auto& idx : doc[kGlobalIndexesFieldName].Array()) {
             auto indexEntry = IndexCatalogType::parse(

@@ -629,8 +629,8 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
                 }
 
                 RenameCollectionInfo info;
-                info.renameTo = NamespaceString(ns);
-                info.renameFrom = NamespaceString(obj.getStringField("to"));
+                info.renameTo = NamespaceStringUtil::deserialize(boost::none, ns);
+                info.renameFrom =NamespaceStringUtil::deserialize(obj.getStringField("to"));
 
                 // Checks if this collection has been renamed before within the same database.
                 // If it has been, update the renameFrom field of the RenameCollectionInfo
@@ -1585,7 +1585,7 @@ void syncFixUp(OperationContext* opCtx,
         boost::optional<NamespaceString> nss =
             CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, uuid);
         if (!nss) {
-            nss = NamespaceString();
+            nss =NamespaceString();
         }
 
         if (RollbackImpl::shouldCreateDataFiles()) {

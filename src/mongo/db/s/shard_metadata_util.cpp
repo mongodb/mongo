@@ -281,7 +281,7 @@ StatusWith<std::vector<ChunkType>> readShardChunks(OperationContext* opCtx,
                                                    boost::optional<long long> limit,
                                                    const OID& epoch,
                                                    const Timestamp& timestamp) {
-    const auto chunksNss = NamespaceString{ChunkType::ShardNSPrefix + nss.ns()};
+    const auto chunksNss = NamespaceStringUtil::deserialize(ChunkType::ShardNSPrefix + nss.ns());
 
     try {
         DBDirectClient client(opCtx);
@@ -322,7 +322,7 @@ Status updateShardChunks(OperationContext* opCtx,
                          const OID& currEpoch) {
     invariant(!chunks.empty());
 
-    const auto chunksNss = NamespaceString{ChunkType::ShardNSPrefix + nss.ns()};
+    const auto chunksNss = NamespaceStringUtil::deserialize(ChunkType::ShardNSPrefix + nss.ns());
 
     try {
         DBDirectClient client(opCtx);

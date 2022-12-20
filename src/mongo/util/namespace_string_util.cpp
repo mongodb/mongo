@@ -90,4 +90,24 @@ NamespaceString NamespaceStringUtil::deserialize(boost::optional<TenantId> tenan
     return nss;
 }
 
+NamespaceString NamespaceStringUtil::deserialize(DatabaseName dbName) {
+    return NamespaceString(dbName);
+}
+
+NamespaceString NamespaceStringUtil::deserialize(DatabaseName dbName, StringData ns) {
+    return NamespaceString(dbName, ns);
+}
+
+NamespaceString deserialize(StringData ns, boost::optional<TenantId> tenantId) {
+    return NamespaceStringUtil::deserialize(tenantId, ns);
+}
+
+NamespaceString deserialize(StringData db, StringData coll, boost::optional<TenantId> tenantId) {
+    return NamespaceStringUtil::deserialize(tenantId, str::stream() << db << "." << coll);
+}
+
+NamespaceString deserialize(boost::optional<TenantId> tenantId, StringData db, StringData coll) {
+    return NamespaceStringUtil::deserialize(tenantId, str::stream() << db << "." << coll);
+}
+
 }  // namespace mongo

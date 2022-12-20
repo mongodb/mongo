@@ -113,7 +113,7 @@ void importCopiedFiles(OperationContext* opCtx, const UUID& migrationId) {
         AutoGetDb dbLock(opCtx, m.ns.dbName(), MODE_IX);
         Lock::CollectionLock systemViewsLock(
             opCtx,
-            NamespaceString(m.ns.dbName(), NamespaceString::kSystemDotViewsCollectionName),
+           NamespaceStringUtil::deserialize(m.ns.dbName(), NamespaceString::kSystemDotViewsCollectionName),
             MODE_X);
         uassertStatusOK(catalog->reloadViews(opCtx, m.ns.dbName()));
     }

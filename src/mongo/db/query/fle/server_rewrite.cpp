@@ -213,7 +213,7 @@ void doFLERewriteInTxn(OperationContext* opCtx,
         opCtx, [sharedBlock](const txn_api::TransactionClient& txnClient, auto txnExec) {
             auto makeCollectionReader = [sharedBlock](FLEQueryInterface* queryImpl,
                                                       const StringData& coll) {
-                NamespaceString nss(sharedBlock->db, coll);
+                NamespaceString nss = NamespaceStringUtil::deserialize(sharedBlock->db, coll);
                 auto docCount = queryImpl->countDocuments(nss);
                 return TxnCollectionReader(docCount, queryImpl, nss);
             };
@@ -242,7 +242,7 @@ BSONObj rewriteEncryptedFilterInsideTxn(FLEQueryInterface* queryImpl,
                                         BSONObj filter,
                                         EncryptedCollScanModeAllowed mode) {
     auto makeCollectionReader = [&](FLEQueryInterface* queryImpl, const StringData& coll) {
-        NamespaceString nss(dbName, coll);
+        NamespaceString nss = NamespaceStringUtil::deserialize(dbName, coll);
         auto docCount = queryImpl->countDocuments(nss);
         return TxnCollectionReader(docCount, queryImpl, nss);
     };

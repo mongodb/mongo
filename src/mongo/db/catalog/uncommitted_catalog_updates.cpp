@@ -211,7 +211,7 @@ void UncommittedCatalogUpdates::replaceViewsForDatabase(const DatabaseName& dbNa
                                                         ViewsForDatabase&& vfdb) {
     _entries.push_back({Entry::Action::kReplacedViewsForDatabase,
                         nullptr,
-                        NamespaceString{dbName, ""},
+                        NamespaceStringUtil::deserialize(dbName, ""),
                         boost::none,
                         {},
                         std::move(vfdb)});

@@ -373,7 +373,7 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
             fassert(40477,
                     bsonExtractStringField(
                         args.updateArgs->criteria, ShardCollectionType::kNssFieldName, &coll));
-            return NamespaceString(coll);
+            return NamespaceStringUtil::deserialize(coll);
         }());
 
         auto enterCriticalSectionFieldNewVal = update_oplog_entry::extractNewValueForField(

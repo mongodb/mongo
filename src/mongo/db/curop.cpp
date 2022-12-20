@@ -354,7 +354,7 @@ void CurOp::setNS_inlock(NamespaceString nss) {
 }
 
 void CurOp::setNS_inlock(const DatabaseName& dbName) {
-    _nss = NamespaceString(dbName);
+    _nss =NamespaceStringUtil::deserialize(dbName);
 }
 
 TickSource::Tick CurOp::startTime() {
@@ -409,7 +409,7 @@ void CurOp::enter_inlock(NamespaceString nss, int dbProfileLevel) {
 }
 
 void CurOp::enter_inlock(const DatabaseName& dbName, int dbProfileLevel) {
-    enter_inlock(NamespaceString(dbName), dbProfileLevel);
+    enter_inlock(NamespaceStringUtil::deserialize(dbName), dbProfileLevel);
 }
 
 void CurOp::raiseDbProfileLevel(int dbProfileLevel) {
@@ -1039,7 +1039,7 @@ void OpDebug::append(OperationContext* opCtx,
 
     b.append("op", logicalOpToString(logicalOp));
 
-    NamespaceString nss = NamespaceString(curop.getNS());
+    NamespaceString nss =NamespaceStringUtil::deserialize(curop.getNS());
     b.append("ns", nss.ns());
 
     appendAsObjOrString(
@@ -1260,7 +1260,7 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
         b.append(field, logicalOpToString(args.op.logicalOp));
     });
     addIfNeeded("ns", [](auto field, auto args, auto& b) {
-        b.append(field, NamespaceString(args.curop.getNS()).ns());
+        b.append(field,NamespaceStringUtil::deserialize(args.curop.getNS()).ns());
     });
 
     addIfNeeded("command", [](auto field, auto args, auto& b) {

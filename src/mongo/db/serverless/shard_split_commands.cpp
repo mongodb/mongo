@@ -109,7 +109,7 @@ public:
         }
 
         NamespaceString ns() const {
-            return NamespaceString(request().getDbName(), "");
+            return NamespaceStringUtil::deserialize(request().getDbName(), "");
         }
     };
 
@@ -187,7 +187,7 @@ public:
         }
 
         NamespaceString ns() const {
-            return NamespaceString(request().getDbName(), "");
+            return NamespaceStringUtil::deserialize(request().getDbName(), "");
         }
     };
 
@@ -264,7 +264,7 @@ public:
         }
 
         NamespaceString ns() const {
-            return NamespaceString(request().getDbName(), "");
+            return NamespaceStringUtil::deserialize(request().getDbName(), "");
         }
     };
 

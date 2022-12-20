@@ -72,6 +72,11 @@ public:
      * eg. deserialize(boost::none, "foo.bar") -> NamespaceString(boost::none, "foo.bar")
      */
     static NamespaceString deserialize(boost::optional<TenantId> tenantId, StringData ns);
+    static NamespaceString deserialize(DatabaseName dbName);
+    static NamespaceString deserialize(DatabaseName dbName, StringData ns);
+    static NamespaceString deserialize(StringData ns, boost::optional<TenantId> tenantId = boost::none);
+    static NamespaceString deserialize(StringData db, StringData coll, boost::optional<TenantId> tenantId = boost::none);
+    static NamespaceString deserialize(boost::optional<TenantId> tenantId, StringData db, StringData coll);
 };
 
 }  // namespace mongo

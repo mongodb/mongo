@@ -796,7 +796,7 @@ NamespaceString extractNs(DatabaseName dbName, const BSONObj& cmdObj) {
             first.canonicalType() == canonicalizeBSONType(mongo::String));
     StringData coll = first.valueStringData();
     uassert(28635, "no collection name specified", !coll.empty());
-    return NamespaceString(dbName, coll);
+    return NamespaceStringUtil::deserialize(dbName, coll);
 }
 
 NamespaceString extractNsFromUUID(OperationContext* opCtx, const UUID& uuid) {
@@ -839,7 +839,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           const auto& ui = entry.getUuid();
           const auto& cmd = entry.getObject();
 
-          const NamespaceString nss(extractNs(entry.getNss().dbName(), cmd));
+          const NamespaceString nss = NamespaceStringUtil::deserialize(extractNs(entry.getNss().dbName(), cmd));
 
           const auto& migrationId = entry.getFromTenantMigration();
           if (migrationId) {
@@ -889,7 +889,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                       "The createIndexes operation is not supported in applyOps mode"};
           }
 
-          const NamespaceString nss(
+          const NamespaceString nss = NamespaceStringUtil::deserialize(
               extractNsFromUUIDorNs(opCtx, entry.getNss(), entry.getUuid(), cmd));
           BSONElement first = cmd.firstElement();
           invariant(first.fieldNameStringData() == "createIndexes");

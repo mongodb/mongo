@@ -60,7 +60,7 @@ NamespaceString _getIndexedNss(const std::vector<BSONObj>& documents) {
     uassert(ErrorCodes::FailedToParse,
             "index write batches may only contain a single index descriptor",
             documents.size() == 1);
-    return NamespaceString(std::move(ns));
+    return NamespaceStringUtil::deserialize(std::move(ns));
 }
 
 void fillPrivileges(const write_ops::InsertCommandRequest& op,

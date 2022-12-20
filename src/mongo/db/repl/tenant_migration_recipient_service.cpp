@@ -98,7 +98,7 @@ constexpr int kCheckpointTsBackupCursorErrorCode = 6929900;
 constexpr int kCloseCursorBeforeOpenErrorCode = 50886;
 
 NamespaceString getOplogBufferNs(const UUID& migrationUUID) {
-    return NamespaceString(NamespaceString::kConfigDb,
+    return NamespaceStringUtil::deserialize(NamespaceString::kConfigDb,
                            kOplogBufferPrefix + migrationUUID.toString());
 }
 
@@ -1423,7 +1423,7 @@ void TenantMigrationRecipientService::Instance::_processCommittedTransactionEntr
 
     MutableOplogEntry noopEntry;
     noopEntry.setOpType(repl::OpTypeEnum::kNoop);
-    auto tenantNss = NamespaceString(getTenantId() + "_", "");
+    auto tenantNss =NamespaceStringUtil::deserialize(getTenantId() + "_", "");
     noopEntry.setNss(tenantNss);
     // Write a fake applyOps with the tenantId as the namespace so that this will be picked
     // up by the committed transaction prefetch pipeline in subsequent migrations.

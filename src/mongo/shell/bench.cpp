@@ -211,7 +211,7 @@ int runQueryWithReadCommands(DBClientBase* conn,
                              BSONObj* objOut) {
     const auto dbName = findCommand->getNamespaceOrUUID()
                             .nss()
-                            .value_or(NamespaceString())
+                            .value_or(NamespaceStringUtil::deserialize())
                             .dbName()
                             .toStringWithTenantId();
 
@@ -248,7 +248,7 @@ int runQueryWithReadCommands(DBClientBase* conn,
 
         GetMoreCommandRequest getMoreRequest(
             cursorResponse.getCursorId(),
-            findCommand->getNamespaceOrUUID().nss().value_or(NamespaceString()).coll().toString());
+            findCommand->getNamespaceOrUUID().nss().value_or(NamespaceStringUtil::deserialize()).coll().toString());
         getMoreRequest.setBatchSize(findCommand->getBatchSize());
         BSONObj getMoreCommandResult;
         uassert(ErrorCodes::CommandFailed,
@@ -278,13 +278,13 @@ void doNothing(const BSONObj&) {}
 Timestamp getLatestClusterTime(DBClientBase* conn) {
     // Sort by descending 'ts' in the query to the oplog collection. The first entry will have the
     // latest cluster time.
-    auto findCommand = std::make_unique<FindCommandRequest>(NamespaceString("local.oplog.rs"));
+    auto findCommand = std::make_unique<FindCommandRequest>(NamespaceStringUtil::deserialize("local.oplog.rs"));
     findCommand->setSort(BSON("$natural" << -1));
     findCommand->setLimit(1LL);
     findCommand->setSingleBatch(true);
     invariant(query_request_helper::validateFindCommandRequest(*findCommand));
     const auto dbName =
-        findCommand->getNamespaceOrUUID().nss().value_or(NamespaceString()).db().toString();
+        findCommand->getNamespaceOrUUID().nss().value_or(NamespaceStringUtil::deserialize()).db().toString();
 
     BSONObj oplogResult;
     int count = runQueryWithReadCommands(conn,
@@ -1020,7 +1020,7 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
         case OpType::FINDONE: {
             BSONObj fixedQuery = fixQuery(this->query, *state->bsonTemplateEvaluator);
             BSONObj result;
-            auto findCommand = std::make_unique<FindCommandRequest>(NamespaceString(this->ns));
+            auto findCommand = std::make_unique<FindCommandRequest>(NamespaceStringUtil::deserialize(this->ns));
             findCommand->setFilter(fixedQuery);
             findCommand->setProjection(this->projection);
             findCommand->setLimit(1LL);
@@ -1107,7 +1107,7 @@ void BenchRunOp::executeOnce(DBClientBase* conn,
             uassert(
                 28824, "cannot use 'options' in combination with read commands", !this->options);
 
-            auto findCommand = std::make_unique<FindCommandRequest>(NamespaceString(this->ns));
+            auto findCommand = std::make_unique<FindCommandRequest>(NamespaceStringUtil::deserialize(this->ns));
             findCommand->setFilter(fixedQuery);
             findCommand->setProjection(this->projection);
             if (this->skip) {

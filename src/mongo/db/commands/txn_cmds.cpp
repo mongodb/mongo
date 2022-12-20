@@ -100,7 +100,7 @@ public:
         }
 
         NamespaceString ns() const final {
-            return NamespaceString(request().getDbName());
+            return NamespaceStringUtil::deserialize(request().getDbName());
         }
 
         Reply typedRun(OperationContext* opCtx) final {
@@ -229,7 +229,7 @@ public:
         }
 
         NamespaceString ns() const final {
-            return NamespaceString(request().getDbName());
+            return NamespaceStringUtil::deserialize(request().getDbName());
         }
 
         Reply typedRun(OperationContext* opCtx) final {

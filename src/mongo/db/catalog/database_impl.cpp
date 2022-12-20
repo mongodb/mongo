@@ -345,7 +345,7 @@ void DatabaseImpl::getStats(OperationContext* opCtx,
 Status DatabaseImpl::dropView(OperationContext* opCtx, NamespaceString viewName) const {
     dassert(opCtx->lockState()->isDbLockedForMode(name(), MODE_IX));
     dassert(opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_IX));
-    dassert(opCtx->lockState()->isCollectionLockedForMode(NamespaceString(_viewsName), MODE_X));
+    dassert(opCtx->lockState()->isCollectionLockedForMode(_viewsName, MODE_X));
 
     Status status = CollectionCatalog::get(opCtx)->dropView(opCtx, viewName);
     Top::get(opCtx->getServiceContext()).collectionDropped(viewName);
@@ -699,11 +699,11 @@ Status DatabaseImpl::createView(OperationContext* opCtx,
                                 const CollectionOptions& options) const {
     dassert(opCtx->lockState()->isDbLockedForMode(name(), MODE_IX));
     dassert(opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_IX));
-    dassert(opCtx->lockState()->isCollectionLockedForMode(NamespaceString(_viewsName), MODE_X));
+    dassert(opCtx->lockState()->isCollectionLockedForMode(_viewsName, MODE_X));
 
     invariant(options.isView());
 
-    NamespaceString viewOnNss(viewName.db(), options.viewOn);
+    NamespaceString viewOnNss = NamespaceStringUtil::deserialize(viewName.db(), options.viewOn);
     _checkCanCreateCollection(opCtx, viewName, options);
 
     BSONArray pipeline(options.pipeline);

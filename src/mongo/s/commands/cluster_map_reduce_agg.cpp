@@ -78,10 +78,10 @@ auto makeExpressionContext(OperationContext* opCtx,
     StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
     resolvedNamespaces.try_emplace(nss.coll(), nss, std::vector<BSONObj>{});
     if (parsedMr.getOutOptions().getOutputType() != OutputType::InMemory) {
-        auto outNss = NamespaceString{parsedMr.getOutOptions().getDatabaseName()
+        auto outNss = NamespaceStringUtil::deserialize(parsedMr.getOutOptions().getDatabaseName()
                                           ? *parsedMr.getOutOptions().getDatabaseName()
                                           : parsedMr.getNamespace().db(),
-                                      parsedMr.getOutOptions().getCollectionName()};
+                                      parsedMr.getOutOptions().getCollectionName());
         resolvedNamespaces.try_emplace(outNss.coll(), outNss, std::vector<BSONObj>{});
     }
     auto runtimeConstants = Variables::generateRuntimeConstants(opCtx);
@@ -153,8 +153,8 @@ bool runAggregationMapReduce(OperationContext* opCtx,
     auto parsedMr = MapReduceCommandRequest::parse(IDLParserContext("mapReduce"), cmd);
     stdx::unordered_set<NamespaceString> involvedNamespaces{parsedMr.getNamespace()};
     auto hasOutDB = parsedMr.getOutOptions().getDatabaseName();
-    auto resolvedOutNss = NamespaceString{hasOutDB ? *hasOutDB : parsedMr.getNamespace().db(),
-                                          parsedMr.getOutOptions().getCollectionName()};
+    auto resolvedOutNss = NamespaceStringUtil::deserialize(hasOutDB ? *hasOutDB : parsedMr.getNamespace().db(),
+                                          parsedMr.getOutOptions().getCollectionName());
 
     if (_sampler.tick()) {
         LOGV2_WARNING(5725800,

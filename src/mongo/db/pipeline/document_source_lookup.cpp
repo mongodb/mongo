@@ -104,7 +104,7 @@ NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
             elem.type() == BSONType::String || elem.type() == BSONType::Object);
 
     if (elem.type() == BSONType::String) {
-        return NamespaceString(defaultDb, elem.valueStringData());
+        return NamespaceStringUtil::deserialize(defaultDb, elem.valueStringData());
     }
 
     // Valdate the db and coll names.
@@ -112,7 +112,7 @@ NamespaceString parseLookupFromAndResolveNamespace(const BSONElement& elem,
         IDLParserContext{elem.fieldNameStringData(), false /* apiStrict */, defaultDb.tenantId()},
         elem.embeddedObject());
     // TODO SERVER-62491 Use system tenantId to construct nss if running in serverless.
-    auto nss = NamespaceString(spec.getDb().value_or(DatabaseName()), spec.getColl().value_or(""));
+    auto nss =NamespaceStringUtil::deserialize(spec.getDb().value_or(DatabaseName()), spec.getColl().value_or(""));
     uassert(
         ErrorCodes::FailedToParse,
         str::stream() << "$lookup with syntax {from: {db:<>, coll:<>},..} is not supported for db: "

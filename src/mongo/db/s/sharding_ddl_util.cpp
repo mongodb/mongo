@@ -199,7 +199,7 @@ void deleteCollection(OperationContext* opCtx,
                 auto now = VectorClock::get(getGlobalServiceContext())->getTime();
                 const auto clusterTime = now.clusterTime().asTimestamp();
                 NamespacePlacementType placementInfo(
-                    NamespaceString(nss), clusterTime, {} /*shards*/);
+                   NamespaceStringUtil::deserialize(nss), clusterTime, {} /*shards*/);
                 placementInfo.setUuid(uuid);
                 write_ops::InsertCommandRequest insertPlacementEntry(
                     NamespaceString::kConfigsvrPlacementHistoryNamespace, {placementInfo.toBSON()});

@@ -48,14 +48,14 @@ constexpr StringData AuthorizationManager::V1_USER_NAME_FIELD_NAME;
 constexpr StringData AuthorizationManager::V1_USER_SOURCE_FIELD_NAME;
 
 
-const NamespaceString AuthorizationManager::adminCommandNamespace("admin.$cmd");
-const NamespaceString AuthorizationManager::rolesCollectionNamespace("admin.system.roles");
-const NamespaceString AuthorizationManager::usersBackupCollectionNamespace(
+const NamespaceString AuthorizationManager::adminCommandNamespace = NamespaceStringUtil::deserialize("admin.$cmd");
+const NamespaceString AuthorizationManager::rolesCollectionNamespace = NamespaceStringUtil::deserialize("admin.system.roles");
+const NamespaceString AuthorizationManager::usersBackupCollectionNamespace = NamespaceStringUtil::deserialize(
     "admin.system.backup_users");
-const NamespaceString AuthorizationManager::usersCollectionNamespace("admin.system.users");
-const NamespaceString AuthorizationManager::versionCollectionNamespace("admin.system.version");
-const NamespaceString AuthorizationManager::defaultTempUsersCollectionNamespace("admin.tempusers");
-const NamespaceString AuthorizationManager::defaultTempRolesCollectionNamespace("admin.temproles");
+const NamespaceString AuthorizationManager::usersCollectionNamespace = NamespaceStringUtil::deserialize("admin.system.users");
+const NamespaceString AuthorizationManager::versionCollectionNamespace = NamespaceStringUtil::deserialize("admin.system.version");
+const NamespaceString AuthorizationManager::defaultTempUsersCollectionNamespace = NamespaceStringUtil::deserialize("admin.tempusers");
+const NamespaceString AuthorizationManager::defaultTempRolesCollectionNamespace = NamespaceStringUtil::deserialize("admin.temproles");
 
 const Status AuthorizationManager::authenticationFailedStatus(ErrorCodes::AuthenticationFailed,
                                                               "Authentication failed.");

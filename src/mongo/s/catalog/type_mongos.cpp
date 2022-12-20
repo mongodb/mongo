@@ -34,9 +34,10 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+#include "mongo/util/namespace_string_util.h"
 
 namespace mongo {
-const NamespaceString MongosType::ConfigNS("config.mongos");
+const NamespaceString MongosType::ConfigNS = NamespaceStringUtil::deserialize("config.mongos");
 
 const BSONField<std::string> MongosType::name("_id");
 const BSONField<Date_t> MongosType::created("created");

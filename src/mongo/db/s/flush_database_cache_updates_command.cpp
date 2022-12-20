@@ -116,7 +116,7 @@ public:
          * ns() is the database to flush, with no collection.
          */
         NamespaceString ns() const {
-            return NamespaceString(_dbName(), "");
+            return NamespaceStringUtil::deserialize(_dbName(), "");
         }
 
         bool supportsWriteConcern() const override {

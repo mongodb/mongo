@@ -79,7 +79,7 @@ public:
 
     private:
         NamespaceString ns() const override {
-            return NamespaceString(request().getDbName());
+            return NamespaceStringUtil::deserialize(request().getDbName());
         }
 
         bool supportsWriteConcern() const override {

@@ -100,7 +100,7 @@ Status createIndex(OperationContext* opCtx, StringData ns, const BSONObj& keys, 
 }
 
 Status createIndexFromSpec(OperationContext* opCtx, StringData ns, const BSONObj& spec) {
-    NamespaceString nss(ns);
+    NamespaceString nss = NamespaceStringUtil::deserialize(ns);
     AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IX);
     {
         Lock::CollectionLock collLock(opCtx, nss, MODE_X);

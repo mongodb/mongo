@@ -1940,7 +1940,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
                                        &collection,
                                        policy,
                                        defaultPlannerOptions,
-                                       NamespaceString(),
+                                      NamespaceString(),
                                        std::move(querySolution));
 }
 
@@ -2118,7 +2118,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
                                        &collection,
                                        policy,
                                        defaultPlannerOptions,
-                                       NamespaceString(),
+                                      NamespaceString(),
                                        std::move(querySolution));
 }
 
@@ -2464,7 +2464,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
         coll,
         yieldPolicy,
         plannerOptions,
-        NamespaceString(),
+       NamespaceString(),
         std::move(querySolution),
         /* metric stored in PlanExplainer via PlanExecutor construction*/
         opCtx->getElapsedQueryPlanningTime());
@@ -2785,7 +2785,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorForS
                                             coll,
                                             yieldPolicy,
                                             plannerParams.options,
-                                            NamespaceString(),
+                                           NamespaceString(),
                                             std::move(soln));
     if (exec.isOK()) {
         LOGV2_DEBUG(20931,
@@ -2839,7 +2839,7 @@ getExecutorDistinctFromIndexSolutions(OperationContext* opCtx,
                                                     coll,
                                                     yieldPolicy,
                                                     plannerOptions,
-                                                    NamespaceString(),
+                                                   NamespaceString(),
                                                     std::move(currentSolution));
             if (exec.isOK()) {
                 LOGV2_DEBUG(

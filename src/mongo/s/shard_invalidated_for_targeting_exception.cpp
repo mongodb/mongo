@@ -33,6 +33,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/namespace_string_util.h"
 
 namespace mongo {
 namespace {
@@ -53,7 +54,7 @@ std::shared_ptr<const ErrorExtraInfo> ShardInvalidatedForTargetingInfo::parse(co
 
 ShardInvalidatedForTargetingInfo ShardInvalidatedForTargetingInfo::parseFromCommandError(
     const BSONObj& obj) {
-    return ShardInvalidatedForTargetingInfo(NamespaceString(obj["nss"].String()));
+    return ShardInvalidatedForTargetingInfo(NamespaceStringUtil::deserialize(obj["nss"].String()));
 }
 
 }  // namespace mongo

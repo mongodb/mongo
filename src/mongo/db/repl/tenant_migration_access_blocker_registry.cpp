@@ -295,7 +295,7 @@ std::shared_ptr<TenantMigrationDonorAccessBlocker>
 TenantMigrationAccessBlockerRegistry::_getAllTenantDonorAccessBlocker(
     WithLock lk, const DatabaseName& dbName) const {
     // No-op oplog entries, e.g. for linearizable reads, use namespace "".
-    bool isInternal = (dbName.db() == "" || NamespaceString(dbName).isOnInternalDb());
+    bool isInternal = (dbName.db() == "" ||NamespaceStringUtil::deserialize(dbName).isOnInternalDb());
     if (isInternal) {
         return nullptr;
     }

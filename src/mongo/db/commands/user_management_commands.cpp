@@ -225,7 +225,7 @@ Status checkOkayToGrantPrivilegesToRole(const RoleName& role, const PrivilegeVec
 
 NamespaceString usersNSS(const boost::optional<TenantId>& tenant) {
     if (tenant) {
-        return NamespaceString(tenant, NamespaceString::kAdminDb, NamespaceString::kSystemUsers);
+        return NamespaceStringUtil::deserialize(tenant, NamespaceString::kAdminDb, NamespaceString::kSystemUsers);
     } else {
         return AuthorizationManager::usersCollectionNamespace;
     }
@@ -233,7 +233,7 @@ NamespaceString usersNSS(const boost::optional<TenantId>& tenant) {
 
 NamespaceString rolesNSS(const boost::optional<TenantId>& tenant) {
     if (tenant) {
-        return NamespaceString(tenant, NamespaceString::kAdminDb, NamespaceString::kSystemRoles);
+        return NamespaceStringUtil::deserialize(tenant, NamespaceString::kAdminDb, NamespaceString::kSystemRoles);
     } else {
         return AuthorizationManager::rolesCollectionNamespace;
     }
@@ -954,9 +954,9 @@ public:
         NamespaceString ns() const final {
             const auto& cmd = request();
             if constexpr (hasGetCmdParamStringData<RequestT>) {
-                return NamespaceString(cmd.getDbName(), cmd.getCommandParameter());
+                return NamespaceStringUtil::deserialize(cmd.getDbName(), cmd.getCommandParameter());
             }
-            return NamespaceString(cmd.getDbName(), "");
+            return NamespaceStringUtil::deserialize(cmd.getDbName(), "");
         }
     };
 
@@ -2128,7 +2128,7 @@ public:
         }
 
         NamespaceString ns() const final {
-            return NamespaceString(request().getDbName(), "");
+            return NamespaceStringUtil::deserialize(request().getDbName(), "");
         }
     };
 
@@ -2310,7 +2310,7 @@ void _processUsers(OperationContext* opCtx,
 
     uassertStatusOK(queryAuthzDocument(
         opCtx,
-        NamespaceString(usersCollName),
+       NamespaceStringUtil::deserialize(usersCollName),
         db.empty() ? BSONObj() : BSON(AuthorizationManager::USER_DB_FIELD_NAME << db),
         BSONObj(),
         [&](const BSONObj& userObj) {
@@ -2438,7 +2438,7 @@ void _processRoles(OperationContext* opCtx,
 
     uassertStatusOK(queryAuthzDocument(
         opCtx,
-        NamespaceString(rolesCollName),
+       NamespaceStringUtil::deserialize(rolesCollName),
         db.empty() ? BSONObj() : BSON(AuthorizationManager::ROLE_DB_FIELD_NAME << db),
         BSONObj(),
         [&](const BSONObj& roleObj) {

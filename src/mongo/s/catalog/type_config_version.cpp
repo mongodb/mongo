@@ -35,10 +35,12 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
+#include "mongo/util/namespace_string_util.h"
+
 
 namespace mongo {
 
-const NamespaceString VersionType::ConfigNS("config.version");
+const NamespaceString VersionType::ConfigNS = NamespaceStringUtil::deserialize("config.version");
 
 const BSONField<int> VersionType::minCompatibleVersion("minCompatibleVersion");
 const BSONField<int> VersionType::currentVersion("currentVersion");

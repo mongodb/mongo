@@ -83,7 +83,7 @@ public:
         uassert(ErrorCodes::InvalidNamespace,
                 "'movePrimary' must be of type String",
                 nsElt.type() == BSONType::String);
-        return NamespaceString(dbName.tenantId(), nsElt.str());
+        return NamespaceStringUtil::deserialize(dbName.tenantId(), nsElt.str());
     }
 
     bool run(OperationContext* opCtx,

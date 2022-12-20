@@ -486,7 +486,7 @@ void processFieldsForInsert(FLEQueryInterface* queryImpl,
                             int32_t* pStmtId,
                             bool bypassDocumentValidation) {
 
-    NamespaceString nssEsc(edcNss.db(), efc.getEscCollection().value());
+    NamespaceString nssEsc = NamespaceStringUtil::deserialize(edcNss.db(), efc.getEscCollection().value());
 
     auto docCount = queryImpl->countDocuments(nssEsc);
 
@@ -548,7 +548,7 @@ void processFieldsForInsert(FLEQueryInterface* queryImpl,
             checkWriteErrors(escInsertReply);
 
 
-            NamespaceString nssEcoc(edcNss.db(), efc.getEcocCollection().value());
+            NamespaceString nssEcoc = NamespaceStringUtil::deserialize(edcNss.db(), efc.getEcocCollection().value());
 
             // TODO - should we make this a batch of ECOC updates?
             auto ecocInsertReply = uassertStatusOK(queryImpl->insertDocument(
@@ -644,7 +644,7 @@ void processRemovedFields(FLEQueryInterface* queryImpl,
                           const std::vector<EDCIndexedFields>& deletedFields,
                           int32_t* pStmtId) {
 
-    NamespaceString eccNss(edcNss.db(), efc.getEccCollection().value());
+    NamespaceString eccNss = NamespaceStringUtil::deserialize(edcNss.db(), efc.getEccCollection().value());
 
     auto docCount = queryImpl->countDocuments(eccNss);
 

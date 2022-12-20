@@ -34,6 +34,7 @@
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/namespace_string_util.h"
 
 namespace mongo {
 namespace {
@@ -48,7 +49,7 @@ void CannotImplicitlyCreateCollectionInfo::serialize(BSONObjBuilder* bob) const 
 
 std::shared_ptr<const ErrorExtraInfo> CannotImplicitlyCreateCollectionInfo::parse(
     const BSONObj& obj) {
-    return std::make_shared<CannotImplicitlyCreateCollectionInfo>(NamespaceString(obj["ns"].str()));
+    return std::make_shared<CannotImplicitlyCreateCollectionInfo>(NamespaceStringUtil::deserialize(obj["ns"].str()));
 }
 
 }  // namespace mongo

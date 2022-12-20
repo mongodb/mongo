@@ -193,7 +193,7 @@ struct HandleRequest {
             auto& dbmsg = getDbMessage();
             if (!dbmsg.messageShouldHaveNs())
                 return {};
-            return NamespaceString(dbmsg.getns());
+            return NamespaceStringUtil::deserialize(dbmsg.getns());
         }
 
         void assertValidNsString() {
@@ -1980,7 +1980,7 @@ void curOpCommandSetup(OperationContext* opCtx, const OpMsgRequest& request) {
 
     // We construct a legacy $cmd namespace so we can fill in curOp using
     // the existing logic that existed for OP_QUERY commands
-    NamespaceString nss(
+    NamespaceString nss = NamespaceStringUtil::deserialize(
         DatabaseNameUtil::deserialize(request.getValidatedTenantId(), request.getDatabase()),
         "$cmd");
 

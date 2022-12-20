@@ -101,7 +101,7 @@ public:
             return false;
         }
         NamespaceString ns() const final {
-            return NamespaceString(request().getDbName());
+            return NamespaceStringUtil::deserialize(request().getDbName());
         }
         void doCheckAuthorization(OperationContext* opCtx) const final {
             assertUserCanRunValidate(opCtx, request());
@@ -140,7 +140,7 @@ public:
                 if (validateCmdRequest.getCollection()) {
                     if (!_validateNamespace(
                             opCtx,
-                            NamespaceString(dbName.db(), *validateCmdRequest.getCollection()))) {
+                           NamespaceStringUtil::deserialize(dbName.db(), *validateCmdRequest.getCollection()))) {
                         return;
                     }
                     continue;

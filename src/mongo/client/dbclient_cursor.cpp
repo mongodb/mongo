@@ -224,7 +224,7 @@ void DBClientCursor::dataReceived(const Message& reply, bool& retry, string& hos
 
     // TODO SERVER-70067: Get nss from the parsed cursor directly as it already has the tenant
     // information.
-    _ns = NamespaceString(
+    _ns = NamespaceStringUtil::deserialize(
         _ns.tenantId(),  // always reuse the request's tenant in case no tenant in the response.
         cr.getNSS().toString());  // find command can change the ns to use for getMores.
     // Store the resume token, if we got one.
@@ -345,7 +345,7 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
       _originalHost(_client->getServerAddress()),
       _nsOrUuid(nsOrUuid),
       _isInitialized(true),
-      _ns(nsOrUuid.nss() ? *nsOrUuid.nss() : NamespaceString(nsOrUuid.dbName().value())),
+      _ns(nsOrUuid.nss() ? *nsOrUuid.nss() :NamespaceStringUtil::deserialize(nsOrUuid.dbName().value())),
       _cursorId(cursorId),
       _isExhaust(isExhaust),
       _operationTime(operationTime),
@@ -358,7 +358,7 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
     : _client(client),
       _originalHost(_client->getServerAddress()),
       _nsOrUuid(findRequest.getNamespaceOrUUID()),
-      _ns(_nsOrUuid.nss() ? *_nsOrUuid.nss() : NamespaceString(_nsOrUuid.dbName().value())),
+      _ns(_nsOrUuid.nss() ? *_nsOrUuid.nss() :NamespaceStringUtil::deserialize(_nsOrUuid.dbName().value())),
       _batchSize(findRequest.getBatchSize().value_or(0)),
       _findRequest(std::move(findRequest)),
       _readPref(readPref),

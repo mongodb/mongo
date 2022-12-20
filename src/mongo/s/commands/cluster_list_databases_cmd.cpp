@@ -72,7 +72,7 @@ public:
         void doCheckAuthorization(OperationContext*) const final {}
 
         NamespaceString ns() const final {
-            return NamespaceString(request().getDbName(), "");
+            return NamespaceStringUtil::deserialize(request().getDbName(), "");
         }
 
         ListDatabasesReply typedRun(OperationContext* opCtx) final {

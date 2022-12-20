@@ -108,7 +108,7 @@ std::set<std::string> getDatabasesToRestore(OperationContext* opCtx) {
             continue;
         }
 
-        NamespaceString nss(doc.getStringField("ns"));
+        NamespaceString nss = NamespaceStringUtil::deserialize(doc.getStringField("ns"));
         databasesToRestore.emplace(nss.db());
     }
 
@@ -120,15 +120,15 @@ std::set<std::string> getDatabasesToRestore(OperationContext* opCtx) {
 const stdx::unordered_map<NamespaceString,
                           std::pair<boost::optional<std::string>, boost::optional<std::string>>>
     kCollectionEntries = {
-        {NamespaceString("config.chunks"), std::make_pair(boost::none, std::string("uuid"))},
-        {NamespaceString("config.collections"),
+        {NamespaceStringUtil::deserialize("config.chunks"), std::make_pair(boost::none, std::string("uuid"))},
+        {NamespaceStringUtil::deserialize("config.collections"),
          std::make_pair(std::string("_id"), std::string("uuid"))},
-        {NamespaceString("config.migrationCoordinators"),
+        {NamespaceStringUtil::deserialize("config.migrationCoordinators"),
          std::make_pair(std::string("nss"), std::string("collectionUuid"))},
-        {NamespaceString("config.tags"), std::make_pair(std::string("ns"), boost::none)},
-        {NamespaceString("config.rangeDeletions"),
+        {NamespaceStringUtil::deserialize("config.tags"), std::make_pair(std::string("ns"), boost::none)},
+        {NamespaceStringUtil::deserialize("config.rangeDeletions"),
          std::make_pair(std::string("nss"), std::string("collectionUuid"))},
-        {NamespaceString("config.system.sharding_ddl_coordinators"),
+        {NamespaceStringUtil::deserialize("config.system.sharding_ddl_coordinators"),
          std::make_pair(std::string("_id.namespace"), boost::none)}};
 
 class ConfigSvrRunRestoreCommand : public BasicCommand {
@@ -216,10 +216,10 @@ public:
                         // Handles the "_id.namespace" case for collection
                         // "config.system.sharding_ddl_coordinators".
                         const auto obj = doc.getField(nssFieldName->substr(0, dotPosition)).Obj();
-                        docNss = NamespaceString(
+                        docNss =NamespaceStringUtil::deserialize(
                             obj.getStringField(nssFieldName->substr(dotPosition + 1)));
                     } else {
-                        docNss = NamespaceString(doc.getStringField(*nssFieldName));
+                        docNss =NamespaceStringUtil::deserialize(doc.getStringField(*nssFieldName));
                     }
                 }
 
@@ -269,7 +269,7 @@ public:
 
         {
             const std::vector<NamespaceString> databasesEntries = {
-                NamespaceString("config.databases")};
+               NamespaceStringUtil::deserialize("config.databases")};
 
             // Remove database entries from the config collections if no collection for the given
             // database was restored.
@@ -289,7 +289,7 @@ public:
                 while (cursor->more()) {
                     auto doc = cursor->next();
 
-                    const NamespaceString dbNss = NamespaceString(doc.getStringField("_id"));
+                    const NamespaceString dbNss =NamespaceStringUtil::deserialize(doc.getStringField("_id"));
                     if (!dbNss.coll().empty()) {
                         // We want to handle database only namespaces.
                         continue;

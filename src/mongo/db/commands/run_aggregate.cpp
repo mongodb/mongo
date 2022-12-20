@@ -372,7 +372,7 @@ StatusWith<StringMap<ExpressionContext::ResolvedNamespace>> resolveInvolvedNames
                 // collection name references a view on the aggregation request's database. Note
                 // that the inverse scenario (mistaking a view for a collection) is not an issue
                 // because $merge/$out cannot target a view.
-                auto nssToCheck = NamespaceString(request.getNamespace().db(), involvedNs.coll());
+                auto nssToCheck =NamespaceStringUtil::deserialize(request.getNamespace().db(), involvedNs.coll());
                 if (catalog->lookupView(opCtx, nssToCheck)) {
                     auto status = resolveViewDefinition(nssToCheck);
                     if (!status.isOK()) {

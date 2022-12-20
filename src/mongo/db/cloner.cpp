@@ -358,7 +358,7 @@ Status Cloner::_createCollectionsForDb(
         BSONObjBuilder optionsBuilder;
         optionsBuilder.appendElements(params.collectionInfo["options"].Obj());
 
-        const NamespaceString nss(dbName, params.collectionName);
+        const NamespaceString nss = NamespaceStringUtil::deserialize(dbName, params.collectionName);
 
         uassertStatusOK(userAllowedCreateNS(opCtx, nss));
         Status status = writeConflictRetry(opCtx, "createCollection", nss.ns(), [&] {
@@ -508,7 +508,7 @@ Status Cloner::copyDb(OperationContext* opCtx,
     // Get index specs for each collection.
     std::map<StringData, std::list<BSONObj>> collectionIndexSpecs;
     for (auto&& params : createCollectionParams) {
-        const NamespaceString nss(dBName, params.collectionName);
+        const NamespaceString nss = NamespaceStringUtil::deserialize(dBName, params.collectionName);
         const bool includeBuildUUIDs = false;
         const int options = 0;
         auto indexSpecs = conn->getIndexSpecs(nss, includeBuildUUIDs, options);
@@ -543,7 +543,7 @@ Status Cloner::copyDb(OperationContext* opCtx,
                   "Copying indexes",
                   "collectionInfo"_attr = params.collectionInfo);
 
-            const NamespaceString nss(dBName, params.collectionName);
+            const NamespaceString nss = NamespaceStringUtil::deserialize(dBName, params.collectionName);
 
 
             _copyIndexes(opCtx,
@@ -565,7 +565,7 @@ Status Cloner::copyDb(OperationContext* opCtx,
                     "  really will clone: {params_collectionInfo}",
                     "params_collectionInfo"_attr = params.collectionInfo);
 
-        const NamespaceString nss(dBName, params.collectionName);
+        const NamespaceString nss = NamespaceStringUtil::deserialize(dBName, params.collectionName);
 
         clonedColls->insert(nss.ns());
 

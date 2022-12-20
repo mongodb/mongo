@@ -100,7 +100,7 @@ public:
             return request().getCommandParameter();
         }
         NamespaceString ns() const override {
-            return {getDbName(), ""};
+            return NamespaceStringUtil::deserialize(getDbName(), "");
         }
 
         bool supportsWriteConcern() const override {

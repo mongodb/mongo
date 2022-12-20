@@ -318,7 +318,7 @@ bool killExhaust(const Message& in, ServiceEntryPoint* sep, Client* client) {
                client->makeOperationContext().get(),
                OpMsgRequest::fromDBAndBody(
                    db,
-                   KillCursorsCommandRequest(NamespaceString(db, body["collection"].String()),
+                   KillCursorsCommandRequest(NamespaceStringUtil::deserialize(db, body["collection"].String()),
                                              {CursorId{firstElement.Long()}})
                        .toBSON(BSONObj{}))
                    .serialize())

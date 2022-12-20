@@ -35,7 +35,7 @@
 namespace mongo {
 namespace {
 
-const auto kAdminCommandNamespace = NamespaceString{NamespaceString::kAdminDb}.getCommandNS();
+const auto kAdminCommandNamespace = NamespaceStringUtil::deserialize(NamespaceString::kAdminDb).getCommandNS();
 
 /**
  * Returns operations that can fit into an "applyOps" entry. The returned operations are

@@ -78,14 +78,14 @@ DocumentSourceOut::~DocumentSourceOut() {
 NamespaceString DocumentSourceOut::parseNsFromElem(const BSONElement& spec,
                                                    const DatabaseName& defaultDB) {
     if (spec.type() == BSONType::String) {
-        return NamespaceString(defaultDB, spec.valueStringData());
+        return NamespaceStringUtil::deserialize(defaultDB, spec.valueStringData());
     } else if (spec.type() == BSONType::Object) {
         auto nsObj = spec.Obj();
         uassert(16994,
                 str::stream() << "If an object is passed to " << kStageName
                               << " it must have exactly 2 fields: 'db' and 'coll'",
                 nsObj.nFields() == 2 && nsObj.hasField("coll") && nsObj.hasField("db"));
-        return NamespaceString(defaultDB.tenantId(), nsObj["db"].String(), nsObj["coll"].String());
+        return NamespaceStringUtil::deserialize(defaultDB.tenantId(), nsObj["db"].String(), nsObj["coll"].String());
     } else {
         uassert(16990,
                 "{} only supports a string or object argument, but found {}"_format(
@@ -113,7 +113,7 @@ void DocumentSourceOut::initialize() {
     // to be the target collection once we are done.
     // Note that this temporary collection name is used by MongoMirror and thus should not be
     // changed without consultation.
-    _tempNs = NamespaceString(outputNs.tenantId(),
+    _tempNs =NamespaceStringUtil::deserialize(outputNs.tenantId(),
                               str::stream() << outputNs.dbName().toString() << ".tmp.agg_out."
                                             << UUID::gen());
 

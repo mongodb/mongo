@@ -59,7 +59,7 @@
 namespace mongo {
 
 namespace {
-static const NamespaceString kConfigNss("local.system.replset");
+static const NamespaceString kConfigNss = NamespaceStringUtil::deserialize("local.system.replset");
 static const std::string kRepairIncompleteFileName = "_repair_incomplete";
 
 const auto getRepairObserver =

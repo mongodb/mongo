@@ -78,14 +78,14 @@ public:
     }
 
     NamespaceString parseNs(const DatabaseName& dbName, const BSONObj& cmdObj) const override {
-        return NamespaceString(dbName.tenantId(), CommandHelpers::parseNsFullyQualified(cmdObj));
+        return NamespaceStringUtil::deserialize(dbName.tenantId(), CommandHelpers::parseNsFullyQualified(cmdObj));
     }
 
     bool run(OperationContext* opCtx,
              const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        const NamespaceString nss(parseNs(dbName, cmdObj));
+        const NamespaceString nss = NamespaceStringUtil::deserialize(parseNs(dbName, cmdObj));
 
         uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
 

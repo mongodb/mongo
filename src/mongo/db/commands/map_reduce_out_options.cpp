@@ -34,6 +34,8 @@
 #include "mongo/db/commands/map_reduce_out_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/namespace_string_util.h"
+
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -105,7 +107,7 @@ MapReduceOutOptions MapReduceOutOptions::parseFromBSON(const BSONElement& elemen
                         db.type() == BSONType::String);
                 uassert(ErrorCodes::CommandNotSupported,
                         "cannot target internal database as output",
-                        !(NamespaceString(db.valueStringData(), collectionName).isOnInternalDb()));
+                        !(NamespaceStringUtil::deserialize(db.valueStringData(), collectionName).isOnInternalDb()));
                 return boost::make_optional(db.str());
             } else {
                 --allowedNFields;

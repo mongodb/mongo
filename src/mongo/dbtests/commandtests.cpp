@@ -52,7 +52,7 @@ TEST(CommandTests, InputDocumentSequeceWorksEndToEnd) {
     const auto opCtxHolder = cc().makeOperationContext();
     auto opCtx = opCtxHolder.get();
 
-    NamespaceString nss("test", "doc_seq");
+    NamespaceString nss = NamespaceStringUtil::deserialize("test", "doc_seq");
     DBDirectClient db(opCtx);
     db.dropCollection(nss.ns());
     ASSERT_EQ(db.count(nss), 0u);
@@ -85,7 +85,7 @@ public:
         db.dropCollection(nss().ns());
     }
 
-    NamespaceString nss() {
+    NamespaceString nss = NamespaceStringUtil::deserialize() {
         return NamespaceString("test.testCollection");
     }
     const char* nsDb() {
@@ -108,7 +108,7 @@ struct Base {
         ASSERT_OK(dbtests::createIndex(&_opCtx, nss().ns(), BSON("files_id" << 1 << "n" << 1)));
     }
 
-    NamespaceString nss() {
+    NamespaceString nss = NamespaceStringUtil::deserialize() {
         return NamespaceString("test.fs.chunks");
     }
 

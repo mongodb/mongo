@@ -47,6 +47,7 @@
 
 namespace mongo {
 
+class NamespaceStringUtil;
 class NamespaceString {
 public:
     constexpr static size_t MaxDatabaseNameLen =
@@ -288,66 +289,6 @@ public:
      * Constructs a NamespaceString from the fully qualified namespace named in "ns" and the
      * tenantId. "ns" is NOT expected to contain the tenantId.
      */
-    explicit NamespaceString(boost::optional<TenantId> tenantId, StringData ns) {
-        _dotIndex = ns.find(".");
-
-        uassert(ErrorCodes::InvalidNamespace,
-                "namespaces cannot have embedded null characters",
-                ns.find('\0') == std::string::npos);
-
-        StringData db = ns.substr(0, _dotIndex);
-        _dbName = DatabaseName(std::move(tenantId), db);
-        _ns = ns.toString();
-    }
-
-
-    /**
-     * Constructs a NamespaceString for the given database.
-     */
-    explicit NamespaceString(DatabaseName dbName) : _dbName(std::move(dbName)), _ns(_dbName.db()) {}
-
-    // TODO SERVER-65920 Remove this constructor once all constructor call sites have been updated
-    // to pass tenantId explicitly
-    explicit NamespaceString(StringData ns, boost::optional<TenantId> tenantId = boost::none)
-        : NamespaceString(std::move(tenantId), ns) {}
-
-    /**
-     * Constructs a NamespaceString for the given database and collection names.
-     * "dbName" must not contain a ".", and "collectionName" must not start with one.
-     */
-    NamespaceString(DatabaseName dbName, StringData collectionName)
-        : _dbName(std::move(dbName)), _ns(str::stream() << _dbName.db() << '.' << collectionName) {
-        const auto& db = _dbName.db();
-
-        uassert(ErrorCodes::InvalidNamespace,
-                "'.' is an invalid character in the database name: " + db,
-                db.find('.') == std::string::npos);
-        uassert(ErrorCodes::InvalidNamespace,
-                "Collection names cannot start with '.': " + collectionName,
-                collectionName.empty() || collectionName[0] != '.');
-
-        _dotIndex = db.size();
-        dassert(_ns[_dotIndex] == '.');
-
-        uassert(ErrorCodes::InvalidNamespace,
-                "namespaces cannot have embedded null characters",
-                _ns.find('\0') == std::string::npos);
-    }
-
-    /**
-     * Constructs a NamespaceString for the given db name, collection name, and tenantId.
-     * "db" must not contain a ".", and "collectionName" must not start with one. "dbName" is
-     * NOT expected to contain a tenantId.
-     */
-    NamespaceString(boost::optional<TenantId> tenantId, StringData db, StringData collectionName)
-        : NamespaceString(DatabaseName(std::move(tenantId), db), collectionName) {}
-
-    // TODO SERVER-65920 Remove this constructor once all constructor call sites have been updated
-    // to pass tenantId explicitly
-    NamespaceString(StringData db,
-                    StringData collectionName,
-                    boost::optional<TenantId> tenantId = boost::none)
-        : NamespaceString(DatabaseName(std::move(tenantId), db), collectionName) {}
 
     /**
      * Constructs a NamespaceString from the string 'ns'. Should only be used when reading a
@@ -761,8 +702,69 @@ public:
     friend auto logAttrs(const NamespaceString& nss) {
         return "namespace"_attr = nss;
     }
+ /**
+     * Constructs a NamespaceString for the given database.
+     */
+    explicit NamespaceString(DatabaseName dbName) : _dbName(std::move(dbName)), _ns(_dbName.db()) {}
+
+    /**
+     * Constructs a NamespaceString for the given database and collection names.
+     * "dbName" must not contain a ".", and "collectionName" must not start with one.
+     */
+    NamespaceString(DatabaseName dbName, StringData collectionName)
+        : _dbName(std::move(dbName)), _ns(str::stream() << _dbName.db() << '.' << collectionName) {
+        const auto& db = _dbName.db();
+
+        uassert(ErrorCodes::InvalidNamespace,
+                "'.' is an invalid character in the database name: " + db,
+                db.find('.') == std::string::npos);
+        uassert(ErrorCodes::InvalidNamespace,
+                "Collection names cannot start with '.': " + collectionName,
+                collectionName.empty() || collectionName[0] != '.');
+
+        _dotIndex = db.size();
+        dassert(_ns[_dotIndex] == '.');
+
+        uassert(ErrorCodes::InvalidNamespace,
+                "namespaces cannot have embedded null characters",
+                _ns.find('\0') == std::string::npos);
+    }
 
 private:
+friend NamespaceStringUtil;
+
+explicit NamespaceString(boost::optional<TenantId> tenantId, StringData ns) {
+        _dotIndex = ns.find(".");
+
+        uassert(ErrorCodes::InvalidNamespace,
+                "namespaces cannot have embedded null characters",
+                ns.find('\0') == std::string::npos);
+
+        StringData db = ns.substr(0, _dotIndex);
+        _dbName = DatabaseName(std::move(tenantId), db);
+        _ns = ns.toString();
+    }
+
+    // TODO SERVER-65920 Remove this constructor once all constructor call sites have been updated
+    // to pass tenantId explicitly
+    explicit NamespaceString(StringData ns, boost::optional<TenantId> tenantId = boost::none)
+        : NamespaceString(std::move(tenantId), ns) {}
+
+    /**
+     * Constructs a NamespaceString for the given db name, collection name, and tenantId.
+     * "db" must not contain a ".", and "collectionName" must not start with one. "dbName" is
+     * NOT expected to contain a tenantId.
+     */
+    NamespaceString(boost::optional<TenantId> tenantId, StringData db, StringData collectionName)
+        : NamespaceString(DatabaseName(std::move(tenantId), db), collectionName) {}
+
+    // TODO SERVER-65920 Remove this constructor once all constructor call sites have been updated
+    // to pass tenantId explicitly
+    NamespaceString(StringData db,
+                    StringData collectionName,
+                    boost::optional<TenantId> tenantId = boost::none)
+        : NamespaceString(DatabaseName(std::move(tenantId), db), collectionName) {}
+
     DatabaseName _dbName;
     std::string _ns;
     size_t _dotIndex = std::string::npos;

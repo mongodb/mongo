@@ -88,7 +88,7 @@ public:
     Status checkAuthForOperation(OperationContext* opCtx,
                                  const DatabaseName& dbName,
                                  const BSONObj& cmdObj) const override {
-        const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
+        const NamespaceString nss = NamespaceStringUtil::deserialize(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
         if (!AuthorizationSession::get(opCtx->getClient())
                  ->isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(nss),
                                                     ActionType::createIndex)) {
@@ -101,7 +101,7 @@ public:
              const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
+        const NamespaceString nss = NamespaceStringUtil::deserialize(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
         LOGV2_DEBUG(22757,
                     1,
                     "setIndexCommitQuorum",

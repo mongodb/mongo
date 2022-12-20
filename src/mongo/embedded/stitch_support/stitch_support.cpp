@@ -60,7 +60,7 @@ namespace mongo {
 
 using StitchSupportStatusImpl = StatusForAPI<stitch_support_v1_error>;
 
-const NamespaceString kDummyNamespaceStr = NamespaceString("");
+const NamespaceString kDummyNamespaceStr =NamespaceStringUtil::deserialize("");
 
 /**
  * C interfaces that use enterCXX() must provide a translateException() function that converts any

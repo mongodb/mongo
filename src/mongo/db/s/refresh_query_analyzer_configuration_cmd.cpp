@@ -67,7 +67,7 @@ public:
 
     private:
         NamespaceString ns() const {
-            return NamespaceString(NamespaceString::kAdminDb, "");
+            return NamespaceStringUtil::deserialize(NamespaceString::kAdminDb, "");
         }
 
         bool supportsWriteConcern() const override {

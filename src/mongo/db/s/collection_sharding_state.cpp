@@ -113,7 +113,7 @@ public:
         std::vector<NamespaceString> result;
         result.reserve(_collections.size());
         for (const auto& [ns, _] : _collections) {
-            result.emplace_back(ns);
+            result.emplace_back(NamespaceStringUtil::deserialize(ns));
         }
         return result;
     }

@@ -90,7 +90,7 @@ void addPrivileges_${role.name}(PrivilegeVector* privileges, StringData dbName) 
             ResourcePattern::forCollectionName("$priv.collection"_sd),
             //#elif $priv.matchType == 'exact_namespace'
             ResourcePattern::forExactNamespace(
-                NamespaceString($dbName($priv.db), "$priv.collection"_sd)),
+               NamespaceStringUtil::deserialize($dbName($priv.db), "$priv.collection"_sd)),
             //#elif $priv.matchType == 'any_system_buckets'
             ResourcePattern::forAnySystemBuckets(),
             //#elif $priv.matchType == 'system_buckets_in_any_db'

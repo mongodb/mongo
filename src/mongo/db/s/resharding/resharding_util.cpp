@@ -129,7 +129,7 @@ RecipientShardEntry makeRecipientShard(ShardId shardId,
 }
 
 NamespaceString constructTemporaryReshardingNss(StringData db, const UUID& sourceUuid) {
-    return NamespaceString(db,
+    return NamespaceStringUtil::deserialize(db,
                            fmt::format("{}{}",
                                        NamespaceString::kTemporaryReshardingCollectionPrefix,
                                        sourceUuid.toString()));
@@ -348,12 +348,12 @@ bool isFinalOplog(const repl::OplogEntry& oplog, UUID reshardingUUID) {
 }
 
 NamespaceString getLocalOplogBufferNamespace(UUID existingUUID, ShardId donorShardId) {
-    return NamespaceString("config.localReshardingOplogBuffer.{}.{}"_format(
+    return NamespaceStringUtil::deserialize("config.localReshardingOplogBuffer.{}.{}"_format(
         existingUUID.toString(), donorShardId.toString()));
 }
 
 NamespaceString getLocalConflictStashNamespace(UUID existingUUID, ShardId donorShardId) {
-    return NamespaceString{NamespaceString::kConfigDb,
+    return NamespaceStringUtil::deserialize(NamespaceString::kConfigDb,
                            "localReshardingConflictStash.{}.{}"_format(existingUUID.toString(),
                                                                        donorShardId.toString())};
 }

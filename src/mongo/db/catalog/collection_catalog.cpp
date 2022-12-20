@@ -619,7 +619,7 @@ Status CollectionCatalog::createView(OperationContext* opCtx,
     invariant(durability == ViewsForDatabase::Durability::kAlreadyDurable ||
               opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_IX));
     invariant(opCtx->lockState()->isCollectionLockedForMode(
-        NamespaceString(viewName.dbName(), NamespaceString::kSystemDotViewsCollectionName),
+       NamespaceStringUtil::deserialize(viewName.dbName(), NamespaceString::kSystemDotViewsCollectionName),
         MODE_X));
 
     invariant(_viewsForDatabase.contains(viewName.dbName()));
@@ -669,7 +669,7 @@ Status CollectionCatalog::modifyView(
     const ViewsForDatabase::PipelineValidatorFn& validatePipeline) const {
     invariant(opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_X));
     invariant(opCtx->lockState()->isCollectionLockedForMode(
-        NamespaceString(viewName.dbName(), NamespaceString::kSystemDotViewsCollectionName),
+       NamespaceStringUtil::deserialize(viewName.dbName(), NamespaceString::kSystemDotViewsCollectionName),
         MODE_X));
     invariant(_viewsForDatabase.contains(viewName.dbName()));
     const ViewsForDatabase& viewsForDb = *_getViewsForDatabase(opCtx, viewName.dbName());
@@ -715,7 +715,7 @@ Status CollectionCatalog::modifyView(
 Status CollectionCatalog::dropView(OperationContext* opCtx, const NamespaceString& viewName) const {
     invariant(opCtx->lockState()->isCollectionLockedForMode(viewName, MODE_IX));
     invariant(opCtx->lockState()->isCollectionLockedForMode(
-        NamespaceString(viewName.dbName(), NamespaceString::kSystemDotViewsCollectionName),
+       NamespaceStringUtil::deserialize(viewName.dbName(), NamespaceString::kSystemDotViewsCollectionName),
         MODE_X));
     invariant(_viewsForDatabase.contains(viewName.dbName()));
     const ViewsForDatabase& viewsForDb = *_getViewsForDatabase(opCtx, viewName.dbName());
@@ -754,7 +754,7 @@ Status CollectionCatalog::dropView(OperationContext* opCtx, const NamespaceStrin
 
 Status CollectionCatalog::reloadViews(OperationContext* opCtx, const DatabaseName& dbName) const {
     invariant(opCtx->lockState()->isCollectionLockedForMode(
-        NamespaceString(dbName, NamespaceString::kSystemDotViewsCollectionName), MODE_IS));
+       NamespaceStringUtil::deserialize(dbName, NamespaceString::kSystemDotViewsCollectionName), MODE_IS));
 
     auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
     if (uncommittedCatalogUpdates.shouldIgnoreExternalViewChanges(dbName)) {
@@ -1765,7 +1765,7 @@ std::shared_ptr<Collection> CollectionCatalog::deregisterCollection(
 void CollectionCatalog::registerUncommittedView(OperationContext* opCtx,
                                                 const NamespaceString& nss) {
     invariant(opCtx->lockState()->isCollectionLockedForMode(
-        NamespaceString(nss.dbName(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
+       NamespaceStringUtil::deserialize(nss.dbName(), NamespaceString::kSystemDotViewsCollectionName), MODE_X));
 
     // Since writing to system.views requires an X lock, we only need to cross-check collection
     // namespaces here.
@@ -2039,7 +2039,7 @@ void CollectionCatalog::deregisterAllCollectionsAndViews(ServiceContext* svcCtx)
 
 void CollectionCatalog::clearViews(OperationContext* opCtx, const DatabaseName& dbName) const {
     invariant(opCtx->lockState()->isCollectionLockedForMode(
-        NamespaceString(dbName, NamespaceString::kSystemDotViewsCollectionName), MODE_X));
+       NamespaceStringUtil::deserialize(dbName, NamespaceString::kSystemDotViewsCollectionName), MODE_X));
 
     auto it = _viewsForDatabase.find(dbName);
     invariant(it != _viewsForDatabase.end());

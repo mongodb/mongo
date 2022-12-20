@@ -189,7 +189,7 @@ public:
             return false;
         }
 
-        const NamespaceString nss(ns);
+        const NamespaceString nss = NamespaceStringUtil::deserialize(ns);
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Invalid namespace: " << nss.ns(),
                 nss.isValid());

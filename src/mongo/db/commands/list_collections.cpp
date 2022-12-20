@@ -303,7 +303,7 @@ public:
         }
 
         NamespaceString ns() const final {
-            return NamespaceString(request().getDbName());
+            return NamespaceStringUtil::deserialize(request().getDbName());
         }
 
         Reply typedRun(OperationContext* opCtx) final {
@@ -350,7 +350,7 @@ public:
                 if (DatabaseHolder::get(opCtx)->dbExists(opCtx, dbName)) {
                     if (auto collNames = _getExactNameMatches(matcher.get())) {
                         for (auto&& collName : *collNames) {
-                            auto nss = NamespaceString(dbName, collName);
+                            auto nss =NamespaceStringUtil::deserialize(dbName, collName);
 
                             // Only validate on a per-collection basis if the user requested
                             // a list of authorized collections

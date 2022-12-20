@@ -219,7 +219,7 @@ DatabaseType ShardingCatalogManager::createDatabase(
             if (feature_flags::gHistoricalPlacementShardingCatalog.isEnabled(
                     serverGlobalParams.featureCompatibility)) {
                 NamespacePlacementType placementInfo(
-                    NamespaceString(dbName),
+                   NamespaceStringUtil::deserialize(dbName),
                     clusterTime,
                     std::vector<mongo::ShardId>{resolvedPrimaryShard->getId()});
                 withTransaction(
@@ -365,7 +365,7 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
                 const auto clusterTime = now.clusterTime().asTimestamp();
 
                 NamespacePlacementType placementInfo(
-                    NamespaceString(dbName), clusterTime, std::vector<mongo::ShardId>{toShardId});
+                   NamespaceStringUtil::deserialize(dbName), clusterTime, std::vector<mongo::ShardId>{toShardId});
 
                 write_ops::InsertCommandRequest insertPlacementHistoryOp(
                     NamespaceString::kConfigsvrPlacementHistoryNamespace);

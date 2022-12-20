@@ -47,7 +47,7 @@ namespace mongo {
 class AggregationContextFixture : public ServiceContextTest {
 public:
     AggregationContextFixture()
-        : AggregationContextFixture(NamespaceString(boost::none, "unittests", "pipeline_test")) {}
+        : AggregationContextFixture(NamespaceStringUtil::deserialize(boost::none, "unittests", "pipeline_test")) {}
 
     AggregationContextFixture(NamespaceString nss) {
         auto service = getServiceContext();

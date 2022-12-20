@@ -97,7 +97,7 @@ public:
             HealthLog::get(_opCtx->getServiceContext()).log(*healthLogEntry);
 
             DbCheckOplogStartStop oplogEntry;
-            const auto nss = NamespaceString("admin.$cmd");
+            const auto nss =NamespaceStringUtil::deserialize("admin.$cmd");
             oplogEntry.setNss(nss);
             oplogEntry.setType(OplogEntriesEnum::Start);
             _logOp(_opCtx, nss, boost::none /*uuid*/, oplogEntry.toBSON());
@@ -109,7 +109,7 @@ public:
     ~DbCheckStartAndStopLogger() {
         try {
             DbCheckOplogStartStop oplogEntry;
-            const auto nss = NamespaceString("admin.$cmd");
+            const auto nss =NamespaceStringUtil::deserialize("admin.$cmd");
             oplogEntry.setNss(nss);
             oplogEntry.setType(OplogEntriesEnum::Stop);
             _logOp(_opCtx, nss, boost::none /*uuid*/, oplogEntry.toBSON());
@@ -154,7 +154,7 @@ using DbCheckRun = std::vector<DbCheckCollectionInfo>;
 std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
                                                 const DatabaseName& dbName,
                                                 const DbCheckSingleInvocation& invocation) {
-    NamespaceString nss(dbName, invocation.getColl());
+    NamespaceString nss = NamespaceStringUtil::deserialize(dbName, invocation.getColl());
     AutoGetCollectionForRead agc(opCtx, nss);
 
     uassert(ErrorCodes::NamespaceNotFound,

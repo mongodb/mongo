@@ -308,7 +308,7 @@ PlanExecutor::ExecState PlanExecutorSBE::getNextImpl(ObjectType* out, RecordId* 
             if (MONGO_unlikely(planExecutorHangBeforeShouldWaitForInserts.shouldFail(
                     [this](const BSONObj& data) {
                         if (data.hasField("namespace") &&
-                            _nss != NamespaceString(data.getStringField("namespace"))) {
+                            _nss !=NamespaceStringUtil::deserialize(data.getStringField("namespace"))) {
                             return false;
                         }
                         return true;

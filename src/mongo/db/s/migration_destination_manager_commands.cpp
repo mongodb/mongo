@@ -77,7 +77,7 @@ public:
     }
 
     NamespaceString parseNs(const DatabaseName& dbName, const BSONObj& cmdObj) const override {
-        return NamespaceString(dbName.tenantId(), CommandHelpers::parseNsFullyQualified(cmdObj));
+        return NamespaceStringUtil::deserialize(dbName.tenantId(), CommandHelpers::parseNsFullyQualified(cmdObj));
     }
 
     Status checkAuthForOperation(OperationContext* opCtx,
@@ -108,7 +108,7 @@ public:
         opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
         uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
-        auto nss = NamespaceString(parseNs({boost::none, dbname}, cmdObj));
+        auto nss = parseNs({boost::none, dbname}, cmdObj);
 
         auto cloneRequest = uassertStatusOK(StartChunkCloneRequest::createFromCommand(nss, cmdObj));
 

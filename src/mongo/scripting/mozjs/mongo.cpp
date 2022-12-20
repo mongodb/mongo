@@ -433,7 +433,7 @@ void MongoBase::Functions::cursorHandleFromId::call(JSContext* cx, JS::CallArgs 
     JS::RootedObject c(cx);
     scope->getProto<CursorHandleInfo>().newObject(&c);
 
-    setCursorHandle(scope, c, NamespaceString(ns), cursorId, args);
+    setCursorHandle(scope, c, NamespaceStringUtil::deserialize(boost::none, ns), cursorId, args);
 
     args.rval().setObjectOrNull(c);
 }

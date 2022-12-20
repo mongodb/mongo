@@ -56,8 +56,8 @@ Status checkAuthForRenameCollectionCommand(Client* client,
             "'to' must be of type String",
             targetNsElt.type() == BSONType::String);
 
-    const NamespaceString sourceNS(sourceNsElt.valueStringData());
-    const NamespaceString targetNS(targetNsElt.valueStringData());
+    const NamespaceString sourceNS = NamespaceStringUtil::deserialize(sourceNsElt.valueStringData());
+    const NamespaceString targetNS = NamespaceStringUtil::deserialize(targetNsElt.valueStringData());
     bool dropTarget = cmdObj["dropTarget"].trueValue();
 
     if (sourceNS.db() == targetNS.db() && sourceNS.isNormalCollection() &&

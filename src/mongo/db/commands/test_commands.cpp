@@ -52,7 +52,7 @@
 namespace mongo {
 namespace {
 
-const NamespaceString kDurableHistoryTestNss("mdb_testing.pinned_timestamp");
+const NamespaceString kDurableHistoryTestNss = NamespaceStringUtil::deserialize("mdb_testing.pinned_timestamp");
 const std::string kTestingDurableHistoryPinName = "_testing";
 
 using repl::UnreplicatedWritesBlock;

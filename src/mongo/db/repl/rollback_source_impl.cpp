@@ -66,7 +66,7 @@ int RollbackSourceImpl::getRollbackId() const {
 }
 
 BSONObj RollbackSourceImpl::getLastOperation() const {
-    FindCommandRequest findCmd{NamespaceString{_collectionName}};
+    FindCommandRequest findCmd{NamespaceStringUtil::deserialize(_collectionName)};
     findCmd.setSort(BSON("$natural" << -1));
     findCmd.setReadConcern(ReadConcernArgs::kLocal);
     return _getConnection()->findOne(std::move(findCmd),

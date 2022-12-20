@@ -306,7 +306,7 @@ StatusWith<CursorResponse> CursorResponse::parseFromBSON(const BSONObj& cmdRespo
                               << writeConcernError.type()};
     }
 
-    return {{NamespaceString(fullns),
+    return {{NamespaceStringUtil::deserialize(fullns),
              cursorId,
              std::move(batch),
              atClusterTimeElem ? atClusterTimeElem.timestamp() : boost::optional<Timestamp>{},

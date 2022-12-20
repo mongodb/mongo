@@ -148,7 +148,7 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
         } else {
             invariant(_cq);
             _nss =
-                _cq->getFindCommandRequest().getNamespaceOrUUID().nss().value_or(NamespaceString());
+                _cq->getFindCommandRequest().getNamespaceOrUUID().nss().value_or(NamespaceStringUtil::deserialize());
         }
     }
 
@@ -483,7 +483,7 @@ PlanExecutor::ExecState PlanExecutorImpl::_getNextImpl(Snapshotted<Document>* ob
             if (MONGO_unlikely(planExecutorHangBeforeShouldWaitForInserts.shouldFail(
                     [this](const BSONObj& data) {
                         if (data.hasField("namespace") &&
-                            _nss != NamespaceString(data.getStringField("namespace"))) {
+                            _nss !=NamespaceStringUtil::deserialize(data.getStringField("namespace"))) {
                             return false;
                         }
                         return true;

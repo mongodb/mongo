@@ -40,7 +40,7 @@
 
 namespace mongo {
 
-const NamespaceString MigrationType::ConfigNS("config.migrations");
+const NamespaceString MigrationType::ConfigNS = NamespaceStringUtil::deserialize("config.migrations");
 
 const BSONField<std::string> MigrationType::ns("ns");
 const BSONField<BSONObj> MigrationType::min("min");
@@ -85,7 +85,7 @@ StatusWith<MigrationType> MigrationType::fromBSON(const BSONObj& source) {
         Status status = bsonExtractStringField(source, ns.name(), &migrationNS);
         if (!status.isOK())
             return status;
-        migrationType._nss = NamespaceString(migrationNS);
+        migrationType._nss =NamespaceStringUtil::deserialize(migrationNS);
     }
 
     {

@@ -936,7 +936,7 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
 WiredTigerRecordStore::~WiredTigerRecordStore() {
     if (!isTemp()) {
         LOGV2_DEBUG(
-            22395, 1, "~WiredTigerRecordStore for: {namespace}", logAttrs(NamespaceString(ns())));
+            22395, 1, "~WiredTigerRecordStore for: {namespace}", logAttrs(NamespaceStringUtil::deserialize(ns())));
     } else {
         LOGV2_DEBUG(22396,
                     1,
@@ -1377,7 +1377,7 @@ Status WiredTigerRecordStore::_insertRecords(OperationContext* opCtx,
             // on indexes.
             BSONObj obj = record_id_helpers::toBSONAs(record.id, "");
             return buildDupKeyErrorStatus(obj,
-                                          NamespaceString(ns()),
+                                         NamespaceStringUtil::deserialize(ns()),
                                           "" /* indexName */,
                                           BSON("_id" << 1),
                                           BSONObj() /* collation */,
@@ -2485,7 +2485,7 @@ std::unique_ptr<SeekableRecordCursor> StandardWiredTigerRecordStore::getCursor(
         // If we already have a snapshot we don't know what it can see, unless we know no one
         // else could be writing (because we hold an exclusive lock).
         invariant(!wru->isActive() ||
-                  opCtx->lockState()->isCollectionLockedForMode(NamespaceString(_ns), MODE_X) ||
+                  opCtx->lockState()->isCollectionLockedForMode(NamespaceStringUtil::deserialize(_ns), MODE_X) ||
                   wru->getIsOplogReader());
         wru->setIsOplogReader();
     }

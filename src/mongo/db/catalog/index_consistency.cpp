@@ -182,7 +182,7 @@ void IndexConsistency::repairMissingIndexEntries(OperationContext* opCtx,
     }
     if (results->numDocumentsMovedToLostAndFound > 0) {
         const NamespaceString lostAndFoundNss =
-            NamespaceString(NamespaceString::kLocalDb,
+           NamespaceStringUtil::deserialize(NamespaceString::kLocalDb,
                             "lost_and_found." + _validateState->getCollection()->uuid().toString());
         results->warnings.push_back(str::stream()
                                     << "Removed " << results->numDocumentsMovedToLostAndFound

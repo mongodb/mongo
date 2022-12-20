@@ -66,7 +66,7 @@ public:
         }
 
         NamespaceString ns() const final {
-            return NamespaceString(request().getDbName());
+            return NamespaceStringUtil::deserialize(request().getDbName());
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const final {

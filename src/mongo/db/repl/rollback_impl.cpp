@@ -417,8 +417,8 @@ StatusWith<std::set<NamespaceString>> RollbackImpl::_namespacesForOp(const Oplog
         switch (oplogEntry.getCommandType()) {
             case OplogEntry::CommandType::kRenameCollection: {
                 // Add both the 'from' and 'to' namespaces.
-                namespaces.insert(NamespaceString(firstElem.valueStringDataSafe()));
-                namespaces.insert(NamespaceString(obj.getStringField("to")));
+                namespaces.insert(NamespaceStringUtil::deserialize(firstElem.valueStringDataSafe()));
+                namespaces.insert(NamespaceStringUtil::deserialize(obj.getStringField("to")));
                 break;
             }
             case OplogEntry::CommandType::kDropDatabase: {
@@ -1041,7 +1041,7 @@ Status RollbackImpl::_processRollbackOp(OperationContext* opCtx, const OplogEntr
             if (auto countResult = _parseDroppedCollectionCount(oplogEntry)) {
                 PendingDropInfo info;
                 info.count = *countResult;
-                info.nss = NamespaceString(oplogEntry.getObject()[kToFieldName].String());
+                info.nss =NamespaceStringUtil::deserialize(oplogEntry.getObject()[kToFieldName].String());
                 _pendingDrops[dropTargetUUID] = info;
                 _newCounts[dropTargetUUID] = info.count;
             } else {

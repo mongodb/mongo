@@ -65,7 +65,7 @@ StatusWith<BalanceChunkRequest> BalanceChunkRequest::parseFromConfigCommand(cons
         if (!status.isOK()) {
             return status;
         }
-        nss = NamespaceString(ns);
+        nss = NamespaceStringUtil::deserialize(boost::none, ns);
     }
 
     const auto chunkStatus = ChunkType::parseFromNetworkRequest(obj);
