@@ -69,6 +69,10 @@ PlanStageTestFixture::generateVirtualScanMulti(int32_t numSlots, const BSONArray
 
 void PlanStageTestFixture::prepareTree(CompileCtx* ctx, PlanStage* root) {
     Lock::GlobalLock globalLock{operationContext(), MODE_IS};
+    if (_yieldPolicy) {
+        _yieldPolicy->clearRegisteredPlans();
+        _yieldPolicy->registerPlan(root);
+    }
     root->attachToOperationContext(operationContext());
     root->prepare(*ctx);
     root->open(false);

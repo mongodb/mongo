@@ -477,7 +477,8 @@ EvalExprStagePair generateUnion(std::vector<std::pair<EvalExpr, EvalStage>> bran
 std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateVirtualScan(
     sbe::value::SlotIdGenerator* slotIdGenerator,
     sbe::value::TypeTags arrTag,
-    sbe::value::Value arrVal);
+    sbe::value::Value arrVal,
+    PlanYieldPolicy* yieldPolicy = nullptr);
 
 /**
  * Make a mock scan with multiple output slots from an BSON array. This method does NOT assume
@@ -487,7 +488,8 @@ std::pair<sbe::value::SlotVector, std::unique_ptr<sbe::PlanStage>> generateVirtu
     sbe::value::SlotIdGenerator* slotIdGenerator,
     int numSlots,
     sbe::value::TypeTags arrTag,
-    sbe::value::Value arrVal);
+    sbe::value::Value arrVal,
+    PlanYieldPolicy* yieldPolicy = nullptr);
 
 /**
  * Helper functions for converting from BSONObj/BSONArray to SBE Object/Array. Caller owns the SBE

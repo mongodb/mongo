@@ -39,10 +39,6 @@ namespace mongo::sbe {
 
 class SbeSpoolTest : public PlanStageTestFixture {
 public:
-    SpoolId generateSpoolId() {
-        return _spoolIdGenerator.generate();
-    }
-
     /**
      * Given an input subtree 'outerBranch' and a 'spoolId', constructs a plan of the following
      * shape:
@@ -94,9 +90,6 @@ public:
 
         return makeSpoolConsumer<false>(std::move(outerBranch), spoolId);
     }
-
-private:
-    sbe::value::SpoolIdGenerator _spoolIdGenerator;
 };
 
 TEST_F(SbeSpoolTest, SpoolEagerProducerBasic) {

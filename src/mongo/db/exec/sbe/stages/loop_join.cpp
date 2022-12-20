@@ -207,7 +207,7 @@ void LoopJoinStage::close() {
 }
 
 void LoopJoinStage::doSaveState(bool relinquishCursor) {
-    if (_isReadingLeftSide || _outerGetNext) {
+    if (_isReadingLeftSide) {
         // If we yield while reading the left side, there is no need to prepareForYielding() data
         // held in the right side, since we will have to re-open it anyway.
         const bool recursive = true;

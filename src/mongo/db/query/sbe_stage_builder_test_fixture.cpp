@@ -74,11 +74,8 @@ SbeStageBuilderTestFixture::buildPlanStage(
         colls = MultipleCollectionAccessor(collPtr);
     }
 
-    stage_builder::SlotBasedStageBuilder builder{operationContext(),
-                                                 colls,
-                                                 *statusWithCQ.getValue(),
-                                                 *querySolution,
-                                                 nullptr /* YieldPolicy */};
+    stage_builder::SlotBasedStageBuilder builder{
+        operationContext(), colls, *statusWithCQ.getValue(), *querySolution, getYieldPolicy()};
 
     auto stage = builder.build(querySolution->root());
     auto data = builder.getPlanStageData();

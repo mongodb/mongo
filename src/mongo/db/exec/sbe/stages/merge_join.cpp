@@ -325,13 +325,13 @@ void MergeJoinStage::close() {
 }
 
 void MergeJoinStage::doSaveState(bool relinquishCursor) {
-    if (!slotsAccessible() || !relinquishCursor) {
+    if (!relinquishCursor) {
         return;
     }
 
     // We only have to save shallow non-owning materialized rows.
-    prepareForYielding(_currentOuterKey);
-    prepareForYielding(_currentInnerKey);
+    prepareForYielding(_currentOuterKey, true);
+    prepareForYielding(_currentInnerKey, true);
 }
 
 std::unique_ptr<PlanStageStats> MergeJoinStage::getStats(bool includeDebugInfo) const {

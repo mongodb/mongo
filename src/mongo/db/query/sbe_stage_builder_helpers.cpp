@@ -661,7 +661,8 @@ EvalExpr makeBalancedBooleanOpTree(sbe::EPrimBinary::Op logicOp,
 std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateVirtualScan(
     sbe::value::SlotIdGenerator* slotIdGenerator,
     sbe::value::TypeTags arrTag,
-    sbe::value::Value arrVal) {
+    sbe::value::Value arrVal,
+    PlanYieldPolicy* yieldPolicy) {
     // The value passed in must be an array.
     invariant(sbe::value::isArray(arrTag));
 
@@ -680,7 +681,8 @@ std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateVirtualSc
         unwindSlot,
         slotIdGenerator->generate(),  // We don't need an index slot but must to provide it.
         false,                        // Don't preserve null and empty arrays.
-        kEmptyPlanNodeId);
+        kEmptyPlanNodeId,
+        yieldPolicy);
 
     // Return the UnwindStage and its output slot. The UnwindStage can be used as an input
     // to other PlanStages.
@@ -691,13 +693,14 @@ std::pair<sbe::value::SlotVector, std::unique_ptr<sbe::PlanStage>> generateVirtu
     sbe::value::SlotIdGenerator* slotIdGenerator,
     int numSlots,
     sbe::value::TypeTags arrTag,
-    sbe::value::Value arrVal) {
+    sbe::value::Value arrVal,
+    PlanYieldPolicy* yieldPolicy) {
     using namespace std::literals;
 
     invariant(numSlots >= 1);
 
     // Generate a mock scan with a single output slot.
-    auto [scanSlot, scanStage] = generateVirtualScan(slotIdGenerator, arrTag, arrVal);
+    auto [scanSlot, scanStage] = generateVirtualScan(slotIdGenerator, arrTag, arrVal, yieldPolicy);
 
     // Create a ProjectStage that will read the data from 'scanStage' and split it up
     // across multiple output slots.

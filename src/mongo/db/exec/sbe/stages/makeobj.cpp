@@ -405,11 +405,11 @@ size_t MakeObjStageBase<O>::estimateCompileTimeSize() const {
 
 template <MakeObjOutputType O>
 void MakeObjStageBase<O>::doSaveState(bool relinquishCursor) {
-    if (!slotsAccessible() || !relinquishCursor) {
+    if (!relinquishCursor) {
         return;
     }
 
-    prepareForYielding(_obj);
+    prepareForYielding(_obj, slotsAccessible());
 }
 
 // Explicit template instantiations.

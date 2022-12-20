@@ -83,20 +83,32 @@ using MakeStageFn = std::function<std::pair<T, std::unique_ptr<PlanStage>>(
  */
 class PlanStageTestFixture : public CatalogTestFixture {
 public:
-    PlanStageTestFixture() = default;
+    PlanStageTestFixture(bool enableYield = true) : _enableYield(enableYield){};
 
     void setUp() override {
         CatalogTestFixture::setUp();
+        _yieldPolicy = _enableYield ? makeYieldPolicy() : nullptr;
         _slotIdGenerator.reset(new value::SlotIdGenerator());
+        _spoolIdGenerator.reset(new value::SpoolIdGenerator());
     }
 
     void tearDown() override {
-        _slotIdGenerator.reset();
+        _spoolIdGenerator.reset(nullptr);
+        _slotIdGenerator.reset(nullptr);
+        _yieldPolicy.reset(nullptr);
         CatalogTestFixture::tearDown();
     }
 
     value::SlotId generateSlotId() {
         return _slotIdGenerator->generate();
+    }
+
+    SpoolId generateSpoolId() {
+        return _spoolIdGenerator->generate();
+    }
+
+    PlanYieldPolicySBE* getYieldPolicy() const {
+        return _yieldPolicy.get();
     }
 
     /**
@@ -134,7 +146,8 @@ public:
      */
     std::pair<value::SlotId, std::unique_ptr<PlanStage>> generateVirtualScan(value::TypeTags arrTag,
                                                                              value::Value arrVal) {
-        return stage_builder::generateVirtualScan(_slotIdGenerator.get(), arrTag, arrVal);
+        return stage_builder::generateVirtualScan(
+            _slotIdGenerator.get(), arrTag, arrVal, _yieldPolicy.get());
     };
 
     /**
@@ -151,7 +164,7 @@ public:
     std::pair<value::SlotVector, std::unique_ptr<PlanStage>> generateVirtualScanMulti(
         int32_t numSlots, value::TypeTags arrTag, value::Value arrVal) {
         return stage_builder::generateVirtualScanMulti(
-            _slotIdGenerator.get(), numSlots, arrTag, arrVal);
+            _slotIdGenerator.get(), numSlots, arrTag, arrVal, _yieldPolicy.get());
     };
 
     /**
@@ -242,8 +255,28 @@ public:
                       value::Value expectedVal,
                       const MakeStageFn<value::SlotVector>& makeStageMulti);
 
+protected:
+    std::unique_ptr<PlanYieldPolicySBE> makeYieldPolicy() {
+        return std::make_unique<PlanYieldPolicySBE>(
+            PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+            operationContext()->getServiceContext()->getFastClockSource(),
+            0,
+            Milliseconds::zero(),
+            &_yieldable,
+            nullptr);
+    }
+
 private:
+    class MockYieldable : public Yieldable {
+        void yield() const override {}
+        void restore() const override {}
+    };
+
+    MockYieldable _yieldable;
+    bool _enableYield;
+    std::unique_ptr<PlanYieldPolicySBE> _yieldPolicy;
     std::unique_ptr<value::SlotIdGenerator> _slotIdGenerator;
+    std::unique_ptr<value::SpoolIdGenerator> _spoolIdGenerator;
 };
 
 }  // namespace mongo::sbe

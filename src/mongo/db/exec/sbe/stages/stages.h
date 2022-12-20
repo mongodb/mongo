@@ -124,19 +124,35 @@ public:
      * Ensures that accessor owns the underlying BSON value, which can be potentially owned by
      * storage.
      */
-    static void prepareForYielding(value::OwnedValueAccessor& accessor) {
-        auto [tag, value] = accessor.getViewOfValue();
-        if (shouldCopyValue(tag)) {
-            accessor.makeOwned();
+    void prepareForYielding(value::OwnedValueAccessor& accessor, bool isAccessible) {
+        if (isAccessible) {
+            auto [tag, value] = accessor.getViewOfValue();
+            if (shouldCopyValue(tag)) {
+                accessor.makeOwned();
+            }
+        } else {
+#if defined(MONGO_CONFIG_DEBUG_BUILD)
+            auto [tag, val] = value::getPoisonValue();
+            accessor.reset(false, tag, val);
+#endif
         }
     }
 
-    static void prepareForYielding(value::MaterializedRow& row) {
-        for (size_t idx = 0; idx < row.size(); idx++) {
-            auto [tag, value] = row.getViewOfValue(idx);
-            if (shouldCopyValue(tag)) {
-                row.makeOwned(idx);
+    void prepareForYielding(value::MaterializedRow& row, bool isAccessible) {
+        if (isAccessible) {
+            for (size_t idx = 0; idx < row.size(); idx++) {
+                auto [tag, value] = row.getViewOfValue(idx);
+                if (shouldCopyValue(tag)) {
+                    row.makeOwned(idx);
+                }
             }
+        } else {
+#if defined(MONGO_CONFIG_DEBUG_BUILD)
+            auto [tag, val] = value::getPoisonValue();
+            for (size_t idx = 0; idx < row.size(); idx++) {
+                row.reset(idx, false, tag, val);
+            }
+#endif
         }
     }
 
@@ -387,6 +403,10 @@ public:
         _participateInTrialRunTracking = false;
     }
 
+    bool slotsAccessible() const {
+        return _slotsAccessible;
+    }
+
 protected:
     PlanState trackPlanState(PlanState state) {
         if (state == PlanState::IS_EOF) {
@@ -402,10 +422,6 @@ protected:
     void trackClose() {
         _commonStats.closes++;
         _slotsAccessible = false;
-    }
-
-    bool slotsAccessible() const {
-        return _slotsAccessible;
     }
 
     /**

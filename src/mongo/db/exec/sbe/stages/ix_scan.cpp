@@ -127,16 +127,14 @@ value::SlotAccessor* IndexScanStageBase::getAccessor(CompileCtx& ctx, value::Slo
 
 void IndexScanStageBase::doSaveState(bool relinquishCursor) {
     if (relinquishCursor) {
-        if (slotsAccessible()) {
-            if (_recordAccessor) {
-                prepareForYielding(*_recordAccessor);
-            }
-            if (_recordIdAccessor) {
-                prepareForYielding(*_recordIdAccessor);
-            }
-            for (auto& accessor : _accessors) {
-                prepareForYielding(accessor);
-            }
+        if (_recordAccessor) {
+            prepareForYielding(*_recordAccessor, slotsAccessible());
+        }
+        if (_recordIdAccessor) {
+            prepareForYielding(*_recordIdAccessor, slotsAccessible());
+        }
+        for (auto& accessor : _accessors) {
+            prepareForYielding(accessor, slotsAccessible());
         }
 
         if (_cursor) {
@@ -463,10 +461,10 @@ void SimpleIndexScanStage::doSaveState(bool relinquishCursor) {
     // as the index scan is opened.
     if (_open && relinquishCursor) {
         if (_seekKeyLowHolder) {
-            prepareForYielding(*_seekKeyLowHolder);
+            prepareForYielding(*_seekKeyLowHolder, true);
         }
         if (_seekKeyHighHolder) {
-            prepareForYielding(*_seekKeyHighHolder);
+            prepareForYielding(*_seekKeyHighHolder, true);
         }
     }
 

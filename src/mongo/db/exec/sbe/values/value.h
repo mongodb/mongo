@@ -43,6 +43,7 @@
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
 #include "mongo/bson/ordering.h"
+#include "mongo/config.h"
 #include "mongo/db/exec/shard_filterer.h"
 #include "mongo/db/fts/fts_matcher.h"
 #include "mongo/db/query/bson_typemask.h"
@@ -1387,6 +1388,20 @@ std::pair<TypeTags, Value> makeCopyMakeObjSpec(const MakeObjSpec&);
 std::pair<TypeTags, Value> makeCopyCollator(const CollatorInterface& collator);
 
 std::pair<TypeTags, Value> makeCopyIndexBounds(const IndexBounds& collator);
+
+#if defined(MONGO_CONFIG_DEBUG_BUILD)
+/**
+ * Returns a poison value that should never be encountered in production.
+ * Used by asserts/invariants to invalidate values that should never be accessed.
+ */
+inline std::pair<TypeTags, Value> getPoisonValue() {
+    return {TypeTags::Nothing, (uint64_t)-1};
+}
+
+inline bool isPoisonValue(TypeTags tag, Value val) {
+    return tag == TypeTags::Nothing && val == (uint64_t)-1;
+}
+#endif
 
 inline std::pair<TypeTags, Value> copyValue(TypeTags tag, Value val) {
     switch (tag) {

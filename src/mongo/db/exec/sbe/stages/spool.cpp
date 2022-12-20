@@ -285,12 +285,12 @@ PlanState SpoolLazyProducerStage::getNext() {
 }
 
 void SpoolLazyProducerStage::doSaveState(bool relinquishCursor) {
-    if (!slotsAccessible() || !relinquishCursor) {
+    if (!relinquishCursor) {
         return;
     }
 
     for (auto& [slot, accessor] : _outAccessors) {
-        prepareForYielding(accessor);
+        prepareForYielding(accessor, slotsAccessible());
     }
 }
 

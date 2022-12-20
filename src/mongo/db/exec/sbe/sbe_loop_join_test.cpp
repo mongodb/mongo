@@ -33,6 +33,7 @@
 
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 #include "mongo/db/exec/sbe/stages/loop_join.h"
+#include "mongo/db/exec/sbe/stages/spool.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo::sbe {
@@ -163,6 +164,45 @@ TEST_F(LoopJoinStageTest, LoopJoinEqualityPredicate) {
 
         auto [innerTag, innerVal] = inner->copyOrMoveValue();
         assertValuesEqual(innerTag, innerVal, value::TypeTags::NumberInt32, expected[i]);
+    }
+    ASSERT_EQ(i, expected.size());
+}
+
+TEST_F(LoopJoinStageTest, LoopJoinInnerBlockingStage) {
+    auto ctx = makeCompileCtx();
+
+    // Build a scan for the outer loop.
+    auto [outerScanSlot, outerScanStage] = generateVirtualScan(BSON_ARRAY(1 << 2));
+
+    // Build a scan for the inner loop.
+    auto [innerScanSlot, innerScanStage] = generateVirtualScan(BSON_ARRAY(3 << 4 << 5));
+
+    auto spoolStage = makeS<SpoolEagerProducerStage>(
+        std::move(innerScanStage), generateSpoolId(), makeSV(innerScanSlot), kEmptyPlanNodeId);
+
+    // Build and prepare for execution loop join of the two scan stages.
+    auto loopJoin = makeS<LoopJoinStage>(std::move(outerScanStage),
+                                         std::move(spoolStage),
+                                         makeSV(outerScanSlot) /*outerProjects*/,
+                                         makeSV() /*outerCorrelated*/,
+                                         nullptr /*predicate*/,
+                                         kEmptyPlanNodeId);
+
+    prepareTree(ctx.get(), loopJoin.get());
+    auto outer = loopJoin->getAccessor(*ctx, outerScanSlot);
+    auto inner = loopJoin->getAccessor(*ctx, innerScanSlot);
+
+    // Expected output: cartesian product of the two scans.
+    std::vector<std::pair<int, int>> expected{{1, 3}, {1, 4}, {1, 5}, {2, 3}, {2, 4}, {2, 5}};
+    int i = 0;
+    for (auto st = loopJoin->getNext(); st == PlanState::ADVANCED; st = loopJoin->getNext(), i++) {
+        ASSERT_LT(i, expected.size());
+
+        auto [outerTag, outerVal] = outer->copyOrMoveValue();
+        assertValuesEqual(outerTag, outerVal, value::TypeTags::NumberInt32, expected[i].first);
+
+        auto [innerTag, innerVal] = inner->copyOrMoveValue();
+        assertValuesEqual(innerTag, innerVal, value::TypeTags::NumberInt32, expected[i].second);
     }
     ASSERT_EQ(i, expected.size());
 }

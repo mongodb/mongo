@@ -460,8 +460,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     }
 
     inputGuard.reset();
-    auto [scanSlots, scanStage] =
-        generateVirtualScanMulti(&_slotIdGenerator, vsn->hasRecordId ? 2 : 1, inputTag, inputVal);
+    auto [scanSlots, scanStage] = generateVirtualScanMulti(
+        &_slotIdGenerator, vsn->hasRecordId ? 2 : 1, inputTag, inputVal, _yieldPolicy);
 
     sbe::value::SlotId resultSlot;
     if (vsn->hasRecordId) {

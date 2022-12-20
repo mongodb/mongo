@@ -290,11 +290,11 @@ void TraverseStage::doSaveState(bool relinquishCursor) {
         _outFieldOutputAccessor.reset();
     }
 
-    if (!slotsAccessible() || !relinquishCursor) {
+    if (!relinquishCursor) {
         return;
     }
 
-    prepareForYielding(_outFieldOutputAccessor);
+    prepareForYielding(_outFieldOutputAccessor, slotsAccessible());
 }
 
 void TraverseStage::doRestoreState(bool relinquishCursor) {

@@ -31,6 +31,7 @@
 
 #include <type_traits>
 
+#include "mongo/config.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/util/id_generator.h"
 
@@ -72,6 +73,21 @@ public:
      * make a deep copy. The returned value is owned by the caller.
      */
     virtual std::pair<TypeTags, Value> copyOrMoveValue() = 0;
+};
+
+class SlotAccessorHelper {
+public:
+    /**
+     * Asserts that a value has not been invalidated.
+     */
+    MONGO_COMPILER_ALWAYS_INLINE static void dassertValidSlotValue(TypeTags tag, Value val) {
+#if defined(MONGO_CONFIG_DEBUG_BUILD)
+        tassert(7200401,
+                str::stream() << "Unexpected poison value. Likely attempted to access a slot that "
+                                 "was disabled and invalidated in save/restore cycle.",
+                !value::isPoisonValue(tag, val));
+#endif
+    }
 };
 
 /**
@@ -151,6 +167,7 @@ public:
      * Returns a non-owning view of the value.
      */
     std::pair<TypeTags, Value> getViewOfValue() const override {
+        SlotAccessorHelper::dassertValidSlotValue(_tag, _val);
         return {_tag, _val};
     }
 
@@ -160,6 +177,7 @@ public:
      * the caller owns the resulting value.
      */
     std::pair<TypeTags, Value> copyOrMoveValue() override {
+        SlotAccessorHelper::dassertValidSlotValue(_tag, _val);
         if (_owned) {
             _owned = false;
             return {_tag, _val};
@@ -416,10 +434,12 @@ public:
     }
 
     std::pair<value::TypeTags, value::Value> getViewOfValue(size_t idx) const {
+        SlotAccessorHelper::dassertValidSlotValue(tags()[idx], values()[idx]);
         return {tags()[idx], values()[idx]};
     }
 
     std::pair<value::TypeTags, value::Value> copyOrMoveValue(size_t idx) {
+        SlotAccessorHelper::dassertValidSlotValue(tags()[idx], values()[idx]);
         if (owned()[idx]) {
             owned()[idx] = false;
             return {tags()[idx], values()[idx]};
