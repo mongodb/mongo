@@ -22,7 +22,7 @@ if _IS_WINDOWS:
 PROCS_TIMEOUT_SECS = 60
 
 
-def call(args, logger):
+def call(args, logger, timeout_seconds=None, pinfo=None):
     """Call subprocess on args list."""
     logger.info(str(args))
 
@@ -31,7 +31,16 @@ def call(args, logger):
     logger_pipe = core.pipe.LoggerPipe(logger, logging.INFO, process.stdout)
     logger_pipe.wait_until_started()
 
-    ret = process.wait()
+    try:
+        ret = process.wait(timeout=timeout_seconds)
+    except subprocess.TimeoutExpired:
+        logger.error("Killing %s processes with PIDs %s because time limit expired", pinfo.name,
+                     str(pinfo.pidv))
+        process.kill()
+        process.wait()
+        logger_pipe.wait_until_finished()
+        return
+
     logger_pipe.wait_until_finished()
 
     if ret != 0:
