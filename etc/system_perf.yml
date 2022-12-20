@@ -1310,7 +1310,6 @@ buildvariants:
       - name: tpch_10_normalized
       - name: tpch_10_denormalized
       - name: column_store_index_charts_events_1G
-      - name: column_store_index_charts_events_15G
       - name: ssb_column_store_comparison
 
   - name: linux-standalone-classic-query-engine
@@ -1421,6 +1420,34 @@ buildvariants:
     tasks:
       - name: linkbench
       - name: linkbench2
+
+  - name: linux-1-node-replSet-lite-all-feature-flags.2022-11
+    display_name: Linux 1-Node ReplSet (graviton lite, all FF) 2022-11
+    # TODO SERVER-70644: Will make it less frequent when the columnstore index project is finished.
+    cron: "0 0 * * 0,2,3,4,5" # Run it every day except Saturday and Monday.
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      workload_setup: 2022-11
+      mongodb_setup: single-replica-all-feature-flags
+      infrastructure_provisioning: graviton-single-lite.2022-11
+      infrastructure_provisioning_release: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile-variant: -arm64
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: bestbuy_4_analytics
+      - name: bestbuy_4_analytics_columnstore
+      - name: column_store_index_charts_events_1G
+      - name: column_store_index_charts_events_15G
+      - name: ssb_column_store_comparison
 
   - name: compile-rhel70
     display_name: Compile for Atlas-like
@@ -2484,7 +2511,6 @@ buildvariants:
       - name: tpch_10_normalized
       - name: tpch_10_denormalized
       - name: column_store_index_charts_events_1G
-      - name: column_store_index_charts_events_15G
       - name: ssb_column_store_comparison
 
   - name: linux-standalone-classic-query-engine.2022-11
