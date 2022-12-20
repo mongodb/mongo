@@ -148,7 +148,7 @@ const kCmdsAllowedWithSecurityToken = new Set([
     // `connectionStatus`,
     // `connPoolStats`,
     // `top`,
-    // `killop`,
+    `killop`,
     // `endSessions`,
 ]);
 

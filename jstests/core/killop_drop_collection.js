@@ -4,7 +4,7 @@
  * This test confirms that killOp won't interrupt a collection drop, and that the drop occurs
  * successfully.
  *
- * The test runs commands that are not allowed with security token: fsyncUnlock, killOp.
+ * The test runs commands that are not allowed with security token: fsyncUnlock.
  * @tags: [
  *   not_allowed_with_security_token,
  *   assumes_superuser_permissions,

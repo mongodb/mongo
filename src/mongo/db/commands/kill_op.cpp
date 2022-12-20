@@ -67,6 +67,10 @@ public:
         // killOp always reports success once past the auth check.
         return true;
     }
+
+    bool allowedWithSecurityToken() const final {
+        return true;
+    }
 } killOpCmd;
 
 }  // namespace mongo

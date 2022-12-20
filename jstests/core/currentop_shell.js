@@ -2,7 +2,7 @@
  * Tests that the shell helper db.currentOpCursor isn't constrained by the legacy currentOp server
  * command - ie. the result set isn't limited to 16MB and long operations aren't truncated.
  *
- * The test runs commands that are not allowed with security token: getLog, killOp.
+ * The test runs commands that are not allowed with security token: getLog.
  * @tags: [
  *   not_allowed_with_security_token,
  *   uses_parallel_shell,
