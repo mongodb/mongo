@@ -5937,7 +5937,7 @@ tasks:
 
 - <<: *gen_task_template
   name: concurrency_sharded_initial_sync_gen
-  tags: ["concurrency", "stepdowns", "initsync", "large", "sharded", "no_debug_mode"]
+  tags: ["concurrency", "stepdowns", "initsync", "large", "sharded", "no_debug_mode", "requires_wt"]
   commands:
   - func: "generate resmoke tasks"
     vars:
