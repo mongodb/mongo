@@ -119,7 +119,8 @@ public:
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             AutoGetCollectionForRead autoColl(opCtx, CollectionType::ConfigNS);
             const auto& collection = autoColl.getCollection();
-            const auto numShardedCollections = collection ? collection->numRecords(opCtx) : 0;
+            const std::size_t numShardedCollections =
+                collection ? collection->numRecords(opCtx) : 0;
             result.appendNumber("numShardedCollections", numShardedCollections);
         }
 
