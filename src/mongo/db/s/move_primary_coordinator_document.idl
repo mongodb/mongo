@@ -42,11 +42,12 @@ enums:
         type: string
         values:
             kUnset: "unset"
-            kCheckPreconditions: "checkPreconditions"
-            kCloneCatalogData: "cloneCatalogData"
+            kClone: "clone"
+            kCatchup: "catchup"
             kEnterCriticalSection: "enterCriticalSection"
-            kCommitMetadataChanges: "commitMetadataChanges"
-            kCleanStaleData: "cleanStaleData"
+            kCommit: "commit"
+            kExitCriticalSection: "exitCriticalSection"
+            kClean: "clean"
 
 structs:
     MovePrimaryCoordinatorDocument:
@@ -63,3 +64,7 @@ structs:
             toShardId:
                 type: shard_id
                 description: "Destination shard of the database."
+            collectionsToClone:
+                type: array<namespacestring>
+                description: "List of collections to be cloned by the destination shard."
+                optional: true

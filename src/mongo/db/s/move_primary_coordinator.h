@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2021-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -31,6 +31,7 @@
 
 #include "mongo/db/s/move_primary_coordinator_document_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
+#include "mongo/s/client/shard.h"
 
 namespace mongo {
 
@@ -42,7 +43,7 @@ public:
     using Phase = MovePrimaryCoordinatorPhaseEnum;
 
     MovePrimaryCoordinator(ShardingDDLCoordinatorService* service, const BSONObj& initialState);
-    ~MovePrimaryCoordinator() = default;
+    virtual ~MovePrimaryCoordinator() = default;
 
     void checkIfOptionsConflict(const BSONObj& doc) const override;
     bool canAlwaysStartWhenUserWritesAreDisabled() const override;
@@ -53,7 +54,101 @@ private:
     ExecutorFuture<void> _runImpl(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                   const CancellationToken& token) noexcept override;
 
+    ExecutorFuture<void> runMovePrimaryWorkflow(
+        std::shared_ptr<executor::ScopedTaskExecutor> executor,
+        const CancellationToken& token) noexcept;
+
+    /**
+     * Logs in the `config.changelog` collection a specific event for `movePrimary` operations.
+     */
+    void logChange(OperationContext* opCtx, const std::string& what) const;
+
+    /**
+     * Returns the list of unsharded collections for the given database. These are the collections
+     * the recipient is expected to clone.
+     */
+    std::vector<NamespaceString> getUnshardedCollections(OperationContext* opCtx);
+
+    /**
+     * Requests to the recipient to clone all the collections of the given database currently owned
+     * by this shard. Once the cloning is complete, the recipient returns the list of the actually
+     * cloned collections as part of the response.
+     */
+    StatusWith<Shard::CommandResponse> cloneDataToRecipient(OperationContext* opCtx) const;
+
+    /**
+     * Returns `true` whether the list of actually cloned collections (returned by the cloning
+     * command response) matches the list of collection to clone (persisted in the coordinator
+     * document), `false` otherwise.
+     */
+    bool checkClonedData(Shard::CommandResponse cloneResponse) const;
+
+    /**
+     * Commits the new primary shard for the given database to the config server. The database
+     * version is passed to the config server's command as an idempotency key.
+     */
+    StatusWith<Shard::CommandResponse> commitMetadataToConfig(
+        OperationContext* opCtx, const DatabaseVersion& preCommitDbVersion) const;
+
+    /**
+     * Ensures that the metadata changes have been actually commited on the config server, asserting
+     * otherwise. This is a pedantic check to rule out any potentially disastrous problems.
+     */
+    void assertChangedMetadataOnConfig(OperationContext* opCtx,
+                                       const DatabaseVersion& preCommitDbVersion) const;
+
+    /**
+     * Clears the database metadata in the local catalog cache. Secondary nodes clear the database
+     * metadata as a result of exiting the critical section of the primary node
+     * (`kExitCriticalSection` phase).
+     */
+    void clearDbMetadataOnPrimary(OperationContext* opCtx) const;
+
+    /**
+     * Drops stale collections on the donor.
+     */
+    void dropStaleDataOnDonor(OperationContext* opCtx) const;
+
+    /**
+     * Blocks write operations on the database, causing them to fail with the
+     * `MovePrimaryInProgress` error.
+     *
+     * TODO (SERVER-71566): This is a synchronization mechanism specifically designed for
+     * `movePrimary` operations. It will likely be replaced by the critical section once the time
+     * frame in which writes are blocked is reduced. Writes are already blocked in the `kCatchup`
+     * phase.
+     */
+    void blockWritesLegacy(OperationContext* opCtx) const;
+
+    /**
+     * Unblocks write operations on the database.
+     *
+     * TODO (SERVER-71566): This is a synchronization mechanism specifically designed for
+     * `movePrimary` operations. It will likely be replaced by the critical section once the time
+     * frame in which writes are blocked is reduced. Reads and writes are already unblocked in the
+    // `kExitCriticalSection` phase.
+     */
+    void unblockWritesLegacy(OperationContext* opCtx) const;
+
+    /**
+     * Blocks write operations on the database, causing them to wait until the critical section has
+     * entered.
+     */
+    void blockWrites(OperationContext* opCtx) const;
+
+    /**
+     * Blocks read operations on the database, causing them to wait until the critical section has
+     * entered.
+     */
+    void blockReads(OperationContext* opCtx) const;
+
+    /**
+     * Unblocks read and write operations on the database.
+     */
+    void unblockReadsAndWrites(OperationContext* opCtx) const;
+
     const DatabaseName _dbName;
+    const BSONObj _csReason;
 };
 
 }  // namespace mongo

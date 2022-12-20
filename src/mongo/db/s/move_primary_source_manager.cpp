@@ -108,7 +108,7 @@ Status MovePrimarySourceManager::clone(OperationContext* opCtx) {
 
         auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
             opCtx, getNss().dbName(), DSSAcquisitionMode::kExclusive);
-        scopedDss->setMovePrimarySourceManager(opCtx, this);
+        scopedDss->setMovePrimaryInProgress(opCtx);
     }
 
     _state = kCloning;
@@ -511,7 +511,7 @@ void MovePrimarySourceManager::_cleanup(OperationContext* opCtx) {
 
         auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
             opCtx, getNss().dbName(), DSSAcquisitionMode::kExclusive);
-        scopedDss->clearMovePrimarySourceManager(opCtx);
+        scopedDss->unsetMovePrimaryInProgress(opCtx);
         DatabaseHolder::get(opCtx)->clearDbInfo(opCtx, getNss().dbName());
 
         // Leave the critical section if we're still registered.

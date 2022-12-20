@@ -97,7 +97,7 @@ public:
         const auto dbName = parseNs({boost::none, ""}, cmdObj).dbName();
 
         const NamespaceString dbNss(dbName);
-        const auto toShard = movePrimaryRequest.getTo();
+        const auto toShardArg = movePrimaryRequest.getTo();
 
         uassert(
             ErrorCodes::InvalidNamespace,
@@ -110,7 +110,7 @@ public:
 
         uassert(ErrorCodes::InvalidOptions,
                 str::stream() << "you have to specify where you want to move it",
-                !toShard.empty());
+                !toShardArg.empty());
 
         CommandHelpers::uassertCommandRunWithMajority(getName(), opCtx->getWriteConcern());
 
@@ -127,7 +127,7 @@ public:
                     MovePrimaryCoordinatorDocument doc;
                     doc.setShardingDDLCoordinatorMetadata(
                         {{dbNss, DDLCoordinatorTypeEnum::kMovePrimaryNoResilient}});
-                    doc.setToShardId(toShard.toString());
+                    doc.setToShardId(toShardArg.toString());
                     return doc.toBSON();
                 }();
 
@@ -140,11 +140,19 @@ public:
                 return coordinator->getCompletionFuture();
             }
 
+            auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+            // Ensure that the shard information is up-to-date as possible to catch the case where
+            // a shard with the same name, but with a different host, has been removed/re-added.
+            shardRegistry->reload(opCtx);
+            const auto toShard = uassertStatusOKWithContext(
+                shardRegistry->getShard(opCtx, toShardArg.toString()),
+                "Requested primary shard {} does not exist"_format(toShardArg));
+
             const auto coordinatorDoc = [&] {
                 MovePrimaryCoordinatorDocument doc;
                 doc.setShardingDDLCoordinatorMetadata(
                     {{dbNss, DDLCoordinatorTypeEnum::kMovePrimary}});
-                doc.setToShardId(toShard.toString());
+                doc.setToShardId(toShard->getId());
                 return doc.toBSON();
             }();
 

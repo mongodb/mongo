@@ -35,8 +35,6 @@
 
 namespace mongo {
 
-class MovePrimarySourceManager;
-
 enum class DSSAcquisitionMode { kShared, kExclusive };
 
 /**
@@ -112,25 +110,28 @@ public:
     }
 
     /**
-     * Returns the active movePrimary source manager, if one is available.
+     * Returns `true` whether a `movePrimary` operation on this database is in progress, `false`
+     * otherwise.
      */
     bool isMovePrimaryInProgress() const {
-        return _sourceMgr;
+        return _movePrimaryInProgress;
     }
 
     /**
-     * Attaches a movePrimary source manager to this database's sharding state. Must be called with
-     * the database lock in X mode. May not be called if there is a movePrimary source manager
-     * already installed. Must be followed by a call to clearMovePrimarySourceManager.
+     * Declares that a `movePrimary` operation on this database is in progress. This causes write
+     * operations on this database to fail with the `MovePrimaryInProgress` error.
+     *
+     * Must be called with the database locked in X mode.
      */
-    void setMovePrimarySourceManager(OperationContext* opCtx, MovePrimarySourceManager* sourceMgr);
+    void setMovePrimaryInProgress(OperationContext* opCtx);
 
     /**
-     * Removes a movePrimary source manager from this database's sharding state. Must be called with
-     * with the database lock in X mode. May not be called if there isn't a movePrimary source
-     * manager installed already through a previous call to setMovePrimarySourceManager.
+     * Declares that the `movePrimary` operation on this database is over. This re-enables write
+     * operations on this database.
+     *
+     * Must be called with the database locked in IX mode.
      */
-    void clearMovePrimarySourceManager(OperationContext* opCtx);
+    void unsetMovePrimaryInProgress(OperationContext* opCtx);
 
     /**
      * Sets the database metadata refresh future for other threads to wait on it.
@@ -174,12 +175,9 @@ private:
 
     ShardingMigrationCriticalSection _critSec;
 
-    // If this database is serving as a source shard for a movePrimary, the source manager will be
-    // non-null. To write this value, there needs to be X-lock on the database in order to
-    // synchronize with other callers which will read the source manager.
-    //
-    // NOTE: The source manager is not owned by this class.
-    MovePrimarySourceManager* _sourceMgr{nullptr};
+    // Is `true` when this database is serving as a source shard for a movePrimary, `false`
+    // otherwise.
+    bool _movePrimaryInProgress{false};
 
     // Tracks the ongoing database metadata refresh. Possibly keeps a future for other threads to
     // wait on it, and a cancellation source to cancel the ongoing database metadata refresh.

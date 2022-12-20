@@ -60,6 +60,8 @@ class Status;
  *
  * At any point in time it is safe to let the MovePrimarySourceManager object go out of scope in
  * which case the destructor will take care of clean up based on how far we have advanced.
+ *
+ * TODO (SERVER-71309): Remove once 7.0 becomes last LTS.
  */
 class MovePrimarySourceManager {
     MovePrimarySourceManager(const MovePrimarySourceManager&) = delete;

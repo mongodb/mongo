@@ -156,18 +156,14 @@ void DatabaseShardingState::exitCriticalSectionNoChecks(OperationContext* opCtx)
     _critSec.exitCriticalSectionNoChecks();
 }
 
-void DatabaseShardingState::setMovePrimarySourceManager(OperationContext* opCtx,
-                                                        MovePrimarySourceManager* sourceMgr) {
+void DatabaseShardingState::setMovePrimaryInProgress(OperationContext* opCtx) {
     invariant(opCtx->lockState()->isDbLockedForMode(_dbName, MODE_X));
-    invariant(sourceMgr);
-    invariant(!_sourceMgr);
-
-    _sourceMgr = sourceMgr;
+    _movePrimaryInProgress = true;
 }
 
-void DatabaseShardingState::clearMovePrimarySourceManager(OperationContext* opCtx) {
+void DatabaseShardingState::unsetMovePrimaryInProgress(OperationContext* opCtx) {
     invariant(opCtx->lockState()->isDbLockedForMode(_dbName, MODE_IX));
-    _sourceMgr = nullptr;
+    _movePrimaryInProgress = false;
 }
 
 void DatabaseShardingState::setDbMetadataRefreshFuture(SharedSemiFuture<void> future,
