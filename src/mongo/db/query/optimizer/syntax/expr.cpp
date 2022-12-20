@@ -75,6 +75,11 @@ ABT Constant::fromDouble(double value) {
     return make<Constant>(TypeTags::NumberDouble, bitcastFrom<double>(value));
 }
 
+ABT Constant::fromDecimal(const Decimal128& value) {
+    auto [tag, val] = makeCopyDecimal(value);
+    return make<Constant>(tag, val);
+}
+
 ABT Constant::timestamp(const Timestamp& t) {
     return make<Constant>(TypeTags::Timestamp, bitcastFrom<uint64_t>(t.asULL()));
 }

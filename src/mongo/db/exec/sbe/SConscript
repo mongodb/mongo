@@ -268,3 +268,14 @@ env.CppUnitTest(
         'sbe_abt_test_util',
     ],
 )
+
+env.CppUnitTest(
+    target='abt_lowering_test',
+    source=[
+        'abt/abt_lower_test.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/unittest/unittest',
+        'query_sbe_abt',
+    ],
+)

@@ -58,6 +58,8 @@ public:
 
     static ABT fromDouble(double value);
 
+    static ABT fromDecimal(const Decimal128& value);
+
     static ABT emptyObject();
     static ABT emptyArray();
 
