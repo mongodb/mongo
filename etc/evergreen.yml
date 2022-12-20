@@ -2824,6 +2824,7 @@ buildvariants:
   name: &enterprise-rhel80-debug-complete-tsan enterprise-rhel80-debug-complete-tsan
   display_name: "~ TSAN Enterprise RHEL 8.0 COMPLETE DEBUG"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  activate: false
   modules:
   - enterprise
   run_on:
