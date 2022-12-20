@@ -375,17 +375,18 @@ TEST_F(SplitChunkTest, NonExisingNamespaceErrors) {
 
         setupCollection(nss, _keyPattern, {chunk});
 
-        ASSERT_THROWS_WHAT(ShardingCatalogManager::get(operationContext())
-                               ->commitChunkSplit(operationContext(),
-                                                  NamespaceString("TestDB.NonExistingColl"),
-                                                  collEpoch,
-                                                  Timestamp{50, 0},
-                                                  ChunkRange(chunkMin, chunkMax),
-                                                  splitPoints,
-                                                  "shard0000",
-                                                  false /* fromChunkSplitter*/),
-                           DBException,
-                           "Collection does not exist");
+        ASSERT_EQUALS(ShardingCatalogManager::get(operationContext())
+                          ->commitChunkSplit(operationContext(),
+                                             NamespaceString("TestDB.NonExistingColl"),
+                                             collEpoch,
+                                             Timestamp{50, 0},
+                                             ChunkRange(chunkMin, chunkMax),
+                                             splitPoints,
+                                             "shard0000",
+                                             false /* fromChunkSplitter*/)
+                          .getStatus()
+                          .code(),
+                      ErrorCodes::ConflictingOperationInProgress);
     };
 
     test(_nss2, Timestamp(42));

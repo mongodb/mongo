@@ -564,7 +564,7 @@ let viewsCommandTests = {
         skipStandalone: true,
         isAdminCommand: true,
         expectFailure: true,
-        expectedErrorCode: ErrorCodes.NamespaceNotFound,
+        expectedErrorCode: ErrorCodes.ConflictingOperationInProgress,
     },
     replSetAbortPrimaryCatchUp: {skip: isUnrelated},
     replSetFreeze: {skip: isUnrelated},
