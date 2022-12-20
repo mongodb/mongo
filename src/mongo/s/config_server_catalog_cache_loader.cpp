@@ -34,6 +34,7 @@
 
 #include <memory>
 
+#include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -58,7 +59,10 @@ CollectionAndChangedChunks getChangedChunks(OperationContext* opCtx,
                                             const NamespaceString& nss,
                                             ChunkVersion sinceVersion) {
     const auto readConcern = [&]() -> repl::ReadConcernArgs {
-        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
+            !gFeatureFlagConfigServerAlwaysShardRemote.isEnabledAndIgnoreFCV()) {
+            // When the feature flag is on, the config server may read from a secondary which may
+            // need to wait for replication, so we should use afterClusterTime.
             return {repl::ReadConcernLevel::kSnapshotReadConcern};
         } else {
             const auto vcTime = VectorClock::get(opCtx)->getTime();

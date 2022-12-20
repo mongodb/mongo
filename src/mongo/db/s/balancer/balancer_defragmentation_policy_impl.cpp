@@ -69,16 +69,17 @@ ShardVersion getShardVersion(OperationContext* opCtx,
 }
 
 std::vector<ChunkType> getCollectionChunks(OperationContext* opCtx, const CollectionType& coll) {
-    return uassertStatusOK(Grid::get(opCtx)->catalogClient()->getChunks(
-        opCtx,
-        BSON(ChunkType::collectionUUID() << coll.getUuid()) /*query*/,
-        BSON(ChunkType::min() << 1) /*sort*/,
-        boost::none /*limit*/,
-        nullptr /*opTime*/,
-        coll.getEpoch(),
-        coll.getTimestamp(),
-        repl::ReadConcernLevel::kLocalReadConcern,
-        boost::none));
+    auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
+    return uassertStatusOK(
+        catalogClient->getChunks(opCtx,
+                                 BSON(ChunkType::collectionUUID() << coll.getUuid()) /*query*/,
+                                 BSON(ChunkType::min() << 1) /*sort*/,
+                                 boost::none /*limit*/,
+                                 nullptr /*opTime*/,
+                                 coll.getEpoch(),
+                                 coll.getTimestamp(),
+                                 repl::ReadConcernLevel::kLocalReadConcern,
+                                 boost::none));
 }
 
 uint64_t getCollectionMaxChunkSizeBytes(OperationContext* opCtx, const CollectionType& coll) {
@@ -1181,16 +1182,17 @@ class SplitChunksPhase : public DefragmentationPhase {
 public:
     static std::unique_ptr<SplitChunksPhase> build(OperationContext* opCtx,
                                                    const CollectionType& coll) {
-        auto collectionChunks = uassertStatusOK(Grid::get(opCtx)->catalogClient()->getChunks(
-            opCtx,
-            BSON(ChunkType::collectionUUID() << coll.getUuid()) /*query*/,
-            BSON(ChunkType::min() << 1) /*sort*/,
-            boost::none /*limit*/,
-            nullptr /*opTime*/,
-            coll.getEpoch(),
-            coll.getTimestamp(),
-            repl::ReadConcernLevel::kLocalReadConcern,
-            boost::none));
+        auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
+        auto collectionChunks = uassertStatusOK(
+            catalogClient->getChunks(opCtx,
+                                     BSON(ChunkType::collectionUUID() << coll.getUuid()) /*query*/,
+                                     BSON(ChunkType::min() << 1) /*sort*/,
+                                     boost::none /*limit*/,
+                                     nullptr /*opTime*/,
+                                     coll.getEpoch(),
+                                     coll.getTimestamp(),
+                                     repl::ReadConcernLevel::kLocalReadConcern,
+                                     boost::none));
 
         stdx::unordered_map<ShardId, PendingActions> pendingActionsByShards;
 
@@ -1421,7 +1423,8 @@ void BalancerDefragmentationPolicyImpl::startCollectionDefragmentation(Operation
 void BalancerDefragmentationPolicyImpl::abortCollectionDefragmentation(OperationContext* opCtx,
                                                                        const NamespaceString& nss) {
     stdx::lock_guard<Latch> lk(_stateMutex);
-    auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss, {});
+    auto coll =
+        ShardingCatalogManager::get(opCtx)->localCatalogClient()->getCollection(opCtx, nss, {});
     if (coll.getDefragmentCollection()) {
         if (_defragmentationStates.contains(coll.getUuid())) {
             // Notify phase to abort current phase
@@ -1593,7 +1596,8 @@ bool BalancerDefragmentationPolicyImpl::_advanceToNextActionablePhase(OperationC
     boost::optional<CollectionType> coll(boost::none);
     while (phaseTransitionNeeded()) {
         if (!coll) {
-            coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, collUuid);
+            coll = ShardingCatalogManager::get(opCtx)->localCatalogClient()->getCollection(
+                opCtx, collUuid);
         }
         currentPhase = _transitionPhases(opCtx, *coll, currentPhase->getNextPhase());
         advanced = true;

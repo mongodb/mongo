@@ -32,6 +32,7 @@
 #include <fmt/format.h>
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/repl/optime_with.h"
@@ -1005,7 +1006,10 @@ CatalogCache::IndexCache::LookupResult CatalogCache::IndexCache::_lookupIndexes(
                                   "timeInStore"_attr = previousVersion);
 
         const auto readConcern = [&]() -> repl::ReadConcernArgs {
-            if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
+                !gFeatureFlagConfigServerAlwaysShardRemote.isEnabledAndIgnoreFCV()) {
+                // When the feature flag is on, the config server may read from a secondary which
+                // may need to wait for replication, so we should use afterClusterTime.
                 return {repl::ReadConcernLevel::kSnapshotReadConcern};
             } else {
                 const auto vcTime = VectorClock::get(opCtx)->getTime();

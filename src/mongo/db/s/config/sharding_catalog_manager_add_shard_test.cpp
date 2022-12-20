@@ -85,8 +85,8 @@ protected:
         setUpAndInitializeConfigDb();
 
         auto clusterIdLoader = ClusterIdentityLoader::get(operationContext());
-        ASSERT_OK(clusterIdLoader->loadClusterId(operationContext(),
-                                                 repl::ReadConcernLevel::kLocalReadConcern));
+        ASSERT_OK(clusterIdLoader->loadClusterId(
+            operationContext(), catalogClient(), repl::ReadConcernLevel::kLocalReadConcern));
         _clusterId = clusterIdLoader->getClusterId();
     }
 

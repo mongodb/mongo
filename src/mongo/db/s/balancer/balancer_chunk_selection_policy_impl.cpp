@@ -38,6 +38,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj_comparator_interface.h"
+#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/sharding_config_server_parameters_gen.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/logv2/log.h"
@@ -175,7 +176,8 @@ getDataSizeInfoForCollections(OperationContext* opCtx,
 
 CollectionDataSizeInfoForBalancing getDataSizeInfoForCollection(OperationContext* opCtx,
                                                                 const NamespaceString& nss) {
-    const auto coll = Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
+    const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
+    const auto coll = catalogClient->getCollection(opCtx, nss);
     std::vector<CollectionType> vec{coll};
     return std::move(getDataSizeInfoForCollections(opCtx, vec).at(nss));
 }
@@ -348,7 +350,8 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToSpli
 
     const auto& shardStats = shardStatsStatus.getValue();
 
-    auto collections = Grid::get(opCtx)->catalogClient()->getCollections(opCtx, {});
+    const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
+    auto collections = catalogClient->getCollections(opCtx, {});
     if (collections.empty()) {
         return SplitInfoVector{};
     }
@@ -412,7 +415,8 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
         return MigrateInfoVector{};
     }
 
-    auto collections = Grid::get(opCtx)->catalogClient()->getCollections(opCtx, {});
+    const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
+    auto collections = catalogClient->getCollections(opCtx, {});
     if (collections.empty()) {
         return MigrateInfoVector{};
     }
@@ -506,7 +510,7 @@ StatusWith<MigrateInfosWithReason> BalancerChunkSelectionPolicyImpl::selectChunk
 
     // Used to check locally if the collection exists, it should trow NamespaceNotFound if it
     // doesn't.
-    Grid::get(opCtx)->catalogClient()->getCollection(opCtx, nss);
+    ShardingCatalogManager::get(opCtx)->localCatalogClient()->getCollection(opCtx, nss);
 
     stdx::unordered_set<ShardId> availableShards;
     std::transform(shardStats.begin(),
@@ -569,7 +573,8 @@ Status BalancerChunkSelectionPolicyImpl::checkMoveAllowed(OperationContext* opCt
         return shardStatsStatus.getStatus();
     }
 
-    const CollectionType collection = Grid::get(opCtx)->catalogClient()->getCollection(
+    const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
+    const CollectionType collection = catalogClient->getCollection(
         opCtx, chunk.getCollectionUUID(), repl::ReadConcernLevel::kLocalReadConcern);
     const auto& nss = collection.getNss();
 

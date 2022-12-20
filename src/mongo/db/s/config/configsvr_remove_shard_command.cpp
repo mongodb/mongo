@@ -118,7 +118,7 @@ public:
             return shard->getId();
         }();
 
-        const auto catalogClient = Grid::get(opCtx)->catalogClient();
+        const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
         const auto shardingCatalogManager = ShardingCatalogManager::get(opCtx);
 
         const auto shardDrainingStatus = [&] {

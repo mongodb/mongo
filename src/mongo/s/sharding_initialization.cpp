@@ -239,8 +239,9 @@ Status loadGlobalSettingsFromConfigServer(OperationContext* opCtx) {
         }
 
         try {
+            auto catalogClient = Grid::get(opCtx)->catalogClient();
             uassertStatusOK(ClusterIdentityLoader::get(opCtx)->loadClusterId(
-                opCtx, repl::ReadConcernLevel::kMajorityReadConcern));
+                opCtx, catalogClient, repl::ReadConcernLevel::kMajorityReadConcern));
             // Assert will be raised on failure to talk to config server.
             loadCWWCFromConfigServerForReplication(opCtx);
             return Status::OK();

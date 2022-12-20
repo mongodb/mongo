@@ -227,8 +227,7 @@ StatusWith<ChunkVersion> getMaxChunkVersionFromQueryResponse(
  * Helper function to get the collection entry and version for nss. Always uses kLocalReadConcern.
  */
 StatusWith<std::pair<CollectionType, ChunkVersion>> getCollectionAndVersion(
-    OperationContext* opCtx, const NamespaceString& nss) {
-    auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    OperationContext* opCtx, Shard* configShard, const NamespaceString& nss) {
     auto findCollResponse =
         configShard->exhaustiveFindOnConfig(opCtx,
                                             ReadPreferenceSetting{ReadPreference::PrimaryOnly},
@@ -250,14 +249,13 @@ StatusWith<std::pair<CollectionType, ChunkVersion>> getCollectionAndVersion(
     const auto chunksQuery = BSON(ChunkType::collectionUUID << coll.getUuid());
     const auto version = uassertStatusOK(getMaxChunkVersionFromQueryResponse(
         coll,
-        Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
-            opCtx,
-            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-            repl::ReadConcernLevel::kLocalReadConcern,
-            ChunkType::ConfigNS,
-            chunksQuery,                     // Query all chunks for this namespace.
-            BSON(ChunkType::lastmod << -1),  // Sort by version.
-            1))                              // Limit 1.
+        configShard->exhaustiveFindOnConfig(opCtx,
+                                            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                                            repl::ReadConcernLevel::kLocalReadConcern,
+                                            ChunkType::ConfigNS,
+                                            chunksQuery,  // Query all chunks for this namespace.
+                                            BSON(ChunkType::lastmod << -1),  // Sort by version.
+                                            1))                              // Limit 1.
     );
 
     return std::pair<CollectionType, ChunkVersion>{std::move(coll), std::move(version)};
@@ -367,7 +365,8 @@ void ShardingCatalogManager::bumpMajorVersionOneChunkPerShard(
     const NamespaceString& nss,
     TxnNumber txnNumber,
     const std::vector<ShardId>& shardIds) {
-    const auto [coll, curCollectionVersion] = uassertStatusOK(getCollectionAndVersion(opCtx, nss));
+    const auto [coll, curCollectionVersion] =
+        uassertStatusOK(getCollectionAndVersion(opCtx, _localConfigShard.get(), nss));
     ChunkVersion targetChunkVersion(
         {curCollectionVersion.epoch(), curCollectionVersion.getTimestamp()},
         {curCollectionVersion.majorVersion() + 1, 0});
@@ -596,7 +595,7 @@ ShardingCatalogManager::commitChunkSplit(OperationContext* opCtx,
     Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
 
     // Get collection entry and max chunk version for this namespace.
-    auto swCollAndVersion = getCollectionAndVersion(opCtx, nss);
+    auto swCollAndVersion = getCollectionAndVersion(opCtx, _localConfigShard.get(), nss);
 
     if (!swCollAndVersion.isOK()) {
         return swCollAndVersion.getStatus().withContext(
@@ -794,7 +793,8 @@ ShardingCatalogManager::commitChunksMerge(OperationContext* opCtx,
     Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
 
     // 1. Retrieve the initial collection version info to build up the logging info.
-    const auto [coll, collVersion] = uassertStatusOK(getCollectionAndVersion(opCtx, nss));
+    const auto [coll, collVersion] =
+        uassertStatusOK(getCollectionAndVersion(opCtx, _localConfigShard.get(), nss));
     uassert(ErrorCodes::StaleEpoch,
             "Collection changed",
             (!epoch || collVersion.epoch() == epoch) &&
@@ -1242,8 +1242,8 @@ void ShardingCatalogManager::upgradeChunksHistory(OperationContext* opCtx,
     // migrations.
     Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
 
-    const auto [coll, collVersion] = uassertStatusOK(getCollectionAndVersion(opCtx, nss));
-    auto const configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    const auto [coll, collVersion] =
+        uassertStatusOK(getCollectionAndVersion(opCtx, _localConfigShard.get(), nss));
 
     if (force) {
         LOGV2(620650,
@@ -1251,7 +1251,7 @@ void ShardingCatalogManager::upgradeChunksHistory(OperationContext* opCtx,
               "order to force all chunks' history to get recreated",
               "namespace"_attr = nss.ns());
 
-        BatchedCommandRequest request([&configShard, collUuid = coll.getUuid()] {
+        BatchedCommandRequest request([collUuid = coll.getUuid()] {
             write_ops::UpdateCommandRequest updateOp(ChunkType::ConfigNS);
             updateOp.setUpdates({[&] {
                 write_ops::UpdateOpEntry entry;
@@ -1949,15 +1949,14 @@ void ShardingCatalogManager::_commitChunkMigrationInTransaction(
         const auto chunkQuery =
             BSON(ChunkType::collectionUUID << migratedChunk->getCollectionUUID() << ChunkType::shard
                                            << migratedChunk->getShard());
-        auto findResponse = uassertStatusOK(
-            Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
-                opCtx,
-                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                repl::ReadConcernLevel::kLocalReadConcern,
-                ChunkType::ConfigNS,
-                chunkQuery,
-                BSONObj(),
-                1 /* limit */));
+        auto findResponse = uassertStatusOK(_localConfigShard->exhaustiveFindOnConfig(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            repl::ReadConcernLevel::kLocalReadConcern,
+            ChunkType::ConfigNS,
+            chunkQuery,
+            BSONObj(),
+            1 /* limit */));
         return findResponse.docs.empty();
     }();
 
