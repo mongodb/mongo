@@ -73,11 +73,13 @@ def _combine_errors(fixes_filename: str, files_to_parse: List[str]) -> int:
         with open(item) as input_yml:
             fixes = yaml.safe_load(input_yml)
         for fix in fixes['Diagnostics']:
+            fix_msg = fix["DiagnosticMessage"]
             fix_data = all_fixes.setdefault(fix["DiagnosticName"], {}).setdefault(
-                fix["FilePath"], {}).setdefault(
-                    fix["FileOffset"], {
-                        "replacements": fix["Replacements"], "message": fix["Message"], "count": 0,
-                        "source_files": []
+                fix_msg.get("FilePath", "FilePath Not Found"), {}).setdefault(
+                    fix_msg.get("FileOffset", "FileOffset Not Found"), {
+                        "replacements": fix_msg.get(
+                            "Replacements", "Replacements not found"), "message": fix_msg.get(
+                                "Message", "Message not found"), "count": 0, "source_files": []
                     })
             fix_data["count"] += 1
             fix_data["source_files"].append(fixes['MainSourceFile'])
