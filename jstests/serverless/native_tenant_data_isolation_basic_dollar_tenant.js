@@ -123,13 +123,8 @@ const testColl = testDb.getCollection(kCollName);
     expectedDbs.push("config");
     expectedDbs.push("local");
 
-    if (featureFlagRequireTenantId) {
-        assert.eq(0, allDbs.databases.length);
-        assert(arrayEq([], allDbs.databases.map(db => db.name)));
-    } else {
-        assert.eq(5, allDbs.databases.length);
-        assert(arrayEq(expectedDbs, allDbs.databases.map(db => db.name)));
-    }
+    assert.eq(5, allDbs.databases.length);
+    assert(arrayEq(expectedDbs, allDbs.databases.map(db => db.name)));
 }
 
 // Test insert, agg, find, getMore, and explain commands.

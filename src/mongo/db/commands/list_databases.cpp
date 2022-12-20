@@ -122,17 +122,8 @@ public:
                 Lock::GlobalLock lk(opCtx, MODE_IS);
                 CurOpFailpointHelpers::waitWhileFailPointEnabled(
                     &hangBeforeListDatabases, opCtx, "hangBeforeListDatabases", []() {});
-                auto tid = cmd.getDbName().tenantId();
 
-                if (gMultitenancySupport &&
-                    serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-                    gFeatureFlagRequireTenantID.isEnabled(
-                        serverGlobalParams.featureCompatibility) &&
-                    !tid) {
-                    dbNames = {};
-                } else {
-                    dbNames = storageEngine->listDatabases(tid);
-                }
+                dbNames = storageEngine->listDatabases(cmd.getDbName().tenantId());
             }
             std::vector<ListDatabasesReplyItem> items;
             int64_t totalSize = list_databases::setReplyItems(opCtx,
