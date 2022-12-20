@@ -493,6 +493,10 @@ ExecutorFuture<void> CreateCollectionCoordinator::_runImpl(
                             getCollation(opCtx, nss(), _request.getCollation()).second,
                             _request.getUnique().value_or(false))) {
 
+                    // Ensure that the completion of the request gets recorded at least once on the
+                    // oplog.
+                    _writeOplogMessage(opCtx, nss(), *_collectionUUID, _request.toBSON());
+
                     // The critical section can still be held here if the node committed the
                     // sharding of the collection but then it stepped down before it managed to
                     // delete the coordinator document
