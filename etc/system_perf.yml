@@ -899,6 +899,14 @@ tasks:
             {scale: 4,
              columnstore: True}
 
+  - name: external_data_source
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          mongodb_setup: "external_data_source"
+          test_control: "external_data_source"
+
   - name: tpch_1_normalized
     priority: 5
     commands:
@@ -1301,6 +1309,7 @@ buildvariants:
       - name: bestbuy_agg_merge_wordcount
       - name: bestbuy_4_analytics
       - name: bestbuy_4_analytics_columnstore
+      - name: external_data_source
       - name: bestbuy_query
       - name: cursor_manager
       - name: map_reduce_workloads
