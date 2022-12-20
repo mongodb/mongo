@@ -264,8 +264,14 @@ StatusWith<Shard::QueryResponse> ShardRemote::_runExhaustiveCursorCommand(
         getMoreBob->append("collection", data.nss.coll());
     };
 
-    const Milliseconds requestTimeout =
-        std::min(opCtx->getRemainingMaxTimeMillis(), maxTimeMSOverride);
+    const Milliseconds requestTimeout = [&] {
+        auto minMaxTimeMS = std::min(opCtx->getRemainingMaxTimeMillis(), maxTimeMSOverride);
+        if (minMaxTimeMS < Milliseconds::max()) {
+            return minMaxTimeMS;
+        }
+        // The Fetcher expects kNoTimeout when there is no maxTimeMS instead of Milliseconds::max().
+        return RemoteCommandRequest::kNoTimeout;
+    }();
 
     auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     Fetcher fetcher(executor.get(),
@@ -307,6 +313,17 @@ StatusWith<Shard::QueryResponse> ShardRemote::_runExhaustiveCursorCommand(
     return response;
 }
 
+Milliseconds getExhaustiveFindOnConfigMaxTimeMS(OperationContext* opCtx,
+                                                const NamespaceString& nss) {
+    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        // Don't use a timeout on the config server to guarantee it can always refresh.
+        return Milliseconds::max();
+    }
+
+    return std::min(opCtx->getRemainingMaxTimeMillis(),
+                    nss == ChunkType::ConfigNS ? Milliseconds(gFindChunksOnConfigTimeoutMS.load())
+                                               : Shard::kDefaultConfigCommandTimeout);
+}
 
 StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
     OperationContext* opCtx,
@@ -341,10 +358,7 @@ StatusWith<Shard::QueryResponse> ShardRemote::_exhaustiveFindOnConfig(
         return bob.done().getObjectField(repl::ReadConcernArgs::kReadConcernFieldName).getOwned();
     }();
 
-    const Milliseconds maxTimeMS =
-        std::min(opCtx->getRemainingMaxTimeMillis(),
-                 nss == ChunkType::ConfigNS ? Milliseconds(gFindChunksOnConfigTimeoutMS.load())
-                                            : kDefaultConfigCommandTimeout);
+    const Milliseconds maxTimeMS = getExhaustiveFindOnConfigMaxTimeMS(opCtx, nss);
 
     BSONObjBuilder findCmdBuilder;
 

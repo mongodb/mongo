@@ -38,6 +38,7 @@
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/client_metadata_propagation_egress_hook.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/dbhelpers.h"
@@ -48,6 +49,7 @@
 #include "mongo/db/ops/update.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/chunk_splitter.h"
+#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/periodic_balancer_config_refresher.h"
 #include "mongo/db/s/read_only_catalog_cache_loader.h"
 #include "mongo/db/s/shard_local.h"
@@ -55,9 +57,11 @@
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/vector_clock_metadata_hook.h"
+#include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
+#include "mongo/s/catalog/sharding_catalog_client_impl.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_factory.h"
 #include "mongo/s/client/shard_remote.h"
@@ -116,6 +120,15 @@ public:
                                      ShardRegistry::ConnectionStringUpdateType::kConfirmed);
         } catch (const ExceptionForCat<ErrorCategory::ShutdownError>& e) {
             LOGV2(471692, "Unable to update the shard registry", "error"_attr = e);
+        }
+
+        auto const shardingState = ShardingState::get(_serviceContext);
+        if (!shardingState->enabled()) {
+            // If our sharding state isn't enabled, we don't have a shard identity document, so
+            // there's nothing to update. Note technically this may race with the config server
+            // being added as a shard, but that shouldn't be a problem since addShard will use a
+            // valid connection string and should serialize with a replica set reconfig.
+            return;
         }
 
         auto setName = connStr.getSetName();
@@ -489,8 +502,15 @@ void ShardingInitializationMongoD::updateShardIdentityConfigString(
 }
 
 void ShardingInitializationMongoD::onSetCurrentConfig(OperationContext* opCtx) {
-    // TODO SERVER-72088: Use the connection string from the config to construct a ShardRemote for
-    // the config server when in catalog shard mode.
+    if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer ||
+        !gFeatureFlagConfigServerAlwaysShardRemote.isEnabledAndIgnoreFCV()) {
+        // Only config servers capable of acting as a shard set up the config shard in their shard
+        // registry with a real connection string.
+        return;
+    }
+
+    auto myConnectionString = repl::ReplicationCoordinator::get(opCtx)->getConfigConnectionString();
+    Grid::get(opCtx)->shardRegistry()->initConfigShardIfNecessary(myConnectionString);
 }
 
 void ShardingInitializationMongoD::onInitialDataAvailable(OperationContext* opCtx,
@@ -507,10 +527,42 @@ void ShardingInitializationMongoD::onInitialDataAvailable(OperationContext* opCt
     }
 }
 
+void initializeGlobalShardingStateForConfigServer(OperationContext* opCtx) {
+    ShardingInitializationMongoD::get(opCtx)->installReplicaSetChangeListener(
+        opCtx->getServiceContext());
+
+    auto configCS = []() -> boost::optional<ConnectionString> {
+        if (gFeatureFlagConfigServerAlwaysShardRemote.isEnabledAndIgnoreFCV()) {
+            // When the config server can operate as a shard, it sets up a ShardRemote for the
+            // config shard, which is created later after loading the local replica set config.
+            return boost::none;
+        }
+        return {ConnectionString::forLocal()};
+    }();
+
+    initializeGlobalShardingStateForMongoD(opCtx, ShardId::kConfigServerId, configCS);
+
+    // ShardLocal to use for explicitly local commands on the config server.
+    auto localConfigShard = Grid::get(opCtx)->shardRegistry()->createLocalConfigShard();
+    auto localCatalogClient = std::make_unique<ShardingCatalogClientImpl>(localConfigShard);
+
+    ShardingCatalogManager::create(
+        opCtx->getServiceContext(),
+        makeShardingTaskExecutor(executor::makeNetworkInterface("AddShard-TaskExecutor")),
+        std::move(localConfigShard),
+        std::move(localCatalogClient));
+
+    if (!gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV()) {
+        Grid::get(opCtx)->setShardingInitialized();
+    }
+}
+
 void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
                                             const ShardId& shardId,
-                                            const ConnectionString& configCS) {
-    uassert(ErrorCodes::BadValue, "Unrecognized connection string.", configCS);
+                                            const boost::optional<ConnectionString>& configCS) {
+    if (configCS) {
+        uassert(ErrorCodes::BadValue, "Unrecognized connection string.", *configCS);
+    }
 
     auto targeterFactory = std::make_unique<RemoteCommandTargeterFactoryImpl>();
     auto targeterFactoryPtr = targeterFactory.get();
@@ -602,16 +654,20 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
     }
 }
 
+
+void ShardingInitializationMongoD::installReplicaSetChangeListener(ServiceContext* service) {
+    _replicaSetChangeListener =
+        ReplicaSetMonitor::getNotifier().makeListener<ShardingReplicaSetChangeListener>(service);
+}
+
 void ShardingInitializationMongoD::_initializeShardingEnvironmentOnShardServer(
     OperationContext* opCtx, const ShardIdentity& shardIdentity) {
 
-    _replicaSetChangeListener =
-        ReplicaSetMonitor::getNotifier().makeListener<ShardingReplicaSetChangeListener>(
-            opCtx->getServiceContext());
+    installReplicaSetChangeListener(opCtx->getServiceContext());
 
     initializeGlobalShardingStateForMongoD(opCtx,
                                            shardIdentity.getShardName().toString(),
-                                           shardIdentity.getConfigsvrConnectionString());
+                                           {shardIdentity.getConfigsvrConnectionString()});
 
     // Determine primary/secondary/standalone state in order to properly initialize sharding
     // components.

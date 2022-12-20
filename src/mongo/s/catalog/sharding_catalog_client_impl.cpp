@@ -36,6 +36,7 @@
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
+#include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -323,11 +324,24 @@ std::vector<BSONObj> runCatalogAggregation(OperationContext* opCtx,
                                            AggregateCommandRequest& aggRequest,
                                            const repl::ReadConcernArgs& readConcern,
                                            const Milliseconds& maxTimeout) {
+    // Reads on the config server may run on any node in its replica set. Such reads use the config
+    // time as an afterClusterTime token, but config time is only inclusive of majority committed
+    // data, so we should not use a weaker read concern. Note if the local node is a config server,
+    // it can use these concerns safely with a ShardLocal, which would require relaxing this
+    // invariant.
+    invariant(readConcern.getLevel() == repl::ReadConcernLevel::kMajorityReadConcern ||
+                  readConcern.getLevel() == repl::ReadConcernLevel::kSnapshotReadConcern ||
+                  readConcern.getLevel() == repl::ReadConcernLevel::kLinearizableReadConcern,
+              str::stream() << "Disallowed read concern: " << readConcern.toBSONInner());
+
     aggRequest.setReadConcern(readConcern.toBSONInner());
     aggRequest.setWriteConcern(WriteConcernOptions());
 
     const auto readPref = [&]() -> ReadPreferenceSetting {
-        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
+            !gFeatureFlagConfigServerAlwaysShardRemote.isEnabledAndIgnoreFCV()) {
+            // When the feature flag is on, the config server may read from any node in its replica
+            // set, so we should use the typical config server read preference.
             return {};
         }
 
@@ -340,6 +354,7 @@ std::vector<BSONObj> runCatalogAggregation(OperationContext* opCtx,
     aggRequest.setUnwrappedReadPref(readPref.toContainingBSON());
 
     if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
+        // Don't use a timeout on the config server to guarantee it can always refresh.
         const Milliseconds maxTimeMS = std::min(opCtx->getRemainingMaxTimeMillis(), maxTimeout);
         aggRequest.setMaxTimeMS(durationCount<Milliseconds>(maxTimeMS));
     }
@@ -540,7 +555,10 @@ std::vector<ShardId> makeAndRunPlacementHistoryAggregation(
 
     // Run the aggregation
     const auto readConcern = [&]() -> repl::ReadConcernArgs {
-        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
+            !gFeatureFlagConfigServerAlwaysShardRemote.isEnabledAndIgnoreFCV()) {
+            // When the feature flag is on, the config server may read from a secondary which may
+            // need to wait for replication, so we should use afterClusterTime.
             return {repl::ReadConcernLevel::kMajorityReadConcern};
         } else {
             const auto time = VectorClock::get(opCtx)->getTime();

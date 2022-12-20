@@ -1949,15 +1949,14 @@ void ShardingCatalogManager::_commitChunkMigrationInTransaction(
         const auto chunkQuery =
             BSON(ChunkType::collectionUUID << migratedChunk->getCollectionUUID() << ChunkType::shard
                                            << migratedChunk->getShard());
-        auto findResponse = uassertStatusOK(
-            Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
-                opCtx,
-                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                repl::ReadConcernLevel::kLocalReadConcern,
-                ChunkType::ConfigNS,
-                chunkQuery,
-                BSONObj(),
-                1 /* limit */));
+        auto findResponse = uassertStatusOK(_localConfigShard->exhaustiveFindOnConfig(
+            opCtx,
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            repl::ReadConcernLevel::kLocalReadConcern,
+            ChunkType::ConfigNS,
+            chunkQuery,
+            BSONObj(),
+            1 /* limit */));
         return findResponse.docs.empty();
     }();
 

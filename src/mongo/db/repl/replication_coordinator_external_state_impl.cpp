@@ -917,7 +917,9 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
             // to ShardingCatalogManager::initializeConfigDatabaseIfNeeded above), this read can
             // only meaningfully fail if the node is shutting down.
             status = ClusterIdentityLoader::get(opCtx)->loadClusterId(
-                opCtx, repl::ReadConcernLevel::kLocalReadConcern);
+                opCtx,
+                ShardingCatalogManager::get(opCtx)->localCatalogClient(),
+                repl::ReadConcernLevel::kLocalReadConcern);
 
             if (ErrorCodes::isShutdownError(status.code())) {
                 return;

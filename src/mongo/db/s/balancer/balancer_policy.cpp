@@ -35,6 +35,7 @@
 #include <random>
 
 #include "mongo/db/s/balancer/type_migration.h"
+#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/catalog/type_shard.h"
@@ -200,7 +201,7 @@ StatusWith<ZoneInfo> ZoneInfo::getZonesForCollection(OperationContext* opCtx,
                                                      const NamespaceString& nss,
                                                      const KeyPattern& keyPattern) {
     const auto swCollectionZones =
-        Grid::get(opCtx)->catalogClient()->getTagsForCollection(opCtx, nss);
+        ShardingCatalogManager::get(opCtx)->localCatalogClient()->getTagsForCollection(opCtx, nss);
     if (!swCollectionZones.isOK()) {
         return swCollectionZones.getStatus().withContext(
             str::stream() << "Unable to load zones for collection " << nss);

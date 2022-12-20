@@ -589,7 +589,7 @@ void removeChunkAndTagsDocs(OperationContext* opCtx,
     const auto chunksQuery = BSON(ChunkType::collectionUUID() << collUUID);
     const auto tagDeleteOperationHint = BSON(TagsType::ns() << 1 << TagsType::min() << 1);
 
-    const auto catalogClient = Grid::get(opCtx)->catalogClient();
+    const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
 
     uassertStatusOK(catalogClient->removeConfigDocuments(
         opCtx, ChunkType::ConfigNS, chunksQuery, kMajorityWriteConcern));
@@ -844,7 +844,7 @@ void removeCoordinatorDocAndReshardingFields(OperationContext* opCtx,
     // collection. So don't try to call remove as it will end up removing the metadata
     // for the real collection.
     if (!wasDecisionPersisted) {
-        const auto catalogClient = Grid::get(opCtx)->catalogClient();
+        const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
 
         uassertStatusOK(catalogClient->removeConfigDocuments(
             opCtx,
@@ -2146,8 +2146,9 @@ void ReshardingCoordinator::_updateChunkImbalanceMetrics(const NamespaceString& 
             Grid::get(opCtx)->catalogCache()->getShardedCollectionPlacementInfoWithRefresh(opCtx,
                                                                                            nss));
 
+        const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
         const auto collectionZones =
-            uassertStatusOK(Grid::get(opCtx)->catalogClient()->getTagsForCollection(opCtx, nss));
+            uassertStatusOK(catalogClient->getTagsForCollection(opCtx, nss));
 
         const auto& keyPattern = routingInfo.getShardKeyPattern().getKeyPattern();
 
@@ -2159,9 +2160,8 @@ void ReshardingCoordinator::_updateChunkImbalanceMetrics(const NamespaceString& 
                           tag.getTag())));
         }
 
-        const auto allShardsWithOpTime =
-            uassertStatusOK(Grid::get(opCtx)->catalogClient()->getAllShards(
-                opCtx, repl::ReadConcernLevel::kLocalReadConcern));
+        const auto allShardsWithOpTime = uassertStatusOK(
+            catalogClient->getAllShards(opCtx, repl::ReadConcernLevel::kLocalReadConcern));
 
         auto imbalanceCount =
             getMaxChunkImbalanceCount(routingInfo, allShardsWithOpTime.value, zoneInfo);

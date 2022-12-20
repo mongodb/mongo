@@ -33,6 +33,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/repl/primary_only_service.h"
+#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/logv2/log.h"
@@ -51,7 +52,7 @@ UUID retrieveReshardingUUID(OperationContext* opCtx, const NamespaceString& ns) 
     repl::ReadConcernArgs::get(opCtx) =
         repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
 
-    const auto catalogClient = Grid::get(opCtx)->catalogClient();
+    const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
     const auto collEntry = catalogClient->getCollection(opCtx, ns);
 
     uassert(ErrorCodes::NoSuchReshardCollection,
