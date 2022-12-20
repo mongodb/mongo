@@ -55,19 +55,19 @@ st.printShardingStatus();
 
 // Upserted replacement update can result in no shard key.
 assert.commandWorked(upsertedResult(coll, {x: -1}, {_id: 1}));
-assert.docEq(coll.findOne({}), {_id: 1});
+assert.docEq({_id: 1}, coll.findOne({}));
 
 // Upserted with supplied document can result in no shard key.
 assert.commandWorked(upsertSuppliedResult(coll, {x: -1}, {_id: 1}));
-assert.docEq(coll.findOne({}), {_id: 1});
+assert.docEq({_id: 1}, coll.findOne({}));
 
 // Upserted op style update will propagate shard key by default.
 assert.commandWorked(upsertedResult(coll, {x: -1}, {$set: {_id: 1}}));
-assert.docEq(coll.findOne({}), {_id: 1, x: -1});
+assert.docEq({_id: 1, x: -1}, coll.findOne({}));
 
 // Upserted op style update can unset propagated shard key.
 assert.commandWorked(upsertedResult(coll, {x: -1}, {$set: {_id: 1}, $unset: {x: 1}}));
-assert.docEq(coll.findOne({}), {_id: 1});
+assert.docEq({_id: 1}, coll.findOne({}));
 
 // Updates with upsert must contain shard key in query when $op style
 assert.eq(1, upsertedXVal(coll, {x: 1}, {$set: {a: 1}}));
@@ -122,22 +122,22 @@ st.printShardingStatus();
 
 // Upserted replacement update can result in no shard key with nested shard key.
 assert.commandWorked(upsertedResult(coll, {"x.x": -1}, {_id: 1}));
-assert.docEq(coll.findOne({}), {_id: 1});
+assert.docEq({_id: 1}, coll.findOne({}));
 
 // Upserted with supplied document can result in no shard key with nested shard key.
 assert.commandWorked(upsertSuppliedResult(coll, {"x.x": -1}, {_id: 1}));
-assert.docEq(coll.findOne({}), {_id: 1});
+assert.docEq({_id: 1}, coll.findOne({}));
 
 // Upserted op style update will propagate shard key by default with nested shard key.
 assert.commandWorked(upsertedResult(coll, {"x.x": -1}, {$set: {_id: 1}}));
-assert.docEq(coll.findOne({}), {_id: 1, x: {x: -1}});
+assert.docEq({_id: 1, x: {x: -1}}, coll.findOne({}));
 
 // Upserted op style update can unset propagated shard key fields with nested shard key.
 assert.commandWorked(upsertedResult(coll, {"x.x": -1}, {$set: {_id: 1}, $unset: {"x.x": 1}}));
-assert.docEq(coll.findOne({}), {_id: 1, x: {}});
+assert.docEq({_id: 1, x: {}}, coll.findOne({}));
 
 assert.commandWorked(upsertedResult(coll, {"x.x": -1}, {$set: {_id: 1}, $unset: {"x": 1}}));
-assert.docEq(coll.findOne({}), {_id: 1});
+assert.docEq({_id: 1}, coll.findOne({}));
 
 // Nested field extraction with nested shard key
 assert.docEq({x: 1}, upsertedXVal(coll, {"x.x": 1}, {$set: {a: 1}}));
@@ -193,13 +193,13 @@ st.printShardingStatus();
 
 // No upsert type can result in a missing shard key for nested _id key.
 assert.commandWorked(upsertedResult(coll, {_id: {x: -1}}, {}));
-assert.docEq(coll.findOne({}), {_id: {x: -1}});
+assert.docEq({_id: {x: -1}}, coll.findOne({}));
 
 assert.commandWorked(upsertSuppliedResult(coll, {_id: {x: -1}}, {}));
-assert.docEq(coll.findOne({}), {_id: {x: -1}});
+assert.docEq({_id: {x: -1}}, coll.findOne({}));
 
 assert.commandWorked(upsertedResult(coll, {_id: {x: -1}}, {$set: {y: 1}}));
-assert.docEq(coll.findOne({}), {_id: {x: -1}, y: 1});
+assert.docEq({_id: {x: -1}, y: 1}, coll.findOne({}));
 
 assert.commandFailedWithCode(
     upsertedResult(coll, {_id: {x: -1}}, {$set: {y: 1}, $unset: {"_id.x": 1}}),
@@ -207,16 +207,16 @@ assert.commandFailedWithCode(
 
 // All update types can re-state shard key for nested _id key.
 assert.commandWorked(upsertedResult(coll, {_id: {x: -1}}, {_id: {x: -1}, y: 1}));
-assert.docEq(coll.findOne({}), {_id: {x: -1}, y: 1});
+assert.docEq({_id: {x: -1}, y: 1}, coll.findOne({}));
 
 assert.commandWorked(upsertSuppliedResult(coll, {_id: {x: -1}}, {_id: {x: -1}, y: 1}));
-assert.docEq(coll.findOne({}), {_id: {x: -1}, y: 1});
+assert.docEq({_id: {x: -1}, y: 1}, coll.findOne({}));
 
 assert.commandWorked(upsertedResult(coll, {_id: {x: -1}}, {$set: {_id: {x: -1}, y: 1}}));
-assert.docEq(coll.findOne({}), {_id: {x: -1}, y: 1});
+assert.docEq({_id: {x: -1}, y: 1}, coll.findOne({}));
 
 assert.commandWorked(upsertedResult(coll, {_id: {x: -1}}, {$set: {"_id.x": -1, y: 1}}));
-assert.docEq(coll.findOne({}), {_id: {x: -1}, y: 1});
+assert.docEq({_id: {x: -1}, y: 1}, coll.findOne({}));
 
 // No upsert type can modify shard key for nested _id key.
 assert.commandFailedWithCode(upsertedResult(coll, {_id: {x: -1}}, {_id: {x: -2}}),
@@ -276,13 +276,13 @@ assert.commandFailedWithCode(upsertedResult(coll, {"_id.x": -1}, {_id: {x: -1}})
                              ErrorCodes.NotExactValueField);
 
 assert.commandWorked(upsertSuppliedResult(coll, {"_id.x": -1}, {_id: {x: -1}}));
-assert.docEq(coll.findOne({}), {_id: {x: -1}});
+assert.docEq({_id: {x: -1}}, coll.findOne({}));
 
 assert.commandFailedWithCode(upsertedResult(coll, {"_id.x": -1}, {$set: {_id: {x: -1}}}),
                              ErrorCodes.ImmutableField);
 
 assert.commandWorked(upsertedResult(coll, {"_id.x": -1}, {$set: {"_id.x": -1}}));
-assert.docEq(coll.findOne({}), {_id: {x: -1}});
+assert.docEq({_id: {x: -1}}, coll.findOne({}));
 
 st.stop();
 })();

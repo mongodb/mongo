@@ -44,7 +44,7 @@ try {
 
     db.runReadCommand({ping: 1});
     assert.eq(commandsRan.length, 1);
-    assert.docEq(commandsRan[0].cmd, {ping: 1}, "The command should not have been wrapped.");
+    assert.docEq({ping: 1}, commandsRan[0].cmd, "The command should not have been wrapped.");
     assert.eq(
         commandsRan[0].opts & DBQuery.Option.slaveOk, 0, "The slaveOk bit should not be set.");
 

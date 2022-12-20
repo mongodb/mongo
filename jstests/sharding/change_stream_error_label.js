@@ -94,8 +94,8 @@ assert.soon(() => {
 
 // Issue a "find" query to retrieve the first few documents, leaving the cursor open.
 const findCursor = coll.find({}).sort({_id: 1}).batchSize(2);
-assert.docEq(findCursor.next(), {_id: -10});
-assert.docEq(findCursor.next(), {_id: -9});
+assert.docEq({_id: -10}, findCursor.next());
+assert.docEq({_id: -9}, findCursor.next());
 assert.eq(findCursor.objsLeftInBatch(), 0);
 
 // Open a non-$changeStream agg cursor. Set the batchSize to 0, since otherwise the aggregation will

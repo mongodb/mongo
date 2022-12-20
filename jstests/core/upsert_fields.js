@@ -226,4 +226,4 @@ assert.eq(1, upsertedId({_id: 1, x: [1, {x: 1}], "x.x": 1}, {}));
 // make sure query doesn't error when creating doc for insert, since it's missing the rest of the
 // dbref fields. SERVER-14024
 // Fails in 2.6.1->3
-assert.docEq(tojson(DBRef("a", 1)), upsertedXVal({"x.$id": 1}, {$set: {x: DBRef("a", 1)}}));
+assert.docEq(DBRef("a", 1), upsertedXVal({"x.$id": 1}, {$set: {x: DBRef("a", 1)}}));

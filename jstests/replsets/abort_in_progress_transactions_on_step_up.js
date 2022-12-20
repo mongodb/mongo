@@ -144,8 +144,8 @@ const secondDoc = {
 };
 assert.commandWorked(newSession.getDatabase(dbName).getCollection(collName).insert(secondDoc));
 assert.commandWorked(newSession.commitTransaction_forTesting());
-assert.docEq(testDB.getCollection(collName).find().toArray(), [secondDoc]);
-assert.docEq(newTestDB.getCollection(collName).find().toArray(), [secondDoc]);
+assert.docEq([secondDoc], testDB.getCollection(collName).find().toArray());
+assert.docEq([secondDoc], newTestDB.getCollection(collName).find().toArray());
 
 replTest.stopSet();
 })();

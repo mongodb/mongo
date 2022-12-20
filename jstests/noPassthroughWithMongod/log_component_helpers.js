@@ -11,11 +11,11 @@ var originalSettings =
 
 // getLogComponents
 var components1 = mongo.getLogComponents();
-assert.docEq(components1, originalSettings);
+assert.docEq(originalSettings, components1);
 
 // getLogComponents via db
 var components2 = db.getLogComponents();
-assert.docEq(components2, originalSettings);
+assert.docEq(originalSettings, components2);
 
 // setLogLevel - default component
 mongo.setLogLevel(2);

@@ -71,7 +71,7 @@ for (let i = 0; i < numColls; i++) {
 
 const checkColl = function(num, numBuckets) {
     jsTestLog('Checking collection ' + num);
-    assert.docEq(coll(num).find().sort({_id: 1}).toArray(), docs);
+    assert.docEq(docs, coll(num).find().sort({_id: 1}).toArray());
     const buckets = bucketsColl(num).find().toArray();
     assert.eq(buckets.length,
               numBuckets,

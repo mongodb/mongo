@@ -75,8 +75,8 @@ for (let id = 0; id < nDocs; ++id) {
         next = changeStream.next();
         assert.eq(next.operationType, "update");
         assert.eq(next.documentKey, Object.merge(shardKeyFromId(id), {_id: id}));
-        assert.docEq(next.fullDocument,
-                     Object.merge(shardKeyFromId(id), {_id: id, updatedCount: 1}));
+        assert.docEq(Object.merge(shardKeyFromId(id), {_id: id, updatedCount: 1}),
+                     next.fullDocument);
     }
 });
 
@@ -101,8 +101,8 @@ assert.commandWorked(mongosDB.adminCommand({
         let next = changeStream.next();
         assert.eq(next.operationType, "update");
         assert.eq(next.documentKey, Object.merge(shardKeyFromId(id), {_id: id}));
-        assert.docEq(next.fullDocument,
-                     Object.merge(shardKeyFromId(id), {_id: id, updatedCount: 2}));
+        assert.docEq(Object.merge(shardKeyFromId(id), {_id: id, updatedCount: 2}),
+                     next.fullDocument);
     }
 });
 

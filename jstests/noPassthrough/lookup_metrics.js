@@ -75,7 +75,7 @@ function generateExpectedCounters(joinStrategy = lookupStrategy.nonSbe, spillToD
 // Compare the values of the lookup counters to an object that represents the expected values.
 function compareLookupCounters(expectedCounters) {
     let counters = db.serverStatus().metrics.query.lookup;
-    assert.docEq(counters, expectedCounters);
+    assert.docEq(expectedCounters, counters);
 }
 
 // Run a lookup pipeline that does not get pushed down to SBE because it's querying against a view.

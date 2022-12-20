@@ -26,7 +26,7 @@ function assertWildcardQuery(query, expectedPath) {
     const ixScans = getPlanStages(getWinningPlan(explainOutput.queryPlanner), "IXSCAN");
     // Verify that the winning plan uses the $** index with the expected path.
     assert.eq(ixScans.length, FixtureHelpers.numberOfShardsForCollection(coll));
-    assert.docEq(ixScans[0].keyPattern, {"$_path": 1, [expectedPath]: 1});
+    assert.docEq({"$_path": 1, [expectedPath]: 1}, ixScans[0].keyPattern);
     // Verify that the results obtained from the $** index are identical to a COLLSCAN.
     assertArrayEq(coll.find(query).toArray(), coll.find(query).hint({$natural: 1}).toArray());
 }

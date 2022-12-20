@@ -19,7 +19,7 @@ assert.commandWorked(coll.insert({_id: 0, a: 1}));
 assert.soon(() => cursor.hasNext());
 let next = cursor.next();
 assert.eq(next.operationType, "insert");
-assert.docEq(next.fullDocument, {_id: 0, a: 1});
+assert.docEq({_id: 0, a: 1}, next.fullDocument);
 
 // Drop the database, this will cause invalidation of the change streams.
 assert.commandWorked(testDB.dropDatabase());
@@ -46,5 +46,5 @@ cursor = coll.watch([{$match: {operationType: 'insert'}}], {startAfter: invalida
 assert.soon(() => cursor.hasNext());
 next = cursor.next();
 assert.eq(next.operationType, "insert");
-assert.docEq(next.fullDocument, {_id: 1, a: 101});
+assert.docEq({_id: 1, a: 101}, next.fullDocument);
 }());

@@ -182,32 +182,34 @@ assert = (function() {
     };
 
     function _isDocEq(a, b) {
-        if (a == b) {
-            return true;
-        }
-
-        var aSorted = sortDoc(a);
-        var bSorted = sortDoc(b);
-
-        if ((aSorted != null && bSorted != null) && friendlyEqual(aSorted, bSorted)) {
-            return true;
-        }
-
-        return false;
+        return a === b || bsonUnorderedFieldsCompare(a, b) === 0;
     }
 
-    assert.docEq = function(a, b, msg) {
+    /**
+     * Throws if 'actualDoc' object is not equal to 'expectedDoc' object. The order of fields
+     * (properties) within objects is disregarded.
+     * Throws if object representation in BSON exceeds 16793600 bytes.
+     */
+    assert.docEq = function(expectedDoc, actualDoc, msg) {
         _validateAssertionMessage(msg);
 
-        if (_isDocEq(a, b)) {
+        if (_isDocEq(expectedDoc, actualDoc)) {
             return;
         }
 
-        doassert(_buildAssertionMessage(
-            msg, "[" + tojson(a) + "] != [" + tojson(b) + "] are not equal"));
+        doassert(_buildAssertionMessage(msg,
+                                        "expected document " + tojson(expectedDoc) +
+                                            " and actual document " + tojson(actualDoc) +
+                                            " are not equal"));
     };
 
+    /**
+     * Throws if the elements of the two given sets are not the same. Use only for primitive
+     * (non-object) set element types.
+     */
     assert.setEq = function(expectedSet, actualSet, msg) {
+        _validateAssertionMessage(msg);
+
         const failAssertion = function() {
             doassert(_buildAssertionMessage(msg,
                                             "expected set " + tojson(expectedSet) +

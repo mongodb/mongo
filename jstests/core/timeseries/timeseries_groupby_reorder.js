@@ -31,13 +31,14 @@ if (!isMongos(db)) {
         {$group: {_id: '$meta', accmin: {$min: '$b'}, accmax: {$max: '$c'}}}
     ]);
 
-    assert.docEq(res.stages[1], {
+    assert.docEq({
         "$group":
             {_id: "$meta", accmin: {"$min": "$control.min.b"}, accmax: {"$max": "$control.max.c"}}
-    });
+    },
+                 res.stages[1]);
 }
 
 const res = coll.aggregate([{$group: {_id: '$meta', accmin: {$min: '$b'}, accmax: {$max: '$c'}}}])
                 .toArray();
-assert.docEq(res, [{"_id": null, "accmin": 1, "accmax": 3}]);
+assert.docEq([{"_id": null, "accmin": 1, "accmax": 3}], res);
 })();

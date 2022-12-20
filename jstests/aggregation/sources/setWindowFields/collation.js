@@ -30,7 +30,7 @@ let results =
             collation)
         .toArray();
 // Test document order before $_internalSetWindowFields rather than $setWindowFields output order.
-assert.docEq(results[0].arr, ["10", "3", "2"]);
+assert.docEq(["10", "3", "2"], results[0].arr);
 
 // Test that partitionBy and window function respect collation.
 results =

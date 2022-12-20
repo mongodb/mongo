@@ -235,7 +235,7 @@ try {
     assert.eq(cmdRes.cursor.nextBatch.length,
               1,
               'Collection documents: ' + tojson(db.await_data.find({}).toArray()));
-    assert.docEq(cmdRes.cursor.nextBatch[0], {_id: "match", x: 1});
+    assert.docEq({_id: "match", x: 1}, cmdRes.cursor.nextBatch[0]);
 } finally {
     db.setLogLevel(originalCmdLogLevel, 'command');
     db.setLogLevel(originalQueryLogLevel, 'query');

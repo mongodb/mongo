@@ -66,14 +66,14 @@ function runTest(docs, query, results, path, bounds) {
         bucketColl = db.getCollection('system.buckets.' + tsColl.getName());
 
         // Confirm expected results.
-        assert.docEq(tsColl.aggregate(pipeline).toArray(), results);
+        assert.docEq(results, tsColl.aggregate(pipeline).toArray());
         const buckets = bucketColl.aggregate(controlPipeline).toArray();
 
         // Check that we only have one bucket.
         assert.eq(buckets.length, 1);
 
         // Check that the bounds are what we expect.
-        assert.docEq(buckets[0].value, bounds);
+        assert.docEq(bounds, buckets[0].value);
     }
 
     rst.stopSet();

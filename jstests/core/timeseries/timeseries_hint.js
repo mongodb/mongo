@@ -38,7 +38,7 @@ assert.commandWorked(coll.insert(docsAsc));
 
 function runTest({command, expectedResult, expectedDirection}) {
     const result = assert.commandWorked(db.runCommand(command));
-    assert.docEq(result.cursor.firstBatch, expectedResult);
+    assert.docEq(expectedResult, result.cursor.firstBatch);
 
     const plan = db.runCommand({explain: command});
     const scan = getAggPlanStage(plan, 'COLLSCAN');

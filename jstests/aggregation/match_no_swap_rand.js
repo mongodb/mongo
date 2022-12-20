@@ -31,7 +31,7 @@ function assertScanFilterEq({coll, pipeline, filter}) {
     // Sometimes explain will have 'filter' set to an empty object, other times there will be no
     // 'filter'. If we are expecting there to be no filter on the COLLSCAN, either is acceptable.
     if (filter) {
-        assert.docEq(collScan.filter, filter);
+        assert.docEq(filter, collScan.filter);
     } else {
         assert(!collScan.filter || Object.keys(collScan.filter).length == 0);
     }

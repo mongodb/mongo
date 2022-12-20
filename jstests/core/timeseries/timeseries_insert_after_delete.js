@@ -45,7 +45,7 @@ TimeseriesTest.run((insert) => {
               1);
     assert.commandWorked(insert(coll, [objB]));
     const docs = coll.find({}, {_id: 0}).toArray();
-    assert.docEq(docs, [objB]);
+    assert.docEq([objB], docs);
     assert(coll.drop());
 });
 })();

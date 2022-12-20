@@ -70,8 +70,8 @@ const testOptions = function(options) {
     assert(collections.find(entry => entry.name === 'system.views'));
     assert(collections.find(entry => entry.name === 'system.buckets.' + coll.getName()));
     assert.docEq(
-        collections.find(entry => entry.name === coll.getName()),
-        {name: coll.getName(), type: 'timeseries', options: options, info: {readOnly: false}});
+        {name: coll.getName(), type: 'timeseries', options: options, info: {readOnly: false}},
+        collections.find(entry => entry.name === coll.getName()));
 };
 
 testOptions({timeseries: {timeField: timeFieldName}});

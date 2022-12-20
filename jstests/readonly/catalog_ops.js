@@ -61,7 +61,7 @@ runReadOnlyTest(function() {
             });
             var expectedIndexes = [{_id: 1}].concat(this.indexSpecs);
 
-            assert.docEq(actualIndexes, expectedIndexes);
+            assert.docEq(expectedIndexes, actualIndexes);
 
             // Check that createIndexes fails.
             assert.commandFailed(

@@ -35,7 +35,7 @@ function testFAMWorked(insert, cmdObj, expected) {
     if (!cmdObj['new']) {
         // Test that the find operation returns the expected result.
         res = t.findOne(cmdObj['query'], cmdObj['fields']);
-        assert.docEq(res, expected, 'positional projection failed for find');
+        assert.docEq(expected, res, 'positional projection failed for find');
     }
 
     // Test that the findAndModify command returns the expected result.
@@ -46,7 +46,7 @@ function testFAMWorked(insert, cmdObj, expected) {
     if (cmdObj['new']) {
         // Test that the find operation returns the expected result.
         res = t.findOne(cmdObj['query'], cmdObj['fields']);
-        assert.docEq(res, expected, 'positional projection failed for find');
+        assert.docEq(expected, res, 'positional projection failed for find');
     }
 }
 

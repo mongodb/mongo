@@ -56,7 +56,7 @@ const testCollationCollection =
 assert.commandWorked(testCollationCollection.insert({_id: "insert_one"}));
 assert.commandWorked(testCollationCollection.insert({_id: "INSERT_TWO"}));
 assert.soon(() => csCursor.hasNext());
-assert.docEq(csCursor.next().fullDocument, {_id: "INSERT_TWO"});
+assert.docEq({_id: "INSERT_TWO"}, csCursor.next().fullDocument);
 csCursor.close();
 
 // We can resume from the pre-creation high water mark if we do not specify a collation...
@@ -73,7 +73,7 @@ let cmdResResumeFromBeforeCollCreated = assert.commandWorked(runExactCommand(db,
 // to the simple collation. We will therefore match 'INSERT_TWO' but not 'insert_one'.
 csCursor = new DBCommandCursor(db, cmdResResumeFromBeforeCollCreated);
 assert.soon(() => csCursor.hasNext());
-assert.docEq(csCursor.next().fullDocument, {_id: "INSERT_TWO"});
+assert.docEq({_id: "INSERT_TWO"}, csCursor.next().fullDocument);
 csCursor.close();
 
 // If we do specify a non-simple collation, it will be adopted by the pipeline.
@@ -90,9 +90,9 @@ cmdResResumeFromBeforeCollCreated = assert.commandWorked(runExactCommand(db, {
 // Now we match both 'insert_one' and 'INSERT_TWO'.
 csCursor = new DBCommandCursor(db, cmdResResumeFromBeforeCollCreated);
 assert.soon(() => csCursor.hasNext());
-assert.docEq(csCursor.next().fullDocument, {_id: "insert_one"});
+assert.docEq({_id: "insert_one"}, csCursor.next().fullDocument);
 assert.soon(() => csCursor.hasNext());
-assert.docEq(csCursor.next().fullDocument, {_id: "INSERT_TWO"});
+assert.docEq({_id: "INSERT_TWO"}, csCursor.next().fullDocument);
 csCursor.close();
 
 // Now open a change stream with batchSize:0 in order to produce a new high water mark.
@@ -126,7 +126,7 @@ csCursor = new DBCommandCursor(db, cmdResResumeWithCollation);
 // ... but we do not inherit the collection's case-insensitive collation, matching 'INSERT_FOUR'
 // but not the preceding 'insert_three'.
 assert.soon(() => csCursor.hasNext());
-assert.docEq(csCursor.next().fullDocument, {_id: "INSERT_FOUR"});
+assert.docEq({_id: "INSERT_FOUR"}, csCursor.next().fullDocument);
 csCursor.close();
 
 // Drop the collection and obtain a new pre-creation high water mark. We will use this later.

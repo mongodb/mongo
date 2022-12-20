@@ -33,7 +33,7 @@
 
             assert.eq(resultsPlain[parameter["name"]], expectedValue, plainErrMsg);
             assert.docEq(
-                resultsWithDetail[parameter["name"]], expectedDetailedResultObj, detailErrMsg);
+                expectedDetailedResultObj, resultsWithDetail[parameter["name"]], detailErrMsg);
         });
     }
 

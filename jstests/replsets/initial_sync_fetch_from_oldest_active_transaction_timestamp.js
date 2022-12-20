@@ -152,7 +152,7 @@ assert.eq(secondaryOplog.find({"ts": beginFetchingTs}).itcount(), 1);
 
 // Make sure the first transaction committed properly and is reflected after the initial sync.
 let res = secondary.getDB(dbName).getCollection(collName).findOne({_id: 2});
-assert.docEq(res, {_id: 2}, res);
+assert.docEq({_id: 2}, res);
 
 jsTestLog("Stepping up the secondary");
 

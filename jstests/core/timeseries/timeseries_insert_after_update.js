@@ -68,7 +68,7 @@ TimeseriesTest.run((insert) => {
     const expectedNumBucketsReopened = stats.timeseries['numBucketsReopened'] + 1;
 
     assert.commandWorked(insert(coll, docs.slice(1)));
-    assert.docEq(coll.find({}, {_id: 0}).sort({[timeFieldName]: 1}).toArray(), docs);
+    assert.docEq(docs, coll.find({}, {_id: 0}).sort({[timeFieldName]: 1}).toArray());
 
     if (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(testDB)) {
         assert.eq(bucketsColl.find().itcount(), 2, bucketsColl.find().toArray());

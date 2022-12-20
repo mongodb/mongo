@@ -128,9 +128,9 @@ assert.eq(replMetrics.stateTransition.lastStateTransition, "stepDown");
 assert.eq(replMetrics.stateTransition.userOperationsKilled, 1, replMetrics);
 
 jsTestLog("Check nodes have correct data");
-assert.docEq(newPrimary.getDB(dbName)[collName].find({_id: 0}).toArray(), [{_id: 0, b: 1}]);
+assert.docEq([{_id: 0, b: 1}], newPrimary.getDB(dbName)[collName].find({_id: 0}).toArray());
 rst.awaitReplication();
-assert.docEq(primary.getDB(dbName)[collName].find({_id: 0}).toArray(), [{_id: 0, b: 1}]);
+assert.docEq([{_id: 0, b: 1}], primary.getDB(dbName)[collName].find({_id: 0}).toArray());
 
 rst.stopSet();
 })();

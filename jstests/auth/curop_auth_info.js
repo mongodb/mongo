@@ -46,14 +46,14 @@ const runTest = function(conn, failPointConn) {
     print(tojson(authedUsers), tojson(impersonators));
     if (impersonators) {
         assert.eq(authedUsers.length, 1);
-        assert.docEq(authedUsers[0], {user: "testuser", db: "admin"});
+        assert.docEq({user: "testuser", db: "admin"}, authedUsers[0]);
         assert(impersonators);
         assert.eq(impersonators.length, 1);
-        assert.docEq(impersonators[0], {user: "__system", db: "local"});
+        assert.docEq({user: "__system", db: "local"}, impersonators[0]);
     } else {
         assert(authedUsers);
         assert.eq(authedUsers.length, 1);
-        assert.docEq(authedUsers[0], {user: "testuser", db: "admin"});
+        assert.docEq({user: "testuser", db: "admin"}, authedUsers[0]);
     }
 };
 

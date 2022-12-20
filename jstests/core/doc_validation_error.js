@@ -42,8 +42,8 @@ function executeDocumentValidationTestCase(testCase) {
     // Verify that document validation failed and the document validation error matches the
     // expected.
     assertDocumentValidationFailure(result, coll);
-    assert.docEq(result.getWriteError().errInfo.details,
-                 testCase.expectedError,
+    assert.docEq(testCase.expectedError,
+                 result.getWriteError().errInfo.details,
                  `Test case ${testCase.name}`);
 }
 

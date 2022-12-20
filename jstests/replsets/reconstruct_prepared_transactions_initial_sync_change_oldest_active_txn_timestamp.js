@@ -99,7 +99,7 @@ jsTestLog("Checking that the first transaction is properly prepared");
 
 // Make sure that we can't read changes to the document from the first prepared transaction
 // after initial sync.
-assert.docEq(secondaryColl.findOne({_id: 1}), {_id: 1});
+assert.docEq({_id: 1}, secondaryColl.findOne({_id: 1}));
 
 jsTestLog("Committing the transaction");
 
@@ -108,7 +108,7 @@ replTest.awaitReplication();
 
 // Make sure that we can see the data from a committed transaction on the secondary if it was
 // applied during secondary oplog application.
-assert.docEq(secondaryColl.findOne({_id: 1}), {_id: 1, a: 1});
+assert.docEq({_id: 1, a: 1}, secondaryColl.findOne({_id: 1}));
 
 replTest.stopSet();
 })();

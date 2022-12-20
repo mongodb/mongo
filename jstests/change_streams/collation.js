@@ -229,7 +229,7 @@ assert.commandWorked(caseInsensitiveCollection.insert({_id: 0, text: "abc"}));
 
 assert.soon(() => changeStream.hasNext());
 const next = changeStream.next();
-assert.docEq(next.documentKey, {_id: 0});
+assert.docEq({_id: 0}, next.documentKey);
 const resumeToken = next._id;
 
 // Insert a second document to see after resuming.
@@ -245,7 +245,7 @@ changeStream = caseInsensitiveCollection.watch(
     {resumeAfter: resumeToken, collation: {locale: "simple"}});
 
 assert.soon(() => changeStream.hasNext());
-assert.docEq(changeStream.next().documentKey, {_id: "dropped_coll"});
+assert.docEq({_id: "dropped_coll"}, changeStream.next().documentKey);
 
 // Test that a pipeline without an explicit collation is allowed to resume the change stream
 // after the collection has been dropped, and it will use the simple collation. Do not
@@ -263,7 +263,7 @@ const cmdRes = assert.commandWorked(runCommandChangeStreamPassthroughAware(
 
 changeStream = new DBCommandCursor(db, cmdRes);
 assert.soon(() => changeStream.hasNext());
-assert.docEq(changeStream.next().documentKey, {_id: "dropped_coll"});
+assert.docEq({_id: "dropped_coll"}, changeStream.next().documentKey);
 }());
 
 // Test that the default collation of a new version of the collection is not applied when
@@ -280,7 +280,7 @@ assert.commandWorked(caseInsensitiveCollection.insert({_id: 0, text: "abc"}));
 
 assert.soon(() => changeStream.hasNext());
 const next = changeStream.next();
-assert.docEq(next.documentKey, {_id: 0});
+assert.docEq({_id: 0}, next.documentKey);
 const resumeToken = next._id;
 
 // Insert a second document to see after resuming.
@@ -294,7 +294,7 @@ assert.commandWorked(caseInsensitiveCollection.insert({_id: "new collection", te
 // Verify that the stream sees the insert before the drop and then is exhausted. We won't
 // see the invalidate because the pipeline has a $match stage after the $changeStream.
 assert.soon(() => changeStream.hasNext());
-assert.docEq(changeStream.next().fullDocument, {_id: "dropped_coll", text: "ABC"});
+assert.docEq({_id: "dropped_coll", text: "ABC"}, changeStream.next().fullDocument);
 // Only single-collection streams will be exhausted from the drop. Use 'next()' instead of
 // 'isExhausted()' to force a getMore since the previous getMore may not include the
 // collection drop, which is more likely with sharded collections on slow machines.
@@ -309,7 +309,7 @@ changeStream = caseInsensitiveCollection.watch(
     {resumeAfter: resumeToken, collation: {locale: "fr"}});
 
 assert.soon(() => changeStream.hasNext());
-assert.docEq(changeStream.next().documentKey, {_id: "dropped_coll"});
+assert.docEq({_id: "dropped_coll"}, changeStream.next().documentKey);
 // Only single-collection streams will be exhausted from the drop. Use 'next()' instead of
 // 'isExhausted()' to force a getMore since the previous getMore may not include the
 // collection drop, which is more likely with sharded collections on slow machines.
@@ -329,6 +329,6 @@ const cmdRes = assert.commandWorked(runCommandChangeStreamPassthroughAware(
 
 changeStream = new DBCommandCursor(db, cmdRes);
 assert.soon(() => changeStream.hasNext());
-assert.docEq(changeStream.next().documentKey, {_id: "dropped_coll"});
+assert.docEq({_id: "dropped_coll"}, changeStream.next().documentKey);
 }());
 })();

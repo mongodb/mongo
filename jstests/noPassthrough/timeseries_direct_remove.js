@@ -37,7 +37,7 @@ assert.commandWorked(
 assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
 
 assert.commandWorked(coll.insert(docs[0]));
-assert.docEq(coll.find().sort({_id: 1}).toArray(), docs.slice(0, 1));
+assert.docEq(docs.slice(0, 1), coll.find().sort({_id: 1}).toArray());
 
 let buckets = bucketsColl.find().sort({_id: 1}).toArray();
 assert.eq(buckets.length, 1);
@@ -51,7 +51,7 @@ buckets = bucketsColl.find().sort({_id: 1}).toArray();
 assert.eq(buckets.length, 0);
 
 assert.commandWorked(coll.insert(docs[1]));
-assert.docEq(coll.find().sort({_id: 1}).toArray(), docs.slice(1, 2));
+assert.docEq(docs.slice(1, 2), coll.find().sort({_id: 1}).toArray());
 
 buckets = bucketsColl.find().sort({_id: 1}).toArray();
 assert.eq(buckets.length, 1);
@@ -72,7 +72,7 @@ assert.eq(removeResult.nRemoved, 1);
 fpInsert.off();
 awaitInsert();
 
-assert.docEq(coll.find().sort({_id: 1}).toArray(), docs.slice(2, 3));
+assert.docEq(docs.slice(2, 3), coll.find().sort({_id: 1}).toArray());
 
 buckets = bucketsColl.find().sort({_id: 1}).toArray();
 assert.eq(buckets.length, 1);

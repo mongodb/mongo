@@ -32,7 +32,7 @@ assert.commandWorked(mongosColl.update({_id: 0}, {$set: {updated: true}}));
 assert.soon(() => csCur.hasNext());
 let updateEvent = csCur.next();
 assert.eq(updateEvent.operationType, "update");
-assert.docEq(updateEvent.fullDocument, {_id: 0, a: -100, updated: true});
+assert.docEq({_id: 0, a: -100, updated: true}, updateEvent.fullDocument);
 
 // Now shard the collection on {a: 1} and move the upper chunk to the other shard.
 assert.commandWorked(mongosColl.createIndex({a: 1}));
@@ -44,7 +44,7 @@ csCur = mongosColl.watch([], {resumeAfter: insertEvent._id, fullDocument: "updat
 assert.soon(() => csCur.hasNext());
 updateEvent = csCur.next();
 assert.eq(updateEvent.operationType, "update");
-assert.docEq(updateEvent.fullDocument, {_id: 0, a: -100, updated: true});
+assert.docEq({_id: 0, a: -100, updated: true}, updateEvent.fullDocument);
 
 // Insert a second document with the same _id on the second shard.
 assert.commandWorked(mongosColl.insert({_id: 0, a: 100}));

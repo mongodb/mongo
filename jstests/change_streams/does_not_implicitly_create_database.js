@@ -14,7 +14,7 @@ assert.commandWorked(testDB.dropDatabase());
 
 let dbList = assert.commandWorked(
     db.adminCommand({listDatabases: 1, nameOnly: true, filter: {name: testDB.getName()}}));
-assert.docEq(dbList.databases, []);
+assert.docEq([], dbList.databases);
 
 const collName = "test";
 
@@ -29,13 +29,13 @@ assert.gt(changeStreamCursor.id, 0);
 // Confirm that the database has not been implicitly created.
 dbList = assert.commandWorked(
     db.adminCommand({listDatabases: 1, nameOnly: true, filter: {name: testDB.getName()}}));
-assert.docEq(dbList.databases, []);
+assert.docEq([], dbList.databases);
 
 // Confirm that a non-$changeStream aggregation on the non-existent database returns an empty
 // cursor.
 const nonCsCmdRes = assert.commandWorked(
     testDB.runCommand({aggregate: collName, pipeline: [{$match: {}}], cursor: {}}));
-assert.docEq(nonCsCmdRes.cursor.firstBatch, []);
+assert.docEq([], nonCsCmdRes.cursor.firstBatch);
 assert.eq(nonCsCmdRes.cursor.id, 0);
 
 // Now perform some writes into the collection...
@@ -47,7 +47,7 @@ assert.commandWorked(testDB[collName].remove({_id: 2}));
 // ... confirm that the database has been created...
 dbList = assert.commandWorked(
     db.adminCommand({listDatabases: 1, nameOnly: true, filter: {name: testDB.getName()}}));
-assert.docEq(dbList.databases, [{name: testDB.getName()}]);
+assert.docEq([{name: testDB.getName()}], dbList.databases);
 
 // ... and verify that the changes are observed by the stream.
 const expectedChanges = [

@@ -41,8 +41,8 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
     }
     assert.commandWorked(coll.insert(input));
     assert.docEq(
-        coll.find({_id: input._id}, projection).limit(1).hint({$natural: 1}).toArray()[0],
         expectedOutput,
+        coll.find({_id: input._id}, projection).limit(1).hint({$natural: 1}).toArray()[0],
         () =>
             tojson(coll.find({_id: input._id}, projection).limit(1).hint({$natural: 1}).explain()));
 
@@ -50,16 +50,16 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
         assert.commandWorkedOrFailedWithCode(coll.createIndex(indexSpec),
                                              ErrorCodes.IndexAlreadyExists);
         assert.docEq(
-            coll.find({_id: input._id}, projection).hint(indexSpec).toArray()[0],
             expectedOutput,
+            coll.find({_id: input._id}, projection).hint(indexSpec).toArray()[0],
             () => tojson(
                 coll.find({_id: input._id}, projection).hint(indexSpec).explain("executionStats")));
     }
 
     assert.docEq(
+        expectedOutput,
         coll.aggregate([{$match: {_id: input._id}}, {$project: projection}], {hint: {$natural: 1}})
-            .toArray()[0],
-        expectedOutput);
+            .toArray()[0]);
 }
 
 // The basics: what happens when I include a top-level field?

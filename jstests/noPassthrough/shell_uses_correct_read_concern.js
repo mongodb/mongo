@@ -48,7 +48,7 @@ session.startTransaction({readConcern: {level: "snapshot"}});
 assert.eq(coll.runCommand({"find": coll.getName()}).cursor.firstBatch.length, 1);
 assert.eq(coll.runCommand({"find": coll.getName()}).cursor.firstBatch.length, 1);
 assert.eq(coll.find({"_id": 0}).itcount(), 1);
-assert.docEq(coll.findOne({"_id": 0}), testDoc);
+assert.docEq(testDoc, coll.findOne({"_id": 0}));
 
 assert.commandWorked(session.commitTransaction_forTesting());
 assert.eq(getSnapshotRCCount(), 4);

@@ -45,7 +45,7 @@ const runTest = function(ordered) {
     assert.commandWorked(coll.insert(docs[1], {ordered: ordered}));
 
     // There should not be any leftover state from the failed insert.
-    assert.docEq(coll.find().toArray(), [docs[1]]);
+    assert.docEq([docs[1]], coll.find().toArray());
     const buckets = bucketsColl.find().sort({['control.min.' + timeFieldName]: 1}).toArray();
     jsTestLog('Checking buckets: ' + tojson(buckets));
     assert.eq(buckets.length, 1);

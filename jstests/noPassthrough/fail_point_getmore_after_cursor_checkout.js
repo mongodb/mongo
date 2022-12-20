@@ -28,8 +28,8 @@ for (let testCursor of [coll.find({}).sort({_id: 1}).batchSize(2),
     }));
 
     // Consume the documents from the first batch, leaving the cursor open.
-    assert.docEq(testCursor.next(), {_id: 0});
-    assert.docEq(testCursor.next(), {_id: 1});
+    assert.docEq({_id: 0}, testCursor.next());
+    assert.docEq({_id: 1}, testCursor.next());
     assert.eq(testCursor.objsLeftInBatch(), 0);
 
     // Issue a getMore and confirm that the failpoint throws the expected exception.

@@ -66,7 +66,7 @@ function testDeleteInMultiDocTxn({collName, deleteCommand, expectedChanges}) {
         collection: coll
     });
     assert.commandWorked(coll.insert({a: 1, _id: 5}));
-    assert.docEq(cst.getOneChange(cursor).documentKey, {a: 1, _id: 5});
+    assert.docEq({a: 1, _id: 5}, cst.getOneChange(cursor).documentKey);
 
     cst.cleanUp();
 }

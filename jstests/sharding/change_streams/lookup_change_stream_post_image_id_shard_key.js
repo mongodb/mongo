@@ -62,7 +62,7 @@ for (let nextId of [1000, -1000]) {
     assert.eq(next.operationType, "update");
     // Only the "_id" field is present in next.documentKey because the shard key is the _id.
     assert.eq(next.documentKey, {_id: nextId});
-    assert.docEq(next.fullDocument, {_id: nextId, updatedCount: 1});
+    assert.docEq({_id: nextId, updatedCount: 1}, next.fullDocument);
 }
 
 // Test that the change stream can still see the updated post image, even if a chunk is
@@ -81,7 +81,7 @@ for (let nextId of [1000, -1000]) {
     let next = changeStream.next();
     assert.eq(next.operationType, "update");
     assert.eq(next.documentKey, {_id: nextId});
-    assert.docEq(next.fullDocument, {_id: nextId, updatedCount: 2});
+    assert.docEq({_id: nextId, updatedCount: 2}, next.fullDocument);
 }
 
 st.stop();

@@ -111,7 +111,7 @@ function confirmExpectedExprExecution(expr, metricsToCheck, collation) {
             const stage = getPlanStageFunc(explain, "IXSCAN");
             assert.neq(null, stage, tojson(explain));
             assert(stage.hasOwnProperty("keyPattern"), tojson(explain));
-            assert.docEq(stage.keyPattern, metricsToCheck.expectedIndex, tojson(explain));
+            assert.docEq(metricsToCheck.expectedIndex, stage.keyPattern, tojson(explain));
         } else {
             assert(getPlanStageFunc(explain, "COLLSCAN"), tojson(explain));
         }

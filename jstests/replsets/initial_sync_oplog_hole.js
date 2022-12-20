@@ -87,11 +87,11 @@ joinHungWrite();
 
 jsTestLog("Checking that primary has all data items.");
 // Make sure the primary collection has all three data items.
-assert.docEq(primaryColl.find().toArray(), [{"_id": "a"}, {"_id": "b"}, {"_id": "c"}]);
+assert.docEq([{"_id": "a"}, {"_id": "b"}, {"_id": "c"}], primaryColl.find().toArray());
 
 jsTestLog("Checking that secondary has all data items.");
 replTest.awaitReplication();
-assert.docEq(secondaryColl.find().toArray(), [{"_id": "a"}, {"_id": "b"}, {"_id": "c"}]);
+assert.docEq([{"_id": "a"}, {"_id": "b"}, {"_id": "c"}], secondaryColl.find().toArray());
 
 replTest.stopSet();
 })();

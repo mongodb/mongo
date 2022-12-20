@@ -41,7 +41,7 @@ function assertAllEventsObserved(changeStream, expectedDocs) {
     for (let expectedDoc of expectedDocs) {
         assert.soon(() => changeStream.hasNext());
         const nextEvent = changeStream.next();
-        assert.docEq(nextEvent.fullDocument, expectedDoc, tojson(nextEvent));
+        assert.docEq(expectedDoc, nextEvent.fullDocument, tojson(nextEvent));
     }
 }
 
@@ -50,7 +50,7 @@ function assertCollectionDropEventObserved(changeStream, dbName, collectionName)
     assert.soon(() => changeStream.hasNext());
     const nextEvent = changeStream.next();
     assert.eq(nextEvent.operationType, "drop", tojson(nextEvent));
-    assert.docEq(nextEvent.ns, {db: dbName, coll: collectionName}, tojson(nextEvent));
+    assert.docEq({db: dbName, coll: collectionName}, nextEvent.ns, tojson(nextEvent));
 }
 
 // Open a whole-db change stream on the as yet non-existent database.

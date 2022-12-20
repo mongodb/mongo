@@ -210,9 +210,9 @@ function runOnFieldsTests(targetShardKey, targetSplit) {
                 on: Object.keys(dottedPathIndexSpec)
             }
         }]));
-        assert.docEq(targetColl.findOne({"newField.subField": "hi", proofOfUpdate: "PROOF"},
-                                        {"newField.subField": 1, proofOfUpdate: 1, _id: 0}),
-                     {newField: {subField: "hi"}, proofOfUpdate: "PROOF"});
+        assert.docEq({newField: {subField: "hi"}, proofOfUpdate: "PROOF"},
+                     targetColl.findOne({"newField.subField": "hi", proofOfUpdate: "PROOF"},
+                                        {"newField.subField": 1, proofOfUpdate: 1, _id: 0}));
     } else {
         assertErrCodeAndErrMsgContains(sourceColl,
                                        [{
@@ -243,9 +243,9 @@ function runOnFieldsTests(targetShardKey, targetSplit) {
                 }
             }
         ]));
-        assert.docEq(targetColl.findOne({"newField.subField": "hi", proofOfUpdate: "PROOF"},
-                                        {"newField.subField": 1, proofOfUpdate: 1, _id: 0}),
-                     {newField: {subField: "hi"}, proofOfUpdate: "PROOF"});
+        assert.docEq({newField: {subField: "hi"}, proofOfUpdate: "PROOF"},
+                     targetColl.findOne({"newField.subField": "hi", proofOfUpdate: "PROOF"},
+                                        {"newField.subField": 1, proofOfUpdate: 1, _id: 0}));
     }
 }
 

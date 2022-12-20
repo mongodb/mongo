@@ -24,7 +24,7 @@ const explainPlan = assert.commandWorked(mongosConn.getDB("admin").runCommand(
 
 // We expect the stages to appear under the 'mongos' heading, for 'splitPipeline' to be
 // null, and for the 'mongos.host' field to be the hostname:port of the mongoS itself.
-assert.docEq(explainPlan.mongos.stages, expectedExplainStages);
+assert.docEq(expectedExplainStages, explainPlan.mongos.stages);
 assert.eq(explainPlan.mongos.host, mongosConn.name);
 assert.isnull(explainPlan.splitPipeline);
 

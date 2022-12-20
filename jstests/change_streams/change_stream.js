@@ -220,7 +220,7 @@ let resumeCursor =
 // Insert a document and save the resulting change stream.
 assert.commandWorked(db.resume1.insert({_id: 1}));
 const firstInsertChangeDoc = cst.getOneChange(resumeCursor);
-assert.docEq(firstInsertChangeDoc.fullDocument, {_id: 1});
+assert.docEq({_id: 1}, firstInsertChangeDoc.fullDocument);
 
 jsTestLog("Testing resume after one document.");
 resumeCursor = cst.startWatchingChanges({
@@ -232,10 +232,10 @@ resumeCursor = cst.startWatchingChanges({
 jsTestLog("Inserting additional documents.");
 assert.commandWorked(db.resume1.insert({_id: 2}));
 const secondInsertChangeDoc = cst.getOneChange(resumeCursor);
-assert.docEq(secondInsertChangeDoc.fullDocument, {_id: 2});
+assert.docEq({_id: 2}, secondInsertChangeDoc.fullDocument);
 assert.commandWorked(db.resume1.insert({_id: 3}));
 const thirdInsertChangeDoc = cst.getOneChange(resumeCursor);
-assert.docEq(thirdInsertChangeDoc.fullDocument, {_id: 3});
+assert.docEq({_id: 3}, thirdInsertChangeDoc.fullDocument);
 
 jsTestLog("Testing resume after first document of three.");
 resumeCursor = cst.startWatchingChanges({

@@ -67,7 +67,7 @@ function checkIndexStats(coll, keys, sharded) {
                       : `Index stats 'shard' field should not exist on a non-sharded collection.\n${
                             tojson(index)}`);
         assert.docEq(
-            index.key, keys[i], `Index should have key spec ${tojson(keys[i])}.\n${tojson(index)}`);
+            keys[i], index.key, `Index should have key spec ${tojson(keys[i])}.\n${tojson(index)}`);
     });
 }
 

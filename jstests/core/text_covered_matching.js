@@ -52,7 +52,7 @@ assert.eq(explainResult.executionStats.nReturned,
 let filteringStage = getPlanStages(explainResult, "IXSCAN")[0];
 assert.hasFields(
     filteringStage, ["filter"], "No filter found on IXSCAN: " + tojson(filteringStage));
-assert.docEq(filteringStage.filter, {"b": {"$eq": 1}}, "Incorrect filter on IXSCAN.");
+assert.docEq({"b": {"$eq": 1}}, filteringStage.filter, "Incorrect filter on IXSCAN.");
 
 // When we include the text score in the projection, we use a TEXT_OR in our query plan, which
 // changes how filtering is done. We should get the same result, however.
@@ -73,7 +73,7 @@ assert.eq(explainResult.executionStats.nReturned,
 filteringStage = getPlanStages(explainResult, "TEXT_OR")[0];
 assert.hasFields(
     filteringStage, ["filter"], "No filter found on TEXT_OR: " + tojson(filteringStage));
-assert.docEq(filteringStage.filter, {"b": {"$eq": 1}}, "Incorrect filter on TEXT_OR.");
+assert.docEq({"b": {"$eq": 1}}, filteringStage.filter, "Incorrect filter on TEXT_OR.");
 
 // When we search more than one term, we perform filtering in the OR stage rather than the
 // underlying IXSCANs, but we should get an equivalent result.
@@ -91,7 +91,7 @@ assert.eq(explainResult.executionStats.nReturned,
           "Unexpected number of results returned: " + tojson(explainResult));
 filteringStage = getPlanStages(explainResult, "OR")[0];
 assert.hasFields(filteringStage, ["filter"], "No filter found on OR: " + tojson(filteringStage));
-assert.docEq(filteringStage.filter, {"b": {"$eq": 1}}, "Incorrect filter on OR.");
+assert.docEq({"b": {"$eq": 1}}, filteringStage.filter, "Incorrect filter on OR.");
 
 //
 // Test the query {$text: {$search: "hello"}, c: 1} with and without the 'textScore' in the

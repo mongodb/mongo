@@ -30,4 +30,4 @@ assert.eq(0, f.findOne()._id, "D");
 f.drop();
 f.save({_id: 1, a: 1});
 f.update({}, {$unset: {"a": 1, "b.c": 1}});
-assert.docEq(f.findOne(), {_id: 1}, "E");
+assert.docEq({_id: 1}, f.findOne(), "E");

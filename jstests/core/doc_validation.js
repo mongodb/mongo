@@ -321,7 +321,7 @@ const expectedError = {
     details:
         {operatorName: "$eq", specifiedAs: {a: 1}, reason: "comparison failed", consideredValue: 2}
 };
-assert.docEq(errorInfo, expectedError, tojson(res));
+assert.docEq(expectedError, errorInfo, tojson(res));
 
 // Insert a valid document.
 assert.commandWorked(coll.insert({_id: 1, a: 1}));
@@ -353,6 +353,6 @@ for (const command of [updateCommand, findAndModifyCommand]) {
             consideredValue: 2
         }
     };
-    assert.docEq(errorInfo, expectedError, tojson(res));
+    assert.docEq(expectedError, errorInfo, tojson(res));
 }
 })();

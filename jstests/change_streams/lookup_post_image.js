@@ -223,7 +223,7 @@ cursor = cst.startWatchingChanges({
 assert.commandWorked(coll.update({_id: "getMoreEnabled"}, {$set: {updated: true}}));
 
 const doc = cst.getOneChange(cursor);
-assert.docEq(doc["fullDocument"], {_id: "getMoreEnabled", updated: true});
+assert.docEq({_id: "getMoreEnabled", updated: true}, doc["fullDocument"]);
 
 // Test that invalidate entries don't have 'fullDocument' even if 'updateLookup' is
 // specified.

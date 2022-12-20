@@ -120,7 +120,7 @@ function assertDocumentInsertedAtTimestamp(commitTimestamp, insertedDocumentId) 
 // collection 'coll' was written at timestamp 'commitTimestamp'.
 function assertDocumentPreImageWrittenAtTimestamp(commitTimestamp, modifiedDocumentId) {
     const beforeCommitTimestamp = getPreviousTimestampValue(commitTimestamp);
-    const preImagesCollection = getPreImagesCollection(testDB);
+    const preImagesCollection = getPreImagesCollection(testDB.getMongo());
     assert.eq(0,
               preImagesCollection.find({"preImage._id": modifiedDocumentId})
                   .readConcern("snapshot", beforeCommitTimestamp)

@@ -80,10 +80,10 @@ const expectedFindOneAndUpdatePostImage =
     Object.merge(expectedFindAndModifyPostImage, {findOneAndUpdate: true});
 const findAndModifyPostImage =
     testColl.findAndModify({query: {_id: 1}, update: [{$set: {findAndModify: true}}], new: true});
-assert.docEq(findAndModifyPostImage, expectedFindAndModifyPostImage);
+assert.docEq(expectedFindAndModifyPostImage, findAndModifyPostImage);
 const findOneAndUpdatePostImage = testColl.findOneAndUpdate(
     {_id: 1}, [{$set: {findOneAndUpdate: true}}], {returnNewDocument: true});
-assert.docEq(findOneAndUpdatePostImage, expectedFindOneAndUpdatePostImage);
+assert.docEq(expectedFindOneAndUpdatePostImage, findOneAndUpdatePostImage);
 
 //
 // Explain for updates that use an _id lookup query.

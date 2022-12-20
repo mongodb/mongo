@@ -70,18 +70,18 @@ const testWriteOplogDocumentKey = ({sharded, inTransaction}) => {
     const [insertOplog, replaceOplog, updateOplog, deleteOplog] = oplogs;
     const docKey = sharded ? docKeys.sharded : docKeys.unsharded;
     assert.eq(insertOplog.op, 'i', insertOplog);
-    assert.docEq(insertOplog.o, doc0, insertOplog);
-    assert.docEq(insertOplog.o2, docKey, insertOplog);
+    assert.docEq(doc0, insertOplog.o, insertOplog);
+    assert.docEq(docKey, insertOplog.o2, insertOplog);
 
     assert.eq(replaceOplog.op, 'u', replaceOplog);
-    assert.docEq(replaceOplog.o, doc1, replaceOplog);
-    assert.docEq(replaceOplog.o2, docKey, replaceOplog);
+    assert.docEq(doc1, replaceOplog.o, replaceOplog);
+    assert.docEq(docKey, replaceOplog.o2, replaceOplog);
 
     assert.eq(updateOplog.op, 'u', updateOplog);
-    assert.docEq(updateOplog.o2, docKey, updateOplog);
+    assert.docEq(docKey, updateOplog.o2, updateOplog);
 
     assert.eq(deleteOplog.op, 'd', deleteOplog);
-    assert.docEq(deleteOplog.o, docKey, deleteOplog);
+    assert.docEq(docKey, deleteOplog.o, deleteOplog);
 
     performWrites(function largeInsert(coll) {
         const largeDoc = {_id: 'x'.repeat(16 * 1024 * 1024), a: 0};

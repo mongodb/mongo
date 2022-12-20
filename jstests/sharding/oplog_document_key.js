@@ -12,14 +12,14 @@ function validateDocumentKeyInOplogForRemove(ns, _id, docKey) {
     const deleteEntry = oplog.findOne({ns: ns, op: 'd', 'o._id': _id});
     const o = docKey ? {_id: _id, x: docKey} : {_id: _id};
     if (deleteEntry) {
-        assert.docEq(deleteEntry.o, o);
+        assert.docEq(o, deleteEntry.o);
     } else {
         // Validate this is a batched delete, which includes the document key.
         const elemMatch = docKey ? {'ns': ns, 'op': 'd', 'o._id': _id, 'o.x': docKey}
                                  : {'ns': ns, 'op': 'd', 'o._id': _id};
         const applyOpsEntry =
             oplog.findOne({ns: 'admin.$cmd', op: 'c', 'o.applyOps': {$elemMatch: elemMatch}});
-        assert.docEq(applyOpsEntry.o.applyOps[0].o, o);
+        assert.docEq(o, applyOpsEntry.o.applyOps[0].o);
     }
 }
 

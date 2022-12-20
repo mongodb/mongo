@@ -65,14 +65,14 @@ assert.soonNoExcept(
 // this alone does not prove that the multi-update actually wrote its shard key into the oplog.
 csCursor = mongosColl.watch([], {resumeAfter: resumeToken, fullDocument: "updateLookup"});
 assert.soon(() => csCursor.hasNext());
-assert.docEq(csCursor.next().fullDocument, {_id: 0, a: -100, updated: true});
+assert.docEq({_id: 0, a: -100, updated: true}, csCursor.next().fullDocument);
 
 // Now insert a new document with the same _id on the other shard. Update lookup will be able to
 // distinguish between the two, proving that they both have full shard keys available.
 assert.commandWorked(mongosColl.insert({_id: 0, a: 100}));
 csCursor = mongosColl.watch([], {resumeAfter: resumeToken, fullDocument: "updateLookup"});
 assert.soon(() => csCursor.hasNext());
-assert.docEq(csCursor.next().fullDocument, {_id: 0, a: -100, updated: true});
+assert.docEq({_id: 0, a: -100, updated: true}, csCursor.next().fullDocument);
 
 st.stop();
 })();

@@ -35,20 +35,18 @@ assert.commandWorked(coll.insert([
 
 runWithDifferentIndexes(
     [[], [{a: 1}, {b: 1, c: 1}], [{a: 1, c: 1}, {b: 1}], [{a: 1, c: 1}, {b: 1, c: 1}]], () => {
-        assert.docEq(coll.find({a: {$lt: 3}}).sort({c: 1, a: 1}).toArray(),
-                     [{_id: 6, a: 2, b: 6, c: 7, d: 0}, {_id: 2, a: 1, b: 5, c: 9, d: 1}]);
-
-        assert.docEq(coll.find({$or: [{a: {$gt: 8}}, {b: {$lt: 2}}]}).sort({c: 1}).toArray(), [
-            {_id: 13, a: 9, b: 1.5, d: 1},
-            {_id: 5, a: 9, b: 1, c: 5, d: 1},
-            {_id: 12, a: 9, c: 5.5, d: 1}
-        ]);
+        assert.docEq([{_id: 6, a: 2, b: 6, c: 7, d: 0}, {_id: 2, a: 1, b: 5, c: 9, d: 1}],
+                     coll.find({a: {$lt: 3}}).sort({c: 1, a: 1}).toArray());
 
         assert.docEq(
-            coll.find(
-                    {$or: [{a: {$gt: 8}}, {$and: [{b: {$lt: 5}}, {$or: [{c: {$lt: 5}}, {d: 1}]}]}]})
-                .sort({c: 1})
-                .toArray(),
+            [
+                {_id: 13, a: 9, b: 1.5, d: 1},
+                {_id: 5, a: 9, b: 1, c: 5, d: 1},
+                {_id: 12, a: 9, c: 5.5, d: 1}
+            ],
+            coll.find({$or: [{a: {$gt: 8}}, {b: {$lt: 2}}]}).sort({c: 1}).toArray());
+
+        assert.docEq(
             [
                 {_id: 13, a: 9, b: 1.5, d: 1},
                 {_id: 1, a: 8, b: 3, c: 4, d: 0},
@@ -56,18 +54,23 @@ runWithDifferentIndexes(
                 {_id: 5, a: 9, b: 1, c: 5, d: 1},
                 {_id: 12, a: 9, c: 5.5, d: 1},
                 {_id: 9, a: 7, b: 2, c: 6, d: 1}
-            ]);
+            ],
+            coll.find(
+                    {$or: [{a: {$gt: 8}}, {$and: [{b: {$lt: 5}}, {$or: [{c: {$lt: 5}}, {d: 1}]}]}]})
+                .sort({c: 1})
+                .toArray());
 
-        assert.docEq(coll.find({$or: [{a: {$gt: 6}}, {b: {$lt: 4}}]}).sort({a: 1, b: 1}).toArray(),
-                     [
-                         {_id: 10, b: 3, c: 4.5, d: 0},
-                         {_id: 9, a: 7, b: 2, c: 6, d: 1},
-                         {_id: 1, a: 8, b: 3, c: 4, d: 0},
-                         {_id: 11, a: 8, b: 3.5, d: 0},
-                         {_id: 12, a: 9, c: 5.5, d: 1},
-                         {_id: 5, a: 9, b: 1, c: 5, d: 1},
-                         {_id: 13, a: 9, b: 1.5, d: 1}
-                     ]);
+        assert.docEq(
+            [
+                {_id: 10, b: 3, c: 4.5, d: 0},
+                {_id: 9, a: 7, b: 2, c: 6, d: 1},
+                {_id: 1, a: 8, b: 3, c: 4, d: 0},
+                {_id: 11, a: 8, b: 3.5, d: 0},
+                {_id: 12, a: 9, c: 5.5, d: 1},
+                {_id: 5, a: 9, b: 1, c: 5, d: 1},
+                {_id: 13, a: 9, b: 1.5, d: 1}
+            ],
+            coll.find({$or: [{a: {$gt: 6}}, {b: {$lt: 4}}]}).sort({a: 1, b: 1}).toArray());
 
         assert.sameMembers(coll.find({$or: [{a: {$gt: 6}}, {b: {$lt: 4}}]}).toArray(), [
             {_id: 9, a: 7, b: 2, c: 6, d: 1},
@@ -122,7 +125,8 @@ runWithDifferentIndexes(
         }),
                   [{c: null}, {c: null}, {c: 4}, {c: 5}, {c: 5.5}, {c: 6}]);
 
-        assert.docEq(coll.find({$or: [{a: {$gt: 6}}, {b: {$lt: 4}}]}, {c: 1, _id: 0})
+        assert.docEq([{c: null}, {c: null}, {c: 4}, {c: 4.5}, {c: 5}, {c: 5.5}, {c: 6}],
+                     coll.find({$or: [{a: {$gt: 6}}, {b: {$lt: 4}}]}, {c: 1, _id: 0})
                          .sort({c: 1})
                          .toArray()
                          .map(obj => {
@@ -130,7 +134,6 @@ runWithDifferentIndexes(
                                  obj.c = null;
                              }
                              return obj;
-                         }),
-                     [{c: null}, {c: null}, {c: 4}, {c: 4.5}, {c: 5}, {c: 5.5}, {c: 6}]);
+                         }));
     });
 })();

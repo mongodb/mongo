@@ -43,7 +43,7 @@ function assertExpectedDocAnswersWildcardIndexQuery(doc, query, match, expectedB
 
     // Expected bounds were used.
     if (expectedBounds !== undefined) {
-        ixScans.forEach((ixScan) => assert.docEq(ixScan.indexBounds, expectedBounds));
+        ixScans.forEach((ixScan) => assert.docEq(expectedBounds, ixScan.indexBounds));
     }
 }
 

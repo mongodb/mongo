@@ -73,8 +73,8 @@ runReadOnlyTest(function() {
                 {$limit: 2},
             ];
 
-            assert.docEq(readableCollection.aggregate(mostAwardsPipeline).toArray(),
-                         [{_id: "Spotlight", count: 3}, {_id: "The Revenant", count: 3}]);
+            assert.docEq([{_id: "Spotlight", count: 3}, {_id: "The Revenant", count: 3}],
+                         readableCollection.aggregate(mostAwardsPipeline).toArray());
         }
     };
 }());

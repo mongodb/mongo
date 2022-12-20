@@ -151,7 +151,7 @@ jsTestLog("Checking that the first transaction is properly prepared");
 
 // Make sure that we can't read changes to the document from the first prepared transaction
 // after initial sync.
-assert.docEq(secondaryColl.findOne({_id: 1}), {_id: 1});
+assert.docEq({_id: 1}, secondaryColl.findOne({_id: 1}));
 
 jsTestLog("Committing the first transaction");
 
@@ -160,13 +160,13 @@ replTest.awaitReplication();
 
 // Make sure that we can see the data from a committed transaction on the secondary if it was
 // applied during secondary oplog application.
-assert.docEq(secondaryColl.findOne({_id: 1}), {_id: 1, a: 1});
+assert.docEq({_id: 1, a: 1}, secondaryColl.findOne({_id: 1}));
 
 jsTestLog("Checking that the fourth transaction is properly prepared");
 
 // Make sure that we can't read changes to the document from the first prepared transaction
 // after initial sync.
-assert.docEq(secondaryColl.findOne({_id: 4}), {_id: 4});
+assert.docEq({_id: 4}, secondaryColl.findOne({_id: 4}));
 
 jsTestLog("Committing the fourth transaction");
 
@@ -175,7 +175,7 @@ replTest.awaitReplication();
 
 // Make sure that we can see the data from a committed transaction on the secondary if it was
 // applied during secondary oplog application.
-assert.docEq(secondaryColl.findOne({_id: 4}), {_id: 4, a: 1});
+assert.docEq({_id: 4, a: 1}, secondaryColl.findOne({_id: 4}));
 
 jsTestLog("Stepping up the secondary");
 
@@ -232,7 +232,7 @@ session2.startTransaction();
 assert.commandWorked(sessionDB2[collName].update({_id: 2}, {_id: 2, a: 3}));
 prepareTimestamp2 = PrepareHelpers.prepareTransaction(session2);
 assert.commandWorked(PrepareHelpers.commitTransaction(session2, prepareTimestamp2));
-assert.docEq(testColl.findOne({_id: 2}), {_id: 2, a: 3});
+assert.docEq({_id: 2, a: 3}, testColl.findOne({_id: 2}));
 
 // Force the third session to use the same lsid and txnNumber as from before the restart. This
 // ensures that we're working with the same session and transaction.

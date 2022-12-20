@@ -414,16 +414,16 @@ function runCommonTests(conn, curOpSpec) {
     let expectedStages = [{$currentOp: {idleConnections: true}}, {$match: {desc: {$eq: "test"}}}];
 
     if (isRemoteShardCurOp) {
-        assert.docEq(explainPlan.splitPipeline.shardsPart, expectedStages);
+        assert.docEq(expectedStages, explainPlan.splitPipeline.shardsPart);
         for (let i = 0; i < stParams.shards; i++) {
             let shardName = st["rs" + i].name;
-            assert.docEq(explainPlan.shards[shardName].stages, expectedStages);
+            assert.docEq(expectedStages, explainPlan.shards[shardName].stages);
         }
     } else if (isLocalMongosCurOp) {
         expectedStages[0].$currentOp.localOps = true;
-        assert.docEq(explainPlan.mongos.stages, expectedStages);
+        assert.docEq(expectedStages, explainPlan.mongos.stages);
     } else {
-        assert.docEq(explainPlan.stages, expectedStages);
+        assert.docEq(expectedStages, explainPlan.stages);
     }
 
     // Test that a user with the inprog privilege can run getMore on a $currentOp aggregation

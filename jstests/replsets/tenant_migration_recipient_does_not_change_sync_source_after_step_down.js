@@ -114,7 +114,7 @@ hangDuringCollectionClone.off();
 // verify the sync source is still the donor's old primary.
 TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
 assert.eq(recipientColl.find().itcount(), docs1.length + docs2.length);
-assert.docEq(recipientColl.find().sort({_id: 1}).toArray(), docs1.concat(docs2));
+assert.docEq(docs1.concat(docs2), recipientColl.find().sort({_id: 1}).toArray());
 verifySyncSource(recipientPrimary, migrationId, donorPrimary.host);
 
 tenantMigrationTest.stop();

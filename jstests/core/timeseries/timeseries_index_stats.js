@@ -71,12 +71,12 @@ TimeseriesTest.run((insert) => {
         const stat = indexStatsDocs[i];
         assert(indexKeys.hasOwnProperty(stat.name),
                '$indexStats returned unknown index: ' + stat.name + ': ' + tojson(indexStatsDocs));
-        assert.docEq(indexKeys[stat.name],
-                     stat.key,
+        assert.docEq(stat.key,
+                     indexKeys[stat.name],
                      '$indexStats returned unexpected top-level key for index: ' + stat.name +
                          ': ' + tojson(indexStatsDocs));
-        assert.docEq(indexKeys[stat.name],
-                     stat.spec.key,
+        assert.docEq(stat.spec.key,
+                     indexKeys[stat.name],
                      '$indexStats returned unexpected nested key in spec for index: ' + stat.name +
                          ': ' + tojson(indexStatsDocs));
     }

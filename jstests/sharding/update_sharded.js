@@ -149,22 +149,22 @@ for (let i = 0; i < 2; i++) {
     // Can unset shard key with op style update.
     assert.commandWorked(coll.insert({_id: 11, key: 1}));
     assert.commandWorked(sessionColl.update({_id: 11, key: 1}, {$unset: {key: 1}}));
-    assert.docEq(sessionColl.findOne({_id: 11}), {_id: 11});
+    assert.docEq({_id: 11}, sessionColl.findOne({_id: 11}));
 
     // Can unset shard key with replacement style update.
     assert.commandWorked(coll.insert({_id: 12, key: 1}));
     assert.commandWorked(sessionColl.update({_id: 12, key: 1}, {_id: 12}));
-    assert.docEq(sessionColl.findOne({_id: 12}), {_id: 12});
+    assert.docEq({_id: 12}, sessionColl.findOne({_id: 12}));
 
     // Can unset shard key with pipeline style update.
     assert.commandWorked(coll.insert({_id: 13, key: 1}));
     assert.commandWorked(sessionColl.update({_id: 13, key: 1}, [{$unset: "key"}, {$set: {x: 1}}]));
-    assert.docEq(sessionColl.findOne({_id: 13}), {_id: 13, x: 1});
+    assert.docEq({_id: 13, x: 1}, sessionColl.findOne({_id: 13}));
 
     // Can unset nested fields in the shard key.
     assert.commandWorked(coll.insert({_id: 14, key: {a: 1, b: 1}}));
     assert.commandWorked(sessionColl.update({_id: 14, key: {a: 1, b: 1}}, {$unset: {"key.a": 1}}));
-    assert.docEq(sessionColl.findOne({_id: 14}), {_id: 14, key: {b: 1}});
+    assert.docEq({_id: 14, key: {b: 1}}, sessionColl.findOne({_id: 14}));
 }
 
 // Tests for nested shard keys.
@@ -181,18 +181,18 @@ function testNestedShardKeys(collName, keyPattern) {
     // Can unset shard key with op style update.
     assert.commandWorked(coll.insert({_id: 11, skey: {skey: 1}}));
     assert.commandWorked(sessionColl.update({_id: 11, "skey.skey": 1}, {$unset: {skey: 1}}));
-    assert.docEq(sessionColl.findOne({_id: 11}), {_id: 11});
+    assert.docEq({_id: 11}, sessionColl.findOne({_id: 11}));
 
     // Can unset shard key with replacement style update.
     assert.commandWorked(coll.insert({_id: 12, skey: {skey: 1}}));
     assert.commandWorked(sessionColl.update({_id: 12, "skey.skey": 1}, {_id: 12}));
-    assert.docEq(sessionColl.findOne({_id: 12}), {_id: 12});
+    assert.docEq({_id: 12}, sessionColl.findOne({_id: 12}));
 
     // Can unset shard key with pipeline style update.
     assert.commandWorked(coll.insert({_id: 13, skey: {skey: 1}}));
     assert.commandWorked(
         sessionColl.update({_id: 13, "skey.skey": 1}, [{$unset: "skey"}, {$set: {x: 1}}]));
-    assert.docEq(sessionColl.findOne({_id: 13}), {_id: 13, x: 1});
+    assert.docEq({_id: 13, x: 1}, sessionColl.findOne({_id: 13}));
 
     //
     // Verify each field in a nested shard key can be unset.
@@ -201,25 +201,25 @@ function testNestedShardKeys(collName, keyPattern) {
     // For op-style.
     assert.commandWorked(coll.insert({_id: 14, skey: {skey: 1}}));
     assert.commandWorked(sessionColl.update({_id: 14, "skey.skey": 1}, {$unset: {"skey.skey": 1}}));
-    assert.docEq(sessionColl.findOne({_id: 14}), {_id: 14, skey: {}});
+    assert.docEq({_id: 14, skey: {}}, sessionColl.findOne({_id: 14}));
     assert.commandWorked(sessionColl.update({_id: 14, skey: {}}, {$unset: {skey: 1}}));
-    assert.docEq(sessionColl.findOne({_id: 14}), {_id: 14});
+    assert.docEq({_id: 14}, sessionColl.findOne({_id: 14}));
 
     // For replacement style.
     assert.commandWorked(coll.insert({_id: 15, skey: {skey: 1}}));
     assert.commandWorked(sessionColl.update({_id: 15, "skey.skey": 1}, {skey: 1}));
-    assert.docEq(sessionColl.findOne({_id: 15}), {_id: 15, skey: 1});
+    assert.docEq({_id: 15, skey: 1}, sessionColl.findOne({_id: 15}));
     assert.commandWorked(sessionColl.update({_id: 15, skey: 1}, {$unset: {skey: 1}}));
-    assert.docEq(sessionColl.findOne({_id: 15}), {_id: 15});
+    assert.docEq({_id: 15}, sessionColl.findOne({_id: 15}));
 
     // This can be used to make sure pipeline-based updates generate delta oplog entries.
     const largeStr = '*'.repeat(128);
     // For pipeline style.
     assert.commandWorked(coll.insert({_id: 16, skey: {skey: 1}, largeStr: largeStr}));
     assert.commandWorked(sessionColl.update({_id: 16, "skey.skey": 1}, [{$unset: "skey.skey"}]));
-    assert.docEq(sessionColl.findOne({_id: 16}), {_id: 16, skey: {}, largeStr: largeStr});
+    assert.docEq({_id: 16, skey: {}, largeStr: largeStr}, sessionColl.findOne({_id: 16}));
     assert.commandWorked(sessionColl.update({_id: 16, skey: {}}, [{$unset: "skey"}]));
-    assert.docEq(sessionColl.findOne({_id: 16}), {_id: 16, largeStr: largeStr});
+    assert.docEq({_id: 16, largeStr: largeStr}, sessionColl.findOne({_id: 16}));
 }
 
 testNestedShardKeys("update_nested", {"skey.skey": 1});

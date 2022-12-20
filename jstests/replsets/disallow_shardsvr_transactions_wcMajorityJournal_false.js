@@ -47,7 +47,7 @@ assert.commandWorked(
     sessionDb.runCommand({insert: "foo", documents: [{_id: 3}], txnNumber: NumberLong(1)}));
 
 // Assert documents inserted.
-assert.docEq(sessionColl.find().sort({_id: 1}).toArray(), [{_id: 1}, {_id: 3}]);
+assert.docEq([{_id: 1}, {_id: 3}], sessionColl.find().sort({_id: 1}).toArray());
 
 replSet.stopSet();
 }());

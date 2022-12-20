@@ -58,7 +58,7 @@ const runTest = function({pipeline, behaviour, expectedDocs}) {
     const docs = coll.aggregate([...pipeline, {$sort: {a: 1, b: 1, _id: 1}}]).toArray();
     assert.eq(docs.length, expectedDocs.length, "Incorrect docs: " + tojson(docs));
     docs.forEach((doc, i) => {
-        assert.docEq(doc, expectedDocs[i], "Incorrect docs: " + tojson(docs));
+        assert.docEq(expectedDocs[i], doc, "Incorrect docs: " + tojson(docs));
     });
 };
 

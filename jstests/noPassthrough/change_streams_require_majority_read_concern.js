@@ -79,7 +79,7 @@ rst.awaitLastOpCommitted();
 
 // Verify that the expected doc is returned because it has been committed.
 let doc = cst.getOneChange(cursor);
-assert.docEq(doc.operationType, "insert");
-assert.docEq(doc.fullDocument, {_id: 2});
+assert.docEq("insert", doc.operationType);
+assert.docEq({_id: 2}, doc.fullDocument);
 rst.stopSet();
 }());

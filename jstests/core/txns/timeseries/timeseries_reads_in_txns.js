@@ -55,12 +55,12 @@ assert.commandWorked(sessionRegularColl.insert(doc4));
 // The last insert should be visible in this session.
 doc4 = sessionRegularColl.findOne({_id: 1, x: 1});
 assert.neq(null, doc4);
-assert.docEq(doc4, doc1);
+assert.docEq(doc1, doc4);
 
 session.commitTransaction();
 
 // Verify that after a commit the update persists.
 let doc5 = regularColl.findOne({_id: 1, x: 1});
 assert.neq(null, doc5);
-assert.docEq(doc5, doc4);
+assert.docEq(doc4, doc5);
 })();

@@ -34,7 +34,7 @@ db.foo.count();
 
 // Check that there is no readPref on the command document.
 assert.eq(commandsRan.length, 1);
-assert.docEq(commandsRan[0].cmd, {count: "foo", query: {}});
+assert.docEq({count: "foo", query: {}}, commandsRan[0].cmd);
 
 commandsRan = [];
 
@@ -44,5 +44,5 @@ db.foo.count();
 
 // Check that we have correctly attached the read preference to the command.
 assert.eq(commandsRan.length, 1);
-assert.docEq(commandsRan[0].cmd, {count: "foo", query: {}, $readPreference: {mode: "secondary"}});
+assert.docEq({count: "foo", query: {}, $readPreference: {mode: "secondary"}}, commandsRan[0].cmd);
 })();

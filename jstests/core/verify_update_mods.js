@@ -30,7 +30,7 @@ function executeUpdateTestCase(testCase) {
     if (testCase.expectedErrorCode == undefined) {
         // Verify that the command succeeded and collection's contents match the expected results.
         assert.commandWorked(result);
-        assert.docEq(coll.find({}).sort({_id: 1}).toArray(), testCase.expectedResults);
+        assert.docEq(testCase.expectedResults, coll.find({}).sort({_id: 1}).toArray());
     } else {
         assert.commandFailedWithCode(result, testCase.expectedErrorCode);
     }

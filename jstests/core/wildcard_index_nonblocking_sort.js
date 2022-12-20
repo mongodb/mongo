@@ -42,7 +42,7 @@ function checkQueryUsesSortType(query, sort, projection, isBlocking) {
         assert.eq(ixScans.length, FixtureHelpers.numberOfShardsForCollection(coll), explain);
 
         const sortKey = Object.keys(sort)[0];
-        assert.docEq(ixScans[0].keyPattern, {$_path: 1, [sortKey]: 1});
+        assert.docEq({$_path: 1, [sortKey]: 1}, ixScans[0].keyPattern);
     }
 }
 

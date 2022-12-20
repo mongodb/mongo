@@ -101,7 +101,7 @@ assert.commandWorked(mongosColl.update({_id: 1}, {$set: {updatedCount: 1}}));
 assert.soon(() => changeStream.hasNext());
 let latestChange = changeStream.next();
 assert.eq(latestChange.operationType, "update");
-assert.docEq(latestChange.fullDocument, {_id: 1, updatedCount: 1});
+assert.docEq({_id: 1, updatedCount: 1}, latestChange.fullDocument);
 
 // Test that the change stream itself goes to the secondary. There might be more than one if we
 // needed multiple getMores to retrieve the changes.
@@ -208,7 +208,7 @@ const joinResumeReplicationShell =
 assert.soon(() => changeStream.hasNext());
 latestChange = changeStream.next();
 assert.eq(latestChange.operationType, "update");
-assert.docEq(latestChange.fullDocument, {_id: 1, updatedCount: 2});
+assert.docEq({_id: 1, updatedCount: 2}, latestChange.fullDocument);
 joinResumeReplicationShell();
 
 // Test that the update lookup goes to the new closest secondary.

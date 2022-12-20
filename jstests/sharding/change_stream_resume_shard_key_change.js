@@ -72,8 +72,8 @@ const verifyChanges = (changeStream, startingIndex) => {
         }
         return changes.length === docs.length - startingIndex;
     });
-    assert.docEq(changes.map(x => x.fullDocument), docs.slice(startingIndex));
-    assert.docEq(changes.map(x => x.documentKey), docKeys.slice(startingIndex));
+    assert.docEq(docs.slice(startingIndex), changes.map(x => x.fullDocument));
+    assert.docEq(docKeys.slice(startingIndex), changes.map(x => x.documentKey));
     return changes;
 };
 

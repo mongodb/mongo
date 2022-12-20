@@ -63,7 +63,7 @@ var res = t.update({_id: 8}, {$push: {x: {$sort: {a: -1}}}});
 // Test that when given a document with a $sort field that matches the form of a plain document
 // (instead of a $sort modifier document), $push will add that field to the specified array.
 assert.commandWorked(res);
-assert.docEq(t.findOne({_id: 8}), {_id: 8, x: [{a: 1}, {a: 2}, {$sort: {a: -1}}]});
+assert.docEq({_id: 8, x: [{a: 1}, {a: 2}, {$sort: {a: -1}}]}, t.findOne({_id: 8}));
 
 t.save({_id: 100, x: [{a: 1}]});
 

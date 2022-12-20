@@ -136,8 +136,8 @@ function runWildcardIndexTest(keyPattern, pathProjection, expectedPaths) {
 
             // Verify that the winning plan uses the $** index with the expected bounds.
             assert.eq(ixScans.length, FixtureHelpers.numberOfShardsForCollection(coll));
-            assert.docEq(ixScans[0].keyPattern, {$_path: 1, [path]: 1});
-            assert.docEq(ixScans[0].indexBounds, expectedBounds);
+            assert.docEq({$_path: 1, [path]: 1}, ixScans[0].keyPattern);
+            assert.docEq(expectedBounds, ixScans[0].indexBounds);
 
             // Verify that the results obtained from the $** index are identical to a COLLSCAN.
             // We must explicitly hint the wildcard index, because we also sort on {_id: 1} to

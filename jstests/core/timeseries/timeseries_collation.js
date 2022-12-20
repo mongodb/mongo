@@ -66,7 +66,7 @@ TimeseriesTest.run((insert) => {
     const results = coll.find().sort({_id: 1}).toArray();
     assert.eq(docs.length, results.length);
     for (let i = 0; i < results.length; i++) {
-        assert.docEq(results[i], docs[i]);
+        assert.docEq(docs[i], results[i]);
     }
 
     // Now let's check that min and max appropriately ignore collation for field names, but not

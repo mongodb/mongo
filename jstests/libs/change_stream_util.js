@@ -563,13 +563,13 @@ function assertChangeStreamPreAndPostImagesCollectionOptionIsAbsent(db, collName
     assert(!collectionInfos[0].options.hasOwnProperty("changeStreamPreAndPostImages"));
 }
 
-function getPreImagesCollection(db) {
-    return db.getSiblingDB(kPreImagesCollectionDatabase).getCollection(kPreImagesCollectionName);
+function getPreImagesCollection(connection) {
+    return connection.getDB(kPreImagesCollectionDatabase).getCollection(kPreImagesCollectionName);
 }
 
 // Returns the pre-images written while performing the write operations.
 function preImagesForOps(db, writeOps) {
-    const preImagesColl = getPreImagesCollection(db);
+    const preImagesColl = getPreImagesCollection(db.getMongo());
     const preImagesCollSortSpec = {"_id.ts": 1, "_id.applyOpsIndex": 1};
 
     // Determine the id of the last pre-image document written to be able to determine the pre-image
@@ -601,7 +601,7 @@ function preImagesForOps(db, writeOps) {
  * _id.applyOpsIndex ascending.
  */
 function getPreImages(connection) {
-    return connection.getDB(kPreImagesCollectionDatabase)[kPreImagesCollectionName]
+    return getPreImagesCollection(connection)
         .find()
         .sort({"_id.ts": 1, "_id.applyOpsIndex": 1})
         .allowDiskUse()

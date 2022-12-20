@@ -74,7 +74,7 @@ function runTests(sourceColl, mongodConnection) {
 
     res = targetColl.find().sort({_id: 1});
     // Only a single document is visible ($merge did not see the second insert).
-    assert.docEq(res.next(), {_id: 1, state: 'merge'});
+    assert.docEq({_id: 1, state: 'merge'}, res.next());
     assert(res.isExhausted());
 
     // The same $merge but with whenMatched set to "replace".
@@ -100,9 +100,9 @@ function runTests(sourceColl, mongodConnection) {
 
     res = targetReplaceDocsColl.find().sort({_id: 1});
     // The first document must overwrite the update that the read portion of $merge did not see.
-    assert.docEq(res.next(), {_id: 1, state: 'merge'});
+    assert.docEq({_id: 1, state: 'merge'}, res.next());
     // The second document is the result of the independent insert that $merge did not see.
-    assert.docEq(res.next(), {_id: 2, state: 'before'});
+    assert.docEq({_id: 2, state: 'before'}, res.next());
     assert(res.isExhausted());
 
     assert.commandWorked(targetColl.remove({}));
@@ -155,7 +155,7 @@ function runTests(sourceColl, mongodConnection) {
 
     res = targetColl.find().sort({_id: 1});
     // Only a single document is visible ($merge did not see the second insert).
-    assert.docEq(res.next(), {_id: 2, state: 'merge'});
+    assert.docEq({_id: 2, state: 'merge'}, res.next());
     assert(res.isExhausted());
 }
 

@@ -343,8 +343,8 @@ function dropWithoutImplicitRecreate(coll) {
             }
         }
     ]));
-    assert.docEq(target.findOne({"a.b": "hi", proofOfUpdate: "PROOF"}),
-                 {_id: "TARGET", a: {b: "hi"}, proofOfUpdate: "PROOF"});
+    assert.docEq({_id: "TARGET", a: {b: "hi"}, proofOfUpdate: "PROOF"},
+                 target.findOne({"a.b": "hi", proofOfUpdate: "PROOF"}));
 }());
 
 // Test that a unique index that is sparse can still be used.

@@ -55,10 +55,10 @@ const runTest = function({pipeline, eventFilter, wholeBucketFilter, expectedDocs
               unpackStages.length,
               "Should only have a single $_internalUnpackBucket stage: " + tojson(explain));
     const unpackStage = unpackStages[0].$_internalUnpackBucket;
-    assert.docEq(unpackStage.eventFilter, eventFilter, "Incorrect eventFilter: " + tojson(explain));
+    assert.docEq(eventFilter, unpackStage.eventFilter, "Incorrect eventFilter: " + tojson(explain));
     if (wholeBucketFilter) {
-        assert.docEq(unpackStage.wholeBucketFilter,
-                     wholeBucketFilter,
+        assert.docEq(wholeBucketFilter,
+                     unpackStage.wholeBucketFilter,
                      "Incorrect wholeBucketFilter: " + tojson(explain));
     } else {
         assert(!unpackStage.wholeBucketFilter, "Incorrect wholeBucketFilter: " + tojson(explain));
@@ -69,7 +69,7 @@ const runTest = function({pipeline, eventFilter, wholeBucketFilter, expectedDocs
     docs.forEach((doc, i) => {
         // Do not need to check document _id, since checking time is already unique.
         delete doc._id;
-        assert.docEq(doc, expectedDocs[i], "Incorrect docs: " + tojson(docs));
+        assert.docEq(expectedDocs[i], doc, "Incorrect docs: " + tojson(docs));
     });
 };
 

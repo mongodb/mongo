@@ -293,7 +293,7 @@ var EncryptedClient = class {
 
         let onDiskDocs = coll.find({}, {[kSafeContentField]: 0}).sort({_id: 1}).toArray();
 
-        assert.docEq(onDiskDocs, docs);
+        assert.docEq(docs, onDiskDocs);
     }
 
     assertStateCollectionsAfterCompact(collName, ecocExists) {

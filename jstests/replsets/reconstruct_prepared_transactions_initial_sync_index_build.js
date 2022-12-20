@@ -129,7 +129,7 @@ replTest.awaitReplication();
 awaitIndexBuild();
 
 // Make sure that we can see the data from the committed transaction on the secondary.
-assert.docEq(secondaryColl.findOne({_id: 1}), {_id: 1, a: 2});
+assert.docEq({_id: 1, a: 2}, secondaryColl.findOne({_id: 1}));
 
 replTest.stopSet();
 })();

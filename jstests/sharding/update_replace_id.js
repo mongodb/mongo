@@ -48,8 +48,8 @@ function restartProfiling() {
 function setUpData() {
     // Write a single document to shard0 and verify that it is present.
     mongosColl.insert({_id: -100, a: -100, msg: "not_updated"});
-    assert.docEq(shard0DB.test.find({_id: -100}).toArray(),
-                 [{_id: -100, a: -100, msg: "not_updated"}]);
+    assert.docEq([{_id: -100, a: -100, msg: "not_updated"}],
+                 shard0DB.test.find({_id: -100}).toArray());
 
     // Write a document with the same key directly to shard1. This simulates an orphaned
     // document, or the duplicate document which temporarily exists during a chunk migration.
@@ -70,15 +70,15 @@ function runReplacementUpdateTestsForHashedShardKey() {
         mongosColl.update({_id: -100}, {a: -100, msg: "update_extracted_id_from_query"}));
 
     // Verify that the update did not modify the orphan document.
-    assert.docEq(shard1DB.test.find({_id: -100}).toArray(),
-                 [{_id: -100, a: -100, msg: "not_updated"}]);
+    assert.docEq([{_id: -100, a: -100, msg: "not_updated"}],
+                 shard1DB.test.find({_id: -100}).toArray());
     assert.eq(writeRes.nMatched, 1);
     assert.eq(writeRes.nModified, 1);
 
     // Verify that the update only targeted shard0 and that the resulting document appears as
     // expected.
-    assert.docEq(mongosColl.find({_id: -100}).toArray(),
-                 [{_id: -100, a: -100, msg: "update_extracted_id_from_query"}]);
+    assert.docEq([{_id: -100, a: -100, msg: "update_extracted_id_from_query"}],
+                 mongosColl.find({_id: -100}).toArray());
     profilerHasSingleMatchingEntryOrThrow({
         profileDB: shard0DB,
         filter: {op: "update", "command.u.msg": "update_extracted_id_from_query"}
@@ -99,10 +99,10 @@ function runReplacementUpdateTestsForHashedShardKey() {
     // expected. At this point in the test we expect shard1 to be stale, because it was the
     // destination shard for the first moveChunk; we therefore explicitly check the profiler for
     // a successful update, i.e. one which did not report a stale config exception.
-    assert.docEq(mongosColl.find({_id: 101}).toArray(),
-                 [{_id: 101, a: 101, msg: "upsert_extracted_id_from_query"}]);
-    assert.docEq(shard1DB.test.find({_id: 101}).toArray(),
-                 [{_id: 101, a: 101, msg: "upsert_extracted_id_from_query"}]);
+    assert.docEq([{_id: 101, a: 101, msg: "upsert_extracted_id_from_query"}],
+                 mongosColl.find({_id: 101}).toArray());
+    assert.docEq([{_id: 101, a: 101, msg: "upsert_extracted_id_from_query"}],
+                 shard1DB.test.find({_id: 101}).toArray());
     profilerHasZeroMatchingEntriesOrThrow({
         profileDB: shard0DB,
         filter: {op: "update", "command.u.msg": "upsert_extracted_id_from_query"}
@@ -128,15 +128,15 @@ function runReplacementUpdateTestsForCompoundShardKey() {
         mongosColl.update({_id: -100}, {a: -100, msg: "update_extracted_id_from_query"}));
 
     // Verify that the update did not modify the orphan document.
-    assert.docEq(shard1DB.test.find({_id: -100}).toArray(),
-                 [{_id: -100, a: -100, msg: "not_updated"}]);
+    assert.docEq([{_id: -100, a: -100, msg: "not_updated"}],
+                 shard1DB.test.find({_id: -100}).toArray());
     assert.eq(writeRes.nMatched, 1);
     assert.eq(writeRes.nModified, 1);
 
     // Verify that the update only targeted shard0 and that the resulting document appears as
     // expected.
-    assert.docEq(mongosColl.find({_id: -100}).toArray(),
-                 [{_id: -100, a: -100, msg: "update_extracted_id_from_query"}]);
+    assert.docEq([{_id: -100, a: -100, msg: "update_extracted_id_from_query"}],
+                 mongosColl.find({_id: -100}).toArray());
     profilerHasSingleMatchingEntryOrThrow({
         profileDB: shard0DB,
         filter: {op: "update", "command.u.msg": "update_extracted_id_from_query"}
@@ -153,7 +153,7 @@ function runReplacementUpdateTestsForCompoundShardKey() {
         ErrorCodes.ShardKeyNotFound);
 
     // Verify that the document did not perform any writes.
-    assert.docEq(mongosColl.find({_id: 101}).itcount(), 0);
+    assert.eq(0, mongosColl.find({_id: 101}).itcount());
 
     // Verify that an update whose query contains an exact match on _id but whose replacement
     // doc does not contain all other shard key fields will be targeted as if the missing shard
@@ -169,8 +169,8 @@ function runReplacementUpdateTestsForCompoundShardKey() {
     assert.commandWorked(
         sessionColl.update({_id: -99}, {_id: -99, msg: "update_missing_shard_key_field"}));
 
-    assert.docEq(sessionColl.find({_id: -99}).toArray(),
-                 [{_id: -99, msg: "update_missing_shard_key_field"}]);
+    assert.docEq([{_id: -99, msg: "update_missing_shard_key_field"}],
+                 sessionColl.find({_id: -99}).toArray());
 
     // Verify that an upsert whose query contains an exact match on _id but whose replacement
     // document does not contain all other shard key fields will work properly.

@@ -59,7 +59,7 @@ const unionWith = (foreignCollName, values) => {
 // Verify that a $unionWith whose local collection has no default collation uses the simple
 // collation for comparisons on a foreign collection with a non-simple default collation.
 let results = noCollationColl.aggregate(unionWith(caseInsensitiveColl.getName(), ["B"])).toArray();
-assert.docEq(results, [{val: "B", caseSensitiveColl: false}, {val: "B", caseSensitiveColl: true}]);
+assert.docEq([{val: "B", caseSensitiveColl: false}, {val: "B", caseSensitiveColl: true}], results);
 // Verify that a $unionWith whose local collection has no default collation but which is running in
 // a pipeline with a non-simple user-specified collation uses the latter for comparisons on the
 // foreign collection.
@@ -67,22 +67,26 @@ results = noCollationColl
               .aggregate(unionWith(caseInsensitiveColl.getName(), ["B"]),
                          {collation: caseInsensitiveCollation})
               .toArray();
-assert.docEq(results, [
-    {val: "B", caseSensitiveColl: false},  // Case insensitive match on local collection.
-    {val: "b", caseSensitiveColl: false},
-    {val: "b", caseSensitiveColl: true},
-    {val: "B", caseSensitiveColl: true}  // Case insensitive match on foreign collection.
-]);
+assert.docEq(
+    [
+        {val: "B", caseSensitiveColl: false},  // Case insensitive match on local collection.
+        {val: "b", caseSensitiveColl: false},
+        {val: "b", caseSensitiveColl: true},
+        {val: "B", caseSensitiveColl: true}  // Case insensitive match on foreign collection.
+    ],
+    results);
 
 // Verify that a $unionWith whose local collection has a non-simple collation uses the latter for
 // comparisons on a foreign collection with no default collation.
 results = caseInsensitiveColl.aggregate(unionWith(noCollationColl.getName(), ["B"])).toArray();
-assert.docEq(results, [
-    {val: "B", caseSensitiveColl: false},  // Case insensitive match on local collection.
-    {val: "b", caseSensitiveColl: false},
-    {val: "b", caseSensitiveColl: true},
-    {val: "B", caseSensitiveColl: true}  // Case insensitive match on foreign collection.
-]);
+assert.docEq(
+    [
+        {val: "B", caseSensitiveColl: false},  // Case insensitive match on local collection.
+        {val: "b", caseSensitiveColl: false},
+        {val: "b", caseSensitiveColl: true},
+        {val: "B", caseSensitiveColl: true}  // Case insensitive match on foreign collection.
+    ],
+    results);
 
 // Verify that a $unionWith whose local collection has a non-simple collation but which is running
 // in a pipeline with a user-specified simple collation uses the latter for comparisons on the
@@ -90,7 +94,7 @@ assert.docEq(results, [
 results = caseInsensitiveColl
               .aggregate(unionWith(noCollationColl.getName(), ["B"]), {collation: simpleCollation})
               .toArray();
-assert.docEq(results, [{val: "B", caseSensitiveColl: false}, {val: "B", caseSensitiveColl: true}]);
+assert.docEq([{val: "B", caseSensitiveColl: false}, {val: "B", caseSensitiveColl: true}], results);
 
 // Create a case-sensitive/simple view and a case-insensitive view.
 testDB.noCollationView.drop();
@@ -112,7 +116,7 @@ assert.commandWorked(testDB.runCommand({
 results =
     caseInsensitiveColl.aggregate(unionWith("noCollationView", ["B"]), {collation: simpleCollation})
         .toArray();
-assert.docEq(results, [{val: "B", caseSensitiveView: true}, {val: "B", caseSensitiveColl: false}]);
+assert.docEq([{val: "B", caseSensitiveView: true}, {val: "B", caseSensitiveColl: false}], results);
 
 // Verify that the command fails if the collation of the pipeline doesn't match the collation of the
 // view.
@@ -133,10 +137,12 @@ assert.commandFailedWithCode(noCollationColl.runCommand({
 // Verify that the command succeeds if both the pipeline and the $unionWith'd view uses a
 // case-insensitive collation.
 results = caseInsensitiveColl.aggregate(unionWith("caseInsensitiveView", ["B"])).toArray();
-assert.docEq(results, [
-    {val: "B", caseSensitiveView: false},
-    {val: "b", caseSensitiveView: false},
-    {val: "B", caseSensitiveColl: false},
-    {val: "b", caseSensitiveColl: false}
-]);
+assert.docEq(
+    [
+        {val: "B", caseSensitiveView: false},
+        {val: "b", caseSensitiveView: false},
+        {val: "B", caseSensitiveColl: false},
+        {val: "b", caseSensitiveColl: false}
+    ],
+    results);
 })();

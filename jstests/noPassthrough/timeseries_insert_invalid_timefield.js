@@ -38,13 +38,13 @@ const goodDocs = [
 ];
 assert.commandWorked(coll.insert(goodDocs[0]));
 assert.eq(1, coll.count());
-assert.docEq(coll.find().toArray(), [goodDocs[0]]);
+assert.docEq([goodDocs[0]], coll.find().toArray());
 
 // now make sure we reject if timeField is missing or isn't a valid BSON datetime
 let mixedDocs = [{meta: "B", data: true}, goodDocs[1], {time: "invalid", meta: "B", data: false}];
 assert.commandFailedWithCode(coll.insert(mixedDocs, {ordered: false}), ErrorCodes.BadValue);
 assert.eq(coll.count(), 2);
-assert.docEq(coll.find().toArray(), goodDocs);
+assert.docEq(goodDocs, coll.find().toArray());
 assert.eq(null, coll.findOne({meta: mixedDocs[0].meta}));
 assert.eq(null, coll.findOne({meta: mixedDocs[2].meta}));
 

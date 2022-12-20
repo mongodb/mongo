@@ -76,9 +76,9 @@ function assertPipelineUsesAggregation({
     if (expectedResult) {
         const actualResult = coll.aggregate(pipeline, pipelineOptions).toArray();
         if (preserveResultOrder) {
-            assert.docEq(actualResult, expectedResult);
+            assert.docEq(expectedResult, actualResult);
         } else {
-            assert.sameMembers(actualResult, expectedResult);
+            assert.sameMembers(expectedResult, actualResult);
         }
     }
 
@@ -120,9 +120,9 @@ function assertPipelineDoesNotUseAggregation({
     if (expectedResult) {
         const actualResult = coll.aggregate(pipeline, pipelineOptions).toArray();
         if (preserveResultOrder) {
-            assert.docEq(actualResult, expectedResult);
+            assert.docEq(expectedResult, actualResult);
         } else {
-            assert.sameMembers(actualResult, expectedResult);
+            assert.sameMembers(expectedResult, actualResult);
         }
     }
 

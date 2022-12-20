@@ -59,7 +59,7 @@ for (let key of Object.keys(ChangeStreamWatchMode)) {
     const docsFoundInOrder = [firstChange];
     for (let i = 0; i < nDocs - 1; i++) {
         const change = cst.getOneChange(changeStream);
-        assert.docEq(change.ns, {db: s0DB.getName(), coll: coll.getName()});
+        assert.docEq({db: s0DB.getName(), coll: coll.getName()}, change.ns);
         assert.eq(change.operationType, "insert");
 
         docsFoundInOrder.push(change);

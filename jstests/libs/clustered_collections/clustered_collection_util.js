@@ -70,7 +70,7 @@ var ClusteredCollectionUtil = class {
             assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: collName}}));
         const listCollsOptions = listColls.cursor.firstBatch[0].options;
         assert(listCollsOptions.clusteredIndex);
-        assert.docEq(listCollsOptions.clusteredIndex, fullCreateOptions.clusteredIndex);
+        assert.docEq(fullCreateOptions.clusteredIndex, listCollsOptions.clusteredIndex);
     }
 
     // The clusteredIndex should appear in listIndexes with additional "clustered" field.
@@ -79,7 +79,7 @@ var ClusteredCollectionUtil = class {
         const listIndexes = assert.commandWorked(db[collName].runCommand("listIndexes"));
         const expectedListIndexesOutput =
             Object.extend({clustered: true}, fullCreateOptions.clusteredIndex);
-        assert.docEq(listIndexes.cursor.firstBatch[0], expectedListIndexesOutput);
+        assert.docEq(expectedListIndexesOutput, listIndexes.cursor.firstBatch[0]);
     }
 
     static testBasicClusteredCollection(db, collName, clusterKey) {

@@ -43,7 +43,7 @@ assert.commandWorked(coll.insert({_id: "x"}));
 let latestChange = cst.getOneChange(csNoPreImages);
 assert.eq(latestChange.operationType, "insert");
 assert(!latestChange.hasOwnProperty("fullDocumentBeforeChange"));
-assert.docEq(latestChange.fullDocument, {_id: "x"});
+assert.docEq({_id: "x"}, latestChange.fullDocument);
 assert.docEq(latestChange, cst.getOneChange(csPreImageWhenAvailableCursor));
 assert.docEq(latestChange, cst.getOneChange(csPreImageRequiredCursor));
 
@@ -52,7 +52,7 @@ assert.commandWorked(coll.update({_id: "x"}, {foo: "bar"}));
 latestChange = cst.getOneChange(csNoPreImages);
 assert.eq(latestChange.operationType, "replace");
 assert(!latestChange.hasOwnProperty("fullDocumentBeforeChange"));
-assert.docEq(latestChange.fullDocument, {_id: "x", foo: "bar"});
+assert.docEq({_id: "x", foo: "bar"}, latestChange.fullDocument);
 // Add the expected "fullDocumentBeforeChange" and confirm that both pre-image cursors see it.
 latestChange.fullDocumentBeforeChange = {
     _id: "x"
@@ -104,7 +104,7 @@ assert.commandWorked(coll.insert({_id: "y"}));
 latestChange = cst.getOneChange(csNoPreImages);
 assert.eq(latestChange.operationType, "insert");
 assert(!latestChange.hasOwnProperty("fullDocumentBeforeChange"));
-assert.docEq(latestChange.fullDocument, {_id: "y"});
+assert.docEq({_id: "y"}, latestChange.fullDocument);
 assert.docEq(latestChange, cst.getOneChange(csPreImageWhenAvailableCursor));
 assert.docEq(latestChange, cst.getOneChange(csPreImageRequiredCursor));
 
@@ -113,7 +113,7 @@ assert.commandWorked(coll.update({_id: "y"}, {foo: "bar"}));
 latestChange = cst.getOneChange(csNoPreImages);
 assert.eq(latestChange.operationType, "replace");
 assert(!latestChange.hasOwnProperty("fullDocumentBeforeChange"));
-assert.docEq(latestChange.fullDocument, {_id: "y", foo: "bar"});
+assert.docEq({_id: "y", foo: "bar"}, latestChange.fullDocument);
 
 // Add the expected "fullDocumentBeforeChange" and confirm that pre-image is not present.
 latestChange.fullDocumentBeforeChange = null;

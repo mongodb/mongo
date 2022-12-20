@@ -54,14 +54,14 @@ function runTest(underflow, overflow, query, results) {
     // avoid BUS and index selection, so we sort after gathering the results.
     const aggActuals = tsColl.aggregate(pipeline).toArray();
     aggActuals.sort(cmpTimeFields);
-    assert.docEq(aggActuals, results);
+    assert.docEq(results, aggActuals);
 
     // Verify the equivalent find command. We again don't want to go through a plan that
     // encourages a sort order to avoid BUS and index selection, so we sort after gathering the
     // results.
     let findActuals = tsColl.find(query, {_id: 0, [timeFieldName]: 1}).toArray();
     findActuals.sort(cmpTimeFields);
-    assert.docEq(findActuals, results);
+    assert.docEq(results, findActuals);
 }
 
 runTest(false,

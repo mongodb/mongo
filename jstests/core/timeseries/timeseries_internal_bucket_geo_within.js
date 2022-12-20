@@ -93,7 +93,7 @@ results = coll.aggregate([
               ])
               .toArray();
 assert.eq(results.length, 1, results);
-assert.docEq(results[0].a, {b: {type: "Point", coordinates: [0, 0]}});
+assert.docEq({b: {type: "Point", coordinates: [0, 0]}}, results[0].a);
 
 // Test a scenario where $geoWithin does implicit array traversal.
 coll.drop();
@@ -118,11 +118,13 @@ results = coll.aggregate([
               ])
               .toArray();
 assert.eq(results.length, 1, results);
-assert.docEq(results[0].a, [
-    12345,
-    {type: "Point", coordinates: [180, 0]},
-    {"1": {type: "Point", coordinates: [0, 0]}},
-]);
+assert.docEq(
+    [
+        12345,
+        {type: "Point", coordinates: [180, 0]},
+        {"1": {type: "Point", coordinates: [0, 0]}},
+    ],
+    results[0].a);
 
 pipeline = [{
     $match: {

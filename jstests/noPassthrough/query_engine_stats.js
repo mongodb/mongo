@@ -110,7 +110,7 @@ function generateExpectedCounters(queryFramework) {
 // values.
 function compareQueryEngineCounters(expectedCounters) {
     let counters = db.serverStatus().metrics.query.queryFramework;
-    assert.docEq(counters, expectedCounters);
+    assert.docEq(expectedCounters, counters);
 }
 
 // Start with SBE off.

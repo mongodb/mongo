@@ -22,7 +22,7 @@ function executeAggregationTestCase(collection, testCase) {
             assert(testCase.expectedErrorCode === undefined,
                    `Expected an exception with code ${testCase.expectedErrorCode}`);
         }
-        assert.docEq(actualResults, testCase.expectedResults);
+        assert.docEq(testCase.expectedResults, actualResults);
     } catch (error) {
         if (testCase.expectedErrorCode === undefined) {
             throw error;

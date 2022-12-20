@@ -41,7 +41,7 @@ function runTest(docs, query, results) {
     docs.forEach(d => tsColl.insert(Object.assign({[timeFieldName]: new Date("2021-01-01")}, d)));
 
     // Check that the result is in the result set.
-    assert.docEq(tsColl.aggregate(pipeline).toArray(), results);
+    assert.docEq(results, tsColl.aggregate(pipeline).toArray());
 
     // Ensure $type operator was not used.
     const explain = tsColl.explain().aggregate(pipeline);

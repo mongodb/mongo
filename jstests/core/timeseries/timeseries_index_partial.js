@@ -266,18 +266,21 @@ assert.sameMembers(buckets.getIndexes(), extraBucketIndexes.concat([
 
     // Queries on the collection use the collection's collation by default.
     assert.docEq(
-        coll.find({}, {_id: 0, [metaField + '.x']: 1}).sort({[metaField + '.x']: 1}).toArray(), [
+        [
             {[metaField]: {x: "500"}},
             {[metaField]: {x: "500"}},
             {[metaField]: {x: "1000"}},
             {[metaField]: {x: "1000"}},
-        ]);
-    assert.docEq(coll.find({}, {_id: 0, a: 1}).sort({a: 1}).toArray(), [
-        {a: "3"},
-        {a: "3"},
-        {a: "120"},
-        {a: "120"},
-    ]);
+        ],
+        coll.find({}, {_id: 0, [metaField + '.x']: 1}).sort({[metaField + '.x']: 1}).toArray());
+    assert.docEq(
+        [
+            {a: "3"},
+            {a: "3"},
+            {a: "120"},
+            {a: "120"},
+        ],
+        coll.find({}, {_id: 0, a: 1}).sort({a: 1}).toArray());
 
     // Specifying a collation and partialFilterExpression together fails, even if the collation
     // matches the collection's default collation.
@@ -300,8 +303,8 @@ assert.sameMembers(buckets.getIndexes(), extraBucketIndexes.concat([
         {a: 1}, {name: "a_lt_25_default", partialFilterExpression: {a: {$lt: "25"}}}));
 
     // Verify that the index contains what we expect.
-    assert.docEq(coll.find({}, {_id: 0, a: 1}).hint("a_lt_25_default").toArray(),
-                 [{a: "3"}, {a: "3"}]);
+    assert.docEq([{a: "3"}, {a: "3"}],
+                 coll.find({}, {_id: 0, a: 1}).hint("a_lt_25_default").toArray());
 
     // Verify that the index is used when possible.
     function checkPlanAndResult({predicate, collation, stageName, indexName, expectedResults}) {
@@ -318,7 +321,7 @@ assert.sameMembers(buckets.getIndexes(), extraBucketIndexes.concat([
         }
 
         const results = cur.toArray();
-        assert.docEq(results, expectedResults);
+        assert.docEq(expectedResults, results);
     }
 
     // a < "25" can use the index, since the collations match.

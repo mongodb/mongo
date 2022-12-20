@@ -48,9 +48,9 @@ var crudAPISpecTests = function crudAPISpecTests() {
         };
     }
 
-    function checkResultObject(first, second) {
+    function checkResultObject(expected, actual) {
         // Only assert on the "modifiedCount" property
-        assert.docEq(first, second);
+        assert.docEq(expected, actual);
     }
 
     // Setup executors
@@ -659,7 +659,7 @@ var crudAPISpecTests = function crudAPISpecTests() {
 
     // Simple projection
     var result = coll.find({}).sort({a: 1}).limit(1).skip(1).projection({_id: 0, a: 1}).toArray();
-    assert.docEq(result, [{a: 1}]);
+    assert.docEq([{a: 1}], result);
 
     // Simple tailable cursor
     var cursor = coll.find({}).sort({a: 1}).tailable();

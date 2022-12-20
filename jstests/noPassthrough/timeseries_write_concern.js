@@ -69,7 +69,7 @@ assert.eq(
 restartReplicationOnSecondaries(replTest);
 awaitInsert();
 
-assert.docEq(coll.find().toArray(), docs);
+assert.docEq(docs, coll.find().toArray());
 const buckets = bucketsColl.find().toArray();
 assert.eq(buckets.length, 1, 'Expected one bucket but found: ' + tojson(buckets));
 const serverStatus = assert.commandWorked(testDB.serverStatus()).bucketCatalog;

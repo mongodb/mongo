@@ -57,13 +57,13 @@ function runTest(conn, failPointConn, shardColl) {
               docs.length - resWithCannotContinue.nInserted - 1);
     for (let i = 0; i < resWithCannotContinue.getWriteErrors().length; i++) {
         assert.eq(resWithCannotContinue.getWriteErrors()[i].index, i);
-        assert.docEq(resWithCannotContinue.getWriteErrors()[i].getOperation(), docs[i + 1]);
+        assert.docEq(docs[i + 1], resWithCannotContinue.getWriteErrors()[i].getOperation());
     }
 
     //
     // Test with failPoint which can allow subsequent write operations of the batch.
     //
-    assert.docEq(coll.find().sort({_id: 1}).toArray(), []);
+    assert.docEq([], coll.find().sort({_id: 1}).toArray());
     assert.eq(bucketsColl.count(),
               0,
               'Expected zero buckets but found: ' + tojson(bucketsColl.find().toArray()));
@@ -82,10 +82,10 @@ function runTest(conn, failPointConn, shardColl) {
     assert.eq(res.getWriteErrors().length, docs.length - res.nInserted - 1);
     for (let i = 0; i < res.getWriteErrors().length; i++) {
         assert.eq(res.getWriteErrors()[i].index, i);
-        assert.docEq(res.getWriteErrors()[i].getOperation(), docs[i + 1]);
+        assert.docEq(docs[i + 1], res.getWriteErrors()[i].getOperation());
     }
 
-    assert.docEq(coll.find().sort({_id: 1}).toArray(), [docs[0], docs[3], docs[4]]);
+    assert.docEq([docs[0], docs[3], docs[4]], coll.find().sort({_id: 1}).toArray());
     assert.eq(bucketsColl.count(),
               2,
               'Expected two buckets but found: ' + tojson(bucketsColl.find().toArray()));
@@ -94,7 +94,7 @@ function runTest(conn, failPointConn, shardColl) {
 
     // The documents should go into two new buckets due to the failed insert on the existing bucket.
     assert.commandWorked(coll.insert(docs.slice(1, 3), {ordered: false}));
-    assert.docEq(coll.find().sort({_id: 1}).toArray(), docs);
+    assert.docEq(docs, coll.find().sort({_id: 1}).toArray());
     // If we allow bucket reopening, we will save out on opening another bucket.
     const expectedBucketCount =
         (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(testDB)) ? 2 : 3;

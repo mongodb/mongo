@@ -37,7 +37,7 @@ TimeseriesTest.run((insert) => {
         assert.contains(bucketsColl.getName(), db.getCollectionNames());
 
         assert.commandWorked(insert(coll, docs));
-        assert.docEq(coll.find().sort({_id: 1}).toArray(), docs);
+        assert.docEq(docs, coll.find().sort({_id: 1}).toArray());
 
         const buckets = bucketsColl.find().sort({_id: 1}).toArray();
         jsTestLog('Checking buckets:' + tojson(buckets));

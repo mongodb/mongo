@@ -38,7 +38,7 @@ assert.commandWorked(
 assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
 
 assert.commandWorked(coll.insert(docs[0]));
-assert.docEq(coll.find().sort({_id: 1}).toArray(), docs.slice(0, 1));
+assert.docEq(docs.slice(0, 1), coll.find().sort({_id: 1}).toArray());
 
 let buckets = bucketsColl.find().sort({_id: 1}).toArray();
 assert.eq(buckets.length, 1);
@@ -75,7 +75,7 @@ awaitInsert();
 // The expected ordering is that the insert finished, then the update overwrote the bucket document,
 // so there should be one document, and a closed flag.
 
-assert.docEq(coll.find().sort({_id: 1}).toArray(), docs.slice(0, 1));
+assert.docEq(docs.slice(0, 1), coll.find().sort({_id: 1}).toArray());
 
 buckets = bucketsColl.find().sort({_id: 1}).toArray();
 assert.eq(buckets.length, 1);
@@ -86,7 +86,7 @@ assert(buckets[0].control.closed);
 // Now another insert should generate a new bucket.
 
 assert.commandWorked(coll.insert(docs[2]));
-assert.docEq(coll.find().sort({_id: 1}).toArray(), [docs[0], docs[2]]);
+assert.docEq([docs[0], docs[2]], coll.find().sort({_id: 1}).toArray());
 
 buckets = bucketsColl.find().sort({_id: 1}).toArray();
 assert.eq(buckets.length, 2);

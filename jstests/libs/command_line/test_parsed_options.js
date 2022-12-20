@@ -114,7 +114,7 @@ function testGetCmdLineOptsMongod(mongoRunnerConfig, expectedResult) {
     delete getCmdLineOptsResult.parsed.setParameter.backtraceLogFile;
 
     // Make sure the options are equal to what we expect
-    assert.docEq(getCmdLineOptsResult.parsed, expectedResult.parsed);
+    assert.docEq(expectedResult.parsed, getCmdLineOptsResult.parsed);
 
     // Cleanup
     mongod.getDB("admin").logout();
@@ -206,7 +206,7 @@ function testGetCmdLineOptsMongos(mongoRunnerConfig, expectedResult) {
     }
 
     // Make sure the options are equal to what we expect
-    assert.docEq(getCmdLineOptsResult.parsed, expectedResult.parsed);
+    assert.docEq(expectedResult.parsed, getCmdLineOptsResult.parsed);
 }
 
 // Tests that the passed configuration will not run a new mongod instances. Mainly used to test

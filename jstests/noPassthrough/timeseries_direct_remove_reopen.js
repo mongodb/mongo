@@ -40,7 +40,7 @@ assert.commandWorked(testDB.createCollection(
 assert.contains(bucketsColl.getName(), testDB.getCollectionNames());
 
 assert.commandWorked(coll.insert(docs[0]));
-assert.docEq(coll.find().sort({_id: 1}).toArray(), docs.slice(0, 1));
+assert.docEq(docs.slice(0, 1), coll.find().sort({_id: 1}).toArray());
 
 let buckets = bucketsColl.find().sort({_id: 1}).toArray();
 assert.eq(buckets.length, 1);
@@ -82,7 +82,7 @@ awaitInsert();
 
 // The expected ordering is that the remove finishes, then the insert opens a new bucket.
 
-assert.docEq(coll.find().sort({_id: 1}).toArray().length, 1);
+assert.docEq(1, coll.find().sort({_id: 1}).toArray().length);
 
 buckets = bucketsColl.find().sort({_id: 1}).toArray();
 assert.eq(buckets.length, 1);

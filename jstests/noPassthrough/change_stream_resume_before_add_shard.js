@@ -43,7 +43,7 @@ function addShardToCluster(shardName) {
     // is used by change streams as a sentinel to indicate that no writes have occurred on the
     // replica set before this point.
     const firstOplogEntry = replTest.getPrimary().getCollection("local.oplog.rs").findOne();
-    assert.docEq(firstOplogEntry.o, {msg: "initiating set"});
+    assert.docEq({msg: "initiating set"}, firstOplogEntry.o);
     assert.eq(firstOplogEntry.op, "n");
 
     return replTest;
@@ -56,7 +56,7 @@ function assertCanResumeFromEachEvent(eventList) {
         const resumedStream = coll.watch([], {resumeAfter: eventList[i]._id});
         for (let j = i + 1; j < eventList.length; ++j) {
             assert.soon(() => resumedStream.hasNext());
-            assert.docEq(resumedStream.next(), eventList[j]);
+            assert.docEq(eventList[j], resumedStream.next());
         }
         resumedStream.close();
     }

@@ -24,7 +24,7 @@ function executeTestCase(collection, testCase) {
     if (testCase.hasOwnProperty("expectedError")) {
         assert.throwsWithCode(findCommand, testCase.expectedError, [], testCase);
     } else {
-        assert.docEq(findCommand(), testCase.expectedResults, testCase);
+        assert.docEq(testCase.expectedResults, findCommand(), testCase);
     }
 }
 

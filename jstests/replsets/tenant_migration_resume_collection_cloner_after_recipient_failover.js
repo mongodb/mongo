@@ -100,7 +100,7 @@ const tenantMigrationFailoverTest = function(isTimeSeries, createCollFn, docs) {
     // Check that recipient has cloned all documents in the collection.
     recipientColl = newRecipientPrimary.getDB(dbName).getCollection(collName);
     assert.eq(docs.length, recipientColl.find().itcount());
-    assert.docEq(recipientColl.find().sort({_id: 1}).toArray(), docs);
+    assert.docEq(docs, recipientColl.find().sort({_id: 1}).toArray());
     TenantMigrationUtil.checkTenantDBHashes({
         donorRst: tenantMigrationTest.getDonorRst(),
         recipientRst: tenantMigrationTest.getRecipientRst(),

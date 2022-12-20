@@ -54,10 +54,7 @@ function verifyEqLookupNodeStrategy(
     if (strategy === "IndexedLoopJoin") {
         assert(indexKeyPattern,
                "expected indexKeyPattern should be set for IndexedLoopJoin algorithm");
-        assert.docEq(eqLookupNode.indexKeyPattern,
-                     indexKeyPattern,
-                     "expected IndexedLoopJoin node to have index " + tojson(indexKeyPattern) +
-                         ", got plan " + tojson(eqLookupNode));
+        assert.docEq(indexKeyPattern, eqLookupNode.indexKeyPattern);
     }
 }
 
@@ -968,7 +965,7 @@ MongoRunner.stopMongod(conn);
         session.startTransaction({readConcern: {level: "snapshot"}});
 
         function verifySingleDoc(cursor) {
-            assert.docEq(cursor.next(), {_id: 0, a: 0, out: [{_id: 0, b: 0}]});
+            assert.docEq({_id: 0, a: 0, out: [{_id: 0, b: 0}]}, cursor.next());
             assert(!cursor.hasNext());
         }
 

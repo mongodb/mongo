@@ -207,7 +207,7 @@ const runRewritesTest = (sortSpec,
     const ogExplainFull = testColl.explain().aggregate(ogPipeline, options);
 
     // Assert correct
-    assert.docEq(optResults, ogResults);
+    assert.docEq(ogResults, optResults);
     // Make sure we're not testing trivial / empty queries.
     assert.gt(ogResults.length, 0, 'Expected the queries in this test to have nonempty results');
 
@@ -242,7 +242,7 @@ const runRewritesTest = (sortSpec,
     let foundMatch = findFirstMatch(optExplain);
     if (!precise) {
         assert.docEq(
-            foundMatch, bucketSpanMatch, 'Expected an extra $match to check the bucket span');
+            bucketSpanMatch, foundMatch, 'Expected an extra $match to check the bucket span');
     } else {
         // (We don't have a 'assert.notDocEq' helper, but docEq is 'eq' + 'sortDoc'.)
         assert.neq(sortDoc(foundMatch),

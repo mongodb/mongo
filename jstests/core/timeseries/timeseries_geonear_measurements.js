@@ -79,9 +79,7 @@ function runFlatExamples(coll, isTimeseries) {
         {$project: {_id: 0, loc: 1, distance: {$floor: "$distance"}}},
         {$limit: 1},
     ];
-    assert.docEq(coll.aggregate(pipeline).toArray(), [
-        {loc: [0, 0], distance: 180},
-    ]);
+    assert.docEq([{loc: [0, 0], distance: 180}], coll.aggregate(pipeline).toArray());
 
     // For the rest of the examples, query from [0, 0] because it makes distances more convenient.
 
@@ -96,18 +94,20 @@ function runFlatExamples(coll, isTimeseries) {
         },
         {$project: {_id: 0, loc: 1, distance: 1}},
     ];
-    assert.docEq(coll.aggregate(pipeline).toArray(), [
-        {loc: [0, 0], distance: 0},
-        {loc: [0, 1], distance: 1},
-        {loc: [0, 2], distance: 2},
-        {loc: [0, 3], distance: 3},
-        {loc: [0, 4], distance: 4},
-        {loc: [0, 5], distance: 5},
-        {loc: [0, 6], distance: 6},
-        {loc: [0, 7], distance: 7},
-        {loc: [0, 8], distance: 8},
-        {loc: [0, 9], distance: 9},
-    ]);
+    assert.docEq(
+        [
+            {loc: [0, 0], distance: 0},
+            {loc: [0, 1], distance: 1},
+            {loc: [0, 2], distance: 2},
+            {loc: [0, 3], distance: 3},
+            {loc: [0, 4], distance: 4},
+            {loc: [0, 5], distance: 5},
+            {loc: [0, 6], distance: 6},
+            {loc: [0, 7], distance: 7},
+            {loc: [0, 8], distance: 8},
+            {loc: [0, 9], distance: 9},
+        ],
+        coll.aggregate(pipeline).toArray());
     plan = coll.explain().aggregate(pipeline);
     // Since we don't support '2d' index on time-series metrics, and '2dsphere' indexes can't
     // answer flat queries, we always expect a collscan for timeseries.
@@ -129,13 +129,15 @@ function runFlatExamples(coll, isTimeseries) {
         {$limit: 5},
         {$project: {_id: 0, loc: 1, distance: 1}},
     ];
-    assert.docEq(coll.aggregate(pipeline).toArray(), [
-        {loc: [0, 0], distance: 0},
-        {loc: [0, 1], distance: 1},
-        {loc: [0, 2], distance: 2},
-        {loc: [0, 3], distance: 3},
-        {loc: [0, 4], distance: 4},
-    ]);
+    assert.docEq(
+        [
+            {loc: [0, 0], distance: 0},
+            {loc: [0, 1], distance: 1},
+            {loc: [0, 2], distance: 2},
+            {loc: [0, 3], distance: 3},
+            {loc: [0, 4], distance: 4},
+        ],
+        coll.aggregate(pipeline).toArray());
     plan = coll.explain().aggregate(pipeline);
     if (isTimeseries) {
         assert(aggPlanHasStage(plan, 'COLLSCAN'), plan);
@@ -155,15 +157,17 @@ function runFlatExamples(coll, isTimeseries) {
         },
         {$project: {_id: 0, loc: 1, distance: 1}},
     ];
-    assert.docEq(coll.aggregate(pipeline).toArray(), [
-        {loc: [0, 0], distance: 0},
-        {loc: [0, 1], distance: 1},
-        {loc: [0, 2], distance: 2},
-        {loc: [0, 3], distance: 3},
-        {loc: [0, 4], distance: 4},
-        {loc: [0, 5], distance: 5},
-        {loc: [0, 6], distance: 6},
-    ]);
+    assert.docEq(
+        [
+            {loc: [0, 0], distance: 0},
+            {loc: [0, 1], distance: 1},
+            {loc: [0, 2], distance: 2},
+            {loc: [0, 3], distance: 3},
+            {loc: [0, 4], distance: 4},
+            {loc: [0, 5], distance: 5},
+            {loc: [0, 6], distance: 6},
+        ],
+        coll.aggregate(pipeline).toArray());
     plan = coll.explain().aggregate(pipeline);
     if (isTimeseries) {
         assert(aggPlanHasStage(plan, 'COLLSCAN'), plan);
@@ -183,15 +187,17 @@ function runFlatExamples(coll, isTimeseries) {
         },
         {$project: {_id: 0, loc: 1, distance: 1}},
     ];
-    assert.docEq(coll.aggregate(pipeline).toArray(), [
-        {loc: [0, 3], distance: 3},
-        {loc: [0, 4], distance: 4},
-        {loc: [0, 5], distance: 5},
-        {loc: [0, 6], distance: 6},
-        {loc: [0, 7], distance: 7},
-        {loc: [0, 8], distance: 8},
-        {loc: [0, 9], distance: 9},
-    ]);
+    assert.docEq(
+        [
+            {loc: [0, 3], distance: 3},
+            {loc: [0, 4], distance: 4},
+            {loc: [0, 5], distance: 5},
+            {loc: [0, 6], distance: 6},
+            {loc: [0, 7], distance: 7},
+            {loc: [0, 8], distance: 8},
+            {loc: [0, 9], distance: 9},
+        ],
+        coll.aggregate(pipeline).toArray());
     plan = coll.explain().aggregate(pipeline);
     if (isTimeseries) {
         assert(aggPlanHasStage(plan, 'COLLSCAN'), plan);
@@ -212,12 +218,14 @@ function runFlatExamples(coll, isTimeseries) {
         },
         {$project: {_id: 0, loc: 1, distance: 1}},
     ];
-    assert.docEq(coll.aggregate(pipeline).toArray(), [
-        {loc: [0, 3], distance: 3},
-        {loc: [0, 4], distance: 4},
-        {loc: [0, 5], distance: 5},
-        {loc: [0, 6], distance: 6},
-    ]);
+    assert.docEq(
+        [
+            {loc: [0, 3], distance: 3},
+            {loc: [0, 4], distance: 4},
+            {loc: [0, 5], distance: 5},
+            {loc: [0, 6], distance: 6},
+        ],
+        coll.aggregate(pipeline).toArray());
     plan = coll.explain().aggregate(pipeline);
     if (isTimeseries) {
         assert(aggPlanHasStage(plan, 'COLLSCAN'), plan);
@@ -239,12 +247,14 @@ function runFlatExamples(coll, isTimeseries) {
         },
         {$project: {_id: 0, loc: 1, distance: 1}},
     ];
-    assert.docEq(coll.aggregate(pipeline).toArray(), [
-        {loc: [0, 3], distance: 30},
-        {loc: [0, 4], distance: 40},
-        {loc: [0, 5], distance: 50},
-        {loc: [0, 6], distance: 60},
-    ]);
+    assert.docEq(
+        [
+            {loc: [0, 3], distance: 30},
+            {loc: [0, 4], distance: 40},
+            {loc: [0, 5], distance: 50},
+            {loc: [0, 6], distance: 60},
+        ],
+        coll.aggregate(pipeline).toArray());
     plan = coll.explain().aggregate(pipeline);
     if (isTimeseries) {
         assert(aggPlanHasStage(plan, 'COLLSCAN'), plan);
@@ -305,18 +315,20 @@ function runSphereExamples(coll, isTimeseries, has2dsphereIndex, scaleResult, qu
         },
         {$project: {_id: 0, loc: 1, distance: {$floor: {$multiply: [scaleResult, "$distance"]}}}},
     ];
-    assert.docEq(coll.aggregate(pipeline).toArray(), [
-        {loc: [0, 9], distance: Math.floor(degreesToMeters(180 - 9))},
-        {loc: [0, 8], distance: Math.floor(degreesToMeters(180 - 8))},
-        {loc: [0, 7], distance: Math.floor(degreesToMeters(180 - 7))},
-        {loc: [0, 6], distance: Math.floor(degreesToMeters(180 - 6))},
-        {loc: [0, 5], distance: Math.floor(degreesToMeters(180 - 5))},
-        {loc: [0, 4], distance: Math.floor(degreesToMeters(180 - 4))},
-        {loc: [0, 3], distance: Math.floor(degreesToMeters(180 - 3))},
-        {loc: [0, 2], distance: Math.floor(degreesToMeters(180 - 2))},
-        {loc: [0, 1], distance: Math.floor(degreesToMeters(180 - 1))},
-        {loc: [0, 0], distance: Math.floor(degreesToMeters(180 - 0))},
-    ]);
+    assert.docEq(
+        [
+            {loc: [0, 9], distance: Math.floor(degreesToMeters(180 - 9))},
+            {loc: [0, 8], distance: Math.floor(degreesToMeters(180 - 8))},
+            {loc: [0, 7], distance: Math.floor(degreesToMeters(180 - 7))},
+            {loc: [0, 6], distance: Math.floor(degreesToMeters(180 - 6))},
+            {loc: [0, 5], distance: Math.floor(degreesToMeters(180 - 5))},
+            {loc: [0, 4], distance: Math.floor(degreesToMeters(180 - 4))},
+            {loc: [0, 3], distance: Math.floor(degreesToMeters(180 - 3))},
+            {loc: [0, 2], distance: Math.floor(degreesToMeters(180 - 2))},
+            {loc: [0, 1], distance: Math.floor(degreesToMeters(180 - 1))},
+            {loc: [0, 0], distance: Math.floor(degreesToMeters(180 - 0))},
+        ],
+        coll.aggregate(pipeline).toArray());
     plan = coll.explain().aggregate(pipeline);
     if (isTimeseries) {
         // Without a maxDistance we have to unpack every bucket and sort the events.
@@ -344,13 +356,15 @@ function runSphereExamples(coll, isTimeseries, has2dsphereIndex, scaleResult, qu
         {$limit: 5},
         {$project: {_id: 0, loc: 1, distance: {$floor: {$multiply: [scaleResult, "$distance"]}}}},
     ];
-    assert.docEq(coll.aggregate(pipeline).toArray(), [
-        {loc: [0, 9], distance: Math.floor(degreesToMeters(180 - 9))},
-        {loc: [0, 8], distance: Math.floor(degreesToMeters(180 - 8))},
-        {loc: [0, 7], distance: Math.floor(degreesToMeters(180 - 7))},
-        {loc: [0, 6], distance: Math.floor(degreesToMeters(180 - 6))},
-        {loc: [0, 5], distance: Math.floor(degreesToMeters(180 - 5))},
-    ]);
+    assert.docEq(
+        [
+            {loc: [0, 9], distance: Math.floor(degreesToMeters(180 - 9))},
+            {loc: [0, 8], distance: Math.floor(degreesToMeters(180 - 8))},
+            {loc: [0, 7], distance: Math.floor(degreesToMeters(180 - 7))},
+            {loc: [0, 6], distance: Math.floor(degreesToMeters(180 - 6))},
+            {loc: [0, 5], distance: Math.floor(degreesToMeters(180 - 5))},
+        ],
+        coll.aggregate(pipeline).toArray());
     plan = coll.explain().aggregate(pipeline);
     if (isTimeseries) {
         // Without a maxDistance we have to unpack every bucket and sort the events.
@@ -376,15 +390,17 @@ function runSphereExamples(coll, isTimeseries, has2dsphereIndex, scaleResult, qu
         },
         {$project: {_id: 0, loc: 1, distance: {$floor: {$multiply: [scaleResult, "$distance"]}}}},
     ];
-    assert.docEq(coll.aggregate(pipeline).toArray(), [
-        {loc: [0, 9], distance: Math.floor(degreesToMeters(180 - 9))},
-        {loc: [0, 8], distance: Math.floor(degreesToMeters(180 - 8))},
-        {loc: [0, 7], distance: Math.floor(degreesToMeters(180 - 7))},
-        {loc: [0, 6], distance: Math.floor(degreesToMeters(180 - 6))},
-        {loc: [0, 5], distance: Math.floor(degreesToMeters(180 - 5))},
-        {loc: [0, 4], distance: Math.floor(degreesToMeters(180 - 4))},
-        {loc: [0, 3], distance: Math.floor(degreesToMeters(180 - 3))},
-    ]);
+    assert.docEq(
+        [
+            {loc: [0, 9], distance: Math.floor(degreesToMeters(180 - 9))},
+            {loc: [0, 8], distance: Math.floor(degreesToMeters(180 - 8))},
+            {loc: [0, 7], distance: Math.floor(degreesToMeters(180 - 7))},
+            {loc: [0, 6], distance: Math.floor(degreesToMeters(180 - 6))},
+            {loc: [0, 5], distance: Math.floor(degreesToMeters(180 - 5))},
+            {loc: [0, 4], distance: Math.floor(degreesToMeters(180 - 4))},
+            {loc: [0, 3], distance: Math.floor(degreesToMeters(180 - 3))},
+        ],
+        coll.aggregate(pipeline).toArray());
     plan = coll.explain().aggregate(pipeline);
     if (isTimeseries) {
         // With maxDistance we can generate a $geoWithin predicate, which can use an index when
@@ -409,16 +425,18 @@ function runSphereExamples(coll, isTimeseries, has2dsphereIndex, scaleResult, qu
         },
         {$project: {_id: 0, loc: 1, distance: {$floor: {$multiply: [scaleResult, "$distance"]}}}},
     ];
-    assert.docEq(coll.aggregate(pipeline).toArray(), [
-        {loc: [0, 7], distance: Math.floor(degreesToMeters(180 - 7))},
-        {loc: [0, 6], distance: Math.floor(degreesToMeters(180 - 6))},
-        {loc: [0, 5], distance: Math.floor(degreesToMeters(180 - 5))},
-        {loc: [0, 4], distance: Math.floor(degreesToMeters(180 - 4))},
-        {loc: [0, 3], distance: Math.floor(degreesToMeters(180 - 3))},
-        {loc: [0, 2], distance: Math.floor(degreesToMeters(180 - 2))},
-        {loc: [0, 1], distance: Math.floor(degreesToMeters(180 - 1))},
-        {loc: [0, 0], distance: Math.floor(degreesToMeters(180 - 0))},
-    ]);
+    assert.docEq(
+        [
+            {loc: [0, 7], distance: Math.floor(degreesToMeters(180 - 7))},
+            {loc: [0, 6], distance: Math.floor(degreesToMeters(180 - 6))},
+            {loc: [0, 5], distance: Math.floor(degreesToMeters(180 - 5))},
+            {loc: [0, 4], distance: Math.floor(degreesToMeters(180 - 4))},
+            {loc: [0, 3], distance: Math.floor(degreesToMeters(180 - 3))},
+            {loc: [0, 2], distance: Math.floor(degreesToMeters(180 - 2))},
+            {loc: [0, 1], distance: Math.floor(degreesToMeters(180 - 1))},
+            {loc: [0, 0], distance: Math.floor(degreesToMeters(180 - 0))},
+        ],
+        coll.aggregate(pipeline).toArray());
     plan = coll.explain().aggregate(pipeline);
     if (isTimeseries) {
         if (has2dsphereIndex) {
@@ -442,13 +460,15 @@ function runSphereExamples(coll, isTimeseries, has2dsphereIndex, scaleResult, qu
         },
         {$project: {_id: 0, loc: 1, distance: {$floor: {$multiply: [scaleResult, "$distance"]}}}},
     ];
-    assert.docEq(coll.aggregate(pipeline).toArray(), [
-        {loc: [0, 7], distance: Math.floor(degreesToMeters(180 - 7))},
-        {loc: [0, 6], distance: Math.floor(degreesToMeters(180 - 6))},
-        {loc: [0, 5], distance: Math.floor(degreesToMeters(180 - 5))},
-        {loc: [0, 4], distance: Math.floor(degreesToMeters(180 - 4))},
-        {loc: [0, 3], distance: Math.floor(degreesToMeters(180 - 3))},
-    ]);
+    assert.docEq(
+        [
+            {loc: [0, 7], distance: Math.floor(degreesToMeters(180 - 7))},
+            {loc: [0, 6], distance: Math.floor(degreesToMeters(180 - 6))},
+            {loc: [0, 5], distance: Math.floor(degreesToMeters(180 - 5))},
+            {loc: [0, 4], distance: Math.floor(degreesToMeters(180 - 4))},
+            {loc: [0, 3], distance: Math.floor(degreesToMeters(180 - 3))},
+        ],
+        coll.aggregate(pipeline).toArray());
     plan = coll.explain().aggregate(pipeline);
     if (isTimeseries) {
         if (has2dsphereIndex) {
@@ -473,13 +493,15 @@ function runSphereExamples(coll, isTimeseries, has2dsphereIndex, scaleResult, qu
         },
         {$project: {_id: 0, loc: 1, distance: {$floor: {$multiply: [scaleResult, "$distance"]}}}},
     ];
-    assert.docEq(coll.aggregate(pipeline).toArray(), [
-        {loc: [0, 7], distance: Math.floor(10 * degreesToMeters(180 - 7))},
-        {loc: [0, 6], distance: Math.floor(10 * degreesToMeters(180 - 6))},
-        {loc: [0, 5], distance: Math.floor(10 * degreesToMeters(180 - 5))},
-        {loc: [0, 4], distance: Math.floor(10 * degreesToMeters(180 - 4))},
-        {loc: [0, 3], distance: Math.floor(10 * degreesToMeters(180 - 3))},
-    ]);
+    assert.docEq(
+        [
+            {loc: [0, 7], distance: Math.floor(10 * degreesToMeters(180 - 7))},
+            {loc: [0, 6], distance: Math.floor(10 * degreesToMeters(180 - 6))},
+            {loc: [0, 5], distance: Math.floor(10 * degreesToMeters(180 - 5))},
+            {loc: [0, 4], distance: Math.floor(10 * degreesToMeters(180 - 4))},
+            {loc: [0, 3], distance: Math.floor(10 * degreesToMeters(180 - 3))},
+        ],
+        coll.aggregate(pipeline).toArray());
     plan = coll.explain().aggregate(pipeline);
     if (isTimeseries) {
         if (has2dsphereIndex) {
@@ -520,7 +542,7 @@ function runSphereExamples(coll, isTimeseries, has2dsphereIndex, scaleResult, qu
         },
         {$match: {no_such_field: 456}},
     ];
-    assert.docEq(coll.aggregate(pipeline).toArray(), []);
+    assert.docEq([], coll.aggregate(pipeline).toArray());
     plan = coll.explain().aggregate(pipeline);
     if (isTimeseries) {
         if (has2dsphereIndex) {

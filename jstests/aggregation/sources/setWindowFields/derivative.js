@@ -99,24 +99,26 @@ result = coll.aggregate([
                  {$sort: {time: 1}},
              ])
              .toArray();
-assert.docEq(result, [
-    // The first document looks behind 3, but can't go any further back than time: 0.
-    // It also looks ahead 1. So the points it compares are time: 0 and time: 1.
-    {time: 0, y: 100, dy: +5},
-    // The second document gets time: 0 and time: 2.
-    {time: 1, y: 105, dy: +8 / 2},
-    // The third gets time: 0 and time: 3.
-    {time: 2, y: 108, dy: +8 / 3},
-    // This is the first document whose left endpoint lies within the partition.
-    // So this one, and the next few, all have fully-populated windows.
-    {time: 3, y: 108, dy: +15 / 4},
-    {time: 4, y: 115, dy: +10 / 4},
-    {time: 5, y: 115, dy: +10 / 4},
-    {time: 6, y: 118, dy: +10 / 4},
-    // For the last document, there is no document at offset +1, so it sees
-    // time: 4 and time: 7.
-    {time: 7, y: 118, dy: +3 / 3},
-]);
+assert.docEq(
+    [
+        // The first document looks behind 3, but can't go any further back than time: 0.
+        // It also looks ahead 1. So the points it compares are time: 0 and time: 1.
+        {time: 0, y: 100, dy: +5},
+        // The second document gets time: 0 and time: 2.
+        {time: 1, y: 105, dy: +8 / 2},
+        // The third gets time: 0 and time: 3.
+        {time: 2, y: 108, dy: +8 / 3},
+        // This is the first document whose left endpoint lies within the partition.
+        // So this one, and the next few, all have fully-populated windows.
+        {time: 3, y: 108, dy: +15 / 4},
+        {time: 4, y: 115, dy: +10 / 4},
+        {time: 5, y: 115, dy: +10 / 4},
+        {time: 6, y: 118, dy: +10 / 4},
+        // For the last document, there is no document at offset +1, so it sees
+        // time: 4 and time: 7.
+        {time: 7, y: 118, dy: +3 / 3},
+    ],
+    result);
 // Because the derivative is the same irrespective of sort order (as long as we reexpress the
 // bounds) we can compare this result with the result of the previous aggregation.
 const resultDesc =
@@ -133,7 +135,7 @@ const resultDesc =
             {$sort: {time: 1}},
         ])
         .toArray();
-assert.docEq(result, resultDesc);
+assert.docEq(resultDesc, result);
 
 // Example with range-based bounds.
 coll.drop();
@@ -158,14 +160,16 @@ result = coll.aggregate([
                  {$sort: {time: 1}},
              ])
              .toArray();
-assert.docEq(result, [
-    {time: 0, y: 10, dy: null},
-    {time: 10, y: 12, dy: (12 - 10) / (10 - 0)},
-    {time: 11, y: 15, dy: (15 - 12) / (11 - 10)},
-    {time: 12, y: 19, dy: (19 - 12) / (12 - 10)},
-    {time: 13, y: 24, dy: (24 - 12) / (13 - 10)},
-    {time: 20, y: 30, dy: (30 - 12) / (20 - 10)},
-]);
+assert.docEq(
+    [
+        {time: 0, y: 10, dy: null},
+        {time: 10, y: 12, dy: (12 - 10) / (10 - 0)},
+        {time: 11, y: 15, dy: (15 - 12) / (11 - 10)},
+        {time: 12, y: 19, dy: (19 - 12) / (12 - 10)},
+        {time: 13, y: 24, dy: (24 - 12) / (13 - 10)},
+        {time: 20, y: 30, dy: (30 - 12) / (20 - 10)},
+    ],
+    result);
 
 // 'unit' only supports 'week' and smaller.
 coll.drop();
@@ -377,12 +381,14 @@ result = coll.aggregate([
                  {$sort: {time: 1}},
              ])
              .toArray();
-assert.docEq(result, [
-    {time: ISODate("2020-01-01T00:00:00.00Z"), y: 10, dy: null},
-    {time: ISODate("2020-01-01T00:00:10.00Z"), y: 12, dy: (12 - 10) / (10 - 0)},
-    {time: ISODate("2020-01-01T00:00:11.00Z"), y: 15, dy: (15 - 12) / (11 - 10)},
-    {time: ISODate("2020-01-01T00:00:12.00Z"), y: 19, dy: (19 - 12) / (12 - 10)},
-    {time: ISODate("2020-01-01T00:00:13.00Z"), y: 24, dy: (24 - 12) / (13 - 10)},
-    {time: ISODate("2020-01-01T00:00:20.00Z"), y: 30, dy: (30 - 12) / (20 - 10)},
-]);
+assert.docEq(
+    [
+        {time: ISODate("2020-01-01T00:00:00.00Z"), y: 10, dy: null},
+        {time: ISODate("2020-01-01T00:00:10.00Z"), y: 12, dy: (12 - 10) / (10 - 0)},
+        {time: ISODate("2020-01-01T00:00:11.00Z"), y: 15, dy: (15 - 12) / (11 - 10)},
+        {time: ISODate("2020-01-01T00:00:12.00Z"), y: 19, dy: (19 - 12) / (12 - 10)},
+        {time: ISODate("2020-01-01T00:00:13.00Z"), y: 24, dy: (24 - 12) / (13 - 10)},
+        {time: ISODate("2020-01-01T00:00:20.00Z"), y: 30, dy: (30 - 12) / (20 - 10)},
+    ],
+    result);
 })();

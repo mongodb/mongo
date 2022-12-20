@@ -37,7 +37,7 @@ for (let key of Object.keys(ChangeStreamWatchMode)) {
     assert.commandWorked(coll.insert({_id: 2}, {writeConcern: {w: "majority"}}));
 
     const firstChange = cst.getOneChange(changeStream);
-    assert.docEq(firstChange.fullDocument, {_id: 0});
+    assert.docEq({_id: 0}, firstChange.fullDocument);
 
     // Make the primary step down
     assert.commandWorked(primaryDB.adminCommand({replSetStepDown: 30}));

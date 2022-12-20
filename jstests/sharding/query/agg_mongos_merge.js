@@ -515,7 +515,7 @@ const metaDataTests = [
     {
         pipeline: [{$match: {$text: {$search: "txt"}}}, {$sort: {text: 1}}],
         verifyNoMetaData: (doc) =>
-            assert.docEq([doc.$textScore, doc.$sortKey], [undefined, undefined])
+            assert.docEq([undefined, undefined], [doc.$textScore, doc.$sortKey])
     }
 ];
 

@@ -105,7 +105,7 @@ jsTestLog("Initial sync completed");
 
 // Make sure the transaction committed properly and is reflected after the initial sync.
 let res = secondary.getDB(dbName).getCollection(collName).findOne({_id: 2});
-assert.docEq(res, {_id: 2}, res);
+assert.docEq({_id: 2}, res);
 
 // Step up the secondary after initial sync is done and make sure we can successfully run
 // another transaction.
@@ -120,7 +120,7 @@ assert.commandWorked(sessionColl2.insert({_id: 4}));
 let prepareTimestamp2 = PrepareHelpers.prepareTransaction(session2);
 assert.commandWorked(PrepareHelpers.commitTransaction(session2, prepareTimestamp2));
 res = newPrimary.getDB(dbName).getCollection(collName).findOne({_id: 4});
-assert.docEq(res, {_id: 4}, res);
+assert.docEq({_id: 4}, res);
 
 replTest.stopSet();
 })();

@@ -37,7 +37,7 @@ function optimize(expression) {
 
 function assertOptimized(expression, value) {
     const optimized = optimize(expression);
-    assert.docEq(optimized, {$const: value}, "ensure short-circuiting worked", optimized);
+    assert.docEq({$const: value}, optimized, "ensure short-circuiting worked");
 }
 
 function assertNotOptimized(expression) {

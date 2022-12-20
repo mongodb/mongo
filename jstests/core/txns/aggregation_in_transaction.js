@@ -84,7 +84,7 @@ withTxnAndAutoRetryOnMongos(session, () => {
                     as: "lookup",
                 }
             });
-        assert.docEq(cursor.next(), lookupDoc);
+        assert.docEq(lookupDoc, cursor.next());
         assert(!cursor.hasNext());
 
         jsTestLog("Testing $graphLookup within a transaction.");
@@ -98,7 +98,7 @@ withTxnAndAutoRetryOnMongos(session, () => {
                     as: "lookup"
                 }
             });
-        assert.docEq(cursor.next(), lookupDoc);
+        assert.docEq(lookupDoc, cursor.next());
         assert(!cursor.hasNext());
     }
 

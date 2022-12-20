@@ -38,11 +38,11 @@ function checkDbHash(mongo) {
 
     var res = testDB.runCommand('dbhash');
     assert.commandWorked(res);
-    assert.docEq(Object.keys(res.collections), replicatedSystemCollections, tojson(res));
+    assert.docEq(replicatedSystemCollections, Object.keys(res.collections), tojson(res));
 
     res = adminDB.runCommand('dbhash');
     assert.commandWorked(res);
-    assert.docEq(Object.keys(res.collections), replicatedAdminSystemCollections, tojson(res));
+    assert.docEq(replicatedAdminSystemCollections, Object.keys(res.collections), tojson(res));
 
     return res.md5;
 }

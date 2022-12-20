@@ -33,9 +33,17 @@ replTest.initiate();
 // Asserts that documents in the pre-images collection on the primary node are the same as on a
 // secondary node.
 function assertPreImagesCollectionOnPrimaryMatchesSecondary() {
-    assert.docEq(getPreImages(replTest.getPrimary()),
-                 getPreImages(replTest.getSecondary()),
-                 "pre-images collection content differs");
+    function detailedError() {
+        return "pre-images collection on primary " + tojson(getPreImages(replTest.getPrimary())) +
+            " does not match pre-images collection on secondary " +
+            tojson(getPreImages(replTest.getSecondary()));
+    }
+    const preImagesCollOnPrimary = getPreImagesCollection(replTest.getPrimary());
+    const preImagesCollOnSecondary = getPreImagesCollection(replTest.getSecondary());
+    assert.eq(preImagesCollOnPrimary.count(), preImagesCollOnSecondary.count(), detailedError);
+    assert.eq(preImagesCollOnPrimary.hashAllDocs(),
+              preImagesCollOnSecondary.hashAllDocs(),
+              detailedError);
 }
 
 for (const [collectionName, collectionOptions] of [
@@ -57,17 +65,17 @@ for (const [collectionName, collectionOptions] of [
         assert.commandWorked(coll.insert({_id: 5, v: 1}));
 
         // Issue "findAndModify" command to return a document version before update.
-        assert.docEq(coll.findAndModify({query: {_id: 5}, update: {$inc: {v: 1}}, new: false}),
-                     {_id: 5, v: 1});
+        assert.docEq({_id: 5, v: 1},
+                     coll.findAndModify({query: {_id: 5}, update: {$inc: {v: 1}}, new: false}));
 
         // Issue "findAndModify" command to return a document version after update.
-        assert.docEq(coll.findAndModify({query: {_id: 5}, update: {$inc: {v: 1}}, new: true}),
-                     {_id: 5, v: 3});
+        assert.docEq({_id: 5, v: 3},
+                     coll.findAndModify({query: {_id: 5}, update: {$inc: {v: 1}}, new: true}));
 
         // Issue "findAndModify" command to return a document version before deletion.
         assert.docEq(
-            coll.findAndModify({query: {_id: 5}, new: false, remove: true, writeConcern: {w: 2}}),
-            {_id: 5, v: 3});
+            {_id: 5, v: 3},
+            coll.findAndModify({query: {_id: 5}, new: false, remove: true, writeConcern: {w: 2}}));
     }
 
     function issueWriteCommandsInTransaction(testDB) {

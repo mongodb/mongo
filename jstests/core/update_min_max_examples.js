@@ -59,7 +59,7 @@ coll.insert(insertdoc);
 res = coll.update({_id: 7, "y.a": 6}, {$max: {"y.$.a": 7}});
 assert.commandWorked(res);
 insertdoc.y[1].a = 7;
-assert.docEq(coll.findOne({_id: 7}), insertdoc);
+assert.docEq(insertdoc, coll.findOne({_id: 7}));
 
 // $min with positional operator
 insertdoc = {
@@ -70,5 +70,5 @@ coll.insert(insertdoc);
 res = coll.update({_id: 8, "y.a": 6}, {$min: {"y.$.a": 5}});
 assert.commandWorked(res);
 insertdoc.y[1].a = 5;
-assert.docEq(coll.findOne({_id: 8}), insertdoc);
+assert.docEq(insertdoc, coll.findOne({_id: 8}));
 }());

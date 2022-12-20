@@ -62,10 +62,10 @@ let testMixedTypeQuerying = () => {
             // Compare the results.
             try {
                 assert.docEq(
-                    // Is timeseries.
-                    db.test.find({[path]: {[compare]: val}}, {_id: 0}).toArray(),
                     // Isn't timeseries.
-                    db.control.find({[path]: {[compare]: val}}, {_id: 0}).toArray());
+                    db.control.find({[path]: {[compare]: val}}, {_id: 0}).toArray(),
+                    // Is timeseries.
+                    db.test.find({[path]: {[compare]: val}}, {_id: 0}).toArray());
                 return true;
             } catch (e) {
                 printjson(

@@ -76,7 +76,7 @@ const coll = db.jstests_find_and_modify_hint;
     famUpdateCmd =
         {findAndModify: coll.getName(), query: {}, update: {$set: {y: 1}}, hint: {s: 1}, new: true};
     let res = assert.commandWorked(coll.runCommand(famUpdateCmd));
-    assert.docEq(res.value, {_id: 2, x: 1, s: 0, y: 1});
+    assert.docEq({_id: 2, x: 1, s: 0, y: 1}, res.value);
 
     // Update hinting a sparse index with upsert option can result in an insert even if the
     // correct behaviour would be to update an existing document.
@@ -91,13 +91,13 @@ const coll = db.jstests_find_and_modify_hint;
     };
     res = assert.commandWorked(coll.runCommand(famUpdateCmd));
     assert.eq(res.lastErrorObject.upserted, 3);  // value of _id
-    assert.docEq(res.value, {_id: 3, x: 2, y: 1});
+    assert.docEq({_id: 3, x: 2, y: 1}, res.value);
 
     // Make sure an indexed document gets deleted when index hint is provided.
     assert.commandWorked(coll.insert({x: 1}));
     const famRemoveCmd = {findAndModify: coll.getName(), query: {x: 1}, remove: true, hint: {s: 1}};
     res = assert.commandWorked(coll.runCommand(famRemoveCmd));
-    assert.docEq(res.value, {_id: 2, x: 1, s: 0, y: 1});
+    assert.docEq({_id: 2, x: 1, s: 0, y: 1}, res.value);
 })();
 
 (function shellHelpersTest() {
@@ -110,24 +110,24 @@ const coll = db.jstests_find_and_modify_hint;
     // the sparse index.
     let newDoc =
         coll.findAndModify({query: {x: 1}, update: {$set: {y: 2}}, hint: {s: 1}, new: true});
-    assert.docEq(newDoc, {_id: 2, x: 1, s: 0, y: 2});
+    assert.docEq({_id: 2, x: 1, s: 0, y: 2}, newDoc);
 
     // Insert document that will not be in the sparse index. Update hinting sparse index should
     // result in upsert.
     assert.commandWorked(coll.insert({_id: 3, x: 2}));
     newDoc = coll.findOneAndUpdate(
         {x: 2}, {$set: {_id: 4, y: 2}}, {hint: {s: 1}, upsert: true, returnNewDocument: true});
-    assert.docEq(newDoc, {_id: 4, x: 2, y: 2});
+    assert.docEq({_id: 4, x: 2, y: 2}, newDoc);
 
     // Similarly, hinting the sparse index for a replacement should result in an upsert.
     assert.commandWorked(coll.insert({_id: 5, x: 3}));
     newDoc = coll.findOneAndReplace(
         {x: 3}, {_id: 6, y: 2}, {hint: {s: 1}, upsert: true, returnNewDocument: true});
-    assert.docEq(newDoc, {_id: 6, y: 2});
+    assert.docEq({_id: 6, y: 2}, newDoc);
 
     // Make sure an indexed document gets deleted when index hint is provided.
     newDoc = coll.findOneAndDelete({x: 2}, {hint: {s: 1}});
-    assert.docEq(newDoc, {_id: 3, x: 2});
+    assert.docEq({_id: 3, x: 2}, newDoc);
 })();
 
 (function failedHintTest() {

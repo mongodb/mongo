@@ -365,10 +365,10 @@ const retryOnNetworkErrorTests = [
             let obj2 = {_id: 2, x: 5};
             assert.commandWorked(coll1.insert(obj1));
             assert.commandWorked(coll1.insert(obj2));
-            assert.docEq(coll1.find().toArray(), [{_id: 1, x: 5}, {_id: 2, x: 5}]);
+            assert.docEq([{_id: 1, x: 5}, {_id: 2, x: 5}], coll1.find().toArray());
             obj1.x = 7;
             assert.commandWorked(coll1.update({_id: 2}, {$set: {x: 8}}));
-            assert.docEq(coll1.find().toArray(), [{_id: 1, x: 5}, {_id: 2, x: 8}]);
+            assert.docEq([{_id: 1, x: 5}, {_id: 2, x: 8}], coll1.find().toArray());
         }
     },
     {
@@ -1398,13 +1398,13 @@ const txnOverridePlusRetryOnNetworkErrorTests = [
             let obj2 = {_id: 2, x: 5};
             assert.commandWorked(coll1.insert(obj1));
             assert.commandWorked(coll1.insert(obj2));
-            assert.docEq(coll1.find().toArray(), [{_id: 1, x: 5}, {_id: 2, x: 5}]);
+            assert.docEq([{_id: 1, x: 5}, {_id: 2, x: 5}], coll1.find().toArray());
             obj1.x = 7;
             assert.commandWorked(coll1.update({_id: 2}, {$set: {x: 8}}));
-            assert.docEq(coll1.find().toArray(), [{_id: 1, x: 5}, {_id: 2, x: 8}]);
+            assert.docEq([{_id: 1, x: 5}, {_id: 2, x: 8}], coll1.find().toArray());
 
             endCurrentTransactionIfOpen();
-            assert.docEq(coll1.find().toArray(), [{_id: 1, x: 5}, {_id: 2, x: 8}]);
+            assert.docEq([{_id: 1, x: 5}, {_id: 2, x: 8}], coll1.find().toArray());
         }
     },
     {

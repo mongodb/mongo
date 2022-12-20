@@ -53,12 +53,12 @@ const pipeline1 = [
 {
     // The pipeline should succeed.
     const aggResult = coll.aggregate(pipeline1).toArray();
-    assert.docEq(aggResult, [{_id: 99, b: 123}]);
+    assert.docEq([{_id: 99, b: 123}], aggResult);
 
     // The pipeline should succeed without pushing down to find.
     const noOptResult =
         coll.aggregate([{$_internalInhibitOptimization: {}}].concat(pipeline1)).toArray();
-    assert.docEq(noOptResult, [{_id: 99, b: 123}]);
+    assert.docEq([{_id: 99, b: 123}], noOptResult);
 }
 
 // Similarly, we can select the 1 valid document by flipping the sort and skipping
@@ -72,11 +72,11 @@ const pipeline2 = [
 {
     // The pipeline should succeed.
     const aggResult = coll.aggregate(pipeline2).toArray();
-    assert.docEq(aggResult, [{_id: 99, b: 123}]);
+    assert.docEq([{_id: 99, b: 123}], aggResult);
 
     // The pipeline should succeed without pushing down to find.
     const noOptResult =
         coll.aggregate([{$_internalInhibitOptimization: {}}].concat(pipeline2)).toArray();
-    assert.docEq(noOptResult, [{_id: 99, b: 123}]);
+    assert.docEq([{_id: 99, b: 123}], noOptResult);
 }
 })();
