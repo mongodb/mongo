@@ -477,19 +477,18 @@ MozJSImplScope::MozJSImplScope(MozJSScriptEngine* engine, boost::optional<int> j
       _statusProto(_context),
       _timestampProto(_context),
       _uriProto(_context) {
-    _environmentPreparer = std::make_unique<EnvironmentPreparer>(_context);
-    _moduleLoader = std::make_unique<ModuleLoader>();
-    uassert(ErrorCodes::JSInterpreterFailure, "Failed to create ModuleLoader", _moduleLoader);
-    uassert(ErrorCodes::JSInterpreterFailure,
-            "Failed to initialize ModuleLoader",
-            _moduleLoader->init(_context, boost::filesystem::current_path()));
-
     {
         JS_AddInterruptCallback(_context, _interruptCallback);
         JS_SetGCCallback(_context, _gcCallback, this);
         JS_SetContextPrivate(_context, this);
 
         JSAutoRealm ac(_context, _global);
+        _environmentPreparer = std::make_unique<EnvironmentPreparer>(_context);
+        _moduleLoader = std::make_unique<ModuleLoader>();
+        uassert(ErrorCodes::JSInterpreterFailure, "Failed to create ModuleLoader", _moduleLoader);
+        uassert(ErrorCodes::JSInterpreterFailure,
+                "Failed to initialize ModuleLoader",
+                _moduleLoader->init(_context, engine->getLoadPath()));
 
         _checkErrorState(JS::InitRealmStandardClasses(_context));
 

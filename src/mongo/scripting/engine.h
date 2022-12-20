@@ -245,6 +245,9 @@ public:
     virtual int getJSHeapLimitMB() const = 0;
     virtual void setJSHeapLimitMB(int limit) = 0;
 
+    virtual std::string getLoadPath() const = 0;
+    virtual void setLoadPath(const std::string& loadPath) = 0;
+
     /**
      * Calls the constructor for the Global ScriptEngine. 'disableLoadStored' causes future calls to
      * the function Scope::loadStored(), which would otherwise load stored procedures, to be

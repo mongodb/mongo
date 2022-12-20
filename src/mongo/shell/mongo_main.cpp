@@ -844,6 +844,15 @@ int mongo_main(int argc, char* argv[]) {
         mongo::getGlobalScriptEngine()->enableJavaScriptProtection(
             shellGlobalParams.javascriptProtection);
 
+        if (shellGlobalParams.files.size() > 0) {
+            boost::system::error_code ec;
+            auto loadPath =
+                boost::filesystem::canonical(shellGlobalParams.files[0], ec).parent_path().string();
+            if (!ec) {
+                mongo::getGlobalScriptEngine()->setLoadPath(loadPath);
+            }
+        }
+
         ScopeGuard poolGuard([] { ScriptEngine::dropScopeCache(); });
 
         std::unique_ptr<mongo::Scope> scope(mongo::getGlobalScriptEngine()->newScope());

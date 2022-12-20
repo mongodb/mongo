@@ -29,20 +29,24 @@
 
 #include <boost/filesystem.hpp>
 
+#include "mongo/logv2/log.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/module_loader.h"
 #include "mongo/util/file.h"
 
+#include <js/JSON.h>
 #include <js/Modules.h>
 #include <js/SourceText.h>
 #include <js/StableStringChars.h>
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
+
 namespace mongo {
 namespace mozjs {
 
-bool ModuleLoader::init(JSContext* cx, const boost::filesystem::path& loadPath) {
-    invariant(loadPath.is_absolute());
-    _loadPath = loadPath.string();
+bool ModuleLoader::init(JSContext* cx, const std::string& loadPath) {
+    _baseUrl = resolveBaseUrl(cx, loadPath);
+    LOGV2_DEBUG(716281, 2, "Resolved module base url.", "baseUrl"_attr = _baseUrl.c_str());
 
     JSRuntime* rt = JS_GetRuntime(cx);
     JS::SetModuleResolveHook(rt, ModuleLoader::moduleResolveHook);
@@ -63,14 +67,14 @@ JSObject* ModuleLoader::loadRootModuleFromSource(JSContext* cx,
 JSObject* ModuleLoader::loadRootModule(JSContext* cx,
                                        const std::string& path,
                                        boost::optional<StringData> source) {
-    JS::RootedString loadPath(cx, JS_NewStringCopyN(cx, _loadPath.c_str(), _loadPath.size()));
+    JS::RootedString baseUrl(cx, JS_NewStringCopyN(cx, _baseUrl.c_str(), _baseUrl.size()));
     JS::RootedObject info(cx, [&]() {
         if (source) {
             JS::RootedString src(cx, JS_NewStringCopyN(cx, source->rawData(), source->size()));
-            return createScriptPrivateInfo(cx, loadPath, src);
+            return createScriptPrivateInfo(cx, baseUrl, src);
         }
 
-        return createScriptPrivateInfo(cx, loadPath, nullptr);
+        return createScriptPrivateInfo(cx, baseUrl, nullptr);
     }());
 
     if (!info) {
@@ -121,8 +125,8 @@ bool ModuleLoader::importModuleDynamically(JSContext* cx,
                                            JS::HandleValue referencingPrivate,
                                            JS::HandleObject moduleRequest,
                                            JS::HandleObject promise) {
-    JS::RootedString loadPath(cx, JS_NewStringCopyN(cx, _loadPath.c_str(), _loadPath.size()));
-    JS::RootedObject info(cx, createScriptPrivateInfo(cx, loadPath, nullptr));
+    JS::RootedString baseUrl(cx, JS_NewStringCopyN(cx, _baseUrl.c_str(), _baseUrl.size()));
+    JS::RootedObject info(cx, createScriptPrivateInfo(cx, baseUrl, nullptr));
     JS::RootedValue newReferencingPrivate(cx, JS::ObjectValue(*info));
 
     // The dynamic `import` method returns a Promise, and thus allows us to perform module loading
@@ -489,6 +493,81 @@ JSObject* ModuleLoader::createScriptPrivateInfo(JSContext* cx,
     }
 
     return info;
+}
+
+/*
+The rules for baseUrl resolution are as follows:
+    1. At process start determine a "loadPath" which is either the parent directory of the first
+      file passed in to execute, or the current working directory.
+    2. Search the loadPath for a file called "jsconfig.json", and attempt to read it as a JSON file.
+    3. If found, try to find a property "compilerOptions.baseUrl" in that file and resolve that URL
+      relative to the location of "jsconfig.json".
+    4. If not found, loadPath is now the parent directory of loadPath, repeat steps #2-3 until
+       either the baseUrl is resolved or we reach the root directory.
+    5. If no baseUrl is resolved, return the current working directory
+*/
+static const char* const kJSConfigJsonFileName = "jsconfig.json";
+static const char* const kCompileOptionsPropertyName = "compilerOptions";
+static const char* const kBaseUrlPropertyName = "baseUrl";
+std::string ModuleLoader::resolveBaseUrl(JSContext* cx, const std::string& loadPath) {
+    auto path = boost::filesystem::path(loadPath);
+    while (true) {
+        const boost::filesystem::directory_iterator end;
+        const auto it = std::find_if(boost::filesystem::directory_iterator(path),
+                                     end,
+                                     [&](const boost::filesystem::directory_entry& e) {
+                                         return e.path().filename() == kJSConfigJsonFileName;
+                                     });
+        if (it != end) {
+            auto jsConfigPath = it->path().string();
+            JS::RootedString jsConfigPathString(cx, JS_NewStringCopyZ(cx, jsConfigPath.c_str()));
+            JS::RootedString jsConfigSource(cx, fileAsString(cx, jsConfigPathString));
+            if (!jsConfigSource) {
+                break;
+            }
+
+            JS::RootedValue jsConfig(cx);
+            if (!JS_ParseJSON(cx, jsConfigSource, &jsConfig)) {
+                LOGV2_ERROR(716282, "Unable to parse JSON.", "jsonConfigPath"_attr = jsConfigPath);
+                break;
+            }
+
+            JS::RootedObject jsConfigObject(cx, &jsConfig.toObject());
+            JS::RootedValue compilerOptionsValue(cx);
+            if (!JS_GetProperty(
+                    cx, jsConfigObject, kCompileOptionsPropertyName, &compilerOptionsValue)) {
+                break;
+            }
+
+            JS::RootedObject compilerOptionsObject(cx, &compilerOptionsValue.toObject());
+            JS::RootedValue baseUrlValue(cx);
+            if (!JS_GetProperty(cx, compilerOptionsObject, kBaseUrlPropertyName, &baseUrlValue)) {
+                break;
+            }
+
+            JS::RootedString baseUrlString(cx, baseUrlValue.toString());
+            auto baseUrl = std::string{JS_EncodeStringToUTF8(cx, baseUrlString).get()};
+
+            boost::system::error_code ec;
+            auto resolvedPath =
+                boost::filesystem::canonical(it->path().parent_path() / baseUrl, ec);
+            if (ec) {
+                LOGV2_ERROR(
+                    716283, "Unable to resolve parsed baseUrl.", "error"_attr = ec.to_string());
+                break;
+            }
+
+            return resolvedPath.string();
+        }
+
+        if (!path.has_parent_path()) {
+            break;
+        }
+
+        path = path.parent_path();
+    }
+
+    return boost::filesystem::current_path().string();
 }
 
 }  // namespace mozjs

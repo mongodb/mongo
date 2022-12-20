@@ -66,7 +66,8 @@ std::string ScriptEngine::getInterpreterVersionString() {
 
 namespace mozjs {
 
-MozJSScriptEngine::MozJSScriptEngine(bool disableLoadStored) : ScriptEngine(disableLoadStored) {
+MozJSScriptEngine::MozJSScriptEngine(bool disableLoadStored)
+    : ScriptEngine(disableLoadStored), _loadPath(boost::filesystem::current_path().string()) {
     uassert(ErrorCodes::JSInterpreterFailure, "Failed to JS_Init()", JS_Init());
     js::DisableExtraThreads();
 }
@@ -148,6 +149,14 @@ int MozJSScriptEngine::getJSHeapLimitMB() const {
 
 void MozJSScriptEngine::setJSHeapLimitMB(int limit) {
     gJSHeapLimitMB.store(limit);
+}
+
+std::string MozJSScriptEngine::getLoadPath() const {
+    return _loadPath;
+}
+
+void MozJSScriptEngine::setLoadPath(const std::string& loadPath) {
+    _loadPath = loadPath;
 }
 
 void MozJSScriptEngine::registerOperation(OperationContext* opCtx, MozJSImplScope* scope) {
