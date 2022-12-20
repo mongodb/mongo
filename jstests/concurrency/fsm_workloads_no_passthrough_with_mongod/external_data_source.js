@@ -214,85 +214,21 @@ var $config = (function() {
             jsTestLog(`${this.tid} is done with group`);
         }
 
-        function lookup(db, collName) {
-            jsTestLog(`${this.tid} running lookup`);
-
-            const localColl = this.localCollObjs;
-            const foreignColl = this.foreignCollObjs;
-            _writeTestPipeObjects(
-                this.pipeName2, foreignColl.length, foreignColl, this.kDefaultPipePath);
-            _writeTestPipeObjects(
-                this.pipeName1, localColl.length, localColl, this.kDefaultPipePath);
-
-            const lookupTable = [];
-            foreignColl.forEach(obj => {
-                lookupTable[obj._id] = obj;
-            });
-            const expectedRes = localColl.map(obj => {
-                let clone = Object.assign({}, obj);
-                clone.out = [lookupTable[obj.g]];
-                return clone;
-            });
-
-            let resArr = db[this.vcollName1]
-                             .aggregate(
-                                 [
-                                     {
-                                         $lookup: {
-                                             from: this.vcollName2,
-                                             localField: "g",
-                                             foreignField: "_id",
-                                             as: "out"
-                                         }
-                                     }
-                                 ],
-                                 {
-                                     $_externalDataSources: [
-                                         {
-                                             collName: this.vcollName1,
-                                             dataSources: [{
-                                                 url: kUrlProtocolFile + this.pipeName1,
-                                                 storageType: "pipe",
-                                                 fileType: "bson"
-                                             }]
-                                         },
-                                         {
-                                             collName: this.vcollName2,
-                                             dataSources: [{
-                                                 url: kUrlProtocolFile + this.pipeName2,
-                                                 storageType: "pipe",
-                                                 fileType: "bson"
-                                             }]
-                                         }
-                                     ]
-                                 }
-                             ).toArray();
-            assert.eq(resArr.length, expectedRes.length);
-            for (let i = 0; i < expectedRes.length; ++i) {
-                assert.eq(
-                    resArr[i], expectedRes[i], `Unexpected obj = ${tojson(resArr[i])} at ${i}`);
-            }
-
-            jsTestLog(`${this.tid} is done with lookup`);
-        }
-
         return {
             init: init,
             scan: scan,
             match: match,
             unionWith: unionWith,
             group: group,
-            lookup: lookup,
         };
     })();
 
     var transitions = {
-        init: {scan: 0.2, match: 0.2, unionWith: 0.2, group: 0.2, lookup: 0.2},
-        scan: {scan: 0.2, match: 0.2, unionWith: 0.2, group: 0.2, lookup: 0.2},
-        match: {scan: 0.2, match: 0.2, unionWith: 0.2, group: 0.2, lookup: 0.2},
-        unionWith: {scan: 0.2, match: 0.2, unionWith: 0.2, group: 0.2, lookup: 0.2},
-        group: {scan: 0.2, match: 0.2, unionWith: 0.2, group: 0.2, lookup: 0.2},
-        lookup: {scan: 0.2, match: 0.2, unionWith: 0.2, group: 0.2, lookup: 0.2},
+        init: {scan: 0.25, match: 0.25, unionWith: 0.25, group: 0.25},
+        scan: {scan: 0.25, match: 0.25, unionWith: 0.25, group: 0.25},
+        match: {scan: 0.25, match: 0.25, unionWith: 0.25, group: 0.25},
+        unionWith: {scan: 0.25, match: 0.25, unionWith: 0.25, group: 0.25},
+        group: {scan: 0.25, match: 0.25, unionWith: 0.25, group: 0.25},
     };
 
     function setup(db, collName, cluster) {

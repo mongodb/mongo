@@ -113,22 +113,6 @@ assert.throwsWithCode(() => {
     });
 }, 7039003);
 
-// $lookup's 'from' collection is not an external data source
-assert.throwsWithCode(() => {
-    db.coll.aggregate(
-        [
-            {$match: {a: 1}},
-            {$lookup: {from: "unknown2", localField: "a", foreignField: "b", as: "out"}}
-        ],
-        {
-            $_externalDataSources: [{
-                collName: "coll",
-                dataSources:
-                    [{url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "bson"}]
-            }]
-        });
-}, 7039004);
-
 (function testSampleStageOverExternalDataSourceNotOptimized() {
     const explain = db.coll.explain().aggregate([{$sample: {size: 10}}], {
         $_externalDataSources: [{
@@ -240,76 +224,6 @@ function testSimpleAggregationsOverExternalDataSource(pipeDir) {
                       kObjsToWrite[objIdx % kNumObjs],
                       "Object read from pipe does not match expected.");
         }
-    }
-
-    ////////////////////////////////////////////////////////////////////////////////////////////////
-    // Test successful lookup between two external data sources.
-    ////////////////////////////////////////////////////////////////////////////////////////////////
-    const kObjsToWrite1 = [{"localKey": 0}, {"localKey": 1}, {"localKey": 2}];
-    const kObjsToWrite2 =
-        [{"foreignKey": 0, "foreignVal": "Zero"}, {"foreignKey": 2, "foreignVal": "Two"}];
-    const kExpectedLookup = [
-        {"localKey": 0, "out": [{"foreignKey": 0, "foreignVal": "Zero"}]},
-        {"localKey": 1, "out": []},
-        {"localKey": 2, "out": [{"foreignKey": 2, "foreignVal": "Two"}]}
-    ];
-
-    // $_externalDataSources specified in order (local, foreign).
-    _writeTestPipeObjects(pipeName1, kObjsToWrite1.length, kObjsToWrite1, pipeDir);  // local
-    _writeTestPipeObjects(pipeName2, kObjsToWrite2.length, kObjsToWrite2, pipeDir);  // foreign
-    cursor = db.local.aggregate(
-        [{
-            $lookup:
-                {from: "foreign", localField: "localKey", foreignField: "foreignKey", as: "out"}
-        }],
-        {
-            $_externalDataSources: [
-                {
-                    collName: "local",
-                    dataSources:
-                        [{url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "bson"}]
-                },
-                {
-                    collName: "foreign",
-                    dataSources:
-                        [{url: kUrlProtocolFile + pipeName2, storageType: "pipe", fileType: "bson"}]
-                }
-            ]
-        });
-    // Verify the $lookup result.
-    for (let expected = 0; expected < kExpectedLookup.length; ++expected) {
-        assert.eq(cursor.next(),
-                  kExpectedLookup[expected],
-                  "Lookup result " + expected + " does not match expected.");
-    }
-
-    // $_externalDataSources specified in order (foreign, local).
-    _writeTestPipeObjects(pipeName1, kObjsToWrite1.length, kObjsToWrite1, pipeDir);  // local
-    _writeTestPipeObjects(pipeName2, kObjsToWrite2.length, kObjsToWrite2, pipeDir);  // foreign
-    cursor = db.local.aggregate(
-        [{
-            $lookup:
-                {from: "foreign", localField: "localKey", foreignField: "foreignKey", as: "out"}
-        }],
-        {
-            $_externalDataSources: [
-                {
-                    collName: "foreign",
-                    dataSources:
-                        [{url: kUrlProtocolFile + pipeName2, storageType: "pipe", fileType: "bson"}]
-                },
-                {
-                    collName: "local",
-                    dataSources:
-                        [{url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "bson"}]
-                }
-            ]
-        });
-    // Verify the $lookup result.
-    for (let expected = 0; expected < kExpectedLookup.length; ++expected) {
-        assert.eq(cursor.next(),
-                  kExpectedLookup[expected],
-                  "Lookup result " + expected + " does not match expected.");
     }
 
     // Prepares data for $match / $group / $unionWith / spill test cases.
@@ -452,74 +366,6 @@ function testSimpleAggregationsOverExternalDataSource(pipeDir) {
             setParameter: 1,
             internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill:
                 oldSbeGroupMaxMemory,
-        }));
-    })();
-
-    (function testSpillingLookupOverExternalDataSource() {
-        // Makes sure that SBE $lookup spill data.
-        const oldSbeLookupMaxMemory =
-            assert
-                .commandWorked(db.adminCommand({
-                    setParameter: 1,
-                    internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill: 1,
-                }))
-                .was;
-
-        let foreignCollObjs = [];
-        for (let i = 0; i < kNumGroups; ++i) {
-            foreignCollObjs.push({
-                _id: i,
-                desc1: "description_" + Random.randInt(kNumGroups),
-                desc2: "description_" + Random.randInt(kNumGroups),
-            });
-        }
-
-        _writeTestPipeObjects(pipeName2, foreignCollObjs.length, foreignCollObjs, pipeDir);
-        _writeTestPipeObjects(pipeName1, collObjs.length, collObjs, pipeDir);
-
-        const lookupTable = [];
-        foreignCollObjs.forEach(obj => {
-            lookupTable[obj._id] = obj;
-        });
-        const expectedRes = collObjs.map(obj => {
-            let clone = Object.assign({}, obj);
-            clone.out = [lookupTable[obj.g]];
-            return clone;
-        });
-
-        const cursor = db.coll.aggregate(
-            [{$lookup: {from: "foreign", localField: "g", foreignField: "_id", as: "out"}}], {
-                $_externalDataSources: [
-                    {
-                        collName: "coll",
-                        dataSources: [{
-                            url: kUrlProtocolFile + pipeName1,
-                            storageType: "pipe",
-                            fileType: "bson"
-                        }]
-                    },
-                    {
-                        collName: "foreign",
-                        dataSources: [{
-                            url: kUrlProtocolFile + pipeName2,
-                            storageType: "pipe",
-                            fileType: "bson"
-                        }]
-                    }
-                ]
-            });
-        const resArr = cursor.toArray();
-        assert.eq(resArr.length, expectedRes.length);
-        for (let i = 0; i < expectedRes.length; ++i) {
-            assert.eq(resArr[i],
-                      expectedRes[i],
-                      `Expected ${tojson(expectedRes[i])} but got ${tojson(resArr[i])}`);
-        }
-
-        assert.commandWorked(db.adminCommand({
-            setParameter: 1,
-            internalQuerySlotBasedExecutionHashLookupApproxMemoryUseInBytesBeforeSpill:
-                oldSbeLookupMaxMemory,
         }));
     })();
 }
