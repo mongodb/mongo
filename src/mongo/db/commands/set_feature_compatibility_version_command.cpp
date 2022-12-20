@@ -444,6 +444,14 @@ private:
     void _shardServerPhase1Tasks(OperationContext* opCtx,
                                  multiversion::FeatureCompatibilityVersion actualVersion,
                                  multiversion::FeatureCompatibilityVersion requestedVersion) {
+        // TODO (SERVER-71309): Remove once 7.0 becomes last LTS.
+        if (actualVersion > requestedVersion &&
+            !feature_flags::gResilientMovePrimary.isEnabledOnVersion(requestedVersion)) {
+            ShardingDDLCoordinatorService::getService(opCtx)
+                ->waitForCoordinatorsOfGivenTypeToComplete(opCtx,
+                                                           DDLCoordinatorTypeEnum::kMovePrimary);
+        }
+
         // TODO SERVER-68008: Remove collMod draining mechanism after 7.0 becomes last LTS.
         if (actualVersion > requestedVersion &&
             !feature_flags::gCollModCoordinatorV3.isEnabledOnVersion(requestedVersion)) {
