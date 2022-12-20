@@ -103,4 +103,13 @@ JWSValidatedToken::JWSValidatedToken(const JWKManager& keyMgr, StringData token)
     uassertStatusOK(validate(keyMgr));
 };
 
+StatusWith<std::string> JWSValidatedToken::extractIssuerFromCompactSerialization(
+    StringData token) try {
+    auto tokenSplit = parseSignedToken(token);
+    auto payload = fromjson(base64url::decode(tokenSplit.token[1]));
+    return JWT::parse(IDLParserContext{"JWT"}, payload).getIssuer().toString();
+} catch (const DBException& ex) {
+    return ex.toStatus();
+}
+
 }  // namespace mongo::crypto

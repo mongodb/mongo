@@ -527,6 +527,15 @@ env.Library(
     ],
 )
 
+env.Library(
+    target='oidc_protocol',
+    source=['oidc_protocol.idl'],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/idl/idl_parser',
+    ],
+)
+
 env.CppUnitTest(
     target='db_auth_test',
     source=[

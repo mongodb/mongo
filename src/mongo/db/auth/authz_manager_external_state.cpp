@@ -37,10 +37,28 @@
 #include "mongo/util/net/ssl_types.h"
 
 namespace mongo {
+namespace {
+using UniqueExternalState = AuthzManagerExternalState::UniqueExternalState;
+using ShimFn = AuthzManagerExternalState::ShimFn;
+std::vector<ShimFn> shimFunctions;
+}  // namespace
 
-std::unique_ptr<AuthzManagerExternalState> AuthzManagerExternalState::create() {
+UniqueExternalState AuthzManagerExternalState::create() {
     static auto w = MONGO_WEAK_FUNCTION_DEFINITION(AuthzManagerExternalState::create);
-    return w();
+
+    UniqueExternalState externalState = w();
+    for (const auto& shim : shimFunctions) {
+        externalState = shim(std::move(externalState));
+    }
+    return externalState;
+}
+
+void AuthzManagerExternalState::prependShim(ShimFn&& shim) {
+    shimFunctions.insert(shimFunctions.begin(), std::move(shim));
+}
+
+void AuthzManagerExternalState::appendShim(ShimFn&& shim) {
+    shimFunctions.push_back(std::move(shim));
 }
 
 AuthzManagerExternalState::AuthzManagerExternalState() = default;

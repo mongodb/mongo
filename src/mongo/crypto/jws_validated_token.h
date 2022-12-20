@@ -49,6 +49,11 @@ public:
     JWSValidatedToken(const JWKManager& keyMgr, StringData token);
 
     /**
+     * Extract just the Issuer name ('iss') from the token.
+     */
+    static StatusWith<std::string> extractIssuerFromCompactSerialization(StringData token);
+
+    /**
      * Validates token is not expired or issued on a later date,
      * verifies it has a validator matching its keyId and finally
      * it calls validate from the validator, returning the status.
