@@ -463,13 +463,13 @@ AsyncRequestsSender::Response executeCommandAgainstDatabasePrimary(
         ? appendShardVersion(cmdObj, ShardVersion::UNSHARDED())
         : cmdObj;
 
-    auto responses =
-        gatherResponses(opCtx,
-                        dbName,
-                        readPref,
-                        retryPolicy,
-                        std::vector<AsyncRequestsSender::Request>{AsyncRequestsSender::Request(
-                            dbInfo->getPrimary(), appendDbVersionIfPresent(cmdObj, dbInfo))});
+    auto responses = gatherResponses(
+        opCtx,
+        dbName,
+        readPref,
+        retryPolicy,
+        std::vector<AsyncRequestsSender::Request>{AsyncRequestsSender::Request(
+            dbInfo->getPrimary(), appendDbVersionIfPresent(cmdObjWithShardVersion, dbInfo))});
     return std::move(responses.front());
 }
 
