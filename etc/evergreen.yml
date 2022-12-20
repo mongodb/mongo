@@ -3220,7 +3220,7 @@ buildvariants:
   display_name: "Shared SCons Cache Pruning"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
-  - ubuntu1604-test
+  - ubuntu2204-small
   stepback: false
   tasks:
   - name: shared_scons_cache_pruning

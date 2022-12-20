@@ -109,7 +109,11 @@ def prune_cache(cache_path, cache_size_gb, clean_ratio):
 
             # check the atime again just to make sure something wasn't accessed while
             # we pruning other files.
-            if cache_item.time < os.stat(cache_item.path).st_atime:
+            try:
+                if cache_item.time < os.stat(cache_item.path).st_atime:
+                    continue
+            except FileNotFoundError as err:
+                LOGGER.warning("Unable to find file %s : %s", cache_item, err)
                 continue
 
             to_remove = cache_item.path + ".del"
