@@ -69,8 +69,6 @@ all:
   ticket: SERVER-63159
 - test_file: jstests/core/internal_apply_oplog_update.js
   ticket: SERVER-63159
-- test_file: jstests/sharding/prepare_transaction_then_migrate.js
-  ticket: SERVER-68361
 suites:
   change_streams_multiversion: null
   change_streams_sharded_collections_multiversion_passthrough: null
