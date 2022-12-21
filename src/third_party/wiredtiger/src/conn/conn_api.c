@@ -1963,13 +1963,11 @@ err:
 int
 __wt_debug_mode_config(WT_SESSION_IMPL *session, const char *cfg[])
 {
-    WT_CACHE *cache;
     WT_CONFIG_ITEM cval;
     WT_CONNECTION_IMPL *conn;
     WT_TXN_GLOBAL *txn_global;
 
     conn = S2C(session);
-    cache = conn->cache;
     txn_global = &conn->txn_global;
 
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.checkpoint_retention", &cval));
@@ -2014,9 +2012,9 @@ __wt_debug_mode_config(WT_SESSION_IMPL *session, const char *cfg[])
 
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.eviction", &cval));
     if (cval.val)
-        F_SET(cache, WT_CACHE_EVICT_DEBUG_MODE);
+        FLD_SET(conn->debug_flags, WT_CONN_DEBUG_EVICT_AGGRESSIVE_MODE);
     else
-        F_CLR(cache, WT_CACHE_EVICT_DEBUG_MODE);
+        FLD_CLR(conn->debug_flags, WT_CONN_DEBUG_EVICT_AGGRESSIVE_MODE);
 
     WT_RET(__wt_config_gets(session, cfg, "debug_mode.log_retention", &cval));
     conn->debug_log_cnt = (uint32_t)cval.val;

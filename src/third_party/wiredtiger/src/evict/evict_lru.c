@@ -1163,6 +1163,7 @@ static int
 __evict_lru_walk(WT_SESSION_IMPL *session)
 {
     WT_CACHE *cache;
+    WT_CONNECTION_IMPL *conn;
     WT_DECL_RET;
     WT_EVICT_QUEUE *queue, *other_queue;
     WT_TRACK_OP_DECL;
@@ -1170,7 +1171,8 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
     uint32_t candidates, entries;
 
     WT_TRACK_OP_INIT(session);
-    cache = S2C(session)->cache;
+    conn = S2C(session);
+    cache = conn->cache;
 
     /* Age out the score of how much the queue has been empty recently. */
     if (cache->evict_empty_score > 0)
@@ -1228,7 +1230,7 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
      * Style note: __wt_qsort is a macro that can leave a dangling else. Full curly braces are
      * needed here for the compiler.
      */
-    if (F_ISSET(cache, WT_CACHE_EVICT_DEBUG_MODE)) {
+    if (FLD_ISSET(conn->debug_flags, WT_CONN_DEBUG_EVICT_AGGRESSIVE_MODE)) {
         __wt_qsort(queue->evict_queue, entries, sizeof(WT_EVICT_ENTRY), __evict_lru_cmp_debug);
     } else {
         __wt_qsort(queue->evict_queue, entries, sizeof(WT_EVICT_ENTRY), __evict_lru_cmp);
@@ -1308,7 +1310,7 @@ __evict_lru_walk(WT_SESSION_IMPL *session)
     /*
      * Signal any application or helper threads that may be waiting to help with eviction.
      */
-    __wt_cond_signal(session, S2C(session)->evict_threads.wait_cond);
+    __wt_cond_signal(session, conn->evict_threads.wait_cond);
 
 err:
     WT_TRACK_OP_END(session);
@@ -2010,7 +2012,8 @@ __evict_walk_tree(WT_SESSION_IMPL *session, WT_EVICT_QUEUE *queue, u_int max_ent
          * being skipped for walks), or we are in eviction debug mode. The goal here is that if
          * trees become completely idle, we eventually push them out of cache completely.
          */
-        if (!F_ISSET(cache, WT_CACHE_EVICT_DEBUG_MODE) && F_ISSET(ref, WT_REF_FLAG_INTERNAL)) {
+        if (!FLD_ISSET(conn->debug_flags, WT_CONN_DEBUG_EVICT_AGGRESSIVE_MODE) &&
+          F_ISSET(ref, WT_REF_FLAG_INTERNAL)) {
             if (page == last_parent)
                 continue;
             if (btree->evict_walk_period == 0 && !__wt_cache_aggressive(session))
