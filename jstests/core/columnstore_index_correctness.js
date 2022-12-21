@@ -105,6 +105,41 @@ const coll = db.columnstore_index_correctness;
     }
 })();
 
+(function testColumnScanFindsAllDocumentsUsingDenseColumn() {
+    // Check that column scan projections without filters will return all the documents, leveraging
+    // dense columns internally regardless of whether _id is included or not. Internally, the dense
+    // RowId Column will be scanned if the dense _id field is not included in the query. Scanning a
+    // dense field column, which has a value present for every document in the collection, is
+    // necessary to find documents missing all projected fields -- in the following queries
+    // ultimately returning empty documents for such documents, rather than not at all.
+
+    // Store documents where 'x' and 'y' fields are missing in some documents but present in other
+    // documents. This should cause the dense _id or internal RowId columns to be used to identify
+    // null field values.
+    const docs = [
+        {_id: 0, x: 1, y: "fee"},
+        {_id: 1},
+        {_id: 2, x: 1},
+        {_id: 3, y: "fii"},
+        {_id: 4, x: 1, y: "foo"},
+        {_id: 5},
+        {_id: 6, x: 1}
+    ];
+    coll.drop();
+    assert.commandWorked(coll.insertMany(docs));
+    assert.commandWorked(coll.createIndex({"$**": "columnstore"}));
+
+    const findDocsWithoutID = coll.find({}, {_id: 0, "x": 1, "y": 1}).toArray();
+    assert.eq(findDocsWithoutID.length,
+              docs.length,
+              `Unexpected number of documents: ${tojson(findDocsWithoutID)}`);
+
+    const findDocsWithID = coll.find({}, {_id: 1, "x": 1, "y": 1}).toArray();
+    assert.eq(findDocsWithID.length,
+              docs.length,
+              `Unexpected number of documents: ${tojson(findDocsWithID)}`);
+})();
+
 // Multiple tests in this file use the same dataset. Intentionally not using _id as the unique
 // identifier, to avoid getting IDHACK plans when we query by it.
 const docs = [

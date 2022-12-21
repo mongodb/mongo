@@ -37,6 +37,7 @@ namespace sbe {
 ColumnScanStage::ColumnScanStage(UUID collectionUuid,
                                  StringData columnIndexName,
                                  std::vector<std::string> paths,
+                                 bool densePathIncludedInScan,
                                  std::vector<bool> includeInOutput,
                                  boost::optional<value::SlotId> recordIdSlot,
                                  boost::optional<value::SlotId> reconstuctedRecordSlot,
@@ -55,7 +56,8 @@ ColumnScanStage::ColumnScanStage(UUID collectionUuid,
       _reconstructedRecordSlot(reconstuctedRecordSlot),
       _rowStoreSlot(rowStoreSlot),
       _rowStoreExpr(std::move(rowStoreExpr)),
-      _filteredPaths(std::move(filteredPaths)) {
+      _filteredPaths(std::move(filteredPaths)),
+      _densePathIncludedInScan(densePathIncludedInScan) {
     invariant(_filteredPaths.size() <= _paths.size(),
               "Filtered paths should be a subset of all paths");
     invariant(_paths.size() == _includeInOutput.size());
@@ -69,6 +71,7 @@ std::unique_ptr<PlanStage> ColumnScanStage::clone() const {
     return std::make_unique<ColumnScanStage>(_collUuid,
                                              _columnIndexName,
                                              _paths,
+                                             _densePathIncludedInScan,
                                              _includeInOutput,
                                              _recordIdSlot,
                                              _reconstructedRecordSlot,
@@ -138,9 +141,9 @@ value::SlotAccessor* ColumnScanStage::getAccessor(CompileCtx& ctx, value::SlotId
 }
 
 void ColumnScanStage::doSaveState(bool relinquishCursor) {
-    if (_denseColumnCursor) {
-        _denseColumnCursor->makeOwned();
-        _denseColumnCursor->cursor().save();
+    if (_recordIdColumnCursor) {
+        _recordIdColumnCursor->makeOwned();
+        _recordIdColumnCursor->cursor().save();
     }
 
     for (auto& cursor : _columnCursors) {
@@ -187,8 +190,8 @@ void ColumnScanStage::doRestoreState(bool relinquishCursor) {
         }
     }
 
-    if (_denseColumnCursor) {
-        _denseColumnCursor->cursor().restore();
+    if (_recordIdColumnCursor) {
+        _recordIdColumnCursor->cursor().restore();
     }
     for (auto& cursor : _columnCursors) {
         cursor.cursor().restore();
@@ -202,8 +205,8 @@ void ColumnScanStage::doDetachFromOperationContext() {
     if (_rowStoreCursor) {
         _rowStoreCursor->detachFromOperationContext();
     }
-    if (_denseColumnCursor) {
-        _denseColumnCursor->cursor().detachFromOperationContext();
+    if (_recordIdColumnCursor) {
+        _recordIdColumnCursor->cursor().detachFromOperationContext();
     }
     for (auto& cursor : _columnCursors) {
         cursor.cursor().detachFromOperationContext();
@@ -217,8 +220,8 @@ void ColumnScanStage::doAttachToOperationContext(OperationContext* opCtx) {
     if (_rowStoreCursor) {
         _rowStoreCursor->reattachToOperationContext(opCtx);
     }
-    if (_denseColumnCursor) {
-        _denseColumnCursor->cursor().reattachToOperationContext(opCtx);
+    if (_recordIdColumnCursor) {
+        _recordIdColumnCursor->cursor().reattachToOperationContext(opCtx);
     }
     for (auto& cursor : _columnCursors) {
         cursor.cursor().reattachToOperationContext(opCtx);
@@ -273,21 +276,22 @@ void ColumnScanStage::open(bool reOpen) {
 
         auto iam = static_cast<ColumnStoreAccessMethod*>(entry->accessMethod());
 
-        // The dense _recordId column is only needed if there are no filters (TODO SERVER-68377:
-        // eventually we can avoid including this column for the cases where a known dense column
-        // such as _id is being read anyway).
-        if (_filteredPaths.empty()) {
-            _denseColumnCursor = std::make_unique<ColumnCursor>(
-                iam->storage()->newCursor(_opCtx, ColumnStore::kRowIdPath),
-                _specificStats.cursorStats.emplace_back(ColumnStore::kRowIdPath.toString(),
-                                                        false /*includeInOutput*/));
-        }
         for (size_t i = 0; i < _paths.size(); i++) {
             _columnCursors.emplace_back(
                 iam->storage()->newCursor(_opCtx, _paths[i]),
                 _specificStats.cursorStats.emplace_back(_paths[i], _includeInOutput[i]));
         }
+
+        // The dense _recordId column is only needed if there are no filters and no dense field is
+        // being scanned already for the query.
+        if (_filteredPaths.empty() && !_densePathIncludedInScan) {
+            _recordIdColumnCursor = std::make_unique<ColumnCursor>(
+                iam->storage()->newCursor(_opCtx, ColumnStore::kRowIdPath),
+                _specificStats.cursorStats.emplace_back(ColumnStore::kRowIdPath.toString(),
+                                                        false /*includeInOutput*/));
+        }
     }
+
     _rowId = ColumnStore::kNullRowId;
     _open = true;
 }
@@ -430,10 +434,10 @@ RowId ColumnScanStage::findNextRowIdForFilteredColumns() {
 }
 
 RowId ColumnScanStage::findMinRowId() const {
-    if (_denseColumnCursor) {
-        // The cursor of the dense column cannot be ahead of any other, so it's always at the
-        // minimum.
-        auto& result = _denseColumnCursor->lastCell();
+    if (_recordIdColumnCursor) {
+        // The cursor of the dense _recordId column cannot be ahead of any other (there are no
+        // filters on it to move it forward arbitrarily), so it's always at the minimum.
+        auto& result = _recordIdColumnCursor->lastCell();
         if (!result) {
             return ColumnStore::kNullRowId;
         }
@@ -450,10 +454,20 @@ RowId ColumnScanStage::findMinRowId() const {
     return recordId;
 }
 
+/**
+ * When called for the first time, initializes all the column cursors to the beginning of their
+ * respective columns. On subsequent calls, if path filters are present, forwards all cursors to
+ * their next filter match. If no filters are present, cursors are stepped forward passed the
+ * current _rowId, if necessary: there may be gaps in columns, putting one cursor far ahead of the
+ * others in past cursor advancement.
+ *
+ * Returns the lowest RowId across cursors if there are no filtered paths; otherwise the RowId of
+ * the current cursors' position where all filters match.
+ */
 RowId ColumnScanStage::advanceCursors() {
     if (_rowId == ColumnStore::kNullRowId) {
-        if (_denseColumnCursor) {
-            _denseColumnCursor->seekAtOrPast(ColumnStore::kNullRowId);
+        if (_recordIdColumnCursor) {
+            _recordIdColumnCursor->seekAtOrPast(ColumnStore::kNullRowId);
         }
         for (auto& columnCursor : _columnCursors) {
             columnCursor.seekAtOrPast(ColumnStore::kNullRowId);
@@ -468,15 +482,17 @@ RowId ColumnScanStage::advanceCursors() {
         return findNextRowIdForFilteredColumns();
     }
 
+    /* no filtered paths */
+
     // In absence of filters all cursors iterate forward on their own. Some of the cursors might
-    // be ahead of the current '_rowId' because there are gaps in their columns - don't move them
-    // but only those that are at '_rowId' and therefore their values have been consumed.
-    // While at it, compute the new min row ID. auto nextRecordId = RecordId();
+    // be ahead of the current '_rowId' because there are gaps in their columns: don't move them,
+    // unless they are at '_rowId' and therefore their values have been consumed.
+    // While at it, compute the new min row ID.
     auto nextRowId = ColumnStore::kNullRowId;
-    if (_denseColumnCursor) {
-        invariant(_denseColumnCursor->lastCell()->rid == _rowId,
-                  "Dense cursor should always be at the current minimum record ID");
-        auto cell = _denseColumnCursor->next();
+    if (_recordIdColumnCursor) {
+        invariant(_recordIdColumnCursor->lastCell()->rid == _rowId,
+                  "The dense _recordId cursor should always be at the current minimum record ID");
+        auto cell = _recordIdColumnCursor->next();
         if (!cell) {
             return ColumnStore::kNullRowId;
         }
@@ -491,7 +507,8 @@ RowId ColumnScanStage::advanceCursors() {
             cell = cursor.next();
         }
         if (cell && (nextRowId == ColumnStore::kNullRowId || cell->rid < nextRowId)) {
-            invariant(!_denseColumnCursor, "Dense cursor should have the next lowest record ID");
+            invariant(!_recordIdColumnCursor,
+                      "The dense _recordId cursor should have the next lowest record ID");
             nextRowId = cell->rid;
         }
     }
@@ -608,7 +625,7 @@ void ColumnScanStage::close() {
     _coll.reset();
     _columnCursors.clear();
     _parentPathCursors.clear();
-    _denseColumnCursor.reset();
+    _recordIdColumnCursor.reset();
     _open = false;
 }
 

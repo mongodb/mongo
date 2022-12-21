@@ -765,8 +765,10 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // column_scan stage defines the order of fields in the reconstructed record).
     std::vector<std::string> paths;
     paths.reserve(csn->allFields.size());
+    bool densePathIncludeInFields = false;
     if (csn->allFields.find("_id") != csn->allFields.end()) {
         paths.push_back("_id");
+        densePathIncludeInFields = true;
     }
     for (const auto& path : csn->allFields) {
         if (path != "_id") {
@@ -838,6 +840,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
         std::make_unique<sbe::ColumnScanStage>(getCurrentCollection(reqs)->uuid(),
                                                csn->indexEntry.identifier.catalogName,
                                                std::move(paths),
+                                               densePathIncludeInFields,
                                                std::move(includeInOutput),
                                                ridSlot,
                                                reconstructedRecordSlot,

@@ -74,6 +74,7 @@ public:
     ColumnScanStage(UUID collectionUuid,
                     StringData columnIndexName,
                     std::vector<std::string> paths,
+                    bool densePathIncludedInScan,
                     std::vector<bool> includeInOutput,
                     boost::optional<value::SlotId> recordIdSlot,
                     boost::optional<value::SlotId> reconstructedRecordSlot,
@@ -291,9 +292,19 @@ private:
     // Cursors to simultaneously read from the sections of the index for each path.
     std::vector<ColumnCursor> _columnCursors;
     StringMap<std::unique_ptr<ColumnCursor>> _parentPathCursors;
-    // Dense column contains record ids for all records. It is necessary to support projection
-    // semantics for missing values on paths.
-    std::unique_ptr<ColumnCursor> _denseColumnCursor;
+
+    // A dense column contains records for all documents in the collection. It is sometimes
+    // necessary to support projection semantics for missing values on paths. If a dense path is not
+    // specified to the constructor, noted in '_densePathIncludedInScan', and there are no pushed
+    // down filters (_filteredPaths), then a cursor will be implicitly opened against the dense
+    // _recordId column.
+    std::unique_ptr<ColumnCursor> _recordIdColumnCursor;
+
+    // 'densePathIncludedInScan' indicates whether there is a path present in 'paths' that is
+    // expected to be present for every document in the collection. This avoids the extra cost of
+    // iterating the _recordId dense column to ensure all null values for a column are observed.
+    bool _densePathIncludedInScan = false;
+
     // Cursor into the associated row store.
     std::unique_ptr<SeekableRecordCursor> _rowStoreCursor;
 

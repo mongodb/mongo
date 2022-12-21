@@ -8,8 +8,6 @@
 "use strict";
 
 load("jstests/aggregation/extras/utils.js");  // For assertArrayEq
-load("jstests/libs/analyze_plan.js");         // For planHasStage.
-load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
 load("jstests/libs/sbe_explain_helpers.js");  // For getSbePlanStages.
 load("jstests/libs/columnstore_util.js");     // For setUpServerForColumnStoreIndexTest.
 
@@ -34,7 +32,7 @@ assert.commandWorked(coll.insertMany(docs, {ordered: false}));
 (function testScanOnTwoColumns() {
     const explain = coll.find({}, {x: 1, 'y.a': 1}).explain("executionStats");
 
-    // Validate SBE part.
+    // Validate that the plan was SBE and using a ColumnScan.
     const columnScanStages = getSbePlanStages(explain, "columnscan");
     assert.eq(columnScanStages.length, 1, `Could not find 'columnscan' stage: ${tojson(explain)}`);
     const columnScan = columnScanStages[0];
@@ -45,18 +43,17 @@ assert.commandWorked(coll.insertMany(docs, {ordered: false}));
         extraErrorMsg: 'Paths used by column scan stage'
     });
 
-    // Verifying column fields.
+    // Verify that the expected number of column fields were scanned.
     const columns = columnScan.columns;
     assert.eq(
-        Object.keys(columns).length, 4, `Should access 4 columns but accessed: ${tojson(columns)}`);
+        Object.keys(columns).length, 3, `Should access 3 columns but accessed: ${tojson(columns)}`);
 
     // We seek into each column once, when setting up the cursors. The dense column is the first
     // to hit EOF after iterating over all documents so other columns iterate at least one time
     // less.
     const expectedColumns = {
-        "<<RowId Column>>": {"numNexts": docs.length, "numSeeks": 1, "usedInOutput": false},
-        "_id": {"numNexts": docs.length - 1, "numSeeks": 1, "usedInOutput": true},
-        "x": {"numNexts": docs.length - 1, "numSeeks": 1, "usedInOutput": true},
+        "_id": {"numNexts": docs.length, "numSeeks": 1, "usedInOutput": true},
+        "x": {"numNexts": docs.length, "numSeeks": 1, "usedInOutput": true},
         "y.a": {"numNexts": 1, "numSeeks": 1, "usedInOutput": true}
     };
     for (const [columnName, expectedObj] of Object.entries(expectedColumns)) {
@@ -79,8 +76,7 @@ assert.commandWorked(coll.insertMany(docs, {ordered: false}));
     // 'totalKeysExamined' should be equal to the sum of "next" and "seek" calls across all
     // columns.
     assert.eq(explain.executionStats.totalKeysExamined,
-              columns["<<RowId Column>>"].numNexts + columns["<<RowId Column>>"].numSeeks +
-                  columns["_id"].numNexts + columns["_id"].numSeeks + columns["x"].numNexts +
+              columns["_id"].numNexts + columns["_id"].numSeeks + columns["x"].numNexts +
                   columns["x"].numSeeks + columns["y.a"].numNexts + columns["y.a"].numSeeks +
                   parentColumns["y"].numNexts + parentColumns["y"].numSeeks,
               `Mismatch in totalKeysExamined.`);
@@ -96,14 +92,15 @@ assert.commandWorked(coll.insertMany(docs, {ordered: false}));
                       {"allFields": ["_id", "x", "y.a"], "extraFieldsPermitted": true},
                       false /* verbose */,
                       null /* valueComparator */,
-                      ["stage", "planNodeId"]));
+                      ["stage", "planNodeId"]),
+           `Mismatching column scan plan stage ${tojson(columnScanPlanStages[0])}`);
 }());
 
 // Test the explain output for a scan on a nonexistent field.
 (function testNonexistentField() {
     const explain = coll.find({}, {z: 1}).explain("executionStats");
 
-    // Validate SBE part.
+    // Validate that the plan was SBE and using a ColumnScan.
     const columnScanStages = getSbePlanStages(explain, "columnscan");
     assert.eq(columnScanStages.length, 1, `Could not find 'columnscan' stage: ${tojson(explain)}`);
     const columnScan = columnScanStages[0];
@@ -114,13 +111,12 @@ assert.commandWorked(coll.insertMany(docs, {ordered: false}));
         extraErrorMsg: 'Paths used by column scan stage'
     });
 
-    // Verifying column fields.
+    // Verify that the expected number of column fields were scanned.
     const columns = columnScan.columns;
     assert.eq(
-        Object.keys(columns).length, 3, `Should access 3 columns but accessed: ${tojson(columns)}`);
+        Object.keys(columns).length, 2, `Should access 2 columns but accessed: ${tojson(columns)}`);
     const expectedColumns = {
-        "<<RowId Column>>": {"numNexts": docs.length, "numSeeks": 1, "usedInOutput": false},
-        "_id": {"numNexts": docs.length - 1, "numSeeks": 1, "usedInOutput": true},
+        "_id": {"numNexts": docs.length, "numSeeks": 1, "usedInOutput": true},
         "z": {"numNexts": 0, "numSeeks": 1, "usedInOutput": true},
     };
     for (const [columnName, expectedObj] of Object.entries(expectedColumns)) {
@@ -136,8 +132,7 @@ assert.commandWorked(coll.insertMany(docs, {ordered: false}));
     // 'totalKeysExamined' should be equal to the sum of "next" and "seek" calls across all
     // columns.
     assert.eq(explain.executionStats.totalKeysExamined,
-              columns["<<RowId Column>>"].numNexts + columns["<<RowId Column>>"].numSeeks +
-                  columns["_id"].numNexts + columns["_id"].numSeeks + columns["z"].numNexts +
+              columns["_id"].numNexts + columns["_id"].numSeeks + columns["z"].numNexts +
                   columns["z"].numSeeks,
               `Mismatch in totalKeysExamined.`);
 
@@ -152,31 +147,32 @@ assert.commandWorked(coll.insertMany(docs, {ordered: false}));
                       {"allFields": ["_id", "z"], "extraFieldsPermitted": false},
                       false /* verbose */,
                       null /* valueComparator */,
-                      ["stage", "planNodeId"]));
+                      ["stage", "planNodeId"]),
+           `Mismatching column scan plan stage ${tojson(columnScanPlanStages[0])}`);
 }());
 
-// Test the explain output for a scan on a 2-level nested field.
+// Test the explain output for a scan on a 2-level nested field; and exclude the _id field to
+// exercise explain for the hidden dense RowId column.
 (function testMultipleNestedColumns() {
-    const explain = coll.find({}, {'y.b.c': 1}).explain("executionStats");
+    const explain = coll.find({}, {'_id': 0, 'y.b.c': 1}).explain("executionStats");
 
-    // Validate SBE part.
+    // Validate that the plan was SBE and using a ColumnScan.
     const columnScanStages = getSbePlanStages(explain, "columnscan");
     assert.eq(columnScanStages.length, 1, `Could not find 'columnscan' stage: ${tojson(explain)}`);
     const columnScan = columnScanStages[0];
 
     assertArrayEq({
         actual: columnScan.paths,
-        expected: ["_id", "y.b.c"],
+        expected: ["y.b.c"],
         extraErrorMsg: 'Paths used by column scan stage'
     });
 
-    // Verifying column fields.
+    // Verify that the expected number of column fields were scanned.
     const columns = columnScan.columns;
     assert.eq(
-        Object.keys(columns).length, 3, `Should access 3 columns but accessed: ${tojson(columns)}`);
+        Object.keys(columns).length, 2, `Should access 2 columns but accessed: ${tojson(columns)}`);
     const expectedColumns = {
         "<<RowId Column>>": {"numNexts": docs.length, "numSeeks": 1, "usedInOutput": false},
-        "_id": {"numNexts": docs.length - 1, "numSeeks": 1, "usedInOutput": true},
         "y.b.c": {"numNexts": 1, "numSeeks": 1, "usedInOutput": true},
     };
     for (const [columnName, expectedObj] of Object.entries(expectedColumns)) {
@@ -205,10 +201,9 @@ assert.commandWorked(coll.insertMany(docs, {ordered: false}));
     // columns.
     assert.eq(explain.executionStats.totalKeysExamined,
               columns["<<RowId Column>>"].numNexts + columns["<<RowId Column>>"].numSeeks +
-                  columns["_id"].numNexts + columns["_id"].numSeeks + columns["y.b.c"].numNexts +
-                  columns["y.b.c"].numSeeks + parentColumns["y.b"].numNexts +
-                  parentColumns["y.b"].numSeeks + parentColumns["y"].numNexts +
-                  parentColumns["y"].numSeeks,
+                  columns["y.b.c"].numNexts + columns["y.b.c"].numSeeks +
+                  parentColumns["y.b"].numNexts + parentColumns["y.b"].numSeeks +
+                  parentColumns["y"].numNexts + parentColumns["y"].numSeeks,
               `Mismatch in totalKeysExamined.`);
 
     assert.eq(columnScan.numRowStoreFetches, 0, 'Mismatch in numRowStoreFetches');
@@ -219,10 +214,11 @@ assert.commandWorked(coll.insertMany(docs, {ordered: false}));
     assert.eq(
         columnScanPlanStages.length, 1, `Could not find 'COLUMN_SCAN' stage: ${tojson(explain)}`);
     assert(documentEq(columnScanPlanStages[0],
-                      {"allFields": ["_id", "y.b.c"], "extraFieldsPermitted": true},
+                      {"allFields": ["y.b.c"], "extraFieldsPermitted": true},
                       false /* verbose */,
                       null /* valueComparator */,
-                      ["stage", "planNodeId"]));
+                      ["stage", "planNodeId"]),
+           `Mismatching column scan plan stage ${tojson(columnScanPlanStages[0])}`);
 }());
 
 // Test fallback to the row store.
@@ -268,6 +264,7 @@ assert.commandWorked(coll.insertMany(docs, {ordered: false}));
                       },
                       false /* verbose */,
                       null /* valueComparator */,
-                      ["stage", "planNodeId"]));
+                      ["stage", "planNodeId"]),
+           `Mismatching column scan plan stage ${tojson(columnScanPlanStages[0])}`);
 }());
 }());
