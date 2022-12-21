@@ -94,8 +94,7 @@ tests.push(function rawCommandWriteOk() {
     assert.doesNotThrow(() => assert.commandWorkedIgnoringWriteErrors(res));
     assert.throws(() => assert.commandFailed(res));
     assert.throws(() => assert.commandFailedWithCode(res, 0));
-    assert.doesNotThrow(
-        () => assert.commandWorkedOrFailedWithCode(res, 0, "threw even though succeeded"));
+    assert.doesNotThrow(() => assert.commandWorkedOrFailedWithCode(res, 0));
 });
 
 tests.push(function rawCommandWriteErr() {
@@ -106,9 +105,9 @@ tests.push(function rawCommandWriteErr() {
     assert.doesNotThrow(() => assert.commandFailedWithCode(res, ErrorCodes.DuplicateKey));
     assert.doesNotThrow(
         () => assert.commandFailedWithCode(res, [ErrorCodes.DuplicateKey, kFakeErrCode]));
-    assert.throws(
+    assert.doesNotThrow(
         () => assert.commandWorkedOrFailedWithCode(
-            res, [ErrorCodes.DuplicateKey, kFakeErrCode], "expected to throw on write error"));
+            res, [ErrorCodes.DuplicateKey, kFakeErrCode], "expected a write failure"));
     assert.throws(() => assert.commandWorkedOrFailedWithCode(
                       res, [kFakeErrCode], "expected to throw on write error"));
 });
@@ -140,8 +139,8 @@ tests.push(function collMultiInsertWriteOk() {
     assert.doesNotThrow(() => assert.commandWorkedIgnoringWriteErrors(res));
     assert.throws(() => assert.commandFailed(res));
     assert.throws(() => assert.commandFailedWithCode(res, 0));
-    assert.throws(() =>
-                      assert.commandWorkedOrFailedWithCode(res, 0, "threw even though succeeded"));
+    assert.doesNotThrow(
+        () => assert.commandWorkedOrFailedWithCode(res, 0, "threw even though succeeded"));
 });
 
 tests.push(function collMultiInsertWriteErr() {
