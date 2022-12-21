@@ -134,14 +134,16 @@ StatusWith<std::vector<BSONObj>> selectChunkSplitPoints(OperationContext* opCtx,
                                                         const NamespaceString& nss,
                                                         const ShardKeyPattern& shardKeyPattern,
                                                         const ChunkRange& chunkRange,
-                                                        long long chunkSizeBytes) {
+                                                        long long chunkSizeBytes,
+                                                        boost::optional<int> limit) {
     auto shardStatus = Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId);
     if (!shardStatus.isOK()) {
         return shardStatus.getStatus();
     }
 
-    const AutoSplitVectorRequest req(
+    AutoSplitVectorRequest req(
         nss, shardKeyPattern.toBSON(), chunkRange.getMin(), chunkRange.getMax(), chunkSizeBytes);
+    req.setLimit(limit);
 
     auto cmdStatus = shardStatus.getValue()->runCommandWithFixedRetryAttempts(
         opCtx,

@@ -89,7 +89,8 @@ public:
                                                                req.getKeyPattern(),
                                                                req.getMin(),
                                                                req.getMax(),
-                                                               req.getMaxChunkSizeBytes());
+                                                               req.getMaxChunkSizeBytes(),
+                                                               req.getLimit());
             return Response(std::move(splitPoints), continuation);
         }
 
