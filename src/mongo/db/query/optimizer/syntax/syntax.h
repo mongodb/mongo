@@ -202,24 +202,23 @@ inline constexpr bool isComparisonOp(Operations op) {
 
 /**
  * Flip the argument order of a comparison op.
- * TODO SERVER-71500 Fix, test, and consider renaming reverseComparisonOp.
  *
  * Not to be confused with boolean negation: see 'negateComparisonOp'.
  */
-inline constexpr Operations reverseComparisonOp(Operations op) {
+inline constexpr Operations flipComparisonOp(Operations op) {
     switch (op) {
         case Operations::Eq:
         case Operations::Neq:
             return op;
 
         case Operations::Lt:
-            return Operations::Gte;
-        case Operations::Lte:
             return Operations::Gt;
+        case Operations::Lte:
+            return Operations::Gte;
         case Operations::Gt:
-            return Operations::Lte;
-        case Operations::Gte:
             return Operations::Lt;
+        case Operations::Gte:
+            return Operations::Lte;
 
         default:
             MONGO_UNREACHABLE;
@@ -232,7 +231,7 @@ inline constexpr Operations reverseComparisonOp(Operations op) {
  * If the op is not a comparison, return none.
  * If the op can't be negated (for example EqMember), return none.
  *
- * Not to be confused with flipping the argument order: see 'reverseComparisonOp'.
+ * Not to be confused with flipping the argument order: see 'flipComparisonOp'.
  */
 inline boost::optional<Operations> negateComparisonOp(Operations op) {
     switch (op) {

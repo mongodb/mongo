@@ -183,7 +183,7 @@ public:
                 isSimplePath(rightPtr->getPath()) &&
                 rightPtr->getInput() == _ctx.getRootProjVar()) {
                 addEvalFilterFn(
-                    std::move(rightPtr->getPath()), std::move(left), reverseComparisonOp(op));
+                    std::move(rightPtr->getPath()), std::move(left), flipComparisonOp(op));
                 return;
             }
         }

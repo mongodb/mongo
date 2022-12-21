@@ -81,4 +81,59 @@ const t = db.cqf_agg_expr;
         assertArrayEq({actual: res, expected: [{_id: 1, a: [{b: 1}]}, {_id: 3, a: {b: [1]}}]});
     }
 }
+{
+    t.drop();
+    assert.commandWorked(t.insert({_id: 0, a: 1}));
+    assert.commandWorked(t.insert({_id: 1, a: 2}));
+    assert.commandWorked(t.insert({_id: 2, a: 3}));
+
+    {
+        const res = t.aggregate([{$match: {$expr: {$lt: [2, "$a"]}}}]).toArray();
+
+        assert.eq(1, res.length);
+        assert.eq(3, res[0].a);
+    }
+    {
+        const res = t.aggregate([{$match: {$expr: {$gt: ["$a", 2]}}}]).toArray();
+
+        assert.eq(1, res.length);
+        assert.eq(3, res[0].a);
+    }
+    {
+        const res = t.aggregate([{$match: {$expr: {$lte: [2, "$a"]}}}]).toArray();
+
+        assert.eq(2, res.length);
+        assertArrayEq({actual: res, expected: [{_id: 1, a: 2}, {_id: 2, a: 3}]});
+    }
+    {
+        const res = t.aggregate([{$match: {$expr: {$gte: ["$a", 2]}}}]).toArray();
+
+        assert.eq(2, res.length);
+        assertArrayEq({actual: res, expected: [{_id: 1, a: 2}, {_id: 2, a: 3}]});
+    }
+    {
+        const res = t.aggregate([{$match: {$expr: {$gt: [3, "$a"]}}}]).toArray();
+
+        assert.eq(2, res.length);
+        assertArrayEq({actual: res, expected: [{_id: 0, a: 1}, {_id: 1, a: 2}]});
+    }
+    {
+        const res = t.aggregate([{$match: {$expr: {$lt: ["$a", 3]}}}]).toArray();
+
+        assert.eq(2, res.length);
+        assertArrayEq({actual: res, expected: [{_id: 0, a: 1}, {_id: 1, a: 2}]});
+    }
+    {
+        const res = t.aggregate([{$match: {$expr: {$gte: [3, "$a"]}}}]).toArray();
+
+        assert.eq(3, res.length);
+        assertArrayEq({actual: res, expected: [{_id: 0, a: 1}, {_id: 1, a: 2}, {_id: 2, a: 3}]});
+    }
+    {
+        const res = t.aggregate([{$match: {$expr: {$lte: ["$a", 3]}}}]).toArray();
+
+        assert.eq(3, res.length);
+        assertArrayEq({actual: res, expected: [{_id: 0, a: 1}, {_id: 1, a: 2}, {_id: 2, a: 3}]});
+    }
+}
 }());
