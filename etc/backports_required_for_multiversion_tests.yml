@@ -149,8 +149,6 @@ all:
   ticket: SERVER-67492
 - test_file: jstests/replsets/optime.js
   ticket: SERVER-67532
-- test_file: jstests/sharding/prepare_transaction_then_migrate.js
-  ticket: SERVER-68361
 suites:
   change_streams_multiversion: null
   concurrency_replication_multiversion: null
