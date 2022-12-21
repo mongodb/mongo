@@ -29,10 +29,11 @@
 
 #pragma once
 
+#include "boost/dynamic_bitset.hpp"
+
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/db/update_index_data.h"
-
 
 namespace mongo::doc_diff {
 
@@ -80,5 +81,14 @@ boost::optional<DiffResult> computeOplogDiff(const BSONObj& pre,
  * Returns 'boost::none' if the diff exceeds the BSON size limit.
  */
 boost::optional<BSONObj> computeInlineDiff(const BSONObj& pre, const BSONObj& post);
+
+using BitVector = boost::dynamic_bitset<size_t>;
+/**
+ * Returns a bitset of the same size of the indexData argument, where each bit indicates
+ * whether one of the modifications described in the diff document affects one of the
+ * indexed paths described in the matching object.
+ */
+BitVector anyIndexesMightBeAffected(const Diff& diff,
+                                    const std::vector<const UpdateIndexData*>& indexData);
 
 };  // namespace mongo::doc_diff

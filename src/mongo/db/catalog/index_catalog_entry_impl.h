@@ -38,6 +38,7 @@
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/update_index_data.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 
@@ -190,6 +191,10 @@ public:
      */
     void setMinimumVisibleSnapshot(Timestamp newMinimumVisibleSnapshot) final;
 
+    const UpdateIndexData& getIndexedPaths() const final {
+        return _indexedPaths;
+    }
+
 private:
     /**
      * Sets this index to be multikey when we are running inside a multi-document transaction.
@@ -247,5 +252,8 @@ private:
     // Used to improve lookups without having to search for the index name
     // accessing the collection metadata.
     int _indexOffset;
+
+    // Describes the paths indexed by this index.
+    UpdateIndexData _indexedPaths;
 };
 }  // namespace mongo

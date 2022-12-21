@@ -387,8 +387,14 @@ bool Helpers::findByIdAndNoopUpdate(OperationContext* opCtx,
     CollectionUpdateArgs args(snapshottedDoc.value());
     args.criteria = idQuery;
     args.update = BSONObj();
-    collection_internal::updateDocument(
-        opCtx, collection, recordId, snapshottedDoc, result, false, nullptr, &args);
+    collection_internal::updateDocument(opCtx,
+                                        collection,
+                                        recordId,
+                                        snapshottedDoc,
+                                        result,
+                                        collection_internal::kUpdateNoIndexes,
+                                        nullptr,
+                                        &args);
 
     return true;
 }

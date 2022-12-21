@@ -31,7 +31,9 @@
 
 #include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/db/update/update_node.h"
+#include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/db/update/v2_log_builder.h"
 #include "mongo/unittest/unittest.h"
 
@@ -87,6 +89,21 @@ protected:
         applyParams.modifiedPaths = &_modifiedPaths;
         applyParams.logMode = ApplyParams::LogMode::kGenerateOplogEntry;
         return applyParams;
+    }
+
+    bool getIndexAffectedFromLogEntry() {
+        if (!_logBuilder || !_indexData) {
+            return false;
+        }
+        // Keep the object alive, extractDiffFromOplogEntry returns a subdocument of this document.
+        BSONObj logEntry = getOplogEntry();
+        auto diff = update_oplog_entry::extractDiffFromOplogEntry(logEntry);
+        if (!diff) {
+            return false;
+        }
+        return mongo::doc_diff::anyIndexesMightBeAffected(
+                   *diff, std::vector<const UpdateIndexData*>{_indexData.get()})
+            .any();
     }
 
     UpdateNode::UpdateNodeApplyParams getUpdateNodeApplyParams() {

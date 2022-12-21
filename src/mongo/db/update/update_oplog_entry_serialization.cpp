@@ -40,6 +40,18 @@ BSONObj makeDeltaOplogEntry(const doc_diff::Diff& diff) {
     return builder.obj();
 }
 
+boost::optional<BSONObj> extractDiffFromOplogEntry(const BSONObj& opLog) {
+    auto version = opLog["$v"];
+    if (version.ok() &&
+        version.numberInt() == static_cast<int>(UpdateOplogEntryVersion::kDeltaV2)) {
+        auto diff = opLog[kDiffObjectFieldName];
+        if (diff.type() == BSONType::Object) {
+            return diff.embeddedObject();
+        }
+    }
+    return {};
+}
+
 namespace {
 BSONElement extractNewValueForFieldFromV1Entry(const BSONObj& oField, StringData fieldName) {
     // Check the '$set' section.

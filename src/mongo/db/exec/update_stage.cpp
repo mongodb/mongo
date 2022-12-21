@@ -41,6 +41,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/update/path_support.h"
+#include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
@@ -273,17 +274,18 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
                     checkUpdateChangesShardKeyFields(boost::none /* newObj */, oldObj);
                 }
 
+                auto diff = update_oplog_entry::extractDiffFromOplogEntry(logObj);
                 WriteUnitOfWork wunit(opCtx());
-                newObj = uassertStatusOK(
-                    collection_internal::updateDocumentWithDamages(opCtx(),
-                                                                   collection(),
-                                                                   recordId,
-                                                                   oldObj,
-                                                                   source,
-                                                                   _damages,
-                                                                   driver->modsAffectIndices(),
-                                                                   _params.opDebug,
-                                                                   &args));
+                newObj = uassertStatusOK(collection_internal::updateDocumentWithDamages(
+                    opCtx(),
+                    collection(),
+                    recordId,
+                    oldObj,
+                    source,
+                    _damages,
+                    diff.has_value() ? &*diff : collection_internal::kUpdateAllIndexes,
+                    _params.opDebug,
+                    &args));
                 invariant(oldObj.snapshotId() == opCtx()->recoveryUnit()->getSnapshotId());
                 wunit.commit();
             }
@@ -304,15 +306,18 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
                 if (_isUserInitiatedWrite) {
                     checkUpdateChangesShardKeyFields(newObj, oldObj);
                 }
+
+                auto diff = update_oplog_entry::extractDiffFromOplogEntry(logObj);
                 WriteUnitOfWork wunit(opCtx());
-                newRecordId = collection_internal::updateDocument(opCtx(),
-                                                                  collection(),
-                                                                  recordId,
-                                                                  oldObj,
-                                                                  newObj,
-                                                                  driver->modsAffectIndices(),
-                                                                  _params.opDebug,
-                                                                  &args);
+                newRecordId = collection_internal::updateDocument(
+                    opCtx(),
+                    collection(),
+                    recordId,
+                    oldObj,
+                    newObj,
+                    diff.has_value() ? &*diff : collection_internal::kUpdateAllIndexes,
+                    _params.opDebug,
+                    &args);
                 invariant(oldObj.snapshotId() == opCtx()->recoveryUnit()->getSnapshotId());
                 wunit.commit();
             }

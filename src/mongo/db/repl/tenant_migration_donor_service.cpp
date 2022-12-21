@@ -666,7 +666,7 @@ ExecutorFuture<repl::OpTime> TenantMigrationDonorService::Instance::_updateState
                                                            originalRecordId,
                                                            originalSnapshot,
                                                            updatedStateDocBson,
-                                                           false,
+                                                           collection_internal::kUpdateNoIndexes,
                                                            nullptr /* OpDebug* */,
                                                            &args);
 

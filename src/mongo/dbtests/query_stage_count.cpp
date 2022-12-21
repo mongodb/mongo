@@ -131,7 +131,7 @@ public:
             oldrecordId,
             Snapshotted<BSONObj>(_opCtx.recoveryUnit()->getSnapshotId(), oldDoc),
             newDoc,
-            true,
+            collection_internal::kUpdateAllIndexes,
             nullptr,
             &args);
         wunit.commit();

@@ -257,6 +257,7 @@ public:
                         const CollectionPtr& coll,
                         const BSONObj& oldDoc,
                         const BSONObj& newDoc,
+                        const BSONObj* opDiff,
                         const RecordId& recordId,
                         int64_t* keysInsertedOut,
                         int64_t* keysDeletedOut) const override;

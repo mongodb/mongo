@@ -400,8 +400,14 @@ public:
         CollectionUpdateArgs args{oldDoc.value()};
         {
             WriteUnitOfWork wuow(&_opCtx);
-            collection_internal::updateDocument(
-                &_opCtx, coll, *it, oldDoc, newDoc(oldDoc), false, nullptr, &args);
+            collection_internal::updateDocument(&_opCtx,
+                                                coll,
+                                                *it,
+                                                oldDoc,
+                                                newDoc(oldDoc),
+                                                collection_internal::kUpdateNoIndexes,
+                                                nullptr,
+                                                &args);
             wuow.commit();
         }
         exec->restoreState(&coll);
@@ -419,8 +425,14 @@ public:
             oldDoc = coll->docFor(&_opCtx, *it);
             {
                 WriteUnitOfWork wuow(&_opCtx);
-                collection_internal::updateDocument(
-                    &_opCtx, coll, *it++, oldDoc, newDoc(oldDoc), false, nullptr, &args);
+                collection_internal::updateDocument(&_opCtx,
+                                                    coll,
+                                                    *it++,
+                                                    oldDoc,
+                                                    newDoc(oldDoc),
+                                                    collection_internal::kUpdateNoIndexes,
+                                                    nullptr,
+                                                    &args);
                 wuow.commit();
             }
         }

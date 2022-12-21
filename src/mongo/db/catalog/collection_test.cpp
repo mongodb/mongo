@@ -278,8 +278,14 @@ TEST_F(CollectionTest, VerifyIndexIsUpdated) {
         WriteUnitOfWork wuow(opCtx);
         Snapshotted<BSONObj> oldSnap(opCtx->recoveryUnit()->getSnapshotId(), oldDoc);
         CollectionUpdateArgs args{oldDoc};
-        collection_internal::updateDocument(
-            opCtx, coll, oldRecordId, oldSnap, newDoc, true, nullptr, &args);
+        collection_internal::updateDocument(opCtx,
+                                            coll,
+                                            oldRecordId,
+                                            oldSnap,
+                                            newDoc,
+                                            collection_internal::kUpdateAllIndexes,
+                                            nullptr,
+                                            &args);
         wuow.commit();
     }
     auto indexRecordId = userIdx->getEntry()->accessMethod()->asSortedData()->findSingle(
@@ -329,7 +335,7 @@ TEST_F(CollectionTest, VerifyIndexIsUpdatedWithDamages) {
                                                            oldSnap,
                                                            damagesOutput.damageSource.get(),
                                                            damagesOutput.damages,
-                                                           true,
+                                                           collection_internal::kUpdateAllIndexes,
                                                            nullptr,
                                                            &args);
         ASSERT_OK(newDocStatus);

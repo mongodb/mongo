@@ -334,6 +334,114 @@ void serializeInlineDiff(diff_tree::DocumentSubDiffNode const* node, BSONObjBuil
         }
     }
 }
+
+void anyIndexesMightBeAffected(ArrayDiffReader* reader,
+                               const std::vector<const UpdateIndexData*>& indexData,
+                               FieldRef* fieldRef,
+                               BitVector* result);
+
+void anyIndexesMightBeAffected(DocumentDiffReader* reader,
+                               const std::vector<const UpdateIndexData*>& indexData,
+                               FieldRef* fieldRef,
+                               BitVector* result) {
+    boost::optional<StringData> delItem;
+    while ((delItem = reader->nextDelete())) {
+        FieldRef::FieldRefTempAppend tempAppend(*fieldRef, *delItem);
+        for (size_t i = 0; i < indexData.size(); i++) {
+            if (!(*result)[i]) {
+                (*result)[i] = indexData[i]->mightBeIndexed(*fieldRef);
+            }
+        }
+        // early exit
+        if (result->all()) {
+            return;
+        }
+    }
+
+    boost::optional<BSONElement> updItem;
+    while ((updItem = reader->nextUpdate())) {
+        FieldRef::FieldRefTempAppend tempAppend(*fieldRef, updItem->fieldNameStringData());
+        for (size_t i = 0; i < indexData.size(); i++) {
+            if (!(*result)[i]) {
+                (*result)[i] = indexData[i]->mightBeIndexed(*fieldRef);
+            }
+        }
+        // early exit
+        if (result->all()) {
+            return;
+        }
+    }
+
+    boost::optional<BSONElement> insItem;
+    while ((insItem = reader->nextInsert())) {
+        FieldRef::FieldRefTempAppend tempAppend(*fieldRef, insItem->fieldNameStringData());
+        for (size_t i = 0; i < indexData.size(); i++) {
+            if (!(*result)[i]) {
+                (*result)[i] = indexData[i]->mightBeIndexed(*fieldRef);
+            }
+        }
+        // early exit
+        if (result->all()) {
+            return;
+        }
+    }
+
+    for (auto subItem = reader->nextSubDiff(); subItem; subItem = reader->nextSubDiff()) {
+        FieldRef::FieldRefTempAppend tempAppend(*fieldRef, subItem->first);
+        stdx::visit(
+            OverloadedVisitor{[&indexData, &fieldRef, &result](DocumentDiffReader& item) {
+                                  anyIndexesMightBeAffected(&item, indexData, fieldRef, result);
+                              },
+                              [&indexData, &fieldRef, &result](ArrayDiffReader& item) {
+                                  anyIndexesMightBeAffected(&item, indexData, fieldRef, result);
+                              }},
+            subItem->second);
+        // early exit
+        if (result->all()) {
+            return;
+        }
+    }
+}
+
+void anyIndexesMightBeAffected(ArrayDiffReader* reader,
+                               const std::vector<const UpdateIndexData*>& indexData,
+                               FieldRef* fieldRef,
+                               BitVector* result) {
+    if (reader->newSize()) {
+        for (size_t i = 0; i < indexData.size(); i++) {
+            if (!(*result)[i]) {
+                (*result)[i] = indexData[i]->mightBeIndexed(*fieldRef);
+            }
+        }
+        // early exit
+        if (result->all()) {
+            return;
+        }
+    }
+    for (auto item = reader->next(); item; item = reader->next()) {
+        auto idxAsStr = std::to_string(item->first);
+        FieldRef::FieldRefTempAppend tempAppend(*fieldRef, idxAsStr);
+        stdx::visit(
+            OverloadedVisitor{[&indexData, &fieldRef, &result](BSONElement& update) {
+                                  for (size_t i = 0; i < indexData.size(); i++) {
+                                      if (!(*result)[i]) {
+                                          (*result)[i] = indexData[i]->mightBeIndexed(*fieldRef);
+                                      }
+                                  }
+                              },
+                              [&indexData, &fieldRef, &result](DocumentDiffReader& item) {
+                                  anyIndexesMightBeAffected(&item, indexData, fieldRef, result);
+                              },
+                              [&indexData, &fieldRef, &result](ArrayDiffReader& item) {
+                                  anyIndexesMightBeAffected(&item, indexData, fieldRef, result);
+                              }},
+            item->second);
+        // early exit
+        if (result->all()) {
+            return;
+        }
+    }
+}
 }  // namespace
 
 boost::optional<DiffResult> computeOplogDiff(const BSONObj& pre,
@@ -362,4 +470,18 @@ boost::optional<BSONObj> computeInlineDiff(const BSONObj& pre, const BSONObj& po
     return bob.obj();
 }
 
+
+BitVector anyIndexesMightBeAffected(const Diff& diff,
+                                    const std::vector<const UpdateIndexData*>& indexData) {
+    invariant(!indexData.empty());
+    BitVector result(indexData.size());
+    if (diff.isEmpty()) {
+        return result;
+    }
+
+    DocumentDiffReader reader(diff);
+    FieldRef path;
+    anyIndexesMightBeAffected(&reader, indexData, &path, &result);
+    return result;
+}
 }  // namespace mongo::doc_diff

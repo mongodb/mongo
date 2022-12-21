@@ -118,77 +118,83 @@ const UpdateIndexData& CollectionQueryInfo::getIndexKeys(OperationContext* opCtx
     return _indexedPaths;
 }
 
-void CollectionQueryInfo::computeIndexKeys(OperationContext* opCtx, const CollectionPtr& coll) {
+void CollectionQueryInfo::computeUpdateIndexData(const IndexCatalogEntry* entry,
+                                                 const IndexAccessMethod* accessMethod,
+                                                 UpdateIndexData* outData) {
+    const IndexDescriptor* descriptor = entry->descriptor();
+    if (bool isWildcard = (descriptor->getAccessMethodName() == IndexNames::WILDCARD);
+        isWildcard || descriptor->getAccessMethodName() == IndexNames::COLUMN) {
+        // Obtain the projection used by the $** index's key generator.
+        const auto* pathProj = isWildcard
+            ? static_cast<const IndexPathProjection*>(
+                  static_cast<const WildcardAccessMethod*>(accessMethod)->getWildcardProjection())
+            : static_cast<const IndexPathProjection*>(
+                  static_cast<const ColumnStoreAccessMethod*>(accessMethod)
+                      ->getColumnstoreProjection());
+        // If the projection is an exclusion, then we must check the new document's keys on all
+        // updates, since we do not exhaustively know the set of paths to be indexed.
+        if (pathProj->exec()->getType() ==
+            TransformerInterface::TransformerType::kExclusionProjection) {
+            outData->allPathsIndexed();
+        } else {
+            // If a subtree was specified in the keyPattern, or if an inclusion projection is
+            // present, then we need only index the path(s) preserved by the projection.
+            const auto& exhaustivePaths = pathProj->exhaustivePaths();
+            invariant(exhaustivePaths);
+            for (const auto& path : *exhaustivePaths) {
+                outData->addPath(path);
+            }
+        }
+    } else if (descriptor->getAccessMethodName() == IndexNames::TEXT) {
+        fts::FTSSpec ftsSpec(descriptor->infoObj());
+
+        if (ftsSpec.wildcard()) {
+            outData->allPathsIndexed();
+        } else {
+            for (size_t i = 0; i < ftsSpec.numExtraBefore(); ++i) {
+                outData->addPath(FieldRef(ftsSpec.extraBefore(i)));
+            }
+            for (fts::Weights::const_iterator it = ftsSpec.weights().begin();
+                 it != ftsSpec.weights().end();
+                 ++it) {
+                outData->addPath(FieldRef(it->first));
+            }
+            for (size_t i = 0; i < ftsSpec.numExtraAfter(); ++i) {
+                outData->addPath(FieldRef(ftsSpec.extraAfter(i)));
+            }
+            // Any update to a path containing "language" as a component could change the
+            // language of a subdocument.  Add the override field as a path component.
+            outData->addPathComponent(ftsSpec.languageOverrideField());
+        }
+    } else {
+        BSONObj key = descriptor->keyPattern();
+        BSONObjIterator j(key);
+        while (j.more()) {
+            BSONElement e = j.next();
+            outData->addPath(FieldRef(e.fieldName()));
+        }
+    }
+
+    // handle partial indexes
+    const MatchExpression* filter = entry->getFilterExpression();
+    if (filter) {
+        stdx::unordered_set<std::string> paths;
+        QueryPlannerIXSelect::getFields(filter, &paths);
+        for (auto it = paths.begin(); it != paths.end(); ++it) {
+            outData->addPath(FieldRef(*it));
+        }
+    }
+}
+
+void CollectionQueryInfo::computeUpdateIndexData(OperationContext* opCtx,
+                                                 const CollectionPtr& coll) {
     _indexedPaths.clear();
 
     auto it = coll->getIndexCatalog()->getIndexIterator(
         opCtx, IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished);
     while (it->more()) {
         const IndexCatalogEntry* entry = it->next();
-        const IndexDescriptor* descriptor = entry->descriptor();
-        const IndexAccessMethod* iam = entry->accessMethod();
-
-        if (bool isWildcard = (descriptor->getAccessMethodName() == IndexNames::WILDCARD);
-            isWildcard || descriptor->getAccessMethodName() == IndexNames::COLUMN) {
-            // Obtain the projection used by the $** index's key generator.
-            const auto* pathProj = isWildcard
-                ? static_cast<const IndexPathProjection*>(
-                      static_cast<const WildcardAccessMethod*>(iam)->getWildcardProjection())
-                : static_cast<const IndexPathProjection*>(
-                      static_cast<const ColumnStoreAccessMethod*>(iam)->getColumnstoreProjection());
-            // If the projection is an exclusion, then we must check the new document's keys on all
-            // updates, since we do not exhaustively know the set of paths to be indexed.
-            if (pathProj->exec()->getType() ==
-                TransformerInterface::TransformerType::kExclusionProjection) {
-                _indexedPaths.allPathsIndexed();
-            } else {
-                // If a subtree was specified in the keyPattern, or if an inclusion projection is
-                // present, then we need only index the path(s) preserved by the projection.
-                const auto& exhaustivePaths = pathProj->exhaustivePaths();
-                invariant(exhaustivePaths);
-                for (const auto& path : *exhaustivePaths) {
-                    _indexedPaths.addPath(path);
-                }
-            }
-        } else if (descriptor->getAccessMethodName() == IndexNames::TEXT) {
-            fts::FTSSpec ftsSpec(descriptor->infoObj());
-
-            if (ftsSpec.wildcard()) {
-                _indexedPaths.allPathsIndexed();
-            } else {
-                for (size_t i = 0; i < ftsSpec.numExtraBefore(); ++i) {
-                    _indexedPaths.addPath(FieldRef(ftsSpec.extraBefore(i)));
-                }
-                for (fts::Weights::const_iterator it = ftsSpec.weights().begin();
-                     it != ftsSpec.weights().end();
-                     ++it) {
-                    _indexedPaths.addPath(FieldRef(it->first));
-                }
-                for (size_t i = 0; i < ftsSpec.numExtraAfter(); ++i) {
-                    _indexedPaths.addPath(FieldRef(ftsSpec.extraAfter(i)));
-                }
-                // Any update to a path containing "language" as a component could change the
-                // language of a subdocument.  Add the override field as a path component.
-                _indexedPaths.addPathComponent(ftsSpec.languageOverrideField());
-            }
-        } else {
-            BSONObj key = descriptor->keyPattern();
-            BSONObjIterator j(key);
-            while (j.more()) {
-                BSONElement e = j.next();
-                _indexedPaths.addPath(FieldRef(e.fieldName()));
-            }
-        }
-
-        // handle partial indexes
-        const MatchExpression* filter = entry->getFilterExpression();
-        if (filter) {
-            stdx::unordered_set<std::string> paths;
-            QueryPlannerIXSelect::getFields(filter, &paths);
-            for (auto it = paths.begin(); it != paths.end(); ++it) {
-                _indexedPaths.addPath(FieldRef(*it));
-            }
-        }
+        computeUpdateIndexData(entry, entry->accessMethod(), &_indexedPaths);
     }
 
     _keysComputed = true;
@@ -261,7 +267,7 @@ void CollectionQueryInfo::init(OperationContext* opCtx, const CollectionPtr& col
 
 void CollectionQueryInfo::rebuildIndexData(OperationContext* opCtx, const CollectionPtr& coll) {
     _keysComputed = false;
-    computeIndexKeys(opCtx, coll);
+    computeUpdateIndexData(opCtx, coll);
     updatePlanCacheIndexEntries(opCtx, coll);
 }
 

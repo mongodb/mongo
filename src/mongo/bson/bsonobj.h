@@ -123,6 +123,7 @@ public:
     using ComparisonRulesSet = BSONComparatorInterfaceBase<BSONObj>::ComparisonRulesSet;
 
     static constexpr char kMinBSONLength = 5;
+    static const BSONObj kEmptyObject;
 
     /**
      * Construct an empty BSONObj -- that is, {}.

@@ -975,14 +975,15 @@ ExecutorFuture<repl::OpTime> ShardSplitDonorService::DonorStateMachine::_updateS
                            args.oplogSlots = {oplogSlot};
                            args.update = updatedStateDocBson;
 
-                           collection_internal::updateDocument(opCtx,
-                                                               *collection,
-                                                               originalRecordId,
-                                                               originalSnapshot,
-                                                               updatedStateDocBson,
-                                                               false,
-                                                               nullptr /* OpDebug* */,
-                                                               &args);
+                           collection_internal::updateDocument(
+                               opCtx,
+                               *collection,
+                               originalRecordId,
+                               originalSnapshot,
+                               updatedStateDocBson,
+                               collection_internal::kUpdateNoIndexes,
+                               nullptr /* OpDebug* */,
+                               &args);
 
                            return oplogSlot;
                        }();

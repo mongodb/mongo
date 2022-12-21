@@ -76,6 +76,7 @@
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/storage/storage_util.h"
 #include "mongo/db/ttl_collection_cache.h"
+#include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
@@ -1852,32 +1853,43 @@ Status IndexCatalogImpl::updateRecord(OperationContext* const opCtx,
                                       const CollectionPtr& coll,
                                       const BSONObj& oldDoc,
                                       const BSONObj& newDoc,
+                                      const BSONObj* opDiff,
                                       const RecordId& recordId,
                                       int64_t* const keysInsertedOut,
                                       int64_t* const keysDeletedOut) const {
     *keysInsertedOut = 0;
     *keysDeletedOut = 0;
 
-    // Ready indexes go directly through the IndexAccessMethod.
-    for (IndexCatalogEntryContainer::const_iterator it = _readyIndexes.begin();
-         it != _readyIndexes.end();
-         ++it) {
-        IndexCatalogEntry* entry = it->get();
-        auto status = _updateRecord(
-            opCtx, coll, entry, oldDoc, newDoc, recordId, keysInsertedOut, keysDeletedOut);
-        if (!status.isOK())
-            return status;
-    }
+    const size_t numIndexesToUpdate = _readyIndexes.size() + _buildingIndexes.size();
+    if (numIndexesToUpdate > 0) {
+        mongo::doc_diff::BitVector toUpdate;
+        if (opDiff) {
+            std::vector<const UpdateIndexData*> allIndexPaths;
+            allIndexPaths.reserve(numIndexesToUpdate);
+            for (auto& indexes : {std::ref(_readyIndexes), std::ref(_buildingIndexes)}) {
+                for (const auto& indexEntry : indexes.get()) {
+                    dassert(!indexEntry->getIndexedPaths().isEmpty());
+                    allIndexPaths.push_back(&indexEntry->getIndexedPaths());
+                }
+            }
+            toUpdate = mongo::doc_diff::anyIndexesMightBeAffected(*opDiff, allIndexPaths);
+        } else {
+            toUpdate = mongo::doc_diff::BitVector(numIndexesToUpdate);
+            toUpdate.set();
+        }
 
-    // Building indexes go through the interceptor.
-    for (IndexCatalogEntryContainer::const_iterator it = _buildingIndexes.begin();
-         it != _buildingIndexes.end();
-         ++it) {
-        IndexCatalogEntry* entry = it->get();
-        auto status = _updateRecord(
-            opCtx, coll, entry, oldDoc, newDoc, recordId, keysInsertedOut, keysDeletedOut);
-        if (!status.isOK())
-            return status;
+        for (size_t pos = toUpdate.find_first(); pos != mongo::doc_diff::BitVector::npos;
+             pos = toUpdate.find_next(pos)) {
+            const IndexCatalogEntry* entry = (pos < _readyIndexes.size())
+                ? (_readyIndexes.begin() + pos)->get()
+                : (_buildingIndexes.begin() + (pos - _readyIndexes.size()))->get();
+
+            auto status = _updateRecord(
+                opCtx, coll, entry, oldDoc, newDoc, recordId, keysInsertedOut, keysDeletedOut);
+            if (!status.isOK()) {
+                return status;
+            }
+        }
     }
     return Status::OK();
 }

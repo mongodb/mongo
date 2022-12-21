@@ -490,6 +490,9 @@ public:
     /**
      * Both 'keysInsertedOut' and 'keysDeletedOut' are required and will be set to the number of
      * index keys inserted and deleted by this operation, respectively.
+     * The 'opDiff' argument specifies an optional document containing the differences between
+     * 'oldDoc' and 'newDoc' that can be used to decide which indexes have to be modified. If
+     * set to null, all indexes should be updated.
      *
      * This method may throw.
      */
@@ -497,6 +500,7 @@ public:
                                 const CollectionPtr& coll,
                                 const BSONObj& oldDoc,
                                 const BSONObj& newDoc,
+                                const BSONObj* opDiff,
                                 const RecordId& recordId,
                                 int64_t* keysInsertedOut,
                                 int64_t* keysDeletedOut) const = 0;

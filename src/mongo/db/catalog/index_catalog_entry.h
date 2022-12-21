@@ -55,6 +55,7 @@ class IndexBuildInterceptor;
 class IndexDescriptor;
 class MatchExpression;
 class OperationContext;
+class UpdateIndexData;
 
 class IndexCatalogEntry : public std::enable_shared_from_this<IndexCatalogEntry> {
 public:
@@ -190,6 +191,8 @@ public:
     virtual boost::optional<Timestamp> getMinimumVisibleSnapshot() const = 0;
 
     virtual void setMinimumVisibleSnapshot(Timestamp name) = 0;
+
+    virtual const UpdateIndexData& getIndexedPaths() const = 0;
 };
 
 class IndexCatalogEntryContainer {

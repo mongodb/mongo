@@ -251,7 +251,6 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentUpdate) {
         auto oldDoc = collection->docFor(_opCtx.get(), record->id);
         {
             WriteUnitOfWork wuow(_opCtx.get());
-            const bool indexesAffected = true;
             OpDebug* opDebug = nullptr;
             CollectionUpdateArgs args{oldDoc.value()};
             collection_internal::updateDocument(
@@ -260,7 +259,7 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentUpdate) {
                 record->id,
                 oldDoc,
                 BSON("_id" << 0 << "a" << 5 << "b" << BSON_ARRAY(1 << 2 << 3)),
-                indexesAffected,
+                collection_internal::kUpdateAllIndexes,
                 opDebug,
                 &args);
             wuow.commit();
@@ -302,19 +301,18 @@ TEST_F(MultikeyPathsTest, PathsUpdatedOnDocumentUpdateWithDamages) {
         auto damagesOutput = doc_diff::computeDamages(oldDoc.value(), diffResult->diff, false);
         {
             WriteUnitOfWork wuow(_opCtx.get());
-            const bool indexesAffected = true;
             OpDebug* opDebug = nullptr;
             CollectionUpdateArgs args{oldDoc.value()};
-            auto newDocResult =
-                collection_internal::updateDocumentWithDamages(_opCtx.get(),
-                                                               *collection,
-                                                               record->id,
-                                                               oldDoc,
-                                                               damagesOutput.damageSource.get(),
-                                                               damagesOutput.damages,
-                                                               indexesAffected,
-                                                               opDebug,
-                                                               &args);
+            auto newDocResult = collection_internal::updateDocumentWithDamages(
+                _opCtx.get(),
+                *collection,
+                record->id,
+                oldDoc,
+                damagesOutput.damageSource.get(),
+                damagesOutput.damages,
+                collection_internal::kUpdateAllIndexes,
+                opDebug,
+                &args);
             ASSERT_TRUE(newDocResult.getValue().woCompare(newDoc) == 0);
             ASSERT_TRUE(newDocResult.isOK());
             wuow.commit();

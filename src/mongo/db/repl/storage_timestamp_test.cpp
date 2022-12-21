@@ -3205,7 +3205,7 @@ TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyUpdate) {
             record->id,
             Snapshotted<BSONObj>(_opCtx->recoveryUnit()->getSnapshotId(), oldObj),
             newObj,
-            false,
+            collection_internal::kUpdateNoIndexes,
             nullptr,
             &args);
         wuow.commit();
@@ -3258,8 +3258,16 @@ TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyUpdateWithDamages) {
         auto record = cursor->next();
         invariant(record);
         WriteUnitOfWork wuow(_opCtx);
-        const auto statusWith = collection_internal::updateDocumentWithDamages(
-            _opCtx, *autoColl, record->id, objSnapshot, source, damages, false, nullptr, &args);
+        const auto statusWith =
+            collection_internal::updateDocumentWithDamages(_opCtx,
+                                                           *autoColl,
+                                                           record->id,
+                                                           objSnapshot,
+                                                           source,
+                                                           damages,
+                                                           collection_internal::kUpdateNoIndexes,
+                                                           nullptr,
+                                                           &args);
         wuow.commit();
         ASSERT_OK(statusWith.getStatus());
     }

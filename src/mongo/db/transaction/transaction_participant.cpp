@@ -451,14 +451,14 @@ void updateSessionEntry(OperationContext* opCtx,
     args.criteria = toUpdateIdDoc;
     args.update = updateMod;
 
-    // Specify indexesAffected = false because the sessions collection has two indexes: {_id: 1} and
+    // Specify kUpdateNoIndexes because the sessions collection has two indexes: {_id: 1} and
     // {parentLsid: 1, _id.txnNumber: 1, _id: 1}, and none of the fields are mutable.
     collection_internal::updateDocument(opCtx,
                                         *collection,
                                         recordId,
                                         Snapshotted<BSONObj>(startingSnapshotId, originalDoc),
                                         updateMod,
-                                        false, /* indexesAffected */
+                                        collection_internal::kUpdateNoIndexes,
                                         nullptr,
                                         &args);
 

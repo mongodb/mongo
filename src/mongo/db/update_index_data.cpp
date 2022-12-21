@@ -126,6 +126,10 @@ void UpdateIndexData::clear() {
     _allPathsIndexed = false;
 }
 
+bool UpdateIndexData::isEmpty() const {
+    return !_allPathsIndexed && _canonicalPaths.empty() && _pathComponents.empty();
+}
+
 bool UpdateIndexData::mightBeIndexed(const FieldRef& path) const {
     if (_allPathsIndexed) {
         return true;

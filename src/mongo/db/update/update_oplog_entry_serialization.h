@@ -67,6 +67,11 @@ enum class FieldRemovedStatus { kFieldRemoved, kFieldNotRemoved, kUnknown };
 BSONObj makeDeltaOplogEntry(const doc_diff::Diff& diff);
 
 /**
+ * Given a $v: 2 delta-style oplog entry, return the embedded diff object.
+ */
+boost::optional<BSONObj> extractDiffFromOplogEntry(const BSONObj& opLog);
+
+/**
  * Produce the contents of the 'o' field of a replacement style oplog entry.
  */
 inline BSONObj makeReplacementOplogEntry(const BSONObj& replacement) {

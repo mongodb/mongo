@@ -89,6 +89,8 @@ int compareObjects(const BSONObj& firstObj,
 
 /* BSONObj ------------------------------------------------------------*/
 
+const BSONObj BSONObj::kEmptyObject;
+
 void BSONObj::_assertInvalid(int maxSize) const {
     StringBuilder ss;
     int os = objsize();

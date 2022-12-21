@@ -1444,15 +1444,19 @@ Status performAtomicTimeseriesWrites(
         args.source = OperationSource::kTimeseriesInsert;
 
         BSONObj updated;
-        bool indexesAffected = true;
+        BSONObj diffFromUpdate;
+        const BSONObj* diffOnIndexes =
+            collection_internal::kUpdateAllIndexes;  // Assume all indexes are affected.
         if (update.getU().type() == write_ops::UpdateModification::Type::kDelta) {
+            diffFromUpdate = update.getU().getDiff();
             auto result = doc_diff::applyDiff(original.value(),
-                                              update.getU().getDiff(),
+                                              diffFromUpdate,
                                               &CollectionQueryInfo::get(*coll).getIndexKeys(opCtx),
                                               static_cast<bool>(repl::tenantMigrationInfo(opCtx)));
             updated = result.postImage;
-            indexesAffected = result.indexesAffected;
-            args.update = update_oplog_entry::makeDeltaOplogEntry(update.getU().getDiff());
+            diffOnIndexes =
+                result.indexesAffected ? &diffFromUpdate : collection_internal::kUpdateNoIndexes;
+            args.update = update_oplog_entry::makeDeltaOplogEntry(diffFromUpdate);
         } else if (update.getU().type() == write_ops::UpdateModification::Type::kTransform) {
             const auto& transform = update.getU().getTransform();
             auto transformed = transform(original.value());
@@ -1472,7 +1476,7 @@ Status performAtomicTimeseriesWrites(
         }
 
         collection_internal::updateDocument(
-            opCtx, *coll, recordId, original, updated, indexesAffected, &curOp->debug(), &args);
+            opCtx, *coll, recordId, original, updated, diffOnIndexes, &curOp->debug(), &args);
         if (slot) {
             if (participant) {
                 // Manually sets the timestamp so that the "prevOpTime" field in the oplog entry is

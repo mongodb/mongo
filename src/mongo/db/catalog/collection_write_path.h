@@ -45,6 +45,12 @@ enum class StoreDeletedDoc { Off, On };
 enum class RetryableWrite { kYes, kNo };
 
 /**
+ * Constants used for the opDiff argument in updateDocument and updateDocumentWithDamages.
+ */
+constexpr const BSONObj* kUpdateAllIndexes = nullptr;
+constexpr const BSONObj* kUpdateNoIndexes = &BSONObj::kEmptyObject;
+
+/**
  * Inserts a document into the record store for a bulk loader that manages the index building. The
  * bulk loader is notified with the RecordId of the document inserted into the RecordStore through
  * the 'OnRecordInsertedFn' callback.
@@ -94,6 +100,9 @@ Status checkFailCollectionInsertsFailPoint(const NamespaceString& ns, const BSON
  *
  * If the document fits in the old space, it is put there; if not, it is moved.
  * Sets 'args.updatedDoc' to the updated version of the document with damages applied, on success.
+ * 'opDiff' Optional argument. If set to kUpdateAllIndexes, all the indexes are updated. If it is
+ * set to kUpdateNoIndexes, no indexes are updated. Otherwise, it is the precomputed difference
+ * between 'oldDoc' and 'newDoc', used to determine which indexes need to be updated.
  * 'opDebug' Optional argument. When not null, will be used to record operation statistics.
  * @return the post update location of the doc (may or may not be the same as oldLocation)
  */
@@ -102,7 +111,7 @@ RecordId updateDocument(OperationContext* opCtx,
                         const RecordId& oldLocation,
                         const Snapshotted<BSONObj>& oldDoc,
                         const BSONObj& newDoc,
-                        bool indexesAffected,
+                        const BSONObj* opDiff,
                         OpDebug* opDebug,
                         CollectionUpdateArgs* args);
 
@@ -117,7 +126,7 @@ StatusWith<BSONObj> updateDocumentWithDamages(OperationContext* opCtx,
                                               const Snapshotted<BSONObj>& oldDoc,
                                               const char* damageSource,
                                               const mutablebson::DamageVector& damages,
-                                              bool indexesAffected,
+                                              const BSONObj* opDiff,
                                               OpDebug* opDebug,
                                               CollectionUpdateArgs* args);
 

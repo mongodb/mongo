@@ -143,6 +143,7 @@ TEST_F(CurrentDateNodeTest, ApplyTrue) {
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
+    ASSERT_EQUALS(result.indexesAffected, getIndexAffectedFromLogEntry());
 
     ASSERT_EQUALS(doc.root().countChildren(), 1U);
     ASSERT_TRUE(doc.root()["a"].ok());
@@ -163,6 +164,7 @@ TEST_F(CurrentDateNodeTest, ApplyFalse) {
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
+    ASSERT_EQUALS(result.indexesAffected, getIndexAffectedFromLogEntry());
 
     ASSERT_EQUALS(doc.root().countChildren(), 1U);
     ASSERT_TRUE(doc.root()["a"].ok());
@@ -183,6 +185,7 @@ TEST_F(CurrentDateNodeTest, ApplyDate) {
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
+    ASSERT_EQUALS(result.indexesAffected, getIndexAffectedFromLogEntry());
 
     ASSERT_EQUALS(doc.root().countChildren(), 1U);
     ASSERT_TRUE(doc.root()["a"].ok());
@@ -203,6 +206,7 @@ TEST_F(CurrentDateNodeTest, ApplyTimestamp) {
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
+    ASSERT_EQUALS(result.indexesAffected, getIndexAffectedFromLogEntry());
 
     ASSERT_EQUALS(doc.root().countChildren(), 1U);
     ASSERT_TRUE(doc.root()["a"].ok());
@@ -223,6 +227,7 @@ TEST_F(CurrentDateNodeTest, ApplyFieldDoesNotExist) {
     auto result = node.apply(getApplyParams(doc.root()), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_TRUE(result.indexesAffected);
+    ASSERT_EQUALS(result.indexesAffected, getIndexAffectedFromLogEntry());
 
     ASSERT_EQUALS(doc.root().countChildren(), 1U);
     ASSERT_TRUE(doc.root()["a"].ok());
@@ -245,6 +250,7 @@ TEST_F(CurrentDateNodeTest, ApplyIndexesNotAffected) {
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
+    ASSERT_EQUALS(result.indexesAffected, getIndexAffectedFromLogEntry());
 
     assertOplogEntryIsUpdateOfExpectedType(getOplogEntry(), "a");
 }
@@ -261,6 +267,7 @@ TEST_F(CurrentDateNodeTest, ApplyNoIndexDataOrLogBuilder) {
     auto result = node.apply(getApplyParams(doc.root()["a"]), getUpdateNodeApplyParams());
     ASSERT_FALSE(result.noop);
     ASSERT_FALSE(result.indexesAffected);
+    ASSERT_EQUALS(result.indexesAffected, getIndexAffectedFromLogEntry());
 
     ASSERT_EQUALS(doc.root().countChildren(), 1U);
     ASSERT_TRUE(doc.root()["a"].ok());

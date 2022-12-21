@@ -258,7 +258,6 @@ Status SortedDataIndexAccessMethod::update(OperationContext* opCtx,
                                            const InsertDeleteOptions& options,
                                            int64_t* numInserted,
                                            int64_t* numDeleted) {
-
     UpdateTicket updateTicket;
     prepareUpdate(opCtx, coll, oldDoc, newDoc, loc, options, &updateTicket);
 

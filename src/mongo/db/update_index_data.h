@@ -78,6 +78,11 @@ public:
 
     bool mightBeIndexed(const FieldRef& path) const;
 
+    /**
+     * Return whether this structure has been cleared or has not been initialized yet.
+     */
+    bool isEmpty() const;
+
 private:
     /**
      * Returns true if 'b' is a prefix of 'a', or if the two paths are equal.
