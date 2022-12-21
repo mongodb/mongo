@@ -30,11 +30,25 @@
 #pragma once
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/pipeline/document_source_internal_inhibit_optimization.h"
+#include "mongo/db/pipeline/visitors/document_source_visitor_registry.h"
 #include "mongo/db/query/query_knobs_gen.h"
+
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
+
+namespace optimizer {
+/**
+ * Visitor that is responsible for indicating whether a DocumentSource is eligible for Bonsai by
+ * setting the 'eligible' member variable. Stages which are "test-only" and not officially supported
+ * should set 'eligible' to false.
+ */
+struct ABTUnsupportedDocumentSourceVisitorContext : public DocumentSourceVisitorContextBase {
+    bool eligible{true};
+};
+}  // namespace optimizer
 
 template <typename T>
 void coutPrintAttr(const logv2::detail::NamedArg<T>& arg) {
@@ -82,7 +96,7 @@ bool isEligibleForBonsai(const CanonicalQuery& cq,
  * options for further details.
  */
 bool isEligibleForBonsai_forTesting(const CanonicalQuery& cq);
-bool isEligibleForBonsai_forTesting(const Pipeline& pipeline);
+bool isEligibleForBonsai_forTesting(ServiceContext* serviceCtx, const Pipeline& pipeline);
 
 }  // namespace mongo
 #undef MONGO_LOGV2_DEFAULT_COMPONENT

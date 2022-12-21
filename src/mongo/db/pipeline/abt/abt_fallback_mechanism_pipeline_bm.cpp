@@ -50,7 +50,7 @@ public:
         auto opCtx = testServiceContext.makeOperationContext();
 
         auto nss = NamespaceString("test.bm");
-        auto expCtx = new ExpressionContextForTest(opCtx.get(), nss);
+        auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx.get(), nss);
 
         std::unique_ptr<Pipeline, PipelineDeleter> parsedPipeline =
             Pipeline::parse(pipeline, expCtx);
@@ -58,7 +58,8 @@ public:
 
         // This is where recording starts.
         for (auto keepRunning : state) {
-            benchmark::DoNotOptimize(isEligibleForBonsai_forTesting(*parsedPipeline.get()));
+            benchmark::DoNotOptimize(isEligibleForBonsai_forTesting(
+                testServiceContext.getServiceContext(), *parsedPipeline.get()));
             benchmark::ClobberMemory();
         }
     }

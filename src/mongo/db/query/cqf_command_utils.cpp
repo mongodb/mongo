@@ -71,22 +71,37 @@
 #include "mongo/db/pipeline/abt/match_expression_visitor.h"
 #include "mongo/db/pipeline/abt/utils.h"
 #include "mongo/db/pipeline/document_source_bucket_auto.h"
+#include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
+#include "mongo/db/pipeline/document_source_change_stream_add_pre_image.h"
+#include "mongo/db/pipeline/document_source_change_stream_check_invalidate.h"
+#include "mongo/db/pipeline/document_source_change_stream_check_resumability.h"
+#include "mongo/db/pipeline/document_source_change_stream_check_topology_change.h"
+#include "mongo/db/pipeline/document_source_change_stream_handle_topology_change.h"
+#include "mongo/db/pipeline/document_source_change_stream_transform.h"
+#include "mongo/db/pipeline/document_source_change_stream_unwind_transaction.h"
 #include "mongo/db/pipeline/document_source_coll_stats.h"
 #include "mongo/db/pipeline/document_source_current_op.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
+#include "mongo/db/pipeline/document_source_densify.h"
 #include "mongo/db/pipeline/document_source_exchange.h"
 #include "mongo/db/pipeline/document_source_facet.h"
+#include "mongo/db/pipeline/document_source_find_and_modify_image_lookup.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
 #include "mongo/db/pipeline/document_source_geo_near_cursor.h"
 #include "mongo/db/pipeline/document_source_graph_lookup.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_index_stats.h"
+#include "mongo/db/pipeline/document_source_internal_all_collection_stats.h"
+#include "mongo/db/pipeline/document_source_internal_apply_oplog_update.h"
+#include "mongo/db/pipeline/document_source_internal_compute_geo_near_distance.h"
+#include "mongo/db/pipeline/document_source_internal_convert_bucket_index_stats.h"
 #include "mongo/db/pipeline/document_source_internal_inhibit_optimization.h"
 #include "mongo/db/pipeline/document_source_internal_shard_filter.h"
 #include "mongo/db/pipeline/document_source_internal_split_pipeline.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_list_cached_and_active_users.h"
+#include "mongo/db/pipeline/document_source_list_catalog.h"
 #include "mongo/db/pipeline/document_source_list_local_sessions.h"
 #include "mongo/db/pipeline/document_source_list_sessions.h"
 #include "mongo/db/pipeline/document_source_lookup.h"
@@ -101,14 +116,18 @@
 #include "mongo/db/pipeline/document_source_sample.h"
 #include "mongo/db/pipeline/document_source_sample_from_random_cursor.h"
 #include "mongo/db/pipeline/document_source_sequential_document_cache.h"
+#include "mongo/db/pipeline/document_source_set_variable_from_subpipeline.h"
+#include "mongo/db/pipeline/document_source_set_window_fields.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_skip.h"
 #include "mongo/db/pipeline/document_source_sort.h"
+#include "mongo/db/pipeline/document_source_streaming_group.h"
 #include "mongo/db/pipeline/document_source_tee_consumer.h"
 #include "mongo/db/pipeline/document_source_telemetry.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
 #include "mongo/db/pipeline/visitors/document_source_visitor.h"
+#include "mongo/db/pipeline/visitors/document_source_visitor_registry_mongod.h"
 #include "mongo/db/pipeline/visitors/document_source_walker.h"
 #include "mongo/db/pipeline/visitors/transformer_interface_walker.h"
 #include "mongo/db/query/expression_walker.h"
@@ -1012,172 +1031,6 @@ private:
     bool& _eligible;
 };
 
-/**
- * Visitor that is responsible for indicating whether a DocumentSource is eligible for Bonsai by
- * setting the 'eligible' member variable. Stages which are "test-only" and not officially supported
- * should set 'eligible' to false.
- */
-class ABTUnsupportedDocumentSourceVisitor : public DocumentSourceConstVisitor {
-public:
-    void visit(const DocumentSourceInternalUnpackBucket* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourceBucketAuto* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourceCollStats* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourceCurrentOp* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourceCursor* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourceExchange* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourceFacet* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourceGeoNear* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourceGeoNearCursor* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourceGraphLookUp* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourceIndexStats* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourceInternalShardFilter* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourceInternalSplitPipeline* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourceListCachedAndActiveUsers* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourceListLocalSessions* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourceListSessions* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourceLookUp* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourceMerge* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourceMergeCursors* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourceOperationMetrics* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourceOut* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourcePlanCacheStats* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourceQueue* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourceRedact* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourceSample* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourceSampleFromRandomCursor* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourceSequentialDocumentCache* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourceTeeConsumer* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourceTelemetry* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourceGroup* source) override {
-        unsupportedStage(source);
-    }
-    void visit(const DocumentSourceLimit* source) override {
-        unsupportedStage(source);
-    }
-    void visit(const DocumentSourceSkip* source) override {
-        unsupportedStage(source);
-    }
-    void visit(const DocumentSourceSort* source) override {
-        unsupportedStage(source);
-    }
-    void visit(const DocumentSourceUnwind* source) override {
-        unsupportedStage(source);
-    }
-    void visit(const DocumentSourceUnionWith* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourceInternalInhibitOptimization* source) override {
-        // Can be ignored.
-    }
-
-    void visit(const DocumentSourceMatch* source) override {
-        // Pass a reference to our local 'eligible' variable to allow the visitor to overwrite it.
-        ABTMatchExpressionVisitor visitor(eligible);
-        MatchExpressionWalker walker(nullptr /*preVisitor*/, nullptr /*inVisitor*/, &visitor);
-        tree_walker::walk<true, MatchExpression>(source->getMatchExpression(), &walker);
-    }
-
-    void visit(const DocumentSourceSingleDocumentTransformation* source) override {
-        ABTTransformerVisitor visitor(eligible);
-        TransformerInterfaceWalker walker(&visitor);
-        walker.walk(&source->getTransformer());
-    }
-
-    void unsupportedStage(const DocumentSource* source) {
-        eligible = false;
-    }
-
-    bool eligible = true;
-};
-
 template <class RequestType>
 bool isEligibleCommon(const RequestType& request,
                       OperationContext* opCtx,
@@ -1263,20 +1116,12 @@ boost::optional<bool> shouldForceEligibility() {
     MONGO_UNREACHABLE;
 }
 
-bool isEligibleForBonsai(const Pipeline& pipeline) {
-    ABTUnsupportedDocumentSourceVisitor visitor;
-    DocumentSourceWalkerLegacy walker(nullptr /*preVisitor*/, &visitor);
-
-    // The rudimentary walker may throw if it reaches a stage that it isn't aware about, so catch it
-    // here and return ineligible.
-    // TODO SERVER-62027 this should no longer be needed once all stages require a visit.
-    try {
-        walker.walk(pipeline);
-    } catch (DBException&) {
-        visitor.eligible = false;
-    }
-
-    return visitor.eligible;
+bool isEligibleForBonsai(ServiceContext* serviceCtx, const Pipeline& pipeline) {
+    ABTUnsupportedDocumentSourceVisitorContext visitorCtx;
+    auto& reg = getDocumentSourceVisitorRegistry(serviceCtx);
+    DocumentSourceWalker walker(reg, &visitorCtx);
+    walker.walk(pipeline);
+    return visitorCtx.eligible;
 }
 
 bool isEligibleForBonsai(const CanonicalQuery& cq) {
@@ -1325,7 +1170,7 @@ bool isEligibleForBonsai(const AggregateCommandRequest& request,
         return false;
     }
 
-    return isEligibleForBonsai(pipeline);
+    return isEligibleForBonsai(opCtx->getServiceContext(), pipeline);
 }
 
 bool isEligibleForBonsai(const CanonicalQuery& cq,
@@ -1362,8 +1207,34 @@ bool isEligibleForBonsai_forTesting(const CanonicalQuery& cq) {
     return isEligibleForBonsai(cq);
 }
 
-bool isEligibleForBonsai_forTesting(const Pipeline& pipeline) {
-    return isEligibleForBonsai(pipeline);
+bool isEligibleForBonsai_forTesting(ServiceContext* serviceCtx, const Pipeline& pipeline) {
+    return isEligibleForBonsai(serviceCtx, pipeline);
 }
 
 }  // namespace mongo
+
+namespace mongo::optimizer {
+// Templated visit function to mark DocumentSources as ineligible for CQF.
+template <typename T>
+void visit(ABTUnsupportedDocumentSourceVisitorContext* ctx, const T&) {
+    ctx->eligible = false;
+}
+
+void visit(ABTUnsupportedDocumentSourceVisitorContext* ctx, const DocumentSourceMatch& source) {
+    ABTMatchExpressionVisitor visitor(ctx->eligible);
+    MatchExpressionWalker walker(nullptr, nullptr, &visitor);
+    tree_walker::walk<true, MatchExpression>(source.getMatchExpression(), &walker);
+}
+
+void visit(ABTUnsupportedDocumentSourceVisitorContext* ctx,
+           const DocumentSourceSingleDocumentTransformation& source) {
+    ABTTransformerVisitor visitor(ctx->eligible);
+    TransformerInterfaceWalker walker(&visitor);
+    walker.walk(&source.getTransformer());
+}
+
+const ServiceContext::ConstructorActionRegisterer abtUnsupportedRegisterer{
+    "ABTUnsupportedRegisterer", [](ServiceContext* service) {
+        registerMongodVisitor<ABTUnsupportedDocumentSourceVisitorContext>(service);
+    }};
+}  // namespace mongo::optimizer

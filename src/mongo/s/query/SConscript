@@ -45,6 +45,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_uuid_mismatch_info',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
+        'cqf_utils',
     ],
 )
 
@@ -72,6 +73,17 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/pipeline/pipeline',
         'async_results_merger',
+    ],
+)
+
+env.Library(
+    target='cqf_utils',
+    source=[
+        'cqf_utils.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/pipeline/pipeline',
+        'router_exec_stage',
     ],
 )
 

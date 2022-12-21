@@ -173,6 +173,8 @@ void registerVisitFuncs(DocumentSourceVisitorRegistry* reg) {
     registerVisitFuncs<VisitorCtx, Ds...>(reg);
 }
 
-// TODO SERVER-71944: Introduce global registry.
+// Declare visitor registry as a decoration on the service context.
+inline const auto getDocumentSourceVisitorRegistry =
+    ServiceContext::declareDecoration<DocumentSourceVisitorRegistry>();
 
 }  // namespace mongo

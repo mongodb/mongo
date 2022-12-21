@@ -62,7 +62,8 @@ public:
                                const std::vector<BSONObj>& pipeline) override final {
         QueryTestServiceContext testServiceContext;
         auto opCtx = testServiceContext.makeOperationContext();
-        auto expCtx = new ExpressionContextForTest(opCtx.get(), NamespaceString("test.bm"));
+        auto expCtx =
+            make_intrusive<ExpressionContextForTest>(opCtx.get(), NamespaceString("test.bm"));
 
         Metadata metadata{{}};
         auto prefixId = PrefixId::createForTests();
@@ -72,7 +73,8 @@ public:
             Pipeline::parse(pipeline, expCtx);
         parsedPipeline->optimizePipeline();
 
-        if (!isEligibleForBonsai_forTesting(*parsedPipeline.get())) {
+        if (!isEligibleForBonsai_forTesting(testServiceContext.getServiceContext(),
+                                            *parsedPipeline.get())) {
             state.SkipWithError("Pipeline is not supported by CQF");
             return;
         }
