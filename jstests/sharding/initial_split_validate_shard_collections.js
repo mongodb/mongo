@@ -66,7 +66,6 @@ const chunksOnShard0 = st.shard0.getDB("config").getCollection(chunksCollName).f
 const chunksOnShard1 = st.shard1.getDB("config").getCollection(chunksCollName).find().toArray();
 assert.eq(chunksOnConfigCount, chunksOnShard0.length);
 assert.eq(chunksOnConfigCount, chunksOnShard1.length);
-assert.eq(chunksOnShard0, chunksOnShard1);
 
 st.stop();
 })();

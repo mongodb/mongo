@@ -60,6 +60,7 @@ const BSONField<bool> ChunkType::jumbo("jumbo");
 const BSONField<Date_t> ChunkType::lastmod("lastmod");
 const BSONField<BSONObj> ChunkType::history("history");
 const BSONField<int64_t> ChunkType::estimatedSizeBytes("estimatedDataSizeBytes");
+const BSONField<Timestamp> ChunkType::onCurrentShardSince("onCurrentShardSince");
 const BSONField<bool> ChunkType::historyIsAt40("historyIsAt40");
 
 namespace {
@@ -238,6 +239,14 @@ StatusWith<ChunkType> ChunkType::_parseChunkBase(const BSONObj& source) {
     }
 
     {
+        Timestamp onCurrentShardSinceValue;
+        Status status = bsonExtractTimestampField(
+            source, onCurrentShardSince.name(), &onCurrentShardSinceValue);
+        chunk._onCurrentShardSince =
+            (status.isOK() ? (boost::optional<Timestamp>)onCurrentShardSinceValue : boost::none);
+    }
+
+    {
         BSONElement historyObj;
         Status status = bsonExtractTypedField(source, history.name(), Array, &historyObj);
         if (status.isOK()) {
@@ -246,6 +255,8 @@ StatusWith<ChunkType> ChunkType::_parseChunkBase(const BSONObj& source) {
                 return history.getStatus();
 
             chunk._history = std::move(history.getValue());
+            dassert(!chunk._onCurrentShardSince.has_value() ||
+                    *chunk._onCurrentShardSince == chunk._history.front().getValidAfter());
         } else if (status == ErrorCodes::NoSuchKey) {
             // History is missing, so it will be presumed empty
         } else {
@@ -470,6 +481,11 @@ BSONObj ChunkType::toConfigBSON() const {
                              static_cast<long long>(*_estimatedSizeBytes));
     if (_jumbo)
         builder.append(jumbo.name(), getJumbo());
+    if (_onCurrentShardSince) {
+        dassert(!_history.empty());
+        dassert(_history.front().getValidAfter() == *_onCurrentShardSince);
+        builder.append(onCurrentShardSince.name(), *_onCurrentShardSince);
+    }
     addHistoryToBSON(builder);
     return builder.obj();
 }
@@ -484,6 +500,8 @@ BSONObj ChunkType::toShardBSON() const {
     builder.append(max.name(), getMax());
     builder.append(shard.name(), getShard().toString());
     builder.appendTimestamp(lastmod.name(), _version->toLong());
+    if (_onCurrentShardSince)
+        builder.append(onCurrentShardSince.name(), *_onCurrentShardSince);
     addHistoryToBSON(builder);
     return builder.obj();
 }
@@ -530,6 +548,10 @@ void ChunkType::setEstimatedSizeBytes(const boost::optional<int64_t>& estimatedS
 
 void ChunkType::setJumbo(bool jumbo) {
     _jumbo = jumbo;
+}
+
+void ChunkType::setOnCurrentShardSince(const Timestamp& onCurrentShardSince) {
+    _onCurrentShardSince = onCurrentShardSince;
 }
 
 void ChunkType::addHistoryToBSON(BSONObjBuilder& builder) const {
@@ -589,6 +611,14 @@ Status ChunkType::validate() const {
             return {ErrorCodes::BadValue,
                     str::stream() << "History contains an invalid shard "
                                   << _history.front().getShard()};
+        }
+        if (_onCurrentShardSince.has_value() &&
+            _history.front().getValidAfter() != *_onCurrentShardSince) {
+            return {ErrorCodes::BadValue,
+                    str::stream() << "The first `validAfter` in the chunk's `history` is not "
+                                     "consistent with `onCurrentShardSince`: validAfter is "
+                                  << _history.front().getValidAfter()
+                                  << " while onCurrentShardSince is " << *_onCurrentShardSince};
         }
     }
 

@@ -54,7 +54,7 @@ CollectionMetadata makeCollectionMetadataImpl(
 
     const OID epoch = OID::gen();
 
-    const Timestamp kRouting(100, 0);
+    const Timestamp kOnCurrentShardSince(100, 0);
     const Timestamp kChunkManager(staleChunkManager ? 99 : 100, 0);
 
     std::vector<ChunkType> allChunks;
@@ -65,12 +65,18 @@ CollectionMetadata makeCollectionMetadataImpl(
             // Need to add a chunk to the other shard from nextMinKey to myNextChunk.first.
             allChunks.emplace_back(
                 uuid, ChunkRange{nextMinKey, myNextChunk.first}, version, kOtherShard);
-            allChunks.back().setHistory({ChunkHistory(kRouting, kOtherShard)});
+            auto& chunk = allChunks.back();
+            chunk.setOnCurrentShardSince(kOnCurrentShardSince);
+            chunk.setHistory({ChunkHistory(*chunk.getOnCurrentShardSince(), chunk.getShard())});
+
             version.incMajor();
         }
         allChunks.emplace_back(
             uuid, ChunkRange{myNextChunk.first, myNextChunk.second}, version, kThisShard);
-        allChunks.back().setHistory({ChunkHistory(kRouting, kThisShard)});
+        auto& chunk = allChunks.back();
+        chunk.setOnCurrentShardSince(kOnCurrentShardSince);
+        chunk.setHistory({ChunkHistory(*chunk.getOnCurrentShardSince(), chunk.getShard())});
+
         version.incMajor();
         nextMinKey = myNextChunk.second;
     }
@@ -78,7 +84,9 @@ CollectionMetadata makeCollectionMetadataImpl(
     if (SimpleBSONObjComparator::kInstance.evaluate(nextMinKey < shardKeyPattern.globalMax())) {
         allChunks.emplace_back(
             uuid, ChunkRange{nextMinKey, shardKeyPattern.globalMax()}, version, kOtherShard);
-        allChunks.back().setHistory({ChunkHistory(kRouting, kOtherShard)});
+        auto& chunk = allChunks.back();
+        chunk.setOnCurrentShardSince(kOnCurrentShardSince);
+        chunk.setHistory({ChunkHistory(*chunk.getOnCurrentShardSince(), chunk.getShard())});
     }
 
     return CollectionMetadata(

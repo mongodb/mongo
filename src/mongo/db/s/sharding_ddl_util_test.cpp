@@ -128,7 +128,8 @@ TEST_F(ShardingDDLUtilTest, ShardedRenameMetadata) {
         chunk.setCollectionUUID(collUUID);
         chunk.setVersion(chunkVersion);
         chunk.setShard(shard0.getName());
-        chunk.setHistory({ChunkHistory(Timestamp(1, i), shard0.getName())});
+        chunk.setOnCurrentShardSince(Timestamp(1, i));
+        chunk.setHistory({ChunkHistory(*chunk.getOnCurrentShardSince(), shard0.getName())});
         chunk.setMin(BSON("a" << i));
         chunk.setMax(BSON("a" << i + 1));
         chunks.push_back(chunk);
@@ -147,7 +148,8 @@ TEST_F(ShardingDDLUtilTest, ShardedRenameMetadata) {
         chunk.setCollectionUUID(toUUID);
         chunk.setVersion(chunkVersion);
         chunk.setShard(shard0.getName());
-        chunk.setHistory({ChunkHistory(Timestamp(1, i), shard0.getName())});
+        chunk.setOnCurrentShardSince(Timestamp(1, i));
+        chunk.setHistory({ChunkHistory(*chunk.getOnCurrentShardSince(), shard0.getName())});
         chunk.setMin(BSON("a" << i));
         chunk.setMax(BSON("a" << i + 1));
         originalToChunks.push_back(chunk);
@@ -230,7 +232,8 @@ TEST_F(ShardingDDLUtilTest, RenamePreconditionsAreMet) {
     chunk.setCollectionUUID(UUID::gen());
     chunk.setVersion(chunkVersion);
     chunk.setShard(shard0.getName());
-    chunk.setHistory({ChunkHistory(Timestamp(1, 1), shard0.getName())});
+    chunk.setOnCurrentShardSince(Timestamp(1, 1));
+    chunk.setHistory({ChunkHistory(*chunk.getOnCurrentShardSince(), shard0.getName())});
     chunk.setMin(kMinBSONKey);
     chunk.setMax(kMaxBSONKey);
 
@@ -271,7 +274,8 @@ TEST_F(ShardingDDLUtilTest, RenamePreconditionsTargetCollectionExists) {
     chunk.setCollectionUUID(UUID::gen());
     chunk.setVersion(chunkVersion);
     chunk.setShard(shard0.getName());
-    chunk.setHistory({ChunkHistory(Timestamp(1, 1), shard0.getName())});
+    chunk.setOnCurrentShardSince(Timestamp(1, 1));
+    chunk.setHistory({ChunkHistory(*chunk.getOnCurrentShardSince(), shard0.getName())});
     chunk.setMin(kMinBSONKey);
     chunk.setMax(kMaxBSONKey);
 

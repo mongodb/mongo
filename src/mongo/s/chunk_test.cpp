@@ -47,8 +47,9 @@ TEST(ChunkTest, HasMovedSincePinnedTimestamp) {
                         ChunkRange{kShardKeyPattern.globalMin(), kShardKeyPattern.globalMax()},
                         version,
                         kShardOne);
-    chunkType.setHistory(
-        {ChunkHistory(Timestamp(101, 0), kShardOne), ChunkHistory(Timestamp(100, 0), kShardTwo)});
+    chunkType.setOnCurrentShardSince(Timestamp(101, 0));
+    chunkType.setHistory({ChunkHistory(*chunkType.getOnCurrentShardSince(), kShardOne),
+                          ChunkHistory(Timestamp(100, 0), kShardTwo)});
 
     ChunkInfo chunkInfo(chunkType);
     Chunk chunk(chunkInfo, Timestamp(100, 0));
@@ -64,7 +65,8 @@ TEST(ChunkTest, HasMovedAndReturnedSincePinnedTimestamp) {
                         ChunkRange{kShardKeyPattern.globalMin(), kShardKeyPattern.globalMax()},
                         version,
                         kShardOne);
-    chunkType.setHistory({ChunkHistory(Timestamp(102, 0), kShardOne),
+    chunkType.setOnCurrentShardSince(Timestamp(102, 0));
+    chunkType.setHistory({ChunkHistory(*chunkType.getOnCurrentShardSince(), kShardOne),
                           ChunkHistory(Timestamp(101, 0), kShardTwo),
                           ChunkHistory(Timestamp(100, 0), kShardOne)});
 
@@ -82,8 +84,9 @@ TEST(ChunkTest, HasNotMovedSincePinnedTimestamp) {
                         ChunkRange{kShardKeyPattern.globalMin(), kShardKeyPattern.globalMax()},
                         version,
                         kShardOne);
-    chunkType.setHistory(
-        {ChunkHistory(Timestamp(100, 0), kShardOne), ChunkHistory(Timestamp(99, 0), kShardTwo)});
+    chunkType.setOnCurrentShardSince(Timestamp(100, 0));
+    chunkType.setHistory({ChunkHistory(*chunkType.getOnCurrentShardSince(), kShardOne),
+                          ChunkHistory(Timestamp(99, 0), kShardTwo)});
 
     ChunkInfo chunkInfo(chunkType);
     Chunk chunk(chunkInfo, Timestamp(100, 0));
@@ -100,7 +103,8 @@ TEST(ChunkTest, HasNoHistoryValidForPinnedTimestamp_OneEntry) {
                         ChunkRange{kShardKeyPattern.globalMin(), kShardKeyPattern.globalMax()},
                         version,
                         kShardOne);
-    chunkType.setHistory({ChunkHistory(Timestamp(101, 0), kShardOne)});
+    chunkType.setOnCurrentShardSince(Timestamp(101, 0));
+    chunkType.setHistory({ChunkHistory(*chunkType.getOnCurrentShardSince(), kShardOne)});
 
     ChunkInfo chunkInfo(chunkType);
     Chunk chunk(chunkInfo, Timestamp(100, 0));
@@ -116,8 +120,9 @@ TEST(ChunkTest, HasNoHistoryValidForPinnedTimestamp_MoreThanOneEntry) {
                         ChunkRange{kShardKeyPattern.globalMin(), kShardKeyPattern.globalMax()},
                         version,
                         kShardOne);
-    chunkType.setHistory(
-        {ChunkHistory(Timestamp(102, 0), kShardOne), ChunkHistory(Timestamp(101, 0), kShardTwo)});
+    chunkType.setOnCurrentShardSince(Timestamp(102, 0));
+    chunkType.setHistory({ChunkHistory(*chunkType.getOnCurrentShardSince(), kShardOne),
+                          ChunkHistory(Timestamp(101, 0), kShardTwo)});
 
     ChunkInfo chunkInfo(chunkType);
     Chunk chunk(chunkInfo, Timestamp(100, 0));

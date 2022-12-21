@@ -76,7 +76,8 @@ void appendChunk(const SplitPolicyParams& params,
                  std::vector<ChunkType>* chunks) {
     chunks->emplace_back(params.collectionUUID, ChunkRange(min, max), *version, shardId);
     auto& chunk = chunks->back();
-    chunk.setHistory({ChunkHistory(version->getTimestamp(), shardId)});
+    chunk.setOnCurrentShardSince(version->getTimestamp());
+    chunk.setHistory({ChunkHistory(*chunk.getOnCurrentShardSince(), shardId)});
     version->incMinor();
 }
 

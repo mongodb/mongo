@@ -86,7 +86,8 @@ protected:
         chunkType.setShard(shardId);
         chunkType.setMin(minKey);
         chunkType.setMax(maxKey);
-        chunkType.setHistory({ChunkHistory(Timestamp(100, 0), shardId)});
+        chunkType.setOnCurrentShardSince(Timestamp(100, 0));
+        chunkType.setHistory({ChunkHistory(*chunkType.getOnCurrentShardSince(), shardId)});
         return chunkType;
     }
 

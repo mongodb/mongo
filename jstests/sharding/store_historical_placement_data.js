@@ -130,6 +130,8 @@ function testMoveChunk(dbName, collName) {
     let migratedChunk = configDB.chunks.findOne({uuid: collUUID, min: {x: MinKey}});
     assert(timestampCmp(placementAfterMigration.timestamp, migratedChunk.history[0].validAfter) ===
            0);
+    assert(timestampCmp(placementAfterMigration.timestamp, migratedChunk.onCurrentShardSince) ===
+           0);
 
     // Move out the last chunk from shard0 to shard2 - a new placement entry should appear, where
     // the donor has been removed and the recipient inserted
@@ -138,6 +140,8 @@ function testMoveChunk(dbName, collName) {
         getValidatedPlacementInfoForCollection(dbName, collName, [shard1, shard2]);
     migratedChunk = configDB.chunks.findOne({uuid: collUUID, min: {x: 0}});
     assert(timestampCmp(placementAfterMigration.timestamp, migratedChunk.history[0].validAfter) ===
+           0);
+    assert(timestampCmp(placementAfterMigration.timestamp, migratedChunk.onCurrentShardSince) ===
            0);
 
     // Create a third chunk in shard1, then move it to shard2: since this migration does not alter
@@ -168,6 +172,8 @@ function testMoveRange(dbName, collName) {
     let migratedChunk = configDB.chunks.findOne({uuid: collUUID, min: {x: MinKey}});
     assert(timestampCmp(placementAfterMigration.timestamp, migratedChunk.history[0].validAfter) ===
            0);
+    assert(timestampCmp(placementAfterMigration.timestamp, migratedChunk.onCurrentShardSince) ===
+           0);
 
     // Move the other half to shard 1 -> shard 0 should be removed from the placement data
     assert.commandWorked(
@@ -175,6 +181,8 @@ function testMoveRange(dbName, collName) {
     placementAfterMigration = getValidatedPlacementInfoForCollection(dbName, collName, [shard1]);
     migratedChunk = configDB.chunks.findOne({uuid: collUUID, min: {x: 0}});
     assert(timestampCmp(placementAfterMigration.timestamp, migratedChunk.history[0].validAfter) ===
+           0);
+    assert(timestampCmp(placementAfterMigration.timestamp, migratedChunk.onCurrentShardSince) ===
            0);
 }
 

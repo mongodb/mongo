@@ -214,6 +214,7 @@ public:
     static const BSONField<Date_t> lastmod;
     static const BSONField<BSONObj> history;
     static const BSONField<int64_t> estimatedSizeBytes;
+    static const BSONField<Timestamp> onCurrentShardSince;
     static const BSONField<bool> historyIsAt40;
 
     ChunkType();
@@ -222,14 +223,14 @@ public:
     /**
      * Constructs a new ChunkType object from BSON with the following format:
      * {min: <>, max: <>, shard: <>, uuid: <>, history: <>, jumbo: <>, lastmod: <>,
-     * lastmodEpoch: <>, lastmodTimestamp: <>}
+     * lastmodEpoch: <>, lastmodTimestamp: <>, onCurrentShardSince: <>}
      */
     static StatusWith<ChunkType> parseFromNetworkRequest(const BSONObj& source);
 
     /**
      * Constructs a new ChunkType object from BSON with the following format:
      * {_id: <>, min: <>, max: <>, shard: <>, uuid: <>, history: <>, jumbo: <>, lastmod: <>,
-     * estimatedSizeByte: <>}
+     * estimatedSizeByte: <>, onCurrentShardSince: <>}
      *
      * Returns ErrorCodes::NoSuchKey if the '_id' field is missing
      */
@@ -239,7 +240,7 @@ public:
 
     /**
      * Constructs a new ChunkType object from BSON with the following format:
-     * {_id: <>, max: <>, shard: <>, history: <>, lastmod: <>}
+     * {_id: <>, max: <>, shard: <>, history: <>, lastmod: <>, onCurrentShardSince: <>}
      * Also does validation of the contents.
      */
     static StatusWith<ChunkType> parseFromShardBSON(const BSONObj& source,
@@ -308,6 +309,11 @@ public:
     }
     void setJumbo(bool jumbo);
 
+    const boost::optional<Timestamp>& getOnCurrentShardSince() const {
+        return _onCurrentShardSince;
+    }
+    void setOnCurrentShardSince(const Timestamp& onCurrentShardSince);
+
     void setHistory(std::vector<ChunkHistory> history) {
         _history = std::move(history);
         if (!_history.empty()) {
@@ -334,7 +340,7 @@ public:
 private:
     /**
      * Parses the base chunk data on all usages:
-     * {history: <>, shard: <>}
+     * {history: <>, shard: <>, onCurrentShardSince: <>}
      */
     static StatusWith<ChunkType> _parseChunkBase(const BSONObj& source);
 
@@ -357,6 +363,8 @@ private:
     boost::optional<int64_t> _estimatedSizeBytes;
     // (O)(C)     too big to move?
     boost::optional<bool> _jumbo;
+    // (M)(C)(S)  timestamp since this chunk belongs to the current shard
+    boost::optional<Timestamp> _onCurrentShardSince;
     // history of the chunk
     std::vector<ChunkHistory> _history;
 };

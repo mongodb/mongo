@@ -528,7 +528,8 @@ TEST_F(ChunkManagerQueryTest, SnapshotQueryWithMoreShardsThanLatestMetadata) {
     version.incMajor();
     chunk1.setVersion(version);
     chunk1.setShard(chunk0.getShard());
-    chunk1.setHistory({ChunkHistory(Timestamp(20, 0), ShardId("0")),
+    chunk1.setOnCurrentShardSince(Timestamp(20, 0));
+    chunk1.setHistory({ChunkHistory(*chunk1.getOnCurrentShardSince(), ShardId("0")),
                        ChunkHistory(Timestamp(1, 0), ShardId("1"))});
 
     ChunkManager chunkManager(

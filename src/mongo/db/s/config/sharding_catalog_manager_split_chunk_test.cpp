@@ -88,7 +88,8 @@ TEST_F(SplitChunkTest, SplitExistingChunkCorrectlyShouldSucceed) {
         auto chunkMax = BSON("a" << 10);
         chunk.setMin(chunkMin);
         chunk.setMax(chunkMax);
-        chunk.setHistory({ChunkHistory(Timestamp(100, 0), ShardId(_shardName)),
+        chunk.setOnCurrentShardSince(Timestamp(100, 0));
+        chunk.setHistory({ChunkHistory(*chunk.getOnCurrentShardSince(), ShardId(_shardName)),
                           ChunkHistory(Timestamp(90, 0), ShardId("shardY"))});
 
         auto chunkSplitPoint = BSON("a" << 5);
@@ -150,6 +151,8 @@ TEST_F(SplitChunkTest, SplitExistingChunkCorrectlyShouldSucceed) {
 
         // Both chunks should have the same history
         ASSERT(chunkDoc.getHistory() == otherChunkDoc.getHistory());
+        ASSERT(chunkDoc.getOnCurrentShardSince().has_value());
+        ASSERT_EQ(chunkDoc.getOnCurrentShardSince(), otherChunkDoc.getOnCurrentShardSince());
     };
 
     test(_nss2, Timestamp(42));
@@ -172,7 +175,8 @@ TEST_F(SplitChunkTest, MultipleSplitsOnExistingChunkShouldSucceed) {
         auto chunkMax = BSON("a" << 10);
         chunk.setMin(chunkMin);
         chunk.setMax(chunkMax);
-        chunk.setHistory({ChunkHistory(Timestamp(100, 0), ShardId(_shardName)),
+        chunk.setOnCurrentShardSince(Timestamp(100, 0));
+        chunk.setHistory({ChunkHistory(*chunk.getOnCurrentShardSince(), ShardId(_shardName)),
                           ChunkHistory(Timestamp(90, 0), ShardId("shardY"))});
 
         auto chunkSplitPoint = BSON("a" << 5);
@@ -239,6 +243,10 @@ TEST_F(SplitChunkTest, MultipleSplitsOnExistingChunkShouldSucceed) {
         // Both chunks should have the same history
         ASSERT(chunkDoc.getHistory() == midChunkDoc.getHistory());
         ASSERT(midChunkDoc.getHistory() == lastChunkDoc.getHistory());
+
+        ASSERT(chunkDoc.getOnCurrentShardSince().has_value());
+        ASSERT_EQ(chunkDoc.getOnCurrentShardSince(), midChunkDoc.getOnCurrentShardSince());
+        ASSERT_EQ(midChunkDoc.getOnCurrentShardSince(), lastChunkDoc.getOnCurrentShardSince());
     };
 
     test(_nss2, Timestamp(42));

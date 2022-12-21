@@ -83,17 +83,20 @@ protected:
                                  {shardKeyPattern.getKeyPattern().globalMin(), BSON("_id" << -100)},
                                  version,
                                  {"0"});
-                chunk1.setHistory({ChunkHistory(Timestamp(75, 0), ShardId("0")),
+                chunk1.setOnCurrentShardSince(Timestamp(75, 0));
+                chunk1.setHistory({ChunkHistory(*chunk1.getOnCurrentShardSince(), ShardId("0")),
                                    ChunkHistory(Timestamp(25, 0), ShardId("1"))});
                 version.incMinor();
 
                 ChunkType chunk2(uuid, {BSON("_id" << -100), BSON("_id" << 0)}, version, {"1"});
-                chunk2.setHistory({ChunkHistory(Timestamp(75, 0), ShardId("1")),
+                chunk2.setOnCurrentShardSince(Timestamp(75, 0));
+                chunk2.setHistory({ChunkHistory(*chunk2.getOnCurrentShardSince(), ShardId("1")),
                                    ChunkHistory(Timestamp(25, 0), ShardId("0"))});
                 version.incMinor();
 
                 ChunkType chunk3(uuid, {BSON("_id" << 0), BSON("_id" << 100)}, version, {"0"});
-                chunk3.setHistory({ChunkHistory(Timestamp(75, 0), ShardId("0")),
+                chunk3.setOnCurrentShardSince(Timestamp(75, 0));
+                chunk3.setHistory({ChunkHistory(*chunk3.getOnCurrentShardSince(), ShardId("0")),
                                    ChunkHistory(Timestamp(25, 0), ShardId("1"))});
                 version.incMinor();
 
@@ -101,7 +104,8 @@ protected:
                                  {BSON("_id" << 100), shardKeyPattern.getKeyPattern().globalMax()},
                                  version,
                                  {"1"});
-                chunk4.setHistory({ChunkHistory(Timestamp(75, 0), ShardId("1")),
+                chunk4.setOnCurrentShardSince(Timestamp(75, 0));
+                chunk4.setHistory({ChunkHistory(*chunk4.getOnCurrentShardSince(), ShardId("1")),
                                    ChunkHistory(Timestamp(25, 0), ShardId("0"))});
                 version.incMinor();
 

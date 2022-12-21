@@ -721,7 +721,9 @@ void ShardingCatalogManager::_mergeChunksInTransaction(
                         mergedChunk.setVersion(mergeVersion);
                         mergedChunk.setEstimatedSizeBytes(boost::none);
 
-                        mergedChunk.setHistory({ChunkHistory(validAfter, mergedChunk.getShard())});
+                        mergedChunk.setOnCurrentShardSince(validAfter);
+                        mergedChunk.setHistory({ChunkHistory(*mergedChunk.getOnCurrentShardSince(),
+                                                             mergedChunk.getShard())});
 
                         entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
                             mergedChunk.toConfigBSON()));
@@ -1125,7 +1127,9 @@ ShardingCatalogManager::commitChunkMigration(OperationContext* opCtx,
                               << " is greater or equal to the new validAfter "
                               << validAfter.value().toString()};
     }
-    newHistory.emplace(newHistory.begin(), ChunkHistory(validAfter.value(), toShard));
+    newMigratedChunk->setOnCurrentShardSince(validAfter.value());
+    newHistory.emplace(newHistory.begin(),
+                       ChunkHistory(*newMigratedChunk->getOnCurrentShardSince(), toShard));
     newMigratedChunk->setHistory(std::move(newHistory));
 
     std::shared_ptr<std::vector<ChunkType>> newSplitChunks =
@@ -1315,7 +1319,9 @@ void ShardingCatalogManager::upgradeChunksHistory(OperationContext* opCtx,
         changedShardIds.emplace(upgradeChunk.getShard());
 
         // Construct the fresh history.
-        upgradeChunk.setHistory({ChunkHistory{validAfter, upgradeChunk.getShard()}});
+        upgradeChunk.setOnCurrentShardSince(validAfter);
+        upgradeChunk.setHistory(
+            {ChunkHistory{*upgradeChunk.getOnCurrentShardSince(), upgradeChunk.getShard()}});
 
         // Set the 'historyIsAt40' field so that it gets skipped if the command is re-run
         BSONObjBuilder chunkObjBuilder(upgradeChunk.toConfigBSON());

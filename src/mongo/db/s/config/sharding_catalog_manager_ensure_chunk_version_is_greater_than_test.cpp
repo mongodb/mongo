@@ -61,7 +61,8 @@ ChunkType generateChunkType(const NamespaceString& nss,
     chunkType.setShard(shardId);
     chunkType.setMin(minKey);
     chunkType.setMax(maxKey);
-    chunkType.setHistory({ChunkHistory(Timestamp(100, 0), shardId)});
+    chunkType.setOnCurrentShardSince(Timestamp(100, 0));
+    chunkType.setHistory({ChunkHistory(*chunkType.getOnCurrentShardSince(), shardId)});
     return chunkType;
 }
 
@@ -87,6 +88,7 @@ void assertChunkVersionWasBumpedTo(const ChunkType& chunkTypeBefore,
     ASSERT_BSONOBJ_EQ(chunkTypeBefore.getMin(), chunkTypeAfter.getMin());
     ASSERT_BSONOBJ_EQ(chunkTypeBefore.getMax(), chunkTypeAfter.getMax());
     ASSERT(chunkTypeBefore.getHistory() == chunkTypeAfter.getHistory());
+    ASSERT_EQ(chunkTypeBefore.getOnCurrentShardSince(), chunkTypeAfter.getOnCurrentShardSince());
 }
 
 TEST_F(EnsureChunkVersionIsGreaterThanTest, IfNoCollectionFoundReturnsSuccess) {

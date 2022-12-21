@@ -92,8 +92,10 @@ TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceed) {
     chunk2.setName(OID::gen());
 
     // set histories
-    chunk.setHistory({ChunkHistory{Timestamp{100, 0}, _shardId}});
-    chunk2.setHistory({ChunkHistory{Timestamp{200, 0}, _shardId}});
+    chunk.setOnCurrentShardSince(Timestamp{100, 0});
+    chunk2.setOnCurrentShardSince(Timestamp{200, 0});
+    chunk.setHistory({ChunkHistory{*chunk.getOnCurrentShardSince(), _shardId}});
+    chunk2.setHistory({ChunkHistory{*chunk2.getOnCurrentShardSince(), _shardId}});
 
     // set boundaries
     auto chunkMin = BSON("a" << 1);
@@ -181,9 +183,12 @@ TEST_F(MergeChunkTest, MergeSeveralChunksCorrectlyShouldSucceed) {
     chunk3.setName(OID::gen());
 
     // set histories
-    chunk.setHistory({ChunkHistory{Timestamp{100, 10}, _shardId}});
-    chunk2.setHistory({ChunkHistory{Timestamp{200, 1}, _shardId}});
-    chunk3.setHistory({ChunkHistory{Timestamp{50, 0}, _shardId}});
+    chunk.setOnCurrentShardSince(Timestamp{100, 10});
+    chunk2.setOnCurrentShardSince(Timestamp{200, 1});
+    chunk3.setOnCurrentShardSince(Timestamp{50, 0});
+    chunk.setHistory({ChunkHistory{*chunk.getOnCurrentShardSince(), _shardId}});
+    chunk2.setHistory({ChunkHistory{*chunk2.getOnCurrentShardSince(), _shardId}});
+    chunk3.setHistory({ChunkHistory{*chunk3.getOnCurrentShardSince(), _shardId}});
 
     auto chunkMin = BSON("a" << 1);
     auto chunkBound = BSON("a" << 5);
@@ -242,6 +247,7 @@ TEST_F(MergeChunkTest, MergeSeveralChunksCorrectlyShouldSucceed) {
     ASSERT_EQ(1UL, mergedChunk.getHistory().size());
     ASSERT_EQ(chunk2.getHistory().front().getValidAfter(),
               mergedChunk.getHistory().front().getValidAfter());
+    ASSERT_EQ(chunk2.getOnCurrentShardSince(), mergedChunk.getOnCurrentShardSince());
 }
 
 TEST_F(MergeChunkTest, NewMergeShouldClaimHighestVersion) {
@@ -263,8 +269,10 @@ TEST_F(MergeChunkTest, NewMergeShouldClaimHighestVersion) {
     chunk2.setName(OID::gen());
 
     // set histories
-    chunk.setHistory({ChunkHistory{Timestamp{100, 0}, _shardId}});
-    chunk2.setHistory({ChunkHistory{Timestamp{200, 0}, _shardId}});
+    chunk.setOnCurrentShardSince(Timestamp{100, 0});
+    chunk2.setOnCurrentShardSince(Timestamp{200, 0});
+    chunk.setHistory({ChunkHistory{*chunk.getOnCurrentShardSince(), _shardId}});
+    chunk2.setHistory({ChunkHistory{*chunk2.getOnCurrentShardSince(), _shardId}});
 
     auto chunkMin = BSON("a" << 1);
     auto chunkBound = BSON("a" << 5);
@@ -328,6 +336,7 @@ TEST_F(MergeChunkTest, NewMergeShouldClaimHighestVersion) {
     ASSERT_EQ(1UL, mergedChunk.getHistory().size());
     ASSERT_EQ(chunk2.getHistory().front().getValidAfter(),
               mergedChunk.getHistory().front().getValidAfter());
+    ASSERT_EQ(chunk2.getOnCurrentShardSince(), mergedChunk.getOnCurrentShardSince());
 }
 
 TEST_F(MergeChunkTest, MergeLeavesOtherChunksAlone) {
@@ -348,8 +357,10 @@ TEST_F(MergeChunkTest, MergeLeavesOtherChunksAlone) {
     chunk2.setName(OID::gen());
 
     // set histories
-    chunk.setHistory({ChunkHistory{Timestamp{100, 5}, shardId}});
-    chunk2.setHistory({ChunkHistory{Timestamp{200, 1}, shardId}});
+    chunk.setOnCurrentShardSince(Timestamp{100, 5});
+    chunk2.setOnCurrentShardSince(Timestamp{200, 1});
+    chunk.setHistory({ChunkHistory{*chunk.getOnCurrentShardSince(), shardId}});
+    chunk2.setHistory({ChunkHistory{*chunk2.getOnCurrentShardSince(), shardId}});
 
     auto chunkMin = BSON("a" << 1);
     auto chunkBound = BSON("a" << 5);
@@ -430,8 +441,10 @@ TEST_F(MergeChunkTest, NonExistingNamespace) {
     auto chunk2(chunk);
 
     // set history
-    chunk.setHistory({ChunkHistory{Timestamp{100, 0}, _shardId}});
-    chunk2.setHistory({ChunkHistory{Timestamp{200, 0}, _shardId}});
+    chunk.setOnCurrentShardSince(Timestamp{100, 0});
+    chunk2.setOnCurrentShardSince(Timestamp{200, 0});
+    chunk.setHistory({ChunkHistory{*chunk.getOnCurrentShardSince(), _shardId}});
+    chunk2.setHistory({ChunkHistory{*chunk2.getOnCurrentShardSince(), _shardId}});
 
     auto chunkMin = BSON("a" << 1);
     auto chunkBound = BSON("a" << 5);
@@ -474,8 +487,10 @@ TEST_F(MergeChunkTest, NonMatchingUUIDsOfChunkAndRequestErrors) {
     auto chunk2(chunk);
 
     // set histories
-    chunk.setHistory({ChunkHistory{Timestamp{100, 0}, _shardId}});
-    chunk2.setHistory({ChunkHistory{Timestamp{200, 0}, _shardId}});
+    chunk.setOnCurrentShardSince(Timestamp{100, 0});
+    chunk2.setOnCurrentShardSince(Timestamp{200, 0});
+    chunk.setHistory({ChunkHistory{*chunk.getOnCurrentShardSince(), _shardId}});
+    chunk2.setHistory({ChunkHistory{*chunk2.getOnCurrentShardSince(), _shardId}});
 
     auto chunkMin = BSON("a" << 1);
     auto chunkBound = BSON("a" << 5);
@@ -522,7 +537,8 @@ TEST_F(MergeChunkTest, MergeAlreadyHappenedSucceeds) {
     mergedChunk.setName(OID::gen());
     mergedChunk.setCollectionUUID(collUuid);
     mergedChunk.setShard(_shardId);
-    mergedChunk.setHistory({ChunkHistory{Timestamp{100, 0}, _shardId}});
+    mergedChunk.setOnCurrentShardSince(Timestamp{100, 0});
+    mergedChunk.setHistory({ChunkHistory{*mergedChunk.getOnCurrentShardSince(), _shardId}});
 
 
     setupCollection(_nss1, _keyPattern, {mergedChunk});
@@ -582,9 +598,12 @@ TEST_F(MergeChunkTest, MergingChunksWithDollarPrefixShouldSucceed) {
     auto chunkMax = BSON("a" << kMaxBSONKey);
 
     // set histories
-    chunk1.setHistory({ChunkHistory{Timestamp{100, 9}, _shardId}});
-    chunk2.setHistory({ChunkHistory{Timestamp{200, 5}, _shardId}});
-    chunk3.setHistory({ChunkHistory{Timestamp{156, 1}, _shardId}});
+    chunk1.setOnCurrentShardSince(Timestamp{100, 9});
+    chunk2.setOnCurrentShardSince(Timestamp{200, 5});
+    chunk3.setOnCurrentShardSince(Timestamp{156, 1});
+    chunk1.setHistory({ChunkHistory{*chunk1.getOnCurrentShardSince(), _shardId}});
+    chunk2.setHistory({ChunkHistory{*chunk2.getOnCurrentShardSince(), _shardId}});
+    chunk3.setHistory({ChunkHistory{*chunk3.getOnCurrentShardSince(), _shardId}});
 
     // first chunk boundaries
     chunk1.setMin(chunkMin);
@@ -641,6 +660,7 @@ TEST_F(MergeChunkTest, MergingChunksWithDollarPrefixShouldSucceed) {
     ASSERT_EQ(1UL, mergedChunk.getHistory().size());
     ASSERT_EQ(chunk2.getHistory().front().getValidAfter(),
               mergedChunk.getHistory().front().getValidAfter());
+    ASSERT_EQ(chunk2.getOnCurrentShardSince(), mergedChunk.getOnCurrentShardSince());
 }
 
 }  // namespace

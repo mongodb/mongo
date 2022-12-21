@@ -107,7 +107,9 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectly) {
         migratedChunk.setCollectionUUID(collUUID);
         migratedChunk.setVersion(origVersion);
         migratedChunk.setShard(shard0.getName());
-        migratedChunk.setHistory({ChunkHistory(Timestamp(100, 0), shard0.getName())});
+        migratedChunk.setOnCurrentShardSince(Timestamp(100, 0));
+        migratedChunk.setHistory(
+            {ChunkHistory(*migratedChunk.getOnCurrentShardSince(), shard0.getName())});
         migratedChunk.setMin(BSON("a" << 1));
         migratedChunk.setMax(BSON("a" << 10));
 
@@ -117,7 +119,9 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectly) {
         controlChunk.setCollectionUUID(collUUID);
         controlChunk.setVersion(origVersion);
         controlChunk.setShard(shard0.getName());
-        controlChunk.setHistory({ChunkHistory(Timestamp(50, 0), shard0.getName())});
+        controlChunk.setOnCurrentShardSince(Timestamp(50, 0));
+        controlChunk.setHistory(
+            {ChunkHistory(*controlChunk.getOnCurrentShardSince(), shard0.getName())});
         controlChunk.setMin(BSON("a" << 10));
         controlChunk.setMax(BSON("a" << 20));
         controlChunk.setJumbo(true);
@@ -155,6 +159,7 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectly) {
     // The migrated chunk's history should be updated.
     ASSERT_EQ(2UL, chunkDoc0.getHistory().size());
     ASSERT_EQ(validAfter, chunkDoc0.getHistory().front().getValidAfter());
+    ASSERT_EQ(validAfter, *chunkDoc0.getOnCurrentShardSince());
 
     auto chunkDoc1 = uassertStatusOK(
         getChunkDoc(operationContext(), controlChunk.getMin(), collEpoch, collTimestamp));
@@ -166,6 +171,8 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectly) {
               chunkDoc1.getHistory().front().getValidAfter());
     ASSERT_EQ(controlChunk.getHistory().front().getShard(),
               chunkDoc1.getHistory().front().getShard());
+    ASSERT(chunkDoc1.getOnCurrentShardSince().has_value());
+    ASSERT_EQ(controlChunk.getOnCurrentShardSince(), chunkDoc1.getOnCurrentShardSince());
     ASSERT(chunkDoc1.getJumbo());
 }
 
@@ -192,7 +199,8 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectlyWithoutControlChunk) {
     chunk0.setCollectionUUID(collUUID);
     chunk0.setVersion(origVersion);
     chunk0.setShard(shard0.getName());
-    chunk0.setHistory({ChunkHistory(Timestamp(100, 0), shard0.getName())});
+    chunk0.setOnCurrentShardSince(Timestamp(100, 0));
+    chunk0.setHistory({ChunkHistory(*chunk0.getOnCurrentShardSince(), shard0.getName())});
 
     // apportion
     auto chunkMin = BSON("a" << 1);
@@ -233,6 +241,7 @@ TEST_F(CommitChunkMigrate, ChunksUpdatedCorrectlyWithoutControlChunk) {
     // The history should be updated.
     ASSERT_EQ(2UL, chunkDoc0.getHistory().size());
     ASSERT_EQ(validAfter, chunkDoc0.getHistory().front().getValidAfter());
+    ASSERT_EQ(validAfter, *chunkDoc0.getOnCurrentShardSince());
 }
 
 TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtlTrimHistory) {
@@ -258,7 +267,8 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtlTrimHistory) {
     chunk0.setCollectionUUID(collUUID);
     chunk0.setVersion(origVersion);
     chunk0.setShard(shard0.getName());
-    chunk0.setHistory({ChunkHistory(Timestamp(100, 0), shard0.getName())});
+    chunk0.setOnCurrentShardSince(Timestamp(100, 0));
+    chunk0.setHistory({ChunkHistory(*chunk0.getOnCurrentShardSince(), shard0.getName())});
 
     // apportion
     auto chunkMin = BSON("a" << 1);
@@ -297,6 +307,7 @@ TEST_F(CommitChunkMigrate, CheckCorrectOpsCommandNoCtlTrimHistory) {
     // The new history entry should be added, but the old one preserved.
     ASSERT_EQ(2UL, chunkDoc0.getHistory().size());
     ASSERT_EQ(validAfter, chunkDoc0.getHistory().front().getValidAfter());
+    ASSERT_EQ(validAfter, *chunkDoc0.getOnCurrentShardSince());
 }
 
 TEST_F(CommitChunkMigrate, RejectOutOfOrderHistory) {
@@ -320,7 +331,8 @@ TEST_F(CommitChunkMigrate, RejectOutOfOrderHistory) {
     chunk0.setCollectionUUID(collUUID);
     chunk0.setVersion(origVersion);
     chunk0.setShard(shard0.getName());
-    chunk0.setHistory({ChunkHistory(Timestamp(100, 0), shard0.getName())});
+    chunk0.setOnCurrentShardSince(Timestamp(100, 0));
+    chunk0.setHistory({ChunkHistory(*chunk0.getOnCurrentShardSince(), shard0.getName())});
 
     // apportion
     auto chunkMin = BSON("a" << 1);
@@ -484,7 +496,8 @@ TEST_F(CommitChunkMigrate, CommitWithLastChunkOnShardShouldNotAffectOtherChunks)
     chunk0.setCollectionUUID(collUUID);
     chunk0.setVersion(origVersion);
     chunk0.setShard(shard0.getName());
-    chunk0.setHistory({ChunkHistory(Timestamp(100, 0), shard0.getName())});
+    chunk0.setOnCurrentShardSince(Timestamp(100, 0));
+    chunk0.setHistory({ChunkHistory(*chunk0.getOnCurrentShardSince(), shard0.getName())});
 
     // apportion
     auto chunkMin = BSON("a" << 1);
@@ -503,7 +516,8 @@ TEST_F(CommitChunkMigrate, CommitWithLastChunkOnShardShouldNotAffectOtherChunks)
     chunk1.setMax(chunkMaxax);
 
     Timestamp ctrlChunkValidAfter = Timestamp(50, 0);
-    chunk1.setHistory({ChunkHistory(ctrlChunkValidAfter, shard1.getName())});
+    chunk1.setOnCurrentShardSince(ctrlChunkValidAfter);
+    chunk1.setHistory({ChunkHistory(*chunk1.getOnCurrentShardSince(), shard1.getName())});
 
     setupCollection(kNamespace, kKeyPattern, {chunk0, chunk1});
 
@@ -534,6 +548,7 @@ TEST_F(CommitChunkMigrate, CommitWithLastChunkOnShardShouldNotAffectOtherChunks)
     // The migrated chunk's history should be updated.
     ASSERT_EQ(2UL, chunkDoc0.getHistory().size());
     ASSERT_EQ(validAfter, chunkDoc0.getHistory().front().getValidAfter());
+    ASSERT_EQ(validAfter, *chunkDoc0.getOnCurrentShardSince());
 
     auto chunkDoc1 =
         uassertStatusOK(getChunkDoc(operationContext(), chunkMax, collEpoch, collTimestamp));
@@ -543,6 +558,7 @@ TEST_F(CommitChunkMigrate, CommitWithLastChunkOnShardShouldNotAffectOtherChunks)
     // The control chunk's history should be unchanged.
     ASSERT_EQ(1UL, chunkDoc1.getHistory().size());
     ASSERT_EQ(ctrlChunkValidAfter, chunkDoc1.getHistory().front().getValidAfter());
+    ASSERT_EQ(ctrlChunkValidAfter, *chunkDoc1.getOnCurrentShardSince());
 }
 
 TEST_F(CommitChunkMigrate, RejectMissingChunkVersion) {
@@ -565,7 +581,9 @@ TEST_F(CommitChunkMigrate, RejectMissingChunkVersion) {
     migratedChunk.setName(OID::gen());
     migratedChunk.setCollectionUUID(collUUID);
     migratedChunk.setShard(shard0.getName());
-    migratedChunk.setHistory({ChunkHistory(Timestamp(100, 0), shard0.getName())});
+    migratedChunk.setOnCurrentShardSince(Timestamp(100, 0));
+    migratedChunk.setHistory(
+        {ChunkHistory(*migratedChunk.getOnCurrentShardSince(), shard0.getName())});
     migratedChunk.setMin(BSON("a" << 1));
     migratedChunk.setMax(BSON("a" << 10));
 
@@ -574,7 +592,9 @@ TEST_F(CommitChunkMigrate, RejectMissingChunkVersion) {
     currentChunk.setCollectionUUID(collUUID);
     currentChunk.setVersion(origVersion);
     currentChunk.setShard(shard0.getName());
-    currentChunk.setHistory({ChunkHistory(Timestamp(100, 0), shard0.getName())});
+    currentChunk.setOnCurrentShardSince(Timestamp(100, 0));
+    currentChunk.setHistory(
+        {ChunkHistory(*currentChunk.getOnCurrentShardSince(), shard0.getName())});
     currentChunk.setMin(BSON("a" << 1));
     currentChunk.setMax(BSON("a" << 10));
 
@@ -615,7 +635,9 @@ TEST_F(CommitChunkMigrate, RejectOlderChunkVersion) {
     migratedChunk.setCollectionUUID(collUUID);
     migratedChunk.setVersion(origVersion);
     migratedChunk.setShard(shard0.getName());
-    migratedChunk.setHistory({ChunkHistory(Timestamp(100, 0), shard0.getName())});
+    migratedChunk.setOnCurrentShardSince(Timestamp(100, 0));
+    migratedChunk.setHistory(
+        {ChunkHistory(*migratedChunk.getOnCurrentShardSince(), shard0.getName())});
     migratedChunk.setMin(BSON("a" << 1));
     migratedChunk.setMax(BSON("a" << 10));
 
@@ -626,7 +648,9 @@ TEST_F(CommitChunkMigrate, RejectOlderChunkVersion) {
     currentChunk.setCollectionUUID(collUUID);
     currentChunk.setVersion(currentChunkVersion);
     currentChunk.setShard(shard0.getName());
-    currentChunk.setHistory({ChunkHistory(Timestamp(100, 0), shard0.getName())});
+    currentChunk.setOnCurrentShardSince(Timestamp(100, 0));
+    currentChunk.setHistory(
+        {ChunkHistory(*currentChunk.getOnCurrentShardSince(), shard0.getName())});
     currentChunk.setMin(BSON("a" << 1));
     currentChunk.setMax(BSON("a" << 10));
 
@@ -667,7 +691,9 @@ TEST_F(CommitChunkMigrate, RejectMismatchedEpoch) {
     migratedChunk.setCollectionUUID(collUUID);
     migratedChunk.setVersion(origVersion);
     migratedChunk.setShard(shard0.getName());
-    migratedChunk.setHistory({ChunkHistory(Timestamp(100, 0), shard0.getName())});
+    migratedChunk.setOnCurrentShardSince(Timestamp(100, 0));
+    migratedChunk.setHistory(
+        {ChunkHistory(*migratedChunk.getOnCurrentShardSince(), shard0.getName())});
     migratedChunk.setMin(BSON("a" << 1));
     migratedChunk.setMax(BSON("a" << 10));
 
@@ -678,7 +704,9 @@ TEST_F(CommitChunkMigrate, RejectMismatchedEpoch) {
     currentChunk.setCollectionUUID(collUUID);
     currentChunk.setVersion(currentChunkVersion);
     currentChunk.setShard(shard0.getName());
-    currentChunk.setHistory({ChunkHistory(Timestamp(100, 0), shard0.getName())});
+    currentChunk.setOnCurrentShardSince(Timestamp(100, 0));
+    currentChunk.setHistory(
+        {ChunkHistory(*currentChunk.getOnCurrentShardSince(), shard0.getName())});
     currentChunk.setMin(BSON("a" << 1));
     currentChunk.setMax(BSON("a" << 10));
 
@@ -716,6 +744,8 @@ public:
         chunk.setVersion(version);
         chunk.setShard(shardID);
         chunk.setHistory(history);
+        if (!history.empty())
+            chunk.setOnCurrentShardSince(history.front().getValidAfter());
         chunk.setMin(min);
         chunk.setMax(max);
 
@@ -731,7 +761,6 @@ public:
         uint32_t currentMajorVersion = 1;
         int historyTimestampSecond = 100;
 
-        std::vector<ChunkHistory> history;
         std::vector<BSONObj> chunksMin = {kKeyPattern.globalMin()};
         for (int i = 10; i < numberOfChunks * 10; i += 10) {
             chunksMin.push_back(BSON("x" << i));
@@ -744,8 +773,8 @@ public:
             const auto shardId = _shardIds.at(i % 2);  // Shard owning the chunk
             ChunkVersion version =
                 ChunkVersion({_collEpoch, _collTimestamp}, {currentMajorVersion++, 0});
-            history.insert(history.begin(),
-                           {ChunkHistory(Timestamp(historyTimestampSecond++, 0), shardId)});
+            std::vector<ChunkHistory> history{
+                ChunkHistory(Timestamp(historyTimestampSecond++, 0), shardId)};
             ChunkType chunk = createChunk(_collUUID, min, max, version, shardId, history);
             chunks.push_back(chunk);
         }
@@ -811,6 +840,7 @@ public:
             // The migrated chunk's history should have been updated with a new `validAfter` entry
             ASSERT_EQ(origChunk.getHistory().size() + 1, newChunk.getHistory().size());
             ASSERT_EQ(validAfter, newChunk.getHistory().front().getValidAfter());
+            ASSERT_EQ(validAfter, *newChunk.getOnCurrentShardSince());
 
             // The migrated chunk's history must inherit the previous chunk's history
             assertSameHistories(std::vector<ChunkHistory>(newChunk.getHistory().begin() + 1,
@@ -827,6 +857,7 @@ public:
                                             migratedChunk.getVersion().epoch(),
                                             migratedChunk.getVersion().getTimestamp()));
             ASSERT_EQ(donor, leftSplitChunk.getShard());
+            ASSERT_EQ(origChunk.getOnCurrentShardSince(), leftSplitChunk.getOnCurrentShardSince());
 
             // The min of the split chunk must be the min of the original chunk
             ASSERT(leftSplitChunk.getMin().woCompare(origChunk.getMin()) == 0);
@@ -851,6 +882,7 @@ public:
                                             migratedChunk.getVersion().epoch(),
                                             migratedChunk.getVersion().getTimestamp()));
             ASSERT_EQ(donor, rightSplitChunk.getShard());
+            ASSERT_EQ(origChunk.getOnCurrentShardSince(), rightSplitChunk.getOnCurrentShardSince());
 
             // The min of the right split chunk must fit the max of the new chunk
             ASSERT(rightSplitChunk.getMin().woCompare(migratedChunk.getMax()) == 0);
