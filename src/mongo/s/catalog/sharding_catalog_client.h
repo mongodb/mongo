@@ -213,12 +213,6 @@ public:
                                                                    const NamespaceString& nss) = 0;
 
     /**
-     * Retrieves all namespaces that have zones associated with a database.
-     */
-    virtual std::vector<NamespaceString> getAllNssThatHaveZonesForDatabase(
-        OperationContext* opCtx, const StringData& dbName) = 0;
-
-    /**
      * Retrieves all shards in this sharded cluster.
      * Returns a !OK status if an error occurs.
      */
