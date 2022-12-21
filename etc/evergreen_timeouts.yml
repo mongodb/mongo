@@ -107,6 +107,8 @@ overrides:
   rhel80-debug-ubsan:
   - task: run_unittests
     exec_timeout: 24
+  - task: update_timeseries_fuzzer
+    exec_timeout: 150  # 2.5 hours
 
   rhel80-debug-suggested:
   - task: replica_sets_jscore_passthrough
