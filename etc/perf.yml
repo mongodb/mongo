@@ -60,7 +60,7 @@ modules:
   - name: dsi
     repo: git@github.com:10gen/dsi.git
     prefix: ${workdir}/src
-    branch: master
+    branch: microbenchmarks-stable
   - name: genny
     repo: git@github.com:10gen/genny.git
     prefix: ${workdir}/src
