@@ -183,10 +183,10 @@ __drop_tiered(WT_SESSION_IMPL *session, const char *uri, bool force, const char 
     WT_TIERED *tiered;
     u_int i, localid;
     const char *filename, *name;
-    bool exist, locked, remove_files, remove_shared;
+    bool exist, got_dhandle, locked, remove_files, remove_shared;
 
     conn = S2C(session);
-    locked = false;
+    got_dhandle = locked = false;
     WT_RET(__wt_config_gets(session, cfg, "remove_files", &cval));
     remove_files = cval.val != 0;
     WT_RET(__wt_config_gets(session, cfg, "remove_shared", &cval));
@@ -200,6 +200,7 @@ __drop_tiered(WT_SESSION_IMPL *session, const char *uri, bool force, const char 
     name = NULL;
     /* Get the tiered data handle. */
     WT_RET(__wt_session_get_dhandle(session, uri, NULL, NULL, WT_DHANDLE_EXCLUSIVE));
+    got_dhandle = true;
     tiered = (WT_TIERED *)session->dhandle;
 
     /*
@@ -284,6 +285,7 @@ __drop_tiered(WT_SESSION_IMPL *session, const char *uri, bool force, const char 
      * the tiered structure because that is from the dhandle.
      */
     WT_ERR(__wt_session_release_dhandle(session));
+    got_dhandle = false;
     WT_WITH_HANDLE_LIST_WRITE_LOCK(
       session, ret = __wt_conn_dhandle_close_all(session, uri, true, force));
     WT_ERR(ret);
@@ -297,6 +299,8 @@ __drop_tiered(WT_SESSION_IMPL *session, const char *uri, bool force, const char 
     ret = __wt_metadata_remove(session, uri);
 
 err:
+    if (got_dhandle)
+        WT_TRET(__wt_session_release_dhandle(session));
     __wt_free(session, name);
     if (locked)
         __wt_spin_unlock(session, &conn->tiered_lock);
