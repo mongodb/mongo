@@ -3584,9 +3584,6 @@ def doConfigure(myenv):
         # other than disabling all deprecation warnings. We will
         # revisit this once we are fully on C++20 and can commit the
         # C++20 style code.
-        #
-        # TODO(SERVER-60175): In fact we will want to explicitly opt
-        # in to -Wdeprecated, since clang doesn't include it in -Wall.
         if get_option('cxx-std') == "20":
             myenv.AddToCXXFLAGSIfSupported('-Wno-deprecated')
 
