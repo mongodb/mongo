@@ -2698,63 +2698,6 @@ protected:
     const NamespaceString _nssWithTid{TenantId(OID::gen()), "test", "coll"};
 };
 
-DEATH_TEST_REGEX_F(BatchedWriteOutputsTest,
-                   TestCannotGroupDDLOperation,
-                   "Invariant failure.*getOpType.*repl::OpTypeEnum::kDelete.*kInsert.*kUpdate") {
-    auto opCtxRaii = cc().makeOperationContext();
-    OperationContext* opCtx = opCtxRaii.get();
-    WriteUnitOfWork wuow(opCtx, true /* groupOplogEntries */);
-
-    auto& bwc = BatchedWriteContext::get(opCtx);
-    bwc.addBatchedOperation(
-        opCtx,
-        repl::MutableOplogEntry::makeCreateCommand(
-            NamespaceString(boost::none, "other", "coll"), CollectionOptions(), BSON("v" << 2)));
-}
-
-DEATH_TEST_REGEX_F(BatchedWriteOutputsTest,
-                   TestDoesNotSupportPreImagesInCollection,
-                   "Invariant "
-                   "failure.*getChangeStreamPreImageRecordingMode.*repl::ReplOperation::"
-                   "ChangeStreamPreImageRecordingMode::kOff") {
-    auto opCtxRaii = cc().makeOperationContext();
-    OperationContext* opCtx = opCtxRaii.get();
-    WriteUnitOfWork wuow(opCtx, true /* groupOplogEntries */);
-
-    auto& bwc = BatchedWriteContext::get(opCtx);
-    auto entry = repl::MutableOplogEntry::makeDeleteOperation(_nss, UUID::gen(), BSON("_id" << 0));
-    entry.setChangeStreamPreImageRecordingMode(
-        repl::ReplOperation::ChangeStreamPreImageRecordingMode::kPreImagesCollection);
-    bwc.addBatchedOperation(opCtx, entry);
-}
-
-DEATH_TEST_REGEX_F(BatchedWriteOutputsTest,
-                   TestDoesNotSupportMultiDocTxn,
-                   "Invariant failure.*!opCtx->inMultiDocumentTransaction()") {
-    auto opCtxRaii = cc().makeOperationContext();
-    OperationContext* opCtx = opCtxRaii.get();
-    opCtx->setInMultiDocumentTransaction();
-    WriteUnitOfWork wuow(opCtx, true /* groupOplogEntries */);
-
-    auto& bwc = BatchedWriteContext::get(opCtx);
-    auto entry = repl::MutableOplogEntry::makeDeleteOperation(_nss, UUID::gen(), BSON("_id" << 0));
-    bwc.addBatchedOperation(opCtx, entry);
-}
-
-DEATH_TEST_REGEX_F(BatchedWriteOutputsTest,
-                   TestDoesNotSupportRetryableWrites,
-                   "Invariant failure.*!opCtx->getTxnNumber()") {
-    auto opCtxRaii = cc().makeOperationContext();
-    OperationContext* opCtx = opCtxRaii.get();
-    opCtx->setLogicalSessionId(LogicalSessionId(makeLogicalSessionIdForTest()));
-    opCtx->setTxnNumber(TxnNumber{1});
-    WriteUnitOfWork wuow(opCtx, true /* groupOplogEntries */);
-
-    auto& bwc = BatchedWriteContext::get(opCtx);
-    auto entry = repl::MutableOplogEntry::makeDeleteOperation(_nss, UUID::gen(), BSON("_id" << 0));
-    bwc.addBatchedOperation(opCtx, entry);
-}
-
 // Verifies that a WriteUnitOfWork with groupOplogEntries=true replicates its writes as a single
 // applyOps. Tests WUOWs batching a range of 1 to 5 deletes (inclusive).
 TEST_F(BatchedWriteOutputsTest, TestApplyOpsGrouping) {
