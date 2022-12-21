@@ -39,25 +39,30 @@
 #define MAX_RUN 5
 #define MAX_TIERED_FILES 10
 #define NUM_RECORDS 500
+#define MAX_VALUE_SIZE 200
 
 /* Constants and variables declaration. */
 static const char conn_config[] =
   "create,cache_size=2GB,statistics=(all),statistics_log=(json,on_close,wait=1)";
-static const char table_config_row[] = "leaf_page_max=64KB,key_format=i,value_format=S";
-static char data_str[200] = "";
+static const char table_config[] = "leaf_page_max=64KB,key_format=i,value_format=u";
+static unsigned char data_str[MAX_VALUE_SIZE] = "";
 
 static TEST_OPTS *opts, _opts;
 static bool read_data = true;
+static bool flush;
+
+static WT_RAND_STATE rnd;
 /* Forward declarations. */
 
 static double calculate_std_deviation(const double *);
 static void compute_wt_file_size(const char *, const char *, uint64_t *);
 static void compute_tiered_file_size(const char *, const char *, uint64_t *);
+static void fill_random_data(void);
 static void get_file_size(const char *, uint64_t *);
-static void recover_validate(const char *, uint32_t, uint64_t, int);
-static void run_test_clean(const char *, uint32_t, bool);
-static void run_test(const char *, uint32_t, bool, int);
-static void populate(WT_SESSION *, uint32_t);
+static void recover_validate(const char *, uint32_t, uint64_t, uint32_t);
+static void run_test_clean(const char *, uint32_t);
+static void run_test(const char *, uint32_t, uint32_t);
+static void populate(WT_SESSION *, uint32_t, uint32_t);
 
 static double avg_wtime_arr[MAX_RUN], avg_rtime_arr[MAX_RUN], avg_wthroughput_arr[MAX_RUN],
   avg_rthroughput_arr[MAX_RUN];
@@ -70,7 +75,6 @@ static uint64_t avg_filesize_array[MAX_RUN];
 int
 main(int argc, char *argv[])
 {
-    bool flush;
     int i;
     opts = &_opts;
     memset(opts, 0, sizeof(*opts));
@@ -93,22 +97,22 @@ main(int argc, char *argv[])
         /*
          * Run test with 100K file size. Row store case.
          */
-        run_test_clean("100KB", NUM_RECORDS, flush);
+        run_test_clean("100KB", NUM_RECORDS);
 
         /*
          * Run test with 1Mb file size. Row store case.
          */
-        run_test_clean("1MB", NUM_RECORDS * 10, flush);
+        run_test_clean("1MB", NUM_RECORDS * 10);
 
         /*
          * Run test with 10 Mb file size. Row store case.
          */
-        run_test_clean("10MB", NUM_RECORDS * 100, flush);
+        run_test_clean("10MB", NUM_RECORDS * 100);
 
         /*
          * Run test with 100 Mb file size. Row store case.
          */
-        run_test_clean("100MB", NUM_RECORDS * 1000, flush);
+        run_test_clean("100MB", NUM_RECORDS * 1000);
         flush = true;
     }
 
@@ -143,20 +147,20 @@ difftime_sec(struct timeval t0, struct timeval t1)
  *     This function runs the test for configured number of times to compute the average time taken.
  */
 static void
-run_test_clean(const char *suffix, uint32_t num_records, bool flush)
+run_test_clean(const char *suffix, uint32_t num_records)
 {
     char home_full[HOME_BUF_SIZE];
     double avg_wtime, avg_rtime, avg_wthroughput, avg_rthroughput;
     uint64_t avg_file_size;
-    int counter;
+    uint32_t counter;
 
     avg_file_size = 0;
     avg_wtime = avg_rtime = avg_rthroughput = avg_wthroughput = 0;
 
     for (counter = 0; counter < MAX_RUN; ++counter) {
         testutil_check(__wt_snprintf(
-          home_full, HOME_BUF_SIZE, "%s_%s_%d_%d", opts->home, suffix, flush, counter));
-        run_test(home_full, num_records, flush, counter);
+          home_full, HOME_BUF_SIZE, "%s_%s_%d_%" PRIu32, opts->home, suffix, flush, counter));
+        run_test(home_full, num_records, counter);
     }
 
     /* Cleanup */
@@ -185,28 +189,45 @@ run_test_clean(const char *suffix, uint32_t num_records, bool flush)
 }
 
 /*
+ * fill_random_data --
+ *     Fill random data.
+ */
+static void
+fill_random_data(void)
+{
+    uint64_t i, str_len;
+
+    str_len = sizeof(data_str) / sizeof(data_str[0]);
+    for (i = 0; i < str_len - 1; i++)
+        data_str[i] = '\x01' + (uint8_t)__wt_random(&rnd) % 255;
+
+    data_str[str_len - 1] = '\0';
+}
+
+/*
  * recover_validate --
  *     Open wiredtiger and validate the data.
  */
 static void
-recover_validate(const char *home, uint32_t num_records, uint64_t file_size, int counter)
+recover_validate(const char *home, uint32_t num_records, uint64_t file_size, uint32_t counter)
 {
     struct timeval start, end;
 
     char buf[1024], rm_cmd[512];
-    char *str_val;
     double diff_sec;
     int status;
     size_t val_1_size, val_2_size;
-    uint64_t i, str_len;
+    uint64_t key, i, v;
 
     WT_CONNECTION *conn;
     WT_CURSOR *cursor;
+    WT_ITEM item;
     WT_SESSION *session;
 
     /* Copy the data to a separate folder for debugging purpose. */
     testutil_copy_data(home);
 
+    key = 0;
     buf[0] = '\0';
     /*
      * Open the connection which forces recovery to be run.
@@ -214,13 +235,9 @@ recover_validate(const char *home, uint32_t num_records, uint64_t file_size, int
     testutil_wiredtiger_open(opts, home, buf, NULL, &conn, true, true);
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
-    // srand((unsigned long)getpid() + num_records);
-    srand((uint32_t)getpid() + num_records);
-    str_len = sizeof(data_str) / sizeof(data_str[0]);
-    for (i = 0; i < str_len - 1; i++)
-        data_str[i] = 'a' + (uint32_t)rand() % 26;
-
-    data_str[str_len - 1] = '\0';
+    /* Seed the random number generator */
+    v = (uint32_t)getpid() + num_records + (2 * counter);
+    __wt_random_init_custom_seed(&rnd, v);
 
     testutil_check(__wt_snprintf(rm_cmd, sizeof(rm_cmd), "rm -rf %s/cache-bucket/*", home));
     status = system(rm_cmd);
@@ -228,18 +245,22 @@ recover_validate(const char *home, uint32_t num_records, uint64_t file_size, int
         testutil_die(status, "system: %s", rm_cmd);
 
     testutil_check(session->open_cursor(session, opts->uri, NULL, NULL, &cursor));
-    val_1_size = strlen(data_str);
+    val_1_size = MAX_VALUE_SIZE;
 
     gettimeofday(&start, 0);
 
     for (i = 0; i < num_records; i++) {
-        cursor->set_key(cursor, i + 1);
-        testutil_check(cursor->search(cursor));
-        testutil_check(cursor->get_value(cursor, &str_val));
-        val_2_size = strlen(str_val);
+        fill_random_data();
+
+        testutil_check(cursor->next(cursor));
+        testutil_check(cursor->get_key(cursor, &key));
+        testutil_assert(key == i + 1);
+        testutil_check(cursor->get_value(cursor, &item));
+        val_2_size = item.size;
         testutil_assert(val_1_size == val_2_size);
-        testutil_assert(memcmp(data_str, str_val, val_1_size) == 0);
+        testutil_assert(memcmp(data_str, item.data, item.size) == 0);
     }
+    testutil_assert(cursor->next(cursor) == WT_NOTFOUND);
     gettimeofday(&end, 0);
 
     testutil_check(session->close(session, NULL));
@@ -256,7 +277,7 @@ recover_validate(const char *home, uint32_t num_records, uint64_t file_size, int
  *     parameter.
  */
 static void
-run_test(const char *home, uint32_t num_records, bool flush, int counter)
+run_test(const char *home, uint32_t num_records, uint32_t counter)
 {
     struct timeval start, end;
 
@@ -277,13 +298,13 @@ run_test(const char *home, uint32_t num_records, bool flush, int counter)
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
     /* Create and populate table. Checkpoint the data after that. */
-    testutil_check(session->create(session, opts->uri, table_config_row));
+    testutil_check(session->create(session, opts->uri, table_config));
 
     testutil_check(__wt_snprintf(buf, sizeof(buf), flush ? "flush_tier=(enabled,force=true)" : ""));
 
     gettimeofday(&start, 0);
 
-    populate(session, num_records);
+    populate(session, num_records, counter);
     testutil_check(session->checkpoint(session, buf));
 
     gettimeofday(&end, 0);
@@ -311,23 +332,23 @@ run_test(const char *home, uint32_t num_records, bool flush, int counter)
  *     Populate the table.
  */
 static void
-populate(WT_SESSION *session, uint32_t num_records)
+populate(WT_SESSION *session, uint32_t num_records, uint32_t counter)
 {
     WT_CURSOR *cursor;
-    uint64_t i, str_len;
+    WT_ITEM item;
+    uint64_t v, i;
 
-    srand((uint32_t)getpid() + num_records);
-
-    str_len = sizeof(data_str) / sizeof(data_str[0]);
-    for (i = 0; i < str_len - 1; i++)
-        data_str[i] = 'a' + (uint32_t)rand() % 26;
-
-    data_str[str_len - 1] = '\0';
+    /* Seed the random number generator */
+    v = (uint32_t)getpid() + num_records + (2 * counter);
+    __wt_random_init_custom_seed(&rnd, v);
 
     testutil_check(session->open_cursor(session, opts->uri, NULL, NULL, &cursor));
     for (i = 0; i < num_records; i++) {
+        fill_random_data();
         cursor->set_key(cursor, i + 1);
-        cursor->set_value(cursor, data_str);
+        item.data = data_str;
+        item.size = sizeof(data_str);
+        cursor->set_value(cursor, &item);
         testutil_check(cursor->insert(cursor));
     }
 
