@@ -134,12 +134,20 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
     auto catalog = collection->getIndexCatalog();
     const IndexDescriptor* idx = catalog->findShardKeyPrefixedIndex(opCtx, keyPattern, false);
     if (!idx) {
-        LOGV2_ERROR_OPTIONS(23765,
-                            {logv2::UserAssertAfterLog(ErrorCodes::InternalError)},
-                            "Unable to find shard key index for {keyPattern} in {namespace}",
-                            "Unable to find shard key index",
-                            "keyPattern"_attr = keyPattern.toString(),
-                            "namespace"_attr = nss.ns());
+        LOGV2_ERROR(23765,
+                    "Unable to find shard key index",
+                    "keyPattern"_attr = keyPattern,
+                    "namespace"_attr = nss.ns());
+
+        // When a shard key index is not found, the range deleter gets stuck and indefinitely logs
+        // an error message. This sleep is aimed at avoiding logging too aggressively in order to
+        // prevent log files to increase too much in size.
+        opCtx->sleepFor(Seconds(5));
+
+        uasserted(ErrorCodes::IndexNotFound,
+                  str::stream() << "Unable to find shard key index"
+                                << " for " << nss.ns() << " and key pattern `"
+                                << keyPattern.toString() << "'");
     }
 
     // Extend bounds to match the index we found
