@@ -70,7 +70,7 @@
 #include "mongo/shell/shell_utils.h"
 #include "mongo/shell/shell_utils_launcher.h"
 #include "mongo/stdx/utility.h"
-#include "mongo/transport/transport_layer_asio.h"
+#include "mongo/transport/asio_transport_layer.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/exit.h"
@@ -725,12 +725,12 @@ int mongo_main(int argc, char* argv[]) {
         OCSPManager::start(serviceContext);
 #endif
 
-        transport::TransportLayerASIO::Options opts;
+        transport::AsioTransportLayer::Options opts;
         opts.enableIPv6 = shellGlobalParams.enableIPv6;
-        opts.mode = transport::TransportLayerASIO::Options::kEgress;
+        opts.mode = transport::AsioTransportLayer::Options::kEgress;
 
         serviceContext->setTransportLayer(
-            std::make_unique<transport::TransportLayerASIO>(opts, nullptr));
+            std::make_unique<transport::AsioTransportLayer>(opts, nullptr));
         auto tlPtr = serviceContext->getTransportLayer();
         uassertStatusOK(tlPtr->setup());
         uassertStatusOK(tlPtr->start());

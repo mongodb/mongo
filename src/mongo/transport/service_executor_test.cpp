@@ -196,7 +196,7 @@ public:
 /* This implements the portions of the transport::Reactor based on ASIO, but leaves out
  * the methods not needed by ServiceExecutors.
  *
- * TODO Maybe use TransportLayerASIO's Reactor?
+ * TODO Maybe use AsioTransportLayer's Reactor?
  */
 class ASIOReactor : public transport::Reactor {
 public:

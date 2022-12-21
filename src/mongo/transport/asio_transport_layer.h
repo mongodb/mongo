@@ -69,22 +69,22 @@ class ServiceEntryPoint;
 namespace transport {
 
 // Simulates reads and writes that always return 1 byte and fail with EAGAIN
-extern FailPoint transportLayerASIOshortOpportunisticReadWrite;
+extern FailPoint asioTransportLayerShortOpportunisticReadWrite;
 
 // Cause an asyncConnect to timeout after it's successfully connected to the remote peer
-extern FailPoint transportLayerASIOasyncConnectTimesOut;
+extern FailPoint asioTransportLayerAsyncConnectTimesOut;
 
-extern FailPoint transportLayerASIOhangBeforeAcceptCallback;
+extern FailPoint asioTransportLayerHangBeforeAcceptCallback;
 
-extern FailPoint transportLayerASIOhangDuringAcceptCallback;
+extern FailPoint asioTransportLayerHangDuringAcceptCallback;
 
 
 /**
  * A TransportLayer implementation based on ASIO networking primitives.
  */
-class TransportLayerASIO final : public TransportLayer {
-    TransportLayerASIO(const TransportLayerASIO&) = delete;
-    TransportLayerASIO& operator=(const TransportLayerASIO&) = delete;
+class AsioTransportLayer final : public TransportLayer {
+    AsioTransportLayer(const AsioTransportLayer&) = delete;
+    AsioTransportLayer& operator=(const AsioTransportLayer&) = delete;
 
 public:
     constexpr static auto kSlowOperationThreshold = Seconds(1);
@@ -118,7 +118,7 @@ public:
     };
 
     /**
-     * A service, internal to `TransportLayerASIO`, that allows creating timers and running `Future`
+     * A service, internal to `AsioTransportLayer`, that allows creating timers and running `Future`
      * continuations when a timeout occurs. This allows setting up timeouts for synchronous
      * operations, such as a synchronous SSL handshake. A separate thread is assigned to run these
      * timers to:
@@ -126,7 +126,7 @@ public:
      *   asynchronous listener.
      * - Avoid any performance implications on other reactors (e.g., the `egressReactor`).
      * The public visibility is only for testing purposes and this service is not intended to be
-     * used outside `TransportLayerASIO`.
+     * used outside `AsioTransportLayer`.
      */
     class TimerService {
     public:
@@ -163,7 +163,7 @@ public:
 
         // Serializes invocations of `start()` and `stop()`, and allows updating `_state` and
         // `_thread` as a single atomic operation.
-        Mutex _mutex = MONGO_MAKE_LATCH("TransportLayerASIO::TimerService::_mutex");
+        Mutex _mutex = MONGO_MAKE_LATCH("AsioTransportLayer::TimerService::_mutex");
 
         // State transitions: `kInitialized` --> `kStarted` --> `kStopped`
         //                          |_______________________________^
@@ -174,11 +174,11 @@ public:
         stdx::thread _thread;
     };
 
-    TransportLayerASIO(const Options& opts,
+    AsioTransportLayer(const Options& opts,
                        ServiceEntryPoint* sep,
                        const WireSpec& wireSpec = WireSpec::instance());
 
-    ~TransportLayerASIO() override;
+    ~AsioTransportLayer() override;
 
     StatusWith<SessionHandle> connect(HostAndPort peer,
                                       ConnectSSLMode sslMode,
@@ -264,20 +264,20 @@ private:
     SSLParams::SSLModes _sslMode() const;
 #endif
 
-    Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "TransportLayerASIO::_mutex");
+    Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "AsioTransportLayer::_mutex");
 
-    // There are three reactors that are used by TransportLayerASIO. The _ingressReactor contains
+    // There are three reactors that are used by AsioTransportLayer. The _ingressReactor contains
     // all the accepted sockets and all ingress networking activity. The _acceptorReactor contains
     // all the sockets in _acceptors.  The _egressReactor contains egress connections.
     //
-    // TransportLayerASIO should never call run() on the _ingressReactor.
+    // AsioTransportLayer should never call run() on the _ingressReactor.
     // In synchronous mode, this will cause a massive performance degradation due to
     // unnecessary wakeups on the asio thread for sockets we don't intend to interact
     // with asynchronously. The additional IO context avoids registering those sockets
     // with the acceptors epoll set, thus avoiding those wakeups.  Calling run will
     // undo that benefit.
     //
-    // TransportLayerASIO should run its own thread that calls run() on the _acceptorReactor
+    // AsioTransportLayer should run its own thread that calls run() on the _acceptorReactor
     // to process calls to async_accept - this is the equivalent of the "listener" thread in
     // other TransportLayers.
     //

@@ -50,10 +50,10 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/tools/mongobridge_tool/bridge_commands.h"
 #include "mongo/tools/mongobridge_tool/mongobridge_options.h"
+#include "mongo/transport/asio_transport_layer.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/service_entry_point_impl.h"
 #include "mongo/transport/service_executor_synchronous.h"
-#include "mongo/transport/transport_layer_asio.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/future.h"
@@ -509,11 +509,11 @@ int bridgeMain(int argc, char** argv) {
     serviceContext->setServiceEntryPoint(std::make_unique<ServiceEntryPointBridge>(serviceContext));
 
     {
-        transport::TransportLayerASIO::Options opts;
+        transport::AsioTransportLayer::Options opts;
         opts.ipList.emplace_back("0.0.0.0");
         opts.port = mongoBridgeGlobalParams.port;
 
-        auto tl = std::make_unique<mongo::transport::TransportLayerASIO>(
+        auto tl = std::make_unique<mongo::transport::AsioTransportLayer>(
             opts, serviceContext->getServiceEntryPoint());
         serviceContext->setTransportLayer(std::move(tl));
     }

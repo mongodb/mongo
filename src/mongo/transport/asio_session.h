@@ -35,10 +35,10 @@
 #include "mongo/config.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/transport/asio_transport_layer.h"
 #include "mongo/transport/asio_utils.h"
 #include "mongo/transport/baton.h"
 #include "mongo/transport/ssl_connection_context.h"
-#include "mongo/transport/transport_layer_asio.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/net/socket_utils.h"
 #ifdef MONGO_CONFIG_SSL
@@ -54,8 +54,8 @@
 
 namespace mongo::transport {
 
-extern FailPoint transportLayerASIOshortOpportunisticReadWrite;
-extern FailPoint transportLayerASIOSessionPauseBeforeSetSocketOption;
+extern FailPoint asioTransportLayerShortOpportunisticReadWrite;
+extern FailPoint asioTransportLayerSessionPauseBeforeSetSocketOption;
 
 template <typename SuccessValue>
 auto futurize(const std::error_code& ec, SuccessValue&& successValue) {
@@ -76,7 +76,7 @@ inline Future<void> futurize(const std::error_code& ec) {
     return Result::makeReady();
 }
 
-class TransportLayerASIO::AsioSession final : public Session {
+class AsioTransportLayer::AsioSession final : public Session {
 public:
     using GenericSocket = asio::generic::stream_protocol::socket;
 
@@ -84,7 +84,7 @@ public:
 
     // If the socket is disconnected while any of these options are being set, this constructor
     // may throw, but it is guaranteed to throw a mongo DBException.
-    AsioSession(TransportLayerASIO* tl,
+    AsioSession(AsioTransportLayer* tl,
                 GenericSocket socket,
                 bool isIngressSession,
                 Endpoint endpoint = Endpoint(),
@@ -149,8 +149,8 @@ public:
 #endif
 
 protected:
-    friend class TransportLayerASIO;
-    friend TransportLayerASIO::BatonASIO;
+    friend class AsioTransportLayer;
+    friend AsioTransportLayer::BatonASIO;
 
 #ifdef MONGO_CONFIG_SSL
     // Constructs a SSL socket required to initiate SSL handshake for egress connections.
@@ -302,7 +302,7 @@ private:
     std::shared_ptr<const SSLConnectionContext> _sslContext;
 #endif
 
-    TransportLayerASIO* const _tl;
+    AsioTransportLayer* const _tl;
     bool _isIngressSession;
     bool _isFromLoadBalancer = false;
     boost::optional<SockAddr> _proxiedSrcEndpoint;

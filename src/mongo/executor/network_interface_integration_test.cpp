@@ -500,7 +500,7 @@ TEST_F(NetworkInterfaceTest, LateCancel) {
 
 TEST_F(NetworkInterfaceTest, ConnectionErrorDropsSingleConnection) {
     FailPoint* failPoint =
-        globalFailPointRegistry().find("transportLayerASIOasyncConnectReturnsConnectionError");
+        globalFailPointRegistry().find("asioTransportLayerAsyncConnectReturnsConnectionError");
     auto timesEntered = failPoint->setMode(FailPoint::nTimes, 1);
 
     auto cbh = makeCallbackHandle();

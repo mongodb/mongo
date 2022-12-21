@@ -70,7 +70,7 @@ assert.commandWorked(db[kCollectionName].insertOne({primaryOnly: true, [kKeyName
 
 jsTestLog("Activating the delay in connection establishment.");
 let connDelayFailPoint = configureFailPoint(
-    st.s, 'transportLayerASIOdelayConnection', {millis: kConnectionEstablishmentDelayMillis});
+    st.s, 'asioTransportLayerDelayConnection', {millis: kConnectionEstablishmentDelayMillis});
 assert.commandWorked(st.s.adminCommand(
     {setParameter: 1, slowConnectionThresholdMillis: kConnectionEstablishmentDelayMillis}));
 assert.commandWorked(

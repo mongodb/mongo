@@ -140,7 +140,7 @@ public:
 
 }  // namespace
 
-void TransportLayerASIO::BatonASIO::schedule(Task func) noexcept {
+void AsioTransportLayer::BatonASIO::schedule(Task func) noexcept {
     auto task = [this, func = std::move(func)](stdx::unique_lock<Mutex> lk) mutable {
         auto status = _opCtx ? Status::OK() : getDetachedError();
         lk.unlock();
@@ -159,11 +159,11 @@ void TransportLayerASIO::BatonASIO::schedule(Task func) noexcept {
         notify();
 }
 
-void TransportLayerASIO::BatonASIO::notify() noexcept {
+void AsioTransportLayer::BatonASIO::notify() noexcept {
     efd(_opCtx).notify();
 }
 
-Waitable::TimeoutState TransportLayerASIO::BatonASIO::run_until(ClockSource* clkSource,
+Waitable::TimeoutState AsioTransportLayer::BatonASIO::run_until(ClockSource* clkSource,
                                                                 Date_t deadline) noexcept {
     // Set up a timer on the baton with the specified deadline. This synthetic timer is used by
     // `_poll()`, which is called through `run()`, to enforce a deadline for the blocking `::poll`.
@@ -182,7 +182,7 @@ Waitable::TimeoutState TransportLayerASIO::BatonASIO::run_until(ClockSource* clk
     }
 }
 
-void TransportLayerASIO::BatonASIO::run(ClockSource* clkSource) noexcept {
+void AsioTransportLayer::BatonASIO::run(ClockSource* clkSource) noexcept {
     // On the way out, fulfill promises and run scheduled jobs without holding the lock.
     std::list<Promise<void>> toFulfill;
     const ScopeGuard guard([&] {
@@ -218,7 +218,7 @@ void TransportLayerASIO::BatonASIO::run(ClockSource* clkSource) noexcept {
     }
 }
 
-void TransportLayerASIO::BatonASIO::markKillOnClientDisconnect() noexcept {
+void AsioTransportLayer::BatonASIO::markKillOnClientDisconnect() noexcept {
     auto client = _opCtx->getClient();
     invariant(client);
     if (auto session = client->session()) {
@@ -229,11 +229,11 @@ void TransportLayerASIO::BatonASIO::markKillOnClientDisconnect() noexcept {
     }
 }
 
-Future<void> TransportLayerASIO::BatonASIO::addSession(Session& session, Type type) noexcept {
+Future<void> AsioTransportLayer::BatonASIO::addSession(Session& session, Type type) noexcept {
     return _addSession(session, type == Type::In ? POLLIN : POLLOUT);
 }
 
-Future<void> TransportLayerASIO::BatonASIO::waitUntil(const ReactorTimer& reactorTimer,
+Future<void> AsioTransportLayer::BatonASIO::waitUntil(const ReactorTimer& reactorTimer,
                                                       Date_t expiration) noexcept try {
     auto pf = makePromiseFuture<void>();
     _safeExecute(stdx::unique_lock(_mutex),
@@ -247,7 +247,7 @@ Future<void> TransportLayerASIO::BatonASIO::waitUntil(const ReactorTimer& reacto
     return ex.toStatus();
 }
 
-bool TransportLayerASIO::BatonASIO::cancelSession(Session& session) noexcept {
+bool AsioTransportLayer::BatonASIO::cancelSession(Session& session) noexcept {
     const auto id = session.id();
 
     stdx::unique_lock lk(_mutex);
@@ -269,7 +269,7 @@ bool TransportLayerASIO::BatonASIO::cancelSession(Session& session) noexcept {
     return true;
 }
 
-bool TransportLayerASIO::BatonASIO::cancelTimer(const ReactorTimer& timer) noexcept {
+bool AsioTransportLayer::BatonASIO::cancelTimer(const ReactorTimer& timer) noexcept {
     const auto id = timer.id();
 
     stdx::unique_lock lk(_mutex);
@@ -292,13 +292,13 @@ bool TransportLayerASIO::BatonASIO::cancelTimer(const ReactorTimer& timer) noexc
     return true;
 }
 
-bool TransportLayerASIO::BatonASIO::canWait() noexcept {
+bool AsioTransportLayer::BatonASIO::canWait() noexcept {
     stdx::lock_guard lk(_mutex);
     return _opCtx;
 }
 
-void TransportLayerASIO::BatonASIO::_safeExecute(stdx::unique_lock<Mutex> lk,
-                                                 TransportLayerASIO::BatonASIO::Job job) {
+void AsioTransportLayer::BatonASIO::_safeExecute(stdx::unique_lock<Mutex> lk,
+                                                 AsioTransportLayer::BatonASIO::Job job) {
     if (!_opCtx) {
         // If we're detached, no job can safely execute.
         iasserted(getDetachedError());
@@ -312,7 +312,7 @@ void TransportLayerASIO::BatonASIO::_safeExecute(stdx::unique_lock<Mutex> lk,
     }
 }
 
-std::list<Promise<void>> TransportLayerASIO::BatonASIO::_poll(stdx::unique_lock<Mutex>& lk,
+std::list<Promise<void>> AsioTransportLayer::BatonASIO::_poll(stdx::unique_lock<Mutex>& lk,
                                                               ClockSource* clkSource) {
     const auto now = clkSource->now();
 
@@ -389,7 +389,7 @@ std::list<Promise<void>> TransportLayerASIO::BatonASIO::_poll(stdx::unique_lock<
     return promises;
 }
 
-Future<void> TransportLayerASIO::BatonASIO::_addSession(Session& session, short events) try {
+Future<void> AsioTransportLayer::BatonASIO::_addSession(Session& session, short events) try {
     auto pf = makePromiseFuture<void>();
     TransportSession ts{checked_cast<AsioSession&>(session).getSocket().native_handle(),
                         events,
@@ -404,7 +404,7 @@ Future<void> TransportLayerASIO::BatonASIO::_addSession(Session& session, short 
     return ex.toStatus();
 }
 
-void TransportLayerASIO::BatonASIO::detachImpl() noexcept {
+void AsioTransportLayer::BatonASIO::detachImpl() noexcept {
     decltype(_scheduled) scheduled;
     decltype(_sessions) sessions;
     decltype(_timers) timers;

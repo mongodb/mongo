@@ -31,7 +31,7 @@
 
 #include "mongo/base/init.h"
 #include "mongo/db/service_context.h"
-#include "mongo/transport/transport_layer_asio.h"
+#include "mongo/transport/asio_transport_layer.h"
 
 #include <iostream>
 
@@ -43,9 +43,9 @@ namespace {
 ServiceContext::ConstructorActionRegisterer registerEgressTransportLayer{
     "ConfigureEgressTransportLayer", [](ServiceContext* sc) {
         invariant(!sc->getTransportLayer());
-        transport::TransportLayerASIO::Options opts;
-        opts.mode = transport::TransportLayerASIO::Options::kEgress;
-        sc->setTransportLayer(std::make_unique<transport::TransportLayerASIO>(opts, nullptr));
+        transport::AsioTransportLayer::Options opts;
+        opts.mode = transport::AsioTransportLayer::Options::kEgress;
+        sc->setTransportLayer(std::make_unique<transport::AsioTransportLayer>(opts, nullptr));
         uassertStatusOK(sc->getTransportLayer()->setup());
         uassertStatusOK(sc->getTransportLayer()->start());
     }};

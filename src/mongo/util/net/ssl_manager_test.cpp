@@ -33,8 +33,8 @@
 #include "mongo/config.h"
 #include "mongo/platform/basic.h"
 
+#include "mongo/transport/asio_transport_layer.h"
 #include "mongo/transport/service_entry_point.h"
-#include "mongo/transport/transport_layer_asio.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/net/ssl/context.hpp"
 #include "mongo/util/net/ssl_manager.h"
@@ -507,10 +507,10 @@ TEST(SSLManager, RotateCertificatesFromFile) {
     auto options = [] {
         ServerGlobalParams params;
         params.noUnixSocket = true;
-        transport::TransportLayerASIO::Options opts(&params);
+        transport::AsioTransportLayer::Options opts(&params);
         return opts;
     }();
-    transport::TransportLayerASIO tla(options, &sepu);
+    transport::AsioTransportLayer tla(options, &sepu);
     uassertStatusOK(tla.rotateCertificates(manager, false /* asyncOCSPStaple */));
 }
 
@@ -543,10 +543,10 @@ TEST(SSLManager, RotateClusterCertificatesFromFile) {
     auto options = [] {
         ServerGlobalParams params;
         params.noUnixSocket = true;
-        transport::TransportLayerASIO::Options opts(&params);
+        transport::AsioTransportLayer::Options opts(&params);
         return opts;
     }();
-    transport::TransportLayerASIO tla(options, &sepu);
+    transport::AsioTransportLayer tla(options, &sepu);
     uassertStatusOK(tla.rotateCertificates(manager, false /* asyncOCSPStaple */));
 }
 
@@ -611,10 +611,10 @@ TEST(SSLManager, TransientSSLParams) {
     auto options = [] {
         ServerGlobalParams params;
         params.noUnixSocket = true;
-        transport::TransportLayerASIO::Options opts(&params);
+        transport::AsioTransportLayer::Options opts(&params);
         return opts;
     }();
-    transport::TransportLayerASIO tla(options, &sepu);
+    transport::AsioTransportLayer tla(options, &sepu);
 
     TransientSSLParams transientSSLParams;
     transientSSLParams.sslClusterPEMPayload = loadFile("jstests/libs/client.pem");
@@ -644,10 +644,10 @@ TEST(SSLManager, TransientSSLParamsStressTestWithTransport) {
     auto options = [] {
         ServerGlobalParams params;
         params.noUnixSocket = true;
-        transport::TransportLayerASIO::Options opts(&params);
+        transport::AsioTransportLayer::Options opts(&params);
         return opts;
     }();
-    transport::TransportLayerASIO tla(options, &sepu);
+    transport::AsioTransportLayer tla(options, &sepu);
 
     TransientSSLParams transientSSLParams;
     transientSSLParams.sslClusterPEMPayload = loadFile("jstests/libs/client.pem");

@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/transport/transport_layer_asio.h"
+#include "mongo/transport/asio_transport_layer.h"
 
 #include <fstream>
 #include <queue>
@@ -287,24 +287,24 @@ private:
     synchronized_value<std::vector<std::unique_ptr<SessionThread>>> _sessions;
 };
 
-std::unique_ptr<transport::TransportLayerASIO> makeTLA(ServiceEntryPoint* sep) {
+std::unique_ptr<transport::AsioTransportLayer> makeTLA(ServiceEntryPoint* sep) {
     auto options = [] {
         ServerGlobalParams params;
         params.noUnixSocket = true;
-        transport::TransportLayerASIO::Options opts(&params);
+        transport::AsioTransportLayer::Options opts(&params);
         // TODO SERVER-30312 should clean this up and assign a port from the supplied port range
         // provided by resmoke.
         opts.port = 0;
         return opts;
     }();
-    auto tla = std::make_unique<transport::TransportLayerASIO>(options, sep);
+    auto tla = std::make_unique<transport::AsioTransportLayer>(options, sep);
     ASSERT_OK(tla->setup());
     ASSERT_OK(tla->start());
     return tla;
 }
 
 /**
- * Properly setting up and tearing down the MockSEP and TransportLayerASIO is
+ * Properly setting up and tearing down the MockSEP and AsioTransportLayer is
  * tricky. Most tests can delegate the details to this TestFixture.
  */
 class TestFixture {
@@ -320,7 +320,7 @@ public:
         return _sep;
     }
 
-    transport::TransportLayerASIO& tla() {
+    transport::AsioTransportLayer& tla() {
         return *_tla;
     }
 
@@ -349,24 +349,24 @@ public:
 private:
     RAIIServerParameterControllerForTest _featureFlagController{"featureFlagConnHealthMetrics",
                                                                 true};
-    std::unique_ptr<transport::TransportLayerASIO> _tla;
+    std::unique_ptr<transport::AsioTransportLayer> _tla;
     MockSEP _sep;
 
-    FailPoint& _hangBeforeAccept = transport::transportLayerASIOhangBeforeAcceptCallback;
-    FailPoint& _hangDuringAccept = transport::transportLayerASIOhangDuringAcceptCallback;
+    FailPoint& _hangBeforeAccept = transport::asioTransportLayerHangBeforeAcceptCallback;
+    FailPoint& _hangDuringAccept = transport::asioTransportLayerHangDuringAcceptCallback;
 
     FailPoint::EntryCountT _hangBeforeAcceptTimesEntered{0};
     FailPoint::EntryCountT _hangDuringAcceptTimesEntered{0};
 };
 
-TEST(TransportLayerASIO, ListenerPortZeroTreatedAsEphemeral) {
+TEST(AsioTransportLayer, ListenerPortZeroTreatedAsEphemeral) {
     Notification<bool> connected;
     TestFixture tf;
     tf.sep().setOnStartSession([&](auto&&) { connected.set(true); });
 
     int port = tf.tla().listenerPort();
     ASSERT_GT(port, 0);
-    LOGV2(6109514, "TransportLayerASIO listening", "port"_attr = port);
+    LOGV2(6109514, "AsioTransportLayer listening", "port"_attr = port);
 
     ConnectionThread connectThread(port);
     connected.get();
@@ -389,14 +389,14 @@ void setNoLinger(ConnectionThread& conn) {
  * Test that the server appropriately handles a client-side socket disconnection, and that the
  * client sends an RST packet when the socket is forcibly closed.
  */
-TEST(TransportLayerASIO, TCPResetAfterConnectionIsSilentlySwallowed) {
+TEST(AsioTransportLayer, TCPResetAfterConnectionIsSilentlySwallowed) {
     TestFixture tf;
 
     AtomicWord<int> sessionsCreated{0};
     tf.sep().setOnStartSession([&](auto&&) { sessionsCreated.fetchAndAdd(1); });
 
     LOGV2(6109515, "connecting");
-    auto& fp = transport::transportLayerASIOhangDuringAcceptCallback;
+    auto& fp = transport::asioTransportLayerHangDuringAcceptCallback;
     auto timesEntered = fp.setMode(FailPoint::alwaysOn);
     ConnectionThread connectThread(tf.tla().listenerPort(), &setNoLinger);
     fp.waitForTimesEntered(timesEntered + 1);
@@ -414,9 +414,9 @@ TEST(TransportLayerASIO, TCPResetAfterConnectionIsSilentlySwallowed) {
 #ifdef __linux__
 /**
  * Test that the server successfully captures the TCP socket queue depth, and places the value both
- * into the TransportLayerASIO class and FTDC output.
+ * into the AsioTransportLayer class and FTDC output.
  */
-TEST(TransportLayerASIO, TCPCheckQueueDepth) {
+TEST(AsioTransportLayer, TCPCheckQueueDepth) {
     // Set the listenBacklog to a parameter greater than the number of connection threads we intend
     // to create.
     serverGlobalParams.listenBacklog = 10;
@@ -464,7 +464,7 @@ TEST(TransportLayerASIO, TCPCheckQueueDepth) {
 }
 #endif
 
-TEST(TransportLayerASIO, ThrowOnNetworkErrorInEnsureSync) {
+TEST(AsioTransportLayer, ThrowOnNetworkErrorInEnsureSync) {
     TestFixture tf;
     Notification<SessionThread*> mockSessionCreated;
     tf.sep().setOnStartSession([&](SessionThread& st) { mockSessionCreated.set(&st); });
@@ -490,7 +490,7 @@ TEST(TransportLayerASIO, ThrowOnNetworkErrorInEnsureSync) {
 }
 
 /* check that timeouts actually time out */
-TEST(TransportLayerASIO, SourceSyncTimeoutTimesOut) {
+TEST(AsioTransportLayer, SourceSyncTimeoutTimesOut) {
     TestFixture tf;
     Notification<StatusWith<Message>> received;
     tf.sep().setOnStartSession([&](SessionThread& st) {
@@ -502,7 +502,7 @@ TEST(TransportLayerASIO, SourceSyncTimeoutTimesOut) {
 }
 
 /* check that timeouts don't time out unless there's an actual timeout */
-TEST(TransportLayerASIO, SourceSyncTimeoutSucceeds) {
+TEST(AsioTransportLayer, SourceSyncTimeoutSucceeds) {
     TestFixture tf;
     Notification<StatusWith<Message>> received;
     tf.sep().setOnStartSession([&](SessionThread& st) {
@@ -515,7 +515,7 @@ TEST(TransportLayerASIO, SourceSyncTimeoutSucceeds) {
 }
 
 /** Switching from timeouts to no timeouts must reset the timeout to unlimited. */
-TEST(TransportLayerASIO, SwitchTimeoutModes) {
+TEST(AsioTransportLayer, SwitchTimeoutModes) {
     TestFixture tf;
     Notification<SessionThread*> mockSessionCreated;
     tf.sep().setOnStartSession([&](SessionThread& st) { mockSessionCreated.set(&st); });
@@ -601,12 +601,12 @@ private:
 };
 
 /**
- * Have `TransportLayerASIO` make a egress connection and observe behavior when
+ * Have `AsioTransportLayer` make a egress connection and observe behavior when
  * that connection is immediately reset by the peer. Test that if this happens
  * during the `AsioSession` constructor, that the thrown `asio::system_error`
  * is handled safely (translated to a Status holding a SocketException).
  */
-TEST(TransportLayerASIO, EgressConnectionResetByPeerDuringSessionCtor) {
+TEST(AsioTransportLayer, EgressConnectionResetByPeerDuringSessionCtor) {
     // Under TFO, no SYN is sent until the client has data to send.  For this
     // test, we need the server to respond when the client hits the failpoint
     // in the AsioSession ctor. So we have to disable TFO.
@@ -618,7 +618,7 @@ TEST(TransportLayerASIO, EgressConnectionResetByPeerDuringSessionCtor) {
 
     // `fp` pauses the `AsioSession` constructor immediately prior to its
     // `setsockopt` sequence, to allow time for the peer reset to propagate.
-    FailPoint& fp = transport::transportLayerASIOSessionPauseBeforeSetSocketOption;
+    FailPoint& fp = transport::asioTransportLayerSessionPauseBeforeSetSocketOption;
 
     Acceptor server(ioContext);
     server.setOnAccept([&](std::shared_ptr<Acceptor::Connection> conn) {
@@ -651,7 +651,7 @@ TEST(TransportLayerASIO, EgressConnectionResetByPeerDuringSessionCtor) {
  * With no regard to mongo code, just check what the ASIO socket
  * implementation does in the reset connection scenario.
  */
-TEST(TransportLayerASIO, ConfirmSocketSetOptionOnResetConnections) {
+TEST(AsioTransportLayer, ConfirmSocketSetOptionOnResetConnections) {
     asio::io_context ioContext;
     Acceptor server{ioContext};
     Notification<bool> accepted;
@@ -688,7 +688,7 @@ TEST(TransportLayerASIO, ConfirmSocketSetOptionOnResetConnections) {
           "msg"_attr = "{}"_format(thrown ? thrown->message() : ""));
 }
 
-class TransportLayerASIOWithServiceContextTest : public ServiceContextTest {
+class AsioTransportLayerWithServiceContextTest : public ServiceContextTest {
 public:
     class ThreadCounter {
     public:
@@ -747,21 +747,21 @@ public:
         getServiceContext()->getTransportLayer()->shutdown();
     }
 
-    transport::TransportLayerASIO& tla() {
+    transport::AsioTransportLayer& tla() {
         auto tl = getServiceContext()->getTransportLayer();
-        return *dynamic_cast<transport::TransportLayerASIO*>(tl);
+        return *dynamic_cast<transport::AsioTransportLayer*>(tl);
     }
 };
 
-TEST_F(TransportLayerASIOWithServiceContextTest, TimerServiceDoesNotSpawnThreadsBeforeStart) {
+TEST_F(AsioTransportLayerWithServiceContextTest, TimerServiceDoesNotSpawnThreadsBeforeStart) {
     ThreadCounter counter;
-    { transport::TransportLayerASIO::TimerService service{{counter.makeSpawnFunc()}}; }
+    { transport::AsioTransportLayer::TimerService service{{counter.makeSpawnFunc()}}; }
     ASSERT_EQ(counter.created(), 0);
 }
 
-TEST_F(TransportLayerASIOWithServiceContextTest, TimerServiceOneShotStart) {
+TEST_F(AsioTransportLayerWithServiceContextTest, TimerServiceOneShotStart) {
     ThreadCounter counter;
-    transport::TransportLayerASIO::TimerService service{{counter.makeSpawnFunc()}};
+    transport::AsioTransportLayer::TimerService service{{counter.makeSpawnFunc()}};
     service.start();
     LOGV2(5490004, "Awaiting timer thread start", "threads"_attr = counter.started());
     counter.waitForStarted([](auto n) { return n > 0; });
@@ -773,30 +773,30 @@ TEST_F(TransportLayerASIOWithServiceContextTest, TimerServiceOneShotStart) {
     ASSERT_EQ(counter.created(), 1) << "Redundant start should spawn only once";
 }
 
-TEST_F(TransportLayerASIOWithServiceContextTest, TimerServiceDoesNotStartAfterStop) {
+TEST_F(AsioTransportLayerWithServiceContextTest, TimerServiceDoesNotStartAfterStop) {
     ThreadCounter counter;
-    transport::TransportLayerASIO::TimerService service{{counter.makeSpawnFunc()}};
+    transport::AsioTransportLayer::TimerService service{{counter.makeSpawnFunc()}};
     service.stop();
     service.start();
     ASSERT_EQ(counter.created(), 0) << "Stop then start should not spawn";
 }
 
-TEST_F(TransportLayerASIOWithServiceContextTest, TimerServiceCanStopMoreThanOnce) {
+TEST_F(AsioTransportLayerWithServiceContextTest, TimerServiceCanStopMoreThanOnce) {
     // Verifying that it is safe to have multiple calls to `stop()`.
     {
-        transport::TransportLayerASIO::TimerService service;
+        transport::AsioTransportLayer::TimerService service;
         service.start();
         service.stop();
         service.stop();
     }
     {
-        transport::TransportLayerASIO::TimerService service;
+        transport::AsioTransportLayer::TimerService service;
         service.stop();
         service.stop();
     }
 }
 
-TEST_F(TransportLayerASIOWithServiceContextTest, TransportStartAfterShutDown) {
+TEST_F(AsioTransportLayerWithServiceContextTest, TransportStartAfterShutDown) {
     tla().shutdown();
     ASSERT_EQ(tla().start(), transport::TransportLayer::ShutdownStatus);
 }
@@ -804,7 +804,7 @@ TEST_F(TransportLayerASIOWithServiceContextTest, TransportStartAfterShutDown) {
 #ifdef MONGO_CONFIG_SSL
 #ifndef _WIN32
 // TODO SERVER-62035: enable the following on Windows.
-TEST_F(TransportLayerASIOWithServiceContextTest, ShutdownDuringSSLHandshake) {
+TEST_F(AsioTransportLayerWithServiceContextTest, ShutdownDuringSSLHandshake) {
     /**
      * Creates a server and a client thread:
      * - The server listens for incoming connections, but doesn't participate in SSL handshake.
@@ -1156,7 +1156,7 @@ TEST_F(BatonASIOLinuxTest, CancelAsyncOperationsInterruptsOngoingOperations) {
         // Blocks the main thread as it schedules an opportunistic read, but before it starts
         // polling on the networking baton. Then it cancels the operation before unblocking the main
         // thread.
-        FailPointEnableBlock fp("transportLayerASIOBlockBeforeOpportunisticRead");
+        FailPointEnableBlock fp("asioTransportLayerBlockBeforeOpportunisticRead");
         isReady.set();
         waitForTimesEntered(fp, 1);
         client().session()->cancelAsyncOperations();
@@ -1182,7 +1182,7 @@ TEST_F(BatonASIOLinuxTest, AsyncOpsMakeProgressWhenSessionAddedToDetachedBaton) 
         });
     });
 
-    FailPointEnableBlock fp("transportLayerASIOBlockBeforeAddSession");
+    FailPointEnableBlock fp("asioTransportLayerBlockBeforeAddSession");
     ready.set();
     waitForTimesEntered(fp, 1);
 

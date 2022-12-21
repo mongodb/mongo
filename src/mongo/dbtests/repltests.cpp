@@ -46,7 +46,7 @@
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
-#include "mongo/transport/transport_layer_asio.h"
+#include "mongo/transport/asio_transport_layer.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -100,9 +100,9 @@ public:
           _defaultReplSettings(
               ReplicationCoordinator::get(_opCtx.getServiceContext())->getSettings()) {
         auto* const sc = _opCtx.getServiceContext();
-        transport::TransportLayerASIO::Options opts;
-        opts.mode = transport::TransportLayerASIO::Options::kEgress;
-        sc->setTransportLayer(std::make_unique<transport::TransportLayerASIO>(opts, nullptr));
+        transport::AsioTransportLayer::Options opts;
+        opts.mode = transport::AsioTransportLayer::Options::kEgress;
+        sc->setTransportLayer(std::make_unique<transport::AsioTransportLayer>(opts, nullptr));
         ASSERT_OK(sc->getTransportLayer()->setup());
         ASSERT_OK(sc->getTransportLayer()->start());
 

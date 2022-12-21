@@ -44,10 +44,10 @@
 
 namespace mongo::transport {
 
-MONGO_FAIL_POINT_DEFINE(transportLayerASIOshortOpportunisticReadWrite);
-MONGO_FAIL_POINT_DEFINE(transportLayerASIOSessionPauseBeforeSetSocketOption);
-MONGO_FAIL_POINT_DEFINE(transportLayerASIOBlockBeforeOpportunisticRead);
-MONGO_FAIL_POINT_DEFINE(transportLayerASIOBlockBeforeAddSession);
+MONGO_FAIL_POINT_DEFINE(asioTransportLayerShortOpportunisticReadWrite);
+MONGO_FAIL_POINT_DEFINE(asioTransportLayerSessionPauseBeforeSetSocketOption);
+MONGO_FAIL_POINT_DEFINE(asioTransportLayerBlockBeforeOpportunisticRead);
+MONGO_FAIL_POINT_DEFINE(asioTransportLayerBlockBeforeAddSession);
 
 namespace {
 
@@ -108,8 +108,8 @@ CounterMetric totalIngressTLSHandshakeTimeMillis("network.totalIngressTLSHandsha
 }  // namespace
 
 
-TransportLayerASIO::AsioSession::AsioSession(
-    TransportLayerASIO* tl,
+AsioTransportLayer::AsioSession::AsioSession(
+    AsioTransportLayer* tl,
     GenericSocket socket,
     bool isIngressSession,
     Endpoint endpoint,
@@ -120,7 +120,7 @@ TransportLayerASIO::AsioSession::AsioSession(
     auto family = endpointToSockAddr(_socket.local_endpoint()).getType();
     auto sev = logv2::LogSeverity::Debug(3);
     if (family == AF_INET || family == AF_INET6) {
-        transportLayerASIOSessionPauseBeforeSetSocketOption.pauseWhileSet();
+        asioTransportLayerSessionPauseBeforeSetSocketOption.pauseWhileSet();
         setSocketOption(_socket, asio::ip::tcp::no_delay(true), "session no delay", sev);
         setSocketOption(_socket, asio::socket_base::keep_alive(true), "session keep alive", sev);
         setSocketKeepAliveParams(_socket.native_handle(), sev);
@@ -162,7 +162,7 @@ TransportLayerASIO::AsioSession::AsioSession(
     throw;
 }
 
-void TransportLayerASIO::AsioSession::end() {
+void AsioTransportLayer::AsioSession::end() {
     if (getSocket().is_open()) {
         std::error_code ec;
         getSocket().shutdown(GenericSocket::shutdown_both, ec);
@@ -175,14 +175,14 @@ void TransportLayerASIO::AsioSession::end() {
     }
 }
 
-StatusWith<Message> TransportLayerASIO::AsioSession::sourceMessage() noexcept try {
+StatusWith<Message> AsioTransportLayer::AsioSession::sourceMessage() noexcept try {
     ensureSync();
     return sourceMessageImpl().getNoThrow();
 } catch (const DBException& ex) {
     return ex.toStatus();
 }
 
-Future<Message> TransportLayerASIO::AsioSession::asyncSourceMessage(
+Future<Message> AsioTransportLayer::AsioSession::asyncSourceMessage(
     const BatonHandle& baton) noexcept try {
     ensureAsync();
     return sourceMessageImpl(baton);
@@ -190,7 +190,7 @@ Future<Message> TransportLayerASIO::AsioSession::asyncSourceMessage(
     return ex.toStatus();
 }
 
-Status TransportLayerASIO::AsioSession::waitForData() noexcept try {
+Status AsioTransportLayer::AsioSession::waitForData() noexcept try {
     ensureSync();
     asio::error_code ec;
     getSocket().wait(asio::ip::tcp::socket::wait_read, ec);
@@ -199,21 +199,21 @@ Status TransportLayerASIO::AsioSession::waitForData() noexcept try {
     return ex.toStatus();
 }
 
-Future<void> TransportLayerASIO::AsioSession::asyncWaitForData() noexcept try {
+Future<void> AsioTransportLayer::AsioSession::asyncWaitForData() noexcept try {
     ensureAsync();
     return getSocket().async_wait(asio::ip::tcp::socket::wait_read, UseFuture{});
 } catch (const DBException& ex) {
     return ex.toStatus();
 }
 
-Status TransportLayerASIO::AsioSession::sinkMessage(Message message) noexcept try {
+Status AsioTransportLayer::AsioSession::sinkMessage(Message message) noexcept try {
     ensureSync();
     return sinkMessageImpl(std::move(message)).getNoThrow();
 } catch (const DBException& ex) {
     return ex.toStatus();
 }
 
-Future<void> TransportLayerASIO::AsioSession::asyncSinkMessage(
+Future<void> AsioTransportLayer::AsioSession::asyncSinkMessage(
     Message message, const BatonHandle& baton) noexcept try {
     ensureAsync();
     return sinkMessageImpl(std::move(message), baton);
@@ -221,7 +221,7 @@ Future<void> TransportLayerASIO::AsioSession::asyncSinkMessage(
     return ex.toStatus();
 }
 
-Future<void> TransportLayerASIO::AsioSession::sinkMessageImpl(Message message,
+Future<void> AsioTransportLayer::AsioSession::sinkMessageImpl(Message message,
                                                               const BatonHandle& baton) {
     _asyncOpState.start();
     return write(asio::buffer(message.buf(), message.size()), baton)
@@ -236,7 +236,7 @@ Future<void> TransportLayerASIO::AsioSession::sinkMessageImpl(Message message,
         });
 }
 
-void TransportLayerASIO::AsioSession::cancelAsyncOperations(const BatonHandle& baton) {
+void AsioTransportLayer::AsioSession::cancelAsyncOperations(const BatonHandle& baton) {
     LOGV2_DEBUG(4615608,
                 3,
                 "Canceling outstanding I/O operations on connection to {remote}",
@@ -252,12 +252,12 @@ void TransportLayerASIO::AsioSession::cancelAsyncOperations(const BatonHandle& b
     getSocket().cancel();
 }
 
-void TransportLayerASIO::AsioSession::setTimeout(boost::optional<Milliseconds> timeout) {
+void AsioTransportLayer::AsioSession::setTimeout(boost::optional<Milliseconds> timeout) {
     invariant(!timeout || timeout->count() > 0);
     _configuredTimeout = timeout;
 }
 
-bool TransportLayerASIO::AsioSession::isConnected() {
+bool AsioTransportLayer::AsioSession::isConnected() {
     // socket.is_open() only returns whether the socket is a valid file descriptor and
     // if we haven't marked this socket as closed already.
     if (!getSocket().is_open())
@@ -297,18 +297,18 @@ bool TransportLayerASIO::AsioSession::isConnected() {
 }
 
 #ifdef MONGO_CONFIG_SSL
-const SSLConfiguration* TransportLayerASIO::AsioSession::getSSLConfiguration() const {
+const SSLConfiguration* AsioTransportLayer::AsioSession::getSSLConfiguration() const {
     if (_sslContext->manager) {
         return &_sslContext->manager->getSSLConfiguration();
     }
     return nullptr;
 }
 
-std::shared_ptr<SSLManagerInterface> TransportLayerASIO::AsioSession::getSSLManager() const {
+std::shared_ptr<SSLManagerInterface> AsioTransportLayer::AsioSession::getSSLManager() const {
     return _sslContext->manager;
 }
 
-Status TransportLayerASIO::AsioSession::buildSSLSocket(const HostAndPort& target) {
+Status AsioTransportLayer::AsioSession::buildSSLSocket(const HostAndPort& target) {
     invariant(!_sslSocket, "SSL socket is already constructed");
     if (!_sslContext->egress) {
         return Status(ErrorCodes::SSLHandshakeFailed, "SSL requested but SSL support is disabled");
@@ -317,7 +317,7 @@ Status TransportLayerASIO::AsioSession::buildSSLSocket(const HostAndPort& target
     return Status::OK();
 }
 
-Future<void> TransportLayerASIO::AsioSession::handshakeSSLForEgress(const HostAndPort& target,
+Future<void> AsioTransportLayer::AsioSession::handshakeSSLForEgress(const HostAndPort& target,
                                                                     const ReactorHandle& reactor) {
     invariant(_sslSocket, "SSL Socket expected to be built");
     auto doHandshake = [&] {
@@ -340,7 +340,7 @@ Future<void> TransportLayerASIO::AsioSession::handshakeSSLForEgress(const HostAn
 }
 #endif
 
-void TransportLayerASIO::AsioSession::ensureSync() {
+void AsioTransportLayer::AsioSession::ensureSync() {
     asio::error_code ec;
     if (_blockingMode != Sync) {
         getSocket().non_blocking(false, ec);
@@ -370,7 +370,7 @@ void TransportLayerASIO::AsioSession::ensureSync() {
     }
 }
 
-void TransportLayerASIO::AsioSession::ensureAsync() {
+void AsioTransportLayer::AsioSession::ensureAsync() {
     if (_blockingMode == Async)
         return;
 
@@ -384,7 +384,7 @@ void TransportLayerASIO::AsioSession::ensureAsync() {
     _blockingMode = Async;
 }
 
-auto TransportLayerASIO::AsioSession::getSocket() -> GenericSocket& {
+auto AsioTransportLayer::AsioSession::getSocket() -> GenericSocket& {
 #ifdef MONGO_CONFIG_SSL
     if (_sslSocket) {
         return static_cast<GenericSocket&>(_sslSocket->lowest_layer());
@@ -393,7 +393,7 @@ auto TransportLayerASIO::AsioSession::getSocket() -> GenericSocket& {
     return _socket;
 }
 
-ExecutorFuture<void> TransportLayerASIO::AsioSession::parseProxyProtocolHeader(
+ExecutorFuture<void> AsioTransportLayer::AsioSession::parseProxyProtocolHeader(
     const ReactorHandle& reactor) {
     invariant(_isIngressSession);
     invariant(reactor);
@@ -437,7 +437,7 @@ ExecutorFuture<void> TransportLayerASIO::AsioSession::parseProxyProtocolHeader(
         });
 }
 
-Future<Message> TransportLayerASIO::AsioSession::sourceMessageImpl(const BatonHandle& baton) {
+Future<Message> AsioTransportLayer::AsioSession::sourceMessageImpl(const BatonHandle& baton) {
     static constexpr auto kHeaderSize = sizeof(MSGHEADER::Value);
 
     auto headerBuffer = SharedBuffer::allocate(kHeaderSize);
@@ -492,7 +492,7 @@ Future<Message> TransportLayerASIO::AsioSession::sourceMessageImpl(const BatonHa
 }
 
 template <typename MutableBufferSequence>
-Future<void> TransportLayerASIO::AsioSession::read(const MutableBufferSequence& buffers,
+Future<void> AsioTransportLayer::AsioSession::read(const MutableBufferSequence& buffers,
                                                    const BatonHandle& baton) {
 #ifdef MONGO_CONFIG_SSL
     if (_sslSocket) {
@@ -518,7 +518,7 @@ Future<void> TransportLayerASIO::AsioSession::read(const MutableBufferSequence& 
 }
 
 template <typename ConstBufferSequence>
-Future<void> TransportLayerASIO::AsioSession::write(const ConstBufferSequence& buffers,
+Future<void> AsioTransportLayer::AsioSession::write(const ConstBufferSequence& buffers,
                                                     const BatonHandle& baton) {
 #ifdef MONGO_CONFIG_SSL
     _ranHandshake = true;
@@ -542,14 +542,14 @@ Future<void> TransportLayerASIO::AsioSession::write(const ConstBufferSequence& b
 }
 
 template <typename Stream, typename MutableBufferSequence>
-Future<void> TransportLayerASIO::AsioSession::opportunisticRead(
+Future<void> AsioTransportLayer::AsioSession::opportunisticRead(
     Stream& stream, const MutableBufferSequence& buffers, const BatonHandle& baton) {
     std::error_code ec;
     size_t size;
 
-    transportLayerASIOBlockBeforeOpportunisticRead.pauseWhileSet();
+    asioTransportLayerBlockBeforeOpportunisticRead.pauseWhileSet();
 
-    if (MONGO_unlikely(transportLayerASIOshortOpportunisticReadWrite.shouldFail()) &&
+    if (MONGO_unlikely(asioTransportLayerShortOpportunisticReadWrite.shouldFail()) &&
         _blockingMode == Async) {
         asio::mutable_buffer localBuffer = buffers;
 
@@ -585,7 +585,7 @@ Future<void> TransportLayerASIO::AsioSession::opportunisticRead(
             return makeCanceledStatus();
         if (auto networkingBaton = baton ? baton->networking() : nullptr;
             networkingBaton && networkingBaton->canWait()) {
-            transportLayerASIOBlockBeforeAddSession.pauseWhileSet();
+            asioTransportLayerBlockBeforeAddSession.pauseWhileSet();
             return networkingBaton->addSession(*this, NetworkingBaton::Type::In)
                 .onError([](Status error) {
                     if (ErrorCodes::isShutdownError(error)) {
@@ -609,19 +609,19 @@ Future<void> TransportLayerASIO::AsioSession::opportunisticRead(
 }
 
 #ifdef MONGO_CONFIG_SSL
-boost::optional<std::string> TransportLayerASIO::AsioSession::getSniName() const {
+boost::optional<std::string> AsioTransportLayer::AsioSession::getSniName() const {
     return SSLPeerInfo::forSession(shared_from_this()).sniName;
 }
 #endif
 
 template <typename Stream, typename ConstBufferSequence>
-Future<void> TransportLayerASIO::AsioSession::opportunisticWrite(Stream& stream,
+Future<void> AsioTransportLayer::AsioSession::opportunisticWrite(Stream& stream,
                                                                  const ConstBufferSequence& buffers,
                                                                  const BatonHandle& baton) {
     std::error_code ec;
     std::size_t size;
 
-    if (MONGO_unlikely(transportLayerASIOshortOpportunisticReadWrite.shouldFail()) &&
+    if (MONGO_unlikely(asioTransportLayerShortOpportunisticReadWrite.shouldFail()) &&
         _blockingMode == Async) {
         asio::const_buffer localBuffer = buffers;
 
@@ -661,7 +661,7 @@ Future<void> TransportLayerASIO::AsioSession::opportunisticWrite(Stream& stream,
             return makeCanceledStatus();
         if (auto networkingBaton = baton ? baton->networking() : nullptr;
             networkingBaton && networkingBaton->canWait()) {
-            transportLayerASIOBlockBeforeAddSession.pauseWhileSet();
+            asioTransportLayerBlockBeforeAddSession.pauseWhileSet();
             return networkingBaton->addSession(*this, NetworkingBaton::Type::Out)
                 .onError([](Status error) {
                     if (ErrorCodes::isShutdownError(error)) {
@@ -686,7 +686,7 @@ Future<void> TransportLayerASIO::AsioSession::opportunisticWrite(Stream& stream,
 
 #ifdef MONGO_CONFIG_SSL
 template <typename MutableBufferSequence>
-Future<bool> TransportLayerASIO::AsioSession::maybeHandshakeSSLForIngress(
+Future<bool> AsioTransportLayer::AsioSession::maybeHandshakeSSLForIngress(
     const MutableBufferSequence& buffer) {
     invariant(asio::buffer_size(buffer) >= sizeof(MSGHEADER::Value));
     MSGHEADER::ConstView headerView(asio::buffer_cast<char*>(buffer));
@@ -776,13 +776,13 @@ Future<bool> TransportLayerASIO::AsioSession::maybeHandshakeSSLForIngress(
 #endif  // MONGO_CONFIG_SSL
 
 template <typename Buffer>
-bool TransportLayerASIO::AsioSession::checkForHTTPRequest(const Buffer& buffers) {
+bool AsioTransportLayer::AsioSession::checkForHTTPRequest(const Buffer& buffers) {
     invariant(asio::buffer_size(buffers) >= 4);
     const StringData bufferAsStr(asio::buffer_cast<const char*>(buffers), 4);
     return (bufferAsStr == "GET "_sd);
 }
 
-Future<Message> TransportLayerASIO::AsioSession::sendHTTPResponse(const BatonHandle& baton) {
+Future<Message> AsioTransportLayer::AsioSession::sendHTTPResponse(const BatonHandle& baton) {
     constexpr auto userMsg =
         "It looks like you are trying to access MongoDB over HTTP"
         " on the native driver port.\r\n"_sd;

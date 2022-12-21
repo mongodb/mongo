@@ -38,7 +38,7 @@ Tasks can be scheduled on this baton through its associated `OperationContext`
 and using `OperationContext::getBaton()::schedule(...)`.
 
 Note that this baton is not available for an `OperationContext` that belongs to 
-a `ServiceContext` with a `TransportLayerASIO` transport layer. In that case, 
+a `ServiceContext` with an `AsioTransportLayer` transport layer. In that case, 
 the aforementioned interface will return a handle to *BatonASIO*.
 
 ### BatonASIO

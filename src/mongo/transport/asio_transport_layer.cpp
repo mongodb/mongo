@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/transport/transport_layer_asio.h"
+#include "mongo/transport/asio_transport_layer.h"
 
 #include <fmt/format.h>
 #include <fstream>
@@ -121,11 +121,11 @@ bool tcpFastOpenIsConfigured = false;
 boost::optional<Status> maybeTcpFastOpenStatus;
 }  // namespace
 
-MONGO_FAIL_POINT_DEFINE(transportLayerASIOasyncConnectTimesOut);
-MONGO_FAIL_POINT_DEFINE(transportLayerASIOdelayConnection);
-MONGO_FAIL_POINT_DEFINE(transportLayerASIOhangBeforeAcceptCallback);
-MONGO_FAIL_POINT_DEFINE(transportLayerASIOhangDuringAcceptCallback);
-MONGO_FAIL_POINT_DEFINE(transportLayerASIOasyncConnectReturnsConnectionError);
+MONGO_FAIL_POINT_DEFINE(asioTransportLayerAsyncConnectTimesOut);
+MONGO_FAIL_POINT_DEFINE(asioTransportLayerDelayConnection);
+MONGO_FAIL_POINT_DEFINE(asioTransportLayerHangBeforeAcceptCallback);
+MONGO_FAIL_POINT_DEFINE(asioTransportLayerHangDuringAcceptCallback);
+MONGO_FAIL_POINT_DEFINE(asioTransportLayerAsyncConnectReturnsConnectionError);
 
 #ifdef MONGO_CONFIG_SSL
 SSLConnectionContext::~SSLConnectionContext() = default;
@@ -207,7 +207,7 @@ private:
     std::shared_ptr<TimerType> _timer;
 };
 
-class TransportLayerASIO::ASIOReactor final : public Reactor {
+class AsioTransportLayer::ASIOReactor final : public Reactor {
 public:
     ASIOReactor() : _clkSource(this), _stats(&_clkSource), _ioContext() {}
 
@@ -286,7 +286,7 @@ private:
 
     class ThreadIdGuard {
     public:
-        ThreadIdGuard(TransportLayerASIO::ASIOReactor* reactor) {
+        ThreadIdGuard(AsioTransportLayer::ASIOReactor* reactor) {
             invariant(!_reactorForThread);
             _reactorForThread = reactor;
         }
@@ -306,10 +306,10 @@ private:
     asio::io_context _ioContext;
 };
 
-thread_local TransportLayerASIO::ASIOReactor* TransportLayerASIO::ASIOReactor::_reactorForThread =
+thread_local AsioTransportLayer::ASIOReactor* AsioTransportLayer::ASIOReactor::_reactorForThread =
     nullptr;
 
-TransportLayerASIO::Options::Options(const ServerGlobalParams* params,
+AsioTransportLayer::Options::Options(const ServerGlobalParams* params,
                                      boost::optional<int> loadBalancerPort)
     : port(params->port),
       loadBalancerPort(loadBalancerPort),
@@ -321,17 +321,17 @@ TransportLayerASIO::Options::Options(const ServerGlobalParams* params,
       maxConns(params->maxConns) {
 }
 
-TransportLayerASIO::TimerService::TimerService(Options opt)
-    : _reactor(std::make_shared<TransportLayerASIO::ASIOReactor>()) {
+AsioTransportLayer::TimerService::TimerService(Options opt)
+    : _reactor(std::make_shared<AsioTransportLayer::ASIOReactor>()) {
     if (opt.spawn)
         _spawn = std::move(opt.spawn);
 }
 
-TransportLayerASIO::TimerService::~TimerService() {
+AsioTransportLayer::TimerService::~TimerService() {
     stop();
 }
 
-void TransportLayerASIO::TimerService::start() {
+void AsioTransportLayer::TimerService::start() {
     // Skip the expensive lock acquisition and `compareAndSwap` in the common path.
     if (MONGO_likely(_state.load() != State::kInitialized))
         return;
@@ -357,7 +357,7 @@ void TransportLayerASIO::TimerService::start() {
     }
 }
 
-void TransportLayerASIO::TimerService::stop() {
+void AsioTransportLayer::TimerService::stop() {
     // It's possible for `stop()` to be called without `start()` having been called (or for them to
     // be called concurrently), so we only proceed with stopping the reactor and joining the thread
     // if we've already transitioned to the `kStarted` state.
@@ -369,22 +369,22 @@ void TransportLayerASIO::TimerService::stop() {
     _thread.join();
 }
 
-std::unique_ptr<ReactorTimer> TransportLayerASIO::TimerService::makeTimer() {
+std::unique_ptr<ReactorTimer> AsioTransportLayer::TimerService::makeTimer() {
     return _getReactor()->makeTimer();
 }
 
-Date_t TransportLayerASIO::TimerService::now() {
+Date_t AsioTransportLayer::TimerService::now() {
     return _getReactor()->now();
 }
 
-Reactor* TransportLayerASIO::TimerService::_getReactor() {
-    // TODO SERVER-57253 We can start this service as part of starting `TransportLayerASIO`.
+Reactor* AsioTransportLayer::TimerService::_getReactor() {
+    // TODO SERVER-57253 We can start this service as part of starting `AsioTransportLayer`.
     // Then, we can remove the following invocation of `start()`.
     start();
     return _reactor.get();
 }
 
-TransportLayerASIO::TransportLayerASIO(const TransportLayerASIO::Options& opts,
+AsioTransportLayer::AsioTransportLayer(const AsioTransportLayer::Options& opts,
                                        ServiceEntryPoint* sep,
                                        const WireSpec& wireSpec)
     : TransportLayer(wireSpec),
@@ -395,9 +395,9 @@ TransportLayerASIO::TransportLayerASIO(const TransportLayerASIO::Options& opts,
       _listenerOptions(opts),
       _timerService(std::make_unique<TimerService>()) {}
 
-TransportLayerASIO::~TransportLayerASIO() = default;
+AsioTransportLayer::~AsioTransportLayer() = default;
 
-struct TransportLayerASIO::AcceptorRecord {
+struct AsioTransportLayer::AcceptorRecord {
     AcceptorRecord(SockAddr address, GenericAcceptor acceptor)
         : address(std::move(address)), acceptor(std::move(acceptor)) {}
 
@@ -588,7 +588,7 @@ Status makeConnectError(Status status, const HostAndPort& peer, const WrappedEnd
 }
 
 
-StatusWith<SessionHandle> TransportLayerASIO::connect(
+StatusWith<SessionHandle> AsioTransportLayer::connect(
     HostAndPort peer,
     ConnectSSLMode sslMode,
     Milliseconds timeout,
@@ -699,7 +699,7 @@ StatusWith<SessionHandle> TransportLayerASIO::connect(
 }
 
 template <typename Endpoint>
-StatusWith<TransportLayerASIO::AsioSessionHandle> TransportLayerASIO::_doSyncConnect(
+StatusWith<AsioTransportLayer::AsioSessionHandle> AsioTransportLayer::_doSyncConnect(
     Endpoint endpoint,
     const HostAndPort& peer,
     const Milliseconds& timeout,
@@ -772,14 +772,14 @@ StatusWith<TransportLayerASIO::AsioSessionHandle> TransportLayerASIO::_doSyncCon
     }
 }
 
-Future<SessionHandle> TransportLayerASIO::asyncConnect(
+Future<SessionHandle> AsioTransportLayer::asyncConnect(
     HostAndPort peer,
     ConnectSSLMode sslMode,
     const ReactorHandle& reactor,
     Milliseconds timeout,
     std::shared_ptr<ConnectionMetrics> connectionMetrics,
     std::shared_ptr<const SSLConnectionContext> transientSSLContext) {
-    if (MONGO_unlikely(transportLayerASIOasyncConnectReturnsConnectionError.shouldFail()))
+    if (MONGO_unlikely(asioTransportLayerAsyncConnectReturnsConnectionError.shouldFail()))
         return Status{ErrorCodes::ConnectionError, "Failing asyncConnect due to fail-point"};
 
     invariant(connectionMetrics);
@@ -814,7 +814,7 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(
         WrappedResolver resolver;
         WrappedEndpoint resolvedEndpoint;
         const HostAndPort peer;
-        TransportLayerASIO::AsioSessionHandle session;
+        AsioTransportLayer::AsioSessionHandle session;
         ReactorHandle reactor;
     };
 
@@ -854,7 +854,7 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(
     Date_t timeBefore = Date_t::now();
 
     auto resolverFuture = [&]() {
-        if (auto sfp = transportLayerASIOdelayConnection.scoped(); MONGO_unlikely(sfp.isActive())) {
+        if (auto sfp = asioTransportLayerDelayConnection.scoped(); MONGO_unlikely(sfp.isActive())) {
             Milliseconds delay{sfp.getData()["millis"].safeNumberInt()};
             Date_t deadline = reactor->now() + delay;
             if ((delay > Milliseconds(0)) && (deadline < Date_t::max())) {
@@ -964,7 +964,7 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(
             return makeConnectError(status, connector->peer, connector->resolvedEndpoint);
         })
         .getAsync([connector](Status connectResult) {
-            if (MONGO_unlikely(transportLayerASIOasyncConnectTimesOut.shouldFail())) {
+            if (MONGO_unlikely(asioTransportLayerAsyncConnectTimesOut.shouldFail())) {
                 LOGV2(23013, "asyncConnectTimesOut fail point is active. simulating timeout.");
                 return;
             }
@@ -1128,7 +1128,7 @@ Status validateFastOpenOnce() noexcept {
 }
 }  // namespace
 
-Status TransportLayerASIO::setup() {
+Status AsioTransportLayer::setup() {
     std::vector<std::string> listenAddrs;
     if (_listenerOptions.ipList.empty() && _listenerOptions.isIngress()) {
         listenAddrs = {"127.0.0.1"};
@@ -1318,7 +1318,7 @@ Status TransportLayerASIO::setup() {
     return Status::OK();
 }
 
-std::vector<std::pair<SockAddr, int>> TransportLayerASIO::getListenerSocketBacklogQueueDepths()
+std::vector<std::pair<SockAddr, int>> AsioTransportLayer::getListenerSocketBacklogQueueDepths()
     const {
     std::vector<std::pair<SockAddr, int>> queueDepths;
     for (auto&& record : _acceptorRecords) {
@@ -1327,13 +1327,13 @@ std::vector<std::pair<SockAddr, int>> TransportLayerASIO::getListenerSocketBackl
     return queueDepths;
 }
 
-void TransportLayerASIO::appendStatsForServerStatus(BSONObjBuilder* bob) const {
+void AsioTransportLayer::appendStatsForServerStatus(BSONObjBuilder* bob) const {
     if (gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCV()) {
         bob->append("listenerProcessingTime", _listenerProcessingTime.load().toBSON());
     }
 }
 
-void TransportLayerASIO::appendStatsForFTDC(BSONObjBuilder& bob) const {
+void AsioTransportLayer::appendStatsForFTDC(BSONObjBuilder& bob) const {
     if (gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCV()) {
         BSONArrayBuilder queueDepthsArrayBuilder(
             bob.subarrayStart("listenerSocketBacklogQueueDepths"));
@@ -1345,7 +1345,7 @@ void TransportLayerASIO::appendStatsForFTDC(BSONObjBuilder& bob) const {
     }
 }
 
-void TransportLayerASIO::_runListener() noexcept {
+void AsioTransportLayer::_runListener() noexcept {
     setThreadName("listener");
 
     stdx::unique_lock lk(_mutex);
@@ -1410,7 +1410,7 @@ void TransportLayerASIO::_runListener() noexcept {
     }
 }
 
-Status TransportLayerASIO::start() {
+Status AsioTransportLayer::start() {
     stdx::unique_lock lk(_mutex);
     if (_isShutdown) {
         LOGV2(6986801, "Cannot start an already shutdown TransportLayer");
@@ -1427,7 +1427,7 @@ Status TransportLayerASIO::start() {
     return Status::OK();
 }
 
-void TransportLayerASIO::shutdown() {
+void AsioTransportLayer::shutdown() {
     stdx::unique_lock lk(_mutex);
 
     if (std::exchange(_isShutdown, true)) {
@@ -1461,7 +1461,7 @@ void TransportLayerASIO::shutdown() {
     thread.join();
 }
 
-ReactorHandle TransportLayerASIO::getReactor(WhichReactor which) {
+ReactorHandle AsioTransportLayer::getReactor(WhichReactor which) {
     switch (which) {
         case TransportLayer::kIngress:
             return _ingressReactor;
@@ -1492,11 +1492,11 @@ bool isTcp(Protocol&& p) {
 }
 }  // namespace
 
-void TransportLayerASIO::_acceptConnection(GenericAcceptor& acceptor) {
+void AsioTransportLayer::_acceptConnection(GenericAcceptor& acceptor) {
     auto acceptCb = [this, &acceptor](const std::error_code& ec,
                                       AsioSession::GenericSocket peerSocket) mutable {
         Timer timer;
-        transportLayerASIOhangDuringAcceptCallback.pauseWhileSet();
+        asioTransportLayerHangDuringAcceptCallback.pauseWhileSet();
 
         if (auto lk = stdx::lock_guard(_mutex); _isShutdown) {
             return;
@@ -1556,14 +1556,14 @@ void TransportLayerASIO::_acceptConnection(GenericAcceptor& acceptor) {
         _acceptConnection(acceptor);
     };
 
-    transportLayerASIOhangBeforeAcceptCallback.pauseWhileSet();
+    asioTransportLayerHangBeforeAcceptCallback.pauseWhileSet();
 
     _trySetListenerSocketBacklogQueueDepth(acceptor);
 
     acceptor.async_accept(*_ingressReactor, std::move(acceptCb));
 }
 
-void TransportLayerASIO::_trySetListenerSocketBacklogQueueDepth(
+void AsioTransportLayer::_trySetListenerSocketBacklogQueueDepth(
     GenericAcceptor& acceptor) noexcept {
 #ifdef __linux__
     try {
@@ -1589,11 +1589,11 @@ void TransportLayerASIO::_trySetListenerSocketBacklogQueueDepth(
 }
 
 #ifdef MONGO_CONFIG_SSL
-SSLParams::SSLModes TransportLayerASIO::_sslMode() const {
+SSLParams::SSLModes AsioTransportLayer::_sslMode() const {
     return static_cast<SSLParams::SSLModes>(getSSLGlobalParams().sslMode.load());
 }
 
-Status TransportLayerASIO::rotateCertificates(std::shared_ptr<SSLManagerInterface> manager,
+Status AsioTransportLayer::rotateCertificates(std::shared_ptr<SSLManagerInterface> manager,
                                               bool asyncOCSPStaple) {
     if (manager && manager->isTransient()) {
         return Status(ErrorCodes::InternalError,
@@ -1608,7 +1608,7 @@ Status TransportLayerASIO::rotateCertificates(std::shared_ptr<SSLManagerInterfac
 }
 
 StatusWith<std::shared_ptr<const transport::SSLConnectionContext>>
-TransportLayerASIO::_createSSLContext(std::shared_ptr<SSLManagerInterface>& manager,
+AsioTransportLayer::_createSSLContext(std::shared_ptr<SSLManagerInterface>& manager,
                                       SSLParams::SSLModes sslMode,
                                       bool asyncOCSPStaple) const {
 
@@ -1657,7 +1657,7 @@ TransportLayerASIO::_createSSLContext(std::shared_ptr<SSLManagerInterface>& mana
 }
 
 StatusWith<std::shared_ptr<const transport::SSLConnectionContext>>
-TransportLayerASIO::createTransientSSLContext(const TransientSSLParams& transientSSLParams) {
+AsioTransportLayer::createTransientSSLContext(const TransientSSLParams& transientSSLParams) {
     auto coordinator = SSLManagerCoordinator::get();
     if (!coordinator) {
         return Status(ErrorCodes::InvalidSSLConfiguration,
@@ -1672,7 +1672,7 @@ TransportLayerASIO::createTransientSSLContext(const TransientSSLParams& transien
 #endif
 
 #ifdef __linux__
-BatonHandle TransportLayerASIO::makeBaton(OperationContext* opCtx) const {
+BatonHandle AsioTransportLayer::makeBaton(OperationContext* opCtx) const {
     invariant(!opCtx->getBaton());
 
     auto baton = std::make_shared<BatonASIO>(opCtx);

@@ -40,9 +40,9 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/transport/asio_transport_layer.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
-#include "mongo/transport/transport_layer_asio.h"
 #include "mongo/unittest/integration_test.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/fail_point.h"
@@ -55,7 +55,7 @@
 namespace mongo {
 namespace {
 
-TEST(TransportLayerASIO, HTTPRequestGetsHTTPError) {
+TEST(AsioTransportLayer, HTTPRequestGetsHTTPError) {
     auto connectionString = unittest::getFixtureConnectionString();
     auto server = connectionString.getServers().front();
 
@@ -101,7 +101,7 @@ TEST(TransportLayerASIO, HTTPRequestGetsHTTPError) {
 //
 // Because of the file size limit, it's only an effective check on debug builds (where the future
 // implementation checks the length of the future chain).
-TEST(TransportLayerASIO, ShortReadsAndWritesWork) {
+TEST(AsioTransportLayer, ShortReadsAndWritesWork) {
     const auto assertOK = [](executor::RemoteCommandResponse reply) {
         ASSERT_OK(reply.status);
         ASSERT(reply.data["ok"]) << reply.data;
@@ -127,7 +127,7 @@ TEST(TransportLayerASIO, ShortReadsAndWritesWork) {
 
     handle->initWireVersion(__FILE__, nullptr).get();
 
-    FailPointEnableBlock fp("transportLayerASIOshortOpportunisticReadWrite");
+    FailPointEnableBlock fp("asioTransportLayerShortOpportunisticReadWrite");
 
     const executor::RemoteCommandRequest ecr{
         server, "admin", BSON("echo" << std::string(1 << 10, 'x')), BSONObj(), nullptr};
@@ -140,7 +140,7 @@ TEST(TransportLayerASIO, ShortReadsAndWritesWork) {
     handle->runCommandRequest(ecr, opCtx->getBaton()).get(opCtx.get());
 }
 
-TEST(TransportLayerASIO, asyncConnectTimeoutCleansUpSocket) {
+TEST(AsioTransportLayer, asyncConnectTimeoutCleansUpSocket) {
     auto connectionString = unittest::getFixtureConnectionString();
     auto server = connectionString.getServers().front();
 
@@ -154,7 +154,7 @@ TEST(TransportLayerASIO, asyncConnectTimeoutCleansUpSocket) {
         thread.join();
     });
 
-    FailPointEnableBlock fp("transportLayerASIOasyncConnectTimesOut");
+    FailPointEnableBlock fp("asioTransportLayerAsyncConnectTimesOut");
     auto metrics = std::make_shared<ConnectionMetrics>(sc->getFastClockSource());
     auto client = AsyncDBClient::connect(
                       server, transport::kGlobalSSLMode, sc, reactor, Milliseconds{500}, metrics)
@@ -162,7 +162,7 @@ TEST(TransportLayerASIO, asyncConnectTimeoutCleansUpSocket) {
     ASSERT_EQ(client.getStatus(), ErrorCodes::NetworkTimeout);
 }
 
-TEST(TransportLayerASIO, exhaustIsMasterShouldReceiveMultipleReplies) {
+TEST(AsioTransportLayer, exhaustIsMasterShouldReceiveMultipleReplies) {
     auto connectionString = unittest::getFixtureConnectionString();
     auto server = connectionString.getServers().front();
 
@@ -241,7 +241,7 @@ TEST(TransportLayerASIO, exhaustIsMasterShouldReceiveMultipleReplies) {
     }
 }
 
-TEST(TransportLayerASIO, exhaustIsMasterShouldStopOnFailure) {
+TEST(AsioTransportLayer, exhaustIsMasterShouldStopOnFailure) {
     const auto assertOK = [](executor::RemoteCommandResponse reply) {
         ASSERT_OK(reply.status);
         ASSERT(reply.data["ok"]) << reply.data;

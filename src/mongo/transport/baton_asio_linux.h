@@ -49,11 +49,11 @@ namespace mongo {
 namespace transport {
 
 /**
- * TransportLayerASIO Baton implementation for linux.
+ * AsioTransportLayer Baton implementation for linux.
  *
  * We implement our networking reactor on top of poll + eventfd for wakeups
  */
-class TransportLayerASIO::BatonASIO : public NetworkingBaton {
+class AsioTransportLayer::BatonASIO : public NetworkingBaton {
 public:
     BatonASIO(OperationContext* opCtx) : _opCtx(opCtx) {}
 

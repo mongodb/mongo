@@ -41,9 +41,9 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/transport/asio_transport_layer.h"
 #include "mongo/transport/service_executor_synchronous.h"
 #include "mongo/transport/session.h"
-#include "mongo/transport/transport_layer_asio.h"
 #include "mongo/util/net/ssl_types.h"
 #include "mongo/util/time_support.h"
 
@@ -135,11 +135,11 @@ Status TransportLayerManager::addAndStartTransportLayer(std::unique_ptr<Transpor
 }
 
 std::unique_ptr<TransportLayer> TransportLayerManager::makeAndStartDefaultEgressTransportLayer() {
-    transport::TransportLayerASIO::Options opts(&serverGlobalParams);
-    opts.mode = transport::TransportLayerASIO::Options::kEgress;
+    transport::AsioTransportLayer::Options opts(&serverGlobalParams);
+    opts.mode = transport::AsioTransportLayer::Options::kEgress;
     opts.ipList.clear();
 
-    auto ret = std::make_unique<transport::TransportLayerASIO>(opts, nullptr);
+    auto ret = std::make_unique<transport::AsioTransportLayer>(opts, nullptr);
     uassertStatusOK(ret->setup());
     uassertStatusOK(ret->start());
     return std::unique_ptr<TransportLayer>(std::move(ret));
@@ -149,9 +149,9 @@ std::unique_ptr<TransportLayer> TransportLayerManager::createWithConfig(
     const ServerGlobalParams* config, ServiceContext* ctx, boost::optional<int> loadBalancerPort) {
     auto sep = ctx->getServiceEntryPoint();
 
-    transport::TransportLayerASIO::Options opts(config, loadBalancerPort);
+    transport::AsioTransportLayer::Options opts(config, loadBalancerPort);
     std::vector<std::unique_ptr<TransportLayer>> retVector;
-    retVector.emplace_back(std::make_unique<transport::TransportLayerASIO>(opts, sep));
+    retVector.emplace_back(std::make_unique<transport::AsioTransportLayer>(opts, sep));
     return std::make_unique<TransportLayerManager>(std::move(retVector));
 }
 
