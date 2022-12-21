@@ -43,6 +43,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/kill_sessions_common.h"
 #include "mongo/db/session/logical_session_cache.h"
@@ -260,7 +261,8 @@ void CursorManager::unpin(OperationContext* opCtx,
     // interesting in proactively cleaning up that cursor's resources. In these cases, we
     // proactively delete the cursor. In other cases we preserve the error code so that the client
     // will see the reason the cursor was killed when asking for the next batch.
-    if (interruptStatus == ErrorCodes::Interrupted || interruptStatus == ErrorCodes::CursorKilled) {
+    if (interruptStatus == ErrorCodes::Interrupted || interruptStatus == ErrorCodes::CursorKilled ||
+        (cursor->cameFromRouter() && interruptStatus == ErrorCodes::MaxTimeMSExpired)) {
         LOGV2(20530,
               "removing cursor {cursor_cursorid} after completing batch: {error}",
               "Removing cursor after completing batch",
@@ -371,6 +373,7 @@ ClientCursorPin CursorManager::registerCursor(OperationContext* opCtx,
 
     std::unique_ptr<ClientCursor, ClientCursor::Deleter> clientCursor(
         new ClientCursor(std::move(cursorParams), cursorId, opCtx, now));
+    clientCursor->setCameFromRouter(OperationShardingState::isComingFromRouter(opCtx));
 
     // Register this cursor for lookup by transaction.
     if (opCtx->getLogicalSessionId() && opCtx->getTxnNumber()) {

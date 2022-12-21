@@ -299,6 +299,24 @@ public:
         _stashedRecoveryUnit = std::move(ru);
     }
 
+    /**
+     * When properly set, returns true when this client cursor came from router (mongos) in case of
+     * sharding.
+     */
+    bool cameFromRouter() const {
+        return _cameFromRouter;
+    }
+
+    /**
+     * Sets 'cameFromRouter' flag of this client cursor. This flag comes from 'OperationContext'.
+     *
+     * A cursor needs to store this, because it might be used with several operation contexts, but
+     * only the first operation context has this information.
+     */
+    void setCameFromRouter(bool newValue) {
+        _cameFromRouter = newValue;
+    }
+
 private:
     friend class CursorManager;
     friend class ClientCursorPin;
@@ -439,6 +457,8 @@ private:
 
     // The client OperationKey associated with this cursor.
     boost::optional<OperationKey> _opKey;
+
+    bool _cameFromRouter = false;
 };
 
 /**
