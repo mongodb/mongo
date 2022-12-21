@@ -40,6 +40,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/update_metrics.h"
 #include "mongo/db/commands/write_commands_common.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
@@ -797,10 +798,10 @@ public:
                 // Make sure the document hasn't changed since we read it into the BucketCatalog.
                 // This should not happen, but since we can double-check it here, we can guard
                 // against the missed update that would result from simply replacing with 'after'.
-                tassert(6990700,
-                        "Bucket document changed between initial read and update",
-                        bucketDoc.binaryEqual(before));
-
+                if (!bucketDoc.binaryEqual(before)) {
+                    throwWriteConflictException(
+                        "Bucket document changed between initial read and update");
+                }
                 return after;
             };
 
