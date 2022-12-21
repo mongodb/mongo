@@ -58,7 +58,6 @@ case $# in
     if [ $1 == "-F" ]; then
         # We are running in fast mode, get all the source files modified according to git.
         search=`git diff --name-only $(git merge-base --fork-point develop) | grep -E '\.(c|h|cpp)$'`
-        echo $search
     else
         search="$1"
         exclude=false

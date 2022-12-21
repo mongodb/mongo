@@ -13,7 +13,7 @@ type python > /dev/null 2>&1 || {
 
 echo 'dist/s_all run started...'
 
-fast=1
+fast=""
 force=
 reconf=0
 errmode=0
@@ -32,7 +32,7 @@ while :
         shift;;
     -F) # Run fast.
         echo "dist/s_all running in fast mode..."
-        fast=0
+        fast="-F"
         shift;;
     *)
         break;;
@@ -46,14 +46,6 @@ errchk()
 {
     if ! `test -s $2`; then
         return
-    fi
-
-    # Return if evergreen validate runs successfully.
-    if echo "$1" | grep -q "evergreen"; then
-        if  cat "$2" | grep -q ".yml is valid"; then
-            rm -f "$2"
-            return
-        fi
     fi
 
     echo "####################### MESSAGE ############################"
@@ -91,33 +83,23 @@ run "python log.py"
 run "python stat.py"
 run "python verbose.py"
 run "sh ./s_copyright"
-if [ $fast -eq 0 ]; then
-    run "sh ./s_style -F"
-    run "./s_clang_format -F"
-else
-    run "sh ./s_style"
-    run "./s_clang_format"
-fi
+run "sh ./s_style ${fast}"
+run "./s_clang_format ${fast}"
 run "python prototypes.py"
 run "sh ./s_typedef -b"
 run "python test_tag.py"
 # The s_mentions script requires bash.
 run "./s_mentions" "--warning-only"
-if [ $(command -v evergreen) ] && [ -f ~/.evergreen.yml ]; then
-    run "cd .."
-    run "evergreen validate -p wiredtiger test/evergreen.yml"
-    run "evergreen validate -p wiredtiger test/evergreen_develop.yml"
-    run "cd dist"
-fi
 
 COMMANDS="
 2>&1 ./s_define > ${t_pfx}s_define
 2>&1 ./s_docs > ${t_pfx}s_docs
 2>&1 ./s_evergreen > ${t_pfx}s_evergreen
+2>&1 ./s_evergreen_validate ${fast} > ${t_pfx}s_evergreen_validate
 2>&1 ./s_export > ${t_pfx}s_export
 2>&1 ./s_free > ${t_pfx}s_free
 2>&1 ./s_funcs > ${t_pfx}s_funcs
-2>&1 ./s_function > ${t_pfx}s_function
+2>&1 ./s_function ${fast} > ${t_pfx}s_function
 2>&1 ./s_getopt > ${t_pfx}s_getopt
 2>&1 ./s_lang > ${t_pfx}s_lang
 2>&1 ./s_longlines > ${t_pfx}s_longlines
@@ -144,7 +126,7 @@ for f in `find . -name ${t_pfx}\*`; do
         LOCAL_NAME=`basename $f`
         # Find original command and trim redirect garbage
         FAILED_CMD=`echo "$COMMANDS" | grep $LOCAL_NAME | \
-            sed -e 's/ >.*//' -e 's/.* //'`
+            sed -e 's/ >.*//' -e 's/2>&1 //'`
         errchk "$FAILED_CMD" $f
     fi
 done
