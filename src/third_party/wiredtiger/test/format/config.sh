@@ -1,9 +1,9 @@
 #! /bin/sh
 
-# This script creates format's config.h and config_def.c files. To change format's configuration,
+# This script creates format's config.h and format_config_def.c files. To change format's configuration,
 # modify this file and then run it as a script.
 
-fc="config_def.c"
+fc="format_config_def.c"
 fh="config.h"
 
 cat<<END_OF_HEADER_FILE_PREFIX>$fh
