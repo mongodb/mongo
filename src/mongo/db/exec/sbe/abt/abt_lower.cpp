@@ -407,9 +407,12 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const FilterNode& n,
     auto expr = SBEExpressionLowering{_env, _slotMap}.optimize(filter);
     const PlanNodeId planNodeId = _nodeToGroupPropsMap.at(&n)._planNodeId;
 
-    // Check if the filter expression is 'constant' (i.e. does not depend on any variables)
-    // and create FilterStage<true>.
-    if (_env.getVariables(filter)._variables.empty()) {
+    // Check if the filter expression is 'constant' (i.e., does not depend on any variables); then
+    // create FilterStage<true> if it is constant, or FilterStage<false> otherwise.
+    bool isConstant = true;
+    VariableEnvironment::walkVariables(filter, [&](const Variable&) { isConstant = false; });
+
+    if (isConstant) {
         return sbe::makeS<sbe::FilterStage<true>>(std::move(input), std::move(expr), planNodeId);
     } else {
         return sbe::makeS<sbe::FilterStage<false>>(std::move(input), std::move(expr), planNodeId);

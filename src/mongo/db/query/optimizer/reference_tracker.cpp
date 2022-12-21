@@ -236,37 +236,37 @@ struct CollectedInfo {
 };
 
 /**
- * Collect all Variables into a set.
+ * Walks over all variables in the ABT and calls a callback for each variable.
  */
-class VariableCollector {
+class VariableTransporter {
 public:
+    VariableTransporter(
+        const std::function<void(const Variable&)>& variableCallback,
+        const std::function<void(const ProjectionName&)>& variableDefinitionCallback)
+        : _variableCallback(variableCallback),
+          _variableDefinitionCallback(variableDefinitionCallback) {}
+
     template <typename T, typename... Ts>
     void transport(const T& /*op*/, Ts&&... /*ts*/) {}
 
     void transport(const Variable& op) {
-        _result._variables.push_back(op);
+        _variableCallback(op);
     }
 
     void transport(const LambdaAbstraction& op, const ABT& /*bind*/) {
-        _result._definedVars.insert(op.varName());
+        _variableDefinitionCallback(op.varName());
     }
 
     void transport(const Let& op, const ABT& /*bind*/, const ABT& /*expr*/) {
-        _result._definedVars.insert(op.varName());
-    }
-
-    static VariableCollectorResult collect(const ABT& n) {
-        VariableCollector collector;
-        collector.collectInternal(n);
-        return std::move(collector._result);
+        _variableDefinitionCallback(op.varName());
     }
 
 private:
-    void collectInternal(const ABT& n) {
-        algebra::transport<false>(n, *this);
-    }
+    // Callback used on each Variable in the ABT.
+    const std::function<void(const Variable&)>& _variableCallback;
 
-    VariableCollectorResult _result;
+    // Callback used on any defined variable name (via a Let or Lambda) in the ABT.
+    const std::function<void(const ProjectionName&)>& _variableDefinitionCallback;
 };
 
 struct Collector {
@@ -991,17 +991,12 @@ bool VariableEnvironment::isLastRef(const Variable& var) const {
     return _info->lastRefs.count(&var) > 0;
 }
 
-VariableCollectorResult VariableEnvironment::getVariables(const ABT& n) {
-    return VariableCollector::collect(n);
-}
-
-void VariableEnvironment::walkVariables(const ABT& n, std::function<void(const Variable&)> func) {
-    // TODO SERVER-71530 consider passing the lambda into the transport, to avoid building a vector.
-    VariableCollectorResult collected = VariableEnvironment::getVariables(n);
-
-    for (auto&& var : collected._variables) {
-        func(var.get());
-    }
+void VariableEnvironment::walkVariables(
+    const ABT& n,
+    const std::function<void(const Variable&)>& variableCallback,
+    const std::function<void(const ProjectionName&)>& variableDefinitionCallback) {
+    VariableTransporter transporter(variableCallback, variableDefinitionCallback);
+    algebra::transport<false>(n, transporter);
 }
 
 

@@ -175,10 +175,12 @@ TEST(ReferenceTrackerTest, GetDefinitionsForLet) {
 
     // But, the environment keeps the info about the definitions for all variables in the ABT. Check
     // that the local variable is defined by the Let.
-    auto variables = VariableEnvironment::getVariables(evalNode);
-    auto xVar = std::find_if(variables._variables.begin(),
-                             variables._variables.end(),
-                             [&](const Variable& var) { return var.name() == "x"; });
+    const Variable* xVar = nullptr;
+    VariableEnvironment::walkVariables(evalNode, [&](const Variable& var) {
+        if (var.name() == "x") {
+            xVar = &var;
+        }
+    });
     ASSERT(env.isLastRef(*xVar));
     ASSERT(env.getDefinition(*xVar).definedBy == letRef);
 }

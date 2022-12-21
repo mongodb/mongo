@@ -1140,10 +1140,9 @@ public:
                 const ABT& aggExpr = node.getAggregationExpressions().at(aggIndex);
                 aggregationProjections.push_back(aggExpr);
 
-                for (const Variable& var : VariableEnvironment::getVariables(aggExpr)._variables) {
-                    // Add all references this expression requires.
-                    projectionsToAdd.insert(var.name());
-                }
+                // Add all references this expression requires.
+                VariableEnvironment::walkVariables(
+                    aggExpr, [&](const Variable& var) { projectionsToAdd.insert(var.name()); });
             }
         }
 

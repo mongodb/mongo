@@ -207,12 +207,14 @@ TEST(Optimizer, Tracker4) {
     ASSERT(!env.hasFreeVariables());
 
     // Get all variables from the expression
-    auto vars = VariableEnvironment::getVariables(filterNode.cast<FilterNode>()->getFilter());
-    ASSERT(vars._variables.size() == 1);
+    std::vector<std::reference_wrapper<const Variable>> vars;
+    VariableEnvironment::walkVariables(filterNode.cast<FilterNode>()->getFilter(),
+                                       [&](const Variable& var) { vars.push_back(var); });
+    ASSERT(vars.size() == 1);
     // Get all definitions from the scan and below (even though there is nothing below the scan).
     auto defs = env.getDefinitions(scanNodeRef);
     // Make sure that variables are defined by the scan (and not by Eval).
-    for (const Variable& v : vars._variables) {
+    for (const Variable& v : vars) {
         auto it = defs.find(v.name());
         ASSERT(it != defs.end());
         ASSERT(it->second.definedBy == env.getDefinition(v).definedBy);

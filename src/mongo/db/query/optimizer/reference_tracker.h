@@ -55,16 +55,6 @@ struct Definition {
 struct CollectedInfo;
 using DefinitionsMap = ProjectionNameMap<Definition>;
 
-struct VariableCollectorResult {
-    // The Variables referenced by the subtree.
-    std::vector<std::reference_wrapper<const Variable>> _variables;
-    // The names of locally-defined Variables. These aren't propagated up the tree during normal
-    // variable resolution. Tracking these separately allows us to easily check, for example, which
-    // variables are referenced in but not defined by the subtree (i.e. variables which should be
-    // defined elsewhere in the ABT).
-    ProjectionNameSet _definedVars;
-};
-
 /**
  * Helps enforce scoping and validity rules for definitions and Variable references.
  */
@@ -83,15 +73,14 @@ public:
     void rebuild(const ABT& root);
 
     /**
-     * Get information about Variables in the subtree rooted at 'n', including Variables referenced
-     * by the subtree and locally-defined Variables.
+     * Calls 'variableCallback' on each Variable and `variableDefinitionCallback` on each
+     * variable name defined via a Let or Lambda in the ABT.
      */
-    static VariableCollectorResult getVariables(const ABT& n);
-
-    /**
-     * Call 'func' on each Variable in the subtree.
-     */
-    static void walkVariables(const ABT& n, std::function<void(const Variable&)> func);
+    static void walkVariables(
+        const ABT& n,
+        const std::function<void(const Variable&)>& variableCallback,
+        const std::function<void(const ProjectionName&)>& variableDefinitionCallback =
+            [](const ProjectionName&) {});
 
     ~VariableEnvironment();
 

@@ -207,11 +207,17 @@ public:
 
 private:
     void extractFromABT(ProjectionNameSet& vars, const ABT& v) {
-        const auto& result = VariableEnvironment::getVariables(v);
-        for (const Variable& var : result._variables) {
-            if (result._definedVars.count(var.name()) == 0) {
-                // We are interested in either free variables, or variables defined on other nodes.
-                vars.insert(var.name());
+        // Mark variables as defined or not in this subtree.
+        ProjectionNameMap<bool> varHasDefinitionMap;
+        VariableEnvironment::walkVariables(
+            v,
+            [&](const Variable& var) { varHasDefinitionMap.emplace(var.name(), false); },
+            [&](const ProjectionName& definedVar) { varHasDefinitionMap[definedVar] = true; });
+        for (const auto& varHasDefinition : varHasDefinitionMap) {
+            if (!varHasDefinition.second) {
+                // We are interested in when the variable has no definition in this subtree of the
+                // ABT: either free variables, or variables defined on other nodes.
+                vars.insert(varHasDefinition.first);
             }
         }
     }
