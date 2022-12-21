@@ -1534,6 +1534,7 @@ buildvariants:
   - name: version_burn_in_gen
     variant: generate-tasks-for-version
   tasks:
+  - name: analyze_shard_key_jscore_passthrough_gen
   - name: cqf
   - name: cqf_disabled_pipeline_opt
   - name: cqf_passthrough

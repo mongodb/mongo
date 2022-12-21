@@ -218,6 +218,7 @@ void QueryAnalysisSampler::_refreshConfigurations(OperationContext* opCtx) {
 
     stdx::lock_guard<Latch> lk(_mutex);
     std::map<NamespaceString, SampleRateLimiter> sampleRateLimiters;
+    LOGV2_DEBUG(6876103, 2, "Getting query analyzer configurations.");
     for (const auto& configuration : response.getConfigurations()) {
         auto it = _sampleRateLimiters.find(configuration.getNs());
         if (it == _sampleRateLimiters.end() ||

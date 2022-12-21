@@ -369,6 +369,7 @@ void QueryAnalysisWriter::_flush(OperationContext* opCtx,
         long long objSize = 0;
 
         size_t lastIndex = tmpBuffer.getCount();  // inclusive
+        LOGV2_DEBUG(6876101, 2, "Persisting sampled queries", "buffer"_attr = tmpBuffer.getCount());
         while (lastIndex > 0 && docsToInsert.size() < maxBatchSize) {
             // Check if the next document can fit in the batch.
             auto doc = tmpBuffer.at(lastIndex - 1);
@@ -382,6 +383,8 @@ void QueryAnalysisWriter::_flush(OperationContext* opCtx,
         // We don't add a document that is above the size limit to the buffer so we should have
         // added at least one document to 'docsToInsert'.
         invariant(!docsToInsert.empty());
+        LOGV2_DEBUG(
+            6876102, 2, "Persisting sapmled queries", "docsToInsert"_attr = docsToInsert.size());
 
         write_ops::InsertCommandRequest insertCmd(ns);
         insertCmd.setDocuments(std::move(docsToInsert));
