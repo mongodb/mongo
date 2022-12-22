@@ -1270,7 +1270,7 @@ buildvariants:
     compile_flags: >-
       --ssl MONGO_DISTMOD=rhel90
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     has_packages: true
     packager_script: packager.py
     packager_arch: aarch64
@@ -1282,7 +1282,7 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - rhel90-arm64-large
-  - name: aggregation !.feature_flag_guarded
+  - name: aggregation
   - name: .auth !.audit !.multiversion
   - name: causally_consistent_jscore_txns_passthrough
   - name: .misc_js
@@ -1329,7 +1329,7 @@ buildvariants:
     compile_flags: >-
       --ssl MONGO_DISTMOD=rhel90
       -j$(grep -c ^processor /proc/cpuinfo)
-      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
       -Wl,--no-gnu-unique"
@@ -1345,7 +1345,7 @@ buildvariants:
   - name: compile_test_and_package_serial_no_unittests_TG
     distros:
     - rhel90-arm64-large
-  - name: .aggfuzzer !.multiversion !.feature_flag_guarded
+  - name: .aggfuzzer !.multiversion
   - name: audit
   - name: auth_audit_gen
   - name: auth_gen
@@ -1353,7 +1353,7 @@ buildvariants:
   - name: .encrypt !.sharding !.replica_sets !.aggregation !.jscore
   - name: external_auth
   - name: external_auth_aws
-  - name: .jscore .common !.decimal !.sharding !.feature_flag_guarded
+  - name: .jscore .common !.decimal !.sharding
   - name: jsCore_txns_large_txns_format
   - name: .jstestfuzz .common
   - name: .logical_session_cache .one_sec
