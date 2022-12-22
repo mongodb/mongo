@@ -949,6 +949,14 @@ TEST(ColKeyGen, DuplicateFieldTests) {
                                   {BSON("c" << false), {"a", "a.b"}},
                                   {BSON("a.b" << true), {"a", "a.b"}},
                                   {BSON("a.b" << false), {"a"}}}));
+    basicTests(__LINE__,
+               R"({a: { b: { c: 42 }, b: [ 42 ] } })",
+               {{"a", {"", "", kHasSubPath}},
+                {"a.b", {"", "", kHasDuplicateFields}},
+                {"a.b.c", {"42", "", kIsSparse}}},
+               expectedProjPairs({
+                   {{}, {"a", "a.b", "a.b.c"}},
+               }));
 }
 
 void updateTest(

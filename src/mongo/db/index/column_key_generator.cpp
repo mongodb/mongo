@@ -528,8 +528,27 @@ private:
                                             newPosition.begin(),
                                             newPosition.end());
         if (MONGO_unlikely(newIt == newPosition.end())) {
-            // This can only happen if there is a duplicate field in an array, because otherwise
-            // the raw array infos must differ by an index in some array.
+            // The 'oldPosition' and 'newPosition' are at the same place in their parent array,
+            // which is only possible if they are actually in two different arrays that share the
+            // same path because one of their ancestor objects has the same field name twice.
+            return foundDuplicateField();
+        }
+
+        if (MONGO_unlikely(*newIt == '[')) {
+            // The idea with the std::mismatch call above is to handle arrays. The while-loop below
+            // will back up the iterators to the common ancestor, the beginning of an array. For
+            // example, in the case where there's an array value [1,1,1], the oldPosition would be
+            // '[' (implicit 0 index), for the first scalar, and the newPosition would be '[1', for
+            // the second scalar in the array. This scenario is handled by the while-loop below.
+            //
+            // However, it is possible for the 'oldIt' to not be in an array while the 'newIt' is in
+            // an array. This can only happen if 'newPosition' traverses an array that has the same
+            // -- duplicate -- field name as the non-array value that 'oldPosition' goes through.
+            //
+            // Examples:
+            //  {a: {b : {c: 42}, b: [42]}} on path a.b, oldPosition is '{' and newPosition is '{['
+            //  {a: {b:[1]}, a: [{b:[2]}]}  on path a.b, oldPosition is '{[' and newPosition '[{['.
+            invariant(oldIt == oldPosition.end() || *oldIt != '[');
             return foundDuplicateField();
         }
 
