@@ -94,7 +94,7 @@ var $config = extendWorkload($config, function($config, $super) {
                         return false;
                     }
                     // Unexpected error.
-                    doassart(`Failed with unexpected ${tojson(res)}`);
+                    doassert(`Failed with unexpected ${tojson(res)}`);
                 }, "Reshard command failed", 10 * 1000);
             } else {
                 assert.commandWorked(db.adminCommand(reshardCollectionCmdObj));
