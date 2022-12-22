@@ -84,7 +84,7 @@ BSONObj DepsTracker::toProjectionWithoutMetadata(
     // For example, the dependencies ["a.b", "a.b.c.g", "c", "c.d", "f"] would be
     // minimally covered by the projection {"a.b": 1, "c": 1, "f": 1}.
     bool idSpecified = false;
-    for (auto path : simplifyDependencies(fields, truncationBehavior)) {
+    for (auto& path : simplifyDependencies(fields, truncationBehavior)) {
         // Remember if _id was specified.  If not, we'll later explicitly add {_id: 0}
         if (str::startsWith(path, "_id") && (path.size() == 3 || path[3] == '.')) {
             idSpecified = true;
