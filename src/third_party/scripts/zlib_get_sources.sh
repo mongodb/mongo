@@ -8,7 +8,7 @@ set -o errexit
 # This script is designed to run on most unix-like OSes
 #
 
-VERSION=1.2.12
+VERSION=1.2.13
 NAME=zlib
 TARBALL=${NAME}-${VERSION}.tar.gz
 TARBALL_DEST_DIR=${NAME}-${VERSION}
