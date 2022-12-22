@@ -387,14 +387,6 @@ public:
 
     virtual ~Sorter() {}
 
-    size_t numSorted() const {
-        return _numSorted;
-    }
-
-    uint64_t totalDataSizeSorted() const {
-        return _totalDataSizeSorted;
-    }
-
     PersistedState persistDataForShutdown();
 
     SharedBufferFragmentBuilder& memPool() {
@@ -404,9 +396,6 @@ public:
 
 protected:
     virtual void spill() = 0;
-
-    size_t _numSorted = 0;              // Keeps track of the number of keys sorted.
-    uint64_t _totalDataSizeSorted = 0;  // Keeps track of the total size of data sorted.
 
     SortOptions _opts;
 
@@ -463,7 +452,6 @@ public:
     // Serialize the bound for explain output
     virtual Document serializeBound() const = 0;
 
-    virtual size_t totalDataSizeBytes() const = 0;
     virtual size_t limit() const = 0;
 
     // By default, uassert that the input meets our assumptions of being almost-sorted.
@@ -545,10 +533,6 @@ public:
         return {makeBound.serialize()};
     };
 
-    size_t totalDataSizeBytes() const {
-        return _totalDataSizeSorted;
-    }
-
     size_t limit() const {
         return _opts.limit;
     }
@@ -566,9 +550,6 @@ private:
     void _spill();
 
     bool _checkInput;
-
-    size_t _numSorted = 0;              // Keeps track of the number of keys sorted.
-    uint64_t _totalDataSizeSorted = 0;  // Keeps track of the total size of data sorted.
 
     const SortOptions _opts;
 

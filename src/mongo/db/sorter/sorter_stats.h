@@ -33,10 +33,15 @@
 
 namespace mongo {
 
+/**
+ * For collecting cumulative stats of all sorters.
+ */
 struct SorterTracker {
-    AtomicWord<long long> spilledRanges;
-    AtomicWord<long long> bytesSpilled;
-    AtomicWord<long long> bytesSpilledUncompressed;
+    AtomicWord<long long> spilledRanges{0};
+    AtomicWord<long long> bytesSpilled{0};
+    AtomicWord<long long> bytesSpilledUncompressed{0};
+    AtomicWord<long long> numSorted{0};
+    AtomicWord<long long> bytesSorted{0};
 };
 
 /**
@@ -62,24 +67,31 @@ private:
     long long _bytesSpilled = 0;
 };
 
+/**
+ * For collecting individual sorter stats.
+ */
 class SorterStats {
 public:
     SorterStats(SorterTracker* sorterTracker);
 
     void incrementSpilledRanges();
-
     /**
      * Sets the number of spilled ranges to the specified amount. Cannot be called after
      * incrementSpilledRanges.
      */
-    void setSpilledRanges(long long spills);
+    void setSpilledRanges(uint64_t spills);
+    uint64_t spilledRanges() const;
 
-    long long spilledRanges() const {
-        return _spilledRanges;
-    }
+    void incrementNumSorted(uint64_t sortedKeys = 1);
+    uint64_t numSorted() const;
+
+    void incrementBytesSorted(uint64_t bytes);
+    uint64_t bytesSorted() const;
 
 private:
-    long long _spilledRanges = 0;
+    uint64_t _spilledRanges = 0;  // Number of spills.
+    uint64_t _numSorted = 0;      // Number of keys sorted.
+    uint64_t _bytesSorted = 0;    // Total bytes of data sorted.
 
     // All SorterStats update the SorterTracker to report sorter statistics for the
     // server.

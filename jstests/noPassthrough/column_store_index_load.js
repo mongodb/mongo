@@ -128,6 +128,8 @@ assert.docEq({
     spilledRanges: NumberLong(0),
     bytesSpilledUncompressed: NumberLong(0),
     bytesSpilled: NumberLong(0),
+    numSorted: NumberLong(0),
+    bytesSorted: NumberLong(0),
 },
              statsAfterInMemoryBuild.indexBulkBuilder);
 
@@ -161,6 +163,12 @@ assert.between(0,
                approxMemoryUsage,
                tojson(indexBulkBuilderSection),
                true);
+assert.gte(indexBulkBuilderSection.bytesSpilledUncompressed,
+           indexBulkBuilderSection.bytesSpilled,
+           tojson(indexBulkBuilderSection));
+// TODO SERVER-71188: Update numSorted and bytesSorted when column store sorter starts tracking them
+assert.eq(indexBulkBuilderSection.numSorted, 0, tojson(indexBulkBuilderSection));
+assert.eq(indexBulkBuilderSection.bytesSorted, 0, tojson(indexBulkBuilderSection));
 
 // Perfom the online load.
 onlineLoadColl.drop();

@@ -486,7 +486,7 @@ public:
                 std::shared_ptr<IWSorter> sorter = makeSorter(opts, IWComparator(ASC));
                 addData(sorter.get());
                 ASSERT_ITERATORS_EQUIVALENT(done(sorter.get()), correct());
-                ASSERT_EQ(numAdded(), sorter->numSorted());
+                ASSERT_EQ(numAdded(), sorter->stats().numSorted());
                 if (assertRanges) {
                     assertRangeInfo(sorter, opts);
                 }
@@ -495,7 +495,7 @@ public:
                 std::shared_ptr<IWSorter> sorter = makeSorter(opts, IWComparator(DESC));
                 addData(sorter.get());
                 ASSERT_ITERATORS_EQUIVALENT(done(sorter.get()), correctReverse());
-                ASSERT_EQ(numAdded(), sorter->numSorted());
+                ASSERT_EQ(numAdded(), sorter->stats().numSorted());
                 if (assertRanges) {
                     assertRangeInfo(sorter, opts);
                 }
@@ -883,7 +883,7 @@ TEST_F(SorterMakeFromExistingRangesTest, SkipFileCheckingOnEmptyRanges) {
     ASSERT_EQ(0, sorter->stats().spilledRanges());
 
     auto iter = std::unique_ptr<IWIterator>(sorter->done());
-    ASSERT_EQ(0, sorter->numSorted());
+    ASSERT_EQ(0, sorter->stats().numSorted());
 
     iter->openSource();
     ASSERT_FALSE(iter->more());
@@ -933,7 +933,7 @@ TEST_F(SorterMakeFromExistingRangesTest, CorruptedFile) {
 
     // The number of spills is set when NoLimitSorter is constructed from existing ranges.
     ASSERT_EQ(makeSampleRanges().size(), sorter->stats().spilledRanges());
-    ASSERT_EQ(0, sorter->numSorted());
+    ASSERT_EQ(0, sorter->stats().numSorted());
 
     // 16817 - error reading file.
     ASSERT_THROWS_CODE(sorter->done(), DBException, 16817);
@@ -963,7 +963,7 @@ TEST_F(SorterMakeFromExistingRangesTest, RoundTrip) {
         state = sorterBeforeShutdown->persistDataForShutdown();
         ASSERT_FALSE(state.fileName.empty());
         ASSERT_EQUALS(1U, state.ranges.size()) << state.ranges.size();
-        ASSERT_EQ(1, sorterBeforeShutdown->numSorted());
+        ASSERT_EQ(1, sorterBeforeShutdown->stats().numSorted());
     }
 
     // On restart, reconstruct sorter from persisted state.
@@ -978,7 +978,7 @@ TEST_F(SorterMakeFromExistingRangesTest, RoundTrip) {
     sorter->add(pairInsertedAfterStartup.first, pairInsertedAfterStartup.second);
 
     // Technically this sorter has not sorted anything. It is just merging files.
-    ASSERT_EQ(0, sorter->numSorted());
+    ASSERT_EQ(0, sorter->stats().numSorted());
 
     // Read data from sorter.
     {

@@ -137,9 +137,9 @@ public:
             _sorter.reset(DocumentSorter::make(makeSortOptions(), Comparator(_sortPattern)));
         }
         _output.reset(_sorter->done());
-        _stats.keysSorted += _sorter->numSorted();
+        _stats.keysSorted += _sorter->stats().numSorted();
         _stats.spills += _sorter->stats().spilledRanges();
-        _stats.totalDataSizeBytes += _sorter->totalDataSizeSorted();
+        _stats.totalDataSizeBytes += _sorter->stats().bytesSorted();
         _sorter.reset();
     }
 

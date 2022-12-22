@@ -301,7 +301,7 @@ void DocumentSourceSort::serializeToArray(
 
         if (explain >= ExplainOptions::Verbosity::kExecStats) {
             mutDoc["totalDataSizeSortedBytesEstimate"] =
-                Value(static_cast<long long>(_timeSorter->totalDataSizeBytes()));
+                Value(static_cast<long long>(_timeSorter->stats().bytesSorted()));
             mutDoc["usedDisk"] = Value(_timeSorter->stats().spilledRanges() > 0);
             mutDoc["spills"] = Value(static_cast<long long>(_timeSorter->stats().spilledRanges()));
         }

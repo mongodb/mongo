@@ -33,15 +33,24 @@
 
 namespace mongo {
 namespace {
-TEST(SorterStatsTest, Basic) {
+TEST(SorterStatsTest, Basics) {
     SorterTracker sorterTracker;
     SorterStats sorterStats(&sorterTracker);
 
     sorterStats.incrementSpilledRanges();
+    ASSERT_EQ(sorterStats.spilledRanges(), 1);
     ASSERT_EQ(sorterTracker.spilledRanges.load(), 1);
+
+    sorterStats.incrementNumSorted();
+    ASSERT_EQ(sorterStats.numSorted(), 1);
+    ASSERT_EQ(sorterTracker.numSorted.load(), 1);
+
+    sorterStats.incrementBytesSorted(1);
+    ASSERT_EQ(sorterStats.bytesSorted(), 1);
+    ASSERT_EQ(sorterTracker.bytesSorted.load(), 1);
 }
 
-TEST(SorterStatsTest, MultipleSorters) {
+TEST(SorterStatsTest, MultipleSortersSpilledRanges) {
     SorterTracker sorterTracker;
     SorterStats sorterStats1(&sorterTracker);
     SorterStats sorterStats2(&sorterTracker);
@@ -49,10 +58,37 @@ TEST(SorterStatsTest, MultipleSorters) {
 
     sorterStats1.incrementSpilledRanges();
     sorterStats2.incrementSpilledRanges();
+    ASSERT_EQ(sorterStats1.spilledRanges(), 1);
+    ASSERT_EQ(sorterStats2.spilledRanges(), 1);
     ASSERT_EQ(sorterTracker.spilledRanges.load(), 2);
 
     sorterStats3.setSpilledRanges(10);
+    ASSERT_EQ(sorterStats3.spilledRanges(), 10);
     ASSERT_EQ(sorterTracker.spilledRanges.load(), 12);
+}
+
+TEST(SorterStatsTest, MultipleSortersNumSorted) {
+    SorterTracker sorterTracker;
+    SorterStats sorterStats1(&sorterTracker);
+    SorterStats sorterStats2(&sorterTracker);
+
+    sorterStats1.incrementNumSorted();
+    sorterStats2.incrementNumSorted(2);
+    ASSERT_EQ(sorterStats1.numSorted(), 1);
+    ASSERT_EQ(sorterStats2.numSorted(), 2);
+    ASSERT_EQ(sorterTracker.numSorted.load(), 3);
+}
+
+TEST(SorterStatsTest, MultipleSortersBytesSorted) {
+    SorterTracker sorterTracker;
+    SorterStats sorterStats1(&sorterTracker);
+    SorterStats sorterStats2(&sorterTracker);
+
+    sorterStats1.incrementBytesSorted(1);
+    sorterStats2.incrementBytesSorted(2);
+    ASSERT_EQ(sorterStats1.bytesSorted(), 1);
+    ASSERT_EQ(sorterStats2.bytesSorted(), 2);
+    ASSERT_EQ(sorterTracker.bytesSorted.load(), 3);
 }
 
 DEATH_TEST(SorterStatsTest, SetNonZeroNumSpilledRanges, "invariant") {

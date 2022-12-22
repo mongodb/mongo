@@ -102,6 +102,8 @@ public:
         builder.append("bytesSpilledUncompressed",
                        sorterTracker.bytesSpilledUncompressed.loadRelaxed());
         builder.append("bytesSpilled", sorterTracker.bytesSpilled.loadRelaxed());
+        builder.append("numSorted", sorterTracker.numSorted.loadRelaxed());
+        builder.append("bytesSorted", sorterTracker.bytesSorted.loadRelaxed());
         return builder.obj();
     }
 

@@ -719,11 +719,9 @@ public:
         if (memPool) {
             auto memUsedInsideSorter = (sizeof(Key) + sizeof(Value)) * (_data.size() + 1);
             _memUsed = memPool->memUsage() + memUsedInsideSorter;
-            this->_totalDataSizeSorted = _memUsed;
         } else {
             auto memUsage = key.memUsageForSorter() + val.memUsageForSorter();
             _memUsed += memUsage;
-            this->_totalDataSizeSorted += memUsage;
         }
 
         // Invoking keyValProducer could invalidate key and val if it uses move semantics,
@@ -732,10 +730,6 @@ public:
 
         if (_memUsed > this->_opts.maxMemoryUsageBytes) {
             spill();
-            if (memPool) {
-                // We expect that all buffers are unused at this point.
-                memPool->freeUnused();
-            }
         }
     }
 
@@ -784,7 +778,8 @@ private:
     void sort() {
         STLComparator less(this->_comp);
         std::stable_sort(_data.begin(), _data.end(), less);
-        this->_numSorted += _data.size();
+        this->_stats.incrementNumSorted(_data.size());
+        this->_stats.incrementBytesSorted(_memUsed);
     }
 
     void spill() {
@@ -812,6 +807,11 @@ private:
 
         this->_iters.push_back(std::shared_ptr<Iterator>(iteratorPtr));
 
+        auto& memPool = this->_memPool;
+        if (memPool) {
+            // We expect that all buffers are unused at this point.
+            memPool->freeUnused();
+        }
         _memUsed = 0;
 
         this->_stats.incrementSpilledRanges();
@@ -837,7 +837,7 @@ public:
 
     template <typename Generator>
     void addImpl(const Key& key, const Value& val, Generator keyValProducer) {
-        this->_numSorted += 1;
+        this->_stats.incrementNumSorted();
         if (_haveData) {
             dassertCompIsSane(_comp, _best.first, key);
             if (_comp(_best.first, key) <= 0)
@@ -915,7 +915,7 @@ public:
     void addImpl(const Key& key, const Value& val, Generator keyValProducer) {
         invariant(!_done);
 
-        this->_numSorted += 1;
+        this->_stats.incrementNumSorted();
 
         STLComparator less(this->_comp);
 
@@ -930,7 +930,6 @@ public:
             _data.emplace_back(keyValProducer());
 
             _memUsed += memUsage;
-            this->_totalDataSizeSorted += memUsage;
 
             if (_data.size() == this->_opts.limit)
                 std::make_heap(_data.begin(), _data.end(), less);
@@ -950,8 +949,6 @@ public:
 
         auto memUsage = key.memUsageForSorter() + val.memUsageForSorter();
         _memUsed += memUsage;
-        this->_totalDataSizeSorted += memUsage;
-
         _memUsed -= _data.front().first.memUsageForSorter();
         _memUsed -= _data.front().second.memUsageForSorter();
 
@@ -1015,6 +1012,8 @@ private:
         } else {
             std::stable_sort(_data.begin(), _data.end(), less);
         }
+
+        this->_stats.incrementBytesSorted(_memUsed);
     }
 
     // Can only be called after _data is sorted
@@ -1127,7 +1126,6 @@ private:
         this->_iters.push_back(std::shared_ptr<Iterator>(iteratorPtr));
 
         _memUsed = 0;
-
         this->_stats.incrementSpilledRanges();
     }
 
@@ -1470,7 +1468,7 @@ void BoundedSorter<Key, Value, Comparator, BoundMaker>::add(Key key, Value value
     _heap.emplace(std::move(key), std::move(value));
 
     _memUsed += memUsage;
-    this->_totalDataSizeSorted += memUsage;
+    this->_stats.incrementBytesSorted(memUsage);
 
     if (_memUsed > _opts.maxMemoryUsageBytes)
         _spill();
@@ -1483,7 +1481,7 @@ void BoundedSorter<Key, Value, Comparator, BoundMaker>::restart() {
 
     // In state kDone, the heap and spill are usually empty, because kDone means the sorter has
     // no more elements to return. However, if there is a limit then we can also reach state
-    // kDone when '_numSorted == _opts.limit'.
+    // kDone when 'this->_stats.numSorted() == _opts.limit'.
     _spillIter.reset();
     _heap = decltype(_heap){Greater{&compare}};
     _memUsed = 0;
@@ -1495,7 +1493,7 @@ void BoundedSorter<Key, Value, Comparator, BoundMaker>::restart() {
     // - Typically, we should be ready for more input (kWait).
     // - If there is a limit and we reached it, then we're done. We were done before restart()
     //   and we're still done.
-    if (_opts.limit && _numSorted == _opts.limit) {
+    if (_opts.limit && this->_stats.numSorted() == _opts.limit) {
         tassert(6434806,
                 "BoundedSorter has fulfilled _opts.limit and should still be in state kDone",
                 getState() == State::kDone);
@@ -1507,7 +1505,7 @@ void BoundedSorter<Key, Value, Comparator, BoundMaker>::restart() {
 template <typename Key, typename Value, typename Comparator, typename BoundMaker>
 typename BoundedSorterInterface<Key, Value>::State
 BoundedSorter<Key, Value, Comparator, BoundMaker>::getState() const {
-    if (_opts.limit > 0 && _opts.limit == _numSorted) {
+    if (_opts.limit > 0 && _opts.limit == this->_stats.numSorted()) {
         return State::kDone;
     }
 
@@ -1569,7 +1567,7 @@ std::pair<Key, Value> BoundedSorter<Key, Value, Comparator, BoundMaker>::next() 
         pullFromSpilled();
     }
 
-    ++_numSorted;
+    this->_stats.incrementNumSorted();
 
     return result;
 }
