@@ -10,7 +10,7 @@ buildvariants:
   - rhel81-power8-small
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
   stepback: false
-  expansions:
+  expansions: &enterprise-rhel-81-ppc64le-expansions-template
     additional_package_targets: >-
       archive-mongocryptd
       archive-mongocryptd-debug
@@ -68,6 +68,7 @@ buildvariants:
   name: enterprise-rhel-81-ppc64le-dynamic
   display_name: Enterprise RHEL 8.1 PPC64LE Shared
   expansions:
+    <<: *enterprise-rhel-81-ppc64le-expansions-template
     compile_flags: >-
       --link-model=dynamic
       --ssl
