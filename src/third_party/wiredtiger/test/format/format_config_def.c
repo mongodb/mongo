@@ -96,11 +96,32 @@ CONFIG configuration_list[] = {{"assert.read_timestamp", "assert read_timestamp"
   {"checkpoint.wait", "seconds to wait if wiredtiger checkpoints configured", 0x0, 5, 100, 3600,
     V_GLOBAL_CHECKPOINT_WAIT},
 
+  {"debug.checkpoint_retention", "adjust log removal to retain the log records", 0x0, 0, 128, 1024,
+    V_GLOBAL_DEBUG_CHECKPOINT_RETENTION},
+
+  {"debug.eviction",
+    "modify internal algorithms to force history store eviction to happen more aggressively",
+    C_BOOL, 2, 0, 0, V_GLOBAL_DEBUG_EVICTION},
+
+  {"debug.log_retention", "adjust log removal to retain at least this number of log files", 0x0, 0,
+    128, 1024, V_GLOBAL_DEBUG_LOG_RETENTION},
+
   {"debug.realloc_exact", "reallocation of memory will only provide the exact amount requested",
     C_BOOL, 0, 0, 0, V_GLOBAL_DEBUG_REALLOC_EXACT},
 
   {"debug.realloc_malloc", "every realloc call will force a new memory allocation by using malloc",
     C_BOOL, 5, 0, 0, V_GLOBAL_DEBUG_REALLOC_MALLOC},
+
+  {"debug.slow_checkpoint",
+    "slow down checkpoint creation by slowing down internal page processing", C_BOOL, 2, 0, 0,
+    V_GLOBAL_DEBUG_SLOW_CHECKPOINT},
+
+  {"debug.table_logging", "write transaction related information to the log for all operations",
+    C_BOOL, 2, 0, 0, V_GLOBAL_DEBUG_TABLE_LOGGING},
+
+  {"debug.update_restore_evict",
+    "control all dirty page evictions through forcing update restore eviction", C_BOOL, 2, 0, 0,
+    V_GLOBAL_DEBUG_UPDATE_RESTORE_EVICT},
 
   {"disk.checksum", "checksum type (on | off | uncompressed | unencrypted)",
     C_IGNORE | C_STRING | C_TABLE, 0, 0, 0, V_TABLE_DISK_CHECKSUM},
