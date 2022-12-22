@@ -42,6 +42,7 @@
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/vector_clock.h"
+#include "mongo/platform/random.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/util/fail_point.h"
 
@@ -898,9 +899,12 @@ TEST_F(RenameRangeDeletionsTest, BasicRenameRangeDeletionsTest) {
 }
 
 /**
- * TODO SERVER-72176: re-enable this test
  *  Same as BasicRenameRangeDeletionsTest, but also tests idempotency of single utility functions
+ */
 TEST_F(RenameRangeDeletionsTest, IdempotentRenameRangeDeletionsTest) {
+    PseudoRandom random(SecureRandom().nextInt64());
+    auto generateRandomNumberFrom1To10 = [&random]() { return random.nextInt32(9) + 1; };
+
     const auto numTasks = 10;
     std::vector<RangeDeletionTask> tasks;
 
@@ -917,14 +921,16 @@ TEST_F(RenameRangeDeletionsTest, IdempotentRenameRangeDeletionsTest) {
     }
 
     // Rename range deletions, repeating idempotent steps several times
-    const auto kMaxRepeat = 10;
-    for (int i = 0; i < rand() % kMaxRepeat; i++) {
+    auto randomLoopNTimes = generateRandomNumberFrom1To10();
+    for (int i = 0; i < randomLoopNTimes; i++) {
         snapshotRangeDeletionsForRename(_opCtx, kNss, kToNss);
     }
-    for (int i = 0; i < rand() % kMaxRepeat; i++) {
+    randomLoopNTimes = generateRandomNumberFrom1To10();
+    for (int i = 0; i < randomLoopNTimes; i++) {
         restoreRangeDeletionTasksForRename(_opCtx, kToNss);
     }
-    for (int i = 0; i < rand() % kMaxRepeat; i++) {
+    randomLoopNTimes = generateRandomNumberFrom1To10();
+    for (int i = 0; i < randomLoopNTimes; i++) {
         deleteRangeDeletionTasksForRename(_opCtx, kNss, kToNss);
     }
 
@@ -948,7 +954,6 @@ TEST_F(RenameRangeDeletionsTest, IdempotentRenameRangeDeletionsTest) {
         NamespaceString::kRangeDeletionForRenameNamespace);
     ASSERT_EQ(0, forRenameStore.count(_opCtx, BSONObj()));
 }
-*/
 
 }  // namespace
 }  // namespace mongo
