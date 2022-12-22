@@ -29,8 +29,10 @@
 
 #pragma once
 
+#include <deque>
 #include <list>
 #include <memory>
+#include <mutex>
 #include <set>
 
 #include "mongo/bson/bsonobj.h"
@@ -263,6 +265,15 @@ private:
     Status _storeCurrentLocs(OperationContext* opCtx);
 
     /**
+     * Returns boost::none if there are no more documents to get.
+     * Increments _inProgressReads if and only if return value is not none.
+     */
+    boost::optional<Snapshotted<BSONObj>> _getNextDoc(OperationContext* opCtx,
+                                                      const CollectionPtr& collection);
+
+    void _insertOverflowDoc(Snapshotted<BSONObj> doc);
+
+    /**
      * Adds the OpTime to the list of OpTimes for oplog entries that we should consider migrating as
      * part of session migration.
      */
@@ -369,6 +380,47 @@ private:
 
     // List of record ids that needs to be transferred (initial clone)
     std::set<RecordId> _cloneLocs;
+
+    // This iterator is a pointer into the _cloneLocs set.  It allows concurrent access to
+    // the _cloneLocs set by allowing threads servicing _migrateClone requests to do the
+    // following:
+    //   1.  Acquire mutex "_mutex" above.
+    //   2.  Copy *_cloneRecordIdsIter into its local stack frame.
+    //   3.  Increment _cloneRecordIdsIter
+    //   4.  Unlock "_mutex."
+    //   5.  Do the I/O to fetch the document corresponding to this record Id.
+    //
+    // The purpose of this algorithm, is to allow different threads to concurrently start I/O jobs
+    // in order to more fully saturate the disk.
+    //
+    // One issue with this algorithm, is that only 16MB worth of documents can be returned in
+    // response to a _migrateClone request.  But, the thread does not know the size of a document
+    // until it does the I/O.  At which point, if the document does not fit in the response to
+    // _migrateClone request the document must be made available to a different thread servicing a
+    // _migrateClone request. To solve this problem, the thread adds the document
+    // to the below _overflowDocs deque.
+    std::set<RecordId>::iterator _cloneRecordIdsIter;
+
+    // This deque stores all documents that must be sent to the destination, but could not fit
+    // in the response to a particular _migrateClone request.
+    std::deque<Snapshotted<BSONObj>> _overflowDocs;
+
+    // This integer represents how many documents are being "held" by threads servicing
+    // _migrateClone requests. Any document that is "held" by a thread may be added to the
+    // _overflowDocs deque if it doesn't fit in the response to a _migrateClone request.
+    // This integer is necessary because it gives us a condition on when all documents to be sent
+    // to the destination have been exhausted.
+    //
+    // If (_cloneRecordIdsIter == _cloneLocs.end() && _overflowDocs.empty() && _inProgressReads
+    // == 0) then all documents have been returned to the destination.
+    decltype(_cloneLocs.size()) _inProgressReads = 0;
+
+    // This condition variable allows us to wait on the following condition:
+    //   Either we're done and the above condition is satisfied, or there is some document to
+    //   return.
+    stdx::condition_variable _moreDocsCV;
+    decltype(_cloneLocs.size()) _numRecordsCloned{0};
+    decltype(_cloneLocs.size()) _numRecordsPassedOver{0};
 
     // The estimated average object size during the clone phase. Used for buffer size
     // pre-allocation (initial clone).

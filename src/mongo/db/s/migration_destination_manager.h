@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 
 #include "mongo/base/string_data.h"
@@ -39,6 +40,8 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/s/active_migrations_registry.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/s/migration_batch_fetcher.h"
 #include "mongo/db/s/migration_recipient_recovery_document_gen.h"
 #include "mongo/db/s/migration_session_id.h"
 #include "mongo/db/s/session_catalog_migration_destination.h"
@@ -178,6 +181,11 @@ public:
                                                   const boost::optional<ChunkManager>& cm,
                                                   boost::optional<Timestamp> afterClusterTime);
 
+
+    bool isParallelFetchingSupported() {
+        return _parallelFetchersSupported;
+    }
+
     /**
      * Gets the collection uuid and options from fromShardId. If given a chunk manager, will fetch
      * the collection options using the database version protocol.
@@ -283,8 +291,22 @@ private:
 
     stdx::thread _migrateThreadHandle;
 
+    long long _getNumCloned() {
+        return _migrationCloningProgress->getNumCloned();
+    }
+
+    long long _getNumBytesCloned() {
+        return _migrationCloningProgress->getNumBytes();
+    }
+
     boost::optional<UUID> _migrationId;
     boost::optional<UUID> _collectionUuid;
+
+    // State that is shared among all inserter threads.
+    std::shared_ptr<MigrationCloningProgressSharedState> _migrationCloningProgress;
+
+    bool _parallelFetchersSupported;
+
     LogicalSessionId _lsid;
     TxnNumber _txnNumber{kUninitializedTxnNumber};
     NamespaceString _nss;
@@ -304,8 +326,6 @@ private:
     // failure we can perform the appropriate cleanup.
     bool _chunkMarkedPending{false};
 
-    long long _numCloned{0};
-    long long _clonedBytes{0};
     long long _numCatchup{0};
     long long _numSteady{0};
 
