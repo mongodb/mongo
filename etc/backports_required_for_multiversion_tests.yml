@@ -110,6 +110,8 @@ last-continuous:
     ticket: SERVER-59923
   - test_file: jstests/replsets/dont_set_invalid_rwconcern.js
     ticket: SERVER-60817
+  - test_file: jstests/replsets/dbhash_lock_acquisition.js
+    ticket: SERVER-60829
   - test_file: jstests/core/sbe/sbe_ixscan_explain.js
     ticket: SERVER-61087
   - test_file: jstests/replsets/tenant_migration_transaction_boundary.js
@@ -188,6 +190,8 @@ last-continuous:
     ticket: SERVER-64780
   - test_file: jstests/sharding/shard_key_index_must_exist.js
     ticket: SERVER-6491
+  - test_file: jstests/sharding/query/shard_refuses_cursor_ownership.js
+    ticket: SERVER-65259
   - test_file: jstests/replsets/capped_deletes.js
     ticket: SERVER-65261
   - test_file: jstests/aggregation/agg_infinite_recursion.js
@@ -204,8 +208,6 @@ last-continuous:
     ticket: SERVER-66379
   - test_file: jstests/core/where_multiple_plans.js
     ticket: SERVER-66389
-  - test_file: jstests/replsets/dbhash_lock_acquisition.js
-    ticket: SERVER-60829
   - test_file: jstests/replsets/tenant_migration_donor_resume_on_stepup_and_restart.js
     ticket: SERVER-66719
   - test_file: jstests/sharding/move_chunk_interrupt_postimage.js
@@ -220,18 +222,14 @@ last-continuous:
     ticket: SERVER-68628
   - test_file: jstests/sharding/move_chunk_interrupt_postimage.js
     ticket: SERVER-68728
+  - test_file: src/mongo/db/modules/enterprise/jstests/fcbis/fcbis_election_during_storage_change.js
+    ticket: SERVER-69861
   - test_file: jstests/aggregation/expressions/switch_errors.js
     ticket: SERVER-70190
   - test_file: jstests/core/cover_null_queries.js
     ticket: SERVER-70436
-  - test_file: jstests/sharding/prepare_transaction_then_migrate.js
-    ticket: SERVER-68361
   - test_file: jstests/sharding/all_collection_stats.js
     ticket: SERVER-71477
-  - test_file: src/mongo/db/modules/enterprise/jstests/fcbis/fcbis_election_during_storage_change.js
-    ticket: SERVER-69861
-  - test_file: jstests/sharding/query/shard_refuses_cursor_ownership.js
-    ticket: SERVER-65259
   - test_file: jstests/sharding/drop_collection.js
     ticket: SERVER-71689
   suites: null
@@ -429,6 +427,8 @@ last-lts:
     ticket: SERVER-59952
   - test_file: jstests/replsets/dont_set_invalid_rwconcern.js
     ticket: SERVER-60817
+  - test_file: jstests/replsets/dbhash_lock_acquisition.js
+    ticket: SERVER-60829
   - test_file: jstests/core/sbe/sbe_ixscan_explain.js
     ticket: SERVER-61087
   - test_file: jstests/replsets/tenant_migration_transaction_boundary.js
@@ -499,6 +499,8 @@ last-lts:
     ticket: SERVER-64485
   - test_file: jstests/sharding/shard_key_index_must_exist.js
     ticket: SERVER-6491
+  - test_file: jstests/sharding/query/shard_refuses_cursor_ownership.js
+    ticket: SERVER-65259
   - test_file: jstests/replsets/capped_deletes.js
     ticket: SERVER-65261
   - test_file: jstests/aggregation/agg_infinite_recursion.js
@@ -515,8 +517,6 @@ last-lts:
     ticket: SERVER-66379
   - test_file: jstests/core/where_multiple_plans.js
     ticket: SERVER-66389
-  - test_file: jstests/replsets/dbhash_lock_acquisition.js
-    ticket: SERVER-60829
   - test_file: jstests/replsets/tenant_migration_donor_resume_on_stepup_and_restart.js
     ticket: SERVER-66719
   - test_file: jstests/sharding/move_chunk_interrupt_postimage.js
@@ -531,18 +531,14 @@ last-lts:
     ticket: SERVER-68628
   - test_file: jstests/sharding/move_chunk_interrupt_postimage.js
     ticket: SERVER-68728
+  - test_file: src/mongo/db/modules/enterprise/jstests/fcbis/fcbis_election_during_storage_change.js
+    ticket: SERVER-69861
   - test_file: jstests/aggregation/expressions/switch_errors.js
     ticket: SERVER-70190
   - test_file: jstests/core/cover_null_queries.js
     ticket: SERVER-70436
-  - test_file: jstests/sharding/prepare_transaction_then_migrate.js
-    ticket: SERVER-68361
   - test_file: jstests/sharding/all_collection_stats.js
     ticket: SERVER-71477
-  - test_file: src/mongo/db/modules/enterprise/jstests/fcbis/fcbis_election_during_storage_change.js
-    ticket: SERVER-69861
-  - test_file: jstests/sharding/query/shard_refuses_cursor_ownership.js
-    ticket: SERVER-65259
   - test_file: jstests/sharding/drop_collection.js
     ticket: SERVER-71689
   suites: null
