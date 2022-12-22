@@ -9761,7 +9761,7 @@ buildvariants:
   modules:
   - enterprise
   run_on:
-  - suse12-test
+  - suse12-sp5-small
   batchtime: 10080 # 7 days
   expansions:
     push_path: linux
@@ -9782,7 +9782,7 @@ buildvariants:
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - suse12-build
+    - suse12-sp5-large
   - name: .aggfuzzer .common
   - name: audit
   - name: causally_consistent_jscore_txns_passthrough
@@ -9801,12 +9801,12 @@ buildvariants:
     - ubuntu1604-packer
   - name: .publish
     distros:
-    - suse12-small
+    - suse12-sp5-small
 
 - name: suse12
   display_name: SSL SUSE 12
   run_on:
-  - suse12-test
+  - suse12-sp5-small
   batchtime: 10080 # 7 days
   expansions:
     push_path: linux
@@ -9824,11 +9824,11 @@ buildvariants:
     scons_cache_scope: shared
     tooltags: "ssl"
     build_mongoreplay: true
-    large_distro_name: suse12-build
+    large_distro_name: suse12-sp5-large
   tasks:
   - name: compile_all_run_unittests_TG
     distros:
-    - suse12-build
+    - suse12-sp5-large
   - name: .aggfuzzer .common
   - name: aggregation
   - name: .auth !.audit !.multiversion
@@ -9837,7 +9837,7 @@ buildvariants:
   - name: .concurrency .common !.large
   - name: .concurrency .common .large
     distros:
-      - suse12-build
+      - suse12-sp5-large
   - name: concurrency_replication_causal_consistency_gen
   - name: disk_wiredtiger
   - name: free_monitoring
@@ -9853,7 +9853,7 @@ buildvariants:
   - name: .stitch
   - name: .publish
     distros:
-    - suse12-small
+    - suse12-sp5-small
 
 - name: enterprise-suse15-64
   display_name: Enterprise SLES 15
