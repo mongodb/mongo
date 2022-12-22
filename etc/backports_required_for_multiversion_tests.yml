@@ -272,8 +272,6 @@ last-continuous:
     ticket: SERVER-70190
   - test_file: jstests/core/cover_null_queries.js
     ticket: SERVER-70436
-  - test_file: jstests/sharding/prepare_transaction_then_migrate.js
-    ticket: SERVER-68361
   - test_file: jstests/sharding/all_collection_stats.js
     ticket: SERVER-71477
   suites: null
@@ -623,8 +621,6 @@ last-lts:
     ticket: SERVER-70190
   - test_file: jstests/core/cover_null_queries.js
     ticket: SERVER-70436
-  - test_file: jstests/sharding/prepare_transaction_then_migrate.js
-    ticket: SERVER-68361
   - test_file: jstests/sharding/all_collection_stats.js
     ticket: SERVER-71477
   suites: null
