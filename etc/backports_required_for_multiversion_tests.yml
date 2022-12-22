@@ -254,6 +254,8 @@ last-continuous:
     ticket: SERVER-67723
   - test_file: jstests/sharding/collection_uuid_shard_capped_collection.js
     ticket: SERVER-67885
+  - test_file: jstests/sharding/prepare_transaction_then_migrate.js
+    ticket: SERVER-68361
   - test_file: jstests/core/txns/txn_ops_allowed_on_buckets_coll.js
     ticket: SERVER-68556
   - test_file: jstests/core/txns/no_writes_to_system_collections_in_txn.js
@@ -272,8 +274,6 @@ last-continuous:
     ticket: SERVER-70190
   - test_file: jstests/core/cover_null_queries.js
     ticket: SERVER-70436
-  - test_file: jstests/sharding/prepare_transaction_then_migrate.js
-    ticket: SERVER-68361
   - test_file: jstests/sharding/all_collection_stats.js
     ticket: SERVER-71477
   suites: null
@@ -607,6 +607,8 @@ last-lts:
     ticket: SERVER-67723
   - test_file: jstests/sharding/collection_uuid_shard_capped_collection.js
     ticket: SERVER-67885
+  - test_file: jstests/sharding/prepare_transaction_then_migrate.js
+    ticket: SERVER-68361
   - test_file: jstests/core/txns/txn_ops_allowed_on_buckets_coll.js
     ticket: SERVER-68556
   - test_file: jstests/core/txns/no_writes_to_system_collections_in_txn.js
@@ -623,8 +625,6 @@ last-lts:
     ticket: SERVER-70190
   - test_file: jstests/core/cover_null_queries.js
     ticket: SERVER-70436
-  - test_file: jstests/sharding/prepare_transaction_then_migrate.js
-    ticket: SERVER-68361
   - test_file: jstests/sharding/all_collection_stats.js
     ticket: SERVER-71477
   suites: null
