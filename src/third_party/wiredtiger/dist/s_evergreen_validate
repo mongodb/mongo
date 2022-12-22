@@ -4,6 +4,8 @@ t=__wt.$$
 trap 'rm -f $t' 0 1 2 3 13 15
 
 fast=false
+exit1=0
+exit2=0
 case "$1" in
     -F) # Run fast.
         fast=true
@@ -36,7 +38,7 @@ if [ $(command -v evergreen) ] && [ -f ~/.evergreen.yml ]; then
     cd dist
 fi
 
-if test $exit1 -ne 0 -o $exit2 -ne 0 ; then
+if [ "$exit1" -ne  0 -o "$exit2" -ne 0 ]; then
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
     echo "$0 failed with output:"
     cat $t
