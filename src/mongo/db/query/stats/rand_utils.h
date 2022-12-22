@@ -154,7 +154,10 @@ std::string genString(size_t len, size_t seed);
     requested ratio. The generated array will contain the same values given the same
     inputs on all platforms.
  */
-std::vector<SBEValue> genFixedValueArray(size_t nElems, double intRatio, double strRatio);
+std::vector<SBEValue> genFixedValueArray(size_t nElems,
+                                         double intRatio,
+                                         double strRatio,
+                                         boost::optional<size_t> strLen = {});
 
 /**
     Generate a random string of length len.

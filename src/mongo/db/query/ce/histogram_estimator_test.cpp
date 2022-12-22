@@ -59,7 +59,8 @@ public:
     }
 
 protected:
-    std::unique_ptr<cascades::CardinalityEstimator> getEstimator() const override {
+    std::unique_ptr<cascades::CardinalityEstimator> getEstimator(
+        bool /*forValidation*/) const override {
         // making a copy of CollecitonStatistics to override
         return std::make_unique<HistogramEstimator>(_stats, makeHeuristicCE());
     }

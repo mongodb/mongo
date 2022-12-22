@@ -150,3 +150,16 @@ env.CppUnitTest(
         'test_utils',
     ],
 )
+
+env.CppUnitTest(
+    target="ce_benchmark_test",
+    source=[
+        'benchmark_test.cpp',
+        'benchmark_utils.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/optimizer/optimizer',
+        '$BUILD_DIR/mongo/db/query/stats/stats_test_utils',
+        'test_utils',
+    ],
+)

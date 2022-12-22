@@ -38,6 +38,9 @@
 
 
 namespace mongo::optimizer {
+namespace {
+unittest::TempDir tempDir("ABTPipelineTest");
+}
 
 std::unique_ptr<mongo::Pipeline, mongo::PipelineDeleter> parsePipeline(
     const NamespaceString& nss,
@@ -61,7 +64,6 @@ std::unique_ptr<mongo::Pipeline, mongo::PipelineDeleter> parsePipeline(
         ctx->setResolvedNamespace(resolvedNss.ns, resolvedNss);
     }
 
-    unittest::TempDir tempDir("ABTPipelineTest");
     ctx->tempDir = tempDir.path();
 
     return Pipeline::parse(request.getPipeline(), ctx);

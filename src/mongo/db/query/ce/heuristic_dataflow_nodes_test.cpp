@@ -50,7 +50,8 @@ public:
     DataflowCETester() : CETester(kCollName, kCollCard, kDefaultCETestPhaseSet) {}
 
 protected:
-    std::unique_ptr<cascades::CardinalityEstimator> getEstimator() const override {
+    std::unique_ptr<cascades::CardinalityEstimator> getEstimator(
+        bool /*forValidation*/) const override {
         return std::make_unique<HeuristicEstimator>();
     }
 };

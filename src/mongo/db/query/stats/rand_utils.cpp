@@ -280,7 +280,10 @@ std::string genString(size_t len, size_t seed) {
     deterministic in that the same parameters will always generate the same array, even on
     different platforms.
 */
-std::vector<SBEValue> genFixedValueArray(size_t nElems, double intRatio, double strRatio) {
+std::vector<SBEValue> genFixedValueArray(size_t nElems,
+                                         double intRatio,
+                                         double strRatio,
+                                         boost::optional<size_t> strLen) {
 
     std::vector<SBEValue> values;
 
@@ -300,7 +303,7 @@ std::vector<SBEValue> genFixedValueArray(size_t nElems, double intRatio, double 
     std::vector<std::string> stringSet;
     stringSet.reserve(strNDV);
     for (size_t i = 0; i < strNDV; ++i) {
-        const auto randStr = genString(8, i);
+        const auto randStr = genString(strLen.get_value_or(8), i);
         stringSet.push_back(randStr);
     }
 

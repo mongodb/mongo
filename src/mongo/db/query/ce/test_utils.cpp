@@ -88,14 +88,14 @@ CEType CETester::getCE(ABT& abt, std::function<bool(const ABT&)> nodePredicate) 
                                  ConstEval::constFold,
                                  DebugInfo::kDefaultForTests,
                                  _hints};
-    phaseManager.optimize(abt);
+    optimize(phaseManager, abt);
 
     const auto& memo = phaseManager.getMemo();
     if constexpr (kCETestLogOnly) {
         std::cout << ExplainGenerator::explainMemo(memo) << std::endl;
     }
 
-    auto cht = getEstimator();
+    auto cht = getEstimator(true /* forValidation */);
 
     // If we are running no optimization phases, we are ensuring that we get the correct estimate on
     // the original ABT (usually testing the CE for FilterNodes). The memo won't have any groups for
@@ -156,6 +156,10 @@ CEType CETester::getCE(ABT& abt, std::function<bool(const ABT&)> nodePredicate) 
     }
 
     return outCard;
+}
+
+void CETester::optimize(OptPhaseManager& phaseManager, ABT& abt) const {
+    phaseManager.optimize(abt);
 }
 
 ScanDefinition& CETester::getCollScanDefinition() {
