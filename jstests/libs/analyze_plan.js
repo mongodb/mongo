@@ -328,6 +328,9 @@ function aggPlanHasStage(root, stage) {
 /**
  * Given the root stage of explain's BSON representation of a query plan ('root'),
  * returns true if the plan has a stage called 'stage'.
+ *
+ * Expects that the stage appears once or zero times per node. If the stage appears more than once
+ * on one node's query plan, an error will be thrown.
  */
 function planHasStage(db, root, stage) {
     const matchingStages = getPlanStages(root, stage);
