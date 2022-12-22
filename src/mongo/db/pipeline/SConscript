@@ -142,7 +142,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/exec/sort_executor',
-        '$BUILD_DIR/mongo/db/index/key_generator',
+        '$BUILD_DIR/mongo/db/index/index_access_method',
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )
@@ -353,7 +353,7 @@ pipelineEnv.Library(
         '$BUILD_DIR/mongo/db/exec/scoped_timer',
         '$BUILD_DIR/mongo/db/exec/sort_executor',
         '$BUILD_DIR/mongo/db/generic_cursor',
-        '$BUILD_DIR/mongo/db/index/key_generator',
+        '$BUILD_DIR/mongo/db/index/index_access_method',
         '$BUILD_DIR/mongo/db/pipeline/change_stream_error_extra_info',
         '$BUILD_DIR/mongo/db/pipeline/lite_parsed_document_source',
         '$BUILD_DIR/mongo/db/query/collation/collator_factory_interface',

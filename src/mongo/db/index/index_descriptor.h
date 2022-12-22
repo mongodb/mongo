@@ -122,15 +122,40 @@ public:
     }
 
     /**
-     * Return the path projection spec, if one exists. This is only applicable for '$**' indexes.
+     * Return the path projection spec, if one exists. This is only applicable for wildcard ('$**')
+     * and columnstore indexes. It is kept as originally specified by the createIndex() call, not
+     * normalized.
+     *
+     * It contains only the projection object that was contained in one of the fields listed below
+     * from the original createIndex() parameters object, but it does NOT preserve the field name:
+     *   - "wildcardProjection"    (IndexDescriptor::kWildcardProjectionFieldName)
+     *   - "columnstoreProjection" (IndexDescriptor::kColumnStoreProjectionFieldName)
+     *
+     * This is set by the IndexDescriptor constructor and never changes after that.
+     *
+     * Example: db.a.createIndex({"$**":1}, {"name": "i1", "wildcardProjection": {"a.b": 1}})
+     *   return (unnormalized) object: {"a.b":{"$numberDouble":"1"}}
      */
     const BSONObj& pathProjection() const {
         return _projection;
     }
 
     /**
-     * Returns the normalized path projection spec, if one exists. This is only applicable for '$**'
-     * indexes.
+     * Returns the normalized path projection spec, if one exists. This is only applicable for
+     * wildcard ('$**') and columnstore indexes. It is the normalized version of the path projection
+     * and is used to determine whether a new index candidate from createIndex() duplicates an
+     * existing index.
+     *
+     * It contains the normalized projection object based on the original object that was contained
+     * in one of the fields listed below from the original createIndex() parameters object, but it
+     * does NOT preserve the field name:
+     *   - "wildcardProjection"    (IndexDescriptor::kWildcardProjectionFieldName)
+     *   - "columnstoreProjection" (IndexDescriptor::kColumnStoreProjectionFieldName)
+     *
+     * This is set by the IndexDescriptor constructor and never changes after that.
+     *
+     * Example: db.a.createIndex({"$**":1}, {"name": "i1", "wildcardProjection": {"a.b": 1}})
+     *   return (normalized) object: {"a":{"b":true},"_id":false}
      */
     const BSONObj& normalizedPathProjection() const {
         return _normalizedProjection;
@@ -271,13 +296,6 @@ public:
     }
 
 private:
-    // This method should only ever be called by WildcardAccessMethod or ColumnstoreAccessMethod, to
-    // set the '_normalizedProjection' for descriptors associated with an existing
-    // IndexCatalogEntry.
-    void _setNormalizedPathProjection(BSONObj&& proj) {
-        _normalizedProjection = std::move(proj);
-    }
-
     /**
      * Returns wildcardProjection or columnstoreProjection projection
      */
@@ -305,8 +323,8 @@ private:
 
     int64_t _numFields;  // How many fields are indexed?
     BSONObj _keyPattern;
-    BSONObj _projection;
-    BSONObj _normalizedProjection;
+    BSONObj _projection;            // for wildcardProjection / columnstoreProjection; never changes
+    BSONObj _normalizedProjection;  // for wildcardProjection / columnstoreProjection; never changes
     std::string _indexName;
     bool _isIdIndex;
     bool _sparse;
@@ -326,8 +344,6 @@ private:
     friend class IndexCatalog;
     friend class IndexCatalogEntryImpl;
     friend class IndexCatalogEntryContainer;
-    friend class WildcardAccessMethod;
-    friend class ColumnStoreAccessMethod;
 };
 
 }  // namespace mongo

@@ -27,10 +27,9 @@
  *    it in the license file.
  */
 
-
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/index/btree_access_method.h"
+#include "mongo/db/index/index_access_method.h"
 
 #include <utility>
 #include <vector>
@@ -43,15 +42,24 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/index/2d_access_method.h"
+#include "mongo/db/index/btree_access_method.h"
 #include "mongo/db/index/bulk_builder_common.h"
+#include "mongo/db/index/columns_access_method.h"
+#include "mongo/db/index/fts_access_method.h"
+#include "mongo/db/index/hash_access_method.h"
 #include "mongo/db/index/index_build_interceptor.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index/s2_access_method.h"
+#include "mongo/db/index/s2_bucket_access_method.h"
+#include "mongo/db/index/wildcard_access_method.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/timestamp_block.h"
 #include "mongo/db/storage/execution_context.h"
+#include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
@@ -71,6 +79,50 @@ MONGO_FAIL_POINT_DEFINE(hangIndexBuildDuringBulkLoadPhase);
 MONGO_FAIL_POINT_DEFINE(hangIndexBuildDuringBulkLoadPhaseSecond);
 MONGO_FAIL_POINT_DEFINE(hangDuringIndexBuildBulkLoadYield);
 MONGO_FAIL_POINT_DEFINE(hangDuringIndexBuildBulkLoadYieldSecond);
+
+/**
+ * Static factory method that constructs and returns an appropriate IndexAccessMethod depending on
+ * the type of the index.
+ */
+std::unique_ptr<IndexAccessMethod> IndexAccessMethod::make(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const CollectionOptions& collectionOptions,
+    IndexCatalogEntry* entry,
+    StringData ident) {
+
+    auto engine = opCtx->getServiceContext()->getStorageEngine()->getEngine();
+    auto desc = entry->descriptor();
+    auto makeSDI = [&] {
+        return engine->getSortedDataInterface(opCtx, nss, collectionOptions, ident, desc);
+    };
+    auto makeCS = [&] {
+        return engine->getColumnStore(opCtx, nss, collectionOptions, ident, desc);
+    };
+    const std::string& type = desc->getAccessMethodName();
+
+    if ("" == type)
+        return std::make_unique<BtreeAccessMethod>(entry, makeSDI());
+    else if (IndexNames::HASHED == type)
+        return std::make_unique<HashAccessMethod>(entry, makeSDI());
+    else if (IndexNames::GEO_2DSPHERE == type)
+        return std::make_unique<S2AccessMethod>(entry, makeSDI());
+    else if (IndexNames::GEO_2DSPHERE_BUCKET == type)
+        return std::make_unique<S2BucketAccessMethod>(entry, makeSDI());
+    else if (IndexNames::TEXT == type)
+        return std::make_unique<FTSAccessMethod>(entry, makeSDI());
+    else if (IndexNames::GEO_2D == type)
+        return std::make_unique<TwoDAccessMethod>(entry, makeSDI());
+    else if (IndexNames::WILDCARD == type)
+        return std::make_unique<WildcardAccessMethod>(entry, makeSDI());
+    else if (IndexNames::COLUMN == type)
+        return std::make_unique<ColumnStoreAccessMethod>(entry, makeCS());
+    LOGV2(20688,
+          "Can't find index for keyPattern {keyPattern}",
+          "Can't find index for keyPattern",
+          "keyPattern"_attr = desc->keyPattern());
+    fassertFailed(31021);
+}
 
 namespace {
 

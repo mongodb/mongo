@@ -69,7 +69,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/fts/base_fts',
-        '$BUILD_DIR/mongo/db/index/key_generator',
+        '$BUILD_DIR/mongo/db/index/index_access_method',
         '$BUILD_DIR/mongo/db/record_id_helpers',
         '$BUILD_DIR/mongo/db/server_base',
         'query_plan_cache',

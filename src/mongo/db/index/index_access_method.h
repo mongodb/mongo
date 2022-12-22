@@ -74,6 +74,12 @@ public:
     IndexAccessMethod() = default;
     virtual ~IndexAccessMethod() = default;
 
+    static std::unique_ptr<IndexAccessMethod> make(OperationContext* opCtx,
+                                                   const NamespaceString& nss,
+                                                   const CollectionOptions& collectionOptions,
+                                                   IndexCatalogEntry* entry,
+                                                   StringData ident);
+
     /**
      * Equivalent to (but shorter and faster than): dynamic_cast<SortedDataIndexAccessMethod*>(this)
      */
@@ -272,27 +278,6 @@ public:
         size_t maxMemoryUsageBytes,
         const boost::optional<IndexStateInfo>& stateInfo,
         StringData dbName) = 0;
-};
-
-/**
- * Factory class that constructs an IndexAccessMethod depending on the type of index.
- */
-class IndexAccessMethodFactory {
-public:
-    IndexAccessMethodFactory() = default;
-    virtual ~IndexAccessMethodFactory() = default;
-
-    static IndexAccessMethodFactory* get(ServiceContext* service);
-    static IndexAccessMethodFactory* get(OperationContext* opCtx);
-    static void set(ServiceContext* service,
-                    std::unique_ptr<IndexAccessMethodFactory> collectionFactory);
-
-
-    virtual std::unique_ptr<IndexAccessMethod> make(OperationContext* opCtx,
-                                                    const NamespaceString& nss,
-                                                    const CollectionOptions& collectionOptions,
-                                                    IndexCatalogEntry* entry,
-                                                    StringData ident) = 0;
 };
 
 /**

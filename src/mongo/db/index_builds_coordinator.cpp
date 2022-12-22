@@ -3159,6 +3159,7 @@ std::vector<BSONObj> IndexBuildsCoordinator::prepareSpecListForCreate(
     return resultSpecs;
 }
 
+// Returns normalized versions of 'indexSpecs' for the catalog.
 std::vector<BSONObj> IndexBuildsCoordinator::normalizeIndexSpecs(
     OperationContext* opCtx,
     const CollectionPtr& collection,
@@ -3180,47 +3181,13 @@ std::vector<BSONObj> IndexBuildsCoordinator::normalizeIndexSpecs(
     // for clients to validate (via the listIndexes output) whether a given partialFilterExpression
     // is equivalent to the filter that they originally submitted. Omitting this normalization does
     // not impact our internal index comparison semantics, since we compare based on the parsed
-    // MatchExpression trees rather than the serialized BSON specs. See SERVER-54357.
+    // MatchExpression trees rather than the serialized BSON specs.
+    //
+    // For similar reasons we do not normalize index projection objects here, if any, so their
+    // original forms get persisted in the catalog. Projection normalization to detect whether a
+    // candidate new index would duplicate an existing index is done only in the memory-only
+    // 'IndexDescriptor._normalizedProjection' field.
 
-    // If any of the specs describe wildcard or columnstore indexes, normalize the respective
-    // projections if present. This will change all specs of the form {"a.b.c": 1} to normalized
-    // form {a: {b: {c : 1}}}.
-    std::transform(normalSpecs.begin(), normalSpecs.end(), normalSpecs.begin(), [](auto& spec) {
-        BSONObj pathProjectionSpec;
-        bool isWildcard = false;
-        auto wildcardProjection = spec[IndexDescriptor::kWildcardProjectionFieldName];
-        auto columnStoreProjection = spec[IndexDescriptor::kColumnStoreProjectionFieldName];
-        if (wildcardProjection) {
-            pathProjectionSpec = wildcardProjection.Obj();
-            invariant(!spec[IndexDescriptor::kColumnStoreProjectionFieldName]);
-            isWildcard = true;
-        } else if (columnStoreProjection) {
-            pathProjectionSpec = columnStoreProjection.Obj();
-            invariant(!spec[IndexDescriptor::kWildcardProjectionFieldName]);
-        } else {
-            // No projection to normalize.
-            return spec;
-        }
-        uassert(ErrorCodes::InvalidIndexSpecificationOption,
-                "Can't enable both wildcardProjection and columnstoreProjection",
-                !(wildcardProjection && columnStoreProjection));
-
-        // Exactly one of wildcardProjection or columnstoreProjection is enabled
-        const auto projectionName = isWildcard ? IndexDescriptor::kWildcardProjectionFieldName
-                                               : IndexDescriptor::kColumnStoreProjectionFieldName;
-        static const auto kFieldSetKeyPattern = isWildcard ? BSON("$**" << 1)
-                                                           : BSON("$**"
-                                                                  << "columnstore");
-        auto indexPathProjection = isWildcard
-            ? static_cast<IndexPathProjection>(WildcardKeyGenerator::createProjectionExecutor(
-                  kFieldSetKeyPattern, pathProjectionSpec))
-            : static_cast<IndexPathProjection>(
-                  column_keygen::ColumnKeyGenerator::createProjectionExecutor(kFieldSetKeyPattern,
-                                                                              pathProjectionSpec));
-        auto normalizedProjection =
-            indexPathProjection.exec()->serializeTransformation(boost::none).toBson();
-        return spec.addField(BSON(projectionName << normalizedProjection).firstElement());
-    });
     return normalSpecs;
 }
 

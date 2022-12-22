@@ -546,7 +546,7 @@ env.Library(
         '$BUILD_DIR/mongo/bson/util/bson_extract',
         '$BUILD_DIR/mongo/db/catalog/collection_catalog',
         '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-        '$BUILD_DIR/mongo/db/index/index_descriptor',
+        '$BUILD_DIR/mongo/db/index/index_access_method',
         'bson_collection_catalog_entry',
     ],
     LIBDEPS_PRIVATE=[

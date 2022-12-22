@@ -37,7 +37,7 @@ stitchSupportTargets = stitchSupportEnv.Library(
         'stitch_support.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/index/index_access_methods',
+        '$BUILD_DIR/mongo/db/index/index_access_method',
         '$BUILD_DIR/mongo/db/ops/parsed_update',
         '$BUILD_DIR/mongo/db/query/collation/collator_factory_icu',
         '$BUILD_DIR/mongo/db/query/collation/collator_factory_interface',

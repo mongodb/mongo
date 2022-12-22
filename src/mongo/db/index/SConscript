@@ -4,54 +4,12 @@ Import("env")
 
 env = env.Clone()
 
-env.Library(
-    target='index_descriptor',
-    source=[
-        'index_descriptor.cpp',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/catalog/index_catalog',
-        '$BUILD_DIR/mongo/db/query/collation/collator_factory_interface',
-        '$BUILD_DIR/mongo/db/query_expressions',
-        '$BUILD_DIR/mongo/db/server_base',
-    ],
-)
-
-env.Library(
-    target='key_generator',
-    source=[
-        'btree_key_generator.cpp',
-        'column_key_generator.cpp',
-        'expression_keys_private.cpp',
-        'sort_key_generator.cpp',
-        'wildcard_key_generator.cpp',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/bson/dotted_path_support',
-        '$BUILD_DIR/mongo/db/exec/projection_executor',
-        '$BUILD_DIR/mongo/db/exec/working_set',
-        '$BUILD_DIR/mongo/db/fts/base_fts',
-        '$BUILD_DIR/mongo/db/geo/geoparser',
-        '$BUILD_DIR/mongo/db/mongohasher',
-        '$BUILD_DIR/mongo/db/pipeline/document_path_support',
-        '$BUILD_DIR/mongo/db/query/collation/collator_interface',
-        '$BUILD_DIR/mongo/db/query/projection_ast',
-        '$BUILD_DIR/mongo/db/query/sort_pattern',
-        '$BUILD_DIR/mongo/db/record_id_helpers',
-        '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util',
-        '$BUILD_DIR/third_party/s2/s2',
-        'expression_params',
-        'index_descriptor',
-    ],
-)
-
 env.Benchmark(
     target='key_gen_bm',
     source='key_gen_bm.cpp',
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
-        'key_generator',
+        'index_access_method',
     ],
 )
 
@@ -70,33 +28,51 @@ env.Library(
     ],
 )
 
-env.Library(
-    target='index_access_method_factory',
-    source=[
-        'index_access_method_factory.cpp',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/server_base',
-    ],
-)
-
 iamEnv = env.Clone()
 iamEnv.InjectThirdParty(libraries=['snappy'])
 iamEnv.Library(
     target="index_access_method",
     source=[
+        '2d_access_method.cpp',
+        'btree_access_method.cpp',
+        'btree_key_generator.cpp',
+        'column_key_generator.cpp',
+        'columns_access_method.cpp',
         'duplicate_key_tracker.cpp',
+        'expression_keys_private.cpp',
+        'fts_access_method.cpp',
+        'hash_access_method.cpp',
         'index_access_method.cpp',
         'index_build_interceptor.cpp',
         'index_build_interceptor.idl',
+        'index_descriptor.cpp',
+        's2_access_method.cpp',
+        's2_bucket_access_method.cpp',
         'skipped_record_tracker.cpp',
+        'sort_key_generator.cpp',
+        'wildcard_access_method.cpp',
+        'wildcard_key_generator.cpp',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/bson/dotted_path_support',
         '$BUILD_DIR/mongo/db/catalog/collection',
+        '$BUILD_DIR/mongo/db/catalog/index_catalog',
         '$BUILD_DIR/mongo/db/catalog/index_catalog_entry',
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
         '$BUILD_DIR/mongo/db/curop',
+        '$BUILD_DIR/mongo/db/exec/projection_executor',
+        '$BUILD_DIR/mongo/db/exec/working_set',
+        '$BUILD_DIR/mongo/db/fts/base_fts',
+        '$BUILD_DIR/mongo/db/geo/geoparser',
+        '$BUILD_DIR/mongo/db/mongohasher',
         '$BUILD_DIR/mongo/db/multi_key_path_tracker',
+        '$BUILD_DIR/mongo/db/pipeline/document_path_support',
+        '$BUILD_DIR/mongo/db/query/collation/collator_factory_interface',
+        '$BUILD_DIR/mongo/db/query/collation/collator_interface',
+        '$BUILD_DIR/mongo/db/query/projection_ast',
+        '$BUILD_DIR/mongo/db/query/sort_pattern',
+        '$BUILD_DIR/mongo/db/query_expressions',
+        '$BUILD_DIR/mongo/db/record_id_helpers',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/resumable_index_builds_idl',
         '$BUILD_DIR/mongo/db/server_base',
@@ -109,10 +85,13 @@ iamEnv.Library(
         '$BUILD_DIR/mongo/db/storage/key_string',
         '$BUILD_DIR/mongo/db/storage/record_store_base',
         '$BUILD_DIR/mongo/db/storage/storage_options',
+        '$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util',
         '$BUILD_DIR/mongo/db/vector_clock',
         '$BUILD_DIR/mongo/util/progress_meter',
+        '$BUILD_DIR/third_party/s2/s2',
         '$BUILD_DIR/third_party/shim_snappy',
-        'index_descriptor',
+        'column_store_index',
+        'expression_params',
     ],
 )
 
@@ -130,35 +109,6 @@ iamEnv.Library(
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/s/is_mongos',
         '$BUILD_DIR/third_party/shim_snappy',
-    ],
-)
-
-env.Library(
-    target='index_access_methods',
-    source=[
-        '2d_access_method.cpp',
-        'columns_access_method.cpp',
-        'btree_access_method.cpp',
-        'fts_access_method.cpp',
-        'hash_access_method.cpp',
-        'index_access_method_factory_impl.cpp',
-        's2_access_method.cpp',
-        's2_bucket_access_method.cpp',
-        'wildcard_access_method.cpp',
-    ],
-    LIBDEPS=[
-        'index_access_method',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/concurrency/exception_util',
-        '$BUILD_DIR/mongo/db/curop',
-        '$BUILD_DIR/mongo/db/fts/base_fts',
-        '$BUILD_DIR/mongo/db/resumable_index_builds_idl',
-        '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/db/storage/execution_context',
-        'column_store_index',
-        'expression_params',
-        'key_generator',
     ],
 )
 
@@ -184,7 +134,6 @@ indexTestEnv.CppUnitTest(
         '$BUILD_DIR/mongo/db/catalog/catalog_test_fixture',
         '$BUILD_DIR/mongo/db/exec/document_value/document_value_test_util',
         '$BUILD_DIR/mongo/db/exec/working_set',
-        '$BUILD_DIR/mongo/db/index/index_access_method',
         '$BUILD_DIR/mongo/db/mongohasher',
         '$BUILD_DIR/mongo/db/query/collation/collator_interface_mock',
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
@@ -195,7 +144,6 @@ indexTestEnv.CppUnitTest(
         '$BUILD_DIR/mongo/db/sorter/sorter_stats',
         'column_store_index',
         'expression_params',
-        'index_access_methods',
-        'key_generator',
+        'index_access_method',
     ],
 )

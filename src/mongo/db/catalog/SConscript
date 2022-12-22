@@ -161,9 +161,7 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/common',
-        '$BUILD_DIR/mongo/db/index/index_access_methods',
-        '$BUILD_DIR/mongo/db/index/index_descriptor',
-        '$BUILD_DIR/mongo/db/index/key_generator',
+        '$BUILD_DIR/mongo/db/index/index_access_method',
         '$BUILD_DIR/mongo/db/query/collation/collator_factory_interface',
         '$BUILD_DIR/mongo/db/query_expressions',
         '$BUILD_DIR/mongo/db/server_base',
@@ -202,7 +200,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/collection_index_usage_tracker',
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/index/index_access_method',
-        '$BUILD_DIR/mongo/db/index/index_descriptor',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/ttl_collection_cache',
@@ -241,9 +238,6 @@ env.Library(
     source=[
         'collection.cpp',
         'collection_operation_source.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/s/sharding_api_d',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',
@@ -398,8 +392,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/dbcommands_idl',
         '$BUILD_DIR/mongo/db/index/column_store_index',
         '$BUILD_DIR/mongo/db/index/index_access_method',
-        '$BUILD_DIR/mongo/db/index/index_access_method_factory',
-        '$BUILD_DIR/mongo/db/index/index_access_methods',
         '$BUILD_DIR/mongo/db/multitenancy',
         '$BUILD_DIR/mongo/db/op_observer/op_observer',
         '$BUILD_DIR/mongo/db/record_id_helpers',
@@ -473,7 +465,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
         '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/index/index_access_method',
-        '$BUILD_DIR/mongo/db/index/index_access_methods',
         '$BUILD_DIR/mongo/db/multi_key_path_tracker',
         '$BUILD_DIR/mongo/db/record_id_helpers',
         '$BUILD_DIR/mongo/db/server_base',
@@ -696,7 +687,6 @@ if wiredtiger:
             '$BUILD_DIR/mongo/db/auth/authmocks',
             '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
             '$BUILD_DIR/mongo/db/index/index_access_method',
-            '$BUILD_DIR/mongo/db/index/index_access_methods',
             '$BUILD_DIR/mongo/db/index_builds_coordinator_mongod',
             '$BUILD_DIR/mongo/db/multitenancy',
             '$BUILD_DIR/mongo/db/op_observer/op_observer',

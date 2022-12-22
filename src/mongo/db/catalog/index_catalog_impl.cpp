@@ -612,7 +612,7 @@ IndexCatalogEntry* IndexCatalogImpl::createIndexEntry(OperationContext* opCtx,
     }
 
     if (!frozen) {
-        entry->setAccessMethod(IndexAccessMethodFactory::get(opCtx)->make(
+        entry->setAccessMethod(IndexAccessMethod::make(
             opCtx, collection->ns(), collection->getCollectionOptions(), entry.get(), ident));
     }
 
@@ -1371,7 +1371,7 @@ Status IndexCatalogImpl::resetUnfinishedIndexForRecovery(OperationContext* opCtx
 
     // Update the index entry state in preparation to rebuild the index.
     if (!released->accessMethod()) {
-        released->setAccessMethod(IndexAccessMethodFactory::get(opCtx)->make(
+        released->setAccessMethod(IndexAccessMethod::make(
             opCtx, collection->ns(), collection->getCollectionOptions(), released.get(), ident));
     }
 

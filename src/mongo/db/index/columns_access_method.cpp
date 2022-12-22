@@ -68,15 +68,7 @@ ColumnStoreAccessMethod::ColumnStoreAccessMethod(IndexCatalogEntry* ice,
     : _store(std::move(store)),
       _indexCatalogEntry(ice),
       _descriptor(ice->descriptor()),
-      _keyGen(_descriptor->keyPattern(), _descriptor->pathProjection()) {
-    // Normalize the 'columnstoreProjection' index option to facilitate its comparison as part of
-    // index signature.
-    if (!_descriptor->pathProjection().isEmpty()) {
-        auto* projExec = getColumnstoreProjection()->exec();
-        ice->descriptor()->_setNormalizedPathProjection(
-            projExec->serializeTransformation(boost::none).toBson());
-    }
-}
+      _keyGen(_descriptor->keyPattern(), _descriptor->pathProjection()) {}
 
 class ColumnStoreAccessMethod::BulkBuilder final
     : public BulkBuilderCommon<ColumnStoreAccessMethod::BulkBuilder> {
