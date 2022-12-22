@@ -140,9 +140,9 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
-    target='interval_intersection_test',
+    target='interval_simplify_test',
     source=[
-        "interval_intersection_test.cpp",
+        "interval_simplify_test.cpp",
     ],
     LIBDEPS=[
         "optimizer",

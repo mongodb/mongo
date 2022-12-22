@@ -31,6 +31,8 @@
 
 #include "mongo/db/query/optimizer/index_bounds.h"
 
+#include "mongo/db/query/optimizer/utils/utils.h"
+
 namespace mongo::optimizer {
 
 /**

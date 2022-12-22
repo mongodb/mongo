@@ -419,18 +419,26 @@ private:
 /**
  * Interval expressions.
  */
+inline auto _disj(IntervalReqExpr::NodeVector v) {
+    return IntervalReqExpr::make<IntervalReqExpr::Disjunction>(std::move(v));
+}
+
 template <typename... Ts>
 inline auto _disj(Ts&&... pack) {
     IntervalReqExpr::NodeVector v;
     (v.push_back(std::forward<Ts>(pack)), ...);
-    return IntervalReqExpr::make<IntervalReqExpr::Disjunction>(std::move(v));
+    return _disj(std::move(v));
+}
+
+inline auto _conj(IntervalReqExpr::NodeVector v) {
+    return IntervalReqExpr::make<IntervalReqExpr::Conjunction>(std::move(v));
 }
 
 template <typename... Ts>
 inline auto _conj(Ts&&... pack) {
     IntervalReqExpr::NodeVector v;
     (v.push_back(std::forward<Ts>(pack)), ...);
-    return IntervalReqExpr::make<IntervalReqExpr::Conjunction>(std::move(v));
+    return _conj(std::move(v));
 }
 
 inline auto _interval(IntervalRequirement req) {
