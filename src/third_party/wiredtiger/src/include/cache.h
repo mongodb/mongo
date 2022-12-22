@@ -218,7 +218,7 @@ struct __wt_cache {
 #define WT_CACHE_POOL_MANAGER 0x1u /* The active cache pool manager */
 #define WT_CACHE_POOL_RUN 0x2u     /* Cache pool thread running */
                                    /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
-    uint32_t pool_flags;           /* Cache pool flags */
+    uint16_t pool_flags_atomic;    /* Cache pool flags */
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_CACHE_EVICT_CLEAN 0x001u        /* Evict clean pages */
