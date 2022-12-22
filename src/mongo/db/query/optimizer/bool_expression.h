@@ -135,6 +135,69 @@ struct BoolExpr {
         }
         return {};
     }
+
+    /**
+     * Converts a BoolExpr to DNF. Assumes 'n' is in CNF. Returns boost::none if the resulting
+     * formula would have more than 'maxClauses' clauses.
+     */
+    static boost::optional<Node> convertToDNF(const Node& n,
+                                              boost::optional<size_t> maxClauses = boost::none) {
+        tassert(7115100, "Expected Node to be a Conjunction", n.template is<Conjunction>());
+        return convertTo<false /*toCNF*/>(n, maxClauses);
+    }
+
+    /**
+     * Converts a BoolExpr to CNF. Assumes 'n' is in DNF. Returns boost::none if the resulting
+     * formula would have more than 'maxClauses' clauses.
+     */
+    static boost::optional<Node> convertToCNF(const Node& n,
+                                              boost::optional<size_t> maxClauses = boost::none) {
+        tassert(7115101, "Expected Node to be a Disjunction", n.template is<Disjunction>());
+        return convertTo<true /*toCNF*/>(n, maxClauses);
+    }
+
+private:
+    template <bool toCNF,
+              class TopLevel = std::conditional_t<toCNF, Conjunction, Disjunction>,
+              class SecondLevel = std::conditional_t<toCNF, Disjunction, Conjunction>>
+    static boost::optional<Node> convertTo(const Node& n, boost::optional<size_t> maxClauses) {
+        std::vector<NodeVector> newChildren;
+        newChildren.push_back({});
+
+        // Process the children of 'n' in order. Suppose the input (in CNF) was (a+b).(c+d). After
+        // the first child, we have [[a], [b]] in 'newChildren'. After the second child, we have
+        // [[a, c], [b, c], [a, d], [b, d]].
+        for (const auto& child : n.template cast<SecondLevel>()->nodes()) {
+            auto childNode = child.template cast<TopLevel>();
+            auto numGrandChildren = childNode->nodes().size();
+            auto frontierSize = newChildren.size();
+
+            if (maxClauses.has_value() && frontierSize * numGrandChildren > maxClauses) {
+                return boost::none;
+            }
+
+            // Each child (literal) under 'child' is added to a new copy of the existing vectors...
+            for (size_t grandChild = 1; grandChild < numGrandChildren; grandChild++) {
+                for (size_t i = 0; i < frontierSize; i++) {
+                    NodeVector newNodeVec = newChildren.at(i);
+                    newNodeVec.push_back(childNode->nodes().at(grandChild));
+                    newChildren.push_back(newNodeVec);
+                }
+            }
+
+            // Except the first child under 'child', which can modify the vectors in place.
+            for (size_t i = 0; i < frontierSize; i++) {
+                NodeVector& nv = newChildren.at(i);
+                nv.push_back(childNode->nodes().front());
+            }
+        }
+
+        NodeVector res;
+        for (size_t i = 0; i < newChildren.size(); i++) {
+            res.push_back(make<SecondLevel>(std::move(newChildren[i])));
+        }
+        return make<TopLevel>(res);
+    }
 };
 
 }  // namespace mongo::optimizer
