@@ -57,8 +57,7 @@ assert.commandFailedWithCode(shardedColl.insert({_id: 4, a: 2}), ErrorCodes.Dupl
 
 // Try converting the index to unique and make sure no indexes are converted on any shards.
 assert.commandFailedWithCode(
-    db.runCommand(
-        {collMod: shardedColl.getName(), index: {keyPattern: {a: 1}, hidden: true, unique: true}}),
+    db.runCommand({collMod: shardedColl.getName(), index: {keyPattern: {a: 1}, unique: true}}),
     ErrorCodes.CannotConvertIndexToUnique);
 
 const s0Coll = st.shard0.getDB(jsTestName()).getCollection("sharded");
@@ -78,8 +77,8 @@ assert.eq(countPrepareUniqueIndexes(s1Coll, {a: 1}),
 
 // Remove the duplicate and confirm the indexes are converted.
 assert.commandWorked(shardedColl.deleteOne({_id: 2}));
-assert.commandWorked(db.runCommand(
-    {collMod: shardedColl.getName(), index: {keyPattern: {a: 1}, hidden: true, unique: true}}));
+assert.commandWorked(
+    db.runCommand({collMod: shardedColl.getName(), index: {keyPattern: {a: 1}, unique: true}}));
 assert.eq(countUniqueIndexes(s0Coll, {a: 1}),
           1,
           'index should be unique: ' + tojson(s0Coll.getIndexes()));
