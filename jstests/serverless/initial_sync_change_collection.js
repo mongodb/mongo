@@ -43,12 +43,13 @@ assert.commandWorked(tenantPrimaryNode.getDB("test").stockPrice.insert(mdbStockP
 assert.eq(primaryChangeColl.find({o: mdbStockPriceDoc}).toArray().length, 1);
 
 // Add a new secondary to the replica set and block the initial sync after the data cloning is done.
-const secondary = replSetTest.addNode({
+const secondary = replSetTest.add({
     setParameter: {
         // Hang after the data cloning phase is completed.
         "failpoint.initialSyncHangAfterDataCloning": tojson({mode: "alwaysOn"})
     }
 });
+replSetTest.reInitiate();
 
 // Wait for the cloning phase to complete. The cloning phase should not clone documents of the
 // change collection from the primary.

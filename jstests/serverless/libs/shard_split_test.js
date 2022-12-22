@@ -53,7 +53,7 @@ const doWriteOperations = function(rstArgs, tenantIds) {
 
 const addRecipientNodes = function({rst, numNodes, recipientTagName}) {
     numNodes = numNodes || 3;  // default to three nodes
-    let recipientNodes = [];
+    const recipientNodes = [];
     const options = TenantMigrationUtil.makeX509OptionsForTest();
     jsTestLog(`Adding ${numNodes} non-voting recipient nodes to donor`);
     for (let i = 0; i < numNodes; ++i) {
@@ -348,6 +348,7 @@ class ShardSplitTest {
         recipientTagName = "recipientNode",
         recipientSetName = "recipientSetName",
         quickGarbageCollection = false,
+        donorRst,
         nodeOptions,
         allowStaleReadsOnDonor = false,
         initiateWithShortElectionTimeout = false
@@ -362,12 +363,16 @@ class ShardSplitTest {
             nodeOptions["setParameter"]["failpoint.tenantMigrationDonorAllowsNonTimestampedReads"] =
                 tojson({mode: 'alwaysOn'});
         }
-        this.donor = new ReplSetTest({name: "donor", nodes: 3, serverless: true, nodeOptions});
-        this.donor.startSet();
-        if (initiateWithShortElectionTimeout) {
-            this.initiateWithShortElectionTimeout();
+        if (donorRst) {
+            this.donor = donorRst;
         } else {
-            this.donor.initiate();
+            this.donor = new ReplSetTest({name: "donor", nodes: 3, serverless: true, nodeOptions});
+            this.donor.startSet();
+            if (initiateWithShortElectionTimeout) {
+                this.initiateWithShortElectionTimeout();
+            } else {
+                this.donor.initiate();
+            }
         }
 
         this.recipientTagName = recipientTagName;
@@ -414,7 +419,7 @@ class ShardSplitTest {
      * @param {numNodes} indicates the number of recipient nodes to be added.
      */
     addRecipientNodes(numNodes) {
-        if (this.recipientNodes.lengh > 0) {
+        if (this.recipientNodes.length > 0) {
             throw new Error("Recipient nodes may only be added once");
         }
 

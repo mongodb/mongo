@@ -67,11 +67,10 @@ function verifyChangeCollectionEntries(
 // A class that sets up the multitenant environment to enable change collections on the replica set.
 // This class also provides helpers that are commonly used when working with change collections.
 class ChangeStreamMultitenantReplicaSetTest extends ReplSetTest {
-    constructor(config) {
+    constructor(config = {}) {
         // Instantiate the 'ReplSetTest' with 'serverless' as an option.
-        const nodeConfig = Object.assign(
-            {name: "ChangeStreamMultitenantReplicaSetTest", serverless: true}, config);
-        super(nodeConfig);
+        super(Object.assign({name: "ChangeStreamMultitenantReplicaSetTest", serverless: true},
+                            config));
 
         // A dictionary of parameters required for multitenancy.
         this._multitenancyParameters = {
@@ -81,31 +80,35 @@ class ChangeStreamMultitenantReplicaSetTest extends ReplSetTest {
             featureFlagRequireTenantID: true
         };
 
-        // Start and initialize the replica set.
+        const nodeOptions = config.nodeOptions || {};
         const setParameter =
-            Object.assign({}, config.setParameter || {}, this._multitenancyParameters);
-        this.startSet({setParameter: setParameter});
+            Object.assign({}, nodeOptions.setParameter || {}, this._multitenancyParameters);
+        this.startSet({setParameter});
         this.initiate();
 
         // Create a root user within the multitenant environment to enable passing '$tenant' to
         // commands.
         assert.commandWorked(this.getPrimary().getDB("admin").runCommand(
             {createUser: "root", pwd: "pwd", roles: ["root"]}));
-    }
 
-    // Adds a node to the replica set with the provided configuration 'config'.
-    addNode(config) {
-        // Get the a copy of the 'config' dictionary and add required multitenancy flags to it.
-        const nodeConfig = Object.assign({serverless: true}, config);
-        nodeConfig.setParameter =
-            Object.assign({}, nodeConfig.setParameter || {}, this._multitenancyParameters);
+        // Unfortunately, ES6 class inheritance doesn't play all that nicely with legacy "Function"
+        // classes. As such, overriding an instance method and calling the superclass method does
+        // not work properly. We can fake this by holding onto a reference to the "super" add
+        // method (ensuring that we bind to the context in this class to avoid issues with the
+        // method being invoked in the wrong context) and call it from our override below.
+        // If and when ReplSetTest is refactored to use ES6 classes, we can get rid of this madness.
+        const superAdd = this.add.bind(this);
 
-        // Initiate the replica set with the newly added node.
-        const node = this.add(nodeConfig);
-        this.reInitiate();
+        // Adds a node to the replica set with the provided configuration 'config'.
+        this.add = (config) => {
+            // Get the a copy of the 'config' dictionary and add required multitenancy flags to it.
+            const nodeConfig = Object.assign({serverless: true}, config);
+            nodeConfig.setParameter =
+                Object.assign({}, nodeConfig.setParameter || {}, this._multitenancyParameters);
 
-        // Return the newly added node.
-        return node;
+            // Initiate the replica set with the newly added node.
+            return superAdd(nodeConfig);
+        };
     }
 
     // Returns a connection to the 'hostAddr' with 'tenantId' stamped to it for the created user.
