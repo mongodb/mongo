@@ -45,7 +45,7 @@ namespace mongo {
 namespace {
 
 // mms-automation stores its document in local.clustermanager
-static const NamespaceString localClusterManagerNss("local.clustermanager");
+static const NamespaceString localClusterManagerNss = NamespaceStringUtil::deserialize("local.clustermanager");
 
 }  // namespace
 

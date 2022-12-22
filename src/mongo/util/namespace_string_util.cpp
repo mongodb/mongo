@@ -98,15 +98,15 @@ NamespaceString NamespaceStringUtil::deserialize(DatabaseName dbName, StringData
     return NamespaceString(dbName, ns);
 }
 
-NamespaceString deserialize(StringData ns, boost::optional<TenantId> tenantId) {
+NamespaceString NamespaceStringUtil::deserialize(StringData ns, boost::optional<TenantId> tenantId) {
     return NamespaceStringUtil::deserialize(tenantId, ns);
 }
 
-NamespaceString deserialize(StringData db, StringData coll, boost::optional<TenantId> tenantId) {
+NamespaceString NamespaceStringUtil::deserialize(StringData db, StringData coll, boost::optional<TenantId> tenantId) {
     return NamespaceStringUtil::deserialize(tenantId, str::stream() << db << "." << coll);
 }
 
-NamespaceString deserialize(boost::optional<TenantId> tenantId, StringData db, StringData coll) {
+NamespaceString NamespaceStringUtil::deserialize(boost::optional<TenantId> tenantId, StringData db, StringData coll) {
     return NamespaceStringUtil::deserialize(tenantId, str::stream() << db << "." << coll);
 }
 

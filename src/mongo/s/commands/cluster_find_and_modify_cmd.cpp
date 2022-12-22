@@ -402,7 +402,7 @@ public:
                 return request.body;
             }
         }();
-        const NamespaceString nss = NamespaceStringUtil::deserialize(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
+        const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
 
         const auto cri =
             uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(opCtx, nss));
@@ -482,7 +482,7 @@ public:
              const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        const NamespaceString nss = NamespaceStringUtil::deserialize(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
+        const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
 
         if (processFLEFindAndModify(opCtx, cmdObj, result) == FLEBatchResult::kProcessed) {
             return true;

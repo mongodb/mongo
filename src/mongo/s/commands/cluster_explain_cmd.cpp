@@ -86,7 +86,7 @@ public:
         : CommandInvocation(explainCommand),
           _outerRequest{&request},
           _dbName{_outerRequest->getDatabase().toString()},
-          _ns{CommandHelpers::parseNsFromCommand(_dbName, _outerRequest->body)},
+          _ns{NamespaceStringUtil::deserialize(CommandHelpers::parseNsFromCommand(_dbName, _outerRequest->body))},
           _verbosity{std::move(verbosity)},
           _innerRequest{std::move(innerRequest)},
           _innerInvocation{std::move(innerInvocation)} {}

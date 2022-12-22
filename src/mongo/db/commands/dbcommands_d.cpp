@@ -256,7 +256,7 @@ public:
              const DatabaseName& dbName,
              const BSONObj& jsobj,
              BSONObjBuilder& result) override {
-        const NamespaceString nss = NamespaceStringUtil::deserialize(parseNs(dbName, jsobj));
+        const NamespaceString nss(parseNs(dbName, jsobj));
 
         md5digest d;
         md5_state_t st;

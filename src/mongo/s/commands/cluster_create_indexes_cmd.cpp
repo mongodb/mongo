@@ -93,7 +93,7 @@ public:
                               const BSONObj& cmdObj,
                               const RequestParser&,
                               BSONObjBuilder& output) final {
-        const NamespaceString nss = NamespaceStringUtil::deserialize(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
+        const NamespaceString nss(CommandHelpers::parseNsCollectionRequired(dbName, cmdObj));
         LOGV2_DEBUG(22750,
                     1,
                     "createIndexes: {namespace} cmd: {command}",

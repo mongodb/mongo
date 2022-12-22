@@ -1762,7 +1762,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(Operat
     const bool isLogged = false;
     StatusWith<std::string> swConfig =
         WiredTigerRecordStore::generateCreateString(_canonicalName,
-                                                    NamespaceString("") /* internal table */,
+                                                    NamespaceStringUtil::deserialize("") /* internal table */,
                                                     ident,
                                                     CollectionOptions(),
                                                     _rsOptions,
@@ -1782,7 +1782,7 @@ std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(Operat
     uassertStatusOK(wtRCToStatus(session->create(session, uri.c_str(), config.c_str()), session));
 
     WiredTigerRecordStore::Params params;
-    params.nss = NamespaceString("");
+    params.nss = NamespaceStringUtil::deserialize("");
     params.ident = ident.toString();
     params.engineName = _canonicalName;
     params.isCapped = false;

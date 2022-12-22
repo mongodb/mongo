@@ -211,7 +211,7 @@ int runQueryWithReadCommands(DBClientBase* conn,
                              BSONObj* objOut) {
     const auto dbName = findCommand->getNamespaceOrUUID()
                             .nss()
-                            .value_or(NamespaceStringUtil::deserialize())
+                            .value_or(NamespaceString())
                             .dbName()
                             .toStringWithTenantId();
 
@@ -248,7 +248,7 @@ int runQueryWithReadCommands(DBClientBase* conn,
 
         GetMoreCommandRequest getMoreRequest(
             cursorResponse.getCursorId(),
-            findCommand->getNamespaceOrUUID().nss().value_or(NamespaceStringUtil::deserialize()).coll().toString());
+            findCommand->getNamespaceOrUUID().nss().value_or(NamespaceString()).coll().toString());
         getMoreRequest.setBatchSize(findCommand->getBatchSize());
         BSONObj getMoreCommandResult;
         uassert(ErrorCodes::CommandFailed,
@@ -284,7 +284,7 @@ Timestamp getLatestClusterTime(DBClientBase* conn) {
     findCommand->setSingleBatch(true);
     invariant(query_request_helper::validateFindCommandRequest(*findCommand));
     const auto dbName =
-        findCommand->getNamespaceOrUUID().nss().value_or(NamespaceStringUtil::deserialize()).db().toString();
+        findCommand->getNamespaceOrUUID().nss().value_or(NamespaceString()).db().toString();
 
     BSONObj oplogResult;
     int count = runQueryWithReadCommands(conn,

@@ -111,7 +111,7 @@ public:
                    ExplainOptions::Verbosity verbosity,
                    rpc::ReplyBuilderInterface* result) const override {
         const BSONObj& cmdObj = opMsgRequest.body;
-        const NamespaceString nss = NamespaceStringUtil::deserialize(parseNs(opMsgRequest.getDatabase(), cmdObj));
+        const NamespaceString nss(parseNs(opMsgRequest.getDatabase(), cmdObj));
 
         auto parsedDistinctCmd =
             ParsedDistinct::parse(opCtx, nss, cmdObj, ExtensionsCallbackNoop(), true);
@@ -194,7 +194,7 @@ public:
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
-        const NamespaceString nss = NamespaceStringUtil::deserialize(parseNs(dbName, cmdObj));
+        const NamespaceString nss(parseNs(dbName, cmdObj));
 
         auto parsedDistinctCmd =
             ParsedDistinct::parse(opCtx, nss, cmdObj, ExtensionsCallbackNoop(), false);

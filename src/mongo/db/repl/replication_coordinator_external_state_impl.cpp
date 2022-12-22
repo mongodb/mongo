@@ -137,7 +137,7 @@ const char kLocalDbName[] = "local";
 // TODO SERVER-62491 Use SystemTenantId
 const DatabaseName kConfigDatabaseName{boost::none, kLocalDbName};
 
-const NamespaceString kConfigCollectionNS{kLocalDbName, "system.replset"};
+const NamespaceString kConfigCollectionNS = NamespaceStringUtil::deserialize(kLocalDbName, "system.replset");
 
 MONGO_FAIL_POINT_DEFINE(dropPendingCollectionReaperHang);
 

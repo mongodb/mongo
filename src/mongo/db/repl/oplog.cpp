@@ -839,7 +839,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           const auto& ui = entry.getUuid();
           const auto& cmd = entry.getObject();
 
-          const NamespaceString nss = NamespaceStringUtil::deserialize(extractNs(entry.getNss().dbName(), cmd));
+          const NamespaceString nss(extractNs(entry.getNss().dbName(), cmd));
 
           const auto& migrationId = entry.getFromTenantMigration();
           if (migrationId) {
@@ -889,7 +889,7 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                       "The createIndexes operation is not supported in applyOps mode"};
           }
 
-          const NamespaceString nss = NamespaceStringUtil::deserialize(
+          const NamespaceString nss(
               extractNsFromUUIDorNs(opCtx, entry.getNss(), entry.getUuid(), cmd));
           BSONElement first = cmd.firstElement();
           invariant(first.fieldNameStringData() == "createIndexes");

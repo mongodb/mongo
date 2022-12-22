@@ -362,7 +362,7 @@ Status checkAuthForMapReduce(const BasicCommand* commandTemplate,
         }
 
         ResourcePattern outputResource(
-            ResourcePattern::forExactNamespace(NamespaceStringUtil::deserialize(outputOptions.finalNamespace)));
+            ResourcePattern::forExactNamespace(outputOptions.finalNamespace));
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Invalid target namespace " << outputResource.ns().ns(),
                 outputResource.ns().isValid());

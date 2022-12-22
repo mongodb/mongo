@@ -91,7 +91,7 @@ const ReadPreferenceSetting kConfigPrimaryPreferredSelector(ReadPreference::Prim
 const int kMaxReadRetry = 3;
 const int kMaxWriteRetry = 3;
 
-const NamespaceString kSettingsNamespace("config", "settings");
+const NamespaceString kSettingsNamespace = NamespaceStringUtil::deserialize("config", "settings");
 
 void toBatchError(const Status& status, BatchedCommandResponse* response) {
     response->clear();

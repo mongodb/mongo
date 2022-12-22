@@ -1158,7 +1158,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto [matchedDocumentsSlot, foreignStage] = [&, localStage = std::move(localStage)]() mutable
         -> std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> {
         const auto& foreignColl =
-            _collections.lookupCollection(NamespaceStringUtil::deserialize(eqLookupNode->foreignCollection));
+            _collections.lookupCollection(eqLookupNode->foreignCollection);
 
         boost::optional<SlotId> collatorSlot = _state.data->env->getSlotIfExists("collator"_sd);
         switch (eqLookupNode->lookupStrategy) {

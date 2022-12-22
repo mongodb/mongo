@@ -624,7 +624,7 @@ void processRemovedFieldsHelper(FLEQueryInterface* queryImpl,
         true));
     checkWriteErrors(eccInsertReply);
 
-    NamespaceString nssEcoc(edcNss.db(), efc.getEcocCollection().value());
+    NamespaceString nssEcoc = NamespaceStringUtil::deserialize(edcNss.db(), efc.getEcocCollection().value());
 
     // TODO - make this a batch of ECOC updates?
     EncryptedStateCollectionTokens tokens(esc, ecc);

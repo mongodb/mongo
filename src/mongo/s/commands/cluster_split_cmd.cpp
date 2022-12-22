@@ -133,7 +133,7 @@ public:
                    const BSONObj& cmdObj,
                    std::string& errmsg,
                    BSONObjBuilder& result) override {
-        const NamespaceString nss = NamespaceStringUtil::deserialize(parseNs({boost::none, dbname}, cmdObj));
+        const NamespaceString nss(parseNs({boost::none, dbname}, cmdObj));
 
         const auto cm = uassertStatusOK(
             Grid::get(opCtx)->catalogCache()->getShardedCollectionPlacementInfoWithRefresh(opCtx,

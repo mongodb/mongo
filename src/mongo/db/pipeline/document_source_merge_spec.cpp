@@ -52,7 +52,7 @@ NamespaceString mergeTargetNssParseFromBSON(boost::optional<TenantId> tenantId,
         uassert(5786800,
                 "{} 'into' field cannot be an empty string"_format(DocumentSourceMerge::kStageName),
                 !elem.valueStringData().empty());
-        return {"", elem.valueStringData()};
+        return NamespaceStringUtil::deserialize("", elem.valueStringData());
     }
 
     auto spec = NamespaceSpec::parse(

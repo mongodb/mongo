@@ -78,6 +78,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/rpc/message',
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'ftdc_server',
     ],
 )

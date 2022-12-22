@@ -231,7 +231,7 @@ Status FixUpInfo::recordDropTargetInfo(const BSONElement& dropTarget,
 
     // The namespace of the collection that was dropped is the same namespace
     // that we are trying to rename the collection to.
-    NamespaceString droppedNs(obj.getStringField("to"));
+    NamespaceString droppedNs = NamespaceStringUtil::deserialize(obj.getStringField("to"));
 
     // Records the information necessary for undoing the dropTarget.
     recordRollingBackDrop(droppedNs, opTime, dropTargetUUID);
@@ -369,7 +369,7 @@ Status rollback_internal::updateFixUpInfoFromLocalOplogEntry(OperationContext* o
                 //        }
                 //     ...
                 // }
-                NamespaceString collectionNamespace(nss.getSisterNS(first.valueStringDataSafe()));
+                NamespaceString collectionNamespace = NamespaceStringUtil::deserialize(nss.getSisterNS(first.valueStringDataSafe()));
 
                 // Registers the collection to be removed from the drop pending collection
                 // reaper and to be renamed from its drop pending namespace to original namespace.
@@ -1619,7 +1619,7 @@ void syncFixUp(OperationContext* opCtx,
             try {
 
                 // TODO: Lots of overhead in context. This can be faster.
-                const NamespaceString docNss(doc.ns);
+                const NamespaceString docNss = NamespaceStringUtil::deserialize(doc.ns);
                 Lock::DBLock docDbLock(opCtx, docNss.dbName(), MODE_X);
                 OldClientContext ctx(opCtx, docNss);
                 CollectionWriter collection(opCtx, uuid);

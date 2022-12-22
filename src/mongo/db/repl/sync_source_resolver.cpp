@@ -49,7 +49,7 @@
 namespace mongo {
 namespace repl {
 
-const NamespaceString SyncSourceResolver::kLocalOplogNss("local.oplog.rs");
+const NamespaceString SyncSourceResolver::kLocalOplogNss = NamespaceStringUtil::deserialize("local.oplog.rs");
 const Seconds SyncSourceResolver::kFetcherTimeout(30);
 const Seconds SyncSourceResolver::kFetcherErrorDenylistDuration(10);
 const Seconds SyncSourceResolver::kOplogEmptyDenylistDuration(10);

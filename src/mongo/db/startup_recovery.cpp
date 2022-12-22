@@ -390,7 +390,7 @@ void reconcileCatalogAndRebuildUnfinishedIndexes(
     }
 
     for (const auto& entry : nsToIndexNameObjMap) {
-        NamespaceString collNss(entry.first);
+        NamespaceString collNss = NamespaceStringUtil::deserialize(entry.first);
 
         auto collection = catalog->lookupCollectionByNamespace(opCtx, collNss);
         for (const auto& indexName : entry.second.first) {

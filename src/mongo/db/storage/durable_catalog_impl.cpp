@@ -431,7 +431,7 @@ std::shared_ptr<BSONCollectionCatalogEntry::MetaData> DurableCatalogImpl::_parse
 void DurableCatalogImpl::putMetaData(OperationContext* opCtx,
                                      const RecordId& catalogId,
                                      BSONCollectionCatalogEntry::MetaData& md) {
-    NamespaceString nss = NamespaceStringUtil::deserialize(md.nss);
+    NamespaceString nss = md.nss;
     BSONObj obj = _findEntry(opCtx, catalogId);
 
     {
@@ -591,8 +591,8 @@ StatusWith<std::string> DurableCatalogImpl::newOrphanedIdent(
     std::string identNs = ident;
     std::replace(identNs.begin(), identNs.end(), '-', '_');
     // TODO SERVER-62491 Use system tenantId.
-    NamespaceString nss = NamespaceStringUtil::deserialize(NamespaceStringUtil::deserialize(NamespaceString::kOrphanCollectionDb,
-                                        NamespaceString::kOrphanCollectionPrefix + identNs));
+    NamespaceString nss = NamespaceStringUtil::deserialize(NamespaceString::kOrphanCollectionDb,
+                                        NamespaceString::kOrphanCollectionPrefix + identNs);
 
     BSONObj obj;
     {

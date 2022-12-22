@@ -106,7 +106,7 @@ public:
                   "clientWriteRequest"_attr = writeCmd,
                   "shardId"_attr = shardId);
 
-            const NamespaceString nss = NamespaceStringUtil::deserialize(
+            const NamespaceString nss(
                 CommandHelpers::parseNsCollectionRequired(ns().dbName(), writeCmd));
             const auto targetDocId = request().getTargetDocId();
             const auto commandName = writeCmd.firstElementFieldNameStringData();

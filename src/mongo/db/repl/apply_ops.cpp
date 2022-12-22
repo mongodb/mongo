@@ -85,8 +85,8 @@ Status _applyOps(OperationContext* opCtx,
         if (*opType == 'n')
             continue;
 
-        const NamespaceString nss = NamespaceStringUtil::deserialize(
-            NamespaceStringUtil::deserialize(dbName.tenantId(), opObj["ns"].String()));
+        const NamespaceString nss =
+            NamespaceStringUtil::deserialize(dbName.tenantId(), opObj["ns"].String());
 
         // Need to check this here, or OldClientContext may fail an invariant.
         if (*opType != 'c' && !nss.isValid())

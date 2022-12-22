@@ -325,7 +325,7 @@ StatusWith<std::vector<BSONObj>> Cloner::_filterCollectionsForClone(
             return status;
         }
 
-        const NamespaceString ns(fromDBName, collectionName.c_str());
+        const NamespaceString ns = NamespaceStringUtil::deserialize(fromDBName, collectionName.c_str());
         if (ns.isSystem()) {
             if (!ns.isLegalClientSystemNS(serverGlobalParams.featureCompatibility)) {
                 LOGV2_DEBUG(20419, 2, "\t\t not cloning because system collection");
@@ -498,7 +498,7 @@ Status Cloner::copyDb(OperationContext* opCtx,
             params.idIndexSpec = idIndex.Obj();
         }
 
-        const NamespaceString ns(dBName, params.collectionName);
+        const NamespaceString ns = NamespaceStringUtil::deserialize(dBName, params.collectionName);
         if (std::find(shardedColls.begin(), shardedColls.end(), ns) != shardedColls.end()) {
             params.shardedColl = true;
         }

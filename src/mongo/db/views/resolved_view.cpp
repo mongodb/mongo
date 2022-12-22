@@ -101,7 +101,7 @@ ResolvedView ResolvedView::fromBSON(const BSONObj& commandResponseObj) {
         usesExtendedRange = boost::optional<bool>(usesExtendedRangeElem.boolean());
     }
 
-    return {NamespaceString(viewDef["ns"].valueStringData()),
+    return {NamespaceStringUtil::deserialize(viewDef["ns"].valueStringData()),
             std::move(pipeline),
             std::move(collationSpec),
             std::move(timeseriesOptions),

@@ -1244,7 +1244,7 @@ void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const DatabaseName&
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
 
     oplogEntry.setTid(dbName.tenantId());
-    oplogEntry.setNss({dbName, "$cmd"});
+    oplogEntry.setNss(NamespaceStringUtil::deserialize(dbName, "$cmd"));
     oplogEntry.setObject(BSON("dropDatabase" << 1));
     logOperation(opCtx, &oplogEntry, true /*assignWallClockTime*/, _oplogWriter.get());
 
@@ -1668,7 +1668,7 @@ void logCommitOrAbortForPreparedTransaction(OperationContext* opCtx,
     const auto txnRetryCounter = *opCtx->getTxnRetryCounter();
 
     oplogEntry->setOpType(repl::OpTypeEnum::kCommand);
-    oplogEntry->setNss({"admin", "$cmd"});
+    oplogEntry->setNss(NamespaceStringUtil::deserialize("admin", "$cmd"));
     oplogEntry->setSessionId(opCtx->getLogicalSessionId());
     oplogEntry->setTxnNumber(opCtx->getTxnNumber());
     if (!isDefaultTxnRetryCounter(txnRetryCounter)) {
@@ -2074,7 +2074,7 @@ void OpObserverImpl::onTransactionPrepare(
                     auto oplogSlot = reservedSlots.front();
                     MutableOplogEntry oplogEntry;
                     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
-                    oplogEntry.setNss({"admin", "$cmd"});
+                    oplogEntry.setNss(NamespaceStringUtil::deserialize("admin", "$cmd"));
                     oplogEntry.setOpTime(oplogSlot);
                     oplogEntry.setPrevWriteOpTimeInTransaction(repl::OpTime());
                     oplogEntry.setObject(applyOpsBuilder.done());

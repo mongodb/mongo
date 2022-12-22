@@ -206,7 +206,7 @@ public:
                           "The collStats command is deprecated. For more information, see "
                           "https://dochub.mongodb.org/core/collStats-deprecated");
 
-        const NamespaceString nss = NamespaceStringUtil::deserialize(parseNs(dbName, cmdObj));
+        const NamespaceString nss(parseNs(dbName, cmdObj));
 
         const auto targeter = CollectionRoutingInfoTargeter(opCtx, nss);
         const auto cri = targeter.getRoutingInfo();

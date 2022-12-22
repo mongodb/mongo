@@ -107,7 +107,7 @@ public:
         Impl::checkCanRunHere(opCtx);
 
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
-        const NamespaceString nss = NamespaceStringUtil::deserialize(parseNs({boost::none, dbname}, cmdObj));
+        const NamespaceString nss(parseNs({boost::none, dbname}, cmdObj));
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Invalid namespace specified '" << nss.ns() << "'",
                 nss.isValid());
@@ -214,14 +214,14 @@ public:
 
         const BSONObj& cmdObj = request.body;
 
-        CountCommandRequest countRequest(NamespaceStringOrUUID(NamespaceString()));
+        CountCommandRequest countRequest(NamespaceStringOrUUID(NamespaceString{}));
         try {
             countRequest = CountCommandRequest::parse(IDLParserContext("count"), request);
         } catch (...) {
             return exceptionToStatus();
         }
 
-        const NamespaceString nss = NamespaceStringUtil::deserialize(parseNs(request.getDatabase(), cmdObj));
+        const NamespaceString nss(parseNs(request.getDatabase(), cmdObj));
         uassert(ErrorCodes::InvalidNamespace,
                 str::stream() << "Invalid namespace specified '" << nss.ns() << "'",
                 nss.isValid());
@@ -254,7 +254,7 @@ public:
                                                            targetingQuery,
                                                            targetingCollation);
         } catch (const ExceptionFor<ErrorCodes::CommandOnShardedViewNotSupportedOnMongod>& ex) {
-            CountCommandRequest countRequest(NamespaceStringOrUUID(NamespaceStringUtil::deserialize(}));
+            CountCommandRequest countRequest(NamespaceStringOrUUID(NamespaceString{}));
             try {
                 countRequest = CountCommandRequest::parse(IDLParserContext("count"), cmdObj);
             } catch (...) {

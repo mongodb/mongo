@@ -78,18 +78,13 @@ public:
      * Returns a pattern that matches the named database, and NamespaceStrings
      * "ns" for which ns.isSystem() is false and ns.db() == dbname.
      */
-    static ResourcePattern forDatabaseName(StringData dbName) {
-        return ResourcePattern(MatchTypeEnum::kMatchDatabaseName,NamespaceStringUtil::deserialize(dbName, ""));
-    }
+    static ResourcePattern forDatabaseName(StringData dbName);
 
     /**
      * Returns a pattern that matches NamespaceStrings "ns" for which ns.coll() ==
      * collectionName.
      */
-    static ResourcePattern forCollectionName(StringData collectionName) {
-        return ResourcePattern(MatchTypeEnum::kMatchCollectionName,
-                              NamespaceStringUtil::deserialize("", collectionName));
-    }
+    static ResourcePattern forCollectionName(StringData collectionName);
 
     /**
      * Returns a pattern that matches the given exact namespace string.
@@ -110,30 +105,19 @@ public:
      * Returns a pattern that matches any collection with the prefix "system.buckets." in database
      * "db".
      */
-    static ResourcePattern forAnySystemBucketsInDatabase(StringData dbName) {
-        return ResourcePattern(MatchTypeEnum::kMatchAnySystemBucketInDBResource,
-                              NamespaceStringUtil::deserialize(dbName, ""));
-    }
-
+    static ResourcePattern forAnySystemBucketsInDatabase(StringData dbName);
     /**
      * Returns a pattern that matches any collection with the prefix "system.buckets.<collection>"
      * in any database.
      */
-    static ResourcePattern forAnySystemBucketsInAnyDatabase(StringData collectionName) {
-        return ResourcePattern(MatchTypeEnum::kMatchSystemBucketInAnyDBResource,
-                              NamespaceStringUtil::deserialize("", collectionName));
-    }
+    static ResourcePattern forAnySystemBucketsInAnyDatabase(StringData collectionName);
 
     /**
      * Returns a pattern that matches a collection with the name
      * "<dbName>.system.buckets.<collectionName>"
      */
     static ResourcePattern forExactSystemBucketsCollection(StringData dbName,
-                                                           StringData collectionName) {
-        invariant(!collectionName.startsWith("system.buckets."));
-        return ResourcePattern(MatchTypeEnum::kMatchExactSystemBucketResource,
-                              NamespaceStringUtil::deserialize(dbName, collectionName));
-    }
+                                                           StringData collectionName);
 
     /**
      * Constructs a pattern that never matches.

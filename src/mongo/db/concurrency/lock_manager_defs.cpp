@@ -28,7 +28,7 @@
  */
 
 #include "lock_manager_defs.h"
-#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/namespace_string.h"
 
 namespace mongo {
 
@@ -36,7 +36,7 @@ namespace mongo {
 const ResourceId resourceIdLocalDB =
     ResourceId(RESOURCE_DATABASE, DatabaseName(boost::none, "local"));
 const ResourceId resourceIdOplog =
-    ResourceId(RESOURCE_COLLECTION, NamespaceStringUtil::deserialize(boost::none, "local.oplog.rs"));
+    ResourceId(RESOURCE_COLLECTION, NamespaceString::kRsOplogNamespace);
 const ResourceId resourceIdAdminDB =
     ResourceId(RESOURCE_DATABASE, DatabaseName(boost::none, "admin"));
 const ResourceId resourceIdGlobal =

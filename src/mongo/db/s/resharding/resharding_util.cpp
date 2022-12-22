@@ -355,7 +355,7 @@ NamespaceString getLocalOplogBufferNamespace(UUID existingUUID, ShardId donorSha
 NamespaceString getLocalConflictStashNamespace(UUID existingUUID, ShardId donorShardId) {
     return NamespaceStringUtil::deserialize(NamespaceString::kConfigDb,
                            "localReshardingConflictStash.{}.{}"_format(existingUUID.toString(),
-                                                                       donorShardId.toString())};
+                                                                       donorShardId.toString()));
 }
 
 void doNoopWrite(OperationContext* opCtx, StringData opStr, const NamespaceString& nss) {

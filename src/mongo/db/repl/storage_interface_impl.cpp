@@ -104,7 +104,7 @@ const auto kIdIndexName = "_id_"_sd;
 }  // namespace
 
 StorageInterfaceImpl::StorageInterfaceImpl()
-    : _rollbackIdNss(StorageInterfaceImpl::kDefaultRollbackIdNamespace) {}
+    : _rollbackIdNss(NamespaceStringUtil::deserialize(StorageInterfaceImpl::kDefaultRollbackIdNamespace)) {}
 
 StatusWith<int> StorageInterfaceImpl::getRollbackID(OperationContext* opCtx) {
     BSONObjBuilder bob;

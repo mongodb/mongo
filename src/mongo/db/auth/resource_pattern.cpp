@@ -32,9 +32,36 @@
 #include <iostream>
 
 #include "mongo/db/auth/resource_pattern.h"
+#include "mongo/util/namespace_string_util.h"
 
 
 namespace mongo {
+
+    ResourcePattern ResourcePattern::forDatabaseName(StringData dbName) {
+        return ResourcePattern(MatchTypeEnum::kMatchDatabaseName,NamespaceStringUtil::deserialize(dbName, ""));
+    }
+
+        ResourcePattern ResourcePattern::forCollectionName(StringData collectionName) {
+        return ResourcePattern(MatchTypeEnum::kMatchCollectionName,
+                              NamespaceStringUtil::deserialize("", collectionName));
+    }
+
+        ResourcePattern ResourcePattern::forAnySystemBucketsInDatabase(StringData dbName) {
+        return ResourcePattern(MatchTypeEnum::kMatchAnySystemBucketInDBResource,
+                              NamespaceStringUtil::deserialize(dbName, ""));
+    }
+
+        ResourcePattern ResourcePattern::forAnySystemBucketsInAnyDatabase(StringData collectionName) {
+        return ResourcePattern(MatchTypeEnum::kMatchSystemBucketInAnyDBResource,
+                              NamespaceStringUtil::deserialize("", collectionName));
+    }
+
+        ResourcePattern ResourcePattern::forExactSystemBucketsCollection(StringData dbName,
+                                                           StringData collectionName) {
+        invariant(!collectionName.startsWith("system.buckets."));
+        return ResourcePattern(MatchTypeEnum::kMatchExactSystemBucketResource,
+                              NamespaceStringUtil::deserialize(dbName, collectionName));
+    }
 
 std::string ResourcePattern::toString() const {
     switch (_matchType) {

@@ -35,6 +35,7 @@
 #include "mongo/db/field_parser.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/util/str.h"
+#include "mongo/util/namespace_string_util.h"
 
 namespace mongo {
 

@@ -48,14 +48,13 @@ constexpr StringData AuthorizationManager::V1_USER_NAME_FIELD_NAME;
 constexpr StringData AuthorizationManager::V1_USER_SOURCE_FIELD_NAME;
 
 
-const NamespaceString AuthorizationManager::adminCommandNamespace = NamespaceStringUtil::deserialize("admin.$cmd");
-const NamespaceString AuthorizationManager::rolesCollectionNamespace = NamespaceStringUtil::deserialize("admin.system.roles");
-const NamespaceString AuthorizationManager::usersBackupCollectionNamespace = NamespaceStringUtil::deserialize(
-    "admin.system.backup_users");
-const NamespaceString AuthorizationManager::usersCollectionNamespace = NamespaceStringUtil::deserialize("admin.system.users");
-const NamespaceString AuthorizationManager::versionCollectionNamespace = NamespaceStringUtil::deserialize("admin.system.version");
-const NamespaceString AuthorizationManager::defaultTempUsersCollectionNamespace = NamespaceStringUtil::deserialize("admin.tempusers");
-const NamespaceString AuthorizationManager::defaultTempRolesCollectionNamespace = NamespaceStringUtil::deserialize("admin.temproles");
+const NamespaceString AuthorizationManager::adminCommandNamespace = NamespaceString(DatabaseName("admin"), ".$cmd");
+const NamespaceString AuthorizationManager::rolesCollectionNamespace = NamespaceString(DatabaseName("admin"), "system.roles");
+const NamespaceString AuthorizationManager::usersBackupCollectionNamespace = NamespaceString(DatabaseName("admin"), "system.backup_users");
+const NamespaceString AuthorizationManager::usersCollectionNamespace = NamespaceString(DatabaseName("admin"), "system.users");
+const NamespaceString AuthorizationManager::versionCollectionNamespace = NamespaceString::kServerConfigurationNamespace;
+const NamespaceString AuthorizationManager::defaultTempUsersCollectionNamespace = NamespaceString(DatabaseName("admin"), "tempusers");
+const NamespaceString AuthorizationManager::defaultTempRolesCollectionNamespace = NamespaceString(DatabaseName("admin"), "temproles");
 
 const Status AuthorizationManager::authenticationFailedStatus(ErrorCodes::AuthenticationFailed,
                                                               "Authentication failed.");

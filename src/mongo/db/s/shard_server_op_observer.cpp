@@ -151,7 +151,7 @@ void onConfigDeleteInvalidateCachedCollectionMetadataAndNotify(OperationContext*
     std::string deletedCollection;
     fassert(40479,
             bsonExtractStringField(query, ShardCollectionType::kNssFieldName, &deletedCollection));
-    const NamespaceString deletedNss(deletedCollection);
+    const NamespaceString deletedNss = NamespaceStringUtil::deserialize(deletedCollection);
 
     // Need the WUOW to retain the lock for CollectionVersionLogOpHandler::commit().
     // TODO SERVER-58223: evaluate whether this is safe or whether acquiring the lock can block.

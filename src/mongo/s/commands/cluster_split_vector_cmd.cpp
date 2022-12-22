@@ -73,7 +73,7 @@ public:
              const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        const NamespaceString nss = NamespaceStringUtil::deserialize(parseNs(dbName, cmdObj));
+        const NamespaceString nss(parseNs(dbName, cmdObj));
         uassert(ErrorCodes::IllegalOperation,
                 "Performing splitVector across dbs isn't supported via mongos",
                 nss.dbName() == dbName);

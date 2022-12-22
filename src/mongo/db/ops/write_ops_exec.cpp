@@ -954,7 +954,7 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
                 (stmtIds.empty() || stmtIds.front() == kUninitializedStmtId));
 
     UpdateRequest request(op);
-    request.setNamespaceStringUtil::deserialize(boost::none, ns);
+    request.setNamespaceString(ns);
     request.setLegacyRuntimeConstants(std::move(runtimeConstants));
     if (letParams) {
         request.setLetParameters(std::move(letParams));

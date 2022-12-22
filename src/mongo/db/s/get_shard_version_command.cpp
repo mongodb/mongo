@@ -85,7 +85,7 @@ public:
              const DatabaseName& dbName,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        const NamespaceString nss = NamespaceStringUtil::deserialize(parseNs(dbName, cmdObj));
+        const NamespaceString nss(parseNs(dbName, cmdObj));
 
         uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
 
