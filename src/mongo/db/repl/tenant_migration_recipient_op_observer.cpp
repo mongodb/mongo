@@ -65,8 +65,10 @@ void onSetRejectReadsBeforeTimestamp(OperationContext* opCtx,
         invariant(mtab);
         mtab->startRejectingReadsBefore(recipientStateDoc.getRejectReadsBeforeTimestamp().value());
     } else {
-        tenant_migration_access_blocker::startRejectingReadsBefore(
-            opCtx, recipientStateDoc.getRejectReadsBeforeTimestamp().get());
+        auto mtab = tenant_migration_access_blocker::getRecipientAccessBlockerForMigration(
+            opCtx->getServiceContext(), recipientStateDoc.getId());
+        invariant(mtab);
+        mtab->startRejectingReadsBefore(recipientStateDoc.getRejectReadsBeforeTimestamp().get());
     }
 }
 
@@ -119,6 +121,37 @@ void handleShardMergeStateChange(OperationContext* opCtx,
             break;
     }
 }
+
+void handleShardMergeDocInsertion(const TenantMigrationRecipientDocument& doc,
+                                  OperationContext* opCtx) {
+    switch (doc.getState()) {
+        case TenantMigrationRecipientStateEnum::kUninitialized:
+        case TenantMigrationRecipientStateEnum::kLearnedFilenames:
+        case TenantMigrationRecipientStateEnum::kConsistent:
+            uasserted(ErrorCodes::IllegalOperation,
+                      str::stream() << "Inserting the TenantMigrationRecipient document in state "
+                                    << TenantMigrationRecipientState_serializer(doc.getState())
+                                    << " is illegal");
+            break;
+        case TenantMigrationRecipientStateEnum::kStarted: {
+            invariant(doc.getTenantIds());
+            auto mtab = std::make_shared<TenantMigrationRecipientAccessBlocker>(
+                opCtx->getServiceContext(), doc.getId());
+            TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                .add(*doc.getTenantIds(), mtab);
+
+            opCtx->recoveryUnit()->onRollback([opCtx, migrationId = doc.getId()] {
+                TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                    .removeAccessBlockersForMigration(
+                        migrationId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
+            });
+        } break;
+        case TenantMigrationRecipientStateEnum::kDone:
+            break;
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
 }  // namespace
 
 void TenantMigrationRecipientOpObserver::onCreateCollection(OperationContext* opCtx,
@@ -128,50 +161,36 @@ void TenantMigrationRecipientOpObserver::onCreateCollection(OperationContext* op
                                                             const BSONObj& idIndex,
                                                             const OplogSlot& createOpTime,
                                                             bool fromMigrate) {
-    if (shard_merge_utils::isDonatedFilesCollection(collectionName)) {
-        auto collString = collectionName.coll().toString();
-        auto migrationUUID =
-            uassertStatusOK(UUID::parse(collString.substr(collString.find('.') + 1)));
-        auto fileClonerTempDirPath = shard_merge_utils::fileClonerTempDir(migrationUUID);
+    if (!shard_merge_utils::isDonatedFilesCollection(collectionName)) {
+        return;
+    }
 
-        // This is possible when a secondary restarts or rollback and the donated files collection
-        // is created as part of oplog replay.
-        if (boost::filesystem::exists(fileClonerTempDirPath)) {
-            LOGV2_DEBUG(6113316,
-                        1,
-                        "File cloner temp directory already exists",
-                        "directory"_attr = fileClonerTempDirPath.generic_string());
+    auto collString = collectionName.coll().toString();
+    auto migrationUUID = uassertStatusOK(UUID::parse(collString.substr(collString.find('.') + 1)));
+    auto fileClonerTempDirPath = shard_merge_utils::fileClonerTempDir(migrationUUID);
 
-            // Ignoring the errors because if this step fails, then the following step
-            // create_directory() will fail and that will throw an exception.
-            boost::system::error_code ec;
-            boost::filesystem::remove_all(fileClonerTempDirPath, ec);
-        }
+    // This is possible when a secondary restarts or rollback and the donated files collection
+    // is created as part of oplog replay.
+    if (boost::filesystem::exists(fileClonerTempDirPath)) {
+        LOGV2_DEBUG(6113316,
+                    1,
+                    "File cloner temp directory already exists",
+                    "directory"_attr = fileClonerTempDirPath.generic_string());
 
-        try {
-            boost::filesystem::create_directory(fileClonerTempDirPath);
-        } catch (std::exception& e) {
-            LOGV2_ERROR(6113317,
-                        "Error creating file cloner temp directory",
-                        "directory"_attr = fileClonerTempDirPath.generic_string(),
-                        "error"_attr = e.what());
-            throw;
-        }
-    } else if (!collectionName.isOnInternalDb()) {
-        const auto& recipientInfo = tenantMigrationInfo(opCtx);
-        if (!recipientInfo)
-            return;
+        // Ignoring the errors because if this step fails, then the following step
+        // create_directory() will fail and that will throw an exception.
+        boost::system::error_code ec;
+        boost::filesystem::remove_all(fileClonerTempDirPath, ec);
+    }
 
-        const auto tenantId = tenant_migration_access_blocker::parseTenantIdFromDB(
-            collectionName.dbName().toStringWithTenantId());
-
-        tassert(
-            6461602,
-            "Unable to determine tenant id from provided database name"_format(collectionName.db()),
-            tenantId);
-
-        tenant_migration_access_blocker::addTenantMigrationRecipientAccessBlocker(
-            opCtx->getServiceContext(), tenantId.get(), recipientInfo->uuid);
+    try {
+        boost::filesystem::create_directory(fileClonerTempDirPath);
+    } catch (std::exception& e) {
+        LOGV2_ERROR(6113317,
+                    "Error creating file cloner temp directory",
+                    "directory"_attr = fileClonerTempDirPath.generic_string(),
+                    "error"_attr = e.what());
+        throw;
     }
 }
 
@@ -190,6 +209,11 @@ void TenantMigrationRecipientOpObserver::onInserts(
                 ServerlessOperationLockRegistry::get(opCtx->getServiceContext())
                     .acquireLock(ServerlessOperationLockRegistry::LockType::kTenantRecipient,
                                  recipientStateDoc.getId());
+            }
+
+            if (auto protocol = recipientStateDoc.getProtocol().value_or(kDefaultMigrationProtocol);
+                protocol == MigrationProtocolEnum::kShardMerge) {
+                handleShardMergeDocInsertion(recipientStateDoc, opCtx);
             }
         }
     }
@@ -243,6 +267,8 @@ void TenantMigrationRecipientOpObserver::onUpdate(OperationContext* opCtx,
                         recipientMtab->stopBlockingTTL();
                     };
 
+                // TODO SERVER-68799 Simplify cleanup logic for shard merge as the tenants share a
+                // single RTAB
                 TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
                     .applyAll(TenantMigrationAccessBlocker::BlockerType::kRecipient,
                               cleanUpBlockerIfGarbage);

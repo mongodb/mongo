@@ -274,7 +274,6 @@ public:
     }
 };
 
-
 }  // namespace
 
 TenantMigrationRecipientService::TenantMigrationRecipientService(
@@ -389,6 +388,7 @@ TenantMigrationRecipientService::Instance::Instance(
       _stateDoc(
           TenantMigrationRecipientDocument::parse(IDLParserContext("recipientStateDoc"), stateDoc)),
       _tenantId(_stateDoc.getTenantId().toString()),
+      _tenantIds(_stateDoc.getTenantIds() ? *_stateDoc.getTenantIds() : std::vector<TenantId>()),
       _protocol(_stateDoc.getProtocol().value_or(MigrationProtocolEnum::kMultitenantMigrations)),
       _migrationUuid(_stateDoc.getId()),
       _donorConnectionString(_stateDoc.getDonorConnectionString().toString()),
@@ -417,6 +417,9 @@ TenantMigrationRecipientService::Instance::Instance(
               return boost::none;
           }
       }()) {
+
+    // Validate the provided tenantIds matches with the protocol
+    _validateTenantIdsForProtocol();
 }
 
 boost::optional<BSONObj> TenantMigrationRecipientService::Instance::reportForCurrentOp(
@@ -1571,6 +1574,23 @@ void TenantMigrationRecipientService::Instance::_createOplogBuffer(WithLock,
         auto bufferCollection = std::make_unique<OplogBufferCollection>(
             StorageInterface::get(opCtx), oplogBufferNS, options);
         _donorOplogBuffer = std::move(bufferCollection);
+    }
+}
+
+void TenantMigrationRecipientService::Instance::_validateTenantIdsForProtocol() {
+    switch (_protocol) {
+        case MigrationProtocolEnum::kMultitenantMigrations:
+            uassert(ErrorCodes::InvalidOptions,
+                    "The field 'tenantIds' must not be set for protocol 'multitenant migration'",
+                    _tenantIds.empty() && !_tenantId.empty());
+            break;
+        case MigrationProtocolEnum::kShardMerge:
+            uassert(ErrorCodes::InvalidOptions,
+                    "The field 'tenantIds' must be set and non-empty for protocol 'shard merge'",
+                    _tenantId.empty() && !_tenantIds.empty());
+            break;
+        default:
+            MONGO_UNREACHABLE;
     }
 }
 

@@ -43,16 +43,14 @@ namespace tenant_migration_access_blocker {
 std::shared_ptr<TenantMigrationDonorAccessBlocker> getDonorAccessBlockerForMigration(
     ServiceContext* serviceContext, const UUID& migrationId);
 
+std::shared_ptr<TenantMigrationRecipientAccessBlocker> getRecipientAccessBlockerForMigration(
+    ServiceContext* serviceContext, const UUID& migrationId);
+
 std::shared_ptr<TenantMigrationDonorAccessBlocker> getTenantMigrationDonorAccessBlocker(
     ServiceContext* serviceContext, StringData tenantId);
 
 std::shared_ptr<TenantMigrationRecipientAccessBlocker> getTenantMigrationRecipientAccessBlocker(
     ServiceContext* serviceContext, StringData tenantId);
-
-/**
- * For "shard merge" protocol: tell all recipient access blockers to reject reads before ts.
- */
-void startRejectingReadsBefore(OperationContext* opCtx, mongo::Timestamp ts);
 
 /**
  * Add an access blocker if one does not already exist.

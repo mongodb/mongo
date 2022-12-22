@@ -428,6 +428,12 @@ public:
         void _createOplogBuffer(WithLock, OperationContext* opCtx);
 
         /**
+         * Validates the tenantIds field is consistent with the protocol given. Throws an exception
+         * if there is a mismatch.
+         */
+        void _validateTenantIdsForProtocol();
+
+        /**
          * Runs an aggregation that gets the entire oplog chain for every retryable write entry in
          * `config.transactions`. Only returns oplog entries in the chain where
          * `ts` < `startFetchingOpTime.ts` and adds them to the oplog buffer.
@@ -645,6 +651,7 @@ public:
         // This data is provided in the initial state doc and never changes.  We keep copies to
         // avoid having to obtain the mutex to access them.
         const std::string _tenantId;                                                     // (R)
+        const std::vector<TenantId> _tenantIds;                                          // (R)
         const MigrationProtocolEnum _protocol;                                           // (R)
         const UUID _migrationUuid;                                                       // (R)
         const std::string _donorConnectionString;                                        // (R)

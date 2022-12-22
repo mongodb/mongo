@@ -50,7 +50,9 @@
 #include "mongo/db/repl/primary_only_service_op_observer.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
 #include "mongo/db/repl/tenant_migration_recipient_entry_helpers.h"
+#include "mongo/db/repl/tenant_migration_recipient_op_observer.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
@@ -175,6 +177,9 @@ public:
             opObserverRegistry->addObserver(
                 std::make_unique<PrimaryOnlyServiceOpObserver>(serviceContext));
 
+            // Add OpObserver needed by subclasses.
+            addOpObserver(opObserverRegistry);
+
             _registry = repl::PrimaryOnlyServiceRegistry::get(getServiceContext());
             std::unique_ptr<TenantMigrationRecipientService> service =
                 std::make_unique<TenantMigrationRecipientService>(getServiceContext());
@@ -280,6 +285,10 @@ protected:
     size_t _numSecondaryIndexesCreated{0};
     size_t _numDocsInserted{0};
 
+    const TenantId _tenantA{OID::gen()};
+    const TenantId _tenantB{OID::gen()};
+    const std::vector<TenantId> _tenants{_tenantA, _tenantB};
+
     const TenantMigrationPEMPayload kRecipientPEMPayload = [&] {
         std::ifstream infile("jstests/libs/client.pem");
         std::string buf((std::istreambuf_iterator<char>(infile)), std::istreambuf_iterator<char>());
@@ -372,6 +381,8 @@ protected:
     }
 
 private:
+    virtual void addOpObserver(OpObserverRegistry* opObserverRegistry){};
+
     ClockSourceMock _clkSource;
 
     unittest::MinimumLoggedSeverityGuard _replicationSeverityGuard{
@@ -438,6 +449,97 @@ BSONObj createServerAggregateReply() {
         .toBSONAsInitialResponse();
 }
 
+/**
+ * This class adds the TenantMigrationRecipientOpObserver to the main test fixture class. It cannot
+ * be used in tests after insertion of the state document because the OpObserver uses
+ * TenantFileImporter service when the state document is updated. This importer is not mocked
+ * currently and does not work with unit tests as it creates its own thread.
+ */
+class TenantMigrationRecipientServiceShardMergeTestInsert
+    : public TenantMigrationRecipientServiceShardMergeTest {
+private:
+    void addOpObserver(OpObserverRegistry* opObserverRegistry) {
+        opObserverRegistry->addObserver(std::make_unique<TenantMigrationRecipientOpObserver>());
+    }
+};
+
+TEST_F(TenantMigrationRecipientServiceShardMergeTestInsert,
+       TestBlockersAreInsertedWhenInsertingStateDocument) {
+    stopFailPointEnableBlock fp("fpBeforeFetchingDonorClusterTimeKeys");
+    const UUID migrationUUID = UUID::gen();
+
+    MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /* dollarPrefixHosts */);
+    getTopologyManager()->setTopologyDescription(replSet.getTopologyDescription(clock()));
+    insertTopOfOplog(&replSet, OpTime(Timestamp(5, 1), 1));
+
+    // Mock the aggregate response from the donor.
+    MockRemoteDBServer* const _donorServer =
+        mongo::MockConnRegistry::get()->getMockRemoteDBServer(replSet.getPrimary());
+    _donorServer->setCommandReply("aggregate", createServerAggregateReply());
+
+    TenantMigrationRecipientDocument initialStateDocument(
+        migrationUUID,
+        replSet.getConnectionString(),
+        "",
+        kDefaultStartMigrationTimestamp,
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setProtocol(MigrationProtocolEnum::kShardMerge);
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
+    initialStateDocument.setTenantIds(_tenants);
+
+    auto opCtx = makeOperationContext();
+    std::shared_ptr<TenantMigrationRecipientService::Instance> instance;
+    {
+        auto fp = globalFailPointRegistry().find(
+            "fpAfterPersistingTenantMigrationRecipientInstanceStateDoc");
+        auto initialTimesEntered = fp->setMode(FailPoint::alwaysOn,
+                                               0,
+                                               BSON("action"
+                                                    << "hang"));
+        instance = TenantMigrationRecipientService::Instance::getOrCreate(
+            opCtx.get(), _service, initialStateDocument.toBSON());
+        ASSERT(instance.get());
+
+        fp->waitForTimesEntered(initialTimesEntered + 1);
+
+        // Test that access blocker exists.
+        for (const auto& tenantId : _tenants) {
+            auto blocker =
+                TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                    .getTenantMigrationAccessBlockerForTenantId(
+                        tenantId.toString(), TenantMigrationAccessBlocker::BlockerType::kRecipient);
+            ASSERT(!!blocker);
+        }
+        fp->setMode(FailPoint::off);
+    }
+
+    ASSERT_EQ(stopFailPointErrorCode, instance->getDataSyncCompletionFuture().getNoThrow().code());
+    ASSERT_OK(instance->getForgetMigrationDurableFuture().getNoThrow());
+}
+
+TEST_F(TenantMigrationRecipientServiceShardMergeTest, CannotCreateServiceWithoutTenants) {
+    const UUID migrationUUID = UUID::gen();
+    const NamespaceString aggregateNs = NamespaceString("admin.$cmd.aggregate");
+
+    MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /* dollarPrefixHosts */);
+
+    TenantMigrationRecipientDocument initialStateDocument(
+        migrationUUID,
+        replSet.getConnectionString(),
+        "",
+        kDefaultStartMigrationTimestamp,
+        ReadPreferenceSetting(ReadPreference::PrimaryOnly));
+    initialStateDocument.setProtocol(MigrationProtocolEnum::kShardMerge);
+    initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
+
+    auto opCtx = makeOperationContext();
+
+    ASSERT_THROWS_CODE(TenantMigrationRecipientService::Instance::getOrCreate(
+                           opCtx.get(), _service, initialStateDocument.toBSON()),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+}
+
 TEST_F(TenantMigrationRecipientServiceShardMergeTest, OpenBackupCursorSuccessfully) {
     stopFailPointEnableBlock fp("fpBeforeAdvancingStableTimestamp");
     const UUID migrationUUID = UUID::gen();
@@ -459,11 +561,12 @@ TEST_F(TenantMigrationRecipientServiceShardMergeTest, OpenBackupCursorSuccessful
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        "",
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kShardMerge);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
+    initialStateDocument.setTenantIds(_tenants);
 
     auto opCtx = makeOperationContext();
     std::shared_ptr<TenantMigrationRecipientService::Instance> instance;
@@ -527,11 +630,12 @@ TEST_F(TenantMigrationRecipientServiceShardMergeTest, OpenBackupCursorAndRetries
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        "",
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kShardMerge);
     initialStateDocument.setRecipientCertificateForDonor(kRecipientPEMPayload);
+    initialStateDocument.setTenantIds(_tenants);
 
     auto opCtx = makeOperationContext();
     std::shared_ptr<TenantMigrationRecipientService::Instance> instance;

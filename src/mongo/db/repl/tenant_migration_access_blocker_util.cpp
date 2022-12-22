@@ -74,6 +74,14 @@ std::shared_ptr<TenantMigrationDonorAccessBlocker> getDonorAccessBlockerForMigra
                                           TenantMigrationAccessBlocker::BlockerType::kDonor));
 }
 
+std::shared_ptr<TenantMigrationRecipientAccessBlocker> getRecipientAccessBlockerForMigration(
+    ServiceContext* serviceContext, const UUID& migrationId) {
+    return checked_pointer_cast<TenantMigrationRecipientAccessBlocker>(
+        TenantMigrationAccessBlockerRegistry::get(serviceContext)
+            .getAccessBlockerForMigration(migrationId,
+                                          TenantMigrationAccessBlocker::BlockerType::kRecipient));
+}
+
 std::shared_ptr<TenantMigrationDonorAccessBlocker> getTenantMigrationDonorAccessBlocker(
     ServiceContext* const serviceContext, StringData tenantId) {
     return checked_pointer_cast<TenantMigrationDonorAccessBlocker>(
@@ -86,16 +94,6 @@ std::shared_ptr<TenantMigrationRecipientAccessBlocker> getTenantMigrationRecipie
     return checked_pointer_cast<TenantMigrationRecipientAccessBlocker>(
         TenantMigrationAccessBlockerRegistry::get(serviceContext)
             .getTenantMigrationAccessBlockerForTenantId(tenantId, MtabType::kRecipient));
-}
-
-void startRejectingReadsBefore(OperationContext* opCtx, mongo::Timestamp ts) {
-    auto callback = [&](std::string _, std::shared_ptr<TenantMigrationAccessBlocker>& mtab) {
-        auto recipientMtab = checked_pointer_cast<TenantMigrationRecipientAccessBlocker>(mtab);
-        recipientMtab->startRejectingReadsBefore(ts);
-    };
-
-    TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-        .applyAll(TenantMigrationAccessBlocker::BlockerType::kRecipient, callback);
 }
 
 void addTenantMigrationRecipientAccessBlocker(ServiceContext* serviceContext,
