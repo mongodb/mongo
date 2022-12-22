@@ -197,34 +197,6 @@ configure_timing_stress(char **p, size_t max)
 }
 
 /*
- * configure_debug_mode --
- *     Configure debug settings.
- */
-static void
-configure_debug_mode(char **p, size_t max)
-{
-    CONFIG_APPEND(*p, ",debug_mode=[");
-
-    if (GV(DEBUG_CHECKPOINT_RETENTION) != 0)
-        CONFIG_APPEND(*p, ",checkpoint_retention=%" PRIu32, GV(DEBUG_CHECKPOINT_RETENTION));
-    if (GV(DEBUG_EVICTION))
-        CONFIG_APPEND(*p, ",eviction=true");
-    if (GV(DEBUG_LOG_RETENTION) != 0)
-        CONFIG_APPEND(*p, ",log_retention=%" PRIu32, GV(DEBUG_LOG_RETENTION));
-    if (GV(DEBUG_REALLOC_EXACT))
-        CONFIG_APPEND(*p, ",realloc_exact=true");
-    if (GV(DEBUG_REALLOC_MALLOC))
-        CONFIG_APPEND(*p, ",realloc_malloc=true");
-    if (GV(DEBUG_SLOW_CHECKPOINT))
-        CONFIG_APPEND(*p, ",slow_checkpoint=true");
-    if (GV(DEBUG_TABLE_LOGGING))
-        CONFIG_APPEND(*p, ",table_logging=true");
-    if (GV(DEBUG_UPDATE_RESTORE_EVICT))
-        CONFIG_APPEND(*p, ",update_restore_evict=true");
-    CONFIG_APPEND(*p, "]");
-}
-
-/*
  * create_database --
  *     Create a WiredTiger database.
  */
@@ -314,11 +286,14 @@ create_database(const char *home, WT_CONNECTION **connp)
     if (GV(DISK_DATA_EXTEND))
         CONFIG_APPEND(p, ",file_extend=(data=8MB)");
 
+    if (GV(DEBUG_REALLOC_EXACT))
+        CONFIG_APPEND(p, ",debug_mode=(realloc_exact=true)");
+
+    if (GV(DEBUG_REALLOC_MALLOC))
+        CONFIG_APPEND(p, ",debug_mode=(realloc_malloc=true)");
+
     /* Optional timing stress. */
     configure_timing_stress(&p, max);
-
-    /* Optional debug mode. */
-    configure_debug_mode(&p, max);
 
     /* Extensions. */
     CONFIG_APPEND(p, ",extensions=[\"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\"],",
@@ -518,9 +493,6 @@ wts_open(const char *home, WT_CONNECTION **connp, bool verify_metadata)
 
     /* Optional timing stress. */
     configure_timing_stress(&p, max);
-
-    /* Optional debug mode. */
-    configure_debug_mode(&p, max);
 
     /* If in-memory, there's only a single, shared WT_CONNECTION handle. */
     if (GV(RUNS_IN_MEMORY) != 0)
