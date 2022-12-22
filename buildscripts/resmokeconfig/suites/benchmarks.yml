@@ -23,6 +23,37 @@ selector:
   - build/install/bin/sbe_expression_bm*
   # These benchmarks are being run as part of the benchmarks_abt.yml test suite.
   - build/install/bin/abt_translation_bm*
+  - build/install/bin/status_bm
+  - build/install/bin/simple8b_bm
+  - build/install/bin/bsoncolumn_bm
+  - build/install/bin/bson_bm
+  - build/install/bin/collection_catalog_bm
+  - build/install/bin/lock_manager_bm
+  - build/install/bin/key_gen_bm
+  - build/install/bin/expression_bm
+  - build/install/bin/migration_chunk_cloner_source_legacy_bm
+  - build/install/bin/sharding_write_router_bm
+  - build/install/bin/storage_wiredtiger_begin_transaction_block_bm
+  - build/install/bin/storage_key_string_bm
+  - build/install/bin/storage_record_id_bm
+  - build/install/bin/commands_bm
+  - build/install/bin/logv2_bm
+  - build/install/bin/endian_bm
+  - build/install/bin/chunk_manager_refresh_bm
+  - build/install/bin/condition_variable_bm
+  - build/install/bin/system_resource_canary_bm
+  - build/install/bin/ticketholder_bm
+  - build/install/bin/fail_point_bm
+  - build/install/bin/clock_source_bm
+  - build/install/bin/decimal_counter_bm
+  - build/install/bin/itoa_bm
+  - build/install/bin/future_bm
+  - build/install/bin/hash_table_bm
+  - build/install/bin/base64_bm
+  - build/install/bin/stacktrace_bm
+  - build/install/bin/string_bm
+  - build/install/bin/cancellation_bm
+  - build/install/bin/uuid_bm
 
 
 executor:

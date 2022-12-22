@@ -149,11 +149,87 @@ NamespaceString NamespaceStringUtil::deserialize(boost::optional<TenantId> tenan
     return nss;
 }
 
+NamespaceString NamespaceStringUtil::deserialize(boost::optional<TenantId> tenantId,
+                                                 StringData ns, bool checkFull) {
+    if (ns.empty()) {
+        return NamespaceString();
+    }
+
+    if (!gMultitenancySupport) {
+        massert(6972102,
+                str::stream() << "TenantId must not be set, but it is " << tenantId->toString(),
+                tenantId == boost::none);
+        return NamespaceString(boost::none, ns);
+    }
+
+    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)) {
+        // TODO SERVER-62491: Invariant for all databases. Remove the invariant bypass for
+        // admin, local, config dbs.
+        if (checkFull) {
+            auto nss = NamespaceString(std::move(tenantId), ns);
+            if (!nss.tenantId() && !globalNamespaces.count(nss)) {
+                massert(6972100, "fake assert", true);
+            // std::cout<<"xxx nss isn't in global namespace and doesn't have tenant"<<std::endl;
+            }
+            return nss;
+        } else {
+            StringData dbName = ns.substr(0, ns.find('.'));
+            if (!(dbName == NamespaceString::kAdminDb) && !(dbName == NamespaceString::kLocalDb) &&
+                !(dbName == NamespaceString::kConfigDb)) {
+                massert(6972100,
+                        str::stream() << "TenantId must be set on nss " << ns,
+                        tenantId != boost::none);
+            }
+            return NamespaceString(std::move(tenantId), ns);
+        }
+    }
+
+    auto nss = NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(ns);
+    // TenantId could be prefixed, or passed in separately (or both) and namespace is always
+    // constructed with the tenantId separately.
+    if (tenantId != boost::none) {
+        if (!nss.tenantId()) {
+            return NamespaceString(std::move(tenantId), ns);
+        }
+        massert(6972101,
+                str::stream() << "TenantId must match the db prefix tenantId: "
+                              << tenantId->toString() << " prefix " << nss.tenantId()->toString(),
+                tenantId == nss.tenantId());
+    }
+
+    return nss;
+}
+
 NamespaceString NamespaceStringUtil::deserialize(DatabaseName dbName) {
     return NamespaceString(dbName);
 }
 
 NamespaceString NamespaceStringUtil::deserialize(DatabaseName dbName, StringData ns) {
+    if (!gMultitenancySupport) {
+        return NamespaceString(dbName, ns);
+    }
+
+    if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
+        gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)) {
+        // TODO SERVER-62491: Invariant for all databases. Remove the invariant bypass for
+        // admin, local, config dbs.
+        auto nss = NamespaceString(dbName, ns);
+        if (!dbName.tenantId() && !globalNamespaces.count(nss)) {
+            massert(6972100, "fake assert", true);
+           // std::cout<<"xxx nss isn't in global namespace and doesn't have tenant"<<std::endl;
+        }
+        return nss;
+        /*StringData dbName = ns.substr(0, ns.find('.'));
+        if (!(dbName == NamespaceString::kAdminDb) && !(dbName == NamespaceString::kLocalDb) &&
+            !(dbName == NamespaceString::kConfigDb)) {
+            massert(6972100,
+                    str::stream() << "TenantId must be set on nss " << ns,
+                    tenantId != boost::none);
+        }
+        return NamespaceString(std::move(tenantId), ns);*/
+    }
+
     return NamespaceString(dbName, ns);
 }
 

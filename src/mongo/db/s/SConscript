@@ -855,7 +855,7 @@ env.Benchmark(
     ],
 )
 
-env.Benchmark(
+""" env.Benchmark(
     target='sharding_write_router_bm',
     source=[
         'sharding_write_router_bm.cpp',
@@ -867,4 +867,4 @@ env.Benchmark(
         'sharding_api_d',
         'sharding_runtime_d',
     ],
-)
+) """

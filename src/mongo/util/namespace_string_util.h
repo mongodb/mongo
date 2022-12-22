@@ -78,6 +78,7 @@ public:
     static NamespaceString deserialize(StringData ns, boost::optional<TenantId> tenantId = boost::none);
     static NamespaceString deserialize(StringData db, StringData coll, boost::optional<TenantId> tenantId = boost::none);
     static NamespaceString deserialize(boost::optional<TenantId> tenantId, StringData db, StringData coll);
+    static NamespaceString deserialize(boost::optional<TenantId> tenantId, StringData ns, bool checkFull);
 };
 
 }  // namespace mongo

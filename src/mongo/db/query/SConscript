@@ -463,7 +463,7 @@ env.CppUnitTest(
     ],
 )
 
-env.Benchmark(
+""" env.Benchmark(
     target="sbe_expression_bm",
     source=[
         "sbe_expression_bm.cpp",
@@ -475,4 +475,4 @@ env.Benchmark(
         "$BUILD_DIR/mongo/db/query_exec",
         "query_test_service_context",
     ],
-)
+) """

@@ -197,6 +197,17 @@ env.Library(
     ],
 )
 
+env.Benchmark(
+    target='nss_util_bm',
+    source=[
+        'nss_util_bm.cpp',
+    ],
+    LIBDEPS=[
+        'namespace_string_database_name_util',
+        'processinfo',
+    ],
+)
+
 env.Library(
     target='fail_point',
     source=[

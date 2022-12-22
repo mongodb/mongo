@@ -316,7 +316,7 @@ env.Library(
     ],
 )
 
-env.Benchmark(
+""" env.Benchmark(
     target='collection_catalog_bm',
     source=[
         'collection_catalog_bm.cpp',
@@ -326,7 +326,7 @@ env.Benchmark(
         '$BUILD_DIR/mongo/db/multitenancy',
         'collection_catalog',
     ],
-)
+) """
 
 env.Library(
     target='catalog_control',

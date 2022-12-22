@@ -82,7 +82,7 @@ env.Library(
     ],
 )
 
-env.Benchmark(
+""" env.Benchmark(
     target='lock_manager_bm',
     source=[
         'd_concurrency_bm.cpp',
@@ -90,7 +90,7 @@ env.Benchmark(
     LIBDEPS=[
         'lock_manager',
     ],
-)
+) """
 
 env.CppUnitTest(
     target='db_concurrency_test',

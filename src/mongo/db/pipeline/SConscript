@@ -507,7 +507,7 @@ env.Library(
     LIBDEPS_PRIVATE=[],
 )
 
-env.Benchmark(
+""" env.Benchmark(
     target='abt_translation_bm',
     source=[
         'abt/abt_fallback_mechanism_cq_bm.cpp',
@@ -525,7 +525,7 @@ env.Benchmark(
         '$BUILD_DIR/mongo/unittest/unittest',
         '$BUILD_DIR/mongo/util/processinfo',
     ],
-)
+) """
 
 env.CppUnitTest(
     target='db_pipeline_test',
@@ -706,7 +706,7 @@ bmEnv.Library(
     ],
 )
 
-env.Benchmark(
+""" env.Benchmark(
     target='expression_bm',
     source=[
         'expression_bm.cpp',
@@ -716,4 +716,4 @@ env.Benchmark(
         '$BUILD_DIR/mongo/db/query_expressions', '$BUILD_DIR/mongo/db/service_context_test_fixture',
         'expression_bm_fixture'
     ],
-)
+) """
