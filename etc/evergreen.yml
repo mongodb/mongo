@@ -135,7 +135,7 @@ variables:
 - &linux_arm64_generic_expansions
   multiversion_platform: amazon2
   multiversion_edition: enterprise
-  multiversion_architecture: arm64
+  multiversion_architecture: aarch64
   packager_arch: aarch64
   packager_distro: amazon2
   repo_edition: enterprise
