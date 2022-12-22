@@ -28,7 +28,6 @@
  */
 
 #include "lock_manager_defs.h"
-#include "mongo/util/namespace_string.h"
 
 namespace mongo {
 

@@ -86,7 +86,9 @@ DatabaseName DatabaseNameUtil::deserialize(boost::optional<TenantId> tenantId, S
         // TODO SERVER-70876 Uncomment out this conditional to check that we always have a tenantId.
         if (db != "admin" && db != "config" && db != "local")
             //massert(7005300, "TenantId must be set", tenantId != boost::none);
-            massert(700053, "fake assert", true);
+            if (!tenantId) {
+                massert(700053, "fake assert", true);
+            }
 
         return DatabaseName(std::move(tenantId), db);
     }

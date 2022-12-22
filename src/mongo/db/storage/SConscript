@@ -543,6 +543,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/server_options_core',
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
         'record_store_base',
         'storage_options',
     ],

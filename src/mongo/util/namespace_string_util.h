@@ -36,6 +36,7 @@ namespace mongo {
 
 class NamespaceStringUtil {
 public:
+    static const stdx::unordered_set<NamespaceString> globalNamespaces;
     /**
      * Serializes a NamespaceString object.
      *

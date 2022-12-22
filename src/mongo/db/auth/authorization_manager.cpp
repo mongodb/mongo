@@ -48,7 +48,7 @@ constexpr StringData AuthorizationManager::V1_USER_NAME_FIELD_NAME;
 constexpr StringData AuthorizationManager::V1_USER_SOURCE_FIELD_NAME;
 
 
-const NamespaceString AuthorizationManager::adminCommandNamespace = NamespaceString(DatabaseName("admin"), ".$cmd");
+const NamespaceString AuthorizationManager::adminCommandNamespace = NamespaceString(DatabaseName("admin"), "$cmd");
 const NamespaceString AuthorizationManager::rolesCollectionNamespace = NamespaceString(DatabaseName("admin"), "system.roles");
 const NamespaceString AuthorizationManager::usersBackupCollectionNamespace = NamespaceString(DatabaseName("admin"), "system.backup_users");
 const NamespaceString AuthorizationManager::usersCollectionNamespace = NamespaceString(DatabaseName("admin"), "system.users");

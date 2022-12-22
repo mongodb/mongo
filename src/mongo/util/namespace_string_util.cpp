@@ -36,6 +36,59 @@
 
 namespace mongo {
 
+const stdx::unordered_set<NamespaceString> NamespaceStringUtil::globalNamespaces{
+    NamespaceString::kServerConfigurationNamespace,
+    NamespaceString::kLogicalSessionsNamespace,
+    NamespaceString::kConfigDatabasesNamespace,
+    NamespaceString::kSessionTransactionsTableNamespace,
+    NamespaceString::kShardConfigCollectionsNamespace,
+    NamespaceString::kShardConfigDatabasesNamespace,
+    NamespaceString::kKeysCollectionNamespace,
+    NamespaceString::kExternalKeysCollectionNamespace,
+    NamespaceString::kRsOplogNamespace,
+    NamespaceString::kTransactionCoordinatorsNamespace,
+    NamespaceString::kMigrationCoordinatorsNamespace,
+    NamespaceString::kMigrationRecipientsNamespace,
+    NamespaceString::kTenantMigrationDonorsNamespace,
+    NamespaceString::kTenantMigrationRecipientsNamespace,
+    NamespaceString::kTenantMigrationOplogView,
+    NamespaceString::kShardSplitDonorsNamespace,
+    NamespaceString::kSystemReplSetNamespace,
+    NamespaceString::kLastVoteNamespace,
+    NamespaceString::kIndexBuildEntryNamespace,
+    NamespaceString::kRangeDeletionNamespace,
+    NamespaceString::kRangeDeletionForRenameNamespace,
+    NamespaceString::kConfigReshardingOperationsNamespace,
+    NamespaceString::kDonorReshardingOperationsNamespace,
+    NamespaceString::kRecipientReshardingOperationsNamespace,
+    NamespaceString::kShardingDDLCoordinatorsNamespace,
+    NamespaceString::kShardingRenameParticipantsNamespace,
+    NamespaceString::kConfigSettingsNamespace,
+    NamespaceString::kVectorClockNamespace,
+    NamespaceString::kReshardingApplierProgressNamespace,
+    NamespaceString::kReshardingTxnClonerProgressNamespace,
+    NamespaceString::kCollectionCriticalSectionsNamespace,
+    NamespaceString::kForceOplogBatchBoundaryNamespace,
+    NamespaceString::kConfigImagesNamespace,
+    NamespaceString::kConfigsvrCoordinatorsNamespace,
+    NamespaceString::kUserWritesCriticalSectionsNamespace,
+    NamespaceString::kConfigsvrRestoreNamespace,
+    NamespaceString::kCompactStructuredEncryptionCoordinatorNamespace,
+    NamespaceString::kConfigsvrShardsNamespace,
+    NamespaceString::kConfigsvrCollectionsNamespace,
+    NamespaceString::kConfigsvrIndexCatalogNamespace,
+    NamespaceString::kShardIndexCatalogNamespace,
+    NamespaceString::kShardCollectionCatalogNamespace,
+    NamespaceString::kConfigsvrPlacementHistoryNamespace,
+    NamespaceString::kLockpingsNamespace,
+    NamespaceString::kDistLocksNamepsace,
+    NamespaceString::kSetChangeStreamStateCoordinatorNamespace,
+    NamespaceString::kGlobalIndexClonerNamespace,
+    NamespaceString::kConfigQueryAnalyzersNamespace,
+    NamespaceString::kConfigSampledQueriesNamespace,
+    NamespaceString::kConfigSampledQueriesDiffNamespace
+};
+
 std::string NamespaceStringUtil::serialize(const NamespaceString& ns) {
     if (gMultitenancySupport) {
         if (serverGlobalParams.featureCompatibility.isVersionInitialized() &&
@@ -64,14 +117,20 @@ NamespaceString NamespaceStringUtil::deserialize(boost::optional<TenantId> tenan
         gFeatureFlagRequireTenantID.isEnabled(serverGlobalParams.featureCompatibility)) {
         // TODO SERVER-62491: Invariant for all databases. Remove the invariant bypass for
         // admin, local, config dbs.
-        StringData dbName = ns.substr(0, ns.find('.'));
+        auto nss = NamespaceString(std::move(tenantId), ns);
+        if (!tenantId && !globalNamespaces.count(nss)) {
+            massert(6972100, "fake assert", true);
+           // std::cout<<"xxx nss isn't in global namespace and doesn't have tenant"<<std::endl;
+        }
+        return nss;
+        /*StringData dbName = ns.substr(0, ns.find('.'));
         if (!(dbName == NamespaceString::kAdminDb) && !(dbName == NamespaceString::kLocalDb) &&
             !(dbName == NamespaceString::kConfigDb)) {
             massert(6972100,
                     str::stream() << "TenantId must be set on nss " << ns,
                     tenantId != boost::none);
         }
-        return NamespaceString(std::move(tenantId), ns);
+        return NamespaceString(std::move(tenantId), ns);*/
     }
 
     auto nss = NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(ns);
