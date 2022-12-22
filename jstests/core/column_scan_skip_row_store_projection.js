@@ -62,7 +62,7 @@ function setupCollections() {
     assert.commandWorked(unindexedColl.insertMany(docs));
 }
 
-function test({agg, requiresRowStoreExpr, rowstoreFetches}) {
+function test({agg, requiresRowStoreExpr, requiredRowstoreReads}) {
     // Check that columnstore index is used, and we skip the row store expression appropriately.
     const explainPlan = indexedColl.explain("queryPlanner").aggregate(agg);
     let sbeStages = ('queryPlanner' in explainPlan)
@@ -82,13 +82,19 @@ function test({agg, requiresRowStoreExpr, rowstoreFetches}) {
         assert(nullRegex.test(sbeStages), `Expected null rowStoreExpr in ${sbeStages}`);
         assert(!notNullRegex.test(sbeStages), `Don't expect non-null rowStoreExpr in ${sbeStages}`);
     }
-    // Check the expected number of row store fetches.
+
+    // Check the expected number of row store reads. The reads are triggered by encountering a
+    // record that cannot be reconstructed from the index and come in the form of a fetch followed
+    // by a few records scanned from the row store. The number of scanned records fluctuates
+    // depending on the settings and the data patterns so the only invariant we can assert is that
+    // the number of combined reads from the row store is at least as the number of "bad" records.
     const explainExec = indexedColl.explain("executionStats").aggregate(agg);
-    const actualRowstoreFetches =
-        parseInt(JSON.stringify(explainExec).split('"numRowStoreFetches":')[1].split(",")[0]);
-    assert.eq(
-        actualRowstoreFetches,
-        rowstoreFetches,
+    const actualRowstoreReads =
+        parseInt(JSON.stringify(explainExec).split('"numRowStoreFetches":')[1].split(",")[0]) +
+        parseInt(JSON.stringify(explainExec).split('"numRowStoreScans":')[1].split(",")[0]);
+    assert.gte(
+        actualRowstoreReads,
+        requiredRowstoreReads,
         `Unexpected nubmer of row store fetches in ${JSON.stringify(explainExec, null, '\t')}`);
 
     // Check that results are identical with and without columnstore index.
@@ -100,37 +106,37 @@ function test({agg, requiresRowStoreExpr, rowstoreFetches}) {
 
 function runAllAggregations() {
     // $project only.  Requires row store expression regardless of nesting under the projected path.
-    test({agg: [{$project: {_id: 0, a: 1}}], requiresRowStoreExpr: true, rowstoreFetches: 4});
-    test({agg: [{$project: {_id: 0, b: 1}}], requiresRowStoreExpr: true, rowstoreFetches: 2});
+    test({agg: [{$project: {_id: 0, a: 1}}], requiresRowStoreExpr: true, requiredRowstoreReads: 4});
+    test({agg: [{$project: {_id: 0, b: 1}}], requiresRowStoreExpr: true, requiredRowstoreReads: 2});
 
     // $group only.
     // The 4 cases below provide the same coverage but illustrate when row store fetches are needed.
     test({
         agg: [{$group: {_id: null, a: {$push: "$a"}}}],
         requiresRowStoreExpr: false,
-        rowstoreFetches: 4
+        requiredRowstoreReads: 4
     });
     test({
         agg: [{$group: {_id: null, b: {$push: "$b"}}}],
         requiresRowStoreExpr: false,
-        rowstoreFetches: 2
+        requiredRowstoreReads: 2
     });
     test({
         agg: [{$group: {_id: null, e: {$push: "$e"}}}],
         requiresRowStoreExpr: false,
-        rowstoreFetches: 0
+        requiredRowstoreReads: 0
     });
     test({
         agg: [{$group: {_id: "$_id", a: {$push: "$a"}, b: {$push: "$b"}}}],
         requiresRowStoreExpr: false,
-        rowstoreFetches: 5
+        requiredRowstoreReads: 5
     });
 
     // $group and $project, including _id.
     test({
         agg: [{$project: {_id: 1, a: 1}}, {$group: {_id: "$_id", a: {$push: "$a"}}}],
         requiresRowStoreExpr: false,
-        rowstoreFetches: 4
+        requiredRowstoreReads: 4
     });
 
     // The rowStoreExpr is needed to prevent the $group from seeing b.
@@ -140,7 +146,7 @@ function runAllAggregations() {
             {$group: {_id: "$_id", a: {$push: "$a"}, b: {$push: "$b"}}}
         ],
         requiresRowStoreExpr: true,
-        rowstoreFetches: 4
+        requiredRowstoreReads: 4
     });
 
     // Same as above, but add another $group later that would be eligible for skipping the row store
@@ -153,7 +159,7 @@ function runAllAggregations() {
             {$group: {_id: "$_id", a: {$push: "$a"}}}
         ],
         requiresRowStoreExpr: true,
-        rowstoreFetches: 4
+        requiredRowstoreReads: 4
     });
 
     // $group and $project, excluding _id.
@@ -162,14 +168,14 @@ function runAllAggregations() {
     test({
         agg: [{$project: {_id: 0, a: 1}}, {$group: {_id: "$_id", a: {$push: "$a"}}}],
         requiresRowStoreExpr: true,
-        rowstoreFetches: 4
+        requiredRowstoreReads: 4
     });
 
     // $match with a filter that can be pushed down.
     test({
         agg: [{$match: {a: 2}}, {$group: {_id: "$_id", b: {$push: "$b"}, a: {$push: "$a"}}}],
         requiresRowStoreExpr: false,
-        rowstoreFetches: 1
+        requiredRowstoreReads: 1
     });
 
     // $match with no group, and non-output filter that can't be pushed down.
@@ -190,7 +196,7 @@ function runAllAggregations() {
     test({
         agg: [{$match: {"a.c": 5}}, {$group: {_id: "$_id", b_d: {$push: "$b.d"}}}],
         requiresRowStoreExpr: false,
-        rowstoreFetches: 1
+        requiredRowstoreReads: 1
     });
 
     // BrowserUsageByDistinctUserQuery from ColumnStoreIndex.yml in the genny repo.
@@ -222,7 +228,7 @@ function runAllAggregations() {
             {"$limit": 5000}
         ],
         requiresRowStoreExpr: false,
-        rowstoreFetches: 0
+        requiredRowstoreReads: 0
     });
 
     // Cases that may be improved by future work:
@@ -232,7 +238,7 @@ function runAllAggregations() {
     test({
         agg: [{$limit: 100}, {$group: {_id: null, a: {$push: "$a"}}}],
         requiresRowStoreExpr: true,  // ideally this would be false
-        rowstoreFetches: 4
+        requiredRowstoreReads: 4
     });
 
     // $match with a nested path filter than can be pushed down.
@@ -241,7 +247,7 @@ function runAllAggregations() {
         test({
             agg: [{$match: {"a.e": 1}}, {$group: {_id: "$_id", a: {$push: "$a"}}}],
             requiresRowStoreExpr: false,
-            rowstoreFetches: 0
+            requiredRowstoreReads: 0
         });
     });
 }
