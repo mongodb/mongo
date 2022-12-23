@@ -64,6 +64,56 @@ namespace tenant_migration_access_blocker {
 
 namespace {
 using MtabType = TenantMigrationAccessBlocker::BlockerType;
+
+bool recoverTenantMigrationRecipientAccessBlockers(const TenantMigrationRecipientDocument& doc,
+                                                   OperationContext* opCtx) {
+    // The only case where we do not create the mtab is when we are sure
+    // 1) we have not copied any data
+    //      - We set startingFCV before copying any data
+    // 2) we won't copy any data
+    //      - The document is set to kDone only after data copy is finished or won't start (the
+    //      migration has completed or aborted)
+    // Therefore checking the state is kDone and startingFCV is not set ensures correctness.
+    if (doc.getState() == TenantMigrationRecipientStateEnum::kDone &&
+        !doc.getRecipientPrimaryStartingFCV()) {
+        return true;
+    }
+
+    auto mtab = std::make_shared<TenantMigrationRecipientAccessBlocker>(opCtx->getServiceContext(),
+                                                                        doc.getId());
+    auto protocol = doc.getProtocol().value_or(MigrationProtocolEnum::kMultitenantMigrations);
+    switch (protocol) {
+        case MigrationProtocolEnum::kShardMerge:
+            invariant(doc.getTenantIds());
+            TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                .add(*doc.getTenantIds(), mtab);
+            break;
+        case MigrationProtocolEnum::kMultitenantMigrations:
+            invariant(!doc.getTenantId().empty());
+            TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
+                .add(doc.getTenantId(), mtab);
+            break;
+        default:
+            MONGO_UNREACHABLE;
+    }
+
+    switch (doc.getState()) {
+        case TenantMigrationRecipientStateEnum::kStarted:
+        case TenantMigrationRecipientStateEnum::kLearnedFilenames:
+            invariant(!doc.getRejectReadsBeforeTimestamp());
+            break;
+        case TenantMigrationRecipientStateEnum::kConsistent:
+        case TenantMigrationRecipientStateEnum::kDone:
+            if (doc.getRejectReadsBeforeTimestamp()) {
+                mtab->startRejectingReadsBefore(doc.getRejectReadsBeforeTimestamp().get());
+            }
+            break;
+        case TenantMigrationRecipientStateEnum::kUninitialized:
+            MONGO_UNREACHABLE;
+    }
+
+    return true;
+}
 }  // namespace
 
 std::shared_ptr<TenantMigrationDonorAccessBlocker> getDonorAccessBlockerForMigration(
@@ -398,42 +448,7 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
         NamespaceString::kTenantMigrationRecipientsNamespace);
 
     recipientStore.forEach(opCtx, {}, [&](const TenantMigrationRecipientDocument& doc) {
-        // Do not create the mtab when:
-        // 1) the migration was forgotten before receiving a 'recipientSyncData' with a
-        //    'returnAfterReachingDonorTimestamp'.
-        // 2) a delayed 'recipientForgetMigration' was received after the state doc was deleted.
-        if (doc.getState() == TenantMigrationRecipientStateEnum::kDone &&
-            !doc.getRejectReadsBeforeTimestamp()) {
-            return true;
-        }
-
-        auto protocol = doc.getProtocol().value_or(MigrationProtocolEnum::kMultitenantMigrations);
-        if (protocol == MigrationProtocolEnum::kShardMerge) {
-            return true;
-        }
-
-        auto mtab = std::make_shared<TenantMigrationRecipientAccessBlocker>(
-            opCtx->getServiceContext(), doc.getId());
-
-        TenantMigrationAccessBlockerRegistry::get(opCtx->getServiceContext())
-            .add(doc.getTenantId(), mtab);
-
-        switch (doc.getState()) {
-            case TenantMigrationRecipientStateEnum::kStarted:
-            case TenantMigrationRecipientStateEnum::kLearnedFilenames:
-                invariant(!doc.getRejectReadsBeforeTimestamp());
-                break;
-            case TenantMigrationRecipientStateEnum::kConsistent:
-            case TenantMigrationRecipientStateEnum::kDone:
-                if (doc.getRejectReadsBeforeTimestamp()) {
-                    mtab->startRejectingReadsBefore(doc.getRejectReadsBeforeTimestamp().get());
-                }
-                break;
-            case TenantMigrationRecipientStateEnum::kUninitialized:
-                MONGO_UNREACHABLE;
-        }
-
-        return true;
+        return recoverTenantMigrationRecipientAccessBlockers(doc, opCtx);
     });
 
     // Recover TenantMigrationDonorAccessBlockers for ShardSplit.

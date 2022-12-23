@@ -2,6 +2,7 @@
  * Tests that tenant migration recipient's in memory state is recovered correctly on startup. This
  * test randomly selects a point during the migration to shutdown the recipient.
  *
+ *  TODO SERVER-72209 Remove incompatible_with_shard_merge once recipient is resistent to restarts
  * @tags: [
  *   incompatible_with_macos,
  *   incompatible_with_shard_merge,
@@ -34,7 +35,7 @@ recipientRst.initiate();
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), recipientRst});
 
 const kMaxSleepTimeMS = 7500;
-const kTenantId = 'testTenantId';
+const kTenantId = ObjectId().str;
 
 let recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 
@@ -49,8 +50,9 @@ if (index < kMigrationFpNames.length) {
     configureFailPoint(recipientPrimary, kMigrationFpNames[index], {action: "hang"});
 }
 
+const migrationId = UUID();
 const migrationOpts = {
-    migrationIdString: extractUUIDFromObject(UUID()),
+    migrationIdString: extractUUIDFromObject(migrationId),
     tenantId: kTenantId,
 };
 assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
@@ -65,7 +67,7 @@ recipientRst.startSet({
 recipientPrimary = recipientRst.getPrimary();
 const configRecipientsColl =
     recipientPrimary.getCollection(TenantMigrationTest.kConfigRecipientsNS);
-const recipientDoc = configRecipientsColl.findOne({tenantId: kTenantId});
+const recipientDoc = configRecipientsColl.findOne({_id: migrationId});
 if (recipientDoc) {
     switch (recipientDoc.state) {
         case TenantMigrationTest.RecipientState.kStarted:
