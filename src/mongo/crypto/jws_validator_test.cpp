@@ -80,17 +80,18 @@ public:
     };
 
     void evaluate(RSAKeySignatureVerificationVector test) {
-        std::string algorithm = "RSA";
+        constexpr auto kKeyType = "RSA";
+        constexpr auto kAlgorithm = "RS256";
         BSONObjBuilder rsaKey;
 
-        rsaKey.append("kty", algorithm);
+        rsaKey.append("kty", kKeyType);
         rsaKey.append("kid", test.keyID);
         rsaKey.append("e", test.e);
         rsaKey.append("n", test.n);
 
-        auto asymmetricKey = uassertStatusOK(JWSValidator::create(algorithm, rsaKey.obj()));
+        auto asymmetricKey = uassertStatusOK(JWSValidator::create(kKeyType, rsaKey.obj()));
         Status result = asymmetricKey->validate(
-            algorithm,
+            kAlgorithm,
             ConstDataRange(test.msg.data(), test.msg.length()).data(),
             ConstDataRange(test.signature.data(), test.signature.length()).data());
         if (test.shouldPass) {

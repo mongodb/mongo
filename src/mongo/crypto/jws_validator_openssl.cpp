@@ -84,12 +84,15 @@ namespace {
 using UniqueRSA = std::unique_ptr<RSA, OpenSSLDeleter<decltype(RSA_free), RSA_free>>;
 using UniqueEVPPKey =
     std::unique_ptr<EVP_PKEY, OpenSSLDeleter<decltype(EVP_PKEY_free), EVP_PKEY_free>>;
+using UniqueEVPMDCtx =
+    std::unique_ptr<EVP_MD_CTX, OpenSSLDeleter<decltype(EVP_MD_CTX_free), ::EVP_MD_CTX_free>>;
 using UniqueBIGNUM = std::unique_ptr<BIGNUM, OpenSSLDeleter<decltype(BN_free), BN_free>>;
 
 class JWSValidatorOpenSSLRSA : public JWSValidator {
 public:
-    JWSValidatorOpenSSLRSA(StringData algorithm, const BSONObj& key)
-        : _verificationCtx(EVP_MD_CTX_new()) {
+    JWSValidatorOpenSSLRSA(StringData algorithm, const BSONObj& key) : _key(EVP_PKEY_new()) {
+        uassert(7095402, "Unknown hashing algorithm", algorithm == "RSA");
+
         auto RSAKey = JWKRSA::parse(IDLParserContext("JWKRSA"), key);
 
         const auto* pubKeyNData =
@@ -109,30 +112,27 @@ public:
         n.release();  // Now owned by rsa
         e.release();  // Now owned by rsa
 
-        UniqueEVPPKey evpKey(EVP_PKEY_new());
-        uassertOpenSSL("Failed creating EVP_PKey", evpKey.get() != nullptr);
+        uassertOpenSSL("Failed creating EVP_PKey", _key.get() != nullptr);
         uassertOpenSSL("EVP_PKEY assignment failed",
-                       EVP_PKEY_assign_RSA(evpKey.get(), rsa.get()) == 1);
-        rsa.release();  // Now owned by evpKey
-
-        uassert(7095402, "Unknown hashing algorithm", algorithm == "RSA");
-        uassertOpenSSL("DigestVerifyInit failed",
-                       EVP_DigestVerifyInit(
-                           _verificationCtx.get(), nullptr, EVP_sha256(), nullptr, evpKey.get()) ==
-                           1);
+                       EVP_PKEY_assign_RSA(_key.get(), rsa.get()) == 1);
+        rsa.release();  // Now owned by _key
     }
 
     Status validate(StringData algorithm, StringData payload, StringData signature) const final {
-        uassert(7095403, "Unknown hashing algorithm", algorithm == "RSA" || algorithm == "RS256");
+        uassert(7095403, "Unknown hashing algorithm", algorithm == "RS256");
 
+        UniqueEVPMDCtx ctx(EVP_MD_CTX_new());
+        uassertOpenSSL(
+            "DigestVerifyInit failed",
+            EVP_DigestVerifyInit(ctx.get(), nullptr, EVP_sha256(), nullptr, _key.get()) == 1);
         uassertOpenSSL(
             "DigestVerifyUpdate failed",
-            EVP_DigestVerifyUpdate(_verificationCtx.get(),
+            EVP_DigestVerifyUpdate(ctx.get(),
                                    reinterpret_cast<const unsigned char*>(payload.rawData()),
                                    payload.size()) == 1);
 
         int verifyRes =
-            EVP_DigestVerifyFinal(_verificationCtx.get(),
+            EVP_DigestVerifyFinal(ctx.get(),
                                   reinterpret_cast<const unsigned char*>(signature.rawData()),
                                   signature.size());
         if (verifyRes == 0) {
@@ -145,8 +145,7 @@ public:
     }
 
 private:
-    std::unique_ptr<EVP_MD_CTX, OpenSSLDeleter<decltype(EVP_MD_CTX_free), ::EVP_MD_CTX_free>>
-        _verificationCtx;
+    UniqueEVPPKey _key;
 
     static void uassertOpenSSL(StringData context, bool success) {
         uassert(ErrorCodes::OperationFailed,
