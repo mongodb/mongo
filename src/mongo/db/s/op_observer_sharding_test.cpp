@@ -28,18 +28,24 @@
  */
 
 #include "mongo/db/catalog/create_collection.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/op_observer/op_observer_util.h"
+#include "mongo/db/op_observer/oplog_writer_impl.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/op_observer_sharding_impl.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/s/type_shard_identity.h"
+#include "mongo/db/session/session_catalog_mongod.h"
 
 namespace mongo {
 namespace {
 
 const NamespaceString kTestNss("TestDB", "TestColl");
+const NamespaceString kUnshardedNss("TestDB", "UnshardedColl");
 
 void setCollectionFilteringMetadata(OperationContext* opCtx, CollectionMetadata metadata) {
     AutoGetCollection autoColl(opCtx, kTestNss, MODE_X);
@@ -55,8 +61,22 @@ protected:
 
         OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
             operationContext());
+
+        Lock::GlobalWrite globalLock(operationContext());
+        bool justCreated = false;
+        auto databaseHolder = DatabaseHolder::get(operationContext());
+        auto db = databaseHolder->openDb(operationContext(), kTestNss.dbName(), &justCreated);
+        databaseHolder->setDbInfo(
+            operationContext(),
+            kTestNss.dbName(),
+            DatabaseType{kTestNss.dbName().db(), ShardId("this"), dbVersion1});
+        ASSERT_TRUE(db);
+        ASSERT_TRUE(justCreated);
+
         uassertStatusOK(createCollection(
             operationContext(), kTestNss.dbName(), BSON("create" << kTestNss.coll())));
+        uassertStatusOK(createCollection(
+            operationContext(), kUnshardedNss.dbName(), BSON("create" << kUnshardedNss.coll())));
     }
 
     /**
@@ -91,6 +111,9 @@ protected:
                                                Timestamp(100, 0)),
                                   ShardId("this"));
     }
+
+    const DatabaseVersion dbVersion0 = DatabaseVersion::makeFixed();
+    const DatabaseVersion dbVersion1 = dbVersion0.makeUpdated();
 };
 
 TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateUnsharded) {
@@ -200,6 +223,61 @@ TEST_F(DocumentKeyStateTest, MakeDocumentKeyStateShardedWithIdHashInShardKey) {
     ASSERT_FALSE(OpObserverShardingImpl::isMigrating(operationContext(), kTestNss, doc));
 }
 
+TEST_F(DocumentKeyStateTest, CheckDBVersion) {
+    OpObserverRegistry opObserver;
+    opObserver.addObserver(
+        std::make_unique<OpObserverShardingImpl>(std::make_unique<OplogWriterImpl>()));
+
+    OperationContext* opCtx = operationContext();
+    AutoGetCollection autoColl(opCtx, kUnshardedNss, MODE_IX);
+    WriteUnitOfWork wuow(opCtx);
+    const bool fromMigrate = false;
+    auto shardVersion = ShardVersion::UNSHARDED();
+
+    // Insert parameters
+    std::vector<InsertStatement> toInsert;
+    toInsert.emplace_back(kUninitializedStmtId, BSON("_id" << 1));
+
+    // Update parameters
+    const auto criteria = BSON("_id" << 1);
+    const auto preImageDoc = criteria;
+    CollectionUpdateArgs updateArgs{preImageDoc};
+    updateArgs.criteria = criteria;
+    updateArgs.stmtIds = {kUninitializedStmtId};
+    updateArgs.updatedDoc = BSON("_id" << 1 << "data"
+                                       << "y");
+    updateArgs.update = BSON("$set" << BSON("data"
+                                            << "y"));
+    OplogUpdateEntryArgs update(&updateArgs, *autoColl);
+
+    // OpObserver calls
+    auto onInsert = [&]() {
+        opObserver.onInserts(opCtx, *autoColl, toInsert.begin(), toInsert.end(), fromMigrate);
+    };
+    auto onUpdate = [&]() { opObserver.onUpdate(opCtx, update); };
+    auto onDelete = [&]() {
+        opObserver.aboutToDelete(opCtx, *autoColl, BSON("_id" << 0));
+        opObserver.onDelete(opCtx, *autoColl, kUninitializedStmtId, {});
+    };
+
+    // Using the latest dbVersion works
+    {
+        ScopedSetShardRole scopedSetShardRole{
+            operationContext(), kTestNss, shardVersion, dbVersion1};
+        onInsert();
+        onUpdate();
+        onDelete();
+    }
+
+    // Using the old dbVersion fails
+    {
+        ScopedSetShardRole scopedSetShardRole{
+            operationContext(), kTestNss, shardVersion, dbVersion0};
+        ASSERT_THROWS_CODE(onInsert(), AssertionException, ErrorCodes::StaleDbVersion);
+        ASSERT_THROWS_CODE(onUpdate(), AssertionException, ErrorCodes::StaleDbVersion);
+        ASSERT_THROWS_CODE(onDelete(), AssertionException, ErrorCodes::StaleDbVersion);
+    }
+}
 
 }  // namespace
 }  // namespace mongo

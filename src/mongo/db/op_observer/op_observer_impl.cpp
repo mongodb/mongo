@@ -647,17 +647,14 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         onWriteOpCompleted(opCtx, stmtIdsWritten, sessionTxnRecord);
     }
 
-    size_t index = 0;
-    for (auto it = first; it != last; it++, index++) {
-        auto opTime = opTimeList.empty() ? repl::OpTime() : opTimeList[index];
-        shardObserveInsertOp(opCtx,
-                             nss,
-                             it->doc,
-                             opTime,
-                             shardingWriteRouter,
-                             fromMigrate,
-                             inMultiDocumentTransaction);
-    }
+    shardObserveInsertsOp(opCtx,
+                          nss,
+                          first,
+                          last,
+                          opTimeList,
+                          shardingWriteRouter,
+                          fromMigrate,
+                          inMultiDocumentTransaction);
 
     if (nss.coll() == "system.js") {
         Scope::storedFuncMod(opCtx);

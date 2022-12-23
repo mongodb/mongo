@@ -99,8 +99,8 @@ public:
 
     void onInserts(OperationContext* opCtx,
                    const CollectionPtr& coll,
-                   std::vector<InsertStatement>::const_iterator begin,
-                   std::vector<InsertStatement>::const_iterator end,
+                   std::vector<InsertStatement>::const_iterator first,
+                   std::vector<InsertStatement>::const_iterator last,
                    bool fromMigrate) final;
 
     void onInsertGlobalIndexKey(OperationContext* opCtx,
@@ -246,13 +246,14 @@ private:
     virtual void shardObserveAboutToDelete(OperationContext* opCtx,
                                            NamespaceString const& nss,
                                            BSONObj const& doc) {}
-    virtual void shardObserveInsertOp(OperationContext* opCtx,
-                                      const NamespaceString nss,
-                                      const BSONObj& insertedDoc,
-                                      const repl::OpTime& opTime,
-                                      const ShardingWriteRouter& shardingWriteRouter,
-                                      const bool fromMigrate,
-                                      const bool inMultiDocumentTransaction) {}
+    virtual void shardObserveInsertsOp(OperationContext* opCtx,
+                                       NamespaceString nss,
+                                       std::vector<InsertStatement>::const_iterator first,
+                                       std::vector<InsertStatement>::const_iterator last,
+                                       const std::vector<repl::OpTime>& opTimeList,
+                                       const ShardingWriteRouter& shardingWriteRouter,
+                                       bool fromMigrate,
+                                       bool inMultiDocumentTransaction){};
     virtual void shardObserveUpdateOp(OperationContext* opCtx,
                                       const NamespaceString nss,
                                       boost::optional<BSONObj> preImageDoc,

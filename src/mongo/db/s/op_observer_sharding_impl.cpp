@@ -29,6 +29,7 @@
 
 #include "mongo/db/s/op_observer_sharding_impl.h"
 
+#include "mongo/db/catalog/catalog_helper.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/database_sharding_state.h"
@@ -107,18 +108,21 @@ void OpObserverShardingImpl::shardObserveAboutToDelete(OperationContext* opCtx,
     getIsMigrating(opCtx) = isMigrating(opCtx, nss, docToDelete);
 }
 
-void OpObserverShardingImpl::shardObserveInsertOp(OperationContext* opCtx,
-                                                  const NamespaceString nss,
-                                                  const BSONObj& insertedDoc,
-                                                  const repl::OpTime& opTime,
-                                                  const ShardingWriteRouter& shardingWriteRouter,
-                                                  const bool fromMigrate,
-                                                  const bool inMultiDocumentTransaction) {
+void OpObserverShardingImpl::shardObserveInsertsOp(
+    OperationContext* opCtx,
+    const NamespaceString nss,
+    std::vector<InsertStatement>::const_iterator first,
+    std::vector<InsertStatement>::const_iterator last,
+    const std::vector<repl::OpTime>& opTimeList,
+    const ShardingWriteRouter& shardingWriteRouter,
+    const bool fromMigrate,
+    const bool inMultiDocumentTransaction) {
     if (nss == NamespaceString::kSessionTransactionsTableNamespace || fromMigrate)
         return;
 
     auto* const css = shardingWriteRouter.getCss();
     css->checkShardVersionOrThrow(opCtx);
+    catalog_helper::assertMatchingDbVersion(opCtx, nss.db());
 
     auto* const csr = checked_cast<CollectionShardingRuntime*>(css);
     auto metadata = csr->getCurrentMetadataIfKnown();
@@ -127,21 +131,26 @@ void OpObserverShardingImpl::shardObserveInsertOp(OperationContext* opCtx,
         return;
     }
 
-    if (inMultiDocumentTransaction) {
-        const auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
+    int index = 0;
+    for (auto it = first; it != last; it++, index++) {
+        auto opTime = opTimeList.empty() ? repl::OpTime() : opTimeList[index];
 
-        if (atClusterTime) {
-            const auto shardKey =
-                metadata->getShardKeyPattern().extractShardKeyFromDocThrows(insertedDoc);
-            assertIntersectingChunkHasNotMoved(opCtx, *metadata, shardKey, *atClusterTime);
+        if (inMultiDocumentTransaction) {
+            const auto atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
+
+            if (atClusterTime) {
+                const auto shardKey =
+                    metadata->getShardKeyPattern().extractShardKeyFromDocThrows(it->doc);
+                assertIntersectingChunkHasNotMoved(opCtx, *metadata, shardKey, *atClusterTime);
+            }
+
+            return;
         }
 
-        return;
-    }
-
-    auto cloner = MigrationSourceManager::getCurrentCloner(*csr);
-    if (cloner) {
-        cloner->onInsertOp(opCtx, insertedDoc, opTime);
+        auto cloner = MigrationSourceManager::getCurrentCloner(*csr);
+        if (cloner) {
+            cloner->onInsertOp(opCtx, it->doc, opTime);
+        }
     }
 }
 
@@ -155,6 +164,7 @@ void OpObserverShardingImpl::shardObserveUpdateOp(OperationContext* opCtx,
                                                   const bool inMultiDocumentTransaction) {
     auto* const css = shardingWriteRouter.getCss();
     css->checkShardVersionOrThrow(opCtx);
+    catalog_helper::assertMatchingDbVersion(opCtx, nss.db());
 
     auto* const csr = checked_cast<CollectionShardingRuntime*>(css);
     auto metadata = csr->getCurrentMetadataIfKnown();
@@ -190,6 +200,7 @@ void OpObserverShardingImpl::shardObserveDeleteOp(OperationContext* opCtx,
                                                   const bool inMultiDocumentTransaction) {
     auto* const css = shardingWriteRouter.getCss();
     css->checkShardVersionOrThrow(opCtx);
+    catalog_helper::assertMatchingDbVersion(opCtx, nss.db());
 
     auto* const csr = checked_cast<CollectionShardingRuntime*>(css);
     auto metadata = csr->getCurrentMetadataIfKnown();
