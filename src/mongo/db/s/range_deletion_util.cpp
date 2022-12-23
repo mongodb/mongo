@@ -36,7 +36,6 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/concurrency/lock_state.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/delete_stage.h"
 #include "mongo/db/exec/working_set_common.h"
@@ -329,8 +328,6 @@ Status deleteRangeInBatches(OperationContext* opCtx,
                             const BSONObj& keyPattern,
                             const ChunkRange& range) {
     suspendRangeDeletion.pauseWhileSet(opCtx);
-
-    SetAdmissionPriorityForLock priority(opCtx, AdmissionContext::Priority::kLow);
 
     bool allDocsRemoved = false;
     // Delete all batches in this range unless a stepdown error occurs. Do not yield the
