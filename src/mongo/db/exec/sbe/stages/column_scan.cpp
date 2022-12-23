@@ -34,11 +34,6 @@
 
 namespace mongo {
 namespace sbe {
-ColumnScanStage::RowstoreScanModeTracker::RowstoreScanModeTracker()
-    : _minBatchSize(internalQueryColumnRowstoreScanMinBatchSize.load()),
-      _maxBatchSize(std::max(internalQueryColumnRowstoreScanMaxBatchSize.load(), _minBatchSize)),
-      _batchSize(_minBatchSize) {}
-
 ColumnScanStage::ColumnScanStage(UUID collectionUuid,
                                  StringData columnIndexName,
                                  std::vector<std::string> paths,
@@ -469,7 +464,7 @@ RowId ColumnScanStage::findMinRowId() const {
  * Returns the lowest RowId across cursors if there are no filtered paths; otherwise the RowId of
  * the current cursors' position where all filters match.
  */
-RowId ColumnScanStage::advanceColumnCursors(bool reset) {
+RowId ColumnScanStage::advanceCursors() {
     if (_rowId == ColumnStore::kNullRowId) {
         if (_recordIdColumnCursor) {
             _recordIdColumnCursor->seekAtOrPast(ColumnStore::kNullRowId);
@@ -478,15 +473,6 @@ RowId ColumnScanStage::advanceColumnCursors(bool reset) {
             columnCursor.seekAtOrPast(ColumnStore::kNullRowId);
         }
         return _filteredPaths.empty() ? findMinRowId() : findNextRowIdForFilteredColumns();
-    }
-
-    if (reset) {
-        if (_recordIdColumnCursor) {
-            _recordIdColumnCursor->seekAtOrPast(_rowId);
-        }
-        for (auto& cursor : _columnCursors) {
-            cursor.seekAtOrPast(_rowId);
-        }
     }
 
     if (!_filteredPaths.empty()) {
@@ -503,11 +489,9 @@ RowId ColumnScanStage::advanceColumnCursors(bool reset) {
     // unless they are at '_rowId' and therefore their values have been consumed.
     // While at it, compute the new min row ID.
     auto nextRowId = ColumnStore::kNullRowId;
-
     if (_recordIdColumnCursor) {
-        tassert(6859101,
-                "The dense _recordId cursor should always be at the current minimum record ID",
-                _recordIdColumnCursor->lastCell()->rid == _rowId);
+        invariant(_recordIdColumnCursor->lastCell()->rid == _rowId,
+                  "The dense _recordId cursor should always be at the current minimum record ID");
         auto cell = _recordIdColumnCursor->next();
         if (!cell) {
             return ColumnStore::kNullRowId;
@@ -523,9 +507,8 @@ RowId ColumnScanStage::advanceColumnCursors(bool reset) {
             cell = cursor.next();
         }
         if (cell && (nextRowId == ColumnStore::kNullRowId || cell->rid < nextRowId)) {
-            tassert(6859102,
-                    "The dense _recordId cursor should have the next lowest record ID",
-                    !_recordIdColumnCursor);
+            invariant(!_recordIdColumnCursor,
+                      "The dense _recordId cursor should have the next lowest record ID");
             nextRowId = cell->rid;
         }
     }
@@ -542,93 +525,77 @@ PlanState ColumnScanStage::getNext() {
 
     checkForInterrupt(_opCtx);
 
-    if (_scanTracker.isScanningRowstore()) {
-        _scanTracker.track();
+    _rowId = advanceCursors();
+    if (_rowId == ColumnStore::kNullRowId) {
+        return trackPlanState(PlanState::IS_EOF);
+    }
 
-        auto record = _rowStoreCursor->next();
-        if (!record) {
-            return trackPlanState(PlanState::IS_EOF);
+    bool useRowStore = false;
+
+    auto [outTag, outVal] = value::makeNewObject();
+    auto& outObj = *value::bitcastTo<value::Object*>(outVal);
+    value::ValueGuard materializedObjGuard(outTag, outVal);
+
+    StringDataSet pathsRead;
+    for (size_t i = 0; i < _columnCursors.size(); ++i) {
+        if (!_includeInOutput[i]) {
+            continue;
         }
-        ++_specificStats.numRowStoreScans;
+        auto& cursor = _columnCursors[i];
+        auto& lastCell = cursor.lastCell();
 
-        _rowId = record->id.getLong();
-        processRecordFromRowstore(*record);
-    } else {
-        // When we are scanning the row store, we let the column cursors fall behind, so on exiting
-        // from the scan mode, they must be reset to the current _rowId, before they can advance to
-        // the next.
-        _rowId = advanceColumnCursors(_scanTracker.isFinishingScan() /* reset */);
-
-        if (_rowId == ColumnStore::kNullRowId) {
-            return trackPlanState(PlanState::IS_EOF);
-        }
-
-        // Attempt to reconstruct the object from the index. If we cannot do this, we'll fetch the
-        // corresponding record from the row store and will enter the row store scanning mode for
-        // the next few records.
-        bool canReconstructFromIndex = true;
-
-        auto [outTag, outVal] = value::makeNewObject();
-        auto& outObj = *value::bitcastTo<value::Object*>(outVal);
-        value::ValueGuard materializedObjGuard(outTag, outVal);
-
-        StringDataSet pathsRead;
-        for (size_t i = 0; i < _columnCursors.size(); ++i) {
-            if (!_includeInOutput[i]) {
-                continue;
-            }
-            auto& cursor = _columnCursors[i];
-            auto& lastCell = cursor.lastCell();
-
-            boost::optional<SplitCellView> splitCellView;
-            if (lastCell && lastCell->rid == _rowId) {
-                splitCellView = SplitCellView::parse(lastCell->value);
-            }
-
-            const auto& path = cursor.path();
-
-            if (splitCellView &&
-                (splitCellView->hasSubPaths || splitCellView->hasDuplicateFields)) {
-                canReconstructFromIndex = false;
-                break;
-            } else {
-                if (!splitCellView || splitCellView->isSparse) {
-                    // Must read in the parent information first.
-                    readParentsIntoObj(path, &outObj, &pathsRead);
-                }
-                if (splitCellView) {
-                    auto translatedCell = translateCell(path, *splitCellView);
-                    addCellToObject(translatedCell, outObj);
-                    pathsRead.insert(path);
-                }
-            }
+        boost::optional<SplitCellView> splitCellView;
+        if (lastCell && lastCell->rid == _rowId) {
+            splitCellView = SplitCellView::parse(lastCell->value);
         }
 
-        if (!canReconstructFromIndex) {
-            ++_specificStats.numRowStoreFetches;
+        const auto& path = cursor.path();
 
-            // Enter the row store scanning mode for the next few reads.
-            if (_filteredPaths.empty()) {
-                _scanTracker.startNextBatch();
-            }
-
-            // It's possible that we are reading a long range of records that cannot be served from
-            // the index. We could add more state tracking to keep scanning the row store even when
-            // doing the checkpoint at the end of a batch, but we don't think it's helpful because
-            // the hit of adjusting the column cursors and attempting to reconstruct the object is
-            // likely much bigger than seek() vs next() on the row store.
-            auto record = _rowStoreCursor->seekExact(RecordId(_rowId));
-            tassert(6859103, "Row store must be in sync with the index", record);
-
-            processRecordFromRowstore(*record);
+        if (splitCellView && (splitCellView->hasSubPaths || splitCellView->hasDuplicateFields)) {
+            useRowStore = true;
+            break;
         } else {
-            _scanTracker.reset();
-
-            if (_reconstructedRecordAccessor) {
-                _reconstructedRecordAccessor->reset(true, outTag, outVal);
+            if (!splitCellView || splitCellView->isSparse) {
+                // Must read in the parent information first.
+                readParentsIntoObj(path, &outObj, &pathsRead);
             }
-            materializedObjGuard.reset();
+            if (splitCellView) {
+                auto translatedCell = translateCell(path, *splitCellView);
+                addCellToObject(translatedCell, outObj);
+                pathsRead.insert(path);
+            }
         }
+    }
+
+    if (useRowStore) {
+        ++_specificStats.numRowStoreFetches;
+        // TODO: In some cases we can avoid calling seek() on the row store cursor, and instead do
+        // a next() which should be much cheaper.
+        auto record = _rowStoreCursor->seekExact(RecordId(_rowId));
+
+        // If there's no record, the index is out of sync with the row store.
+        invariant(record);
+
+        _rowStoreAccessor->reset(false,
+                                 value::TypeTags::bsonObject,
+                                 value::bitcastFrom<const char*>(record->data.data()));
+
+        if (_reconstructedRecordAccessor) {
+            if (_rowStoreExpr) {
+                auto [owned, tag, val] = _bytecode.run(_rowStoreExprCode.get());
+                _reconstructedRecordAccessor->reset(owned, tag, val);
+            } else {
+                _reconstructedRecordAccessor->reset(
+                    false,
+                    value::TypeTags::bsonObject,
+                    value::bitcastFrom<const char*>(record->data.data()));
+            }
+        }
+    } else {
+        if (_reconstructedRecordAccessor) {
+            _reconstructedRecordAccessor->reset(true, outTag, outVal);
+        }
+        materializedObjGuard.reset();
     }
 
     if (_recordIdAccessor) {
@@ -648,23 +615,6 @@ PlanState ColumnScanStage::getNext() {
     }
 
     return trackPlanState(PlanState::ADVANCED);
-}
-
-void ColumnScanStage::processRecordFromRowstore(const Record& record) {
-    _rowStoreAccessor->reset(
-        false, value::TypeTags::bsonObject, value::bitcastFrom<const char*>(record.data.data()));
-
-    if (_reconstructedRecordAccessor) {
-        if (_rowStoreExpr) {
-            auto [owned, tag, val] = _bytecode.run(_rowStoreExprCode.get());
-            _reconstructedRecordAccessor->reset(owned, tag, val);
-        } else {
-            _reconstructedRecordAccessor->reset(
-                false,
-                value::TypeTags::bsonObject,
-                value::bitcastFrom<const char*>(record.data.data()));
-        }
-    }
 }
 
 void ColumnScanStage::close() {
@@ -688,8 +638,6 @@ std::unique_ptr<PlanStageStats> ColumnScanStage::getStats(bool includeDebugInfo)
         bob.append("columnIndexName", _columnIndexName);
         bob.appendNumber("numRowStoreFetches",
                          static_cast<long long>(_specificStats.numRowStoreFetches));
-        bob.appendNumber("numRowStoreScans",
-                         static_cast<long long>(_specificStats.numRowStoreScans));
         BSONObjBuilder columns(bob.subobjStart("columns"));
         for (const ColumnScanStats::CursorStats& cursorStat : _specificStats.cursorStats) {
             StringData path = cursorStat.path;

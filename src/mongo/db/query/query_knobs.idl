@@ -1046,36 +1046,6 @@ server_parameters:
       gte: 0
     on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
-  internalQueryColumnRowstoreScanMinBatchSize:
-    description: "The minimum number of records that will be scanned from the row store after
-    running into a record that cannot be served from the index and before attempting to use the
-    index again. No preemptive scanning will be done if this setting is 0."
-    set_at: [ startup, runtime ]
-    cpp_varname: "internalQueryColumnRowstoreScanMinBatchSize"
-    cpp_vartype: AtomicWord<long long>
-    # The preemptive scan of the row store mitigates the situation when there is a range of records
-    # that cannot be served from CSI. We increase the batch size exponentially as we keep seeing
-    # 'bad' data so starting with a low minimum batch size is OK and allows to minimize scanning
-    # if the 'bad' records are isolated.
-    default: 1
-    validator:
-        gte: 0
-
-  internalQueryColumnRowstoreScanMaxBatchSize:
-    description: "The maximum number of records that can be scanned from the row store after
-    running into a record that cannot be served from the index and before attempting to use the
-    index again. If this setting is less than 'internalQueryColumnRowstoreScanMinBatchSize' the
-    batch size will be fixed at 'internalQueryColumnRowstoreScanMinBatchSize'."
-    set_at: [ startup, runtime ]
-    cpp_varname: "internalQueryColumnRowstoreScanMaxBatchSize"
-    cpp_vartype: AtomicWord<long long>
-    # The sweet spot for scanning vs attempting to use the index would very much depend on the data
-    # so there is no default setting that would work in all situations. Setting it relatively high
-    # favors the case when all of the data would require reading from the row store.
-    default: 10000
-    validator:
-        gte: 0
-
   internalQueryColumnScanMinNumColumnFilters:
     description: "The min number of column filters for which column scan will always be allowed. If
       it is set to 0 column scan will always be allowed."

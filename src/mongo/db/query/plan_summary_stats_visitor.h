@@ -48,7 +48,7 @@ public:
         _summary.totalDocsExamined += stats->numReads;
     }
     void visit(tree_walker::MaybeConstPtr<true, sbe::ColumnScanStats> stats) override final {
-        _summary.totalDocsExamined += stats->numRowStoreFetches + stats->numRowStoreScans;
+        _summary.totalDocsExamined += stats->numRowStoreFetches;
         for (auto const& stat : stats->cursorStats)
             _summary.totalKeysExamined += stat.numNexts + stat.numSeeks;
         for (auto const& stat : stats->parentCursorStats)
