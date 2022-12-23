@@ -978,14 +978,14 @@ tasks:
           test_control_params: |
             {scale: 1}
 
-  - name: column_store_index_charts_events_15G
+  - name: column_store_index_charts_events_10G
     priority: 5
     commands:
       - func: f_run_dsi_workload
         vars:
           test_control: "charts_events"
           test_control_params: |
-            {scale: 15}
+            {scale: 10}
 
   - name: non_sharded_workloads
     priority: 5
@@ -1466,7 +1466,7 @@ buildvariants:
       - name: bestbuy_4_analytics
       - name: bestbuy_4_analytics_columnstore
       - name: column_store_index_charts_events_1G
-      - name: column_store_index_charts_events_15G
+      - name: column_store_index_charts_events_10G
       - name: ssb_column_store_comparison
 
   - name: compile-rhel70
