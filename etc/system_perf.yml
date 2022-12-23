@@ -1255,7 +1255,6 @@ buildvariants:
 
   - name: linux-standalone
     display_name: Linux Standalone Legacy
-    cron: "0 0 * * 4"  # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: standalone
@@ -1294,7 +1293,6 @@ buildvariants:
 
   - name: linux-standalone-all-feature-flags
     display_name: Linux Standalone (all feature flags) Legacy
-    cron: "0 0 * * 4"  # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: standalone-all-feature-flags
@@ -1425,7 +1423,6 @@ buildvariants:
 
   - name: linux-1-node-replSet-all-feature-flags
     display_name: Linux 1-Node ReplSet (all feature flags) Legacy
-    cron: "0 0 * * 4"  # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: single-replica-all-feature-flags
@@ -1490,7 +1487,6 @@ buildvariants:
 
   - name: linux-1-node-replSet
     display_name: Linux 1-Node ReplSet Legacy
-    cron: "0 0 * * 4"  # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: single-replica
@@ -1539,7 +1535,6 @@ buildvariants:
 
   - name: linux-standalone-audit
     display_name: Linux Standalone Audit Legacy
-    cron: "0 0 * * 4"  # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: standalone-audit
@@ -1560,7 +1555,6 @@ buildvariants:
 
   - name: linux-1-node-replSet-audit-log-encryption-no-compression
     display_name: Linux Single-node Replica Set Audit w/ At-Rest Log Encryption (No compression) Legacy
-    cron: "0 0 * * 4"  # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: single-replica-audit-log-encryption-no-compression
@@ -1576,7 +1570,6 @@ buildvariants:
 
   - name: linux-1-node-replSet-audit
     display_name: Linux Single-node Replica Set Audit Legacy
-    cron: "0 0 * * 4"  # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: single-replica-audit
@@ -1592,7 +1585,6 @@ buildvariants:
 
   - name: linux-1-node-replSet-audit-log-encryption-compression
     display_name: Linux Single-node Replica Set Audit w/ At-Rest Log Encryption (With compression) Legacy
-    cron: "0 0 * * 4"  # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: single-replica-audit-log-encryption-compression
@@ -1608,7 +1600,6 @@ buildvariants:
 
   - name: linux-1-node-replSet-fle
     display_name: Linux 1-Node ReplSet FLE Legacy
-    cron: "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
     modules: *modules
     expansions:
       mongodb_setup: single-replica-fle
@@ -1627,7 +1618,6 @@ buildvariants:
 
   - name: linux-1-node-replSet-cwrwc
     display_name: Linux 1-Node ReplSet CWRWC Legacy
-    cron: "0 0 * * 4"  # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: single-replica-cwrwc
@@ -1647,7 +1637,6 @@ buildvariants:
 
   - name: linux-1-node-replSet-ese-cbc
     display_name: Linux 1-Node ReplSet ESE CBC Legacy
-    cron: "0 0 * * 4"  # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: single-replica-ese-cbc
@@ -1669,7 +1658,6 @@ buildvariants:
 
   - name: linux-1-node-replSet-ese-gcm
     display_name: Linux 1-Node ReplSet ESE GCM Legacy
-    cron: "0 0 1 * *"  # 00:00 on the first of each month
     modules: *modules
     expansions:
       mongodb_setup: single-replica-ese-gcm
@@ -1691,7 +1679,6 @@ buildvariants:
 
   - name: linux-1-node-15gbwtcache
     display_name: Linux 1-Node ReplSet 15 GB WiredTiger Cache Legacy
-    cron: "0 0 * * 4"  # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: single-replica-15gbwtcache
@@ -1713,7 +1700,6 @@ buildvariants:
 
   - name: linux-3-node-1dayhistory-15gbwtcache
     display_name: Linux 3-Node ReplSet 1 Day History 15 GB WiredTiger Cache Legacy
-    cron: "0 0 * * 4"  # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: replica-1dayhistory-15gbwtcache
@@ -1736,7 +1722,6 @@ buildvariants:
 
   - name: linux-3-shard
     display_name: Linux 3-Shard Cluster Legacy
-    cron: "0 0 * * 4"  # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: shard
@@ -1771,7 +1756,6 @@ buildvariants:
 
   - name: linux-shard-lite-audit
     display_name: Linux Shard Lite Cluster Audit Legacy
-    cron: "0 0 * * 4"  # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: shard-lite-audit
@@ -1788,7 +1772,6 @@ buildvariants:
 
   - name: linux-shard-lite
     display_name: Linux Shard Lite Cluster Legacy
-    cron: "0 0 * * 4"  # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: shard-lite
@@ -1832,7 +1815,6 @@ buildvariants:
 
   - name: linux-shard-lite-cwrwc
     display_name: Linux Shard Lite Cluster CWRWC Legacy
-    cron: "0 0 * * 4"  # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: shard-lite-cwrwc
@@ -1852,7 +1834,6 @@ buildvariants:
 
   - name: linux-shard-lite-read-concern-available
     display_name: Linux Shard Lite ReadConcern Available Legacy
-    cron: "0 0 * * 4"  # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: shard-lite-read-concern-available
@@ -1872,7 +1853,6 @@ buildvariants:
 
   - name: linux-shard-lite-all-feature-flags
     display_name: Linux Shard Lite (all feature flags) Legacy
-    cron: "0 0 * * 4"  # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: shard-lite-all-feature-flags
@@ -1896,7 +1876,6 @@ buildvariants:
 
   - name: linux-shard-single
     display_name: Linux Shard Single Legacy
-    cron: "0 0 * * 4"  # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: shard-single
@@ -1914,7 +1893,6 @@ buildvariants:
 
   - name: linux-3-node-replSet
     display_name: Linux 3-Node ReplSet Legacy
-    cron: "0 0 * * 4"  # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: replica
@@ -1972,7 +1950,6 @@ buildvariants:
 
   - name: linux-3-node-replSet-last-continuous-fcv
     display_name: Linux 3-Node ReplSet (Last Continuous FCV) Legacy
-    cron: "0 0 * * 4"  # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: replica-last-continuous-fcv
@@ -2027,7 +2004,6 @@ buildvariants:
 
   - name: linux-3-node-replSet-last-lts-fcv
     display_name: Linux 3-Node ReplSet (Last LTS FCV) Legacy
-    cron: "0 0 * * 4"  # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: replica-last-lts-fcv
@@ -2084,7 +2060,6 @@ buildvariants:
   # history even though the display name is "all feature flags"
   - name: linux-3-node-replSet-disabled-feature-flags
     display_name: Linux 3-Node ReplSet (all feature flags) Legacy
-    cron: "0 0 * * 4"  # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: replica-all-feature-flags
@@ -2141,7 +2116,6 @@ buildvariants:
 
   - name: linux-3-node-replSet-noflowcontrol
     display_name: Linux 3-Node ReplSet (Flow Control off) Legacy
-    cron: "0 0 * * 4"  # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: replica-noflowcontrol
@@ -2172,7 +2146,6 @@ buildvariants:
 
   - name: linux-3-node-replSet-ssl
     display_name: Linux 3-Node ReplSet (SSL) Legacy
-    cron: "0 0 * * 4"  # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: replica-ssl
@@ -2192,7 +2165,6 @@ buildvariants:
 
   - name: linux-3-node-replSet-maintenance-events
     display_name: Linux 3-Node ReplSet (Maintenance Events) Legacy
-    cron: "0 0 * * 4"  # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: replica-maintenance-events
@@ -2220,7 +2192,6 @@ buildvariants:
 
   - name: linux-3-node-replSet-initialsync
     display_name: Linux 3-Node ReplSet Initial Sync Legacy
-    cron: "0 0 * * 4"  # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: replica-2node
@@ -2240,7 +2211,6 @@ buildvariants:
 
   - name: linux-replSet-initialsync-logkeeper
     display_name: Linux ReplSet Initial Sync LogKeeper Legacy
-    cron: "0 0 * * 4"  # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: initialsync-logkeeper
@@ -2262,7 +2232,6 @@ buildvariants:
 
   - name: linux-replSet-audit
     display_name: Linux 3-Node ReplSet Audit Legacy
-    cron: "0 0 * * 4"  # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: replica-audit
@@ -2281,7 +2250,6 @@ buildvariants:
 
   - name: linux-replSet-auth-delay
     display_name: Linux 3-Node ReplSet (Auth Delay) Legacy
-    cron: "0 0 * * 4"  # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: replica-auth-cluster-delay
@@ -2299,7 +2267,6 @@ buildvariants:
 
   - name: atlas-like-M60
     display_name: M60-Like-old 3-Node ReplSet
-    cron: "0 0 * * 4"  # 00:00 on Thursday
     modules: *modules
     expansions:
       mongodb_setup: atlas-like-replica
