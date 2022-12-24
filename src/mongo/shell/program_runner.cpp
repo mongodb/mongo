@@ -616,7 +616,8 @@ void ProgramRunner::launchProcess(int child_stdout) {
         // Ensure there is enough room to write the string, the string's NULL byte, and the block's
         // NULL byte
         uassert(7095702,
-                str::stream() << "Insufficient space to set environment variable " << envKeyValue,
+                str::stream() << "Insufficient space to set environment variable "
+                              << toUtf8String(envKeyValue),
                 environmentOffset + envKeyValue.size() + 1 + 1 <= environmentBlockSize);
         wcscpy_s(
             lpEnvironment.get() + environmentOffset, envKeyValue.size() + 1, envKeyValue.c_str());
@@ -746,7 +747,7 @@ void ProgramRunner::loadEnvironmentVariables(BSONObj env) {
         std::wstring envKeyValue(processEnv);
         size_t splitPoint = envKeyValue.find('=');
         uassert(ErrorCodes::BadValue,
-                str::stream() << "Environment key " << envKeyValue
+                str::stream() << "Environment key " << toUtf8String(envKeyValue)
                               << " does not have '=' separator",
                 splitPoint != std::wstring::npos);
         std::string envKey = toUtf8String(envKeyValue.substr(0, splitPoint));
