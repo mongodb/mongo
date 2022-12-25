@@ -33,6 +33,7 @@
 
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_visitor.h"
@@ -65,4 +66,95 @@ public:
     }
 };
 
+/**
+ * The expression '$_internalIndexKey' is used to generate index keys documents for the provided
+ * document 'doc' using the index specification 'spec'. The 'doc' field can be an arbitrary
+ * expression, including a field path or variable like '$$ROOT'. The 'spec' field is aligned with
+ * that of the 'createIndex' command and is treated as a constant expression, as if it had been
+ * supplied by the client as '$literal'.
+ *
+ * The expression specification is a follows:
+ * {
+ *     $_internalIndexKey: {
+ *         doc: <document | expression | field-path | variable>,
+ *         spec: <document>
+ *     }
+ * }
+ *
+ * Returns: A 'Value' which is an array of 'BSONObj' document, where each document represents the
+ * generated index keys object.
+ *
+ * Note that this expression does not inherit the collation from the collection. A collation must be
+ * explicitly provided in the index spec 'spec'.
+ *
+ * Examples:
+ * Case 1: The 'doc' field is a document.
+ * Input1:
+ * {
+ *     $_internalIndexKey: {
+ *         doc: {a: 4, b: 5},
+ *         spec: {key: {a: 1}, name: "exampleIndex"}
+ *     }
+ * }
+ * Output1: [{a: 4}]
+ *
+ * Case 2: The 'doc' field is '$$ROOT' and the current document been processed by the pipeline is
+ * '{a: 4, b: 5}'.
+ * Input2:
+ * {
+ *     $_internalIndexKey: {
+ *         doc: '$$ROOT',
+ *         spec: {key: {a: 1}, name: "exampleIndex"}
+ *     }
+ * }
+ * Output2: [{a: 4}]
+ *
+ * Case 3: The 'doc' field is an expression.
+ * Input3:
+ * {
+ *     $_internalIndexKey: {
+ *         doc: {$literal: {a: 4, b: 5}},
+ *         spec: {key: {a: 1}, name: "exampleIndex"}
+ *     }
+ * }
+ * Output3: [{a: 4}]
+ */
+class ExpressionInternalIndexKey final : public Expression {
+public:
+    static constexpr const char* const opName = "$_internalIndexKey";
+
+    static boost::intrusive_ptr<Expression> parse(ExpressionContext* expCtx,
+                                                  BSONElement bsonExpr,
+                                                  const VariablesParseState& vps);
+
+    ExpressionInternalIndexKey(ExpressionContext* expCtx,
+                               boost::intrusive_ptr<Expression> doc,
+                               boost::intrusive_ptr<Expression> spec);
+
+    boost::intrusive_ptr<Expression> optimize() final;
+
+    Value serialize(bool explain) const final;
+
+    Value evaluate(const Document& root, Variables* variables) const final;
+
+    const char* getOpName() const {
+        return opName;
+    }
+
+    void acceptVisitor(ExpressionMutableVisitor* visitor) final {
+        return visitor->visit(this);
+    }
+
+    void acceptVisitor(ExpressionConstVisitor* visitor) const final {
+        return visitor->visit(this);
+    }
+
+private:
+    constexpr static auto kDocField = "doc"_sd;
+    constexpr static auto kSpecField = "spec"_sd;
+    constexpr static auto kIndexSpecKeyField = "key"_sd;
+
+    boost::intrusive_ptr<Expression> _doc;
+    boost::intrusive_ptr<Expression> _spec;
+};
 };  // namespace mongo

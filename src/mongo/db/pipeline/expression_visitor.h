@@ -157,6 +157,7 @@ class ExpressionInternalFindPositional;
 class ExpressionInternalFindElemMatch;
 class ExpressionInternalFLEBetween;
 class ExpressionInternalFLEEqual;
+class ExpressionInternalIndexKey;
 class ExpressionInternalJsEmit;
 class ExpressionInternalOwningShard;
 class ExpressionFunction;
@@ -379,6 +380,7 @@ public:
     virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionTsIncrement>) = 0;
     virtual void visit(
         expression_walker::MaybeConstPtr<IsConst, ExpressionInternalOwningShard>) = 0;
+    virtual void visit(expression_walker::MaybeConstPtr<IsConst, ExpressionInternalIndexKey>) = 0;
 };
 
 using ExpressionMutableVisitor = ExpressionVisitor<false>;
@@ -545,5 +547,6 @@ struct SelectiveConstExpressionVisitorBase : public ExpressionConstVisitor {
     void visit(const ExpressionTsSecond*) override {}
     void visit(const ExpressionTsIncrement*) override {}
     void visit(const ExpressionInternalOwningShard*) override {}
+    void visit(const ExpressionInternalIndexKey*) override {}
 };
 }  // namespace mongo

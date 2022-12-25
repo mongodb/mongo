@@ -536,6 +536,7 @@ public:
     void visit(const ExpressionTsSecond* expr) final {}
     void visit(const ExpressionTsIncrement* expr) final {}
     void visit(const ExpressionInternalOwningShard* expr) final {}
+    void visit(const ExpressionInternalIndexKey* expr) final {}
 
 private:
     ExpressionVisitorContext* _context;
@@ -740,6 +741,7 @@ public:
     void visit(const ExpressionTsSecond* expr) final {}
     void visit(const ExpressionTsIncrement* expr) final {}
     void visit(const ExpressionInternalOwningShard* expr) final {}
+    void visit(const ExpressionInternalIndexKey* expr) final {}
 
 private:
     ExpressionVisitorContext* _context;
@@ -3106,6 +3108,10 @@ public:
 
     void visit(const ExpressionInternalOwningShard* expr) final {
         unsupportedExpression("$_internalOwningShard");
+    }
+
+    void visit(const ExpressionInternalIndexKey* expr) final {
+        unsupportedExpression("$_internalIndexKey");
     }
 
 private:

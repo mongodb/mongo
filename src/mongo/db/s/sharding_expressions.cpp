@@ -27,23 +27,339 @@
  *    it in the license file.
  */
 
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/s/sharding_expressions.h"
 
+#include "mongo/client/index_spec.h"
+#include "mongo/db/catalog/index_key_validate.h"
+#include "mongo/db/db_raii.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/index/2d_common.h"
+#include "mongo/db/index/btree_key_generator.h"
+#include "mongo/db/index/expression_keys_private.h"
+#include "mongo/db/index/expression_params.h"
+#include "mongo/db/index/s2_common.h"
+#include "mongo/db/index/wildcard_key_generator.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_visitor.h"
 #include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/is_mongos.h"
 
-
 namespace mongo {
+namespace {
+/**
+ * The class IndexKeysObjectsGenerator is used to generate the index keys objects for the provided
+ * document 'docObj' and the index descriptor 'indexDescriptor'. This class determines the index
+ * type from the 'indexDescriptor', generates the corresponding key strings and then convert those
+ * key strings to the index keys objects. An index keys object is of the following form:
+ * {<field_name>: <index key>, ...}, which maps a field name to an index key.
+ */
+class IndexKeysObjectsGenerator {
+public:
+    IndexKeysObjectsGenerator(ExpressionContext* expCtx,
+                              const BSONObj& docObj,
+                              IndexDescriptor* indexDescriptor)
+        : _expCtx{expCtx},
+          _docObj{docObj},
+          _indexDescriptor{indexDescriptor},
+          _fieldNames{indexDescriptor->getFieldNames()} {
+        // Validate the key pattern to ensure that the field ordering is ascending.
+        auto keyPattern = _indexDescriptor->keyPattern();
+        for (auto& keyElem : keyPattern) {
+            uassert(6868501,
+                    str::stream() << "Index key pattern field ordering must be ascending. Field: "
+                                  << keyElem.fieldNameStringData() << " is not ascending.",
+                    !keyElem.isNumber() || keyElem.numberInt() == 1);
+        }
+
+        // Set the collator interface if the index descriptor has a collation.
+        if (auto collation = indexDescriptor->collation(); !collation.isEmpty()) {
+            auto collatorFactory =
+                CollatorFactoryInterface::get(expCtx->opCtx->getServiceContext());
+            auto collatorFactoryResult = collatorFactory->makeFromBSON(collation);
+
+            uassert(6868502,
+                    str::stream() << "Malformed 'collation' document provided. Reason "
+                                  << collatorFactoryResult.getStatus(),
+                    collatorFactoryResult.isOK());
+            _collatorInterface = std::move(collatorFactoryResult.getValue());
+        }
+    }
+
+    /**
+     * Returns the generated index keys objects for the provided index type. The returned value
+     * 'Value' is an array of 'BSONObj' the contains the generated keys objects.
+     */
+    Value generateKeys() const {
+        KeyStringSet keyStrings;
+
+        // Generate the key strings based on the index type.
+        switch (_indexDescriptor->getIndexType()) {
+            case IndexType::INDEX_BTREE: {
+                _generateBtreeIndexKeys(&keyStrings);
+                break;
+            }
+            case IndexType::INDEX_HASHED: {
+                _generateHashedIndexKeys(&keyStrings);
+                break;
+            }
+            case IndexType::INDEX_2D: {
+                _generate2DIndexKeys(&keyStrings);
+                break;
+            }
+            case IndexType::INDEX_2DSPHERE:
+            case IndexType::INDEX_2DSPHERE_BUCKET: {
+                _generate2DSphereIndexKeys(&keyStrings);
+                break;
+            }
+            case IndexType::INDEX_TEXT: {
+                _generateTextIndexKeys(&keyStrings);
+                break;
+            }
+            case IndexType::INDEX_WILDCARD: {
+                _generateWildcardIndexKeys(&keyStrings);
+                break;
+            }
+            default: {
+                uasserted(6868503,
+                          str::stream()
+                              << "Unsupported index type: " << _indexDescriptor->getIndexType());
+            }
+        };
+
+        return _generateReply(keyStrings);
+    }
+
+private:
+    /**
+     * Generates the key string for the 'btree' index type and adds them to the 'keyStrings'.
+     */
+    void _generateBtreeIndexKeys(KeyStringSet* keyStrings) const {
+        std::vector<BSONElement> keysElements{_fieldNames.size(), BSONElement{}};
+        auto bTreeKeyGenerator = std::make_unique<BtreeKeyGenerator>(
+            _fieldNames, keysElements, _indexDescriptor->isSparse(), _keyStringVersion, _ordering);
+
+        constexpr bool skipMultikey = false;
+        const boost::optional<RecordId> recordId = boost::none;
+        MultikeyPaths multikeyPaths;
+        SharedBufferFragmentBuilder pooledBufferBuilder(BufBuilder::kDefaultInitSizeBytes);
+
+        bTreeKeyGenerator->getKeys(pooledBufferBuilder,
+                                   _docObj,
+                                   skipMultikey,
+                                   keyStrings,
+                                   &multikeyPaths,
+                                   _collatorInterface.get(),
+                                   recordId);
+    }
+
+    /**
+     * Generates the key strings for the 'hashed' index type and adds them to the 'keyStrings'.
+     */
+    void _generateHashedIndexKeys(KeyStringSet* keyStrings) const {
+        HashSeed seed;
+        int hashVersion;
+        BSONObj keyPattern;
+        ExpressionParams::parseHashParams(
+            _indexDescriptor->infoObj(), &seed, &hashVersion, &keyPattern);
+
+        constexpr auto ignoreArraysAlongPath = false;
+        const boost::optional<RecordId> recordId = boost::none;
+        SharedBufferFragmentBuilder pooledBufferBuilder(BufBuilder::kDefaultInitSizeBytes);
+
+        ExpressionKeysPrivate::getHashKeys(pooledBufferBuilder,
+                                           _docObj,
+                                           keyPattern,
+                                           seed,
+                                           hashVersion,
+                                           _indexDescriptor->isSparse(),
+                                           _collatorInterface.get(),
+                                           keyStrings,
+                                           _keyStringVersion,
+                                           _ordering,
+                                           ignoreArraysAlongPath,
+                                           recordId);
+    }
+
+    /*
+     * Generates the key strings for the '2d' index type and adds them to the 'keyStrings'.
+     */
+    void _generate2DIndexKeys(KeyStringSet* keyStrings) const {
+        TwoDIndexingParams twoDIndexingParams;
+        ExpressionParams::parseTwoDParams(_indexDescriptor->infoObj(), &twoDIndexingParams);
+
+        const boost::optional<RecordId> recordId = boost::none;
+        SharedBufferFragmentBuilder pooledBufferBuilder(BufBuilder::kDefaultInitSizeBytes);
+
+        ExpressionKeysPrivate::get2DKeys(pooledBufferBuilder,
+                                         _docObj,
+                                         twoDIndexingParams,
+                                         keyStrings,
+                                         _keyStringVersion,
+                                         _ordering,
+                                         recordId);
+    }
+
+    /*
+     * Generates the key strings for the '2dsphere' and the '2dsphere_bucket' index types and adds
+     * them to the 'keyStrings'.
+     */
+    void _generate2DSphereIndexKeys(KeyStringSet* keyStrings) const {
+        S2IndexingParams s2IndexingParams;
+        ExpressionParams::initialize2dsphereParams(
+            _indexDescriptor->infoObj(), _collatorInterface.get(), &s2IndexingParams);
+
+        MultikeyPaths multikeyPaths;
+        const boost::optional<RecordId> recordId = boost::none;
+        SharedBufferFragmentBuilder pooledBufferBuilder(BufBuilder::kDefaultInitSizeBytes);
+
+        ExpressionKeysPrivate::getS2Keys(pooledBufferBuilder,
+                                         _docObj,
+                                         _indexDescriptor->keyPattern(),
+                                         s2IndexingParams,
+                                         keyStrings,
+                                         &multikeyPaths,
+                                         _keyStringVersion,
+                                         SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
+                                         _ordering,
+                                         recordId);
+    }
+
+    /**
+     * Generates the key strings for the 'text' index type and adds them to the 'keyStrings'.
+     */
+    void _generateTextIndexKeys(KeyStringSet* keyStrings) const {
+        fts::FTSSpec ftsSpec{_indexDescriptor->infoObj()};
+        const boost::optional<RecordId> recordId = boost::none;
+        SharedBufferFragmentBuilder pooledBufferBuilder(BufBuilder::kDefaultInitSizeBytes);
+
+        ExpressionKeysPrivate::getFTSKeys(pooledBufferBuilder,
+                                          _docObj,
+                                          ftsSpec,
+                                          keyStrings,
+                                          _keyStringVersion,
+                                          _ordering,
+                                          recordId);
+    }
+
+    /*
+     * Generates the key string for the 'wildcard' index type and adds them to the 'keyStrings'.
+     */
+    void _generateWildcardIndexKeys(KeyStringSet* keyStrings) const {
+        WildcardKeyGenerator wildcardKeyGenerator{_indexDescriptor->keyPattern(),
+                                                  _indexDescriptor->pathProjection(),
+                                                  _collatorInterface.get(),
+                                                  _keyStringVersion,
+                                                  _ordering};
+
+        KeyStringSet* multikeyMetadataKeys = nullptr;
+        const boost::optional<RecordId> recordId = boost::none;
+        SharedBufferFragmentBuilder pooledBufferBuilder(BufBuilder::kDefaultInitSizeBytes);
+
+        wildcardKeyGenerator.generateKeys(
+            pooledBufferBuilder, _docObj, keyStrings, multikeyMetadataKeys, recordId);
+    }
+
+    /**
+     * Returns a 'Value' that is a vector of 'BSONObj' that contains the index keys documents.
+     */
+    Value _generateReply(const KeyStringSet& keyStrings) const {
+        // This helper accepts the key string 'keyString' and returns a 'BSONObj' that maps a field
+        // names to its index key.
+        auto buildObjectFromKeyString = [&](const auto& keyString) {
+            auto keyStringObj = KeyString::toBson(keyString, Ordering::make(BSONObj()));
+            BSONObjBuilder keyObjectBuilder;
+
+            switch (_indexDescriptor->getIndexType()) {
+                //
+                // A wild card key string is of the following format:
+                // {'': <field name>, '': <key value>}.
+                // The 'keyStringObj' itself contains the field name and the key. As such build a
+                // new 'BSONObj' that directly maps a field name and its index key.
+                //
+                case IndexType::INDEX_WILDCARD: {
+                    boost::optional<std::string> fieldName;
+                    boost::optional<BSONElement> keyStringElem;
+
+                    BSONObjIterator keyStringObjIter = BSONObjIterator(keyStringObj);
+                    if (keyStringObjIter.more()) {
+                        fieldName = keyStringObjIter.next().String();
+                    }
+                    if (keyStringObjIter.more()) {
+                        keyStringElem = keyStringObjIter.next();
+                    }
+
+                    invariant(!keyStringObjIter.more());
+
+                    if (fieldName && keyStringElem) {
+                        keyObjectBuilder << *fieldName << *keyStringElem;
+                    }
+                    break;
+                }
+
+                //
+                // For all other index types, each 'BSONElement' field of the 'keyStringObj' has a
+                // one-to-one mapping with the elements of the '_fieldNames'. This one-to-one
+                // property is utilized to builds a new 'BSONObj' that has keys from 'fieldNames'
+                // and values from key string 'BSONElement'.
+                //
+                default: {
+                    auto fieldNamesIter = _fieldNames.begin();
+                    for (auto&& keyStringElem : keyStringObj) {
+                        keyObjectBuilder << *fieldNamesIter << keyStringElem;
+                        ++fieldNamesIter;
+                    }
+
+                    invariant(fieldNamesIter == _fieldNames.end());
+                    break;
+                }
+            }
+
+            return keyObjectBuilder.obj();
+        };
+
+        // Iterate through each key string and get a new 'BSONObj' that has field names and
+        // corresponding keys embedded to it.
+        std::vector<BSONObj> keysArrayBuilder;
+        for (auto&& keyString : keyStrings) {
+            auto keyStringObj = buildObjectFromKeyString(keyString);
+            if (!keyStringObj.isEmpty()) {
+                keysArrayBuilder.push_back(std::move(keyStringObj));
+            }
+        }
+
+        return Value{keysArrayBuilder};
+    }
+
+    // An existing expression context.
+    const ExpressionContext* const _expCtx;
+
+    // The document for which the key strings should be generated.
+    const BSONObj& _docObj;
+
+    // The index descriptor to be used for generating the key strings.
+    const IndexDescriptor* const _indexDescriptor;
+
+    // Field names derived from the key pattern of the index descriptor.
+    const std::vector<const char*> _fieldNames;
+
+    // The collator interface initialized from the index descriptor.
+    std::unique_ptr<CollatorInterface> _collatorInterface;
+
+    // The key string version to be used for generating the key strings.
+    const KeyString::Version _keyStringVersion = KeyString::Version::kLatestVersion;
+
+    // The ordering to be used for generating the key strings.
+    const Ordering _ordering = Ordering::allAscending();
+};
+}  // namespace
 
 Value ExpressionInternalOwningShard::evaluate(const Document& root, Variables* variables) const {
     // TODO SERVER-71519: Add support for handling stale exception from mongos with
@@ -96,6 +412,87 @@ Value ExpressionInternalOwningShard::evaluate(const Document& root, Variables* v
     return Value(shardId.toString());
 }
 
+boost::intrusive_ptr<Expression> ExpressionInternalIndexKey::parse(ExpressionContext* expCtx,
+                                                                   BSONElement bsonExpr,
+                                                                   const VariablesParseState& vps) {
+    uassert(6868506,
+            str::stream() << opName << " supports an object as its argument",
+            bsonExpr.type() == BSONType::Object);
+
+    BSONElement docElement;
+    BSONElement specElement;
+
+    for (auto&& bsonArgs : bsonExpr.embeddedObject()) {
+        if (bsonArgs.fieldNameStringData() == kDocField) {
+            docElement = bsonArgs;
+        } else if (bsonArgs.fieldNameStringData() == kSpecField) {
+            uassert(6868507,
+                    str::stream() << opName << " requires 'spec' argument to be an object",
+                    bsonArgs.type() == BSONType::Object);
+            specElement = bsonArgs;
+        } else {
+            uasserted(6868508,
+                      str::stream() << "Unknown argument: " << bsonArgs.fieldNameStringData()
+                                    << "found while parsing" << opName);
+        }
+    }
+
+    uassert(6868509,
+            str::stream() << opName << " requires both 'doc' and 'spec' arguments",
+            !docElement.eoo() && !specElement.eoo());
+
+    return new ExpressionInternalIndexKey(expCtx,
+                                          parseOperand(expCtx, docElement, vps),
+                                          ExpressionConstant::create(expCtx, Value{specElement}));
+}
+
+ExpressionInternalIndexKey::ExpressionInternalIndexKey(ExpressionContext* expCtx,
+                                                       boost::intrusive_ptr<Expression> doc,
+                                                       boost::intrusive_ptr<Expression> spec)
+    : Expression(expCtx, {std::move(doc), std::move(spec)}),
+      _doc(_children[0]),
+      _spec(_children[1]) {
+    expCtx->sbeCompatible = false;
+}
+
+boost::intrusive_ptr<Expression> ExpressionInternalIndexKey::optimize() {
+    invariant(_doc);
+    invariant(_spec);
+
+    _doc = _doc->optimize();
+    _spec = _spec->optimize();
+    return this;
+}
+
+Value ExpressionInternalIndexKey::serialize(bool explain) const {
+    invariant(_doc);
+    invariant(_spec);
+
+    return Value(DOC(opName << DOC(kDocField << _doc->serialize(explain) << kSpecField
+                                             << _spec->serialize(explain))));
+}
+
+Value ExpressionInternalIndexKey::evaluate(const Document& root, Variables* variables) const {
+    uassert(
+        6868510, str::stream() << opName << " is currently not supported on mongos", !isMongos());
+
+    auto docObj = _doc->evaluate(root, variables).getDocument().toBson();
+    auto specObj = _spec->evaluate(root, variables).getDocument().toBson();
+
+    // Parse and validate the index spec and then create the index descriptor object from it.
+    auto indexSpec =
+        index_key_validate::parseAndValidateIndexSpecs(getExpressionContext()->opCtx, specObj);
+    BSONObj keyPattern = indexSpec.getObjectField(kIndexSpecKeyField);
+    auto indexDescriptor =
+        std::make_unique<IndexDescriptor>(IndexNames::findPluginName(keyPattern), indexSpec);
+
+    IndexKeysObjectsGenerator indexKeysObjectsGenerator(
+        getExpressionContext(), docObj, indexDescriptor.get());
+
+    return indexKeysObjectsGenerator.generateKeys();
+}
+
 REGISTER_STABLE_EXPRESSION(_internalOwningShard, ExpressionInternalOwningShard::parse);
+REGISTER_STABLE_EXPRESSION(_internalIndexKey, ExpressionInternalIndexKey::parse);
 
 };  // namespace mongo

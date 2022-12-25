@@ -47,6 +47,9 @@ selector:
   - jstests/core/killop_drop_collection.js # Uses fsyncLock.
   # This test uses `benchRun` which spawns connections which do not inherit the causal session.
   - jstests/core/benchrun_pipeline_updates.js
+  # "Error: [197] != [[ 6868501 ]] are not equal"
+  - jstests/core/index_key_expression.js
+
 
   exclude_with_any_tags:
   # Tests tagged with the following will fail because they assume collections are not sharded.

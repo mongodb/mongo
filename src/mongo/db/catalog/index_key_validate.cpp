@@ -948,6 +948,38 @@ bool isIndexAllowedInAPIVersion1(const IndexDescriptor& indexDesc) {
         !indexDesc.isSparse();
 }
 
+BSONObj parseAndValidateIndexSpecs(OperationContext* opCtx, const BSONObj& indexSpecObj) {
+    constexpr auto k_id_ = "_id_"_sd;
+    constexpr auto kStar = "*"_sd;
+
+    BSONObj parsedIndexSpec = indexSpecObj;
+
+    auto indexSpecStatus = index_key_validate::validateIndexSpec(opCtx, parsedIndexSpec);
+    uassertStatusOK(indexSpecStatus.getStatus().withContext(
+        str::stream() << "Error in specification " << parsedIndexSpec.toString()));
+
+    auto indexSpec = indexSpecStatus.getValue();
+    if (IndexDescriptor::isIdIndexPattern(indexSpec[IndexDescriptor::kKeyPatternFieldName].Obj())) {
+        uassertStatusOK(index_key_validate::validateIdIndexSpec(indexSpec));
+    } else {
+        uassert(ErrorCodes::BadValue,
+                str::stream() << "The index name '_id_' is reserved for the _id index, "
+                                 "which must have key pattern {_id: 1}, found "
+                              << indexSpec[IndexDescriptor::kKeyPatternFieldName],
+                indexSpec[IndexDescriptor::kIndexNameFieldName].String() != k_id_);
+
+        // An index named '*' cannot be dropped on its own, because a dropIndex oplog
+        // entry with a '*' as an index name means "drop all indexes in this
+        // collection".  We disallow creation of such indexes to avoid this conflict.
+        uassert(ErrorCodes::BadValue,
+                "The index name '*' is not valid.",
+                indexSpec[IndexDescriptor::kIndexNameFieldName].String() != kStar);
+    }
+
+    return indexSpec;
+}
+
+
 GlobalInitializerRegisterer filterAllowedIndexFieldNamesInitializer(
     "FilterAllowedIndexFieldNames", [](InitializerContext* service) {
         if (filterAllowedIndexFieldNames)

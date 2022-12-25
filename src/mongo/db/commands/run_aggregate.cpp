@@ -435,7 +435,8 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     const AggregateCommandRequest& request,
     std::unique_ptr<CollatorInterface> collator,
     boost::optional<UUID> uuid,
-    ExpressionContext::CollationMatchesDefault collationMatchesDefault) {
+    ExpressionContext::CollationMatchesDefault collationMatchesDefault,
+    boost::optional<CollectionOptions> collectionOptions = boost::none) {
     boost::intrusive_ptr<ExpressionContext> expCtx =
         new ExpressionContext(opCtx,
                               request,
@@ -938,8 +939,14 @@ Status runAggregate(OperationContext* opCtx,
             opCtx, nss, collections.getMainCollection(), request.getCollectionUUID());
 
         invariant(collatorToUse);
-        expCtx = makeExpressionContext(
-            opCtx, request, std::move(*collatorToUse), uuid, collatorToUseMatchesDefault);
+        expCtx = makeExpressionContext(opCtx,
+                                       request,
+                                       std::move(*collatorToUse),
+                                       uuid,
+                                       collatorToUseMatchesDefault,
+                                       collections.getMainCollection()
+                                           ? collections.getMainCollection()->getCollectionOptions()
+                                           : boost::optional<CollectionOptions>(boost::none));
 
         expCtx->startExpressionCounters();
         auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);

@@ -157,6 +157,13 @@ Status validateIndexSpecTTL(const BSONObj& indexSpec);
 bool isIndexAllowedInAPIVersion1(const IndexDescriptor& indexDesc);
 
 /**
+ * Parses the index specifications from 'indexSpecObj', validates them, and returns equivalent index
+ * specifications that have any missing attributes filled in. If any index specification is
+ * malformed, then an error status is returned.
+ */
+BSONObj parseAndValidateIndexSpecs(OperationContext* opCtx, const BSONObj& indexSpecObj);
+
+/**
  * Optional filtering function to adjust allowed index field names at startup.
  * Set it in a MONGO_INITIALIZER with 'FilterAllowedIndexFieldNames' as a dependant.
  */

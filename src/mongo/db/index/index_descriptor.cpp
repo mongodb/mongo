@@ -251,4 +251,51 @@ IndexDescriptor::Comparison IndexDescriptor::compareIndexOptions(
     return optsIdentical ? Comparison::kIdentical : Comparison::kEquivalent;
 }
 
+std::vector<const char*> IndexDescriptor::getFieldNames() const {
+    constexpr auto kFTSTerm = "term"_sd;
+    constexpr auto kFTSWeight = "weight"_sd;
+    constexpr auto kFTSFieldName = "_fts"_sd;
+    constexpr auto kFTSXFieldName = "_ftsx"_sd;
+
+    std::vector<const char*> fieldNames;
+
+    // This field is only applicable for the text index and if set to true, then the 'term' and the
+    // 'weight' field names have already been added to the 'fieldNames'.
+    bool hasSeenFtsOrFtsxFields = false;
+
+    // Appends the 'term' and 'weight' fields to the 'fieldNames' vector if 'hasSeenFtsOrFtsxFields'
+    // is set to false.
+    auto maybeAppendFtsIndexField = [&]() {
+        if (!hasSeenFtsOrFtsxFields) {
+            fieldNames.push_back(kFTSTerm.rawData());
+            fieldNames.push_back(kFTSWeight.rawData());
+            hasSeenFtsOrFtsxFields = true;
+        }
+    };
+
+    // Iterate over the key pattern and add the field names to the 'fieldNames' vector.
+    BSONObjIterator keyPatternIter(_keyPattern);
+    while (keyPatternIter.more()) {
+        BSONElement KeyPatternElem = keyPatternIter.next();
+        auto fieldName = KeyPatternElem.fieldNameStringData();
+
+        // If the index type is text and the field name is either '_fts' or '_ftsx', then append the
+        // index fields to the field names, otherwise add the field name from the key pattern.
+        if ((_indexType == IndexType::INDEX_TEXT) &&
+            (fieldName == kFTSFieldName || fieldName == kFTSXFieldName)) {
+            maybeAppendFtsIndexField();
+        } else {
+            fieldNames.push_back(fieldName.rawData());
+        }
+    }
+
+    // If the index type is text and the 'hasSeenFtsOrFtsxFields' is set to false, then append the
+    // index fields.
+    if (_indexType == IndexType::INDEX_TEXT) {
+        maybeAppendFtsIndexField();
+    }
+
+    return fieldNames;
+}
+
 }  // namespace mongo

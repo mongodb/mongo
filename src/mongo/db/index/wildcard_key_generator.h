@@ -58,7 +58,7 @@ public:
                          const CollatorInterface* collator,
                          KeyString::Version keyStringVersion,
                          Ordering ordering,
-                         KeyFormat rsKeyFormat);
+                         boost::optional<KeyFormat> rsKeyFormat = boost::none);
 
     /**
      * Returns a pointer to the key generator's underlying ProjectionExecutor.
@@ -119,6 +119,6 @@ private:
     const BSONObj _keyPattern;
     const KeyString::Version _keyStringVersion;
     const Ordering _ordering;
-    const KeyFormat _rsKeyFormat;
+    const boost::optional<KeyFormat> _rsKeyFormat;
 };
 }  // namespace mongo

@@ -67,6 +67,8 @@ selector:
   - jstests/core/list_catalog.js
   # TODO SERVER-71470: this test cannot work as aggregate with $lookup query on multiple collections drops off the tenant informaton.
   - jstests/core/txns/aggregation_in_transaction.js
+  # This test uses '_hashBSONElement' command that cannot be run with security token.
+  - jstests/core/index_key_expression.js
 
 executor:
   archive:

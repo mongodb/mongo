@@ -964,6 +964,10 @@ public:
         unsupportedExpression();
     }
 
+    void visit(const ExpressionInternalIndexKey* expr) override final {
+        unsupportedExpression();
+    }
+
 private:
     void unsupportedExpression() {
         _eligible = false;

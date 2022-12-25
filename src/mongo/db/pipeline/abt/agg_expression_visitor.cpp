@@ -779,6 +779,10 @@ public:
         unsupportedExpression("$_internalOwningShard");
     }
 
+    void visit(const ExpressionInternalIndexKey* expr) override final {
+        unsupportedExpression("$_internalIndexKey");
+    }
+
 private:
     /**
      * Shared logic for $and, $or. Converts each child into an EExpression that evaluates to Boolean

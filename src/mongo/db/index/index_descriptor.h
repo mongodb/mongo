@@ -239,6 +239,19 @@ public:
     }
 
     /**
+     * Returns the field names from the index key pattern.
+     *
+     * Examples:
+     * For the index key pattern {a: 1, b: 1}, this method returns {"a", "b"}.
+     * For the text index key pattern {a: "text", _fts: "text", b: "text"}, this method returns
+     * {"a", "term", "weight", "b"}.
+     *
+     * Note that this method will not be able to resolve the field names for a wildcard index. So,
+     * for the wild card index {"$**": 1}, this method will return {"$**"}.
+     */
+    std::vector<const char*> getFieldNames() const;
+
+    /**
      * Returns true if the key pattern is for the _id index.
      * The _id index must have form exactly {_id : 1} or {_id : -1}.
      * Allows an index of form {_id : "hashed"} to exist but

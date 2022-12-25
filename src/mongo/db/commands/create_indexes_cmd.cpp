@@ -99,54 +99,28 @@ constexpr auto kAllIndexesAlreadyExist = "all indexes already exist"_sd;
 constexpr auto kIndexAlreadyExists = "index already exists"_sd;
 
 /**
- * Parses the index specifications from 'cmdObj', validates them, and returns equivalent index
- * specifications that have any missing attributes filled in. If any index specification is
- * malformed, then an error status is returned.
+ * Parses the index specifications from 'cmd', validates them, and returns equivalent index
+ * specifications. If any index specification is malformed, then an error status is returned.
  */
 std::vector<BSONObj> parseAndValidateIndexSpecs(OperationContext* opCtx,
-                                                const CreateIndexesCommand& cmd) {
-    constexpr auto k_id_ = "_id_"_sd;
-    constexpr auto kStar = "*"_sd;
-
-    const auto ns = cmd.getNamespace();
-    const bool ignoreUnknownIndexOptions = cmd.getIgnoreUnknownIndexOptions();
-
+                                                const CreateIndexesCommand& cmd,
+                                                const NamespaceString& ns) {
     std::vector<BSONObj> indexSpecs;
+
     for (const auto& index : cmd.getIndexes()) {
-        BSONObj parsedIndexSpec = index;
-        if (ignoreUnknownIndexOptions) {
+        auto parsedIndexSpec = index;
+
+        if (cmd.getIgnoreUnknownIndexOptions()) {
             parsedIndexSpec = index_key_validate::removeUnknownFields(ns, parsedIndexSpec);
         }
 
-        auto indexSpecStatus = index_key_validate::validateIndexSpec(opCtx, parsedIndexSpec);
-        uassertStatusOK(indexSpecStatus.getStatus().withContext(
-            str::stream() << "Error in specification " << parsedIndexSpec.toString()));
+        parsedIndexSpec = index_key_validate::parseAndValidateIndexSpecs(opCtx, parsedIndexSpec);
+        uassert(ErrorCodes::BadValue,
+                "Can't hide index on system collection",
+                !(ns.isSystem() && !ns.isTimeseriesBucketsCollection()) ||
+                    parsedIndexSpec[IndexDescriptor::kHiddenFieldName].eoo());
 
-        auto indexSpec = indexSpecStatus.getValue();
-        if (IndexDescriptor::isIdIndexPattern(
-                indexSpec[IndexDescriptor::kKeyPatternFieldName].Obj())) {
-            uassertStatusOK(index_key_validate::validateIdIndexSpec(indexSpec));
-        } else {
-            uassert(ErrorCodes::BadValue,
-                    str::stream() << "The index name '_id_' is reserved for the _id index, "
-                                     "which must have key pattern {_id: 1}, found "
-                                  << indexSpec[IndexDescriptor::kKeyPatternFieldName],
-                    indexSpec[IndexDescriptor::kIndexNameFieldName].String() != k_id_);
-
-            // An index named '*' cannot be dropped on its own, because a dropIndex oplog
-            // entry with a '*' as an index name means "drop all indexes in this
-            // collection".  We disallow creation of such indexes to avoid this conflict.
-            uassert(ErrorCodes::BadValue,
-                    "The index name '*' is not valid.",
-                    indexSpec[IndexDescriptor::kIndexNameFieldName].String() != kStar);
-
-            uassert(ErrorCodes::BadValue,
-                    "Can't hide index on system collection",
-                    !(ns.isSystem() && !ns.isTimeseriesBucketsCollection()) ||
-                        indexSpec[IndexDescriptor::kHiddenFieldName].eoo());
-        }
-
-        indexSpecs.push_back(std::move(indexSpec));
+        indexSpecs.push_back(std::move(parsedIndexSpec));
     }
 
     uassert(ErrorCodes::BadValue, "Must specify at least one index to create", !indexSpecs.empty());
@@ -361,7 +335,6 @@ CreateIndexesReply runCreateIndexesOnNewCollection(
     boost::optional<CommitQuorumOptions> commitQuorum,
     bool createCollImplicitly) {
     WriteUnitOfWork wunit(opCtx);
-
     uassert(ErrorCodes::CommandNotSupportedOnView,
             "Cannot create indexes on a view",
             !CollectionCatalog::get(opCtx)->lookupView(opCtx, ns));
@@ -472,7 +445,7 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
                           << " within a transaction.",
             !opCtx->inMultiDocumentTransaction() || !ns.isSystem());
 
-    auto specs = parseAndValidateIndexSpecs(opCtx, cmd);
+    auto specs = parseAndValidateIndexSpecs(opCtx, cmd, ns);
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
     // Two phase index builds are designed to improve the availability of indexes in a replica set.
