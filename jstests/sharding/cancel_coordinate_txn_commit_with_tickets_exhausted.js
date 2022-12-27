@@ -61,7 +61,7 @@ const removeOperationThreads = Array.from({length: kNumWriteTickets}).map(() => 
         const conn = new Mongo(host);
         const testDB = conn.getDB(dbName);
         const coll = testDB.getCollection(collName);
-        insertLatch.await();
+        insertLatch.awaitLatch();
         assert.commandWorked(coll.remove({key: 200}, {justOne: true}));
     }, st.s.host, dbName, collName, insertLatch);
 });

@@ -419,7 +419,7 @@ if (typeof CountDownLatch !== 'undefined') {
         //       prototype are lost during the serialization to BSON that occurs
         //       when passing data to a child thread.
 
-        this.await = function() {
+        this.awaitLatch = function() {
             CountDownLatch._await(this._descriptor);
         };
         this.countDown = function() {

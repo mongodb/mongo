@@ -217,7 +217,7 @@ var workerThread = (function() {
             // an exception. Nothing prior to (and including) args.latch.countDown()
             // should be wrapped in a try/catch statement.
             try {
-                args.latch.await();  // wait for all threads to start
+                args.latch.awaitLatch();  // wait for all threads to start
 
                 Random.setRandomSeed(args.seed);
                 run(configs);
