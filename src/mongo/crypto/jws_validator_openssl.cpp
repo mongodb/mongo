@@ -75,6 +75,10 @@ int RSA_set0_key(RSA* r, BIGNUM* n, BIGNUM* e, BIGNUM* d) {
     return 1;
 }
 
+int EVP_DigestVerifyFinal(EVP_MD_CTX* md, const unsigned char* sig, size_t len) {
+    return EVP_DigestVerifyFinal(md, const_cast<unsigned char*>(sig), len);
+}
+
 }  // namespace
 #endif
 
