@@ -240,11 +240,6 @@ function databaseExists(db, dbName) {
     return res.databases.some((dbDoc => dbDoc.name === dbName));
 }
 
-function collectionExists(db, collName) {
-    const res = assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: collName}}));
-    return res.cursor.firstBatch.length == 1;
-}
-
 function indexExists(db, collName, targetIndex) {
     const res = assert.commandWorked(db.runCommand({listIndexes: collName}));
     return res.cursor.firstBatch.some(
