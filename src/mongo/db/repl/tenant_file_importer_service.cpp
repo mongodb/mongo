@@ -97,16 +97,6 @@ void importCopiedFiles(OperationContext* opCtx, const UUID& migrationId) {
     auto metadatas = wiredTigerRollbackToStableAndGetMetadata(opCtx, tempWTDirectory.string());
 
     wiredTigerImportFromBackupCursor(opCtx, metadatas, tempWTDirectory.string());
-
-    auto catalog = CollectionCatalog::get(opCtx);
-    for (auto&& m : metadatas) {
-        AutoGetDb dbLock(opCtx, m.ns.dbName(), MODE_IX);
-        Lock::CollectionLock systemViewsLock(
-            opCtx,
-            NamespaceString(m.ns.dbName(), NamespaceString::kSystemDotViewsCollectionName),
-            MODE_X);
-        uassertStatusOK(catalog->reloadViews(opCtx, m.ns.dbName()));
-    }
 }
 }  // namespace
 
