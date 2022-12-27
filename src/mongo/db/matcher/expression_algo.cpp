@@ -482,34 +482,39 @@ std::unique_ptr<MatchExpression> tryAddExpr(StringData path,
 }
 
 /**
- * Helper for the main public API. Returns only the residual predicate and adds any columnar
- * predicates into 'out'.
+ * Here we check whether the comparison can work with the given value. Objects and arrays are
+ * generally not permitted. Objects can't work because the paths will be split apart in the columnar
+ * index. We could do arrays of scalars since we would have all that information in the index, but
+ * it proved complex to integrate due to the interface with the matcher. It expects to get a
+ * BSONElement for the whole Array but we'd like to avoid materializing that.
+ *
+ * One exception to the above: We can support EQ with empty objects and empty arrays since those are
+ * stored as values in CSI. Maybe could also support LT and LTE, but those don't seem as important
+ * so are left for future work.
+ */
+bool canCompareWith(const BSONElement& elem, bool isEQ) {
+    const auto type = elem.type();
+    if (type == BSONType::MinKey || type == BSONType::MaxKey) {
+        // MinKey and MaxKey have special semantics for comparison to objects.
+        return false;
+    }
+    if (type == BSONType::Array || type == BSONType::Object) {
+        return isEQ && elem.Obj().isEmpty();
+    }
+
+    // We support all other types, except null, since it is equivalent to x==null || !exists(x).
+    return !elem.isNull();
+}
+
+/**
+ * Helper for the main public API. Returns the residual predicate and adds any columnar predicates
+ * into 'out', if they can be pushed down on their own, or into 'pending' if they can be pushed down
+ * only if there are fully supported predicates on the same path.
  */
 std::unique_ptr<MatchExpression> splitMatchExpressionForColumns(
-    const MatchExpression* me, StringMap<std::unique_ptr<MatchExpression>>& out) {
-    auto canCompareWith = [](const BSONElement& elem, bool isEQ) {
-        // Here we check whether the comparison can work with the given value. Objects and arrays
-        // are generally not permitted. Objects can't work because the paths will be split apart in
-        // the columnar index. We could do arrays of scalars since we would have all that
-        // information in the index, but it proved complex to integrate due to the interface with
-        // the matcher. It expects to get a BSONElement for the whole Array but we'd like to avoid
-        // materializing that.
-        //
-        // One exception to the above: We can support EQ with empty objects and empty arrays since
-        // those are more obviously correct. Maybe could also support LT and LTE, but those don't
-        // seem as important so are left for future work.
-        auto type = elem.type();
-        if (type == BSONType::MinKey || type == BSONType::MaxKey) {
-            // MinKey and MaxKey have special semantics for comparison to objects.
-            return false;
-        }
-        if (type == BSONType::Array || type == BSONType::Object) {
-            return isEQ && elem.Obj().isEmpty();
-        }
-
-        // We support all other types, except null, since it is equivalent to x==null || !exists(x).
-        return !elem.isNull();
-    };
+    const MatchExpression* me,
+    StringMap<std::unique_ptr<MatchExpression>>& out,
+    StringMap<std::unique_ptr<MatchExpression>>& pending) {
     switch (me->matchType()) {
         // These are always safe since they will never match documents missing their field, or where
         // the element is an object or array.
@@ -556,7 +561,8 @@ std::unique_ptr<MatchExpression> splitMatchExpressionForColumns(
             auto originalAnd = checked_cast<const AndMatchExpression*>(me);
             std::vector<std::unique_ptr<MatchExpression>> newChildren;
             for (size_t i = 0, end = originalAnd->numChildren(); i != end; ++i) {
-                if (auto residual = splitMatchExpressionForColumns(originalAnd->getChild(i), out)) {
+                if (auto residual =
+                        splitMatchExpressionForColumns(originalAnd->getChild(i), out, pending)) {
                     newChildren.emplace_back(std::move(residual));
                 }
             }
@@ -568,8 +574,24 @@ std::unique_ptr<MatchExpression> splitMatchExpressionForColumns(
                 : std::make_unique<AndMatchExpression>(std::move(newChildren));
         }
 
+        case MatchExpression::NOT: {
+            // We can support negation of all supported operators, except AND. The unsupported ops
+            // would manifest as non-null residual.
+            auto sub = checked_cast<const NotMatchExpression*>(me)->getChild(0);
+            if (sub->matchType() == MatchExpression::AND) {
+                return me->shallowClone();
+            }
+            StringMap<std::unique_ptr<MatchExpression>> outSub;
+            StringMap<std::unique_ptr<MatchExpression>> pendingSub;
+            auto residual = splitMatchExpressionForColumns(sub, outSub, pendingSub);
+            if (residual || !pendingSub.empty()) {
+                return me->shallowClone();
+            }
+            uassert(7040600, "Should have exactly one path under $not", outSub.size() == 1);
+            return tryAddExpr(outSub.begin()->first /* path */, me, pending);
+        }
+
         // We don't currently handle any of these cases, but some may be possible in the future.
-        case MatchExpression::NOT:
         case MatchExpression::ALWAYS_FALSE:
         case MatchExpression::ALWAYS_TRUE:
         case MatchExpression::ELEM_MATCH_OBJECT:
@@ -939,8 +961,52 @@ bool bidirectionalPathPrefixOf(StringData first, StringData second) {
 std::pair<StringMap<std::unique_ptr<MatchExpression>>, std::unique_ptr<MatchExpression>>
 splitMatchExpressionForColumns(const MatchExpression* me) {
     StringMap<std::unique_ptr<MatchExpression>> out;
-    auto residualMatch = mongo::splitMatchExpressionForColumns(me, out);
-    return {std::move(out), std::move(residualMatch)};
+    StringMap<std::unique_ptr<MatchExpression>> pending;
+    auto residualMatch = mongo::splitMatchExpressionForColumns(me, out, pending);
+
+    // Let's combine pending expressions with those in 'out', if possible.
+    for (auto pIt = pending.begin(); pIt != pending.end();) {
+        const auto& path = pIt->first;
+        auto oIt = out.find(path);
+        if (oIt != out.end()) {
+            auto expr = std::move(pIt->second);
+            // Do not create nested ANDs.
+            if (expr->matchType() == MatchExpression::AND) {
+                auto pendingAnd = checked_cast<AndMatchExpression*>(expr.get());
+                for (size_t i = 0, end = pendingAnd->numChildren(); i != end; ++i) {
+                    mongo::addExpr(path, pendingAnd->releaseChild(i), out);
+                }
+            } else {
+                mongo::addExpr(path, std::move(expr), out);
+            }
+
+            // Remove the path from the 'pending' map.
+            auto toErase = pIt;
+            ++pIt;
+            pending.erase(toErase);
+        } else {
+            ++pIt;
+        }
+    }
+
+    if (pending.empty()) {
+        return {std::move(out), std::move(residualMatch)};
+    }
+
+    // The unmatched pending predicates have to be done as residual.
+    std::vector<std::unique_ptr<MatchExpression>> unmatchedPending;
+    unmatchedPending.reserve(pending.size() + 1);
+    for (auto& p : pending) {
+        unmatchedPending.push_back(std::move(p.second));
+    }
+    if (residualMatch) {
+        unmatchedPending.push_back(std::move(residualMatch));
+    }
+
+    if (unmatchedPending.size() == 1) {
+        return {std::move(out), std::move(unmatchedPending[0])};
+    }
+    return {std::move(out), std::make_unique<AndMatchExpression>(std::move(unmatchedPending))};
 }
 
 std::string filterMapToString(const StringMap<std::unique_ptr<MatchExpression>>& filterMap) {

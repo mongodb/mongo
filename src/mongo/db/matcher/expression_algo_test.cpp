@@ -1747,7 +1747,6 @@ TEST(SplitMatchExpressionForColumns, SplitsSafeEqualities) {
     }
 }
 
-
 TEST(SplitMatchExpressionForColumns, SupportsEqualityToEmptyObjects) {
     {
         ParsedMatchExpression equalsEmptyObj("{albatross: {}}");
@@ -1980,6 +1979,7 @@ TEST(SplitMatchExpressionForColumns, SupportsTypeSpecificPredicates) {
         << splitUp.at("falcon")->toString();
     ASSERT(residual == nullptr);
 }
+
 TEST(SplitMatchExpressionForColumns, SupportsExistsTrue) {
     ParsedMatchExpression existsPredicate("{albatross: {$exists: true}}");
     auto&& [splitUp, residual] = expression::splitMatchExpressionForColumns(existsPredicate.get());
@@ -2236,7 +2236,7 @@ TEST(SplitMatchExpressionForColumns, SupportsAndFlattensNestedAnd) {
     ASSERT(residual == nullptr);
 }
 
-TEST(SplitMatchExpressionForColumns, DoesNotSupportNotQueries) {
+TEST(SplitMatchExpressionForColumns, DoesNotSupportStandaloneNotQueries) {
     {
         ParsedMatchExpression notEqFilter("{albatross: {$not: {$eq: 2}}}");
         auto&& [splitUp, residual] = expression::splitMatchExpressionForColumns(notEqFilter.get());
@@ -2244,10 +2244,45 @@ TEST(SplitMatchExpressionForColumns, DoesNotSupportNotQueries) {
         assertMatchesEqual(notEqFilter, residual);
     }
     {
-        ParsedMatchExpression notAndFilter("{albatross: {$not: {$gt: 2, $lt: 10}}}");
+        ParsedMatchExpression notAndFilter("{albatross: {$not: {$type: 'number'}}}");
         auto&& [splitUp, residual] = expression::splitMatchExpressionForColumns(notAndFilter.get());
         ASSERT_EQ(splitUp.size(), 0) << splitUp.size();
         assertMatchesEqual(notAndFilter, residual);
+    }
+}
+
+TEST(SplitMatchExpressionForColumns, SupportsNotQueriesInPresenceOfOtherSupportedOnSamePath) {
+    {
+        ParsedMatchExpression notEqFilter(
+            "{$and: [{a: {$gt: 0, $lt: 50}}, {a: {$ne: 2}}, {a: {$ne: 20}}]}");
+        auto&& [splitUp, residual] = expression::splitMatchExpressionForColumns(notEqFilter.get());
+        ASSERT_EQ(splitUp.size(), 1) << splitUp.size();
+        ASSERT(splitUp.contains("a"));
+        ASSERT(splitUp.at("a")->matchType() == MatchExpression::AND) << splitUp.at("a")->toString();
+        ASSERT(residual == nullptr) << residual->toString();
+    }
+    {
+        // {$ne: null} is the same as {$not: {$eq: null}} and while it could be evaluated against
+        // the index, because {$eq: null} isn't supported for push down, we don't push down its
+        // negation either, but {$ne: 2} should be lowered.
+        ParsedMatchExpression notAndFilter(
+            "{$and: [{a: {$exists: true}}, {a: {$ne: 2}}, {a: {$ne: null}}]}");
+        auto&& [splitUp, residual] = expression::splitMatchExpressionForColumns(notAndFilter.get());
+        ASSERT_EQ(splitUp.size(), 1) << splitUp.size();
+        ASSERT(splitUp.at("a")->matchType() == MatchExpression::AND) << splitUp.at("a")->toString();
+        assertMatchesEqual(ParsedMatchExpression("{a: {$ne: null}}"), residual);
+    }
+    {
+        // $not on multiple paths should only be lowered if there are supported predicates on the
+        // same path with them
+        ParsedMatchExpression notEqFilter("{a: {$gt: 0, $ne: 2}, b:{$ne: 2, $lt: 5}, c: {$ne: 2}}");
+        auto&& [splitUp, residual] = expression::splitMatchExpressionForColumns(notEqFilter.get());
+        ASSERT_EQ(splitUp.size(), 2) << splitUp.size();
+        ASSERT(splitUp.contains("a"));
+        ASSERT(splitUp.at("a")->matchType() == MatchExpression::AND) << splitUp.at("a")->toString();
+        ASSERT(splitUp.contains("b"));
+        ASSERT(splitUp.at("b")->matchType() == MatchExpression::AND) << splitUp.at("a")->toString();
+        assertMatchesEqual(ParsedMatchExpression("{c: {$ne: 2}}"), residual);
     }
 }
 

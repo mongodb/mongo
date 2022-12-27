@@ -600,38 +600,88 @@ function runPerPathFiltersTest({docs, query, projection, expected, testDescripti
     });
 })();
 
-// Check translation of MQL $not and $ne match expressions.
-// NB: per SERVER-68743 the queries in this test won't be using per-path filters yet, but eventually
-// they should.
+// Translation of MQL $not match expression. These tests don't check that lowering of the filter
+// with $not actually happens, they only check that whatever happens with the filters, the semantics
+// are correct. However, the dataset is such that incorrect lowering would also produce an incorrect
+// result and/or asserts in the production code.
+//
+// Notes:
+// 1. We cannot test {x: {$ne: 2, $ne: 42}} via JS because the client drops duplicated fields.
+//    A conjunction of $not can be tested with $and.
+// 2. {x: {$not: {$gte: 5}}} isn't the same as {x: {$lt: 5}}; as it doesn't do type bracketing and
+//    behaves differently on arrays ($lt:5 finds arrays with _an_ element less than 5, while $not of
+//    $gte finds arrays for which _all_ elements are less than 5).
+// 3. Can only negate with $not the operations listed in 'queryOperatorMap' (see
+//    matcher/expression_parser.cpp), that is {$not: {$or: [{x: 2}, {x: 42}]}} isn't allowed.
+function runNotTest(filter, expected) {
+    let actual = coll_filters.find(filter, {_id: 0, n: 1}).toArray();
+    let explain = coll_filters.find(filter, {_id: 0, n: 1}).explain().queryPlanner.winningPlan;
+    assert(resultsEq(actual, expected),
+           `actual=${tojson(actual)}, expected=${tojson(expected)}\nTEST: ${tojson(filter)}\n ${
+               tojson(explain)}`);
+}
 (function testPerPathFilters_SupportedMatchExpressions_Not() {
     const docs = [
-        {_id: 0, x: 42},
-        {_id: 1, x: 0},
-        {_id: 2, x: null},
-        {_id: 3, no_x: 0},
-        {_id: 4, x: []},
-        {_id: 5, x: {}},
+        {n: 0, x: 42},
+        {n: 1, x: 2},
+        {n: 2, x: null},
+        {n: 3, no_x: 0},
+        {n: 4, x: "string"},
+        {n: 5, x: {foo: 0}},
+        {n: 6, x: [2, 42]},
+        {n: 7, x: [[42]]},
     ];
 
     coll_filters.drop();
     coll_filters.insert(docs);
     assert.commandWorked(coll_filters.createIndex({"$**": "columnstore"}));
 
-    let expected = [];
-    let actual = [];
-    let errMsg = "";
+    // $ne AND a supported predicate on the same path -> lowered.
+    runNotTest({x: {$ne: 42, $gt: 0}}, [{n: 1}]);
 
-    actual = coll_filters.find({x: {$ne: null}}, {_id: 1}).toArray();
-    expected = [{_id: 0}, {_id: 1}, {_id: 4}, {_id: 5}];
-    errMsg = "SupportedMatchExpressions: $ne";
-    assert(resultsEq(actual, expected),
-           `actual=${tojson(actual)}, expected=${tojson(expected)}${errMsg}`);
+    // AND of multiple $not and a supported predicate on the same path -> lowered.
+    runNotTest({x: {$ne: 42, $not: {$eq: 2}, $exists: true}}, [{n: 2}, {n: 4}, {n: 5}, {n: 7}]);
 
-    actual = coll_filters.find({x: {$not: {$eq: null}}}, {_id: 1}).toArray();
-    expected = [{_id: 0}, {_id: 1}, {_id: 4}, {_id: 5}];
-    errMsg = "SupportedMatchExpressions: $not + $eq";
-    assert(resultsEq(actual, expected),
-           `actual=${tojson(actual)}, expected=${tojson(expected)}${errMsg}`);
+    // $ne AND a supported predicate AND an unsupported predicate -> lowered.
+    runNotTest({x: {$ne: 42, $in: [2, 42, null], $exists: true}}, [{n: 1}, {n: 2}]);
+
+    // A supported predicate on a _different_ path -> not lowered.
+    runNotTest({x: {$ne: 42}, n: {$lt: 100}},
+               [{n: 1}, {n: 2}, {n: 3}, {n: 4}, {n: 5}, {n: 7}]);  // if lowered, would skip n:3
+
+    // $ne AND an unsupported predicate -> not lowered.
+    runNotTest({x: {$ne: 42, $in: [2, 42, null]}},
+               [{n: 1}, {n: 2}, {n: 3}]);  // if lowered, would skip n:3
+
+    // $not OF an unsupported predicate -> not lowered.
+    runNotTest({x: {$not: {$eq: {foo: 0}}, $exists: true}},
+               [{n: 0}, {n: 1}, {n: 2}, {n: 4}, {n: 6}, {n: 7}]);  // if lowered would return n:5
+
+    // $not OF $and -> curretnly not lowered (would require supporting OR on the same path).
+    runNotTest({x: {$not: {$gt: 5, $lt: 50}, $exists: true}},
+               [{n: 1}, {n: 2}, {n: 4}, {n: 5}, {n: 7}]);  // if lowered would hit 6733605
+
+    // $not of $not -> currently not lowered (to simplify the implementation of $not lowering).
+    runNotTest({x: {$not: {$ne: 42}, $exists: true}},
+               [{n: 0}, {n: 6}]);  // if lowered would also return n:5, n:6
+
+    // $not OF a supported predicate -> lowered.
+    runNotTest({x: {$not: {$gt: 5}, $exists: true}}, [{n: 1}, {n: 2}, {n: 4}, {n: 5}, {n: 7}]);
+
+    // Two paths with $not AND-ed with supported predicates -> both are lowered.
+    runNotTest({x: {$not: {$gt: 5}, $exists: true}, n: {$ne: 5, $lt: 10}},
+               [{n: 1}, {n: 2}, {n: 4}, {n: 7}]);
+
+    // Two paths with $not, but only one is AND-ed with a supported predicate.
+    runNotTest({x: {$not: {$gt: 5}}, n: {$ne: 5, $lt: 10}},
+               [{n: 1}, {n: 2}, {n: 3}, {n: 4}, {n: 7}]);  // if "x" is lowered would skip n:3
+
+    // $not of $type -> lowered
+    runNotTest({x: {$not: {$type: "object"}, $exists: true}},
+               [{n: 0}, {n: 1}, {n: 2}, {n: 4}, {n: 6}, {n: 7}]);
+
+    // $not of $exists (result will be empty when combined with any supported predicate) -> lowered.
+    runNotTest({x: {$not: {$exists: "true"}, $exists: true}}, []);
 })();
 
 function testInExpr(test) {

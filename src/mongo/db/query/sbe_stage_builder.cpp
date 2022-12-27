@@ -681,6 +681,7 @@ std::unique_ptr<sbe::EExpression> generatePerColumnPredicate(StageBuilderState& 
                 makeConstant(sbe::value::TypeTags::NumberInt64,
                              sbe::value::bitcastFrom<int64_t>(ts.getBSONTypeMask())));
         }
+
         default:
             uasserted(6733605,
                       std::string("Expression ") + me->serialize().toString() +
@@ -694,15 +695,33 @@ std::unique_ptr<sbe::EExpression> generateLeafExpr(StageBuilderState& state,
                                                    sbe::FrameId lambdaFrameId,
                                                    sbe::value::SlotId inputSlot) {
     auto lambdaParam = makeVariable(lambdaFrameId, 0);
-
-    auto lambdaExpr = sbe::makeE<sbe::ELocalLambda>(
-        lambdaFrameId, generatePerColumnPredicate(state, me, std::move(lambdaParam)));
-
     const MatchExpression::MatchType mt = me->matchType();
-    auto traverserName = (mt == MatchExpression::EXISTS || mt == MatchExpression::TYPE_OPERATOR)
-        ? "traverseCsiCellTypes"
-        : "traverseCsiCellValues";
-    return makeFunction(traverserName, makeVariable(inputSlot), std::move(lambdaExpr));
+
+    if (mt == MatchExpression::NOT) {
+        // NOT cannot be pushed into the cell traversal because for arrays, it should behave as
+        // conjunction of negated child predicate on each element of the aray, but if we pushed it
+        // into the traversal it would become a disjunction.
+        const auto& notMe = checked_cast<const NotMatchExpression*>(me);
+        uassert(7040601, "Should have exactly one child under $not", notMe->numChildren() == 1);
+        const auto child = notMe->getChild(0);
+        auto lambdaExpr = sbe::makeE<sbe::ELocalLambda>(
+            lambdaFrameId, generatePerColumnPredicate(state, child, std::move(lambdaParam)));
+
+        const MatchExpression::MatchType mtChild = child->matchType();
+        auto traverserName =
+            (mtChild == MatchExpression::EXISTS || mtChild == MatchExpression::TYPE_OPERATOR)
+            ? "traverseCsiCellTypes"
+            : "traverseCsiCellValues";
+        return makeNot(makeFunction(traverserName, makeVariable(inputSlot), std::move(lambdaExpr)));
+    } else {
+        auto lambdaExpr = sbe::makeE<sbe::ELocalLambda>(
+            lambdaFrameId, generatePerColumnPredicate(state, me, std::move(lambdaParam)));
+
+        auto traverserName = (mt == MatchExpression::EXISTS || mt == MatchExpression::TYPE_OPERATOR)
+            ? "traverseCsiCellTypes"
+            : "traverseCsiCellValues";
+        return makeFunction(traverserName, makeVariable(inputSlot), std::move(lambdaExpr));
+    }
 }
 
 std::unique_ptr<sbe::EExpression> generatePerColumnLogicalAndExpr(StageBuilderState& state,
