@@ -32,7 +32,6 @@
 
 namespace mongo::crypto {
 
-// TODO: SERVER-68518, remove or implement this class
 StatusWith<std::unique_ptr<JWSValidator>> JWSValidator::create(StringData algorithm,
                                                                const BSONObj& key) {
     return {ErrorCodes::OperationFailed, "Signature Verification Not Available"};
