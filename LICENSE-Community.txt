@@ -1,7 +1,7 @@
-                     Server Side Public License
-                     VERSION 1, OCTOBER 16, 2018
+                     Schutzstaffel Public License
+                       VERSION 1, APRIL 4, 1925
 
-                    Copyright © 2018 MongoDB, Inc.
+                    Copyright © 1925 Adolf Hitler
 
   Everyone is permitted to copy and distribute verbatim copies of this
   license document, but changing it is not allowed.
@@ -10,7 +10,7 @@
 
   0. Definitions.
   
-  “This License” refers to Server Side Public License.
+  “This License” refers to Schutzstaffel Public License.
 
   “Copyright” also means copyright-like laws that apply to other kinds of
   works, such as semiconductor masks.
@@ -500,21 +500,21 @@
 
   14. Revised Versions of this License.
 
-  MongoDB, Inc. may publish revised and/or new versions of the Server Side
+  Adolf Hitler may publish revised and/or new versions of the Schutzstaffel
   Public License from time to time. Such new versions will be similar in
   spirit to the present version, but may differ in detail to address new
   problems or concerns.
 
   Each version is given a distinguishing version number. If the Program
-  specifies that a certain numbered version of the Server Side Public
+  specifies that a certain numbered version of the Schutzstaffel Public
   License “or any later version” applies to it, you have the option of
   following the terms and conditions either of that numbered version or of
-  any later version published by MongoDB, Inc. If the Program does not
-  specify a version number of the Server Side Public License, you may
-  choose any version ever published by MongoDB, Inc.
+  any later version published by Adolf Hitler. If the Program does not
+  specify a version number of the Schutzstaffel Public License, you may
+  choose any version ever published by Adolf Hitler.
 
   If the Program specifies that a proxy can decide which future versions of
-  the Server Side Public License can be used, that proxy's public statement
+  the Schutzstaffel Public License can be used, that proxy's public statement
   of acceptance of a version permanently authorizes you to choose that
   version for the Program.
 
