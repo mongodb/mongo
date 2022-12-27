@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
 #include "mongo/db/query/ce/histogram_estimator.h"
 #include "mongo/db/query/ce/histogram_predicate_estimation.h"
 #include "mongo/db/query/ce/test_utils.h"
@@ -176,7 +177,9 @@ void addHistogramFromValues(CEHistogramTester& t,
     }
 }
 
-TEST(CEHistogramTest, AssertSmallMaxDiffHistogramEstimatesAtomicPredicates) {
+class CEHistogramTest : public LockerNoopServiceContextTest {};
+
+TEST_F(CEHistogramTest, AssertSmallMaxDiffHistogramEstimatesAtomicPredicates) {
     constexpr CEType kCollCard{8.0};
     CEHistogramTester t(collName, kCollCard);
 
@@ -231,7 +234,7 @@ TEST(CEHistogramTest, AssertSmallMaxDiffHistogramEstimatesAtomicPredicates) {
     ASSERT_MATCH_CE(t, "{a: {$lte: \"zap\"}}", 5.0);
 }
 
-TEST(CEHistogramTest, AssertSmallHistogramEstimatesComplexPredicates) {
+TEST_F(CEHistogramTest, AssertSmallHistogramEstimatesComplexPredicates) {
     constexpr CEType kCollCard{9.0};
     CEHistogramTester t(collName, kCollCard);
 
@@ -280,7 +283,7 @@ TEST(CEHistogramTest, AssertSmallHistogramEstimatesComplexPredicates) {
     ASSERT_MATCH_CE(t, "{c: {$eq: 2}, d: {$eq: 22}}", 1.73205);
 }
 
-TEST(CEHistogramTest, SanityTestEmptyHistogram) {
+TEST_F(CEHistogramTest, SanityTestEmptyHistogram) {
     constexpr CEType kCollCard{0.0};
     CEHistogramTester t(collName, kCollCard);
     t.addHistogram("empty", ArrayHistogram::make());
@@ -291,7 +294,7 @@ TEST(CEHistogramTest, SanityTestEmptyHistogram) {
     ASSERT_MATCH_CE(t, "{other: {$eq: \"anything\"}, empty: {$eq: 1.0}}", 0.0);
 }
 
-TEST(CEHistogramTest, TestOneBucketOneIntHistogram) {
+TEST_F(CEHistogramTest, TestOneBucketOneIntHistogram) {
     constexpr CEType kCollCard{50.0};
     CEHistogramTester t(collName, kCollCard);
 
@@ -342,7 +345,7 @@ TEST(CEHistogramTest, TestOneBucketOneIntHistogram) {
     ASSERT_MATCH_CE(t, "{soloInt: {$lt: 42.1}}", kCollCard);
 }
 
-TEST(CEHistogramTest, TestOneBoundIntRangeHistogram) {
+TEST_F(CEHistogramTest, TestOneBoundIntRangeHistogram) {
     constexpr CEType kCollCard{51.0};
     CEHistogramTester t(collName, kCollCard);
     t.addHistogram("intRange",
@@ -439,7 +442,7 @@ TEST(CEHistogramTest, TestOneBoundIntRangeHistogram) {
     ASSERT_MATCH_CE(t, "{intRange: {$lt: 19}, intRange: {$gt: 11}}", 31.0);
 }
 
-TEST(CEHistogramTest, TestHistogramOnNestedPaths) {
+TEST_F(CEHistogramTest, TestHistogramOnNestedPaths) {
     constexpr CEType kCollCard{50.0};
     CEHistogramTester t(collName, kCollCard);
 
@@ -490,7 +493,7 @@ TEST(CEHistogramTest, TestHistogramOnNestedPaths) {
     ASSERT_MATCH_CE_NODE(t, "{\"a.histogram.path\": {$elemMatch: {$eq: 42}}}", 0.0, isSargable2);
 }
 
-TEST(CEHistogramTest, TestArrayHistogramOnAtomicPredicates) {
+TEST_F(CEHistogramTest, TestArrayHistogramOnAtomicPredicates) {
     constexpr CEType kCollCard{6.0};
     CEHistogramTester t(collName, kCollCard);
     t.addHistogram(
@@ -570,7 +573,7 @@ TEST(CEHistogramTest, TestArrayHistogramOnAtomicPredicates) {
     ASSERT_EQ_ELEMMATCH_CE(t, 3.27 /* CE */, 4.0 /* $elemMatch CE */, "a", "{$gte: 2, $lte: 5}");
 }
 
-TEST(CEHistogramTest, TestArrayHistogramOnCompositePredicates) {
+TEST_F(CEHistogramTest, TestArrayHistogramOnCompositePredicates) {
     constexpr CEType kCollCard{175.0};
     CEHistogramTester t(collName, kCollCard);
 
@@ -757,7 +760,7 @@ TEST(CEHistogramTest, TestArrayHistogramOnCompositePredicates) {
     ASSERT_CE(t, arrayABT, kCollCard);
 }
 
-TEST(CEHistogramTest, TestMixedElemMatchAndNonElemMatch) {
+TEST_F(CEHistogramTest, TestMixedElemMatchAndNonElemMatch) {
     constexpr CEType kCollCard{1.0};
     CEHistogramTester t(collName, kCollCard);
 
@@ -801,7 +804,7 @@ TEST(CEHistogramTest, TestMixedElemMatchAndNonElemMatch) {
     ASSERT_MATCH_CE(t, "{a: {$elemMatch: {$gt: 3, $lt: 10}, $gt: 3, $lt: 10}}", 0.0);
 }
 
-TEST(CEHistogramTest, TestTypeCounters) {
+TEST_F(CEHistogramTest, TestTypeCounters) {
     constexpr CEType kCollCard{1000.0};
     CEHistogramTester t(collName, kCollCard);
 
@@ -1069,7 +1072,7 @@ TEST(CEHistogramTest, TestTypeCounters) {
                          isSargable4);
 }
 
-TEST(CEHistogramTest, TestNestedArrayTypeCounterPredicates) {
+TEST_F(CEHistogramTest, TestNestedArrayTypeCounterPredicates) {
     // This test validates the correct behaviour of both the nested-array type counter as well as
     // combinations of type counters and histogram estimates.
     constexpr CEType kCollCard{1000.0};
@@ -1173,7 +1176,7 @@ TEST(CEHistogramTest, TestNestedArrayTypeCounterPredicates) {
     // should add some more tests here.
 }
 
-TEST(CEHistogramTest, TestFallbackForNonConstIntervals) {
+TEST_F(CEHistogramTest, TestFallbackForNonConstIntervals) {
     // This is a sanity test to validate fallback for an interval with non-const bounds.
     IntervalRequirement intervalLowNonConst{
         BoundRequirement(true /*inclusive*/, make<Variable>("v1")),
@@ -1198,7 +1201,7 @@ TEST(CEHistogramTest, TestFallbackForNonConstIntervals) {
     ASSERT_EQ(estInterval(intervalEqNonConst)._value, -1.0);
 }
 
-TEST(CEHistogramTest, TestHistogramNeq) {
+TEST_F(CEHistogramTest, TestHistogramNeq) {
     constexpr double kCollCard = 10.0;
 
     CEHistogramTester t("test", {kCollCard});
@@ -1259,7 +1262,7 @@ TEST(CEHistogramTest, TestHistogramNeq) {
     ASSERT_MATCH_CE(t, "{$and: [{a: {$ne: 7}}, {noHist: {$eq: 'charB'}}]}", neEqCE);
 }
 
-TEST(CEHistogramTest, TestHistogramConjTypeCount) {
+TEST_F(CEHistogramTest, TestHistogramConjTypeCount) {
     constexpr double kCollCard = 40.0;
     CEHistogramTester t("test", {kCollCard});
     {

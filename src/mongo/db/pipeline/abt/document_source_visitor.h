@@ -29,11 +29,33 @@
 
 #pragma once
 
+#include "mongo/db/pipeline/abt/algebrizer_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/visitors/document_source_visitor_registry.h"
 #include "mongo/db/query/optimizer/node.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
 
 namespace mongo::optimizer {
+
+struct ABTDocumentSourceTranslationVisitorContext : public DocumentSourceVisitorContextBase {
+    ABTDocumentSourceTranslationVisitorContext(AlgebrizerContext& ctx, const Metadata& metadata)
+        : algCtx(ctx), metadata(metadata) {}
+
+    // Prevent copying and moving as this object has reference members.
+    ABTDocumentSourceTranslationVisitorContext(const ABTDocumentSourceTranslationVisitorContext&) =
+        delete;
+    ABTDocumentSourceTranslationVisitorContext& operator=(
+        const ABTDocumentSourceTranslationVisitorContext&) = delete;
+    ABTDocumentSourceTranslationVisitorContext(ABTDocumentSourceTranslationVisitorContext&&) =
+        delete;
+    ABTDocumentSourceTranslationVisitorContext& operator=(
+        ABTDocumentSourceTranslationVisitorContext&&) = delete;
+
+    void pushLimitSkip(int64_t limit, int64_t skip);
+
+    AlgebrizerContext& algCtx;
+    const Metadata& metadata;
+};
 
 ABT translatePipelineToABT(const Metadata& metadata,
                            const Pipeline& pipeline,

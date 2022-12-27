@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/pipeline/abt/document_source_visitor.h"
 #include "mongo/db/pipeline/visitors/document_source_visitor_registry_mongos.h"
 #include "mongo/db/query/cqf_command_utils.h"
 #include "mongo/db/service_context.h"
@@ -41,6 +42,16 @@ void visit(ABTUnsupportedDocumentSourceVisitorContext* ctx, const DocumentSource
 const ServiceContext::ConstructorActionRegisterer abtUnsupportedRegisterer{
     "ABTUnsupportedRegistererMongoS", [](ServiceContext* service) {
         registerMongosVisitor<ABTUnsupportedDocumentSourceVisitorContext>(service);
+    }};
+
+void visit(ABTDocumentSourceTranslationVisitorContext* ctx, const DocumentSourceMergeCursors&) {
+    uasserted(ErrorCodes::InternalErrorNotSupported,
+              "DocumentSourceMergeCursors is not supported in CQF");
+}
+
+const ServiceContext::ConstructorActionRegisterer abtTranslationRegisterer{
+    "ABTTranslationRegistererMongoS", [](ServiceContext* service) {
+        registerMongosVisitor<ABTDocumentSourceTranslationVisitorContext>(service);
     }};
 
 }  // namespace mongo::optimizer

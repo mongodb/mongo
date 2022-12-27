@@ -347,9 +347,9 @@ TEST_F(NodeSBE, Lower1) {
     auto prefixId = PrefixId::createForTests();
     Metadata metadata{{}};
 
-    OperationContextNoop noop;
-    auto pipeline =
-        parsePipeline("[{$project:{'a.b.c.d':{$literal:'abc'}}}]", NamespaceString("test"), &noop);
+    auto opCtx = makeOperationContext();
+    auto pipeline = parsePipeline(
+        "[{$project:{'a.b.c.d':{$literal:'abc'}}}]", NamespaceString("test"), opCtx.get());
 
     const auto [tag, val] = sbe::value::makeNewArray();
     {
@@ -401,8 +401,6 @@ TEST_F(NodeSBE, Lower1) {
     auto sbePlan = g.optimize(tree);
     ASSERT_EQ(1, map.size());
     ASSERT_FALSE(ridSlot);
-
-    auto opCtx = makeOperationContext();
 
     sbe::CompileCtx ctx(std::make_unique<sbe::RuntimeEnvironment>());
     sbePlan->prepare(ctx);
@@ -590,8 +588,8 @@ TEST_F(NodeSBE, RequireRID) {
     auto prefixId = PrefixId::createForTests();
     Metadata metadata{{}};
 
-    OperationContextNoop noop;
-    auto pipeline = parsePipeline("[{$match: {a: 2}}]", NamespaceString("test"), &noop);
+    auto opCtx = makeOperationContext();
+    auto pipeline = parsePipeline("[{$match: {a: 2}}]", NamespaceString("test"), opCtx.get());
 
     const ProjectionName scanProjName = prefixId.getNextId("scan");
 
@@ -650,8 +648,6 @@ TEST_F(NodeSBE, RequireRID) {
     auto sbePlan = g.optimize(tree);
     ASSERT_EQ(1, map.size());
     ASSERT_TRUE(ridSlot);
-
-    auto opCtx = makeOperationContext();
 
     sbe::CompileCtx ctx(std::make_unique<sbe::RuntimeEnvironment>());
     sbePlan->prepare(ctx);

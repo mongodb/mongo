@@ -249,6 +249,7 @@ env.Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/auth/authmocks",
+        "$BUILD_DIR/mongo/db/pipeline/abt_translation",
         "$BUILD_DIR/mongo/db/query/optimizer/unit_test_utils",
         '$BUILD_DIR/mongo/db/query/query_test_service_context',
         '$BUILD_DIR/mongo/db/query_exec',

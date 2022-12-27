@@ -45,7 +45,7 @@ unittest::TempDir tempDir("ABTPipelineTest");
 std::unique_ptr<mongo::Pipeline, mongo::PipelineDeleter> parsePipeline(
     const NamespaceString& nss,
     const std::string& inputPipeline,
-    OperationContextNoop& opCtx,
+    OperationContext& opCtx,
     const std::vector<ExpressionContext::ResolvedNamespace>& involvedNss) {
     const BSONObj inputBson = fromjson("{pipeline: " + inputPipeline + "}");
 
@@ -75,9 +75,9 @@ ABT translatePipeline(const Metadata& metadata,
                       std::string scanDefName,
                       PrefixId& prefixId,
                       const std::vector<ExpressionContext::ResolvedNamespace>& involvedNss) {
-    OperationContextNoop opCtx;
+    auto opCtx = cc().makeOperationContext();
     auto pipeline =
-        parsePipeline(NamespaceString("a." + scanDefName), pipelineStr, opCtx, involvedNss);
+        parsePipeline(NamespaceString("a." + scanDefName), pipelineStr, *opCtx, involvedNss);
     return translatePipelineToABT(metadata,
                                   *pipeline.get(),
                                   scanProjName,

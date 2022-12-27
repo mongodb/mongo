@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
 #include "mongo/db/query/ce/benchmark_utils.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/db/query/stats/max_diff.h"
@@ -137,7 +138,7 @@ void generateHistorgrams(const BenchmarkDescriptor& descriptor,
  * A test fixture for CE benchmaarks. It provides a common 'setUp' hook to be invoked before each
  * benchmark, as well as a 'runBenchmarks' driver to be used in each TEST_F.
  */
-class CEBenchmarkTest : public unittest::Test {
+class CEBenchmarkTest : public LockerNoopServiceContextTest {
 protected:
     /**
      * Given a 'benchmarkName' name (which corresponds to a test name specified in a TEST_F

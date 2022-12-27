@@ -126,7 +126,6 @@
 #include "mongo/db/pipeline/document_source_telemetry.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
-#include "mongo/db/pipeline/visitors/document_source_visitor.h"
 #include "mongo/db/pipeline/visitors/document_source_visitor_registry_mongod.h"
 #include "mongo/db/pipeline/visitors/document_source_walker.h"
 #include "mongo/db/pipeline/visitors/transformer_interface_walker.h"

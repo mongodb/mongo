@@ -35,8 +35,8 @@
 #include "mongo/db/query/optimizer/metadata_factory.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/golden_test.h"
-
 
 namespace mongo::optimizer {
 
@@ -50,7 +50,7 @@ ABT translatePipeline(const Metadata& metadata,
 /**
  * Fixture for ABT tests which use the golden testing infrastructure.
  */
-class ABTGoldenTestFixture : public unittest::Test {
+class ABTGoldenTestFixture : public ServiceContextTest {
 public:
     static constexpr StringData kConfigPath = "src/mongo/db/test_output/pipeline/abt"_sd;
 

@@ -109,6 +109,14 @@ template <typename T>
 void registerMongodVisitor(ServiceContext* service) {
     auto& registry = getDocumentSourceVisitorRegistry(service);
     registerVisitFuncs<T,
+                       // These document sources are defined in the 'query_exec' library, so having
+                       // them here causes a circular dependency. We should ideally factor them out
+                       // into their own library (or as part of libpipeline) but this requires a
+                       // large refactor of the 'query_exec' library.
+                       // It should be safe to ignore these for now as the only user of the visitor
+                       // is CQF, which won't encounter these DocumentSources.
+                       // DocumentSourceCursor,
+                       // DocumentSourceGeoNearCursor,
                        DocumentSourceBucketAuto,
                        DocumentSourceChangeStreamAddPostImage,
                        DocumentSourceChangeStreamAddPreImage,
@@ -120,12 +128,10 @@ void registerMongodVisitor(ServiceContext* service) {
                        DocumentSourceChangeStreamUnwindTransaction,
                        DocumentSourceCollStats,
                        DocumentSourceCurrentOp,
-                       DocumentSourceCursor,
                        DocumentSourceExchange,
                        DocumentSourceFacet,
                        DocumentSourceFindAndModifyImageLookup,
                        DocumentSourceGeoNear,
-                       DocumentSourceGeoNearCursor,
                        DocumentSourceGraphLookUp,
                        DocumentSourceGroup,
                        DocumentSourceIndexStats,

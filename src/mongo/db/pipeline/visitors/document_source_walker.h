@@ -31,31 +31,9 @@
 
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/db/pipeline/visitors/document_source_visitor.h"
 #include "mongo/db/pipeline/visitors/document_source_visitor_registry.h"
 
 namespace mongo {
-
-/**
- * DEPRECATED: Use 'DocumentSourceWalker' instead.
- * A document source walker.
- * TODO SERVER-71943: Delete this class.
- */
-class DocumentSourceWalkerLegacy final {
-public:
-    DocumentSourceWalkerLegacy(DocumentSourceConstVisitor* preVisitor,
-                               DocumentSourceConstVisitor* postVisitor)
-        : _preVisitor{preVisitor}, _postVisitor{postVisitor} {}
-
-    void walk(const Pipeline& pipeline);
-
-private:
-    template <class T>
-    bool visitHelper(const DocumentSource* source);
-
-    DocumentSourceConstVisitor* _preVisitor;
-    DocumentSourceConstVisitor* _postVisitor;
-};
 
 /**
  * A walker over a DocumentSource pipeline. See the DocumentSourceVisitorRegistry header for details

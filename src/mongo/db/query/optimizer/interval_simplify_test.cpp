@@ -30,6 +30,7 @@
 #include <string>
 #include <vector>
 
+#include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/metadata_factory.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
@@ -67,7 +68,9 @@ ABT optimizedQueryPlan(const std::string& query,
     return optimized;
 }
 
-TEST(IntervalIntersection, SingleFieldIntersection) {
+class IntervalIntersection : public LockerNoopServiceContextTest {};
+
+TEST_F(IntervalIntersection, SingleFieldIntersection) {
     opt::unordered_map<std::string, IndexDefinition> testIndex = {
         {"index1", makeIndexDefinition("a0", CollationOp::Ascending, /*Not multikey*/ false)}};
 
@@ -256,7 +259,7 @@ TEST(IntervalIntersection, SingleFieldIntersection) {
         optimizedQueryPlan(q7Text, testIndex));
 }
 
-TEST(IntervalIntersection, MultiFieldIntersection) {
+TEST_F(IntervalIntersection, MultiFieldIntersection) {
     std::vector<TestIndexField> indexFields{{"a0", CollationOp::Ascending, false},
                                             {"b0", CollationOp::Ascending, false}};
 
@@ -341,7 +344,7 @@ TEST(IntervalIntersection, MultiFieldIntersection) {
         optimizedQueryPlan(q4Text, testIndex));
 }
 
-TEST(IntervalIntersection, VariableIntervals1) {
+TEST_F(IntervalIntersection, VariableIntervals1) {
     auto interval = _disj(
         _conj(_interval(_incl("v1"_var), _plusInf()), _interval(_excl("v2"_var), _plusInf())));
 
@@ -368,7 +371,7 @@ TEST(IntervalIntersection, VariableIntervals1) {
     ASSERT_TRUE(*result == *result1);
 }
 
-TEST(IntervalIntersection, VariableIntervals2) {
+TEST_F(IntervalIntersection, VariableIntervals2) {
     auto interval = _disj(_conj(_interval(_incl("v1"_var), _incl("v3"_var)),
                                 _interval(_incl("v2"_var), _incl("v4"_var))));
 
@@ -391,7 +394,7 @@ TEST(IntervalIntersection, VariableIntervals2) {
     ASSERT_TRUE(*result == *result1);
 }
 
-TEST(IntervalIntersection, VariableIntervals3) {
+TEST_F(IntervalIntersection, VariableIntervals3) {
     auto interval = _disj(_conj(_interval(_excl("v1"_var), _incl("v3"_var)),
                                 _interval(_incl("v2"_var), _incl("v4"_var))));
 
@@ -421,7 +424,7 @@ TEST(IntervalIntersection, VariableIntervals3) {
     ASSERT_TRUE(*result == *result1);
 }
 
-TEST(IntervalIntersection, VariableIntervals4) {
+TEST_F(IntervalIntersection, VariableIntervals4) {
     auto interval = _disj(_conj(_interval(_excl("v1"_var), _incl("v3"_var)),
                                 _interval(_incl("v2"_var), _excl("v4"_var))));
 
@@ -749,7 +752,7 @@ void testIntervalFuzz(const uint64_t seed, PseudoRandom& threadLocalRNG) {
 static constexpr int bitsetSize = 10;
 static const size_t numThreads = ProcessInfo::getNumCores();
 
-TEST(IntervalIntersection, IntervalPermutations) {
+TEST_F(IntervalIntersection, IntervalPermutations) {
     static constexpr int numPermutations =
         bitsetSize * bitsetSize * bitsetSize * bitsetSize * 2 * 2 * 2 * 2;
     /**
@@ -783,7 +786,7 @@ TEST(IntervalIntersection, IntervalPermutations) {
     std::cout << "...done. Took: " << elapsed << " s.\n";
 }
 
-TEST(IntervalIntersection, IntervalFuzz) {
+TEST_F(IntervalIntersection, IntervalFuzz) {
     static constexpr int numFuzzTests = 5000;
     /**
      * Generate random intervals with a mix of variables and constants, and test that they intersect

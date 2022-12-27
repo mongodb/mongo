@@ -73,6 +73,7 @@
 #include "mongo/db/pipeline/document_source_telemetry.h"
 #include "mongo/db/pipeline/document_source_union_with.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
+#include "mongo/db/pipeline/visitors/document_source_visitor_registry_mongod.h"
 #include "mongo/db/pipeline/visitors/document_source_walker.h"
 #include "mongo/db/pipeline/visitors/transformer_interface_walker.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
@@ -80,575 +81,465 @@
 
 namespace mongo::optimizer {
 
-class ABTDocumentSourceVisitor : public DocumentSourceConstVisitor {
-public:
-    ABTDocumentSourceVisitor(AlgebrizerContext& ctx, const Metadata& metadata)
-        : _ctx(ctx), _metadata(metadata) {}
+void ABTDocumentSourceTranslationVisitorContext::pushLimitSkip(const int64_t limit,
+                                                               const int64_t skip) {
+    auto entry = algCtx.getNode();
+    algCtx.setNode<LimitSkipNode>(std::move(entry._rootProjection),
+                                  properties::LimitSkipRequirement(limit, skip),
+                                  std::move(entry._node));
+}
 
-    void visit(const DocumentSourceBucketAuto* source) override {
-        unsupportedStage(source);
+template <typename T>
+void visit(ABTDocumentSourceTranslationVisitorContext*, const T& source) {
+    uasserted(ErrorCodes::InternalErrorNotSupported,
+              str::stream() << "Stage is not supported: " << source.getSourceName());
+}
+
+void visit(ABTDocumentSourceTranslationVisitorContext* visitorCtx,
+           const DocumentSourceGroup& source) {
+    const StringMap<boost::intrusive_ptr<Expression>>& idFields = source.getIdFields();
+    uassert(6624201, "Empty idFields map", !idFields.empty());
+
+    std::vector<FieldNameType> groupByFieldNames;
+    for (const auto& [fieldName, expr] : idFields) {
+        groupByFieldNames.push_back(FieldNameType{fieldName});
+    }
+    const bool isSingleIdField =
+        groupByFieldNames.size() == 1 && groupByFieldNames.front() == "_id";
+
+    // Sort in order to generate consistent plans.
+    std::sort(groupByFieldNames.begin(), groupByFieldNames.end());
+
+    ProjectionNameVector groupByProjNames;
+    AlgebrizerContext& ctx = visitorCtx->algCtx;
+    auto entry = ctx.getNode();
+    for (const FieldNameType& fieldName : groupByFieldNames) {
+        const ProjectionName groupByProjName = ctx.getNextId("groupByProj");
+        groupByProjNames.push_back(groupByProjName);
+
+        ABT groupByExpr = generateAggExpression(
+            idFields.at(fieldName.value()).get(), entry._rootProjection, ctx.getPrefixId());
+
+        ctx.setNode<EvaluationNode>(
+            entry._rootProjection, groupByProjName, std::move(groupByExpr), std::move(entry._node));
+        entry = ctx.getNode();
     }
 
-    void visit(const DocumentSourceCollStats* source) override {
-        unsupportedStage(source);
-    }
+    // Fields corresponding to each accumulator
+    std::vector<FieldNameType> aggProjFieldNames;
+    // Projection names corresponding to each high-level accumulator ($avg can be broken down
+    // into sum and count.).
+    ProjectionNameVector aggOutputProjNames;
+    // Projection names corresponding to each low-level accumulator (no $avg).
+    ProjectionNameVector aggLowLevelOutputProjNames;
 
-    void visit(const DocumentSourceCurrentOp* source) override {
-        unsupportedStage(source);
-    }
+    ABTVector aggregationProjections;
+    const std::vector<AccumulationStatement>& accumulatedFields = source.getAccumulatedFields();
 
-    void visit(const DocumentSourceCursor* source) override {
-        unsupportedStage(source);
-    }
+    // Used to keep track which $sum and $count projections to use to compute $avg.
+    struct AvgProjNames {
+        ProjectionName _output;
+        ProjectionName _sum;
+        ProjectionName _count;
+    };
+    std::vector<AvgProjNames> avgProjNames;
 
-    void visit(const DocumentSourceExchange* source) override {
-        unsupportedStage(source);
-    }
+    for (const AccumulationStatement& stmt : accumulatedFields) {
+        const FieldNameType fieldName{stmt.fieldName};
+        aggProjFieldNames.push_back(fieldName);
 
-    void visit(const DocumentSourceFacet* source) override {
-        unsupportedStage(source);
-    }
+        ProjectionName aggOutputProjName{ctx.getNextId("field_agg")};
 
-    void visit(const DocumentSourceGeoNear* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourceGeoNearCursor* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourceGraphLookUp* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourceInternalUnpackBucket* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourceGroup* source) override {
-        const StringMap<boost::intrusive_ptr<Expression>>& idFields = source->getIdFields();
-        uassert(6624201, "Empty idFields map", !idFields.empty());
-
-        std::vector<FieldNameType> groupByFieldNames;
-        for (const auto& [fieldName, expr] : idFields) {
-            groupByFieldNames.push_back(FieldNameType{fieldName});
-        }
-        const bool isSingleIdField =
-            groupByFieldNames.size() == 1 && groupByFieldNames.front() == "_id";
-
-        // Sort in order to generate consistent plans.
-        std::sort(groupByFieldNames.begin(), groupByFieldNames.end());
-
-        ProjectionNameVector groupByProjNames;
-        auto entry = _ctx.getNode();
-        for (const FieldNameType& fieldName : groupByFieldNames) {
-            const ProjectionName groupByProjName = _ctx.getNextId("groupByProj");
-            groupByProjNames.push_back(groupByProjName);
-
-            ABT groupByExpr = generateAggExpression(
-                idFields.at(fieldName.value()).get(), entry._rootProjection, _ctx.getPrefixId());
-
-            _ctx.setNode<EvaluationNode>(entry._rootProjection,
-                                         groupByProjName,
-                                         std::move(groupByExpr),
-                                         std::move(entry._node));
-            entry = _ctx.getNode();
-        }
-
-        // Fields corresponding to each accumulator
-        std::vector<FieldNameType> aggProjFieldNames;
-        // Projection names corresponding to each high-level accumulator ($avg can be broken down
-        // into sum and count.).
-        ProjectionNameVector aggOutputProjNames;
-        // Projection names corresponding to each low-level accumulator (no $avg).
-        ProjectionNameVector aggLowLevelOutputProjNames;
-
-        ABTVector aggregationProjections;
-        const std::vector<AccumulationStatement>& accumulatedFields =
-            source->getAccumulatedFields();
-
-        // Used to keep track which $sum and $count projections to use to compute $avg.
-        struct AvgProjNames {
-            ProjectionName _output;
-            ProjectionName _sum;
-            ProjectionName _count;
-        };
-        std::vector<AvgProjNames> avgProjNames;
-
-        for (const AccumulationStatement& stmt : accumulatedFields) {
-            const FieldNameType fieldName{stmt.fieldName};
-            aggProjFieldNames.push_back(fieldName);
-
-            ProjectionName aggOutputProjName{_ctx.getNextId("field_agg")};
-
-            ABT aggInputExpr = generateAggExpression(
-                stmt.expr.argument.get(), entry._rootProjection, _ctx.getPrefixId());
-            if (!aggInputExpr.is<Constant>() && !aggInputExpr.is<Variable>()) {
-                // Generate nodes for complex projections, otherwise inline constants and variables
-                // into the group.
-                const ProjectionName aggInputProjName = _ctx.getNextId("groupByInputProj");
-                _ctx.setNode<EvaluationNode>(entry._rootProjection,
-                                             aggInputProjName,
-                                             std::move(aggInputExpr),
-                                             std::move(entry._node));
-                entry = _ctx.getNode();
-                aggInputExpr = make<Variable>(aggInputProjName);
-            }
-
-            aggOutputProjNames.push_back(aggOutputProjName);
-            if (stmt.makeAccumulator()->getOpName() == "$avg"_sd) {
-                // Express $avg as sum / count.
-                ProjectionName sumProjName{_ctx.getNextId("field_sum_agg")};
-                aggLowLevelOutputProjNames.push_back(sumProjName);
-                ProjectionName countProjName{_ctx.getNextId("field_count_agg")};
-                aggLowLevelOutputProjNames.push_back(countProjName);
-                avgProjNames.emplace_back(AvgProjNames{std::move(aggOutputProjName),
-                                                       std::move(sumProjName),
-                                                       std::move(countProjName)});
-
-                aggregationProjections.emplace_back(
-                    make<FunctionCall>("$sum", makeSeq(aggInputExpr)));
-                aggregationProjections.emplace_back(
-                    make<FunctionCall>("$sum", makeSeq(Constant::int64(1))));
-            } else {
-                aggLowLevelOutputProjNames.push_back(std::move(aggOutputProjName));
-                aggregationProjections.emplace_back(make<FunctionCall>(
-                    stmt.makeAccumulator()->getOpName(), makeSeq(std::move(aggInputExpr))));
-            }
+        ABT aggInputExpr = generateAggExpression(
+            stmt.expr.argument.get(), entry._rootProjection, ctx.getPrefixId());
+        if (!aggInputExpr.is<Constant>() && !aggInputExpr.is<Variable>()) {
+            // Generate nodes for complex projections, otherwise inline constants and variables
+            // into the group.
+            const ProjectionName aggInputProjName = ctx.getNextId("groupByInputProj");
+            ctx.setNode<EvaluationNode>(entry._rootProjection,
+                                        aggInputProjName,
+                                        std::move(aggInputExpr),
+                                        std::move(entry._node));
+            entry = ctx.getNode();
+            aggInputExpr = make<Variable>(aggInputProjName);
         }
 
-        ABT result = make<GroupByNode>(ProjectionNameVector{groupByProjNames},
-                                       aggLowLevelOutputProjNames,
-                                       aggregationProjections,
-                                       std::move(entry._node));
+        aggOutputProjNames.push_back(aggOutputProjName);
+        if (stmt.makeAccumulator()->getOpName() == "$avg"_sd) {
+            // Express $avg as sum / count.
+            ProjectionName sumProjName{ctx.getNextId("field_sum_agg")};
+            aggLowLevelOutputProjNames.push_back(sumProjName);
+            ProjectionName countProjName{ctx.getNextId("field_count_agg")};
+            aggLowLevelOutputProjNames.push_back(countProjName);
+            avgProjNames.emplace_back(AvgProjNames{
+                std::move(aggOutputProjName), std::move(sumProjName), std::move(countProjName)});
 
-        for (auto&& [outputProjName, sumProjName, countProjName] : avgProjNames) {
-            result = make<EvaluationNode>(
-                std::move(outputProjName),
-                make<If>(make<BinaryOp>(
-                             Operations::Gt, make<Variable>(countProjName), Constant::int64(0)),
-                         make<BinaryOp>(Operations::Div,
-                                        make<Variable>(std::move(sumProjName)),
-                                        make<Variable>(countProjName)),
-                         Constant::nothing()),
-                std::move(result));
+            aggregationProjections.emplace_back(make<FunctionCall>("$sum", makeSeq(aggInputExpr)));
+            aggregationProjections.emplace_back(
+                make<FunctionCall>("$sum", makeSeq(Constant::int64(1))));
+        } else {
+            aggLowLevelOutputProjNames.push_back(std::move(aggOutputProjName));
+            aggregationProjections.emplace_back(make<FunctionCall>(
+                stmt.makeAccumulator()->getOpName(), makeSeq(std::move(aggInputExpr))));
         }
+    }
 
-        ABT integrationPath = make<PathIdentity>();
-        for (size_t i = 0; i < groupByFieldNames.size(); i++) {
-            std::string fieldName = groupByFieldNames.at(i).value().toString();
-            if (!isSingleIdField) {
-                // Erase '_id.' prefix.
-                fieldName = fieldName.substr(strlen("_id."));
-            }
+    ABT result = make<GroupByNode>(ProjectionNameVector{groupByProjNames},
+                                   aggLowLevelOutputProjNames,
+                                   aggregationProjections,
+                                   std::move(entry._node));
 
-            maybeComposePath(integrationPath,
-                             make<PathField>(FieldNameType{std::move(fieldName)},
-                                             make<PathConstant>(make<Variable>(
-                                                 std::move(groupByProjNames.at(i))))));
-        }
-        if (!isSingleIdField) {
-            integrationPath = make<PathField>("_id", std::move(integrationPath));
-        }
-
-        for (size_t i = 0; i < aggProjFieldNames.size(); i++) {
-            maybeComposePath(
-                integrationPath,
-                make<PathField>(aggProjFieldNames.at(i),
-                                make<PathConstant>(make<Variable>(aggOutputProjNames.at(i)))));
-        }
-
-        entry = _ctx.getNode();
-        const ProjectionName mergeProject{_ctx.getNextId("agg_project")};
-        _ctx.setNode<EvaluationNode>(
-            mergeProject,
-            mergeProject,
-            make<EvalPath>(std::move(integrationPath), Constant::emptyObject()),
+    for (auto&& [outputProjName, sumProjName, countProjName] : avgProjNames) {
+        result = make<EvaluationNode>(
+            std::move(outputProjName),
+            make<If>(
+                make<BinaryOp>(Operations::Gt, make<Variable>(countProjName), Constant::int64(0)),
+                make<BinaryOp>(Operations::Div,
+                               make<Variable>(std::move(sumProjName)),
+                               make<Variable>(countProjName)),
+                Constant::nothing()),
             std::move(result));
     }
 
-    void visit(const DocumentSourceIndexStats* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourceInternalInhibitOptimization* source) override {
-        // Can be ignored.
-    }
-
-    void visit(const DocumentSourceInternalShardFilter* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourceInternalSplitPipeline* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourceLimit* source) override {
-        pushLimitSkip(source->getLimit(), 0);
-    }
-
-    void visit(const DocumentSourceListCachedAndActiveUsers* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourceListLocalSessions* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourceListSessions* source) override {
-        unsupportedStage(source);
-    }
-
-    void visit(const DocumentSourceLookUp* source) override {
-        // This is an **experimental** implementation of $lookup. To achieve fully compatible
-        // implementation we need the following:
-        //   1. Check and potentially fix array to array comparison.
-        //   2. Add ability to generate unique values (sequential or otherwise) in order to
-        //   eliminate reliance of _id. This can be achieved for example via a stateful function.
-        //   Currently, after joining the unwound elements, we perform a de-duplication based on _id
-        //   to determine which corresponding documents match.
-
-        uassert(6624303, "$lookup needs to be SBE compatible", source->sbeCompatible());
-
-        std::string scanDefName = source->getFromNs().coll().toString();
-        const ProjectionName& scanProjName = _ctx.getNextId("scan");
-
-        ABT pipelineABT = _metadata._scanDefs.at(scanDefName).exists()
-            ? make<ScanNode>(scanProjName, scanDefName)
-            : make<ValueScanNode>(ProjectionNameVector{scanProjName},
-                                  createInitialScanProps(scanProjName, scanDefName));
-
-        const ProjectionName& localIdProjName = _ctx.getNextId("localId");
-        auto entry = _ctx.getNode();
-        _ctx.setNode<EvaluationNode>(entry._rootProjection,
-                                     localIdProjName,
-                                     make<EvalPath>(make<PathGet>("_id", make<PathIdentity>()),
-                                                    make<Variable>(entry._rootProjection)),
-                                     std::move(entry._node));
-
-        const auto& localPath = source->getLocalField();
-        ABT localPathGet = translateFieldPath(
-            *localPath,
-            make<PathIdentity>(),
-            [](FieldNameType fieldName, const bool isLastElement, ABT input) {
-                return make<PathGet>(
-                    std::move(fieldName),
-                    isLastElement ? std::move(input)
-                                  : make<PathTraverse>(PathTraverse::kUnlimited, std::move(input)));
-            });
-
-        auto localPathProjName = _ctx.getNextId("localPath");
-        entry = _ctx.getNode();
-        _ctx.setNode<EvaluationNode>(
-            entry._rootProjection,
-            localPathProjName,
-            make<EvalPath>(std::move(localPathGet), make<Variable>(entry._rootProjection)),
-            std::move(entry._node));
-
-        auto localProjName = _ctx.getNextId("local");
-        entry = _ctx.getNode();
-        _ctx.setNode<EvaluationNode>(entry._rootProjection,
-                                     localProjName,
-                                     make<BinaryOp>(Operations::FillEmpty,
-                                                    make<Variable>(std::move(localPathProjName)),
-                                                    Constant::null()),
-                                     std::move(entry._node));
-
-        const auto& foreignPath = source->getForeignField();
-        ABT foreignSimplePath = translateFieldPath(
-            *foreignPath,
-            make<PathCompare>(Operations::EqMember, make<Variable>(localProjName)),
-            [](FieldNameType fieldName, const bool /*isLastElement*/, ABT input) {
-                return make<PathGet>(
-                    std::move(fieldName),
-                    make<PathTraverse>(PathTraverse::kSingleLevel, std::move(input)));
-            });
-
-        // Retain only the top-level get into foreignSimplePath.
-        ABT foreignPathCmp = make<PathIdentity>();
-        std::swap(foreignPathCmp, foreignSimplePath.cast<PathGet>()->getPath());
-
-        ProjectionName foreignProjName = _ctx.getNextId("remotePath");
-        pipelineABT = make<EvaluationNode>(
-            foreignProjName,
-            make<EvalPath>(std::move(foreignSimplePath), make<Variable>(scanProjName)),
-            std::move(pipelineABT));
-
-        entry = _ctx.getNode();
-        _ctx.setNode<BinaryJoinNode>(
-            std::move(entry._rootProjection),
-            JoinType::Left,
-            ProjectionNameSet{},
-            make<EvalFilter>(std::move(foreignPathCmp), make<Variable>(std::move(foreignProjName))),
-            std::move(entry._node),
-            std::move(pipelineABT));
-
-        entry = _ctx.getNode();
-
-        const ProjectionName& localFoldedProjName = _ctx.getNextId("localFolded");
-        const ProjectionName& foreignFoldedProjName = _ctx.getNextId("foreignFolded");
-        ABT groupByFoldNode = make<GroupByNode>(
-            ProjectionNameVector{localIdProjName},
-            ProjectionNameVector{localFoldedProjName, foreignFoldedProjName},
-            makeSeq(make<FunctionCall>("$first", makeSeq(make<Variable>(entry._rootProjection))),
-                    make<FunctionCall>("$push", makeSeq(make<Variable>(scanProjName)))),
-            std::move(entry._node));
-
-        ABT resultPath = translateFieldPath(
-            source->getAsField(),
-            make<PathConstant>(make<Variable>(foreignFoldedProjName)),
-            [](FieldNameType fieldName, const bool isLastElement, ABT input) {
-                if (!isLastElement) {
-                    input = make<PathTraverse>(PathTraverse::kUnlimited, std::move(input));
-                }
-                return make<PathField>(std::move(fieldName), std::move(input));
-            });
-
-        const ProjectionName& resultProjName = _ctx.getNextId("result");
-        _ctx.setNode<EvaluationNode>(
-            resultProjName,
-            resultProjName,
-            make<EvalPath>(std::move(resultPath), make<Variable>(localFoldedProjName)),
-            std::move(groupByFoldNode));
-    }
-
-    void visit(const DocumentSourceMatch* source) override {
-        auto entry = _ctx.getNode();
-        ABT matchExpr = generateMatchExpression(source->getMatchExpression(),
-                                                true /*allowAggExpressions*/,
-                                                entry._rootProjection,
-                                                _ctx.getPrefixId());
-
-        // If we have a top-level composition, flatten it into a chain of separate FilterNodes.
-        const auto& composition =
-            collectComposedBounded(matchExpr, kMaxPathConjunctionDecomposition);
-        for (const auto& path : composition) {
-            _ctx.setNode<FilterNode>(entry._rootProjection,
-                                     make<EvalFilter>(path, make<Variable>(entry._rootProjection)),
-                                     std::move(entry._node));
-            entry = _ctx.getNode();
+    ABT integrationPath = make<PathIdentity>();
+    for (size_t i = 0; i < groupByFieldNames.size(); i++) {
+        std::string fieldName = groupByFieldNames.at(i).value().toString();
+        if (!isSingleIdField) {
+            // Erase '_id.' prefix.
+            fieldName = fieldName.substr(strlen("_id."));
         }
+
+        maybeComposePath(
+            integrationPath,
+            make<PathField>(FieldNameType{std::move(fieldName)},
+                            make<PathConstant>(make<Variable>(std::move(groupByProjNames.at(i))))));
+    }
+    if (!isSingleIdField) {
+        integrationPath = make<PathField>("_id", std::move(integrationPath));
     }
 
-    void visit(const DocumentSourceMerge* source) override {
-        unsupportedStage(source);
+    for (size_t i = 0; i < aggProjFieldNames.size(); i++) {
+        maybeComposePath(
+            integrationPath,
+            make<PathField>(aggProjFieldNames.at(i),
+                            make<PathConstant>(make<Variable>(aggOutputProjNames.at(i)))));
     }
 
-    void visit(const DocumentSourceMergeCursors* source) override {
-        unsupportedStage(source);
-    }
+    entry = ctx.getNode();
+    const ProjectionName mergeProject{ctx.getNextId("agg_project")};
+    ctx.setNode<EvaluationNode>(mergeProject,
+                                mergeProject,
+                                make<EvalPath>(std::move(integrationPath), Constant::emptyObject()),
+                                std::move(result));
+}
 
-    void visit(const DocumentSourceOperationMetrics* source) override {
-        unsupportedStage(source);
-    }
+void visit(ABTDocumentSourceTranslationVisitorContext* visitorCtx,
+           const DocumentSourceLimit& source) {
+    visitorCtx->pushLimitSkip(source.getLimit(), 0);
+}
 
-    void visit(const DocumentSourceOut* source) override {
-        unsupportedStage(source);
-    }
+void visit(ABTDocumentSourceTranslationVisitorContext* visitorCtx,
+           const DocumentSourceLookUp& source) {
+    // This is an **experimental** implementation of $lookup. To achieve fully compatible
+    // implementation we need the following:
+    //   1. Check and potentially fix array to array comparison.
+    //   2. Add ability to generate unique values (sequential or otherwise) in order to
+    //   eliminate reliance of _id. This can be achieved for example via a stateful function.
+    //   Currently, after joining the unwound elements, we perform a de-duplication based on _id
+    //   to determine which corresponding documents match.
 
-    void visit(const DocumentSourcePlanCacheStats* source) override {
-        unsupportedStage(source);
-    }
+    uassert(6624303, "$lookup needs to be SBE compatible", source.sbeCompatible());
 
-    void visit(const DocumentSourceQueue* source) override {
-        unsupportedStage(source);
-    }
+    std::string scanDefName = source.getFromNs().coll().toString();
+    AlgebrizerContext& ctx = visitorCtx->algCtx;
+    const ProjectionName& scanProjName = ctx.getNextId("scan");
 
-    void visit(const DocumentSourceRedact* source) override {
-        unsupportedStage(source);
-    }
+    ABT pipelineABT = visitorCtx->metadata._scanDefs.at(scanDefName).exists()
+        ? make<ScanNode>(scanProjName, scanDefName)
+        : make<ValueScanNode>(ProjectionNameVector{scanProjName},
+                              createInitialScanProps(scanProjName, scanDefName));
 
-    void visit(const DocumentSourceSample* source) override {
-        unsupportedStage(source);
-    }
+    const ProjectionName& localIdProjName = ctx.getNextId("localId");
+    auto entry = ctx.getNode();
+    ctx.setNode<EvaluationNode>(entry._rootProjection,
+                                localIdProjName,
+                                make<EvalPath>(make<PathGet>("_id", make<PathIdentity>()),
+                                               make<Variable>(entry._rootProjection)),
+                                std::move(entry._node));
 
-    void visit(const DocumentSourceSampleFromRandomCursor* source) override {
-        unsupportedStage(source);
-    }
+    const auto& localPath = source.getLocalField();
+    ABT localPathGet = translateFieldPath(
+        *localPath,
+        make<PathIdentity>(),
+        [](FieldNameType fieldName, const bool isLastElement, ABT input) {
+            return make<PathGet>(
+                std::move(fieldName),
+                isLastElement ? std::move(input)
+                              : make<PathTraverse>(PathTraverse::kUnlimited, std::move(input)));
+        });
 
-    void visit(const DocumentSourceSequentialDocumentCache* source) override {
-        unsupportedStage(source);
-    }
+    auto localPathProjName = ctx.getNextId("localPath");
+    entry = ctx.getNode();
+    ctx.setNode<EvaluationNode>(
+        entry._rootProjection,
+        localPathProjName,
+        make<EvalPath>(std::move(localPathGet), make<Variable>(entry._rootProjection)),
+        std::move(entry._node));
 
-    void visit(const DocumentSourceSingleDocumentTransformation* source) override {
-        const ProjectionName& rootProjName = _ctx.getNode()._rootProjection;
-        FieldMapBuilder builder(rootProjName, rootProjName == _ctx.getScanProjName());
-        ABTTransformerVisitor visitor(_ctx, builder);
-        TransformerInterfaceWalker walker(&visitor);
-        walker.walk(&source->getTransformer());
-        visitor.generateCombinedProjection();
-    }
+    auto localProjName = ctx.getNextId("local");
+    entry = ctx.getNode();
+    ctx.setNode<EvaluationNode>(entry._rootProjection,
+                                localProjName,
+                                make<BinaryOp>(Operations::FillEmpty,
+                                               make<Variable>(std::move(localPathProjName)),
+                                               Constant::null()),
+                                std::move(entry._node));
 
-    void visit(const DocumentSourceSkip* source) override {
-        pushLimitSkip(-1, source->getSkip());
-    }
+    const auto& foreignPath = source.getForeignField();
+    ABT foreignSimplePath = translateFieldPath(
+        *foreignPath,
+        make<PathCompare>(Operations::EqMember, make<Variable>(localProjName)),
+        [](FieldNameType fieldName, const bool /*isLastElement*/, ABT input) {
+            return make<PathGet>(std::move(fieldName),
+                                 make<PathTraverse>(PathTraverse::kSingleLevel, std::move(input)));
+        });
 
-    void visit(const DocumentSourceSort* source) override {
-        generateCollationNode(_ctx, source->getSortKeyPattern());
+    // Retain only the top-level get into foreignSimplePath.
+    ABT foreignPathCmp = make<PathIdentity>();
+    std::swap(foreignPathCmp, foreignSimplePath.cast<PathGet>()->getPath());
 
-        if (source->getLimit().has_value()) {
-            // We need to limit the result of the collation.
-            pushLimitSkip(source->getLimit().value(), 0);
-        }
-    }
+    ProjectionName foreignProjName = ctx.getNextId("remotePath");
+    pipelineABT = make<EvaluationNode>(
+        foreignProjName,
+        make<EvalPath>(std::move(foreignSimplePath), make<Variable>(scanProjName)),
+        std::move(pipelineABT));
 
-    void visit(const DocumentSourceTeeConsumer* source) override {
-        unsupportedStage(source);
-    }
+    entry = ctx.getNode();
+    ctx.setNode<BinaryJoinNode>(
+        std::move(entry._rootProjection),
+        JoinType::Left,
+        ProjectionNameSet{},
+        make<EvalFilter>(std::move(foreignPathCmp), make<Variable>(std::move(foreignProjName))),
+        std::move(entry._node),
+        std::move(pipelineABT));
 
-    void visit(const DocumentSourceTelemetry* source) override {
-        unsupportedStage(source);
-    }
+    entry = ctx.getNode();
 
-    void visit(const DocumentSourceUnionWith* source) override {
-        auto entry = _ctx.getNode();
-        ProjectionName unionProjName = entry._rootProjection;
+    const ProjectionName& localFoldedProjName = ctx.getNextId("localFolded");
+    const ProjectionName& foreignFoldedProjName = ctx.getNextId("foreignFolded");
+    ABT groupByFoldNode = make<GroupByNode>(
+        ProjectionNameVector{localIdProjName},
+        ProjectionNameVector{localFoldedProjName, foreignFoldedProjName},
+        makeSeq(make<FunctionCall>("$first", makeSeq(make<Variable>(entry._rootProjection))),
+                make<FunctionCall>("$push", makeSeq(make<Variable>(scanProjName)))),
+        std::move(entry._node));
 
-        const Pipeline& pipeline = source->getPipeline();
-
-        NamespaceString involvedNss = pipeline.getContext()->ns;
-        std::string scanDefName = involvedNss.coll().toString();
-        const ProjectionName& scanProjName = _ctx.getNextId("scan");
-
-        ABT initialNode = _metadata._scanDefs.at(scanDefName).exists()
-            ? make<ScanNode>(scanProjName, scanDefName)
-            : make<ValueScanNode>(ProjectionNameVector{scanProjName},
-                                  createInitialScanProps(scanProjName, scanDefName));
-
-        ABT pipelineABT = translatePipelineToABT(
-            _metadata, pipeline, scanProjName, std::move(initialNode), _ctx.getPrefixId());
-
-        uassert(6624425, "Expected root node for union pipeline", pipelineABT.is<RootNode>());
-        ABT pipelineABTWithoutRoot = pipelineABT.cast<RootNode>()->getChild();
-        // Pull out the root projection(s) from the inner pipeline.
-        const ProjectionNameVector& rootProjections =
-            pipelineABT.cast<RootNode>()->getProperty().getProjections().getVector();
-        uassert(6624426,
-                "Expected a single projection for inner union branch",
-                rootProjections.size() == 1);
-
-        // Add an evaluation node such that it shares a projection with the outer pipeline. If the
-        // same projection name is already defined in the inner pipeline then there's no need for
-        // the extra eval node.
-        const ProjectionName& innerProjection = rootProjections[0];
-        ProjectionName newRootProj = unionProjName;
-        if (innerProjection != unionProjName) {
-            ABT evalNodeInner = make<EvaluationNode>(
-                unionProjName,
-                make<EvalPath>(make<PathIdentity>(), make<Variable>(innerProjection)),
-                std::move(pipelineABTWithoutRoot));
-            _ctx.setNode(
-                std::move(newRootProj),
-                make<UnionNode>(ProjectionNameVector{std::move(unionProjName)},
-                                makeSeq(std::move(entry._node), std::move(evalNodeInner))));
-        } else {
-            _ctx.setNode(std::move(newRootProj),
-                         make<UnionNode>(
-                             ProjectionNameVector{std::move(unionProjName)},
-                             makeSeq(std::move(entry._node), std::move(pipelineABTWithoutRoot))));
-        }
-    }
-
-    void visit(const DocumentSourceUnwind* source) override {
-        const FieldPath& unwindFieldPath = source->getUnwindPath();
-        const bool preserveNullAndEmpty = source->preserveNullAndEmptyArrays();
-
-        const ProjectionName pidProjName{_ctx.getNextId("unwoundPid")};
-        const ProjectionName unwoundProjName{_ctx.getNextId("unwoundProj")};
-
-        const auto generatePidGteZeroTest = [&pidProjName](ABT thenCond, ABT elseCond) {
-            return make<If>(
-                make<BinaryOp>(Operations::Gte, make<Variable>(pidProjName), Constant::int64(0)),
-                std::move(thenCond),
-                std::move(elseCond));
-        };
-
-        ABT embedPath = make<Variable>(unwoundProjName);
-        if (preserveNullAndEmpty) {
-            const ProjectionName unwindLambdaVarName{_ctx.getNextId("unwoundLambdaVarName")};
-            embedPath = make<PathLambda>(make<LambdaAbstraction>(
-                unwindLambdaVarName,
-                generatePidGteZeroTest(std::move(embedPath), make<Variable>(unwindLambdaVarName))));
-        } else {
-            embedPath = make<PathConstant>(std::move(embedPath));
-        }
-        embedPath = translateFieldPath(
-            unwindFieldPath,
-            std::move(embedPath),
-            [](FieldNameType fieldName, const bool isLastElement, ABT input) {
-                return make<PathField>(
-                    std::move(fieldName),
-                    isLastElement ? std::move(input)
-                                  : make<PathTraverse>(PathTraverse::kUnlimited, std::move(input)));
-            });
-
-        ABT unwoundPath =
-            translateFieldPath(unwindFieldPath,
-                               make<PathIdentity>(),
-                               [](FieldNameType fieldName, const bool isLastElement, ABT input) {
-                                   return make<PathGet>(std::move(fieldName), std::move(input));
-                               });
-
-        auto entry = _ctx.getNode();
-        _ctx.setNode<EvaluationNode>(
-            entry._rootProjection,
-            unwoundProjName,
-            make<EvalPath>(std::move(unwoundPath), make<Variable>(entry._rootProjection)),
-            std::move(entry._node));
-
-        entry = _ctx.getNode();
-        _ctx.setNode<UnwindNode>(std::move(entry._rootProjection),
-                                 unwoundProjName,
-                                 pidProjName,
-                                 preserveNullAndEmpty,
-                                 std::move(entry._node));
-
-        entry = _ctx.getNode();
-        const ProjectionName embedProjName{_ctx.getNextId("embedProj")};
-        _ctx.setNode<EvaluationNode>(
-            embedProjName,
-            embedProjName,
-            make<EvalPath>(std::move(embedPath), make<Variable>(entry._rootProjection)),
-            std::move(entry._node));
-
-        if (source->indexPath().has_value()) {
-            const FieldPath indexFieldPath = source->indexPath().value();
-            if (indexFieldPath.getPathLength() > 0) {
-                ABT indexPath = translateFieldPath(
-                    indexFieldPath,
-                    make<PathConstant>(
-                        generatePidGteZeroTest(make<Variable>(pidProjName), Constant::null())),
-                    [](FieldNameType fieldName, const bool /*isLastElement*/, ABT input) {
-                        return make<PathField>(std::move(fieldName), std::move(input));
-                    });
-
-                entry = _ctx.getNode();
-                const ProjectionName embedPidProjName{_ctx.getNextId("embedPidProj")};
-                _ctx.setNode<EvaluationNode>(
-                    embedPidProjName,
-                    embedPidProjName,
-                    make<EvalPath>(std::move(indexPath), make<Variable>(entry._rootProjection)),
-                    std::move(entry._node));
+    ABT resultPath = translateFieldPath(
+        source.getAsField(),
+        make<PathConstant>(make<Variable>(foreignFoldedProjName)),
+        [](FieldNameType fieldName, const bool isLastElement, ABT input) {
+            if (!isLastElement) {
+                input = make<PathTraverse>(PathTraverse::kUnlimited, std::move(input));
             }
+            return make<PathField>(std::move(fieldName), std::move(input));
+        });
+
+    const ProjectionName& resultProjName = ctx.getNextId("result");
+    ctx.setNode<EvaluationNode>(
+        resultProjName,
+        resultProjName,
+        make<EvalPath>(std::move(resultPath), make<Variable>(localFoldedProjName)),
+        std::move(groupByFoldNode));
+}
+
+void visit(ABTDocumentSourceTranslationVisitorContext* visitorCtx,
+           const DocumentSourceMatch& source) {
+    AlgebrizerContext& ctx = visitorCtx->algCtx;
+    auto entry = ctx.getNode();
+    ABT matchExpr = generateMatchExpression(source.getMatchExpression(),
+                                            true /*allowAggExpressions*/,
+                                            entry._rootProjection,
+                                            ctx.getPrefixId());
+
+    // If we have a top-level composition, flatten it into a chain of separate
+    // FilterNodes.
+    const auto& composition = collectComposedBounded(matchExpr, kMaxPathConjunctionDecomposition);
+    for (const auto& path : composition) {
+        ctx.setNode<FilterNode>(entry._rootProjection,
+                                make<EvalFilter>(path, make<Variable>(entry._rootProjection)),
+                                std::move(entry._node));
+        entry = ctx.getNode();
+    }
+}
+
+void visit(ABTDocumentSourceTranslationVisitorContext* visitorCtx,
+           const DocumentSourceSingleDocumentTransformation& source) {
+    AlgebrizerContext& ctx = visitorCtx->algCtx;
+    const ProjectionName& rootProjName = ctx.getNode()._rootProjection;
+    FieldMapBuilder builder(rootProjName, rootProjName == ctx.getScanProjName());
+    ABTTransformerVisitor visitor(ctx, builder);
+    TransformerInterfaceWalker walker(&visitor);
+    walker.walk(&source.getTransformer());
+    visitor.generateCombinedProjection();
+}
+
+void visit(ABTDocumentSourceTranslationVisitorContext* visitorCtx,
+           const DocumentSourceSkip& source) {
+    visitorCtx->pushLimitSkip(-1, source.getSkip());
+}
+
+void visit(ABTDocumentSourceTranslationVisitorContext* visitorCtx,
+           const DocumentSourceSort& source) {
+    AlgebrizerContext& ctx = visitorCtx->algCtx;
+    generateCollationNode(ctx, source.getSortKeyPattern());
+
+    if (source.getLimit().has_value()) {
+        // We need to limit the result of the collation.
+        visitorCtx->pushLimitSkip(source.getLimit().value(), 0);
+    }
+}
+
+void visit(ABTDocumentSourceTranslationVisitorContext* visitorCtx,
+           const DocumentSourceUnionWith& source) {
+    AlgebrizerContext& ctx = visitorCtx->algCtx;
+    auto entry = ctx.getNode();
+    ProjectionName unionProjName = entry._rootProjection;
+
+    const Pipeline& pipeline = source.getPipeline();
+
+    NamespaceString involvedNss = pipeline.getContext()->ns;
+    std::string scanDefName = involvedNss.coll().toString();
+    const ProjectionName& scanProjName = ctx.getNextId("scan");
+
+    const Metadata& metadata = visitorCtx->metadata;
+    ABT initialNode = metadata._scanDefs.at(scanDefName).exists()
+        ? make<ScanNode>(scanProjName, scanDefName)
+        : make<ValueScanNode>(ProjectionNameVector{scanProjName},
+                              createInitialScanProps(scanProjName, scanDefName));
+
+    ABT pipelineABT = translatePipelineToABT(
+        metadata, pipeline, scanProjName, std::move(initialNode), ctx.getPrefixId());
+
+    uassert(6624425, "Expected root node for union pipeline", pipelineABT.is<RootNode>());
+    ABT pipelineABTWithoutRoot = pipelineABT.cast<RootNode>()->getChild();
+    // Pull out the root projection(s) from the inner pipeline.
+    const ProjectionNameVector& rootProjections =
+        pipelineABT.cast<RootNode>()->getProperty().getProjections().getVector();
+    uassert(6624426,
+            "Expected a single projection for inner union branch",
+            rootProjections.size() == 1);
+
+    // Add an evaluation node such that it shares a projection with the outer
+    // pipeline. If the same projection name is already defined in the inner pipeline
+    // then there's no need for the extra eval node.
+    const ProjectionName& innerProjection = rootProjections[0];
+    ProjectionName newRootProj = unionProjName;
+    if (innerProjection != unionProjName) {
+        ABT evalNodeInner = make<EvaluationNode>(
+            unionProjName,
+            make<EvalPath>(make<PathIdentity>(), make<Variable>(innerProjection)),
+            std::move(pipelineABTWithoutRoot));
+        ctx.setNode(std::move(newRootProj),
+                    make<UnionNode>(ProjectionNameVector{std::move(unionProjName)},
+                                    makeSeq(std::move(entry._node), std::move(evalNodeInner))));
+    } else {
+        ctx.setNode(
+            std::move(newRootProj),
+            make<UnionNode>(ProjectionNameVector{std::move(unionProjName)},
+                            makeSeq(std::move(entry._node), std::move(pipelineABTWithoutRoot))));
+    }
+}
+
+void visit(ABTDocumentSourceTranslationVisitorContext* visitorCtx,
+           const DocumentSourceUnwind& source) {
+    const FieldPath& unwindFieldPath = source.getUnwindPath();
+    const bool preserveNullAndEmpty = source.preserveNullAndEmptyArrays();
+
+    AlgebrizerContext& ctx = visitorCtx->algCtx;
+    const ProjectionName pidProjName{ctx.getNextId("unwoundPid")};
+    const ProjectionName unwoundProjName{ctx.getNextId("unwoundProj")};
+
+    const auto generatePidGteZeroTest = [&pidProjName](ABT thenCond, ABT elseCond) {
+        return make<If>(
+            make<BinaryOp>(Operations::Gte, make<Variable>(pidProjName), Constant::int64(0)),
+            std::move(thenCond),
+            std::move(elseCond));
+    };
+
+    ABT embedPath = make<Variable>(unwoundProjName);
+    if (preserveNullAndEmpty) {
+        const ProjectionName unwindLambdaVarName{ctx.getNextId("unwoundLambdaVarName")};
+        embedPath = make<PathLambda>(make<LambdaAbstraction>(
+            unwindLambdaVarName,
+            generatePidGteZeroTest(std::move(embedPath), make<Variable>(unwindLambdaVarName))));
+    } else {
+        embedPath = make<PathConstant>(std::move(embedPath));
+    }
+    embedPath = translateFieldPath(
+        unwindFieldPath,
+        std::move(embedPath),
+        [](FieldNameType fieldName, const bool isLastElement, ABT input) {
+            return make<PathField>(
+                std::move(fieldName),
+                isLastElement ? std::move(input)
+                              : make<PathTraverse>(PathTraverse::kUnlimited, std::move(input)));
+        });
+
+    ABT unwoundPath =
+        translateFieldPath(unwindFieldPath,
+                           make<PathIdentity>(),
+                           [](FieldNameType fieldName, const bool isLastElement, ABT input) {
+                               return make<PathGet>(std::move(fieldName), std::move(input));
+                           });
+
+    auto entry = ctx.getNode();
+    ctx.setNode<EvaluationNode>(
+        entry._rootProjection,
+        unwoundProjName,
+        make<EvalPath>(std::move(unwoundPath), make<Variable>(entry._rootProjection)),
+        std::move(entry._node));
+
+    entry = ctx.getNode();
+    ctx.setNode<UnwindNode>(std::move(entry._rootProjection),
+                            unwoundProjName,
+                            pidProjName,
+                            preserveNullAndEmpty,
+                            std::move(entry._node));
+
+    entry = ctx.getNode();
+    const ProjectionName embedProjName{ctx.getNextId("embedProj")};
+    ctx.setNode<EvaluationNode>(
+        embedProjName,
+        embedProjName,
+        make<EvalPath>(std::move(embedPath), make<Variable>(entry._rootProjection)),
+        std::move(entry._node));
+
+    if (source.indexPath().has_value()) {
+        const FieldPath indexFieldPath = source.indexPath().value();
+        if (indexFieldPath.getPathLength() > 0) {
+            ABT indexPath = translateFieldPath(
+                indexFieldPath,
+                make<PathConstant>(
+                    generatePidGteZeroTest(make<Variable>(pidProjName), Constant::null())),
+                [](FieldNameType fieldName, const bool /*isLastElement*/, ABT input) {
+                    return make<PathField>(std::move(fieldName), std::move(input));
+                });
+
+            entry = ctx.getNode();
+            const ProjectionName embedPidProjName{ctx.getNextId("embedPidProj")};
+            ctx.setNode<EvaluationNode>(
+                embedPidProjName,
+                embedPidProjName,
+                make<EvalPath>(std::move(indexPath), make<Variable>(entry._rootProjection)),
+                std::move(entry._node));
         }
     }
+}
 
-private:
-    void unsupportedStage(const DocumentSource* source) const {
-        uasserted(ErrorCodes::InternalErrorNotSupported,
-                  str::stream() << "Stage is not supported: " << source->getSourceName());
-    }
-
-    void pushLimitSkip(const int64_t limit, const int64_t skip) {
-        auto entry = _ctx.getNode();
-        _ctx.setNode<LimitSkipNode>(std::move(entry._rootProjection),
-                                    properties::LimitSkipRequirement(limit, skip),
-                                    std::move(entry._node));
-    }
-
-    AlgebrizerContext& _ctx;
-    const Metadata& _metadata;
-};
+const ServiceContext::ConstructorActionRegisterer abtTranslationRegisterer{
+    "ABTTranslationRegisterer", [](ServiceContext* service) {
+        registerMongodVisitor<ABTDocumentSourceTranslationVisitorContext>(service);
+    }};
 
 ABT translatePipelineToABT(const Metadata& metadata,
                            const Pipeline& pipeline,
@@ -656,9 +547,11 @@ ABT translatePipelineToABT(const Metadata& metadata,
                            ABT initialNode,
                            PrefixId& prefixId) {
     AlgebrizerContext ctx(prefixId, {scanProjName, std::move(initialNode)});
-    ABTDocumentSourceVisitor visitor(ctx, metadata);
+    ABTDocumentSourceTranslationVisitorContext visitorCtx(ctx, metadata);
 
-    DocumentSourceWalkerLegacy walker(nullptr /*preVisitor*/, &visitor);
+    ServiceContext* serviceCtx = pipeline.getContext()->opCtx->getServiceContext();
+    auto& reg = getDocumentSourceVisitorRegistry(serviceCtx);
+    DocumentSourceWalker walker(reg, &visitorCtx);
     walker.walk(pipeline);
 
     auto entry = ctx.getNode();
