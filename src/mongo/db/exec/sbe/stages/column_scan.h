@@ -227,8 +227,11 @@ private:
     // Finds the lowest record ID across all cursors. Doesn't move any of the cursors.
     RowId findMinRowId() const;
 
-    // Move cursors to the next record to be processed.
-    RowId advanceCursors();
+    // Move column cursors to the next record to be processed. If 'reset' is true, it will first
+    // seek all of the cursors to the current '_rowId' and then advance.
+    RowId advanceColumnCursors(bool reset);
+
+    void processRecordFromRowstore(const Record& record);
 
     value::ColumnStoreEncoder _encoder{};
 
@@ -305,8 +308,55 @@ private:
     // iterating the _recordId dense column to ensure all null values for a column are observed.
     bool _densePathIncludedInScan = false;
 
+    // CSI performs the best when it doesn't have to read from the record store, because the reads
+    // are expensive. There are multiple components to the costs:
+    //  1. moving the per column cursors to the current record
+    //  2. partially reconstructing the object before realizing one of the paths is "bad"
+    //  3. seeking into the row store
+    // If the fallback to the row store happens often, it's cheaper to replace these with a linear
+    // scan through the row store. For this heuristic we are assuming that bad data is either rare
+    // or comes in "chunks". For the former, triggering a short scan on seeing bad data would
+    // amortize and for the latter we'll exponentially increase the number of the scanned records
+    // until we are out of the "bad chunk". This approach effectively replaces CSI with a collection
+    // scan under the hood for the case when data's schema isn't compatible with CSI. NB: we only do
+    // the scanning when no per path filters are lowered, as we cannot (currently) filter based on
+    // the record from the row store.
     // Cursor into the associated row store.
     std::unique_ptr<SeekableRecordCursor> _rowStoreCursor;
+    class RowstoreScanModeTracker {
+    public:
+        RowstoreScanModeTracker();
+
+        bool isScanningRowstore() const {
+            return _checkpointDueIn > 1;
+        }
+        bool isFinishingScan() const {
+            return _checkpointDueIn == 1;
+        }
+        void startNextBatch() {
+            if (_minBatchSize > 0) {
+                // We must distinguish between '_rowstoreScanCheckpointDueIn' _being_ zero and
+                // _becoming_ zero, so we exit from the scan mode when
+                // '_rowstoreScanCheckpointDueIn' is equal to 1 not 0, thus "+ 1" below.
+                _checkpointDueIn = _batchSize + 1;
+                _batchSize = std::min<long long>(_maxBatchSize, _batchSize * _batchSizeGrowth);
+            }
+        }
+        void reset() {
+            _batchSize = _minBatchSize;
+            _checkpointDueIn = 0;
+        }
+        void track() {
+            _checkpointDueIn--;
+        }
+
+    private:
+        long long _checkpointDueIn = 0;
+        const long long _minBatchSize;  // read from the query_knobs
+        const long long _maxBatchSize;  // read from the query_knobs
+        long long _batchSize;           // adaptive batch size between min and max
+        const double _batchSizeGrowth = 2;
+    } _scanTracker;
 
     bool _open{false};
 

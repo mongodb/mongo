@@ -91,7 +91,6 @@ struct ScanStats final : public SpecificStats {
 };
 
 struct ColumnScanStats final : public SpecificStats {
-
     // Struct to hold relevant stats for ColumnCursor and ParentPathCursor
     // Note: `includeInOutput` field is only relevant for ColumnCursor
     struct CursorStats final {
@@ -120,7 +119,11 @@ struct ColumnScanStats final : public SpecificStats {
         visitor->visit(this);
     }
 
+    // Occasionally column scan might need to read records from the corresponding row store. It
+    // might either fetch a record by its id, or scan a few consecutive records from the current
+    // cursor's position ('numRowStoreScans' counts the total number of scanned records).
     size_t numRowStoreFetches{0};
+    size_t numRowStoreScans{0};
 
     // Lists holding all of the stats of current struct's cursors. These stats objects are owned
     // here, and referred to by the cursor execution objects.
