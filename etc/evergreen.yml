@@ -2947,7 +2947,6 @@ buildvariants:
       --opt=off
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --detect-odr-violations
-      --link-model=dynamic
     scons_cache_mode: all
     scons_cache_scope: shared
     num_scons_link_jobs_available: 0.99
@@ -2977,7 +2976,6 @@ buildvariants:
       MONGO_DISTMOD=rhel80
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --link-model=dynamic
     test_flags: >-
       --mongosSetParameters="{initialServiceExecutorUseDedicatedThread: false}"
       --mongodSetParameters="{initialServiceExecutorUseDedicatedThread: false}"
@@ -3018,7 +3016,6 @@ buildvariants:
       MONGO_DISTMOD=rhel80
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --link-model=dynamic
     test_flags: >-
       --mongosSetParameters="{replicaSetMonitorProtocol: sdam}"
       --mongodSetParameters="{replicaSetMonitorProtocol: sdam}"
@@ -3058,7 +3055,6 @@ buildvariants:
       MONGO_DISTMOD=rhel80
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --link-model=dynamic
     test_flags: >-
       --mongosSetParameters="ShardingTaskExecutorPoolReplicaSetMatching: \"matchPrimaryNode\""
       --excludeWithAnyTags=sets_replica_set_matching_strategy
@@ -3186,7 +3182,6 @@ buildvariants:
       MONGO_DISTMOD=rhel80
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      --link-model=dynamic
     multiversion_platform: rhel80
     multiversion_edition: enterprise
     test_flags: >-
