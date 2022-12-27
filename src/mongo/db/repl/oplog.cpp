@@ -841,11 +841,6 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
 
           const NamespaceString nss(extractNs(entry.getNss().dbName(), cmd));
 
-          const auto& migrationId = entry.getFromTenantMigration();
-          if (migrationId) {
-              tenantMigrationInfo(opCtx) = boost::optional<TenantMigrationInfo>(migrationId);
-          }
-
           // Mode SECONDARY steady state replication should not allow create collection to rename an
           // existing collection out of the way. This leaves a collection orphaned and is a bug.
           // Renaming temporarily out of the way is only allowed for oplog replay, where we expect
