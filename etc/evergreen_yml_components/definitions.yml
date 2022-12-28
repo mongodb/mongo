@@ -5620,6 +5620,13 @@ tasks:
     vars:
       use_large_distro: "true"
 
+- <<: *task_template
+  name: telemetry_passthrough
+  tags: []
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+
 - <<: *gen_task_template
   name: tenant_migration_jscore_passthrough_gen
   tags: ["serverless"]

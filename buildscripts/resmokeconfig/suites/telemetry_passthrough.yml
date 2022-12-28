@@ -1,0 +1,32 @@
+test_kind: js_test
+
+selector:
+  roots:
+  - jstests/aggregation/**/*.js
+  - jstests/core/**/*.js
+  - jstests/telemetry/**/*.js
+  exclude_files:
+  # Excluding tests involving transactions due to "Transaction numbers are only allowed on a
+  # replica set member or mongos" error
+  - jstests/core/txns/**/*.js
+  exclude_with_any_tags:
+  # Excluding tests involving transactions due to "Transaction numbers are only allowed on a
+  # replica set member or mongos" error
+  - uses_transactions
+  # Temporarily exclude tests that are failing
+  - exclude_from_telemetry_passthrough
+
+executor:
+  archive:
+    hooks:
+      - ValidateCollections
+  hooks:
+  - class: ValidateCollections
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: MongoDFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        internalQueryConfigureTelemetrySamplingRate: 2147483647

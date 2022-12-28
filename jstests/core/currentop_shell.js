@@ -13,6 +13,8 @@
  *   # currentOp results.
  *   assumes_read_preference_unchanged,
  *   no_selinux,
+ *   #TODO SERVER-72404 Unblock this test from the telemetry passthrough
+ *   exclude_from_telemetry_passthrough,
  * ]
  */
 

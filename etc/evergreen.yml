@@ -972,6 +972,7 @@ buildvariants:
   - name: sharding_auth_audit_gen
   - name: sharding_ese_gen
   - name: sharding_opportunistic_secondary_targeting_gen
+  - name: telemetry_passthrough
   - name: unittest_shell_hang_analyzer_gen
 
 - name: &enterprise-windows-cxx20-debug-experimental enterprise-windows-cxx20-debug-experimental
@@ -1637,6 +1638,7 @@ buildvariants:
   - name: secondary_reads_passthrough_gen
   - name: .shard_split
   - name: .shard_merge
+  - name: telemetry_passthrough
 
 - &enterprise-rhel-80-64-bit-dynamic-classic-engine
   <<: *linux_x86_dynamic_compile_variant_dependency
@@ -2267,6 +2269,7 @@ buildvariants:
   - name: secondary_reads_passthrough_gen
   - name: .shard_split
   - name: .shard_merge
+  - name: telemetry_passthrough
 
 
 ###########################################
@@ -2366,6 +2369,7 @@ buildvariants:
   - name: .stitch
   - name: .shard_split
   - name: .shard_merge
+  - name: telemetry_passthrough
 # Disabling the following tests as they are not aware of feature flags.
 #  - name: .benchmarks - building benchmarks is also disabled
 #  - name: unittest_shell_hang_analyzer_gen
@@ -2544,6 +2548,7 @@ buildvariants:
   - name: watchdog_wiredtiger
   - name: .shard_split
   - name: .shard_merge
+  - name: telemetry_passthrough
 # Disabling the following tests as they are not aware of feature flags.
 #  - name: .benchmarks - building benchmarks is also disabled
 #  - name: server_discovery_and_monitoring_json_test_TG
