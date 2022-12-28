@@ -403,6 +403,24 @@ commands:
         strict: false
         chained_structs:
             RefineCollectionShardKeyRequest: RefineCollectionShardKeyRequest
+    
+    _shardsvrValidateShardKeyCandidate:
+        description: "Command run on shards to ensure we have a viable key to refine the shard key."
+        command_name: _shardsvrValidateShardKeyCandidate
+        cpp_name: ShardsvrValidateShardKeyCandidate
+        strict: false
+        namespace: type
+        api_version: ""
+        type: namespacestring
+        fields:
+            key:
+                type: KeyPattern
+                description: "The index specification document to use as the new shard key."
+                optional: false
+            enforceUniquenessCheck:
+                description: >-
+                    Verifies that the shard key index has the same unique setting as the command.
+                type: optionalBool
 
     _configsvrRefineCollectionShardKey:
         command_name: _configsvrRefineCollectionShardKey

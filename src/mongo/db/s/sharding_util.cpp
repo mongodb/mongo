@@ -40,6 +40,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_index_catalog_gen.h"
+#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/request_types/flush_routing_table_cache_updates_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -61,17 +62,13 @@ void tellShardsToRefreshCollection(OperationContext* opCtx,
     sendCommandToShards(opCtx, NamespaceString::kAdminDb, cmdObj, shardIds, executor);
 }
 
-std::vector<AsyncRequestsSender::Response> sendCommandToShards(
+std::vector<AsyncRequestsSender::Response> processShardResponses(
     OperationContext* opCtx,
     StringData dbName,
     const BSONObj& command,
-    const std::vector<ShardId>& shardIds,
+    const std::vector<AsyncRequestsSender::Request>& requests,
     const std::shared_ptr<executor::TaskExecutor>& executor,
-    const bool throwOnError) {
-    std::vector<AsyncRequestsSender::Request> requests;
-    for (const auto& shardId : shardIds) {
-        requests.emplace_back(shardId, command);
-    }
+    bool throwOnError) {
 
     std::vector<AsyncRequestsSender::Response> responses;
     if (!requests.empty()) {
@@ -112,6 +109,37 @@ std::vector<AsyncRequestsSender::Response> sendCommandToShards(
     }
     return responses;
 }
+
+std::vector<AsyncRequestsSender::Response> sendCommandToShards(
+    OperationContext* opCtx,
+    StringData dbName,
+    const BSONObj& command,
+    const std::vector<ShardId>& shardIds,
+    const std::shared_ptr<executor::TaskExecutor>& executor,
+    const bool throwOnError) {
+    std::vector<AsyncRequestsSender::Request> requests;
+    for (const auto& shardId : shardIds) {
+        requests.emplace_back(shardId, command);
+    }
+
+    return processShardResponses(opCtx, dbName, command, requests, executor, throwOnError);
+}
+
+std::vector<AsyncRequestsSender::Response> sendCommandToShardsWithVersion(
+    OperationContext* opCtx,
+    StringData dbName,
+    const BSONObj& command,
+    const std::vector<ShardId>& shardIds,
+    const std::shared_ptr<executor::TaskExecutor>& executor,
+    const CollectionRoutingInfo& cri,
+    const bool throwOnError) {
+    std::vector<AsyncRequestsSender::Request> requests;
+    for (const auto& shardId : shardIds) {
+        requests.emplace_back(shardId, appendShardVersion(command, cri.getShardVersion(shardId)));
+    }
+    return processShardResponses(opCtx, dbName, command, requests, executor, throwOnError);
+}
+
 
 // TODO SERVER-67593: Investigate if DBDirectClient can be used instead.
 Status createIndexOnCollection(OperationContext* opCtx,

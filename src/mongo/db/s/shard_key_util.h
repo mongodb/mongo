@@ -115,6 +115,32 @@ private:
 };
 
 /**
+ * Implementation of steps for validating a shard key for refineCollectionShardKey locally.
+ */
+class ValidationBehaviorsLocalRefineShardKey final : public ShardKeyValidationBehaviors {
+public:
+    ValidationBehaviorsLocalRefineShardKey(OperationContext* opCtx, const CollectionPtr& coll);
+
+    std::vector<BSONObj> loadIndexes(const NamespaceString& nss) const override;
+
+    void verifyUsefulNonMultiKeyIndex(const NamespaceString& nss,
+                                      const BSONObj& proposedKey) const override;
+
+    void verifyCanCreateShardKeyIndex(const NamespaceString& nss,
+                                      std::string* errMsg) const override;
+
+    void createShardKeyIndex(const NamespaceString& nss,
+                             const BSONObj& proposedKey,
+                             const boost::optional<BSONObj>& defaultCollation,
+                             bool unique) const override;
+
+private:
+    OperationContext* _opCtx;
+
+    const CollectionPtr& _coll;
+};
+
+/**
  * Compares the proposed shard key with the collection's existing indexes to ensure they are a legal
  * combination.
  *

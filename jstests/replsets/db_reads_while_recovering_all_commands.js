@@ -116,6 +116,7 @@ const allCommands = {
     _shardsvrSetClusterParameter: {skip: isAnInternalCommand},
     _shardsvrSetUserWriteBlockMode: {skip: isPrimaryOnly},
     _shardsvrUnregisterIndex: {skip: isPrimaryOnly},
+    _shardsvrValidateShardKeyCandidate: {skip: isPrimaryOnly},
     _shardsvrCollMod: {skip: isPrimaryOnly},
     _shardsvrCollModParticipant: {skip: isAnInternalCommand},
     _shardsvrParticipantBlock: {skip: isAnInternalCommand},

@@ -36,6 +36,7 @@
 #include "mongo/db/shard_id.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/async_requests_sender.h"
+#include "mongo/s/catalog_cache.h"
 
 namespace mongo {
 namespace sharding_util {
@@ -59,6 +60,19 @@ std::vector<AsyncRequestsSender::Response> sendCommandToShards(
     const BSONObj& command,
     const std::vector<ShardId>& shardIds,
     const std::shared_ptr<executor::TaskExecutor>& executor,
+    bool throwOnError = true);
+
+/**
+ * Generic utility to send a command to a list of shards attaching the shard version to the request.
+ * If `throwOnError=true`, throws in case one of the commands fails.
+ */
+std::vector<AsyncRequestsSender::Response> sendCommandToShardsWithVersion(
+    OperationContext* opCtx,
+    StringData dbName,
+    const BSONObj& command,
+    const std::vector<ShardId>& shardIds,
+    const std::shared_ptr<executor::TaskExecutor>& executor,
+    const CollectionRoutingInfo& cri,
     bool throwOnError = true);
 
 /**

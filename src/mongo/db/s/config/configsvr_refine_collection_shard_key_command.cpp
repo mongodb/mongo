@@ -34,6 +34,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/shard_key_util.h"
+#include "mongo/db/s/sharding_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
@@ -114,26 +115,56 @@ public:
                                   << oldShardKeyPattern.toString(),
                     oldShardKeyPattern.isExtendedBy(newShardKeyPattern));
 
-            // Indexes are loaded using shard versions, so validating the shard key may need to be
-            // retried on StaleConfig errors.
-            auto catalogCache = Grid::get(opCtx)->catalogCache();
-            shardVersionRetry(opCtx,
-                              catalogCache,
-                              nss,
-                              "validating indexes for refineCollectionShardKey"_sd,
-                              [&] {
-                                  // Note a shard key index will never be created automatically for
-                                  // refining a shard key, so no default collation is needed.
-                                  shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
-                                      opCtx,
-                                      nss,
-                                      newShardKeyPattern,
-                                      boost::none,
-                                      collType.getUnique(),
-                                      request().getEnforceUniquenessCheck().value_or(true),
-                                      shardkeyutil::ValidationBehaviorsRefineShardKey(opCtx, nss));
-                              });
+            {
+                // Indexes are loaded using shard versions, so validating the shard key may need to
+                // be retried on StaleConfig errors.
+                auto catalogCache = Grid::get(opCtx)->catalogCache();
+                shardVersionRetry(
+                    opCtx,
+                    catalogCache,
+                    nss,
+                    "validating indexes for refineCollectionShardKey"_sd,
+                    [&] {
+                        auto cm =
+                            uassertStatusOK(catalogCache->getCollectionPlacementInfo(opCtx, nss));
+                        std::set<ShardId> shardsIds;
 
+                        cm.getAllShardIds(&shardsIds);
+                        std::vector<ShardId> shardsIdsVec{shardsIds.begin(), shardsIds.end()};
+
+                        ShardsvrValidateShardKeyCandidate validateRequest(nss);
+                        validateRequest.setKey(newShardKeyPattern.getKeyPattern());
+                        validateRequest.setEnforceUniquenessCheck(
+                            request().getEnforceUniquenessCheck());
+                        validateRequest.setDbName(NamespaceString::kAdminDb);
+                        try {
+                            sharding_util::sendCommandToShardsWithVersion(
+                                opCtx,
+                                nss.db(),
+                                validateRequest.toBSON({}),
+                                shardsIdsVec,
+                                Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
+                                uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss)),
+                                true);
+                            return;
+                        } catch (const DBException& ex) {
+                            if (ex.code() != ErrorCodes::CommandNotFound) {
+                                throw;
+                            }
+                        }
+                        // Fallback mode, use lastLTS way.
+                        // Note a shard key index will never be created automatically for
+                        // refining a shard key, so no default collation is needed.
+                        shardkeyutil::validateShardKeyIndexExistsOrCreateIfPossible(
+                            opCtx,
+                            nss,
+                            newShardKeyPattern,
+                            boost::none,
+                            collType.getUnique(),
+                            request().getEnforceUniquenessCheck().value_or(true),
+                            shardkeyutil::ValidationBehaviorsRefineShardKey(opCtx, nss));
+                    });
+            }
             LOGV2(21922,
                   "CMD: refineCollectionShardKey: {request}",
                   "CMD: refineCollectionShardKey",

@@ -544,6 +544,7 @@ env.Library(
         'shardsvr_set_cluster_parameter_command.cpp',
         'shardsvr_set_user_write_block_mode_command.cpp',
         'shardsvr_split_chunk_command.cpp',
+        'shardsvr_validate_shard_key_candidate.cpp',
         'split_vector_command.cpp',
         'txn_two_phase_commit_cmds.cpp',
         'wait_for_ongoing_chunk_splits_command.cpp',

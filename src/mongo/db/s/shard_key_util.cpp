@@ -37,6 +37,7 @@
 #include "mongo/db/hasher.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/s/shard_key_index_util.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
@@ -364,7 +365,7 @@ void ValidationBehaviorsRefineShardKey::verifyCanCreateShardKeyIndex(const Names
     uasserted(
         ErrorCodes::InvalidOptions,
         str::stream() << "Please create an index that starts with the proposed shard key before"
-                         " sharding the collection. "
+                         " refining the collection's shard key. "
                       << *errMsg);
 }
 
@@ -375,6 +376,54 @@ void ValidationBehaviorsRefineShardKey::createShardKeyIndex(
     bool unique) const {
     MONGO_UNREACHABLE;
 }
+
+ValidationBehaviorsLocalRefineShardKey::ValidationBehaviorsLocalRefineShardKey(
+    OperationContext* opCtx, const CollectionPtr& coll)
+    : _opCtx(opCtx), _coll(coll) {}
+
+
+std::vector<BSONObj> ValidationBehaviorsLocalRefineShardKey::loadIndexes(
+    const NamespaceString& nss) const {
+    std::vector<BSONObj> indexes;
+    auto it = _coll->getIndexCatalog()->getIndexIterator(
+        _opCtx, mongo::IndexCatalog::InclusionPolicy::kReady);
+    while (it->more()) {
+        auto entry = it->next();
+        indexes.push_back(entry->descriptor()->toBSON());
+    }
+    return indexes;
+}
+
+void ValidationBehaviorsLocalRefineShardKey::verifyUsefulNonMultiKeyIndex(
+    const NamespaceString& nss, const BSONObj& proposedKey) const {
+    std::string tmpErrMsg = "couldn't find valid index for shard key";
+    uassert(ErrorCodes::InvalidOptions,
+            tmpErrMsg,
+            findShardKeyPrefixedIndex(_opCtx,
+                                      _coll,
+                                      _coll->getIndexCatalog(),
+                                      proposedKey,
+                                      /*requireSingleKey=*/true,
+                                      &tmpErrMsg));
+}
+
+void ValidationBehaviorsLocalRefineShardKey::verifyCanCreateShardKeyIndex(
+    const NamespaceString& nss, std::string* errMsg) const {
+    uasserted(
+        ErrorCodes::InvalidOptions,
+        str::stream() << "Please create an index that starts with the proposed shard key before"
+                         " refining the collection's shard key. "
+                      << *errMsg);
+}
+
+void ValidationBehaviorsLocalRefineShardKey::createShardKeyIndex(
+    const NamespaceString& nss,
+    const BSONObj& proposedKey,
+    const boost::optional<BSONObj>& defaultCollation,
+    bool unique) const {
+    MONGO_UNREACHABLE;
+}
+
 
 }  // namespace shardkeyutil
 }  // namespace mongo
