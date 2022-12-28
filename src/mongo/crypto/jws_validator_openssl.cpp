@@ -75,10 +75,6 @@ int RSA_set0_key(RSA* r, BIGNUM* n, BIGNUM* e, BIGNUM* d) {
     return 1;
 }
 
-int EVP_DigestVerifyFinal(EVP_MD_CTX* md, const unsigned char* sig, size_t len) {
-    return EVP_DigestVerifyFinal(md, const_cast<unsigned char*>(sig), len);
-}
-
 }  // namespace
 #endif
 
@@ -135,10 +131,10 @@ public:
                                    reinterpret_cast<const unsigned char*>(payload.rawData()),
                                    payload.size()) == 1);
 
-        int verifyRes =
-            EVP_DigestVerifyFinal(ctx.get(),
-                                  reinterpret_cast<const unsigned char*>(signature.rawData()),
-                                  signature.size());
+        int verifyRes = EVP_DigestVerifyFinal(
+            ctx.get(),
+            const_cast<unsigned char*>(reinterpret_cast<const unsigned char*>(signature.rawData())),
+            signature.size());
         if (verifyRes == 0) {
             return {ErrorCodes::InvalidSignature, "OpenSSL: Signature is invalid"};
         } else if (verifyRes != 1) {
