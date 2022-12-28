@@ -116,6 +116,11 @@ StatusWith<std::vector<TagsType>> ShardingCatalogClientMock::getTagsForCollectio
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
+std::vector<NamespaceString> ShardingCatalogClientMock::getAllNssThatHaveZonesForDatabase(
+    OperationContext* opCtx, const StringData& dbName) {
+    uasserted(ErrorCodes::InternalError, "Method not implemented");
+}
+
 StatusWith<repl::OpTimeWith<std::vector<ShardType>>> ShardingCatalogClientMock::getAllShards(
     OperationContext* opCtx, repl::ReadConcernLevel readConcern) {
     return {ErrorCodes::InternalError, "Method not implemented"};

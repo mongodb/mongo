@@ -1039,6 +1039,67 @@ StatusWith<std::vector<TagsType>> ShardingCatalogClientImpl::getTagsForCollectio
     return tags;
 }
 
+std::vector<NamespaceString> ShardingCatalogClientImpl::getAllNssThatHaveZonesForDatabase(
+    OperationContext* opCtx, const StringData& dbName) {
+    auto expCtx =
+        make_intrusive<ExpressionContext>(opCtx, nullptr /*collator*/, TagsType::ConfigNS);
+    StringMap<ExpressionContext::ResolvedNamespace> resolvedNamespaces;
+    resolvedNamespaces[TagsType::ConfigNS.coll()] = {TagsType::ConfigNS,
+                                                     std::vector<BSONObj>() /* pipeline */};
+    expCtx->setResolvedNamespaces(resolvedNamespaces);
+
+    // Parse pipeline:
+    //      - First stage will find all that namespaces on 'config.tags' that are part of the
+    //      given database.
+    //      - Second stage will group namespaces to not have repetitions.
+    //
+    //      db.tags.aggregate([
+    //          {$match: {ns: {$regex : "^dbName\\..*"}}},
+    //          {$group: {_id : "$ns"}}
+    //      ])
+    //
+    const std::string regex = "^" + pcre_util::quoteMeta(dbName) + "\\..*";
+    auto matchStageBson = BSON("ns" << BSON("$regex" << regex));
+    auto matchStage = DocumentSourceMatch::createFromBson(
+        Document{{"$match", std::move(matchStageBson)}}.toBson().firstElement(), expCtx);
+
+    auto groupStageBson = BSON("_id"
+                               << "$ns");
+    auto groupStage = DocumentSourceGroup::createFromBson(
+        Document{{"$group", std::move(groupStageBson)}}.toBson().firstElement(), expCtx);
+
+    // Create pipeline
+    Pipeline::SourceContainer stages;
+    stages.emplace_back(std::move(matchStage));
+    stages.emplace_back(std::move(groupStage));
+
+    const auto pipeline = Pipeline::create(stages, expCtx);
+    auto aggRequest = AggregateCommandRequest(TagsType::ConfigNS, pipeline->serializeToBson());
+
+    // Run the aggregation
+    const auto readConcern = [&]() -> repl::ReadConcernArgs {
+        if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
+            return {repl::ReadConcernLevel::kMajorityReadConcern};
+        } else {
+            const auto time = VectorClock::get(opCtx)->getTime();
+            return {time.configTime(), repl::ReadConcernLevel::kMajorityReadConcern};
+        }
+    }();
+
+    auto aggResult = runCatalogAggregation(opCtx,
+                                           Grid::get(opCtx)->shardRegistry()->getConfigShard(),
+                                           aggRequest,
+                                           readConcern,
+                                           Shard::kDefaultConfigCommandTimeout);
+
+    // Parse the result
+    std::vector<NamespaceString> nssList;
+    for (const auto& doc : aggResult) {
+        nssList.push_back(NamespaceString(doc.getField("_id").String()));
+    }
+    return nssList;
+}
+
 StatusWith<repl::OpTimeWith<std::vector<ShardType>>> ShardingCatalogClientImpl::getAllShards(
     OperationContext* opCtx, repl::ReadConcernLevel readConcern) {
     auto findStatus = _exhaustiveFindOnConfig(opCtx,

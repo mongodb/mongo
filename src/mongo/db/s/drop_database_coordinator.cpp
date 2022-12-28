@@ -308,6 +308,19 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     _dropShardedCollection(opCtx, coll, executor);
                 }
 
+                // First of all, we will get all namespaces that still have zones associated to
+                // database _dbName from 'config.tags'. As we already have removed all zones
+                // associated with each sharded collections from database _dbName, the returned
+                // zones are owned by unsharded or nonexistent collections. After that, we will
+                // removed these remaining zones.
+                const auto& nssWithZones =
+                    catalogClient->getAllNssThatHaveZonesForDatabase(opCtx, _dbName);
+                for (const auto& nss : nssWithZones) {
+                    _updateSession(opCtx);
+                    sharding_ddl_util::removeTagsMetadataFromConfig(
+                        opCtx, nss, getCurrentSession());
+                }
+
                 const auto allShardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
                 {
                     // Acquire the database critical section in order to disallow implicit
