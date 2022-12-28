@@ -88,6 +88,14 @@ last-continuous:
     ticket: SERVER-68628
   - test_file: jstests/sharding/move_chunk_interrupt_postimage.js
     ticket: SERVER-68728
+  - test_file: jstests/core/project_with_collation.js
+    ticket: SERVER-72416
+  - test_file: jstests/core/collation.js
+    ticket: SERVER-72416
+  - test_file: jstests/core/or_to_in.js
+    ticket: SERVER-72416
+  - test_file: jstests/core/index_filter_collation.js
+    ticket: SERVER-72416
   suites:
     change_streams_multiversion_passthrough: null
     change_streams_sharded_collections_multiversion_passthrough: null
@@ -273,6 +281,14 @@ last-lts:
     ticket: SERVER-68628
   - test_file: jstests/sharding/move_chunk_interrupt_postimage.js
     ticket: SERVER-68728
+  - test_file: jstests/core/project_with_collation.js
+    ticket: SERVER-72416
+  - test_file: jstests/core/collation.js
+    ticket: SERVER-72416
+  - test_file: jstests/core/or_to_in.js
+    ticket: SERVER-72416
+  - test_file: jstests/core/index_filter_collation.js
+    ticket: SERVER-72416
   suites:
     change_streams_multiversion_passthrough: null
     change_streams_sharded_collections_multiversion_passthrough: null

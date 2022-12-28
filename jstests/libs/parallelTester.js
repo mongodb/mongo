@@ -260,6 +260,7 @@ if (typeof _threadInject != "undefined") {
                 "merge_sort_collation.js",
                 "explode_for_sort_fetch.js",
                 "or_to_in.js",
+                "project_with_collation.js",
                 "update_pipeline_shell_helpers.js",
                 "update_with_pipeline.js",
                 "verify_update_mods.js",
