@@ -6,6 +6,8 @@
 (function() {
 "use strict";
 
+const collection = db.index_key_expression;
+
 /**
  * Returns the hash of the provided BSON element that is compatible with 'hashed' indexes.
  */
@@ -1009,7 +1011,9 @@ const testScenarios = [
 testScenarios.forEach(testScenario => {
     jsTestLog("Testing scenario: " + tojson(testScenario));
 
-    const collection = db.getCollection(jsTestName());
+    // Drop the collection so the '$$ROOT' does not pick documents from the last test
+    // scenario.
+    collection.drop();
 
     // Insert the document to the collection if the field 'doc' exists in the
     // test-scenario dictionary.
@@ -1042,12 +1046,6 @@ testScenarios.forEach(testScenario => {
     } else {
         assert.throwsWithCode(() => collection.aggregate(pipeline).toArray(),
                               testScenario.expectedErrorCode);
-    }
-
-    // Drop the collection so the '$$ROOT' does not pick documents from the last test
-    // scenario.
-    if (testScenario.doc) {
-        assert(collection.drop());
     }
 });
 })();
