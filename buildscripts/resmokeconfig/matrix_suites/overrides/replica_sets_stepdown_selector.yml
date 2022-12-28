@@ -21,6 +21,7 @@
         - jstests/core/find_and_modify.js
         - jstests/core/find_and_modify2.js
         - jstests/core/find_and_modify_server6865.js
+        - jstests/core/project_with_collation.js
 
         # Stepdown commands during fsync lock will fail.
         - jstests/core/currentop.js
@@ -82,6 +83,7 @@
         - jstests/core/find_and_modify2.js
         - jstests/core/find_and_modify_pipeline_update.js
         - jstests/core/find_and_modify_server6865.js
+        - jstests/core/project_with_collation.js
 
         # These test run commands using legacy queries, which are not supported on sessions.
         - jstests/core/comment_field.js

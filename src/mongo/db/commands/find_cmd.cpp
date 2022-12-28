@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/db/auth/authorization_checks.h"
@@ -85,11 +84,17 @@ const auto kTermField = "term"_sd;
 boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     OperationContext* opCtx,
     const FindCommandRequest& findCommand,
+    const CollectionPtr& collPtr,
     boost::optional<ExplainOptions::Verbosity> verbosity) {
     std::unique_ptr<CollatorInterface> collator;
     if (!findCommand.getCollation().isEmpty()) {
         collator = uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
                                        ->makeFromBSON(findCommand.getCollation()));
+    } else if (collPtr && collPtr->getDefaultCollator()) {
+        // The 'collPtr' will be null for views, but we don't need to worry about views here. The
+        // views will get rewritten into aggregate command and will regenerate the
+        // ExpressionContext.
+        collator = collPtr->getDefaultCollator()->clone();
     }
 
     // Although both 'find' and 'aggregate' commands have an ExpressionContext, some of the data
@@ -288,7 +293,11 @@ public:
 
             // Finish the parsing step by using the FindCommandRequest to create a CanonicalQuery.
             const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
-            auto expCtx = makeExpressionContext(opCtx, *findCommand, verbosity);
+
+            // The collection may be NULL. If so, getExecutor() should handle it by returning an
+            // execution tree with an EOFStage.
+            const auto& collection = ctx->getCollection();
+            auto expCtx = makeExpressionContext(opCtx, *findCommand, collection, verbosity);
             const bool isExplain = true;
             auto cq = uassertStatusOK(
                 CanonicalQuery::canonicalize(opCtx,
@@ -337,10 +346,6 @@ public:
                 }
                 return;
             }
-
-            // The collection may be NULL. If so, getExecutor() should handle it by returning an
-            // execution tree with an EOFStage.
-            const auto& collection = ctx->getCollection();
 
             cq->setUseCqfIfEligible(true);
 
@@ -493,14 +498,14 @@ public:
             }
 
             // Tailing a replicated capped clustered collection requires majority read concern.
-            const auto coll = ctx->getCollection().get();
-            if (coll) {
+            const auto& collection = ctx->getCollection();
+            if (collection) {
                 const bool isTailable = findCommand->getTailable();
                 const bool isMajorityReadConcern = repl::ReadConcernArgs::get(opCtx).getLevel() ==
                     repl::ReadConcernLevel::kMajorityReadConcern;
-                const bool isClusteredCollection = coll->isClustered();
-                const bool isCapped = coll->isCapped();
-                const bool isReplicated = coll->ns().isReplicated();
+                const bool isClusteredCollection = collection->isClustered();
+                const bool isCapped = collection->isCapped();
+                const bool isReplicated = collection->ns().isReplicated();
                 if (isClusteredCollection && isCapped && isReplicated && isTailable) {
                     uassert(ErrorCodes::Error(6049203),
                             "A tailable cursor on a capped clustered collection requires majority "
@@ -514,7 +519,9 @@ public:
 
             // Finish the parsing step by using the FindCommandRequest to create a CanonicalQuery.
             const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
-            auto expCtx = makeExpressionContext(opCtx, *findCommand, boost::none /* verbosity */);
+
+            auto expCtx =
+                makeExpressionContext(opCtx, *findCommand, collection, boost::none /* verbosity */);
             auto cq = uassertStatusOK(
                 CanonicalQuery::canonicalize(opCtx,
                                              std::move(findCommand),
@@ -555,8 +562,6 @@ public:
             // Check whether we are allowed to read from this node after acquiring our locks.
             uassertStatusOK(replCoord->checkCanServeReadsFor(
                 opCtx, nss, ReadPreferenceSetting::get(opCtx).canRunOnSecondary()));
-
-            const auto& collection = ctx->getCollection();
 
             if (cq->getFindCommandRequest().getReadOnce()) {
                 // The readOnce option causes any storage-layer cursors created during plan

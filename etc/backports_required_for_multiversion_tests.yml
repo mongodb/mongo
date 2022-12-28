@@ -274,6 +274,12 @@ last-continuous:
     ticket: SERVER-70436
   - test_file: jstests/sharding/all_collection_stats.js
     ticket: SERVER-71477
+  - test_file: jstests/core/project_with_collation.js
+    ticket: SERVER-72416
+  - test_file: jstests/core/collation.js
+    ticket: SERVER-72416
+  - test_file: jstests/core/or_to_in.js
+    ticket: SERVER-72416
   suites: null
 last-lts:
   all:
@@ -623,4 +629,10 @@ last-lts:
     ticket: SERVER-70436
   - test_file: jstests/sharding/all_collection_stats.js
     ticket: SERVER-71477
+  - test_file: jstests/core/project_with_collation.js
+    ticket: SERVER-72416
+  - test_file: jstests/core/collation.js
+    ticket: SERVER-72416
+  - test_file: jstests/core/or_to_in.js
+    ticket: SERVER-72416
   suites: null
