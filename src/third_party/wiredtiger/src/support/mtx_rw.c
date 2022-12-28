@@ -253,7 +253,13 @@ stall:
         else {
             stats[session->stat_bucket][l->stat_app_usecs_off] += (int64_t)time_diff;
         }
-        session_stats[l->stat_session_usecs_off] += (int64_t)time_diff;
+
+        /*
+         * Not all read-write locks increment session statistics. Check whether the offset is
+         * initialized to determine whether they are enabled.
+         */
+        if (l->stat_session_usecs_off != -1)
+            session_stats[l->stat_session_usecs_off] += (int64_t)time_diff;
     }
 
     /*
@@ -412,7 +418,13 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
             stats[session->stat_bucket][l->stat_int_usecs_off] += (int64_t)time_diff;
         else
             stats[session->stat_bucket][l->stat_app_usecs_off] += (int64_t)time_diff;
-        session_stats[l->stat_session_usecs_off] += (int64_t)time_diff;
+
+        /*
+         * Not all read-write locks increment session statistics. Check whether the offset is
+         * initialized to determine whether they are enabled.
+         */
+        if (l->stat_session_usecs_off != -1)
+            session_stats[l->stat_session_usecs_off] += (int64_t)time_diff;
     }
 
     /*

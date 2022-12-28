@@ -22,6 +22,7 @@ __spin_init_internal(WT_SPINLOCK *t, const char *name)
 {
     t->name = name;
     t->stat_count_off = t->stat_app_usecs_off = t->stat_int_usecs_off = -1;
+    t->stat_session_usecs_off = -1;
     t->initialized = 1;
 }
 
@@ -313,7 +314,13 @@ __wt_spin_lock_track(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
         else {
             stats[session->stat_bucket][t->stat_app_usecs_off] += (int64_t)time_diff;
         }
-        session_stats[t->stat_session_usecs_off] += (int64_t)time_diff;
+
+        /*
+         * Not all spin locks increment session statistics. Check whether the offset is initialized
+         * to determine whether they are enabled.
+         */
+        if (t->stat_session_usecs_off != -1)
+            session_stats[t->stat_session_usecs_off] += (int64_t)time_diff;
     } else
         __wt_spin_lock(session, t);
 }
