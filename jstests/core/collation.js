@@ -27,7 +27,6 @@ load("jstests/libs/index_catalog_helpers.js");
 load("jstests/concurrency/fsm_workload_helpers/server_types.js");
 // For isReplSet
 load("jstests/libs/fixture_helpers.js");
-load("jstests/libs/sbe_explain_helpers.js");  // For engineSpecificAssertion.
 // For areAllCollectionsClustered.
 load("jstests/libs/clustered_collections/clustered_collection_util.js");
 
@@ -758,9 +757,7 @@ if (!isClustered) {
     assert.commandWorked(testDb.createCollection(coll.getName(), {collation: {locale: "en_US"}}));
     explainRes = coll.explain("executionStats").find({_id: "foo"}).finish();
     assert.commandWorked(explainRes);
-    let classicAssert = null !== getPlanStage(getWinningPlan(explainRes.queryPlanner), "IDHACK");
-    let sbeAssert = null !== getPlanStage(getWinningPlan(explainRes.queryPlanner), "IXSCAN");
-    engineSpecificAssertion(classicAssert, sbeAssert, testDb, explainRes);
+    assert.neq(null, getPlanStage(explainRes.executionStats.executionStages, "IDHACK"), explainRes);
 
     // Find on _id should use idhack stage when explicitly given query collation matches
     // collection default.
