@@ -42,11 +42,10 @@
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/thread.h"
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
-
-
 namespace mongo {
 using namespace fmt::literals;
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace {
 // Removes the named pipe and logs an info message if there's an error. The info message should be
@@ -90,6 +89,9 @@ int NamedPipeOutput::write(const char* data, int size) {
     uassert(7005011, "Output must have been opened before writing", _ofs.is_open());
     _ofs.write(data, size);
     if (_ofs.fail()) {
+        uasserted(7239300,
+                  "Failed to write to a named pipe, error: {}"_format(
+                      getErrorMessage("write", _pipeAbsolutePath)));
         return -1;
     }
     return size;
@@ -100,6 +102,9 @@ void NamedPipeOutput::close() {
         _ofs.close();
     }
 }
+
+#undef MONGO_LOGV2_DEFAULT_COMPONENT
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 NamedPipeInput::NamedPipeInput(const std::string& pipeRelativePath)
     : _pipeAbsolutePath((externalPipeDir == "" ? kDefaultPipePath : externalPipeDir) +

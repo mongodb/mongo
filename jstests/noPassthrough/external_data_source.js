@@ -126,6 +126,34 @@ assert.throwsWithCode(() => {
                tojson(explain)}`);
 })();
 
+// Verifies that an external data source cannot be used for the $merge / $out pipeline stages.
+(function testMergeOrOutStageToExternalDataSource() {
+    [{$out: "out"}, {$merge: "out"}].forEach(stage => {
+        assert.throwsWithCode(() => {
+            db.coll.aggregate([stage], {
+                $_externalDataSources: [
+                    {
+                        collName: "coll",
+                        dataSources: [{
+                            url: kUrlProtocolFile + pipeName1,
+                            storageType: "pipe",
+                            fileType: "bson"
+                        }]
+                    },
+                    {
+                        collName: "out",
+                        dataSources: [{
+                            url: kUrlProtocolFile + pipeName2,
+                            storageType: "pipe",
+                            fileType: "bson"
+                        }]
+                    }
+                ]
+            });
+        }, 7239302);
+    });
+})();
+
 //
 // Named Pipes success test cases follow.
 //
@@ -367,6 +395,54 @@ function testSimpleAggregationsOverExternalDataSource(pipeDir) {
             internalQuerySlotBasedExecutionHashAggApproxMemoryUseInBytesBeforeSpill:
                 oldSbeGroupMaxMemory,
         }));
+    })();
+
+    // Verifies that 'killCursors' command works over external data sources while the server keeps
+    // reading data from a named pipe. Reading external data sources should be interruptible.
+    (function testKillCursorOverExternalDataSource() {
+        // Prepares a large dataset.
+        const largeCollObjs = [];
+        const kManyDocs = 250000;
+        for (let i = 0; i < kManyDocs; ++i) {
+            largeCollObjs.push({
+                _id: i,
+                g: Random.randInt(10),  // 10 groups
+                str1: "strdata_" + Random.randInt(100000000),
+            });
+        }
+
+        // We read 2 collections using $unionWith so that the result set cannot be fit into one
+        // result batch for the 'getMore' request.
+        const collName1 = "coll1";
+        const collName2 = "coll2";
+
+        // 250K docs almost reaches 16MB BSONObj size limit.
+        _writeTestPipeObjects(pipeName1, largeCollObjs.length, largeCollObjs, pipeDir);
+        _writeTestPipeObjects(pipeName2, largeCollObjs.length, largeCollObjs, pipeDir);
+
+        let cursor = db[collName1].aggregate([{$unionWith: collName2}], {
+            $_externalDataSources: [
+                {
+                    collName: collName1,
+                    dataSources:
+                        [{url: kUrlProtocolFile + pipeName1, storageType: "pipe", fileType: "bson"}]
+                },
+                {
+                    collName: collName2,
+                    dataSources:
+                        [{url: kUrlProtocolFile + pipeName2, storageType: "pipe", fileType: "bson"}]
+                },
+            ]
+        });
+
+        // Has 'getMore' command issued to the server since the default batch size is 101 documents.
+        for (let i = 0; i < 102; ++i) {
+            cursor.next();
+        }
+
+        // Has 'killCursors' command issued to the server while the server is reading more data from
+        // named pipes to send the next batch. If this fails, an exception will be thrown.
+        cursor.close();
     })();
 }
 

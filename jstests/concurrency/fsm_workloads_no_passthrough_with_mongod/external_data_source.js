@@ -52,22 +52,18 @@ var $config = (function() {
             this.pipeName2 = `concurrency_compute_mode_tid${this.tid}_name2`;
             this.vcollName1 = `vcoll${this.tid}_1`;
             this.vcollName2 = `vcoll${this.tid}_2`;
-
-            removeFile(this.kDefaultPipePath + this.pipeName1);
-            removeFile(this.kDefaultPipePath + this.pipeName2);
         }
 
         function scan(db, collName) {
-            jsTestLog(`${this.tid} running scan`);
+            jsTestLog(`thread_num ${this.tid} scan_case_start`);
 
-            _writeTestPipeObjects(this.pipeName1,
-                                  this.localCollObjs.length,
-                                  this.localCollObjs,
-                                  this.kDefaultPipePath);
-            _writeTestPipeObjects(this.pipeName2,
-                                  this.localCollObjs.length,
-                                  this.localCollObjs,
-                                  this.kDefaultPipePath);
+            const pipeName1 = this.pipeName1 + "_scan";
+            const pipeName2 = this.pipeName2 + "_scan";
+
+            _writeTestPipeObjects(
+                pipeName1, this.localCollObjs.length, this.localCollObjs, this.kDefaultPipePath);
+            _writeTestPipeObjects(
+                pipeName2, this.localCollObjs.length, this.localCollObjs, this.kDefaultPipePath);
 
             const expectedRes = this.localCollObjs.concat(this.localCollObjs);
 
@@ -77,12 +73,12 @@ var $config = (function() {
                                        collName: this.vcollName1,
                                        dataSources: [
                                            {
-                                               url: kUrlProtocolFile + this.pipeName1,
+                                               url: kUrlProtocolFile + pipeName1,
                                                storageType: "pipe",
                                                fileType: "bson"
                                            },
                                            {
-                                               url: kUrlProtocolFile + this.pipeName2,
+                                               url: kUrlProtocolFile + pipeName2,
                                                storageType: "pipe",
                                                fileType: "bson"
                                            }
@@ -96,16 +92,16 @@ var $config = (function() {
                     resArr[i], expectedRes[i], `Unexpected obj = ${tojson(resArr[i])} at ${i}`);
             }
 
-            jsTestLog(`${this.tid} is done with scan`);
+            jsTestLog(`thread_num ${this.tid} scan_case_end`);
         }
 
         function match(db, collName) {
-            jsTestLog(`${this.tid} running match`);
+            jsTestLog(`thread_num ${this.tid} match_case_start`);
 
-            _writeTestPipeObjects(this.pipeName1,
-                                  this.localCollObjs.length,
-                                  this.localCollObjs,
-                                  this.kDefaultPipePath);
+            const pipeName1 = this.pipeName1 + "_match";
+
+            _writeTestPipeObjects(
+                pipeName1, this.localCollObjs.length, this.localCollObjs, this.kDefaultPipePath);
 
             const expectedRes = this.localCollObjs.filter(obj => obj.g < 50);
 
@@ -114,7 +110,7 @@ var $config = (function() {
                                    $_externalDataSources: [{
                                        collName: this.vcollName1,
                                        dataSources: [{
-                                           url: kUrlProtocolFile + this.pipeName1,
+                                           url: kUrlProtocolFile + pipeName1,
                                            storageType: "pipe",
                                            fileType: "bson"
                                        }]
@@ -127,20 +123,19 @@ var $config = (function() {
                     resArr[i], expectedRes[i], `Unexpected obj = ${tojson(resArr[i])} at ${i}`);
             }
 
-            jsTestLog(`${this.tid} is done with match`);
+            jsTestLog(`thread_num ${this.tid} match_case_end`);
         }
 
         function unionWith(db, collName) {
-            jsTestLog(`${this.tid} running unionWith`);
+            jsTestLog(`thread_num ${this.tid} unionWith_case_start`);
 
-            _writeTestPipeObjects(this.pipeName1,
-                                  this.localCollObjs.length,
-                                  this.localCollObjs,
-                                  this.kDefaultPipePath);
-            _writeTestPipeObjects(this.pipeName2,
-                                  this.localCollObjs.length,
-                                  this.localCollObjs,
-                                  this.kDefaultPipePath);
+            const pipeName1 = this.pipeName1 + "_unionWith";
+            const pipeName2 = this.pipeName2 + "_unionWith";
+
+            _writeTestPipeObjects(
+                pipeName1, this.localCollObjs.length, this.localCollObjs, this.kDefaultPipePath);
+            _writeTestPipeObjects(
+                pipeName2, this.localCollObjs.length, this.localCollObjs, this.kDefaultPipePath);
 
             const expectedRes = this.localCollObjs.concat(this.localCollObjs);
 
@@ -150,7 +145,7 @@ var $config = (function() {
                                        {
                                            collName: this.vcollName1,
                                            dataSources: [{
-                                               url: kUrlProtocolFile + this.pipeName1,
+                                               url: kUrlProtocolFile + pipeName1,
                                                storageType: "pipe",
                                                fileType: "bson"
                                            }]
@@ -158,7 +153,7 @@ var $config = (function() {
                                        {
                                            collName: this.vcollName2,
                                            dataSources: [{
-                                               url: kUrlProtocolFile + this.pipeName2,
+                                               url: kUrlProtocolFile + pipeName2,
                                                storageType: "pipe",
                                                fileType: "bson"
                                            }]
@@ -172,16 +167,16 @@ var $config = (function() {
                     resArr[i], expectedRes[i], `Unexpected obj = ${tojson(resArr[i])} at ${i}`);
             }
 
-            jsTestLog(`${this.tid} is done with unionWith`);
+            jsTestLog(`thread_num ${this.tid} unionWith_case_end`);
         }
 
         function group(db, collName) {
-            jsTestLog(`${this.tid} running group`);
+            jsTestLog(`thread_num ${this.tid} group_case_start`);
 
-            _writeTestPipeObjects(this.pipeName1,
-                                  this.localCollObjs.length,
-                                  this.localCollObjs,
-                                  this.kDefaultPipePath);
+            const pipeName1 = this.pipeName1 + "_group";
+
+            _writeTestPipeObjects(
+                pipeName1, this.localCollObjs.length, this.localCollObjs, this.kDefaultPipePath);
 
             const countPerGroup = [];
             for (let i = 0; i < 100; ++i) {
@@ -202,7 +197,7 @@ var $config = (function() {
                                    $_externalDataSources: [{
                                        collName: this.vcollName1,
                                        dataSources: [{
-                                           url: kUrlProtocolFile + this.pipeName1,
+                                           url: kUrlProtocolFile + pipeName1,
                                            storageType: "pipe",
                                            fileType: "bson"
                                        }]
@@ -211,7 +206,7 @@ var $config = (function() {
                                .toArray();
             assert.sameMembers(resArr, expectedRes);
 
-            jsTestLog(`${this.tid} is done with group`);
+            jsTestLog(`thread_num ${this.tid} group_case_end`);
         }
 
         return {

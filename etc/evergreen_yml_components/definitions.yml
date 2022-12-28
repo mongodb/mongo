@@ -5760,7 +5760,7 @@ tasks:
 
 - <<: *gen_task_template
   name: concurrency_compute_mode_gen
-  tags: ["concurrency", "no_passthrough", "compute_mode"]
+  tags: ["concurrency", "no_passthrough", "compute_mode", "no_debug_mode"]
   commands:
   - func: "generate resmoke tasks"
     vars:

@@ -39,11 +39,10 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/util/errno_util.h"
 
-#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
-
-
 namespace mongo {
 using namespace fmt::literals;
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 // On Windows, 'externalPipeDir' parameter is not supported and so the first argument is ignored and
 // instead, 'kDefultPipePath' is used.
@@ -72,12 +71,16 @@ void NamedPipeOutput::open() {
     if (_isOpen) {
         return;
     }
-    auto res = ConnectNamedPipe(_pipe, nullptr);
-    if (!res) {
-        LOGV2_ERROR(7005007,
-                    "Failed to connect a named pipe",
-                    "error"_attr = getErrorMessage("ConnectNamedPipe", _pipeAbsolutePath));
-        return;
+    bool succeeded = ConnectNamedPipe(_pipe, nullptr);
+    if (!succeeded) {
+        // ERROR_PIPE_CONNECTED means that the client has arrived faster and the connection has been
+        // established. It does not count as an error.
+        if (auto ec = lastSystemError().value(); ec != ERROR_PIPE_CONNECTED) {
+            LOGV2_ERROR(7005007,
+                        "Failed to connect a named pipe",
+                        "error"_attr = getErrorMessage("ConnectNamedPipe", _pipeAbsolutePath));
+            return;
+        }
     }
     _isOpen = true;
 }
@@ -86,16 +89,16 @@ int NamedPipeOutput::write(const char* data, int size) {
     uassert(7005012, "Output must have been opened before writing", _isOpen);
     DWORD nWritten = 0;
     // Write the reply to the pipe.
-    auto res = WriteFile(_pipe,      // handle to pipe
-                         data,       // buffer to write from
-                         size,       // number of bytes to write
-                         &nWritten,  // number of bytes written
-                         nullptr);   // not overlapped I/O
+    bool succeeded = WriteFile(_pipe,      // handle to pipe
+                               data,       // buffer to write from
+                               size,       // number of bytes to write
+                               &nWritten,  // number of bytes written
+                               nullptr);   // not overlapped I/O
 
-    if (!res || size != nWritten) {
-        LOGV2_ERROR(7005008,
-                    "Failed to write to a named pipe",
-                    "error"_attr = getErrorMessage("write", _pipeAbsolutePath));
+    if (!succeeded || size != nWritten) {
+        uasserted(7239301,
+                  "Failed to write to a named pipe, error: {}"_format(
+                      getErrorMessage("write", _pipeAbsolutePath)));
         return -1;
     }
 
@@ -113,6 +116,9 @@ void NamedPipeOutput::close() {
         _isOpen = false;
     }
 }
+
+#undef MONGO_LOGV2_DEFAULT_COMPONENT
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 NamedPipeInput::NamedPipeInput(const std::string& pipeRelativePath)
     : _pipeAbsolutePath(kDefaultPipePath + pipeRelativePath),

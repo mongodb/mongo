@@ -1690,8 +1690,8 @@ buildvariants:
   - name: .causally_consistent !.sharding
   - name: .change_stream_fuzzer
   - name: .change_streams
-  - name: .concurrency !.large !.ubsan !.no_txns !.debug_only
-  - name: .concurrency .large !.ubsan !.no_txns !.debug_only
+  - name: .concurrency !.large !.ubsan !.no_txns !.debug_only !.compute_mode
+  - name: .concurrency .large !.ubsan !.no_txns !.debug_only !.compute_mode
     distros:
     - rhel80-medium
   - name: .encrypt
@@ -2425,7 +2425,7 @@ buildvariants:
   - name: .causally_consistent !.wo_snapshot
   - name: .change_streams
   - name: .misc_js
-  - name: .concurrency !.ubsan !.no_txns !.kill_terminate
+  - name: .concurrency !.ubsan !.no_txns !.kill_terminate !.compute_mode
   - name: .encrypt
   - name: free_monitoring
   - name: external_auth
@@ -2595,7 +2595,7 @@ buildvariants:
   - name: .causally_consistent !.wo_snapshot
   - name: .change_streams
   - name: .misc_js
-  - name: .concurrency !.no_txns !.repl !.kill_terminate
+  - name: .concurrency !.no_txns !.repl !.kill_terminate !.compute_mode
   - name: disk_wiredtiger
   - name: .encrypt
   - name: free_monitoring
@@ -2843,8 +2843,8 @@ buildvariants:
   - name: .change_streams
   - name: .change_stream_fuzzer
   - name: .misc_js
-  - name: .concurrency !.large !.ubsan !.no_txns !.debug_only
-  - name: .concurrency .large !.ubsan !.no_txns !.debug_only
+  - name: .concurrency !.large !.ubsan !.no_txns !.debug_only !.compute_mode
+  - name: .concurrency .large !.ubsan !.no_txns !.debug_only !.compute_mode
     distros:
     - rhel80-medium
   - name: config_fuzzer_concurrency
