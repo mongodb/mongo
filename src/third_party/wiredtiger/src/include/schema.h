@@ -66,7 +66,7 @@ struct __wt_table {
     WT_INDEX **indices;
     size_t idx_alloc;
 
-    bool cg_complete, idx_complete, is_simple;
+    bool cg_complete, idx_complete, is_simple, is_tiered_shared;
     u_int ncolgroups, nindices, nkey_columns;
 };
 

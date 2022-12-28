@@ -29,6 +29,7 @@ struct __wt_process {
 
     bool fast_truncate_2022; /* fast-truncate fix run-time configuration */
     bool page_stats_2022;    /* Page stats run-time configuration */
+    bool tiered_shared_2023; /* tiered shared run-time configuration */
 
     WT_CACHE_POOL *cache_pool; /* shared cache information */
 
