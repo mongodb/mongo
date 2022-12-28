@@ -148,7 +148,8 @@ public:
                                                          const ChunkRange& chunkRange,
                                                          const ChunkVersion& version,
                                                          const KeyPattern& keyPattern,
-                                                         bool estimatedValue) = 0;
+                                                         bool estimatedValue,
+                                                         int64_t maxSize) = 0;
 
     virtual SemiFuture<void> requestMoveRange(OperationContext* opCtx,
                                               const ShardsvrMoveRange& request,

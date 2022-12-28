@@ -184,6 +184,7 @@ const std::string DataSizeCommandInfo::kKeyPattern = "keyPattern";
 const std::string DataSizeCommandInfo::kMinValue = "min";
 const std::string DataSizeCommandInfo::kMaxValue = "max";
 const std::string DataSizeCommandInfo::kEstimatedValue = "estimate";
+const std::string DataSizeCommandInfo::kMaxSizeValue = "maxSize";
 
 const std::string SplitChunkCommandInfo::kCommandName = "splitChunk";
 const std::string SplitChunkCommandInfo::kShardName = "from";
@@ -359,13 +360,15 @@ SemiFuture<DataSizeResponse> BalancerCommandsSchedulerImpl::requestDataSize(
     const ChunkRange& chunkRange,
     const ChunkVersion& version,
     const KeyPattern& keyPattern,
-    bool estimatedValue) {
+    bool estimatedValue,
+    int64_t maxSize) {
     auto commandInfo = std::make_shared<DataSizeCommandInfo>(nss,
                                                              shardId,
                                                              keyPattern.toBSON(),
                                                              chunkRange.getMin(),
                                                              chunkRange.getMax(),
                                                              estimatedValue,
+                                                             maxSize,
                                                              version);
 
     return _buildAndEnqueueNewRequest(opCtx, std::move(commandInfo))
@@ -377,7 +380,8 @@ SemiFuture<DataSizeResponse> BalancerCommandsSchedulerImpl::requestDataSize(
             }
             long long sizeBytes = remoteResponse.data["size"].number();
             long long numObjects = remoteResponse.data["numObjects"].number();
-            return DataSizeResponse(sizeBytes, numObjects);
+            bool maxSizeReached = remoteResponse.data["maxReached"].trueValue();
+            return DataSizeResponse(sizeBytes, numObjects, maxSizeReached);
         })
         .semi();
 }
