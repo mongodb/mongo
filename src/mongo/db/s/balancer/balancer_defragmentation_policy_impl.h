@@ -64,6 +64,9 @@ public:
     virtual bool isComplete() const = 0;
 
     virtual void userAbort() = 0;
+
+protected:
+    static constexpr uint64_t kSmallChunkSizeThresholdPctg = 25;
 };
 
 class BalancerDefragmentationPolicyImpl : public BalancerDefragmentationPolicy {
