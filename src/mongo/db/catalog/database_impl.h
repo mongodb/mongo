@@ -62,16 +62,20 @@ public:
      * If we are applying a 'drop' oplog entry on a secondary, 'dropOpTime' will contain the optime
      * of the oplog entry.
      *
+     * When fromMigrate is set, the related oplog entry will be marked with a 'fromMigrate' field to
+     * reduce its visibility (e.g. in change streams).
+     *
      * The caller should hold a DB X lock and ensure there are no index builds in progress on the
      * collection.
      */
     Status dropCollection(OperationContext* opCtx,
                           NamespaceString nss,
-                          repl::OpTime dropOpTime) const final;
+                          repl::OpTime dropOpTime,
+                          bool markFromMigrate) const final;
     Status dropCollectionEvenIfSystem(OperationContext* opCtx,
                                       NamespaceString nss,
                                       repl::OpTime dropOpTime,
-                                      bool markFromMigrate = false) const final;
+                                      bool markFromMigrate) const final;
 
     Status dropView(OperationContext* opCtx, NamespaceString viewName) const final;
 

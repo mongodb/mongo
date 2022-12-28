@@ -44,24 +44,6 @@
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
 namespace mongo {
-namespace {
-
-void dropCollectionHonouringFromMigrateFlag(OperationContext* opCtx,
-                                            const NamespaceString& nss,
-                                            bool fromMigrate) {
-    if (fromMigrate) {
-        mongo::sharding_ddl_util::ensureCollectionDroppedNoChangeEvent(opCtx, nss);
-    } else {
-        DropReply unused;
-        uassertStatusOK(
-            dropCollection(opCtx,
-                           nss,
-                           &unused,
-                           DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops));
-    }
-}
-
-}  // namespace
 
 DropCollectionCoordinator::DropCollectionCoordinator(ShardingDDLCoordinatorService* service,
                                                      const BSONObj& initialState)
@@ -106,7 +88,13 @@ void DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
     }
 
     try {
-        dropCollectionHonouringFromMigrateFlag(opCtx, nss, fromMigrate);
+        DropReply unused;
+        uassertStatusOK(
+            dropCollection(opCtx,
+                           nss,
+                           &unused,
+                           DropCollectionSystemCollectionMode::kDisallowSystemCollectionDrops,
+                           fromMigrate));
     } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
         // Note that even if the namespace was not found we have to execute the code below!
         LOGV2_DEBUG(5280920,

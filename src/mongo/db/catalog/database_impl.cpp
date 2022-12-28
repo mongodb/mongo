@@ -299,7 +299,7 @@ void DatabaseImpl::clearTmpCollections(OperationContext* opCtx) const {
     CollectionCatalog::CollectionInfoFn callback = [&](const CollectionPtr& collection) {
         try {
             WriteUnitOfWork wuow(opCtx);
-            Status status = dropCollection(opCtx, collection->ns(), {});
+            Status status = dropCollection(opCtx, collection->ns(), {}, false);
             if (!status.isOK()) {
                 LOGV2_WARNING(20327,
                               "could not drop temp collection '{namespace}': {error}",
@@ -438,7 +438,8 @@ Status DatabaseImpl::dropView(OperationContext* opCtx, NamespaceString viewName)
 
 Status DatabaseImpl::dropCollection(OperationContext* opCtx,
                                     NamespaceString nss,
-                                    repl::OpTime dropOpTime) const {
+                                    repl::OpTime dropOpTime,
+                                    bool markFromMigrate) const {
     // Cannot drop uncommitted collections.
     invariant(!UncommittedCatalogUpdates::isCreatedCollection(opCtx, nss));
 
@@ -474,7 +475,7 @@ Status DatabaseImpl::dropCollection(OperationContext* opCtx,
         }
     }
 
-    return dropCollectionEvenIfSystem(opCtx, nss, dropOpTime);
+    return dropCollectionEvenIfSystem(opCtx, nss, dropOpTime, markFromMigrate);
 }
 
 Status DatabaseImpl::dropCollectionEvenIfSystem(OperationContext* opCtx,
