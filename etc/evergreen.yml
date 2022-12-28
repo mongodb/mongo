@@ -143,6 +143,15 @@ variables:
   num_scons_link_jobs_available: 0.99
   compile_variant: *amazon_linux2_arm64_compile_variant_name
 
+# If you add anything to san_options, make sure the appropriate changes are
+# also made to SConstruct.
+# and also to the san_options in compile_static_analysis.yml
+- aubsan_options: &aubsan_options
+  >-
+    UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
+    LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1"
+    ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
+
 # Use this template for enterprise Windows testing coverage on non-pushing
 # variants
 - &enterprise-windows-nopush-template
@@ -2291,11 +2300,7 @@ buildvariants:
       archive-mongocryptd
       archive-mongocryptd-debug
     lang_environment: LANG=C
-    # If you add anything to san_options, make sure the appropriate changes are
-    # also made to SConstruct.
-    san_options: >-
-      LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
-      ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
+    san_options: *aubsan_options
     compile_variant: *rhel80-debug-asan-all-feature-flags
     compile_flags: >-
       --variables-files=etc/scons/mongodbtoolchain_${toolchain_version}_clang.vars
@@ -2388,11 +2393,7 @@ buildvariants:
       archive-mongocryptd
       archive-mongocryptd-debug
     lang_environment: LANG=C
-    # If you add anything to san_options, make sure the appropriate changes are
-    # also made to SConstruct.
-    san_options: >-
-      LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
-      ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
+    san_options: *aubsan_options
     compile_flags: >-
       --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
       --dbg=on
@@ -2475,9 +2476,7 @@ buildvariants:
       archive-mongocryptd
       archive-mongocryptd-debug
     lang_environment: LANG=C
-    # If you add anything to san_options, make sure the appropriate changes are
-    # also made to SConstruct.
-    san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
+    san_options: *aubsan_options
     compile_flags: >-
       --variables-files=etc/scons/mongodbtoolchain_${toolchain_version}_clang.vars
       --dbg=on
@@ -2567,9 +2566,7 @@ buildvariants:
       archive-mongocryptd
       archive-mongocryptd-debug
     lang_environment: LANG=C
-    # If you add anything to san_options, make sure the appropriate changes are
-    # also made to SConstruct.
-    san_options: UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
+    san_options: *aubsan_options
     compile_variant: *rhel80-debug-ubsan-classic-engine
     compile_flags: >-
       --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
@@ -2642,12 +2639,7 @@ buildvariants:
   expansions: &aubsan-lite-required-expansions
     compile_variant: *linux_debug_aubsan_compile_variant_name
     lang_environment: LANG=C
-    # If you add anything to san_options, make sure the appropriate changes are
-    # also made to SConstruct.
-    san_options: >-
-      UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
-      LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1"
-      ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
+    san_options: *aubsan_options
     test_flags: --excludeWithAnyTags=requires_ocsp_stapling
     resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
     hang_analyzer_dump_core: false
@@ -3465,10 +3457,7 @@ buildvariants:
     toolchain_version: stable
     # If you add anything to san_options, make sure the appropriate changes are
     # also made to SConstruct.
-    san_options: >-
-      UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
-      LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1"
-      ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
+    san_options: *aubsan_options
     compile_flags: >-
       LINKFLAGS=-nostdlib++
       LIBS=stdc++

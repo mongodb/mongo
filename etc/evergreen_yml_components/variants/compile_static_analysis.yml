@@ -17,6 +17,15 @@ variables:
   scons_cache_mode: all
   has_packages: false
 
+# If you add anything to san_options, make sure the appropriate changes are
+# also made to SConstruct.
+# and also to the san_options in evergreen.yml
+- aubsan_options: &aubsan_options
+  >-
+    UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
+    LSAN_OPTIONS="suppressions=etc/lsan.suppressions:report_objects=1"
+    ASAN_OPTIONS="detect_leaks=1:check_initialization_order=true:strict_init_order=true:abort_on_error=1:disable_coredump=0:handle_abort=1:strict_string_checks=true:detect_invalid_pointer_pairs=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
+
 
 buildvariants:
 
@@ -105,6 +114,7 @@ buildvariants:
   expansions:
     <<: *generic_linux_compile_expansions
     separate_debug: off
+    san_options: *aubsan_options
     # TODO(SERVER-49515): The addition of `--linker=lld` under
     # `compile_flags` below is to Work around
     # https://sourceware.org/bugzilla/show_bug.cgi?id=25975 by forcing
