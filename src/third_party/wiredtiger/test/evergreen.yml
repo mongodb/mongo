@@ -86,6 +86,7 @@ functions:
       script: |
         set -o errexit
         set -o verbose
+        export "PATH=/opt/mongodbtoolchain/v4/bin:$PATH"
         virtualenv -p python3 venv
         source venv/bin/activate
         pip3 install requirements_parser
