@@ -35,6 +35,7 @@ namespace mongo {
 SorterFileStats::SorterFileStats(SorterTracker* sorterTracker) : _sorterTracker(sorterTracker){};
 
 void SorterFileStats::addSpilledDataSize(long long data) {
+    _bytesSpilled += data;
     if (_sorterTracker) {
         _sorterTracker->bytesSpilled.fetchAndAdd(data);
     }
