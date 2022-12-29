@@ -1252,6 +1252,18 @@ env_vars.Add(
 )
 
 env_vars.Add(
+    'LINKFLAGS_COMPILER_EXEC_PREFIX',
+    help='Specify the search path to be injected into the LINKFLAGS',
+    default="",
+)
+
+env_vars.Add(
+    'COMPILER_EXEC_PREFIX_OPT',
+    help='Specify the option sign for compiler exec search paths.',
+    default="-B",
+)
+
+env_vars.Add(
     'NINJA_BUILDDIR',
     help="Location for shared Ninja state",
     default="$BUILD_ROOT/ninja",
@@ -1693,6 +1705,9 @@ def CheckDevEnv(context):
         result = True
     return result
 
+
+env.Append(
+    LINKFLAGS=['${_concat(COMPILER_EXEC_PREFIX_OPT, LINKFLAGS_COMPILER_EXEC_PREFIX, "", __env__)}'])
 
 devenv_check = Configure(
     env,
@@ -3432,22 +3447,11 @@ def doConfigure(myenv):
 
         linker_ld = get_option('linker')
         if linker_ld == 'auto':
-            # lld has problems with separate debug info on some platforms. See:
-            # - https://bugzilla.mozilla.org/show_bug.cgi?id=1485556
-            # - https://bugzilla.mozilla.org/show_bug.cgi?id=1485556
-            #
-            # lld also apparently has problems with symbol resolution
-            # in some esoteric configurations that apply for us when
-            # using --link-model=dynamic mode, so disable lld there
-            # too. See:
-            # - https://bugs.llvm.org/show_bug.cgi?id=46676
-            #
-            # We should revisit all of these issues the next time we upgrade our clang minimum.
-            if get_option('separate-debug') == 'off' and get_option('link-model') != 'dynamic':
+            if not env.TargetOSIs('darwin', 'macOS'):
                 if not myenv.AddToLINKFLAGSIfSupported('-fuse-ld=lld'):
-                    myenv.AddToLINKFLAGSIfSupported('-fuse-ld=gold')
-            else:
-                myenv.AddToLINKFLAGSIfSupported('-fuse-ld=gold')
+                    myenv.FatalError(
+                        f"The recommended linker 'lld' is not supported with the current compiler configuration, you can try the 'gold' linker with '--linker=gold'."
+                    )
         elif link_model.startswith("dynamic") and linker_ld == 'bfd':
             # BFD is not supported due to issues with it causing warnings from some of
             # the third party libraries that mongodb is linked with:

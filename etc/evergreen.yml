@@ -2103,6 +2103,7 @@ buildvariants:
       -j3
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
       --link-model=dynamic
+      --linker=gold
     resmoke_jobs_max: 2
     has_packages: true
     packager_script: packager_enterprise.py

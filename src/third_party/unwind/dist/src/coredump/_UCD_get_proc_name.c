@@ -50,10 +50,8 @@ elf_w (CD_get_proc_name) (struct UCD_info *ui, unw_addr_space_t as, unw_word_t i
   /* segbase: where it is mapped in virtual memory */
   /* mapoff: offset in the file */
   segbase = cphdr->p_vaddr;
-  /*mapoff  = phdr->p_offset; WRONG! phdr->p_offset is the offset in COREDUMP file */
-  mapoff  = 0;
 
-  ret = elf_w (get_proc_name_in_image) (as, &ui->edi.ei, segbase, mapoff, ip, buf, buf_len, offp);
+  ret = elf_w (get_proc_name_in_image) (as, &ui->edi.ei, segbase, ip, buf, buf_len, offp);
 
   return ret;
 }

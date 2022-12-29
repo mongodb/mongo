@@ -98,6 +98,7 @@ buildvariants:
       MONGO_DISTMOD=rhel72
       -j3
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --linker=gold
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic
       -Wl,--no-gnu-unique"
@@ -160,6 +161,7 @@ buildvariants:
       MONGO_DISTMOD=rhel83
       -j3
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --linker=gold
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"

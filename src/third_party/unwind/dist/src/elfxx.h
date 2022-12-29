@@ -50,7 +50,6 @@ extern int elf_w (get_proc_name) (unw_addr_space_t as,
 extern int elf_w (get_proc_name_in_image) (unw_addr_space_t as,
                                            struct elf_image *ei,
                                            unsigned long segbase,
-                                           unsigned long mapoff,
                                            unw_word_t ip,
                                            char *buf, size_t buf_len, unw_word_t *offp);
 

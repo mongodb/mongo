@@ -158,8 +158,7 @@ elf_w (lookup_symbol) (unw_addr_space_t as,
 }
 
 static Elf_W (Addr)
-elf_w (get_load_offset) (struct elf_image *ei, unsigned long segbase,
-                         unsigned long mapoff)
+elf_w (get_load_offset) (struct elf_image *ei, unsigned long segbase)
 {
   Elf_W (Addr) offset = 0;
   Elf_W (Ehdr) *ehdr;
@@ -175,7 +174,7 @@ elf_w (get_load_offset) (struct elf_image *ei, unsigned long segbase,
   phdr = (Elf_W (Phdr) *) ((char *) ei->image + ehdr->e_phoff);
 
   for (i = 0; i < ehdr->e_phnum; ++i)
-    if (phdr[i].p_type == PT_LOAD && (phdr[i].p_offset & pagesize_alignment_mask) == mapoff)
+    if (phdr[i].p_type == PT_LOAD && phdr[i].p_flags & PF_X)
       {
         offset = segbase - phdr[i].p_vaddr + (phdr[i].p_offset & (~pagesize_alignment_mask));
         break;
@@ -276,7 +275,6 @@ elf_w (extract_minidebuginfo) (struct elf_image *ei, struct elf_image *mdi)
 HIDDEN int
 elf_w (get_proc_name_in_image) (unw_addr_space_t as, struct elf_image *ei,
                        unsigned long segbase,
-                       unsigned long mapoff,
                        unw_word_t ip,
                        char *buf, size_t buf_len, unw_word_t *offp)
 {
@@ -284,7 +282,7 @@ elf_w (get_proc_name_in_image) (unw_addr_space_t as, struct elf_image *ei,
   Elf_W (Addr) min_dist = ~(Elf_W (Addr))0;
   int ret;
 
-  load_offset = elf_w (get_load_offset) (ei, segbase, mapoff);
+  load_offset = elf_w (get_load_offset) (ei, segbase);
   ret = elf_w (lookup_symbol) (as, ip, ei, load_offset, buf, buf_len, &min_dist);
 
   /* If the ELF image has MiniDebugInfo embedded in it, look up the symbol in
@@ -328,7 +326,7 @@ elf_w (get_proc_name) (unw_addr_space_t as, pid_t pid, unw_word_t ip,
   if (ret < 0)
     return ret;
 
-  ret = elf_w (get_proc_name_in_image) (as, &ei, segbase, mapoff, ip, buf, buf_len, offp);
+  ret = elf_w (get_proc_name_in_image) (as, &ei, segbase, ip, buf, buf_len, offp);
 
   munmap (ei.image, ei.size);
   ei.image = NULL;
