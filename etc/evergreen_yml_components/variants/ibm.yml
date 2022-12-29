@@ -59,7 +59,6 @@ buildvariants:
   - name: .sharding .common !.multiversion
   - name: .stitch
   - name: .crypt
-  - name: test_packages
   - name: .publish_crypt
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
@@ -138,7 +137,6 @@ buildvariants:
   - name: .sharding .common !.multiversion
   - name: .stitch
   - name: .crypt
-  - name: test_packages
   - name: .publish_crypt
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
@@ -200,7 +198,6 @@ buildvariants:
   - name: .sharding .common !.multiversion
   - name: .stitch
   - name: .crypt
-  - name: test_packages
   - name: .publish_crypt
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
