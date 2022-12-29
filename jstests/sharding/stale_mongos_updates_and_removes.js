@@ -20,6 +20,8 @@
 (function() {
 'use strict';
 
+load("jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js");
+
 // Create a new sharded collection with numDocs documents, with two docs sharing each shard key
 // (used for testing *multi* removes to a *specific* shard key).
 function resetCollection() {
@@ -132,21 +134,37 @@ function checkAllRemoveQueries(makeMongosStaleFunc) {
         assert.writeError(res);
     }
 
-    // Not possible because single remove requires equality match on shard key.
-    checkRemoveIsInvalid(emptyQuery, single, makeMongosStaleFunc);
+    // Sharded deleteOnes that do not directly target a shard can now use the two phase write
+    // protocol to execute.
+    if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
+        doRemove(emptyQuery, single, makeMongosStaleFunc);
+    } else {
+        // Not possible because single remove requires equality match on shard key.
+        checkRemoveIsInvalid(emptyQuery, single, makeMongosStaleFunc);
+    }
     doRemove(emptyQuery, multi, makeMongosStaleFunc);
 
     doRemove(pointQuery, single, makeMongosStaleFunc);
     doRemove(pointQuery, multi, makeMongosStaleFunc);
 
-    // Not possible because can't do range query on a single remove.
-    checkRemoveIsInvalid(rangeQuery, single, makeMongosStaleFunc);
-    doRemove(rangeQuery, multi, makeMongosStaleFunc);
+    // Sharded deleteOnes that do not directly target a shard can now use the two phase write
+    // protocol to execute.
+    if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
+        doRemove(rangeQuery, single, makeMongosStaleFunc);
+        doRemove(rangeQuery, multi, makeMongosStaleFunc);
 
-    // Not possible because single remove must contain _id or shard key at top level
-    // (not within $or).
-    checkRemoveIsInvalid(multiPointQuery, single, makeMongosStaleFunc);
-    doRemove(multiPointQuery, multi, makeMongosStaleFunc);
+        doRemove(multiPointQuery, single, makeMongosStaleFunc);
+        doRemove(multiPointQuery, multi, makeMongosStaleFunc);
+    } else {
+        // Not possible because can't do range query on a single remove.
+        checkRemoveIsInvalid(rangeQuery, single, makeMongosStaleFunc);
+        doRemove(rangeQuery, multi, makeMongosStaleFunc);
+
+        // Not possible because single remove must contain _id or shard key at top level
+        // (not within $or).
+        checkRemoveIsInvalid(multiPointQuery, single, makeMongosStaleFunc);
+        doRemove(multiPointQuery, multi, makeMongosStaleFunc);
+    }
 }
 
 function checkAllUpdateQueries(makeMongosStaleFunc) {
@@ -179,7 +197,13 @@ function checkAllUpdateQueries(makeMongosStaleFunc) {
     function assertUpdateIsValidIfAllChunksOnSingleShard(
         query, update, multiOption, makeMongosStaleFunc) {
         if (makeMongosStaleFunc == makeStaleMongosTargetOneShardWhenChunksAreOnMultipleShards) {
-            assertUpdateIsInvalid(query, update, multiOption, makeMongosStaleFunc);
+            // Sharded updateOnes that do not directly target a shard can now use the two phase
+            // write protocol to execute.
+            if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
+                doUpdate(query, update, multiOption, makeMongosStaleFunc);
+            } else {
+                assertUpdateIsInvalid(query, update, multiOption, makeMongosStaleFunc);
+            }
         } else {
             doUpdate(query, update, multiOption, makeMongosStaleFunc);
         }

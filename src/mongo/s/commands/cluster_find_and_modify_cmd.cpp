@@ -562,14 +562,14 @@ private:
 
     // Catches errors in the given response, and reruns the command if necessary. Uses the given
     // response to construct the findAndModify command result passed to the client.
-    static void _contructResult(OperationContext* opCtx,
-                                const ShardId& shardId,
-                                const boost::optional<ShardVersion>& shardVersion,
-                                const boost::optional<DatabaseVersion>& dbVersion,
-                                const NamespaceString& nss,
-                                const BSONObj& cmdObj,
-                                const BSONObj& response,
-                                BSONObjBuilder* result) {
+    static void _constructResult(OperationContext* opCtx,
+                                 const ShardId& shardId,
+                                 const boost::optional<ShardVersion>& shardVersion,
+                                 const boost::optional<DatabaseVersion>& dbVersion,
+                                 const NamespaceString& nss,
+                                 const BSONObj& cmdObj,
+                                 const BSONObj& response,
+                                 BSONObjBuilder* result) {
         auto txnRouter = TransactionRouter::get(opCtx);
         bool isRetryableWrite = opCtx->getTxnNumber() && !txnRouter;
 
@@ -670,14 +670,14 @@ private:
             }
 
             // Extract findAndModify command result from the result of the two phase write protocol.
-            _contructResult(opCtx,
-                            ShardId(swRes.getValue().getShardId().toString()),
-                            boost::none /* shardVersion */,
-                            dbVersion,
-                            nss,
-                            cmdObj,
-                            response,
-                            result);
+            _constructResult(opCtx,
+                             ShardId(swRes.getValue().getShardId().toString()),
+                             boost::none /* shardVersion */,
+                             dbVersion,
+                             nss,
+                             cmdObj,
+                             response,
+                             result);
         } else {
             // TODO: SERVER-71379 Exhaustively test all error cases for _clusterQuery &
             // _clusterWrite during f&m two phase protocol
@@ -730,7 +730,7 @@ private:
         }();
 
         uassertStatusOK(response.status);
-        _contructResult(
+        _constructResult(
             opCtx, shardId, shardVersion, dbVersion, nss, cmdObj, response.data, result);
     }
 

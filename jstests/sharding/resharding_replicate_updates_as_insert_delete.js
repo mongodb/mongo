@@ -12,6 +12,7 @@
 load('jstests/libs/discover_topology.js');
 load('jstests/sharding/libs/resharding_test_fixture.js');
 load('jstests/sharding/libs/sharded_transactions_helpers.js');
+load("jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js");
 
 const reshardingTest = new ReshardingTest({numDonors: 2, numRecipients: 2, reshardInPlace: true});
 reshardingTest.setup();
@@ -74,11 +75,19 @@ reshardingTest.withReshardingInBackground(  //
             ErrorCodes.InvalidOptions,
             'was able to update value under new shard key when {multi: true} specified');
 
-        assert.commandFailedWithCode(
-            sessionColl.update({_id: 0}, {$set: {y: 10}}),
-            31025,
-            'was able to update value under new shard key without specifying the full shard key ' +
-                'in the query');
+        // Sharded updateOnes that do not directly target a shard can now use the two phase write
+        // protocol to execute.
+        if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(mongos)) {
+            // TODO: SERVER-70581 Handle WCOS for update and findAndModify if replacement document
+            // changes data placement
+            // assert.commandWorked(sessionColl.update({_id: 0}, {$set: {y: 10}}));
+        } else {
+            assert.commandFailedWithCode(
+                sessionColl.update({_id: 0}, {$set: {y: 10}}),
+                31025,
+                'was able to update value under new shard key without specifying the full shard ' +
+                    'key in the query');
+        }
 
         let res;
         assert.soon(

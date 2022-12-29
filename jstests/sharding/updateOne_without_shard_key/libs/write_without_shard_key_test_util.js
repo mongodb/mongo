@@ -12,6 +12,12 @@ var WriteWithoutShardKeyTestUtil = (function() {
         transaction: "Running as a transaction"
     };
 
+    const OperationType = {
+        updateOne: 1,
+        deleteOne: 2,
+        findAndModify: 3,
+    };
+
     function setupShardedCollection(st, nss, shardKey, splitPoints, chunksToMove) {
         const splitString = nss.split(".");
         const dbName = splitString[0];
@@ -34,7 +40,7 @@ var WriteWithoutShardKeyTestUtil = (function() {
     }
 
     /*
-     * Validates the result of doing a write without a shard key.
+     * Validates the result of doing a update without a shard key.
      * - For non-replacement style updates,
      * we expect that for all of the documents in the collection, a modification is only applied to
      * one of the matching documents.
@@ -42,7 +48,7 @@ var WriteWithoutShardKeyTestUtil = (function() {
      * - For replacement style updates, we expect that the final replacement modification is a
      * unique document in the collection.
      */
-    function validateResult(docs, expectedMods, isReplacementTest) {
+    function validateResultUpdate(docs, expectedMods, isReplacementTest) {
         expectedMods.forEach(mod => {
             if (isReplacementTest) {
                 let matches = 0;
@@ -69,19 +75,35 @@ var WriteWithoutShardKeyTestUtil = (function() {
     }
 
     /*
+     * Validates that we've successfully removed the appropriate number of documents.
+     */
+    function validateResultDelete(numDocsLeft, expectedDocsLeft) {
+        assert.eq(numDocsLeft, expectedDocsLeft);
+    }
+
+    /*
      * Inserts a batch of documents and runs a write without shard key and returns all of the
      * documents inserted.
      */
-    function insertDocsAndRunCommand(conn, collName, docsToInsert, cmdObj) {
+    function insertDocsAndRunCommand(
+        conn, collName, docsToInsert, cmdObj, operationType, expectedResponse) {
         assert.commandWorked(conn.getCollection(collName).insert(docsToInsert));
-        assert.commandWorked(conn.runCommand(cmdObj));
+        let res = assert.commandWorked(conn.runCommand(cmdObj));
+        if (operationType === OperationType.updateOne) {
+            assert.eq(expectedResponse.n, res.n);
+            assert.eq(expectedResponse.nModified, res.nModified);
+        } else if (operationType === OperationType.deleteOne) {
+            assert.eq(expectedResponse.n, res.n);
+        } else {
+            // TODO: SERVER-71850 Add in findAndModify support.
+        }
         return conn.getCollection(collName).find({}).toArray();
     }
 
     /*
      * Runs a test using a cmdObj with multiple configurations e.g. with/without a session etc.
      */
-    function runTestWithConfig(conn, testCase, config) {
+    function runTestWithConfig(conn, testCase, config, operationType) {
         testCase.options.forEach(option => {
             jsTestLog(testCase.logMessage + "\n" +
                       "For option: " + tojson(option) + "\n" + config);
@@ -92,8 +114,12 @@ var WriteWithoutShardKeyTestUtil = (function() {
             if (config == Configurations.transaction) {
                 conn.startTransaction();
                 dbConn = conn.getDatabase(testCase.dbName);
-                allMatchedDocs = insertDocsAndRunCommand(
-                    dbConn, testCase.collName, testCase.docsToInsert, newCmdObj, config);
+                allMatchedDocs = insertDocsAndRunCommand(dbConn,
+                                                         testCase.collName,
+                                                         testCase.docsToInsert,
+                                                         newCmdObj,
+                                                         operationType,
+                                                         testCase.expectedResponse);
                 conn.commitTransaction_forTesting();
             } else {
                 switch (config) {
@@ -104,11 +130,30 @@ var WriteWithoutShardKeyTestUtil = (function() {
                     default:
                         dbConn = conn.getDB(testCase.dbName);
                 }
-                allMatchedDocs = insertDocsAndRunCommand(
-                    dbConn, testCase.collName, testCase.docsToInsert, newCmdObj, config);
+                allMatchedDocs = insertDocsAndRunCommand(dbConn,
+                                                         testCase.collName,
+                                                         testCase.docsToInsert,
+                                                         newCmdObj,
+                                                         operationType,
+                                                         testCase.expectedResponse);
             }
 
-            validateResult(allMatchedDocs, testCase.expectedMods, testCase.replacementDocTest);
+            switch (operationType) {
+                case OperationType.updateOne:
+                    validateResultUpdate(
+                        allMatchedDocs, testCase.expectedMods, testCase.replacementDocTest);
+                    break;
+                case OperationType.deleteOne:
+                    validateResultDelete(
+                        allMatchedDocs.length,
+                        testCase.docsToInsert.length - testCase.expectedResponse.n);
+                    break;
+                case OperationType.findAndModify:
+                    // TODO: SERVER-71850 Add in findAndModify support.
+                    break;
+                default:
+                    throw 'Invalid OperationType.';
+            }
 
             // Clean up the collection for the next test case without dropping the collection.
             assert.commandWorked(dbConn.getCollection(testCase.collName).remove({}));
@@ -159,8 +204,8 @@ var WriteWithoutShardKeyTestUtil = (function() {
         getClusterConnection,
         runTestWithConfig,
         insertDocsAndRunCommand,
-        validateResult,
         Configurations,
+        OperationType,
         isWriteWithoutShardKeyFeatureEnabled
     };
 })();

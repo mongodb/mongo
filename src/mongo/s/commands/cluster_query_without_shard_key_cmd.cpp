@@ -84,6 +84,7 @@ BSONObj createAggregateCmdObj(OperationContext* opCtx,
                                       {BSON("$match" << parsedInfo.query),
                                        BSON("$limit" << 1),
                                        BSON("$project" << BSON("_id" << 1))});
+    aggregate.setCollation(parsedInfo.collation);
     return aggregate.toBSON({});
 }
 

@@ -19,8 +19,9 @@ unionColl.drop();
 assert.commandWorked(baseColl.insert({a: 1}));
 
 // Disallowed within an update pipeline.
-assert.commandFailedWithCode(baseColl.update({a: 1}, [{$unionWith: unionColl.getName()}]),
-                             ErrorCodes.InvalidOptions);
+assert.commandFailedWithCode(
+    baseColl.update({a: 1}, [{$unionWith: unionColl.getName()}]),
+    [ErrorCodes.InvalidOptions, ErrorCodes.OperationNotSupportedInTransaction]);
 
 function assertFailsWithCode(pipeline, errCode) {
     assert.commandFailedWithCode(db.runCommand({

@@ -176,19 +176,34 @@ assert.commandFailedWithCode(db.runCommand({
 
 // Update fails when invalid stage is specified. This is a sanity check rather than an exhaustive
 // test of all stages.
+
+// Prime the collection with a matching document for each of the following test cases in the case of
+// an updateOne without shard key since mongos does not validate the specified stage upfront, and no
+// matching documents would just return a no-op OK status instead of an error code.
+assert.commandWorked(coll.insert({x: 1, z: 1}));
 assert.commandFailedWithCode(coll.update({x: 1}, [{$match: {x: 1}}]), ErrorCodes.InvalidOptions);
+
+assert.commandWorked(coll.insert({x: 1, z: 1}));
 assert.commandFailedWithCode(coll.update({x: 1}, [{$sort: {x: 1}}]), ErrorCodes.InvalidOptions);
+
+assert.commandWorked(coll.insert({x: 1, z: 1}));
 assert.commandFailedWithCode(coll.update({x: 1}, [{$facet: {a: [{$match: {x: 1}}]}}]),
                              ErrorCodes.InvalidOptions);
+
+assert.commandWorked(coll.insert({x: 1, z: 1}));
 assert.commandFailedWithCode(
     coll.update(
         {x: 1}, [{
             $bucket: {groupBy: "$a", boundaries: [0, 1], default: "foo", output: {count: {$sum: 1}}}
         }]),
     ErrorCodes.InvalidOptions);
+
+assert.commandWorked(coll.insert({x: 1, z: 1}));
 assert.commandFailedWithCode(
     coll.update({x: 1}, [{$lookup: {from: "foo", as: "as", localField: "a", foreignField: "b"}}]),
     ErrorCodes.InvalidOptions);
+
+assert.commandWorked(coll.insert({x: 1, z: 1}));
 assert.commandFailedWithCode(
     coll.update(
         {x: 1}, [{
@@ -198,6 +213,7 @@ assert.commandFailedWithCode(
     ErrorCodes.InvalidOptions);
 
 // $indexStats is not supported in a transaction passthrough and will fail with a different error.
+assert.commandWorked(coll.insert({x: 1, z: 1}));
 assert.commandFailedWithCode(
     coll.update({x: 1}, [{$indexStats: {}}]),
     [ErrorCodes.InvalidOptions, ErrorCodes.OperationNotSupportedInTransaction]);

@@ -6,6 +6,8 @@
 (function() {
 'use strict';
 
+load("jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js");
+
 var st = new ShardingTest({shards: 2, mongos: 3, other: {shardOptions: {verbose: 2}}});
 
 var mongos = st.s0;
@@ -61,9 +63,16 @@ assert.commandWorked(coll.insert({d: "d"}));
 assert.commandWorked(staleCollA.update({d: "d"}, {$set: {x: "x"}}, false, false));
 assert.eq(staleCollA.findOne().x, "x");
 
-// Make sure we unsuccessfully update with old info
-assert.commandFailedWithCode(staleCollB.update({c: "c"}, {$set: {x: "y"}}, false, false),
-                             ErrorCodes.InvalidOptions);
+// Sharded updateOnes that do not directly target a shard can now use the two phase write protocol
+// to execute.
+if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(admin)) {
+    assert.commandWorked(staleCollB.update({c: "c"}, {$set: {x: "y"}}, false, false));
+} else {
+    // Make sure we unsuccessfully update with old info
+    assert.commandFailedWithCode(staleCollB.update({c: "c"}, {$set: {x: "y"}}, false, false),
+                                 ErrorCodes.InvalidOptions);
+}
+
 assert.eq(staleCollB.findOne().x, "x");
 
 // Change the collection sharding state
@@ -79,8 +88,14 @@ assert.commandWorked(coll.insert({e: "e"}));
 assert.commandWorked(staleCollA.remove({e: "e"}, true));
 assert.eq(null, staleCollA.findOne());
 
-// Make sure we unsuccessfully remove with old info
-assert.commandFailedWithCode(staleCollB.remove({d: "d"}, true), ErrorCodes.ShardKeyNotFound);
+// Sharded deleteOnes that do not directly target a shard can now use the two phase write protocol
+// to execute.
+if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(admin)) {
+    assert.commandWorked(staleCollB.remove({d: "d"}, true));
+} else {
+    // Make sure we unsuccessfully remove with old info
+    assert.commandFailedWithCode(staleCollB.remove({d: "d"}, true), ErrorCodes.ShardKeyNotFound);
+}
 
 st.stop();
 })();

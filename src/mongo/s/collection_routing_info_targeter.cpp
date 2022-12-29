@@ -32,6 +32,7 @@
 
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/pipeline_d.h"
@@ -500,7 +501,9 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
                    "single shard (and have the simple collation), but this update targeted "
                 << endPoints.size() << " shards. Update request: " << updateOp.toBSON()
                 << ", shard key pattern: " << shardKeyPattern.toString(),
-            updateOp.getMulti() || isExactIdQuery(opCtx, _nss, query, collation, _cri.cm));
+            updateOp.getMulti() || isExactIdQuery(opCtx, _nss, query, collation, _cri.cm) ||
+                feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
+                    serverGlobalParams.featureCompatibility));
 
     // If the request is {multi:false}, then this is a single op-style update which we are
     // broadcasting to multiple shards by exact _id. Record this event in our serverStatus metrics.
@@ -594,7 +597,9 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetDelete(
                              "shard key (and have the simple collation). Delete request: "
                           << deleteOp.toBSON()
                           << ", shard key pattern: " << _cri.cm.getShardKeyPattern().toString(),
-            !_cri.cm.isSharded() || deleteOp.getMulti() || isExactIdQuery(opCtx, *cq, _cri.cm));
+            !_cri.cm.isSharded() || deleteOp.getMulti() || isExactIdQuery(opCtx, *cq, _cri.cm) ||
+                feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
+                    serverGlobalParams.featureCompatibility));
 
     if (chunkRanges) {
         chunkRanges->clear();

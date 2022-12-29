@@ -696,13 +696,28 @@ void UpdateStage::_checkRestrictionsOnUpdatingShardKeyAreNotViolated(
     // shard key fields.
     const auto& shardKeyPathsVector = collDesc.getKeyPatternFields();
     pathsupport::EqualityMatches equalities;
+
+    // We can now update a document shard key without needing to specify the full shard key in the
+    // query. The protocol to perform the write uses _id with a proper shardVersion to target the
+    // specific document, but due to current constraints that _id writes are manually broadcast with
+    // ShardVersion::Ignored, we differentiate user queries that originally only contained _id and
+    // the protocol's use of _id in its queries by the shardVersion set.
+    auto sentShardVersion =
+        OperationShardingState::get(opCtx()).getShardVersion(_params.request->getNamespaceString());
+    bool allowShardKeyUpdatesWithoutFullShardKeyInQuery =
+        feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
+            serverGlobalParams.featureCompatibility) &&
+        sentShardVersion && !ShardVersion::isIgnoredVersion(*sentShardVersion);
+
     uassert(31025,
-            "Shard key update is not allowed without specifying the full shard key in the query",
-            _params.canonicalQuery &&
-                pathsupport::extractFullEqualityMatches(
-                    *(_params.canonicalQuery->root()), shardKeyPaths, &equalities)
-                    .isOK() &&
-                equalities.size() == shardKeyPathsVector.size());
+            "Shard key update is not allowed without specifying the full shard key in the "
+            "query",
+            (_params.canonicalQuery &&
+             pathsupport::extractFullEqualityMatches(
+                 *(_params.canonicalQuery->root()), shardKeyPaths, &equalities)
+                 .isOK() &&
+             equalities.size() == shardKeyPathsVector.size()) ||
+                allowShardKeyUpdatesWithoutFullShardKeyInQuery);
 
     // We do not allow updates to the shard key when 'multi' is true.
     uassert(ErrorCodes::InvalidOptions,

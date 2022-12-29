@@ -48,6 +48,7 @@
 #include "mongo/s/request_types/cluster_commands_without_shard_key_gen.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/write_ops/batch_write_op.h"
+#include "mongo/s/write_ops/write_without_shard_key_util.h"
 #include "mongo/util/exit.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -370,6 +371,85 @@ void executeChildBatches(OperationContext* opCtx,
         }
     }
 }
+
+void executeTwoPhaseWrite(OperationContext* opCtx,
+                          NSTargeter& targeter,
+                          BatchWriteOp& batchOp,
+                          std::map<ShardId, std::unique_ptr<TargetedWriteBatch>>& childBatches,
+                          BatchWriteExecStats* stats,
+                          const BatchedCommandRequest& clientRequest,
+                          int currentWriteIndex,
+                          bool& abortBatch) {
+
+    // Extract the current write from the batch and construct a command object with the
+    // write by itself.
+    BSONObj cmdObj;
+    if (clientRequest.getBatchType() == BatchedCommandRequest::BatchType_Update) {
+        auto updateInBatch = clientRequest.getUpdateRequest().getUpdates().at(currentWriteIndex);
+        write_ops::UpdateCommandRequest updateRequest(clientRequest.getNS(), {updateInBatch});
+        cmdObj = updateRequest.toBSON({}).getOwned();
+    } else {
+        auto deleteInBatch = clientRequest.getDeleteRequest().getDeletes().at(currentWriteIndex);
+        write_ops::DeleteCommandRequest deleteRequest(clientRequest.getNS(), {deleteInBatch});
+        cmdObj = deleteRequest.toBSON({}).getOwned();
+    }
+
+    auto swRes = write_without_shard_key::runTwoPhaseWriteProtocol(
+        opCtx, clientRequest.getNS(), std::move(cmdObj), currentWriteIndex);
+
+    Status responseStatus = swRes.getStatus();
+    BatchedCommandResponse batchedCommandResponse;
+    if (swRes.isOK()) {
+        std::string errMsg;
+        if (!batchedCommandResponse.parseBSON(swRes.getValue().getResponse(), &errMsg)) {
+            responseStatus = {ErrorCodes::FailedToParse, errMsg};
+        }
+    }
+
+    // Since we only send the write to a single shard, record the response of the write against the
+    // corresponding child batch for the targeted shard. Record no-ops for the remaining shards.
+    for (auto&& childBatch : childBatches) {
+        auto nextBatch = std::move(childBatch.second);
+
+        // If we're using the two phase write protocol we expect that each TargetedWriteBatch should
+        // only contain 1 write op for each shard.
+        invariant(nextBatch->getWrites().size() == 1);
+
+        if (responseStatus.isOK()) {
+            // If no document matches were made, then the shardId would be the empty string and all
+            // of the child batches would record no-ops.
+            if (swRes.getValue().getShardId() == nextBatch->getEndpoint().shardName) {
+                if ((abortBatch = processResponseFromRemote(opCtx,
+                                                            targeter,
+                                                            nextBatch->getEndpoint().shardName,
+                                                            batchedCommandResponse,
+                                                            batchOp,
+                                                            nextBatch.get(),
+                                                            stats))) {
+                    break;
+                }
+            } else {
+                processResponseFromRemote(opCtx,
+                                          targeter,
+                                          nextBatch->getEndpoint().shardName,
+                                          BatchedCommandResponse(),
+                                          batchOp,
+                                          nextBatch.get(),
+                                          stats);
+            }
+        } else {
+            // The ARS failed to retrieve the response due to some sort of local failure.
+            if ((abortBatch = processErrorResponseFromLocal(opCtx,
+                                                            batchOp,
+                                                            nextBatch.get(),
+                                                            responseStatus,
+                                                            nextBatch->getEndpoint().shardName,
+                                                            boost::none))) {
+                break;
+            }
+        }
+    }
+}
 }  // namespace
 
 void BatchWriteExec::executeBatch(OperationContext* opCtx,
@@ -446,40 +526,32 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
                 break;
             }
         } else {
-
             // If the targetStatus value is true, then we have detected an updateOne/deleteOne
             // request without a shard key or _id. We will use a two phase protocol to apply the
             // write.
             if (feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
                     serverGlobalParams.featureCompatibility) &&
                 targetStatus.getValue()) {
-                const auto currentWriteIndex =
-                    childBatches.begin()->second->getWrites()[0]->writeOpRef.first;
+                tassert(
+                    6992000, "Executing write batches with a size of 0", childBatches.size() > 0u);
 
-                // Extract the current write from the batch and construct a command object with the
-                // write by itself.
-                BSONObj cmdObj = [&] {
-                    if (clientRequest.getBatchType() == BatchedCommandRequest::BatchType_Update) {
-                        auto updateInBatch =
-                            clientRequest.getUpdateRequest().getUpdates().at(currentWriteIndex);
-                        write_ops::UpdateCommandRequest updateRequest(clientRequest.getNS(),
-                                                                      {updateInBatch});
-                        return updateRequest.toBSON({}).getOwned();
-                    } else {
-                        auto deleteInBatch =
-                            clientRequest.getDeleteRequest().getDeletes().at(currentWriteIndex);
-                        write_ops::DeleteCommandRequest deleteRequest(clientRequest.getNS(),
-                                                                      {deleteInBatch});
-                        return deleteRequest.toBSON({}).getOwned();
-                    }
-                }();
+                // Execute the two phase write protocol for writes that cannot directly target a
+                // shard. If there are any transaction errors, 'abortBatch' will be set.
+                executeTwoPhaseWrite(opCtx,
+                                     targeter,
+                                     batchOp,
+                                     childBatches,
+                                     stats,
+                                     clientRequest,
+                                     childBatches.begin()->second->getWrites()[0]->writeOpRef.first,
+                                     abortBatch);
+            } else {
+                // Tries to execute all of the child batches. If there are any transaction errors,
+                // 'abortBatch' will be set.
+                executeChildBatches(
+                    opCtx, targeter, clientRequest, childBatches, stats, batchOp, abortBatch);
             }
         }
-
-        // Tries to execute all of the child batches. If there are any transaction errors,
-        // 'abortBatch' will be set.
-        executeChildBatches(
-            opCtx, targeter, clientRequest, childBatches, stats, batchOp, abortBatch);
 
         ++rounds;
         ++stats->numRounds;

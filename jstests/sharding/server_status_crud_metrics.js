@@ -6,6 +6,8 @@
 (function() {
 "use strict";
 
+load("jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js");
+
 const st = new ShardingTest({shards: 2});
 const testDB = st.s.getDB("test");
 const testColl = testDB.coll;
@@ -52,25 +54,53 @@ assert.commandWorked(testColl.update({x: 1}, {$set: {a: 2}}, {multi: false}));
 assert.commandWorked(testColl.update({_id: 1}, {x: 1, a: 2}));
 assert.commandWorked(testColl.update({x: 1}, {x: 1, a: 1}));
 
-// Shouldn't increment the metric when routing fails.
-assert.commandFailedWithCode(testColl.update({}, {$set: {x: 2}}, {multi: false}),
-                             ErrorCodes.InvalidOptions);
-assert.commandFailedWithCode(testColl.update({_id: 1}, {$set: {x: 2}}, {upsert: true}),
-                             ErrorCodes.ShardKeyNotFound);
+// Sharded deleteOnes that do not directly target a shard can now use the two phase write
+// protocol to execute.
+if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
+    // TODO: SERVER-70581 Handle WCOS for update and findAndModify if replacement document changes
+    // data placement
 
-// Shouldn't increment the metrics for unsharded collection.
-assert.commandWorked(unshardedColl.update({_id: "missing"}, {$set: {a: 1}}, {multi: false}));
-assert.commandWorked(unshardedColl.update({_id: 1}, {$set: {a: 2}}, {multi: false}));
+    // Could match a different document on retry.
+    // assert.commandWorked(testColl.update({}, {$set: {x: 2}}, {multi: false}));
 
-// Shouldn't incement the metrics when query had invalid operator.
-assert.commandFailedWithCode(
-    testColl.update({_id: 1, $invalidOperator: 1}, {$set: {a: 2}}, {multi: false}),
-    ErrorCodes.BadValue);
+    // TODO: SERVER-69918 Implement upsert behavior for _clusterQueryWithoutShardKey
+    // assert.commandWorked(testColl.update({_id: 1}, {$set: {x: 2}}, {upsert: true}),
+    //                      ErrorCodes.ShardKeyNotFound);
 
-mongosServerStatus = testDB.adminCommand({serverStatus: 1});
+    // Shouldn't increment the metrics for unsharded collection.
+    assert.commandWorked(unshardedColl.update({_id: "missing"}, {$set: {a: 1}}, {multi: false}));
+    assert.commandWorked(unshardedColl.update({_id: 1}, {$set: {a: 2}}, {multi: false}));
 
-// Verify that only the first four upserts incremented the metric counter.
-assert.eq(4, mongosServerStatus.metrics.query.updateOneOpStyleBroadcastWithExactIDCount);
+    // Shouldn't increment the metrics when query had invalid operator.
+    assert.commandFailedWithCode(
+        testColl.update({_id: 1, $invalidOperator: 1}, {$set: {a: 2}}, {multi: false}),
+        ErrorCodes.BadValue);
+
+    mongosServerStatus = testDB.adminCommand({serverStatus: 1});
+
+    // Verify that only the first four upserts incremented the metric counter.
+    assert.eq(4, mongosServerStatus.metrics.query.updateOneOpStyleBroadcastWithExactIDCount);
+} else {
+    // Shouldn't increment the metric when routing fails.
+    assert.commandFailedWithCode(testColl.update({}, {$set: {x: 2}}, {multi: false}),
+                                 ErrorCodes.InvalidOptions);
+    assert.commandFailedWithCode(testColl.update({_id: 1}, {$set: {x: 2}}, {upsert: true}),
+                                 ErrorCodes.ShardKeyNotFound);
+
+    // Shouldn't increment the metrics for unsharded collection.
+    assert.commandWorked(unshardedColl.update({_id: "missing"}, {$set: {a: 1}}, {multi: false}));
+    assert.commandWorked(unshardedColl.update({_id: 1}, {$set: {a: 2}}, {multi: false}));
+
+    // Shouldn't incement the metrics when query had invalid operator.
+    assert.commandFailedWithCode(
+        testColl.update({_id: 1, $invalidOperator: 1}, {$set: {a: 2}}, {multi: false}),
+        ErrorCodes.BadValue);
+
+    mongosServerStatus = testDB.adminCommand({serverStatus: 1});
+
+    // Verify that only the first four upserts incremented the metric counter.
+    assert.eq(4, mongosServerStatus.metrics.query.updateOneOpStyleBroadcastWithExactIDCount);
+}
 
 st.stop();
 })();

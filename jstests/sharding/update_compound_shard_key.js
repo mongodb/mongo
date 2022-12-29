@@ -11,6 +11,7 @@
 
 load("jstests/sharding/libs/sharded_transactions_helpers.js");
 load("jstests/sharding/libs/update_shard_key_helpers.js");
+load("jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js");
 
 const st = new ShardingTest({mongos: 1, shards: 3});
 
@@ -132,15 +133,18 @@ assertUpdateWorkedWithNoMatchingDoc({x: 10}, {x: 10, y: 3, z: 3, a: 5}, false);
 assertUpdateWorkedWithNoMatchingDoc({x: 100, y: 55, a: 15}, {x: 100, y: 55, z: 3, a: 6}, false);
 assertUpdateWorkedWithNoMatchingDoc({x: 11, _id: 3}, {x: 11, y: 3, z: 3, a: 7}, false);
 
-// Partial shard key in query can target a single shard, but fails while attempting to
-// modify shard key value.
-assert.commandFailedWithCode(
-    st.s.getDB(kDbName).coll.update(
-        {x: 100, y: 50, a: 5}, {x: 100, y: 55, z: 3, a: 1}, {upsert: false}),
-    31025);
-assert.commandFailedWithCode(
-    st.s.getDB(kDbName).coll.update({x: 4, z: 3}, {x: 4, y: 3, z: 4, a: 1}, {upsert: false}),
-    31025);
+// Shard key field modifications do not have to specify full shard key.
+if (!WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
+    // Partial shard key in query can target a single shard, but fails while attempting to
+    // modify shard key value.
+    assert.commandFailedWithCode(
+        st.s.getDB(kDbName).coll.update(
+            {x: 100, y: 50, a: 5}, {x: 100, y: 55, z: 3, a: 1}, {upsert: false}),
+        31025);
+    assert.commandFailedWithCode(
+        st.s.getDB(kDbName).coll.update({x: 4, z: 3}, {x: 4, y: 3, z: 4, a: 1}, {upsert: false}),
+        31025);
+}
 
 // Full shard key in query, matches no document.
 assertUpdateWorkedWithNoMatchingDoc({x: 4, y: 0, z: 0}, {x: 1110, y: 55, z: 3, a: 111}, false);
@@ -159,11 +163,21 @@ assertUpdateWorkedWithNoMatchingDoc({_id: 1}, {x: 110, y: 55, z: 3, a: 110}, fal
 assertUpdateWorked({_id: 0, y: 3}, {z: 3, x: 4, y: 3, a: 2}, false, 0);
 assertUpdateWorked({_id: 0}, {z: 3, x: 4, y: 3, replStyle: 2}, false, 0);
 
-// When query matches a doc and fails to update because shard key needs to be updated.
-assert.commandFailedWithCode(
-    st.s.getDB(kDbName).coll.update({}, {x: 110, y: 55, z: 3, a: 110}, false), 31025);
-assert.commandFailedWithCode(
-    st.s.getDB(kDbName).coll.update({_id: 2}, {x: 110, y: 55, z: 3, a: 110}, false), 31025);
+// Shard key field modifications do not have to specify full shard key.
+if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
+    // TODO: SERVER-70581 Handle WCOS for update and findAndModify if replacement document changes
+    // data placement
+    // assert.commandWorked(st.s.getDB(kDbName).coll.update({}, {x: 110, y: 55, z: 3, a: 110},
+    // false));
+    assert.commandWorked(
+        st.s.getDB(kDbName).coll.update({_id: 2}, {x: 110, y: 55, z: 3, a: 110}, false));
+} else {
+    // When query matches a doc and fails to update because shard key needs to be updated.
+    assert.commandFailedWithCode(
+        st.s.getDB(kDbName).coll.update({}, {x: 110, y: 55, z: 3, a: 110}, false), 31025);
+    assert.commandFailedWithCode(
+        st.s.getDB(kDbName).coll.update({_id: 2}, {x: 110, y: 55, z: 3, a: 110}, false), 31025);
+}
 
 //
 // Test upsert-specific behaviours.
@@ -194,36 +208,42 @@ assertUpdateWorkedWithNoMatchingDoc(
 assert.commandWorked(session.commitTransaction_forTesting());
 assert.eq(1, sessionDB.coll.find(updateDocTxn).itcount());
 
-// Full shard key not specified in query.
+// Shard key field modifications do not have to specify full shard key.
+if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
+    // TODO: SERVER-69918 Implement upsert behavior for _clusterQueryWithoutShardKey
+} else {
+    // Full shard key not specified in query.
 
-// Query on partial shard key.
-assert.commandFailedWithCode(
-    st.s.getDB(kDbName).coll.update(
-        {x: 100, y: 50, a: 5}, {x: 100, y: 55, z: 3, a: 1}, {upsert: true}),
-    ErrorCodes.ShardKeyNotFound);
-assert.commandFailedWithCode(
-    st.s.getDB(kDbName).coll.update(
-        {x: 100, y: 50, nonExistingField: true}, {x: 100, y: 55, z: 3, a: 1}, {upsert: true}),
-    ErrorCodes.ShardKeyNotFound);
+    // Query on partial shard key.
+    assert.commandFailedWithCode(
+        st.s.getDB(kDbName).coll.update(
+            {x: 100, y: 50, a: 5}, {x: 100, y: 55, z: 3, a: 1}, {upsert: true}),
+        ErrorCodes.ShardKeyNotFound);
+    assert.commandFailedWithCode(
+        st.s.getDB(kDbName).coll.update(
+            {x: 100, y: 50, nonExistingField: true}, {x: 100, y: 55, z: 3, a: 1}, {upsert: true}),
+        ErrorCodes.ShardKeyNotFound);
 
-// Query on partial shard key with _id.
-assert.commandFailedWithCode(
-    st.s.getDB(kDbName).coll.update(
-        {x: 100, y: 50, a: 5, _id: 0}, {x: 100, y: 55, z: 3, a: 1}, {upsert: true}),
-    ErrorCodes.ShardKeyNotFound);
-assert.commandFailedWithCode(
-    st.s.getDB(kDbName).coll.update({x: 100, y: 50, a: 5, _id: 0, nonExistingField: true},
-                                    {x: 100, y: 55, z: 3, a: 1},
-                                    {upsert: true}),
-    ErrorCodes.ShardKeyNotFound);
+    // Query on partial shard key with _id.
+    assert.commandFailedWithCode(
+        st.s.getDB(kDbName).coll.update(
+            {x: 100, y: 50, a: 5, _id: 0}, {x: 100, y: 55, z: 3, a: 1}, {upsert: true}),
+        ErrorCodes.ShardKeyNotFound);
+    assert.commandFailedWithCode(
+        st.s.getDB(kDbName).coll.update({x: 100, y: 50, a: 5, _id: 0, nonExistingField: true},
+                                        {x: 100, y: 55, z: 3, a: 1},
+                                        {upsert: true}),
+        ErrorCodes.ShardKeyNotFound);
 
-// Query on only _id.
-assert.commandFailedWithCode(
-    st.s.getDB(kDbName).coll.update({_id: 0}, {z: 3, x: 4, y: 3, a: 2}, {upsert: true}),
-    ErrorCodes.ShardKeyNotFound);
-assert.commandFailedWithCode(
-    st.s.getDB(kDbName).coll.update({_id: "nonExisting"}, {z: 3, x: 4, y: 3, a: 2}, {upsert: true}),
-    ErrorCodes.ShardKeyNotFound);
+    // Query on only _id.
+    assert.commandFailedWithCode(
+        st.s.getDB(kDbName).coll.update({_id: 0}, {z: 3, x: 4, y: 3, a: 2}, {upsert: true}),
+        ErrorCodes.ShardKeyNotFound);
+    assert.commandFailedWithCode(
+        st.s.getDB(kDbName).coll.update(
+            {_id: "nonExisting"}, {z: 3, x: 4, y: 3, a: 2}, {upsert: true}),
+        ErrorCodes.ShardKeyNotFound);
+}
 
 //
 // Update Type Op-style.
@@ -267,15 +287,23 @@ assertUpdateWorkedWithNoMatchingDoc({x: -1, y: 0}, {"$set": {z: 3, y: 110, a: 91
 assertUpdateWorked({x: 4, z: 3}, {"$set": {opStyle: 3}}, false, 0);
 assertUpdateWorked({x: 4, _id: 0, z: 3}, {"$set": {y: 3, x: 4, z: 3, opStyle: 4}}, false, 0);
 
-// Partial shard key in query can target a single shard, but fails while attempting to modify
-// shard key value.
-assert.commandFailedWithCode(
-    st.s.getDB(kDbName).coll.update(
-        {_id: 1, x: 100, z: 3, a: 5}, {"$set": {y: 55, a: 11}}, {upsert: false}),
-    31025);
-assert.commandFailedWithCode(st.s.getDB(kDbName).coll.update(
-                                 {x: 4, z: 3}, {"$set": {x: 4, y: 3, z: 4, a: 1}}, {upsert: false}),
-                             31025);
+// Shard key field modifications do not have to specify full shard key.
+if (!WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
+    assert.commandFailedWithCode(
+        st.s.getDB(kDbName).coll.update({}, {x: 110, y: 55, z: 3, a: 110}, false), 31025);
+    assert.commandFailedWithCode(
+        st.s.getDB(kDbName).coll.update({_id: 2}, {x: 110, y: 55, z: 3, a: 110}, false), 31025);
+    // Partial shard key in query can target a single shard, but fails while attempting to modify
+    // shard key value.
+    assert.commandFailedWithCode(
+        st.s.getDB(kDbName).coll.update(
+            {_id: 1, x: 100, z: 3, a: 5}, {"$set": {y: 55, a: 11}}, {upsert: false}),
+        31025);
+    assert.commandFailedWithCode(
+        st.s.getDB(kDbName).coll.update(
+            {x: 4, z: 3}, {"$set": {x: 4, y: 3, z: 4, a: 1}}, {upsert: false}),
+        31025);
+}
 
 // Test upsert-specific behaviours.
 
@@ -301,33 +329,38 @@ assertUpdateWorkedWithNoMatchingDoc({x: 4, y: 0, z: 0, opStyle: true}, upsertDoc
 assert.commandWorked(session.commitTransaction_forTesting());
 assert.eq(1, sessionDB.coll.find(upsertDocTxn["$set"]).itcount());
 
-// Full shard key not specified in query.
+// Shard key field modifications do not have to specify full shard key.
+if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
+    // TODO: SERVER-69918 Implement upsert behavior for _clusterQueryWithoutShardKey
+} else {
+    // Full shard key not specified in query.
 
-// Query on _id doesn't work for upserts.
-assert.commandFailedWithCode(
-    st.s.getDB(kDbName).coll.update(
-        {_id: 0}, {"$set": {x: 2, y: 11, z: 10, opStyle: 7}}, {upsert: true}),
-    ErrorCodes.ShardKeyNotFound);
+    // Query on _id doesn't work for upserts.
+    assert.commandFailedWithCode(
+        st.s.getDB(kDbName).coll.update(
+            {_id: 0}, {"$set": {x: 2, y: 11, z: 10, opStyle: 7}}, {upsert: true}),
+        ErrorCodes.ShardKeyNotFound);
 
-// Partial shard key can target single shard. This style of update can work if SERVER-41243 is
-// implemented.
-assert.commandFailedWithCode(
-    st.s.getDB(kDbName).coll.update({x: 14}, {"$set": {opStyle: 5}}, {upsert: true}),
-    ErrorCodes.ShardKeyNotFound);
-assert.commandFailedWithCode(
-    st.s.getDB(kDbName).coll.update({x: 100, y: 51, nonExistingField: true},
-                                    {"$set": {x: 110, y: 55, z: 3, a: 8}},
-                                    {upsert: true}),
-    ErrorCodes.ShardKeyNotFound);
+    // Partial shard key can target single shard. This style of update can work if SERVER-41243 is
+    // implemented.
+    assert.commandFailedWithCode(
+        st.s.getDB(kDbName).coll.update({x: 14}, {"$set": {opStyle: 5}}, {upsert: true}),
+        ErrorCodes.ShardKeyNotFound);
+    assert.commandFailedWithCode(
+        st.s.getDB(kDbName).coll.update({x: 100, y: 51, nonExistingField: true},
+                                        {"$set": {x: 110, y: 55, z: 3, a: 8}},
+                                        {upsert: true}),
+        ErrorCodes.ShardKeyNotFound);
 
-// Partial shard key cannot target single shard.
-assert.commandFailedWithCode(
-    st.s.getDB(kDbName).coll.update(
-        {_id: 0, y: 3}, {"$set": {z: 3, x: 4, y: 3, a: 2}}, {upsert: true}),
-    ErrorCodes.ShardKeyNotFound);
-assert.commandFailedWithCode(
-    st.s.getDB(kDbName).coll.update({y: 3}, {"$set": {z: 3, x: 4, y: 3, a: 2}}, {upsert: true}),
-    ErrorCodes.ShardKeyNotFound);
+    // Partial shard key cannot target single shard.
+    assert.commandFailedWithCode(
+        st.s.getDB(kDbName).coll.update(
+            {_id: 0, y: 3}, {"$set": {z: 3, x: 4, y: 3, a: 2}}, {upsert: true}),
+        ErrorCodes.ShardKeyNotFound);
+    assert.commandFailedWithCode(
+        st.s.getDB(kDbName).coll.update({y: 3}, {"$set": {z: 3, x: 4, y: 3, a: 2}}, {upsert: true}),
+        ErrorCodes.ShardKeyNotFound);
+}
 //
 // Update with pipeline.
 //
@@ -393,10 +426,16 @@ assertUpdateWorkedWithNoMatchingDoc(
     {x: 46, z: 4}, [{$addFields: {y: 10, pipelineUpdateNoOp: false}}], false);
 assertUpdateWorked({x: 4, z: 3}, [{$addFields: {pipelineUpdateDoc: false}}], false, 0);
 
-// Partial shard key in query cannot target a single shard.
-assert.commandFailedWithCode(
-    st.s.getDB(kDbName).coll.update({z: 3, y: 3}, [{$addFields: {foo: 4}}], {upsert: false}),
-    [72, ErrorCodes.InvalidOptions]);
+// Shard key field modifications do not have to specify full shard key.
+if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
+    assert.commandWorked(
+        st.s.getDB(kDbName).coll.update({z: 3, y: 3}, [{$addFields: {foo: 4}}], {upsert: false}));
+} else {
+    // Partial shard key in query cannot target a single shard.
+    assert.commandFailedWithCode(
+        st.s.getDB(kDbName).coll.update({z: 3, y: 3}, [{$addFields: {foo: 4}}], {upsert: false}),
+        [72, ErrorCodes.InvalidOptions]);
+}
 
 // Test upsert-specific behaviours.
 
@@ -440,22 +479,26 @@ assertUpdateWorkedWithNoMatchingDoc({x: 4, y: 0, z: 0, pipelineUpdate: true},
 assert.commandWorked(session.commitTransaction_forTesting());
 assert.eq(1, sessionDB.coll.find(upsertProjectTxnDoc).itcount());
 
-// Full shard key not specified in query.
-assert.commandFailedWithCode(st.s.getDB(kDbName).coll.update(
-                                 {_id: 18, z: 4, x: 3}, [{$addFields: {foo: 4}}], {upsert: true}),
-                             ErrorCodes.ShardKeyNotFound);
-assert.commandFailedWithCode(
-    st.s.getDB(kDbName).coll.update({_id: 0},
-                                    [{
-                                        "$project": {
-                                            x: {$literal: 2111},
-                                            y: {$literal: 55},
-                                            z: {$literal: 3},
-                                            pipelineUpdate: {$literal: true}
-                                        }
-                                    }],
-                                    {upsert: true}),
-    ErrorCodes.ShardKeyNotFound);
-
+if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
+    // TODO: SERVER-69918 Implement upsert behavior for _clusterQueryWithoutShardKey
+} else {
+    // Full shard key not specified in query.
+    assert.commandFailedWithCode(
+        st.s.getDB(kDbName).coll.update(
+            {_id: 18, z: 4, x: 3}, [{$addFields: {foo: 4}}], {upsert: true}),
+        ErrorCodes.ShardKeyNotFound);
+    assert.commandFailedWithCode(
+        st.s.getDB(kDbName).coll.update({_id: 0},
+                                        [{
+                                            "$project": {
+                                                x: {$literal: 2111},
+                                                y: {$literal: 55},
+                                                z: {$literal: 3},
+                                                pipelineUpdate: {$literal: true}
+                                            }
+                                        }],
+                                        {upsert: true}),
+        ErrorCodes.ShardKeyNotFound);
+}
 st.stop();
 })();
