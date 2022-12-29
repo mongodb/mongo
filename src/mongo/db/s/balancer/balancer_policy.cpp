@@ -1031,15 +1031,13 @@ DataSizeInfo::DataSizeInfo(const ShardId& shardId,
                            const ChunkRange& chunkRange,
                            const ChunkVersion& version,
                            const KeyPattern& keyPattern,
-                           bool estimatedValue,
-                           int64_t maxSize)
+                           bool estimatedValue)
     : shardId(shardId),
       nss(nss),
       uuid(uuid),
       chunkRange(chunkRange),
       version(version),
       keyPattern(keyPattern),
-      estimatedValue(estimatedValue),
-      maxSize(maxSize) {}
+      estimatedValue(estimatedValue) {}
 
 }  // namespace mongo
