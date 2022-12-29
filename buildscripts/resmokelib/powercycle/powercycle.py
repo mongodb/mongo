@@ -1100,12 +1100,13 @@ def wait_for_mongod_shutdown(mongod_control, timeout=2 * ONE_HOUR_SECS):
 
 def get_mongo_client_args(host=None, port=None, task_config=None,
                           server_selection_timeout_ms=2 * ONE_HOUR_SECS * 1000,
-                          socket_timeout_ms=2 * ONE_HOUR_SECS * 1000):
+                          socket_timeout_ms=2 * ONE_HOUR_SECS * 1000, direct_connection=True):
     """Return keyword arg dict used in PyMongo client."""
     # Set the default serverSelectionTimeoutMS & socketTimeoutMS to 10 minutes.
     mongo_args = {
         "serverSelectionTimeoutMS": server_selection_timeout_ms,
-        "socketTimeoutMS": socket_timeout_ms
+        "socketTimeoutMS": socket_timeout_ms,
+        "directConnection": direct_connection,
     }
     if host:
         mongo_args["host"] = host
@@ -1165,7 +1166,7 @@ def mongo_reconfig_replication(mongo, host_port, repl_set):
     database = pymongo.database.Database(mongo, "local")
     system_replset = database.get_collection("system.replset")
     # Check if replica set has already been initialized
-    if not system_replset or not system_replset.find_one():
+    if system_replset is None or not system_replset.find_one():
         rs_config = {"_id": repl_set, "members": [{"_id": 0, "host": host_port}]}
         ret = mongo.admin.command("replSetInitiate", rs_config)
         LOGGER.info("Replication initialized: %s %s", ret, rs_config)
