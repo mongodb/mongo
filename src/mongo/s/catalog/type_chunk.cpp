@@ -239,14 +239,6 @@ StatusWith<ChunkType> ChunkType::_parseChunkBase(const BSONObj& source) {
     }
 
     {
-        Timestamp onCurrentShardSinceValue;
-        Status status = bsonExtractTimestampField(
-            source, onCurrentShardSince.name(), &onCurrentShardSinceValue);
-        chunk._onCurrentShardSince =
-            (status.isOK() ? (boost::optional<Timestamp>)onCurrentShardSinceValue : boost::none);
-    }
-
-    {
         BSONElement historyObj;
         Status status = bsonExtractTypedField(source, history.name(), Array, &historyObj);
         if (status.isOK()) {
@@ -255,12 +247,32 @@ StatusWith<ChunkType> ChunkType::_parseChunkBase(const BSONObj& source) {
                 return history.getStatus();
 
             chunk._history = std::move(history.getValue());
-            dassert(!chunk._onCurrentShardSince.has_value() ||
-                    *chunk._onCurrentShardSince == chunk._history.front().getValidAfter());
+
         } else if (status == ErrorCodes::NoSuchKey) {
             // History is missing, so it will be presumed empty
         } else {
             return status;
+        }
+    }
+
+    {
+        if (!chunk._history.empty()) {
+            Timestamp onCurrentShardSinceValue;
+            Status status = bsonExtractTimestampField(
+                source, onCurrentShardSince.name(), &onCurrentShardSinceValue);
+            if (status.isOK()) {
+                chunk._onCurrentShardSince = onCurrentShardSinceValue;
+                if (chunk._history.front().getValidAfter() != onCurrentShardSinceValue) {
+                    return {ErrorCodes::BadValue,
+                            str::stream()
+                                << "The first `validAfter` in the chunk's history is not "
+                                   "consistent with `onCurrentShardSince`: validAfter is "
+                                << chunk._history.front().getValidAfter()
+                                << " while onCurrentShardSince is " << *chunk._onCurrentShardSince};
+                }
+            } else {
+                chunk._onCurrentShardSince = boost::none;
+            }
         }
     }
 
@@ -481,11 +493,6 @@ BSONObj ChunkType::toConfigBSON() const {
                              static_cast<long long>(*_estimatedSizeBytes));
     if (_jumbo)
         builder.append(jumbo.name(), getJumbo());
-    if (_onCurrentShardSince) {
-        dassert(!_history.empty());
-        dassert(_history.front().getValidAfter() == *_onCurrentShardSince);
-        builder.append(onCurrentShardSince.name(), *_onCurrentShardSince);
-    }
     addHistoryToBSON(builder);
     return builder.obj();
 }
@@ -500,8 +507,6 @@ BSONObj ChunkType::toShardBSON() const {
     builder.append(max.name(), getMax());
     builder.append(shard.name(), getShard().toString());
     builder.appendTimestamp(lastmod.name(), _version->toLong());
-    if (_onCurrentShardSince)
-        builder.append(onCurrentShardSince.name(), *_onCurrentShardSince);
     addHistoryToBSON(builder);
     return builder.obj();
 }
@@ -556,10 +561,21 @@ void ChunkType::setOnCurrentShardSince(const Timestamp& onCurrentShardSince) {
 
 void ChunkType::addHistoryToBSON(BSONObjBuilder& builder) const {
     if (_history.size()) {
-        BSONArrayBuilder arrayBuilder(builder.subarrayStart(history.name()));
-        for (const auto& item : _history) {
-            BSONObjBuilder subObjBuilder(arrayBuilder.subobjStart());
-            item.serialize(&subObjBuilder);
+        if (_onCurrentShardSince.has_value()) {
+            uassert(ErrorCodes::BadValue,
+                    str::stream() << "The first `validAfter` in the chunk's history is not "
+                                     "consistent with `onCurrentShardSince`: validAfter is "
+                                  << _history.front().getValidAfter()
+                                  << " while onCurrentShardSince is " << *_onCurrentShardSince,
+                    _history.front().getValidAfter() == *_onCurrentShardSince);
+            builder.append(onCurrentShardSince.name(), *_onCurrentShardSince);
+        }
+        {
+            BSONArrayBuilder arrayBuilder(builder.subarrayStart(history.name()));
+            for (const auto& item : _history) {
+                BSONObjBuilder subObjBuilder(arrayBuilder.subobjStart());
+                item.serialize(&subObjBuilder);
+            }
         }
     }
 }
