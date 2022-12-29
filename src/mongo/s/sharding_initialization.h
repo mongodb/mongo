@@ -78,7 +78,8 @@ Status initializeGlobalShardingState(
  * Loads global settings from config server such as cluster ID and default write concern.
  */
 
-Status loadGlobalSettingsFromConfigServer(OperationContext* opCtx);
+Status loadGlobalSettingsFromConfigServer(OperationContext* opCtx,
+                                          ShardingCatalogClient* catalogClient);
 
 /**
  * Pre-caches mongod routing info for the calling process.

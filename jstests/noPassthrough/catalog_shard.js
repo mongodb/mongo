@@ -90,6 +90,22 @@ const newShardName =
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {skey: 20}}));
 }
 
+{
+    //
+    // Restart in shard role works. Restart all nodes to verify they don't rely on a majority of
+    // nodes being up.
+    //
+    const configNodes = st.configRS.nodes;
+    configNodes.forEach(node => {
+        st.configRS.restart(node, undefined, undefined, false /* wait */);
+    });
+    st.configRS.getPrimary();  // Waits for a stable primary.
+
+    // Basic CRUD and sharded DDL still works.
+    basicCRUD(st.s);
+    assert.commandWorked(st.s.adminCommand({split: ns, middle: {skey: 40}}));
+}
+
 st.stop();
 newShardRS.stopSet();
 }());

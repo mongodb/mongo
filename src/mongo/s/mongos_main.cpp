@@ -458,7 +458,7 @@ Status initializeSharding(OperationContext* opCtx) {
         return status;
     }
 
-    status = loadGlobalSettingsFromConfigServer(opCtx);
+    status = loadGlobalSettingsFromConfigServer(opCtx, Grid::get(opCtx)->catalogClient());
     if (!status.isOK()) {
         return status;
     }

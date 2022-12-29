@@ -220,18 +220,20 @@ Status initializeGlobalShardingState(
 }
 
 void loadCWWCFromConfigServerForReplication(OperationContext* opCtx) {
-    if (serverGlobalParams.clusterRole != ClusterRole::ShardServer) {
+    if (!serverGlobalParams.clusterRole.isExclusivelyShardRole()) {
+        // Cluster wide read/write concern in a sharded cluster lives on the config server, so a
+        // config server node's local cache will be correct and explicitly checking for a default
+        // write concern via remote command is unnecessary.
+        //
+        // TODO SERVER-72696: Verify this when updating CWWC logic for a catalog shard.
         return;
     }
 
     repl::ReplicationCoordinator::get(opCtx)->recordIfCWWCIsSetOnConfigServerOnStartup(opCtx);
 }
 
-Status loadGlobalSettingsFromConfigServer(OperationContext* opCtx) {
-    if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-        return Status::OK();
-    }
-
+Status loadGlobalSettingsFromConfigServer(OperationContext* opCtx,
+                                          ShardingCatalogClient* catalogClient) {
     while (!globalInShutdownDeprecated()) {
         auto stopStatus = opCtx->checkForInterruptNoAssert();
         if (!stopStatus.isOK()) {
@@ -239,11 +241,21 @@ Status loadGlobalSettingsFromConfigServer(OperationContext* opCtx) {
         }
 
         try {
-            auto catalogClient = Grid::get(opCtx)->catalogClient();
+            // It's safe to use local read concern on a config server because we'll read from the
+            // local node, and we only enter here if we found a shardIdentity document, which could
+            // only exist locally if we already inserted the cluster identity document. Between
+            // inserting a cluster id and adding a shard, there is at least one majority write on
+            // the added shard (dropping the sessions collection), so we should be guaranteed the
+            // cluster id cannot roll back.
+            auto readConcern = serverGlobalParams.clusterRole == ClusterRole::ConfigServer
+                ? repl::ReadConcernLevel::kLocalReadConcern
+                : repl::ReadConcernLevel::kMajorityReadConcern;
             uassertStatusOK(ClusterIdentityLoader::get(opCtx)->loadClusterId(
-                opCtx, catalogClient, repl::ReadConcernLevel::kMajorityReadConcern));
+                opCtx, catalogClient, readConcern));
+
             // Assert will be raised on failure to talk to config server.
             loadCWWCFromConfigServerForReplication(opCtx);
+
             return Status::OK();
         } catch (const DBException& ex) {
             Status status = ex.toStatus();

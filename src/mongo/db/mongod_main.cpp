@@ -137,6 +137,7 @@
 #include "mongo/db/s/collection_sharding_state_factory_shard.h"
 #include "mongo/db/s/collection_sharding_state_factory_standalone.h"
 #include "mongo/db/s/config/configsvr_coordinator_service.h"
+#include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/config_server_op_observer.h"
 #include "mongo/db/s/migration_util.h"
 #include "mongo/db/s/op_observer_sharding_impl.h"
@@ -671,16 +672,11 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
 
     WaitForMajorityService::get(serviceContext).startup(serviceContext);
 
-    // This function may take the global lock.
-    auto shardingInitialized = ShardingInitializationMongoD::get(startupOpCtx.get())
-                                   ->initializeShardingAwarenessIfNeeded(startupOpCtx.get());
-    if (shardingInitialized) {
-        auto status = loadGlobalSettingsFromConfigServer(startupOpCtx.get());
-        if (!status.isOK()) {
-            LOGV2(20545,
-                  "Error loading global settings from config server at startup",
-                  "error"_attr = redact(status));
-        }
+    if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
+        // A catalog shard initializes sharding awareness after setting up its config server state.
+
+        // This function may take the global lock.
+        initializeShardingAwarenessIfNeededAndLoadGlobalSettings(startupOpCtx.get());
     }
 
     try {
@@ -744,7 +740,10 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         }
 
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-            initializeGlobalShardingStateForConfigServer(startupOpCtx.get());
+            initializeGlobalShardingStateForConfigServerIfNeeded(startupOpCtx.get());
+
+            // This function may take the global lock.
+            initializeShardingAwarenessIfNeededAndLoadGlobalSettings(startupOpCtx.get());
         }
 
         if (serverGlobalParams.clusterRole == ClusterRole::None &&

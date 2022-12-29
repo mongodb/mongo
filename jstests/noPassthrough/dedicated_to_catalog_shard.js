@@ -35,6 +35,13 @@ const configCS = st.configRS.getURL();
 
     // Failover works.
     st.configRS.stepUp(st.configRS.getSecondary());
+
+    // Restart works. Restart all nodes to verify they don't rely on a majority of nodes being up.
+    const configNodes = st.configRS.nodes;
+    configNodes.forEach(node => {
+        st.configRS.restart(node, undefined, undefined, false /* wait */);
+    });
+    st.configRS.getPrimary();  // Waits for a stable primary.
 }
 
 //
