@@ -239,9 +239,6 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
                                       std::vector<InsertStatement>::const_iterator end,
                                       bool fromMigrate) {
     const auto& nss = coll->ns();
-    auto metadata = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-                        opCtx, nss, CSRAcquisitionMode::kShared)
-                        ->getCurrentMetadataIfKnown();
 
     for (auto it = begin; it != end; ++it) {
         const auto& insertedDoc = it->doc;
@@ -328,13 +325,20 @@ void ShardServerOpObserver::onInserts(OperationContext* opCtx,
             });
         }
 
-        if (metadata && metadata->isSharded()) {
-            incrementChunkOnInsertOrUpdate(opCtx,
-                                           nss,
-                                           *metadata->getChunkManager(),
-                                           insertedDoc,
-                                           insertedDoc.objsize(),
-                                           fromMigrate);
+        if (!nss.isNamespaceAlwaysUnsharded() &&
+            !feature_flags::gNoMoreAutoSplitter.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
+            auto metadata = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+                                opCtx, nss, CSRAcquisitionMode::kShared)
+                                ->getCurrentMetadataIfKnown();
+            if (metadata && metadata->isSharded()) {
+                incrementChunkOnInsertOrUpdate(opCtx,
+                                               nss,
+                                               *metadata->getChunkManager(),
+                                               insertedDoc,
+                                               insertedDoc.objsize(),
+                                               fromMigrate);
+            }
         }
     }
 }
@@ -500,16 +504,20 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
             });
     }
 
-    auto metadata = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-                        opCtx, args.coll->ns(), CSRAcquisitionMode::kShared)
-                        ->getCurrentMetadataIfKnown();
-    if (metadata && metadata->isSharded()) {
-        incrementChunkOnInsertOrUpdate(opCtx,
-                                       args.coll->ns(),
-                                       *metadata->getChunkManager(),
-                                       args.updateArgs->updatedDoc,
-                                       args.updateArgs->updatedDoc.objsize(),
-                                       args.updateArgs->source == OperationSource::kFromMigrate);
+    if (!args.coll->ns().isNamespaceAlwaysUnsharded() &&
+        !feature_flags::gNoMoreAutoSplitter.isEnabled(serverGlobalParams.featureCompatibility)) {
+        auto metadata = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
+                            opCtx, args.coll->ns(), CSRAcquisitionMode::kShared)
+                            ->getCurrentMetadataIfKnown();
+        if (metadata && metadata->isSharded()) {
+            incrementChunkOnInsertOrUpdate(opCtx,
+                                           args.coll->ns(),
+                                           *metadata->getChunkManager(),
+                                           args.updateArgs->updatedDoc,
+                                           args.updateArgs->updatedDoc.objsize(),
+                                           args.updateArgs->source ==
+                                               OperationSource::kFromMigrate);
+        }
     }
 }
 
