@@ -51,7 +51,8 @@ namespace {
 // Removes the named pipe and logs an info message if there's an error. The info message should be
 // fine since this is a test-only implementation.
 void removeAndLog(const char* pipeAbsolutePath) {
-    if (remove(pipeAbsolutePath) < 0) {
+    // Suppress the expected non-error "error" ENOENT ("No such file or directory").
+    if ((remove(pipeAbsolutePath) < 0) && (errno != ENOENT)) {
         LOGV2_INFO(7097000,
                    "Failed to remove",
                    "error"_attr = getErrorMessage("remove", pipeAbsolutePath));
