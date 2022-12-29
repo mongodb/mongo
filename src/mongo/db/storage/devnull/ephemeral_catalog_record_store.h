@@ -115,6 +115,10 @@ public:
         _data->dataSize = dataSize;
     }
 
+    virtual void reserveRecordIds(OperationContext* opCtx,
+                                  std::vector<RecordId>* out,
+                                  size_t nRecords) final{};
+
 protected:
     struct EphemeralForTestRecord {
         EphemeralForTestRecord() : size(0) {}

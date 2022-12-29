@@ -38,6 +38,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/capped_visibility.h"
 #include "mongo/db/catalog/collection_operation_source.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -580,6 +581,33 @@ public:
      * exceeds cappedMaxSize or cappedMaxDocs respectively.
      */
     virtual bool isCappedAndNeedsDelete(OperationContext* opCtx) const = 0;
+
+    /**
+     * When true, this collection uses the CappedSnapshots API to track concurrent writes and safely
+     * handle visibility for readers.
+     */
+    virtual bool usesCappedSnapshots() const = 0;
+
+    virtual std::vector<RecordId> reserveCappedRecordIds(OperationContext* opCtx,
+                                                         size_t nIds) const = 0;
+
+    /**
+     * When we write to a capped collection, we call this so that that the storage engine can manage
+     * the visibility of documents to ensure they are ordered by RecordId.
+     *
+     * Since this is called inside of a WriteUnitOfWork while holding a std::mutex, it is
+     * illegal to acquire any LockManager locks inside of this function.
+     */
+    virtual void registerCappedInserts(OperationContext* opCtx,
+                                       const RecordId& minRecord,
+                                       const RecordId& maxRecord) const = 0;
+    void registerCappedInsert(OperationContext* opCtx, const RecordId& recordId) const {
+        registerCappedInserts(opCtx, recordId, recordId);
+    }
+
+    virtual CappedVisibilityObserver* getCappedVisibilityObserver() const = 0;
+    virtual CappedVisibilitySnapshot takeCappedVisibilitySnapshot() const = 0;
+
 
     //
     // Stats

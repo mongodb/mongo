@@ -224,6 +224,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/curop',
         '$BUILD_DIR/mongo/db/record_id_helpers',
         '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+        '$BUILD_DIR/mongo/db/storage/capped_snapshots',
         '$BUILD_DIR/mongo/db/storage/record_store_base',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/db/storage/write_unit_of_work',
@@ -307,6 +308,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/storage/bson_collection_catalog_entry',
+        '$BUILD_DIR/mongo/db/storage/capped_snapshots',
         '$BUILD_DIR/mongo/db/storage/snapshot_helper',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/db/views/util',
@@ -401,6 +403,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/shard_role',
+        '$BUILD_DIR/mongo/db/storage/capped_snapshots',
         '$BUILD_DIR/mongo/db/storage/durable_catalog_impl',
         '$BUILD_DIR/mongo/db/storage/execution_context',
         '$BUILD_DIR/mongo/db/storage/historical_ident_tracker',
@@ -415,6 +418,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/ttl_collection_cache',
         '$BUILD_DIR/mongo/db/vector_clock',
         '$BUILD_DIR/mongo/db/views/view_catalog_helpers',
+        'capped_visibility',
         'catalog_helpers',
         'catalog_stats',
         'clustered_collection_options',
@@ -488,6 +492,17 @@ env.Library(
         '$BUILD_DIR/mongo/db/index/index_access_method',
         '$BUILD_DIR/mongo/util/fail_point',
         'validate_idl',
+    ],
+)
+
+env.Library(
+    target='capped_visibility',
+    source=[
+        'capped_visibility.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/storage/recovery_unit_base',
     ],
 )
 
@@ -638,6 +653,8 @@ if wiredtiger:
     env.CppUnitTest(
         target='db_catalog_test',
         source=[
+            'capped_collection_test.cpp',
+            'capped_visibility_test.cpp',
             'capped_utils_test.cpp',
             'catalog_control_test.cpp',
             'collection_catalog_test.cpp',
@@ -689,6 +706,7 @@ if wiredtiger:
             '$BUILD_DIR/mongo/util/clock_source_mock',
             '$BUILD_DIR/mongo/util/fail_point',
             '$BUILD_DIR/mongo/util/pcre_wrapper',
+            'capped_visibility',
             'catalog_control',
             'catalog_helpers',
             'catalog_impl',

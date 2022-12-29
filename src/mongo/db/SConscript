@@ -877,6 +877,7 @@ env.Library(
         'curop',
         'multitenancy',
         'server_base',
+        'storage/capped_snapshots',
         'storage/snapshot_helper',
     ],
 )

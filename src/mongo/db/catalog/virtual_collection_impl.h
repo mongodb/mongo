@@ -389,6 +389,31 @@ public:
         return false;
     }
 
+    bool usesCappedSnapshots() const final {
+        return false;
+    }
+
+    std::vector<RecordId> reserveCappedRecordIds(OperationContext* opCtx, size_t nIds) const final {
+        unimplementedTasserted();
+        return {};
+    }
+
+    void registerCappedInserts(OperationContext* opCtx,
+                               const RecordId& minRecord,
+                               const RecordId& maxRecord) const final {
+        unimplementedTasserted();
+    }
+
+    CappedVisibilityObserver* getCappedVisibilityObserver() const final {
+        unimplementedTasserted();
+        return nullptr;
+    }
+
+    CappedVisibilitySnapshot takeCappedVisibilitySnapshot() const final {
+        unimplementedTasserted();
+        return {};
+    }
+
     bool isCapped() const final {
         return false;
     }

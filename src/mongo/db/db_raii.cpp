@@ -37,6 +37,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/storage/capped_snapshots.h"
 #include "mongo/db/storage/snapshot_helper.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/logv2/log.h"
@@ -500,6 +501,10 @@ AutoGetCollectionForReadBase<AutoGetCollectionType, EmplaceAutoCollFunc>::
         assertReadConcernSupported(
             coll, readConcernArgs, opCtx->recoveryUnit()->getTimestampReadSource());
 
+        if (coll->usesCappedSnapshots()) {
+            CappedSnapshots::get(opCtx).establish(opCtx, coll);
+        }
+
         // We make a copy of the namespace so we can use the variable after locks are released,
         // since releasing locks will allow the value of coll->ns() to change.
         const NamespaceString nss = coll->ns();
@@ -680,12 +685,17 @@ void AutoGetCollectionForReadLockFreeLegacy::EmplaceHelper::emplace(
 
                     auto coll = catalog.lookupCollectionByUUIDForRead(opCtx, uuid);
 
-                    // After yielding and reacquiring locks, the preconditions that were used to
-                    // select our ReadSource initially need to be checked again. We select a
-                    // ReadSource based on replication state. After a query yields its locks, the
-                    // replication state may have changed, invalidating our current choice of
-                    // ReadSource. Using the same preconditions, change our ReadSource if necessary.
                     if (coll) {
+                        if (coll->usesCappedSnapshots()) {
+                            CappedSnapshots::get(opCtx).establish(opCtx, coll.get());
+                        }
+
+                        // After yielding and reacquiring locks, the preconditions that were used to
+                        // select our ReadSource initially need to be checked again. We select a
+                        // ReadSource based on replication state. After a query yields its locks,
+                        // the replication state may have changed, invalidating our current choice
+                        // of ReadSource. Using the same preconditions, change our ReadSource if
+                        // necessary.
                         SnapshotHelper::changeReadSourceIfNeeded(opCtx, coll->ns());
                     }
 

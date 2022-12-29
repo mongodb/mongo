@@ -116,6 +116,18 @@ env.Library(
 )
 
 env.Library(
+    target='capped_snapshots',
+    source=[
+        'capped_snapshots.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/catalog/collection',
+        'recovery_unit_base',
+    ],
+)
+
+env.Library(
     target='bson_collection_catalog_entry',
     source=[
         'bson_collection_catalog_entry.cpp',

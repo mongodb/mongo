@@ -30,20 +30,29 @@
 #include "mongo/db/catalog/capped_collection_maintenance.h"
 
 #include "mongo/db/op_observer/op_observer.h"
-
+#include "mongo/db/storage/capped_snapshots.h"
 namespace mongo {
 namespace collection_internal {
 namespace {
 
 class CappedDeleteSideTxn {
 public:
-    CappedDeleteSideTxn(OperationContext* opCtx) : _opCtx(opCtx) {
+    CappedDeleteSideTxn(OperationContext* opCtx, const CollectionPtr& collection) : _opCtx(opCtx) {
         _originalRecoveryUnit = _opCtx->releaseRecoveryUnit().release();
         invariant(_originalRecoveryUnit);
         _originalRecoveryUnitState = _opCtx->setRecoveryUnit(
             std::unique_ptr<RecoveryUnit>(
                 _opCtx->getServiceContext()->getStorageEngine()->newRecoveryUnit()),
             WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+
+        if (collection->usesCappedSnapshots()) {
+            // As is required by the API, we need to establish the capped visibility snapshot for
+            // this cursor on the new RecoveryUnit. This ensures we don't delete any records that
+            // come sequentially after any uncommitted records, which could mean we aren't actually
+            // deleting the oldest entry as we should. This is mostly a technicality and would only
+            // be an observable problem on capped collections with small limits.
+            CappedSnapshots::get(opCtx->recoveryUnit()).establish(opCtx, collection);
+        }
     }
 
     ~CappedDeleteSideTxn() {
@@ -104,7 +113,7 @@ void cappedDeleteUntilBelowConfiguredMaximum(OperationContext* opCtx,
     if (!collection->needsCappedLock()) {
         // Any capped deletes not performed under the capped lock need to commit the innermost
         // WriteUnitOfWork while 'cappedFirstRecordMutex' is locked.
-        cappedDeleteSideTxn.emplace(opCtx);
+        cappedDeleteSideTxn.emplace(opCtx, collection);
     }
 
     const long long currentDataSize = collection->dataSize(opCtx);

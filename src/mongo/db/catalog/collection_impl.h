@@ -237,6 +237,14 @@ public:
     long long getCappedMaxDocs() const final;
     long long getCappedMaxSize() const final;
 
+    bool usesCappedSnapshots() const final;
+    std::vector<RecordId> reserveCappedRecordIds(OperationContext* opCtx, size_t nIds) const final;
+    void registerCappedInserts(OperationContext* opCtx,
+                               const RecordId& minRecord,
+                               const RecordId& maxRecord) const final;
+    CappedVisibilityObserver* getCappedVisibilityObserver() const final;
+    CappedVisibilitySnapshot takeCappedVisibilitySnapshot() const final;
+
     long long numRecords(OperationContext* opCtx) const final;
 
     long long dataSize(OperationContext* opCtx) const final;
@@ -415,6 +423,15 @@ private:
         const bool _needCappedLock;
 
         AtomicWord<bool> _committed{true};
+
+        // Tracks in-progress capped inserts to inform visibility for forward scans so that no
+        // uncommitted records are skipped.
+        CappedVisibilityObserver _cappedObserver;
+
+        // This mutex synchronizes allocating and registering RecordIds for uncommited writes on
+        // capped collections that accept concurrent writes (i.e. usesCappedSnapshots()).
+        mutable Mutex _registerCappedIdsMutex =
+            MONGO_MAKE_LATCH("CollectionImpl::_registerCappedIdsMutex");
 
         // Time-series collections are allowed to contain measurements with arbitrary dates;
         // however, many of our query optimizations only work properly with dates that can be stored

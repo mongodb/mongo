@@ -72,8 +72,12 @@ public:
     InsertStatement(BSONObj toInsert, Timestamp ts, long long term)
         : oplogSlot(repl::OpTime(ts, term)), doc(std::move(toInsert)) {}
 
+    InsertStatement(BSONObj toInsert, RecordId rid)
+        : recordId(std::move(rid)), doc(std::move(toInsert)) {}
+
     std::vector<StmtId> stmtIds = {kUninitializedStmtId};
     OplogSlot oplogSlot;
+    RecordId recordId;
     BSONObj doc;
 };
 

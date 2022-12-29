@@ -39,6 +39,7 @@
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/storage/capped_snapshots.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/snapshot_helper.h"
@@ -2210,11 +2211,15 @@ void CollectionCatalog::cleanupForCatalogReopen(Timestamp stable) {
 
 void CollectionCatalog::invariantHasExclusiveAccessToCollection(OperationContext* opCtx,
                                                                 const NamespaceString& nss) {
+    invariant(hasExclusiveAccessToCollection(opCtx, nss), nss.toString());
+}
+
+bool CollectionCatalog::hasExclusiveAccessToCollection(OperationContext* opCtx,
+                                                       const NamespaceString& nss) {
     auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
-    invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X) ||
-                  (uncommittedCatalogUpdates.isCreatedCollection(opCtx, nss) &&
-                   opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX)),
-              nss.toString());
+    return opCtx->lockState()->isCollectionLockedForMode(nss, MODE_X) ||
+        (uncommittedCatalogUpdates.isCreatedCollection(opCtx, nss) &&
+         opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX));
 }
 
 CollectionPtr CollectionCatalog::_lookupSystemViews(OperationContext* opCtx,
@@ -2312,6 +2317,11 @@ const Collection* LookupCollectionForYieldRestore::operator()(OperationContext* 
     // the C-style pointer to the Collection.
     if (collection->ns() != _nss) {
         return nullptr;
+    }
+
+    // Non-lock-free readers use this path and need to re-establish their capped snapshot.
+    if (collection->usesCappedSnapshots()) {
+        CappedSnapshots::get(opCtx).establish(opCtx, collection.get());
     }
 
     // After yielding and reacquiring locks, the preconditions that were used to select our

@@ -138,6 +138,12 @@ protected:
         unimplementedTasserted();
     }
 
+    void reserveRecordIds(OperationContext* opCtx,
+                          std::vector<RecordId>* out,
+                          size_t nRecords) final {
+        unimplementedTasserted();
+    }
+
 private:
     void unimplementedTasserted() const {
         MONGO_UNIMPLEMENTED_TASSERT(6968600);

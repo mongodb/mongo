@@ -85,6 +85,7 @@ wtEnv.Library(
         '$BUILD_DIR/mongo/db/shard_role',
         '$BUILD_DIR/mongo/db/snapshot_window_options',
         '$BUILD_DIR/mongo/db/storage/backup_block',
+        '$BUILD_DIR/mongo/db/storage/capped_snapshots',
         '$BUILD_DIR/mongo/db/storage/storage_engine_parameters',
         '$BUILD_DIR/mongo/db/storage/storage_repair_observer',
         '$BUILD_DIR/mongo/util/log_and_backoff',

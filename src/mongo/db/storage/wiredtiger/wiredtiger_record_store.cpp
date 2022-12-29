@@ -54,6 +54,7 @@
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
+#include "mongo/db/storage/capped_snapshots.h"
 #include "mongo/db/storage/wiredtiger/oplog_stone_parameters_gen.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_cursor_helpers.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_customization_hooks.h"
@@ -1954,6 +1955,15 @@ void WiredTigerRecordStore::_initNextIdIfNeeded(OperationContext* opCtx) {
     _nextIdNum.store(nextId);
 }
 
+void WiredTigerRecordStore::reserveRecordIds(OperationContext* opCtx,
+                                             std::vector<RecordId>* out,
+                                             size_t nRecords) {
+    auto nextId = _reserveIdBlock(opCtx, nRecords);
+    for (size_t i = 0; i < nRecords; i++) {
+        out->push_back(RecordId(nextId++));
+    }
+}
+
 long long WiredTigerRecordStore::_reserveIdBlock(OperationContext* opCtx, size_t nRecords) {
     // Clustered record stores do not automatically generate int64 RecordIds. RecordIds are instead
     // constructed as binary strings, KeyFormat::String, from the user-defined cluster key.
@@ -2134,8 +2144,8 @@ WiredTigerRecordStoreCursorBase::WiredTigerRecordStoreCursorBase(OperationContex
                                                                  const WiredTigerRecordStore& rs,
                                                                  bool forward)
     : _rs(rs), _opCtx(opCtx), _forward(forward) {
-    if (_rs._isOplog) {
-        initOplogVisibility(_opCtx);
+    if (_rs._isCapped) {
+        initCappedVisibility(_opCtx);
     }
     _cursor.emplace(rs.getURI(), rs.tableId(), true, opCtx);
 }
@@ -2193,7 +2203,7 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
         return {};
     }
 
-    if (_forward && _oplogVisibleTs && id.getLong() > *_oplogVisibleTs) {
+    if (_forward && !isVisible(id)) {
         _eof = true;
         return {};
     }
@@ -2226,7 +2236,7 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::seekExact(const RecordI
         return {};
     }
 
-    if (_forward && _oplogVisibleTs && id.getLong() > *_oplogVisibleTs) {
+    if (_forward && !isVisible(id)) {
         _eof = true;
         return {};
     }
@@ -2274,6 +2284,8 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::seekNear(const RecordId
     // Additionally, forward scanning oplog cursors must not see past holes.
     if (_forward && _oplogVisibleTs && start.getLong() > *_oplogVisibleTs) {
         start = RecordId(*_oplogVisibleTs);
+    } else if (_forward && _cappedSnapshot && !_cappedSnapshot->isRecordVisible(start)) {
+        start = _cappedSnapshot->getHighestVisible();
     }
 
     _skipNextAdvance = false;
@@ -2325,7 +2337,7 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::seekNear(const RecordId
         return boost::none;
     }
 
-    if (_forward && _oplogVisibleTs && curId.getLong() > *_oplogVisibleTs) {
+    if (_forward && !isVisible(curId)) {
         _eof = true;
         return boost::none;
     }
@@ -2347,6 +2359,7 @@ void WiredTigerRecordStoreCursorBase::save() {
         if (_cursor)
             _cursor->reset();
         _oplogVisibleTs = boost::none;
+        _cappedSnapshot = boost::none;
         _readTimestampForOplog = boost::none;
         _hasRestored = false;
     } catch (const WriteConflictException&) {
@@ -2355,17 +2368,37 @@ void WiredTigerRecordStoreCursorBase::save() {
     }
 }
 
-void WiredTigerRecordStoreCursorBase::initOplogVisibility(OperationContext* opCtx) {
-    auto wtRu = WiredTigerRecoveryUnit::get(opCtx);
-    wtRu->setIsOplogReader();
-    if (_forward) {
-        _oplogVisibleTs = wtRu->getOplogVisibilityTs();
+bool WiredTigerRecordStoreCursorBase::isVisible(const RecordId& id) {
+    // The oplog does not use the capped snapshot mechanism, so it should be impossible for both to
+    // exist at once.
+    invariant(!(_oplogVisibleTs && _cappedSnapshot));
+    if (_oplogVisibleTs && id.getLong() > *_oplogVisibleTs) {
+        return false;
     }
-    boost::optional<Timestamp> readTs = wtRu->getPointInTimeReadTimestamp(opCtx);
-    if (readTs && readTs->asLL() != 0) {
-        // One cannot pass a read_timestamp of 0 to WT, but a "0" is commonly understand as every
-        // time is visible.
-        _readTimestampForOplog = readTs->asInt64();
+    if (_cappedSnapshot && !_cappedSnapshot->isRecordVisible(id)) {
+        return false;
+    }
+    return true;
+}
+
+void WiredTigerRecordStoreCursorBase::initCappedVisibility(OperationContext* opCtx) {
+    if (_rs._isOplog) {
+        auto wtRu = WiredTigerRecoveryUnit::get(opCtx);
+        wtRu->setIsOplogReader();
+        if (_forward) {
+            _oplogVisibleTs = wtRu->getOplogVisibilityTs();
+        }
+        boost::optional<Timestamp> readTs = wtRu->getPointInTimeReadTimestamp(opCtx);
+        if (readTs && readTs->asLL() != 0) {
+            // One cannot pass a read_timestamp of 0 to WT, but a "0" is commonly understood as
+            // every time is visible.
+            _readTimestampForOplog = readTs->asInt64();
+        }
+    } else if (_forward) {
+        // We can't enforce that the caller has initialized the capped snapshot before entering this
+        // function because we need to know, for example, what locks are held. So we expect higher
+        // layers to do so.
+        _cappedSnapshot = CappedSnapshots::get(_opCtx).getSnapshot(_rs._ident->getIdent());
     }
 }
 
@@ -2375,8 +2408,8 @@ void WiredTigerRecordStoreCursorBase::saveUnpositioned() {
 }
 
 bool WiredTigerRecordStoreCursorBase::restore(bool tolerateCappedRepositioning) {
-    if (_rs._isOplog) {
-        initOplogVisibility(_opCtx);
+    if (_rs._isCapped) {
+        initCappedVisibility(_opCtx);
     }
 
     if (!_cursor)

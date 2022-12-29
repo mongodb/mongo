@@ -126,6 +126,7 @@ public:
         kCommit
     };
 
+
     void commitRegisteredChanges(boost::optional<Timestamp> commitTimestamp);
     void abortRegisteredChanges();
     virtual ~RecoveryUnit() {}

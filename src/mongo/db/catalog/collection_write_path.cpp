@@ -137,7 +137,13 @@ Status insertDocumentsImpl(OperationContext* opCtx,
     std::vector<Timestamp> timestamps;
     timestamps.reserve(count);
 
-    for (auto it = begin; it != end; it++) {
+    std::vector<RecordId> cappedRecordIds;
+    if (collection->usesCappedSnapshots()) {
+        cappedRecordIds = collection->reserveCappedRecordIds(opCtx, count);
+    }
+
+    size_t i = 0;
+    for (auto it = begin; it != end; it++, i++) {
         const auto& doc = it->doc;
 
         RecordId recordId;
@@ -147,6 +153,12 @@ Status insertDocumentsImpl(OperationContext* opCtx,
                 record_id_helpers::keyForDoc(doc,
                                              collection->getClusteredInfo()->getIndexSpec(),
                                              collection->getDefaultCollator()));
+        } else if (!it->recordId.isNull()) {
+            // This case would only normally be called in a testing circumstance to avoid
+            // automatically generating record ids for capped collections.
+            recordId = it->recordId;
+        } else if (cappedRecordIds.size()) {
+            recordId = std::move(cappedRecordIds[i]);
         }
 
         if (MONGO_unlikely(corruptDocumentOnInsert.shouldFail())) {

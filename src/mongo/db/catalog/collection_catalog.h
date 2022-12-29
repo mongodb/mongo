@@ -644,6 +644,7 @@ public:
      */
     static void invariantHasExclusiveAccessToCollection(OperationContext* opCtx,
                                                         const NamespaceString& nss);
+    static bool hasExclusiveAccessToCollection(OperationContext* opCtx, const NamespaceString& nss);
 
 private:
     friend class CollectionCatalog::iterator;

@@ -58,6 +58,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/capped_snapshots.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_extended_range.h"
@@ -291,7 +292,10 @@ CollectionImpl::SharedState::SharedState(CollectionImpl* collection,
       // clustered capped collections because they only guarantee insertion order when cluster keys
       // are inserted in monotonically-increasing order.
       _isCapped(options.capped),
-      _needCappedLock(_isCapped && collection->ns().isReplicated() && !options.clusteredIndex) {}
+      _needCappedLock(_isCapped && collection->ns().isReplicated() && !options.clusteredIndex),
+      // The record store will be null when the collection is instantiated as part of the repair
+      // path.
+      _cappedObserver(_recordStore ? _recordStore->getIdent() : "") {}
 
 CollectionImpl::SharedState::~SharedState() {
     // The record store will be null when the collection is instantiated as part of the repair path.
@@ -524,6 +528,21 @@ bool CollectionImpl::requiresIdIndex() const {
 
 std::unique_ptr<SeekableRecordCursor> CollectionImpl::getCursor(OperationContext* opCtx,
                                                                 bool forward) const {
+    if (usesCappedSnapshots() && forward) {
+        if (opCtx->recoveryUnit()->isActive()) {
+            auto snapshot =
+                CappedSnapshots::get(opCtx).getSnapshot(_shared->_recordStore->getIdent());
+            invariant(
+                CollectionCatalog::hasExclusiveAccessToCollection(opCtx, ns()) || snapshot,
+                fmt::format("Capped visibility snapshot was not initialized before reading from "
+                            "collection non-exclusively: {}",
+                            _ns.ns()));
+        } else {
+            // We can lazily initialize the capped snapshot because no storage snapshot has been
+            // opened yet.
+            CappedSnapshots::get(opCtx).establish(opCtx, this);
+        }
+    }
     return _shared->_recordStore->getCursor(opCtx, forward);
 }
 
@@ -909,6 +928,67 @@ long long CollectionImpl::getCappedMaxDocs() const {
 
 long long CollectionImpl::getCappedMaxSize() const {
     return _metadata->options.cappedSize;
+}
+
+bool CollectionImpl::usesCappedSnapshots() const {
+    // Only use the behavior for non-replicated capped collections (which can accept concurrent
+    // writes). This behavior relies on RecordIds being allocated in increasing order. For clustered
+    // collections, users define their RecordIds and are not constrained to creating them in
+    // increasing order.
+    // The oplog tracks its visibility through support from the storage engine.
+    return isCapped() && !ns().isReplicated() && !ns().isOplog() && !isClustered();
+}
+
+CappedVisibilityObserver* CollectionImpl::getCappedVisibilityObserver() const {
+    invariant(usesCappedSnapshots());
+    return &_shared->_cappedObserver;
+}
+
+std::vector<RecordId> CollectionImpl::reserveCappedRecordIds(OperationContext* opCtx,
+                                                             size_t count) const {
+    invariant(usesCappedSnapshots());
+
+    // By registering ourselves as a writer, we inform the capped visibility system that we may be
+    // in the process of committing uncommitted records.
+    auto cappedObserver = getCappedVisibilityObserver();
+    cappedObserver->registerWriter(
+        opCtx->recoveryUnit(), [this]() { _shared->_recordStore->notifyCappedWaitersIfNeeded(); });
+
+    std::vector<RecordId> ids;
+    ids.reserve(count);
+    {
+        // We must atomically allocate and register any RecordIds so that we can correctly keep
+        // track of visibility. This ensures capped readers do not skip past any in-progress writes.
+        stdx::lock_guard<Latch> lk(_shared->_registerCappedIdsMutex);
+        _shared->_recordStore->reserveRecordIds(opCtx, &ids, count);
+
+        // We are guaranteed to have a contiguous range so we only register the min and max.
+        registerCappedInserts(opCtx, ids.front(), ids.back());
+    }
+
+    return ids;
+}
+
+void CollectionImpl::registerCappedInserts(OperationContext* opCtx,
+                                           const RecordId& minRecord,
+                                           const RecordId& maxRecord) const {
+    invariant(usesCappedSnapshots());
+    // Callers should be updating visibility as part of a write operation. We want to ensure that
+    // we never get here while holding an uninterruptible, read-ticketed lock. That would indicate
+    // that we are operating with the wrong global lock semantics, and either hold too weak a lock
+    // (e.g. IS) or that we upgraded in a way we shouldn't (e.g. IS -> IX).
+    invariant(opCtx->lockState()->isNoop() || !opCtx->lockState()->hasReadTicket() ||
+              !opCtx->lockState()->uninterruptibleLocksRequested());
+
+    auto* uncommitted =
+        CappedWriter::get(opCtx).getUncommitedRecordsFor(_shared->_recordStore->getIdent());
+    uncommitted->registerRecordIds(minRecord, maxRecord);
+    return;
+}
+
+CappedVisibilitySnapshot CollectionImpl::takeCappedVisibilitySnapshot() const {
+    invariant(usesCappedSnapshots());
+    return _shared->_cappedObserver.makeSnapshot();
 }
 
 long long CollectionImpl::numRecords(OperationContext* opCtx) const {
