@@ -24,6 +24,7 @@ const collName = 'columnstore_index_persistence';
 let db_primary = primary.getDB('test');
 
 if (!setUpServerForColumnStoreIndexTest(db_primary)) {
+    rst.stopSet();
     return;
 }
 

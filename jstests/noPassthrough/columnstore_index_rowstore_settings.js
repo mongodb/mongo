@@ -18,6 +18,7 @@ const mongod = MongoRunner.runMongod({});
 const db = mongod.getDB("test");
 
 if (!setUpServerForColumnStoreIndexTest(db)) {
+    MongoRunner.stopMongod(mongod);
     return;
 }
 

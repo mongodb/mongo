@@ -17,6 +17,7 @@ const db = conn.getDB(jsTestName());
 assert.commandWorked(db.dropDatabase());
 
 if (!setUpServerForColumnStoreIndexTest(db)) {
+    MongoRunner.stopMongod(conn);
     return;
 }
 
