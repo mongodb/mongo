@@ -570,7 +570,17 @@ ShardingCatalogManager::_splitChunkInTransaction(OperationContext* opCtx,
     txn_api::SyncTransactionWithRetries txn(
         opCtx, Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(), nullptr);
 
-    txn.run(opCtx, updateChunksFn);
+    // TODO: SERVER-72431 Make split chunk commit idempotent, with that we won't need anymore the
+    // transaction precondition and we will be able to remove the try/catch on the transaction run
+    try {
+        txn.run(opCtx, updateChunksFn);
+    } catch (const ExceptionFor<ErrorCodes::BadValue>&) {
+        // Makes sure that the last thing we read from config.chunks collection gets majority
+        // written before to return from this command, otherwise next RoutingInfo cache refresh from
+        // the shard may not see those newest information.
+        repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+        throw;
+    }
 
     return ShardingCatalogManager::SplitChunkInTransactionResult{sharedBlock->currentMaxVersion,
                                                                  sharedBlock->newChunks};
