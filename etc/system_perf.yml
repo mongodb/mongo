@@ -1460,27 +1460,7 @@ buildvariants:
     run_on:
       - "rhel70-perf-single"
     depends_on: *_compile_amazon2
-    #TODO SERVER-72436 unblock bestbuy_agg and bestbuy_query
-    #tasks: *classic_engine_tasks
-    tasks:
-      - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
-      - name: industry_benchmarks
-      - name: ycsb_60GB
-      - name: ycsb_60GB.long
-      - name: crud_workloads
-     # - name: bestbuy_agg
-      - name: bestbuy_agg_merge_different_db
-      - name: bestbuy_agg_merge_same_db
-      - name: bestbuy_agg_merge_wordcount
-     # - name: bestbuy_query
-      - name: cursor_manager
-      - name: map_reduce_workloads
-      - name: tpcc
-      - name: tpch_1_normalized
-      - name: tpch_1_denormalized
-      - name: tpch_10_normalized
-      - name: tpch_10_denormalized
+    tasks: *classic_engine_tasks
 
   - name: linux-1-node-replSet-telemetry
     display_name: Linux 1-Node ReplSet (Telemetry)
