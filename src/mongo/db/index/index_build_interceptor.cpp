@@ -305,25 +305,16 @@ Status IndexBuildInterceptor::_applyWrite(OperationContext* opCtx,
                                           TrackDuplicates trackDups,
                                           int64_t* const keysInserted,
                                           int64_t* const keysDeleted) {
-    // Check field for "key" to determine if collection is sorted data or column store.
-    if (operation.hasField("key")) {
-        return _indexCatalogEntry->accessMethod()->applySortedDataSideWrite(
-            opCtx,
-            coll,
-            operation,
-            options,
-            [=](const KeyString::Value& duplicateKey) {
-                return trackDups == TrackDuplicates::kTrack
-                    ? recordDuplicateKey(opCtx, duplicateKey)
-                    : Status::OK();
-            },
-            keysInserted,
-            keysDeleted);
-    } else {
-        _indexCatalogEntry->accessMethod()->applyColumnDataSideWrite(
-            opCtx, coll, operation, keysInserted, keysDeleted);
-        return Status::OK();
-    }
+    // Sorted index types may choose to disallow duplicates (enforcing an unique index). Columnar
+    // indexes are not sorted and therefore cannot enforce uniqueness constraints. Only sorted
+    // indexes will use this lambda passed through the IndexAccessMethod interface.
+    IndexAccessMethod::KeyHandlerFn onDuplicateKeyFn = [=](const KeyString::Value& duplicateKey) {
+        return trackDups == TrackDuplicates::kTrack ? recordDuplicateKey(opCtx, duplicateKey)
+                                                    : Status::OK();
+    };
+
+    return _indexCatalogEntry->accessMethod()->applyIndexBuildSideWrite(
+        opCtx, coll, operation, options, std::move(onDuplicateKeyFn), keysInserted, keysDeleted);
 }
 
 void IndexBuildInterceptor::_yield(OperationContext* opCtx, const Yieldable* yieldable) {

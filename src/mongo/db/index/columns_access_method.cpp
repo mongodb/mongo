@@ -495,11 +495,13 @@ void ColumnStoreAccessMethod::setIdent(std::shared_ptr<Ident> ident) {
     _store->setIdent(std::move(ident));
 }
 
-void ColumnStoreAccessMethod::applyColumnDataSideWrite(OperationContext* opCtx,
-                                                       const CollectionPtr& coll,
-                                                       const BSONObj& operation,
-                                                       int64_t* keysInserted,
-                                                       int64_t* keysDeleted) {
+Status ColumnStoreAccessMethod::applyIndexBuildSideWrite(OperationContext* opCtx,
+                                                         const CollectionPtr& coll,
+                                                         const BSONObj& operation,
+                                                         const InsertDeleteOptions& unusedOptions,
+                                                         KeyHandlerFn&& unusedFn,
+                                                         int64_t* keysInserted,
+                                                         int64_t* keysDeleted) {
     const IndexBuildInterceptor::Op opType = operation.getStringField("op") == "i"_sd
         ? IndexBuildInterceptor::Op::kInsert
         : operation.getStringField("op") == "d"_sd ? IndexBuildInterceptor::Op::kDelete
@@ -530,6 +532,8 @@ void ColumnStoreAccessMethod::applyColumnDataSideWrite(OperationContext* opCtx,
             opCtx->recoveryUnit()->onRollback([keysInserted] { dec(keysInserted); });
             break;
     }
+
+    return Status::OK();
 }
 
 // static

@@ -86,11 +86,13 @@ public:
                   int64_t* keysInsertedOut,
                   int64_t* keysDeletedOut) final;
 
-    void applyColumnDataSideWrite(OperationContext* opCtx,
-                                  const CollectionPtr& coll,
-                                  const BSONObj& operation,
-                                  int64_t* keysInserted,
-                                  int64_t* keysDeleted) final;
+    Status applyIndexBuildSideWrite(OperationContext* opCtx,
+                                    const CollectionPtr& coll,
+                                    const BSONObj& operation,
+                                    const InsertDeleteOptions& unusedOptions,
+                                    KeyHandlerFn&& unusedFn,
+                                    int64_t* keysInserted,
+                                    int64_t* keysDeleted) final;
 
     Status initializeAsEmpty(OperationContext* opCtx) final;
 

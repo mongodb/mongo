@@ -174,23 +174,13 @@ public:
      */
     virtual void setIdent(std::shared_ptr<Ident> newIdent) = 0;
 
-    virtual Status applySortedDataSideWrite(OperationContext* opCtx,
+    virtual Status applyIndexBuildSideWrite(OperationContext* opCtx,
                                             const CollectionPtr& coll,
                                             const BSONObj& operation,
                                             const InsertDeleteOptions& options,
                                             KeyHandlerFn&& onDuplicateKey,
-                                            int64_t* const keysInserted,
-                                            int64_t* const keysDeleted) {
-        MONGO_UNREACHABLE;
-    };
-
-    virtual void applyColumnDataSideWrite(OperationContext* opCtx,
-                                          const CollectionPtr& coll,
-                                          const BSONObj& operation,
-                                          int64_t* keysInserted,
-                                          int64_t* keysDeleted) {
-        MONGO_UNREACHABLE;
-    };
+                                            int64_t* keysInserted,
+                                            int64_t* keysDeleted) = 0;
 
     //
     // Bulk operations support
@@ -582,7 +572,7 @@ public:
 
     void setIdent(std::shared_ptr<Ident> newIdent) final;
 
-    Status applySortedDataSideWrite(OperationContext* opCtx,
+    Status applyIndexBuildSideWrite(OperationContext* opCtx,
                                     const CollectionPtr& coll,
                                     const BSONObj& operation,
                                     const InsertDeleteOptions& options,

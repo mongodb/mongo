@@ -632,7 +632,7 @@ void SortedDataIndexAccessMethod::setIdent(std::shared_ptr<Ident> newIdent) {
     this->_newInterface->setIdent(std::move(newIdent));
 }
 
-Status SortedDataIndexAccessMethod::applySortedDataSideWrite(OperationContext* opCtx,
+Status SortedDataIndexAccessMethod::applyIndexBuildSideWrite(OperationContext* opCtx,
                                                              const CollectionPtr& coll,
                                                              const BSONObj& operation,
                                                              const InsertDeleteOptions& options,
