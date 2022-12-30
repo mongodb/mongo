@@ -266,6 +266,7 @@ protected:
     using StateContexts = stdx::unordered_map<State, StateContext>;
 
     void setState(State s, const OptionalMessageType& message) {
+        stdx::lock_guard<stdx::recursive_mutex> lk(_mutex);
         tassertStarted();
 
         invariant(_current);
