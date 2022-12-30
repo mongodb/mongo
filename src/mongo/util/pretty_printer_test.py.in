@@ -20,7 +20,7 @@ expected_patterns = [
     r'basic_string.* \= *"world"',
 ]
 up_pattern = r'std::unique_ptr<int\> = \{get\(\) \= 0x[0-9a-fA-F]+\}'
-set_pattern = r'std::set with 4 elements'
+set_pattern = r'std::[__debug::]*set with 4 elements'
 static_member_pattern = '128'
 
 def search(pattern, s):
