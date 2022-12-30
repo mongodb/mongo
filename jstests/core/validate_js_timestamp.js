@@ -4,6 +4,10 @@
  *
  * The Timestamp constructor ensures that users cannot _create_ an invalid timestamp, but there is
  * nothing stopping a user function from modifying the timestamp afterwards with invalid values.
+ *
+ * @tags: [
+ *   requires_fcv_63,
+ * ]
  */
 (function() {
 "use strict";
