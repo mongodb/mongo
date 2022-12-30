@@ -101,39 +101,4 @@ TEST_F(TelemetryStoreTest, BasicUsage) {
     ASSERT_EQ(numKeys, 2);
 }
 
-/**
- * Spin up multiple threads reading/writing the store to empirically verify we don't hit an
- * invariant.
- */
-TEST_F(TelemetryStoreTest, ReadWriteLocking) {
-    // Turning on the flag at runtime will crash as telemetry store registerer (which creates the
-    // telemetry store) is called at start up and if flag is off, the telemetry store will have
-    // never been created. Thus, instead of turning on the flag at runtime and crashing, we skip the
-    // test if telemetry feature flag is off.
-    if (!feature_flags::gFeatureFlagTelemetry.isEnabledAndIgnoreFCV()) {
-        return;
-    }
-    std::vector<stdx::thread> threads;
-    auto svcCtx = getServiceContext();
-    for (int i = 0; i < 20; ++i) {
-        threads.emplace_back([&, i]() {
-            auto client = svcCtx->makeClient(std::to_string(i));
-            auto opCtx = client->makeOperationContext();
-            if (i % 4 > 0) {
-                auto sharedTelemetryStore = getTelemetryStoreForRead(opCtx.get());
-                BSONObj key;
-                auto status = sharedTelemetryStore->lookup(key);
-                // Key isn't found, we just need to do something while holding the store's read
-                // lock.
-                ASSERT_NOT_OK(status);
-            } else {
-                [[maybe_unused]] auto oldStore = resetTelemetryStore(opCtx.get());
-            }
-        });
-    }
-    for (auto&& thread : threads) {
-        thread.join();
-    }
-}
-
 }  // namespace mongo::telemetry

@@ -104,31 +104,13 @@ public:
               std::make_unique<TelemetryStore>(std::forward<TelemetryStoreArgs>(args)...)) {}
 
     /**
-     * Acquire the instance of the telemetry store. The telemetry store is mutable and a shared
-     * "read lock" is obtained on the instance. That is, the telemetry store instance will not
-     * be replaced.
+     * Acquire the instance of the telemetry store.
      */
-    SharedTelemetryStore getTelemetryStore(OperationContext* opCtx) {
-        Lock::SharedLock readLock = {opCtx, _instanceMutex};
-        return {_telemetryStore.get(), std::move(readLock)};
-    }
-
-    /**
-     * Acquire the instance of the telemetry store at the same time atomically replacing the
-     * internal instance with a new instance. This operation acquires an exclusive "write lock"
-     * which waits for all read locks to be released before replacing the instance.
-     */
-    std::unique_ptr<TelemetryStore> resetTelemetryStore(OperationContext* opCtx) {
-        size_t size = getTelemetryStoreSize();
-        Lock::ExclusiveLock writeLock{opCtx, _instanceMutex};
-        auto newStore = std::make_unique<TelemetryStore>(size, _telemetryStore->numPartitions());
-        std::swap(_telemetryStore, newStore);
-        return newStore;  // which is now the old store.
+    TelemetryStore& getTelemetryStore() {
+        return *_telemetryStore;
     }
 
 private:
-    Lock::ResourceMutex _instanceMutex{"TelemetryStoreManager"};
-
     std::unique_ptr<TelemetryStore> _telemetryStore;
 };
 
@@ -145,11 +127,8 @@ public:
         auto cappedSize = capTelemetryStoreSize(requestedSize);
 
         auto& telemetryStoreManager = telemetryStoreDecoration(serviceCtx);
-        auto client = Client::getCurrent();
-        uassert(7139000, "Client required to update telemetry store size", client != nullptr);
-        auto&& sharedTelemetryStore =
-            telemetryStoreManager->getTelemetryStore(client->getOperationContext());
-        sharedTelemetryStore->reset(cappedSize);
+        auto&& telemetryStore = telemetryStoreManager->getTelemetryStore();
+        telemetryStore.reset(cappedSize);
     }
 };
 
@@ -239,22 +218,22 @@ void throwIfEncounteringFLEPayload(const BSONElement& e) {
  */
 class LockedMetrics {
     LockedMetrics(TelemetryMetrics* metrics,
-                  SharedTelemetryStore sharedTelemetryStore,
+                  TelemetryStore& telemetryStore,
                   TelemetryStore::Partition partitionLock)
         : _metrics(metrics),
-          _sharedTelemetryStore(std::move(sharedTelemetryStore)),
+          _telemetryStore(telemetryStore),
           _partitionLock(std::move(partitionLock)) {}
 
 public:
     static LockedMetrics get(OperationContext* opCtx, const BSONObj& telemetryKey) {
-        auto&& sharedTelemetryStore = getTelemetryStoreForRead(opCtx);
+        auto&& telemetryStore = getTelemetryStore(opCtx);
         auto&& [statusWithMetrics, partitionLock] =
-            sharedTelemetryStore->getWithPartitionLock(telemetryKey);
+            telemetryStore.getWithPartitionLock(telemetryKey);
         TelemetryMetrics* metrics;
         if (statusWithMetrics.isOK()) {
             metrics = statusWithMetrics.getValue();
         } else {
-            sharedTelemetryStore->put(telemetryKey, {}, partitionLock);
+            telemetryStore.put(telemetryKey, {}, partitionLock);
             auto newMetrics = partitionLock->get(telemetryKey);
             // This can happen if the budget is immediately exceeded. Specifically if the there is
             // not enough room for a single new entry if the number of partitions is too high
@@ -262,7 +241,7 @@ public:
             tassert(7064700, "Should find telemetry store entry", newMetrics.isOK());
             metrics = &newMetrics.getValue()->second;
         }
-        return LockedMetrics{metrics, std::move(sharedTelemetryStore), std::move(partitionLock)};
+        return LockedMetrics{metrics, telemetryStore, std::move(partitionLock)};
     }
 
     TelemetryMetrics* operator->() const {
@@ -272,7 +251,7 @@ public:
 private:
     TelemetryMetrics* _metrics;
 
-    SharedTelemetryStore _sharedTelemetryStore;
+    TelemetryStore& _telemetryStore;
 
     TelemetryStore::Partition _partitionLock;
 };
@@ -503,16 +482,9 @@ void registerGetMoreRequest(OperationContext* opCtx, const PlanExplainer& planEx
     opCtx->storeQueryBSON(telemetryKey);
 }
 
-SharedTelemetryStore getTelemetryStoreForRead(OperationContext* opCtx) {
+TelemetryStore& getTelemetryStore(OperationContext* opCtx) {
     uassert(6579000, "Telemetry is not enabled without the feature flag on", isTelemetryEnabled());
-    return {
-        telemetryStoreDecoration(opCtx->getServiceContext())->getTelemetryStore(opCtx),
-    };
-}
-
-std::unique_ptr<TelemetryStore> resetTelemetryStore(OperationContext* opCtx) {
-    uassert(6579002, "Telemetry is not enabled without the feature flag on", isTelemetryEnabled());
-    return telemetryStoreDecoration(opCtx->getServiceContext())->resetTelemetryStore(opCtx);
+    return telemetryStoreDecoration(opCtx->getServiceContext())->getTelemetryStore();
 }
 
 void recordExecution(OperationContext* opCtx, const OpDebug& opDebug, bool isFle) {

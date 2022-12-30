@@ -175,12 +175,6 @@ private:
 
     bool _initialized = false;
 
-    /**
-     * Instance of TelemetryStore which will be deleted when the document source is deleted. This
-     * non-null only when _clearEntries is true.
-     */
-    boost::optional<std::unique_ptr<TelemetryStore>> _telemetryStore;
-
     QueueWrapper _queue;
 };
 

@@ -170,37 +170,9 @@ using TelemetryStore = PartitionedCache<BSONObj,
                                         SimpleBSONObjComparator::EqualTo>;
 
 /**
- * Shared instance of the telemetry store which holds a read-lock while in use. The read-lock
- * prevents the telemetry store as a whole from being replaced. The telemetry store itself is
- * mutable.
- */
-class SharedTelemetryStore {
-public:
-    SharedTelemetryStore(TelemetryStore* telemetryStore, Lock::SharedLock lock)
-        : _telemetryStore(telemetryStore), _lock(std::move(lock)) {}
-
-    SharedTelemetryStore(SharedTelemetryStore&& other)
-        : _telemetryStore(other._telemetryStore), _lock(std::move(other._lock)) {}
-
-    SharedTelemetryStore(const SharedTelemetryStore&) = delete;
-    SharedTelemetryStore& operator=(const SharedTelemetryStore&) = delete;
-
-    TelemetryStore* operator->() const {
-        return _telemetryStore;
-    }
-
-private:
-    TelemetryStore* _telemetryStore;
-
-    Lock::SharedLock _lock;
-};
-
-/**
  * Acquire a reference to the global telemetry store.
  */
-SharedTelemetryStore getTelemetryStoreForRead(OperationContext* opCtx);
-
-std::unique_ptr<TelemetryStore> resetTelemetryStore(OperationContext* opCtx);
+TelemetryStore& getTelemetryStore(OperationContext* opCtx);
 
 /**
  * Register a request for telemetry collection. The telemetry machinery may decide not to collect

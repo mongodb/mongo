@@ -81,12 +81,12 @@ Value DocumentSourceTelemetry::serialize(boost::optional<ExplainOptions::Verbosi
 }
 
 void DocumentSourceTelemetry::buildTelemetryStoreIterator() {
-    auto&& sharedTelemetryStore = [&]() { return getTelemetryStoreForRead(getContext()->opCtx); }();
+    auto&& telemetryStore = getTelemetryStore(getContext()->opCtx);
 
     // Here we start a new thread which runs until the document source finishes iterating the
     // telemetry store.
-    stdx::thread producer([&, sharedTelemetryStore = std::move(sharedTelemetryStore)] {
-        sharedTelemetryStore->forEachPartition(
+    stdx::thread producer([&] {
+        telemetryStore.forEachPartition(
             [&](const std::function<TelemetryStore::Partition()>& getPartition) {
                 // Block here waiting for the queue to be empty. Locking the partition will block
                 // telemetry writers. We want to delay lock acquisition as long as possible.
