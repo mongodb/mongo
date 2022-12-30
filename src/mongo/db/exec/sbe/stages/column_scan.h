@@ -254,7 +254,7 @@ private:
     // The record id in the row store that is used to connect the per-path entries in the columnar
     // index and to retrieve the full record from the row store, if necessary.
     RecordId _recordId;
-    RowId _rowId;
+    RowId _rowId = ColumnStore::kNullRowId;
     const boost::optional<value::SlotId> _recordIdSlot;
 
     // The object that is equivalent to the record from the associated row store when accessing
