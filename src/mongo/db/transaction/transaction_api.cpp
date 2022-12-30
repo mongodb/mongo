@@ -116,10 +116,13 @@ StatusWith<CommitResult> SyncTransactionWithRetries::runNoThrow(OperationContext
     repl::ReplClientInfo::forClient(opCtx->getClient())
         .setLastProxyWriteTimestampForward(_txn->getOperationTime().asTimestamp());
 
-    // Schedule cleanup tasks after the caller has finished waiting so the caller can't be blocked.
+    // Run cleanup tasks after the caller has finished waiting so the caller can't be blocked.
+    // Attempt to wait for cleanup so it appears synchronous for most callers, but allow
+    // interruptions so we return immediately if the opCtx has been cancelled.
+    //
     // Also schedule after getting the transaction's operation time so the best effort abort can't
     // unnecessarily advance it.
-    _txn->scheduleCleanupIfNecessary();
+    _txn->cleanUpIfNecessary().getNoThrow(opCtx).ignore();
 
     auto unyieldStatus = _resourceYielder ? _resourceYielder->unyieldNoThrow(opCtx) : Status::OK();
 
@@ -678,12 +681,16 @@ Transaction::ErrorHandlingStep Transaction::handleError(const StatusWith<CommitR
     return ErrorHandlingStep::kAbortAndDoNotRetry;
 }
 
-void TransactionWithRetries::scheduleCleanupIfNecessary() {
+SemiFuture<void> TransactionWithRetries::cleanUpIfNecessary() {
     if (!_internalTxn->needsCleanup()) {
-        return;
+        return SemiFuture<void>(Status::OK());
     }
 
-    _bestEffortAbort().getAsync([anchor = shared_from_this()](auto&&) {});
+    return _bestEffortAbort()
+        // Safe to inline because the continuation only holds state.
+        .unsafeToInlineFuture()
+        .tapAll([anchor = shared_from_this()](auto&&) {})
+        .semi();
 }
 
 void Transaction::prepareRequest(BSONObjBuilder* cmdBuilder) {

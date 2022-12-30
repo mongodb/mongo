@@ -563,9 +563,9 @@ public:
 
     /**
      * If the transaction needs to be cleaned up, i.e. aborted, this will schedule the necessary
-     * work without waiting for it to complete.
+     * work. Callers can wait for cleanup by waiting on the returned future.
      */
-    void scheduleCleanupIfNecessary();
+    SemiFuture<void> cleanUpIfNecessary();
 
 private:
     // Helper methods for running a transaction.

@@ -2184,16 +2184,12 @@ TEST_F(TxnAPITest, FailoverAndShutdownErrorsAreFatalForLocalTransactionWCError) 
     runTest(true, Status(ErrorCodes::HostUnreachable, "mock retriable error"));
 }
 
-TEST_F(TxnAPITest, DoesNotWaitForBestEffortAbortOnNonTransientError) {
+TEST_F(TxnAPITest, DoesNotWaitForBestEffortAbortIfCancelled) {
     // Start the transaction with an insert.
     mockClient()->setNextCommandResponse(kOKInsertResponse);
 
     // Hang the best effort abort that will be triggered after giving up on the transaction.
     mockClient()->setHangNextAbortCommand(true);
-    mockClient()->setNextCommandResponse(kOKCommandResponse);
-
-    // Second attempt's insert and successful commit response.
-    mockClient()->setNextCommandResponse(kOKInsertResponse);
     mockClient()->setNextCommandResponse(kOKCommandResponse);
 
     auto swResult = txnWithRetries().runNoThrow(
@@ -2205,10 +2201,14 @@ TEST_F(TxnAPITest, DoesNotWaitForBestEffortAbortOnNonTransientError) {
                                  << "documents" << BSON_ARRAY(BSON("x" << 1))))
                 .get();
 
-            uasserted(ErrorCodes::InternalError, "Mock error");
+            // Interrupting the caller's opCtx prevents waiting for the best effort abort.
+            opCtx()->markKilled();
+            uasserted(ErrorCodes::InternalError, "Mock non-transient error");
             return SemiFuture<void>::makeReady();
         });
-    ASSERT_EQ(swResult.getStatus(), ErrorCodes::InternalError);
+    // The API isn't guaranteed to return the thrown error or an interruption error, but either way
+    // it should return a non-ok status.
+    ASSERT_FALSE(swResult.getStatus().isOK());
 
     // The abort should be hung and not have been processed yet.
     auto lastRequest = mockClient()->getLastSentRequest();
@@ -2218,6 +2218,60 @@ TEST_F(TxnAPITest, DoesNotWaitForBestEffortAbortOnNonTransientError) {
     mockClient()->setHangNextAbortCommand(false);
     waitForAllEarlierTasksToComplete();
     expectSentAbort(0 /* txnNumber */, WriteConcernOptions().toBSON());
+}
+
+TEST_F(TxnAPITest, WaitsForBestEffortAbortOnNonTransientErrorIfNotCancelled) {
+    // Use an executor with higher max threads so a best effort abort could actually run
+    // concurrently within the API. Otherwise the API would always wait for the best effort abort
+    // even if the wait wasn't explicit.
+    ThreadPool::Options options;
+    options.poolName = "TxnAPITest-WaitsForBestEffortAbortOnNonTransientErrorIfNotCancelled";
+    options.minThreads = 1;
+    options.maxThreads = 8;
+    auto executor = std::make_shared<executor::ThreadPoolTaskExecutor>(
+        std::make_unique<ThreadPool>(std::move(options)),
+        executor::makeNetworkInterface("TxnAPITestNetwork"));
+    executor->startup();
+    resetTxnWithRetries(nullptr /* resourceYielder */, executor);
+
+    // Start the transaction with an insert.
+    mockClient()->setNextCommandResponse(kOKInsertResponse);
+
+    // Hang the best effort abort that will be triggered before retrying after we throw an error.
+    mockClient()->setHangNextAbortCommand(true);
+    mockClient()->setNextCommandResponse(kOKCommandResponse);
+
+    auto future = stdx::async(stdx::launch::async, [&] {
+        auto swResult = txnWithRetries().runNoThrow(
+            opCtx(), [&](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+                txnClient
+                    .runCommand("user"_sd,
+                                BSON("insert"
+                                     << "foo"
+                                     << "documents" << BSON_ARRAY(BSON("x" << 1))))
+                    .get();
+
+                // Throw a non-transient error once to trigger a best effort abort with no retry.
+                uasserted(ErrorCodes::BadValue, "Mock non-transient error");
+
+                return SemiFuture<void>::makeReady();
+            });
+        ASSERT_EQ(swResult.getStatus(), ErrorCodes::BadValue);
+    });
+
+    // The future should time out since it's blocked waiting for the best effort abort to finish.
+    ASSERT(stdx::future_status::ready != future.wait_for(Milliseconds(10).toSystemDuration()));
+
+    // The abort should be hung and not have been processed yet.
+    auto lastRequest = mockClient()->getLastSentRequest();
+    ASSERT_NE(lastRequest.firstElementFieldNameStringData(), "abortTransaction"_sd);
+
+    // Allow the abort to finish and it should unblock the API.
+    mockClient()->setHangNextAbortCommand(false);
+    future.get();
+
+    // After the abort finishes, the API should not have retried.
+    expectSentAbort(1 /* txnNumber */, WriteConcernOptions().toBSON());
 }
 
 TEST_F(TxnAPITest, WaitsForBestEffortAbortOnTransientError) {
