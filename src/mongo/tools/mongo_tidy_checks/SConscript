@@ -1,20 +1,33 @@
 Import('env')
 
-import os
-import pathlib
 from buildscripts.toolchains import DEFAULT_DATA_FILE, ToolchainConfig, ToolchainPlatform
+
+toolchain_clang_tidy_dev_found = False
+toolchain_found = False
 
 try:
     toolchain_config = ToolchainConfig(DEFAULT_DATA_FILE, ToolchainPlatform('default'))
-    symlink_path = str(
-        toolchain_config.base_path / toolchain_config.aliases['stable'] / 'bin' / 'clang-tidy')
-    # using os.readlink because pathlib readlink not support on python 3.7
-    base_path = pathlib.Path(os.readlink(symlink_path)).resolve().parent.parent
-except FileNotFoundError:
-    Return()
+    toolchain_found = toolchain_config.base_path.exists()
 
-tidy_include = base_path / 'include'
-tidy_lib = base_path / 'lib'
+    base_revision_path = (toolchain_config.base_path / toolchain_config.aliases['stable'] / 'bin' /
+                          'clang-tidy').resolve().parent.parent
+
+    tidy_include = base_revision_path / 'include'
+    tidy_lib = base_revision_path / 'lib'
+
+    toolchain_clang_tidy_dev_found = (tidy_include / 'clang-tidy' / 'ClangTidy.h').exists()
+
+except FileNotFoundError:
+    pass
+
+if toolchain_found and not toolchain_clang_tidy_dev_found:
+    # If there was a toolchain but its not setup right, issue a warning about this.
+    print(
+        "Could not find not find clang-tidy headers in toolchain, not building mongo custom checks module."
+    )
+
+if not toolchain_found or not toolchain_clang_tidy_dev_found:
+    Return()
 
 env = env.Clone()
 
