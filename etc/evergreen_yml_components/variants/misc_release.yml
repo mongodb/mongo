@@ -1392,9 +1392,8 @@ buildvariants:
     compile_flags: >-
       --ssl
       MONGO_DISTMOD=suse12
-      -j$(grep -c ^processor /proc/cpuinfo)
+      -j$(echo $(grep -c ^processor /proc/cpuinfo) / 2 | bc)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      DWARF_WIDTH=32
     multiversion_platform: suse12
     multiversion_edition: targeted
     has_packages: true
@@ -1456,9 +1455,8 @@ buildvariants:
     compile_flags: >-
       --ssl
       MONGO_DISTMOD=suse12
-      -j$(grep -c ^processor /proc/cpuinfo)
+      -j$(echo $(grep -c ^processor /proc/cpuinfo) / 2 | bc)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      DWARF_WIDTH=32
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
@@ -1518,7 +1516,6 @@ buildvariants:
       MONGO_DISTMOD=suse15
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      DWARF_WIDTH=32
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
@@ -1569,7 +1566,6 @@ buildvariants:
       MONGO_DISTMOD=suse15
       -j$(grep -c ^processor /proc/cpuinfo)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
-      DWARF_WIDTH=32
     multiversion_platform: suse15
     multiversion_edition: targeted
     has_packages: true

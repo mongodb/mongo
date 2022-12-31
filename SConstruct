@@ -1069,6 +1069,12 @@ env_vars.Add(
 )
 
 env_vars.Add(
+    'READELF',
+    help='Path to readelf',
+    default='readelf',
+)
+
+env_vars.Add(
     'GITDIFFFLAGS',
     help='Sets flags for git diff',
     default='',
@@ -4334,23 +4340,77 @@ def doConfigure(myenv):
         if link_model.startswith("dynamic"):
             myenv.AddToLINKFLAGSIfSupported('-Wl,--gdb-index')
 
-        # Normalize DWARF_WIDTH to 64 by default if the user did not
-        # select an explicit value and we are on a platform where it
-        # is believed to be meaningful.
-        if not env['DWARF_WIDTH']:
-            if not myenv.TargetOSIs('macOS', 'darwin', 'windows'):
-                env['DWARF_WIDTH'] = 64
-
-        # Only pass -gdwarf{32,64} if an explicit value was selected
+        # Pass -gdwarf{32,64} if an explicit value was selected
         # or defaulted. Fail the build if we can't honor the
         # selection.
-        if env['DWARF_WIDTH']:
+        if myenv['DWARF_WIDTH']:
             if myenv.AddToCCFLAGSIfSupported('-gdwarf$DWARF_WIDTH'):
                 myenv.AppendUnique(LINKFLAGS=['-gdwarf$DWARF_WIDTH'])
             else:
-                env.FatalError('Could not enable selected dwarf width')
+                myenv.FatalError('Could not enable selected dwarf width')
 
-        if env['DWARF_WIDTH'] == 32 and link_model != 'dynamic':
+        # try to determine the if dwarf64 is viable, and fallback to dwarf32 if not
+        elif myenv.CheckCCFLAGSSupported('-gdwarf64'):
+
+            def CheckForDWARF64Support(context):
+
+                context.Message('Checking that DWARF64 format is viable... ')
+
+                if myenv.get('DWARF_VERSION', 0) <= 4:
+                    result = False
+                else:
+                    test_body = """
+                        #include <iostream>
+                        #include <cstdlib>
+                        int main() {
+                            std::cout << "Hello, World" << std::endl;
+                            return EXIT_SUCCESS;
+                        }
+                        """
+                    original_ccflags = context.env.get('CCFLAGS')
+                    original_linkflags = context.env.get('LINKFLAGS')
+
+                    context.env.Append(CCFLAGS=['-gdwarf64'], LINKFLAGS=['-gdwarf64'])
+
+                    ret = context.TryLink(textwrap.dedent(test_body), ".cpp")
+
+                    context.env['CCFLAGS'] = original_ccflags
+                    context.env['LINKFLAGS'] = original_linkflags
+
+                    if not ret:
+                        context.Result("unknown")
+                        return False
+
+                    regex = re.compile(r'^\s*Length:.*[64|32]-bit\)$', re.MULTILINE)
+                    p = subprocess.run([context.env['READELF'], '-wi', context.lastTarget.path],
+                                       capture_output=True, text=True)
+                    matches = re.findall(regex, p.stdout)
+                    address_types = set()
+                    for match in matches:
+                        address_types.add(match[-len('(XX-bit)'):])
+                    result = len(address_types) == 1 and list(address_types)[0] == '(64-bit)'
+
+                context.Result(result)
+                return result
+
+            conf = Configure(
+                myenv,
+                help=False,
+                custom_tests={
+                    'CheckForDWARF64Support': CheckForDWARF64Support,
+                },
+            )
+
+            if conf.CheckForDWARF64Support():
+                myenv['DWARF_WIDTH'] = 64
+                myenv.AppendUnique(LINKFLAGS=['-gdwarf64'], CCFLAGS=['-gdwarf64'])
+            else:
+                myenv['DWARF_WIDTH'] = 32
+                myenv.AppendUnique(LINKFLAGS=['-gdwarf32'], CCFLAGS=['-gdwarf32'])
+
+            conf.Finish()
+
+        if myenv['DWARF_WIDTH'] == 32 and link_model != 'dynamic':
             # This will create an extra section where debug types can be referred from,
             # reducing other section sizes. This helps most with big static links as there
             # will be lots of duplicate debug type info.
