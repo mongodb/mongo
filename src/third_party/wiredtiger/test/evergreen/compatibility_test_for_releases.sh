@@ -155,6 +155,7 @@ create_configs()
     echo "checkpoints=1"  >> $file_name             # Force periodic writes
     echo "compression=snappy"  >> $file_name        # We only built with snappy, force the choice
     echo "data_source=table" >> $file_name
+    echo "debug.log_retention=0" >> $file_name      # WT-10434 - Not supported by older releases
     echo "debug.realloc_malloc=0" >> $file_name     # WT-10111 - Not supported by older releases
     echo "huffman_key=0" >> $file_name              # WT-6893 - Not supported by newer releases
     echo "in_memory=0" >> $file_name                # Interested in the on-disk format
@@ -163,6 +164,7 @@ create_configs()
     echo "logging_compression=snappy" >> $file_name # We only built with snappy, force the choice
     echo "rows=1000000" >> $file_name
     echo "salvage=0" >> $file_name                  # Faster runs
+    echo "stress.checkpoint=0" >> $file_name        # Faster runs
     echo "timer=4" >> $file_name
     echo "verify=1" >> $file_name                   # Faster runs
 
