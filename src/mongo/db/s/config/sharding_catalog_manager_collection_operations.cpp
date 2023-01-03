@@ -567,6 +567,25 @@ void ShardingCatalogManager::configureCollectionBalancing(
             "invalid configure collection balancing update",
             chunkSizeMB || defragmentCollection || enableAutoSplitter);
 
+    // utility lambda to log the change
+    auto logConfigureCollectionBalancing = [&]() {
+        BSONObjBuilder logChangeDetail;
+        if (chunkSizeMB) {
+            logChangeDetail.append("chunkSizeMB", chunkSizeMB.get());
+        }
+
+        if (defragmentCollection) {
+            logChangeDetail.append("defragmentCollection", defragmentCollection.get());
+        }
+
+        if (enableAutoSplitter) {
+            logChangeDetail.append("enableAutoSplitter", enableAutoSplitter.get());
+        }
+
+        ShardingLogging::get(opCtx)->logChange(
+            opCtx, "configureCollectionBalancing", nss.ns(), logChangeDetail.obj());
+    };
+
     short updatedFields = 0;
     BSONObjBuilder updateCmd;
     {
@@ -605,6 +624,7 @@ void ShardingCatalogManager::configureCollectionBalancing(
     }
 
     if (updatedFields == 0) {
+        logConfigureCollectionBalancing();
         return;
     }
 
@@ -652,6 +672,8 @@ void ShardingCatalogManager::configureCollectionBalancing(
         executor);
 
     Balancer::get(opCtx)->notifyPersistedBalancerSettingsChanged(opCtx);
+
+    logConfigureCollectionBalancing();
 }
 
 void ShardingCatalogManager::renameShardedMetadata(
