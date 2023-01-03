@@ -1483,6 +1483,8 @@ buildvariants:
   - name: sharding_auth_gen
   - name: .stitch
   - name: .crypt
+    distros:
+    - suse12-sp5-large
   - name: .publish_crypt
   - name: test_packages
     distros:
