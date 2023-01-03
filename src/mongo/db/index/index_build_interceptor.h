@@ -31,13 +31,13 @@
 
 #include <memory>
 
+#include "mongo/db/index/column_key_generator.h"
 #include "mongo/db/index/columns_access_method.h"
 #include "mongo/db/index/duplicate_key_tracker.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index/skipped_record_tracker.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/storage/column_store.h"
 #include "mongo/db/storage/temporary_record_store.h"
 #include "mongo/db/yieldable.h"
 #include "mongo/platform/atomic_word.h"
@@ -107,12 +107,14 @@ public:
      * updates written to a temporary table. After the index table scan is complete, these updates
      * will be applied to the underlying index table.
      *
-     * On success, `numKeysOut` if non-null will contain the number of keys added or removed.
+     * On success, 'numKeysWrittenOut' will contain the number of keys that will be inserted or
+     * updated by applying the side write and 'numKeysDeletedOut' will contain the number of keys
+     * that will be removed.
      */
     Status sideWrite(OperationContext* opCtx,
-                     const PathCellSet& columnstoreKeys,
-                     Op op,
-                     int64_t* numKeysOut);
+                     const std::vector<column_keygen::CellPatch>& keys,
+                     int64_t* numKeysWrittenOut,
+                     int64_t* numKeysDeletedOut);
 
     /**
      * Given a duplicate key, record the key for later verification by a call to

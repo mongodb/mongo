@@ -29,9 +29,9 @@
 
 #pragma once
 
+#include "mongo/db/index/column_key_generator.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/storage/column_store.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/util/auto_clear_ptr.h"
 
@@ -62,15 +62,15 @@ public:
     AutoClearPtr<MultikeyPaths> multikeyPaths() {
         return makeAutoClearPtr(&_multikeyPaths);
     }
-    AutoClearPtr<PathCellSet> columnKeys() {
-        return makeAutoClearPtr(&_columnKeys);
+    AutoClearPtr<std::vector<column_keygen::CellPatch>> columnChanges() {
+        return makeAutoClearPtr(&_columnChanges);
     }
 
 private:
     KeyStringSet _keys;
     KeyStringSet _multikeyMetadataKeys;
     MultikeyPaths _multikeyPaths;
-    PathCellSet _columnKeys;
+    std::vector<column_keygen::CellPatch> _columnChanges;
 };
 
 }  // namespace mongo

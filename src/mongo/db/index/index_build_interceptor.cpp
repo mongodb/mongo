@@ -499,35 +499,42 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
 }
 
 Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
-                                        const PathCellSet& keys,
-                                        Op op,
-                                        int64_t* const numKeysOut) {
+                                        const std::vector<column_keygen::CellPatch>& keys,
+                                        int64_t* const numKeysWrittenOut,
+                                        int64_t* const numKeysDeletedOut) {
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
 
-    *numKeysOut = keys.size();
+    int64_t numKeysWritten = 0;
+    int64_t numKeysDeleted = 0;
 
     std::vector<BSONObj> toInsert;
     toInsert.reserve(keys.size());
-    for (const auto& [path, cell, rid] : keys) {
+    for (const auto& patch : keys) {
 
         BSONObjBuilder builder;
-        rid.serializeToken("rid", &builder);
-        builder.append("op", [op] {
-            switch (op) {
-                case Op::kInsert:
+        patch.recordId.serializeToken("rid", &builder);
+        builder.append("op", [&] {
+            switch (patch.diffAction) {
+                case column_keygen::ColumnKeyGenerator::kInsert:
+                    numKeysWritten++;
                     return "i";
-                case Op::kDelete:
+                case column_keygen::ColumnKeyGenerator::kDelete:
+                    numKeysDeleted++;
                     return "d";
-                case Op::kUpdate:
+                case column_keygen::ColumnKeyGenerator::kUpdate:
+                    numKeysWritten++;
                     return "u";
             }
             MONGO_UNREACHABLE;
         }());
-        builder.append("path", path);
-        builder.append("cell", cell);
+        builder.append("path", patch.path);
+        builder.append("cell", patch.contents);
 
         toInsert.push_back(builder.obj());
     }
+
+    *numKeysWrittenOut = numKeysWritten;
+    *numKeysDeletedOut = numKeysDeleted;
 
     return _finishSideWrite(opCtx, std::move(toInsert));
 }

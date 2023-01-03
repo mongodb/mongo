@@ -226,4 +226,25 @@ private:
     const BSONObj _pathProjection;
     const ColumnProjectionTree _projTree;
 };
+
+/**
+ * An insert, update, or delete used to apply part of a diff to a document in a column store index.
+ * These operations get stored in the side writes table to defer column store writes that occur
+ * while the column store is being built.
+ */
+struct CellPatch {
+    PathValue path;
+    CellValue contents;  // Note: 'contents' is empty for DiffAcction::kDelete operations.
+    RecordId recordId;
+    ColumnKeyGenerator::DiffAction diffAction;
+
+    CellPatch(PathValue path,
+              CellValue contents,
+              RecordId recordId,
+              ColumnKeyGenerator::DiffAction diffAction)
+        : path{std::move(path)},
+          contents{std::move(contents)},
+          recordId{std::move(recordId)},
+          diffAction{diffAction} {}
+};
 }  // namespace mongo::column_keygen

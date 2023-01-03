@@ -126,14 +126,17 @@ TEST_F(IndexBuilderInterceptorTest, SingleColumnInsertIsSavedToSideWritesTable) 
     auto interceptor = createIndexBuildInterceptor(
         fromjson("{v: 2, name: 'columnstore', key: {'$**': 'columnstore'}}"));
 
-    PathCellSet columnKeys;
-    columnKeys.emplace_back(std::make_tuple("path", "cell", RecordId(1)));
+    std::vector<column_keygen::CellPatch> columnChanges;
+    columnChanges.emplace_back(
+        "changedPath", "cell", RecordId(1), column_keygen::ColumnKeyGenerator::DiffAction::kInsert);
 
     WriteUnitOfWork wuow(operationContext());
-    int64_t numKeys = 0;
+    int64_t numKeysInserted = 0;
+    int64_t numKeysDeleted = 0;
     ASSERT_OK(interceptor->sideWrite(
-        operationContext(), columnKeys, IndexBuildInterceptor::Op::kInsert, &numKeys));
-    ASSERT_EQ(1, numKeys);
+        operationContext(), columnChanges, &numKeysInserted, &numKeysDeleted));
+    ASSERT_EQ(1, numKeysInserted);
+    ASSERT_EQ(0, numKeysDeleted);
     wuow.commit();
 
     BSONObjBuilder builder;
@@ -146,7 +149,7 @@ TEST_F(IndexBuilderInterceptorTest, SingleColumnInsertIsSavedToSideWritesTable) 
     ASSERT_BSONOBJ_EQ(BSON("rid" << elem << "op"
                                  << "i"
                                  << "path"
-                                 << "path"
+                                 << "changedPath"
                                  << "cell"
                                  << "cell"),
                       sideWrites[0]);
@@ -157,14 +160,17 @@ TEST_F(IndexBuilderInterceptorTest, SingleColumnDeleteIsSavedToSideWritesTable) 
     auto interceptor = createIndexBuildInterceptor(
         fromjson("{v: 2, name: 'columnstore', key: {'$**': 'columnstore'}}"));
 
-    PathCellSet columnKeys;
-    columnKeys.emplace_back(std::make_tuple("path", "", RecordId(1)));
+    std::vector<column_keygen::CellPatch> columnChanges;
+    columnChanges.emplace_back(
+        "changedPath", "", RecordId(1), column_keygen::ColumnKeyGenerator::DiffAction::kDelete);
 
     WriteUnitOfWork wuow(operationContext());
-    int64_t numKeys = 0;
+    int64_t numKeysInserted = 0;
+    int64_t numKeysDeleted = 0;
     ASSERT_OK(interceptor->sideWrite(
-        operationContext(), columnKeys, IndexBuildInterceptor::Op::kDelete, &numKeys));
-    ASSERT_EQ(1, numKeys);
+        operationContext(), columnChanges, &numKeysInserted, &numKeysDeleted));
+    ASSERT_EQ(0, numKeysInserted);
+    ASSERT_EQ(1, numKeysDeleted);
     wuow.commit();
 
     BSONObjBuilder builder;
@@ -177,7 +183,7 @@ TEST_F(IndexBuilderInterceptorTest, SingleColumnDeleteIsSavedToSideWritesTable) 
     ASSERT_BSONOBJ_EQ(BSON("rid" << elem << "op"
                                  << "d"
                                  << "path"
-                                 << "path"
+                                 << "changedPath"
                                  << "cell"
                                  << ""),
                       sideWrites[0]);
@@ -189,14 +195,17 @@ TEST_F(IndexBuilderInterceptorTest, SingleColumnUpdateIsSavedToSideWritesTable) 
         fromjson("{v: 2, name: 'columnstore', key: {'$**': 'columnstore'}}"));
 
     // create path + cell + rid
-    PathCellSet columnKeys;
-    columnKeys.emplace_back(std::make_tuple("path", "cell", RecordId(1)));
+    std::vector<column_keygen::CellPatch> columnChanges;
+    columnChanges.emplace_back(
+        "changedPath", "cell", RecordId(1), column_keygen::ColumnKeyGenerator::DiffAction::kUpdate);
 
     WriteUnitOfWork wuow(operationContext());
-    int64_t numKeys = 0;
+    int64_t numKeysInserted = 0;
+    int64_t numKeysDeleted = 0;
     ASSERT_OK(interceptor->sideWrite(
-        operationContext(), columnKeys, IndexBuildInterceptor::Op::kUpdate, &numKeys));
-    ASSERT_EQ(1, numKeys);
+        operationContext(), columnChanges, &numKeysInserted, &numKeysDeleted));
+    ASSERT_EQ(1, numKeysInserted);
+    ASSERT_EQ(0, numKeysDeleted);
     wuow.commit();
 
     BSONObjBuilder builder;
@@ -209,7 +218,7 @@ TEST_F(IndexBuilderInterceptorTest, SingleColumnUpdateIsSavedToSideWritesTable) 
     ASSERT_BSONOBJ_EQ(BSON("rid" << elem << "op"
                                  << "u"
                                  << "path"
-                                 << "path"
+                                 << "changedPath"
                                  << "cell"
                                  << "cell"),
                       sideWrites[0]);
@@ -220,18 +229,32 @@ TEST_F(IndexBuilderInterceptorTest, MultipleColumnInsertsAreSavedToSideWritesTab
     auto interceptor = createIndexBuildInterceptor(
         fromjson("{v: 2, name: 'columnstore', key: {'$**': 'columnstore'}}"));
 
-    PathCellSet columnKeys;
-    columnKeys.emplace_back(std::make_tuple("path", "cell", RecordId(1)));
-    columnKeys.emplace_back(std::make_tuple("path1", "cell1", RecordId(1)));
-    columnKeys.emplace_back(std::make_tuple("path2", "cell2", RecordId(2)));
-    columnKeys.emplace_back(std::make_tuple("path3", "cell3", RecordId(2)));
+    std::vector<column_keygen::CellPatch> columnChanges;
+    columnChanges.emplace_back("changedPath1",
+                               "cell",
+                               RecordId(1),
+                               column_keygen::ColumnKeyGenerator::DiffAction::kInsert);
+    columnChanges.emplace_back("changedPath2",
+                               "cell1",
+                               RecordId(1),
+                               column_keygen::ColumnKeyGenerator::DiffAction::kInsert);
+    columnChanges.emplace_back("changedPath3",
+                               "cell2",
+                               RecordId(2),
+                               column_keygen::ColumnKeyGenerator::DiffAction::kInsert);
+    columnChanges.emplace_back("changedPath4",
+                               "cell3",
+                               RecordId(2),
+                               column_keygen::ColumnKeyGenerator::DiffAction::kInsert);
 
     WriteUnitOfWork wuow(operationContext());
-    int64_t numKeys = 0;
+    int64_t numKeysInserted = 0;
+    int64_t numKeysDeleted = 0;
 
     ASSERT_OK(interceptor->sideWrite(
-        operationContext(), columnKeys, IndexBuildInterceptor::Op::kInsert, &numKeys));
-    ASSERT_EQ(4, numKeys);
+        operationContext(), columnChanges, &numKeysInserted, &numKeysDeleted));
+    ASSERT_EQ(4, numKeysInserted);
+    ASSERT_EQ(0, numKeysDeleted);
     wuow.commit();
 
     BSONObjBuilder builder;
@@ -249,28 +272,28 @@ TEST_F(IndexBuilderInterceptorTest, MultipleColumnInsertsAreSavedToSideWritesTab
     ASSERT_BSONOBJ_EQ(BSON("rid" << elem1 << "op"
                                  << "i"
                                  << "path"
-                                 << "path"
+                                 << "changedPath1"
                                  << "cell"
                                  << "cell"),
                       sideWrites[0]);
     ASSERT_BSONOBJ_EQ(BSON("rid" << elem1 << "op"
                                  << "i"
                                  << "path"
-                                 << "path1"
+                                 << "changedPath2"
                                  << "cell"
                                  << "cell1"),
                       sideWrites[1]);
     ASSERT_BSONOBJ_EQ(BSON("rid" << elem2 << "op"
                                  << "i"
                                  << "path"
-                                 << "path2"
+                                 << "changedPath3"
                                  << "cell"
                                  << "cell2"),
                       sideWrites[2]);
     ASSERT_BSONOBJ_EQ(BSON("rid" << elem2 << "op"
                                  << "i"
                                  << "path"
-                                 << "path3"
+                                 << "changedPath4"
                                  << "cell"
                                  << "cell3"),
                       sideWrites[3]);
@@ -282,32 +305,48 @@ TEST_F(IndexBuilderInterceptorTest, MultipleColumnSideWritesAreSavedToSideWrites
         fromjson("{v: 2, name: 'columnstore', key: {'$**': 'columnstore'}}"));
 
     WriteUnitOfWork wuow(operationContext());
-    int64_t numKeys = 0;
+    int64_t numKeysInserted = 0;
+    int64_t numKeysDeleted = 0;
 
-    PathCellSet columnKeys;
-    columnKeys.emplace_back(std::make_tuple("path", "cell", RecordId(1)));
+    std::vector<column_keygen::CellPatch> columnChanges;
+    columnChanges.emplace_back("changedPath1",
+                               "cell",
+                               RecordId(1),
+                               column_keygen::ColumnKeyGenerator::DiffAction::kInsert);
     ASSERT_OK(interceptor->sideWrite(
-        operationContext(), columnKeys, IndexBuildInterceptor::Op::kInsert, &numKeys));
-    ASSERT_EQ(1, numKeys);
+        operationContext(), columnChanges, &numKeysInserted, &numKeysDeleted));
+    ASSERT_EQ(1, numKeysInserted);
+    ASSERT_EQ(0, numKeysDeleted);
 
-    PathCellSet columnKeys2;
-    columnKeys2.emplace_back(std::make_tuple("path", "", RecordId(1)));
+    std::vector<column_keygen::CellPatch> columnChanges2;
+    columnChanges2.emplace_back(
+        "changedPath1", "", RecordId(1), column_keygen::ColumnKeyGenerator::DiffAction::kDelete);
     ASSERT_OK(interceptor->sideWrite(
-        operationContext(), columnKeys2, IndexBuildInterceptor::Op::kDelete, &numKeys));
-    ASSERT_EQ(1, numKeys);
+        operationContext(), columnChanges2, &numKeysInserted, &numKeysDeleted));
+    ASSERT_EQ(0, numKeysInserted);
+    ASSERT_EQ(1, numKeysDeleted);
 
-
-    PathCellSet columnKeys3;
-    columnKeys3.emplace_back(std::make_tuple("path1", "cell1", RecordId(2)));
+    std::vector<column_keygen::CellPatch> columnChanges3;
+    columnChanges3.emplace_back("changedPath2",
+                                "cell1",
+                                RecordId(2),
+                                column_keygen::ColumnKeyGenerator::DiffAction::kUpdate);
+    columnChanges3.emplace_back(
+        "changedPath3", "", RecordId(2), column_keygen::ColumnKeyGenerator::DiffAction::kDelete);
     ASSERT_OK(interceptor->sideWrite(
-        operationContext(), columnKeys3, IndexBuildInterceptor::Op::kUpdate, &numKeys));
-    ASSERT_EQ(1, numKeys);
+        operationContext(), columnChanges3, &numKeysInserted, &numKeysDeleted));
+    ASSERT_EQ(1, numKeysInserted);
+    ASSERT_EQ(1, numKeysDeleted);
 
-    PathCellSet columnKeys4;
-    columnKeys4.emplace_back(std::make_tuple("path2", "cell2", RecordId(2)));
+    std::vector<column_keygen::CellPatch> columnChanges4;
+    columnChanges4.emplace_back("changedPath3",
+                                "cell2",
+                                RecordId(2),
+                                column_keygen::ColumnKeyGenerator::DiffAction::kInsert);
     ASSERT_OK(interceptor->sideWrite(
-        operationContext(), columnKeys4, IndexBuildInterceptor::Op::kInsert, &numKeys));
-    ASSERT_EQ(1, numKeys);
+        operationContext(), columnChanges4, &numKeysInserted, &numKeysDeleted));
+    ASSERT_EQ(1, numKeysInserted);
+    ASSERT_EQ(0, numKeysDeleted);
     wuow.commit();
 
     BSONObjBuilder builder;
@@ -321,35 +360,42 @@ TEST_F(IndexBuilderInterceptorTest, MultipleColumnSideWritesAreSavedToSideWrites
     BSONElement elem2 = obj2["rid"];
 
     auto sideWrites = getSideWritesTableContents(std::move(interceptor));
-    ASSERT_EQ(4, sideWrites.size());
+    ASSERT_EQ(5, sideWrites.size());
     ASSERT_BSONOBJ_EQ(BSON("rid" << elem1 << "op"
                                  << "i"
                                  << "path"
-                                 << "path"
+                                 << "changedPath1"
                                  << "cell"
                                  << "cell"),
                       sideWrites[0]);
     ASSERT_BSONOBJ_EQ(BSON("rid" << elem1 << "op"
                                  << "d"
                                  << "path"
-                                 << "path"
+                                 << "changedPath1"
                                  << "cell"
                                  << ""),
                       sideWrites[1]);
     ASSERT_BSONOBJ_EQ(BSON("rid" << elem2 << "op"
                                  << "u"
                                  << "path"
-                                 << "path1"
+                                 << "changedPath2"
                                  << "cell"
                                  << "cell1"),
                       sideWrites[2]);
     ASSERT_BSONOBJ_EQ(BSON("rid" << elem2 << "op"
+                                 << "d"
+                                 << "path"
+                                 << "changedPath3"
+                                 << "cell"
+                                 << ""),
+                      sideWrites[3]);
+    ASSERT_BSONOBJ_EQ(BSON("rid" << elem2 << "op"
                                  << "i"
                                  << "path"
-                                 << "path2"
+                                 << "changedPath3"
                                  << "cell"
                                  << "cell2"),
-                      sideWrites[3]);
+                      sideWrites[4]);
 }
 
 }  // namespace

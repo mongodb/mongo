@@ -295,20 +295,25 @@ Status ColumnStoreAccessMethod::insert(OperationContext* opCtx,
         // We cannot write to the index during its initial build phase, so we defer this insert as a
         // "side write" to be applied after the build completes.
         if (_indexCatalogEntry->isHybridBuilding()) {
-            auto columnKeys = StorageExecutionContext::get(opCtx).columnKeys();
+            auto columnChanges = StorageExecutionContext::get(opCtx).columnChanges();
             _visitCellsForIndexInsert(
                 opCtx, buf, bsonRecords, [&](StringData path, const BsonRecord& rec) {
-                    columnKeys->emplace_back(
-                        path.toString(), CellView{buf.buf(), size_t(buf.len())}.toString(), rec.id);
+                    columnChanges->emplace_back(
+                        path.toString(),
+                        CellView{buf.buf(), size_t(buf.len())}.toString(),
+                        rec.id,
+                        column_keygen::ColumnKeyGenerator::DiffAction::kInsert);
                 });
             int64_t inserted = 0;
-            ON_BLOCK_EXIT([keysInsertedOut, inserted] {
+            int64_t deleted = 0;
+            ON_BLOCK_EXIT([keysInsertedOut, inserted, deleted] {
                 if (keysInsertedOut) {
                     *keysInsertedOut += inserted;
                 }
+                invariant(deleted == 0);
             });
             uassertStatusOK(_indexCatalogEntry->indexBuildInterceptor()->sideWrite(
-                opCtx, *columnKeys, IndexBuildInterceptor::Op::kInsert, &inserted));
+                opCtx, *columnChanges, &inserted, &deleted));
             return Status::OK();
         } else {
             auto cursor = _store->newWriteCursor(opCtx);
@@ -334,17 +339,22 @@ void ColumnStoreAccessMethod::remove(OperationContext* opCtx,
                                      int64_t* keysDeletedOut,
                                      CheckRecordId checkRecordId) {
     if (_indexCatalogEntry->isHybridBuilding()) {
-        auto columnKeys = StorageExecutionContext::get(opCtx).columnKeys();
+        auto columnChanges = StorageExecutionContext::get(opCtx).columnChanges();
         _keyGen.visitPathsForDelete(obj, [&](StringData path) {
-            columnKeys->emplace_back(std::make_tuple(path.toString(), "", rid));
+            columnChanges->emplace_back(path.toString(),
+                                        "",  // No cell content is necessary to describe a deletion.
+                                        rid,
+                                        column_keygen::ColumnKeyGenerator::DiffAction::kDelete);
         });
+        int64_t inserted = 0;
         int64_t removed = 0;
         fassert(6597801,
                 _indexCatalogEntry->indexBuildInterceptor()->sideWrite(
-                    opCtx, *columnKeys, IndexBuildInterceptor::Op::kDelete, &removed));
+                    opCtx, *columnChanges, &inserted, &removed));
         if (keysDeletedOut) {
             *keysDeletedOut += removed;
         }
+        invariant(inserted == 0);
     } else {
         auto cursor = _store->newWriteCursor(opCtx);
         _keyGen.visitPathsForDelete(obj, [&](PathView path) {
@@ -367,26 +377,19 @@ Status ColumnStoreAccessMethod::update(OperationContext* opCtx,
     PooledFragmentBuilder buf(pooledBufferBuilder);
 
     if (_indexCatalogEntry->isHybridBuilding()) {
-        auto columnKeys = StorageExecutionContext::get(opCtx).columnKeys();
+        auto columnChanges = StorageExecutionContext::get(opCtx).columnChanges();
         _keyGen.visitDiffForUpdate(
             oldDoc,
             newDoc,
             [&](column_keygen::ColumnKeyGenerator::DiffAction diffAction,
                 StringData path,
                 const column_keygen::UnencodedCellView* cell) {
-                // TODO SERVER-72351: This is a temporary fix for SERVER-72351.
-                ON_BLOCK_EXIT([&]() { columnKeys->clear(); });
-
                 if (diffAction == column_keygen::ColumnKeyGenerator::DiffAction::kDelete) {
-                    columnKeys->emplace_back(std::make_tuple(path.toString(), "", rid));
-                    int64_t removed = 0;
-                    fassert(6597802,
-                            _indexCatalogEntry->indexBuildInterceptor()->sideWrite(
-                                opCtx, *columnKeys, IndexBuildInterceptor::Op::kDelete, &removed));
-
-                    if (keysDeletedOut) {
-                        *keysDeletedOut += removed;
-                    }
+                    columnChanges->emplace_back(
+                        path.toString(),
+                        "",  // No cell content is necessary to describe a deletion.
+                        rid,
+                        diffAction);
                     return;
                 }
 
@@ -397,22 +400,22 @@ Status ColumnStoreAccessMethod::update(OperationContext* opCtx,
                 buf.reset();
                 column_keygen::writeEncodedCell(*cell, &buf);
 
-                const auto method =
-                    diffAction == column_keygen::ColumnKeyGenerator::DiffAction::kInsert
-                    ? IndexBuildInterceptor::Op::kInsert
-                    : IndexBuildInterceptor::Op::kUpdate;
-
-                columnKeys->emplace_back(std::make_tuple(
-                    path.toString(), CellView{buf.buf(), size_t(buf.len())}.toString(), rid));
-
-                int64_t inserted = 0;
-                Status status = _indexCatalogEntry->indexBuildInterceptor()->sideWrite(
-                    opCtx, *columnKeys, method, &inserted);
-                if (keysInsertedOut) {
-                    *keysInsertedOut += inserted;
-                }
+                columnChanges->emplace_back(path.toString(),
+                                            CellView{buf.buf(), size_t(buf.len())}.toString(),
+                                            rid,
+                                            diffAction);
             });
 
+        int64_t inserted = 0;
+        int64_t deleted = 0;
+        Status status = _indexCatalogEntry->indexBuildInterceptor()->sideWrite(
+            opCtx, *columnChanges, &inserted, &deleted);
+        if (keysInsertedOut) {
+            *keysInsertedOut += inserted;
+        }
+        if (keysDeletedOut) {
+            *keysDeletedOut += deleted;
+        }
     } else {
         auto cursor = _store->newWriteCursor(opCtx);
         _keyGen.visitDiffForUpdate(
