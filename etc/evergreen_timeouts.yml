@@ -13,6 +13,8 @@ overrides:
   amazon-linux2-arm64-compile:
     - task: server_discovery_and_monitoring_json_test
       exec_timeout: 30  # 30 min.
+    - task: run_unittests
+      exec_timeout: 24
 
   enterprise-amazon2-arm64:
   - task: config_fuzzer_replica_sets_jscore_passthrough
