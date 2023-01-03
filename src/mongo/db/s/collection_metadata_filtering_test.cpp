@@ -120,8 +120,8 @@ protected:
 
         {
             AutoGetCollection autoColl(operationContext(), kNss, MODE_X);
-            auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-                operationContext(), kNss, CSRAcquisitionMode::kExclusive);
+            auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
+                operationContext(), kNss);
             scopedCsr->setFilteringMetadata(operationContext(),
                                             CollectionMetadata(cm, ShardId("0")));
         }

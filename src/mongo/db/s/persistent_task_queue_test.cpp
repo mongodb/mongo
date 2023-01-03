@@ -85,8 +85,8 @@ class PersistentTaskQueueTest : public ShardServerTestFixture {
         ShardServerTestFixture::setUp();
         AutoGetDb autoDb(operationContext(), kNss.dbName(), MODE_IX);
         Lock::CollectionLock collLock(operationContext(), kNss, MODE_IX);
-        CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-            operationContext(), kNss, CSRAcquisitionMode::kExclusive)
+        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(operationContext(),
+                                                                             kNss)
             ->setFilteringMetadata(operationContext(), CollectionMetadata());
     }
 };

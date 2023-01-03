@@ -49,8 +49,7 @@ const NamespaceString kUnshardedNss("TestDB", "UnshardedColl");
 
 void setCollectionFilteringMetadata(OperationContext* opCtx, CollectionMetadata metadata) {
     AutoGetCollection autoColl(opCtx, kTestNss, MODE_X);
-    CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-        opCtx, kTestNss, CSRAcquisitionMode::kExclusive)
+    CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, kTestNss)
         ->setFilteringMetadata(opCtx, std::move(metadata));
 }
 

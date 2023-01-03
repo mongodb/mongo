@@ -54,19 +54,19 @@ public:
         return _nss;
     }
 
-    ScopedCollectionDescription getCollectionDescription(OperationContext* opCtx) override {
+    ScopedCollectionDescription getCollectionDescription(OperationContext* opCtx) const override {
         return {kUnshardedCollection};
     }
 
     ScopedCollectionFilter getOwnershipFilter(OperationContext*,
                                               OrphanCleanupPolicy orphanCleanupPolicy,
-                                              bool supportNonVersionedOperations) override {
+                                              bool supportNonVersionedOperations) const override {
         return {kUnshardedCollection};
     }
 
-    void checkShardVersionOrThrow(OperationContext*) override {}
+    void checkShardVersionOrThrow(OperationContext*) const override {}
 
-    void appendShardVersion(BSONObjBuilder* builder) override {}
+    void appendShardVersion(BSONObjBuilder* builder) const override {}
 
     size_t numberOfRangesScheduledForDeletion() const override {
         return 0;

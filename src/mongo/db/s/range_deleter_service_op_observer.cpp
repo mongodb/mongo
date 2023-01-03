@@ -50,8 +50,8 @@ void registerTaskWithOngoingQueriesOnOpLogEntryCommit(OperationContext* opCtx,
         try {
             AutoGetCollection autoColl(opCtx, rdt.getNss(), MODE_IS);
             auto waitForActiveQueriesToComplete =
-                CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-                    opCtx, rdt.getNss(), CSRAcquisitionMode::kShared)
+                CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx,
+                                                                                  rdt.getNss())
                     ->getOngoingQueriesCompletionFuture(rdt.getCollectionUuid(), rdt.getRange())
                     .semi();
             (void)RangeDeleterService::get(opCtx)->registerTask(

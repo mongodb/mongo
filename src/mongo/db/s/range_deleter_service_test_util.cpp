@@ -184,8 +184,7 @@ void _clearFilteringMetadataByUUID(OperationContext* opCtx, const UUID& uuid) {
     NamespaceString nss = RangeDeleterServiceTest::nssWithUuid[uuid];
 
     AutoGetCollection autoColl(opCtx, nss, LockMode::MODE_X);
-    CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-        opCtx, nss, CSRAcquisitionMode::kExclusive)
+    CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss)
         ->clearFilteringMetadata(opCtx);
 }
 

@@ -89,8 +89,8 @@ void ReshardingRecipientService::RecipientStateMachineExternalState::
                                     std::move(collOptions)});
 
     AutoGetCollection autoColl(opCtx, metadata.getTempReshardingNss(), MODE_IX);
-    CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-        opCtx, metadata.getTempReshardingNss(), CSRAcquisitionMode::kExclusive)
+    CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
+        opCtx, metadata.getTempReshardingNss())
         ->clearFilteringMetadata(opCtx);
 }
 

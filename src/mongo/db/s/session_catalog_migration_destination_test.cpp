@@ -284,8 +284,8 @@ public:
     void setUnshardedFilteringMetadata(const NamespaceString& nss) {
         AutoGetDb autoDb(operationContext(), nss.dbName(), MODE_IX);
         Lock::CollectionLock collLock(operationContext(), nss, MODE_IX);
-        CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-            operationContext(), nss, CSRAcquisitionMode::kExclusive)
+        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(operationContext(),
+                                                                             nss)
             ->setFilteringMetadata(operationContext(), CollectionMetadata());
     }
 

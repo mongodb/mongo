@@ -68,8 +68,7 @@ void DropCollectionCoordinator::dropCollectionLocally(OperationContext* opCtx,
         }();
 
         // Clear CollectionShardingRuntime entry
-        CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-            opCtx, nss, CSRAcquisitionMode::kExclusive)
+        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss)
             ->clearFilteringMetadataForDroppedCollection(opCtx);
     }
 

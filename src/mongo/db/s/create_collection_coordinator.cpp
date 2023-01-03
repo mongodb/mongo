@@ -1309,8 +1309,7 @@ void CreateCollectionCoordinator::_commit(OperationContext* opCtx,
         // TODO (SERVER-71444): Fix to be interruptible or document exception.
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
         AutoGetCollection autoColl(opCtx, nss(), MODE_IX);
-        CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-            opCtx, nss(), CSRAcquisitionMode::kExclusive)
+        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss())
             ->clearFilteringMetadata(opCtx);
 
         throw;

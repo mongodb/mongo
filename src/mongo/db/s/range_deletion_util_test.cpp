@@ -120,8 +120,7 @@ public:
                         boost::none);
         AutoGetDb autoDb(_opCtx, kNss.dbName(), MODE_IX);
         Lock::CollectionLock collLock(_opCtx, kNss, MODE_IX);
-        CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-            _opCtx, kNss, CSRAcquisitionMode::kExclusive)
+        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(_opCtx, kNss)
             ->setFilteringMetadata(_opCtx,
                                    CollectionMetadata(std::move(cm), ShardId("dummyShardId")));
     }

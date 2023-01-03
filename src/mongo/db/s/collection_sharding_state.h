@@ -126,7 +126,7 @@ public:
      *
      * The returned object *is not safe* to access after the collection lock has been dropped.
      */
-    virtual ScopedCollectionDescription getCollectionDescription(OperationContext* opCtx) = 0;
+    virtual ScopedCollectionDescription getCollectionDescription(OperationContext* opCtx) const = 0;
 
     /**
      * This method must be called with an OperationShardingState, which specifies an expected shard
@@ -161,7 +161,7 @@ public:
     virtual ScopedCollectionFilter getOwnershipFilter(
         OperationContext* opCtx,
         OrphanCleanupPolicy orphanCleanupPolicy,
-        bool supportNonVersionedOperations = false) = 0;
+        bool supportNonVersionedOperations = false) const = 0;
 
     /**
      * Checks whether the shard version in the operation context is compatible with the shard
@@ -170,12 +170,12 @@ public:
      *
      * If the request is not versioned all collections will be treated as UNSHARDED.
      */
-    virtual void checkShardVersionOrThrow(OperationContext* opCtx) = 0;
+    virtual void checkShardVersionOrThrow(OperationContext* opCtx) const = 0;
 
     /**
      * Appends information about the shard version of the collection.
      */
-    virtual void appendShardVersion(BSONObjBuilder* builder) = 0;
+    virtual void appendShardVersion(BSONObjBuilder* builder) const = 0;
 
     /**
      * Returns the number of ranges scheduled for deletion on the collection.

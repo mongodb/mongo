@@ -124,8 +124,8 @@ public:
                 // inclusive of the commit (and new writes to the committed chunk) that hasn't yet
                 // propagated back to this shard. This ensures the read your own writes causal
                 // consistency guarantee.
-                auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-                    opCtx, ns(), CSRAcquisitionMode::kShared);
+                auto scopedCsr =
+                    CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, ns());
                 criticalSectionSignal = scopedCsr->getCriticalSectionSignal(
                     opCtx, ShardingMigrationCriticalSection::kWrite);
             }

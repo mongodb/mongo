@@ -121,7 +121,7 @@ public:
      * empty BSONObj.
      */
     BSONObj getMigrationStatusReport(
-        const CollectionShardingRuntime::ScopedCollectionShardingRuntime& scopedCsrLock);
+        const CollectionShardingRuntime::ScopedSharedCollectionShardingRuntime& scopedCsrLock);
 
     /**
      * Returns OK if migration started successfully.

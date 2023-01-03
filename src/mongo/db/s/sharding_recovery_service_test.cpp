@@ -133,8 +133,8 @@ public:
             ASSERT(!dss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kRead));
         } else {
             AutoGetCollection coll(opCtx(), nss, MODE_IS);
-            auto csr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-                opCtx(), nss, CSRAcquisitionMode::kShared);
+            auto csr =
+                CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx(), nss);
             ASSERT(
                 csr->getCriticalSectionSignal(opCtx(), ShardingMigrationCriticalSection::kWrite));
             ASSERT(
@@ -151,8 +151,8 @@ public:
             ASSERT(dss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kRead));
         } else {
             AutoGetCollection coll(opCtx(), nss, MODE_IS);
-            auto csr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-                opCtx(), nss, CSRAcquisitionMode::kShared);
+            auto csr =
+                CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx(), nss);
             ASSERT(
                 csr->getCriticalSectionSignal(opCtx(), ShardingMigrationCriticalSection::kWrite));
             ASSERT(csr->getCriticalSectionSignal(opCtx(), ShardingMigrationCriticalSection::kRead));
@@ -168,8 +168,8 @@ public:
             ASSERT(!dss->getCriticalSectionSignal(ShardingMigrationCriticalSection::kRead));
         } else {
             AutoGetCollection coll(opCtx(), nss, MODE_IS);
-            auto csr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-                opCtx(), nss, CSRAcquisitionMode::kShared);
+            auto csr =
+                CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx(), nss);
             ASSERT(
                 !csr->getCriticalSectionSignal(opCtx(), ShardingMigrationCriticalSection::kWrite));
             ASSERT(

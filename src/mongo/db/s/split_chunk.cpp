@@ -101,8 +101,8 @@ bool checkMetadataForSuccessfulSplitChunk(OperationContext* opCtx,
     Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IS);
     Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
 
-    const auto scopedCSR = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-        opCtx, nss, CSRAcquisitionMode::kShared);
+    const auto scopedCSR =
+        CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
     const auto metadataAfterSplit = scopedCSR->getCurrentMetadataIfKnown();
 
     ShardId shardId = ShardingState::get(opCtx)->shardId();

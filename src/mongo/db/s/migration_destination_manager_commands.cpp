@@ -134,8 +134,8 @@ public:
 
         const auto collectionEpoch = [&] {
             AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-            auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-                opCtx, nss, CSRAcquisitionMode::kShared);
+            auto scopedCsr =
+                CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
             auto optMetadata = scopedCsr->getCurrentMetadataIfKnown();
             uassert(StaleConfigInfo(nss,
                                     ShardVersion::IGNORED() /* receivedVersion */,

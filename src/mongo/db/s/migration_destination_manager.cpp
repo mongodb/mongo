@@ -300,8 +300,7 @@ void replaceGlobalIndexesInShardIfNeeded(OperationContext* opCtx,
                                          const UUID& uuid) {
     auto currentShardHasAnyChunks = [&]() -> bool {
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-        auto scsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-            opCtx, nss, CSRAcquisitionMode::kShared);
+        auto scsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
         const auto optMetadata = scsr->getCurrentMetadataIfKnown();
         return optMetadata && optMetadata->currentShardHasAnyChunks();
     }();
@@ -458,7 +457,7 @@ void MigrationDestinationManager::report(BSONObjBuilder& b,
 }
 
 BSONObj MigrationDestinationManager::getMigrationStatusReport(
-    const CollectionShardingRuntime::ScopedCollectionShardingRuntime& scopedCsrLock) {
+    const CollectionShardingRuntime::ScopedSharedCollectionShardingRuntime& scopedCsrLock) {
     stdx::lock_guard<Latch> lk(_mutex);
     if (_isActive(lk)) {
         boost::optional<long long> sessionOplogEntriesMigrated;
@@ -931,8 +930,8 @@ void MigrationDestinationManager::_dropLocalIndexesIfNecessary(
     const CollectionOptionsAndIndexes& collectionOptionsAndIndexes) {
     bool dropNonDonorIndexes = [&]() -> bool {
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-        auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-            opCtx, nss, CSRAcquisitionMode::kShared);
+        auto scopedCsr =
+            CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
         // Only attempt to drop a collection's indexes if we have valid metadata and the collection
         // is sharded
         if (auto optMetadata = scopedCsr->getCurrentMetadataIfKnown()) {
@@ -1853,8 +1852,7 @@ void MigrationDestinationManager::awaitCriticalSectionReleaseSignalAndCompleteMi
 
     if (refreshFailed) {
         AutoGetCollection autoColl(opCtx, _nss, MODE_IX);
-        CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-            opCtx, _nss, CSRAcquisitionMode::kExclusive)
+        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, _nss)
             ->clearFilteringMetadata(opCtx);
     }
 

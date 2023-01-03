@@ -353,8 +353,7 @@ void clearFilteringMetadata(OperationContext* opCtx,
         }
 
         AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-        CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-            opCtx, nss, CSRAcquisitionMode::kExclusive)
+        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss)
             ->clearFilteringMetadata(opCtx);
 
         if (!scheduleAsyncRefresh) {

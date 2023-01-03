@@ -39,7 +39,6 @@
 
 namespace mongo {
 
-enum class CSRAcquisitionMode { kShared, kExclusive };
 typedef std::pair<CollectionMetadata, boost::optional<GlobalIndexesCache>>
     CollectionPlacementAndIndexInfo;
 
@@ -58,13 +57,38 @@ public:
                               std::shared_ptr<executor::TaskExecutor> rangeDeleterExecutor);
 
     /**
-     * Obtains the sharding runtime for the specified collection, along with a resource lock
-     * protecting it from concurrent modifications, which will be held until the object goes out of
-     * scope.
+     * Obtains the sharding runtime for the specified collection, along with a resource lock in
+     * shared mode protecting it from concurrent modifications, which will be held until the object
+     * goes out of scope.
      */
-    class ScopedCollectionShardingRuntime {
+    class ScopedSharedCollectionShardingRuntime {
     public:
-        ScopedCollectionShardingRuntime(ScopedCollectionShardingRuntime&&) = default;
+        ScopedSharedCollectionShardingRuntime(ScopedSharedCollectionShardingRuntime&&) = default;
+
+        const CollectionShardingRuntime* operator->() const {
+            return checked_cast<CollectionShardingRuntime*>(&*_scopedCss);
+        }
+        const CollectionShardingRuntime& operator*() const {
+            return checked_cast<CollectionShardingRuntime&>(*_scopedCss);
+        }
+
+    private:
+        friend class CollectionShardingRuntime;
+
+        ScopedSharedCollectionShardingRuntime(ScopedCollectionShardingState&& scopedCss);
+
+        ScopedCollectionShardingState _scopedCss;
+    };
+
+    /**
+     * Obtains the sharding runtime for the specified collection, along with a resource lock in
+     * exclusive mode protecting it from concurrent modifications, which will be held until the
+     * object goes out of scope.
+     */
+    class ScopedExclusiveCollectionShardingRuntime {
+    public:
+        ScopedExclusiveCollectionShardingRuntime(ScopedExclusiveCollectionShardingRuntime&&) =
+            default;
 
         CollectionShardingRuntime* operator->() const {
             return checked_cast<CollectionShardingRuntime*>(&*_scopedCss);
@@ -76,29 +100,36 @@ public:
     private:
         friend class CollectionShardingRuntime;
 
-        ScopedCollectionShardingRuntime(ScopedCollectionShardingState&& scopedCss);
+        ScopedExclusiveCollectionShardingRuntime(ScopedCollectionShardingState&& scopedCss);
 
         ScopedCollectionShardingState _scopedCss;
     };
-    static ScopedCollectionShardingRuntime assertCollectionLockedAndAcquire(
-        OperationContext* opCtx, const NamespaceString& nss, CSRAcquisitionMode mode);
+
+    static ScopedSharedCollectionShardingRuntime assertCollectionLockedAndAcquireShared(
+        OperationContext* opCtx, const NamespaceString& nss);
+    static ScopedExclusiveCollectionShardingRuntime assertCollectionLockedAndAcquireExclusive(
+        OperationContext* opCtx, const NamespaceString& nss);
+
+    // Delete inherited acquire methods, only assertCollectionLockedAndAcquireShared and
+    // assertCollectionLockedAndAcquireExclusive should be used
+    static ScopedCollectionShardingState assertCollectionLockedAndAcquire(
+        OperationContext* opCtx, const NamespaceString& nss) = delete;
     static ScopedCollectionShardingState acquire(OperationContext* opCtx,
-                                                 const NamespaceString& nss,
-                                                 CSRAcquisitionMode mode) = delete;
+                                                 const NamespaceString& nss) = delete;
 
     const NamespaceString& nss() const override {
         return _nss;
     }
 
-    ScopedCollectionDescription getCollectionDescription(OperationContext* opCtx) override;
+    ScopedCollectionDescription getCollectionDescription(OperationContext* opCtx) const override;
 
     ScopedCollectionFilter getOwnershipFilter(OperationContext* opCtx,
                                               OrphanCleanupPolicy orphanCleanupPolicy,
-                                              bool supportNonVersionedOperations) override;
+                                              bool supportNonVersionedOperations) const override;
 
-    void checkShardVersionOrThrow(OperationContext* opCtx) override;
+    void checkShardVersionOrThrow(OperationContext* opCtx) const override;
 
-    void appendShardVersion(BSONObjBuilder* builder) override;
+    void appendShardVersion(BSONObjBuilder* builder) const override;
 
     size_t numberOfRangesScheduledForDeletion() const override;
 
@@ -110,7 +141,7 @@ public:
      * be used for cases such as checking whether a particular config server update has taken
      * effect.
      */
-    boost::optional<CollectionMetadata> getCurrentMetadataIfKnown();
+    boost::optional<CollectionMetadata> getCurrentMetadataIfKnown() const;
 
     /**
      * Updates the collection's filtering metadata based on changes received from the config server
@@ -171,7 +202,7 @@ public:
      * be waited on. Otherwise, returns nullptr.
      */
     boost::optional<SharedSemiFuture<void>> getCriticalSectionSignal(
-        OperationContext* opCtx, ShardingMigrationCriticalSection::Operation op);
+        OperationContext* opCtx, ShardingMigrationCriticalSection::Operation op) const;
 
     /**
      * Schedules documents in `range` for cleanup after any running queries that may depend on them
@@ -183,7 +214,7 @@ public:
      * succeeds, waitForClean can be called to ensure no other deletions are pending for the range.
      */
     enum CleanWhen { kNow, kDelayed };
-    SharedSemiFuture<void> cleanUpRange(ChunkRange const& range, CleanWhen when);
+    SharedSemiFuture<void> cleanUpRange(ChunkRange const& range, CleanWhen when) const;
 
     /**
      * Waits for all ranges deletion tasks with UUID 'collectionUuid' overlapping range
@@ -201,7 +232,7 @@ public:
      * Returns a future marked as ready when all the ongoing queries retaining the range complete
      */
     SharedSemiFuture<void> getOngoingQueriesCompletionFuture(const UUID& collectionUuid,
-                                                             ChunkRange const& range);
+                                                             ChunkRange const& range) const;
 
     std::uint64_t getNumMetadataManagerChanges_forTest() {
         return _numMetadataManagerChanges;
@@ -221,7 +252,7 @@ public:
      * waited on. Otherwise, returns boost::none.
      */
     boost::optional<SharedSemiFuture<void>> getShardVersionRecoverRefreshFuture(
-        OperationContext* opCtx);
+        OperationContext* opCtx) const;
 
     /**
      * Resets the shard version recover/refresh shared semifuture to boost::none.
@@ -231,12 +262,12 @@ public:
     /**
      * Gets an index version under a lock.
      */
-    boost::optional<CollectionIndexes> getCollectionIndexes(OperationContext* opCtx);
+    boost::optional<CollectionIndexes> getCollectionIndexes(OperationContext* opCtx) const;
 
     /**
      * Gets the index list under a lock.
      */
-    boost::optional<GlobalIndexesCache>& getIndexes(OperationContext* opCtx);
+    const boost::optional<GlobalIndexesCache>& getIndexes(OperationContext* opCtx) const;
 
     /**
      * Add a new index to the shard-role index info under a lock.
@@ -283,7 +314,7 @@ private:
      * atClusterTime if specified.
      */
     std::shared_ptr<ScopedCollectionDescription::Impl> _getCurrentMetadataIfKnown(
-        const boost::optional<LogicalTime>& atClusterTime);
+        const boost::optional<LogicalTime>& atClusterTime) const;
 
     /**
      * Returns the latest version of collection metadata with filtering configured for
@@ -293,7 +324,7 @@ private:
     std::shared_ptr<ScopedCollectionDescription::Impl> _getMetadataWithVersionCheckAt(
         OperationContext* opCtx,
         const boost::optional<mongo::LogicalTime>& atClusterTime,
-        bool supportNonVersionedOperations = false);
+        bool supportNonVersionedOperations = false) const;
 
     /**
      * Auxiliary function used to implement the different flavours of clearFilteringMetadata.

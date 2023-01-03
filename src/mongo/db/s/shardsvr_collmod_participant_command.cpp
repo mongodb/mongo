@@ -103,8 +103,8 @@ public:
                     // TODO (SERVER-71444): Fix to be interruptible or document exception.
                     UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
                     AutoGetCollection autoColl(opCtx, bucketNs, MODE_IX);
-                    CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-                        opCtx, bucketNs, CSRAcquisitionMode::kExclusive)
+                    CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx,
+                                                                                         bucketNs)
                         ->clearFilteringMetadata(opCtx);
                 }
 

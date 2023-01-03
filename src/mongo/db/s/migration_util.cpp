@@ -467,8 +467,9 @@ ExecutorFuture<void> cleanUpRange(ServiceContext* serviceContext,
                        AutoGetCollection autoColl(
                            opCtx, NamespaceStringOrUUID{dbName, collectionUuid}, MODE_IS);
                        optNss.emplace(autoColl.getNss());
-                       auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-                           opCtx, *optNss, CSRAcquisitionMode::kShared);
+                       auto scopedCsr =
+                           CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(
+                               opCtx, *optNss);
                        auto optCollDescr = scopedCsr->getCurrentMetadataIfKnown();
 
                        if (optCollDescr) {
@@ -994,8 +995,8 @@ void resumeMigrationCoordinationsOnStepUp(OperationContext* opCtx) {
 
                       {
                           AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-                          CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-                              opCtx, nss, CSRAcquisitionMode::kExclusive)
+                          CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
+                              opCtx, nss)
                               ->clearFilteringMetadata(opCtx);
                       }
 
@@ -1070,8 +1071,9 @@ void recoverMigrationCoordinations(OperationContext* opCtx,
             auto setFilteringMetadata = [&opCtx, &currentMetadata, &doc, &cancellationToken]() {
                 AutoGetDb autoDb(opCtx, doc.getNss().dbName(), MODE_IX);
                 Lock::CollectionLock collLock(opCtx, doc.getNss(), MODE_IX);
-                auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-                    opCtx, doc.getNss(), CSRAcquisitionMode::kExclusive);
+                auto scopedCsr =
+                    CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
+                        opCtx, doc.getNss());
 
                 auto optMetadata = scopedCsr->getCurrentMetadataIfKnown();
                 invariant(!optMetadata);

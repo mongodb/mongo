@@ -306,16 +306,18 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
                 {
                     Lock::DBLock dbLock(opCtx, fromNss().dbName(), MODE_IX);
                     Lock::CollectionLock collLock(opCtx, fromNss(), MODE_IX);
-                    auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-                        opCtx, fromNss(), CSRAcquisitionMode::kExclusive);
+                    auto scopedCsr =
+                        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
+                            opCtx, fromNss());
                     scopedCsr->clearFilteringMetadataForDroppedCollection(opCtx);
                 }
 
                 {
                     Lock::DBLock dbLock(opCtx, toNss().dbName(), MODE_IX);
                     Lock::CollectionLock collLock(opCtx, toNss(), MODE_IX);
-                    auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-                        opCtx, toNss(), CSRAcquisitionMode::kExclusive);
+                    auto scopedCsr =
+                        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
+                            opCtx, toNss());
                     scopedCsr->clearFilteringMetadata(opCtx);
                 }
 

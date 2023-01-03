@@ -77,14 +77,14 @@ public:
      * Retrieves the MigrationSourceManager pointer that corresponds to the given collection under
      * a CollectionShardingRuntime that has its ResourceMutex locked.
      */
-    static MigrationSourceManager* get(CollectionShardingRuntime& csr);
+    static MigrationSourceManager* get(const CollectionShardingRuntime& csr);
 
     /**
      * If the currently installed migration has reached the cloning stage (i.e., after startClone),
      * returns the cloner currently in use.
      */
     static std::shared_ptr<MigrationChunkClonerSource> getCurrentCloner(
-        CollectionShardingRuntime& csr);
+        const CollectionShardingRuntime& csr);
 
     /**
      * Instantiates a new migration source manager with the specified migration parameters. Must be
@@ -169,7 +169,8 @@ public:
      * Must be called with some form of lock on the collection namespace.
      */
     BSONObj getMigrationStatusReport(
-        const CollectionShardingRuntime::ScopedCollectionShardingRuntime& scopedCsrLock) const;
+        const CollectionShardingRuntime::ScopedSharedCollectionShardingRuntime& scopedCsrLock)
+        const;
 
     const NamespaceString& nss() {
         return _args.getCommandParameter();

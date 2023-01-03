@@ -319,11 +319,11 @@ void onDbVersionMismatch(OperationContext* opCtx,
  * Returns 'true' if there were concurrent operations that had to be joined (in which case all locks
  * will be dropped). If there were none, returns false and the locks continue to be held.
  */
-bool joinCollectionPlacementVersionOperation(
-    OperationContext* opCtx,
-    boost::optional<Lock::DBLock>* dbLock,
-    boost::optional<Lock::CollectionLock>* collLock,
-    boost::optional<CollectionShardingRuntime::ScopedCollectionShardingRuntime>* scopedCsr) {
+template <typename ScopedCSR>
+bool joinCollectionPlacementVersionOperation(OperationContext* opCtx,
+                                             boost::optional<Lock::DBLock>* dbLock,
+                                             boost::optional<Lock::CollectionLock>* collLock,
+                                             boost::optional<ScopedCSR>* scopedCsr) {
     invariant(dbLock->has_value());
     invariant(collLock->has_value());
     invariant(scopedCsr->has_value());
@@ -393,8 +393,9 @@ SharedSemiFuture<void> recoverRefreshCollectionPlacementVersion(
                 Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
                 Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
 
-                auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-                    opCtx, nss, CSRAcquisitionMode::kExclusive);
+                auto scopedCsr =
+                    CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx,
+                                                                                         nss);
 
                 // cancellationToken needs to be checked under the CSR lock before overwriting the
                 // filtering metadata to serialize with other threads calling
@@ -425,8 +426,8 @@ SharedSemiFuture<void> recoverRefreshCollectionPlacementVersion(
                         Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
 
                         auto scopedCsr =
-                            CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-                                opCtx, nss, CSRAcquisitionMode::kShared);
+                            CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx,
+                                                                                              nss);
 
                         if (auto msm = MigrationSourceManager::get(*scopedCsr)) {
                             waitForMigrationAbort.emplace(msm->abort());
@@ -502,9 +503,8 @@ void onCollectionPlacementVersionMismatch(OperationContext* opCtx,
             collLock.emplace(opCtx, nss, MODE_IS);
 
             if (chunkVersionReceived) {
-                boost::optional<CollectionShardingRuntime::ScopedCollectionShardingRuntime>
-                    scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-                        opCtx, nss, CSRAcquisitionMode::kShared);
+                auto scopedCsr = boost::make_optional(
+                    CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss));
 
                 if (joinCollectionPlacementVersionOperation(
                         opCtx, &dbLock, &collLock, &scopedCsr)) {
@@ -522,9 +522,8 @@ void onCollectionPlacementVersionMismatch(OperationContext* opCtx,
                 }
             }
 
-            boost::optional<CollectionShardingRuntime::ScopedCollectionShardingRuntime> scopedCsr =
-                CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-                    opCtx, nss, CSRAcquisitionMode::kExclusive);
+            auto scopedCsr = boost::make_optional(
+                CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss));
 
             if (joinCollectionPlacementVersionOperation(opCtx, &dbLock, &collLock, &scopedCsr)) {
                 continue;
@@ -624,8 +623,8 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
         // is in the 'system.views' collection.
         Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
         Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
-        auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-            opCtx, nss, CSRAcquisitionMode::kExclusive);
+        auto scopedCsr =
+            CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss);
         scopedCsr->setFilteringMetadata(opCtx, CollectionMetadata());
 
         return ChunkVersion::UNSHARDED();
@@ -639,8 +638,8 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
         // is in the 'system.views' collection.
         Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IS);
         Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
-        auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-            opCtx, nss, CSRAcquisitionMode::kShared);
+        auto scopedCsr =
+            CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
         if (auto optMetadata = scopedCsr->getCurrentMetadataIfKnown()) {
             const auto& metadata = *optMetadata;
             if (metadata.isSharded() &&
@@ -663,8 +662,8 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
     // 'system.views' collection.
     Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IX);
     Lock::CollectionLock collLock(opCtx, nss, MODE_IX);
-    auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-        opCtx, nss, CSRAcquisitionMode::kExclusive);
+    auto scopedCsr =
+        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(opCtx, nss);
     if (auto optMetadata = scopedCsr->getCurrentMetadataIfKnown()) {
         const auto& metadata = *optMetadata;
         if (metadata.isSharded() &&

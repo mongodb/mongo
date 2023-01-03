@@ -59,8 +59,8 @@ BSONObj getShardKeyPattern(OperationContext* opCtx,
             AutoGetCollection collection(
                 opCtx, NamespaceStringOrUUID{dbName.toString(), collectionUuid}, MODE_IS);
 
-            auto optMetadata = CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-                                   opCtx, collection.getNss(), CSRAcquisitionMode::kShared)
+            auto optMetadata = CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(
+                                   opCtx, collection.getNss())
                                    ->getCurrentMetadataIfKnown();
             if (optMetadata && optMetadata->isSharded()) {
                 return optMetadata->getShardKeyPattern().toBSON();

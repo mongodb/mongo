@@ -400,10 +400,10 @@ public:
         CollectionShardingRuntimeTest::tearDown();
     }
 
-    CollectionShardingRuntime::ScopedCollectionShardingRuntime csr() {
+    CollectionShardingRuntime::ScopedExclusiveCollectionShardingRuntime csr() {
         AutoGetCollection autoColl(operationContext(), kTestNss, MODE_IX);
-        return CollectionShardingRuntime::assertCollectionLockedAndAcquire(
-            operationContext(), kTestNss, CSRAcquisitionMode::kShared);
+        return CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
+            operationContext(), kTestNss);
     }
 
     const UUID& uuid() const {
