@@ -2209,12 +2209,19 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
     }
 
     if (_forward && _lastReturnedId >= id) {
-        LOGV2_FATAL(
-            22406,
-            "Cursor forward scan next was not greater than last which is indicative of data "
-            "corruption. See http://dochub.mongodb.org/core/data-recovery for recovery steps.",
-            "next"_attr = id,
-            "last"_attr = _lastReturnedId);
+        LOGV2_ERROR(22406,
+                    "WTCursor::next -- c->next_key ( {next}) was not greater than _lastReturnedId "
+                    "({last}) which is a bug.",
+                    "WTCursor::next -- next was not greater than last which is a bug",
+                    "next"_attr = id,
+                    "last"_attr = _lastReturnedId);
+
+        // Crash when testing diagnostics are enabled.
+        invariant(!TestingProctor::instance().isEnabled(), "next was not greater than last");
+
+        // Force a retry of the operation from our last known position by acting as-if
+        // we received a WT_ROLLBACK error.
+        throwWriteConflictException("WTCursor::next -- next was not greater than last.");
     }
 
     WT_ITEM value;
