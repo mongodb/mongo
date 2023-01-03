@@ -173,6 +173,7 @@ indexTestEnv.CppUnitTest(
         'column_cell_test.cpp',
         'column_key_generator_test.cpp',
         'column_store_sorter_test.cpp',
+        'columns_access_method_test.cpp',
         'hash_key_generator_test.cpp',
         'index_build_interceptor_test.cpp',
         's2_key_generator_test.cpp',
@@ -195,6 +196,7 @@ indexTestEnv.CppUnitTest(
         '$BUILD_DIR/mongo/db/sorter/sorter_stats',
         'column_store_index',
         'expression_params',
+        'index_access_methods',
         'key_generator',
     ],
 )

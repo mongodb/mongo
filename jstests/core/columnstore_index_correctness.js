@@ -140,6 +140,42 @@ const coll = db.columnstore_index_correctness;
               `Unexpected number of documents: ${tojson(findDocsWithID)}`);
 })();
 
+(function testFieldsWithDotsAndDollars() {
+    const doc = {
+        _id: 1,
+        "._id": 2,
+        "": {"": 3},
+        ".": 4,
+        "a": {b: {c: 5}, "b.c": 6},
+        "$": 7,
+        "$a": 8,
+        "$$a": {"$.$": 9}
+    };
+    coll.drop();
+    assert.commandWorked(coll.insert(doc));
+    assert.commandWorked(coll.createIndex({"$**": "columnstore"}));
+
+    // Double check that the document was inserted correctly.
+    const queryResult = coll.findOne();
+    assert.docEq(queryResult, doc);
+
+    // A projection on "a.b.c" should retrieve {"a": {"b": {"c": 5}}} but _not_ {"a": {"b.c": 6}}.
+    const kProjection = {_id: 0, "a.b.c": 1};
+    const explain = coll.find({}, kProjection).explain();
+    assert(planHasStage(db, explain, "COLUMN_SCAN"),
+           "Projection of existing column " + tojson(explain));
+
+    const result = coll.findOne({}, kProjection);
+    assert.docEq(result, {a: {b: {c: 5}}});
+
+    // We cannot directly check the output of a column scan on most fields in the test document,
+    // because there is no way to express projections on fields with empty names, internal dots, or
+    // leading $s. For this test, we consider it sufficient that inserts to the column store do not
+    // crash or corrupt data.
+    const validationResult = assert.commandWorked(coll.validate({full: true}));
+    assert(validationResult.valid, validationResult);
+})();
+
 // Multiple tests in this file use the same dataset. Intentionally not using _id as the unique
 // identifier, to avoid getting IDHACK plans when we query by it.
 const docs = [
