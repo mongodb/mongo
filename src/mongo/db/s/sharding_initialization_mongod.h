@@ -145,7 +145,6 @@ private:
  * NOTE: This does not initialize ShardingState, which should only be done for shard servers.
  */
 void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
-                                            const ShardId& shardId,
                                             const boost::optional<ConnectionString>& configCS);
 
 /**

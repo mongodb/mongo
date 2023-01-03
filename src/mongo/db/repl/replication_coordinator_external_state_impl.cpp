@@ -827,11 +827,18 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnStepDownHook() {
     if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
         PeriodicShardedIndexConsistencyChecker::get(_service).onStepDown();
         TransactionCoordinatorService::get(_service)->onStepDown();
-    } else if (ShardingState::get(_service)->enabled()) {
+    }
+    if (ShardingState::get(_service)->enabled()) {
         ChunkSplitter::get(_service).onStepDown();
-        CatalogCacheLoader::get(_service).onStepDown();
         PeriodicBalancerConfigRefresher::get(_service).onStepDown();
-        TransactionCoordinatorService::get(_service)->onStepDown();
+
+        if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
+            // Config shards don't use a loader that requires this.
+            CatalogCacheLoader::get(_service).onStepDown();
+
+            // Called earlier for config servers.
+            TransactionCoordinatorService::get(_service)->onStepDown();
+        }
     }
 
     if (auto validator = LogicalTimeValidator::get(_service)) {
@@ -933,7 +940,8 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
 
         PeriodicShardedIndexConsistencyChecker::get(_service).onStepUp(_service);
         TransactionCoordinatorService::get(_service)->onStepUp(opCtx);
-    } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+    }
+    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
         if (ShardingState::get(opCtx)->enabled()) {
             Status status = ShardingStateRecovery_DEPRECATED::recover(opCtx);
             VectorClockMutable::get(opCtx)->recoverDirect(opCtx);
@@ -947,10 +955,16 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
             }
             fassert(40107, status);
 
-            CatalogCacheLoader::get(_service).onStepUp();
             ChunkSplitter::get(_service).onStepUp();
             PeriodicBalancerConfigRefresher::get(_service).onStepUp(_service);
-            TransactionCoordinatorService::get(_service)->onStepUp(opCtx);
+
+            if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
+                // Config shards don't use a loader that requires this.
+                CatalogCacheLoader::get(_service).onStepUp();
+
+                // Called earlier for config servers.
+                TransactionCoordinatorService::get(_service)->onStepUp(opCtx);
+            }
 
             const auto configsvrConnStr =
                 Grid::get(opCtx)->shardRegistry()->getConfigShard()->getConnString();
@@ -1032,7 +1046,8 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
                                         << NamespaceString::kShardCollectionCatalogNamespace
                                         << " on shard's first transition to primary"));
         }
-    } else {  // unsharded
+    }
+    if (serverGlobalParams.clusterRole == ClusterRole::None) {  // unsharded
         if (auto validator = LogicalTimeValidator::get(_service)) {
             validator->enableKeyGenerator(opCtx, true);
         }

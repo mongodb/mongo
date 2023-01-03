@@ -119,17 +119,29 @@ void ConfigServerCatalogCacheLoader::shutDown() {
 }
 
 void ConfigServerCatalogCacheLoader::notifyOfCollectionVersionUpdate(const NamespaceString& nss) {
-    MONGO_UNREACHABLE;
+    // TODO SERVER-72489: Restore MONGO_UNREACHABLE if we decide to use a
+    // ShardServerCatalogCacheLoader on the catalog shard.
+    if (!gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV()) {
+        MONGO_UNREACHABLE;
+    }
 }
 
 void ConfigServerCatalogCacheLoader::waitForCollectionFlush(OperationContext* opCtx,
                                                             const NamespaceString& nss) {
-    MONGO_UNREACHABLE;
+    // TODO SERVER-72489: Restore MONGO_UNREACHABLE if we decide to use a
+    // ShardServerCatalogCacheLoader on the catalog shard.
+    if (!gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV()) {
+        MONGO_UNREACHABLE;
+    }
 }
 
 void ConfigServerCatalogCacheLoader::waitForDatabaseFlush(OperationContext* opCtx,
                                                           StringData dbName) {
-    MONGO_UNREACHABLE;
+    // TODO SERVER-72489: Restore MONGO_UNREACHABLE if we decide to use a
+    // ShardServerCatalogCacheLoader on the catalog shard.
+    if (!gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV()) {
+        MONGO_UNREACHABLE;
+    }
 }
 
 SemiFuture<CollectionAndChangedChunks> ConfigServerCatalogCacheLoader::getChunksSince(

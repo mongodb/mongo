@@ -45,6 +45,7 @@
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/cluster_server_parameter_cmds_gen.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
@@ -425,9 +426,18 @@ StatusWith<ShardType> ShardingCatalogManager::_validateHostAsShard(
 
     // Is it a config server?
     if (resIsMaster.hasField("configsvr")) {
-        return {ErrorCodes::OperationFailed,
-                str::stream() << "Cannot add " << connectionString.toString()
-                              << " as a shard since it is a config server"};
+        if (!gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV()) {
+            return {ErrorCodes::OperationFailed,
+                    str::stream() << "Cannot add " << connectionString.toString()
+                                  << " as a shard since it is a config server"};
+        }
+
+        auto ourSetName = repl::ReplicationCoordinator::get(opCtx)->getSettings().ourSetName();
+        if (providedSetName != ourSetName) {
+            return {ErrorCodes::OperationFailed,
+                    str::stream() << "Cannot add " << connectionString.toString()
+                                  << " as a catalog shard since it is a different config server"};
+        }
     }
 
     if (resIsMaster.hasField(HelloCommandReply::kIsImplicitDefaultMajorityWCFieldName) &&

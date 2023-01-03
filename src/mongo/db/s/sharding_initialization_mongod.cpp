@@ -453,7 +453,12 @@ void ShardingInitializationMongoD::initializeFromShardIdentity(
         shardingState->setInitialized(ex.toStatus());
     }
 
-    Grid::get(opCtx)->setShardingInitialized();
+    if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer) {
+        Grid::get(opCtx)->setShardingInitialized();
+    } else {
+        // A config server always initializes sharding at startup.
+        invariant(Grid::get(opCtx)->isShardingInitialized());
+    }
 
     if (audit::initializeSynchronizeJob) {
         audit::initializeSynchronizeJob(opCtx->getServiceContext());
@@ -528,8 +533,9 @@ void ShardingInitializationMongoD::onInitialDataAvailable(OperationContext* opCt
 }
 
 void initializeGlobalShardingStateForConfigServer(OperationContext* opCtx) {
-    ShardingInitializationMongoD::get(opCtx)->installReplicaSetChangeListener(
-        opCtx->getServiceContext());
+    const auto service = opCtx->getServiceContext();
+
+    ShardingInitializationMongoD::get(opCtx)->installReplicaSetChangeListener(service);
 
     auto configCS = []() -> boost::optional<ConnectionString> {
         if (gFeatureFlagConfigServerAlwaysShardRemote.isEnabledAndIgnoreFCV()) {
@@ -540,25 +546,24 @@ void initializeGlobalShardingStateForConfigServer(OperationContext* opCtx) {
         return {ConnectionString::forLocal()};
     }();
 
-    initializeGlobalShardingStateForMongoD(opCtx, ShardId::kConfigServerId, configCS);
+    CatalogCacheLoader::set(service, std::make_unique<ConfigServerCatalogCacheLoader>());
+
+    initializeGlobalShardingStateForMongoD(opCtx, configCS);
 
     // ShardLocal to use for explicitly local commands on the config server.
     auto localConfigShard = Grid::get(opCtx)->shardRegistry()->createLocalConfigShard();
     auto localCatalogClient = std::make_unique<ShardingCatalogClientImpl>(localConfigShard);
 
     ShardingCatalogManager::create(
-        opCtx->getServiceContext(),
+        service,
         makeShardingTaskExecutor(executor::makeNetworkInterface("AddShard-TaskExecutor")),
         std::move(localConfigShard),
         std::move(localCatalogClient));
 
-    if (!gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV()) {
-        Grid::get(opCtx)->setShardingInitialized();
-    }
+    Grid::get(opCtx)->setShardingInitialized();
 }
 
 void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
-                                            const ShardId& shardId,
                                             const boost::optional<ConnectionString>& configCS) {
     if (configCS) {
         uassert(ErrorCodes::BadValue, "Unrecognized connection string.", *configCS);
@@ -588,20 +593,6 @@ void initializeGlobalShardingStateForMongoD(OperationContext* opCtx,
         std::make_unique<ShardFactory>(std::move(buildersMap), std::move(targeterFactory));
 
     auto const service = opCtx->getServiceContext();
-
-    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
-        if (storageGlobalParams.queryableBackupMode) {
-            CatalogCacheLoader::set(service, std::make_unique<ReadOnlyCatalogCacheLoader>());
-        } else {
-            CatalogCacheLoader::set(service,
-                                    std::make_unique<ShardServerCatalogCacheLoader>(
-                                        std::make_unique<ConfigServerCatalogCacheLoader>()));
-        }
-    } else if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
-        CatalogCacheLoader::set(service, std::make_unique<ConfigServerCatalogCacheLoader>());
-    } else {
-        MONGO_UNREACHABLE;
-    }
 
     auto validator = LogicalTimeValidator::get(service);
     if (validator) {  // The keyManager may be existing if the node was a part of a standalone RS.
@@ -662,12 +653,9 @@ void ShardingInitializationMongoD::installReplicaSetChangeListener(ServiceContex
 
 void ShardingInitializationMongoD::_initializeShardingEnvironmentOnShardServer(
     OperationContext* opCtx, const ShardIdentity& shardIdentity) {
+    auto const service = opCtx->getServiceContext();
 
-    installReplicaSetChangeListener(opCtx->getServiceContext());
-
-    initializeGlobalShardingStateForMongoD(opCtx,
-                                           shardIdentity.getShardName().toString(),
-                                           {shardIdentity.getConfigsvrConnectionString()});
+    installReplicaSetChangeListener(service);
 
     // Determine primary/secondary/standalone state in order to properly initialize sharding
     // components.
@@ -676,14 +664,30 @@ void ShardingInitializationMongoD::_initializeShardingEnvironmentOnShardServer(
     bool isStandaloneOrPrimary =
         !isReplSet || (replCoord->getMemberState() == repl::MemberState::RS_PRIMARY);
 
-    CatalogCacheLoader::get(opCtx).initializeReplicaSetRole(isStandaloneOrPrimary);
-    ChunkSplitter::get(opCtx).onShardingInitialization(isStandaloneOrPrimary);
-    PeriodicBalancerConfigRefresher::get(opCtx).onShardingInitialization(opCtx->getServiceContext(),
-                                                                         isStandaloneOrPrimary);
+    if (serverGlobalParams.clusterRole.isExclusivelyShardRole()) {
+        // A config server added as a shard would have already set this up at startup.
+        if (storageGlobalParams.queryableBackupMode) {
+            CatalogCacheLoader::set(service, std::make_unique<ReadOnlyCatalogCacheLoader>());
+        } else {
+            CatalogCacheLoader::set(service,
+                                    std::make_unique<ShardServerCatalogCacheLoader>(
+                                        std::make_unique<ConfigServerCatalogCacheLoader>()));
+        }
 
-    // Start the transaction coordinator service only if the node is the primary of a replica set
-    TransactionCoordinatorService::get(opCtx)->onShardingInitialization(
-        opCtx, isReplSet && isStandaloneOrPrimary);
+        initializeGlobalShardingStateForMongoD(opCtx,
+                                               {shardIdentity.getConfigsvrConnectionString()});
+
+        CatalogCacheLoader::get(opCtx).initializeReplicaSetRole(isStandaloneOrPrimary);
+
+        // Start transaction coordinator service only if the node is the primary of a replica set.
+        TransactionCoordinatorService::get(opCtx)->onShardingInitialization(
+            opCtx, isReplSet && isStandaloneOrPrimary);
+    }
+
+    // These only exist on a shard, so always set them up whether we're a config server or not.
+    ChunkSplitter::get(opCtx).onShardingInitialization(isStandaloneOrPrimary);
+    PeriodicBalancerConfigRefresher::get(opCtx).onShardingInitialization(service,
+                                                                         isStandaloneOrPrimary);
 
     LOGV2(22071,
           "Finished initializing sharding components for {memberState} node.",

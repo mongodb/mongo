@@ -31,6 +31,7 @@
 
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_migration_critical_section.h"
@@ -68,7 +69,12 @@ void assertMatchingDbVersion(OperationContext* opCtx, const StringData& dbName) 
 }
 
 void assertIsPrimaryShardForDb(OperationContext* opCtx, const StringData& dbName) {
-    invariant(dbName != NamespaceString::kConfigDb);
+    if (dbName == NamespaceString::kConfigDb) {
+        // TODO SERVER-72488: Include the admin database.
+        invariant(gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV());
+        invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+        return;
+    }
 
     uassert(ErrorCodes::IllegalOperation,
             str::stream() << "Received request without the version for the database " << dbName,
