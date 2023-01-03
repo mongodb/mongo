@@ -271,8 +271,7 @@ public:
                                           const boost::optional<Timestamp>& timestamp,
                                           const UUID& requestCollectionUUID,
                                           const ChunkRange& chunkRange,
-                                          const ShardId& shardId,
-                                          const boost::optional<Timestamp>& validAfter);
+                                          const ShardId& shardId);
 
     /**
      * Updates metadata in config.chunks collection to show the given chunk in its new shard.
@@ -681,7 +680,7 @@ private:
                                    const NamespaceString& nss,
                                    const UUID& collectionUUID,
                                    const ChunkVersion& mergeVersion,
-                                   const boost::optional<Timestamp>& validAfter,
+                                   const Timestamp& validAfter,
                                    const ChunkRange& chunkRange,
                                    const ShardId& shardId,
                                    std::shared_ptr<std::vector<ChunkType>> chunksToMerge);

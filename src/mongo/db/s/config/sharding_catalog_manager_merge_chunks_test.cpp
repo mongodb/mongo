@@ -100,6 +100,11 @@ TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceed) {
     auto chunk2(chunk);
     chunk2.setName(OID::gen());
 
+    // set histories
+    chunk.setHistory({ChunkHistory{Timestamp{100, 0}, _shardId}});
+    chunk2.setHistory({ChunkHistory{Timestamp{200, 0}, _shardId}});
+
+    // set boundaries
     auto chunkMin = BSON("a" << 1);
     auto chunkBound = BSON("a" << 5);
     auto chunkMax = BSON("a" << 10);
@@ -112,8 +117,6 @@ TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceed) {
 
     setupCollection(_nss1, _keyPattern, {chunk, chunk2});
 
-    Timestamp validAfter{100, 0};
-
     ChunkRange rangeToBeMerged(chunk.getMin(), chunk2.getMax());
 
     auto versions = assertGet(ShardingCatalogManager::get(operationContext())
@@ -123,8 +126,7 @@ TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceed) {
                                                       collTimestamp,
                                                       collUuid,
                                                       rangeToBeMerged,
-                                                      _shardId,
-                                                      validAfter));
+                                                      _shardId));
 
     auto collVersion = ChunkVersion::fromBSONPositionalOrNewerFormat(versions["collectionVersion"]);
     auto shardVersion = ChunkVersion::fromBSONPositionalOrNewerFormat(versions["shardVersion"]);
@@ -166,7 +168,8 @@ TEST_F(MergeChunkTest, MergeExistingChunksCorrectlyShouldSucceed) {
 
     // Make sure history is there
     ASSERT_EQ(1UL, mergedChunk.getHistory().size());
-    ASSERT_EQ(validAfter, mergedChunk.getHistory().front().getValidAfter());
+    ASSERT_EQ(chunk2.getHistory().front().getValidAfter(),
+              mergedChunk.getHistory().front().getValidAfter());
 }
 
 TEST_F(MergeChunkTest, MergeSeveralChunksCorrectlyShouldSucceed) {
@@ -187,6 +190,11 @@ TEST_F(MergeChunkTest, MergeSeveralChunksCorrectlyShouldSucceed) {
     chunk2.setName(OID::gen());
     chunk3.setName(OID::gen());
 
+    // set histories
+    chunk.setHistory({ChunkHistory{Timestamp{100, 10}, _shardId}});
+    chunk2.setHistory({ChunkHistory{Timestamp{200, 1}, _shardId}});
+    chunk3.setHistory({ChunkHistory{Timestamp{50, 0}, _shardId}});
+
     auto chunkMin = BSON("a" << 1);
     auto chunkBound = BSON("a" << 5);
     auto chunkBound2 = BSON("a" << 7);
@@ -204,8 +212,6 @@ TEST_F(MergeChunkTest, MergeSeveralChunksCorrectlyShouldSucceed) {
     setupCollection(_nss1, _keyPattern, {chunk, chunk2, chunk3});
     ChunkRange rangeToBeMerged(chunk.getMin(), chunk3.getMax());
 
-    Timestamp validAfter{100, 0};
-
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
                   ->commitChunksMerge(operationContext(),
                                       _nss1,
@@ -213,8 +219,7 @@ TEST_F(MergeChunkTest, MergeSeveralChunksCorrectlyShouldSucceed) {
                                       collTimestamp,
                                       collUuid,
                                       rangeToBeMerged,
-                                      _shardId,
-                                      validAfter));
+                                      _shardId));
 
     const auto query BSON(ChunkType::collectionUUID() << collUuid);
     auto findResponse = uassertStatusOK(
@@ -245,7 +250,8 @@ TEST_F(MergeChunkTest, MergeSeveralChunksCorrectlyShouldSucceed) {
 
     // Make sure history is there
     ASSERT_EQ(1UL, mergedChunk.getHistory().size());
-    ASSERT_EQ(validAfter, mergedChunk.getHistory().front().getValidAfter());
+    ASSERT_EQ(chunk2.getHistory().front().getValidAfter(),
+              mergedChunk.getHistory().front().getValidAfter());
 }
 
 TEST_F(MergeChunkTest, NewMergeShouldClaimHighestVersion) {
@@ -265,6 +271,10 @@ TEST_F(MergeChunkTest, NewMergeShouldClaimHighestVersion) {
     // Construct chunk to be merged
     auto chunk2(chunk);
     chunk2.setName(OID::gen());
+
+    // set histories
+    chunk.setHistory({ChunkHistory{Timestamp{100, 0}, _shardId}});
+    chunk2.setHistory({ChunkHistory{Timestamp{200, 0}, _shardId}});
 
     auto chunkMin = BSON("a" << 1);
     auto chunkBound = BSON("a" << 5);
@@ -288,8 +298,6 @@ TEST_F(MergeChunkTest, NewMergeShouldClaimHighestVersion) {
 
     setupCollection(_nss1, _keyPattern, {chunk, chunk2, otherChunk});
 
-    Timestamp validAfter{100, 0};
-
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
                   ->commitChunksMerge(operationContext(),
                                       _nss1,
@@ -297,8 +305,7 @@ TEST_F(MergeChunkTest, NewMergeShouldClaimHighestVersion) {
                                       collTimestamp,
                                       collUuid,
                                       rangeToBeMerged,
-                                      _shardId,
-                                      validAfter));
+                                      _shardId));
 
     const auto query = BSON(ChunkType::collectionUUID() << collUuid);
     auto findResponse = uassertStatusOK(
@@ -329,7 +336,8 @@ TEST_F(MergeChunkTest, NewMergeShouldClaimHighestVersion) {
 
     // Make sure history is there
     ASSERT_EQ(1UL, mergedChunk.getHistory().size());
-    ASSERT_EQ(validAfter, mergedChunk.getHistory().front().getValidAfter());
+    ASSERT_EQ(chunk2.getHistory().front().getValidAfter(),
+              mergedChunk.getHistory().front().getValidAfter());
 }
 
 TEST_F(MergeChunkTest, MergeLeavesOtherChunksAlone) {
@@ -348,6 +356,10 @@ TEST_F(MergeChunkTest, MergeLeavesOtherChunksAlone) {
     // Construct chunk to be merged
     auto chunk2(chunk);
     chunk2.setName(OID::gen());
+
+    // set histories
+    chunk.setHistory({ChunkHistory{Timestamp{100, 5}, shardId}});
+    chunk2.setHistory({ChunkHistory{Timestamp{200, 1}, shardId}});
 
     auto chunkMin = BSON("a" << 1);
     auto chunkBound = BSON("a" << 5);
@@ -379,8 +391,7 @@ TEST_F(MergeChunkTest, MergeLeavesOtherChunksAlone) {
                                       collTimestamp,
                                       collUuid,
                                       rangeToBeMerged,
-                                      shardId,
-                                      validAfter));
+                                      shardId));
     const auto query = BSON(ChunkType::collectionUUID() << collUuid);
     auto findResponse = uassertStatusOK(
         getConfigShard()->exhaustiveFindOnConfig(operationContext(),
@@ -423,10 +434,15 @@ TEST_F(MergeChunkTest, NonExistingNamespace) {
     chunk.setCollectionUUID(UUID::gen());
 
     auto origVersion = ChunkVersion(1, 0, collEpoch, collTimestamp);
+    chunk.setShard(_shardId);
     chunk.setVersion(origVersion);
 
     // Construct chunk to be merged
     auto chunk2(chunk);
+
+    // set history
+    chunk.setHistory({ChunkHistory{Timestamp{100, 0}, _shardId}});
+    chunk2.setHistory({ChunkHistory{Timestamp{200, 0}, _shardId}});
 
     auto chunkMin = BSON("a" << 1);
     auto chunkBound = BSON("a" << 5);
@@ -442,8 +458,6 @@ TEST_F(MergeChunkTest, NonExistingNamespace) {
 
     setupCollection(_nss1, _keyPattern, {chunk, chunk2});
 
-    Timestamp validAfter{1};
-
     ASSERT_THROWS(ShardingCatalogManager::get(operationContext())
                       ->commitChunksMerge(operationContext(),
                                           NamespaceString("TestDB.NonExistingColl"),
@@ -451,8 +465,7 @@ TEST_F(MergeChunkTest, NonExistingNamespace) {
                                           collTimestamp,
                                           collUuidAtRequest,
                                           rangeToBeMerged,
-                                          _shardId,
-                                          validAfter),
+                                          _shardId),
                   DBException);
 }
 
@@ -471,6 +484,10 @@ TEST_F(MergeChunkTest, NonMatchingUUIDsOfChunkAndRequestErrors) {
     // Construct chunk to be merged
     auto chunk2(chunk);
 
+    // set histories
+    chunk.setHistory({ChunkHistory{Timestamp{100, 0}, _shardId}});
+    chunk2.setHistory({ChunkHistory{Timestamp{200, 0}, _shardId}});
+
     auto chunkMin = BSON("a" << 1);
     auto chunkBound = BSON("a" << 5);
     auto chunkMax = BSON("a" << 10);
@@ -485,8 +502,6 @@ TEST_F(MergeChunkTest, NonMatchingUUIDsOfChunkAndRequestErrors) {
 
     setupCollection(_nss1, _keyPattern, {chunk, chunk2});
 
-    Timestamp validAfter{1};
-
     auto mergeStatus = ShardingCatalogManager::get(operationContext())
                            ->commitChunksMerge(operationContext(),
                                                _nss1,
@@ -494,8 +509,7 @@ TEST_F(MergeChunkTest, NonMatchingUUIDsOfChunkAndRequestErrors) {
                                                collTimestamp,
                                                requestUuid,
                                                rangeToBeMerged,
-                                               _shardId,
-                                               validAfter);
+                                               _shardId);
     ASSERT_EQ(ErrorCodes::InvalidUUID, mergeStatus);
 }
 
@@ -519,11 +533,10 @@ TEST_F(MergeChunkTest, MergeAlreadyHappenedSucceeds) {
     mergedChunk.setName(OID::gen());
     mergedChunk.setCollectionUUID(collUuid);
     mergedChunk.setShard(_shardId);
+    mergedChunk.setHistory({ChunkHistory{Timestamp{100, 0}, _shardId}});
 
 
     setupCollection(_nss1, _keyPattern, {mergedChunk});
-
-    Timestamp validAfter{1};
 
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
                   ->commitChunksMerge(operationContext(),
@@ -532,8 +545,7 @@ TEST_F(MergeChunkTest, MergeAlreadyHappenedSucceeds) {
                                       collTimestamp,
                                       collUuid,
                                       rangeToBeMerged,
-                                      _shardId,
-                                      validAfter));
+                                      _shardId));
 
     // Verify that no change to config.chunks happened.
     const auto query = BSON(ChunkType::collectionUUID() << collUuid);
@@ -580,6 +592,11 @@ TEST_F(MergeChunkTest, MergingChunksWithDollarPrefixShouldSucceed) {
     auto chunkBound2 = BSON("a" << BSON("$mixKey" << 1));
     auto chunkMax = BSON("a" << kMaxBSONKey);
 
+    // set histories
+    chunk1.setHistory({ChunkHistory{Timestamp{100, 9}, _shardId}});
+    chunk2.setHistory({ChunkHistory{Timestamp{200, 5}, _shardId}});
+    chunk3.setHistory({ChunkHistory{Timestamp{156, 1}, _shardId}});
+
     // first chunk boundaries
     chunk1.setMin(chunkMin);
     chunk1.setMax(chunkBound1);
@@ -594,7 +611,6 @@ TEST_F(MergeChunkTest, MergingChunksWithDollarPrefixShouldSucceed) {
 
     // Record chunk boundaries for passing into commitChunksMerge
     ChunkRange rangeToBeMerged(chunk1.getMin(), chunk3.getMax());
-    Timestamp validAfter{100, 0};
 
     ASSERT_OK(ShardingCatalogManager::get(operationContext())
                   ->commitChunksMerge(operationContext(),
@@ -603,8 +619,7 @@ TEST_F(MergeChunkTest, MergingChunksWithDollarPrefixShouldSucceed) {
                                       collTimestamp,
                                       collUuid,
                                       rangeToBeMerged,
-                                      _shardId,
-                                      validAfter));
+                                      _shardId));
 
     const auto query = BSON(ChunkType::collectionUUID() << collUuid);
     auto findResponse = uassertStatusOK(
@@ -635,7 +650,8 @@ TEST_F(MergeChunkTest, MergingChunksWithDollarPrefixShouldSucceed) {
 
     // Make sure history is there
     ASSERT_EQ(1UL, mergedChunk.getHistory().size());
-    ASSERT_EQ(validAfter, mergedChunk.getHistory().front().getValidAfter());
+    ASSERT_EQ(chunk2.getHistory().front().getValidAfter(),
+              mergedChunk.getHistory().front().getValidAfter());
 }
 
 }  // namespace

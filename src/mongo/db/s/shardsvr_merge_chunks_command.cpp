@@ -59,10 +59,8 @@ Shard::CommandResponse commitMergeOnConfigServer(OperationContext* opCtx,
                                                  const ChunkRange& chunkRange,
                                                  const CollectionMetadata& metadata) {
     auto const shardingState = ShardingState::get(opCtx);
-    const auto currentTime = VectorClock::get(opCtx)->getTime();
 
     ConfigSvrMergeChunks request{nss, shardingState->shardId(), metadata.getUUID(), chunkRange};
-    request.setValidAfter(currentTime.clusterTime().asTimestamp());
     request.setEpoch(epoch);
     request.setTimestamp(timestamp);
 

@@ -80,10 +80,6 @@ commands:
                 type: chunk_range
                 cpp_name: "chunkRange"
                 description: "Chunk bounds to merge."
-            validAfter:
-                type: timestamp
-                description: "The time after which this chunk is at this shard."
-                optional: true
             epoch:
                 description: "The expected epoch of the collection that is being committed"
                 type: objectid
