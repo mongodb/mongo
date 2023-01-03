@@ -584,7 +584,7 @@ void ShardServerOpObserver::onModifyShardedCollectionGlobalIndexCatalogEntry(
                 indexes.push_back(indexEntry);
             }
 
-            auto indexVersion = indexDoc["entry"][IndexCatalogType::kLastmodFieldName].timestamp();
+            auto indexVersion = indexDoc["entry"]["v"].timestamp();
             auto collUuid = uassertStatusOK(
                 UUID::parse(indexDoc["entry"][IndexCatalogType::kCollectionUUIDFieldName]));
             opCtx->recoveryUnit()->onCommit([opCtx, nss, collUuid, indexVersion, indexes](auto _) {
