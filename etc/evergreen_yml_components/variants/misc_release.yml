@@ -1389,11 +1389,15 @@ buildvariants:
     push_bucket: downloads.mongodb.org
     push_name: linux
     push_arch: x86_64-suse12
+    # TODO: BUILD-16601
+    # Below we are switching to gold linker because suse12 does not have
+    # a llvm deployment in the toolchain because of issue in BUILD-16601
     compile_flags: >-
       --ssl
       MONGO_DISTMOD=suse12
       -j$(echo $(grep -c ^processor /proc/cpuinfo) / 2 | bc)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --linker=gold
     multiversion_platform: suse12
     multiversion_edition: targeted
     has_packages: true
@@ -1452,11 +1456,15 @@ buildvariants:
     push_bucket: downloads.10gen.com
     push_name: linux
     push_arch: x86_64-enterprise-suse12
+    # TODO: BUILD-16601
+    # Below we are switching to gold linker because suse12 does not have
+    # a llvm deployment in the toolchain because of issue in BUILD-16601
     compile_flags: >-
       --ssl
       MONGO_DISTMOD=suse12
       -j$(echo $(grep -c ^processor /proc/cpuinfo) / 2 | bc)
       --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      --linker=gold
     crypt_task_compile_flags: >-
       SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
       CCFLAGS="-fno-gnu-unique"
