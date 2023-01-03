@@ -178,5 +178,42 @@ TEST_F(ABTPlanGeneration, LowerVarExpression) {
     nodeMap.insert({evalNode.cast<EvaluationNode>(), makeNodeProp()});
     runNodeVariation(ctx, "varInProj", evalNode, nodeMap);
 }
+
+TEST_F(ABTPlanGeneration, LowerLimitSkipNode) {
+
+    // Just Limit
+    NodeToGroupPropsMap nodeMap;
+    GoldenTestContext ctx(&goldenTestConfig);
+    ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
+    FieldProjectionMap map{{}, {ProjectionName{"scan0"}}, {}};
+    ABT scanNode = make<PhysicalScanNode>(map, "collName", false);
+    nodeMap.insert({scanNode.cast<PhysicalScanNode>(), makeNodeProp()});
+    ABT limitNode =
+        make<LimitSkipNode>(properties::LimitSkipRequirement(5, 0), std::move(scanNode));
+    nodeMap.insert({limitNode.cast<LimitSkipNode>(), makeNodeProp()});
+    runNodeVariation(ctx, "Lower single limit without skip", limitNode, nodeMap);
+
+    // Just Skip
+    NodeToGroupPropsMap nodeMap2;
+    FieldProjectionMap map2{{}, {ProjectionName{"scan0"}}, {}};
+    ABT scanNode2 = make<PhysicalScanNode>(map2, "collName", false);
+    nodeMap2.insert({scanNode2.cast<PhysicalScanNode>(), makeNodeProp()});
+    ABT skipNode =
+        make<LimitSkipNode>(properties::LimitSkipRequirement(0, 4), std::move(scanNode2));
+    nodeMap2.insert({skipNode.cast<LimitSkipNode>(), makeNodeProp()});
+    runNodeVariation(ctx, "Lower single skip without limit", skipNode, nodeMap2);
+
+    // Limit and Skip
+    NodeToGroupPropsMap nodeMap3;
+    FieldProjectionMap map3{{}, {ProjectionName{"scan0"}}, {}};
+    ABT scanNode3 = make<PhysicalScanNode>(map3, "collName", false);
+    nodeMap3.insert({scanNode3.cast<PhysicalScanNode>(), makeNodeProp()});
+    ABT limitSkipNode =
+        make<LimitSkipNode>(properties::LimitSkipRequirement(4, 2), std::move(scanNode3));
+    nodeMap3.insert({limitSkipNode.cast<LimitSkipNode>(), makeNodeProp()});
+    runNodeVariation(
+        ctx, "Lower LimitSkip node with values for both limit and skip", limitSkipNode, nodeMap3);
+}
+
 }  // namespace
 }  // namespace mongo::optimizer

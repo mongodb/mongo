@@ -1,0 +1,46 @@
+# Golden test output of ABTPlanGeneration/LowerLimitSkipNode
+
+==== VARIATION: Lower single limit without skip ====
+-- INPUT:
+LimitSkip []
+|   limitSkip:
+|       limit: 5
+|       skip: 0
+PhysicalScan [{'<root>': scan0}, collName]
+    BindBlock:
+        [scan0]
+            Source []
+
+-- OUTPUT:
+[3] limitskip 5 0 
+[1] scan s1 none none none none none [] @"<collUUID>" true false 
+
+==== VARIATION: Lower single skip without limit ====
+-- INPUT:
+LimitSkip []
+|   limitSkip:
+|       limit: 0
+|       skip: 4
+PhysicalScan [{'<root>': scan0}, collName]
+    BindBlock:
+        [scan0]
+            Source []
+
+-- OUTPUT:
+[7] limitskip 0 4 
+[5] scan s1 none none none none none [] @"<collUUID>" true false 
+
+==== VARIATION: Lower LimitSkip node with values for both limit and skip ====
+-- INPUT:
+LimitSkip []
+|   limitSkip:
+|       limit: 4
+|       skip: 2
+PhysicalScan [{'<root>': scan0}, collName]
+    BindBlock:
+        [scan0]
+            Source []
+
+-- OUTPUT:
+[11] limitskip 4 2 
+[9] scan s1 none none none none none [] @"<collUUID>" true false 
