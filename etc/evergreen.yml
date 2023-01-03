@@ -2080,6 +2080,8 @@ buildvariants:
     multiversion_architecture: s390x
     multiversion_edition: enterprise
     num_scons_link_jobs_available: 0.99
+    test_flags: >-
+      --excludeWithAnyTags=incompatible_with_s390x
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:

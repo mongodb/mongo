@@ -79,6 +79,8 @@ buildvariants:
     multiversion_platform: rhel72
     multiversion_architecture: s390x
     multiversion_edition: enterprise
+    test_flags: >-
+      --excludeWithAnyTags=incompatible_with_s390x
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
@@ -131,6 +133,8 @@ buildvariants:
     multiversion_platform: rhel83
     multiversion_architecture: s390x
     multiversion_edition: enterprise
+    test_flags: >-
+      --excludeWithAnyTags=incompatible_with_s390x
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
