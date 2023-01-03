@@ -32,6 +32,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/random.h"
 #include "mongo/s/analyze_shard_key_cmd_gen.h"
 #include "mongo/s/analyze_shard_key_feature_flag_gen.h"
 #include "mongo/s/cluster_commands_helpers.h"
@@ -83,13 +84,14 @@ public:
                 candidateShardIds.insert(cri.cm.dbPrimary());
             }
 
+            PseudoRandom random{SecureRandom{}.nextInt64()};
             const auto unversionedCmdObj =
                 CommandHelpers::filterCommandRequestForPassthrough(request().toBSON({}));
             while (true) {
                 // Select a random shard.
                 invariant(!candidateShardIds.empty());
                 auto it = candidateShardIds.begin();
-                std::advance(it, std::rand() % candidateShardIds.size());
+                std::advance(it, random.nextInt64(candidateShardIds.size()));
                 auto shardId = *it;
                 candidateShardIds.erase(shardId);
 

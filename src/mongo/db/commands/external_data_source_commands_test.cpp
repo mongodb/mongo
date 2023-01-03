@@ -37,6 +37,7 @@
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/named_pipe.h"
+#include "mongo/platform/random.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 
@@ -90,7 +91,7 @@ protected:
     std::vector<BSONObj> generateRandomSimpleDocs(int count) {
         std::vector<BSONObj> docs;
         for (int i = 0; i < count; ++i) {
-            docs.emplace_back(BSON("a" << std::rand() % 10));
+            docs.emplace_back(BSON("a" << _random.nextInt32(10)));
         }
 
         return docs;
@@ -98,10 +99,10 @@ protected:
 
     // Generates a large readable random string to aid debugging.
     std::string getRandomReadableLargeString() {
-        int count = std::rand() % 100 + 2024;
+        int count = _random.nextInt32(100) + 2024;
         std::string str(count, '\0');
         for (int i = 0; i < count; ++i) {
-            str[i] = static_cast<char>(std::rand() % 26) + 'a';
+            str[i] = static_cast<char>(_random.nextInt32(26)) + 'a';
         }
 
         return str;
@@ -129,6 +130,7 @@ protected:
             << "Expected to succeed but failed. result = {}"_format(res.toString());
     }
 
+    PseudoRandom _random{SecureRandom{}.nextInt64()};
     ServiceContext::UniqueOperationContext _uniqueOpCtx{makeOperationContext()};
     OperationContext* _opCtx{_uniqueOpCtx.get()};
 
@@ -136,7 +138,7 @@ protected:
 };
 
 TEST_F(ExternalDataSourceCommandsTest, SimpleScanAggRequest) {
-    const auto nDocs = std::rand() % 100 + 1;
+    const auto nDocs = _random.nextInt32(100) + 1;
     std::vector<BSONObj> srcDocs = generateRandomSimpleDocs(nDocs);
     PipeWaiter pw;
 
@@ -191,7 +193,7 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanAggRequest) {
 
 TEST_F(ExternalDataSourceCommandsTest, SimpleScanOverMultipleNamedPipesAggRequest) {
     // This data set fits into the first batch.
-    const auto nDocs = std::rand() % 50;
+    const auto nDocs = _random.nextInt32(50);
     std::vector<BSONObj> srcDocs = generateRandomSimpleDocs(nDocs);
     PipeWaiter pw;
 
@@ -260,7 +262,7 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanOverMultipleNamedPipesAggReques
 TEST_F(ExternalDataSourceCommandsTest, SimpleScanOverLargeObjectsAggRequest) {
     // MultiBsonStreamCursor's default buffer size is 8K and 2K (at minimum) * 20 would be enough to
     // exceed the initial read. This data set is highly likely to span multiple reads.
-    const auto nDocs = std::rand() % 80 + 20;
+    const auto nDocs = _random.nextInt32(80) + 20;
     std::vector<BSONObj> srcDocs = generateRandomLargeDocs(nDocs);
     PipeWaiter pw;
 
@@ -339,7 +341,7 @@ TEST_F(ExternalDataSourceCommandsTest, ExplainAggRequest) {
 
 TEST_F(ExternalDataSourceCommandsTest, SimpleScanMultiBatchAggRequest) {
     // This 'nDocs' causes a cursor to be created for a simple scan aggregate command.
-    const auto nDocs = std::rand() % 100 + 102;
+    const auto nDocs = _random.nextInt32(100) + 102;
     std::vector<BSONObj> srcDocs = generateRandomSimpleDocs(nDocs);
     PipeWaiter pw;
 
@@ -393,7 +395,7 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleScanMultiBatchAggRequest) {
 }
 
 TEST_F(ExternalDataSourceCommandsTest, SimpleMatchAggRequest) {
-    const auto nDocs = std::rand() % 100 + 1;
+    const auto nDocs = _random.nextInt32(100) + 1;
     std::vector<BSONObj> srcDocs = generateRandomSimpleDocs(nDocs);
     // Expected results for {$match: {a: {$lt: 5}}}.
     std::vector<BSONObj> expectedDocs;
@@ -452,14 +454,14 @@ TEST_F(ExternalDataSourceCommandsTest, SimpleMatchAggRequest) {
 }
 
 TEST_F(ExternalDataSourceCommandsTest, ScanOverRandomInvalidDataAggRequest) {
-    const auto nDocs = std::rand() % 100 + 1;
+    const auto nDocs = _random.nextInt32(100) + 1;
     std::vector<BSONObj> srcDocs = generateRandomSimpleDocs(nDocs);
     PipeWaiter pw;
 
     stdx::thread producer([&] {
         NamedPipeOutput pipeWriter("EDSCTest_ScanOverRandomInvalidDataAggRequestPipe");
         pw.notify();
-        const size_t failPoint = std::rand() % nDocs;
+        const size_t failPoint = _random.nextInt32(nDocs);
         pipeWriter.open();
         for (size_t i = 0; i < srcDocs.size(); ++i) {
             if (i == failPoint) {
@@ -504,7 +506,7 @@ TEST_F(ExternalDataSourceCommandsTest, ScanOverRandomInvalidDataAggRequest) {
 
 TEST_F(ExternalDataSourceCommandsTest, ScanOverRandomInvalidDataAtSecondBatchAggRequest) {
     // This 'nDocs' causes a cursor to be created for a simple scan aggregate command.
-    const auto nDocs = std::rand() % 100 + 102;  // 201 >= nDocs >= 102
+    const auto nDocs = _random.nextInt32(100) + 102;  // 201 >= nDocs >= 102
     std::vector<BSONObj> srcDocs = generateRandomSimpleDocs(nDocs);
     PipeWaiter pw;
 
@@ -512,7 +514,7 @@ TEST_F(ExternalDataSourceCommandsTest, ScanOverRandomInvalidDataAtSecondBatchAgg
         NamedPipeOutput pipeWriter("EDSCTest_ScanOverRandomInvalidDataAtSecondBatchAggRequestPipe");
         pw.notify();
         // The fail point occurs at the second batch.
-        const size_t failPoint = 101 + std::rand() % (nDocs - 101);  // 200 >= failPoint >= 101
+        const size_t failPoint = 101 + _random.nextInt32(nDocs - 101);  // 200 >= failPoint >= 101
         pipeWriter.open();
         for (size_t i = 0; i < srcDocs.size(); ++i) {
             if (i == failPoint) {
@@ -571,7 +573,7 @@ TEST_F(ExternalDataSourceCommandsTest, ScanOverRandomInvalidDataAtSecondBatchAgg
 
 TEST_F(ExternalDataSourceCommandsTest, KillCursorAfterAggRequest) {
     // This 'nDocs' causes a cursor to be created for a simple scan aggregate command.
-    const auto nDocs = std::rand() % 100 + 102;
+    const auto nDocs = _random.nextInt32(100) + 102;
     std::vector<BSONObj> srcDocs = generateRandomSimpleDocs(nDocs);
     PipeWaiter pw;
 
@@ -630,7 +632,7 @@ TEST_F(ExternalDataSourceCommandsTest, KillCursorAfterAggRequest) {
 }
 
 TEST_F(ExternalDataSourceCommandsTest, SimpleScanAndUnionWithMultipleSourcesAggRequest) {
-    const auto nDocs = std::rand() % 100 + 1;
+    const auto nDocs = _random.nextInt32(100) + 1;
     std::vector<BSONObj> srcDocs = generateRandomSimpleDocs(nDocs);
     PipeWaiter pw;
 

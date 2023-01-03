@@ -29,8 +29,11 @@
 
 #include "mongo/s/query_analysis_sampler_util.h"
 
+#include "mongo/platform/random.h"
 #include "mongo/s/analyze_shard_key_util.h"
 #include "mongo/s/query_analysis_sampler.h"
+#include "mongo/util/static_immortal.h"
+#include "mongo/util/synchronized_value.h"
 
 namespace mongo {
 namespace analyze_shard_key {
@@ -39,7 +42,14 @@ namespace {
 
 constexpr auto kSampleIdFieldName = "sampleId"_sd;
 
+template <typename C>
+auto sampleIter(C&& c) {
+    static StaticImmortal<synchronized_value<PseudoRandom>> random{
+        PseudoRandom{SecureRandom().nextInt64()}};
+    return std::next(c.begin(), (*random)->nextInt64(c.size()));
 }
+
+}  // namespace
 
 boost::optional<UUID> tryGenerateSampleId(OperationContext* opCtx, const NamespaceString& nss) {
     return supportsSamplingQueries() ? QueryAnalysisSampler::get(opCtx).tryGenerateSampleId(nss)
@@ -66,13 +76,11 @@ boost::optional<TargetedSampleId> tryGenerateTargetedSampleId(
 }
 
 ShardId getRandomShardId(const std::set<ShardId>& shardIds) {
-    auto it = shardIds.begin();
-    std::advance(it, std::rand() % shardIds.size());
-    return *it;
+    return *sampleIter(shardIds);
 }
 
 ShardId getRandomShardId(const std::vector<ShardEndpoint>& endpoints) {
-    return endpoints[std::rand() % endpoints.size()].shardName;
+    return sampleIter(endpoints)->shardName;
 }
 
 BSONObj appendSampleId(const BSONObj& cmdObj, const UUID& sampleId) {

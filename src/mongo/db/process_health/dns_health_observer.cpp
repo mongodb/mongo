@@ -78,8 +78,8 @@ Future<HealthCheckStatus> DnsHealthObserver::periodicCheckImpl(
         if (shardIds.size() == 0) {
             connString = shardRegistry->getConfigServerConnectionString();
         } else {
-            auto shardSW =
-                shardRegistry->getShard(opCtx.get(), shardIds.at(rand() % shardIds.size()));
+            auto shardSW = shardRegistry->getShard(opCtx.get(),
+                                                   shardIds.at(_random.nextInt32(shardIds.size())));
             auto shardSWStatus = shardSW.getStatus();
             if (shardSWStatus.isOK()) {
                 connString = shardSW.getValue()->getConnString();

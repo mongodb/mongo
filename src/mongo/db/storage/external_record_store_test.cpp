@@ -35,6 +35,7 @@
 #include "mongo/db/storage/input_stream.h"
 #include "mongo/db/storage/multi_bson_stream_cursor.h"
 #include "mongo/db/storage/named_pipe.h"
+#include "mongo/platform/random.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
@@ -72,28 +73,29 @@ private:
 class ExternalRecordStoreTest : public unittest::Test {
 public:
     // Gets a random string of 'count' length consisting of printable ASCII chars (32-126).
-    static std::string getRandomString(const int count) {
+    std::string getRandomString(const int count) {
         std::string buf;
         buf.reserve(count);
 
         for (int i = 0; i < count; ++i) {
-            buf.push_back(static_cast<char>(32 + std::rand() % 95));
+            buf.push_back(static_cast<char>(32 + _random.nextInt32(95)));
         }
 
         return buf;
     }
 
+    void setRandomSeed(int64_t seed) {
+        _random = PseudoRandom{seed};
+    }
+
     static constexpr int kBufferSize = 1024;
     char _buffer[kBufferSize];  // buffer amply big enough to fit any BSONObj used in this test
+    PseudoRandom _random{SecureRandom{}.nextInt64()};
 
     static void createNamedPipe(PipeWaiter* pw,
                                 const std::string& pipePath,
                                 long numToWrite,
                                 const std::vector<BSONObj>& bsonObjs);
-
-    void setUp() override {
-        std::srand(std::time(0));
-    }
 };
 
 // Creates a named pipe of BSON objects.
@@ -177,7 +179,7 @@ TEST_F(ExternalRecordStoreTest, NamedPipeReadPartialData) {
 TEST_F(ExternalRecordStoreTest, NamedPipeReadUntilProducerDone) {
     auto srcBsonObj = BSON("a" << 1);
     auto count = srcBsonObj.objsize();
-    const auto nSent = std::rand() % 100;
+    const auto nSent = _random.nextInt32(100);
     PipeWaiter pw;
     const auto pipePath = "ERSTest_NamedPipeReadUntilProducerDonePipe";
     stdx::thread producer([&] {
@@ -477,12 +479,8 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes3) {
 // average of 1K BSON objects, each object holding a string value of randomized average 1K in size
 // of random printable ASCII characters, plus field name and overhead. Thus it will scan an expected
 // ~20+ MB of data (~1+ MB per pipe).
-//
-// This test uses a fixed random seed so if it fails we can reproduce that easily. C++ does not
-// support multiple random number generators, so this reseeds the shared rand() generater with the
-// current time at the end as other tests in this file expect non-fixed seed randomosity.
 TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes4) {
-    std::srand(972134657);         // set a fixed random seed
+    setRandomSeed(972134657);      // set a fixed random seed
     constexpr int kNumPipes = 20;  // shadows the global
     std::string pipePaths[kNumPipes];
     stdx::thread pipeThreads[kNumPipes];           // pipe producer threads
@@ -492,11 +490,12 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes4) {
 
     // Create the BSON objects, averaging 1K objects per pipe with average 1K random data in each.
     for (int pipeIdx = 0; pipeIdx < kNumPipes; ++pipeIdx) {
-        int numObjs = rand() % 2048;
+        int numObjs = _random.nextInt32(2048);
         objsWritten += numObjs;
         std::string fieldName = "field_{}"_format(pipeIdx);
         for (int objIdx = 0; objIdx < numObjs; ++objIdx) {
-            pipeBsonObjs[pipeIdx].emplace_back(BSON(fieldName << getRandomString(rand() % 2048)));
+            pipeBsonObjs[pipeIdx].emplace_back(
+                BSON(fieldName << getRandomString(_random.nextInt32(2048))));
         }
     }
 
@@ -564,8 +563,5 @@ TEST_F(ExternalRecordStoreTest, NamedPipeMultiplePipes4) {
     } while (record);
     ASSERT_EQ(objsRead, objsWritten)
         << "Expected objsRead == {} but got {}"_format(objsWritten, objsRead);
-
-    // Reseed random number generator with current time to make it "really" random again.
-    setUp();
 }
 }  // namespace mongo

@@ -44,19 +44,33 @@
 #include "mongo/db/storage/named_pipe.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/random.h"
 #include "mongo/stdx/chrono.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/static_immortal.h"
+#include "mongo/util/synchronized_value.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 
 namespace mongo {
-/**
- * Gets a string of 'length' 'a' chars as efficiently as possible.
- */
-std::string NamedPipeHelper::getString(int length) {
-    return std::string(length, 'a');
+namespace {
+uint64_t synchronizedRandom() {
+    static StaticImmortal<synchronized_value<PseudoRandom>> random{
+        PseudoRandom{SecureRandom{}.nextInt64()}};
+    return (*random)->nextInt64();
 }
+
+/** `n` sizes from range [`min`,`max`] */
+std::vector<size_t> randomLengths(size_t n, size_t min, size_t max) {
+    PseudoRandom random{synchronizedRandom()};
+    std::vector<size_t> vec;
+    vec.reserve(n);
+    for (size_t i = 0; i < n; ++i)
+        vec.push_back(min + random.nextInt64(max - min + 1));
+    return vec;
+}
+}  // namespace
 
 /**
  * Reads all BSON objects from all named pipes in 'pipeRelativePaths' and returns the following
@@ -143,9 +157,11 @@ void NamedPipeHelper::writeToPipe(std::string pipeDir,
         NamedPipeOutput pipeWriter(pipeDir, pipeRelativePath);  // producer
 
         pipeWriter.open();
-        for (long i = 0; i < objects; ++i) {
-            int length = std::rand() % (1 + stringMaxSize - stringMinSize) + stringMinSize;
-            BSONObj bsonObj{BSON("length" << length << "string" << getString(length))};
+        for (size_t length : randomLengths(objects, stringMinSize, stringMaxSize)) {
+            auto bsonObj = BSONObjBuilder{}
+                               .append("length", static_cast<int>(length))
+                               .append("string", std::string(length, 'a'))
+                               .obj();
             pipeWriter.write(bsonObj.objdata(), bsonObj.objsize());
         }
         pipeWriter.close();

@@ -58,8 +58,5 @@ public:
                                         std::string pipeRelativePath,
                                         long objects,
                                         std::vector<BSONObj> bsonObjs);
-
-private:
-    static std::string getString(int length);
 };
 }  // namespace mongo

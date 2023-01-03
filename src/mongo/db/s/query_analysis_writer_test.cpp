@@ -36,6 +36,7 @@
 #include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/random.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/unittest/death_test.h"
 #include "mongo/util/fail_point.h"
@@ -189,7 +190,7 @@ protected:
     }
 
     BSONObj makeNonEmptyCollation() {
-        int strength = rand() % 5 + 1;
+        int strength = _getRandomInt(5) + 1;
         return BSON("locale"
                     << "en_US"
                     << "strength" << strength);
@@ -419,8 +420,12 @@ protected:
                                                            << "bar")};
 
 private:
+    int32_t _getRandomInt(int32_t max) {
+        return _random.nextInt32(max);
+    }
+
     bool _getRandomBool() {
-        return rand() % 2 == 0;
+        return _getRandomInt(2) == 0;
     }
 
     /**
@@ -448,6 +453,7 @@ private:
 
     RAIIServerParameterControllerForTest _featureFlagController{"featureFlagAnalyzeShardKey", true};
     FailPointEnableBlock _fp{"disableQueryAnalysisWriter"};
+    PseudoRandom _random{SecureRandom{}.nextInt64()};
 };
 
 DEATH_TEST_F(QueryAnalysisWriterTest, CannotGetIfFeatureFlagNotEnabled, "invariant") {

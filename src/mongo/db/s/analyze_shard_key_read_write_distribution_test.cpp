@@ -35,6 +35,7 @@
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/random.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/unittest/death_test.h"
 
@@ -128,12 +129,16 @@ protected:
             CollectionRoutingInfo{std::move(cm), boost::optional<GlobalIndexesCache>(boost::none)});
     }
 
+    int32_t getRandomInt(int32_t limit) const {
+        return _random->nextInt32(limit);
+    }
+
     bool getRandomBool() const {
-        return rand() % 2 == 0;
+        return getRandomInt(2) == 0;
     }
 
     SampledCommandNameEnum getRandomSampledReadCommandName() const {
-        return kSampledReadCommandNames[std::rand() % kSampledReadCommandNames.size()];
+        return kSampledReadCommandNames[getRandomInt(kSampledReadCommandNames.size())];
     }
 
     SampledQueryDocument makeSampledReadQueryDocument(SampledCommandNameEnum cmdName,
@@ -273,6 +278,8 @@ protected:
     const BSONObj caseInsensitiveCollation =
         BSON(Collation::kLocaleFieldName << "en_US"
                                          << "strength" << 1 << "caseLevel" << false);
+    const std::unique_ptr<PseudoRandom> _random =
+        std::make_unique<PseudoRandom>(SecureRandom().nextInt64());
 };
 
 TEST_F(ReadWriteDistributionTest, ReadDistributionNoQueries) {
