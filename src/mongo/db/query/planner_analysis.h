@@ -151,7 +151,7 @@ public:
      */
     static std::pair<EqLookupNode::LookupStrategy, boost::optional<IndexEntry>>
     determineLookupStrategy(
-        const std::string& foreignCollName,
+        const NamespaceString& foreignCollName,
         const std::string& foreignField,
         const std::map<NamespaceString, SecondaryCollectionInfo>& collectionsInfo,
         bool allowDiskUse,

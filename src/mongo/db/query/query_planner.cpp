@@ -1658,7 +1658,7 @@ std::unique_ptr<QuerySolution> QueryPlanner::extendWithAggPipeline(
                     "This $lookup stage should be compatible with SBE",
                     lookupStage->sbeCompatible());
             auto [strategy, idxEntry] = QueryPlannerAnalysis::determineLookupStrategy(
-                lookupStage->getFromNs().toString(),
+                lookupStage->getFromNs(),
                 lookupStage->getForeignField()->fullPath(),
                 secondaryCollInfos,
                 query.getExpCtx()->allowDiskUse,

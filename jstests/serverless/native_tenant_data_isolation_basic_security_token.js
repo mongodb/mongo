@@ -592,6 +592,55 @@ const tokenDB = tokenConn.getDB(kDbName);
               tojson(collsAfterDropOtherTenant.cursor.firstBatch));
 }
 
+// Test aggregation stage commands
+{
+    // Create a number of collections and entries used to test agg stages
+    const kCollA = "collA";
+    const kCollB = "collB";
+    const kCollC = "collC";
+    const kCollD = "collD";
+    assert.commandWorked(tokenDB.createCollection(kCollA));
+    assert.commandWorked(tokenDB.createCollection(kCollB));
+
+    const collADocs = [
+        {_id: 0, start: "a", end: "b"},
+        {_id: 1, start: "b", end: "c"},
+        {_id: 2, start: "c", end: "d"}
+    ];
+    const collBDocs = [
+        {_id: 0, ref: "a", payload: "1"},
+        {_id: 1, ref: "c", payload: "2"},
+        {_id: 2, ref: "e", payload: "3"}
+    ];
+
+    assert.commandWorked(tokenDB.runCommand({insert: kCollA, documents: collADocs}));
+    assert.commandWorked(tokenDB.runCommand({insert: kCollB, documents: collBDocs}));
+
+    // Set up agg stage input documents
+    const lookupPlannerStage = {
+        $lookup: {from: kCollB, localField: "start", foreignField: "ref", as: "refs"}
+    };
+
+    // Set up assertion targets
+    const lookupTarget = [
+        {_id: 0, refs: [{_id: 0, ref: "a", payload: "1"}]},
+        {_id: 1, refs: []},
+        {_id: 2, refs: [{_id: 1, ref: "c", payload: "2"}]}
+    ];
+
+    // $lookup agg stage that exercises query planner.
+    {
+        const lookupPlannerRes = assert.commandWorked(tokenDB.runCommand({
+            aggregate: kCollA,
+            pipeline: [lookupPlannerStage, {$project: {_id: 1, refs: 1}}],
+            cursor: {}
+        }));
+        assert(arrayEq(lookupTarget, lookupPlannerRes.cursor.firstBatch));
+        checkNsSerializedCorrectly(
+            featureFlagRequireTenantId, kTenant, kDbName, kCollA, lookupPlannerRes.cursor.ns);
+    }
+}
+
 // Test commands using a privleged user with ActionType::useTenant and check the user can still
 // run commands on the doc when passing the correct tenant, but not when passing a different
 // tenant.
