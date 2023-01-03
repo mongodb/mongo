@@ -287,6 +287,11 @@ void insertChunks(OperationContext* opCtx,
             entries.push_back(chunk.toConfigBSON());
         }
         insertOp.setDocuments(entries);
+        insertOp.setWriteCommandRequestBase([] {
+            write_ops::WriteCommandRequestBase wcb;
+            wcb.setOrdered(false);
+            return wcb;
+        }());
         return insertOp;
     }());
 
