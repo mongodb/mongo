@@ -672,12 +672,7 @@ TEST(Path, Fuse7) {
         tree);
 }
 
-TEST(Path, Lower1) {
-    auto prefixId = PrefixId::createForTests();
-
-    auto tree = make<EvalPath>(make<PathIdentity>(), make<Variable>("foo"));
-    auto env = VariableEnvironment::build(tree);
-
+void runPathLowering(VariableEnvironment& env, PrefixId& prefixId, ABT& tree) {
     // Run rewriters while things change
     bool changed = false;
     do {
@@ -689,34 +684,32 @@ TEST(Path, Lower1) {
             changed = true;
         }
     } while (changed);
+}
+
+TEST(Path, LowerPathIdentity) {
+    auto prefixId = PrefixId::createForTests();
+
+    auto tree = make<EvalPath>(make<PathIdentity>(), make<Variable>("foo"));
+    auto env = VariableEnvironment::build(tree);
+    runPathLowering(env, prefixId, tree);
 
     ASSERT(tree.is<Variable>());
     ASSERT_EQ(tree.cast<Variable>()->name(), "foo");
 }
 
-TEST(Path, Lower2) {
+TEST(Path, LowerPathConstant) {
     auto prefixId = PrefixId::createForTests();
 
     auto tree = make<EvalPath>(make<PathConstant>(Constant::int64(10)), make<Variable>("foo"));
     auto env = VariableEnvironment::build(tree);
 
-    // Run rewriters while things change
-    bool changed = false;
-    do {
-        changed = false;
-        if (PathLowering{prefixId, env}.optimize(tree)) {
-            changed = true;
-        }
-        if (ConstEval{env}.optimize(tree)) {
-            changed = true;
-        }
-    } while (changed);
+    runPathLowering(env, prefixId, tree);
 
     ASSERT(tree.is<Constant>());
     ASSERT_EQ(tree.cast<Constant>()->getValueInt64(), 10);
 }
 
-TEST(Path, Lower3) {
+TEST(Path, LowerPathLambda) {
     auto prefixId = PrefixId::createForTests();
 
     auto tree = make<EvalPath>(
@@ -725,23 +718,13 @@ TEST(Path, Lower3) {
         Constant::int64(9));
     auto env = VariableEnvironment::build(tree);
 
-    // Run rewriters while things change
-    bool changed = false;
-    do {
-        changed = false;
-        if (PathLowering{prefixId, env}.optimize(tree)) {
-            changed = true;
-        }
-        if (ConstEval{env}.optimize(tree)) {
-            changed = true;
-        }
-    } while (changed);
+    runPathLowering(env, prefixId, tree);
 
     ASSERT(tree.is<Constant>());
     ASSERT_EQ(tree.cast<Constant>()->getValueInt64(), 10);
 }
 
-TEST(Path, Lower4) {
+TEST(Path, LowerPathGet) {
     auto prefixId = PrefixId::createForTests();
 
     auto tree = make<EvalPath>(
@@ -752,23 +735,13 @@ TEST(Path, Lower4) {
         make<Variable>("rootObj"));
     auto env = VariableEnvironment::build(tree);
 
-    // Run rewriters while things change
-    bool changed = false;
-    do {
-        changed = false;
-        if (PathLowering{prefixId, env}.optimize(tree)) {
-            changed = true;
-        }
-        if (ConstEval{env}.optimize(tree)) {
-            changed = true;
-        }
-    } while (changed);
+    runPathLowering(env, prefixId, tree);
 
     ASSERT(tree.is<Constant>());
     ASSERT_EQ(tree.cast<Constant>()->getValueInt64(), 100);
 }
 
-TEST(Path, Lower5) {
+TEST(Path, LowerPathGetPathLambda) {
     auto prefixId = PrefixId::createForTests();
 
     auto tree = make<EvalPath>(
@@ -782,17 +755,7 @@ TEST(Path, Lower5) {
         make<Variable>("rootObj"));
     auto env = VariableEnvironment::build(tree);
 
-    // Run rewriters while things change
-    bool changed = false;
-    do {
-        changed = false;
-        if (PathLowering{prefixId, env}.optimize(tree)) {
-            changed = true;
-        }
-        if (ConstEval{env}.optimize(tree)) {
-            changed = true;
-        }
-    } while (changed);
+    runPathLowering(env, prefixId, tree);
 
     ASSERT_EXPLAIN(
         "BinaryOp [Add]\n"
@@ -821,17 +784,7 @@ TEST(Path, ProjElim1) {
 
     auto env = VariableEnvironment::build(tree);
 
-    // Run rewriters while things change
-    bool changed = false;
-    do {
-        changed = false;
-        if (PathLowering{prefixId, env}.optimize(tree)) {
-            changed = true;
-        }
-        if (ConstEval{env}.optimize(tree)) {
-            changed = true;
-        }
-    } while (changed);
+    runPathLowering(env, prefixId, tree);
 
     ASSERT_EXPLAIN(
         "Root []\n"
@@ -866,17 +819,7 @@ TEST(Path, ProjElim2) {
 
     auto env = VariableEnvironment::build(tree);
 
-    // Run rewriters while things change
-    bool changed = false;
-    do {
-        changed = false;
-        if (PathLowering{prefixId, env}.optimize(tree)) {
-            changed = true;
-        }
-        if (ConstEval{env}.optimize(tree)) {
-            changed = true;
-        }
-    } while (changed);
+    runPathLowering(env, prefixId, tree);
 
     ASSERT_EXPLAIN(
         "Root []\n"
@@ -933,7 +876,7 @@ TEST(Path, ProjElim3) {
         tree);
 }
 
-TEST(Path, Lower6) {
+TEST(Path, LowerNestedPathGet) {
     auto prefixId = PrefixId::createForTests();
 
     auto tree = make<EvalPath>(
@@ -941,17 +884,7 @@ TEST(Path, Lower6) {
         make<Variable>("rootObj"));
     auto env = VariableEnvironment::build(tree);
 
-    // Run rewriters while things change
-    bool changed = false;
-    do {
-        changed = false;
-        if (PathLowering{prefixId, env}.optimize(tree)) {
-            changed = true;
-        }
-        if (ConstEval{env}.optimize(tree)) {
-            changed = true;
-        }
-    } while (changed);
+    runPathLowering(env, prefixId, tree);
 
     ASSERT_EXPLAIN(
         "Let [valDefault_0]\n"
@@ -968,7 +901,7 @@ TEST(Path, Lower6) {
         tree);
 }
 
-TEST(Path, Lower7) {
+TEST(Path, LowerPathTraverse) {
     auto prefixId = PrefixId::createForTests();
 
     auto tree = make<EvalPath>(
@@ -979,22 +912,28 @@ TEST(Path, Lower7) {
         make<Variable>("rootObj"));
     auto env = VariableEnvironment::build(tree);
 
-    // Run rewriters while things change
-    bool changed = false;
-    do {
-        changed = false;
-        if (PathLowering{prefixId, env}.optimize(tree)) {
-            changed = true;
-        }
-        if (ConstEval{env}.optimize(tree)) {
-            changed = true;
-        }
-    } while (changed);
+    runPathLowering(env, prefixId, tree);
 
-    // Add some asserts on the shape of the tree or something.
+    ASSERT_EXPLAIN(
+        "FunctionCall [traverseP]\n"
+        "  FunctionCall [getField]\n"
+        "    Variable [rootObj]\n"
+        "    Const [\"fieldA\"]\n"
+        "  LambdaAbstraction [inputGet_0]\n"
+        "    Let [valDefault_0]\n"
+        "      FunctionCall [getField]\n"
+        "        Variable [inputGet_0]\n"
+        "        Const [\"fieldB\"]\n"
+        "      If []\n"
+        "        FunctionCall [exists]\n"
+        "          Variable [valDefault_0]\n"
+        "        Variable [valDefault_0]\n"
+        "        Const [0]\n"
+        "  Const [Nothing]\n",
+        tree);
 }
 
-TEST(Path, Lower8) {
+TEST(Path, LowerPathComposeMIdentity) {
     auto prefixId = PrefixId::createForTests();
 
     auto tree = make<EvalPath>(
@@ -1002,23 +941,13 @@ TEST(Path, Lower8) {
         make<Variable>("rootObj"));
     auto env = VariableEnvironment::build(tree);
 
-    // Run rewriters while things change
-    bool changed = false;
-    do {
-        changed = false;
-        if (PathLowering{prefixId, env}.optimize(tree)) {
-            changed = true;
-        }
-        if (ConstEval{env}.optimize(tree)) {
-            changed = true;
-        }
-    } while (changed);
+    runPathLowering(env, prefixId, tree);
 
     ASSERT(tree.is<Constant>());
     ASSERT_EQ(tree.cast<Constant>()->getValueInt64(), 100);
 }
 
-TEST(Path, Lower9) {
+TEST(Path, LowerPathComposeMPathGet) {
     auto prefixId = PrefixId::createForTests();
 
     auto tree = make<EvalPath>(make<PathComposeM>(make<PathGet>("fieldA", make<PathIdentity>()),
@@ -1026,23 +955,13 @@ TEST(Path, Lower9) {
                                make<Variable>("rootObj"));
     auto env = VariableEnvironment::build(tree);
 
-    // Run rewriters while things change
-    bool changed = false;
-    do {
-        changed = false;
-        if (PathLowering{prefixId, env}.optimize(tree)) {
-            changed = true;
-        }
-        if (ConstEval{env}.optimize(tree)) {
-            changed = true;
-        }
-    } while (changed);
+    runPathLowering(env, prefixId, tree);
 
     ASSERT(tree.is<Constant>());
     ASSERT_EQ(tree.cast<Constant>()->getValueInt64(), 100);
 }
 
-TEST(Path, Lower10) {
+TEST(Path, LowerPathField) {
     auto prefixId = PrefixId::createForTests();
 
     auto tree = make<EvalPath>(
@@ -1053,19 +972,162 @@ TEST(Path, Lower10) {
         make<Variable>("rootObj"));
     auto env = VariableEnvironment::build(tree);
 
-    // Run rewriters while things change
-    bool changed = false;
-    do {
-        changed = false;
-        if (PathLowering{prefixId, env}.optimize(tree)) {
-            changed = true;
-        }
-        if (ConstEval{env}.optimize(tree)) {
-            changed = true;
-        }
-    } while (changed);
+    runPathLowering(env, prefixId, tree);
 
-    // Add some asserts on the shape of the tree or something.
+    ASSERT_EXPLAIN(
+        "Let [valField_1]\n"
+        "  FunctionCall [traverseP]\n"
+        "    FunctionCall [getField]\n"
+        "      Variable [rootObj]\n"
+        "      Const [\"fieldA\"]\n"
+        "    LambdaAbstraction [inputField_0]\n"
+        "      Let [valField_0]\n"
+        "        Let [valDefault_0]\n"
+        "          FunctionCall [getField]\n"
+        "            Variable [inputField_0]\n"
+        "            Const [\"fieldB\"]\n"
+        "          If []\n"
+        "            FunctionCall [exists]\n"
+        "              Variable [valDefault_0]\n"
+        "            Variable [valDefault_0]\n"
+        "            Const [0]\n"
+        "        If []\n"
+        "          BinaryOp [Or]\n"
+        "            FunctionCall [exists]\n"
+        "              Variable [valField_0]\n"
+        "            FunctionCall [isObject]\n"
+        "              Variable [inputField_0]\n"
+        "          FunctionCall [setField]\n"
+        "            Variable [inputField_0]\n"
+        "            Const [\"fieldB\"]\n"
+        "            Variable [valField_0]\n"
+        "          Variable [inputField_0]\n"
+        "    Const [Nothing]\n"
+        "  If []\n"
+        "    BinaryOp [Or]\n"
+        "      FunctionCall [exists]\n"
+        "        Variable [valField_1]\n"
+        "      FunctionCall [isObject]\n"
+        "        Variable [rootObj]\n"
+        "    FunctionCall [setField]\n"
+        "      Variable [rootObj]\n"
+        "      Const [\"fieldA\"]\n"
+        "      Variable [valField_1]\n"
+        "    Variable [rootObj]\n",
+        tree);
+}
+
+TEST(Path, LowerPathCompare) {
+    auto prefixId = PrefixId::createForTests();
+
+    auto tree = make<EvalFilter>(make<PathCompare>(Operations::Eq, Constant::int64(1)),
+                                 make<Variable>("root"));
+    auto env = VariableEnvironment::build(tree);
+    runPathLowering(env, prefixId, tree);
+
+    ASSERT_EXPLAIN(
+        "BinaryOp [FillEmpty]\n"
+        "  BinaryOp [Eq]\n"
+        "    Variable [root]\n"
+        "    Const [1]\n"
+        "  Const [false]\n",
+        tree);
+}
+
+TEST(Path, LowerPathDrop) {
+    auto prefixId = PrefixId::createForTests();
+
+    FieldNameOrderedSet names;
+    names.insert("a");
+    names.insert("b");
+    auto tree = make<EvalPath>(make<PathDrop>(std::move(names)), make<Variable>("root"));
+    auto env = VariableEnvironment::build(tree);
+    runPathLowering(env, prefixId, tree);
+
+    ASSERT_EXPLAIN(
+        "If []\n"
+        "  FunctionCall [isObject]\n"
+        "    Variable [root]\n"
+        "  FunctionCall [dropFields]\n"
+        "    Variable [root]\n"
+        "    Const [\"a\"]\n"
+        "    Const [\"b\"]\n"
+        "  Variable [root]\n",
+        tree);
+}
+
+TEST(Path, LowerPathKeep) {
+    auto prefixId = PrefixId::createForTests();
+
+    FieldNameOrderedSet names;
+    names.insert("a");
+    names.insert("b");
+    auto tree = make<EvalPath>(make<PathKeep>(std::move(names)), make<Variable>("root"));
+    auto env = VariableEnvironment::build(tree);
+    runPathLowering(env, prefixId, tree);
+
+    ASSERT_EXPLAIN(
+        "If []\n"
+        "  FunctionCall [isObject]\n"
+        "    Variable [root]\n"
+        "  FunctionCall [keepFields]\n"
+        "    Variable [root]\n"
+        "    Const [\"a\"]\n"
+        "    Const [\"b\"]\n"
+        "  Variable [root]\n",
+        tree);
+}
+
+TEST(Path, LowerPathGetWithObj) {
+    auto prefixId = PrefixId::createForTests();
+    auto tree = make<EvalFilter>(make<PathGet>("a", make<PathObj>()), make<Variable>("root"));
+    auto env = VariableEnvironment::build(tree);
+    runPathLowering(env, prefixId, tree);
+    ASSERT_EXPLAIN(
+        "BinaryOp [FillEmpty]\n"
+        "  FunctionCall [isObject]\n"
+        "    FunctionCall [getField]\n"
+        "      Variable [root]\n"
+        "      Const [\"a\"]\n"
+        "  Const [false]\n",
+        tree);
+}
+
+TEST(Path, LowerPathGetWithArr) {
+    auto prefixId = PrefixId::createForTests();
+    auto tree = make<EvalFilter>(make<PathGet>("a", make<PathArr>()), make<Variable>("root"));
+    auto env = VariableEnvironment::build(tree);
+    runPathLowering(env, prefixId, tree);
+    ASSERT_EXPLAIN(
+        "BinaryOp [FillEmpty]\n"
+        "  FunctionCall [isArray]\n"
+        "    FunctionCall [getField]\n"
+        "      Variable [root]\n"
+        "      Const [\"a\"]\n"
+        "  Const [false]\n",
+        tree);
+}
+
+TEST(Path, LowerPathComposeA) {
+    auto prefixId = PrefixId::createForTests();
+
+    auto tree = make<EvalFilter>(make<PathComposeA>(make<PathConstant>(Constant::boolean(false)),
+                                                    make<PathConstant>(Constant::boolean(true))),
+                                 make<Variable>("rootObj"));
+    auto env = VariableEnvironment::build(tree);
+
+    runPathLowering(env, prefixId, tree);
+
+    ASSERT_EXPLAIN(
+        "BinaryOp [FillEmpty]\n"
+        "  If []\n"
+        "    BinaryOp [FillEmpty]\n"
+        "      Const [false]\n"
+        "      Const [false]\n"
+        "    Const [true]\n"
+        "    Const [true]\n"
+        "  Const [false]\n",
+        tree);
 }
 
 TEST(Path, PathComposeLambdaLHS) {
