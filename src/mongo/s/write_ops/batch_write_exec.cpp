@@ -429,10 +429,14 @@ void executeTwoPhaseWrite(OperationContext* opCtx,
                     break;
                 }
             } else {
+                // Explicitly set the status so that debug builds won't invariant when checking the
+                // status.
+                BatchedCommandResponse noopBatchCommandResponse;
+                noopBatchCommandResponse.setStatus(Status::OK());
                 processResponseFromRemote(opCtx,
                                           targeter,
                                           nextBatch->getEndpoint().shardName,
-                                          BatchedCommandResponse(),
+                                          noopBatchCommandResponse,
                                           batchOp,
                                           nextBatch.get(),
                                           stats);

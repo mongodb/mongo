@@ -158,7 +158,7 @@ public:
     }
 
     bool supportsRetryableWrite() const final {
-        return true;
+        return false;
     }
 
     bool allowedInTransactions() const final {
