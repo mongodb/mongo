@@ -27,11 +27,14 @@
  *    it in the license file.
  */
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
 #include "mongo/db/query/optimizer/explain.h"
+#include "mongo/db/query/optimizer/node_defs.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/rewrites/path_lower.h"
+#include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/unittest/golden_test.h"
 #include "mongo/unittest/unittest.h"
 
@@ -43,6 +46,11 @@ using GoldenTestContext = unittest::GoldenTestContext;
 using GoldenTestConfig = unittest::GoldenTestConfig;
 class ABTPlanGeneration : public unittest::Test {
 protected:
+    ProjectionName scanLabel = ProjectionName{"scan0"_sd};
+    NodeToGroupPropsMap _nodeMap;
+    // This can be modified by tests that need other labels.
+    FieldProjectionMap _fieldProjMap{{}, {scanLabel}, {}};
+
     void runExpressionVariation(GoldenTestContext& gctx, const std::string& name, const ABT& n) {
         auto& stream = gctx.outStream();
         if (stream.tellp()) {
@@ -70,10 +78,7 @@ protected:
         return str.substr(0, atIndex + 2) + "<collUUID>" + str.substr(closeQuote, str.length());
     }
 
-    void runNodeVariation(GoldenTestContext& gctx,
-                          const std::string& name,
-                          const ABT& n,
-                          NodeToGroupPropsMap& nodeMap) {
+    void runNodeVariation(GoldenTestContext& gctx, const std::string& name, const ABT& n) {
         auto& stream = gctx.outStream();
         if (stream.tellp()) {
             stream << std::endl;
@@ -89,9 +94,14 @@ protected:
         opt::unordered_map<std::string, ScanDefinition> scanDefs;
         scanDefs.insert({"collName", buildScanDefinition()});
         Metadata md(scanDefs);
-        auto planStage = SBENodeLowering{env, map, ridSlot, ids, md, nodeMap, false}.optimize(n);
+        auto planStage = SBENodeLowering{env, map, ridSlot, ids, md, _nodeMap, false}.optimize(n);
         sbe::DebugPrinter printer;
         stream << stripUUIDs(printer.print(*planStage)) << std::endl;
+
+        // After a variation is run, presumably any more variations in the test will use a new tree,
+        // so reset the node map.
+        _nodeMap = NodeToGroupPropsMap{};
+        _fieldProjMap = {{}, {ProjectionName{scanLabel}}, {}};
     }
 
     ScanDefinition buildScanDefinition() {
@@ -106,6 +116,10 @@ protected:
         bool exists = true;
         CEType ce{false};
         return ScanDefinition(opts, indexDefs, trie, dnp, exists, ce);
+    }
+
+    ABT scanForTest() {
+        return make<PhysicalScanNode>(_fieldProjMap, "collName", false);
     }
 
     auto getNextNodeID() {
@@ -129,6 +143,25 @@ protected:
         auto prefixId = PrefixId::createForTests();
         runPathLowering(env, prefixId, tree);
     }
+
+    /**
+     * Run passed in ABT through path lowering and return the same ABT. Useful for constructing
+     * physical ABTs in-line for lowering tests.
+     */
+    ABT&& _path(ABT&& tree) {
+        runPathLowering(tree);
+        return std::move(tree);
+    }
+
+    /**
+     * Register the passed-in ABT in the test's node map and return the same ABT. Useful for
+     * constructing physical ABTs in-line for lowering tests.
+     */
+    ABT&& _node(ABT&& tree) {
+        _nodeMap.insert({tree.cast<Node>(), makeNodeProp()});
+        return std::move(tree);
+    }
+
     void runPathLowering(VariableEnvironment& env, PrefixId& prefixId, ABT& tree) {
         // Run rewriters while things change
         bool changed = false;
@@ -166,53 +199,60 @@ TEST_F(ABTPlanGeneration, LowerConstantExpression) {
 }
 
 TEST_F(ABTPlanGeneration, LowerVarExpression) {
-    NodeToGroupPropsMap nodeMap;
     GoldenTestContext ctx(&goldenTestConfig);
     ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
-    FieldProjectionMap map{{}, {ProjectionName{"scan0"}}, {}};
-    ABT scanNode = make<PhysicalScanNode>(map, "collName", false);
-    nodeMap.insert({scanNode.cast<PhysicalScanNode>(), makeNodeProp()});
-    auto field = make<EvalPath>(make<PathGet>("a", make<PathIdentity>()), make<Variable>("scan0"));
-    runPathLowering(field);
-    ABT evalNode = make<EvaluationNode>("proj0", std::move(field), std::move(scanNode));
-    nodeMap.insert({evalNode.cast<EvaluationNode>(), makeNodeProp()});
-    runNodeVariation(ctx, "varInProj", evalNode, nodeMap);
+
+    runNodeVariation(
+        ctx,
+        "varInProj",
+        _node(make<EvaluationNode>("proj0",
+                                   _path(make<EvalPath>(make<PathGet>("a", make<PathIdentity>()),
+                                                        make<Variable>(scanLabel))),
+                                   _node(scanForTest()))));
+}
+
+TEST_F(ABTPlanGeneration, LowerFilterNode) {
+    GoldenTestContext ctx(&goldenTestConfig);
+    ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
+
+    runNodeVariation(
+        ctx,
+        "filter for: a >= 23",
+        _node(make<FilterNode>(
+            _path(make<EvalFilter>(
+                make<PathGet>("a", make<PathCompare>(Operations::Gte, Constant::int32(23))),
+                make<Variable>(scanLabel))),
+            _node(scanForTest()))));
+
+    runNodeVariation(
+        ctx,
+        "filter for constant: true",
+        _node(make<FilterNode>(_path(make<EvalFilter>(make<PathConstant>(Constant::boolean(true)),
+                                                      make<Variable>(scanLabel))),
+                               _node(scanForTest()))));
 }
 
 TEST_F(ABTPlanGeneration, LowerLimitSkipNode) {
-
-    // Just Limit
-    NodeToGroupPropsMap nodeMap;
     GoldenTestContext ctx(&goldenTestConfig);
     ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
-    FieldProjectionMap map{{}, {ProjectionName{"scan0"}}, {}};
-    ABT scanNode = make<PhysicalScanNode>(map, "collName", false);
-    nodeMap.insert({scanNode.cast<PhysicalScanNode>(), makeNodeProp()});
-    ABT limitNode =
-        make<LimitSkipNode>(properties::LimitSkipRequirement(5, 0), std::move(scanNode));
-    nodeMap.insert({limitNode.cast<LimitSkipNode>(), makeNodeProp()});
-    runNodeVariation(ctx, "Lower single limit without skip", limitNode, nodeMap);
+
+    // Just Limit
+    runNodeVariation(
+        ctx,
+        "Lower single limit without skip",
+        _node(make<LimitSkipNode>(properties::LimitSkipRequirement(5, 0), _node(scanForTest()))));
 
     // Just Skip
-    NodeToGroupPropsMap nodeMap2;
-    FieldProjectionMap map2{{}, {ProjectionName{"scan0"}}, {}};
-    ABT scanNode2 = make<PhysicalScanNode>(map2, "collName", false);
-    nodeMap2.insert({scanNode2.cast<PhysicalScanNode>(), makeNodeProp()});
-    ABT skipNode =
-        make<LimitSkipNode>(properties::LimitSkipRequirement(0, 4), std::move(scanNode2));
-    nodeMap2.insert({skipNode.cast<LimitSkipNode>(), makeNodeProp()});
-    runNodeVariation(ctx, "Lower single skip without limit", skipNode, nodeMap2);
+    runNodeVariation(
+        ctx,
+        "Lower single skip without limit",
+        _node(make<LimitSkipNode>(properties::LimitSkipRequirement(0, 4), _node(scanForTest()))));
 
     // Limit and Skip
-    NodeToGroupPropsMap nodeMap3;
-    FieldProjectionMap map3{{}, {ProjectionName{"scan0"}}, {}};
-    ABT scanNode3 = make<PhysicalScanNode>(map3, "collName", false);
-    nodeMap3.insert({scanNode3.cast<PhysicalScanNode>(), makeNodeProp()});
-    ABT limitSkipNode =
-        make<LimitSkipNode>(properties::LimitSkipRequirement(4, 2), std::move(scanNode3));
-    nodeMap3.insert({limitSkipNode.cast<LimitSkipNode>(), makeNodeProp()});
     runNodeVariation(
-        ctx, "Lower LimitSkip node with values for both limit and skip", limitSkipNode, nodeMap3);
+        ctx,
+        "Lower LimitSkip node with values for both limit and skip",
+        _node(make<LimitSkipNode>(properties::LimitSkipRequirement(4, 2), _node(scanForTest()))));
 }
 
 }  // namespace

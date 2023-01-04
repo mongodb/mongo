@@ -1,0 +1,37 @@
+# Golden test output of ABTPlanGeneration/LowerFilterNode
+
+==== VARIATION: filter for: a >= 23 ====
+-- INPUT:
+Filter []
+|   BinaryOp [FillEmpty]
+|   |   Const [false]
+|   BinaryOp [Gte]
+|   |   Const [0]
+|   BinaryOp [Cmp3w]
+|   |   Const [23]
+|   FunctionCall [getField]
+|   |   Const ["a"]
+|   Variable [scan0]
+PhysicalScan [{'<root>': scan0}, collName]
+    BindBlock:
+        [scan0]
+            Source []
+
+-- OUTPUT:
+[3] filter {(((getField(s1, "a") <=> 23) >= 0ll) ?: false)} 
+[1] scan s1 none none none none none [] @"<collUUID>" true false 
+
+==== VARIATION: filter for constant: true ====
+-- INPUT:
+Filter []
+|   BinaryOp [FillEmpty]
+|   |   Const [false]
+|   Const [true]
+PhysicalScan [{'<root>': scan0}, collName]
+    BindBlock:
+        [scan0]
+            Source []
+
+-- OUTPUT:
+[7] cfilter {(true ?: false)} 
+[5] scan s1 none none none none none [] @"<collUUID>" true false 

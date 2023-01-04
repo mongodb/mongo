@@ -46,7 +46,9 @@ public:
     // The default noop transport.
     template <typename T, typename... Ts>
     std::unique_ptr<sbe::EExpression> transport(const T&, Ts&&...) {
-        uasserted(6624237, "abt tree is not lowered correctly");
+        uasserted(6624237,
+                  "ABT expression lowering encountered operator which cannot be directly lowered "
+                  "to an SBE expression.");
         return nullptr;
     }
 
