@@ -294,7 +294,6 @@ variables:
     - ubuntu2004-package
   - name: selinux_rhel7_enterprise
   - name: .publish
-  - name: .publish_test
   - name: generate_buildid_to_debug_symbols_mapping
 
 
