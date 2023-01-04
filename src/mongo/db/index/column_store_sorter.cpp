@@ -129,7 +129,12 @@ void ColumnStoreSorter::add(PathView path, RowId rowId, CellView cellContents) {
             cellListAtPath.empty() || cellListAtPath.back().first < rowId);
 
     cellListAtPath.emplace_back(rowId, CellValue(cellContents.rawData(), cellContents.size()));
-    _memUsed += sizeof(RowId) + sizeof(CellValue) + cellListAtPath.back().second.size();
+
+    auto memUsage = sizeof(RowId) + sizeof(CellValue) + cellListAtPath.back().second.size();
+    _memUsed += memUsage;
+    _stats.incrementBytesSorted(memUsage);
+    _stats.incrementNumSorted();
+
     if (_memUsed > _maxMemoryUsageBytes) {
         spill();
     }
