@@ -78,7 +78,7 @@ BSONObj DocumentSourceCollStats::makeStatsForNs(
     const boost::optional<BSONObj>& filterObj) {
     BSONObjBuilder builder;
 
-    builder.append("ns", NamespaceStringUtil::serialize(nss));
+    builder.append("ns", nss.ns());
 
     auto shardName = expCtx->mongoProcessInterface->getShardName(expCtx->opCtx);
 

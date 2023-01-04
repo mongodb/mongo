@@ -34,7 +34,6 @@
 
 #include "mongo/db/jsobj.h"
 #include "mongo/db/service_context.h"
-#include "mongo/util/namespace_string_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -208,7 +207,7 @@ void Top::appendLatencyStats(const NamespaceString& nss,
     stdx::lock_guard<SimpleMutex> lk(_lock);
     BSONObjBuilder latencyStatsBuilder;
     _usage[hashedNs].opLatencyHistogram.append(includeHistograms, false, &latencyStatsBuilder);
-    builder->append("ns", NamespaceStringUtil::serialize(nss));
+    builder->append("ns", nss.ns());
     builder->append("latencyStats", latencyStatsBuilder.obj());
 }
 
