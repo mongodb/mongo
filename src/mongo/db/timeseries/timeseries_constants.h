@@ -71,7 +71,8 @@ static const StringDataSet kAllowedCollectionCreationOptions{
     CreateCommand::kIndexOptionDefaultsFieldName,
     CreateCommand::kCollationFieldName,
     CreateCommand::kTimeseriesFieldName,
-    CreateCommand::kExpireAfterSecondsFieldName};
+    CreateCommand::kExpireAfterSecondsFieldName,
+    CreateCommand::kDollarTenantFieldName};
 
 }  // namespace timeseries
 }  // namespace mongo

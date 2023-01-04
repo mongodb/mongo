@@ -12,6 +12,13 @@ test_kind: js_test
 selector:
   roots:
   - jstests/core/all.js
+  - jstests/core/timeseries/*.js
+  - jstests/core/txns/timeseries/timeseries_reads_in_txns.js
+  - jstests/core/txns/timeseries_create_in_txn.js
+  - jstests/core/txns/timeseries_insert_in_txn.js
+  exclude_with_any_tags:
+  # TODO SERVER-72173: tenant information is dropped off when trying to profile operation.
+  - requires_profiling
 
 executor:
   archive:
