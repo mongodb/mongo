@@ -6,6 +6,8 @@
 (function() {
 "use strict";
 
+load("jstests/libs/catalog_shard_util.js");
+
 const dbName = "testDb";
 
 function testNonExistingCollection(testCases) {
@@ -111,8 +113,15 @@ function testExistingShardedCollection(st, testCases) {
         const res0 = testCase.conn.adminCommand({analyzeShardKey: ns, key: candidateKey0});
         const res1 = testCase.conn.adminCommand({analyzeShardKey: ns, key: candidateKey1});
         if (testCase.isSupported) {
-            const expectedErrCode =
-                testCase.isMongos ? ErrorCodes.InvalidOptions : ErrorCodes.CollectionIsEmptyLocally;
+            const expectedErrCode = (() => {
+                if (testCase.isMongos) {
+                    return ErrorCodes.InvalidOptions;
+                }
+                if (testCase.doNotExpectColl) {
+                    return ErrorCodes.NamespaceNotFound;
+                }
+                return ErrorCodes.CollectionIsEmptyLocally;
+            })();
             assert.commandFailedWithCode(res, expectedErrCode);
             assert.commandFailedWithCode(res0, expectedErrCode);
             assert.commandFailedWithCode(res1, expectedErrCode);
@@ -136,9 +145,15 @@ function testExistingShardedCollection(st, testCases) {
         const res0 = testCase.conn.adminCommand({analyzeShardKey: ns, key: candidateKey0});
         const res1 = testCase.conn.adminCommand({analyzeShardKey: ns, key: candidateKey1});
         if (testCase.isSupported) {
-            assert.commandWorked(res);
-            assert.commandWorked(res0);
-            assert.commandWorked(res1);
+            if (testCase.doNotExpectColl) {
+                assert.commandFailedWithCode(res, ErrorCodes.NamespaceNotFound);
+                assert.commandFailedWithCode(res0, ErrorCodes.NamespaceNotFound);
+                assert.commandFailedWithCode(res1, ErrorCodes.NamespaceNotFound);
+            } else {
+                assert.commandWorked(res);
+                assert.commandWorked(res0);
+                assert.commandWorked(res1);
+            }
         } else {
             assert.commandFailedWithCode(res, ErrorCodes.IllegalOperation);
             assert.commandFailedWithCode(res0, ErrorCodes.IllegalOperation);
@@ -193,9 +208,13 @@ function testNotSupportReadWriteConcern(writeConn, testCases) {
     st.rs1.nodes.forEach(node => {
         testCases.push({conn: node, isSupported: true, isPrimaryShardMongod: false});
     });
-    // The analyzeShardKey command is not supported on configsvr mongods.
+
+    // The analyzeShardKey command is not supported on dedicated configsvr mongods.
+    const isCatalogShardEnabled = CatalogShardUtil.isEnabledIgnoringFCV(st);
     st.configRS.nodes.forEach(node => {
-        testCases.push({conn: node, isSupported: false});
+        // Don't expect a sharded collection since the config server isn't enabled as a shard and
+        // won't have chunks.
+        testCases.push({conn: node, isSupported: isCatalogShardEnabled, doNotExpectColl: true});
     });
 
     testNonExistingCollection(testCases);

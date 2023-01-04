@@ -7,6 +7,7 @@
 (function() {
 "use strict";
 
+load("jstests/libs/catalog_shard_util.js");
 load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
 
 const supportedTestCases = [
@@ -224,9 +225,11 @@ function testInsertCmd(rst) {
     testFindAndModifyCmd(st.rs0, supportedTestCases);
     testInsertCmd(st.rs0);
 
-    testUpdateCmd(st.configRS, unsupportedTestCases);
-    testDeleteCmd(st.configRS, unsupportedTestCases);
-    testFindAndModifyCmd(st.configRS, unsupportedTestCases);
+    const configTests =
+        CatalogShardUtil.isEnabledIgnoringFCV(st) ? supportedTestCases : unsupportedTestCases;
+    testUpdateCmd(st.configRS, configTests);
+    testDeleteCmd(st.configRS, configTests);
+    testFindAndModifyCmd(st.configRS, configTests);
     testInsertCmd(st.configRS);
 
     st.stop();

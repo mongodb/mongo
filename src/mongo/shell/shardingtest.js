@@ -1355,13 +1355,7 @@ var ShardingTest = function(params) {
         var setIsConfigSvr = false;
 
         if (isCatalogShardMode && i == 0) {
-            var catalogShardFeatureFlag = {
-                configsvr: "",
-                setParameter:
-                    {featureFlagCatalogShard: true, featureFlagConfigServerAlwaysShardRemote: true},
-            };
-            otherParams.configOptions =
-                Object.merge(otherParams.configOptions, catalogShardFeatureFlag);
+            otherParams.configOptions = Object.merge(otherParams.configOptions, {configsvr: ""});
             rsDefaults = Object.merge(rsDefaults, otherParams.configOptions);
             setIsConfigSvr = true;
         } else {

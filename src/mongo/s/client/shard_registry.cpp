@@ -92,7 +92,7 @@ ShardRegistry::ShardRegistry(ServiceContext* service,
     if (_initConfigServerCS) {
         invariant(_initConfigServerCS->isValid());
     } else {
-        invariant(gFeatureFlagConfigServerAlwaysShardRemote.isEnabledAndIgnoreFCV());
+        invariant(gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV());
     }
 
     _threadPool.startup();

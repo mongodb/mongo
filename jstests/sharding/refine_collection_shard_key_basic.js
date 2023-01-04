@@ -7,6 +7,7 @@ TestData.skipCheckShardFilteringMetadata = true;
 
 (function() {
 'use strict';
+load("jstests/libs/catalog_shard_util.js");
 load('jstests/libs/fail_point_util.js');
 load('jstests/libs/profiler.js');
 load('jstests/sharding/libs/shard_versioning_util.js');
@@ -306,9 +307,10 @@ assert.commandFailedWithCode(
     ErrorCodes.NamespaceNotSharded);
 
 // Should fail because operation can't run on config server
+const isCatalogShardEnabled = CatalogShardUtil.isEnabledIgnoringFCV(st);
 assert.commandFailedWithCode(
     mongos.adminCommand({refineCollectionShardKey: "config.collections", key: {_id: 1, aKey: 1}}),
-    ErrorCodes.NoShardingEnabled);
+    isCatalogShardEnabled ? ErrorCodes.ShardingStateNotInitialized : ErrorCodes.NoShardingEnabled);
 
 enableShardingAndShardColl({_id: 1});
 

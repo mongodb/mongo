@@ -1,10 +1,9 @@
 /**
  * Tests catalog shard topology.
  *
- * Requires both catalog shard feature flags.
  * @tags: [
+ *   requires_fcv_63,
  *   featureFlagCatalogShard,
- *   featureFlagConfigServerAlwaysShardRemote,
  * ]
  */
 (function() {

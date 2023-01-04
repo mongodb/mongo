@@ -8,6 +8,7 @@
 (function() {
 "use strict";
 
+load("jstests/libs/catalog_shard_util.js");
 load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
 
 const testCases = [];
@@ -173,9 +174,10 @@ function testDiffs(rst, testCase, expectSampling) {
     // allow the test helper to know if it should use "config" as the name for the test database.
     st.configRS.isConfigRS = true;
 
+    const isCatalogShardEnabled = CatalogShardUtil.isEnabledIgnoringFCV(st);
     for (const testCase of testCases) {
         testDiffs(st.rs0, testCase, true /* expectSampling */);
-        testDiffs(st.configRS, testCase, false /* expectSampling */);
+        testDiffs(st.configRS, testCase, isCatalogShardEnabled /* expectSampling */);
     }
 
     st.stop();

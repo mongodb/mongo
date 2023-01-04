@@ -34,12 +34,3 @@ feature_flags:
         description: "Feature flag for enabling shared config server/shard server cluster role"
         cpp_varname: gFeatureFlagCatalogShard
         default: false
-    # TODO SERVER-72282: Replace with featureFlagCatalogShard once it is stable.
-    #
-    # Temporary feature flag to get coverage for always using config server ShardRemote in the all
-    # feature flags variants. Can be replaced with featureFlagCatalogShard once that flag is stable
-    # enough to run in the all feature flags variants.
-    featureFlagConfigServerAlwaysShardRemote:
-        description: "Feature flag for always using a ShardRemote for ShardRegistry config shard"
-        cpp_varname: gFeatureFlagConfigServerAlwaysShardRemote
-        default: false

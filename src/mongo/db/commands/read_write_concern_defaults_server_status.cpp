@@ -47,7 +47,7 @@ public:
 
     BSONObj generateSection(OperationContext* opCtx,
                             const BSONElement& configElement) const override {
-        if (serverGlobalParams.clusterRole == ClusterRole::ShardServer ||
+        if (serverGlobalParams.clusterRole.isExclusivelyShardRole() ||
             !repl::ReplicationCoordinator::get(opCtx)->isReplEnabled()) {
             return {};
         }

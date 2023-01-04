@@ -1,10 +1,9 @@
 /**
  * Tests catalog shard topology.
  *
- * Requires both catalog shard feature flags.
  * @tags: [
+ *   requires_fcv_63,
  *   featureFlagCatalogShard,
- *   featureFlagConfigServerAlwaysShardRemote,
  * ]
  */
 (function() {
@@ -14,14 +13,7 @@ const dbName = "foo";
 const collName = "bar";
 const ns = dbName + "." + collName;
 
-const st = new ShardingTest({
-    shards: 0,
-    config: 3,
-    configOptions: {
-        setParameter:
-            {featureFlagCatalogShard: true, featureFlagConfigServerAlwaysShardRemote: true}
-    },
-});
+const st = new ShardingTest({shards: 0, config: 3});
 
 const configCS = st.configRS.getURL();
 

@@ -19,7 +19,10 @@ const st = new ShardingTest({
         s2: {setParameter: setParameterOpts}
     },
     shards: 1,
-    rs: {nodes: 1, setParameter: setParameterOpts}
+    rs: {nodes: 1, setParameter: setParameterOpts},
+    other: {
+        configOptions: {setParameter: setParameterOpts},
+    }
 });
 
 const dbName = "testDb";

@@ -7,6 +7,7 @@
 (function() {
 "use strict";
 
+load("jstests/libs/catalog_shard_util.js");
 load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
 
 const shardsvrTestCases = [
@@ -181,10 +182,12 @@ function testAggregateCmd(rst, testCases) {
     testDistinctCmd(st.rs0, shardsvrTestCases);
     testAggregateCmd(st.rs0, shardsvrTestCases);
 
-    testFindCmd(st.configRS, nonShardsvrTestCases);
-    testCountCmd(st.configRS, nonShardsvrTestCases);
-    testDistinctCmd(st.configRS, nonShardsvrTestCases);
-    testAggregateCmd(st.configRS, nonShardsvrTestCases);
+    const configTests =
+        CatalogShardUtil.isEnabledIgnoringFCV(st) ? shardsvrTestCases : nonShardsvrTestCases;
+    testFindCmd(st.configRS, configTests);
+    testCountCmd(st.configRS, configTests);
+    testDistinctCmd(st.configRS, configTests);
+    testAggregateCmd(st.configRS, configTests);
 
     st.stop();
 }

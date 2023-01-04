@@ -339,7 +339,7 @@ std::vector<BSONObj> runCatalogAggregation(OperationContext* opCtx,
 
     const auto readPref = [&]() -> ReadPreferenceSetting {
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
-            !gFeatureFlagConfigServerAlwaysShardRemote.isEnabledAndIgnoreFCV()) {
+            !gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV()) {
             // When the feature flag is on, the config server may read from any node in its replica
             // set, so we should use the typical config server read preference.
             return {};
@@ -1490,7 +1490,7 @@ std::vector<ShardId> ShardingCatalogClientImpl::getHistoricalPlacement(
     // Run the aggregation
     const auto readConcern = [&]() -> repl::ReadConcernArgs {
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
-            !gFeatureFlagConfigServerAlwaysShardRemote.isEnabledAndIgnoreFCV()) {
+            !gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV()) {
             // When the feature flag is on, the config server may read from a secondary which may
             // need to wait for replication, so we should use afterClusterTime.
             return {repl::ReadConcernLevel::kMajorityReadConcern};

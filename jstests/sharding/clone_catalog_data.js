@@ -4,6 +4,8 @@
 // Eventually, _shardsvrMovePrimary will use this command.
 
 (() => {
+    load("jstests/libs/catalog_shard_util.js");
+
     function sortByName(a, b) {
         if (a.name < b.name)
             return -1;
@@ -156,13 +158,16 @@
     }),
                                  ErrorCodes.InvalidOptions);
 
+    const isCatalogShardEnabled = CatalogShardUtil.isEnabledIgnoringFCV(st);
+
     // Check that the command fails when attempting to run on the config server.
     assert.commandFailedWithCode(st.configRS.getPrimary().adminCommand({
         _shardsvrCloneCatalogData: 'test',
         from: fromShard.host,
         writeConcern: {w: "majority"}
     }),
-                                 ErrorCodes.NoShardingEnabled);
+                                 isCatalogShardEnabled ? ErrorCodes.ShardingStateNotInitialized
+                                                       : ErrorCodes.NoShardingEnabled);
 
     // Check that the command fails when failing to specify a source.
     assert.commandFailedWithCode(

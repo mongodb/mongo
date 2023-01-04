@@ -9,6 +9,8 @@
 (function() {
 "use strict";
 
+load("jstests/libs/catalog_shard_util.js");
+
 const kDBName = "foo";
 const kCollName = "bar";
 
@@ -94,11 +96,14 @@ function runTestCaseExpectSuccess(conn, testCase) {
     }
 
     //
-    // Cluster commands are not allowed on a config server node.
+    // Cluster commands are allowed on a catalog shard enabled config server.
     //
 
+    const isCatalogShardEnabled = CatalogShardUtil.isEnabledIgnoringFCV(st);
     for (let testCase of clusterCommandsCases) {
-        runTestCaseExpectFail(st.configRS.getPrimary(), testCase, ErrorCodes.NoShardingEnabled);
+        const expectedErrCode = isCatalogShardEnabled ? ErrorCodes.ShardingStateNotInitialized
+                                                      : ErrorCodes.NoShardingEnabled;
+        runTestCaseExpectFail(st.configRS.getPrimary(), testCase, expectedErrCode);
     }
 
     //

@@ -970,7 +970,8 @@ private:
                                       << NamespaceString::kShardCollectionCatalogNamespace
                                       << causedBy(dropStatus.reason()),
                         dropStatus.isOK() || dropStatus.code() == ErrorCodes::NamespaceNotFound);
-            } else {
+            }
+            if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
                 LOGV2(6711906,
                       "Unset index version field in config.collections",
                       "nss"_attr = CollectionType::ConfigNS);

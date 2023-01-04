@@ -1014,7 +1014,7 @@ CatalogCache::IndexCache::LookupResult CatalogCache::IndexCache::_lookupIndexes(
 
         const auto readConcern = [&]() -> repl::ReadConcernArgs {
             if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer &&
-                !gFeatureFlagConfigServerAlwaysShardRemote.isEnabledAndIgnoreFCV()) {
+                !gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV()) {
                 // When the feature flag is on, the config server may read from a secondary which
                 // may need to wait for replication, so we should use afterClusterTime.
                 return {repl::ReadConcernLevel::kSnapshotReadConcern};

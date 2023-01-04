@@ -519,7 +519,7 @@ void ShardingInitializationMongoD::updateShardIdentityConfigString(
 
 void ShardingInitializationMongoD::onSetCurrentConfig(OperationContext* opCtx) {
     if (serverGlobalParams.clusterRole != ClusterRole::ConfigServer ||
-        !gFeatureFlagConfigServerAlwaysShardRemote.isEnabledAndIgnoreFCV()) {
+        !gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV()) {
         // Only config servers capable of acting as a shard set up the config shard in their shard
         // registry with a real connection string.
         return;
@@ -549,7 +549,7 @@ void initializeGlobalShardingStateForConfigServerIfNeeded(OperationContext* opCt
     ShardingInitializationMongoD::get(opCtx)->installReplicaSetChangeListener(service);
 
     auto configCS = []() -> boost::optional<ConnectionString> {
-        if (gFeatureFlagConfigServerAlwaysShardRemote.isEnabledAndIgnoreFCV()) {
+        if (gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV()) {
             // When the config server can operate as a shard, it sets up a ShardRemote for the
             // config shard, which is created later after loading the local replica set config.
             return boost::none;
