@@ -709,8 +709,9 @@ void initScope(Scope& scope) {
 
     initializeEnterpriseScope(scope);
 
-    scope.injectNative("benchRun", BenchRunner::benchRunSync);
+    scope.injectNative("benchRun", BenchRunner::benchRunSync);  // alias
     scope.injectNative("benchRunSync", BenchRunner::benchRunSync);
+    scope.injectNative("benchRunOnce", BenchRunner::benchRunOnce);
     scope.injectNative("benchStart", BenchRunner::benchStart);
     scope.injectNative("benchFinish", BenchRunner::benchFinish);
 

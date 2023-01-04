@@ -366,6 +366,7 @@ void BenchRunConfig::initializeToDefaults() {
 
     throwGLE = false;
     breakOnTrap = true;
+    benchRunOnce = false;
     randomSeed = 1314159265358979323;
 }
 
@@ -671,6 +672,8 @@ BenchRunOp opFromBson(const BSONObj& op) {
 
 void BenchRunConfig::initializeFromBson(const BSONObj& args) {
     initializeToDefaults();
+    bool parallelSet = false;  // did args include the "parallel" field?
+    bool secondsSet = false;   // did args include the "seconds" field?
 
     auto argToRegex = [](auto&& arg) {
         return std::make_shared<pcre::Regex>(arg.regex(),
@@ -709,6 +712,7 @@ void BenchRunConfig::initializeFromBson(const BSONObj& args) {
                                   << typeName(arg.type()),
                     arg.isNumber());
             parallel = arg.numberInt();
+            parallelSet = true;
         } else if (name == "randomSeed") {
             uassert(34365,
                     str::stream() << "Field '" << name << "' should be a number. . Type is "
@@ -721,6 +725,7 @@ void BenchRunConfig::initializeFromBson(const BSONObj& args) {
                                   << typeName(arg.type()),
                     arg.isNumber());
             seconds = arg.number();
+            secondsSet = true;
         } else if (name == "useSessions") {
             uassert(40641,
                     str::stream() << "Field '" << name << "' should be a boolean. . Type is "
@@ -753,6 +758,8 @@ void BenchRunConfig::initializeFromBson(const BSONObj& args) {
             throwGLE = arg.trueValue();
         } else if (name == "breakOnTrap") {
             breakOnTrap = arg.trueValue();
+        } else if (name == "benchRunOnce") {
+            benchRunOnce = arg.trueValue();
         } else if (name == "trapPattern") {
             trapPattern = argToRegex(arg);
         } else if (name == "noTrapPattern") {
@@ -773,6 +780,11 @@ void BenchRunConfig::initializeFromBson(const BSONObj& args) {
             LOGV2_INFO(22793, "benchRun passed an unsupported field", "name"_attr = name);
             uassert(34376, "benchRun passed an unsupported configuration field", false);
         }
+    }
+
+    if (benchRunOnce) {
+        uassert(7241800, "benchRunOnce() does not support the 'parallel' field.", !parallelSet);
+        uassert(7241801, "benchRunOnce() does not support the 'seconds' field.", !secondsSet);
     }
 }
 
@@ -884,13 +896,18 @@ void BenchRunWorker::start() {
 }
 
 bool BenchRunWorker::shouldStop() const {
-    return _brState.shouldWorkerFinish();
+    // benchRunOnce stops after one execution instead of based on _isShuttingDown flag, so this
+    // always returns true in the benchRunOne case.
+    return _config->benchRunOnce || _brState.shouldWorkerFinish();
 }
 
 bool BenchRunWorker::shouldCollectStats() const {
     return _brState.shouldWorkerCollectStats();
 }
 
+/**
+ * Executes the workload on a worker thread. This is the main routine for benchRunXXX() benchmarks.
+ */
 void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
     verify(conn);
     long long count = 0;
@@ -926,10 +943,23 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
         }
     });
 
-    while (!shouldStop()) {
-        for (const auto& op : _config->ops) {
-            if (shouldStop())
-                break;
+    if (_config->ops.size() > 0) {
+        unsigned long opIdx = 0;  // index of next operation to run
+        if (_config->benchRunOnce) {
+            opIdx = _id;  // in the benchRunOnce case each worker runs its own op (just once)
+        }
+        do {
+            const BenchRunOp& op = _config->ops[opIdx];  // op to run on this iteration
+
+            // Index of op to run on the next iteration. benchRun() workers round-robin through all
+            // the ops until the 'seconds' timer checked by the shouldStop() loop condition expires.
+            // In constrast, benchRunOnce() only runs one op and will never iterate the containing
+            // do loop, because shouldStop() always returns true for that variant, so the update to
+            // 'opIdx' here has no impact on benchRunOnce().
+            ++opIdx;
+            if (opIdx >= _config->ops.size()) {
+                opIdx = 0;
+            }
 
             opState.stats = shouldCollectStats() ? &_stats : &_statsBlackHole;
 
@@ -992,7 +1022,7 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
 
             if (op.delay > 0)
                 sleepmillis(op.delay);
-        }
+        } while (!shouldStop());
     }
 }
 
@@ -1384,8 +1414,14 @@ void BenchRunner::start() {
             }
         }
 
-        // Start threads
-        for (int64_t i = 0; i < _config->parallel; i++) {
+        // Start the worker threads.
+        unsigned nWorkers;
+        if (!_config->benchRunOnce) {
+            nWorkers = _config->parallel;
+        } else {
+            nWorkers = _config->ops.size();
+        }
+        for (int64_t i = 0; i < nWorkers; i++) {
             // Make a unique random seed for the worker.
             const int64_t seed = _config->randomSeed + i;
 
@@ -1524,6 +1560,34 @@ BSONObj BenchRunner::benchRunSync(const BSONObj& argsFake, void* data) {
     sleepmillis((int)(1000.0 * runner->config().seconds));
 
     return benchFinish(start, data);
+}
+
+/**
+ * This is a variant of BenchRunner::benchRunSync() that changes the following behaviors:
+ *   1. It runs all the entries in 'ops[]' exactly once, whereas benchRunSync() runs them round-
+ *      robin until the 'seconds' timer expires.
+ *   2. It does these runs in parallel, whereas benchRunSync() runs them serially.
+ *   3. It does not support the 'parallel' input because its parallelism is determined by the number
+ *      of entries in 'ops[]', whereas benchRunSync() launches 'parallel' number of concurrent
+ *      workers.
+ *   4. It does not support the 'seconds' input because its workers stop after a single execution
+ *      instead of a time limit.
+ *
+ * Thus this method will launch a concurrent worker per entry in 'ops[]' and give each worker only
+ * one entry to execute once, whereas benchRunSync will launch 'parallel' concurrent workers and
+ * give each worker all the entries to be executed round-robin until the 'seconds' timer expires.
+ */
+BSONObj BenchRunner::benchRunOnce(const BSONObj& argsFake, void* data) {
+    verify(argsFake.firstElement().isABSONObj());
+    BSONObj args = argsFake.firstElement().Obj();
+
+    // Add a config field to indicate this variant.
+    args = args.addFields(fromjson("{benchRunOnce: true}"));
+
+    BenchRunner* runner = BenchRunner::createWithConfig(args);
+    runner->start();
+    BSONObj finalObj = BenchRunner::finish(runner);
+    return BSON("" << finalObj);
 }
 
 /**

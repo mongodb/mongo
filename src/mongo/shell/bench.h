@@ -255,6 +255,7 @@ public:
 
     bool throwGLE;
     bool breakOnTrap;
+    bool benchRunOnce;  // is this a call of benchRunOnce() instead of benchRunSync(), etc.?
 
 private:
     static std::function<std::unique_ptr<DBClientBase>(const BenchRunConfig&)> _factory;
@@ -518,7 +519,7 @@ private:
 
     stdx::thread _thread;
 
-    const size_t _id;
+    const size_t _id;  // 0-based ID of this worker instance
 
     const BenchRunConfig* _config;
 
@@ -602,6 +603,7 @@ public:
     static BSONObj benchFinish(const BSONObj& argsFake, void* data);
     static BSONObj benchStart(const BSONObj& argsFake, void* data);
     static BSONObj benchRunSync(const BSONObj& argsFake, void* data);
+    static BSONObj benchRunOnce(const BSONObj& argsFake, void* data);
 
 private:
     // TODO: Same as for createWithConfig.
