@@ -4,14 +4,14 @@
  * @tags: [requires_fcv_62, serverless]
  */
 
-load("jstests/libs/fail_point_util.js");                         // for "configureFailPoint"
-load('jstests/libs/parallel_shell_helpers.js');                  // for "startParallelShell"
-load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // for "setParameter"
-load("jstests/serverless/libs/shard_split_test.js");
-load("jstests/replsets/libs/tenant_migration_test.js");
+import {
+    assertMigrationState,
+    findSplitOperation,
+    ShardSplitTest
+} from "jstests/serverless/libs/shard_split_test.js";
 
-(function() {
-"use strict";
+load("jstests/libs/fail_point_util.js");  // for "configureFailPoint"
+load("jstests/replsets/libs/tenant_migration_test.js");
 
 // Skip db hash check because secondary is left with a different config.
 TestData.skipCheckDBHashes = true;
@@ -51,4 +51,3 @@ test.validateTenantAccessBlockers(
     operation.migrationId, tenantIds, TenantMigrationTest.DonorAccessState.kReject);
 
 test.stop();
-})();

@@ -6,10 +6,13 @@
  * ]
  */
 
+import {
+    addRecipientNodes,
+    commitSplitAsync,
+    waitForGarbageCollectionForSplit
+} from "jstests/serverless/libs/shard_split_test.js";
 load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
-load("jstests/serverless/libs/shard_split_test.js");
-load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
 
 function canStartMigrationAfterSplitGarbageCollection(protocol) {
@@ -20,7 +23,7 @@ function canStartMigrationAfterSplitGarbageCollection(protocol) {
     const splitMigrationId = UUID();
     const tenantMigrationId = UUID();
 
-    sharedOptions = {};
+    const sharedOptions = {};
     sharedOptions["setParameter"] = {shardSplitGarbageCollectionDelayMS: 0, ttlMonitorSleepSecs: 1};
 
     const test = new TenantMigrationTest({quickGarbageCollection: true, sharedOptions});

@@ -16,13 +16,9 @@
  * ]
  */
 
-(function() {
-'use strict';
+import {findSplitOperation, ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
 
 load("jstests/libs/fail_point_util.js");
-load("jstests/libs/parallelTester.js");
-load("jstests/libs/uuid_util.js");
-load("jstests/serverless/libs/shard_split_test.js");
 load("jstests/serverless/shard_split_concurrent_reads_on_donor_util.js");
 
 const ktenantId = ObjectId();
@@ -33,11 +29,11 @@ const kCollName = "testColl";
  * To be used to resume a split that is paused after entering the blocking state. Waits for the
  * number of blocked reads to reach 'targetNumBlockedReads' and unpauses the split.
  */
-function resumeMigrationAfterBlockingRead(host, tenantId, targetNumBlockedReads) {
+async function resumeMigrationAfterBlockingRead(host, tenantId, targetNumBlockedReads) {
+    const {ShardSplitTest} = await import("jstests/serverless/libs/shard_split_test.js");
     load("jstests/libs/fail_point_util.js");
-    load("jstests/serverless/libs/shard_split_test.js");
-    const primary = new Mongo(host);
 
+    const primary = new Mongo(host);
     assert.soon(() => ShardSplitTest.getNumBlockedReads(primary, eval(tenantId)) ==
                     targetNumBlockedReads);
 
@@ -125,4 +121,3 @@ for (const [testCaseName, testCase] of Object.entries(testCases)) {
     const dbName = `${ktenantId.str}_${testCaseName}`;
     testUnblockBlockedReadsAfterMigrationAborted(testCase, dbName, kCollName);
 }
-})();

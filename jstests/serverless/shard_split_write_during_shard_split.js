@@ -4,10 +4,7 @@
  * @tags: [requires_fcv_62, serverless]
  */
 
-load("jstests/serverless/libs/shard_split_test.js");
-
-(function() {
-"use strict";
+import {doWriteOperations, ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
 
 const test = new ShardSplitTest();
 test.addAndAwaitRecipientNodes();
@@ -53,4 +50,3 @@ writeResults.forEach(res => {
 TestData.skipCheckDBHashes = true;
 
 test.stop();
-})();

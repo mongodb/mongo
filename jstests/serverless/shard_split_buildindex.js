@@ -12,12 +12,10 @@
  * ]
  */
 
-(function() {
-"use strict";
+import {assertMigrationState, ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
-load("jstests/serverless/libs/shard_split_test.js");
 
 const shardSplitTest = new ShardSplitTest({quickGarbageCollection: true});
 shardSplitTest.addRecipientNodes();
@@ -143,4 +141,3 @@ assert.commandFailedWithCode(db[kNewCollName1].createIndex({b: 1}),
 operation.forget();
 shardSplitTest.cleanupSuccesfulCommitted(operation.migrationId, tenantIds);
 shardSplitTest.stop();
-})();

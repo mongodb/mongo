@@ -7,13 +7,9 @@
  * @tags: [requires_fcv_62, serverless]
  */
 
-(function() {
-"use strict";
+import {assertMigrationState, ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
 
 load("jstests/libs/fail_point_util.js");
-load('jstests/libs/parallel_shell_helpers.js');  // for "startParallelShell"
-load("jstests/libs/uuid_util.js");
-load("jstests/serverless/libs/shard_split_test.js");
 
 TestData.skipCheckDBHashes = true;
 const test = new ShardSplitTest({quickGarbageCollection: true});
@@ -103,4 +99,3 @@ const test = new ShardSplitTest({quickGarbageCollection: true});
 })();
 
 test.stop();
-})();

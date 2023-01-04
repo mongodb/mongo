@@ -1,9 +1,9 @@
 env:
-  es2019: true
+  es2020: true
   mongo: true
 
 parserOptions:
-  ecmaVersion: 2019
+  ecmaVersion: 2020
   sourceType: "module"
 
 rules:

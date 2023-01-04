@@ -4,12 +4,9 @@
  * @tags: [requires_fcv_62, serverless]
  */
 
-load("jstests/libs/fail_point_util.js");         // for "configureFailPoint"
-load('jstests/libs/parallel_shell_helpers.js');  // for "startParallelShell"
-load("jstests/serverless/libs/shard_split_test.js");
+import {ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
 
-(function() {
-"use strict";
+load("jstests/libs/fail_point_util.js");  // for "configureFailPoint"
 
 const tenantIds = [ObjectId(), ObjectId()];
 
@@ -73,4 +70,3 @@ function commitShardSplitConcurrently() {
 }
 
 commitShardSplitConcurrently();
-})();

@@ -5,10 +5,9 @@
  * @tags: [requires_fcv_62, serverless]
  */
 
-(function() {
-"use strict";
+import {ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
+
 load("jstests/libs/fail_point_util.js");
-load("jstests/serverless/libs/shard_split_test.js");
 
 // Skip db hash check because secondary is left with a different config.
 TestData.skipCheckDBHashes = true;
@@ -51,4 +50,3 @@ if (lastContinuousFCV == "6.1") {
 }
 
 test.stop();
-})();

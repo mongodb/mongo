@@ -3,22 +3,22 @@ load("jstests/replsets/rslib.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
 
-const runForgetShardSplitAsync = function(primaryHost, migrationIdString) {
+function runForgetShardSplitAsync(primaryHost, migrationIdString) {
     const primary = new Mongo(primaryHost);
     return primary.adminCommand({forgetShardSplit: 1, migrationId: UUID(migrationIdString)});
-};
+}
 
-const runAbortShardSplitAsync = function(primaryHost, migrationIdString) {
+function runAbortShardSplitAsync(primaryHost, migrationIdString) {
     const primary = new Mongo(primaryHost);
     return primary.adminCommand({abortShardSplit: 1, migrationId: UUID(migrationIdString)});
-};
+}
 
 /*
  * Connects to a replica set and runs write operation, returning the results.
  * @param {rstArgs} replicaSetArgs for the replica set to connect to.
  * @param {tenantIds} perform a write operation for each tenantId.
  */
-const doWriteOperations = function(rstArgs, tenantIds) {
+export function doWriteOperations(rstArgs, tenantIds) {
     load("jstests/replsets/rslib.js");
 
     const donorRst = createRst(rstArgs, true);
@@ -49,9 +49,9 @@ const doWriteOperations = function(rstArgs, tenantIds) {
     });
 
     return writeResults;
-};
+}
 
-const addRecipientNodes = function({rst, numNodes, recipientTagName}) {
+export function addRecipientNodes({rst, numNodes, recipientTagName}) {
     numNodes = numNodes || 3;  // default to three nodes
     const recipientNodes = [];
     const options = TenantMigrationUtil.makeX509OptionsForTest();
@@ -86,23 +86,22 @@ const addRecipientNodes = function({rst, numNodes, recipientTagName}) {
     recipientNodes.forEach(node => rst.waitForState(node, ReplSetTest.State.SECONDARY));
 
     return recipientNodes;
-};
+}
 
 /**
  * Convert arguments passed through the Thread interface and calls runShardSplitCommand.
  */
-const runCommitSplitThreadWrapper = function(rstArgs,
-                                             migrationIdString,
-                                             tenantIds,
-                                             recipientTagName,
-                                             recipientSetName,
-                                             retryOnRetryableErrors,
-                                             enableDonorStartMigrationFsync) {
+async function runCommitSplitThreadWrapper(rstArgs,
+                                           migrationIdString,
+                                           tenantIds,
+                                           recipientTagName,
+                                           recipientSetName,
+                                           retryOnRetryableErrors,
+                                           enableDonorStartMigrationFsync) {
     load("jstests/replsets/rslib.js");
-    load("jstests/serverless/libs/shard_split_test.js");
+    const {runShardSplitCommand} = await import("jstests/serverless/libs/shard_split_test.js");
 
     const donorRst = createRst(rstArgs, true);
-
     const commitShardSplitCmdObj = {
         commitShardSplit: 1,
         migrationId: UUID(migrationIdString),
@@ -115,7 +114,7 @@ const runCommitSplitThreadWrapper = function(rstArgs,
 
     return runShardSplitCommand(
         donorRst, commitShardSplitCmdObj, retryOnRetryableErrors, enableDonorStartMigrationFsync);
-};
+}
 
 /*
  *  Wait for state document garbage collection by polling for when the document has been removed
@@ -123,7 +122,7 @@ const runCommitSplitThreadWrapper = function(rstArgs,
  * @param {migrationId} id that was used for the commitShardSplit command.
  * @param {tenantIds} tenant ids of the shard split.
  */
-const waitForGarbageCollectionForSplit = function(donorNodes, migrationId, tenantIds) {
+export function waitForGarbageCollectionForSplit(donorNodes, migrationId, tenantIds) {
     jsTestLog("Wait for garbage collection");
     assert.soon(() => donorNodes.every(node => {
         const donorDocumentDeleted =
@@ -153,9 +152,9 @@ const waitForGarbageCollectionForSplit = function(donorNodes, migrationId, tenan
                 "tenant access blockers weren't removed",
                 60 * 1000,
                 1 * 1000);
-};
+}
 
-const commitSplitAsync = function({
+export function commitSplitAsync({
     rst,
     tenantIds,
     recipientTagName,
@@ -183,9 +182,9 @@ const commitSplitAsync = function({
     thread.start();
 
     return thread;
-};
+}
 
-const runShardSplitCommand = function(
+export function runShardSplitCommand(
     replicaSet, cmdObj, retryOnRetryableErrors, enableDonorStartMigrationFsync) {
     let res;
     if (enableDonorStartMigrationFsync) {
@@ -225,7 +224,7 @@ const runShardSplitCommand = function(
         }
     }, "failed to retry commitShardSplit", 10 * 1000, 1 * 1000);
     return res;
-};
+}
 
 /**
  * Utility class to run shard split operations.
@@ -343,7 +342,7 @@ class ShardSplitOperation {
  * Utility class to create a ReplicaSetTest that provides functionnality to run a shard split
  * operation.
  */
-class ShardSplitTest {
+export class ShardSplitTest {
     constructor({
         recipientTagName = "recipientNode",
         recipientSetName = "recipientSetName",
@@ -691,17 +690,12 @@ ShardSplitTest.DonorState = {
     kAborted: "aborted"
 };
 
-function findSplitOperation(primary, migrationId) {
+export function findSplitOperation(primary, migrationId) {
     const donorsCollection = primary.getCollection(ShardSplitTest.kConfigSplitDonorsNS);
     return donorsCollection.findOne({"_id": migrationId});
 }
 
-function cleanupMigrationDocument(primary, migrationId) {
-    const donorsCollection = primary.getCollection(ShardSplitTest.kConfigSplitDonorsNS);
-    return donorsCollection.deleteOne({"_id": migrationId}, {w: "majority"});
-}
-
-function assertMigrationState(primary, migrationId, state) {
+export function assertMigrationState(primary, migrationId, state) {
     const migrationDoc = findSplitOperation(primary, migrationId);
     assert(migrationDoc);
 

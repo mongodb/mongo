@@ -4,13 +4,15 @@
  * @tags: [requires_fcv_62, serverless]
  */
 
+import {
+    assertMigrationState,
+    findSplitOperation,
+    ShardSplitTest
+} from "jstests/serverless/libs/shard_split_test.js";
+
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
 load('jstests/libs/parallel_shell_helpers.js');
-load("jstests/serverless/libs/shard_split_test.js");
-
-(function() {
-"use strict";
 
 jsTestLog("Starting runBlocking");
 
@@ -88,4 +90,3 @@ operation.forget();
 
 test.waitForGarbageCollection(operation.migrationId, tenantIds);
 test.stop();
-})();

@@ -15,13 +15,9 @@
  * ]
  */
 
-(function() {
-'use strict';
-
+import {assertMigrationState, ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
-load("jstests/libs/uuid_util.js");
-load("jstests/serverless/libs/shard_split_test.js");
 
 const kMaxBatchSize = 2;
 const kCollName = "testColl";
@@ -618,5 +614,4 @@ function bulkMultiUpdateDocsUnordered(primaryHost, dbName, collName, numDocs) {
         "Operation interrupted by an internal data migration and could not be automatically retried",
         tojson(bulkWriteRes));
     test.stop();
-})();
 })();

@@ -14,12 +14,9 @@
  * ]
  */
 
-(function() {
-"use strict";
+import {ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
 
 load("jstests/libs/fail_point_util.js");
-load("jstests/libs/uuid_util.js");
-load("jstests/serverless/libs/shard_split_test.js");
 
 const kTenantIds = [ObjectId()];
 
@@ -170,5 +167,4 @@ function checkStandardFieldsOK(ops, {migrationId, reachedDecision, tenantIds}) {
     assert(res.inprog[0].expireAt instanceof Date);
 
     test.stop();
-})();
 })();

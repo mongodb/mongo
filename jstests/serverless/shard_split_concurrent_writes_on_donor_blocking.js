@@ -11,15 +11,12 @@
  *   requires_fcv_62
  * ]
  */
-(function() {
-'use strict';
+
+import {ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
 
 load("jstests/libs/fail_point_util.js");
-load("jstests/libs/parallelTester.js");
-load("jstests/libs/uuid_util.js");
 load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/tenant_migration_concurrent_writes_on_donor_util.js");
-load("jstests/serverless/libs/shard_split_test.js");
 
 TestData.skipCheckDBHashes = true;
 const tenantMigrationTest = new ShardSplitTest({
@@ -186,4 +183,3 @@ ShardSplitTest.checkShardSplitAccessBlocker(
     donorPrimary, kTenantID, {numBlockedWrites: countBlockedWrites});
 
 tenantMigrationTest.stop();
-})();

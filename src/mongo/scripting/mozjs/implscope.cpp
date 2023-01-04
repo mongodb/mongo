@@ -665,7 +665,7 @@ void MozJSImplScope::_MozJSCreateFunction(StringData raw, JS::MutableHandleValue
 bool MozJSImplScope::onSyncPromiseResolved(JSContext* cx, unsigned argc, JS::Value* vp) {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
     auto scope = getScope(cx);
-    scope->_promiseResult.emplace(args[0]);
+    scope->_promiseResult.emplace(cx, args[0]);
     args.rval().setUndefined();
     return true;
 }
@@ -934,6 +934,10 @@ bool MozJSImplScope::exec(StringData code,
 
         JSObject* modulePtr = nullptr;
         if (shouldTryExecAsModule(_context, name, success)) {
+            // If we should run this as a module, we need to clear the previous exception in order
+            // to catch stack traces for future exceptions.
+            JS_ClearPendingException(_context);
+
             modulePtr = _moduleLoader->loadRootModuleFromSource(_context, name, code);
             success = modulePtr != nullptr;
         }
@@ -963,6 +967,9 @@ bool MozJSImplScope::exec(StringData code,
                     if (success) {
                         JS::RootedObject evaluationPromise(_context, &out.toObject());
                         success = JS::ThrowOnModuleEvaluationFailure(_context, evaluationPromise);
+                        if (success) {
+                            success = awaitPromise(_context, evaluationPromise, &out);
+                        }
                     }
                 }
             }

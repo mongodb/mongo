@@ -11,13 +11,11 @@
  *   requires_fcv_62
  * ]
  */
-(function() {
-'use strict';
+import {ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
-load("jstests/serverless/libs/shard_split_test.js");
 
 const kCollName = "testColl";
 const kTenantDefinedDbName = "0";
@@ -96,4 +94,3 @@ assert.lte(Object.bsonsize(bulkWriteRes),
            assert.commandWorked(primaryDB.hello()).maxBsonObjectSize);
 
 test.stop();
-})();

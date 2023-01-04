@@ -13,14 +13,10 @@
  * ]
  */
 
-(function() {
-"use strict";
+import {findSplitOperation, ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
 
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/fail_point_util.js");
-load("jstests/libs/uuid_util.js");
-load("jstests/serverless/libs/shard_split_test.js");
-load("jstests/replsets/libs/tenant_migration_util.js");
 
 const test =
     new ShardSplitTest({recipientTagName: "recipientTag", recipientSetName: "recipientSet"});
@@ -73,4 +69,3 @@ assert(res.code == ErrorCodes.InterruptedDueToReplStateChange ||
 // Shut down all the other nodes.
 test.donor.nodes.filter(node => node.port != donorPrimary.port)
     .forEach(node => donorRst.stop(node));
-})();

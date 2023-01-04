@@ -217,18 +217,8 @@ JSString* ModuleLoader::resolveAndNormalize(JSContext* cx,
     }
 
     boost::system::error_code ec;
-    auto fullPath = [&]() {
-        if (!boost::filesystem::is_directory(refAbsPath)) {
-            return boost::filesystem::canonical(specifierPath, refAbsPath.parent_path(), ec)
-                .lexically_normal()
-                .string();
-        }
-
-        return boost::filesystem::canonical(specifierPath, refAbsPath, ec)
-            .lexically_normal()
-            .string();
-    }();
-
+    auto fullPath =
+        boost::filesystem::canonical(specifierPath, _baseUrl, ec).lexically_normal().string();
     if (ec) {
         if (ec.value() == boost::system::errc::no_such_file_or_directory) {
             JS_ReportErrorUTF8(cx,

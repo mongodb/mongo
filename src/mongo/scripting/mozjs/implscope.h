@@ -457,7 +457,7 @@ private:
 
     std::unique_ptr<ModuleLoader> _moduleLoader;
     std::unique_ptr<EnvironmentPreparer> _environmentPreparer;
-    boost::optional<JS::HandleValue> _promiseResult;
+    boost::optional<JS::RootedValue> _promiseResult;
 
     WrapType<BinDataInfo> _binDataProto;
     WrapType<BSONInfo> _bsonProto;

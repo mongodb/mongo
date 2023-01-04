@@ -16,13 +16,9 @@
  * ]
  */
 
-(function() {
-"use strict";
+import {ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
 
 load("jstests/libs/clustered_collections/clustered_collection_util.js");  // ClusteredCollectionUtil
-load("jstests/libs/parallelTester.js");                                   // Thread()
-load("jstests/libs/uuid_util.js");                                        // extractUUIDFromObject()
-load("jstests/serverless/libs/shard_split_test.js");                      // ShardSplitTest
 
 const test = new ShardSplitTest({
     recipientSetName: "recipientSet",
@@ -100,4 +96,3 @@ operation.forget();
 validateMigrationResults(recipientRst);
 
 test.stop();
-})();

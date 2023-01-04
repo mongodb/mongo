@@ -6,9 +6,9 @@
  * ]
  */
 
+import {addRecipientNodes, commitSplitAsync} from "jstests/serverless/libs/shard_split_test.js";
 load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
-load("jstests/serverless/libs/shard_split_test.js");
 load("jstests/libs/uuid_util.js");
 
 function canStartShardSplitWithAbortedMigration({protocol, runOnRecipient}) {
@@ -18,7 +18,7 @@ function canStartShardSplitWithAbortedMigration({protocol, runOnRecipient}) {
     const splitMigrationId = UUID();
     const tenantMigrationId = UUID();
 
-    sharedOptions = {};
+    const sharedOptions = {};
     sharedOptions["setParameter"] = {shardSplitGarbageCollectionDelayMS: 0, ttlMonitorSleepSecs: 1};
 
     const test = new TenantMigrationTest({quickGarbageCollection: false, sharedOptions});

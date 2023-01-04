@@ -12,11 +12,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/serverless/libs/shard_split_test.js");
-load("jstests/replsets/libs/tenant_migration_util.js");
+import {ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
 
 const test =
     new ShardSplitTest({recipientSetName: "recipientSet", recipientTagName: "recipientTag"});
@@ -46,4 +42,3 @@ unsupportedtenantIds.forEach((invalidTenantId) => {
 });
 
 test.stop();
-})();

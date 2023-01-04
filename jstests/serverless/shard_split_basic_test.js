@@ -3,10 +3,11 @@
  * @tags: [requires_fcv_62, serverless]
  */
 
-load("jstests/serverless/libs/shard_split_test.js");
-
-(function() {
-"use strict";
+import {
+    assertMigrationState,
+    findSplitOperation,
+    ShardSplitTest
+} from "jstests/serverless/libs/shard_split_test.js";
 
 const tenantIds = [ObjectId(), ObjectId()];
 const test = new ShardSplitTest({quickGarbageCollection: true});
@@ -32,4 +33,3 @@ assert.gt(status.shardSplits.totalCommittedDurationWithoutCatchupMillis, 0);
 
 test.cleanupSuccesfulCommitted(operation.migrationId, tenantIds);
 test.stop();
-})();

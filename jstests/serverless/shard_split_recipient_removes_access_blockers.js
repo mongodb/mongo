@@ -4,11 +4,9 @@
  * @tags: [requires_fcv_62, serverless]
  */
 
-load("jstests/libs/fail_point_util.js");
-load("jstests/serverless/libs/shard_split_test.js");
+import {ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
 
-(function() {
-"use strict";
+load("jstests/libs/fail_point_util.js");
 
 // Skip db hash check because secondary is left with a different config.
 TestData.skipCheckDBHashes = true;
@@ -47,4 +45,3 @@ assert.soon(() => test.recipientNodes.every(node => {
 }));
 
 test.stop();
-})();

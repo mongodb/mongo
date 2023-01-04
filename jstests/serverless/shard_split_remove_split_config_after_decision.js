@@ -4,8 +4,9 @@
  * @tags: [requires_fcv_62, serverless]
  */
 
+import {assertMigrationState, ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
+
 load("jstests/libs/fail_point_util.js");
-load("jstests/serverless/libs/shard_split_test.js");
 
 function assertSplitConfigExists(donorPrimary, recipientSetName) {
     jsTestLog("Asserting a split config has been applied");

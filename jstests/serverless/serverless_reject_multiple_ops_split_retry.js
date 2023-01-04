@@ -6,9 +6,9 @@
  * ]
  */
 
+import {addRecipientNodes, commitSplitAsync} from "jstests/serverless/libs/shard_split_test.js";
 load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/libs/tenant_migration_util.js");
-load("jstests/serverless/libs/shard_split_test.js");
 load("jstests/libs/uuid_util.js");
 
 function retrySplit({protocol, recipientTagName, recipientSetName, tenantIds, test, splitRst}) {
@@ -78,7 +78,7 @@ const recipientTagName = "recipientTag";
 const recipientSetName = "recipient";
 const tenantIds = [ObjectId(), ObjectId()];
 
-sharedOptions = {
+const sharedOptions = {
     setParameter: {
         shardSplitGarbageCollectionDelayMS: 0,
         tenantMigrationGarbageCollectionDelayMS: 0,

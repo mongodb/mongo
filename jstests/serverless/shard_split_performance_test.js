@@ -4,7 +4,8 @@
  * @tags: [requires_fcv_62, serverless]
  */
 
-load("jstests/serverless/libs/shard_split_test.js");
+import {assertMigrationState, ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
+
 load("jstests/replsets/rslib.js");
 
 function runOneMoveChunk() {

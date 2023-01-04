@@ -12,12 +12,9 @@
  * ]
  */
 
-(function() {
-"use strict";
+import {findSplitOperation, ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
 
 load("jstests/libs/fail_point_util.js");
-load("jstests/libs/uuid_util.js");
-load("jstests/serverless/libs/shard_split_test.js");
 
 TestData.skipCheckDBHashes = true;
 
@@ -104,4 +101,3 @@ if (fpName) {
 }
 
 test.stop();
-})();

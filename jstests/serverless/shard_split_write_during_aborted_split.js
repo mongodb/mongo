@@ -3,10 +3,7 @@
  * @tags: [requires_fcv_62, serverless]
  */
 
-load("jstests/serverless/libs/shard_split_test.js");
-
-(function() {
-"use strict";
+import {ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
 
 TestData.skipCheckDBHashes = true;
 const test = new ShardSplitTest({
@@ -66,4 +63,3 @@ assert.commandFailedWithCode(splitThread.returnData(), ErrorCodes.TenantMigratio
 writes.forEach(write => write.join());
 
 test.stop();
-})();

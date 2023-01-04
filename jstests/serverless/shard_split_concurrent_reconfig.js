@@ -4,10 +4,7 @@
  * @tags: [requires_fcv_62, serverless]
  */
 
-load("jstests/serverless/libs/shard_split_test.js");
-
-(function() {
-"use strict";
+import {ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
 
 const tenantIds = [ObjectId(), ObjectId()];
 const test = new ShardSplitTest({quickGarbageCollection: true});
@@ -35,4 +32,3 @@ split.forget();
 
 test.cleanupSuccesfulAborted(split.migrationId, tenantIds);
 test.stop();
-})();

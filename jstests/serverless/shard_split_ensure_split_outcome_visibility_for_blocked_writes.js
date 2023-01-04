@@ -14,12 +14,10 @@
  *   requires_fcv_62
  * ]
  */
-(function() {
-'use strict';
+
+import {assertMigrationState, ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
 
 load("jstests/libs/fail_point_util.js");
-load("jstests/libs/uuid_util.js");
-load("jstests/serverless/libs/shard_split_test.js");
 
 const kGarbageCollectionParams = {
     // Set the delay before a donor state doc is garbage collected to be short to speed up the test.
@@ -136,5 +134,4 @@ function insertDocument(primaryHost, dbName, collName) {
     assert.eq(writeRes.writeErrors[0].code, ErrorCodes.TenantMigrationAborted);
 
     test.stop();
-})();
 })();

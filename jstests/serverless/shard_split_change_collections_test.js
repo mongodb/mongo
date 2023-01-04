@@ -3,27 +3,21 @@
  * @tags: [requires_fcv_62, serverless]
  */
 
+import {assertMigrationState, ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
 load("jstests/libs/cluster_server_parameter_utils.js");
-load("jstests/serverless/libs/shard_split_test.js");
 load("jstests/serverless/libs/change_collection_util.js");
 
-(function() {
-"use strict";
-
 const tenantIds = [ObjectId(), ObjectId()];
-
 const donorRst = new ChangeStreamMultitenantReplicaSetTest({
     nodes: 3,
     nodeOptions: {setParameter: {shardSplitGarbageCollectionDelayMS: 0, ttlMonitorSleepSecs: 1}}
 });
 
 const test = new ShardSplitTest({quickGarbageCollection: true, donorRst});
-
 test.addRecipientNodes();
 test.donor.awaitSecondaryNodes();
 
 const donorPrimary = test.getDonorPrimary();
-
 const donorTenantConn =
     ChangeStreamMultitenantReplicaSetTest.getTenantConnection(donorPrimary.host, tenantIds[0]);
 test.donor.setChangeStreamState(donorTenantConn, true);
@@ -43,7 +37,7 @@ assert.eq(donorCursor.hasNext(), true);
 const {_id: resumeToken} = donorCursor.next();
 
 const operation = test.createSplitOperation(tenantIds);
-const result = assert.commandWorked(operation.commit());
+assert.commandWorked(operation.commit());
 assertMigrationState(donorPrimary, operation.migrationId, "committed");
 
 let errCode;
@@ -84,4 +78,3 @@ assert.eq(changeStreamsClusterParameter.expireAfterSeconds, 7200);
 
 test.cleanupSuccesfulCommitted(operation.migrationId, tenantIds);
 test.stop();
-})();

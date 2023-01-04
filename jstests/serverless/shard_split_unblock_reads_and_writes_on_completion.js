@@ -13,13 +13,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/uuid_util.js");
-load("jstests/libs/write_concern_util.js");
-load("jstests/serverless/libs/shard_split_test.js");
+import {ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
 
 function startReadThread(node, dbName, collName, afterClusterTime) {
     let readThread = new Thread((host, dbName, collName, afterClusterTime) => {
@@ -204,5 +198,4 @@ const kCollName = "testColl";
     splitThread.join();
 
     test.stop();
-})();
 })();
