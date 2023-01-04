@@ -586,8 +586,7 @@ void Balancer::_consumeActionStreamLoop() {
                                               dataSizeAction.chunkRange,
                                               dataSizeAction.version,
                                               dataSizeAction.keyPattern,
-                                              dataSizeAction.estimatedValue,
-                                              dataSizeAction.maxSize)
+                                              dataSizeAction.estimatedValue)
                             .thenRunOn(*executor)
                             .onCompletion([this,
                                            selectedStream,
