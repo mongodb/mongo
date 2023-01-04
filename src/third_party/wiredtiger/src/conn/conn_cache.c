@@ -252,7 +252,7 @@ __wt_cache_create(WT_SESSION_IMPL *session, const char *cfg[])
           "eviction updates target must be lower than the eviction updates trigger");
 
     WT_RET(__wt_cond_auto_alloc(
-      session, "cache eviction server", 10000, WT_MILLION, &cache->evict_cond));
+      session, "cache eviction server", 10 * WT_THOUSAND, WT_MILLION, &cache->evict_cond));
     WT_RET(__wt_spin_init(session, &cache->evict_pass_lock, "evict pass"));
     WT_RET(__wt_spin_init(session, &cache->evict_queue_lock, "cache eviction queue"));
     WT_RET(__wt_spin_init(session, &cache->evict_walk_lock, "cache walk"));
