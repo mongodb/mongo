@@ -57,18 +57,24 @@ StringData reduceInt(StringData value) {
 }  // namespace
 
 JWKManager::JWKManager(StringData source) : _keyURI(source) {
-    auto httpClient = HttpClient::createWithoutConnectionPool();
-    httpClient->setHeaders({"Accept: */*"});
-    httpClient->allowInsecureHTTP(getTestCommandsEnabled());
+    try {
+        auto httpClient = HttpClient::createWithoutConnectionPool();
+        httpClient->setHeaders({"Accept: */*"});
+        httpClient->allowInsecureHTTP(getTestCommandsEnabled());
 
-    auto getJWKs = httpClient->get(source);
+        auto getJWKs = httpClient->get(source);
 
-    ConstDataRange cdr = getJWKs.getCursor();
-    StringData str;
-    cdr.readInto<StringData>(&str);
+        ConstDataRange cdr = getJWKs.getCursor();
+        StringData str;
+        cdr.readInto<StringData>(&str);
 
-    BSONObj data = fromjson(str);
-    _setAndValidateKeys(data);
+        BSONObj data = fromjson(str);
+        _setAndValidateKeys(data);
+    } catch (const DBException& ex) {
+        // throws
+        uassertStatusOK(
+            ex.toStatus().withContext(str::stream() << "Failed loading keys from " << source));
+    }
 }
 
 JWKManager::JWKManager(BSONObj keys) {
