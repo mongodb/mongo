@@ -1012,17 +1012,6 @@ server_parameters:
     validator:
       callback: telemetry_util::validateTelemetryStoreSize
 
-  internalQueryConfigureTelemetryFieldNameRedactionStrategy:
-    description:  Choose between the "none" implementation which will not redact any fields names, the "constant"
-      implementation, which will replace all field names with a constant, and the "sha256" implementation, which
-      preserves the identify of a field.
-    set_at: [ startup, runtime ]
-    cpp_class:
-      name: QueryTelemetryControl
-      data: synchronized_value<QueryTelemetryFieldNameRedactionStrategyEnum>
-    default:
-      expr: QueryTelemetryFieldNameRedactionStrategyEnum::kConstantRedactionStrategy
-
   internalQueryColumnScanMinCollectionSizeBytes:
     description: "The min collection size threshold for which column scan will always be allowed. If
       the value is -1, decision will be made based on the size of available memory. If it is set to

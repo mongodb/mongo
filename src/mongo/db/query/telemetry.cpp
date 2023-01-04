@@ -45,6 +45,7 @@
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/system_clock_source.h"
+#include <optional>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -304,16 +305,17 @@ void appendWithRedactedLiterals(BSONObjBuilder& builder, const BSONElement& el) 
 
 }  // namespace
 
-const BSONObj& TelemetryMetrics::redactKey(const BSONObj& key) const {
+const BSONObj& TelemetryMetrics::redactKey(const BSONObj& key, bool redactFieldNames) const {
+    // The redacted key for each entry is cached on first computation. However, if the redaction
+    // straegy has flipped (from no redaction to SHA256, vice versa), we just return the key passed
+    // to the function, so entries returned to the user match the redaction strategy requested in
+    // the most recent telemetry command.
+    if (!redactFieldNames) {
+        return key;
+    }
     if (_redactedKey) {
         return *_redactedKey;
     }
-
-    auto redactionStrategy = ServerParameterSet::getNodeParameterSet()
-                                 ->get<QueryTelemetryControl>(
-                                     "internalQueryConfigureTelemetryFieldNameRedactionStrategy")
-                                 ->_data.get();
-
     // The telemetry key is of the following form:
     // { "<CMD_TYPE>": {...}, "namespace": "...", "applicationName": "...", ... }
     //
@@ -334,21 +336,9 @@ const BSONObj& TelemetryMetrics::redactKey(const BSONObj& key) const {
             auto redactor = [&](BSONObjBuilder subObj, const BSONObj& obj) {
                 for (BSONElement e2 : obj) {
                     if (e2.type() == Object) {
-                        switch (redactionStrategy) {
-                            case QueryTelemetryFieldNameRedactionStrategyEnum::
-                                kSha256RedactionStrategy:
-                                subObj.append(e2.fieldNameStringData(),
-                                              e2.Obj().redact(false, sha256FieldNameHasher));
-                                break;
-                            case QueryTelemetryFieldNameRedactionStrategyEnum::
-                                kConstantRedactionStrategy:
-                                subObj.append(e2.fieldNameStringData(),
-                                              e2.Obj().redact(false, constantFieldNameHasher));
-                                break;
-                            case QueryTelemetryFieldNameRedactionStrategyEnum::kNoRedactionStrategy:
-                                subObj.append(e2.fieldNameStringData(), e2.Obj().redact(false));
-                                break;
-                        }
+                        // Sha256 redaction strategy.
+                        subObj.append(e2.fieldNameStringData(),
+                                      e2.Obj().redact(false, sha256FieldNameHasher));
                     } else {
                         subObj.append(e2);
                     }

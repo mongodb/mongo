@@ -83,18 +83,3 @@ const Decorable<ServiceContext>::Decoration<std::unique_ptr<OnParamChangeUpdater
     telemetryStoreOnParamChangeUpdater =
         ServiceContext::declareDecoration<std::unique_ptr<OnParamChangeUpdater>>();
 }  // namespace mongo::telemetry_util
-
-namespace mongo {
-void QueryTelemetryControl::append(OperationContext*,
-                                   BSONObjBuilder* b,
-                                   StringData name,
-                                   const boost::optional<TenantId>&) {
-    *b << name << QueryTelemetryFieldNameRedactionStrategy_serializer(_data.get());
-}
-
-Status QueryTelemetryControl::setFromString(StringData value, const boost::optional<TenantId>&) {
-    _data = QueryTelemetryFieldNameRedactionStrategy_parse(
-        IDLParserContext("internalQueryConfigureTelemetryFieldNameRedactionStrategy"), value);
-    return Status::OK();
-}
-}  // namespace mongo

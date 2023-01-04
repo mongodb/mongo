@@ -47,8 +47,9 @@ public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec);
 
-        LiteParsed(std::string parseTimeName)
-            : LiteParsedDocumentSource(std::move(parseTimeName)) {}
+        LiteParsed(std::string parseTimeName, bool redactFieldNames)
+            : LiteParsedDocumentSource(std::move(parseTimeName)),
+              _redactFieldNames(redactFieldNames) {}
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const override {
             return stdx::unordered_set<NamespaceString>();
@@ -72,6 +73,8 @@ public:
         void assertSupportsMultiDocumentTransaction() const {
             transactionNotSupported(kStageName);
         }
+
+        bool _redactFieldNames;
     };
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(
@@ -107,6 +110,9 @@ public:
         boost::optional<ExplainOptions::Verbosity> explain = boost::none) const override;
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
+
+    // When true, redact field names from returned query shapes.
+    bool _redactFieldNames;
 
 private:
     /**
@@ -166,9 +172,9 @@ private:
         stdx::condition_variable _waitForEmpty;
     };
 
-    DocumentSourceTelemetry(const boost::intrusive_ptr<ExpressionContext>& expCtx)
-        : DocumentSource(kStageName, expCtx) {}
-
+    DocumentSourceTelemetry(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                            bool redactFieldNames = false)
+        : DocumentSource(kStageName, expCtx), _redactFieldNames(redactFieldNames) {}
     GetNextResult doGetNext() final;
 
     void buildTelemetryStoreIterator();

@@ -26,10 +26,6 @@ var coll = testDB[jsTestName()];
 var collTwo = db[jsTestName() + 'Two'];
 coll.drop();
 
-// Make it easier to extract correct telemetry store entry for purposes of this test.
-assert.commandWorked(testDB.adminCommand(
-    {setParameter: 1, internalQueryConfigureTelemetryFieldNameRedactionStrategy: "none"}));
-
 function verifyMetrics(batch) {
     batch.forEach(element => {
         assert(element.metrics.docsScanned.sum > element.metrics.docsScanned.min);
@@ -54,11 +50,16 @@ function verifyMetrics(batch) {
     });
 }
 
-for (var i = 0; i < 200; i++) {
-    coll.insert({foo: 0, bar: Math.floor(Math.random() * 3)});
-    coll.insert({foo: 1, bar: Math.floor(Math.random() * -2)});
-    collTwo.insert({foo: Math.floor(Math.random() * 2), bar: Math.floor(Math.random() * 2)});
+// Bulk insert documents to reduces roundtrips and make timeout on a slow machine less likely.
+const bulk = coll.initializeUnorderedBulkOp();
+const bulkTwo = collTwo.initializeUnorderedBulkOp();
+for (let i = 0; i < 200; ++i) {
+    bulk.insert({foo: 0, bar: Math.floor(Math.random() * 3)});
+    bulk.insert({foo: 1, bar: Math.floor(Math.random() * -2)});
+    bulkTwo.insert({foo: Math.floor(Math.random() * 2), bar: Math.floor(Math.random() * 2)});
 }
+assert.commandWorked(bulk.execute());
+assert.commandWorked(bulkTwo.execute());
 
 // Assert that two queries with identical structures are represented by the same key
 coll.aggregate([{$match: {foo: 1}}], {cursor: {batchSize: 2}});

@@ -40,6 +40,33 @@ REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(telemetry,
                                            AllowedWithApiStrict::kNeverInVersion1,
                                            feature_flags::gFeatureFlagTelemetry);
 
+bool parseTelemetryEmbeddedObject(BSONObj embeddedObj) {
+    auto fieldNameRedaction = false;
+    if (!embeddedObj.isEmpty()) {
+        uassert(ErrorCodes::FailedToParse,
+                str::stream()
+                    << DocumentSourceTelemetry::kStageName
+                    << " parameters object may only contain one field, 'redactFieldNames'. Found: "
+                    << embeddedObj.toString(),
+                embeddedObj.nFields() == 1);
+
+        uassert(ErrorCodes::FailedToParse,
+                str::stream()
+                    << DocumentSourceTelemetry::kStageName
+                    << " parameters object may only contain 'redactFieldNames' option. Found: "
+                    << embeddedObj.firstElementFieldName(),
+                embeddedObj.hasField("redactFieldNames"));
+
+        uassert(ErrorCodes::FailedToParse,
+                str::stream() << DocumentSourceTelemetry::kStageName
+                              << " redactFieldNames parameter must be boolean. Found type: "
+                              << typeName(embeddedObj.firstElementType()),
+                embeddedObj.firstElementType() == BSONType::Bool);
+        fieldNameRedaction = embeddedObj["redactFieldNames"].trueValue();
+    }
+    return fieldNameRedaction;
+}
+
 std::unique_ptr<DocumentSourceTelemetry::LiteParsed> DocumentSourceTelemetry::LiteParsed::parse(
     const NamespaceString& nss, const BSONElement& spec) {
     uassert(ErrorCodes::FailedToParse,
@@ -47,12 +74,8 @@ std::unique_ptr<DocumentSourceTelemetry::LiteParsed> DocumentSourceTelemetry::Li
                           << " value must be an object. Found: " << typeName(spec.type()),
             spec.type() == BSONType::Object);
 
-    uassert(ErrorCodes::FailedToParse,
-            str::stream() << kStageName
-                          << " parameters object must be empty. Found: " << typeName(spec.type()),
-            spec.embeddedObject().isEmpty());
-
-    return std::make_unique<DocumentSourceTelemetry::LiteParsed>(spec.fieldName());
+    return std::make_unique<DocumentSourceTelemetry::LiteParsed>(
+        spec.fieldName(), parseTelemetryEmbeddedObject(spec.embeddedObject()));
 }
 
 boost::intrusive_ptr<DocumentSource> DocumentSourceTelemetry::createFromBson(
@@ -62,18 +85,14 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceTelemetry::createFromBson(
                           << " value must be an object. Found: " << typeName(spec.type()),
             spec.type() == BSONType::Object);
 
-    uassert(ErrorCodes::FailedToParse,
-            str::stream() << kStageName
-                          << " parameters object must be empty. Found: " << typeName(spec.type()),
-            spec.embeddedObject().isEmpty());
-
     const NamespaceString& nss = pExpCtx->ns;
 
     uassert(ErrorCodes::InvalidNamespace,
             "$telemetry must be run against the 'admin' database with {aggregate: 1}",
             nss.db() == NamespaceString::kAdminDb && nss.isCollectionlessAggregateNS());
 
-    return new DocumentSourceTelemetry(pExpCtx);
+    return new DocumentSourceTelemetry(pExpCtx,
+                                       parseTelemetryEmbeddedObject(spec.embeddedObject()));
 }
 
 Value DocumentSourceTelemetry::serialize(boost::optional<ExplainOptions::Verbosity> explain) const {
@@ -100,7 +119,7 @@ void DocumentSourceTelemetry::buildTelemetryStoreIterator() {
                 const auto partitionReadTime =
                     Timestamp{Timestamp(Date_t::now().toMillisSinceEpoch() / 1000, 0)};
                 for (auto&& [key, metrics] : *partition) {
-                    Document d{{{"key", metrics.redactKey(key)},
+                    Document d{{{"key", metrics.redactKey(key, _redactFieldNames)},
                                 {"metrics", metrics.toBSON()},
                                 {"asOf", partitionReadTime}}};
                     _queue.push(std::move(d));

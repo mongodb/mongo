@@ -408,6 +408,19 @@ function assertErrCodeAndErrMsgContains(coll, pipe, code, expectedMessage) {
 }
 
 /**
+ * Assert that an aggregation ran on admin DB fails with a specific code and the error message
+ * contains the given string. Note that 'code' can be an array of possible codes.
+ */
+function assertAdminDBErrCodeAndErrMsgContains(coll, pipe, code, expectedMessage) {
+    const response = assert.commandFailedWithCode(
+        coll.getDB().adminCommand({aggregate: 1, pipeline: pipe, cursor: {}}), code);
+    assert.neq(
+        -1,
+        response.errmsg.indexOf(expectedMessage),
+        "Error message did not contain '" + expectedMessage + "', found:\n" + tojson(response));
+}
+
+/**
  * Assert that an aggregation fails with any code and the error message contains the given
  * string.
  */

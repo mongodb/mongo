@@ -109,7 +109,7 @@ public:
     /**
      * Redact a given telemetry key.
      */
-    const BSONObj& redactKey(const BSONObj& key) const;
+    const BSONObj& redactKey(const BSONObj& key, bool redactFieldNames) const;
 
     /**
      * Timestamp for when this query shape was added to the store. Set on construction.
