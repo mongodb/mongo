@@ -45,18 +45,21 @@ static const std::map<Aws::Http::HttpResponseCode, int32_t> toErrno = {
   {Aws::Http::HttpResponseCode::BAD_REQUEST, EINVAL},
   {Aws::Http::HttpResponseCode::INTERNAL_SERVER_ERROR, EAGAIN}};
 
-// This class represents an active connection to the AWS S3 endpoint and allows for interaction with
-// S3-Crt client. The S3Connection exposes an API to list the bucket contents filtered by a
-// directory and a prefix, check for an object's existence in the bucket, put an object to the
-// cloud, and get the object from the cloud. Though not required for the file system's
-// implementation, the class also provides the means to delete the objects to clean up artifacts
-// from the internal unit testing. Note we are using S3-Crt client in this class, which differs to
-// the S3 client.
+/*
+ * This class represents an active connection to the AWS S3 endpoint and allows for interaction with
+ * S3-Crt client. The S3Connection exposes an API to list the bucket contents filtered by a
+ * directory and a prefix, check for an object's existence in the bucket, put an object to the
+ * cloud, and get the object from the cloud. Though not required for the file system's
+ * implementation, the class also provides the means to delete the objects to clean up artifacts
+ * from the internal unit testing. Note we are using S3-Crt client in this class, which differs to
+ * the S3 client.
+ */
 class S3Connection {
     public:
-    // We have two constructors for the two different ways to start a S3 connection.
-    // First constructor uses provided credentials, the following uses credentials stored in a local
-    // file.
+    /*
+     * We have two constructors for the two different ways to start a S3 connection. First
+     * constructor uses provided credentials, the following uses credentials stored in a local file.
+     */
     S3Connection(const Aws::Auth::AWSCredentials &credentials,
       const Aws::S3Crt::ClientConfiguration &config, const std::string &bucketName,
       const std::string &objPrefix = "");

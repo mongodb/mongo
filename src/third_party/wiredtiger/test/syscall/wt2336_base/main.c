@@ -28,8 +28,8 @@
 
 #include <stdlib.h>
 
-#include <unistd.h> // TODO
-#include <fcntl.h>  // TODO
+#include <unistd.h>
+#include <fcntl.h>
 #include <wt_internal.h>
 
 static void fail(int) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));

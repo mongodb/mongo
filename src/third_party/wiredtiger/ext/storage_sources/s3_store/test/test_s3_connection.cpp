@@ -41,9 +41,11 @@ const double throughputTargetGbps = 5;
 const uint64_t partSize = 8 * 1024 * 1024;  // 8 MB.
 static std::string bucketName("s3testext"); // Can be overridden with environment variables.
 
-// Objects with the prefex pattern "s3test/*" are deleted after a certain period of time according
-// to the lifecycle rule on the S3 bucket. Should you wish to make any changes to the prefix pattern
-// or lifecycle of the object, please speak to the release manager.
+/*
+ * Objects with the prefex pattern "s3test/*" are deleted after a certain period of time according
+ * to the lifecycle rule on the S3 bucket. Should you wish to make any changes to the prefix pattern
+ * or lifecycle of the object, please speak to the release manager.
+ */
 static std::string objPrefix("s3test/unit/"); // To be concatenated with a random string.
 } // namespace TestDefaults
 

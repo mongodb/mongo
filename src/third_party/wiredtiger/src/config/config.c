@@ -99,6 +99,9 @@ typedef enum {
 } CONFIG_ACTION;
 
 /*
+ * Some inspiration taken from https://github.com/quartzjer/js0n (public domain). These
+ * comments map from constructs in js0n to the equivalent in WiredTiger.
+ *
  * static void *gostruct[] = {
  *		[0 ... 255] = &&l_bad,
  *		['\t'] = &&l_loop, [' '] = &&l_loop,
@@ -106,12 +109,9 @@ typedef enum {
  *		['"'] = &&l_qup,
  *		[':'] = &&l_value, ['='] = &&l_value,
  *		[','] = &&l_next,
- *		// tracking [] and {} individually would allow fuller
- *		// validation but is really messy
  *		['('] = &&l_up, [')'] = &&l_down,
  *		['['] = &&l_up, [']'] = &&l_down,
  *		['{'] = &&l_up, ['}'] = &&l_down,
- *		// bare identifiers
  *		['-'] = &&l_numbare,
  *		['0' ... '9'] = &&l_numbare,
  *		['_'] = &&l_bare,
@@ -144,7 +144,6 @@ static const int8_t gostruct[256] = {A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A_BAD, A
  *	static void *gobare[] =
  *	{
  *		[0 ... 31] = &&l_bad,
- *		// could be more pedantic/validation-checking
  *		[32 ... 126] = &&l_loop,
  *		['\t'] = &&l_unbare, [' '] = &&l_unbare,
  *		['\r'] = &&l_unbare, ['\n'] = &&l_unbare,

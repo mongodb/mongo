@@ -156,7 +156,7 @@ main(int argc, char *argv[])
     testutil_check(session->join(session, jcursor, cursor1, "compare=gt"));
     testutil_check(session->join(session, jcursor, cursor2, "compare=gt"));
 
-    while ((ret = jcursor->next(jcursor)) == 0) // leak
+    while ((ret = jcursor->next(jcursor)) == 0) /* leak */
         ;
     testutil_assert(ret == WT_NOTFOUND);
 

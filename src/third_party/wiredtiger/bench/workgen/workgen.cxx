@@ -111,10 +111,11 @@ struct WorkloadRunnerConnection {
     WT_CONNECTION *connection;
 };
 
-// The number of contexts.  Normally there is one context created, but it will
-// be possible to use several eventually.  More than one is not yet
-// implemented, but we must at least guard against the caller creating more
-// than one.
+/*
+ * The number of contexts. Normally there is one context created, but it will be possible to use
+ * several eventually. More than one is not yet implemented, but we must at least guard against the
+ * caller creating more than one.
+ */
 static uint32_t context_count = 0;
 
 static void *
@@ -288,9 +289,10 @@ monitor_main(void *arg)
     return (nullptr);
 }
 
-// Exponentiate (like the pow function), except that it returns an exact
-// integral 64 bit value, and if it overflows, returns the maximum possible
-// value for the return type.
+/*
+ * Exponentiate (like the pow function), except that it returns an exact integral 64 bit value, and
+ * if it overflows, returns the maximum possible value for the return type.
+ */
 static uint64_t
 power64(int base, int exp)
 {
@@ -887,10 +889,11 @@ ThreadRunner::op_create_all(Operation *op, size_t &keysize, size_t &valuesize)
 
 #define PARETO_SHAPE 1.5
 
-// Return a value within the interval [ 0, recno_max )
-// that is weighted toward lower numbers with pareto_param at 0 (the minimum),
-// and more evenly distributed with pareto_param at 100 (the maximum).
-//
+/*
+ * Return a value within the interval [ 0, recno_max ) that is weighted toward lower numbers with
+ * pareto_param at 0 (the minimum), and more evenly distributed with pareto_param at 100 (the
+ * maximum).
+ */
 static uint64_t
 pareto_calculation(uint32_t randint, uint64_t recno_max, ParetoOptions &pareto)
 {
@@ -907,17 +910,16 @@ pareto_calculation(uint32_t randint, uint64_t recno_max, ParetoOptions &pareto)
     double U = 1 - r / static_cast<double>(UINT32_MAX); // interval [0, 1)
     uint32_t result = (uint64_t)((pow(U, S1) - 1) * S2);
 
-    // This Pareto calculation chooses out of range values less than 20%
-    // of the time, depending on pareto_param.  For param of 0, it is
-    // never out of range, for param of 100, 19.2%. For the default
-    // pareto_param of 20, it will be out of range 2.7% of the time.
-    // Out of range values are channeled into the first key,
-    // making it "hot".  Unfortunately, that means that using a higher
-    // param can get a lot lumped into the first bucket.
-    //
-    // XXX This matches the behavior of wtperf, we may consider instead
-    // retrying (modifying the random number) until we get a good value.
-    //
+    /*
+     * This Pareto calculation chooses out of range values less than 20% of the time, depending on
+     * pareto_param. For param of 0, it is never out of range, for param of 100, 19.2%. For the
+     * default pareto_param of 20, it will be out of range 2.7% of the time. Out of range values are
+     * channeled into the first key, making it "hot". Unfortunately, that means that using a higher
+     * param can get a lot lumped into the first bucket.
+     *
+     * XXX This matches the behavior of wtperf, we may consider instead retrying (modifying the
+     * random number) until we get a good value.
+     */
     if (result > recno_max)
         result = 0;
     return (result);
@@ -972,10 +974,11 @@ ThreadRunner::op_run(Operation *op)
     range = op->_table.options.range;
     if (_throttle != nullptr) {
         while (_throttle_ops >= _throttle_limit && !_in_transaction && !_stop) {
-            // Calling throttle causes a sleep until the next time division,
-            // and we are given a new batch of operations to do before calling
-            // throttle again.  If the number of operations in the batch is
-            // zero, we'll need to go around and throttle again.
+            /*
+             * Calling throttle causes a sleep until the next time division, and we are given a new
+             * batch of operations to do before calling throttle again. If the number of operations
+             * in the batch is zero, we'll need to go around and throttle again.
+             */
             WT_ERR(_throttle->throttle(_throttle_ops, &_throttle_limit));
             _throttle_ops = 0;
             if (_throttle_limit != 0)
@@ -1014,14 +1017,14 @@ ThreadRunner::op_run(Operation *op)
         table_uri = op->_table._uri;
     }
 
-    // A potential race: thread1 is inserting, and increments
-    // Context->_recno[] for fileX.wt. thread2 is doing one of
-    // remove/search/update and grabs the new value of Context->_recno[]
-    // for fileX.wt.  thread2 randomly chooses the highest recno (which
-    // has not yet been inserted by thread1), and when it accesses
-    // the record will get WT_NOTFOUND.  It should be somewhat rare
-    // (and most likely when the threads are first beginning).  Any
-    // WT_NOTFOUND returns are allowed and get their own statistic bumped.
+    /*
+     * A potential race: thread1 is inserting, and increments Context->_recno[] for fileX.wt.
+     * thread2 is doing one of remove/search/update and grabs the new value of Context->_recno[] for
+     * fileX.wt. thread2 randomly chooses the highest recno (which has not yet been inserted by
+     * thread1), and when it accesses the record will get WT_NOTFOUND. It should be somewhat rare
+     * (and most likely when the threads are first beginning). Any WT_NOTFOUND returns are allowed
+     * and get their own statistic bumped.
+     */
     switch (op->_optype) {
     case Operation::OP_CHECKPOINT:
         recno = 0;
@@ -1271,32 +1274,33 @@ Throttle::Throttle(ThreadRunner &runner, double throttle, double throttle_burst)
       _started(false)
 {
 
-    // Our throttling is done by dividing each second into THROTTLE_PER_SEC
-    // parts (we call the parts divisions). In each division, we perform
-    // a certain number of operations. This number is approximately
-    // throttle/THROTTLE_PER_SEC, except that throttle is not necessarily
-    // a multiple of THROTTLE_PER_SEC, nor is it even necessarily an integer.
-    // (That way we can have 1000 threads each inserting 0.5 a second).
+    /*
+     * Our throttling is done by dividing each second into THROTTLE_PER_SEC parts (we call the parts
+     * divisions). In each division, we perform a certain number of operations. This number is
+     * approximately throttle/THROTTLE_PER_SEC, except that throttle is not necessarily a multiple
+     * of THROTTLE_PER_SEC, nor is it even necessarily an integer. (That way we can have 1000
+     * threads each inserting 0.5 a second).
+     */
     ts_clear(_next_div);
     ASSERT(1000 % THROTTLE_PER_SEC == 0); // must evenly divide
     _ms_per_div = 1000 / THROTTLE_PER_SEC;
     _ops_per_div = (uint64_t)ceill(_throttle / THROTTLE_PER_SEC);
 }
 
-// Each time throttle is called, we sleep and return a number of operations to
-// perform next.  To implement this we keep a time calculation in _next_div set
-// initially to the current time + 1/THROTTLE_PER_SEC.  Each call to throttle
-// advances _next_div by 1/THROTTLE_PER_SEC, and if _next_div is in the future,
-// we sleep for the difference between the _next_div and the current_time.  We
-// we return (Thread.options.throttle / THROTTLE_PER_SEC) as the number of
-// operations, if it does not divide evenly, we'll make sure to not exceed
-// the number of operations requested per second.
-//
-// The only variation is that the amount of individual sleeps is modified by a
-// random amount (which varies more widely as Thread.options.throttle_burst is
-// greater).  This has the effect of randomizing how much clumping happens, and
-// ensures that multiple threads aren't executing in lock step.
-//
+/*
+ * Each time throttle is called, we sleep and return a number of operations to perform next. To
+ * implement this we keep a time calculation in _next_div set initially to the current time +
+ * 1/THROTTLE_PER_SEC. Each call to throttle advances _next_div by 1/THROTTLE_PER_SEC, and if
+ * _next_div is in the future, we sleep for the difference between the _next_div and the
+ * current_time. We we return (Thread.options.throttle / THROTTLE_PER_SEC) as the number of
+ * operations, if it does not divide evenly, we'll make sure to not exceed the number of operations
+ * requested per second.
+ *
+ * The only variation is that the amount of individual sleeps is modified by a random amount (which
+ * varies more widely as Thread.options.throttle_burst is greater). This has the effect of
+ * randomizing how much clumping happens, and ensures that multiple threads aren't executing in lock
+ * step.
+ */
 int
 Throttle::throttle(uint64_t op_count, uint64_t *op_limit)
 {
@@ -1988,16 +1992,18 @@ Track::complete_with_latency(uint64_t usecs)
         sec[LATENCY_SEC_BUCKETS - 1]++;
 }
 
-// Return the latency for which the given percent is lower than it.
-// E.g. for percent == 95, returns the latency for which 95% of latencies
-// are faster (lower), and 5% are slower (higher).
+/*
+ * Return the latency for which the given percent is lower than it. E.g. for percent == 95, returns
+ * the latency for which 95% of latencies are faster (lower), and 5% are slower (higher).
+ */
 uint64_t
 Track::percentile_latency(int percent) const
 {
-    // Get the total number of operations in the latency buckets.
-    // We can't reliably use latency_ops, because this struct was
-    // added up from Track structures that were being copied while
-    // being updated.
+    /*
+     * Get the total number of operations in the latency buckets. We can't reliably use latency_ops,
+     * because this struct was added up from Track structures that were being copied while being
+     * updated.
+     */
     uint64_t total = 0;
     for (int i = 0; i < LATENCY_SEC_BUCKETS; i++)
         total += sec[i];

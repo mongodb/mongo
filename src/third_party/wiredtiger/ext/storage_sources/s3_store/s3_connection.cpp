@@ -66,10 +66,11 @@ S3Connection::S3Connection(const Aws::S3Crt::ClientConfiguration &config,
         throw std::invalid_argument(_bucketName + " : Unable to access bucket.");
 }
 
-// Builds a list of object names, with prefix matching, from an S3 bucket into a vector. The
-// batchSize parameter specifies the maximum number of objects returned in each AWS response, up
-// to 1000. Return an errno value given an HTTP response code if the aws request does not
-// succeed.
+/*
+ * Builds a list of object names, with prefix matching, from an S3 bucket into a vector. The
+ * batchSize parameter specifies the maximum number of objects returned in each AWS response, up to
+ * 1000. Return an errno value given an HTTP response code if the aws request does not succeed.
+ */
 int
 S3Connection::ListObjects(const std::string &prefix, std::vector<std::string> &objects,
   uint32_t batchSize, bool listSingle) const
@@ -202,9 +203,11 @@ S3Connection::ObjectExists(const std::string &objectKey, bool &exists, size_t &o
     request.SetKey(_objectPrefix + objectKey);
     Aws::S3Crt::Model::HeadObjectOutcome outcome = _s3CrtClient.HeadObject(request);
 
-    // If an object with the given key does not exist the HEAD request will return a 404.
-    // Do not fail in this case as it is an expected response. Otherwise return an errno value
-    // for any other HTTP response code.
+    /*
+     * If an object with the given key does not exist the HEAD request will return a 404. Do not
+     * fail in this case as it is an expected response. Otherwise return an errno value for any
+     * other HTTP response code.
+     */
     if (outcome.IsSuccess()) {
         exists = true;
         objectSize = outcome.GetResult().GetContentLength();
@@ -230,9 +233,11 @@ S3Connection::BucketExists(bool &exists) const
     request.WithBucket(_bucketName);
     Aws::S3Crt::Model::HeadBucketOutcome outcome = _s3CrtClient.HeadBucket(request);
 
-    // If an object with the given key does not exist the HEAD request will return a 404.
-    // Do not fail in this case as it is an expected response. Otherwise return an errno value
-    // for any other HTTP response code.
+    /*
+     * If an object with the given key does not exist the HEAD request will return a 404. Do not
+     * fail in this case as it is an expected response. Otherwise return an errno value for any
+     * other HTTP response code.
+     */
     if (outcome.IsSuccess()) {
         exists = true;
         return (0);

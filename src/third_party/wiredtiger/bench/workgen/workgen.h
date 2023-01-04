@@ -65,30 +65,31 @@ private:
 };
 #endif
 
-// These classes are all exposed to Python via SWIG. While they may contain
-// data that is private to C++, such data must not prevent the objects from
-// being shared. Tables, Keys, Values, Operations and Threads can be shared: a
-// single Key object might appear in many operations; Operations may appear
-// multiple times in a Thread or in different Threads; the same Thread may
-// appear multiple times in a Workload list, etc.
-//
-// Certain kinds of state are allowed: A Table contains a unique pointer that
-// is used within the internal part of the Context.  Stats contain lots
-// of state, but is made available after a Workload.run().
-//
-// Python controls the lifetime of (nearly) all objects of these classes.
-// The exception is Stat/Track objects, which are also created/used
-// internally to calculate and show statistics during a run.
-//
+/*
+ * These classes are all exposed to Python via SWIG. While they may contain
+ * data that is private to C++, such data must not prevent the objects from
+ * being shared. Tables, Keys, Values, Operations and Threads can be shared: a
+ * single Key object might appear in many operations; Operations may appear
+ * multiple times in a Thread or in different Threads; the same Thread may
+ * appear multiple times in a Workload list, etc.
+ *
+ * Certain kinds of state are allowed: A Table contains a unique pointer that
+ * is used within the internal part of the Context.  Stats contain lots
+ * of state, but is made available after a Workload.run().
+ *
+ * Python controls the lifetime of (nearly) all objects of these classes.
+ * The exception is Stat/Track objects, which are also created/used
+ * internally to calculate and show statistics during a run.
+ */
 struct Track {
     // Threads maintain the total thread operation and total latency they've
     // experienced.
 
-    uint64_t ops_in_progress;           // Total operations not completed */
-    uint64_t ops;                       // Total operations completed */
-    uint64_t rollbacks;                 // Total operations rolled back */
+    uint64_t ops_in_progress;           // Total operations not completed
+    uint64_t ops;                       // Total operations completed
+    uint64_t rollbacks;                 // Total operations rolled back
     uint64_t latency_ops;               // Total ops sampled for latency
-    uint64_t latency;                   // Total latency */
+    uint64_t latency;                   // Total latency
     uint64_t bucket_ops;                // Computed for percentile_latency
 
     // Minimum/maximum latency, shared with the monitor thread, that is, the
@@ -157,7 +158,6 @@ private:
 
 // A Context tracks the current record number for each uri, used
 // for key generation.
-//
 struct Context {
     bool _verbose;
     ContextInternal *_internal;
@@ -175,7 +175,6 @@ struct Context {
 
 // To prevent silent errors, this class is set up in Python so that new
 // properties are prevented, only existing properties can be set.
-//
 struct TableOptions {
     uint_t key_size;
     uint_t value_size;
@@ -336,7 +335,6 @@ struct Operation {
 
 // To prevent silent errors, this class is set up in Python so that new
 // properties are prevented, only existing properties can be set.
-//
 struct ThreadOptions {
     std::string name;
     std::string session_config;
@@ -365,12 +363,14 @@ private:
     OptionsList _options;
 };
 
-// This is a list of threads, which may be used in the Workload constructor.
-// It participates with ThreadList defined on the SWIG/Python side and
-// some Python operators added to Thread to allow Threads to be easily
-// composed using '+' and multiplied (by integer counts) using '*'.
-// Users of the workgen API in Python don't ever need to use
-// ThreadListWrapper or ThreadList.
+/*
+ * This is a list of threads, which may be used in the Workload constructor.
+ * It participates with ThreadList defined on the SWIG/Python side and
+ * some Python operators added to Thread to allow Threads to be easily
+ * composed using '+' and multiplied (by integer counts) using '*'.
+ * Users of the workgen API in Python don't ever need to use
+ * ThreadListWrapper or ThreadList.
+ */
 struct ThreadListWrapper {
     std::vector<Thread> _threads;
 
@@ -432,7 +432,6 @@ struct Transaction {
 
 // To prevent silent errors, this class is set up in Python so that new
 // properties are prevented, only existing properties can be set.
-//
 struct WorkloadOptions {
     int max_latency;
     std::string report_file;
