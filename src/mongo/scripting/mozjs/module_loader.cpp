@@ -531,7 +531,8 @@ std::string ModuleLoader::resolveBaseUrl(JSContext* cx, const std::string& loadP
 
             JS::RootedObject compilerOptionsObject(cx, &compilerOptionsValue.toObject());
             JS::RootedValue baseUrlValue(cx);
-            if (!JS_GetProperty(cx, compilerOptionsObject, kBaseUrlPropertyName, &baseUrlValue)) {
+            if (!JS_GetProperty(cx, compilerOptionsObject, kBaseUrlPropertyName, &baseUrlValue) ||
+                !baseUrlValue.isString()) {
                 break;
             }
 
