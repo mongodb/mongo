@@ -27,13 +27,18 @@
  *    it in the license file.
  */
 
+#include <string>
+
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog/collection_validation.h"
 #include "mongo/db/catalog/collection_write_path.h"
+#include "mongo/db/catalog/column_index_consistency.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/index/column_key_generator.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/bufreader.h"
@@ -53,7 +58,7 @@ private:
         CatalogTestFixture::setUp();
 
         // Create collection kNss for unit tests to use. It will possess a default _id index.
-        CollectionOptions defaultCollectionOptions;
+        const CollectionOptions defaultCollectionOptions;
         ASSERT_OK(storageInterface()->createCollection(
             operationContext(), kNss, defaultCollectionOptions));
     };
@@ -66,12 +71,13 @@ protected:
 };
 
 /**
- * Calls validate on collection kNss with both kValidateFull and kValidateNormal validation levels
+ * Calls validate on collection nss with both kValidateFull and kValidateNormal validation levels
  * and verifies the results.
  *
- * Returns list of validate results.
+ * Returns the list of validation results.
  */
 std::vector<std::pair<BSONObj, ValidateResults>> foregroundValidate(
+    const NamespaceString& nss,
     OperationContext* opCtx,
     bool valid,
     int numRecords,
@@ -86,7 +92,7 @@ std::vector<std::pair<BSONObj, ValidateResults>> foregroundValidate(
         ValidateResults validateResults;
         BSONObjBuilder output;
         ASSERT_OK(CollectionValidation::validate(
-            opCtx, kNss, mode, repairMode, &validateResults, &output));
+            opCtx, nss, mode, repairMode, &validateResults, &output));
         BSONObj obj = output.obj();
         BSONObjBuilder validateResultsBuilder;
         validateResults.appendToResultObj(&validateResultsBuilder, true /* debugging */);
@@ -127,17 +133,21 @@ ValidateResults omitTransientWarnings(const ValidateResults& results) {
 }
 
 /**
- * Calls validate on collection kNss with {background:true} and verifies the results.
+ * Calls validate on collection nss with {background:true} and verifies the results.
  * If 'runForegroundAsWell' is set, then foregroundValidate() above will be run in addition.
+ *
+ * Returns the list of validation results.
  */
-void backgroundValidate(OperationContext* opCtx,
-                        bool valid,
-                        int numRecords,
-                        int numInvalidDocuments,
-                        int numErrors,
-                        bool runForegroundAsWell) {
+std::vector<std::pair<BSONObj, ValidateResults>> backgroundValidate(const NamespaceString& nss,
+                                                                    OperationContext* opCtx,
+                                                                    bool valid,
+                                                                    int numRecords,
+                                                                    int numInvalidDocuments,
+                                                                    int numErrors,
+                                                                    bool runForegroundAsWell) {
+    std::vector<std::pair<BSONObj, ValidateResults>> res;
     if (runForegroundAsWell) {
-        foregroundValidate(opCtx, valid, numRecords, numInvalidDocuments, numErrors);
+        res = foregroundValidate(nss, opCtx, valid, numRecords, numInvalidDocuments, numErrors);
     }
 
     // This function will force a checkpoint, so background validation can then read from that
@@ -149,7 +159,7 @@ void backgroundValidate(OperationContext* opCtx,
     ValidateResults validateResults;
     BSONObjBuilder output;
     ASSERT_OK(CollectionValidation::validate(opCtx,
-                                             kNss,
+                                             nss,
                                              CollectionValidation::ValidateMode::kBackground,
                                              CollectionValidation::RepairMode::kNone,
                                              &validateResults,
@@ -161,24 +171,32 @@ void backgroundValidate(OperationContext* opCtx,
 
     ASSERT_EQ(obj.getIntField("nrecords"), numRecords);
     ASSERT_EQ(obj.getIntField("nInvalidDocuments"), numInvalidDocuments);
+
+    res.push_back({std::make_pair(obj, validateResults)});
+
+    return res;
 }
 
 /**
- * Inserts a range of documents into the kNss collection and then returns that count.
- * The range is defined by [startIDNum, endIDNum), not inclusive of endIDNum, using the numbers as
- * values for '_id' of the document being inserted.
+ * Inserts a range of documents into the nss collection and then returns that count. The range is
+ * defined by [startIDNum, startIDNum+numDocs), not inclusive of (startIDNum+numDocs), using the
+ * numbers as values for '_id' of the document being inserted followed by numFields fields.
  */
-int insertDataRange(OperationContext* opCtx, int startIDNum, int endIDNum) {
-    invariant(startIDNum < endIDNum,
-              str::stream() << "attempted to insert invalid data range from " << startIDNum
-                            << " to " << endIDNum);
-
-
-    AutoGetCollection coll(opCtx, kNss, MODE_IX);
+int insertDataRangeForNumFields(const NamespaceString& nss,
+                                OperationContext* opCtx,
+                                const int startIDNum,
+                                const int numDocs,
+                                const int numFields) {
+    const AutoGetCollection coll(opCtx, nss, MODE_IX);
     std::vector<InsertStatement> inserts;
-    for (int i = startIDNum; i < endIDNum; ++i) {
-        auto doc = BSON("_id" << i);
-        inserts.push_back(InsertStatement(doc));
+    for (int i = 0; i < numDocs; ++i) {
+        BSONObjBuilder bsonBuilder;
+        bsonBuilder << "_id" << i + startIDNum;
+        for (int c = 1; c <= numFields; ++c) {
+            bsonBuilder << "a" + std::to_string(c) << i + (i * numFields + startIDNum) + c;
+        }
+        const auto obj = bsonBuilder.obj();
+        inserts.push_back(InsertStatement(obj));
     }
 
     {
@@ -187,7 +205,20 @@ int insertDataRange(OperationContext* opCtx, int startIDNum, int endIDNum) {
             opCtx, *coll, inserts.begin(), inserts.end(), nullptr, false));
         wuow.commit();
     }
-    return endIDNum - startIDNum;
+    return numDocs;
+}
+
+/**
+ * Inserts a range of documents into the kNss collection and then returns that count. The range is
+ * defined by [startIDNum, endIDNum), not inclusive of endIDNum, using the numbers as values for
+ * '_id' of the document being inserted.
+ */
+int insertDataRange(OperationContext* opCtx, const int startIDNum, const int endIDNum) {
+    invariant(startIDNum < endIDNum,
+              str::stream() << "attempted to insert invalid data range from " << startIDNum
+                            << " to " << endIDNum);
+
+    return insertDataRangeForNumFields(kNss, opCtx, startIDNum, endIDNum - startIDNum, 0);
 }
 
 /**
@@ -209,17 +240,301 @@ int setUpInvalidData(OperationContext* opCtx) {
     return 1;
 }
 
+class CollectionValidationColumnStoreIndexTest : public CollectionValidationDiskTest {
+protected:
+    CollectionValidationColumnStoreIndexTest() : CollectionValidationDiskTest() {}
+
+    const BSONObj kColumnStoreSpec = BSON("name"
+                                          << "$**_columnstore"
+                                          << "key"
+                                          << BSON("$**"
+                                                  << "columnstore")
+                                          << "v" << 2);
+
+    /**
+     * This method decorates the execution of column-store index validation tests. It works by
+     * 1) creating an 'nss' namespace with a column-store index, 2) inserting documents into this
+     * namespace (via calling 'insertDocsFn'), 3) running validation on this collection and making
+     * sure it's valid, 4) running 'modifyIndexContentsFn', and 5) running 'postCheckFn', which
+     * usually contains an index validation call with relevant assertions.
+     *
+     * Returns the list of validation results.
+     */
+    std::vector<std::pair<BSONObj, ValidateResults>> runColumnStoreIndexTest(
+        const NamespaceString& nss,
+        std::function<int(OperationContext*, repl::StorageInterface*)> insertDocsFn,
+        std::function<void(OperationContext*, ColumnStore*, int)> modifyIndexContentsFn,
+        std::function<std::vector<std::pair<BSONObj, ValidateResults>>(OperationContext*, int)>
+            postCheckFn) {
+
+        RAIIServerParameterControllerForTest controller("featureFlagColumnstoreIndexes", true);
+
+        auto opCtx = operationContext();
+
+        {
+            // Durable catalog expects metadata updates to be timestamped but this is
+            // not necessary in our case - we just want to check the contents of the index table.
+            // The alternative here would be to provide a commit timestamp with a TimestamptBlock.
+            repl::UnreplicatedWritesBlock uwb(opCtx);
+
+            ASSERT_OK(
+                storageInterface()->createIndexesOnEmptyCollection(opCtx, nss, {kColumnStoreSpec}));
+        }
+
+        const auto numRecords = insertDocsFn(opCtx, storageInterface());
+
+        // Validate the collection here as a sanity check before we modify the index contents
+        // in-place.
+        foregroundValidate(nss,
+                           opCtx,
+                           /*valid*/ true,
+                           /*numRecords*/ numRecords,
+                           /*numInvalidDocuments*/ 0,
+                           /*numErrors*/ 0);
+
+        {
+            AutoGetCollection autoColl(opCtx, nss, MODE_IX);
+
+            const auto indexCatalog = autoColl->getIndexCatalog();
+            const auto descriptor = indexCatalog->findIndexByName(opCtx, "$**_columnstore");
+            ASSERT(descriptor) << "Cannot find $**_columnstore in index catalog";
+            const auto entry = indexCatalog->getEntry(descriptor);
+            ASSERT(entry) << "Cannot look up index catalog entry for index $**_columnstore";
+
+            const auto columnStore =
+                dynamic_cast<ColumnStoreAccessMethod*>(entry->accessMethod())->writableStorage();
+            ASSERT_FALSE(columnStore->isEmpty(opCtx))
+                << "index $**_columnstore should not be empty";
+
+            modifyIndexContentsFn(opCtx, columnStore, numRecords);
+        }
+
+        return postCheckFn(opCtx, numRecords);
+    }
+
+    /**
+     * Represents a fault where an index entry is deleted.
+     */
+    struct DeletionFault {};
+
+    /**
+     * Represents a fault where an index entry is additionally inserted.
+     */
+    struct InsertionFault {
+        // This value is inserted in the target index cell.
+        std::string insertedIndexValue;
+
+        InsertionFault(std::string iVal = "WRONG_KEY") : insertedIndexValue(iVal) {}
+    };
+
+    /**
+     * Represents a fault where the value of an index entry is replaced with a wrong value.
+     */
+    struct ReplacementFault {
+        // The actual index value is replaced with this given value in the target index cell.
+        std::string updatedIndexValue;
+
+        ReplacementFault(std::string uVal = "WRONG_KEY") : updatedIndexValue(uVal) {}
+    };
+
+    /**
+     * Represents an index corruption in field represented by 'fieldIndex' for a document with id
+     * equals to 'docIndex'. The actual fault can be one of the 'DeletionFault', 'InsertionFault',
+     * or 'ReplacementFault' options.
+     */
+    struct InjectedCorruption {
+        int fieldIndex;
+        int docIndex;
+        std::variant<DeletionFault, InsertionFault, ReplacementFault> fault;
+
+        InjectedCorruption(int fieldIdx,
+                           int docIdx,
+                           std::variant<DeletionFault, InsertionFault, ReplacementFault> f)
+            : fieldIndex(fieldIdx), docIndex(docIdx), fault(f) {}
+
+
+        /**
+         * Returns a field index for a field that doesn't exists. As field indexes are assumed to be
+         * non-negative, it's guaranteed that a negative field index does not exist. 'fldId' is used
+         * to produce more specific negative numbers for the non-existing field index to help with
+         * pinpointing the test failures.
+         */
+        static int getNonExistentFieldIndex(const int fldId) {
+            return -fldId;
+        }
+    };
+
+    int docIndexToRowId(const int docIndex) {
+        return docIndex + 1L;
+    }
+
+    /**
+     * This method runs a column-store index test on 'nss' via a call to 'runColumnStoreIndexTest'.
+     * First, it populates an 'nss' collection (with a column-store index defined on it) with
+     * 'numDocs' documents, where each document has 'numFields' fields. Then, applies a series of
+     * 'corruptions' on the column-store index. Finally, the index validation is ran on this
+     * collection (which now has a corrupted column-store index) and the validation results are
+     * returned.
+     *
+     * Note: passing 'doBackgroundValidation = true' performs both foreground and background
+     *       validations. However, this can only be done in unit-tests that have a single call to
+     *       this method.
+     *
+     * Returns the list of validation results.
+     */
+    std::vector<std::pair<BSONObj, ValidateResults>> validateIndexCorruptions(
+        const NamespaceString& nss,
+        const int numFields,
+        const int numDocs,
+        const std::vector<InjectedCorruption> corruptions,
+        const bool doBackgroundValidation = false) {
+        return runColumnStoreIndexTest(
+            nss,
+            /* insertDocsFn */
+            [&](OperationContext* opCtx, repl::StorageInterface* storageInterface) -> int {
+                return insertDataRangeForNumFields(
+                    nss, opCtx, /*startIDNum*/ 1, /*numDocs*/ numDocs, /*numFields*/ numFields);
+            },
+            // modifyIndexContentsFn: For each corruption specified, introduces the corruption and
+            // then in a separate transaction ensures the corruption is now present.
+            [&](OperationContext* opCtx, ColumnStore* columnStore, int numRecords) -> void {
+                const auto getPath = [](int corruptedFldIndex) -> std::string {
+                    return "a" + std::to_string(corruptedFldIndex);
+                };
+                const auto seekToCorruptedIndexEntry =
+                    [&](int corruptedFldIndex,
+                        int corruptedDocIndex) -> boost::optional<FullCellValue> {
+                    auto cursor = columnStore->newCursor(opCtx, getPath(corruptedFldIndex));
+                    ASSERT(cursor);
+                    const auto res =
+                        cursor->seekAtOrPast(RowId(docIndexToRowId(corruptedDocIndex)));
+                    return res ? FullCellValue(res.value()) : boost::optional<FullCellValue>();
+                };
+
+                for (const auto& corruption : corruptions) {
+                    const int corruptedFldIndex = corruption.fieldIndex;
+                    const int corruptedDocIndex = corruption.docIndex;
+
+                    const auto preCorruptionCell =
+                        seekToCorruptedIndexEntry(corruptedFldIndex, corruptedDocIndex);
+                    // Apply the requested corruption in a transaction.
+                    {
+                        WriteUnitOfWork wuow(opCtx);
+                        const auto cursor = columnStore->newWriteCursor(opCtx);
+                        if (std::holds_alternative<ReplacementFault>(corruption.fault)) {
+                            const auto toVal =
+                                std::get<ReplacementFault>(corruption.fault).updatedIndexValue;
+                            columnStore->update(opCtx,
+                                                getPath(corruptedFldIndex),
+                                                preCorruptionCell->rid,
+                                                StringData(toVal));
+                        } else if (std::holds_alternative<DeletionFault>(corruption.fault)) {
+                            columnStore->remove(
+                                opCtx, getPath(corruptedFldIndex), preCorruptionCell->rid);
+                        } else if (std::holds_alternative<InsertionFault>(corruption.fault)) {
+                            const auto toVal =
+                                std::get<InsertionFault>(corruption.fault).insertedIndexValue;
+                            columnStore->insert(opCtx,
+                                                getPath(corruptedFldIndex),
+                                                RowId(docIndexToRowId(corruptedDocIndex)),
+                                                StringData(toVal));
+                        } else {
+                            MONGO_UNREACHABLE;
+                        }
+                        wuow.commit();
+                    }
+
+                    // Confirm the requested corruption is actually applied (in a separate
+                    // transaction).
+                    {
+
+                        if (std::holds_alternative<ReplacementFault>(corruption.fault)) {
+                            const auto toVal =
+                                std::get<ReplacementFault>(corruption.fault).updatedIndexValue;
+                            const auto corruptedCell =
+                                seekToCorruptedIndexEntry(corruptedFldIndex, corruptedDocIndex);
+                            ASSERT_EQ(corruptedCell->path, getPath(corruptedFldIndex));
+                            ASSERT_EQ(corruptedCell->rid, preCorruptionCell->rid);
+                            ASSERT_EQ(corruptedCell->value, StringData(toVal));
+                        } else if (std::holds_alternative<DeletionFault>(corruption.fault)) {
+                            const auto corruptedCell =
+                                seekToCorruptedIndexEntry(corruptedFldIndex, corruptedDocIndex);
+                            if (numDocs == 1 || corruptedDocIndex == numDocs - 1) {
+                                ASSERT_FALSE(corruptedCell);
+                            } else {
+                                ASSERT_EQ(corruptedCell->path, getPath(corruptedFldIndex));
+                                ASSERT_GT(corruptedCell->rid, preCorruptionCell->rid);
+                            }
+                        } else if (std::holds_alternative<InsertionFault>(corruption.fault)) {
+                            const auto toVal =
+                                std::get<InsertionFault>(corruption.fault).insertedIndexValue;
+                            const auto corruptedCell =
+                                seekToCorruptedIndexEntry(corruptedFldIndex, corruptedDocIndex);
+                            ASSERT_EQ(corruptedCell->path, getPath(corruptedFldIndex));
+                            ASSERT_EQ(corruptedCell->rid,
+                                      RowId(docIndexToRowId(corruptedDocIndex)));
+                            ASSERT_EQ(corruptedCell->value, StringData(toVal));
+                        } else {
+                            MONGO_UNREACHABLE;
+                        }
+                    }
+                }
+            },
+            /* postCheckFn */
+            [&](OperationContext* opCtx,
+                int numRecords) -> std::vector<std::pair<BSONObj, ValidateResults>> {
+                auto serviceContext = opCtx->getServiceContext();
+
+                // Confirm there is an expected validation error
+                std::vector<std::pair<BSONObj, ValidateResults>> results;
+
+                if (doBackgroundValidation) {
+                    // Background validation must be done in a separate thread due to the
+                    // assumptions made in its implementation.
+                    stdx::thread runBackgroundValidate =
+                        stdx::thread([&serviceContext, &numRecords, &nss, &results] {
+                            ThreadClient tc("BackgroundValidate-thread", serviceContext);
+                            auto threadOpCtx = tc->makeOperationContext();
+                            auto bgResults = backgroundValidate(nss,
+                                                                threadOpCtx.get(),
+                                                                /*valid*/ false,
+                                                                /*numRecords*/ numRecords,
+                                                                /*numInvalidDocuments*/ 0,
+                                                                /*numErrors*/ 1,
+                                                                /*runForegroundAsWell*/ false);
+                            results.insert(results.end(), bgResults.begin(), bgResults.end());
+                        });
+                    // Make sure the background validation finishes successfully.
+                    runBackgroundValidate.join();
+                }
+
+                const auto fgResults = foregroundValidate(nss,
+                                                          opCtx,
+                                                          /*valid*/ false,
+                                                          /*numRecords*/ numRecords,
+                                                          /*numInvalidDocuments*/ 0,
+                                                          /*numErrors*/ 1);
+
+                results.insert(results.end(), fgResults.begin(), fgResults.end());
+
+                return results;
+            });
+    }
+};
+
 // Verify that calling validate() on an empty collection with different validation levels returns an
 // OK status.
 TEST_F(CollectionValidationTest, ValidateEmpty) {
-    foregroundValidate(operationContext(),
+    foregroundValidate(kNss,
+                       operationContext(),
                        /*valid*/ true,
                        /*numRecords*/ 0,
                        /*numInvalidDocuments*/ 0,
                        /*numErrors*/ 0);
 }
 TEST_F(CollectionValidationDiskTest, BackgroundValidateEmpty) {
-    backgroundValidate(operationContext(),
+    backgroundValidate(kNss,
+                       operationContext(),
                        /*valid*/ true,
                        /*numRecords*/ 0,
                        /*numInvalidDocuments*/ 0,
@@ -230,7 +545,8 @@ TEST_F(CollectionValidationDiskTest, BackgroundValidateEmpty) {
 // Verify calling validate() on a nonempty collection with different validation levels.
 TEST_F(CollectionValidationTest, Validate) {
     auto opCtx = operationContext();
-    foregroundValidate(opCtx,
+    foregroundValidate(kNss,
+                       opCtx,
                        /*valid*/ true,
                        /*numRecords*/ insertDataRange(opCtx, 0, 5),
                        /*numInvalidDocuments*/ 0,
@@ -238,7 +554,8 @@ TEST_F(CollectionValidationTest, Validate) {
 }
 TEST_F(CollectionValidationDiskTest, BackgroundValidate) {
     auto opCtx = operationContext();
-    backgroundValidate(opCtx,
+    backgroundValidate(kNss,
+                       opCtx,
                        /*valid*/ true,
                        /*numRecords*/ insertDataRange(opCtx, 0, 5),
                        /*numInvalidDocuments*/ 0,
@@ -249,7 +566,8 @@ TEST_F(CollectionValidationDiskTest, BackgroundValidate) {
 // Verify calling validate() on a collection with an invalid document.
 TEST_F(CollectionValidationTest, ValidateError) {
     auto opCtx = operationContext();
-    foregroundValidate(opCtx,
+    foregroundValidate(kNss,
+                       opCtx,
                        /*valid*/ false,
                        /*numRecords*/ setUpInvalidData(opCtx),
                        /*numInvalidDocuments*/ 1,
@@ -257,7 +575,8 @@ TEST_F(CollectionValidationTest, ValidateError) {
 }
 TEST_F(CollectionValidationDiskTest, BackgroundValidateError) {
     auto opCtx = operationContext();
-    backgroundValidate(opCtx,
+    backgroundValidate(kNss,
+                       opCtx,
                        /*valid*/ false,
                        /*numRecords*/ setUpInvalidData(opCtx),
                        /*numInvalidDocuments*/ 1,
@@ -268,7 +587,8 @@ TEST_F(CollectionValidationDiskTest, BackgroundValidateError) {
 // Verify calling validate() with enforceFastCount=true.
 TEST_F(CollectionValidationTest, ValidateEnforceFastCount) {
     auto opCtx = operationContext();
-    foregroundValidate(opCtx,
+    foregroundValidate(kNss,
+                       opCtx,
                        /*valid*/ true,
                        /*numRecords*/ insertDataRange(opCtx, 0, 5),
                        /*numInvalidDocuments*/ 0,
@@ -306,7 +626,7 @@ TEST_F(CollectionValidationDiskTest, BackgroundValidateRunsConcurrentlyWithWrite
             ThreadClient tc("BackgroundValidateConcurrentWithCRUD-thread", serviceContext);
             auto threadOpCtx = tc->makeOperationContext();
             backgroundValidate(
-                threadOpCtx.get(), true, numRecords, 0, 0, /*runForegroundAsWell*/ false);
+                kNss, threadOpCtx.get(), true, numRecords, 0, 0, /*runForegroundAsWell*/ false);
         });
 
         // Wait until validate starts and hangs mid-way on a failpoint, then do concurrent writes,
@@ -319,7 +639,8 @@ TEST_F(CollectionValidationDiskTest, BackgroundValidateRunsConcurrentlyWithWrite
     runBackgroundValidate.join();
 
     // Run regular foreground collection validation to make sure everything is OK.
-    foregroundValidate(opCtx,
+    foregroundValidate(kNss,
+                       opCtx,
                        /*valid*/ true,
                        /*numRecords*/ numRecords + numRecords2,
                        0,
@@ -376,7 +697,7 @@ TEST_F(CollectionValidationTest, ValidateOldUniqueIndexKeyWarning) {
 
     // Validate the collection here as a sanity check before we modify the index contents in-place.
     foregroundValidate(
-        opCtx, /*valid*/ true, /*numRecords*/ 1, /*numInvalidDocuments*/ 0, /*numErrors*/ 0);
+        kNss, opCtx, /*valid*/ true, /*numRecords*/ 1, /*numInvalidDocuments*/ 0, /*numErrors*/ 0);
 
     // Update existing entry in index to pre-4.2 format without record id in key string.
     {
@@ -429,25 +750,374 @@ TEST_F(CollectionValidationTest, ValidateOldUniqueIndexKeyWarning) {
         }
     }
 
-    auto results = foregroundValidate(opCtx,
-                                      /*valid*/ true,
-                                      /*numRecords*/ 1,
-                                      /*numInvalidDocuments*/ 0,
-                                      /*numErrors*/ 0);
+    const auto results = foregroundValidate(kNss,
+                                            opCtx,
+                                            /*valid*/ true,
+                                            /*numRecords*/ 1,
+                                            /*numInvalidDocuments*/ 0,
+                                            /*numErrors*/ 0);
     ASSERT_EQ(results.size(), 2);
 
     for (const auto& result : results) {
         const auto& validateResults = result.second;
         BSONObjBuilder builder;
-        bool debugging = true;
+        const bool debugging = true;
         validateResults.appendToResultObj(&builder, debugging);
-        auto obj = builder.obj();
+        const auto obj = builder.obj();
         ASSERT(validateResults.valid) << obj;
-        auto warningsWithoutTransientErrors = omitTransientWarnings(validateResults);
+        const auto warningsWithoutTransientErrors = omitTransientWarnings(validateResults);
         ASSERT_EQ(warningsWithoutTransientErrors.warnings.size(), 1U) << obj;
         ASSERT_STRING_CONTAINS(warningsWithoutTransientErrors.warnings[0],
                                "Unique index a_1 has one or more keys in the old format")
             << obj;
+    }
+}
+
+/**
+ * Checks whether a given 'entry' is equal to any element in the 'list'.
+ */
+bool equalsAny(const std::string& entry, const std::vector<std::string>& list) {
+    return std::any_of(
+        list.begin(), list.end(), [&entry](const std::string& other) { return entry == other; });
+}
+
+// Exhaustively tests having one error in the column-store index by updating one index entry with an
+// invalid value in different parts of the index on collections with different number of columns and
+// documents.
+TEST_F(CollectionValidationColumnStoreIndexTest, SingleInvalidIndexEntryCSI) {
+    const int kNumFields = 4;
+    const int kMaxNumDocs = 4;
+
+    int testCaseIdx = 0;
+    for (int numFields = 1; numFields <= kNumFields; ++numFields) {
+        for (int numDocs = 1; numDocs <= kMaxNumDocs; ++numDocs) {
+            for (int corruptedFldIndex = 1; corruptedFldIndex <= numFields; ++corruptedFldIndex) {
+                for (int corruptedDocIndex = 0; corruptedDocIndex < numDocs; ++corruptedDocIndex) {
+                    const NamespaceString nss(kNss.toString() + std::to_string(++testCaseIdx));
+
+                    // Create collection nss for unit tests to use.
+                    const CollectionOptions defaultCollectionOptions;
+                    ASSERT_OK(storageInterface()->createCollection(
+                        operationContext(), nss, defaultCollectionOptions));
+
+                    const auto results = validateIndexCorruptions(
+                        nss,
+                        numFields,
+                        numDocs,
+                        /* column-store index corruptions */
+                        {{corruptedFldIndex,
+                          corruptedDocIndex,
+                          /* Update the current index entry with an invalid value. */
+                          ReplacementFault("WRONG_" + std::to_string(corruptedFldIndex) + "_" +
+                                           std::to_string(corruptedDocIndex))}},
+                        /* doBackgroundValidation */ true);
+
+                    ASSERT_EQ(results.size(), 3);
+
+                    for (const auto& result : results) {
+                        const auto& validateResults = result.second;
+                        BSONObjBuilder builder;
+                        const bool debugging = true;
+                        validateResults.appendToResultObj(&builder, debugging);
+                        const auto obj = builder.obj();
+                        ASSERT_FALSE(validateResults.valid) << obj;
+
+                        const auto warningsWithoutTransientErrors =
+                            omitTransientWarnings(validateResults);
+                        ASSERT_EQ(warningsWithoutTransientErrors.warnings.size(), 2U) << obj;
+                        ASSERT(equalsAny("Detected 1 missing index entries.",
+                                         warningsWithoutTransientErrors.warnings))
+                            << obj;
+                        ASSERT(equalsAny("Detected 1 extra index entries.",
+                                         warningsWithoutTransientErrors.warnings))
+                            << obj;
+
+                        ASSERT_EQ(validateResults.errors.size(), 1U) << obj;
+                        ASSERT_EQ(validateResults.errors[0],
+                                  "Index with name '$**_columnstore' has inconsistencies.")
+                            << obj;
+
+                        const auto& extraEntries = validateResults.extraIndexEntries;
+                        ASSERT_EQ(extraEntries.size(), 1U) << obj;
+                        ASSERT_EQ(extraEntries[0]["indexName"].String(), "$**_columnstore") << obj;
+                        ASSERT_EQ(extraEntries[0]["recordId"].Long(),
+                                  docIndexToRowId(corruptedDocIndex))
+                            << obj;
+                        ASSERT_EQ(extraEntries[0]["rowId"].Long(),
+                                  docIndexToRowId(corruptedDocIndex))
+                            << obj;
+                        ASSERT_EQ(extraEntries[0]["indexPath"].String(),
+                                  "a" + std::to_string(corruptedFldIndex))
+                            << obj;
+
+                        const auto& missingEntries = validateResults.missingIndexEntries;
+                        ASSERT_EQ(missingEntries.size(), 1U) << obj;
+                        ASSERT_EQ(missingEntries[0]["indexName"].String(), "$**_columnstore")
+                            << obj;
+                        ASSERT_EQ(missingEntries[0]["recordId"].Long(),
+                                  docIndexToRowId(corruptedDocIndex))
+                            << obj;
+                        ASSERT_EQ(missingEntries[0]["rowId"].Long(),
+                                  docIndexToRowId(corruptedDocIndex))
+                            << obj;
+                        ASSERT_EQ(missingEntries[0]["indexPath"].String(),
+                                  "a" + std::to_string(corruptedFldIndex))
+                            << obj;
+
+                        ASSERT_EQ(validateResults.corruptRecords.size(), 0U) << obj;
+                        ASSERT_EQ(validateResults.numRemovedCorruptRecords, 0U) << obj;
+                        ASSERT_EQ(validateResults.numRemovedExtraIndexEntries, 0U) << obj;
+                        ASSERT_EQ(validateResults.numInsertedMissingIndexEntries, 0U) << obj;
+                        ASSERT_EQ(validateResults.numDocumentsMovedToLostAndFound, 0U) << obj;
+                        ASSERT_EQ(validateResults.numOutdatedMissingIndexEntry, 0U) << obj;
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Exhaustively tests having one error in the column-store index by adding an extra index entry on
+// collections with different number of columns and documents.
+TEST_F(CollectionValidationColumnStoreIndexTest, SingleExtraIndexEntry) {
+    const int kNumFields = 4;
+    const int kMaxNumDocs = 4;
+
+    std::vector<std::pair<int, int>> extraIndexEntryCorruptions = {
+        /* non-existent field on an existing document */
+        {/*corruptedFldIndex*/ InjectedCorruption::getNonExistentFieldIndex(1),
+         /*corruptedDocIndex*/ 0},
+        /* non-existent field on a non-existent document */
+        {/*corruptedFldIndex*/ InjectedCorruption::getNonExistentFieldIndex(2),
+         /*corruptedDocIndex*/ kMaxNumDocs * 10}};
+    for (int corruptedFldIndex = 1; corruptedFldIndex <= kNumFields; ++corruptedFldIndex) {
+        /* existing field on a non-existent document */
+        extraIndexEntryCorruptions.push_back(
+            {corruptedFldIndex, /*corruptedDocIndex*/ kMaxNumDocs * 10});
+    }
+
+    int testCaseIdx = 0;
+    for (int numFields = 1; numFields <= kNumFields; ++numFields) {
+        for (int numDocs = 1; numDocs <= kMaxNumDocs; ++numDocs) {
+            for (const auto& corruption : extraIndexEntryCorruptions) {
+                const int corruptedFldIndex = corruption.first;
+                const int corruptedDocIndex = corruption.second;
+
+                const auto nss = NamespaceString(kNss.toString() + std::to_string(++testCaseIdx));
+
+                // Create collection nss for unit tests to use.
+                const CollectionOptions defaultCollectionOptions;
+                ASSERT_OK(storageInterface()->createCollection(
+                    operationContext(), nss, defaultCollectionOptions));
+
+                const auto results = validateIndexCorruptions(
+                    nss,
+                    numFields,
+                    numDocs,
+                    /* column-store index corruptions */
+                    {{corruptedFldIndex,
+                      corruptedDocIndex,
+                      /* Insert an extra index entry. */
+                      InsertionFault("WRONG_" + std::to_string(corruptedFldIndex) + "_" +
+                                     std::to_string(corruptedDocIndex))}},
+                    /* doBackgroundValidation */ true);
+
+                ASSERT_EQ(results.size(), 3);
+
+                for (const auto& result : results) {
+                    const auto& validateResults = result.second;
+                    BSONObjBuilder builder;
+                    const bool debugging = true;
+                    validateResults.appendToResultObj(&builder, debugging);
+                    const auto obj = builder.obj();
+                    ASSERT_FALSE(validateResults.valid) << obj;
+
+                    const auto warningsWithoutTransientErrors =
+                        omitTransientWarnings(validateResults);
+                    ASSERT_EQ(warningsWithoutTransientErrors.warnings.size(), 1U) << obj;
+                    ASSERT(fmt::format("Detected {} extra index entries.", 1) ==
+                           warningsWithoutTransientErrors.warnings[0])
+                        << obj;
+
+                    ASSERT_EQ(validateResults.errors.size(), 1U) << obj;
+                    ASSERT_EQ(validateResults.errors[0],
+                              "Index with name '$**_columnstore' has inconsistencies.")
+                        << obj;
+
+                    const auto& extraEntries = validateResults.extraIndexEntries;
+                    ASSERT_EQ(extraEntries.size(), 1) << obj;
+                    ASSERT_EQ(extraEntries[0]["indexName"].String(), "$**_columnstore") << obj;
+                    ASSERT_EQ(extraEntries[0]["recordId"].Long(),
+                              docIndexToRowId(corruptedDocIndex))
+                        << obj;
+                    ASSERT_EQ(extraEntries[0]["rowId"].Long(), docIndexToRowId(corruptedDocIndex))
+                        << obj;
+                    ASSERT_EQ(extraEntries[0]["indexPath"].String(),
+                              "a" + std::to_string(corruptedFldIndex))
+                        << obj;
+
+                    ASSERT_EQ(validateResults.missingIndexEntries.size(), 0U) << obj;
+                    ASSERT_EQ(validateResults.corruptRecords.size(), 0U) << obj;
+                    ASSERT_EQ(validateResults.numRemovedCorruptRecords, 0U) << obj;
+                    ASSERT_EQ(validateResults.numRemovedExtraIndexEntries, 0U) << obj;
+                    ASSERT_EQ(validateResults.numInsertedMissingIndexEntries, 0U) << obj;
+                    ASSERT_EQ(validateResults.numDocumentsMovedToLostAndFound, 0U) << obj;
+                    ASSERT_EQ(validateResults.numOutdatedMissingIndexEntry, 0U) << obj;
+                }
+            }
+        }
+    }
+}
+
+// Exhaustively tests having one error in the column-store index by removing one index entry from
+// different parts of the index on collections with different number of columns and documents.
+TEST_F(CollectionValidationColumnStoreIndexTest, SingleMissingIndexEntryCSI) {
+    const int kNumFields = 4;
+    const int kMaxNumDocs = 4;
+
+    int testCaseIdx = 0;
+    for (int numFields = 1; numFields <= kNumFields; ++numFields) {
+        for (int numDocs = 1; numDocs <= kMaxNumDocs; ++numDocs) {
+            for (int corruptedFldIndex = 1; corruptedFldIndex <= numFields; ++corruptedFldIndex) {
+                for (int corruptedDocIndex = 0; corruptedDocIndex < numDocs; ++corruptedDocIndex) {
+                    const NamespaceString nss(kNss.toString() + std::to_string(++testCaseIdx));
+
+                    // Create collection nss for unit tests to use.
+                    const CollectionOptions defaultCollectionOptions;
+                    ASSERT_OK(storageInterface()->createCollection(
+                        operationContext(), nss, defaultCollectionOptions));
+
+                    const auto results =
+                        validateIndexCorruptions(nss,
+                                                 numFields,
+                                                 numDocs,
+                                                 /* column-store index corruptions */
+                                                 {{corruptedFldIndex,
+                                                   corruptedDocIndex,
+                                                   /* Remove the existing index entry. */
+                                                   DeletionFault()}},
+                                                 /* doBackgroundValidation */ true);
+
+                    ASSERT_EQ(results.size(), 3);
+
+                    for (const auto& result : results) {
+                        const auto& validateResults = result.second;
+                        BSONObjBuilder builder;
+                        const bool debugging = true;
+                        validateResults.appendToResultObj(&builder, debugging);
+                        const auto obj = builder.obj();
+                        ASSERT_FALSE(validateResults.valid) << obj;
+
+                        const auto warningsWithoutTransientErrors =
+                            omitTransientWarnings(validateResults);
+                        ASSERT_EQ(warningsWithoutTransientErrors.warnings.size(), 1U) << obj;
+                        ASSERT("Detected 1 missing index entries." ==
+                               warningsWithoutTransientErrors.warnings[0])
+                            << obj;
+
+                        ASSERT_EQ(validateResults.errors.size(), 1U) << obj;
+                        ASSERT_EQ(validateResults.errors[0],
+                                  "Index with name '$**_columnstore' has inconsistencies.")
+                            << obj;
+
+                        const auto& missingEntries = validateResults.missingIndexEntries;
+                        ASSERT_EQ(missingEntries.size(), 1U) << obj;
+                        ASSERT_EQ(missingEntries[0]["indexName"].String(), "$**_columnstore")
+                            << obj;
+                        ASSERT_EQ(missingEntries[0]["recordId"].Long(),
+                                  docIndexToRowId(corruptedDocIndex))
+                            << obj;
+                        ASSERT_EQ(missingEntries[0]["rowId"].Long(),
+                                  docIndexToRowId(corruptedDocIndex))
+                            << obj;
+                        ASSERT_EQ(missingEntries[0]["indexPath"].String(),
+                                  "a" + std::to_string(corruptedFldIndex))
+                            << obj;
+
+                        ASSERT_EQ(validateResults.extraIndexEntries.size(), 0U) << obj;
+                        ASSERT_EQ(validateResults.corruptRecords.size(), 0U) << obj;
+                        ASSERT_EQ(validateResults.numRemovedCorruptRecords, 0U) << obj;
+                        ASSERT_EQ(validateResults.numRemovedExtraIndexEntries, 0U) << obj;
+                        ASSERT_EQ(validateResults.numInsertedMissingIndexEntries, 0U) << obj;
+                        ASSERT_EQ(validateResults.numDocumentsMovedToLostAndFound, 0U) << obj;
+                        ASSERT_EQ(validateResults.numOutdatedMissingIndexEntry, 0U) << obj;
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Tests having multiple errors in the column-store index by updating several index entries with an
+// invalid value in different parts of the index on a collection with multiple columns and multiple
+// documents.
+TEST_F(CollectionValidationColumnStoreIndexTest, MultipleInvalidIndexEntryCSI) {
+    const int numFields = 10;
+    const int numDocs = 50;
+
+    auto results = validateIndexCorruptions(
+        kNss,
+        numFields,
+        numDocs,
+        /* column-store index corruptions */
+        {{/* corruptedFldIndex */ 5,
+          /* corruptedDocIndex */ 9,
+          /* Remove the existing index entry. */
+          DeletionFault()},
+         {/* corruptedFldIndex */ 7,
+          /* corruptedDocIndex */ 2,
+          /* Update the current index entry with an invalid value. */
+          ReplacementFault()},
+         {/* corruptedFldIndex */ 9,
+          /* corruptedDocIndex */ 500,
+          /* Insert an extra index entry for a non-exisiting document. */
+          InsertionFault()},
+         {/* corruptedFldIndex */ InjectedCorruption::getNonExistentFieldIndex(1),
+          /* corruptedDocIndex */ 5,
+          /* Insert an extra index entry for a non-existing field of an existing document. */
+          InsertionFault()},
+         {/* corruptedFldIndex */ InjectedCorruption::getNonExistentFieldIndex(2),
+          /* corruptedDocIndex */ 600,
+          /* Insert an extra index entry for a non-existing field of a non-existing document. */
+          InsertionFault()},
+         {/* corruptedFldIndex */ 2,
+          /* corruptedDocIndex */ 33,
+          /* Update the current index entry with an invalid value. */
+          ReplacementFault()}},
+        /* doBackgroundValidation */ true);
+
+    ASSERT_EQ(results.size(), 3);
+
+    for (const auto& result : results) {
+        const auto& validateResults = result.second;
+        BSONObjBuilder builder;
+        const bool debugging = true;
+        validateResults.appendToResultObj(&builder, debugging);
+        const auto obj = builder.obj();
+        ASSERT_FALSE(validateResults.valid) << obj;
+
+        const auto warningsWithoutTransientErrors = omitTransientWarnings(validateResults);
+        ASSERT_EQ(warningsWithoutTransientErrors.warnings.size(), 2U) << obj;
+        ASSERT(
+            equalsAny("Detected 3 missing index entries.", warningsWithoutTransientErrors.warnings))
+            << obj;
+        ASSERT(
+            equalsAny("Detected 5 extra index entries.", warningsWithoutTransientErrors.warnings))
+            << obj;
+
+        ASSERT_EQ(validateResults.errors.size(), 1U) << obj;
+        ASSERT_EQ(validateResults.errors[0],
+                  "Index with name '$**_columnstore' has inconsistencies.")
+            << obj;
+
+        ASSERT_EQ(validateResults.missingIndexEntries.size(), 3U) << obj;
+        ASSERT_EQ(validateResults.extraIndexEntries.size(), 5U) << obj;
+        ASSERT_EQ(validateResults.corruptRecords.size(), 0U) << obj;
+        ASSERT_EQ(validateResults.numRemovedCorruptRecords, 0U) << obj;
+        ASSERT_EQ(validateResults.numRemovedExtraIndexEntries, 0U) << obj;
+        ASSERT_EQ(validateResults.numInsertedMissingIndexEntries, 0U) << obj;
+        ASSERT_EQ(validateResults.numDocumentsMovedToLostAndFound, 0U) << obj;
+        ASSERT_EQ(validateResults.numOutdatedMissingIndexEntry, 0U) << obj;
     }
 }
 

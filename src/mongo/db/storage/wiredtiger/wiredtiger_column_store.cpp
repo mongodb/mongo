@@ -270,8 +270,11 @@ public:
         if (!_eof && !_lastMoveSkippedKey) {
             WT_ITEM key;
             WT_CURSOR* c = _cursor->get();
-            c->get_key(c, &key);
-            _buffer.assign(static_cast<const char*>(key.data), key.size);
+            if (c->get_key(c, &key) == 0) {
+                _buffer.assign(static_cast<const char*>(key.data), key.size);
+            } else {
+                _buffer.clear();
+            }
         }
         resetCursor();
     }
@@ -320,6 +323,10 @@ private:
         WiredTigerRecoveryUnit::get(_opCtx)->getSession();
 
         WT_CURSOR* c = _cursor->get();
+
+        if (searchKey.empty()) {
+            return false;
+        }
 
         const WiredTigerItem searchKeyItem(searchKey);
         c->set_key(c, searchKeyItem.Get());

@@ -29,12 +29,15 @@
 
 #pragma once
 
+#include <array>
+
+#include "mongo/db/catalog/column_index_consistency.h"
+#include "mongo/db/catalog/index_consistency.h"
 #include "mongo/db/catalog/validate_state.h"
 #include "mongo/util/progress_meter.h"
 
 namespace mongo {
 
-class IndexConsistency;
 class IndexDescriptor;
 class OperationContext;
 
@@ -44,10 +47,11 @@ class OperationContext;
  */
 class ValidateAdaptor {
 public:
-    ValidateAdaptor(IndexConsistency* indexConsistency,
-                    CollectionValidation::ValidateState* validateState)
+    ValidateAdaptor(OperationContext* opCtx, CollectionValidation::ValidateState* validateState)
 
-        : _indexConsistency(indexConsistency), _validateState(validateState) {}
+        : _keyBasedIndexConsistency(opCtx, validateState),
+          _columnIndexConsistency(opCtx, validateState),
+          _validateState(validateState) {}
 
     /**
      * Validates the record data and traverses through its key set to keep track of the
@@ -59,6 +63,13 @@ public:
                                   long long* nNonCompliantDocuments,
                                   size_t* dataSize,
                                   ValidateResults* results);
+    /**
+     * Traverses the record store to retrieve every record and go through its document key
+     * set to keep track of the index consistency during a validation.
+     */
+    void traverseRecordStore(OperationContext* opCtx,
+                             ValidateResults* results,
+                             BSONObjBuilder* output);
 
     /**
      * Traverses the index getting index entries to validate them and keep track of the index keys
@@ -70,12 +81,14 @@ public:
                        ValidateResults* results);
 
     /**
-     * Traverses the record store to retrieve every record and go through its document key
-     * set to keep track of the index consistency during a validation.
+     * Traverses a record on the underlying index consistency objects.
      */
-    void traverseRecordStore(OperationContext* opCtx,
-                             ValidateResults* results,
-                             BSONObjBuilder* output);
+    void traverseRecord(OperationContext* opCtx,
+                        const CollectionPtr& coll,
+                        const IndexCatalogEntry* index,
+                        const RecordId& recordId,
+                        const BSONObj& record,
+                        ValidateResults* results);
 
     /**
      * Validates that the number of document keys matches the number of index keys previously
@@ -85,8 +98,38 @@ public:
                                const IndexCatalogEntry* index,
                                IndexValidateResults& results);
 
+    /**
+     * Informs the index consistency objects that we're advancing to the second phase of index
+     * validation.
+     */
+    void setSecondPhase();
+
+    /**
+     * Sets up the index consistency objects to limit memory usage in the second phase of index
+     * validation. Returns whether the memory limit is sufficient to report at least one index entry
+     * inconsistency and continue with the second phase of validation.
+     */
+    bool limitMemoryUsageForSecondPhase(ValidateResults* result);
+
+    /**
+     * Returns true if the underlying index consistency objects have entry mismatches.
+     */
+    bool haveEntryMismatch() const;
+
+    /**
+     * If repair mode enabled, try inserting _missingIndexEntries into indexes.
+     */
+    void repairIndexEntries(OperationContext* opCtx, ValidateResults* results);
+
+    /**
+     * Records the errors gathered from the second phase of index validation into the provided
+     * ValidateResultsMap and ValidateResults.
+     */
+    void addIndexEntryErrors(OperationContext* opCtx, ValidateResults* results);
+
 private:
-    IndexConsistency* _indexConsistency;
+    KeyStringIndexConsistency _keyBasedIndexConsistency;
+    ColumnIndexConsistency _columnIndexConsistency;
     CollectionValidation::ValidateState* _validateState;
 
     // Saves the record count from the record store traversal to be used later to validate the index
@@ -95,9 +138,5 @@ private:
 
     // For reporting progress during record store and index traversal.
     ProgressMeterHolder _progress;
-
-    // The total number of index keys is stored during the first validation phase, since this
-    // count may change during a second phase.
-    uint64_t _totalIndexKeys = 0;
 };
 }  // namespace mongo
