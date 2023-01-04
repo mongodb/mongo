@@ -184,10 +184,7 @@ class _InitialSyncThread(threading.Thread):
                     for fixture in self._rs_fixtures:
                         self._await_initial_sync_done(fixture)
 
-                    # Coinflip whether to give the nodes some time as a secondaries or to
-                    # transition them to primary immediately.
-                    stage = random.choice(
-                        [SyncerStage.RUN_AS_SECONDARY, SyncerStage.INITSYNC_PRIMARY])
+                    stage = SyncerStage.RUN_AS_SECONDARY
                     wait_secs = 0
 
                 # Nothing to be done. Just let the nodes stay as secondaries for the duration.
