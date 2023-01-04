@@ -738,7 +738,7 @@ if (!isStepdownSuite) {
                         .metadata.shardVersionEpoch.toString());
 }
 
-// TODO: remove once 7.0 becomes last-lts.
+// TODO SERVER-72515: remove once 7.0 becomes last-lts.
 const fcvDoc = assert.commandWorked(
     st.configRS.getPrimary().adminCommand({getParameter: 1, featureCompatibilityVersion: 1}));
 if (fcvDoc.featureCompatibilityVersion.version == lastLTSFCV &&
