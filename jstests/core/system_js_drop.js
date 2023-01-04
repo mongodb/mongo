@@ -6,6 +6,8 @@
  *   assumes_unsharded_collection,
  *   requires_fcv_62,
  *   requires_non_retryable_writes,
+ *   # Uses $where operator.
+ *   requires_scripting,
  * ]
  */
 (function() {

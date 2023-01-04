@@ -2,6 +2,8 @@
 // @tags: [
 //   assumes_unsharded_collection,
 //   requires_non_retryable_writes,
+//   # Uses $function operator.
+//   requires_scripting,
 // ]
 
 (function() {

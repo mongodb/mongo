@@ -5,6 +5,8 @@
 //   not_allowed_with_security_token,
 //   # mapReduce does not support afterClusterTime.
 //   does_not_support_causal_consistency,
+//   # Uses mapReduce command.
+//   requires_scripting,
 // ]
 (function() {
 "use strict";

@@ -11,18 +11,100 @@ test_kind: js_test
 
 selector:
   roots:
-  - jstests/core/all.js
-  - jstests/core/timeseries/*.js
-  - jstests/core/txns/timeseries/timeseries_reads_in_txns.js
-  - jstests/core/txns/timeseries_create_in_txn.js
-  - jstests/core/txns/timeseries_insert_in_txn.js
+  - jstests/core/**/*.js
   exclude_with_any_tags:
+  - command_not_supported_in_serverless
+  # Theses tests expect replication is not enabled.
+  - assumes_standalone_mongod
+  # Capped collections are banned in Serverless.
+  - requires_capped
+  # Server side javascript (such as $where, $function, $accumulator and map-reduce) is not allowed in Serverless.
+  - requires_scripting
+  - uses_map_reduce_with_temp_collections
+  # This test suite creates connection with user "__system", so cannot be authenticated again with different user.
+  - requires_auth
+  # Sharding commands are not tenant aware.
+  - requires_sharding
   # TODO SERVER-72173: tenant information is dropped off when trying to profile operation.
   - requires_profiling
+  # Columnstore indexes are under development and cannot be used without enabling the feature flag
+  - featureFlagColumnstoreIndexes
+  exclude_files:
+  # The "exhaust" function does not use runCommand (required by the inject_security_token.js override).
+  - jstests/core/exhaust.js
+  # These following tests use benchRun which does not use runCommand (required by the inject_dollar_tenant.js override).
+  - jstests/core/bench_test1.js
+  - jstests/core/bench_test2.js
+  - jstests/core/benchrun_cmd_param_error.js
+  - jstests/core/benchrun_pipeline_updates.js
+  # These tests run "applyOps" command which does not depend on $tenant to pass in tenant information.
+  # The tenantId is provided in the oplog entries provided to the applyOps command.
+  - jstests/core/apply_ops*.js
+  - jstests/core/bypass_doc_validation.js
+  - jstests/core/collation.js
+  - jstests/core/collmod_convert_to_unique_apply_ops.js
+  - jstests/core/collmod_without_uuid.js
+  - jstests/core/list_collections1.js
+  - jstests/core/list_collections_filter.js
+  - jstests/core/list_collections_no_views.js
+  - jstests/core/rename_collection_staytemp.js
+  - jstests/core/txns/commands_banning_txnnumber_outside_transactions.js
+  - jstests/core/txns/commands_not_allowed_in_txn.js
+  - jstests/core/txns/prepare_transaction_fails_on_temp_collections.js
+  - jstests/core/views/duplicate_ns.js
+  - jstests/core/views/invalid_system_views.js
+  - jstests/core/views/view_with_invalid_dbname.js
+  - jstests/core/views/views_all_commands.js
+  - jstests/core/views/views_creation.js
+  # This test expects a specific error message, which does not match the error message generated in authentication mode.
+  - jstests/core/commands_with_uuid.js
+  # Sharding command "splictVector" is not tenant aware.
+  - jstests/core/splitvector.js
+  # Sharding command "_shardsvrCreateGlobalIndex" is not tenant aware.
+  - jstests/core/txns/global_index.js
+  # Operations on config.system.sessions are not tenant aware, so cannot be tested with the injected dollar tenant.
+  - jstests/core/list_all_sessions.js
+  - jstests/core/list_sessions.js
+  - jstests/core/api_version_pipeline_stages.js
+  # Operations on config.transactions are not tenant aware, so cannot be tested with the injected dollar tenant.
+  - jstests/core/txns/no_writes_to_config_transactions_with_prepared_transaction.js
+  - jstests/core/txns/commit_prepared_transaction.js
+  - jstests/core/create_indexes.js
+  # In a multitenancy environment the catalog will always return tenant-prefixed entries, so the
+  # list_catalog test will be broken as it checks for non-tenant-prefixed entries.
+  - jstests/core/list_catalog.js
+  # TODO SERVER-71470: this test cannot work as aggregate with $lookup query on multiple collections drops off the tenant informaton.
+  - jstests/core/txns/aggregation_in_transaction.js
+  - jstests/core/plan_cache_clear.js
+  - jstests/core/plan_cache_list_plans.js
+  - jstests/core/index_filter_commands.js
+  # TODO SERVER-72285: currentOp requests with dollar tenant cannot get operations being executed by the tenant.
+  - jstests/core/crud_ops_do_not_throw_locktimeout.js
+  - jstests/core/currentop.js
+  - jstests/core/currentop_waiting_for_latch.js
+  - jstests/core/failcommand_failpoint.js
+  - jstests/core/fsync.js
+  - jstests/core/killop_drop_collection.js
+  - jstests/core/txns/kill_cursors_in_transaction.js
+  - jstests/core/txns/kill_sessions_kills_transaction.js
+  - jstests/core/txns/transactions_block_ddl.js
+  - jstests/core/txns/currentop_blocked_operations.js
+  - jstests/core/txns/new_transactions_on_session_with_prepared_txn_block_behind_prepare.js
+  - jstests/core/txns/write_conflicts_with_non_txns.js
+  # TODO SERVER-72291: rolesInfo commmand is failed when querying relative roles by the tenant.
+  - jstests/core/roles_info.js
+  # TODO SERVER-72083: tenant information of bulkWrite command cannot be parsed correctly.
+  - jstests/core/bulk_write.js
+  # TODO SERVER-72357: cannot get the expected error due to an authorization contract issue.
+  - jstests/core/txns/multi_statement_transaction_command_args.js
 
 executor:
   archive:
     tests: true
+    hooks:
+      - CheckReplDBHash
+      - CheckReplOplogs
+      - ValidateCollections
   config:
     shell_options:
       # In order to use $tenant, connect mongod with user "_system" which can be authenticated with ActionType::useTenant.
@@ -39,6 +121,30 @@ executor:
           keyFile: *keyFile
           keyFileData: *keyFileData
           roleGraphInvalidationIsFatal: true
+  hooks:
+  # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
+  # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
+  # validating the entire contents of the collection.
+  - class: CheckReplOplogs
+    shell_options:
+      global_vars:
+        TestData: *TestData
+        eval: jsTest.authenticate(db.getMongo())
+      <<: *authOptions
+  - class: CheckReplDBHash
+    shell_options:
+      global_vars:
+        TestData: *TestData
+        eval: jsTest.authenticate(db.getMongo())
+      <<: *authOptions
+  - class: ValidateCollections
+    shell_options:
+      global_vars:
+        TestData: *TestData
+        eval: jsTest.authenticate(db.getMongo())
+      <<: *authOptions
+  - class: CleanEveryN
+    n: 20
   fixture:
     class: ReplicaSetFixture
     num_nodes: 3

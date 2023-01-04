@@ -1,6 +1,6 @@
 /**
  * Auth tests for the $listSessions aggregation pipeline.
- * @tags: [requires_sharding]
+ * @tags: [requires_sharding, requires_auth]
  */
 
 (function() {

@@ -3,6 +3,7 @@
 // @tags: [
 //   not_allowed_with_security_token,
 //   uses_transactions,
+//   requires_profiling,
 // ]
 (function() {
 "use strict";

@@ -9,6 +9,8 @@
 //   assumes_read_preference_unchanged,
 //   does_not_support_stepdowns,
 //   no_selinux,
+//   # Uses $where operation.
+//   requires_scripting,
 // ]
 
 (function() {

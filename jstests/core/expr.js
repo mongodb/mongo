@@ -6,6 +6,8 @@
 //   requires_non_retryable_writes,
 //   # We added a new test case for a bug we only fixed in 6.0+: SERVER-64764.
 //   requires_fcv_60,
+//   # Uses mapReduce command.
+//   requires_scripting,
 // ]
 
 // Tests for $expr in the CRUD commands.
