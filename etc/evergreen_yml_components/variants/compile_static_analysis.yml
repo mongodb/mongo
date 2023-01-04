@@ -115,17 +115,6 @@ buildvariants:
     <<: *generic_linux_compile_expansions
     separate_debug: off
     san_options: *aubsan_options
-    # TODO(SERVER-49515): The addition of `--linker=lld` under
-    # `compile_flags` below is to Work around
-    # https://sourceware.org/bugzilla/show_bug.cgi?id=25975 by forcing
-    # use of `lld`. Normally we would not select `lld` here because it
-    # is a dynamic builder and we suppress `lld` in
-    # `--link-model=dynamic` builds to work around
-    # https://bugs.llvm.org/show_bug.cgi?id=44842. That issue is in
-    # fact fixed in v4 `lld`, so we can use `lld` here. We are opting
-    # to do that instead of rolling over to `lld` everywhere just to
-    # unblock the toolchain. Once `lld` is default, this override can
-    # and should be removed.
     compile_flags: >-
       --variables-files=etc/scons/mongodbtoolchain_stable_clang.vars
       --dbg=on
@@ -136,7 +125,6 @@ buildvariants:
       --ocsp-stapling=off
       -j$(grep -c ^processor /proc/cpuinfo)
       --link-model=dynamic
-      --linker=lld
     compile_variant: *linux-debug-aubsan-compile-required
 
 - name: &windows-compile-required windows-compile-required
