@@ -82,6 +82,8 @@ public:
 
     Future<void> waitUntil(const ReactorTimer& timer, Date_t expiration) noexcept override;
 
+    Future<void> waitUntil(Date_t expiration, const CancellationToken&) noexcept override;
+
     bool cancelSession(Session& session) noexcept override;
 
     bool cancelTimer(const ReactorTimer& timer) noexcept override;
@@ -99,6 +101,8 @@ private:
         short events;  // Events to consider while polling for this session (e.g., `POLLIN`).
         Promise<void> promise;
     };
+
+    bool _cancelTimer(size_t timerId) noexcept;
 
     /*
      * Internally, `BatonASIO` thinks in terms of synchronized units of work. This is because a

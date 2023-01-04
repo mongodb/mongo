@@ -103,7 +103,8 @@ public:
     SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommandWithHosts(
         CommandType cmd,
         std::vector<HostAndPort> hosts,
-        std::shared_ptr<RetryPolicy> retryPolicy = std::make_shared<NeverRetryPolicy>()) {
+        std::shared_ptr<RetryPolicy> retryPolicy = std::make_shared<NeverRetryPolicy>(),
+        BatonHandle bh = nullptr) {
         // Use a readPreference that's elgible for hedging.
         ReadPreferenceSetting readPref(ReadPreference::Nearest);
         readPref.hedgingMode = HedgingMode();
@@ -117,14 +118,14 @@ public:
         std::unique_ptr<Targeter> targeter =
             std::make_unique<AsyncRemoteCommandTargeterAdapter>(readPref, t);
 
-        _opCtx = makeOperationContext();
         return sendHedgedCommand(cmd,
                                  _opCtx.get(),
                                  std::move(targeter),
                                  getExecutorPtr(),
                                  CancellationToken::uncancelable(),
                                  retryPolicy,
-                                 readPref);
+                                 readPref,
+                                 bh);
     }
 
     const NamespaceString testNS = NamespaceString("testdb", "testcoll");
@@ -146,10 +147,13 @@ public:
     const RemoteCommandResponse testAlternateIgnorableErrorResponse{
         createErrorResponse(ignorableNetworkTimeoutStatus), Milliseconds(1)};
 
+    auto getOpCtx() {
+        return _opCtx.get();
+    }
+
 private:
-    // This OpCtx is used by sendHedgedCommandWithHosts and is initialized when the function is
-    // first invoked and destroyed during fixture destruction.
-    ServiceContext::UniqueOperationContext _opCtx;
+    // This OpCtx is used by sendHedgedCommandWithHosts and is destroyed during fixture destruction.
+    ServiceContext::UniqueOperationContext _opCtx{makeOperationContext()};
 };
 
 /**
@@ -246,12 +250,11 @@ TEST_F(HedgedAsyncRPCTest, HedgedAsyncRPCWithRetryPolicy) {
 TEST_F(HedgedAsyncRPCTest, FailedTargeting) {
     HelloCommand helloCmd;
     initializeCommand(helloCmd);
-    auto opCtx = makeOperationContext();
     auto targeterFailStatus = Status{ErrorCodes::InternalError, "Fake targeter failure"};
     auto targeter = std::make_unique<FailingTargeter>(targeterFailStatus);
 
     auto resultFuture = sendHedgedCommand(helloCmd,
-                                          opCtx.get(),
+                                          getOpCtx(),
                                           std::move(targeter),
                                           getExecutorPtr(),
                                           CancellationToken::uncancelable());
@@ -819,9 +822,8 @@ TEST_F(HedgedAsyncRPCTest, NoAttemptedTargetIfTargetingFails) {
     auto targeter = std::make_unique<FailingTargeter>(resolveErr);
 
 
-    auto opCtxHolder = makeOperationContext();
     auto resultFuture = sendHedgedCommand(
-        helloCmd, opCtxHolder.get(), std::move(targeter), getExecutorPtr(), _cancellationToken);
+        helloCmd, getOpCtx(), std::move(targeter), getExecutorPtr(), _cancellationToken);
 
     auto error = resultFuture.getNoThrow().getStatus();
     ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);
@@ -868,6 +870,76 @@ TEST_F(HedgedAsyncRPCTest, RemoteErrorAttemptedTargetsContainActual) {
     ASSERT_THAT(remoteErr.getTargetUsed(), eitherHostMatcher);
 }
 
+TEST_F(HedgedAsyncRPCTest, BatonTest) {
+    std::shared_ptr<RetryPolicy> retryPolicy = std::make_shared<NeverRetryPolicy>();
+    auto resultFuture =
+        sendHedgedCommandWithHosts(testFindCmd, kTwoHosts, retryPolicy, getOpCtx()->getBaton());
+
+    Notification<void> seenNetworkRequests;
+    // This thread will respond to the requests we sent via sendHedgedCommandWithHosts above.
+    stdx::thread networkResponder([&] {
+        auto network = getNetworkInterfaceMock();
+        network->enterNetwork();
+        auto now = network->now();
+        performAuthoritativeHedgeBehavior(
+            network,
+            [&](NetworkInterfaceMock::NetworkOperationIterator authoritative,
+                NetworkInterfaceMock::NetworkOperationIterator hedged) {
+                network->scheduleResponse(hedged, now, testIgnorableErrorResponse);
+                network->scheduleSuccessfulResponse(authoritative, now, testSuccessResponse);
+                seenNetworkRequests.set();
+            });
+        network->runReadyNetworkOperations();
+        network->exitNetwork();
+    });
+    // Wait on the opCtx until networkResponder has observed the network requests.
+    // While we block on the opCtx, the current thread should run jobs scheduled
+    // on the baton, including enqueuing the network requests via `sendHedgedCommand` above.
+    seenNetworkRequests.get(getOpCtx());
+
+    networkResponder.join();
+    // Wait on the opCtx again to allow the current thread, via the baton, to propogate
+    // the network responses up into the resultFuture.
+    AsyncRPCResponse res = resultFuture.get(getOpCtx());
+
+    ASSERT_EQ(res.response.getCursor()->getNs(), testNS);
+    ASSERT_BSONOBJ_EQ(res.response.getCursor()->getFirstBatch()[0], testFirstBatch);
+    namespace m = unittest::match;
+    ASSERT_THAT(res.targetUsed, m::AnyOf(m::Eq(kTwoHosts[0]), m::Eq(kTwoHosts[1])));
+}
+TEST_F(HedgedAsyncRPCTest, BatonShutdownExecutorAlive) {
+    auto retryPolicy = std::make_shared<TestRetryPolicy>();
+    const auto maxNumRetries = 5;
+    const auto retryDelay = Milliseconds(10);
+    retryPolicy->setMaxNumRetries(maxNumRetries);
+    for (int i = 0; i < maxNumRetries; ++i)
+        retryPolicy->pushRetryDelay(retryDelay);
+    auto subBaton = getOpCtx()->getBaton()->makeSubBaton();
+    auto resultFuture = sendHedgedCommandWithHosts(testFindCmd, kTwoHosts, retryPolicy, *subBaton);
+
+    subBaton.shutdown();
+    auto net = getNetworkInterfaceMock();
+    for (auto i = 0; i <= maxNumRetries; i++) {
+        executor::NetworkInterfaceMock::InNetworkGuard guard(net);
+        net->advanceTime(net->now() + retryDelay);
+    }
+
+    auto error = resultFuture.getNoThrow().getStatus();
+    auto expectedDetachError = Status(ErrorCodes::ShutdownInProgress, "Baton detached");
+    auto expectedOuterReason = "Remote command execution failed due to executor shutdown";
+
+    ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);
+    ASSERT_EQ(error.reason(), expectedOuterReason);
+
+    auto extraInfo = error.extraInfo<AsyncRPCErrorInfo>();
+    ASSERT(extraInfo);
+
+    ASSERT(extraInfo->isLocal());
+    auto localError = extraInfo->asLocal();
+    ASSERT_EQ(localError, expectedDetachError);
+
+    ASSERT_EQ(0, retryPolicy->getNumRetriesPerformed());
+}
 }  // namespace
 }  // namespace async_rpc
 }  // namespace mongo

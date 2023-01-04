@@ -53,18 +53,25 @@ public:
                                                           Targeter* targeter,
                                                           OperationContext* opCtx,
                                                           std::shared_ptr<TaskExecutor> exec,
-                                                          CancellationToken token) final {
+                                                          CancellationToken token,
+                                                          BatonHandle baton) final {
+        auto proxyExec = std::make_shared<ProxyingExecutor>(baton, exec);
         auto targetsUsed = std::make_shared<std::vector<HostAndPort>>();
         return targeter->resolve(token)
-            .thenRunOn(exec)
-            .then([dbName, cmdBSON, opCtx, exec = std::move(exec), token, targetsUsed](
-                      std::vector<HostAndPort> targets) {
+            .thenRunOn(proxyExec)
+            .then([dbName,
+                   cmdBSON,
+                   opCtx,
+                   exec = std::move(exec),
+                   token,
+                   baton = std::move(baton),
+                   targetsUsed](std::vector<HostAndPort> targets) {
                 invariant(targets.size(),
                           "Successful targeting implies there are hosts to target.");
                 *targetsUsed = targets;
                 executor::RemoteCommandRequestOnAny executorRequest(
                     targets, dbName.toString(), cmdBSON, rpc::makeEmptyMetadata(), opCtx);
-                return exec->scheduleRemoteCommandOnAny(executorRequest, token);
+                return exec->scheduleRemoteCommandOnAny(executorRequest, token, std::move(baton));
             })
             .onError([targetsUsed](Status s) -> StatusWith<TaskExecutor::ResponseOnAnyStatus> {
                 // If there was a scheduling error or other local error before the

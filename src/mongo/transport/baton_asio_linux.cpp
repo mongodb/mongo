@@ -124,8 +124,8 @@ EventFDHolder& efd(OperationContext* opCtx) {
 }
 
 /**
- * This is only used by `run_until()`, and provides a unique timer id. This unique id is supplied by
- * `ReactorTimer`, and used by `waitUntil()` for internal bookkeeping.
+ * This is only used by `run_until()` and `waitUntil()`, and provides a unique timer id. This unique
+ * id is supplied by `ReactorTimer`, and used by the baton for internal bookkeeping.
  */
 class DummyTimer final : public ReactorTimer {
 public:
@@ -247,6 +247,28 @@ Future<void> AsioTransportLayer::BatonASIO::waitUntil(const ReactorTimer& reacto
     return ex.toStatus();
 }
 
+Future<void> AsioTransportLayer::BatonASIO::waitUntil(Date_t expiration,
+                                                      const CancellationToken& token) noexcept try {
+    auto pf = makePromiseFuture<void>();
+    DummyTimer dummy;
+    const size_t timerId = dummy.id();
+    _safeExecute(stdx::unique_lock(_mutex),
+                 [this, timerId, expiration, promise = std::move(pf.promise), &token](
+                     stdx::unique_lock<Mutex>) mutable {
+                     Timer timer{timerId, std::move(promise)};
+                     auto iter = _timers.emplace(expiration, std::move(timer));
+                     _timersById[iter->second.id] = iter;
+                 });
+    token.onCancel().thenRunOn(shared_from_this()).getAsync([this, timerId](Status s) {
+        if (s.isOK()) {
+            _cancelTimer(timerId);
+        }
+    });
+    return std::move(pf.future);
+} catch (const DBException& ex) {
+    return ex.toStatus();
+}
+
 bool AsioTransportLayer::BatonASIO::cancelSession(Session& session) noexcept {
     const auto id = session.id();
 
@@ -271,7 +293,10 @@ bool AsioTransportLayer::BatonASIO::cancelSession(Session& session) noexcept {
 
 bool AsioTransportLayer::BatonASIO::cancelTimer(const ReactorTimer& timer) noexcept {
     const auto id = timer.id();
+    return _cancelTimer(id);
+}
 
+bool AsioTransportLayer::BatonASIO::_cancelTimer(size_t id) noexcept {
     stdx::unique_lock lk(_mutex);
     if (_timersById.find(id) == _timersById.end())
         return false;

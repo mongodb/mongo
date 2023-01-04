@@ -115,22 +115,23 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
     std::shared_ptr<executor::TaskExecutor> exec,
     CancellationToken token,
     std::shared_ptr<RetryPolicy> retryPolicy = std::make_shared<NeverRetryPolicy>(),
-    ReadPreferenceSetting readPref = ReadPreferenceSetting(ReadPreference::PrimaryOnly)) {
+    ReadPreferenceSetting readPref = ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+    BatonHandle baton = nullptr) {
     using SingleResponse = AsyncRPCResponse<typename CommandType::Reply>;
 
     // Set up cancellation token to cancel remaining hedged operations.
     CancellationSource hedgeCancellationToken{token};
     auto targetsAttempted = std::make_shared<std::vector<HostAndPort>>();
+    auto proxyExec = std::make_shared<detail::ProxyingExecutor>(baton, exec);
     auto tryBody = [=, targeter = std::move(targeter)] {
         return targeter->resolve(token)
-            .thenRunOn(exec)
+            .thenRunOn(proxyExec)
             .onError([](Status status) -> StatusWith<std::vector<HostAndPort>> {
                 // Targeting error; rewrite it to a RemoteCommandExecutionError and skip
                 // command execution body. We'll retry if the policy indicates to.
                 return Status{AsyncRPCErrorInfo(status), status.reason()};
             })
-            .then([cmd, opCtx, exec, token, hedgeCancellationToken, readPref, targetsAttempted](
-                      std::vector<HostAndPort> targets) {
+            .then([=](std::vector<HostAndPort> targets) {
                 invariant(targets.size(),
                           "Successful targeting implies there are hosts to target.");
                 *targetsAttempted = targets;
@@ -146,8 +147,9 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
                     std::unique_ptr<Targeter> t = std::make_unique<FixedTargeter>(targets[i]);
                     auto options = std::make_shared<AsyncRPCOptions<CommandType>>(
                         cmd, exec, hedgeCancellationToken.token());
-                    requests.emplace_back(
-                        sendCommand(options, opCtx, std::move(t)).thenRunOn(exec));
+                    options->baton = baton;
+                    requests.push_back(
+                        sendCommand(options, opCtx, std::move(t)).thenRunOn(proxyExec));
                 }
 
                 /**
@@ -189,7 +191,7 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
                 !retryPolicy->recordAndEvaluateRetry(swResponse.getStatus());
         })
         .withBackoffBetweenIterations(detail::RetryDelayAsBackoff(retryPolicy.get()))
-        .on(exec, CancellationToken::uncancelable())
+        .on(proxyExec, CancellationToken::uncancelable())
         // We go inline here to intercept executor-shutdown errors and re-write them
         // so that the API always returns RemoteCommandExecutionError. Additionally,
         // we need to make sure we cancel outstanding requests.

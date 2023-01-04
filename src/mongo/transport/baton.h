@@ -32,6 +32,7 @@
 #include <memory>
 
 #include "mongo/db/baton.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"
 #include "mongo/util/out_of_line_executor.h"
@@ -73,6 +74,8 @@ public:
      * Adds a timer, returning a future which activates after a deadline.
      */
     virtual Future<void> waitUntil(const ReactorTimer& timer, Date_t expiration) noexcept = 0;
+
+    virtual Future<void> waitUntil(Date_t expiration, const CancellationToken& token) noexcept = 0;
 
     /**
      * Cancels waiting on a session.

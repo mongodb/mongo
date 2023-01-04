@@ -44,6 +44,7 @@
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"
@@ -412,6 +413,44 @@ TEST_F(AsyncRPCTestFixture, ExecutorShutdown) {
     ASSERT(ErrorCodes::isA<ErrorCategory::CancellationError>(extraInfo->asLocal()));
 }
 
+TEST_F(AsyncRPCTestFixture, BatonTest) {
+    std::unique_ptr<Targeter> targeter = std::make_unique<LocalHostTargeter>();
+    auto retryPolicy = std::make_shared<NeverRetryPolicy>();
+    HelloCommand helloCmd;
+    HelloCommandReply helloReply = HelloCommandReply(TopologyVersion(OID::gen(), 0));
+    initializeCommand(helloCmd);
+    auto opCtxHolder = makeOperationContext();
+    auto baton = opCtxHolder->getBaton();
+    auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
+        helloCmd, getExecutorPtr(), _cancellationToken);
+    options->baton = baton;
+    auto resultFuture = sendCommand(options, opCtxHolder.get(), std::move(targeter));
+
+    Notification<void> seenNetworkRequest;
+    unittest::ThreadAssertionMonitor monitor;
+    // This thread will respond to the request we sent via sendCommand above.
+    auto networkResponder = monitor.spawn([&] {
+        onCommand([&](const auto& request) {
+            ASSERT(request.cmdObj["hello"]);
+            seenNetworkRequest.set();
+            monitor.notifyDone();
+            return helloReply.toBSON();
+        });
+    });
+    // Wait on the opCtx until networkResponder has observed the network request.
+    // While we block on the opCtx, the current thread should run jobs scheduled
+    // on the baton, including enqueuing the network request via `sendCommand` above.
+    seenNetworkRequest.get(opCtxHolder.get());
+
+    networkResponder.join();
+    // Wait on the opCtx again to allow the current thread, via the baton, to propogate
+    // the network response up into the resultFuture.
+    AsyncRPCResponse res = resultFuture.get(opCtxHolder.get());
+
+    ASSERT_BSONOBJ_EQ(res.response.toBSON(), helloReply.toBSON());
+    ASSERT_EQ(HostAndPort("localhost", serverGlobalParams.port), res.targetUsed);
+}
+
 /*
  * Basic Targeter that returns the host that invoked it.
  */
@@ -506,6 +545,42 @@ TEST_F(AsyncRPCTestFixture, FailedTargeting) {
     // local error (which is just a Status) has the correct code.
     ASSERT(extraInfo->isLocal());
     ASSERT_EQ(extraInfo->asLocal(), targeterFailStatus);
+}
+TEST_F(AsyncRPCTestFixture, BatonShutdownExecutorAlive) {
+    std::unique_ptr<Targeter> targeter = std::make_unique<LocalHostTargeter>();
+    auto retryPolicy = std::make_shared<TestRetryPolicy>();
+    const auto maxNumRetries = 5;
+    const auto retryDelay = Milliseconds(10);
+    retryPolicy->setMaxNumRetries(maxNumRetries);
+    for (int i = 0; i < maxNumRetries; ++i)
+        retryPolicy->pushRetryDelay(retryDelay);
+    HelloCommand helloCmd;
+    HelloCommandReply helloReply = HelloCommandReply(TopologyVersion(OID::gen(), 0));
+    initializeCommand(helloCmd);
+    auto opCtxHolder = makeOperationContext();
+    auto subBaton = opCtxHolder->getBaton()->makeSubBaton();
+    auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
+        helloCmd, getExecutorPtr(), _cancellationToken);
+    options->baton = *subBaton;
+    auto resultFuture = sendCommand(options, opCtxHolder.get(), std::move(targeter));
+
+    subBaton.shutdown();
+
+    auto error = resultFuture.getNoThrow().getStatus();
+    auto expectedDetachError = Status(ErrorCodes::ShutdownInProgress, "Baton detached");
+    auto expectedOuterReason = "Remote command execution failed due to executor shutdown";
+
+    ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);
+    ASSERT_EQ(error.reason(), expectedOuterReason);
+
+    auto extraInfo = error.extraInfo<AsyncRPCErrorInfo>();
+    ASSERT(extraInfo);
+
+    ASSERT(extraInfo->isLocal());
+    auto localError = extraInfo->asLocal();
+    ASSERT_EQ(localError, expectedDetachError);
+
+    ASSERT_EQ(0, retryPolicy->getNumRetriesPerformed());
 }
 
 TEST_F(AsyncRPCTestFixture, SendTxnCommandWithoutTxnRouterAppendsNoTxnFields) {

@@ -100,7 +100,8 @@ public:
         Targeter* targeter,
         OperationContext* opCtx,
         std::shared_ptr<TaskExecutor> exec,
-        CancellationToken token) final {
+        CancellationToken token,
+        BatonHandle) final {
         auto [p, f] = makePromiseFuture<BSONObj>();
         auto targetsAttempted = std::make_shared<std::vector<HostAndPort>>();
         return targeter->resolve(token)
@@ -212,7 +213,8 @@ public:
         Targeter* targeter,
         OperationContext* opCtx,
         std::shared_ptr<TaskExecutor> exec,
-        CancellationToken token) final {
+        CancellationToken token,
+        BatonHandle) final {
         auto [p, f] = makePromiseFuture<BSONObj>();
         auto targetsAttempted = std::make_shared<std::vector<HostAndPort>>();
         return targeter->resolve(token).thenRunOn(exec).then([this,

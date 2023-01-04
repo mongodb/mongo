@@ -1084,14 +1084,47 @@ TEST_F(BatonASIOLinuxTest, BatonWithPendingTasksNeverPolls) {
 
 TEST_F(BatonASIOLinuxTest, BatonWithAnExpiredTimerNeverPolls) {
     auto timer = makeDummyTimer();
+    auto clkSource = getServiceContext()->getPreciseClockSource();
+
+    // Use the ReactorTimer-accepting overload of waitUntil
     blockIfBatonPolls(client(), [&](const BatonHandle& baton, Notification<void>& notification) {
         // Batons use the precise clock source internally. We use the current time (i.e., `now()`)
         // as the deadline to schedule an expired timer on the baton.
-        auto clkSource = getServiceContext()->getPreciseClockSource();
         baton->networking()->waitUntil(*timer, clkSource->now()).getAsync([&](Status) {
             notification.set();
         });
     });
+    // Do the same but with the CancellationToken-accepting overload of waitUntil
+    blockIfBatonPolls(client(), [&](const BatonHandle& baton, Notification<void>& notification) {
+        baton->networking()
+            ->waitUntil(clkSource->now(), CancellationToken::uncancelable())
+            .getAsync([&](Status) { notification.set(); });
+    });
+}
+
+TEST_F(BatonASIOLinuxTest, WaitUntilWithUncancellableTokenFiresAtDeadline) {
+    auto opCtx = client().makeOperationContext();
+    auto baton = opCtx->getBaton()->networking();
+    auto deadline = Date_t::now() + Milliseconds(10);
+    auto fut = baton->waitUntil(deadline, CancellationToken::uncancelable());
+    // We expect this assertion to be evaluated before the deadline is reached.
+    ASSERT_FALSE(fut.isReady());
+    // Now wait until we reach the deadline. Since we wait on the baton's associated
+    // opCtx, the baton's run() function should be invoked, and the
+    // baton should be woken up to fire the timer and ready `fut` at the deadline.
+    ASSERT_EQ(fut.getNoThrow(opCtx.get()), Status::OK());
+}
+
+TEST_F(BatonASIOLinuxTest, WaitUntilWithCanceledTokenIsCanceled) {
+    CancellationSource source;
+    auto token = source.token();
+    auto opCtx = client().makeOperationContext();
+    auto baton = opCtx->getBaton()->networking();
+    auto fut = baton->waitUntil(Date_t::now() + Seconds(10), token);
+    ASSERT_FALSE(fut.isReady());
+    source.cancel();
+    auto expectedError = Status{ErrorCodes::CallbackCanceled, "Baton wait canceled"};
+    ASSERT_EQ(fut.getNoThrow(opCtx.get()), expectedError);
 }
 
 TEST_F(BatonASIOLinuxTest, NotifyInterruptsRunUntilBeforeTimeout) {
