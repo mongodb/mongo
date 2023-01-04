@@ -1242,8 +1242,49 @@ inline auto makeABTConstant(StringData str) {
  * expression.
  */
 optimizer::ABT makeFillEmptyFalse(optimizer::ABT e);
+/**
+ * Check if expression returns Nothing and return boolean true if so. Otherwise, return the
+ * expression.
+ */
+optimizer::ABT makeFillEmptyTrue(optimizer::ABT e);
+optimizer::ABT makeNot(optimizer::ABT e);
 
 optimizer::ProjectionName makeVariableName(sbe::value::SlotId slotId);
 optimizer::ProjectionName makeLocalVariableName(sbe::FrameId frameId, sbe::value::SlotId slotId);
+
+optimizer::ABT generateABTNullOrMissing(optimizer::ProjectionName var);
+optimizer::ABT generateABTNonStringCheck(optimizer::ProjectionName var);
+optimizer::ABT generateABTNullishOrNotRepresentableInt32Check(optimizer::ProjectionName var);
+optimizer::ABT generateABTNegativeCheck(optimizer::ProjectionName var);
+/**
+ * Generates an ABT that checks if the input expression is NaN _assuming that_ it has
+ * already been verified to be numeric.
+ */
+optimizer::ABT generateABTNaNCheck(optimizer::ProjectionName var);
+
+optimizer::ABT makeABTFail(ErrorCodes::Error error, StringData errorMessage);
+
+/**
+ * A pair representing a 1) true/false condition and 2) the value that should be returned if that
+ * condition evaluates to true.
+ */
+using ABTCaseValuePair = std::pair<optimizer::ABT, optimizer::ABT>;
+
+/**
+ * Convert a list of CaseValuePairs into a chain of optimizer::If expressions, with the final else
+ * case evaluating to the 'defaultValue' optimizer::ABT.
+ */
+template <typename... Ts>
+optimizer::ABT buildABTMultiBranchConditional(Ts... cases);
+
+template <typename... Ts>
+optimizer::ABT buildABTMultiBranchConditional(ABTCaseValuePair headCase, Ts... rest) {
+    return optimizer::make<optimizer::If>(std::move(headCase.first),
+                                          std::move(headCase.second),
+                                          buildABTMultiBranchConditional(std::move(rest)...));
+}
+
+template <>
+optimizer::ABT buildABTMultiBranchConditional(optimizer::ABT defaultCase);
 
 }  // namespace mongo::stage_builder

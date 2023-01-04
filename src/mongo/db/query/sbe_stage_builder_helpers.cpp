@@ -1372,10 +1372,22 @@ std::unique_ptr<sbe::EExpression> abtToExpr(optimizer::ABT& abt, optimizer::Slot
     return exprLower.optimize(abt);
 }
 
-optimizer::ABT makeFillEmptyFalse(optimizer::ABT e) {
+optimizer::ABT makeFillEmpty(optimizer::ABT e, bool valueIfEmpty) {
     using namespace std::literals;
     return optimizer::make<optimizer::BinaryOp>(
-        optimizer::Operations::FillEmpty, std::move(e), optimizer::Constant::boolean(false));
+        optimizer::Operations::FillEmpty, std::move(e), optimizer::Constant::boolean(valueIfEmpty));
+}
+
+optimizer::ABT makeFillEmptyFalse(optimizer::ABT e) {
+    return makeFillEmpty(std::move(e), false);
+}
+
+optimizer::ABT makeFillEmptyTrue(optimizer::ABT e) {
+    return makeFillEmpty(std::move(e), true);
+}
+
+optimizer::ABT makeNot(optimizer::ABT e) {
+    return optimizer::make<optimizer::UnaryOp>(optimizer::Operations::Not, std::move(e));
 }
 
 optimizer::ProjectionName makeVariableName(sbe::value::SlotId slotId) {
@@ -1390,6 +1402,52 @@ optimizer::ProjectionName makeLocalVariableName(sbe::FrameId frameId, sbe::value
     str::stream varName;
     varName << "__l" << frameId << "." << slotId;
     return optimizer::ProjectionName{varName};
+}
+
+optimizer::ABT generateABTNullOrMissing(optimizer::ProjectionName var) {
+    return makeFillEmptyTrue(optimizer::make<optimizer::FunctionCall>(
+        "typeMatch",
+        optimizer::ABTVector{optimizer::make<optimizer::Variable>(var),
+                             optimizer::Constant::int32(getBSONTypeMask(BSONType::jstNULL) |
+                                                        getBSONTypeMask(BSONType::Undefined))}));
+}
+
+optimizer::ABT generateABTNonStringCheck(optimizer::ProjectionName var) {
+    return makeNot(optimizer::make<optimizer::FunctionCall>(
+        "isString", optimizer::ABTVector{optimizer::make<optimizer::Variable>(var)}));
+}
+
+optimizer::ABT generateABTNullishOrNotRepresentableInt32Check(optimizer::ProjectionName var) {
+    auto numericConvert32 = optimizer::make<optimizer::FunctionCall>(
+        "convert",
+        optimizer::ABTVector{
+            optimizer::make<optimizer::Variable>(var),
+            optimizer::Constant::int32(static_cast<int32_t>(sbe::value::TypeTags::NumberInt32))});
+    return optimizer::make<optimizer::BinaryOp>(
+        optimizer::Operations::Or,
+        generateABTNullOrMissing(var),
+        makeNot(optimizer::make<optimizer::FunctionCall>(
+            "exists", optimizer::ABTVector{std::move(numericConvert32)})));
+}
+
+optimizer::ABT generateABTNegativeCheck(optimizer::ProjectionName var) {
+    return optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Lt,
+                                                optimizer::make<optimizer::Variable>(var),
+                                                optimizer::Constant::int32(0));
+}
+
+optimizer::ABT generateABTNaNCheck(optimizer::ProjectionName var) {
+    return makeABTFunction("isNaN", optimizer::make<optimizer::Variable>(var));
+}
+
+optimizer::ABT makeABTFail(ErrorCodes::Error error, StringData errorMessage) {
+    return makeABTFunction(
+        "fail"_sd, optimizer::Constant::int32(error), makeABTConstant(errorMessage));
+}
+
+template <>
+optimizer::ABT buildABTMultiBranchConditional(optimizer::ABT defaultCase) {
+    return defaultCase;
 }
 
 }  // namespace mongo::stage_builder

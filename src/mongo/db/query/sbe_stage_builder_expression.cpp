@@ -3307,11 +3307,14 @@ private:
      * is numeric and is not null.
      */
     void generateTrigonometricExpression(StringData exprName) {
+        if (_context->hasAllAbtEligibleEntries(1)) {
+            return generateABTTrigonometricExpression(exprName);
+        }
         auto frameId = _context->state.frameId();
         auto binds = sbe::makeEs(_context->popExpr());
         sbe::EVariable inputRef(frameId, 0);
 
-        auto genericTrignomentricExpr = sbe::makeE<sbe::EIf>(
+        auto genericTrigonometricExpr = sbe::makeE<sbe::EIf>(
             generateNullOrMissing(frameId, 0),
             sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0),
             sbe::makeE<sbe::EIf>(makeFunction("isNumber", inputRef.clone()),
@@ -3322,7 +3325,25 @@ private:
                                                             << " supports only numeric types")));
 
         _context->pushExpr(sbe::makeE<sbe::ELocalBind>(
-            frameId, std::move(binds), std::move(genericTrignomentricExpr)));
+            frameId, std::move(binds), std::move(genericTrigonometricExpr)));
+    }
+
+    void generateABTTrigonometricExpression(StringData exprName) {
+        auto frameId = _context->state.frameId();
+        auto arg = _context->popABTExpr();
+        auto argName = makeLocalVariableName(frameId, 0);
+
+        auto genericTrigonometricExpr = buildABTMultiBranchConditional(
+            ABTCaseValuePair{generateABTNullOrMissing(argName), optimizer::Constant::null()},
+            ABTCaseValuePair{
+                makeABTFunction("isNumber", optimizer::make<optimizer::Variable>(argName)),
+                makeABTFunction(exprName, optimizer::make<optimizer::Variable>(argName))},
+            makeABTFail(ErrorCodes::Error{7157800},
+                        str::stream()
+                            << "$" << exprName.toString() << " supports only numeric types"));
+
+        _context->pushExpr(optimizer::make<optimizer::Let>(
+            std::move(argName), std::move(arg), std::move(genericTrigonometricExpr)));
     }
 
     /**
@@ -3330,10 +3351,13 @@ private:
      * operands are numeric and are not null.
      */
     void generateTrigonometricExpressionBinary(StringData exprName) {
+        if (_context->hasAllAbtEligibleEntries(2)) {
+            return generateABTTrigonometricExpressionBinary(exprName);
+        }
         _context->ensureArity(2);
         auto x = _context->popExpr();
         auto y = _context->popExpr();
-        auto genericTrignomentricExpr = makeLocalBind(
+        auto genericTrigonometricExpr = makeLocalBind(
             _context->state.frameIdGenerator,
             [&](sbe::EVariable lhs, sbe::EVariable rhs) {
                 return buildMultiBranchConditional(
@@ -3353,7 +3377,42 @@ private:
             },
             std::move(y),
             std::move(x));
-        _context->pushExpr(std::move(genericTrignomentricExpr));
+        _context->pushExpr(std::move(genericTrigonometricExpr));
+    }
+
+    void generateABTTrigonometricExpressionBinary(StringData exprName) {
+        _context->ensureArity(2);
+        auto rhs = _context->popABTExpr();
+        auto lhs = _context->popABTExpr();
+        auto lhsName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto rhsName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto lhsVariable = optimizer::make<optimizer::Variable>(lhsName);
+        auto rhsVariable = optimizer::make<optimizer::Variable>(rhsName);
+
+        auto checkNullOrMissing =
+            optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Or,
+                                                 generateABTNullOrMissing(lhsName),
+                                                 generateABTNullOrMissing(rhsName));
+
+        auto checkIsNumber =
+            optimizer::make<optimizer::BinaryOp>(optimizer::Operations::And,
+                                                 makeABTFunction("isNumber", lhsVariable),
+                                                 makeABTFunction("isNumber", rhsVariable));
+
+        auto genericTrigonometricExpr = buildABTMultiBranchConditional(
+            ABTCaseValuePair{std::move(checkNullOrMissing), optimizer::Constant::null()},
+            ABTCaseValuePair{
+                std::move(checkIsNumber),
+                makeABTFunction(exprName, std::move(lhsVariable), std::move(rhsVariable))},
+            makeABTFail(ErrorCodes::Error{7157801},
+                        str::stream() << "$" << exprName << " supports only numeric types"));
+
+
+        _context->pushExpr(optimizer::make<optimizer::Let>(
+            std::move(lhsName),
+            std::move(lhs),
+            optimizer::make<optimizer::Let>(
+                std::move(rhsName), std::move(rhs), std::move(genericTrigonometricExpr))));
     }
 
     /**
@@ -3363,6 +3422,10 @@ private:
     void generateTrigonometricExpressionWithBounds(StringData exprName,
                                                    const DoubleBound& lowerBound,
                                                    const DoubleBound& upperBound) {
+        if (_context->hasAllAbtEligibleEntries(1)) {
+            return generateABTTrigonometricExpressionWithBounds(exprName, lowerBound, upperBound);
+        }
+
         auto frameId = _context->state.frameId();
         auto binds = sbe::makeEs(_context->popExpr());
         sbe::EVariable inputRef(frameId, 0);
@@ -3384,7 +3447,7 @@ private:
                 sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberDouble,
                                            sbe::value::bitcastFrom<double>(upperBound.bound))));
 
-        auto genericTrignomentricExpr = sbe::makeE<sbe::EIf>(
+        auto genericTrigonometricExpr = sbe::makeE<sbe::EIf>(
             generateNullOrMissing(frameId, 0),
             sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::Null, 0),
             sbe::makeE<sbe::EIf>(
@@ -3406,7 +3469,45 @@ private:
                                           << ", " << upperBound.printUpperBound())))));
 
         _context->pushExpr(sbe::makeE<sbe::ELocalBind>(
-            frameId, std::move(binds), std::move(genericTrignomentricExpr)));
+            frameId, std::move(binds), std::move(genericTrigonometricExpr)));
+    }
+
+    void generateABTTrigonometricExpressionWithBounds(StringData exprName,
+                                                      const DoubleBound& lowerBound,
+                                                      const DoubleBound& upperBound) {
+        auto frameId = _context->state.frameId();
+        auto arg = _context->popABTExpr();
+        auto argName = makeLocalVariableName(frameId, 0);
+        auto variable = optimizer::make<optimizer::Variable>(argName);
+        optimizer::Operations lowerCmp =
+            lowerBound.inclusive ? optimizer::Operations::Gte : optimizer::Operations::Gt;
+        optimizer::Operations upperCmp =
+            upperBound.inclusive ? optimizer::Operations::Lte : optimizer::Operations::Lt;
+        auto checkBounds = optimizer::make<optimizer::BinaryOp>(
+            optimizer::Operations::And,
+            optimizer::make<optimizer::BinaryOp>(
+                lowerCmp, variable, optimizer::Constant::fromDouble(lowerBound.bound)),
+            optimizer::make<optimizer::BinaryOp>(
+                upperCmp, variable, optimizer::Constant::fromDouble(upperBound.bound)));
+
+        auto checkIsNumber = makeABTFunction("isNumber", variable);
+        auto trigonometricExpr = makeABTFunction(exprName, variable);
+
+        auto genericTrigonometricExpr = buildABTMultiBranchConditional(
+            ABTCaseValuePair{generateABTNullOrMissing(argName), optimizer::Constant::null()},
+            ABTCaseValuePair{makeNot(std::move(checkIsNumber)),
+                             makeABTFail(ErrorCodes::Error{7157802},
+                                         str::stream() << "$" << exprName.toString()
+                                                       << " supports only numeric types")},
+            ABTCaseValuePair{generateABTNaNCheck(argName), std::move(variable)},
+            ABTCaseValuePair{std::move(checkBounds), std::move(trigonometricExpr)},
+            makeABTFail(ErrorCodes::Error{7157803},
+                        str::stream() << "Cannot apply $" << exprName.toString()
+                                      << ", value must be in " << lowerBound.printLowerBound()
+                                      << ", " << upperBound.printUpperBound()));
+
+        _context->pushExpr(optimizer::make<optimizer::Let>(
+            std::move(argName), std::move(arg), std::move(genericTrigonometricExpr)));
     }
 
     /*
