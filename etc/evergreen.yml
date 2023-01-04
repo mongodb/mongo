@@ -1850,11 +1850,34 @@ buildvariants:
   name: &enterprise-rhel-80-64-bit-future-git-tag-multiversion enterprise-rhel-80-64-bit-future-git-tag-multiversion
   display_name: "Enterprise RHEL 8.0 (future git tag multiversion)"
   expansions:
-    <<: *linux-x86-multiversion-expansions-template
+    compile_flags: >-
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --ssl
+      --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+      MONGO_DISTMOD=rhel80
+      --link-model=dynamic
+    multiversion_platform: rhel80
+    multiversion_edition: enterprise
+    repo_edition: enterprise
+    scons_cache_scope: shared
+    scons_cache_mode: all
+    num_scons_link_jobs_available: 0.99
+    tooltags: "ssl sasl gssapi"
+    build_mongoreplay: true
+    large_distro_name: rhel80-medium
+    resmoke_jobs_factor: 0.25
     bv_future_git_tag: r100.0.0-9999
     test_flags: >-
       --excludeWithAnyTags=future_git_tag_incompatible
+    compile_variant: *enterprise-rhel-80-64-bit-future-git-tag-multiversion
+  depends_on: null
   tasks:
+  - name: version_expansions_gen
+    distros:
+    - rhel80-small
+  - name: compile_test_and_package_parallel_core_stream_TG
+    distros:
+    - rhel80-xlarge
   - name: .multiversion !.future_git_tag_incompatible
   - name: .multiversion_future_git_tag
 
