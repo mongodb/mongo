@@ -1189,6 +1189,11 @@ public:
         auto numChildren = expr->getChildren().size();
         _context->ensureArity(numChildren);
 
+        if (_context->hasAllAbtEligibleEntries(numChildren)) {
+            visitABT(expr, numChildren);
+            return;
+        }
+
         // If there are no children, return an empty array.
         if (numChildren == 0) {
             auto [emptyArrTag, emptyArrValue] = sbe::value::makeNewArray();
@@ -1237,6 +1242,60 @@ public:
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(resultExpr)));
     }
+
+    void visitABT(const ExpressionConcatArrays* expr, size_t numChildren) {
+        // If there are no children, return an empty array.
+        if (numChildren == 0) {
+            _context->pushExpr(optimizer::Constant::emptyArray());
+            return;
+        }
+
+        std::vector<optimizer::ABT> args;
+        args.reserve(numChildren);
+        for (size_t i = 0; i < numChildren; ++i) {
+            args.emplace_back(_context->popABTExpr());
+        }
+        std::reverse(args.begin(), args.end());
+
+        std::vector<optimizer::ABT> argIsNullOrMissing;
+        optimizer::ProjectionNameVector argNames;
+        optimizer::ABTVector argVars;
+        argIsNullOrMissing.reserve(numChildren);
+        argNames.reserve(numChildren);
+        argVars.reserve(numChildren);
+        for (size_t i = 0; i < numChildren; ++i) {
+            argNames.emplace_back(makeLocalVariableName(_context->state.frameId(), 0));
+            argVars.emplace_back(optimizer::make<optimizer::Variable>(argNames.back()));
+            argIsNullOrMissing.emplace_back(generateABTNullOrMissing(argNames.back()));
+        }
+
+        auto anyArgumentNullOrMissing =
+            makeBalancedBooleanOpTree(optimizer::Operations::Or, std::move(argIsNullOrMissing));
+
+        auto nullOrFailExpr = optimizer::make<optimizer::If>(
+            std::move(anyArgumentNullOrMissing),
+            optimizer::Constant::null(),
+            makeABTFail(ErrorCodes::Error{7158000}, "$concatArrays only supports arrays"));
+
+        optimizer::ProjectionName resultName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto resultExpr = optimizer::make<optimizer::Let>(
+            std::move(resultName),
+            optimizer::make<optimizer::FunctionCall>("concatArrays", std::move(argVars)),
+            optimizer::make<optimizer::If>(
+                optimizer::make<optimizer::FunctionCall>(
+                    "exists",
+                    optimizer::ABTVector{optimizer::make<optimizer::Variable>(resultName)}),
+                optimizer::make<optimizer::Variable>(resultName),
+                std::move(nullOrFailExpr)));
+
+        for (size_t i = 0; i < numChildren; ++i) {
+            resultExpr = optimizer::make<optimizer::Let>(
+                std::move(argNames[i]), std::move(args[i]), std::move(resultExpr));
+        }
+
+        _context->pushExpr(std::move(resultExpr));
+    }
+
     void visit(const ExpressionCond* expr) final {
         visitConditionalExpression(expr);
     }
@@ -2651,6 +2710,10 @@ public:
         unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionReverseArray* expr) final {
+        if (_context->hasAllAbtEligibleEntries(1)) {
+            visitABT(expr);
+            return;
+        }
         auto frameId = _context->state.frameId();
         auto binds = sbe::makeEs(_context->popExpr());
         sbe::EVariable inputRef{frameId, 0};
@@ -2668,7 +2731,33 @@ public:
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(exprRevArr)));
     }
 
+    void visitABT(const ExpressionReverseArray* expr) {
+        auto frameId = _context->state.frameId();
+        auto arg = _context->popABTExpr();
+        auto name = makeLocalVariableName(frameId, 0);
+        auto var = optimizer::make<optimizer::Variable>(name);
+
+        auto argumentIsNotArray =
+            makeNot(optimizer::make<optimizer::FunctionCall>("isArray", optimizer::ABTVector{var}));
+
+        auto exprReverseArr = buildABTMultiBranchConditional(
+            ABTCaseValuePair{generateABTNullOrMissing(name), optimizer::Constant::null()},
+            ABTCaseValuePair{
+                std::move(argumentIsNotArray),
+                makeABTFail(ErrorCodes::Error{7158002}, "$reverseArray argument must be an array")},
+            optimizer::make<optimizer::FunctionCall>("reverseArray",
+                                                     optimizer::ABTVector{std::move(var)}));
+
+        _context->pushExpr(optimizer::make<optimizer::Let>(
+            std::move(name), std::move(arg), std::move(exprReverseArr)));
+    }
+
     void visit(const ExpressionSortArray* expr) final {
+        if (_context->hasAllAbtEligibleEntries(1)) {
+            visitABT(expr);
+            return;
+        }
+
         auto frameId = _context->state.frameId();
         auto binds = sbe::makeEs(_context->popExpr());
         sbe::EVariable inputRef{frameId, 0};
@@ -2694,6 +2783,39 @@ public:
 
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(exprSortArr)));
+    }
+
+    void visitABT(const ExpressionSortArray* expr) {
+        auto frameId = _context->state.frameId();
+        auto arg = _context->popABTExpr();
+        auto name = makeLocalVariableName(frameId, 0);
+        auto var = optimizer::make<optimizer::Variable>(name);
+
+        auto [specTag, specVal] = makeValue(expr->getSortPattern());
+        auto specConstant = makeABTConstant(specTag, specVal);
+
+        auto collatorSlot = _context->state.data->env->getSlotIfExists("collator"_sd);
+        auto collatorVar = collatorSlot.map(
+            [&](auto slotId) { return _context->registerVariable(*collatorSlot); });
+
+        auto argumentIsNotArray =
+            makeNot(optimizer::make<optimizer::FunctionCall>("isArray", optimizer::ABTVector{var}));
+
+        optimizer::ABTVector functionArgs{std::move(var), std::move(specConstant)};
+        if (collatorVar) {
+            functionArgs.emplace_back(
+                optimizer::make<optimizer::Variable>(std::move(*collatorVar)));
+        }
+
+        auto exprSortArr = buildABTMultiBranchConditional(
+            ABTCaseValuePair{generateABTNullOrMissing(name), optimizer::Constant::null()},
+            ABTCaseValuePair{std::move(argumentIsNotArray),
+                             makeABTFail(ErrorCodes::Error{7158001},
+                                         "$sortArray input argument must be an array")},
+            optimizer::make<optimizer::FunctionCall>("sortArray", std::move(functionArgs)));
+
+        _context->pushExpr(optimizer::make<optimizer::Let>(
+            std::move(name), std::move(arg), std::move(exprSortArr)));
     }
 
     void visit(const ExpressionSlice* expr) final {
@@ -3135,6 +3257,7 @@ private:
 
         if (_context->hasAllAbtEligibleEntries(numChildren)) {
             std::vector<optimizer::ABT> exprs;
+            exprs.reserve(numChildren);
             for (size_t i = 0; i < numChildren; ++i) {
                 exprs.emplace_back(
                     makeFillEmptyFalse(makeABTFunction("coerceToBool", _context->popABTExpr())));
@@ -3516,6 +3639,11 @@ private:
     void visitIndexOfFunction(const Expression* expr,
                               ExpressionVisitorContext* _context,
                               const std::string& indexOfFunction) {
+        if (_context->hasAllAbtEligibleEntries(expr->getChildren().size())) {
+            visitIndexOfFunctionABT(expr, indexOfFunction);
+            return;
+        }
+
         auto frameId = _context->state.frameId();
         auto children = expr->getChildren();
         auto operandSize = children.size() <= 3 ? 3 : 4;
@@ -3623,6 +3751,128 @@ private:
             std::move(exprIndexOfFunction));
         _context->pushExpr(sbe::makeE<sbe::ELocalBind>(
             frameId, std::move(operands), std::move(totalExprIndexOfFunction)));
+    }
+
+    void visitIndexOfFunctionABT(const Expression* expr, const std::string& indexOfFunction) {
+        auto children = expr->getChildren();
+        auto operandSize = children.size() <= 3 ? 3 : 4;
+        optimizer::ABTVector operands;
+        operands.reserve(operandSize);
+
+        auto strName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto substrName = makeLocalVariableName(_context->state.frameId(), 0);
+        boost::optional<optimizer::ProjectionName> startIndexName;
+        boost::optional<optimizer::ProjectionName> endIndexName;
+
+        // Get arguments from stack.
+        switch (children.size()) {
+            case 2: {
+                operands.emplace_back(optimizer::Constant::int64(0));
+                operands.emplace_back(_context->popABTExpr());
+                operands.emplace_back(_context->popABTExpr());
+                startIndexName.emplace(makeLocalVariableName(_context->state.frameId(), 0));
+                break;
+            }
+            case 3: {
+                operands.emplace_back(_context->popABTExpr());
+                operands.emplace_back(_context->popABTExpr());
+                operands.emplace_back(_context->popABTExpr());
+                startIndexName.emplace(makeLocalVariableName(_context->state.frameId(), 0));
+                break;
+            }
+            case 4: {
+                operands.emplace_back(_context->popABTExpr());
+                operands.emplace_back(_context->popABTExpr());
+                operands.emplace_back(_context->popABTExpr());
+                operands.emplace_back(_context->popABTExpr());
+                startIndexName.emplace(makeLocalVariableName(_context->state.frameId(), 0));
+                endIndexName.emplace(makeLocalVariableName(_context->state.frameId(), 0));
+                break;
+            }
+            default:
+                MONGO_UNREACHABLE;
+        }
+
+        // Add string and substring operands.
+        optimizer::ABTVector functionArgs{optimizer::make<optimizer::Variable>(strName),
+                                          optimizer::make<optimizer::Variable>(substrName)};
+
+        // Add start index operand.
+        if (startIndexName) {
+            auto numericConvert64 = optimizer::make<optimizer::FunctionCall>(
+                "convert",
+                optimizer::ABTVector{optimizer::make<optimizer::Variable>(*startIndexName),
+                                     optimizer::Constant::int32(
+                                         static_cast<int32_t>(sbe::value::TypeTags::NumberInt64))});
+            auto checkValidStartIndex = buildABTMultiBranchConditional(
+                ABTCaseValuePair{generateABTNullishOrNotRepresentableInt32Check(*startIndexName),
+                                 makeABTFail(ErrorCodes::Error{7158003},
+                                             str::stream()
+                                                 << "$" << indexOfFunction
+                                                 << " start index must resolve to a number")},
+                ABTCaseValuePair{generateABTNegativeCheck(*startIndexName),
+                                 makeABTFail(ErrorCodes::Error{7158004},
+                                             str::stream() << "$" << indexOfFunction
+                                                           << " start index must be positive")},
+                std::move(numericConvert64));
+            functionArgs.push_back(std::move(checkValidStartIndex));
+        }
+
+        // Add end index operand.
+        if (endIndexName) {
+            auto numericConvert64 = optimizer::make<optimizer::FunctionCall>(
+                "convert",
+                optimizer::ABTVector{optimizer::make<optimizer::Variable>(*endIndexName),
+                                     optimizer::Constant::int32(
+                                         static_cast<int32_t>(sbe::value::TypeTags::NumberInt64))});
+            auto checkValidEndIndex = buildABTMultiBranchConditional(
+                ABTCaseValuePair{generateABTNullishOrNotRepresentableInt32Check(*endIndexName),
+                                 makeABTFail(ErrorCodes::Error{7158005},
+                                             str::stream()
+                                                 << "$" << indexOfFunction
+                                                 << " end index must resolve to a number")},
+                ABTCaseValuePair{generateABTNegativeCheck(*endIndexName),
+                                 makeABTFail(ErrorCodes::Error{7158006},
+                                             str::stream() << "$" << indexOfFunction
+                                                           << " end index must be positive")},
+                std::move(numericConvert64));
+            functionArgs.push_back(std::move(checkValidEndIndex));
+        }
+
+        // Check if string or substring are null or missing before calling indexOfFunction.
+        auto resultExpr = buildABTMultiBranchConditional(
+            ABTCaseValuePair{generateABTNullOrMissing(strName), optimizer::Constant::null()},
+            ABTCaseValuePair{generateABTNonStringCheck(strName),
+                             makeABTFail(ErrorCodes::Error{7158007},
+                                         str::stream()
+                                             << "$" << indexOfFunction
+                                             << " string must resolve to a string or null")},
+            ABTCaseValuePair{generateABTNullOrMissing(substrName),
+                             makeABTFail(ErrorCodes::Error{7158008},
+                                         str::stream() << "$" << indexOfFunction
+                                                       << " substring must resolve to a string")},
+            ABTCaseValuePair{generateABTNonStringCheck(substrName),
+                             makeABTFail(ErrorCodes::Error{7158009},
+                                         str::stream() << "$" << indexOfFunction
+                                                       << " substring must resolve to a string")},
+            optimizer::make<optimizer::FunctionCall>(indexOfFunction, std::move(functionArgs)));
+
+        // Build local binding tree.
+        int operandIdx = 0;
+        if (endIndexName) {
+            resultExpr = optimizer::make<optimizer::Let>(
+                *endIndexName, std::move(operands[operandIdx++]), std::move(resultExpr));
+        }
+        if (startIndexName) {
+            resultExpr = optimizer::make<optimizer::Let>(
+                *startIndexName, std::move(operands[operandIdx++]), std::move(resultExpr));
+        }
+        resultExpr = optimizer::make<optimizer::Let>(
+            std::move(substrName), std::move(operands[operandIdx++]), std::move(resultExpr));
+        resultExpr = optimizer::make<optimizer::Let>(
+            std::move(strName), std::move(operands[operandIdx++]), std::move(resultExpr));
+
+        _context->pushExpr(std::move(resultExpr));
     }
 
     /**
