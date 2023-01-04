@@ -62,6 +62,7 @@ _RE_STD_OPTIONAL = re.compile(r'\bstd::optional\b')
 _RE_TRACING_SUPPORT = re.compile(r'\bTracerProvider::(get|initialize)\b')
 _RE_COLLECTION_SHARDING_RUNTIME = re.compile(r'\bCollectionShardingRuntime\b')
 _RE_UNINTERRUPTIBLE_LOCK_GUARD = re.compile(r'\bUninterruptibleLockGuard\s+.+\s*;')
+_RE_RAND = re.compile(r'\b(srand\(|rand\(\))')
 
 _RE_GENERIC_FCV_COMMENT = re.compile(r'\(Generic FCV reference\):')
 GENERIC_FCV = [
@@ -157,6 +158,7 @@ class Linter:
             self._check_for_tracing_support(linenum)
             self._check_for_collection_sharding_runtime(linenum)
             self._check_for_uninterruptible_lock_guard(linenum)
+            self._check_for_rand(linenum)
 
             # Relax the rule of commenting generic FCV references for files directly related to FCV
             # implementations.
@@ -311,6 +313,12 @@ class Linter:
                 'the programming model inside MongoDB requires that all operations be interruptible. '
                 'Review with care and if the use is warranted, add NOLINT and a comment explaining why.'
             )
+
+    def _check_for_rand(self, linenum):
+        line = self.clean_lines[linenum]
+        if _RE_RAND.search(line):
+            self._error(linenum, 'mongodb/rand',
+                        'Use of rand or srand, use <random> or PseudoRandom instead.')
 
     def _license_error(self, linenum, msg, category='legal/license'):
         style_url = 'https://github.com/mongodb/mongo/wiki/Server-Code-Style'

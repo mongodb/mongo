@@ -102,7 +102,7 @@ int runDbTests(int argc, char** argv) {
             return std::unique_ptr<DBClientBase>(new DBDirectClient(opCtx));
         });
 
-    srand((unsigned)frameworkGlobalParams.seed);
+    srand((unsigned)frameworkGlobalParams.seed);  // NOLINT
 
     // Set up the periodic runner for background job execution, which is required by the storage
     // engine to be running beforehand.

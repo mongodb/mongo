@@ -600,7 +600,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     }
 
     // This is for security on certain platforms (nonce generation)
-    srand((unsigned)(curTimeMicros64()) ^ (unsigned(uintptr_t(&startupOpCtx))));
+    srand((unsigned)(curTimeMicros64()) ^ (unsigned(uintptr_t(&startupOpCtx))));  // NOLINT
 
     if (globalAuthzManager->shouldValidateAuthSchemaOnStartup()) {
         Status status = verifySystemIndexes(startupOpCtx.get());
@@ -1587,7 +1587,7 @@ int mongod_main(int argc, char* argv[]) {
 
     setupSignalHandlers();
 
-    srand(static_cast<unsigned>(curTimeMicros64()));
+    srand(static_cast<unsigned>(curTimeMicros64()));  // NOLINT
 
     Status status = mongo::runGlobalInitializers(std::vector<std::string>(argv, argv + argc));
     if (!status.isOK()) {

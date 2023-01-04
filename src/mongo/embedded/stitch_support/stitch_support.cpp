@@ -116,7 +116,7 @@ StitchSupportStatusImpl* getStatusImpl(stitch_support_v1_status* status) {
 using StitchSupportException = ExceptionForAPI<stitch_support_v1_error>;
 
 ServiceContext* initialize() {
-    srand(static_cast<unsigned>(curTimeMicros64()));
+    srand(static_cast<unsigned>(curTimeMicros64()));  // NOLINT
 
     // The global initializers can take arguments, which would normally be supplied on the command
     // line, but we assume that clients of this library will never want anything other than the

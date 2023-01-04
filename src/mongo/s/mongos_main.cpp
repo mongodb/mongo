@@ -800,7 +800,7 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
         return ExitCode::processHealthCheck;
     }
 
-    srand((unsigned)(curTimeMicros64()) ^ (unsigned(uintptr_t(&opCtx))));
+    srand((unsigned)(curTimeMicros64()) ^ (unsigned(uintptr_t(&opCtx))));  // NOLINT
 
     SessionKiller::set(serviceContext,
                        std::make_shared<SessionKiller>(serviceContext, killSessionsRemote));

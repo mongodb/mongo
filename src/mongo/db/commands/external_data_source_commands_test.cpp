@@ -71,8 +71,6 @@ protected:
     void setUp() override {
         ServiceContextMongoDTest::setUp();
 
-        std::srand(std::time(0));
-
         const auto service = getServiceContext();
         auto replCoord =
             std::make_unique<repl::ReplicationCoordinatorMock>(service, repl::ReplSettings{});
