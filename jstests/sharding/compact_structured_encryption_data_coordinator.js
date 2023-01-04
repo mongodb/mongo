@@ -60,23 +60,6 @@ assert.eq(reply.stats.esc.inserted, 0);
 assert.eq(reply.stats.esc.updated, 0);
 assert.eq(reply.stats.esc.deleted, 0);
 
-// The eccoc collection is gone, so we should return quickly with no work done.
-const nowork = assert.commandWorked(test.encrypted.compact());
-jsTest.log(nowork);
-
-assert.eq(nowork.stats.ecoc.read, 0);
-assert.eq(nowork.stats.ecoc.deleted, 0);
-
-assert.eq(nowork.stats.ecc.read, 0);
-assert.eq(nowork.stats.ecc.inserted, 0);
-assert.eq(nowork.stats.ecc.updated, 0);
-assert.eq(nowork.stats.ecc.deleted, 0);
-
-assert.eq(nowork.stats.esc.read, 0);
-assert.eq(nowork.stats.esc.inserted, 0);
-assert.eq(nowork.stats.esc.updated, 0);
-assert.eq(nowork.stats.esc.deleted, 0);
-
 if (kHaveAuditing) {
     jsTest.log('Verifying audit contents');
 

@@ -69,6 +69,25 @@ var EncryptedClient = class {
     }
 
     /**
+     * Get the namespaces of the state collections that are associated with the given
+     * encrypted data collection namespace.
+     * @param {string} name Name of the encrypted data collection
+     * @returns Object with fields "esc", "ecc", and "ecoc" whose values
+     *          are the corresponding namespace strings.
+     */
+    getStateCollectionNamespaces(collName) {
+        const baseCollInfos = this._edb.getCollectionInfos({"name": collName});
+        assert.eq(baseCollInfos.length, 1);
+        const baseCollInfo = baseCollInfos[0];
+        assert(baseCollInfo.options.encryptedFields !== undefined);
+        return {
+            esc: baseCollInfo.options.encryptedFields.escCollection,
+            ecc: baseCollInfo.options.encryptedFields.eccCollection,
+            ecoc: baseCollInfo.options.encryptedFields.ecocCollection,
+        };
+    }
+
+    /**
      * Create an encrypted collection. If key ids are not specified, it creates them automatically
      * in the key vault.
      *
@@ -296,7 +315,7 @@ var EncryptedClient = class {
         assert.docEq(docs, onDiskDocs);
     }
 
-    assertStateCollectionsAfterCompact(collName, ecocExists) {
+    assertStateCollectionsAfterCompact(collName, ecocExists, ecocTempExists = false) {
         const baseCollInfos = this._edb.getCollectionInfos({"name": collName});
         assert.eq(baseCollInfos.length, 1);
         const baseCollInfo = baseCollInfos[0];
@@ -309,7 +328,7 @@ var EncryptedClient = class {
         checkMap[baseCollInfo.options.encryptedFields.escCollection] = true;
         checkMap[baseCollInfo.options.encryptedFields.eccCollection] = true;
         checkMap[baseCollInfo.options.encryptedFields.ecocCollection] = ecocExists;
-        checkMap[baseCollInfo.options.encryptedFields.ecocCollection + ".compact"] = false;
+        checkMap[baseCollInfo.options.encryptedFields.ecocCollection + ".compact"] = ecocTempExists;
 
         const edb = this._edb;
         Object.keys(checkMap).forEach(function(coll) {

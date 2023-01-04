@@ -35,6 +35,7 @@
 #include "mongo/base/checked_cast.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/commands/create_gen.h"
 #include "mongo/db/commands/fle2_compact.h"
 #include "mongo/db/commands/rename_collection_gen.h"
 #include "mongo/db/dbdirectclient.h"
@@ -49,6 +50,8 @@ namespace mongo {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(fleCompactHangAfterDropTempCollection);
+MONGO_FAIL_POINT_DEFINE(fleCompactHangBeforeECOCCreate);
+MONGO_FAIL_POINT_DEFINE(fleCompactHangAfterECOCCreate);
 
 const auto kMajorityWriteConcern = BSON("writeConcern" << BSON("w"
                                                                << "majority"));
@@ -100,53 +103,74 @@ void doRenameOperation(const CompactStructuredEncryptionDataState& state,
                         "uuid"_attr = ecocRenameUuid.value(),
                         "expectedUUID"_attr = state.getEcocRenameUuid().value());
             *skipCompact = true;
+            return;
         }
-        // the temp ecoc from a previous compact still exists, so skip rename
-        return;
+        // The temp ECOC from a previous compact still exists, so no need to rename.
+        if (hasEcocNow) {
+            // The ECOC already exists, so skip explicitly creating it.
+            return;
+        }
+    } else {
+        if (!hasEcocNow) {
+            // Nothing to rename.
+            LOGV2_DEBUG(6350492,
+                        1,
+                        "Skipping rename stage as there is no source collection",
+                        "ecocNss"_attr = ecocNss);
+            *skipCompact = true;
+            return;
+        } else if (!hasEcocBefore) {
+            // mismatch of before/after state
+            LOGV2_DEBUG(6517003,
+                        1,
+                        "Skipping compaction due to change in collection state",
+                        "ecocNss"_attr = ecocNss);
+            *skipCompact = true;
+            return;
+        } else if (ecocUuid.value() != state.getEcocUuid().value()) {
+            // The generation of the collection to be compacted is different than the one which was
+            // requested.
+            LOGV2_DEBUG(6350491,
+                        1,
+                        "Skipping rename of mismatched collection uuid",
+                        "ecocNss"_attr = ecocNss,
+                        "uuid"_attr = ecocUuid.value(),
+                        "expectedUUID"_attr = state.getEcocUuid().value());
+            *skipCompact = true;
+            return;
+        }
+
+        LOGV2(6517004,
+              "Renaming the encrypted compaction collection",
+              "ecocNss"_attr = ecocNss,
+              "ecocUuid"_attr = ecocUuid.value(),
+              "ecocRenameNss"_attr = ecocRenameNss);
+
+        // Perform the rename so long as the target namespace does not exist.
+        RenameCollectionCommand cmd(ecocNss, ecocRenameNss);
+        cmd.setDropTarget(false);
+        cmd.setCollectionUUID(state.getEcocUuid().value());
+
+        doRunCommand(opCtx.get(), ecocNss.db(), cmd);
+        *newEcocRenameUuid = state.getEcocUuid();
     }
 
-    if (!hasEcocNow) {
-        // Nothing to rename.
-        LOGV2_DEBUG(6350492,
-                    1,
-                    "Skipping rename stage as there is no source collection",
-                    "ecocNss"_attr = ecocNss);
-        *skipCompact = true;
-        return;
-    } else if (!hasEcocBefore) {
-        // mismatch of before/after state
-        LOGV2_DEBUG(6517003,
-                    1,
-                    "Skipping compaction due to change in collection state",
-                    "ecocNss"_attr = ecocNss);
-        *skipCompact = true;
-        return;
-    } else if (ecocUuid.value() != state.getEcocUuid().value()) {
-        // The generation of the collection to be compacted is different than the one which was
-        // requested.
-        LOGV2_DEBUG(6350491,
-                    1,
-                    "Skipping rename of mismatched collection uuid",
-                    "ecocNss"_attr = ecocNss,
-                    "uuid"_attr = ecocUuid.value(),
-                    "expectedUUID"_attr = state.getEcocUuid().value());
-        *skipCompact = true;
-        return;
+    if (MONGO_unlikely(fleCompactHangBeforeECOCCreate.shouldFail())) {
+        LOGV2(7140500, "Hanging due to fleCompactHangBeforeECOCCreate fail point");
+        fleCompactHangBeforeECOCCreate.pauseWhileSet();
     }
 
-    LOGV2(6517004,
-          "Renaming the encrypted compaction collection",
-          "ecocNss"_attr = ecocNss,
-          "ecocUuid"_attr = ecocUuid.value(),
-          "ecocRenameNss"_attr = ecocRenameNss);
+    // Create the new ECOC collection
+    CreateCommand createCmd(ecocNss);
+    mongo::ClusteredIndexSpec clusterIdxSpec(BSON("_id" << 1), true);
+    createCmd.setClusteredIndex(
+        stdx::variant<bool, mongo::ClusteredIndexSpec>(std::move(clusterIdxSpec)));
+    doRunCommand(opCtx.get(), ecocNss.db(), createCmd);
 
-    // Otherwise, perform the rename so long as the target namespace does not exist.
-    RenameCollectionCommand cmd(ecocNss, ecocRenameNss);
-    cmd.setDropTarget(false);
-    cmd.setCollectionUUID(state.getEcocUuid().value());
-
-    doRunCommand(opCtx.get(), ecocNss.db(), cmd);
-    *newEcocRenameUuid = state.getEcocUuid();
+    if (MONGO_unlikely(fleCompactHangAfterECOCCreate.shouldFail())) {
+        LOGV2(7140501, "Hanging due to fleCompactHangAfterECOCCreate fail point");
+        fleCompactHangAfterECOCCreate.pauseWhileSet();
+    }
 }
 
 CompactStats doCompactOperation(const CompactStructuredEncryptionDataState& state) {
