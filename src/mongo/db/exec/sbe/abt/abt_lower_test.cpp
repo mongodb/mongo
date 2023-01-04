@@ -31,6 +31,7 @@
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
 #include "mongo/db/query/optimizer/explain.h"
+#include "mongo/db/query/optimizer/node.h"
 #include "mongo/db/query/optimizer/node_defs.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/rewrites/path_lower.h"
@@ -71,6 +72,10 @@ protected:
     std::string stripUUIDs(std::string str) {
         // UUIDs are printed with a leading '@' character, and in quotes.
         auto atIndex = str.find('@');
+        // If there aren't any UUIDs in the string, return the input.
+        if (atIndex == std::string::npos) {
+            return str;
+        }
         // Expect a quote after the '@' in the plan.
         ASSERT_EQUALS('\"', str[atIndex + 1]);
         // The next character is a quote. Find the close quote.
@@ -325,5 +330,12 @@ TEST_F(ABTPlanGeneration, LowerCollationNode) {
                       {{"a", "sortA"}, {"b", "sortB"}}, _node(scanForTest()), "scan0", _nodeMap)),
               collationNodeProp2));
 }
+
+TEST_F(ABTPlanGeneration, LowerCoScanNode) {
+    GoldenTestContext ctx(&goldenTestConfig);
+    ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
+    runNodeVariation(ctx, "CoScan", _node(make<CoScanNode>()));
+}
+
 }  // namespace
 }  // namespace mongo::optimizer

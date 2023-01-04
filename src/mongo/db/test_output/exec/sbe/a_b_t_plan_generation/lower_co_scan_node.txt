@@ -1,0 +1,8 @@
+# Golden test output of ABTPlanGeneration/LowerCoScanNode
+
+==== VARIATION: CoScan ====
+-- INPUT:
+CoScan []
+
+-- OUTPUT:
+[1] coscan 
