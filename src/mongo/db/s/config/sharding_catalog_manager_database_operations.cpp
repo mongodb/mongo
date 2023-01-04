@@ -156,8 +156,10 @@ DatabaseType ShardingCatalogManager::createDatabase(
 
         // Do another loop, with the db lock held in order to avoid taking the expensive path on
         // concurrent create database operations
-        dbLock.emplace(DDLLockManager::get(opCtx)->lock(
-            opCtx, dbName, "createDatabase" /* reason */, DDLLockManager::kDefaultLockTimeout));
+        dbLock.emplace(DDLLockManager::get(opCtx)->lock(opCtx,
+                                                        str::toLower(dbName),
+                                                        "createDatabase" /* reason */,
+                                                        DDLLockManager::kDefaultLockTimeout));
     }
 
     // Expensive createDatabase code path
