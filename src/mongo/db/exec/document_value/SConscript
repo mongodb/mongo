@@ -29,3 +29,14 @@ env.Library(
         'document_value',
     ],
 )
+
+env.Benchmark(
+    target='document_bm',
+    source=[
+        'document_bm.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        'document_value',
+    ],
+)
