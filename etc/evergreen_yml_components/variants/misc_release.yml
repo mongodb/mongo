@@ -177,7 +177,6 @@ buildvariants:
     distros:
     - ubuntu2004-package
   - name: .publish
-  - name: .publish_test
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-amazon2
@@ -244,7 +243,6 @@ buildvariants:
     distros:
     - ubuntu2004-package
   - name: .publish
-  - name: .publish_test
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: amazon2-arm64
@@ -298,7 +296,6 @@ buildvariants:
     distros:
     - ubuntu1804-arm64-build
   - name: .publish
-  - name: .publish_test
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-amazon2-arm64
@@ -427,7 +424,6 @@ buildvariants:
     distros:
     - ubuntu1804-arm64-build
   - name: .publish
-  - name: .publish_test
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: amazon2022-arm64
@@ -477,7 +473,6 @@ buildvariants:
     distros:
     - ubuntu2204-arm64-large
   - name: .publish
-  - name: .publish_test
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-amazon2022-arm64
@@ -602,7 +597,6 @@ buildvariants:
     distros:
     - ubuntu2204-arm64-large
   - name: .publish
-  - name: .publish_test
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: debian10
@@ -658,7 +652,6 @@ buildvariants:
     distros:
     - ubuntu2004-package
   - name: .publish
-  - name: .publish_test
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-debian10-64
@@ -722,7 +715,6 @@ buildvariants:
     distros:
     - ubuntu2004-package
   - name: .publish
-  - name: .publish_test
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: debian11
@@ -778,7 +770,6 @@ buildvariants:
     distros:
     - ubuntu2204-large
   - name: .publish
-  - name: .publish_test
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-debian11-64
@@ -840,7 +831,6 @@ buildvariants:
     distros:
     - ubuntu2204-large
   - name: .publish
-  - name: .publish_test
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: rhel70
@@ -896,7 +886,6 @@ buildvariants:
     - ubuntu2004-package
   - name: selinux_rhel7_org
   - name: .publish
-  - name: .publish_test
   - name: generate_buildid_to_debug_symbols_mapping
 
   # This variant compiles on RHEL 7.0 and runs tests on RHEL 7.6
@@ -997,7 +986,6 @@ buildvariants:
     distros:
     - ubuntu2004-package
   - name: .publish
-  - name: .publish_test
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-rhel-80-64-bit
@@ -1123,7 +1111,6 @@ buildvariants:
     - ubuntu2004-package
   - name: selinux_rhel8_enterprise
   - name: .publish
-  - name: .publish_test
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: rhel-82-arm64
@@ -1175,7 +1162,6 @@ buildvariants:
     distros:
     - ubuntu1804-arm64-build
   - name: .publish
-  - name: .publish_test
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-rhel-82-arm64
@@ -1244,7 +1230,6 @@ buildvariants:
     distros:
     - ubuntu1804-arm64-build
   - name: .publish
-  - name: .publish_test
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: rhel90
@@ -1296,7 +1281,6 @@ buildvariants:
     - ubuntu2204-large
   - name: selinux_rhel9_org
   - name: .publish
-  - name: .publish_test
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-rhel-90-64-bit
@@ -1373,7 +1357,6 @@ buildvariants:
     - ubuntu2204-large
   - name: selinux_rhel9_enterprise
   - name: .publish
-  - name: .publish_test
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: suse12
@@ -1431,7 +1414,6 @@ buildvariants:
     distros:
     - ubuntu2004-package
   - name: .publish
-  - name: .publish_test
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-suse12-64
@@ -1490,7 +1472,6 @@ buildvariants:
     distros:
     - ubuntu2004-package
   - name: .publish
-  - name: .publish_test
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-suse15-64
@@ -1542,7 +1523,6 @@ buildvariants:
   - name: .crypt
   - name: .publish_crypt
   - name: .publish
-  - name: .publish_test
   - name: test_packages
     distros:
     - ubuntu2004-package
@@ -1597,7 +1577,6 @@ buildvariants:
   - name: .ssl
   - name: .stitch
   - name: .publish
-  - name: .publish_test
   - name: test_packages
     distros:
     - ubuntu2004-package
@@ -1664,7 +1643,6 @@ buildvariants:
     distros:
     - ubuntu2004-package
   - name: .publish
-  - name: .publish_test
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-ubuntu1804-64
@@ -1747,7 +1725,6 @@ buildvariants:
     distros:
     - ubuntu2004-package
   - name: .publish
-  - name: .publish_test
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-ubuntu1804-arm64
@@ -1813,7 +1790,6 @@ buildvariants:
     distros:
     - ubuntu1804-arm64-build
   - name: .publish
-  - name: .publish_test
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: ubuntu1804-arm64
@@ -1853,7 +1829,6 @@ buildvariants:
     distros:
     - ubuntu1804-arm64-build
   - name: .publish
-  - name: .publish_test
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: ubuntu2204
@@ -1909,7 +1884,6 @@ buildvariants:
     distros:
     - ubuntu2204-large
   - name: .publish
-  - name: .publish_test
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: ubuntu2004
@@ -1965,7 +1939,6 @@ buildvariants:
     distros:
     - ubuntu2004-package
   - name: .publish
-  - name: .publish_test
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-ubuntu2004-64
@@ -2031,7 +2004,6 @@ buildvariants:
     distros:
     - ubuntu2004-package
   - name: .publish
-  - name: .publish_test
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-ubuntu2204-64
@@ -2098,7 +2070,6 @@ buildvariants:
     distros:
     - ubuntu2204-large
   - name: .publish
-  - name: .publish_test
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: enterprise-ubuntu2004-arm64
@@ -2160,7 +2131,6 @@ buildvariants:
     distros:
     - ubuntu1804-arm64-build
   - name: .publish
-  - name: .publish_test
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: ubuntu2004-arm64
@@ -2198,7 +2168,6 @@ buildvariants:
     distros:
     - ubuntu1804-arm64-build
   - name: .publish
-  - name: .publish_test
   - name: generate_buildid_to_debug_symbols_mapping
 
 
@@ -2254,7 +2223,6 @@ buildvariants:
     distros:
     - ubuntu2204-arm64-large
   - name: .publish
-  - name: .publish_test
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: ubuntu2204-arm64
@@ -2288,7 +2256,6 @@ buildvariants:
     distros:
     - ubuntu2204-arm64-large
   - name: .publish
-  - name: .publish_test
   - name: generate_buildid_to_debug_symbols_mapping
 
 - name: windows
