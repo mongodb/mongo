@@ -184,8 +184,8 @@ TEST(Path, Fuse3) {
     // Get "a" Traverse Const 2
     auto get =
         make<EvalPath>(make<PathGet>("a",
-                                     make<PathTraverse>(make<PathConstant>(Constant::int64(2)),
-                                                        PathTraverse::kUnlimited)),
+                                     make<PathTraverse>(PathTraverse::kUnlimited,
+                                                        make<PathConstant>(Constant::int64(2)))),
                        make<Variable>("x"));
     auto project2 = make<EvaluationNode>("y", std::move(get), std::move(project1));
 
@@ -291,8 +291,8 @@ TEST(Path, Fuse4) {
     // Get "a" Traverse Const 2
     auto get =
         make<EvalPath>(make<PathGet>("a",
-                                     make<PathTraverse>(make<PathConstant>(Constant::int64(2)),
-                                                        PathTraverse::kUnlimited)),
+                                     make<PathTraverse>(PathTraverse::kUnlimited,
+                                                        make<PathConstant>(Constant::int64(2)))),
                        make<Variable>("x"));
     auto project2 = make<EvaluationNode>("y", std::move(get), std::move(project1));
 
@@ -433,11 +433,11 @@ TEST(Path, Fuse5) {
 
     // Get "a" Traverse Compare= 2
     auto filter = make<FilterNode>(
-        make<EvalFilter>(
-            make<PathGet>("a",
-                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(2)),
-                                             PathTraverse::kSingleLevel)),
-            make<Variable>("x")),
+        make<EvalFilter>(make<PathGet>("a",
+                                       make<PathTraverse>(
+                                           PathTraverse::kSingleLevel,
+                                           make<PathCompare>(Operations::Eq, Constant::int64(2)))),
+                         make<Variable>("x")),
         std::move(project));
 
     auto tree = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"x"}},
@@ -907,8 +907,8 @@ TEST(Path, LowerPathTraverse) {
     auto tree = make<EvalPath>(
         make<PathGet>(
             "fieldA",
-            make<PathTraverse>(make<PathGet>("fieldB", make<PathDefault>(Constant::int64(0))),
-                               PathTraverse::kUnlimited)),
+            make<PathTraverse>(PathTraverse::kUnlimited,
+                               make<PathGet>("fieldB", make<PathDefault>(Constant::int64(0))))),
         make<Variable>("rootObj"));
     auto env = VariableEnvironment::build(tree);
 
@@ -967,8 +967,8 @@ TEST(Path, LowerPathField) {
     auto tree = make<EvalPath>(
         make<PathField>(
             "fieldA",
-            make<PathTraverse>(make<PathField>("fieldB", make<PathDefault>(Constant::int64(0))),
-                               PathTraverse::kUnlimited)),
+            make<PathTraverse>(PathTraverse::kUnlimited,
+                               make<PathField>("fieldB", make<PathDefault>(Constant::int64(0))))),
         make<Variable>("rootObj"));
     auto env = VariableEnvironment::build(tree);
 

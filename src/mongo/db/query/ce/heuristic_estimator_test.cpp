@@ -389,19 +389,19 @@ TEST(CEHeuristicTest, CEWithoutOptimizationClosedRangeWithPathExpr) {
                 make<PathGet>(
                     "a0",
                     make<PathTraverse>(
+                        PathTraverse::kSingleLevel,
                         make<PathGet>("a1",
                                       make<PathTraverse>(
-                                          make<PathCompare>(Operations::Gt, Constant::int64(5)),
-                                          PathTraverse::kSingleLevel)),
-                        PathTraverse::kSingleLevel)),
-                make<PathGet>(
-                    "a0",
-                    make<PathTraverse>(
-                        make<PathGet>("a1",
-                                      make<PathTraverse>(
-                                          make<PathCompare>(Operations::Lt, Constant::int64(10)),
-                                          PathTraverse::kSingleLevel)),
-                        PathTraverse::kSingleLevel))),
+                                          PathTraverse::kSingleLevel,
+                                          make<PathCompare>(Operations::Gt, Constant::int64(5)))))),
+                make<PathGet>("a0",
+                              make<PathTraverse>(
+                                  PathTraverse::kSingleLevel,
+                                  make<PathGet>("a1",
+                                                make<PathTraverse>(
+                                                    PathTraverse::kSingleLevel,
+                                                    make<PathCompare>(Operations::Lt,
+                                                                      Constant::int64(10))))))),
             make<Variable>("test")),
         std::move(scanNode));
 
@@ -426,19 +426,19 @@ TEST(CEHeuristicTest, CEWithoutOptimizationClosedRangeWith1Variable) {
                 make<PathGet>(
                     "a0",
                     make<PathTraverse>(
+                        PathTraverse::kSingleLevel,
                         make<PathGet>("a1",
                                       make<PathTraverse>(
-                                          make<PathCompare>(Operations::Gt, Constant::int64(5)),
-                                          PathTraverse::kSingleLevel)),
-                        PathTraverse::kSingleLevel)),
-                make<PathGet>(
-                    "a0",
-                    make<PathTraverse>(
-                        make<PathGet>("a1",
-                                      make<PathTraverse>(
-                                          make<PathCompare>(Operations::Lt, make<Variable>("test")),
-                                          PathTraverse::kSingleLevel)),
-                        PathTraverse::kSingleLevel))),
+                                          PathTraverse::kSingleLevel,
+                                          make<PathCompare>(Operations::Gt, Constant::int64(5)))))),
+                make<PathGet>("a0",
+                              make<PathTraverse>(
+                                  PathTraverse::kSingleLevel,
+                                  make<PathGet>("a1",
+                                                make<PathTraverse>(
+                                                    PathTraverse::kSingleLevel,
+                                                    make<PathCompare>(Operations::Lt,
+                                                                      make<Variable>("test"))))))),
             make<Variable>("test")),
         std::move(scanNode));
 
@@ -463,19 +463,19 @@ TEST(CEHeuristicTest, CEWithoutOptimizationOpenRangeWith1Variable) {
                 make<PathGet>(
                     "a0",
                     make<PathTraverse>(
+                        PathTraverse::kSingleLevel,
                         make<PathGet>("a1",
                                       make<PathTraverse>(
-                                          make<PathCompare>(Operations::Lt, Constant::int64(5)),
-                                          PathTraverse::kSingleLevel)),
-                        PathTraverse::kSingleLevel)),
-                make<PathGet>(
-                    "a0",
-                    make<PathTraverse>(
-                        make<PathGet>("a1",
-                                      make<PathTraverse>(
-                                          make<PathCompare>(Operations::Lt, make<Variable>("test")),
-                                          PathTraverse::kSingleLevel)),
-                        PathTraverse::kSingleLevel))),
+                                          PathTraverse::kSingleLevel,
+                                          make<PathCompare>(Operations::Lt, Constant::int64(5)))))),
+                make<PathGet>("a0",
+                              make<PathTraverse>(
+                                  PathTraverse::kSingleLevel,
+                                  make<PathGet>("a1",
+                                                make<PathTraverse>(
+                                                    PathTraverse::kSingleLevel,
+                                                    make<PathCompare>(Operations::Lt,
+                                                                      make<Variable>("test"))))))),
             make<Variable>("test")),
         std::move(scanNode));
 
@@ -500,19 +500,19 @@ TEST(CEHeuristicTest, CEWithoutOptimizationConjunctionOfBoundsWithDifferentPaths
                 make<PathGet>(
                     "a0",
                     make<PathTraverse>(
+                        PathTraverse::kSingleLevel,
                         make<PathGet>("a1",
                                       make<PathTraverse>(
-                                          make<PathCompare>(Operations::Gt, Constant::int64(5)),
-                                          PathTraverse::kSingleLevel)),
-                        PathTraverse::kSingleLevel)),
-                make<PathGet>(
-                    "b0",
-                    make<PathTraverse>(
-                        make<PathGet>("b1",
-                                      make<PathTraverse>(
-                                          make<PathCompare>(Operations::Lt, Constant::int64(10)),
-                                          PathTraverse::kSingleLevel)),
-                        PathTraverse::kSingleLevel))),
+                                          PathTraverse::kSingleLevel,
+                                          make<PathCompare>(Operations::Gt, Constant::int64(5)))))),
+                make<PathGet>("b0",
+                              make<PathTraverse>(
+                                  PathTraverse::kSingleLevel,
+                                  make<PathGet>("b1",
+                                                make<PathTraverse>(
+                                                    PathTraverse::kSingleLevel,
+                                                    make<PathCompare>(Operations::Lt,
+                                                                      Constant::int64(10))))))),
             make<Variable>("test")),
         std::move(scanNode));
 
@@ -590,29 +590,30 @@ TEST(CEHeuristicTest, CEWithoutOptimizationEquivalentConjunctions) {
                 make<PathComposeM>(
                     make<PathGet>(
                         "a0",
-                        make<PathTraverse>(make<PathCompare>(Operations::Gt, Constant::int64(5)),
-                                           PathTraverse::kSingleLevel)),
-                    make<PathGet>(
-                        "b0",
-                        make<PathTraverse>(make<PathCompare>(Operations::Gt, Constant::int64(10)),
-                                           PathTraverse::kSingleLevel))),
+                        make<PathTraverse>(PathTraverse::kSingleLevel,
+                                           make<PathCompare>(Operations::Gt, Constant::int64(5)))),
+                    make<PathGet>("b0",
+                                  make<PathTraverse>(
+                                      PathTraverse::kSingleLevel,
+                                      make<PathCompare>(Operations::Gt, Constant::int64(10))))),
                 make<Variable>("test")),
             make<ScanNode>("test", "test")));
 
     ABT rootNode2 = make<RootNode>(
         properties::ProjectionRequirement{ProjectionNameVector{"test"}},
         make<FilterNode>(
-            make<EvalFilter>(make<PathGet>("a0",
-                                           make<PathTraverse>(make<PathCompare>(Operations::Gt,
-                                                                                Constant::int64(5)),
-                                                              PathTraverse::kSingleLevel)),
-                             make<Variable>("test")),
+            make<EvalFilter>(
+                make<PathGet>(
+                    "a0",
+                    make<PathTraverse>(PathTraverse::kSingleLevel,
+                                       make<PathCompare>(Operations::Gt, Constant::int64(5)))),
+                make<Variable>("test")),
             make<FilterNode>(
                 make<EvalFilter>(
                     make<PathGet>(
                         "b0",
-                        make<PathTraverse>(make<PathCompare>(Operations::Gt, Constant::int64(10)),
-                                           PathTraverse::kSingleLevel)),
+                        make<PathTraverse>(PathTraverse::kSingleLevel,
+                                           make<PathCompare>(Operations::Gt, Constant::int64(10)))),
                     make<Variable>("test")),
                 make<ScanNode>("test", "test"))));
 

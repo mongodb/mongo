@@ -215,11 +215,11 @@ inline auto _arr() {
 }
 
 inline auto _traverse1(PathHolder input) {
-    return PathHolder{make<PathTraverse>(std::move(input._n), PathTraverse::kSingleLevel)};
+    return PathHolder{make<PathTraverse>(PathTraverse::kSingleLevel, std::move(input._n))};
 }
 
 inline auto _traverseN(PathHolder input) {
-    return PathHolder{make<PathTraverse>(std::move(input._n), PathTraverse::kUnlimited)};
+    return PathHolder{make<PathTraverse>(PathTraverse::kUnlimited, std::move(input._n))};
 }
 
 inline auto _field(StringData fn, PathHolder input) {

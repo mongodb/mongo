@@ -234,7 +234,7 @@ public:
             // considered true if it evaluates to true for the array itself or for any of the
             // array’s elements. 'result' evaluates comparison on the array elements, and
             // 'arraysOnly' evaluates the comparison on the array itself.
-            result = make<PathTraverse>(std::move(result), PathTraverse::kSingleLevel);
+            result = make<PathTraverse>(PathTraverse::kSingleLevel, std::move(result));
 
             if (arraysOnlyPtr->size() == 1) {
                 const auto [tagSingle, valSingle] = sbe::value::copyValue(
@@ -455,7 +455,7 @@ public:
                                        Constant::int32(expr->typeSet().getBSONTypeMask())))));
 
         if (shouldGeneratePath(expr)) {
-            result = make<PathTraverse>(std::move(result), PathTraverse::kSingleLevel);
+            result = make<PathTraverse>(PathTraverse::kSingleLevel, std::move(result));
             if (expr->typeSet().hasType(BSONType::Array)) {
                 // If we are testing against array type, insert a comparison against the
                 // non-traversed path (the array itself if we have one).
@@ -499,7 +499,7 @@ private:
             // Make sure we consider only objects or arrays as elements of the array.
             maybeComposePath(result, make<PathComposeA>(make<PathObj>(), make<PathArr>()));
         }
-        result = make<PathTraverse>(std::move(result), PathTraverse::kSingleLevel);
+        result = make<PathTraverse>(PathTraverse::kSingleLevel, std::move(result));
 
         // Make sure we consider only arrays fields on the path.
         maybeComposePath(result, make<PathArr>());
@@ -589,10 +589,10 @@ private:
                 // For example:
                 // find({a: [1]}) matches {a: [1]} and {a: [[1]]}
                 // find({a: {$gt: MinKey()}}) matches {a: []}
-                result = make<PathComposeA>(make<PathTraverse>(result, PathTraverse::kSingleLevel),
+                result = make<PathComposeA>(make<PathTraverse>(PathTraverse::kSingleLevel, result),
                                             result);
             } else {
-                result = make<PathTraverse>(std::move(result), PathTraverse::kSingleLevel);
+                result = make<PathTraverse>(PathTraverse::kSingleLevel, std::move(result));
             }
 
             result = translateFieldRef(*(expr->fieldRef()), std::move(result));

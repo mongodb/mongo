@@ -265,7 +265,7 @@ public:
             make<PathIdentity>(),
             [](FieldNameType fieldName, const bool isLastElement, ABT input) {
                 if (!isLastElement) {
-                    input = make<PathTraverse>(std::move(input), PathTraverse::kUnlimited);
+                    input = make<PathTraverse>(PathTraverse::kUnlimited, std::move(input));
                 }
                 return make<PathGet>(std::move(fieldName), std::move(input));
             },
@@ -287,10 +287,10 @@ public:
 
         _ctx.push<EvalPath>(
             make<PathTraverse>(
+                PathTraverse::kUnlimited,
                 make<PathLambda>(make<LambdaAbstraction>(
                     varName,
-                    make<If>(std::move(filter), make<Variable>(varName), Constant::nothing()))),
-                PathTraverse::kUnlimited),
+                    make<If>(std::move(filter), make<Variable>(varName), Constant::nothing())))),
             std::move(input));
     }
 

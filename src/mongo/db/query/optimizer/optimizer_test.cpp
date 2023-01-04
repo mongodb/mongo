@@ -715,11 +715,11 @@ TEST(Explain, ExplainV2Compact) {
     ABT pathNode =
         make<PathGet>("a",
                       make<PathTraverse>(
+                          PathTraverse::kSingleLevel,
                           make<PathComposeM>(
                               make<PathCompare>(Operations::Gte,
                                                 make<UnaryOp>(Operations::Neg, Constant::int64(2))),
-                              make<PathCompare>(Operations::Lt, Constant::int64(7))),
-                          1));
+                              make<PathCompare>(Operations::Lt, Constant::int64(7)))));
     ABT scanNode = make<ScanNode>("x1", "test");
     ABT evalNode = make<EvaluationNode>(
         "x2", make<EvalPath>(pathNode, make<Variable>("a")), std::move(scanNode));
@@ -807,11 +807,11 @@ TEST(IntervalNormalize, Basic) {
 
 TEST(Optimizer, ExplainRIDUnion) {
     ABT filterNode = make<FilterNode>(
-        make<EvalFilter>(
-            make<PathGet>("a",
-                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1)),
-                                             PathTraverse::kSingleLevel)),
-            make<Variable>("root")),
+        make<EvalFilter>(make<PathGet>("a",
+                                       make<PathTraverse>(
+                                           PathTraverse::kSingleLevel,
+                                           make<PathCompare>(Operations::Eq, Constant::int64(1)))),
+                         make<Variable>("root")),
         make<ScanNode>("root", "c1"));
 
     ABT unionNode = make<RIDUnionNode>("root", filterNode, make<ScanNode>("root", "c1"));

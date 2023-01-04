@@ -115,8 +115,8 @@ ABT FieldMapBuilder::generateABTForField(const FieldMapEntry& entry) const {
         if (!childResult.is<PathIdentity>()) {
             maybeComposePath(result,
                              make<PathField>(FieldNameType{childEntry._fieldName},
-                                             make<PathTraverse>(std::move(childResult),
-                                                                PathTraverse::kUnlimited)));
+                                             make<PathTraverse>(PathTraverse::kUnlimited,
+                                                                std::move(childResult))));
         }
     }
 

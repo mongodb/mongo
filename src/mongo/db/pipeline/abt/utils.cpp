@@ -86,7 +86,7 @@ ABT translateFieldRef(const FieldRef& fieldRef, ABT initial) {
                 maybeComposePath(arrCase, result.cast<PathGet>()->getPath());
                 maybeComposePath<PathComposeA>(result, arrCase);
             } else {
-                result = make<PathTraverse>(std::move(result), PathTraverse::kSingleLevel);
+                result = make<PathTraverse>(PathTraverse::kSingleLevel, std::move(result));
             }
         }
         result = make<PathGet>(FieldNameType{fieldRef[i].toString()}, std::move(result));

@@ -45,11 +45,11 @@ TEST(CostModel, IncreaseIndexScanCost) {
     ABT scanNode = make<ScanNode>("root", "c1");
 
     ABT filterNode = make<FilterNode>(
-        make<EvalFilter>(
-            make<PathGet>("a",
-                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1)),
-                                             PathTraverse::kSingleLevel)),
-            make<Variable>("root")),
+        make<EvalFilter>(make<PathGet>("a",
+                                       make<PathTraverse>(
+                                           PathTraverse::kSingleLevel,
+                                           make<PathCompare>(Operations::Eq, Constant::int64(1)))),
+                         make<Variable>("root")),
         std::move(scanNode));
 
     ABT rootNode =
@@ -148,17 +148,17 @@ TEST(CostModel, IncreaseJoinsCost) {
         make<EvalPath>(make<PathGet>("a", make<PathIdentity>()), make<Variable>("root")),
         std::move(scanNode));
     ABT filterNode1 = make<FilterNode>(
-        make<EvalFilter>(make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(1)),
-                                            PathTraverse::kSingleLevel),
+        make<EvalFilter>(make<PathTraverse>(PathTraverse::kSingleLevel,
+                                            make<PathCompare>(Operations::Eq, Constant::int64(1))),
                          make<Variable>("pa")),
         std::move(evalNode));
 
     ABT filterNode2 = make<FilterNode>(
-        make<EvalFilter>(
-            make<PathGet>("b",
-                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int64(2)),
-                                             PathTraverse::kSingleLevel)),
-            make<Variable>("root")),
+        make<EvalFilter>(make<PathGet>("b",
+                                       make<PathTraverse>(
+                                           PathTraverse::kSingleLevel,
+                                           make<PathCompare>(Operations::Eq, Constant::int64(2)))),
+                         make<Variable>("root")),
         std::move(filterNode1));
 
     ABT rootNode =

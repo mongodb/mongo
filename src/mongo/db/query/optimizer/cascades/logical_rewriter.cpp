@@ -852,7 +852,7 @@ public:
                     "NotPushdown unexpectedly negated when asked only to simplify",
                     !simplified->negated);
             simplified->newNode =
-                make<PathTraverse>(std::move(simplified->newNode), traverse.getMaxDepth());
+                make<PathTraverse>(traverse.getMaxDepth(), std::move(simplified->newNode));
             return simplified;
         } else {
             return {};

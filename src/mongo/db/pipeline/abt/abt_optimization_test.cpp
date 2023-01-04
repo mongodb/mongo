@@ -301,11 +301,11 @@ TEST_F(ABTOptimizationTest, PartialIndex) {
 
     // By default the constant is translated as "int32".
     auto conversionResult = convertExprToPartialSchemaReq(
-        make<EvalFilter>(
-            make<PathGet>("b",
-                          make<PathTraverse>(make<PathCompare>(Operations::Eq, Constant::int32(2)),
-                                             PathTraverse::kSingleLevel)),
-            make<Variable>(scanProjName)),
+        make<EvalFilter>(make<PathGet>("b",
+                                       make<PathTraverse>(
+                                           PathTraverse::kSingleLevel,
+                                           make<PathCompare>(Operations::Eq, Constant::int32(2)))),
+                         make<Variable>(scanProjName)),
         true /*isFilterContext*/,
         {} /*pathToInterval*/);
     ASSERT_TRUE(conversionResult.has_value());

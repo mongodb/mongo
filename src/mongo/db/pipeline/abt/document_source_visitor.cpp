@@ -334,7 +334,7 @@ public:
                 return make<PathGet>(
                     std::move(fieldName),
                     isLastElement ? std::move(input)
-                                  : make<PathTraverse>(std::move(input), PathTraverse::kUnlimited));
+                                  : make<PathTraverse>(PathTraverse::kUnlimited, std::move(input)));
             });
 
         auto localPathProjName = _ctx.getNextId("localPath");
@@ -361,7 +361,7 @@ public:
             [](FieldNameType fieldName, const bool /*isLastElement*/, ABT input) {
                 return make<PathGet>(
                     std::move(fieldName),
-                    make<PathTraverse>(std::move(input), PathTraverse::kSingleLevel));
+                    make<PathTraverse>(PathTraverse::kSingleLevel, std::move(input)));
             });
 
         // Retain only the top-level get into foreignSimplePath.
@@ -399,7 +399,7 @@ public:
             make<PathConstant>(make<Variable>(foreignFoldedProjName)),
             [](FieldNameType fieldName, const bool isLastElement, ABT input) {
                 if (!isLastElement) {
-                    input = make<PathTraverse>(std::move(input), PathTraverse::kUnlimited);
+                    input = make<PathTraverse>(PathTraverse::kUnlimited, std::move(input));
                 }
                 return make<PathField>(std::move(fieldName), std::move(input));
             });
@@ -579,7 +579,7 @@ public:
                 return make<PathField>(
                     std::move(fieldName),
                     isLastElement ? std::move(input)
-                                  : make<PathTraverse>(std::move(input), PathTraverse::kUnlimited));
+                                  : make<PathTraverse>(PathTraverse::kUnlimited, std::move(input)));
             });
 
         ABT unwoundPath =

@@ -249,7 +249,7 @@ public:
     static constexpr size_t kUnlimited = 0;
     static constexpr size_t kSingleLevel = 1;
 
-    PathTraverse(ABT inPath, const size_t maxDepth) : Base(std::move(inPath)), _maxDepth(maxDepth) {
+    PathTraverse(const size_t maxDepth, ABT inPath) : Base(std::move(inPath)), _maxDepth(maxDepth) {
         assertPathSort(getPath());
 
         // TODO SERVER-67306: Support different maxDepth values.

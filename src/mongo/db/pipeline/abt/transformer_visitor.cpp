@@ -127,7 +127,7 @@ void ABTTransformerVisitor::processComputedPaths(const projection_executor::Incl
                 return make<PathGet>(
                     std::move(fieldName),
                     isLastElement ? std::move(input)
-                                  : make<PathTraverse>(std::move(input), PathTraverse::kUnlimited));
+                                  : make<PathTraverse>(PathTraverse::kUnlimited, std::move(input)));
             });
 
         auto entry = _ctx.getNode();
