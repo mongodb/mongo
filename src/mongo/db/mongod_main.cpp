@@ -393,6 +393,11 @@ void registerPrimaryOnlyServices(ServiceContext* serviceContext) {
 
 MONGO_FAIL_POINT_DEFINE(shutdownAtStartup);
 
+// Important:
+// _initAndListen among its other tasks initializes the storage subsystem.
+// File Copy Based Initial Sync will restart the storage subsystem and may need to repeat some
+// of the initialization steps within.  If you add or change any of these steps, make sure
+// any necessary changes are also made to File Copy Based Initial Sync.
 ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     Client::initThread("initandlisten");
 
