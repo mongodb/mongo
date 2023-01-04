@@ -838,6 +838,10 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->addDeepCopy("planSummary", curop.getPlanSummary().toString());
     }
 
+    if (planningTime > Microseconds::zero()) {
+        pAttrs->add("planningTimeMicros", durationCount<Microseconds>(planningTime));
+    }
+
     if (prepareConflictDurationMillis > Milliseconds::zero()) {
         pAttrs->add("prepareConflictDuration", prepareConflictDurationMillis);
     }
@@ -1011,7 +1015,6 @@ void OpDebug::report(OperationContext* opCtx,
     }
 
     pAttrs->add("durationMillis", durationCount<Milliseconds>(executionTime));
-    pAttrs->add("planningTimeMicros", durationCount<Microseconds>(planningTime));
 }
 
 #define OPDEBUG_APPEND_NUMBER2(b, x, y) \
@@ -1175,10 +1178,13 @@ void OpDebug::append(OperationContext* opCtx,
     }
 
     b.appendNumber("millis", durationCount<Milliseconds>(executionTime));
-    b.appendNumber("planningTimeMicros", durationCount<Microseconds>(planningTime));
 
     if (!curop.getPlanSummary().empty()) {
         b.append("planSummary", curop.getPlanSummary());
+    }
+
+    if (planningTime > Microseconds::zero()) {
+        b.appendNumber("planningTimeMicros", durationCount<Microseconds>(planningTime));
     }
 
     if (!execStats.isEmpty()) {
@@ -1486,14 +1492,14 @@ std::function<BSONObj(ProfileFilter::Args)> OpDebug::appendStaged(StringSet requ
         b.appendNumber(field, durationCount<Milliseconds>(args.op.executionTime));
     });
 
-    addIfNeeded("planningTimeMicros", [](auto field, auto args, auto& b) {
-        b.appendNumber(field, durationCount<Microseconds>(args.op.planningTime));
-    });
-
     addIfNeeded("planSummary", [](auto field, auto args, auto& b) {
         if (!args.curop.getPlanSummary().empty()) {
             b.append(field, args.curop.getPlanSummary());
         }
+    });
+
+    addIfNeeded("planningTimeMicros", [](auto field, auto args, auto& b) {
+        b.appendNumber(field, durationCount<Microseconds>(args.op.planningTime));
     });
 
     addIfNeeded("execStats", [](auto field, auto args, auto& b) {
