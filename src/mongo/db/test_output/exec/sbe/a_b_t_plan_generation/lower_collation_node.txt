@@ -1,0 +1,56 @@
+# Golden test output of ABTPlanGeneration/LowerCollationNode
+
+==== VARIATION: Lower collation node with single field ====
+-- INPUT:
+Collation []
+|   |   collation: 
+|   |       sortA: Ascending
+|   RefBlock: 
+|       Variable [sortA]
+Evaluation []
+|   BindBlock:
+|       [sortA]
+|           FunctionCall [getField]
+|           |   Const ["a"]
+|           Variable [scan0]
+PhysicalScan [{'<root>': scan0}, collName]
+    BindBlock:
+        [scan0]
+            Source []
+
+-- OUTPUT:
+[0] sort [s2] [asc] [] 
+[4] project [s2 = getField(s1, "a")] 
+[2] scan s1 none none none none none [] @"<collUUID>" true false 
+
+==== VARIATION: Lower collation node with two fields ====
+-- INPUT:
+Collation []
+|   |   collation: 
+|   |       sortA: Ascending
+|   |       sortB: Descending
+|   RefBlock: 
+|       Variable [sortA]
+|       Variable [sortB]
+Evaluation []
+|   BindBlock:
+|       [sortB]
+|           FunctionCall [getField]
+|           |   Const ["b"]
+|           Variable [scan0]
+Evaluation []
+|   BindBlock:
+|       [sortA]
+|           FunctionCall [getField]
+|           |   Const ["a"]
+|           Variable [scan0]
+PhysicalScan [{'<root>': scan0}, collName]
+    BindBlock:
+        [scan0]
+            Source []
+
+-- OUTPUT:
+[5] sort [s2, s3] [asc, desc] [] 
+[11] project [s3 = getField(s1, "b")] 
+[9] project [s2 = getField(s1, "a")] 
+[7] scan s1 none none none none none [] @"<collUUID>" true false 

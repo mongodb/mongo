@@ -162,6 +162,11 @@ protected:
         return std::move(tree);
     }
 
+    ABT&& _node(ABT&& tree, NodeProps n) {
+        _nodeMap.insert({tree.cast<Node>(), n});
+        return std::move(tree);
+    }
+
     void runPathLowering(VariableEnvironment& env, PrefixId& prefixId, ABT& tree) {
         // Run rewriters while things change
         bool changed = false;
@@ -174,6 +179,23 @@ protected:
                 changed = true;
             }
         } while (changed);
+    }
+
+    ABT createMultipleBindings(std::vector<std::pair<std::string, std::string>> bindingList,
+                               ABT source,
+                               std::string sourceBinding,
+                               NodeToGroupPropsMap& nodeMap) {
+        for (auto [fieldName, bindingName] : bindingList) {
+            auto field =
+                make<EvalPath>(make<PathGet>(FieldNameType(fieldName), make<PathIdentity>()),
+                               make<Variable>(ProjectionName(sourceBinding)));
+            runPathLowering(field);
+            ABT evalNode = make<EvaluationNode>(
+                ProjectionName(bindingName), std::move(field), std::move(source));
+            nodeMap.insert({evalNode.cast<EvaluationNode>(), makeNodeProp()});
+            source = std::move(evalNode);
+        }
+        return source;
     }
 
 private:
@@ -255,5 +277,53 @@ TEST_F(ABTPlanGeneration, LowerLimitSkipNode) {
         _node(make<LimitSkipNode>(properties::LimitSkipRequirement(4, 2), _node(scanForTest()))));
 }
 
+TEST_F(ABTPlanGeneration, LowerCollationNode) {
+    GoldenTestContext ctx(&goldenTestConfig);
+    ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
+
+    properties::PhysProps physProps;
+    properties::setPropertyOverwrite<properties::ProjectionRequirement>(
+        physProps, properties::ProjectionRequirement(ProjectionNameOrderPreservingSet({"sortA"})));
+    NodeProps collationNodeProp{getNextNodeID(),
+                                {},
+                                {},
+                                physProps,
+                                boost::none,
+                                CostType::fromDouble(0),
+                                CostType::fromDouble(0),
+                                {false}};
+
+    runNodeVariation(
+        ctx,
+        "Lower collation node with single field",
+        _node(
+            make<CollationNode>(
+                properties::CollationRequirement({{"sortA", CollationOp::Ascending}}),
+                createMultipleBindings({{"a", "sortA"}}, _node(scanForTest()), "scan0", _nodeMap)),
+            collationNodeProp));
+
+    // Sort on multiple fields.
+    properties::PhysProps physProps2;
+    properties::setPropertyOverwrite<properties::ProjectionRequirement>(
+        physProps2,
+        properties::ProjectionRequirement(ProjectionNameOrderPreservingSet({"sortA", "sortB"})));
+    NodeProps collationNodeProp2{getNextNodeID(),
+                                 {},
+                                 {},
+                                 physProps2,
+                                 boost::none,
+                                 CostType::fromDouble(0),
+                                 CostType::fromDouble(0),
+                                 {false}};
+    runNodeVariation(
+        ctx,
+        "Lower collation node with two fields",
+        _node(make<CollationNode>(
+                  properties::CollationRequirement(
+                      {{"sortA", CollationOp::Ascending}, {"sortB", CollationOp::Descending}}),
+                  createMultipleBindings(
+                      {{"a", "sortA"}, {"b", "sortB"}}, _node(scanForTest()), "scan0", _nodeMap)),
+              collationNodeProp2));
+}
 }  // namespace
 }  // namespace mongo::optimizer
