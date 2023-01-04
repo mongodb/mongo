@@ -238,6 +238,8 @@ last-continuous:
     ticket: SERVER-72416
   - test_file: jstests/core/or_to_in.js
     ticket: SERVER-72416
+  - test_file: src/mongo/db/modules/enterprise/jstests/fcbis/oplog_rollover.js
+    ticket: SERVER-72422
   suites: null
 last-lts:
   all:
@@ -553,4 +555,6 @@ last-lts:
     ticket: SERVER-72416
   - test_file: jstests/core/or_to_in.js
     ticket: SERVER-72416
+  - test_file: src/mongo/db/modules/enterprise/jstests/fcbis/oplog_rollover.js
+    ticket: SERVER-72422
   suites: null
