@@ -341,7 +341,6 @@ components:
     release_monitoring_id: 5303
     local_directory_path: src/third_party/zlib
     team_owner: "Storage Execution"
-    upgrade_suppression: TODO SERVER-71858
 
   zstd:
     homepage_url: http://www.zstd.net/
