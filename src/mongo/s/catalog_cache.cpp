@@ -37,6 +37,8 @@
 
 #include "mongo/s/catalog_cache.h"
 
+#include <fmt/format.h>
+
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/repl/optime_with.h"
@@ -81,28 +83,31 @@ std::shared_ptr<RoutingTableHistory> createUpdatedRoutingTableHistory(
     if (isIncremental && collectionAndChunks.changedChunks.size() == 1 &&
         collectionAndChunks.changedChunks[0].getVersion() == existingHistory->optRt->getVersion()) {
 
-        invariant(collectionAndChunks.allowMigrations == existingHistory->optRt->allowMigrations(),
-                  str::stream() << "allowMigrations field of " << nss
-                                << " collection changed without changing the collection version "
-                                << existingHistory->optRt->getVersion().toString()
-                                << ". Old value: " << existingHistory->optRt->allowMigrations()
-                                << ", new value: " << collectionAndChunks.allowMigrations);
+        tassert(7032310,
+                fmt::format("allowMigrations field of collection '{}' changed without changing the "
+                            "collection version {}. Old value: {}, new value: {}",
+                            nss.toString(),
+                            existingHistory->optRt->getVersion().toString(),
+                            existingHistory->optRt->allowMigrations(),
+                            collectionAndChunks.allowMigrations),
+                collectionAndChunks.allowMigrations == existingHistory->optRt->allowMigrations());
 
         const auto& oldReshardingFields = existingHistory->optRt->getReshardingFields();
         const auto& newReshardingFields = collectionAndChunks.reshardingFields;
-        invariant(
-            [&] {
-                if (oldReshardingFields && newReshardingFields)
-                    return oldReshardingFields->toBSON().woCompare(newReshardingFields->toBSON()) ==
-                        0;
-                else
-                    return !oldReshardingFields && !newReshardingFields;
-            }(),
-            str::stream() << "reshardingFields field of " << nss
-                          << " collection changed without changing the collection version "
-                          << existingHistory->optRt->getVersion().toString()
-                          << ". Old value: " << oldReshardingFields->toBSON()
-                          << ", new value: " << newReshardingFields->toBSON());
+        tassert(7032311,
+                fmt::format("reshardingFields field of collection '{}' changed without changing "
+                            "the collection version {}. Old value: {}, new value: {}",
+                            nss.toString(),
+                            existingHistory->optRt->getVersion().toString(),
+                            oldReshardingFields->toBSON().toString(),
+                            newReshardingFields->toBSON().toString()),
+                [&] {
+                    if (oldReshardingFields && newReshardingFields)
+                        return oldReshardingFields->toBSON().woCompare(
+                                   newReshardingFields->toBSON()) == 0;
+                    else
+                        return !oldReshardingFields && !newReshardingFields;
+                }());
 
         return existingHistory->optRt;
     }
@@ -114,7 +119,11 @@ std::shared_ptr<RoutingTableHistory> createUpdatedRoutingTableHistory(
             return 0;
         }
         if (collectionAndChunks.maxChunkSizeBytes) {
-            invariant(collectionAndChunks.maxChunkSizeBytes.get() > 0);
+            tassert(7032312,
+                    fmt::format("Invalid maxChunkSizeBytes value {} for collection '{}'",
+                                nss.toString(),
+                                collectionAndChunks.maxChunkSizeBytes.get()),
+                    collectionAndChunks.maxChunkSizeBytes.get() > 0);
             return uint64_t(*collectionAndChunks.maxChunkSizeBytes);
         }
         return boost::none;
@@ -252,13 +261,11 @@ CatalogCache::~CatalogCache() {
 StatusWith<CachedDatabaseInfo> CatalogCache::getDatabase(OperationContext* opCtx,
                                                          StringData dbName,
                                                          bool allowLocks) {
-    if (!allowLocks) {
-        invariant(
-            !opCtx->lockState() || !opCtx->lockState()->isLocked(),
+    tassert(7032313,
             "Do not hold a lock while refreshing the catalog cache. Doing so would potentially "
             "hold the lock during a network call, and can lead to a deadlock as described in "
-            "SERVER-37398.");
-    }
+            "SERVER-37398.",
+            allowLocks || !opCtx->lockState() || !opCtx->lockState()->isLocked());
 
     try {
         auto dbEntry = _databaseCache.acquire(opCtx, dbName, CacheCausalConsistency::kLatestKnown);
@@ -277,13 +284,11 @@ StatusWith<ChunkManager> CatalogCache::_getCollectionRoutingInfoAt(
     const NamespaceString& nss,
     boost::optional<Timestamp> atClusterTime,
     bool allowLocks) {
-    if (!allowLocks) {
-        invariant(!opCtx->lockState() || !opCtx->lockState()->isLocked(),
-                  "Do not hold a lock while refreshing the catalog cache. Doing so would "
-                  "potentially hold "
-                  "the lock during a network call, and can lead to a deadlock as described in "
-                  "SERVER-37398.");
-    }
+    tassert(7032314,
+            "Do not hold a lock while refreshing the catalog cache. Doing so would potentially "
+            "hold the lock during a network call, and can lead to a deadlock as described in "
+            "SERVER-37398.",
+            allowLocks || !opCtx->lockState() || !opCtx->lockState()->isLocked());
 
     try {
         const auto swDbInfo = getDatabase(opCtx, nss.db(), allowLocks);

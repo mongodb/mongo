@@ -102,8 +102,9 @@ ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(
     if (!supportNonVersionedOperations) {
         optReceivedShardVersion = getOperationReceivedVersion(opCtx, _nss);
         // No operations should be calling getOwnershipFilter without a shard version
-        invariant(optReceivedShardVersion,
-                  "getOwnershipFilter called by operation that doesn't specify shard version");
+        tassert(7032300,
+                "getOwnershipFilter called by operation that doesn't specify shard version",
+                optReceivedShardVersion);
     }
 
     auto metadata =
@@ -112,10 +113,11 @@ ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(
                                        supportNonVersionedOperations);
 
     if (!supportNonVersionedOperations) {
-        invariant(!ChunkVersion::isIgnoredVersion(*optReceivedShardVersion) ||
-                      !metadata->get().allowMigrations() || !metadata->get().isSharded(),
-                  "For sharded collections getOwnershipFilter cannot be relied on without a valid "
-                  "shard version");
+        tassert(7032301,
+                "For sharded collections getOwnershipFilter cannot be relied on without a valid "
+                "shard version",
+                !ChunkVersion::isIgnoredVersion(*optReceivedShardVersion) ||
+                    !metadata->get().allowMigrations() || !metadata->get().isSharded());
     }
 
     return {std::move(metadata)};
@@ -202,8 +204,9 @@ void CollectionShardingRuntime::setFilteringMetadata(OperationContext* opCtx,
 void CollectionShardingRuntime::setFilteringMetadata_withLock(OperationContext* opCtx,
                                                               CollectionMetadata newMetadata,
                                                               const CSRLock& csrExclusiveLock) {
-    invariant(!newMetadata.isSharded() || !_nss.isNamespaceAlwaysUnsharded(),
-              str::stream() << "Namespace " << _nss.ns() << " must never be sharded.");
+    tassert(7032302,
+            str::stream() << "Namespace " << _nss.ns() << " must never be sharded.",
+            !newMetadata.isSharded() || !_nss.isNamespaceAlwaysUnsharded());
 
     stdx::lock_guard lk(_metadataManagerLock);
 
@@ -479,7 +482,9 @@ CollectionCriticalSection::CollectionCriticalSection(OperationContext* opCtx,
                                    Milliseconds(migrationLockAcquisitionMaxWaitMS.load()));
     auto* const csr = CollectionShardingRuntime::get(_opCtx, _nss);
     auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(opCtx, csr);
-    invariant(csr->getCurrentMetadataIfKnown());
+    tassert(7032305,
+            "Collection metadata unknown when entering critical section",
+            csr->getCurrentMetadataIfKnown());
     csr->enterCriticalSectionCatchUpPhase(csrLock, _reason);
 }
 
@@ -500,7 +505,9 @@ void CollectionCriticalSection::enterCommitPhase() {
                                    Milliseconds(migrationLockAcquisitionMaxWaitMS.load()));
     auto* const csr = CollectionShardingRuntime::get(_opCtx, _nss);
     auto csrLock = CollectionShardingRuntime::CSRLock::lockExclusive(_opCtx, csr);
-    invariant(csr->getCurrentMetadataIfKnown());
+    tassert(7032304,
+            "Collection metadata unknown when entering critical section commit phase",
+            csr->getCurrentMetadataIfKnown());
     csr->enterCriticalSectionCommitPhase(csrLock, _reason);
 }
 
