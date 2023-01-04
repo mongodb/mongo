@@ -221,14 +221,11 @@ functions:
       params:
         working_dir: "wiredtiger/cmake_build"
         shell: bash
-        silent: true
+        include_expansions_in_env:
+          - aws_sdk_s3_ext_access_key
+          - aws_sdk_s3_ext_secret_key
         script: |
           set -o errexit
-          export AWS_ACCESS_KEY_ID=${aws_sdk_s3_ext_access_key}
-          export AWS_SECRET_ACCESS_KEY=${aws_sdk_s3_ext_secret_key}
-
-          # Only set verbose after having put the AWS access credentials into the environment.
-          set -o verbose
 
           virtualenv -p python3 venv
           source venv/bin/activate
@@ -2879,13 +2876,11 @@ tasks:
         params:
           working_dir: "wiredtiger/cmake_build"
           shell: bash
-          silent: true
+          include_expansions_in_env:
+            - aws_sdk_s3_ext_access_key
+            - aws_sdk_s3_ext_secret_key
           script: |
             set -o errexit
-            export AWS_ACCESS_KEY_ID=${aws_sdk_s3_ext_access_key}
-            export AWS_SECRET_ACCESS_KEY=${aws_sdk_s3_ext_secret_key}
-
-            # Only set verbose after having put the AWS access credentials into the environment.
             set -o verbose
 
             # Run S3 extension unit testing.

@@ -41,8 +41,8 @@ def get_auth_token(storage_source):
     if storage_source == 's3_store':
         # Auth token is the AWS access key ID and the AWS secret key as semi-colon separated values.
         # We expect the values to have been provided through the environment variables.
-        access_key = os.getenv('AWS_ACCESS_KEY_ID')
-        secret_key = os.getenv('AWS_SECRET_ACCESS_KEY')
+        access_key = os.getenv('aws_sdk_s3_ext_access_key')
+        secret_key = os.getenv('aws_sdk_s3_ext_secret_key')
         if access_key and secret_key:
             auth_token = access_key + ";" + secret_key
     return auth_token

@@ -98,8 +98,11 @@ TEST_CASE("Testing class S3Connection", "s3-connection")
     awsConfig.throughputTargetGbps = TestDefaults::throughputTargetGbps;
     awsConfig.partSize = TestDefaults::partSize;
 
+    Aws::Auth::AWSCredentials credentials(
+      std::getenv("aws_sdk_s3_ext_access_key"), std::getenv("aws_sdk_s3_ext_secret_key"));
+
     // Initialize the API.
-    S3Connection conn(awsConfig, TestDefaults::bucketName, TestDefaults::objPrefix);
+    S3Connection conn(credentials, awsConfig, TestDefaults::bucketName, TestDefaults::objPrefix);
     bool exists = false;
     size_t objectSize;
 
