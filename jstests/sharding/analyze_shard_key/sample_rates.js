@@ -74,10 +74,10 @@ assert.commandWorked(
 assert.commandWorked(mongosDB.getCollection(collNameNotSampled).insert([{a: 0}]));
 
 /**
- * Runs randomly generated find commands against the collection 'collName' in the database
- * 'dbName' at rate 'numPerSec' for 'durationSecs'.
+ * Tries to run randomly generated find commands against the collection 'collName' in the database
+ * 'dbName' at rate 'targetNumPerSec' for 'durationSecs'. Returns the actual rate.
  */
-function runFindCmdsOnRepeat(mongosHost, dbName, collName, numPerSec, durationSecs) {
+function runFindCmdsOnRepeat(mongosHost, dbName, collName, targetNumPerSec, durationSecs) {
     load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
     const mongos = new Mongo(mongosHost);
     const db = mongos.getDB(dbName);
@@ -89,14 +89,14 @@ function runFindCmdsOnRepeat(mongosHost, dbName, collName, numPerSec, durationSe
         const collation = QuerySamplingUtil.generateRandomCollation();
         return {find: collName, filter, collation};
     };
-    QuerySamplingUtil.runCmdsOnRepeat(db, makeCmdObjFunc, numPerSec, durationSecs);
+    return QuerySamplingUtil.runCmdsOnRepeat(db, makeCmdObjFunc, targetNumPerSec, durationSecs);
 }
 
 /**
- * Runs randomly generated delete commands against the collection 'collName' in the database
- * 'dbName' at rate 'numPerSec' for 'durationSecs'.
+ * Tries to run randomly generated delete commands against the collection 'collName' in the database
+ * 'dbName' at rate 'targetNumPerSec' for 'durationSecs'. Returns the actual rate.
  */
-function runDeleteCmdsOnRepeat(mongosHost, dbName, collName, numPerSec, durationSecs) {
+function runDeleteCmdsOnRepeat(mongosHost, dbName, collName, targetNumPerSec, durationSecs) {
     load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
     const mongos = new Mongo(mongosHost);
     const db = mongos.getDB(dbName);
@@ -108,16 +108,16 @@ function runDeleteCmdsOnRepeat(mongosHost, dbName, collName, numPerSec, duration
         const collation = QuerySamplingUtil.generateRandomCollation();
         return {delete: collName, deletes: [{q: filter, collation, limit: 0}]};
     };
-    QuerySamplingUtil.runCmdsOnRepeat(db, makeCmdObjFunc, numPerSec, durationSecs);
+    return QuerySamplingUtil.runCmdsOnRepeat(db, makeCmdObjFunc, targetNumPerSec, durationSecs);
 }
 
 /**
- * Runs randomly generated aggregate commands with a $lookup stage against the collections
- * 'localCollName' and 'foreignCollName' in the database 'dbName' at rate 'numPerSec' for
- * 'durationSecs'.
+ * Tries to run randomly generated aggregate commands with a $lookup stage against the collections
+ * 'localCollName' and 'foreignCollName' in the database 'dbName' at rate 'targetNumPerSec' for
+ * 'durationSecs'. Returns the actual rate.
  */
 function runNestedAggregateCmdsOnRepeat(
-    mongosHost, dbName, localCollName, foreignCollName, numPerSec, durationSecs) {
+    mongosHost, dbName, localCollName, foreignCollName, targetNumPerSec, durationSecs) {
     load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
     const mongos = new Mongo(mongosHost);
     const db = mongos.getDB(dbName);
@@ -136,7 +136,7 @@ function runNestedAggregateCmdsOnRepeat(
             $readPreference: {mode: "primary"}
         };
     };
-    QuerySamplingUtil.runCmdsOnRepeat(db, makeCmdObjFunc, numPerSec, durationSecs);
+    return QuerySamplingUtil.runCmdsOnRepeat(db, makeCmdObjFunc, targetNumPerSec, durationSecs);
 }
 
 /**
@@ -185,35 +185,43 @@ function testQuerySampling(dbName, collNameNotSampled, collNameSampled) {
     sleep(queryAnalysisSamplerConfigurationRefreshSecs * 1000);
 
     // Define a thread for executing find commands via mongos0.
-    const numFindsPerSec = 25;
-    const findThread = new Thread(
-        runFindCmdsOnRepeat, st.s0.host, dbName, collNameSampled, numFindsPerSec, durationSecs);
+    const targetNumFindPerSec = 25;
+    const findThread = new Thread(runFindCmdsOnRepeat,
+                                  st.s0.host,
+                                  dbName,
+                                  collNameSampled,
+                                  targetNumFindPerSec,
+                                  durationSecs);
 
     // Define a thread for executing delete commands via mongos1.
-    const numDeletesPerSec = 20;
-    const deleteThread = new Thread(
-        runDeleteCmdsOnRepeat, st.s1.host, dbName, collNameSampled, numDeletesPerSec, durationSecs);
+    const targetNumDeletePerSec = 20;
+    const deleteThread = new Thread(runDeleteCmdsOnRepeat,
+                                    st.s1.host,
+                                    dbName,
+                                    collNameSampled,
+                                    targetNumDeletePerSec,
+                                    durationSecs);
 
     // Define a thread for executing aggregate commands via mongos2 (more specifically, shard0's
     // primary).
-    const numAggsPerSec = 10;
+    const targetNumAggPerSec = 10;
     const aggThread = new Thread(runNestedAggregateCmdsOnRepeat,
                                  st.s2.host,
                                  dbName,
                                  collNameNotSampled,
                                  collNameSampled,
-                                 numAggsPerSec,
+                                 targetNumAggPerSec,
                                  durationSecs);
-
-    const totalQueriesPerSec = numFindsPerSec + numDeletesPerSec + numAggsPerSec;
 
     // Run the commands.
     findThread.start();
     deleteThread.start();
     aggThread.start();
-    findThread.join();
-    deleteThread.join();
-    aggThread.join();
+    const actualNumFindPerSec = findThread.returnData();
+    const actualNumDeletePerSec = deleteThread.returnData();
+    const actualNumAggPerSec = aggThread.returnData();
+    const actualTotalQueriesPerSec =
+        actualNumFindPerSec + actualNumDeletePerSec + actualNumAggPerSec;
 
     assert.commandWorked(st.s.adminCommand({configureQueryAnalyzer: sampledNs, mode: "off"}));
     sleep(queryAnalysisWriterIntervalSecs * 1000);
@@ -234,17 +242,18 @@ function testQuerySampling(dbName, collNameNotSampled, collNameSampled) {
     // Verify that the difference between the actual and expected number of samples is within the
     // expected threshold.
     const expectedTotalCount = durationSecs * sampleRate;
-    const expectedFindCount = (numFindsPerSec / totalQueriesPerSec) * expectedTotalCount;
-    const expectedDeleteCount = (numDeletesPerSec / totalQueriesPerSec) * expectedTotalCount;
-    const expectedAggCount = (numAggsPerSec / totalQueriesPerSec) * expectedTotalCount;
+    const expectedFindCount = (actualNumFindPerSec / actualTotalQueriesPerSec) * expectedTotalCount;
+    const expectedDeleteCount =
+        (actualNumDeletePerSec / actualTotalQueriesPerSec) * expectedTotalCount;
+    const expectedAggCount = (actualNumAggPerSec / actualTotalQueriesPerSec) * expectedTotalCount;
     jsTest.log("Checking that the number of sampled queries is within the threshold: " +
                tojsononeline(
                    {expectedTotalCount, expectedFindCount, expectedDeleteCount, expectedAggCount}));
 
     assertDiffPercentage(sampleSize.total, expectedTotalCount, 5 /* maxDiffPercentage */);
-    assertDiffPercentage(sampleSize.find, expectedFindCount, 15 /* maxDiffPercentage */);
-    assertDiffPercentage(sampleSize.delete, expectedDeleteCount, 15 /* maxDiffPercentage */);
-    assertDiffPercentage(sampleSize.aggregate, expectedAggCount, 15 /* maxDiffPercentage */);
+    assertDiffPercentage(sampleSize.find, expectedFindCount, 10 /* maxDiffPercentage */);
+    assertDiffPercentage(sampleSize.delete, expectedDeleteCount, 10 /* maxDiffPercentage */);
+    assertDiffPercentage(sampleSize.aggregate, expectedAggCount, 10 /* maxDiffPercentage */);
 
     QuerySamplingUtil.clearSampledQueryCollectionOnAllShards(st);
 }
