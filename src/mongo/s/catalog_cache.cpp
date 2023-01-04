@@ -37,6 +37,8 @@
 
 #include "mongo/s/catalog_cache.h"
 
+#include <fmt/format.h>
+
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/repl/optime_with.h"
@@ -117,13 +119,11 @@ CatalogCache::~CatalogCache() {
 StatusWith<CachedDatabaseInfo> CatalogCache::getDatabase(OperationContext* opCtx,
                                                          StringData dbName,
                                                          bool allowLocks) {
-    if (!allowLocks) {
-        invariant(
-            !opCtx->lockState() || !opCtx->lockState()->isLocked(),
+    tassert(7032313,
             "Do not hold a lock while refreshing the catalog cache. Doing so would potentially "
             "hold the lock during a network call, and can lead to a deadlock as described in "
-            "SERVER-37398.");
-    }
+            "SERVER-37398.",
+            allowLocks || !opCtx->lockState() || !opCtx->lockState()->isLocked());
 
     try {
         auto dbEntry = _databaseCache.acquire(opCtx, dbName, CacheCausalConsistency::kLatestKnown);
@@ -142,13 +142,11 @@ StatusWith<ChunkManager> CatalogCache::_getCollectionRoutingInfoAt(
     const NamespaceString& nss,
     boost::optional<Timestamp> atClusterTime,
     bool allowLocks) {
-    if (!allowLocks) {
-        invariant(!opCtx->lockState() || !opCtx->lockState()->isLocked(),
-                  "Do not hold a lock while refreshing the catalog cache. Doing so would "
-                  "potentially hold "
-                  "the lock during a network call, and can lead to a deadlock as described in "
-                  "SERVER-37398.");
-    }
+    tassert(7032314,
+            "Do not hold a lock while refreshing the catalog cache. Doing so would potentially "
+            "hold the lock during a network call, and can lead to a deadlock as described in "
+            "SERVER-37398.",
+            allowLocks || !opCtx->lockState() || !opCtx->lockState()->isLocked());
 
     try {
         const auto swDbInfo = getDatabase(opCtx, nss.db(), allowLocks);
@@ -645,21 +643,25 @@ CatalogCache::CollectionCache::LookupResult CatalogCache::CollectionCache::_look
         newComparableVersion.setChunkVersion(newVersion);
 
         if (isIncremental && existingHistory->optRt->getVersion() == newVersion) {
-            invariant(newRoutingHistory.sameAllowMigrations(*existingHistory->optRt),
-                      str::stream()
-                          << "allowMigrations field of " << nss
-                          << " collection changed without changing the collection version "
-                          << newVersion.toString()
-                          << ". Old value: " << existingHistory->optRt->allowMigrations()
-                          << ", new value: " << newRoutingHistory.allowMigrations());
+            tassert(
+                7032310,
+                fmt::format("allowMigrations field of collection '{}' changed without changing the "
+                            "collection version {}. Old value: {}, new value: {}",
+                            nss.toString(),
+                            newVersion.toString(),
+                            existingHistory->optRt->allowMigrations(),
+                            newRoutingHistory.allowMigrations()),
+                newRoutingHistory.sameAllowMigrations(*existingHistory->optRt));
 
-            invariant(newRoutingHistory.sameReshardingFields(*existingHistory->optRt),
-                      str::stream()
-                          << "reshardingFields field of " << nss
-                          << " collection changed without changing the collection version "
-                          << newVersion.toString() << ". Old value: "
-                          << existingHistory->optRt->getReshardingFields()->toBSON()
-                          << ", new value: " << newRoutingHistory.getReshardingFields()->toBSON());
+            tassert(
+                7032311,
+                fmt::format("reshardingFields field of collection '{}' changed without changing "
+                            "the collection version {}. Old value: {}, new value: {}",
+                            nss.toString(),
+                            newVersion.toString(),
+                            existingHistory->optRt->getReshardingFields()->toBSON().toString(),
+                            newRoutingHistory.getReshardingFields()->toBSON().toString()),
+                newRoutingHistory.sameReshardingFields(*existingHistory->optRt));
         }
 
         LOGV2_FOR_CATALOG_REFRESH(4619901,

@@ -37,6 +37,7 @@
 
 #include "mongo/db/s/shard_server_catalog_cache_loader.h"
 
+#include <fmt/format.h>
 #include <memory>
 
 #include "mongo/db/client.h"
@@ -827,7 +828,10 @@ ShardServerCatalogCacheLoader::_schedulePrimaryGetChunksSince(
     }
 
     // After finding metadata remotely, we must have found metadata locally.
-    invariant(!collAndChunks.changedChunks.empty());
+    tassert(7032350,
+            str::stream() << "No chunks metadata found for collection '" << nss
+                          << "' despite the config server returned actual information",
+            !collAndChunks.changedChunks.empty());
 
     return swCollectionAndChangedChunks;
 };
@@ -1235,8 +1239,10 @@ void ShardServerCatalogCacheLoader::_updatePersistedCollAndChunksMetadata(
     stdx::unique_lock<Latch> lock(_mutex);
 
     const CollAndChunkTask& task = _collAndChunkTaskLists[nss].front();
-    invariant(task.dropped || task.updateMetadataFormat ||
-              !task.collectionAndChangedChunks->changedChunks.empty());
+    tassert(7032351,
+            "Invalid CollAndChunkTask state",
+            task.dropped || task.updateMetadataFormat ||
+                !task.collectionAndChangedChunks->changedChunks.empty());
 
     // If this task is from an old term and no longer valid, do not execute and return true so that
     // the task gets removed from the task list
@@ -1385,7 +1391,9 @@ ShardServerCatalogCacheLoader::CollAndChunkTask::CollAndChunkTask(
                                            collectionAndChangedChunks->creationTime);
         } else {
             collectionAndChangedChunks = std::move(statusWithCollectionAndChangedChunks.getValue());
-            invariant(!collectionAndChangedChunks->changedChunks.empty());
+            tassert(7032354,
+                    "Found no chunks in retrieved collection metadata",
+                    !collectionAndChangedChunks->changedChunks.empty());
             const auto highestVersion =
                 collectionAndChangedChunks->changedChunks.back().getVersion();
             // Note that due to the way Phase 1 of the FCV upgrade writes timestamps to chunks
@@ -1399,7 +1407,10 @@ ShardServerCatalogCacheLoader::CollAndChunkTask::CollAndChunkTask(
                                            collectionAndChangedChunks->creationTime);
         }
     } else {
-        invariant(statusWithCollectionAndChangedChunks == ErrorCodes::NamespaceNotFound);
+        tassert(7032358,
+                fmt::format("Encountered unexpected error while fetching collection metadata: {}",
+                            statusWithCollectionAndChangedChunks.getStatus().toString()),
+                statusWithCollectionAndChangedChunks == ErrorCodes::NamespaceNotFound);
         dropped = true;
         maxQueryVersion = ChunkVersion::UNSHARDED();
     }
@@ -1411,7 +1422,10 @@ ShardServerCatalogCacheLoader::DBTask::DBTask(StatusWith<DatabaseType> swDatabas
     if (swDatabaseType.isOK()) {
         dbType = std::move(swDatabaseType.getValue());
     } else {
-        invariant(swDatabaseType == ErrorCodes::NamespaceNotFound);
+        tassert(7032355,
+                fmt::format("Encountered unexpected error while fetching database metadata: {}",
+                            swDatabaseType.getStatus().toString()),
+                swDatabaseType == ErrorCodes::NamespaceNotFound);
     }
 }
 
@@ -1434,10 +1448,11 @@ void ShardServerCatalogCacheLoader::CollAndChunkTaskList::addTask(CollAndChunkTa
     }
 
     if (task.dropped) {
-        invariant(lastTask.maxQueryVersion == task.minQueryVersion,
-                  str::stream() << "The version of the added task is not contiguous with that of "
-                                << "the previous one: LastTask {" << lastTask.toString() << "}, "
-                                << "AddedTask {" << task.toString() << "}");
+        tassert(7032356,
+                str::stream() << "The version of the added task is not contiguous with that of "
+                              << "the previous one: LastTask {" << lastTask.toString() << "}, "
+                              << "AddedTask {" << task.toString() << "}",
+                lastTask.maxQueryVersion == task.minQueryVersion);
 
         // As an optimization, on collection drop, clear any pending tasks in order to prevent any
         // throw-away work from executing. Because we have no way to differentiate whether the
@@ -1451,11 +1466,11 @@ void ShardServerCatalogCacheLoader::CollAndChunkTaskList::addTask(CollAndChunkTa
         }
     } else {
         // Tasks must have contiguous versions, unless a complete reload occurs.
-        invariant(lastTask.maxQueryVersion == task.minQueryVersion || !task.minQueryVersion.isSet(),
-                  str::stream() << "The added task is not the first and its version is not "
-                                << "contiguous with that of the previous one: LastTask {"
-                                << lastTask.toString() << "}, AddedTask {" << task.toString()
-                                << "}");
+        tassert(7032357,
+                str::stream() << "The added task is not the first and its version is not "
+                              << "contiguous with that of the previous one: LastTask {"
+                              << lastTask.toString() << "}, AddedTask {" << task.toString() << "}",
+                lastTask.maxQueryVersion == task.minQueryVersion || !task.minQueryVersion.isSet());
 
         _tasks.emplace_back(std::move(task));
     }
