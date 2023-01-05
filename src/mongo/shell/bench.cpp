@@ -785,6 +785,7 @@ void BenchRunConfig::initializeFromBson(const BSONObj& args) {
     if (benchRunOnce) {
         uassert(7241800, "benchRunOnce() does not support the 'parallel' field.", !parallelSet);
         uassert(7241801, "benchRunOnce() does not support the 'seconds' field.", !secondsSet);
+        parallel = ops.size();  // actual parallism of benchRunOnce(); needed to pass assert checks
     }
 }
 
