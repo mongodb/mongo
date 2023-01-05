@@ -148,8 +148,7 @@ public:
     /**
      * Map of index names to index cursors.
      */
-    const std::map<std::string, std::unique_ptr<SortedDataInterfaceThrottleCursor>>&
-    getIndexCursors() const {
+    const StringMap<std::unique_ptr<SortedDataInterfaceThrottleCursor>>& getIndexCursors() const {
         return _indexCursors;
     }
 
@@ -159,6 +158,10 @@ public:
 
     const std::unique_ptr<SeekableRecordThrottleCursor>& getSeekRecordStoreCursor() const {
         return _seekRecordStoreCursor;
+    }
+
+    const StringMap<std::unique_ptr<ColumnStore::Cursor>>& getColumnStoreCursors() const {
+        return _columnStoreIndexCursors;
     }
 
     RecordId getFirstRecordId() const {
@@ -227,6 +230,8 @@ private:
      */
     void _yieldCursors(OperationContext* opCtx);
 
+    bool _isIndexDataCheckpointed(OperationContext* opCtx, const IndexCatalogEntry* entry);
+
     NamespaceString _nss;
     ValidateMode _mode;
     RepairMode _repairMode;
@@ -253,9 +258,10 @@ private:
     std::vector<std::shared_ptr<const IndexCatalogEntry>> _indexes;
 
     // Shared cursors to be used during validation, created in 'initializeCursors()'.
-    std::map<std::string, std::unique_ptr<SortedDataInterfaceThrottleCursor>> _indexCursors;
+    StringMap<std::unique_ptr<SortedDataInterfaceThrottleCursor>> _indexCursors;
     std::unique_ptr<SeekableRecordThrottleCursor> _traverseRecordStoreCursor;
     std::unique_ptr<SeekableRecordThrottleCursor> _seekRecordStoreCursor;
+    StringMap<std::unique_ptr<ColumnStore::Cursor>> _columnStoreIndexCursors;
 
     RecordId _firstRecordId;
 

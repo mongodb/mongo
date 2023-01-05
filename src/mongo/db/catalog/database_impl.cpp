@@ -57,6 +57,7 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
@@ -749,6 +750,21 @@ Collection* DatabaseImpl::createVirtualCollection(OperationContext* opCtx,
                              vopts);
 }
 
+/**
+ * Some system collections (namely, 'config.transactions' and
+ * 'local.replset.oplogTruncateAfterPoint') are special internal collections that are written to
+ * without updating indexes, so there's no value in creating an index on them.
+ *
+ * @return true if any modification on the collection data leads to updating the indexes defined on
+ * it.
+ */
+bool doesCollectionModificationsUpdateIndexes(StringData collName) {
+    // TODO SERVER-72496: investigate whether 'config.transactions' should remain here or not.
+    return collName != "config.transactions" &&
+        collName !=
+        repl::ReplicationConsistencyMarkersImpl::kDefaultOplogTruncateAfterPointNamespace;
+}
+
 Collection* DatabaseImpl::_createCollection(
     OperationContext* opCtx,
     const NamespaceString& nss,
@@ -856,7 +872,8 @@ Collection* DatabaseImpl::_createCollection(
                 opCtx,
                 collection,
                 !idIndex.isEmpty() ? idIndex : ic->getDefaultIdIndexSpec(collection)));
-            createColumnIndex = createColumnIndexOnAllCollections.shouldFail();
+            createColumnIndex = createColumnIndexOnAllCollections.shouldFail() &&
+                doesCollectionModificationsUpdateIndexes(nss.ns());
         } else {
             // autoIndexId: false is only allowed on unreplicated collections.
             uassert(50001,

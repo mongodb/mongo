@@ -1399,7 +1399,7 @@ Additionally, users can specify that they'd like to perform a `full` validation.
       for the collection and each index, data throttling (for background validation), and general
       information about the collection.
     + [IndexConsistency](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/index_consistency.h)
-      keeps track of the number of keys detected in the record store and indexes. Detects when there
+      descendents keep track of the number of keys detected in the record store and indexes. Detects when there
       are index inconsistencies and maintains the information about the inconsistencies for
       reporting.
     + [ValidateAdaptor](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/validate_adaptor.h)
@@ -1418,15 +1418,15 @@ Additionally, users can specify that they'd like to perform a `full` validation.
     + We choose a read timestamp (`ReadSource`) based on the validation mode: `kNoTimestamp`
     for foreground validation and `kCheckpoint` for background validation.
 * Traverses the `RecordStore` using the `ValidateAdaptor` object.
-    + [Validates each record and adds the document's index key set to the IndexConsistency object](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/validate_adaptor.cpp#L61-L140)
+    + [Validates each record and adds the document's index key set to the IndexConsistency objects](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/validate_adaptor.cpp#L61-L140)
       for consistency checks at later stages.
-        + In an effort to reduce the memory footprint of validation, the `IndexConsistency` object
+        + In an effort to reduce the memory footprint of validation, the `IndexConsistency` objects
           [hashes](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/index_consistency.cpp#L307-L309)
-          the keys passed in to one of many buckets.
-        + Document keys will
+          the keys (or paths) passed in to one of many buckets.
+        + Document keys (or paths) will
           [increment](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/index_consistency.cpp#L204-L214)
           the respective bucket.
-        + Index keys will
+        + Index keys (paths) will
           [decrement](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/index_consistency.cpp#L239-L248)
           the respective bucket.
     + Checks that the `RecordId` is in [increasing order](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/validate_adaptor.cpp#L305-L308).
@@ -1434,8 +1434,8 @@ Additionally, users can specify that they'd like to perform a `full` validation.
       stored in the `RecordStore` (when performing a foreground validation only).
 * Traverses the index entries for each index in the collection.
     + [Validates the index key order to ensure that index entries are in increasing or decreasing order](https://github.com/mongodb/mongo/blob/r4.5.0/src/mongo/db/catalog/validate_adaptor.cpp#L144-L188).
-    + Adds the index key to the `IndexConsistency` object for consistency checks at later stages.
-* After the traversals are finished, the `IndexConsistency` object is checked to detect any
+    + Adds the index key to the `IndexConsistency` objects for consistency checks at later stages.
+* After the traversals are finished, the `IndexConsistency` objects are checked to detect any
   inconsistencies between the collection and indexes.
     + If a bucket has a `value of 0`, then there are no inconsistencies for the keys that hashed
       there.
