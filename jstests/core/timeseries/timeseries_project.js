@@ -97,6 +97,7 @@ const doc = {
     time: new Date("2019-10-11T14:39:18.670Z"),
     x: 5,
     a: 3,
+    obj: {a: 3},
 };
 assert.commandWorked(tsColl.insert(doc));
 assert.commandWorked(regColl.insert(doc));
@@ -107,8 +108,18 @@ let tsDoc = tsColl.aggregate(pipeline).toArray();
 let regDoc = regColl.aggregate(pipeline).toArray();
 assert.docEq(tsDoc, regDoc);
 
+pipeline = [{$project: {_id: 0, obj: "$x", b: {$add: ["$obj.a", 1]}}}];
+tsDoc = tsColl.aggregate(pipeline).toArray();
+regDoc = regColl.aggregate(pipeline).toArray();
+assert.docEq(tsDoc, regDoc);
+
 // Test $addFields.
 pipeline = [{$addFields: {a: "$x", b: "$a"}}, {$project: {_id: 0}}];
+tsDoc = tsColl.aggregate(pipeline).toArray();
+regDoc = regColl.aggregate(pipeline).toArray();
+assert.docEq(tsDoc, regDoc);
+
+pipeline = [{$addFields: {obj: "$x", b: {$add: ["$obj.a", 1]}}}, {$project: {_id: 0}}];
 tsDoc = tsColl.aggregate(pipeline).toArray();
 regDoc = regColl.aggregate(pipeline).toArray();
 assert.docEq(tsDoc, regDoc);

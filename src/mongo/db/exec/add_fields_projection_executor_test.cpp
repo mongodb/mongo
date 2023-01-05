@@ -685,5 +685,62 @@ TEST(AddFieldsProjectionExecutorExecutionTest, DoNotExtractComputedProjectionWit
                        addFields.serializeTransformation(boost::none));
 }
 
+TEST(AddFieldsProjectionExecutorExecutionTest,
+     ExtractComputedProjectionShouldNotHideDependentSubFields) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    AddFieldsProjectionExecutor addFields(expCtx);
+    addFields.parse(BSON("obj"
+                         << "$myMeta"
+                         << "b" << BSON("$add" << BSON_ARRAY("$obj.a" << 1))));
+
+    const std::set<StringData> reservedNames{};
+    auto [extractedAddFields, deleteFlag] =
+        addFields.extractComputedProjections("myMeta", "meta", reservedNames);
+
+    ASSERT_EQ(extractedAddFields.nFields(), 0);
+    ASSERT_EQ(deleteFlag, false);
+
+    auto expectedProjection =
+        Document(fromjson("{obj: '$myMeta', b: {$add: ['$obj.a', {$const: 1}]}}"));
+    ASSERT_DOCUMENT_EQ(expectedProjection, addFields.serializeTransformation(boost::none));
+}
+
+TEST(AddFieldsProjectionExecutorExecutionTest,
+     ExtractComputedProjectionShouldNotHideDependentFieldsWithDottedSibling) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    AddFieldsProjectionExecutor addFields(expCtx);
+    addFields.parse(BSON("a"
+                         << "$myMeta"
+                         << "c.b"
+                         << "$a.x"));
+
+    const std::set<StringData> reservedNames{};
+    auto [extractedAddFields, deleteFlag] =
+        addFields.extractComputedProjections("myMeta", "meta", reservedNames);
+
+    ASSERT_EQ(extractedAddFields.nFields(), 0);
+    ASSERT_EQ(deleteFlag, false);
+
+    auto expectedProjection = Document(fromjson("{a: '$myMeta', c: {b: '$a.x'}}"));
+    ASSERT_DOCUMENT_EQ(expectedProjection, addFields.serializeTransformation(boost::none));
+}
+
+TEST(AddFieldsProjectionExecutorExecutionTest, ExtractComputedProjectionShouldNotIncludeId) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    AddFieldsProjectionExecutor addFields(expCtx);
+    addFields.parse(BSON("a" << BSON("$sum" << BSON_ARRAY("$myMeta"
+                                                          << "$_id"))));
+
+    const std::set<StringData> reservedNames{};
+    auto [extractedAddFields, deleteFlag] =
+        addFields.extractComputedProjections("myMeta", "meta", reservedNames);
+
+    ASSERT_EQ(extractedAddFields.nFields(), 0);
+    ASSERT_EQ(deleteFlag, false);
+
+    auto expectedProjection = Document(fromjson("{a: {$sum: ['$myMeta', '$_id']}}"));
+    ASSERT_DOCUMENT_EQ(expectedProjection, addFields.serializeTransformation(boost::none));
+}
+
 }  // namespace
 }  // namespace mongo::projection_executor
