@@ -270,7 +270,7 @@ TEST_F(BalancerDefragmentationPolicyTest,
     ASSERT_TRUE(nextAction.is_initialized());
     DataSizeInfo dataSizeAction = stdx::get<DataSizeInfo>(*nextAction);
 
-    auto resp = StatusWith(DataSizeResponse(2000, 4));
+    auto resp = StatusWith(DataSizeResponse(2000, 4, false));
     _defragmentationPolicy.applyActionResult(operationContext(), dataSizeAction, resp);
 
     // 1. The outcome of the data size has been stored in the expected document...
@@ -285,6 +285,33 @@ TEST_F(BalancerDefragmentationPolicyTest,
     ASSERT_TRUE(nextAction == boost::none);
     ASSERT_TRUE(_defragmentationPolicy.isDefragmentingCollection(coll.getUuid()));
     verifyExpectedDefragmentationPhaseOndisk(DefragmentationPhaseEnum::kMoveAndMergeChunks);
+}
+
+TEST_F(BalancerDefragmentationPolicyTest,
+       TestPhaseOneDataSizeResponsesWithMaxSizeReachedCausesChunkToBeSkippedByPhaseTwo) {
+    auto coll = setupCollectionWithPhase({makeConfigChunkEntry()});
+    setDefaultClusterStats();
+    _defragmentationPolicy.startCollectionDefragmentation(operationContext(), coll);
+    auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
+    ASSERT_TRUE(nextAction.has_value());
+    DataSizeInfo dataSizeAction = stdx::get<DataSizeInfo>(*nextAction);
+
+    auto resp = StatusWith(DataSizeResponse(2000, 4, true));
+    _defragmentationPolicy.applyActionResult(operationContext(), dataSizeAction, resp);
+
+    // 1. The outcome of the data size has been stored in the expected document...
+    auto chunkQuery = BSON(ChunkType::collectionUUID()
+                           << kUuid << ChunkType::min(kKeyAtMin) << ChunkType::max(kKeyAtMax));
+    auto configChunkDoc =
+        findOneOnConfigCollection(operationContext(), ChunkType::ConfigNS, chunkQuery).getValue();
+    ASSERT_EQ(configChunkDoc.getField("estimatedDataSizeBytes").safeNumberLong(),
+              std::numeric_limits<int64_t>::max());
+
+    // No new action is expected - and the algorithm should converge
+    nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
+    ASSERT_TRUE(nextAction == boost::none);
+    ASSERT_FALSE(_defragmentationPolicy.isDefragmentingCollection(coll.getUuid()));
+    verifyExpectedDefragmentationPhaseOndisk(boost::none);
 }
 
 TEST_F(BalancerDefragmentationPolicyTest, TestRetriableFailedDataSizeActionGetsReissued) {
@@ -321,7 +348,7 @@ TEST_F(BalancerDefragmentationPolicyTest, TestRemoveCollectionEndsDefragmentatio
     auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
     DataSizeInfo dataSizeAction = stdx::get<DataSizeInfo>(*nextAction);
 
-    auto resp = StatusWith(DataSizeResponse(2000, 4));
+    auto resp = StatusWith(DataSizeResponse(2000, 4, false));
     _defragmentationPolicy.applyActionResult(operationContext(), dataSizeAction, resp);
 
     // Remove collection entry from config.collections

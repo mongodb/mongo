@@ -336,12 +336,14 @@ public:
                         const BSONObj& lowerBoundKey,
                         const BSONObj& upperBoundKey,
                         bool estimatedValue,
+                        int64_t maxSize,
                         const ChunkVersion& version)
         : CommandInfo(shardId, nss, boost::none),
           _shardKeyPattern(shardKeyPattern),
           _lowerBoundKey(lowerBoundKey),
           _upperBoundKey(upperBoundKey),
           _estimatedValue(estimatedValue),
+          _maxSize(maxSize),
           _version(version) {}
 
     BSONObj serialise() const override {
@@ -350,7 +352,8 @@ public:
             .append(kKeyPattern, _shardKeyPattern)
             .append(kMinValue, _lowerBoundKey)
             .append(kMaxValue, _upperBoundKey)
-            .append(kEstimatedValue, _estimatedValue);
+            .append(kEstimatedValue, _estimatedValue)
+            .append(kMaxSizeValue, _maxSize);
 
         _version.serializeToBSON(ChunkVersion::kShardVersionField, &commandBuilder);
 
@@ -362,6 +365,7 @@ private:
     BSONObj _lowerBoundKey;
     BSONObj _upperBoundKey;
     bool _estimatedValue;
+    int64_t _maxSize;
     ChunkVersion _version;
 
     static const std::string kCommandName;
@@ -369,6 +373,7 @@ private:
     static const std::string kMinValue;
     static const std::string kMaxValue;
     static const std::string kEstimatedValue;
+    static const std::string kMaxSizeValue;
 };
 
 class SplitChunkCommandInfo : public CommandInfo {
@@ -589,7 +594,8 @@ public:
                                                  const ChunkRange& chunkRange,
                                                  const ChunkVersion& version,
                                                  const KeyPattern& keyPattern,
-                                                 bool estimatedValue) override;
+                                                 bool estimatedValue,
+                                                 int64_t maxSize) override;
 
 private:
     enum class SchedulerState { Recovering, Running, Stopping, Stopped };

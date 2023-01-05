@@ -166,6 +166,11 @@ public:
         auto collectionChunks = getCollectionChunks(opCtx, coll);
         const auto collectionZones = getCollectionZones(opCtx, coll);
 
+        // Calculate small chunk threshold to limit dataSize commands
+        const auto maxChunkSizeBytes = getCollectionMaxChunkSizeBytes(opCtx, coll);
+        const int64_t smallChunkSizeThreshold =
+            (maxChunkSizeBytes / 100) * kSmallChunkSizeThresholdPctg;
+
         stdx::unordered_map<ShardId, PendingActions> pendingActionsByShards;
         // Find ranges of chunks; for single-chunk ranges, request DataSize; for multi-range, issue
         // merge
@@ -192,6 +197,7 @@ public:
             new MergeAndMeasureChunksPhase(coll.getNss(),
                                            coll.getUuid(),
                                            coll.getKeyPattern().toBSON(),
+                                           smallChunkSizeThreshold,
                                            std::move(pendingActionsByShards)));
     }
 
@@ -217,14 +223,15 @@ public:
 
             if (pendingActions.rangesWithoutDataSize.size() > pendingActions.rangesToMerge.size()) {
                 const auto& rangeToMeasure = pendingActions.rangesWithoutDataSize.back();
-                nextAction =
-                    boost::optional<DefragmentationAction>(DataSizeInfo(shardId,
-                                                                        _nss,
-                                                                        _uuid,
-                                                                        rangeToMeasure,
-                                                                        shardVersion,
-                                                                        _shardKey,
-                                                                        true /* estimate */));
+                nextAction = boost::optional<DefragmentationAction>(
+                    DataSizeInfo(shardId,
+                                 _nss,
+                                 _uuid,
+                                 rangeToMeasure,
+                                 shardVersion,
+                                 _shardKey,
+                                 true /* estimate */,
+                                 _smallChunkSizeThresholdBytes /* maxSize */));
                 pendingActions.rangesWithoutDataSize.pop_back();
             } else if (!pendingActions.rangesToMerge.empty()) {
                 const auto& rangeToMerge = pendingActions.rangesToMerge.back();
@@ -297,10 +304,17 @@ public:
                                             dataSizeAction.version,
                                             dataSizeAction.shardId);
                             auto catalogManager = ShardingCatalogManager::get(opCtx);
+                            // Max out the chunk size if it has has been estimated as
+                            // bigger than _smallChunkSizeThresholdBytes; this will exlude
+                            // the chunk from the list of candidates considered by
+                            // MoveAndMergeChunksPhase
+                            auto estimatedSize = dataSizeResponse.getValue().maxSizeReached
+                                ? std::numeric_limits<int64_t>::max()
+                                : dataSizeResponse.getValue().sizeBytes;
                             catalogManager->setChunkEstimatedSize(
                                 opCtx,
                                 chunk,
-                                dataSizeResponse.getValue().sizeBytes,
+                                estimatedSize,
                                 ShardingCatalogClient::kMajorityWriteConcern);
                         },
                         [&]() {
@@ -353,10 +367,12 @@ private:
         const NamespaceString& nss,
         const UUID& uuid,
         const BSONObj& shardKey,
+        const int64_t smallChunkSizeThresholdBytes,
         stdx::unordered_map<ShardId, PendingActions>&& pendingActionsByShards)
         : _nss(nss),
           _uuid(uuid),
           _shardKey(shardKey),
+          _smallChunkSizeThresholdBytes(smallChunkSizeThresholdBytes),
           _pendingActionsByShards(std::move(pendingActionsByShards)) {}
 
     void _abort(const DefragmentationPhaseEnum nextPhase) {
@@ -368,6 +384,7 @@ private:
     const NamespaceString _nss;
     const UUID _uuid;
     const BSONObj _shardKey;
+    const int64_t _smallChunkSizeThresholdBytes;
     stdx::unordered_map<ShardId, PendingActions> _pendingActionsByShards;
     boost::optional<ShardId> _shardToProcess;
     size_t _outstandingActions{0};
@@ -590,7 +607,14 @@ public:
 
                         auto& chunkToDelete = mergeRequest.chunkToMove;
                         mergedChunk->range = mergeRequest.asMergedRange();
-                        mergedChunk->estimatedSizeBytes += chunkToDelete->estimatedSizeBytes;
+                        if (mergedChunk->estimatedSizeBytes !=
+                                std::numeric_limits<int64_t>::max() &&
+                            chunkToDelete->estimatedSizeBytes !=
+                                std::numeric_limits<int64_t>::max()) {
+                            mergedChunk->estimatedSizeBytes += chunkToDelete->estimatedSizeBytes;
+                        } else {
+                            mergedChunk->estimatedSizeBytes = std::numeric_limits<int64_t>::max();
+                        }
                         mergedChunk->busyInOperation = false;
                         auto deletedChunkShard = chunkToDelete->shard;
                         // the lookup data structures...
@@ -767,8 +791,6 @@ private:
     private:
         bool _isChunkToMergeLeftSibling;
     };
-
-    static constexpr uint64_t kSmallChunkSizeThresholdPctg = 25;
 
     const NamespaceString _nss;
 
