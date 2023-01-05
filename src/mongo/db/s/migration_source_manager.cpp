@@ -738,10 +738,6 @@ void MigrationSourceManager::_cleanup(bool completeMigration) noexcept {
                 // shard becomes a primary, it won't have to recover the config server optime.
                 // TODO (SERVER-60110): Remove once 7.0 becomes last LTS.
                 ShardingStateRecovery_DEPRECATED::endMetadataOp(newOpCtx);
-
-                // Checkpoint the vector clock to ensure causality in the event of a crash or
-                // shutdown.
-                VectorClockMutable::get(newOpCtx)->waitForDurableConfigTime().get(newOpCtx);
             }
             if (completeMigration) {
                 // This can be called on an exception path after the OperationContext has been

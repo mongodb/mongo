@@ -1106,6 +1106,15 @@ void recoverMigrationCoordinations(OperationContext* opCtx,
                           "coordinatorDocumentUUID"_attr = doc.getCollectionUuid());
                 }
 
+                // TODO SERVER-71918 once the drop collection coordinator starts persisting the
+                // config time we can remove this. Since the collection has been dropped,
+                // persist config time inclusive of the drop collection event before deleting
+                // leftover migration metadata.
+                // This will ensure that in case of stepdown the new
+                // primary won't read stale data from config server and think that the sharded
+                // collection still exists.
+                VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
+
                 deleteRangeDeletionTaskOnRecipient(opCtx,
                                                    doc.getRecipientShardId(),
                                                    doc.getCollectionUuid(),

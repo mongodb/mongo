@@ -169,6 +169,11 @@ boost::optional<SharedSemiFuture<void>> MigrationCoordinator::completeMigration(
         launchReleaseRecipientCriticalSection(opCtx);
     }
 
+    // Persist the config time before the migration decision to ensure that in case of stepdown
+    // next filtering metadata refresh on the new primary will always include the effect of this
+    // migration.
+    VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
+
     boost::optional<SharedSemiFuture<void>> cleanupCompleteFuture = boost::none;
 
     switch (*decision) {
@@ -358,11 +363,6 @@ void MigrationCoordinator::forgetMigration(OperationContext* opCtx) {
                 2,
                 "Deleting migration coordinator document",
                 "migrationId"_attr = _migrationInfo.getId());
-
-    // Before deleting the migration coordinator document, ensure that in the case of a crash, the
-    // node will start-up from at least the configTime, which it obtained as part of recovery of the
-    // shardVersion, which will ensure that it will see at least the same shardVersion.
-    VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
 
     PersistentTaskStore<MigrationCoordinatorDocument> store(
         NamespaceString::kMigrationCoordinatorsNamespace);
