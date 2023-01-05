@@ -51,7 +51,8 @@ jsTestLog("Available read");
 assert.docEq(newColl.find({}).readConcern("available").toArray(), [{_id: TestData.dataStr, x: 1}]);
 jsTestLog("Local read");
 assert.docEq(newColl.find({}).readConcern("local").toArray(), [{_id: TestData.dataStr, x: 1}]);
-if (jsTest.options().enableMajorityReadConcern === false) {
+if (jsTest.options().enableMajorityReadConcern === false ||
+    jsTest.options().storageEngine == "ephemeralForTest") {
     jsTestLog("Majority read (disabled, should fail)");
     assert.throwsWithCode(() => newColl.find({}).readConcern("majority").toArray(),
                           ErrorCodes.ReadConcernMajorityNotEnabled);
