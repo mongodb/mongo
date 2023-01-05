@@ -1,0 +1,59 @@
+# Golden test output of ABTPlanGeneration/LowerUniqueNode
+
+==== VARIATION: Lower unique node with single key ====
+-- INPUT:
+Unique []
+|   projections: 
+|       proj0
+Evaluation []
+|   BindBlock:
+|       [proj0]
+|           FunctionCall [getField]
+|           |   Const ["a"]
+|           Variable [scan0]
+PhysicalScan [{'<root>': scan0}, collName]
+    BindBlock:
+        [scan0]
+            Source []
+
+-- OUTPUT:
+[5] unique [s2] 
+[3] project [s2 = getField(s1, "a")] 
+[1] scan s1 none none none none none [] @"<collUUID>" true false 
+
+==== VARIATION: Lower unique node with multiple keys ====
+-- INPUT:
+Unique []
+|   projections: 
+|       proj0
+|       proj1
+|       proj2
+Evaluation []
+|   BindBlock:
+|       [proj2]
+|           FunctionCall [getField]
+|           |   Const ["c"]
+|           Variable [scan0]
+Evaluation []
+|   BindBlock:
+|       [proj1]
+|           FunctionCall [getField]
+|           |   Const ["b"]
+|           Variable [scan0]
+Evaluation []
+|   BindBlock:
+|       [proj0]
+|           FunctionCall [getField]
+|           |   Const ["a"]
+|           Variable [scan0]
+PhysicalScan [{'<root>': scan0}, collName]
+    BindBlock:
+        [scan0]
+            Source []
+
+-- OUTPUT:
+[15] unique [s2, s3, s4] 
+[13] project [s4 = getField(s1, "c")] 
+[11] project [s3 = getField(s1, "b")] 
+[9] project [s2 = getField(s1, "a")] 
+[7] scan s1 none none none none none [] @"<collUUID>" true false 

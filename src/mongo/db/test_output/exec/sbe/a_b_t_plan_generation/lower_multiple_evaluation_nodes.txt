@@ -1,0 +1,25 @@
+# Golden test output of ABTPlanGeneration/LowerMultipleEvaluationNodes
+
+==== VARIATION: Lower two chained evaluation nodes ====
+-- INPUT:
+Evaluation []
+|   BindBlock:
+|       [proj1]
+|           FunctionCall [getField]
+|           |   Const ["b"]
+|           Variable [scan0]
+Evaluation []
+|   BindBlock:
+|       [proj0]
+|           FunctionCall [getField]
+|           |   Const ["a"]
+|           Variable [scan0]
+PhysicalScan [{'<root>': scan0}, collName]
+    BindBlock:
+        [scan0]
+            Source []
+
+-- OUTPUT:
+[5] project [s3 = getField(s1, "b")] 
+[3] project [s2 = getField(s1, "a")] 
+[1] scan s1 none none none none none [] @"<collUUID>" true false 

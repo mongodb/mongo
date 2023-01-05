@@ -188,8 +188,7 @@ protected:
 
     ABT createMultipleBindings(std::vector<std::pair<std::string, std::string>> bindingList,
                                ABT source,
-                               std::string sourceBinding,
-                               NodeToGroupPropsMap& nodeMap) {
+                               std::string sourceBinding) {
         for (auto [fieldName, bindingName] : bindingList) {
             auto field =
                 make<EvalPath>(make<PathGet>(FieldNameType(fieldName), make<PathIdentity>()),
@@ -197,7 +196,7 @@ protected:
             runPathLowering(field);
             ABT evalNode = make<EvaluationNode>(
                 ProjectionName(bindingName), std::move(field), std::move(source));
-            nodeMap.insert({evalNode.cast<EvaluationNode>(), makeNodeProp()});
+            _nodeMap.insert({evalNode.cast<EvaluationNode>(), makeNodeProp()});
             source = std::move(evalNode);
         }
         return source;
@@ -301,11 +300,10 @@ TEST_F(ABTPlanGeneration, LowerCollationNode) {
     runNodeVariation(
         ctx,
         "Lower collation node with single field",
-        _node(
-            make<CollationNode>(
-                properties::CollationRequirement({{"sortA", CollationOp::Ascending}}),
-                createMultipleBindings({{"a", "sortA"}}, _node(scanForTest()), "scan0", _nodeMap)),
-            collationNodeProp));
+        _node(make<CollationNode>(
+                  properties::CollationRequirement({{"sortA", CollationOp::Ascending}}),
+                  createMultipleBindings({{"a", "sortA"}}, _node(scanForTest()), "scan0")),
+              collationNodeProp));
 
     // Sort on multiple fields.
     properties::PhysProps physProps2;
@@ -327,7 +325,7 @@ TEST_F(ABTPlanGeneration, LowerCollationNode) {
                   properties::CollationRequirement(
                       {{"sortA", CollationOp::Ascending}, {"sortB", CollationOp::Descending}}),
                   createMultipleBindings(
-                      {{"a", "sortA"}, {"b", "sortB"}}, _node(scanForTest()), "scan0", _nodeMap)),
+                      {{"a", "sortA"}, {"b", "sortB"}}, _node(scanForTest()), "scan0")),
               collationNodeProp2));
 }
 
@@ -337,5 +335,32 @@ TEST_F(ABTPlanGeneration, LowerCoScanNode) {
     runNodeVariation(ctx, "CoScan", _node(make<CoScanNode>()));
 }
 
+TEST_F(ABTPlanGeneration, LowerMultipleEvaluationNodes) {
+    GoldenTestContext ctx(&goldenTestConfig);
+    ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
+    runNodeVariation(
+        ctx,
+        "Lower two chained evaluation nodes",
+        createMultipleBindings({{"a", "proj0"}, {"b", "proj1"}}, _node(scanForTest()), "scan0"));
+}
+
+TEST_F(ABTPlanGeneration, LowerUniqueNode) {
+    GoldenTestContext ctx(&goldenTestConfig);
+    ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
+    runNodeVariation(ctx,
+                     "Lower unique node with single key",
+                     _node(make<UniqueNode>(
+                         ProjectionNameVector{"proj0"},
+                         createMultipleBindings({{"a", "proj0"}}, _node(scanForTest()), "scan0"))));
+
+
+    runNodeVariation(
+        ctx,
+        "Lower unique node with multiple keys",
+        _node(make<UniqueNode>(
+            ProjectionNameVector{"proj0", "proj1", "proj2"},
+            createMultipleBindings(
+                {{"a", "proj0"}, {"b", "proj1"}, {"c", "proj2"}}, _node(scanForTest()), "scan0"))));
+}
 }  // namespace
 }  // namespace mongo::optimizer
