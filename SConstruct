@@ -4355,8 +4355,12 @@ def doConfigure(myenv):
             def CheckForDWARF64Support(context):
 
                 context.Message('Checking that DWARF64 format is viable... ')
+                try:
+                    dwarf_version = int(myenv.get('DWARF_VERSION', 0))
+                except ValueError:
+                    dwarf_version = None
 
-                if myenv.get('DWARF_VERSION', 0) <= 4:
+                if dwarf_version is None or dwarf_version <= 4:
                     result = False
                 else:
                     test_body = """
