@@ -123,15 +123,10 @@ public:
     //    given field path. This raw key value can be used for sorting / comparison, but it is not
     //    always equal to the actual value of the field path (for example, if the key is coming from
     //    an index that has a non-simple collation).
-    // 4) kPathExpr slots represent the value obtained from evaluating an 'ExpressionFieldPath'.
-    //    Typically, this is requested by stages that wish to avoid generating duplicate
-    //    expressions for path traversal (for example, $group stages which reference the same
-    //    field path across multiple accumulators).
     enum class Type {
         kMeta,
         kField,
         kSortKey,
-        kPathExpr,
     };
 
     using Name = std::pair<Type, StringData>;
@@ -140,7 +135,6 @@ public:
     static constexpr auto kMeta = Type::kMeta;
     static constexpr auto kField = Type::kField;
     static constexpr auto kSortKey = Type::kSortKey;
-    static constexpr auto kPathExpr = Type::kPathExpr;
 
     static constexpr Name kResult = {kMeta, "result"_sd};
     static constexpr Name kRecordId = {kMeta, "recordId"_sd};

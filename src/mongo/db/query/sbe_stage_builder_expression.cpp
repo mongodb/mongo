@@ -2075,6 +2075,27 @@ public:
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(expExpr)));
     }
     void visit(const ExpressionFieldPath* expr) final {
+        // There's a chance that we've already generated a SBE plan stage tree for this field path,
+        // in which case we avoid regeneration of the same plan stage tree.
+        if (!_context->state.preGeneratedExprs.empty()) {
+            if (auto it = _context->state.preGeneratedExprs.find(expr->getFieldPath().fullPath());
+                it != _context->state.preGeneratedExprs.end()) {
+                tassert(6089301,
+                        "Expressions for top-level documents / variables must not be pre-generated",
+                        expr->getFieldPath().getPathLength() != 1 && !expr->isVariableReference());
+                if (auto optionalSlot = it->second.getSlot(); optionalSlot) {
+                    _context->pushExpr(*optionalSlot);
+                } else if (it->second.hasABT()) {
+                    _context->pushExpr(it->second.extractABT(_context->state.slotVarMap));
+                } else {
+                    auto preGeneratedExpr = it->second.extractExpr(_context->state.slotVarMap);
+                    _context->pushExpr(preGeneratedExpr->clone());
+                    it->second = std::move(preGeneratedExpr);
+                }
+                return;
+            }
+        }
+
         EvalExpr inputExpr;
         boost::optional<sbe::value::SlotId> topLevelFieldSlot;
         bool expectsDocumentInputOnly = false;
@@ -2083,24 +2104,14 @@ public:
             : boost::none;
 
         if (!Variables::isUserDefinedVariable(expr->getVariableId())) {
-            const auto* slots = _context->slots;
             if (expr->getVariableId() == Variables::kRootId) {
                 // Set inputExpr to refer to the root document.
                 inputExpr = _context->rootExpr.clone();
                 expectsDocumentInputOnly = true;
-
-                if (slots && fp) {
-                    // Check if we already have a slot containing an expression corresponding
-                    // to 'expr'.
-                    auto fpe = std::make_pair(PlanStageSlots::kPathExpr, fp->fullPath());
-                    if (slots->has(fpe)) {
-                        _context->pushExpr(slots->get(fpe));
-                        return;
-                    }
-
-                    // Obtain a slot for the top-level field referred to by 'expr', if one exists.
+                // Check if a slot is available for the top-level field referred to by 'expr'.
+                if (expr->getFieldPath().getPathLength() > 1 && _context->slots) {
                     auto topLevelField = std::make_pair(PlanStageSlots::kField, fp->front());
-                    topLevelFieldSlot = slots->getIfExists(topLevelField);
+                    topLevelFieldSlot = _context->slots->getIfExists(topLevelField);
                 }
             } else if (expr->getVariableId() == Variables::kRemoveId) {
                 // For the field paths that begin with "$$REMOVE", we always produce Nothing,
