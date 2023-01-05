@@ -56,22 +56,27 @@ assert.between(expectedSpilledRanges,
                indexBulkBuilderSection.spilledRanges,
                1 + expectedSpilledRanges,
                tojson(indexBulkBuilderSection),
-               true /* inclusive */);
+               /*inclusive=*/true);
 assert.between(0,
                indexBulkBuilderSection.bytesSpilled,
                approxMemoryUsage,
                tojson(indexBulkBuilderSection),
-               true);
+               /*inclusive=*/true);
 // We write out a single byte for every spilled doc, which is included in the uncompressed size.
 assert.between(0,
                indexBulkBuilderSection.bytesSpilledUncompressed,
                approxMemoryUsage + spillOverhead,
                tojson(indexBulkBuilderSection),
-               true);
+               /*inclusive=*/true);
 assert.eq(indexBulkBuilderSection.numSorted, numDocs, tojson(indexBulkBuilderSection));
 // Expect total bytes sorted to be greater than approxMemoryUsage because of the additional field in
 // the documents inserted which accounts for more bytes than in the rough calculation.
 assert.gte(indexBulkBuilderSection.bytesSorted, approxMemoryUsage, tojson(indexBulkBuilderSection));
+assert.between(0,
+               indexBulkBuilderSection.memUsage,
+               approxMemoryUsage,
+               tojson(indexBulkBuilderSection),
+               /*inclusive=*/true);
 
 (function resumeIndexBuild() {
     jsTestLog(
@@ -107,15 +112,17 @@ assert.between(0,
                indexBulkBuilderSection.bytesSpilled,
                approxMemoryUsage,
                tojson(indexBulkBuilderSection),
-               true);
+               /*inclusive=*/true);
 assert.between(0,
                indexBulkBuilderSection.bytesSpilledUncompressed,
                // We write out some extra data for every spilled doc, which is included in the
                // uncompressed size.
                approxMemoryUsage + spillOverhead,
-               tojson(indexBulkBuilderSection));
+               tojson(indexBulkBuilderSection),
+               /*inclusive=*/true);
 assert.eq(indexBulkBuilderSection.numSorted, 0, tojson(indexBulkBuilderSection));
 assert.eq(indexBulkBuilderSection.bytesSorted, 0, tojson(indexBulkBuilderSection));
+assert.eq(indexBulkBuilderSection.memUsage, 0, tojson(indexBulkBuilderSection));
 
 (function initialSyncNewNode() {
     jsTestLog("Adding new node and initial syncing");
@@ -147,18 +154,19 @@ assert.between(expectedSpilledRanges,
                indexBulkBuilderSection.spilledRanges,
                1 + expectedSpilledRanges,
                tojson(indexBulkBuilderSection),
-               true /* inclusive */);
+               /*inclusive=*/true);
 assert.between(0,
                indexBulkBuilderSection.bytesSpilled,
                approxMemoryUsage,
                tojson(indexBulkBuilderSection),
-               true);
+               /*inclusive=*/true);
 assert.between(0,
                indexBulkBuilderSection.bytesSpilledUncompressed,
                // We write out some extra data for every spilled doc, which is included in the
                // uncompressed size.
                approxMemoryUsage + spillOverhead,
-               tojson(indexBulkBuilderSection));
+               tojson(indexBulkBuilderSection),
+               /*inclusive=*/true);
 // Expect at least all documents in the collection are sorted for three indexes but there may also
 // be internal indexes with additional sorts.
 assert.gte(indexBulkBuilderSection.numSorted, numDocs * 3, tojson(indexBulkBuilderSection));
@@ -167,6 +175,11 @@ assert.gte(indexBulkBuilderSection.numSorted, numDocs * 3, tojson(indexBulkBuild
 // end byte, and the record id.
 let dataUsage = approxMemoryUsage + (3 * numDocs) + (3 * numDocs);
 assert.gte(indexBulkBuilderSection.bytesSorted, dataUsage, tojson(indexBulkBuilderSection));
+assert.between(0,
+               indexBulkBuilderSection.memUsage,
+               approxMemoryUsage,
+               tojson(indexBulkBuilderSection),
+               /*inclusive=*/true);
 
 // Building multiple indexes in a single createIndex command increases count by the number of
 // indexes requested.
@@ -186,24 +199,30 @@ assert.between(expectedSpilledRanges,
                indexBulkBuilderSection.spilledRanges,
                1 + expectedSpilledRanges,
                tojson(indexBulkBuilderSection),
-               true /* inclusive */);
+               /*inclusive=*/true);
 assert.between(0,
                indexBulkBuilderSection.bytesSpilled,
                approxMemoryUsage,
                tojson(indexBulkBuilderSection),
-               true);
+               /*inclusive=*/true);
 assert.between(0,
                indexBulkBuilderSection.bytesSpilledUncompressed,
                // We write out some extra data for every spilled doc, which is included in the
                // uncompressed size.
                approxMemoryUsage + spillOverhead,
-               tojson(indexBulkBuilderSection));
+               tojson(indexBulkBuilderSection),
+               /*inclusive=*/true);
 assert.eq(indexBulkBuilderSection.numSorted, numDocs * 3, tojson(indexBulkBuilderSection));
 // We are sorting on index keys and keystring sizes are encoded to its necessary bytes so we are
 // approximating that _id and b will be at least 3 bytes each to account for the integer value, the
 // end byte, and the record id.
 dataUsage = approxMemoryUsage + (3 * numDocs) + (3 * numDocs);
 assert.gte(indexBulkBuilderSection.bytesSorted, dataUsage, tojson(indexBulkBuilderSection));
+assert.between(0,
+               indexBulkBuilderSection.memUsage,
+               approxMemoryUsage,
+               tojson(indexBulkBuilderSection),
+               /*inclusive=*/true);
 
 replSet.stopSet();
 })();

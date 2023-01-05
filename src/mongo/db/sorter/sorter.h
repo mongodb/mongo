@@ -561,7 +561,6 @@ private:
 
     boost::optional<Key> _min;
     bool _done = false;
-    size_t _memUsed = 0;
 };
 
 /**

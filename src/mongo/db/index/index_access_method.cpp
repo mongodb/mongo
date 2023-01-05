@@ -104,6 +104,7 @@ public:
         builder.append("bytesSpilled", sorterTracker.bytesSpilled.loadRelaxed());
         builder.append("numSorted", sorterTracker.numSorted.loadRelaxed());
         builder.append("bytesSorted", sorterTracker.bytesSorted.loadRelaxed());
+        builder.append("memUsage", sorterTracker.memUsage.loadRelaxed());
         return builder.obj();
     }
 

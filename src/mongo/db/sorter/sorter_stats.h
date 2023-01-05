@@ -42,6 +42,7 @@ struct SorterTracker {
     AtomicWord<long long> bytesSpilledUncompressed{0};
     AtomicWord<long long> numSorted{0};
     AtomicWord<long long> bytesSorted{0};
+    AtomicWord<long long> memUsage{0};
 };
 
 /**
@@ -88,10 +89,17 @@ public:
     void incrementBytesSorted(uint64_t bytes);
     uint64_t bytesSorted() const;
 
+    void incrementMemUsage(uint64_t memUsage);
+    void decrementMemUsage(uint64_t memUsage);
+    void resetMemUsage();
+    void setMemUsage(uint64_t memUsage);
+    uint64_t memUsage() const;
+
 private:
     uint64_t _spilledRanges = 0;  // Number of spills.
     uint64_t _numSorted = 0;      // Number of keys sorted.
     uint64_t _bytesSorted = 0;    // Total bytes of data sorted.
+    uint64_t _memUsage = 0;       // Current memory being used.
 
     // All SorterStats update the SorterTracker to report sorter statistics for the
     // server.

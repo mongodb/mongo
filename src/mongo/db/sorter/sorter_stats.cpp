@@ -89,4 +89,42 @@ void SorterStats::incrementBytesSorted(uint64_t bytes) {
 uint64_t SorterStats::bytesSorted() const {
     return _bytesSorted;
 }
+
+void SorterStats::incrementMemUsage(uint64_t memUsage) {
+    _memUsage += memUsage;
+    if (_sorterTracker) {
+        _sorterTracker->memUsage.fetchAndAdd(memUsage);
+    }
+}
+
+void SorterStats::decrementMemUsage(uint64_t memUsage) {
+    invariant(memUsage <= _memUsage);
+    _memUsage -= memUsage;
+    if (_sorterTracker) {
+        _sorterTracker->memUsage.fetchAndSubtract(memUsage);
+    }
+}
+
+void SorterStats::resetMemUsage() {
+    setMemUsage(0);
+}
+
+void SorterStats::setMemUsage(uint64_t memUsage) {
+    if (memUsage == _memUsage) {
+        return;
+    }
+
+    if (_sorterTracker) {
+        if (memUsage > _memUsage) {
+            _sorterTracker->memUsage.fetchAndAdd(memUsage - _memUsage);
+        } else {
+            _sorterTracker->memUsage.fetchAndSubtract(_memUsage - memUsage);
+        }
+    }
+    _memUsage = memUsage;
+}
+
+uint64_t SorterStats::memUsage() const {
+    return _memUsage;
+}
 }  // namespace mongo

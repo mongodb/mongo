@@ -718,17 +718,17 @@ public:
         auto& memPool = this->_memPool;
         if (memPool) {
             auto memUsedInsideSorter = (sizeof(Key) + sizeof(Value)) * (_data.size() + 1);
-            _memUsed = memPool->memUsage() + memUsedInsideSorter;
+            this->_stats.setMemUsage(memPool->memUsage() + memUsedInsideSorter);
         } else {
             auto memUsage = key.memUsageForSorter() + val.memUsageForSorter();
-            _memUsed += memUsage;
+            this->_stats.incrementMemUsage(memUsage);
         }
 
         // Invoking keyValProducer could invalidate key and val if it uses move semantics,
         // don't reference them anymore from this point on.
         _data.emplace_back(keyValProducer());
 
-        if (_memUsed > this->_opts.maxMemoryUsageBytes) {
+        if (this->_stats.memUsage() > this->_opts.maxMemoryUsageBytes) {
             spill();
         }
     }
@@ -779,7 +779,14 @@ private:
         STLComparator less(this->_comp);
         std::stable_sort(_data.begin(), _data.end(), less);
         this->_stats.incrementNumSorted(_data.size());
-        this->_stats.incrementBytesSorted(_memUsed);
+        auto& memPool = this->_memPool;
+        if (memPool) {
+            invariant(memPool->totalFragmentBytesUsed() >= this->_stats.bytesSorted());
+            this->_stats.incrementBytesSorted(memPool->totalFragmentBytesUsed() -
+                                              this->_stats.bytesSorted());
+        } else {
+            this->_stats.incrementBytesSorted(this->_stats.memUsage());
+        }
     }
 
     void spill() {
@@ -811,14 +818,15 @@ private:
         if (memPool) {
             // We expect that all buffers are unused at this point.
             memPool->freeUnused();
+            this->_stats.setMemUsage(memPool->memUsage());
+        } else {
+            this->_stats.resetMemUsage();
         }
-        _memUsed = 0;
 
         this->_stats.incrementSpilledRanges();
     }
 
     bool _done = false;
-    size_t _memUsed = 0;
     std::deque<Data> _data;  // Data that has not been spilled.
 };
 
@@ -895,7 +903,6 @@ public:
                const Comparator& comp,
                const Settings& settings = Settings())
         : MergeableSorter<Key, Value, Comparator>(opts, comp, settings),
-          _memUsed(0),
           _haveCutoff(false),
           _worstCount(0),
           _medianCount(0) {
@@ -929,12 +936,12 @@ public:
             // don't reference them anymore from this point on.
             _data.emplace_back(keyValProducer());
 
-            _memUsed += memUsage;
+            this->_stats.incrementMemUsage(memUsage);
 
             if (_data.size() == this->_opts.limit)
                 std::make_heap(_data.begin(), _data.end(), less);
 
-            if (_memUsed > this->_opts.maxMemoryUsageBytes)
+            if (this->_stats.memUsage() > this->_opts.maxMemoryUsageBytes)
                 spill();
 
             return;
@@ -948,9 +955,10 @@ public:
         // Remove the old worst pair and insert the contender, adjusting _memUsed
 
         auto memUsage = key.memUsageForSorter() + val.memUsageForSorter();
-        _memUsed += memUsage;
-        _memUsed -= _data.front().first.memUsageForSorter();
-        _memUsed -= _data.front().second.memUsageForSorter();
+        this->_stats.incrementMemUsage(memUsage);
+
+        this->_stats.decrementMemUsage(_data.front().first.memUsageForSorter());
+        this->_stats.decrementMemUsage(_data.front().second.memUsageForSorter());
 
         std::pop_heap(_data.begin(), _data.end(), less);
         // Invoking keyValProducer could invalidate key and val if it uses move semantics,
@@ -958,7 +966,7 @@ public:
         _data.back() = keyValProducer();
         std::push_heap(_data.begin(), _data.end(), less);
 
-        if (_memUsed > this->_opts.maxMemoryUsageBytes)
+        if (this->_stats.memUsage() > this->_opts.maxMemoryUsageBytes)
             spill();
     }
 
@@ -1013,7 +1021,7 @@ private:
             std::stable_sort(_data.begin(), _data.end(), less);
         }
 
-        this->_stats.incrementBytesSorted(_memUsed);
+        this->_stats.incrementBytesSorted(this->_stats.memUsage());
     }
 
     // Can only be called after _data is sorted
@@ -1125,12 +1133,11 @@ private:
         Iterator* iteratorPtr = writer.done();
         this->_iters.push_back(std::shared_ptr<Iterator>(iteratorPtr));
 
-        _memUsed = 0;
+        this->_stats.resetMemUsage();
         this->_stats.incrementSpilledRanges();
     }
 
     bool _done = false;
-    size_t _memUsed;
 
     // Data that has not been spilled. Organized as max-heap if size == limit.
     std::vector<Data> _data;
@@ -1467,10 +1474,9 @@ void BoundedSorter<Key, Value, Comparator, BoundMaker>::add(Key key, Value value
     auto memUsage = key.memUsageForSorter() + value.memUsageForSorter();
     _heap.emplace(std::move(key), std::move(value));
 
-    _memUsed += memUsage;
+    this->_stats.incrementMemUsage(memUsage);
     this->_stats.incrementBytesSorted(memUsage);
-
-    if (_memUsed > _opts.maxMemoryUsageBytes)
+    if (this->_stats.memUsage() > _opts.maxMemoryUsageBytes)
         _spill();
 }
 
@@ -1484,7 +1490,7 @@ void BoundedSorter<Key, Value, Comparator, BoundMaker>::restart() {
     // kDone when 'this->_stats.numSorted() == _opts.limit'.
     _spillIter.reset();
     _heap = decltype(_heap){Greater{&compare}};
-    _memUsed = 0;
+    this->_stats.resetMemUsage();
 
     _done = false;
     _min.reset();
@@ -1541,10 +1547,10 @@ std::pair<Key, Value> BoundedSorter<Key, Value, Comparator, BoundMaker>::next() 
         _heap.pop();
 
         auto memUsage = result.first.memUsageForSorter() + result.second.memUsageForSorter();
-        if (static_cast<int64_t>(memUsage) > static_cast<int64_t>(_memUsed)) {
-            _memUsed = 0;
+        if (static_cast<int64_t>(memUsage) > static_cast<int64_t>(this->_stats.memUsage())) {
+            this->_stats.resetMemUsage();
         } else {
-            _memUsed -= memUsage;
+            this->_stats.decrementMemUsage(memUsage);
         }
     };
 
@@ -1580,17 +1586,17 @@ void BoundedSorter<Key, Value, Comparator, BoundMaker>::_spill() {
     // If we have a small $limit, we can simply extract that many of the smallest elements from
     // the _heap and discard the rest, avoiding an expensive spill to disk.
     if (_opts.limit > 0 && _opts.limit < (_heap.size() / 2)) {
-        _memUsed = 0;
+        this->_stats.resetMemUsage();
         decltype(_heap) retained{Greater{&compare}};
         for (size_t i = 0; i < _opts.limit; ++i) {
-            _memUsed +=
-                _heap.top().first.memUsageForSorter() + _heap.top().second.memUsageForSorter();
+            this->_stats.incrementMemUsage(_heap.top().first.memUsageForSorter() +
+                                           _heap.top().second.memUsageForSorter());
             retained.emplace(_heap.top());
             _heap.pop();
         }
         _heap.swap(retained);
 
-        if (_memUsed < _opts.maxMemoryUsageBytes) {
+        if (this->_stats.memUsage() < _opts.maxMemoryUsageBytes) {
             return;
         }
     }
@@ -1620,7 +1626,7 @@ void BoundedSorter<Key, Value, Comparator, BoundMaker>::_spill() {
 
     dassert(_spillIter->more());
 
-    _memUsed = 0;
+    this->_stats.resetMemUsage();
 }
 
 //

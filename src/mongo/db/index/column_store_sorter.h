@@ -131,7 +131,6 @@ private:
     SorterFileStats* _fileStats;  // Unowned
 
     const size_t _maxMemoryUsageBytes;
-    size_t _memUsed = 0;
 
     /**
      * Mapping from path name to the sorted list of (RecordId, Cell) pairs.

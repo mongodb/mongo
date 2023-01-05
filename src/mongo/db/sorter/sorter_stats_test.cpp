@@ -50,6 +50,34 @@ TEST(SorterStatsTest, Basics) {
     ASSERT_EQ(sorterTracker.bytesSorted.load(), 1);
 }
 
+TEST(SorterStatsTest, SingleSorterMemUsage) {
+    SorterTracker sorterTracker;
+    SorterStats sorterStats(&sorterTracker);
+
+    sorterStats.incrementMemUsage(2);
+    ASSERT_EQ(sorterStats.memUsage(), 2);
+    ASSERT_EQ(sorterTracker.memUsage.load(), 2);
+
+    sorterStats.decrementMemUsage(1);
+    ASSERT_EQ(sorterStats.memUsage(), 1);
+    ASSERT_EQ(sorterTracker.memUsage.load(), 1);
+
+    sorterStats.resetMemUsage();
+    ASSERT_EQ(sorterStats.memUsage(), 0);
+    ASSERT_EQ(sorterTracker.memUsage.load(), 0);
+
+    // Simulate increasing memUsage
+    sorterStats.setMemUsage(3);
+    ASSERT_EQ(sorterStats.memUsage(), 3);
+    ASSERT_EQ(sorterTracker.memUsage.load(), 3);
+
+    // Simulate decreasing memUsage
+    sorterStats.setMemUsage(1);
+    ASSERT_EQ(sorterStats.memUsage(), 1);
+    ASSERT_EQ(sorterTracker.memUsage.load(), 1);
+}
+
+
 TEST(SorterStatsTest, MultipleSortersSpilledRanges) {
     SorterTracker sorterTracker;
     SorterStats sorterStats1(&sorterTracker);
@@ -89,6 +117,52 @@ TEST(SorterStatsTest, MultipleSortersBytesSorted) {
     ASSERT_EQ(sorterStats1.bytesSorted(), 1);
     ASSERT_EQ(sorterStats2.bytesSorted(), 2);
     ASSERT_EQ(sorterTracker.bytesSorted.load(), 3);
+}
+
+TEST(SorterStatsTest, MultipleSortersMemUsage) {
+    SorterTracker sorterTracker;
+    SorterStats sorterStats1(&sorterTracker);
+    SorterStats sorterStats2(&sorterTracker);
+    SorterStats sorterStats3(&sorterTracker);
+
+    sorterStats1.incrementMemUsage(1);
+    ASSERT_EQ(sorterStats1.memUsage(), 1);
+    ASSERT_EQ(sorterTracker.memUsage.load(), 1);
+
+    sorterStats2.incrementMemUsage(2);
+    ASSERT_EQ(sorterStats2.memUsage(), 2);
+    ASSERT_EQ(sorterTracker.memUsage.load(), 3);
+
+    sorterStats1.resetMemUsage();
+    ASSERT_EQ(sorterStats1.memUsage(), 0);
+    ASSERT_EQ(sorterTracker.memUsage.load(), 2);
+
+    sorterStats2.decrementMemUsage(1);
+    ASSERT_EQ(sorterStats2.memUsage(), 1);
+    ASSERT_EQ(sorterTracker.memUsage.load(), 1);
+
+    sorterStats3.incrementMemUsage(3);
+    ASSERT_EQ(sorterStats3.memUsage(), 3);
+    ASSERT_EQ(sorterTracker.memUsage.load(), 4);
+
+    // Simulate increasing memUsage
+    sorterStats1.setMemUsage(4);
+    ASSERT_EQ(sorterStats1.memUsage(), 4);
+    ASSERT_EQ(sorterTracker.memUsage.load(), 8);
+
+    // Simulate decreasing memUsage
+    sorterStats2.setMemUsage(0);
+    ASSERT_EQ(sorterStats2.memUsage(), 0);
+    ASSERT_EQ(sorterTracker.memUsage.load(), 7);
+
+    sorterStats3.setMemUsage(5);
+    ASSERT_EQ(sorterStats3.memUsage(), 5);
+    ASSERT_EQ(sorterTracker.memUsage.load(), 9);
+
+    // Simulate sorter spilling.
+    sorterStats3.resetMemUsage();
+    ASSERT_EQ(sorterStats3.memUsage(), 0);
+    ASSERT_EQ(sorterTracker.memUsage.load(), 4);
 }
 
 DEATH_TEST(SorterStatsTest, SetNonZeroNumSpilledRanges, "invariant") {

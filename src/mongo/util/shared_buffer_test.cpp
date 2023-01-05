@@ -146,6 +146,7 @@ TEST_F(SharedBufferTest, SharedBufferFragmentBuilder) {
     memset(builder.get(), one, kBlockSize / 2);
     auto fragment1 = builder.finish(kBlockSize / 2);
     ASSERT_EQ(fragment1.size(), kBlockSize / 2);
+    ASSERT_EQ(builder.totalFragmentBytesUsed(), kBlockSize / 2);
     verifyFragment(fragment1, one);
 
     builder.start(kBlockSize / 2);
@@ -155,6 +156,7 @@ TEST_F(SharedBufferTest, SharedBufferFragmentBuilder) {
     memset(builder.get(), two, kBlockSize / 4);
     auto fragment2 = builder.finish(kBlockSize / 4);
     ASSERT_EQ(fragment2.size(), kBlockSize / 4);
+    ASSERT_EQ(builder.totalFragmentBytesUsed(), kBlockSize / 2 + kBlockSize / 4);
     // Buffers should not overlap and be next to each other
     ASSERT_EQ(fragment1.get() + fragment1.size(), fragment2.get());
     verifyFragment(fragment2, two);
@@ -172,6 +174,7 @@ TEST_F(SharedBufferTest, SharedBufferFragmentBuilder) {
     auto fragment3 = builder.finish(kBlockSize);
     for (size_t i = 0; i < (kBlockSize / 4); ++i)
         ASSERT(memcmp(fragment3.get() + i, &three, 1) == 0);
+    ASSERT_EQ(builder.totalFragmentBytesUsed(), kBlockSize / 2 + kBlockSize / 4 + kBlockSize);
     ASSERT_EQ(builder.capacity(), kBlockSize);
     verifyFragment(fragment3, three);
 
@@ -198,12 +201,14 @@ TEST_F(SharedBufferTest, ManualFreeSharedBufferFragmentMemUsage1) {
         ASSERT_EQ(kBlockSize, builder.capacity());
         auto fragment1 = builder.finish(kBlockSize / 2);
         ASSERT_EQ(kBlockSize / 2, fragment1.size());
+        ASSERT_EQ(kBlockSize / 2, builder.totalFragmentBytesUsed());
         ASSERT_EQ(kBlockSize, builder.memUsage());
 
         builder.start(kBlockSize / 2);
         ASSERT_EQ(kBlockSize / 2, builder.capacity());
         auto fragment2 = builder.finish(kBlockSize / 2);
         ASSERT_EQ(kBlockSize / 2, fragment2.size());
+        ASSERT_EQ(kBlockSize, builder.totalFragmentBytesUsed());
         ASSERT_EQ(kBlockSize, builder.memUsage());
     }
 
@@ -225,6 +230,7 @@ TEST_F(SharedBufferTest, ManualFreeSharedBufferFragmentMemUsage2) {
         ASSERT_EQ(kBlockSize, builder.capacity());
         auto fragment1 = builder.finish(kBlockSize);
         ASSERT_EQ(kBlockSize, fragment1.size());
+        ASSERT_EQ(kBlockSize, builder.totalFragmentBytesUsed());
         ASSERT_EQ(kBlockSize, builder.memUsage());
 
         builder.start(kBlockSize);
@@ -232,6 +238,7 @@ TEST_F(SharedBufferTest, ManualFreeSharedBufferFragmentMemUsage2) {
         ASSERT_EQ(2 * kBlockSize, builder.capacity());
         auto fragment2 = builder.finish(kBlockSize);
         ASSERT_EQ(kBlockSize, fragment2.size());
+        ASSERT_EQ(2 * kBlockSize, builder.totalFragmentBytesUsed());
         ASSERT_EQ(3 * kBlockSize, builder.memUsage());
     }
 
@@ -256,6 +263,7 @@ TEST_F(SharedBufferTest, ManualFreeSharedBufferFragmentMemUsage3) {
         ASSERT_EQ(kBlockSize, builder.capacity());
         auto fragment1 = builder.finish(1);
         ASSERT_EQ(1, fragment1.size());
+        ASSERT_EQ(1, builder.totalFragmentBytesUsed());
         ASSERT_EQ(kBlockSize, builder.memUsage());
 
         builder.start(kBlockSize);
@@ -263,6 +271,7 @@ TEST_F(SharedBufferTest, ManualFreeSharedBufferFragmentMemUsage3) {
         ASSERT_EQ(2 * kBlockSize, builder.capacity());
         auto fragment2 = builder.finish(kBlockSize);
         ASSERT_EQ(kBlockSize, fragment2.size());
+        ASSERT_EQ(1 + kBlockSize, builder.totalFragmentBytesUsed());
         // We have one buffer of size kBlockSize and another of 2x.
         ASSERT_EQ(3 * kBlockSize, builder.memUsage());
     }
@@ -283,6 +292,7 @@ TEST_F(SharedBufferTest, ManualFreeSharedBufferFragmentMemUsageGrow) {
         ASSERT_EQ(kBlockSize, builder.capacity());
         auto fragment1 = builder.finish(1);
         ASSERT_EQ(1, fragment1.size());
+        ASSERT_EQ(1, builder.totalFragmentBytesUsed());
         ASSERT_EQ(kBlockSize, builder.memUsage());
 
         builder.start(1);
@@ -291,6 +301,7 @@ TEST_F(SharedBufferTest, ManualFreeSharedBufferFragmentMemUsageGrow) {
         builder.grow(kBlockSize);
         auto fragment2 = builder.finish(kBlockSize);
         ASSERT_EQ(kBlockSize, fragment2.size());
+        ASSERT_EQ(1 + kBlockSize, builder.totalFragmentBytesUsed());
         ASSERT_EQ(3 * kBlockSize, builder.memUsage());
     }
 
@@ -311,6 +322,7 @@ TEST_F(SharedBufferTest, ManualFreeSharedBufferFragmentMemReUse) {
         ASSERT_EQ(kBlockSize, builder.capacity());
         auto fragment1 = builder.finish(kBlockSize);
         ASSERT_EQ(kBlockSize, fragment1.size());
+        ASSERT_EQ(kBlockSize, builder.totalFragmentBytesUsed());
         ASSERT_EQ(kBlockSize, builder.memUsage());
     }
 
@@ -321,6 +333,7 @@ TEST_F(SharedBufferTest, ManualFreeSharedBufferFragmentMemReUse) {
         ASSERT_EQ(kBlockSize, builder.capacity());
         auto fragment2 = builder.finish(kBlockSize);
         ASSERT_EQ(kBlockSize, fragment2.size());
+        ASSERT_EQ(2 * kBlockSize, builder.totalFragmentBytesUsed());
         ASSERT_EQ(kBlockSize, builder.memUsage());
     }
 
@@ -330,6 +343,8 @@ TEST_F(SharedBufferTest, ManualFreeSharedBufferFragmentMemReUse) {
         builder.start(2 * kBlockSize);
         ASSERT_EQ(2 * kBlockSize, builder.capacity());
         auto fragment = builder.finish(2 * kBlockSize);
+        ASSERT_EQ(2 * kBlockSize, fragment.size());
+        ASSERT_EQ(4 * kBlockSize, builder.totalFragmentBytesUsed());
         ASSERT_EQ(2 * kBlockSize, builder.memUsage());
     }
 }
@@ -366,6 +381,7 @@ TEST_F(SharedBufferTest, ManualFreeSharedBufferFragmentLotsOfGrows) {
 
         auto fragment1 = builder.finish(5 * kBlockSize);
         ASSERT_EQ(fragment1.size(), 5 * kBlockSize);
+        ASSERT_EQ(5 * kBlockSize, builder.totalFragmentBytesUsed());
 
         // If we start a new fragment, we expect that it's capacity is what remains in the buffer.
         builder.start(kBlockSize);
@@ -374,6 +390,7 @@ TEST_F(SharedBufferTest, ManualFreeSharedBufferFragmentLotsOfGrows) {
 
         auto fragment2 = builder.finish(kBlockSize);
         ASSERT_EQ(kBlockSize, fragment2.size());
+        ASSERT_EQ(6 * kBlockSize, builder.totalFragmentBytesUsed());
     }
 
     // This has no effect on memory usage since the last allocated buffer is 8x the block size. We
@@ -395,6 +412,7 @@ TEST_F(SharedBufferTest, ManualFreeSharedBufferFragmentLotsOfGrows) {
 
         auto fragment1 = builder.finish(8 * kBlockSize);
         ASSERT_EQ(fragment1.size(), 8 * kBlockSize);
+        ASSERT_EQ(14 * kBlockSize, builder.totalFragmentBytesUsed());
     }
 
     builder.freeUnused();

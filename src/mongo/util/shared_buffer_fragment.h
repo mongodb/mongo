@@ -177,6 +177,7 @@ public:
         invariant(_inUse);
         SharedBufferFragment fragment(_buffer, _offset, totalSize);
         _offset += totalSize;
+        _totalFragmentBytesUsed += totalSize;
         _inUse = false;
         return fragment;
     }
@@ -206,9 +207,17 @@ public:
         return _inUse;
     }
 
-    // Returns the memory used by all allocated buffers that are being tracked.
-    size_t memUsage() {
+    // Returns the memory used by all allocated buffers that are being tracked. This returns
+    // instantaneous memory usage of all memory currently allocated, including any memory that is
+    // not being used due to fragmentation in the SharedBufferFragmentBuilder.
+    size_t memUsage() const {
         return _memUsage;
+    }
+
+    // Returns the cumulative memory used by all buffer memory fragments. Does not reset. This
+    // excludes any unused memory due to fragmentation in the SharedBufferFragmentBuilder.
+    size_t totalFragmentBytesUsed() const {
+        return _totalFragmentBytesUsed;
     }
 
     // Frees all unreferenced buffers except for the most recently allocated one. The caller must
@@ -274,6 +283,7 @@ private:
     // no longer needed.
     std::vector<SharedBuffer> _activeBuffers;
     size_t _memUsage = 0;
+    size_t _totalFragmentBytesUsed = 0;
 };
 
 }  // namespace mongo

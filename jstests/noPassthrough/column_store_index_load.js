@@ -151,7 +151,12 @@ assert.between(0.8 * approxMemoryUsage,
                indexBulkBuilderSection.bytesSorted,
                approxMemoryUsage,
                tojson(indexBulkBuilderSection));
-assert.eq(Object.keys(indexBulkBuilderSection).length, 9, tojson(indexBulkBuilderSection));
+assert.between(0,
+               indexBulkBuilderSection.memUsage,
+               approxMemoryUsage,
+               tojson(indexBulkBuilderSection),
+               /*inclusive=*/true);
+assert.eq(Object.keys(indexBulkBuilderSection).length, 10, tojson(indexBulkBuilderSection));
 
 // Perform the external bulk load. The server config won't allow a memory limit lower than 50MB, so
 // we use a failpoint to set it lower than that for the purposes of this test.
@@ -176,13 +181,13 @@ assert.between(expectedSpilledRanges - 1,
                indexBulkBuilderSection.spilledRanges,
                expectedSpilledRanges + 1,
                tojson(indexBulkBuilderSection),
-               true);
+               /*inclusive=*/true);
 // We can only approximate the memory usage and bytes that will be spilled.
 assert.between(0,
                indexBulkBuilderSection.bytesSpilled,
                approxMemoryUsage,
                tojson(indexBulkBuilderSection),
-               true);
+               /*inclusive=*/true);
 assert.gte(indexBulkBuilderSection.bytesSpilledUncompressed,
            indexBulkBuilderSection.bytesSpilled,
            tojson(indexBulkBuilderSection));
@@ -193,6 +198,11 @@ assert.between(approxMemoryUsage * 0.8 * 2,
                indexBulkBuilderSection.bytesSorted,
                approxMemoryUsage * 2,
                tojson(indexBulkBuilderSection));
+assert.between(0,
+               indexBulkBuilderSection.memUsage,
+               approxMemoryUsage,
+               tojson(indexBulkBuilderSection),
+               /*inclusive=*/true);
 
 // Perfom the online load.
 onlineLoadColl.drop();
