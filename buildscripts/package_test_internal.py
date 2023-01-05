@@ -7,6 +7,7 @@ import grp
 import logging
 import os
 import pathlib
+import platform
 import pwd
 import re
 import sys
@@ -218,6 +219,26 @@ def get_test_args(package_manager: str, package_files: List[str]) -> TestArgs:
         else:
             test_args['mongo_user_shell'] = '/bin/false'
 
+    test_args['arch'] = platform.machine()
+
+    deb_output_re = re.compile(r'(?<=Package: ).*$', re.MULTILINE)
+
+    def get_package_name(package_file: str) -> str:
+        if package_manager in ('yum', 'zypper'):
+            result = run_and_log(f"rpm --nosignature -qp --queryformat '%{{NAME}}' {package_file}")
+            return result.stdout.decode('utf-8').strip()
+        else:
+            result = run_and_log(f"dpkg -I {package_file}")
+            match = deb_output_re.search(result.stdout.decode('utf-8'))
+            if match is not None:
+                return match[0]
+            return ''
+
+    package_names: List[str] = []
+    for package in package_files:
+        package_names.append(get_package_name(package))
+    test_args['package_names'] = package_names
+
     return test_args
 
 
@@ -356,6 +377,70 @@ def test_ulimits_correct():
         raise RuntimeError(f"RLMIT_NPROC < 64000: {ulimits['Max processes']}")
 
 
+def test_restart():
+    logging.info("Restarting mongod.")
+
+    run_and_log("systemctl restart mongod.service")
+
+    logging.debug("Waiting up to 60 seconds for mongod to restart...")
+    run_mongo_query("db.smoke.insertOne({answer: 42})")
+
+    run_and_log("systemctl is-active mongod.service")
+
+
+def test_stop():
+    logging.info("Stopping mongod.")
+
+    run_and_log("systemctl stop mongod.service")
+
+    logging.debug("Waiting up to 60 seconds for mongod to finish shutting down...")
+    run_mongo_query("db.smoke.insertOne({answer: 42})", should_fail=True)
+
+    run_and_log("systemctl is-active mongod.service", end_on_error=False)
+
+
+def test_install_compass(test_args: TestArgs):
+    logging.info("Installing Compass.")
+
+    exec_result = run_and_log("install_compass", end_on_error=False)
+
+    if exec_result.returncode != 0:
+        if test_args['arch'] == 'x86_64' and test_args['package_manager'] != 'zypper':
+            # install-compass does not work on platforms other than x86_64 and
+            # currently cannot use zypper to install packages.
+            raise RuntimeError("Failed to install compass")
+
+
+def test_uninstall(test_args: TestArgs):
+    logging.info("Uninstalling packages:\n\t%s", '\n\t'.join(test_args['package_names']))
+
+    command: str
+    if test_args['package_manager'] == 'apt':
+        command = 'apt-get remove -y {}'
+    elif test_args['package_manager'] == 'yum':
+        command = 'yum remove -y {}'
+    elif test_args['package_manager'] == 'zypper':
+        command = 'zypper -n remove {}'
+    else:
+        raise RuntimeError(
+            "Don't know how to uninstall with package manager: {test_args['package_manager']}")
+
+    run_and_log(command.format(' '.join(test_args['package_names'])))
+
+
+def test_uninstall_is_complete(test_args: TestArgs):
+    logging.info("Checking that the installation is complete.")
+
+    leftover_files = [
+        pathlib.Path('/usr/bin/mongod'),
+        pathlib.Path(test_args['systemd_units_dir']) / 'mongod.service',
+    ]
+
+    for path in leftover_files:
+        if path.exists():
+            raise RuntimeError(f"Failed to uninstall cleanly, found: {path}")
+
+
 package_urls = sys.argv[2:]
 
 if len(package_urls) == 0:
@@ -388,5 +473,10 @@ setup()
 test_start()
 test_install_is_complete(test_args)
 test_ulimits_correct()
+test_restart()
+test_stop()
+test_install_compass(test_args)
+test_uninstall(test_args)
+test_uninstall_is_complete(test_args)
 
 sys.exit(0)
