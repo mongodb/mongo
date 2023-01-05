@@ -186,9 +186,9 @@ protected:
         } while (changed);
     }
 
-    ABT createMultipleBindings(std::vector<std::pair<std::string, std::string>> bindingList,
-                               ABT source,
-                               std::string sourceBinding) {
+    ABT createBindings(std::vector<std::pair<std::string, std::string>> bindingList,
+                       ABT source,
+                       std::string sourceBinding) {
         for (auto [fieldName, bindingName] : bindingList) {
             auto field =
                 make<EvalPath>(make<PathGet>(FieldNameType(fieldName), make<PathIdentity>()),
@@ -224,17 +224,66 @@ TEST_F(ABTPlanGeneration, LowerConstantExpression) {
     runExpressionVariation(ctx, "boolean false", Constant::boolean(false));
 }
 
-TEST_F(ABTPlanGeneration, LowerVarExpression) {
+TEST_F(ABTPlanGeneration, LowerCollationNode) {
     GoldenTestContext ctx(&goldenTestConfig);
     ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
 
+    properties::PhysProps physProps;
+    properties::setPropertyOverwrite<properties::ProjectionRequirement>(
+        physProps, properties::ProjectionRequirement(ProjectionNameOrderPreservingSet({"sortA"})));
+    NodeProps collationNodeProp{getNextNodeID(),
+                                {},
+                                {},
+                                physProps,
+                                boost::none,
+                                CostType::fromDouble(0),
+                                CostType::fromDouble(0),
+                                {false}};
+
     runNodeVariation(
         ctx,
-        "varInProj",
-        _node(make<EvaluationNode>("proj0",
-                                   _path(make<EvalPath>(make<PathGet>("a", make<PathIdentity>()),
-                                                        make<Variable>(scanLabel))),
-                                   _node(scanForTest()))));
+        "Lower collation node with single field",
+        _node(make<CollationNode>(
+                  properties::CollationRequirement({{"sortA", CollationOp::Ascending}}),
+                  createBindings({{"a", "sortA"}}, _node(scanForTest()), "scan0")),
+              collationNodeProp));
+
+    // Sort on multiple fields.
+    properties::PhysProps physProps2;
+    properties::setPropertyOverwrite<properties::ProjectionRequirement>(
+        physProps2,
+        properties::ProjectionRequirement(ProjectionNameOrderPreservingSet({"sortA", "sortB"})));
+    NodeProps collationNodeProp2{getNextNodeID(),
+                                 {},
+                                 {},
+                                 physProps2,
+                                 boost::none,
+                                 CostType::fromDouble(0),
+                                 CostType::fromDouble(0),
+                                 {false}};
+    runNodeVariation(
+        ctx,
+        "Lower collation node with two fields",
+        _node(make<CollationNode>(
+                  properties::CollationRequirement(
+                      {{"sortA", CollationOp::Ascending}, {"sortB", CollationOp::Descending}}),
+                  createBindings({{"a", "sortA"}, {"b", "sortB"}}, _node(scanForTest()), "scan0")),
+              collationNodeProp2));
+}
+
+TEST_F(ABTPlanGeneration, LowerCoScanNode) {
+    GoldenTestContext ctx(&goldenTestConfig);
+    ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
+    runNodeVariation(ctx, "CoScan", _node(make<CoScanNode>()));
+}
+
+TEST_F(ABTPlanGeneration, LowerMultipleEvaluationNodes) {
+    GoldenTestContext ctx(&goldenTestConfig);
+    ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
+    runNodeVariation(
+        ctx,
+        "Lower two chained evaluation nodes",
+        createBindings({{"a", "proj0"}, {"b", "proj1"}}, _node(scanForTest()), "scan0"));
 }
 
 TEST_F(ABTPlanGeneration, LowerFilterNode) {
@@ -281,54 +330,6 @@ TEST_F(ABTPlanGeneration, LowerLimitSkipNode) {
         _node(make<LimitSkipNode>(properties::LimitSkipRequirement(4, 2), _node(scanForTest()))));
 }
 
-TEST_F(ABTPlanGeneration, LowerCollationNode) {
-    GoldenTestContext ctx(&goldenTestConfig);
-    ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
-
-    properties::PhysProps physProps;
-    properties::setPropertyOverwrite<properties::ProjectionRequirement>(
-        physProps, properties::ProjectionRequirement(ProjectionNameOrderPreservingSet({"sortA"})));
-    NodeProps collationNodeProp{getNextNodeID(),
-                                {},
-                                {},
-                                physProps,
-                                boost::none,
-                                CostType::fromDouble(0),
-                                CostType::fromDouble(0),
-                                {false}};
-
-    runNodeVariation(
-        ctx,
-        "Lower collation node with single field",
-        _node(make<CollationNode>(
-                  properties::CollationRequirement({{"sortA", CollationOp::Ascending}}),
-                  createMultipleBindings({{"a", "sortA"}}, _node(scanForTest()), "scan0")),
-              collationNodeProp));
-
-    // Sort on multiple fields.
-    properties::PhysProps physProps2;
-    properties::setPropertyOverwrite<properties::ProjectionRequirement>(
-        physProps2,
-        properties::ProjectionRequirement(ProjectionNameOrderPreservingSet({"sortA", "sortB"})));
-    NodeProps collationNodeProp2{getNextNodeID(),
-                                 {},
-                                 {},
-                                 physProps2,
-                                 boost::none,
-                                 CostType::fromDouble(0),
-                                 CostType::fromDouble(0),
-                                 {false}};
-    runNodeVariation(
-        ctx,
-        "Lower collation node with two fields",
-        _node(make<CollationNode>(
-                  properties::CollationRequirement(
-                      {{"sortA", CollationOp::Ascending}, {"sortB", CollationOp::Descending}}),
-                  createMultipleBindings(
-                      {{"a", "sortA"}, {"b", "sortB"}}, _node(scanForTest()), "scan0")),
-              collationNodeProp2));
-}
-
 TEST_F(ABTPlanGeneration, LowerPhysicalScanNode) {
     GoldenTestContext ctx(&goldenTestConfig);
     ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
@@ -369,38 +370,57 @@ TEST_F(ABTPlanGeneration, LowerPhysicalScanNode) {
     }
 }
 
-TEST_F(ABTPlanGeneration, LowerCoScanNode) {
-    GoldenTestContext ctx(&goldenTestConfig);
-    ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
-    runNodeVariation(ctx, "CoScan", _node(make<CoScanNode>()));
-}
-
-TEST_F(ABTPlanGeneration, LowerMultipleEvaluationNodes) {
+TEST_F(ABTPlanGeneration, LowerUniqueNode) {
     GoldenTestContext ctx(&goldenTestConfig);
     ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
     runNodeVariation(
         ctx,
-        "Lower two chained evaluation nodes",
-        createMultipleBindings({{"a", "proj0"}, {"b", "proj1"}}, _node(scanForTest()), "scan0"));
-}
-
-TEST_F(ABTPlanGeneration, LowerUniqueNode) {
-    GoldenTestContext ctx(&goldenTestConfig);
-    ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
-    runNodeVariation(ctx,
-                     "Lower unique node with single key",
-                     _node(make<UniqueNode>(
-                         ProjectionNameVector{"proj0"},
-                         createMultipleBindings({{"a", "proj0"}}, _node(scanForTest()), "scan0"))));
+        "Lower unique node with single key",
+        _node(make<UniqueNode>(ProjectionNameVector{"proj0"},
+                               createBindings({{"a", "proj0"}}, _node(scanForTest()), "scan0"))));
 
 
     runNodeVariation(
         ctx,
         "Lower unique node with multiple keys",
-        _node(make<UniqueNode>(
-            ProjectionNameVector{"proj0", "proj1", "proj2"},
-            createMultipleBindings(
-                {{"a", "proj0"}, {"b", "proj1"}, {"c", "proj2"}}, _node(scanForTest()), "scan0"))));
+        _node(make<UniqueNode>(ProjectionNameVector{"proj0", "proj1", "proj2"},
+                               createBindings({{"a", "proj0"}, {"b", "proj1"}, {"c", "proj2"}},
+                                              _node(scanForTest()),
+                                              "scan0"))));
 }
+
+TEST_F(ABTPlanGeneration, LowerUnwindNode) {
+    GoldenTestContext ctx(&goldenTestConfig);
+    ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
+    runNodeVariation(
+        ctx,
+        "Lower UnwindNode discard non-arrays",
+        _node(make<UnwindNode>(ProjectionName("proj0"),
+                               ProjectionName("proj0_pid"),
+                               false,
+                               createBindings({{"a", "proj0"}}, _node(scanForTest()), "scan0"))));
+
+    runNodeVariation(
+        ctx,
+        "Lower UnwindNode keep non-arrays",
+        _node(make<UnwindNode>(ProjectionName("proj0"),
+                               ProjectionName("proj0_pid"),
+                               true,
+                               createBindings({{"a", "proj0"}}, _node(scanForTest()), "scan0"))));
+}
+
+TEST_F(ABTPlanGeneration, LowerVarExpression) {
+    GoldenTestContext ctx(&goldenTestConfig);
+    ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
+
+    runNodeVariation(
+        ctx,
+        "varInProj",
+        _node(make<EvaluationNode>("proj0",
+                                   _path(make<EvalPath>(make<PathGet>("a", make<PathIdentity>()),
+                                                        make<Variable>(scanLabel))),
+                                   _node(scanForTest()))));
+}
+
 }  // namespace
 }  // namespace mongo::optimizer

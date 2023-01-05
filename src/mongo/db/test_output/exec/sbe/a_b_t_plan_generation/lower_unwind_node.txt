@@ -1,0 +1,49 @@
+# Golden test output of ABTPlanGeneration/LowerUnwindNode
+
+==== VARIATION: Lower UnwindNode discard non-arrays ====
+-- INPUT:
+Unwind []
+|   BindBlock:
+|       [proj0]
+|           Source []
+|       [proj0_pid]
+|           Source []
+Evaluation []
+|   BindBlock:
+|       [proj0]
+|           FunctionCall [getField]
+|           |   Const ["a"]
+|           Variable [scan0]
+PhysicalScan [{'<root>': scan0}, collName]
+    BindBlock:
+        [scan0]
+            Source []
+
+-- OUTPUT:
+[5] unwind s3 s4 s2 false 
+[3] project [s2 = getField(s1, "a")] 
+[1] scan s1 none none none none none [] @"<collUUID>" true false 
+
+==== VARIATION: Lower UnwindNode keep non-arrays ====
+-- INPUT:
+Unwind [retainNonArrays]
+|   BindBlock:
+|       [proj0]
+|           Source []
+|       [proj0_pid]
+|           Source []
+Evaluation []
+|   BindBlock:
+|       [proj0]
+|           FunctionCall [getField]
+|           |   Const ["a"]
+|           Variable [scan0]
+PhysicalScan [{'<root>': scan0}, collName]
+    BindBlock:
+        [scan0]
+            Source []
+
+-- OUTPUT:
+[11] unwind s3 s4 s2 true 
+[9] project [s2 = getField(s1, "a")] 
+[7] scan s1 none none none none none [] @"<collUUID>" true false 
