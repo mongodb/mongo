@@ -499,7 +499,8 @@ boost::optional<GlobalIndexesCache> CatalogCache::_getCollectionIndexInfoAt(
         } catch (const DBException& ex) {
             bool isCatalogCacheRetriableError = ex.isA<ErrorCategory::SnapshotError>() ||
                 ex.code() == ErrorCodes::ConflictingOperationInProgress ||
-                ex.code() == ErrorCodes::QueryPlanKilled;
+                ex.code() == ErrorCodes::QueryPlanKilled ||
+                ex.code() == ErrorCodes::ReadThroughCacheLookupCanceled;
             if (!isCatalogCacheRetriableError) {
                 throw;
             }
