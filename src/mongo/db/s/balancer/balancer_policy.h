@@ -187,7 +187,8 @@ struct DataSizeInfo {
                  const ChunkRange& chunkRange,
                  const ShardVersion& version,
                  const KeyPattern& keyPattern,
-                 bool estimatedValue);
+                 bool estimatedValue,
+                 int64_t maxSize);
 
     ShardId shardId;
     NamespaceString nss;
@@ -198,14 +199,16 @@ struct DataSizeInfo {
     ShardVersion version;
     KeyPattern keyPattern;
     bool estimatedValue;
+    int64_t maxSize;
 };
 
 struct DataSizeResponse {
-    DataSizeResponse(long long sizeBytes, long long numObjects)
-        : sizeBytes(sizeBytes), numObjects(numObjects) {}
+    DataSizeResponse(long long sizeBytes, long long numObjects, bool maxSizeReached)
+        : sizeBytes(sizeBytes), numObjects(numObjects), maxSizeReached(maxSizeReached) {}
 
     long long sizeBytes;
     long long numObjects;
+    bool maxSizeReached;
 };
 
 typedef stdx::

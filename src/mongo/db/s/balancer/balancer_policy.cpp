@@ -976,13 +976,15 @@ DataSizeInfo::DataSizeInfo(const ShardId& shardId,
                            const ChunkRange& chunkRange,
                            const ShardVersion& version,
                            const KeyPattern& keyPattern,
-                           bool estimatedValue)
+                           bool estimatedValue,
+                           int64_t maxSize)
     : shardId(shardId),
       nss(nss),
       uuid(uuid),
       chunkRange(chunkRange),
       version(version),
       keyPattern(keyPattern),
-      estimatedValue(estimatedValue) {}
+      estimatedValue(estimatedValue),
+      maxSize(maxSize) {}
 
 }  // namespace mongo
