@@ -134,4 +134,8 @@ if (checkCascadesOptimizerEnabled(db)) {
         {filter: {a: {$gte: MaxKey()}}, expected: [docs[31]]},
         {filter: {a: {$gt: MaxKey()}}, expected: []});
 }
+
+for (const testData of tests) {
+    runTest(testData.filter, testData.expected);
+}
 }());
