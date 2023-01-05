@@ -62,6 +62,7 @@ public:
                                                           const NamespaceString& nss,
                                                           const UUID& uuid,
                                                           BSONObj indexDoc) override {
+        ReservedTimes times{opCtx};
         for (auto& o : _observers)
             o->onModifyShardedCollectionGlobalIndexCatalogEntry(opCtx, nss, uuid, indexDoc);
     }
