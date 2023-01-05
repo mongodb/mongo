@@ -329,6 +329,46 @@ TEST_F(ABTPlanGeneration, LowerCollationNode) {
               collationNodeProp2));
 }
 
+TEST_F(ABTPlanGeneration, LowerPhysicalScanNode) {
+    GoldenTestContext ctx(&goldenTestConfig);
+    ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
+
+    for (auto i = 0; i <= 1; i++) {
+        auto isParallel = i == 1;
+        auto parallelString = isParallel ? "(parallel)" : "(not parallel)";
+        runNodeVariation(
+            ctx,
+            str::stream() << "Physical scan with root projection " << parallelString,
+            _node(make<PhysicalScanNode>(
+                FieldProjectionMap{{}, {ProjectionName{"root0"}}, {}}, "collName", isParallel)));
+
+        runNodeVariation(
+            ctx,
+            str::stream() << "Physical scan with RID projection " << parallelString,
+            _node(make<PhysicalScanNode>(
+                FieldProjectionMap{{ProjectionName{"RID0"}}, {}, {}}, "collName", isParallel)));
+
+        runNodeVariation(
+            ctx,
+            str::stream() << "Physical scan with root and RID projections " << parallelString,
+            _node(make<PhysicalScanNode>(
+                FieldProjectionMap{{ProjectionName{"RID0"}}, {ProjectionName{"root0"}}, {}},
+                "collName",
+                isParallel)));
+
+        runNodeVariation(
+            ctx,
+            str::stream() << "Physical scan with root, RID and field projections "
+                          << parallelString,
+            _node(make<PhysicalScanNode>(
+                FieldProjectionMap{{ProjectionName{"RID0"}},
+                                   {ProjectionName{"root0"}},
+                                   {{FieldNameType{"field"}, {ProjectionName{"field2"}}}}},
+                "collName",
+                isParallel)));
+    }
+}
+
 TEST_F(ABTPlanGeneration, LowerCoScanNode) {
     GoldenTestContext ctx(&goldenTestConfig);
     ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
