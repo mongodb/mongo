@@ -41,7 +41,6 @@
 #include "mongo/db/op_observer/op_observer_noop.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/checkpointer.h"
 #include "mongo/dbtests/dbtests.h"
 #include "mongo/util/tick_source_mock.h"
 
@@ -83,30 +82,19 @@ public:
 class QueryStageBatchedDeleteTest : public unittest::Test {
 public:
     QueryStageBatchedDeleteTest() : _client(&_opCtx) {
-        // Since this test overrides the tick source on the global service context, it may
-        // conflict with the checkpoint thread, which needs to create an operation context.
-        // Since this test suite is run in isolation, it should be safe to disable the
-        // background job before installing a new tick source.
-        auto service = _opCtx.getServiceContext();
+        // Avoid churning the ticket source on the service context which is shared
+        // with background jobs such as the checkpoint thread.
         if (!_tickSource) {
-            auto checkpointer = Checkpointer::get(service);
-            // BackgrounJob::cancel() keeps the checkpoint thread from starting.
-            // However, if it is already running, we use Checkpoint::shutdown()
-            // to wait for it to stop.
-            if (!checkpointer->cancel().isOK()) {
-                checkpointer->shutdown({ErrorCodes::ShutdownInProgress, ""});
-            }
-
             auto tickSource = std::make_unique<TickSourceMock<Milliseconds>>();
             _tickSource = tickSource.get();
-            service->setTickSource(std::move(tickSource));
+            _opCtx.getServiceContext()->setTickSource(std::move(tickSource));
         }
         _tickSource->reset(1);
         std::unique_ptr<ClockAdvancingOpObserver> opObserverUniquePtr =
             std::make_unique<ClockAdvancingOpObserver>();
         opObserverUniquePtr->tickSource = _tickSource;
         _opObserver = opObserverUniquePtr.get();
-        service->setOpObserver(std::move(opObserverUniquePtr));
+        _opCtx.getServiceContext()->setOpObserver(std::move(opObserverUniquePtr));
     }
 
     virtual ~QueryStageBatchedDeleteTest() {
