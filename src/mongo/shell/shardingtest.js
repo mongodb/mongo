@@ -543,7 +543,9 @@ var ShardingTest = function(params) {
         print("ShardingTest stopped all shards, took " + (new Date() - startTime) + "ms for " +
               this._connections.length + " shards.");
 
-        this.stopAllConfigServers(opts);
+        if (!isCatalogShardMode) {
+            this.stopAllConfigServers(opts);
+        }
 
         var timeMillis = new Date().getTime() - _startTime.getTime();
 
@@ -1184,6 +1186,12 @@ var ShardingTest = function(params) {
     var numMongos = otherParams.hasOwnProperty('mongos') ? otherParams.mongos : 1;
     var numConfigs = otherParams.hasOwnProperty('config') ? otherParams.config : 3;
 
+    let isCatalogShardMode =
+        otherParams.hasOwnProperty('catalogShard') ? otherParams.catalogShard : false;
+    if (typeof Testdata !== 'undefined') {
+        isCatalogShardMode = isCatalogShardMode || Testdata.catalogShard;
+    }
+
     if ("shardAsReplicaSet" in otherParams) {
         throw new Error("Use of deprecated option 'shardAsReplicaSet'");
     }
@@ -1215,6 +1223,10 @@ var ShardingTest = function(params) {
         }
 
         numShards = tempCount;
+    }
+
+    if (isCatalogShardMode) {
+        assert(numShards > 0, 'Catalog shard mode requires at least one shard');
     }
 
     if (Array.isArray(numMongos)) {
@@ -1337,9 +1349,24 @@ var ShardingTest = function(params) {
         var rsDefaults = {
             useHostname: otherParams.useHostname,
             oplogSize: 16,
-            shardsvr: '',
             pathOpts: Object.merge(pathOpts, {shard: i}),
         };
+
+        var setIsConfigSvr = false;
+
+        if (isCatalogShardMode && i == 0) {
+            var catalogShardFeatureFlag = {
+                configsvr: "",
+                setParameter:
+                    {featureFlagCatalogShard: true, featureFlagConfigServerAlwaysShardRemote: true},
+            };
+            otherParams.configOptions =
+                Object.merge(otherParams.configOptions, catalogShardFeatureFlag);
+            rsDefaults = Object.merge(rsDefaults, otherParams.configOptions);
+            setIsConfigSvr = true;
+        } else {
+            rsDefaults.shardsvr = '';
+        }
 
         if (otherParams.rs || otherParams["rs" + i]) {
             if (otherParams.rs) {
@@ -1384,11 +1411,17 @@ var ShardingTest = function(params) {
         delete rsDefaults.settings;
 
         // The number of nodes in the rs field will take priority.
+        let numReplicas;
         if (otherParams.rs || otherParams["rs" + i]) {
-            var numReplicas = rsDefaults.nodes || 3;
+            numReplicas = rsDefaults.nodes || 3;
         } else {
-            var numReplicas = 1;
+            numReplicas = 1;
         }
+
+        if (isCatalogShardMode && i == 0) {
+            numReplicas = numConfigs;
+        }
+
         delete rsDefaults.nodes;
 
         var protocolVersion = rsDefaults.protocolVersion;
@@ -1406,6 +1439,7 @@ var ShardingTest = function(params) {
             waitForKeys: false,
             settings: rsSettings,
             seedRandomNumberGenerator: !randomSeedAlreadySet,
+            isConfigServer: setIsConfigSvr,
         });
 
         print("ShardingTest starting replica set for shard: " + setName);
@@ -1416,55 +1450,62 @@ var ShardingTest = function(params) {
             {setName: setName, test: rs, nodes: rs.startSetAsync(rsDefaults), url: rs.getURL()};
     }
 
-    //
-    // Start up the config server replica set.
-    //
+    if (isCatalogShardMode) {
+        this.configRS = this._rs[0].test;
+    } else {
+        //
+        // Start up the config server replica set.
+        //
 
-    var rstOptions = {
-        useHostName: otherParams.useHostname,
-        host: hostName,
-        useBridge: otherParams.useBridge,
-        bridgeOptions: otherParams.bridgeOptions,
-        keyFile: this.keyFile,
-        waitForKeys: false,
-        name: testName + "-configRS",
-        seedRandomNumberGenerator: !randomSeedAlreadySet,
-        isConfigServer: true,
-    };
+        var rstOptions = {
+            useHostName: otherParams.useHostname,
+            host: hostName,
+            useBridge: otherParams.useBridge,
+            bridgeOptions: otherParams.bridgeOptions,
+            keyFile: this.keyFile,
+            waitForKeys: false,
+            name: testName + "-configRS",
+            seedRandomNumberGenerator: !randomSeedAlreadySet,
+            isConfigServer: true,
+        };
 
-    // always use wiredTiger as the storage engine for CSRS
-    var startOptions = {
-        pathOpts: pathOpts,
-        // Ensure that journaling is always enabled for config servers.
-        configsvr: "",
-        storageEngine: "wiredTiger",
-    };
+        // always use wiredTiger as the storage engine for CSRS
+        var startOptions = {
+            pathOpts: pathOpts,
+            // Ensure that journaling is always enabled for config servers.
+            configsvr: "",
+            storageEngine: "wiredTiger",
+        };
 
-    if (otherParams.configOptions && otherParams.configOptions.binVersion) {
-        otherParams.configOptions.binVersion =
-            MongoRunner.versionIterator(otherParams.configOptions.binVersion);
+        if (otherParams.configOptions && otherParams.configOptions.binVersion) {
+            otherParams.configOptions.binVersion =
+                MongoRunner.versionIterator(otherParams.configOptions.binVersion);
+        }
+
+        startOptions = Object.merge(startOptions, otherParams.configOptions);
+        rstOptions = Object.merge(rstOptions, otherParams.configReplSetTestOptions);
+
+        var nodeOptions = [];
+        for (var i = 0; i < numConfigs; ++i) {
+            nodeOptions.push(otherParams["c" + i] || {});
+        }
+
+        rstOptions.nodes = nodeOptions;
+
+        // Start the config server's replica set without waiting for it to complete. This allows it
+        // to proceed in parallel with the startup of each shard.
+        this.configRS = new ReplSetTest(rstOptions);
+        this.configRS.startSetAsync(startOptions);
     }
-
-    startOptions = Object.merge(startOptions, otherParams.configOptions);
-    rstOptions = Object.merge(rstOptions, otherParams.configReplSetTestOptions);
-
-    var nodeOptions = [];
-    for (var i = 0; i < numConfigs; ++i) {
-        nodeOptions.push(otherParams["c" + i] || {});
-    }
-
-    rstOptions.nodes = nodeOptions;
-
-    // Start the config server's replica set without waiting for it to complete. This allows it
-    // to proceed in parallel with the startup of each shard.
-    this.configRS = new ReplSetTest(rstOptions);
-    this.configRS.startSetAsync(startOptions);
 
     //
     // Wait for each shard replica set to finish starting up.
     //
     for (let i = 0; i < numShards; i++) {
         print("Waiting for shard " + this._rs[i].setName + " to finish starting up.");
+        if (isCatalogShardMode && i == 0) {
+            continue;
+        }
         this._rs[i].test.startSetAwait();
     }
 
@@ -1486,7 +1527,14 @@ var ShardingTest = function(params) {
     // set. Whenever possible, in parallel.
     //
     const shardsRS = this._rs.map(obj => obj.test);
-    const replicaSetsToInitiate = [...shardsRS, this.configRS].map(rst => {
+    var replSetToIntiateArr = [];
+    if (isCatalogShardMode) {
+        replSetToIntiateArr = [...shardsRS];
+    } else {
+        replSetToIntiateArr = [...shardsRS, this.configRS];
+    }
+
+    const replicaSetsToInitiate = replSetToIntiateArr.map(rst => {
         const rstConfig = rst.getReplSetConfig();
 
         // The mongo shell cannot authenticate as the internal __system user in tests that use x509

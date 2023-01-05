@@ -22,42 +22,12 @@ function basicCRUD(conn) {
 }
 
 const st = new ShardingTest({
-    shards: 0,
+    shards: 1,
     config: 3,
-    configOptions: {setParameter: {featureFlagCatalogShard: true}},
+    catalogShard: true,
 });
-const configCS = st.configRS.getURL();
-let configShardName;
 
-//
-// Dedicated config server mode tests (pre addShard).
-//
-{
-    // Can't create user namespaces.
-    assert.commandFailedWithCode(st.configRS.getPrimary().getCollection(ns).insert({_id: 1, x: 1}),
-                                 ErrorCodes.InvalidNamespace);
-
-    // Failover works.
-    st.configRS.stepUp(st.configRS.getSecondary());
-}
-
-//
-// Catalog shard mode tests (post addShard).
-//
-{
-    //
-    // Adding the config server as a shard works.
-    //
-    configShardName = assert.commandWorked(st.s.adminCommand({addShard: configCS})).shardAdded;
-
-    // More than once works.
-    assert.commandWorked(st.s.adminCommand({addShard: configCS}));
-    assert.commandWorked(st.s.adminCommand({addShard: configCS}));
-}
-
-// Refresh the logical session cache now that we have a shard to create the sessions collection to
-// verify it works as expected.
-st.configRS.getPrimary().adminCommand({refreshLogicalSessionCacheNow: 1});
+const configShardName = st.shard0.shardName;
 
 {
     //
