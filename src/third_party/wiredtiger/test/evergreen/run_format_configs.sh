@@ -26,7 +26,7 @@ failure=0
 for config in $(find ../../../test/format/failure_configs/ -name "CONFIG.*" | sort)
 do
 	echo -e "\nTesting CONFIG $config ...\n"
-	if (./t -c $config); then
+	if (./t -1 -c $config); then
 		let "success++"
 	else
 		let "failure++"
