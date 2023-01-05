@@ -537,12 +537,14 @@ private:
             while (size_t len = cursor.strlen()) {
                 uint8_t type = *cursor.ptr;
                 _currElem = cursor.ptr;
+                // In case _currElem is moved (for instance when the type is CodeWScope).
+                auto elemStart = cursor.ptr;
                 cursor.ptr += len + 1;
                 cursor.ptr = _validateElem(cursor, type);
 
                 // Check if the data is compliant to other BSON specifications if the element is
                 // structurally correct.
-                _validator.checkNonConformantElem(_currElem, len + 1, type);
+                _validator.checkNonConformantElem(elemStart, len + 1, type);
 
                 if constexpr (precise) {
                     // See if the _id field was just validated. If so, set the global scope element.
