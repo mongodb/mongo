@@ -37,6 +37,34 @@
 
 namespace mongo {
 
+OrderedPathSet DepsTracker::simplifyDependencies(OrderedPathSet dependencies,
+                                                 TruncateToRootLevel truncateToRootLevel) {
+    // The key operation here is folding dependencies into ancestor dependencies, wherever possible.
+    // This is assisted by a special sort in OrderedPathSet that treats '.'
+    // as the first char and thus places parent paths directly before their children.
+    OrderedPathSet returnSet;
+    std::string last;
+    for (const auto& path : dependencies) {
+        if (!last.empty() && str::startsWith(path, last)) {
+            // We are including a parent of this field, so we can skip this field.
+            continue;
+        }
+
+        // Check that the field requested is a valid field name in the agg language. This
+        // constructor will throw if it isn't.
+        FieldPath fp(path);
+
+        if (truncateToRootLevel == TruncateToRootLevel::yes) {
+            last = fp.front().toString() + '.';
+            returnSet.insert(fp.front().toString());
+        } else {
+            last = path + '.';
+            returnSet.insert(path);
+        }
+    }
+    return returnSet;
+}
+
 std::list<std::string> DepsTracker::sortedFields() const {
     // Use a special comparator to put parent fieldpaths before their children.
     std::list<std::string> sortedFields(fields.begin(), fields.end());

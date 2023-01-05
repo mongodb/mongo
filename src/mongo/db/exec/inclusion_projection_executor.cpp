@@ -99,6 +99,50 @@ boost::intrusive_ptr<Expression> substituteInExpr(boost::intrusive_ptr<Expressio
     }
     return ex;
 };
+
+/**
+ * Returns a vector of top-level dependencies where each index i in the vector corresponds to the
+ * dependencies from the ith expression according to 'orderToProcess'.
+ */
+std::vector<OrderedPathSet> getTopLevelDeps(
+    const std::vector<std::string>& orderToProcess,
+    const StringMap<boost::intrusive_ptr<Expression>>& expressions,
+    const StringMap<std::unique_ptr<ProjectionNode>>& children) {
+    std::vector<OrderedPathSet> topLevelDeps;
+    for (const auto& field : orderToProcess) {
+        DepsTracker deps;
+        if (auto exprIt = expressions.find(field); exprIt != expressions.end()) {
+            exprIt->second->addDependencies(&deps);
+        } else {
+            // Each expression in orderToProcess should either be in expressions or children.
+            auto childIt = children.find(field);
+            tassert(6657000, "Unable to calculate dependencies", childIt != children.end());
+            childIt->second->reportDependencies(&deps);
+        }
+
+        OrderedPathSet ops{deps.fields.begin(), deps.fields.end()};
+        topLevelDeps.push_back(
+            DepsTracker::simplifyDependencies(ops, DepsTracker::TruncateToRootLevel::yes));
+    }
+    return topLevelDeps;
+}
+
+/**
+ * Returns whether or not there is an expression in the projection which depends on 'field' other
+ * than the expression which computes 'field'. For example, given field "a" and projection
+ * {a: "$b", c: {$sum: ["$a", 5]}}, return true. Given field "a" and projection
+ * {a: {$sum: ["$a", 5]}, c: "$b"}, return false. 'field' should be a top level path.
+ */
+bool computedExprDependsOnField(const std::vector<OrderedPathSet>& topLevelDeps,
+                                const std::string& field,
+                                const size_t fieldIndex) {
+    for (size_t i = 0; i < topLevelDeps.size(); i++) {
+        if (i != fieldIndex && topLevelDeps[i].count(field) > 0) {
+            return true;
+        }
+    }
+    return false;
+}
 }  // namespace
 
 std::pair<BSONObj, bool> InclusionNode::extractComputedProjectionsInProject(
@@ -109,8 +153,8 @@ std::pair<BSONObj, bool> InclusionNode::extractComputedProjectionsInProject(
         return {BSONObj{}, false};
     }
 
-    DepsTracker allDeps;
-    reportDependencies(&allDeps);
+    std::vector<OrderedPathSet> topLevelDeps =
+        getTopLevelDeps(_orderToProcessAdditionsAndChildren, _expressions, _children);
 
     // Auxiliary vector with extracted computed projections: <name, expression, replacement
     // strategy>. If the replacement strategy flag is true, the expression is replaced with a
@@ -118,19 +162,15 @@ std::pair<BSONObj, bool> InclusionNode::extractComputedProjectionsInProject(
     std::vector<std::tuple<StringData, boost::intrusive_ptr<Expression>, bool>>
         addFieldsExpressions;
     bool replaceWithProjField = true;
-    for (auto&& field : _orderToProcessAdditionsAndChildren) {
+    for (size_t i = 0; i < _orderToProcessAdditionsAndChildren.size(); i++) {
+        auto&& field = _orderToProcessAdditionsAndChildren[i];
+
         if (reservedNames.count(field) > 0) {
             // Do not pushdown computed projection with reserved name.
             replaceWithProjField = false;
             continue;
         }
-        if (allDeps.fields.count(field) > 0) {
-            // Do not extract a computed projection if its name is the same as a dependent field. If
-            // the extracted $addFields were to be placed before this projection, the dependency
-            // with the common name would be shadowed by the computed projection.
-            replaceWithProjField = false;
-            continue;
-        }
+
         auto expressionIt = _expressions.find(field);
         if (expressionIt == _expressions.end()) {
             // After seeing the first dotted path expression we need to replace computed
@@ -138,13 +178,17 @@ std::pair<BSONObj, bool> InclusionNode::extractComputedProjectionsInProject(
             replaceWithProjField = false;
             continue;
         }
-        DepsTracker deps;
-        expressionIt->second->addDependencies(&deps);
-        auto topLevelFieldNames =
-            deps.toProjectionWithoutMetadata(DepsTracker::TruncateToRootLevel::yes)
-                .getFieldNames<std::set<std::string>>();
-        topLevelFieldNames.erase("_id");
 
+        // Do not extract a computed projection if it is computing a value that other fields in the
+        // same projection depend on. If the extracted $addFields were to be placed before this
+        // projection, the dependency with the common name would be shadowed by the computed
+        // projection.
+        if (computedExprDependsOnField(topLevelDeps, field, i)) {
+            replaceWithProjField = false;
+            continue;
+        }
+
+        const auto& topLevelFieldNames = topLevelDeps[i];
         if (topLevelFieldNames.size() == 1 && topLevelFieldNames.count(oldName.toString()) == 1) {
             // Substitute newName for oldName in the expression.
             StringMap<std::string> renames;
@@ -197,35 +241,34 @@ std::pair<BSONObj, bool> InclusionNode::extractComputedProjectionsInAddFields(
         return {BSONObj{}, false};
     }
 
-    DepsTracker allDeps;
-    reportDependencies(&allDeps);
+    std::vector<OrderedPathSet> topLevelDeps =
+        getTopLevelDeps(_orderToProcessAdditionsAndChildren, _expressions, _children);
 
     // Auxiliary vector with extracted computed projections: <name, expression>.
     // To preserve the original fields order, only projections at the beginning of the
     // _orderToProcessAdditionsAndChildren list can be extracted for pushdown.
     std::vector<std::pair<StringData, boost::intrusive_ptr<Expression>>> addFieldsExpressions;
-    for (auto&& field : _orderToProcessAdditionsAndChildren) {
+    for (size_t i = 0; i < _orderToProcessAdditionsAndChildren.size(); i++) {
+        auto&& field = _orderToProcessAdditionsAndChildren[i];
         // Do not extract for pushdown computed projection with reserved name.
         if (reservedNames.count(field) > 0) {
             break;
         }
-        if (allDeps.fields.count(field) > 0) {
-            // Do not extract a computed projection if its name is the same as a dependent field. If
-            // the extracted $addFields were to be placed before this $addFields, the dependency
-            // with the common name would be shadowed by the computed projection.
-            break;
-        }
+
         auto expressionIt = _expressions.find(field);
         if (expressionIt == _expressions.end()) {
             break;
         }
-        DepsTracker deps;
-        expressionIt->second->addDependencies(&deps);
-        auto topLevelFieldNames =
-            deps.toProjectionWithoutMetadata(DepsTracker::TruncateToRootLevel::yes)
-                .getFieldNames<std::set<std::string>>();
-        topLevelFieldNames.erase("_id");
 
+        // Do not extract a computed projection if it is computing a value that other fields in the
+        // same projection depend on. If the extracted $addFields were to be placed before this
+        // projection, the dependency with the common name would be shadowed by the computed
+        // projection.
+        if (computedExprDependsOnField(topLevelDeps, field, i)) {
+            break;
+        }
+
+        auto& topLevelFieldNames = topLevelDeps[i];
         if (topLevelFieldNames.size() == 1 && topLevelFieldNames.count(oldName.toString()) == 1) {
             // Substitute newName for oldName in the expression.
             StringMap<std::string> renames;

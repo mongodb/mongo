@@ -38,6 +38,20 @@
 
 namespace mongo {
 
+/** Custom comparator that orders fieldpath strings by path prefix first, then by field.
+ * This ensures that a parent field is ordered directly before its children.
+ */
+struct PathPrefixComparator {
+    /* Returns true if the lhs value should sort before the rhs, false otherwise. */
+    bool operator()(const std::string& lhs, const std::string& rhs) const;
+};
+
+/**
+ * Set of field paths strings.  When iterated over, a parent path is seen directly before its
+ * children (or descendants, more generally).  Eg., "a", "a.a", "a.b", "a-plus", "b".
+ */
+typedef std::set<std::string, PathPrefixComparator> OrderedPathSet;
+
 /**
  * This struct allows components in an agg pipeline to report what they need from their input.
  */
@@ -102,6 +116,16 @@ struct DepsTracker {
         : _unavailableMetadata{unavailableMetadata} {}
 
     enum class TruncateToRootLevel : bool { no, yes };
+
+    /**
+     * Return the set of dependencies with descendant paths removed.
+     * For example ["a.b", "a.b.f", "c"] --> ["a.b", "c"].
+     *
+     * TruncateToRootLevel::yes requires all dependencies to be top-level.
+     * The example above would return ["a", "c"]
+     */
+    static OrderedPathSet simplifyDependencies(OrderedPathSet dependencies,
+                                               TruncateToRootLevel truncation);
 
     /**
      * Returns a projection object covering the non-metadata dependencies tracked by this class, or
@@ -205,14 +229,5 @@ private:
     // Represents which metadata is used by the pipeline. This is populated while performing
     // dependency analysis.
     QueryMetadataBitSet _metadataDeps;
-};
-
-
-/** Custom comparator that orders fieldpath strings by path prefix first, then by field.
- * This ensures that a parent field is ordered directly before its children.
- */
-struct PathPrefixComparator {
-    /* Returns true if the lhs value should sort before the rhs, false otherwise. */
-    bool operator()(const std::string& lhs, const std::string& rhs) const;
 };
 }  // namespace mongo

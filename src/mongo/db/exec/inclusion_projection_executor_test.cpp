@@ -1090,6 +1090,62 @@ TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
     ASSERT_DOCUMENT_EQ(expectedProjection, inclusion->serializeTransformation(boost::none));
 }
 
+TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
+       ExtractComputedProjectionInProjectShouldNotIncludeId) {
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies(
+        BSON("a" << BSON("$sum" << BSON_ARRAY("$myMeta"
+                                              << "$_id"))));
+
+    auto r = static_cast<InclusionProjectionExecutor*>(inclusion.get())->getRoot();
+    const std::set<StringData> reservedNames{};
+    auto [addFields, deleteFlag] =
+        r->extractComputedProjectionsInProject("myMeta", "meta", reservedNames);
+
+    ASSERT_EQ(addFields.nFields(), 0);
+    ASSERT_EQ(deleteFlag, false);
+
+    auto expectedProjection = Document(fromjson("{_id: true, a: {$sum: ['$myMeta', '$_id']}}"));
+    ASSERT_DOCUMENT_EQ(expectedProjection, inclusion->serializeTransformation(boost::none));
+}
+
+TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
+       ExtractComputedProjectionInProjectShouldNotHideDependentSubFields) {
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies(BSON("a"
+                                                                     << "$myMeta"
+                                                                     << "b"
+                                                                     << "$a.x"));
+
+    auto r = static_cast<InclusionProjectionExecutor*>(inclusion.get())->getRoot();
+    const std::set<StringData> reservedNames{};
+    auto [addFields, deleteFlag] =
+        r->extractComputedProjectionsInProject("myMeta", "meta", reservedNames);
+
+    ASSERT_EQ(addFields.nFields(), 0);
+    ASSERT_EQ(deleteFlag, false);
+
+    auto expectedProjection = Document(fromjson("{_id: true, a: '$myMeta', b: '$a.x'}"));
+    ASSERT_DOCUMENT_EQ(expectedProjection, inclusion->serializeTransformation(boost::none));
+}
+
+TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault,
+       ExtractComputedProjectionInProjectShouldNotHideDependentSubFieldsWithDottedSibling) {
+    auto inclusion = makeInclusionProjectionWithDefaultPolicies(BSON("a"
+                                                                     << "$myMeta"
+                                                                     << "c.b"
+                                                                     << "$a.x"));
+
+    auto r = static_cast<InclusionProjectionExecutor*>(inclusion.get())->getRoot();
+    const std::set<StringData> reservedNames{};
+    auto [addFields, deleteFlag] =
+        r->extractComputedProjectionsInProject("myMeta", "meta", reservedNames);
+
+    ASSERT_EQ(addFields.nFields(), 0);
+    ASSERT_EQ(deleteFlag, false);
+
+    auto expectedProjection = Document(fromjson("{_id: true, a: '$myMeta', c: {b: '$a.x'}}"));
+    ASSERT_DOCUMENT_EQ(expectedProjection, inclusion->serializeTransformation(boost::none));
+}
+
 TEST_F(InclusionProjectionExecutionTestWithFallBackToDefault, ApplyProjectionAfterSplit) {
     auto inclusion = makeInclusionProjectionWithDefaultPolicies(
         BSON("a" << true << "computedMeta1"
