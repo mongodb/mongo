@@ -72,7 +72,7 @@ void printCollectionAndIndexTableEntries(OperationContext* opCtx, const Namespac
         const auto indexDescriptor = indexCatalogEntry->descriptor();
         const auto iam = indexCatalogEntry->accessMethod()->asSortedData();
         if (!iam) {
-            LOGV2(6325101,
+            LOGV2(6325100,
                   "[Debugging] skipping index {index_name} because it isn't SortedData",
                   "index_name"_attr = indexDescriptor->indexName());
             continue;

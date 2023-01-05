@@ -174,10 +174,11 @@ void _validateIndexes(OperationContext* opCtx,
  */
 void _gatherIndexEntryErrors(OperationContext* opCtx,
                              ValidateState* validateState,
+                             IndexConsistency* indexConsistency,
                              ValidateAdaptor* indexValidator,
                              ValidateResults* result) {
-    indexValidator->setSecondPhase();
-    if (!indexValidator->limitMemoryUsageForSecondPhase(result)) {
+    indexConsistency->setSecondPhase();
+    if (!indexConsistency->limitMemoryUsageForSecondPhase(result)) {
         return;
     }
 
@@ -222,12 +223,12 @@ void _gatherIndexEntryErrors(OperationContext* opCtx,
     }
 
     if (validateState->fixErrors()) {
-        indexValidator->repairIndexEntries(opCtx, result);
+        indexConsistency->repairMissingIndexEntries(opCtx, result);
     }
 
     LOGV2_OPTIONS(20301, {LogComponent::kIndex}, "Finished traversing through all the indexes");
 
-    indexValidator->addIndexEntryErrors(opCtx, result);
+    indexConsistency->addIndexEntryErrors(result);
 }
 
 void _validateIndexKeyCount(OperationContext* opCtx,
@@ -555,7 +556,8 @@ Status validate(OperationContext* opCtx,
                       logAttrs(validateState.nss()),
                       logAttrs(validateState.uuid()));
 
-        ValidateAdaptor indexValidator(opCtx, &validateState);
+        IndexConsistency indexConsistency(opCtx, &validateState);
+        ValidateAdaptor indexValidator(&indexConsistency, &validateState);
 
         // In traverseRecordStore(), the index validator keeps track the records in the record
         // store so that _validateIndexes() can confirm that the index entries match the records in
@@ -567,10 +569,10 @@ Status validate(OperationContext* opCtx,
         // Pause collection validation while a lock is held and between collection and index data
         // validation.
         //
-        // The KeyStringIndexConsistency object saves document key information during collection
-        // data validation and then compares against that key information during index data
-        // validation. This fail point is placed in between them, in an attempt to catch any
-        // inconsistencies that concurrent CRUD ops might cause if we were to have a bug.
+        // The IndexConsistency object saves document key information during collection data
+        // validation and then compares against that key information during index data validation.
+        // This fail point is placed in between them, in an attempt to catch any inconsistencies
+        // that concurrent CRUD ops might cause if we were to have a bug.
         //
         // Only useful for background validation because we hold an intent lock instead of an
         // exclusive lock, and thus allow concurrent operations.
@@ -590,13 +592,14 @@ Status validate(OperationContext* opCtx,
         // Validate indexes and check for mismatches.
         _validateIndexes(opCtx, &validateState, &indexValidator, results);
 
-        if (indexValidator.haveEntryMismatch()) {
+        if (indexConsistency.haveEntryMismatch()) {
             LOGV2_OPTIONS(20305,
                           {LogComponent::kIndex},
                           "Index inconsistencies were detected. "
                           "Starting the second phase of index validation to gather concise errors",
                           "namespace"_attr = validateState.nss());
-            _gatherIndexEntryErrors(opCtx, &validateState, &indexValidator, results);
+            _gatherIndexEntryErrors(
+                opCtx, &validateState, &indexConsistency, &indexValidator, results);
         }
 
         if (!results->valid) {

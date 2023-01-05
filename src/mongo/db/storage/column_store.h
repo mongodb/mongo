@@ -53,18 +53,6 @@ struct FullCellView {
     CellView value;
 };
 
-/**
- * An owned representation of a column-store index entry cell.
- */
-struct FullCellValue {
-    PathValue path;
-    RowId rid;
-    CellValue value;
-
-    FullCellValue(FullCellView fcv) : path(fcv.path), rid(fcv.rid), value(fcv.value) {}
-    FullCellValue(PathView p, RowId r, CellView v) : path(p), rid(r), value(v) {}
-};
-
 struct CellViewForPath {
     RowId rid;
     CellView value;
@@ -78,8 +66,10 @@ struct CellViewForPath {
  * stores tuples of Path, RecordId and Value in a separate format.
  */
 class ColumnStore {
-public:
+protected:
     class Cursor;
+
+public:
     class WriteCursor {
     public:
         virtual ~WriteCursor() = default;
@@ -386,10 +376,7 @@ public:
         _ident = std::move(newIdent);
     }
 
-    /**
-     * The Cursor class is for raw access to the index. Except for unusual use cases (e.g., index
-     * validation) you'll want to use CursorForPath instead.
-     */
+protected:
     class Cursor {
     public:
         virtual ~Cursor() = default;

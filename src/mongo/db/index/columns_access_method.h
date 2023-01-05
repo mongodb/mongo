@@ -48,10 +48,6 @@ public:
 
     ColumnStoreAccessMethod(IndexCatalogEntry* ice, std::unique_ptr<ColumnStore>);
 
-    const column_keygen::ColumnKeyGenerator& getKeyGen() const {
-        return _keyGen;
-    }
-
     /**
      * Returns a pointer to the ColumnstoreProjection owned by the underlying ColumnKeyGenerator.
      */
@@ -127,15 +123,7 @@ public:
         return _store.get();
     }
 
-    ColumnStore* writableStorage() const {
-        return _store.get();
-    }
-
     class BulkBuilder;
-
-    const std::string& indexName() const {
-        return _descriptor->indexName();
-    }
 
     /**
      * Returns true iff 'compressor' is a recognized name of a block compression module that is

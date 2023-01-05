@@ -20,8 +20,8 @@ const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
 
-const columnstoreEnabled =
-    checkSBEEnabled(rst.getPrimary().getDB(dbName), ["featureFlagColumnstoreIndexes"], true);
+const columnstoreEnabled = checkSBEEnabled(
+    rst.getPrimary().getDB(dbName), ["featureFlagColumnstoreIndexes", "featureFlagSbeFull"], true);
 
 const runTests = function(docs, indexSpecsFlat, sideWrites, collNameSuffix) {
     const coll = rst.getPrimary().getDB(dbName).getCollection(jsTestName() + collNameSuffix);

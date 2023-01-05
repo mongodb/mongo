@@ -265,6 +265,7 @@ Status ColumnStoreAccessMethod::BulkBuilder::keyCommitted(
     return Status::OK();
 }
 
+
 void ColumnStoreAccessMethod::_visitCellsForIndexInsert(
     OperationContext* opCtx,
     PooledFragmentBuilder& buf,
@@ -374,9 +375,6 @@ Status ColumnStoreAccessMethod::update(OperationContext* opCtx,
             [&](column_keygen::ColumnKeyGenerator::DiffAction diffAction,
                 StringData path,
                 const column_keygen::UnencodedCellView* cell) {
-                // TODO SERVER-72351: This is a temporary fix for SERVER-72351.
-                ON_BLOCK_EXIT([&]() { columnKeys->clear(); });
-
                 if (diffAction == column_keygen::ColumnKeyGenerator::DiffAction::kDelete) {
                     columnKeys->emplace_back(std::make_tuple(path.toString(), "", rid));
                     int64_t removed = 0;

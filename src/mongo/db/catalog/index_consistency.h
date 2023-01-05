@@ -32,7 +32,6 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/catalog/validate_state.h"
 #include "mongo/db/storage/key_string.h"
-#include "mongo/util/progress_meter.h"
 
 namespace mongo {
 
@@ -70,7 +69,8 @@ struct IndexInfo {
 };
 
 /**
- * Used by _missingIndexEntries to be able to easily access keyString during repairIndexEntries.
+ * Used by _missingIndexEntries to be able to easily access keyString during
+ * repairMissingIndexEntries.
  */
 struct IndexEntryInfo {
     IndexEntryInfo(const IndexInfo& indexInfo,
@@ -85,161 +85,19 @@ struct IndexEntryInfo {
     KeyString::Value keyString;
 };
 
-
 /**
- * The IndexConsistency class provides the base class definitions for index-consistency
- * sub-classes. The base implementation in this class provides the basis for keeping track of the
- * index consistency. It does this by using the index keys from index entries and index keys
- * generated from the document to ensure there is a one-to-one mapping for each key.
+ * The IndexConsistency class is used to keep track of the index consistency.
+ * It does this by using the index keys from index entries and index keys generated from the
+ * document to ensure there is a one-to-one mapping for each key.
+ * In addition, an IndexObserver class can be hooked into the IndexAccessMethod to inform
+ * this class about changes to the indexes during a validation and compensate for them.
  */
-class IndexConsistency {
+class IndexConsistency final {
     using IndexInfoMap = std::map<std::string, IndexInfo>;
     using IndexKey = std::pair<std::string, std::string>;
 
 public:
-    static const long long kInterruptIntervalNumRecords;
-    static const size_t kNumHashBuckets;
-
-    IndexConsistency(OperationContext* opCtx,
-                     CollectionValidation::ValidateState* validateState,
-                     size_t numHashBuckets = kNumHashBuckets);
-
-    /**
-     * Informs the IndexConsistency object that we're advancing to the second phase of
-     * index validation.
-     */
-    void setSecondPhase();
-
-    virtual ~IndexConsistency() = default;
-
-protected:
-    struct IndexKeyBucket {
-        uint32_t indexKeyCount;
-        uint32_t bucketSizeBytes;
-    };
-
-    CollectionValidation::ValidateState* _validateState;
-
-    // We map the hashed KeyString values to a bucket that contains the count of how many
-    // index keys and document keys we've seen in each bucket. This counter is unsigned to avoid
-    // undefined behavior in the (unlikely) case of overflow.
-    // Count rules:
-    //     - If the count is non-zero for a bucket after all documents and index entries have been
-    //       processed, one or more indexes are inconsistent for KeyStrings that map to it.
-    //       Otherwise, those keys are consistent for all indexes with a high degree of confidence.
-    //     - Absent overflow, if a count interpreted as twos complement integer ends up greater
-    //       than zero, there are too few index entries.
-    //     - Similarly, if that count ends up less than zero, there are too many index entries.
-
-    std::vector<IndexKeyBucket> _indexKeyBuckets;
-
-    // Whether we're in the first or second phase of index validation.
-    bool _firstPhase;
-
-private:
-    IndexConsistency() = delete;
-};  // IndexConsistency
-
-/**
- * The KeyStringIndexConsistency class is used to keep track of the index consistency for
- * KeyString based indexes. It does this by using the index keys from index entries and index keys
- * generated from the document to ensure there is a one-to-one mapping for each key. In addition, an
- * IndexObserver class can be hooked into the IndexAccessMethod to inform this class about changes
- * to the indexes during a validation and compensate for them.
- */
-class KeyStringIndexConsistency final : protected IndexConsistency {
-    using IndexInfoMap = std::map<std::string, IndexInfo>;
-    using IndexKey = std::pair<std::string, std::string>;
-
-public:
-    KeyStringIndexConsistency(OperationContext* opCtx,
-                              CollectionValidation::ValidateState* validateState,
-                              size_t numHashBuckets = kNumHashBuckets);
-
-    void setSecondPhase() {
-        IndexConsistency::setSecondPhase();
-    }
-
-    /**
-     * Traverses the column-store index via 'cursor' and accumulates the traversal results.
-     */
-    int64_t traverseIndex(OperationContext* opCtx,
-                          const IndexCatalogEntry* index,
-                          ProgressMeterHolder& _progress,
-                          ValidateResults* results);
-
-    /**
-     * Traverses all paths in a single record from the row-store via the given {'recordId','record'}
-     * pair and accumulates the traversal results.
-     */
-    void traverseRecord(OperationContext* opCtx,
-                        const CollectionPtr& coll,
-                        const IndexCatalogEntry* index,
-                        const RecordId& recordId,
-                        const BSONObj& recordBson,
-                        ValidateResults* results);
-
-    /**
-     * Returns true if any value in the `_indexKeyCount` map is not equal to 0, otherwise return
-     * false.
-     */
-    bool haveEntryMismatch() const;
-
-    /**
-     * If repair mode enabled, try inserting _missingIndexEntries into indexes.
-     */
-    void repairIndexEntries(OperationContext* opCtx, ValidateResults* results);
-
-    /**
-     * Records the errors gathered from the second phase of index validation into the provided
-     * ValidateResultsMap and ValidateResults.
-     */
-    void addIndexEntryErrors(OperationContext* opCtx, ValidateResults* results);
-
-    /**
-     * Sets up this IndexConsistency object to limit memory usage in the second phase of index
-     * validation. Returns whether the memory limit is sufficient to report at least one index entry
-     * inconsistency and continue with the second phase of validation.
-     */
-    bool limitMemoryUsageForSecondPhase(ValidateResults* result);
-
-    void validateIndexKeyCount(OperationContext* opCtx,
-                               const IndexCatalogEntry* index,
-                               long long* numRecords,
-                               IndexValidateResults& results);
-
-    uint64_t getTotalIndexKeys() {
-        return _totalIndexKeys;
-    }
-
-private:
-    KeyStringIndexConsistency() = delete;
-
-    // A vector of IndexInfo indexes by index number
-    IndexInfoMap _indexesInfo;
-
-    // Populated during the second phase of validation, this map contains the index entries that
-    // were pointing at an invalid document key.
-    // The map contains a IndexKey pointing at a set of BSON objects as there may be multiple
-    // extra index entries for the same IndexKey.
-    std::map<IndexKey, SimpleBSONObjSet> _extraIndexEntries;
-
-    // Populated during the second phase of validation, this map contains the index entries that
-    // were missing while the document key was in place.
-    // The map contains a IndexKey pointing to a IndexEntryInfo as there can only be one missing
-    // index entry for a given IndexKey for each index.
-    std::map<IndexKey, IndexEntryInfo> _missingIndexEntries;
-
-    // The total number of index keys is stored during the first validation phase, since this
-    // count may change during a second phase.
-    uint64_t _totalIndexKeys = 0;
-
-    /**
-     * Return info for an index tracked by this with the given 'indexName'.
-     */
-    IndexInfo& getIndexInfo(const std::string& indexName) {
-        return _indexesInfo.at(indexName);
-    }
+    IndexConsistency(OperationContext* opCtx, CollectionValidation::ValidateState* validateState);
 
     /**
      * During the first phase of validation, given the document's key KeyString, increment the
@@ -280,6 +138,87 @@ private:
     size_t getMultikeyMetadataPathCount(IndexInfo* indexInfo);
 
     /**
+     * Returns true if any value in the `_indexKeyCount` map is not equal to 0, otherwise
+     * return false.
+     */
+    bool haveEntryMismatch() const;
+
+    /**
+     * Return info on all indexes tracked by this.
+     */
+    IndexInfoMap& getIndexInfo() {
+        return _indexesInfo;
+    }
+    IndexInfo& getIndexInfo(const std::string& indexName) {
+        return _indexesInfo.at(indexName);
+    }
+
+    /**
+     * Informs the IndexConsistency object that we're advancing to the second phase of index
+     * validation.
+     */
+    void setSecondPhase();
+
+    /**
+     * If repair mode enabled, try inserting _missingIndexEntries into indexes.
+     */
+    void repairMissingIndexEntries(OperationContext* opCtx, ValidateResults* results);
+
+    /**
+     * Records the errors gathered from the second phase of index validation into the provided
+     * ValidateResultsMap and ValidateResults.
+     */
+    void addIndexEntryErrors(ValidateResults* results);
+
+    /**
+     * Sets up this IndexConsistency object to limit memory usage in the second phase of index
+     * validation. Returns whether the memory limit is sufficient to report at least one index entry
+     * inconsistency and continue with the second phase of validation.
+     */
+    bool limitMemoryUsageForSecondPhase(ValidateResults* result);
+
+private:
+    struct IndexKeyBucket {
+        uint32_t indexKeyCount;
+        uint32_t bucketSizeBytes;
+    };
+
+    IndexConsistency() = delete;
+
+    CollectionValidation::ValidateState* _validateState;
+
+    // We map the hashed KeyString values to a bucket that contains the count of how many
+    // index keys and document keys we've seen in each bucket. This counter is unsigned to avoid
+    // undefined behavior in the (unlikely) case of overflow.
+    // Count rules:
+    //     - If the count is non-zero for a bucket after all documents and index entries have been
+    //       processed, one or more indexes are inconsistent for KeyStrings that map to it.
+    //       Otherwise, those keys are consistent for all indexes with a high degree of confidence.
+    //     - Absent overflow, if a count interpreted as twos complement integer ends up greater
+    //       than zero, there are too few index entries.
+    //     - Similarly, if that count ends up less than zero, there are too many index entries.
+
+    std::vector<IndexKeyBucket> _indexKeyBuckets;
+
+    // A vector of IndexInfo indexes by index number
+    IndexInfoMap _indexesInfo;
+
+    // Whether we're in the first or second phase of index validation.
+    bool _firstPhase;
+
+    // Populated during the second phase of validation, this map contains the index entries that
+    // were pointing at an invalid document key.
+    // The map contains a IndexKey pointing at a set of BSON objects as there may be multiple
+    // extra index entries for the same IndexKey.
+    std::map<IndexKey, SimpleBSONObjSet> _extraIndexEntries;
+
+    // Populated during the second phase of validation, this map contains the index entries that
+    // were missing while the document key was in place.
+    // The map contains a IndexKey pointing to a IndexEntryInfo as there can only be one missing
+    // index entry for a given IndexKey for each index.
+    std::map<IndexKey, IndexEntryInfo> _missingIndexEntries;
+
+    /**
      * Generates a key for the second phase of validation. The keys format is the following:
      * {
      *     indexName: <string>,
@@ -302,5 +241,5 @@ private:
      */
     uint32_t _hashKeyString(const KeyString::Value& ks, uint32_t indexNameHash) const;
 
-};  // KeyStringIndexConsistency
+};  // IndexConsistency
 }  // namespace mongo

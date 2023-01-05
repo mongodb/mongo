@@ -38,7 +38,6 @@
 #include "mongo/db/catalog/index_consistency.h"
 #include "mongo/db/catalog/validate_adaptor.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/index/columns_access_method.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/durable_catalog.h"
@@ -193,18 +192,12 @@ void ValidateState::_yieldCursors(OperationContext* opCtx) {
     for (const auto& indexCursor : _indexCursors) {
         indexCursor.second->save();
     }
-    for (const auto& indexCursor : _columnStoreIndexCursors) {
-        indexCursor.second->save();
-    }
 
     _traverseRecordStoreCursor->save();
     _seekRecordStoreCursor->save();
 
     // Restore all the cursors.
     for (const auto& indexCursor : _indexCursors) {
-        indexCursor.second->restore();
-    }
-    for (const auto& indexCursor : _columnStoreIndexCursors) {
         indexCursor.second->restore();
     }
 
@@ -216,16 +209,9 @@ void ValidateState::_yieldCursors(OperationContext* opCtx) {
             _seekRecordStoreCursor->restore());
 }
 
-bool ValidateState::_isIndexDataCheckpointed(OperationContext* opCtx,
-                                             const IndexCatalogEntry* entry) {
-    return isBackground() &&
-        opCtx->getServiceContext()->getStorageEngine()->isInIndividuallyCheckpointedIndexes(
-            entry->getIdent());
-}
-
 void ValidateState::initializeCursors(OperationContext* opCtx) {
     invariant(!_traverseRecordStoreCursor && !_seekRecordStoreCursor && _indexCursors.size() == 0 &&
-              _columnStoreIndexCursors.size() == 0 && _indexes.size() == 0);
+              _indexes.size() == 0);
 
     // Background validation reads from the last stable checkpoint instead of the latest data. This
     // allows concurrent writes to go ahead without interfering with validation's view of the data.
@@ -306,51 +292,27 @@ void ValidateState::initializeCursors(OperationContext* opCtx) {
             continue;
         }
 
-        if (entry->descriptor()->getAccessMethodName() == IndexNames::COLUMN) {
-            const auto iam = entry->accessMethod();
-            _columnStoreIndexCursors.emplace(
-                desc->indexName(),
-                static_cast<ColumnStoreAccessMethod*>(iam)->storage()->newCursor(opCtx));
+        auto iam = entry->accessMethod()->asSortedData();
+        if (!iam)
+            continue;
 
-            // Skip any newly created indexes that, because they were built with a WT bulk loader,
-            // are checkpoint'ed but not yet consistent with the rest of checkpoint's PIT view of
-            // the data.
-            if (_isIndexDataCheckpointed(opCtx, entry)) {
-                _columnStoreIndexCursors.erase(desc->indexName());
-                LOGV2(
-                    7106110,
-                    "Skipping background validation on the index because the index data is not yet "
-                    "consistent in the checkpoint.",
-                    "desc_indexName"_attr = desc->indexName(),
-                    "nss"_attr = _nss);
-                continue;
-            }
-        } else {
-            const auto iam = entry->accessMethod()->asSortedData();
-            if (!iam) {
-                LOGV2(6325100,
-                      "[Debugging] skipping index {index_name} because it isn't SortedData",
-                      "index_name"_attr = desc->indexName());
-                continue;
-            }
+        _indexCursors.emplace(
+            desc->indexName(),
+            std::make_unique<SortedDataInterfaceThrottleCursor>(opCtx, iam, &_dataThrottle));
 
-            _indexCursors.emplace(
-                desc->indexName(),
-                std::make_unique<SortedDataInterfaceThrottleCursor>(opCtx, iam, &_dataThrottle));
-
-            // Skip any newly created indexes that, because they were built with a WT bulk loader,
-            // are checkpoint'ed but not yet consistent with the rest of checkpoint's PIT view of
-            // the data.
-            if (_isIndexDataCheckpointed(opCtx, entry)) {
-                _indexCursors.erase(desc->indexName());
-                LOGV2(
-                    6868903,
-                    "Skipping background validation on the index because the index data is not yet "
-                    "consistent in the checkpoint.",
-                    "desc_indexName"_attr = desc->indexName(),
-                    "nss"_attr = _nss);
-                continue;
-            }
+        // Skip any newly created indexes that, because they were built with a WT bulk loader,
+        // are checkpoint'ed but not yet consistent with the rest of checkpoint's PIT view of
+        // the data.
+        if (isBackground() &&
+            opCtx->getServiceContext()->getStorageEngine()->isInIndividuallyCheckpointedIndexes(
+                diskIndexIdent)) {
+            _indexCursors.erase(desc->indexName());
+            LOGV2(6868903,
+                  "Skipping background validation on the index because the index data is not yet "
+                  "consistent in the checkpoint.",
+                  "desc_indexName"_attr = desc->indexName(),
+                  "nss"_attr = _nss);
+            continue;
         }
 
         _indexes.push_back(indexCatalog->getEntryShared(desc));
