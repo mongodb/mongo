@@ -931,14 +931,14 @@ to disk and [updates](https://github.com/mongodb/mongo/blob/r4.3.4/src/mongo/db/
 For most writes, persisting only the (lsid, txnId) pair alone is sufficient to reconstruct a
 response. For findAndModify however, we also need to respond with the document that would have
 originally been returned. In version 5.0 and earlier, the default behavior is to
-[record the document image into the oplog](https://github.com/mongodb/mongo/blob/33ad68c0dc4bda897a5647608049422ae784a15e/src/mongo/db/op_observer/op_observer_impl.cpp#L191)
+[record the document image into the oplog](https://github.com/mongodb/mongo/blob/33ad68c0dc4bda897a5647608049422ae784a15e/src/mongo/db/op_observer_impl.cpp#L191)
 as a no-op entry. The oplog entries generated would look something like:
 
 * `{ op: "d", o: {_id: 1}, ts: Timestamp(100, 2), preImageOpTime: Timestamp(100, 1), lsid: ..., txnNumber: ...}`
 * `{ op: "n", o: {_id: 1, imageBeforeDelete: "foobar"}, ts: Timestamp(100, 1)}`
 
 There's a cost in "explicitly" replicating these images via the oplog. We've addressed this cost
-with 5.1 where the default is to instead [save the image into a side collection](https://github.com/mongodb/mongo/blob/33ad68c0dc4bda897a5647608049422ae784a15e/src/mongo/db/op_observer/op_observer_impl.cpp#L646-L650)
+with 5.1 where the default is to instead [save the image into a side collection](https://github.com/mongodb/mongo/blob/33ad68c0dc4bda897a5647608049422ae784a15e/src/mongo/db/op_observer_impl.cpp#L646-L650)
 with the namespace `config.image_collection`. A primary will add `needsRetryImage:
 <preImage/postImage>` to the oplog entry to communicate to secondaries that they must make a
 corollary write to `config.image_collection`.
@@ -1367,7 +1367,7 @@ privilege.
 The `UserWriteBlockModeOpObserver` is responsible for blocking disallowed writes. Upon any operation
 which writes, this `OpObserver` checks whether the `GlobalUserWriteBlockState` [allows writes to the
 target
-namespace](https://github.com/10gen/mongo/blob/25377181476e4140c970afa5b018f9b4fcc951e8/src/mongo/db/op_observer/user_write_block_mode_op_observer.cpp#L276-L283).
+namespace](https://github.com/10gen/mongo/blob/387f8c0e26a352b95ecfc6bc51f749d26a929390/src/mongo/db/op_observer/user_write_block_mode_op_observer.cpp#L281-L288).
 The `GlobalUserWriteBlockState` stores whether user write blocking is enabled in a given
 `ServiceContext`. As part of its write access check, it [checks whether the `WriteBlockBypass`
 associated with the given `OperationContext` is
@@ -1407,7 +1407,7 @@ those operations from completing.
 
 #### Code references
 * The [`UserWriteBlockModeOpObserver`
-  class](https://github.com/10gen/mongo/blob/25377181476e4140c970afa5b018f9b4fcc951e8/src/mongo/db/op_observer/user_write_block_mode_op_observer.h#L40)
+  class](https://github.com/10gen/mongo/blob/387f8c0e26a352b95ecfc6bc51f749d26a929390/src/mongo/db/op_observer/user_write_block_mode_op_observer.h#L40)
 * The [`GlobalUserWriteBlockState`
   class](https://github.com/10gen/mongo/blob/25377181476e4140c970afa5b018f9b4fcc951e8/src/mongo/db/s/global_user_write_block_state.h#L37)
 * The [`WriteBlockBypass`
