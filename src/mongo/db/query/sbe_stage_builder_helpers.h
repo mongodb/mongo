@@ -665,11 +665,6 @@ struct StageBuilderState {
     // A flag to indicate the user allows disk use for spilling.
     bool allowDiskUse;
 
-    // This map is used to plumb through pre-generated field expressions ('EvalExpr')
-    // corresponding to field paths to 'generateExpression' to avoid repeated expression generation.
-    // Key is expected to represent field paths in form CURRENT.<field_name>[.<field_name>]*.
-    stdx::unordered_map<std::string /*field path*/, EvalExpr> preGeneratedExprs;
-
     // Holds the mapping between the custom ABT variable names and the slot id they are referencing.
     optimizer::SlotVarMap slotVarMap;
 };
