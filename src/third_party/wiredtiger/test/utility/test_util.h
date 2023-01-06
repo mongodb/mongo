@@ -51,10 +51,10 @@
 
 #define TESTUTIL_ENV_CONFIG_TIERED \
     ",tiered_storage=(bucket=./"   \
-    "bucket,bucket_prefix=pfx-,local_retention=%d,name=dir_store)"
-#define TESTUTIL_ENV_CONFIG_TIERED_EXT               \
-    ",extensions=(%s/ext/storage_sources/dir_store/" \
-    "libwiredtiger_dir_store.so=(early_load=true))"
+    "bucket,bucket_prefix=pfx-,local_retention=%d,name=%s)"
+#define TESTUTIL_ENV_CONFIG_TIERED_EXT        \
+    ",extensions=(%s/ext/storage_sources/%s/" \
+    "libwiredtiger_%s.so=(early_load=true))"
 #define TESTUTIL_ENV_CONFIG_REC \
     ",log=(recover=on,remove=false),statistics=(all),statistics_log=(json,on_close,wait=1)"
 #define TESTUTIL_ENV_CONFIG_COMPAT ",compatibility=(release=\"2.9\")"

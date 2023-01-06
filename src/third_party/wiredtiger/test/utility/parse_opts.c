@@ -27,6 +27,7 @@
  */
 #include "test_util.h"
 #define DIR_STORE "dir_store"
+#define S3_STORE "s3_store"
 
 extern char *__wt_optarg; /* argument associated with option */
 extern int __wt_optind;
@@ -106,6 +107,11 @@ parse_tiered_opt(TEST_OPTS *opts)
         EXPECT_OPTIONAL_ARG_IN_SUB_PARSE(opts);
         if (__wt_optarg == NULL || *__wt_optarg == '\0')
             testutil_die(EINVAL, "-Po option requires an argument");
+
+        if (strncmp(__wt_optarg, DIR_STORE, strlen(__wt_optarg)) != 0 &&
+          strncmp(__wt_optarg, S3_STORE, strlen(__wt_optarg)) != 0)
+            testutil_die(EINVAL, "-Po not a valid argument");
+
         opts->tiered_storage_source = dstrdup(__wt_optarg);
         break;
     case 'S':
