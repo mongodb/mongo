@@ -92,3 +92,8 @@ feature_flags:
       cpp_varname: gFeatureFlagBitwise
       default: true
       version: 6.3
+
+    featureFlagCompoundWildcardIndexes:
+      description: "Feature flag to enable compound wildcard indexes."
+      cpp_varname: gFeatureFlagCompoundWildcardIndexes
+      default: false
