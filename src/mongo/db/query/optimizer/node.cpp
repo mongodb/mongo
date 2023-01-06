@@ -866,7 +866,7 @@ SpoolProducerNode::SpoolProducerNode(const SpoolProducerType type,
         6624155, "Spool producer must have a non-empty projection list", !binder().names().empty());
     tassert(6624120,
             "Invalid combination of spool producer type and spool filter",
-            _type == SpoolProducerType::Lazy || filter == Constant::boolean(true));
+            _type == SpoolProducerType::Lazy || getFilter() == Constant::boolean(true));
 }
 
 bool SpoolProducerNode::operator==(const SpoolProducerNode& other) const {
