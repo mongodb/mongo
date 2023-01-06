@@ -135,6 +135,9 @@ BSONObj generateReopeningFilters(const Date_t& time,
                                  boost::optional<BSONElement> metadata,
                                  const std::string& controlMinTimePath,
                                  int64_t bucketMaxSpanSeconds) {
+    // The bucket must be uncompressed.
+    auto versionFilter = BSON(kControlVersionPath << kTimeseriesControlDefaultVersion);
+
     // The bucket cannot be closed (aka open for new measurements).
     auto closedFlagFilter =
         BSON("$or" << BSON_ARRAY(BSON(kControlClosedPath << BSON("$exists" << false))
@@ -158,7 +161,8 @@ BSONObj generateReopeningFilters(const Date_t& time,
     auto upperBound = BSON(controlMinTimePath << BSON("$gt" << measurementMaxDifference));
     auto timeRangeFilter = BSON("$and" << BSON_ARRAY(lowerBound << upperBound));
 
-    return BSON("$and" << BSON_ARRAY(closedFlagFilter << timeRangeFilter << metaFieldFilter));
+    return BSON("$and" << BSON_ARRAY(versionFilter << closedFlagFilter << timeRangeFilter
+                                                   << metaFieldFilter));
 }
 
 StatusWith<MinMax> generateMinMaxFromBucketDoc(const BSONObj& bucketDoc,

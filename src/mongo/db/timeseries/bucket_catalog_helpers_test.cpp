@@ -379,7 +379,7 @@ TEST_F(BucketCatalogHelpersTest, FindSuitableBucketForMeasurements) {
                                        mongo::fromjson(
                                            R"({
             "_id":{"$oid":"629e1e680958e279dc29a517"},
-            "control":{"version":2,"min":{"_id":7,"time":{"$date":"2023-08-01T13:00:00Z"},"a":1},
+            "control":{"version":1,"min":{"_id":7,"time":{"$date":"2023-08-01T13:00:00Z"},"a":1},
                                    "max":{"_id":10,"time":{"$date":"2023-08-01T14:00:00Z"},"a":3},
                        "closed":false},
             "meta":3,
@@ -475,14 +475,25 @@ TEST_F(BucketCatalogHelpersTest, IncompatibleBucketsForNewMeasurements) {
     ASSERT(autoColl->getTimeseriesOptions() && autoColl->getTimeseriesOptions()->getMetaField());
     auto tsOptions = *autoColl->getTimeseriesOptions();
 
-    std::vector<BSONObj> bucketDocs = {// control.closed flag is true.
+    std::vector<BSONObj> bucketDocs = {// control.version indicates bucket is compressed.
+                                       mongo::fromjson(
+                                           R"({
+            "_id":{"$oid":"62e7e6ec27c28d338ab29200"},
+            "control":{"version":2,"min":{"_id":1,"time":{"$date":"2021-08-01T11:00:00Z"},"a":1},
+                                   "max":{"_id":3,"time":{"$date":"2021-08-01T12:00:00Z"},"a":3}},
+            "meta":1,
+            "data":{"time":{"0":{"$date":"2021-08-01T11:00:00Z"},
+                            "1":{"$date":"2021-08-01T11:00:00Z"},
+                            "2":{"$date":"2021-08-01T11:00:00Z"}},
+                    "a":{"0":1,"1":2,"2":3}}})"),
+                                       // control.closed flag is true.
                                        mongo::fromjson(
                                            R"(
             {"_id":{"$oid":"62e7eee4f33f295800073138"},
             "control":{"version":1,"min":{"_id":7,"time":{"$date":"2022-08-01T12:00:00Z"},"a":1},
                                    "max":{"_id":10,"time":{"$date":"2022-08-01T13:00:00Z"},"a":3},
                        "closed":true},
-            "meta":1,
+            "meta":2,
             "data":{"time":{"0":{"$date":"2022-08-01T12:00:00Z"},
                             "1":{"$date":"2022-08-01T12:00:00Z"},
                             "2":{"$date":"2022-08-01T12:00:00Z"}},
@@ -494,7 +505,7 @@ TEST_F(BucketCatalogHelpersTest, IncompatibleBucketsForNewMeasurements) {
             "control":{"version":2,"min":{"_id":7,"time":{"$date":"2023-08-01T13:00:00Z"},"a":1},
                                    "max":{"_id":10,"time":{"$date":"2023-08-01T14:00:00Z"},"a":3},
                        "closed":true},
-            "meta":2,
+            "meta":3,
             "data":{"time":{"0":{"$date":"2023-08-01T13:00:00Z"},
                             "1":{"$date":"2023-08-01T13:00:00Z"},
                             "2":{"$date":"2023-08-01T13:00:00Z"}},
@@ -505,11 +516,13 @@ TEST_F(BucketCatalogHelpersTest, IncompatibleBucketsForNewMeasurements) {
         _insertIntoBucketColl(doc);
     }
 
-    auto time1 = dateFromISOString("2022-08-01T12:30:00Z");
-    auto time2 = dateFromISOString("2023-08-01T13:30:00Z");
+    auto time1 = dateFromISOString("2021-08-01T11:30:00Z");
+    auto time2 = dateFromISOString("2022-08-01T12:30:00Z");
+    auto time3 = dateFromISOString("2023-08-01T13:30:00Z");
     std::vector<BSONObj> validMeasurementDocs = {
         BSON("_id" << 1 << _timeField << time1.getValue() << _metaField << 1),
-        BSON("_id" << 2 << _timeField << time2.getValue() << _metaField << 2)};
+        BSON("_id" << 2 << _timeField << time2.getValue() << _metaField << 2),
+        BSON("_id" << 3 << _timeField << time3.getValue() << _metaField << 3)};
 
     // Verify that even with matching meta fields and buckets with acceptable time ranges, if the
     // bucket is compressed and/or closed, we should not see it as a candid bucket for future

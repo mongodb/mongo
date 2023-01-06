@@ -215,40 +215,6 @@ const expectToReopenArchivedBuckets = function() {
     jsTestLog("Exiting expectToReopenArchivedBuckets.");
 }();
 
-const expectToReopenCompressedBuckets = function() {
-    jsTestLog("Entering expectToReopenCompressedBuckets...");
-    resetCollection();
-
-    let initialMeasurements = [];
-    for (let i = 0; i < 5; ++i) {
-        initialMeasurements.push({
-            [timeField]: ISODate("2022-08-26T19:19:00Z"),
-            [metaField]: "ReopenedBucket1",
-        });
-    }
-    const forward = {
-        [timeField]: ISODate("2022-08-27T19:19:00Z"),
-        [metaField]: "ReopenedBucket1",
-    };
-    const backward = {
-        [timeField]: ISODate("2022-08-26T19:19:00Z"),
-        [metaField]: "ReopenedBucket1",
-    };
-
-    for (let i = 0; i < initialMeasurements.length; ++i) {
-        checkIfBucketReopened(
-            initialMeasurements[i], /* willCreateBucket */ i == 0, /* willReopenBucket */ false);
-    }
-    // Time forwards will open a new bucket, and close and compress the old one.
-    checkIfBucketReopened(forward, /* willCreateBucket */ true, /* willReopenBucket */ false);
-    assert.eq(1, bucketsColl.find({"control.version": 2}).toArray().length);
-
-    // We expect to reopen the compressed bucket with time backwards.
-    checkIfBucketReopened(backward, /* willCreateBucket */ false, /* willReopenBucket */ true);
-
-    jsTestLog("Exiting expectToReopenCompressedBuckets.");
-}();
-
 const failToReopenNonSuitableBuckets = function() {
     jsTestLog("Entering failToReopenNonSuitableBuckets...");
     resetCollection();
@@ -294,7 +260,46 @@ const failToReopenNonSuitableBuckets = function() {
             "time": {"0": ISODate("2022-08-26T19:19:30Z")}
         }
     };
-
+    const compressedBucketDoc = {
+        "_id": ObjectId("05091c2c050b7495eaef4583"),
+        "control": {
+            "version": 2,
+            "min": {
+                "_id": ObjectId("63091c30138e9261fd70a903"),
+                "time": ISODate("2022-08-26T19:19:00Z")
+            },
+            "max": {
+                "_id": ObjectId("63091c30138e9261fd70a903"),
+                "time": ISODate("2022-08-26T19:19:30Z")
+            },
+            "closed": false
+        },
+        "meta": "NonSuitableBucket2",
+        "data": {
+            "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
+            "time": {"0": ISODate("2022-08-26T19:19:30Z")}
+        }
+    };
+    const closedAndCompressedBucketDoc = {
+        "_id": ObjectId("06091c2c050b7495eaef4584"),
+        "control": {
+            "version": 2,
+            "min": {
+                "_id": ObjectId("63091c30138e9261fd70a903"),
+                "time": ISODate("2022-08-26T19:19:00Z")
+            },
+            "max": {
+                "_id": ObjectId("63091c30138e9261fd70a903"),
+                "time": ISODate("2022-08-26T19:19:30Z")
+            },
+            "closed": true
+        },
+        "meta": "NonSuitableBucket3",
+        "data": {
+            "_id": {"0": ObjectId("63091c30138e9261fd70a903")},
+            "time": {"0": ISODate("2022-08-26T19:19:30Z")}
+        }
+    };
     const year2000BucketDoc = {
         "_id": ObjectId("07091c2c050b7495eaef4585"),
         "control": {
@@ -339,6 +344,14 @@ const failToReopenNonSuitableBuckets = function() {
     assert.commandWorked(bucketsColl.insert(closedBucketDoc));
     // If an otherwise suitable bucket has the closed flag set, we expect to open a new bucket.
     checkIfBucketReopened(measurement1, /* willCreateBucket */ true, /* willReopenBucket */ false);
+
+    assert.commandWorked(bucketsColl.insert(compressedBucketDoc));
+    // If an otherwise suitable bucket is compressed, we expect to open a new bucket.
+    checkIfBucketReopened(measurement2, /* willCreateBucket */ true, /* willReopenBucket */ false);
+
+    assert.commandWorked(bucketsColl.insert(closedAndCompressedBucketDoc));
+    // If an otherwise suitable bucket is compressed and closed, we expect to open a new bucket.
+    checkIfBucketReopened(measurement3, /* willCreateBucket */ true, /* willReopenBucket */ false);
 
     assert.commandWorked(bucketsColl.insert(year2000BucketDoc));
     // If an otherwise suitable bucket has an incompatible time range with the measurement, we
