@@ -91,6 +91,8 @@ overrides:
     exec_timeout: 150  # 2.5 hours
   - task: sharded_collections_jscore_passthrough
     exec_timeout: 300 # 5 hours
+  - task: replica_sets_jscore_passthrough
+    exec_timeout: 150  # 2.5 hours
 
   rhel80-asan:
   - task: run_unittests
