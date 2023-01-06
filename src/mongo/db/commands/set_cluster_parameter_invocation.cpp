@@ -55,12 +55,14 @@ bool SetClusterParameterInvocation::invoke(OperationContext* opCtx,
     ServerParameter* serverParameter = _sps->get(parameterName);
     auto tenantId = cmd.getDbName().tenantId();
 
-    uassert(ErrorCodes::BadValue,
-            str::stream() << "Server parameter: '" << serverParameter->name() << "' is disabled",
-            serverParameter->isEnabled());
-
     auto [query, update] =
-        normalizeParameter(opCtx, cmdParamObj, paramTime, serverParameter, parameterName, tenantId);
+        normalizeParameter(opCtx,
+                           cmdParamObj,
+                           paramTime,
+                           serverParameter,
+                           parameterName,
+                           tenantId,
+                           serverGlobalParams.clusterRole.isExclusivelyShardRole());
 
     BSONObjBuilder oldValueBob;
     serverParameter->append(opCtx, &oldValueBob, parameterName.toString(), tenantId);
@@ -79,7 +81,8 @@ std::pair<BSONObj, BSONObj> SetClusterParameterInvocation::normalizeParameter(
     const boost::optional<Timestamp>& paramTime,
     ServerParameter* sp,
     StringData parameterName,
-    const boost::optional<TenantId>& tenantId) {
+    const boost::optional<TenantId>& tenantId,
+    bool skipValidation) {
     BSONElement commandElement = cmdParamObj.firstElement();
     uassert(ErrorCodes::IllegalOperation,
             "Cluster parameter value must be an object",
@@ -87,7 +90,7 @@ std::pair<BSONObj, BSONObj> SetClusterParameterInvocation::normalizeParameter(
 
     uassert(ErrorCodes::IllegalOperation,
             str::stream() << "Server parameter: '" << sp->name() << "' is disabled",
-            sp->isEnabled());
+            skipValidation || sp->isEnabled());
 
     Timestamp clusterTime = paramTime ? *paramTime : _dbService.getUpdateClusterTime(opCtx);
 
@@ -98,7 +101,9 @@ std::pair<BSONObj, BSONObj> SetClusterParameterInvocation::normalizeParameter(
     BSONObj query = BSON("_id" << parameterName);
     BSONObj update = updateBuilder.obj();
 
-    uassertStatusOK(sp->validate(update, tenantId));
+    if (!skipValidation) {
+        uassertStatusOK(sp->validate(update, tenantId));
+    }
 
     return {query, update};
 }

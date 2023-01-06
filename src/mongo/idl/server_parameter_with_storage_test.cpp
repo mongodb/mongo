@@ -412,7 +412,6 @@ TEST(IDLServerParameterWithStorage, CSPStorageTest) {
     updatedParam.setTestStringField("newTestString");
     updateTime = LogicalTime(Timestamp(Date_t::now()));
     ASSERT_NOT_OK(clusterParam->ServerParameter::validate(updatedParam.toBSON(), boost::none));
-    ASSERT_NOT_OK(clusterParam->ServerParameter::set(updatedParam.toBSON(), boost::none));
     retrievedParam = clusterParam->getValue(boost::none);
     ASSERT_EQ(retrievedParam.getPreAndPostImages().getExpireAfterSeconds(), 35);
     ASSERT_EQ(retrievedParam.getTestStringField(), "default");

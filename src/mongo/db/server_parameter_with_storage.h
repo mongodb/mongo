@@ -331,8 +331,11 @@ public:
      * Convenience wrapper for storing a value.
      */
     Status setValue(const element_type& newValue, const boost::optional<TenantId>& tenantId) {
-        if (auto status = validateValue(newValue, tenantId); !status.isOK()) {
-            return status;
+        // For cluster parameters, validation must be separated from setting.
+        if constexpr (paramType != SPT::kClusterWide) {
+            if (auto status = validateValue(newValue, tenantId); !status.isOK()) {
+                return status;
+            }
         }
 
         _storage.store(newValue, tenantId);

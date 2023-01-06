@@ -79,7 +79,8 @@ public:
             SetClusterParameterInvocation invocation{std::move(parameterService), dbService};
             // Use local write concern for setClusterParameter, the idea is that the command is
             // being called with majority write concern, so, we'll wait for majority after checking
-            // out the session.
+            // out the session. Note that we use the force option for invoke -- the config server
+            // should already have checked isEnabled + validate for us.
             bool writePerformed = invocation.invoke(opCtx,
                                                     setClusterParameterRequest,
                                                     request().getClusterParameterTime(),

@@ -395,7 +395,7 @@ function testDisabledClusterParameters(conn, tenantId) {
         assert.commandFailedWithCode(
             adminDB.runCommand(tenantCommand(
                 {setClusterParameter: {testIntClusterParameter: {intData: 5}}}, tenantId)),
-            ErrorCodes.BadValue);
+            ErrorCodes.IllegalOperation);
 
         // Assert that explicitly getting a disabled cluster server parameter fails on the primary.
         testExplicitDisabledGetClusterParameter(conn.getPrimary(), tenantId);

@@ -77,7 +77,8 @@ public:
                                               boost::none,
                                               serverParameter,
                                               parameterName,
-                                              request().getDbName().tenantId());
+                                              request().getDbName().tenantId(),
+                                              false /* skipValidation */);
 
                 auto tenantId = request().getDbName().tenantId();
 

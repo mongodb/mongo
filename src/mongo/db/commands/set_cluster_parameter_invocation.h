@@ -89,7 +89,8 @@ public:
                                                    const boost::optional<Timestamp>& paramTime,
                                                    ServerParameter* sp,
                                                    StringData parameterName,
-                                                   const boost::optional<TenantId>& tenantId);
+                                                   const boost::optional<TenantId>& tenantId,
+                                                   bool skipValidation);
 
 private:
     std::unique_ptr<ServerParameterService> _sps;

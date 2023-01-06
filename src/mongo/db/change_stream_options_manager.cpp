@@ -82,11 +82,6 @@ void ChangeStreamOptionsParameter::append(OperationContext* opCtx,
 Status ChangeStreamOptionsParameter::set(const BSONElement& newValueElement,
                                          const boost::optional<TenantId>& tenantId) {
     try {
-        Status validateStatus = validate(newValueElement, tenantId);
-        if (!validateStatus.isOK()) {
-            return validateStatus;
-        }
-
         ChangeStreamOptionsManager& changeStreamOptionsManager =
             ChangeStreamOptionsManager::get(getGlobalServiceContext());
         ChangeStreamOptions newOptions = ChangeStreamOptions::parse(
