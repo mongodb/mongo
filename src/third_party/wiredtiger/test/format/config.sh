@@ -137,11 +137,11 @@ CONFIG configuration_list[] = {
 
 {"checkpoint.wait", "seconds to wait if wiredtiger checkpoints configured", 0x0, 5, 100, 3600}
 
-{"debug.checkpoint_retention", "adjust log removal to retain the log records", 0x0, 0, 128, 1024}
+{"debug.checkpoint_retention", "adjust log removal to retain the log records", 0x0, 0, 10, 1024}
 
 {"debug.eviction", "modify internal algorithms to force history store eviction to happen more aggressively", C_BOOL, 2, 0, 0}
 
-{"debug.log_retention", "adjust log removal to retain at least this number of log files", 0x0, 0, 128, 1024}
+{"debug.log_retention", "adjust log removal to retain at least this number of log files", 0x0, 0, 10, 1024}
 
 {"debug.realloc_exact", "reallocation of memory will only provide the exact amount requested", C_BOOL, 0, 0, 0}
 

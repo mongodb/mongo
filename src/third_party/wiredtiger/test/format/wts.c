@@ -209,7 +209,12 @@ configure_debug_mode(char **p, size_t max)
         CONFIG_APPEND(*p, ",checkpoint_retention=%" PRIu32, GV(DEBUG_CHECKPOINT_RETENTION));
     if (GV(DEBUG_EVICTION))
         CONFIG_APPEND(*p, ",eviction=true");
-    if (GV(DEBUG_LOG_RETENTION) != 0)
+    /*
+     * Don't configure log retention debug mode during backward compatibility mode. Compatibility
+     * requires removing log files on reconfigure. When the version is changed for compatibility,
+     * reconfigure requires removing earlier log files and log retention can make that seem to hang.
+     */
+    if (GV(DEBUG_LOG_RETENTION) != 0 && !g.backward_compatible)
         CONFIG_APPEND(*p, ",log_retention=%" PRIu32, GV(DEBUG_LOG_RETENTION));
     if (GV(DEBUG_REALLOC_EXACT))
         CONFIG_APPEND(*p, ",realloc_exact=true");
