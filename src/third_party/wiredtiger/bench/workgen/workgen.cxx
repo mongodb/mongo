@@ -418,9 +418,9 @@ Context::operator=(const Context &other)
 }
 
 ContextInternal::ContextInternal()
-    : _tint(), _table_names(), _table_runtime(nullptr), _runtime_alloced(0), _tint_last(0),
-      _dyn_tint(), _dyn_table_names(), _dyn_table_runtime(), _dyn_tint_last(0), _dyn_table_in_use(),
-      _dyn_tables_delete(), _context_count(0), _dyn_mutex(new std::mutex())
+    : _tint(), _table_names(), _table_runtime(), _tint_last(0), _dyn_tint(), _dyn_table_names(),
+      _dyn_table_runtime(), _dyn_tint_last(0), _dyn_table_in_use(), _dyn_tables_delete(),
+      _context_count(0), _dyn_mutex(new std::mutex())
 {
     uint32_t count = workgen_atomic_add32(&context_count, 1);
     if (count != 1)
@@ -428,23 +428,14 @@ ContextInternal::ContextInternal()
     _context_count = count;
 }
 
-ContextInternal::~ContextInternal()
-{
-    if (_table_runtime != nullptr)
-        delete _table_runtime;
-}
+ContextInternal::~ContextInternal() {}
 
 int
 ContextInternal::create_all()
 {
-    if (_runtime_alloced < _tint_last) {
+    if (_table_runtime.size() < _tint_last) {
         // The array references are 1-based, we'll waste one entry.
-        TableRuntime *new_table_runtime = new TableRuntime[_tint_last + 1];
-        for (uint32_t i = 0; i < _runtime_alloced; i++)
-            new_table_runtime[i + 1] = _table_runtime[i + 1];
-        delete _table_runtime;
-        _table_runtime = new_table_runtime;
-        _runtime_alloced = _tint_last;
+        _table_runtime.resize(_tint_last + 1);
     }
     return (0);
 }
