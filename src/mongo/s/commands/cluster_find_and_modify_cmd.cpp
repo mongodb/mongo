@@ -653,35 +653,32 @@ private:
 
         auto swRes = write_without_shard_key::runTwoPhaseWriteProtocol(
             opCtx, nss, cmdObj, parsedRequest.getStmtId().value_or(0));
+        uassertStatusOK(swRes.getStatus());
 
+        // runTwoPhaseWriteProtocol returns an empty response when there are not matching documents
+        // and {upsert: false}.
         BSONObj response;
-        if (swRes.isOK()) {
-            if (swRes.getValue().getResponse().isEmpty()) {
-                write_ops::FindAndModifyLastError lastError(0 /* n */);
-                lastError.setUpdatedExisting(false);
+        if (swRes.getValue().getResponse().isEmpty()) {
+            write_ops::FindAndModifyLastError lastError(0 /* n */);
+            lastError.setUpdatedExisting(false);
 
-                write_ops::FindAndModifyCommandReply findAndModifyResponse;
-                findAndModifyResponse.setLastErrorObject(std::move(lastError));
-                findAndModifyResponse.setValue(boost::none);
-
-                response = findAndModifyResponse.toBSON();
-            } else {
-                response = swRes.getValue().getResponse();
-            }
-
-            // Extract findAndModify command result from the result of the two phase write protocol.
-            _constructResult(opCtx,
-                             ShardId(swRes.getValue().getShardId().toString()),
-                             boost::none /* shardVersion */,
-                             dbVersion,
-                             nss,
-                             cmdObj,
-                             response,
-                             result);
+            write_ops::FindAndModifyCommandReply findAndModifyResponse;
+            findAndModifyResponse.setLastErrorObject(std::move(lastError));
+            findAndModifyResponse.setValue(boost::none);
+            response = findAndModifyResponse.toBSON();
         } else {
-            // TODO: SERVER-71379 Exhaustively test all error cases for _clusterQuery &
-            // _clusterWrite during f&m two phase protocol
+            response = swRes.getValue().getResponse();
         }
+
+        // Extract findAndModify command result from the result of the two phase write protocol.
+        _constructResult(opCtx,
+                         ShardId(swRes.getValue().getShardId().toString()),
+                         boost::none /* shardVersion */,
+                         dbVersion,
+                         nss,
+                         cmdObj,
+                         response,
+                         result);
     }
 
     // Command invocation to be used if a shard key is specified or the collection is unsharded.
