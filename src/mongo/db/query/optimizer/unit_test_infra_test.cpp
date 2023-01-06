@@ -101,7 +101,7 @@ TEST(TestInfra, DiffTest) {
 
     {
         std::ostringstream os;
-        outputDiff(os, expected, actual, expected.size());
+        outputDiff(os, expected, actual, 0);
         diffStr = os.str();
     }
     ASSERT_STR_EQ_AUTO(  // NOLINT (test auto-update)
@@ -127,7 +127,7 @@ TEST(TestInfra, DiffTest) {
 
     {
         std::ostringstream os;
-        outputDiff(os, {"line1\n", "line2\n", "line3\n"}, {}, 10);
+        outputDiff(os, {"line1\n", "line2\n", "line3\n"}, {}, 7);
         diffStr = os.str();
     }
     ASSERT_STR_EQ_AUTO(  // NOLINT (test auto-update)

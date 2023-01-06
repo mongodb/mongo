@@ -55,6 +55,15 @@ static constexpr const char* kTempFileSuffix = ".tmp.txt";
 using LineDeltaVector = std::vector<std::pair<uint64_t, int64_t>>;
 std::map<std::string, LineDeltaVector> gLineDeltaMap;
 
+// Different compilers expand __LINE__ differently. For multi-line macros, newer versions of GCC use
+// the first line, while older versions use the last line. This flag accounts for the difference in
+// behavior.
+#if defined(__GNUC__) && (__GNUC__) >= 11
+static constexpr bool kIsFirstLine = true;
+#else
+static constexpr bool kIsFirstLine = false;
+#endif
+
 
 void maybePrintABT(const ABT& abt) {
     // Always print using the supported versions to make sure we don't crash.
@@ -155,11 +164,9 @@ static boost::optional<size_t> diffLookAhead(const size_t thisIndex,
 void outputDiff(std::ostream& os,
                 const std::vector<std::string>& expFormatted,
                 const std::vector<std::string>& actualFormatted,
-                const size_t lineNumber) {
+                const size_t startLineNumber) {
     const size_t actualSize = actualFormatted.size();
     const size_t expSize = expFormatted.size();
-    invariant(lineNumber >= expSize);
-    const size_t startLineNumber = lineNumber - expSize;
 
     const auto outputLine =
         [&os](const bool isExpected, const size_t lineNumber, const std::string& line) {
@@ -237,8 +244,13 @@ bool handleAutoUpdate(const std::string& expected,
     const auto expectedFormatted = formatStr(expected, needsEscaping);
     const auto actualFormatted = formatStr(actual, needsEscaping);
 
-    std::cout << fileName << ":" << lineNumber << ": results differ:\n";
-    outputDiff(std::cout, expectedFormatted, actualFormatted, lineNumber);
+    // Treat an empty string as needing one line. Adjust for line delta.
+    const size_t expectedDelta = expectedFormatted.empty() ? 1 : expectedFormatted.size();
+    // Compute the macro argument start line.
+    const size_t startLineNumber = kIsFirstLine ? (lineNumber + 1) : (lineNumber - expectedDelta);
+
+    std::cout << fileName << ":" << startLineNumber << ": results differ:\n";
+    outputDiff(std::cout, expectedFormatted, actualFormatted, startLineNumber);
 
     if (!mongo::unittest::getAutoUpdateOptimizerAsserts()) {
         std::cout << "Auto-updating is disabled.\n";
@@ -249,15 +261,13 @@ bool handleAutoUpdate(const std::string& expected,
     auto& lineDeltas = gLineDeltaMap.emplace(fileName, LineDeltaVector{}).first->second;
     int64_t totalDelta = 0;
     for (const auto& [line, delta] : lineDeltas) {
-        if (line < lineNumber) {
+        if (line < startLineNumber) {
             totalDelta += delta;
         }
     }
 
-    const size_t replacementEndLine = lineNumber + totalDelta;
-    // Treat an empty string as needing one line. Adjust for line delta.
-    const size_t expectedDelta = expectedFormatted.empty() ? 1 : expectedFormatted.size();
-    const size_t replacementStartLine = replacementEndLine - expectedDelta;
+    const size_t replacementStartLine = startLineNumber + totalDelta;
+    const size_t replacementEndLine = replacementStartLine + expectedDelta;
 
     const std::string tempFileName = fileName + kTempFileSuffix;
     std::string line;
@@ -294,7 +304,7 @@ bool handleAutoUpdate(const std::string& expected,
 
     // Add the current delta.
     const int64_t delta = static_cast<int64_t>(actualFormatted.size()) - expectedDelta;
-    lineDeltas.emplace_back(lineNumber, delta);
+    lineDeltas.emplace_back(startLineNumber, delta);
 
     // Do not assert in order to allow multiple tests to be updated.
     return true;

@@ -52,7 +52,7 @@ std::string getPropsStrForExplain(const OptPhaseManager& phaseManager);
 void outputDiff(std::ostream& os,
                 const std::vector<std::string>& expFormatted,
                 const std::vector<std::string>& actualFormatted,
-                size_t lineNumber);
+                size_t startLineNumber);
 
 bool handleAutoUpdate(const std::string& expected,
                       const std::string& actual,
