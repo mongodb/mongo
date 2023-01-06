@@ -324,8 +324,11 @@ __wt_turtle_init(WT_SESSION_IMPL *session)
         WT_RET(ret);
     }
 
-    /* Remove the backup files, we'll never read them again. */
-    return (__wt_backup_file_remove(session));
+    /*
+     * We used to remove the backup file here. But we cannot do that until the metadata is fully
+     * synced to disk after recovery.
+     */
+    return (ret);
 }
 
 /*
