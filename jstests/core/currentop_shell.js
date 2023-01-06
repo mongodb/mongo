@@ -15,8 +15,6 @@
  *   no_selinux,
  *   # Uses $function operator.
  *   requires_scripting,
- *   #TODO SERVER-72404 Unblock this test from the telemetry passthrough
- *   exclude_from_telemetry_passthrough,
  * ]
  */
 
