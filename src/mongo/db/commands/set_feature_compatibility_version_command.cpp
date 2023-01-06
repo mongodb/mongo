@@ -84,6 +84,7 @@
 #include "mongo/db/session_catalog.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/session_txn_record_gen.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/idl/cluster_server_parameter_gen.h"
@@ -827,6 +828,42 @@ private:
                     },
                     [&](const CollectionPtr& collection) {
                         return collection->getTimeseriesOptions() != boost::none;
+                    });
+            }
+        }
+
+        if (!feature_flags::gTimeseriesMetricIndexes.isEnabledOnVersion(requestedVersion)) {
+            for (const auto& tenantDbName : DatabaseHolder::get(opCtx)->getNames()) {
+                const auto& dbName = tenantDbName.dbName();
+                Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
+                catalog::forEachCollectionFromDb(
+                    opCtx, tenantDbName, MODE_X, [&](const CollectionPtr& collection) {
+                        auto indexCatalog = collection->getIndexCatalog();
+                        auto indexIt = indexCatalog->getIndexIterator(
+                            opCtx, /*includeUnfinishedIndexes=*/true);
+
+                        while (indexIt->more()) {
+                            auto indexEntry = indexIt->next();
+
+                            if (auto filter = indexEntry->getFilterExpression()) {
+                                auto status = IndexCatalogImpl::checkValidFilterExpressions(
+                                    filter,
+                                    /*timeseriesMetricIndexesFeatureFlagEnabled*/ false);
+                                uassert(ErrorCodes::CannotDowngrade,
+                                        str::stream()
+                                            << "Cannot downgrade the cluster when there are "
+                                               "secondary indexes with partial filter expressions "
+                                               "that contain $in/$or/$geoWithin or an $and that is "
+                                               "not top level. Drop all indexes containing these "
+                                               "partial filter elements before downgrading. First "
+                                               "detected incompatible index name: '"
+                                            << indexEntry->descriptor()->indexName()
+                                            << "' on collection: '" << collection->ns().coll()
+                                            << "'",
+                                        status.isOK());
+                            }
+                        }
+                        return true;
                     });
             }
         }
