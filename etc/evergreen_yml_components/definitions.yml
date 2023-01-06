@@ -6591,6 +6591,14 @@ tasks:
         ${additional_package_targets|}
       task_compile_flags: >-
         --legacy-tarball
+  - command: subprocess.exec
+    params:
+      binary: bash
+      add_expansions_to_env: true
+      args:
+      - "src/evergreen/run_python_script.sh"
+      - "evergreen/macos_notary.py"
+      - "mongodb-dist.${ext|tgz}"
   - func: "f_expansions_write"
   - command: subprocess.exec
     params:
