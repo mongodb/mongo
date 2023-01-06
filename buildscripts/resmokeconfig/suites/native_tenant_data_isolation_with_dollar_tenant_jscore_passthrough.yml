@@ -73,11 +73,6 @@ selector:
   # In a multitenancy environment the catalog will always return tenant-prefixed entries, so the
   # list_catalog test will be broken as it checks for non-tenant-prefixed entries.
   - jstests/core/list_catalog.js
-  # TODO SERVER-71470: this test cannot work as aggregate with $lookup query on multiple collections drops off the tenant informaton.
-  - jstests/core/txns/aggregation_in_transaction.js
-  - jstests/core/plan_cache_clear.js
-  - jstests/core/plan_cache_list_plans.js
-  - jstests/core/index_filter_commands.js
   # TODO SERVER-72285: currentOp requests with dollar tenant cannot get operations being executed by the tenant.
   - jstests/core/crud_ops_do_not_throw_locktimeout.js
   - jstests/core/currentop.js
