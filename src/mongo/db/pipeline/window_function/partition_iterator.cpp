@@ -116,8 +116,8 @@ optional<Document> PartitionIterator::operator[](int index) {
     for (int i = _cache->getHighestIndex(); i < docDesired; i++) {
         // Pull in document from prior stage.
         getNextDocument();
-        // Check for EOF or the next partition.
-        if (_state == IteratorState::kAwaitingAdvanceToNext ||
+        // Check whether the next document is available.
+        if (isPaused() || _state == IteratorState::kAwaitingAdvanceToNext ||
             _state == IteratorState::kAwaitingAdvanceToEOF) {
             return boost::none;
         }
@@ -163,6 +163,7 @@ PartitionIterator::AdvanceResult PartitionIterator::advanceInternal() {
     // whether to pull from the prior stage.
     switch (_state) {
         case IteratorState::kNotInitialized:
+        case IteratorState::kPauseExecution:
         case IteratorState::kIntraPartition:
             // Pull in the next document and advance the pointer.
             getNextDocument();
@@ -467,9 +468,12 @@ void PartitionIterator::getNextDocument() {
         return;
     }
 
-    if (!getNextRes.isAdvanced())
+    if (getNextRes.isPaused()) {
+        _state = IteratorState::kPauseExecution;
         return;
+    }
 
+    tassert(7169100, "getNextResult must have advanced", getNextRes.isAdvanced());
     auto doc = getNextRes.releaseDocument();
 
     // Greedily populate the internal document cache to enable easier memory tracking versus
@@ -489,7 +493,11 @@ void PartitionIterator::getNextDocument() {
         uassert(ErrorCodes::TypeMismatch,
                 "Cannot 'partitionBy' an expression of type array",
                 !curKey.isArray());
-        if (_state == IteratorState::kNotInitialized) {
+        if (!_nextPartition && _state != IteratorState::kIntraPartition) {
+            tassert(7169101,
+                    "state must be uninitialized or paused",
+                    _state == IteratorState::kNotInitialized ||
+                        _state == IteratorState::kPauseExecution);
             _nextPartition = NextPartitionState{std::move(doc), std::move(curKey)};
             _tracker->update(getNextPartitionStateSize());
             advanceToNextPartition();

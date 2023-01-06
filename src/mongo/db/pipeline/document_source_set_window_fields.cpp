@@ -464,8 +464,12 @@ DocumentSource::GetNextResult DocumentSourceInternalSetWindowFields::doGetNext()
         return DocumentSource::GetNextResult::makeEOF();
 
     auto curDoc = _iterator.current();
-    // The only way we hit this case is if there are no documents, since otherwise _eof will be set.
     if (!curDoc) {
+        if (_iterator.isPaused()) {
+            return DocumentSource::GetNextResult::makePauseExecution();
+        }
+        // The only way we hit this case is if there are no documents, since otherwise _eof will be
+        // set.
         _eof = true;
         return DocumentSource::GetNextResult::makeEOF();
     }
