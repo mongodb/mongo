@@ -275,6 +275,7 @@ private:
     void start(Flags flags) override {
         _flags = flags;
         _end = false;
+        _i = 0;
 
         if (_failed) {
             _end = true;
