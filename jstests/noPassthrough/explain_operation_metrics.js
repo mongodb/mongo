@@ -48,11 +48,14 @@ const runTest = (db) => {
         assert.eq(12, idxFindOperationMetrics.idxEntryBytesRead, idxFindResult);
         assert.eq(3, idxFindOperationMetrics.idxEntryUnitsRead, idxFindResult);
 
-        // The number of cursorSeeks can change depending on whether a yield has occurred. We
-        // account for this by incrementing the expected value by the number of calls to
-        // 'restoreState'.
-        const numAdditionalCursorSeeks = idxFindExecutionStats.executionStages.restoreState;
-        assert.eq(4 + numAdditionalCursorSeeks, idxFindOperationMetrics.cursorSeeks, idxFindResult);
+        // The number of cursorSeeks can change depending on whether a yield has occurred. Note
+        // however, that the number of calls to 'restoreState' represents an upper bound and not an
+        // exact number of cursor seeks. We therefore assert that the number of cursor seeks is at
+        // least the number of documents (3) plus the number of (non-yielding) index seeks (1), but
+        // is no greater than this quantity plus the number of calls to 'restoreState'.
+        const numRestoreStateCalls = idxFindExecutionStats.executionStages.restoreState;
+        assert.lte(4, idxFindOperationMetrics.cursorSeeks, idxFindResult);
+        assert.gte(4 + numRestoreStateCalls, idxFindOperationMetrics.cursorSeeks, idxFindResult);
     }
 };
 
