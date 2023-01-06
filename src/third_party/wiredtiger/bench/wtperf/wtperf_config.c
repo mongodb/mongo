@@ -31,14 +31,14 @@
 static CONFIG_OPT config_opts_desc[] = {
 /* Option descriptions */
 #define OPT_DEFINE_DESC
-#include "wtperf_opt.i"
+#include "wtperf_opt_inline.h"
 #undef OPT_DEFINE_DESC
 };
 
 static CONFIG_OPTS config_opts_default = {
 /* Option defaults */
 #define OPT_DEFINE_DEFAULT
-#include "wtperf_opt.i"
+#include "wtperf_opt_inline.h"
 #undef OPT_DEFINE_DEFAULT
 
   {NULL, NULL} /* config_head */

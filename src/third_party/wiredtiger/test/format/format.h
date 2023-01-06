@@ -452,4 +452,4 @@ void wts_verify_checkpoint(WT_CONNECTION *, const char *);
 
 #define WARN(fmt, ...) fprintf(stderr, "%s: WARNING: " fmt "\n", progname, __VA_ARGS__)
 
-#include "format.i"
+#include "format_inline.h"

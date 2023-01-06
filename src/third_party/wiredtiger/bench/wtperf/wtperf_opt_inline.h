@@ -25,7 +25,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  *
- * wtperf_opt.i
+ * wtperf_opt_inline.h
  *  List of options for wtperf.  This is included multiple times.
  */
 
@@ -80,8 +80,8 @@
  * The difference between CONFIG_STRING and STRING is that CONFIG_STRING
  * options are appended to existing content, whereas STRING options overwrite.
  */
-DEF_OPT_AS_UINT32(
-  backup_interval, 0, "backup the database every interval seconds during the workload phase, 0 to disable")
+DEF_OPT_AS_UINT32(backup_interval, 0,
+  "backup the database every interval seconds during the workload phase, 0 to disable")
 DEF_OPT_AS_UINT32(
   checkpoint_interval, 120, "checkpoint every interval seconds during the workload phase.")
 DEF_OPT_AS_UINT32(checkpoint_stress_rate, 0,
@@ -143,8 +143,9 @@ DEF_OPT_AS_BOOL(range_partition, 0, "partition data by range (vs hash)")
 DEF_OPT_AS_UINT32(read_range, 0,
   "read a sequential range of keys upon each read operation. This value tells us how many keys "
   "to read each time, or an upper bound on the number of keys read if read_range_random is set.")
-DEF_OPT_AS_BOOL(read_range_random, 0, "if doing range reads, select the number of keys to read "
-   "in a range uniformly at random.")
+DEF_OPT_AS_BOOL(read_range_random, 0,
+  "if doing range reads, select the number of keys to read "
+  "in a range uniformly at random.")
 DEF_OPT_AS_BOOL(readonly, 0,
   "reopen the connection between populate and workload phases in readonly mode.  Requires "
   "reopen_connection turned on (default).  Requires that read be the only workload specified")
@@ -166,8 +167,9 @@ DEF_OPT_AS_UINT32(
 DEF_OPT_AS_UINT32(scan_table_count, 0,
   "number of separate tables to be used for scanning. Zero indicates that tables are shared with "
   "other operations")
-DEF_OPT_AS_BOOL(select_latest, 0, "in workloads that involve inserts and another type of operation,"
-        "select the recently inserted records with higher probability")
+DEF_OPT_AS_BOOL(select_latest, 0,
+  "in workloads that involve inserts and another type of operation,"
+  "select the recently inserted records with higher probability")
 DEF_OPT_AS_CONFIG_STRING(sess_config, "", "session configuration string")
 DEF_OPT_AS_UINT32(session_count_idle, 0, "number of idle sessions to create. Default 0.")
 /* The following table configuration is based on the configuration MongoDB uses for collections. */
@@ -193,14 +195,14 @@ DEF_OPT_AS_STRING(threads, "",
   "'update_delta', 'truncate', 'truncate_pct' and 'truncate_count'. There are also behavior "
   "modifiers, supported modifiers are 'ops_per_txn'")
 /*
- * Note for tiered storage usage, the test expects that the bucket will be specified in the
- * runner's 'conn_config' line. Any bucket or directory listed is assumed to already exist and the
- * test program will just use it. The program does not parse the connection configuration line.
+ * Note for tiered storage usage, the test expects that the bucket will be specified in the runner's
+ * 'conn_config' line. Any bucket or directory listed is assumed to already exist and the test
+ * program will just use it. The program does not parse the connection configuration line.
  */
-DEF_OPT_AS_STRING(tiered, "none",
-  "tiered extension.  Allowed configuration values are: 'none', 'dir_store', 's3'")
-DEF_OPT_AS_UINT32(
-  tiered_flush_interval, 0, "Call flush_tier every interval seconds during the workload phase. "
+DEF_OPT_AS_STRING(
+  tiered, "none", "tiered extension.  Allowed configuration values are: 'none', 'dir_store', 's3'")
+DEF_OPT_AS_UINT32(tiered_flush_interval, 0,
+  "Call flush_tier every interval seconds during the workload phase. "
   "We recommend this value be larger than the checkpoint_interval. 0 to disable. The "
   "'tiered_extension' must be set to something other than 'none'.")
 DEF_OPT_AS_CONFIG_STRING(transaction_config, "",

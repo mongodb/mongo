@@ -143,6 +143,11 @@ mmrand(WT_RAND_STATE *rnd, u_int min, u_int max)
     return (v);
 }
 
+/*
+ * random_sleep --
+ *     Randomly select a time to sleep between 0 and a maximum number of seconds, favoring shorter
+ *     sleep times.
+ */
 static inline void
 random_sleep(WT_RAND_STATE *rnd, u_int max_seconds)
 {
@@ -167,8 +172,8 @@ random_sleep(WT_RAND_STATE *rnd, u_int max_seconds)
 }
 
 /*
- * tables_apply -
- *	Call an underlying function on all tables.
+ * tables_apply --
+ *     Call an underlying function on all tables.
  */
 static inline void
 tables_apply(void (*func)(TABLE *, void *), void *arg)
@@ -257,8 +262,7 @@ table_select_type(table_type type)
  *     Open a WiredTiger cursor.
  */
 static inline void
-wt_wrap_open_cursor(
-  WT_SESSION *session, const char *uri, const char *config, WT_CURSOR **cursorp)
+wt_wrap_open_cursor(WT_SESSION *session, const char *uri, const char *config, WT_CURSOR **cursorp)
 {
     WT_DECL_RET;
 
@@ -334,8 +338,8 @@ key_gen_insert(TABLE *table, WT_RAND_STATE *rnd, WT_ITEM *key, uint64_t keyno)
 }
 
 /*
- * lock_try_writelock
- *     Try to get exclusive lock.  Fail immediately if not available.
+ * lock_try_writelock --
+ *     Try to get exclusive lock. Fail immediately if not available.
  */
 static inline int
 lock_try_writelock(WT_SESSION *session, RWLOCK *lock)
@@ -385,8 +389,8 @@ lock_readlock(WT_SESSION *session, RWLOCK *lock)
 }
 
 /*
- * lock_writeunlock --
- *     Release an exclusive lock.
+ * lock_readunlock --
+ *     Release a shared lock.
  */
 static inline void
 lock_readunlock(WT_SESSION *session, RWLOCK *lock)
