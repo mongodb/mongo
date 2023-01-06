@@ -8,7 +8,12 @@ load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
 
 function getScanCostWith(customScanCost) {
     const costStr = `{"scanIncrementalCost": ${customScanCost}}`;
-    const conn = MongoRunner.runMongod({setParameter: {'internalCostModelCoefficients': costStr}});
+    const conn = MongoRunner.runMongod({
+        setParameter: {
+            'internalCostModelCoefficients': costStr,
+            'internalQueryFrameworkControl': "forceBonsai"
+        }
+    });
 
     const db = conn.getDB(jsTestName());
     const coll = db.start_up_with_custom_cost_model;
