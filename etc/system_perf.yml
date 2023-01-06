@@ -887,7 +887,7 @@ tasks:
           test_control: "bestbuy_analytics"
           test_control_params: |
             {scale: 4,
-             columnstore: False}
+             columnstore: false}
 
   - name: bestbuy_4_analytics_columnstore
     priority: 5
@@ -897,7 +897,7 @@ tasks:
           test_control: "bestbuy_analytics"
           test_control_params: |
             {scale: 4,
-             columnstore: True}
+             columnstore: true}
 
   - name: external_data_source
     priority: 5
@@ -966,7 +966,19 @@ tasks:
           test_control: "column_store_tpch"
           test_control_params: |
             {scale: 10,
-             schema: denormalized}
+             schema: denormalized,
+             columnstore: true}
+  - name: column_store_tpch_10_denormalized_unindexed
+    priority: 5
+    exec_timeout_secs: 43200 # 12 hours
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "column_store_tpch"
+          test_control_params: |
+            {scale: 10,
+             schema: denormalized,
+             columnstore: false}
 
 # TODO PERF-3094: Remove these charts_events tasks.
   - name: column_store_index_charts_events_1G
@@ -1327,6 +1339,7 @@ buildvariants:
       - name: tpch_10_normalized
       - name: tpch_10_denormalized
       - name: column_store_tpch_10_denormalized
+      - name: column_store_tpch_10_denormalized_unindexed
       - name: column_store_index_charts_events_1G
       - name: ssb_column_store_comparison
 
@@ -1523,6 +1536,8 @@ buildvariants:
       - name: bestbuy_4_analytics_columnstore
       - name: column_store_index_charts_events_1G
       - name: column_store_index_charts_events_10G
+      - name: column_store_tpch_10_denormalized
+      - name: column_store_tpch_10_denormalized_unindexed
       - name: ssb_column_store_comparison
 
   - name: compile-rhel70
@@ -2557,6 +2572,8 @@ buildvariants:
       - name: tpch_10_normalized
       - name: tpch_10_denormalized
       - name: column_store_index_charts_events_1G
+      - name: column_store_tpch_10_denormalized
+      - name: column_store_tpch_10_denormalized_unindexed
       - name: ssb_column_store_comparison
 
   - name: linux-standalone-classic-query-engine.2022-11
