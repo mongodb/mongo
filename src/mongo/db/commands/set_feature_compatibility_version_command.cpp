@@ -746,17 +746,12 @@ private:
 
         // (Generic FCV reference): TODO SERVER-60912: When kLastLTS is 6.0, remove this FCV-gated
         // downgrade code.
-        if (requestedVersion == multiversion::GenericFCV::kLastLTS) {
+        if (!feature_flags::gTimeseriesMetricIndexes.isEnabledOnVersion(requestedVersion)) {
             for (const auto& tenantDbName : DatabaseHolder::get(opCtx)->getNames()) {
                 const auto& dbName = tenantDbName.dbName();
                 Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
                 catalog::forEachCollectionFromDb(
-                    opCtx,
-                    tenantDbName,
-                    MODE_X,
-                    [&](const CollectionPtr& collection) {
-                        invariant(collection->getTimeseriesOptions());
-
+                    opCtx, tenantDbName, MODE_X, [&](const CollectionPtr& collection) {
                         auto indexCatalog = collection->getIndexCatalog();
                         auto indexIt = indexCatalog->getIndexIterator(
                             opCtx, /*includeUnfinishedIndexes=*/true);
@@ -767,20 +762,26 @@ private:
                             // in 5.2 and up. If the user tries to downgrade the cluster to an
                             // earlier version, they must first remove all incompatible secondary
                             // indexes on time-series measurements.
-                            uassert(
-                                ErrorCodes::CannotDowngrade,
-                                str::stream()
-                                    << "Cannot downgrade the cluster when there are secondary "
-                                       "indexes on time-series measurements present, or when there "
-                                       "are partial indexes on a time-series collection. Drop all "
-                                       "secondary indexes on time-series measurements, and all "
-                                       "partial indexes on time-series collections, before "
-                                       "downgrading. First detected incompatible index name: '"
-                                    << indexEntry->descriptor()->indexName() << "' on collection: '"
-                                    << collection->ns().getTimeseriesViewNamespace() << "'",
-                                timeseries::isBucketsIndexSpecCompatibleForDowngrade(
-                                    *collection->getTimeseriesOptions(),
-                                    indexEntry->descriptor()->infoObj()));
+                            if (requestedVersion == multiversion::GenericFCV::kLastLTS &&
+                                collection->getTimeseriesOptions()) {
+                                uassert(
+                                    ErrorCodes::CannotDowngrade,
+                                    str::stream()
+                                        << "Cannot downgrade the cluster when there are secondary "
+                                           "indexes on time-series measurements present, or when "
+                                           "there "
+                                           "are partial indexes on a time-series collection. Drop "
+                                           "all "
+                                           "secondary indexes on time-series measurements, and all "
+                                           "partial indexes on time-series collections, before "
+                                           "downgrading. First detected incompatible index name: '"
+                                        << indexEntry->descriptor()->indexName()
+                                        << "' on collection: '"
+                                        << collection->ns().getTimeseriesViewNamespace() << "'",
+                                    timeseries::isBucketsIndexSpecCompatibleForDowngrade(
+                                        *collection->getTimeseriesOptions(),
+                                        indexEntry->descriptor()->infoObj()));
+                            }
 
                             if (auto filter = indexEntry->getFilterExpression()) {
                                 auto status = IndexCatalogImpl::checkValidFilterExpressions(
@@ -795,8 +796,8 @@ private:
                                                "partial filter elements before downgrading. First "
                                                "detected incompatible index name: '"
                                             << indexEntry->descriptor()->indexName()
-                                            << "' on collection: '"
-                                            << collection->ns().getTimeseriesViewNamespace() << "'",
+                                            << "' on collection: '" << collection->ns().coll()
+                                            << "'",
                                         status.isOK());
                             }
                         }
@@ -824,45 +825,6 @@ private:
                                 logAttrs(collection->uuid()));
                         }
 
-                        return true;
-                    },
-                    [&](const CollectionPtr& collection) {
-                        return collection->getTimeseriesOptions() != boost::none;
-                    });
-            }
-        }
-
-        if (!feature_flags::gTimeseriesMetricIndexes.isEnabledOnVersion(requestedVersion)) {
-            for (const auto& tenantDbName : DatabaseHolder::get(opCtx)->getNames()) {
-                const auto& dbName = tenantDbName.dbName();
-                Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
-                catalog::forEachCollectionFromDb(
-                    opCtx, tenantDbName, MODE_X, [&](const CollectionPtr& collection) {
-                        auto indexCatalog = collection->getIndexCatalog();
-                        auto indexIt = indexCatalog->getIndexIterator(
-                            opCtx, /*includeUnfinishedIndexes=*/true);
-
-                        while (indexIt->more()) {
-                            auto indexEntry = indexIt->next();
-
-                            if (auto filter = indexEntry->getFilterExpression()) {
-                                auto status = IndexCatalogImpl::checkValidFilterExpressions(
-                                    filter,
-                                    /*timeseriesMetricIndexesFeatureFlagEnabled*/ false);
-                                uassert(ErrorCodes::CannotDowngrade,
-                                        str::stream()
-                                            << "Cannot downgrade the cluster when there are "
-                                               "secondary indexes with partial filter expressions "
-                                               "that contain $in/$or/$geoWithin or an $and that is "
-                                               "not top level. Drop all indexes containing these "
-                                               "partial filter elements before downgrading. First "
-                                               "detected incompatible index name: '"
-                                            << indexEntry->descriptor()->indexName()
-                                            << "' on collection: '" << collection->ns().coll()
-                                            << "'",
-                                        status.isOK());
-                            }
-                        }
                         return true;
                     });
             }

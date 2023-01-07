@@ -674,13 +674,7 @@ Status _checkValidFilterExpressions(const MatchExpression* expression,
                 }
             }
             return Status::OK();
-        case MatchExpression::GEO:
         case MatchExpression::INTERNAL_BUCKET_GEO_WITHIN:
-        case MatchExpression::INTERNAL_EXPR_EQ:
-        case MatchExpression::INTERNAL_EXPR_LT:
-        case MatchExpression::INTERNAL_EXPR_LTE:
-        case MatchExpression::INTERNAL_EXPR_GT:
-        case MatchExpression::INTERNAL_EXPR_GTE:
         case MatchExpression::MATCH_IN:
             if (timeseriesMetricIndexesFeatureFlagEnabled) {
                 return Status::OK();
@@ -694,6 +688,12 @@ Status _checkValidFilterExpressions(const MatchExpression* expression,
         case MatchExpression::GT:
         case MatchExpression::GTE:
         case MatchExpression::EXISTS:
+        case MatchExpression::INTERNAL_EXPR_EQ:
+        case MatchExpression::INTERNAL_EXPR_LT:
+        case MatchExpression::INTERNAL_EXPR_LTE:
+        case MatchExpression::INTERNAL_EXPR_GT:
+        case MatchExpression::INTERNAL_EXPR_GTE:
+        case MatchExpression::GEO:
         case MatchExpression::TYPE_OPERATOR:
             return Status::OK();
         default:
