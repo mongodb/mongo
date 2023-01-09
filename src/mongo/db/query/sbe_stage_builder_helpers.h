@@ -1249,6 +1249,7 @@ optimizer::ProjectionName makeLocalVariableName(sbe::FrameId frameId, sbe::value
 
 optimizer::ABT generateABTNullOrMissing(optimizer::ProjectionName var);
 optimizer::ABT generateABTNonStringCheck(optimizer::ProjectionName var);
+optimizer::ABT generateABTNonArrayCheck(optimizer::ProjectionName var);
 optimizer::ABT generateABTNullishOrNotRepresentableInt32Check(optimizer::ProjectionName var);
 optimizer::ABT generateABTNegativeCheck(optimizer::ProjectionName var);
 /**

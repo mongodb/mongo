@@ -1413,8 +1413,11 @@ optimizer::ABT generateABTNullOrMissing(optimizer::ProjectionName var) {
 }
 
 optimizer::ABT generateABTNonStringCheck(optimizer::ProjectionName var) {
-    return makeNot(optimizer::make<optimizer::FunctionCall>(
-        "isString", optimizer::ABTVector{optimizer::make<optimizer::Variable>(var)}));
+    return makeNot(makeABTFunction("isString", optimizer::make<optimizer::Variable>(var)));
+}
+
+optimizer::ABT generateABTNonArrayCheck(optimizer::ProjectionName var) {
+    return makeNot(makeABTFunction("isArray", optimizer::make<optimizer::Variable>(var)));
 }
 
 optimizer::ABT generateABTNullishOrNotRepresentableInt32Check(optimizer::ProjectionName var) {

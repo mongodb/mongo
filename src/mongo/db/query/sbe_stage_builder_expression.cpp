@@ -3871,6 +3871,9 @@ private:
         using namespace std::literals;
 
         size_t arity = expr->getChildren().size();
+        if (_context->hasAllAbtEligibleEntries(arity)) {
+            return generateABTSetExpression(expr, setOp);
+        }
         _context->ensureArity(arity);
         auto frameId = _context->state.frameId();
 
@@ -3889,27 +3892,8 @@ private:
         checkExprsNotArray.reserve(arity);
 
         auto collatorSlot = _context->state.data->env->getSlotIfExists("collator"_sd);
-
-        auto [operatorName, setFunctionName] = [setOp, collatorSlot]() {
-            switch (setOp) {
-                case SetOperation::Difference:
-                    return std::make_pair("setDifference"_sd,
-                                          collatorSlot ? "collSetDifference"_sd
-                                                       : "setDifference"_sd);
-                case SetOperation::Intersection:
-                    return std::make_pair("setIntersection"_sd,
-                                          collatorSlot ? "collSetIntersection"_sd
-                                                       : "setIntersection"_sd);
-                case SetOperation::Union:
-                    return std::make_pair("setUnion"_sd,
-                                          collatorSlot ? "collSetUnion"_sd : "setUnion"_sd);
-                case SetOperation::Equals:
-                    return std::make_pair("setEquals"_sd,
-                                          collatorSlot ? "collSetEquals"_sd : "setEquals"_sd);
-                default:
-                    MONGO_UNREACHABLE;
-            }
-        }();
+        auto [operatorName, setFunctionName] =
+            getSetOperatorAndFunctionNames(setOp, collatorSlot.has_value());
 
         if (collatorSlot) {
             argVars.push_back(sbe::makeE<sbe::EVariable>(*collatorSlot));
@@ -3952,6 +3936,88 @@ private:
             sbe::makeE<sbe::EFunction>(setFunctionName, std::move(argVars)));
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(setExpr)));
+    }
+
+    void generateABTSetExpression(const Expression* expr, SetOperation setOp) {
+        using namespace std::literals;
+
+        size_t arity = expr->getChildren().size();
+        _context->ensureArity(arity);
+
+        optimizer::ABTVector args;
+        optimizer::ProjectionNameVector argNames;
+        optimizer::ABTVector variables;
+
+        optimizer::ABTVector checkNulls;
+        optimizer::ABTVector checkNotArrays;
+
+        auto collatorSlot = _context->state.data->env->getSlotIfExists("collator"_sd);
+
+        args.reserve(arity);
+        argNames.reserve(arity);
+        variables.reserve(arity + (collatorSlot.has_value() ? 1 : 0));
+        checkNulls.reserve(arity);
+        checkNotArrays.reserve(arity);
+
+        auto [operatorName, setFunctionName] =
+            getSetOperatorAndFunctionNames(setOp, collatorSlot.has_value());
+        if (collatorSlot) {
+            variables.push_back(
+                optimizer::make<optimizer::Variable>(_context->registerVariable(*collatorSlot)));
+        }
+
+        for (size_t idx = 0; idx < arity; ++idx) {
+            args.push_back(_context->popABTExpr());
+            auto argName = makeLocalVariableName(_context->state.frameId(), 0);
+            argNames.push_back(argName);
+            variables.push_back(optimizer::make<optimizer::Variable>(argName));
+
+            checkNulls.push_back(generateABTNullOrMissing(argName));
+            checkNotArrays.push_back(generateABTNonArrayCheck(std::move(argName)));
+        }
+        // Reverse the args array to preserve the original order of the arguments, since some set
+        // operations, such as $setDifference, are not commutative.
+        std::reverse(std::begin(args), std::end(args));
+
+        auto checkNullAnyArgument =
+            makeBalancedBooleanOpTree(optimizer::Operations::Or, std::move(checkNulls));
+        auto checkNotArrayAnyArgument =
+            makeBalancedBooleanOpTree(optimizer::Operations::Or, std::move(checkNotArrays));
+        auto setExpr = buildABTMultiBranchConditional(
+            ABTCaseValuePair{std::move(checkNullAnyArgument), optimizer::Constant::null()},
+            ABTCaseValuePair{std::move(checkNotArrayAnyArgument),
+                             makeABTFail(ErrorCodes::Error{7158100},
+                                         str::stream() << "All operands of $" << operatorName
+                                                       << " must be arrays.")},
+            optimizer::make<optimizer::FunctionCall>(setFunctionName.toString(),
+                                                     std::move(variables)));
+
+        for (size_t i = 0; i < arity; ++i) {
+            setExpr = optimizer::make<optimizer::Let>(
+                std::move(argNames[i]), std::move(args[i]), setExpr);
+        }
+
+        _context->pushExpr(std::move(setExpr));
+    }
+
+    std::pair<StringData, StringData> getSetOperatorAndFunctionNames(SetOperation setOp,
+                                                                     bool hasCollator) const {
+        switch (setOp) {
+            case SetOperation::Difference:
+                return std::make_pair("setDifference"_sd,
+                                      hasCollator ? "collSetDifference"_sd : "setDifference"_sd);
+            case SetOperation::Intersection:
+                return std::make_pair("setIntersection"_sd,
+                                      hasCollator ? "collSetIntersection"_sd
+                                                  : "setIntersection"_sd);
+            case SetOperation::Union:
+                return std::make_pair("setUnion"_sd,
+                                      hasCollator ? "collSetUnion"_sd : "setUnion"_sd);
+            case SetOperation::Equals:
+                return std::make_pair("setEquals"_sd,
+                                      hasCollator ? "collSetEquals"_sd : "setEquals"_sd);
+        }
+        MONGO_UNREACHABLE;
     }
 
     /**
