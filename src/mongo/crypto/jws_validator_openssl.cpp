@@ -119,12 +119,12 @@ public:
     }
 
     Status validate(StringData algorithm, StringData payload, StringData signature) const final {
-        uassert(7095403, "Unknown hashing algorithm", algorithm == "RS256");
+        const EVP_MD* alg = getHashingAlg(algorithm);
+        uassert(7095403, str::stream() << "Unknown hashing algorithm: '" << algorithm << "'", alg);
 
         UniqueEVPMDCtx ctx(EVP_MD_CTX_new());
-        uassertOpenSSL(
-            "DigestVerifyInit failed",
-            EVP_DigestVerifyInit(ctx.get(), nullptr, EVP_sha256(), nullptr, _key.get()) == 1);
+        uassertOpenSSL("DigestVerifyInit failed",
+                       EVP_DigestVerifyInit(ctx.get(), nullptr, alg, nullptr, _key.get()) == 1);
         uassertOpenSSL(
             "DigestVerifyUpdate failed",
             EVP_DigestVerifyUpdate(ctx.get(),
@@ -145,7 +145,21 @@ public:
     }
 
 private:
-    UniqueEVPPKey _key;
+    static constexpr auto kRS256 = "RS256"_sd;
+    static constexpr auto kRS384 = "RS384"_sd;
+    static constexpr auto kRS512 = "RS512"_sd;
+    static const EVP_MD* getHashingAlg(StringData alg) {
+        if (alg == kRS256) {
+            return EVP_sha256();
+        }
+        if (alg == kRS384) {
+            return EVP_sha384();
+        }
+        if (alg == kRS512) {
+            return EVP_sha512();
+        }
+        return nullptr;
+    }
 
     static void uassertOpenSSL(StringData context, bool success) {
         uassert(ErrorCodes::OperationFailed,
@@ -153,6 +167,8 @@ private:
                               << SSLManagerInterface::getSSLErrorMessage(ERR_get_error()),
                 success);
     }
+
+    UniqueEVPPKey _key;
 };
 }  // namespace
 
