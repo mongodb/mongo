@@ -362,7 +362,7 @@ operations(u_int ops_seconds, bool lastrun)
         track_ops(&total);
         if (!running)
             break;
-        __wt_sleep(0, 250000); /* 1/4th of a second */
+        __wt_sleep(0, 250 * WT_THOUSAND); /* 1/4th of a second */
         if (fourths != -1)
             --fourths;
         if (quit_fourths != -1 && --quit_fourths == 0) {
@@ -890,9 +890,9 @@ ops(void *arg)
     session_op = 0;
 
     /* Set the first operation where we'll reset the session. */
-    reset_op = mmrand(&tinfo->rnd, 100, 10000);
+    reset_op = mmrand(&tinfo->rnd, 100, 10 * WT_THOUSAND);
     /* Set the first operation where we'll truncate a range. */
-    truncate_op = mmrand(&tinfo->rnd, 100, 10000);
+    truncate_op = mmrand(&tinfo->rnd, 100, 10 * WT_THOUSAND);
 
     for (intxn = false; !tinfo->quit;) {
         ++tinfo->ops;
@@ -909,7 +909,7 @@ ops(void *arg)
             session = tinfo->session;
 
             /* Pick the next session/cursor close/open. */
-            session_op += mmrand(&tinfo->rnd, 100, 5000);
+            session_op += mmrand(&tinfo->rnd, 100, 5 * WT_THOUSAND);
         }
 
         /* If not in a transaction, reset the session periodically so that operation is tested. */
@@ -917,7 +917,7 @@ ops(void *arg)
             testutil_check(session->reset(session));
 
             /* Pick the next reset operation. */
-            reset_op += mmrand(&tinfo->rnd, 40000, 60000);
+            reset_op += mmrand(&tinfo->rnd, 40 * WT_THOUSAND, 60 * WT_THOUSAND);
         }
 
         /*
@@ -986,7 +986,7 @@ ops(void *arg)
                         op = TRUNCATE;
 
                     /* Pick the next truncate operation. */
-                    truncate_op += mmrand(&tinfo->rnd, 20000, 100000);
+                    truncate_op += mmrand(&tinfo->rnd, 20 * WT_THOUSAND, 100 * WT_THOUSAND);
                 }
             } else if (i < TV(OPS_PCT_DELETE) + TV(OPS_PCT_INSERT))
                 op = INSERT;
@@ -1406,7 +1406,7 @@ wts_read_scan(TABLE *table, void *arg)
     WT_ORDERED_READ(max_rows, table->rows_current);
     for (keyno = 0; keyno < max_rows;) {
         if (++keyno > 50)
-            keyno += mmrand(NULL, 1, 1000);
+            keyno += mmrand(NULL, 1, WT_THOUSAND);
         if (keyno > max_rows)
             keyno = max_rows;
 

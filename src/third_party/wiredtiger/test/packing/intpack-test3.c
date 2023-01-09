@@ -131,7 +131,7 @@ main(void)
      * Test all values in a range, to ensure pack/unpack of small numbers (which most actively use
      * different numbers of bits) works.
      */
-    test_spread(0, 100000, 100000);
+    test_spread(0, 100 * WT_THOUSAND, 100 * WT_THOUSAND);
     test_spread(INT16_MAX, range, range);
     test_spread(INT32_MAX, range, range);
     test_spread(start_int64, range, range);

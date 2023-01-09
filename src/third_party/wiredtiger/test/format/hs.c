@@ -79,7 +79,7 @@ hs_cursor(void *arg)
          * blocking normal operations.
          */
         next = mmrand(NULL, 0, 1) == 1;
-        for (i = mmrand(NULL, 1000, 100000); i > 0; --i) {
+        for (i = mmrand(NULL, WT_THOUSAND, 100 * WT_THOUSAND); i > 0; --i) {
             if ((ret = (next ? cursor->next(cursor) : cursor->prev(cursor))) != 0) {
                 testutil_assertfmt(ret == WT_NOTFOUND || ret == WT_CACHE_FULL || ret == WT_ROLLBACK,
                   "WT_CURSOR.%s failed: %d", next ? "next" : "prev", ret);

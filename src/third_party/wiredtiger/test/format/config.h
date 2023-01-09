@@ -27,7 +27,7 @@ typedef struct {
     u_int off; /* Value offset */
 } CONFIG;
 
-#define V_MAX_TABLES_CONFIG 1000
+#define V_MAX_TABLES_CONFIG WT_THOUSAND
 
 #define V_GLOBAL_ASSERT_READ_TIMESTAMP 0
 #define V_GLOBAL_BACKUP 1

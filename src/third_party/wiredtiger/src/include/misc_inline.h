@@ -251,9 +251,9 @@ __wt_failpoint(WT_SESSION_IMPL *session, uint64_t conn_flag, u_int probability)
         return (false);
 
     /* Assert that the given probability is sane. */
-    WT_ASSERT(session, probability <= 10000);
+    WT_ASSERT(session, probability <= 10 * WT_THOUSAND);
 
-    return (__wt_random(&session->rnd) % 10000 <= probability);
+    return (__wt_random(&session->rnd) % (10 * WT_THOUSAND) <= probability);
 }
 
 /*

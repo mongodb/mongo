@@ -52,8 +52,8 @@
  * of inserts set low as a default.
  */
 
-#define N_RECORDS 10000
-#define N_INSERT 500000
+#define N_RECORDS (10 * WT_THOUSAND)
+#define N_INSERT (500 * WT_THOUSAND)
 #define N_INSERT_THREAD 2
 #define N_JOIN_THREAD 2
 #define S64 "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789::"
@@ -272,12 +272,12 @@ thread_insert(void *arg)
             if (__wt_random(&rnd) % 2 == 0)
                 post = 54321;
             else
-                post = i % 100000;
+                post = i % (100 * WT_THOUSAND);
             if (__wt_random(&rnd) % 2 == 0) {
                 bal = -100;
                 flag = 1;
             } else {
-                bal = 1 + (i % 1000) * 100;
+                bal = 1 + (i % WT_THOUSAND) * 100;
                 flag = 0;
             }
             maincur->set_value(maincur, post, bal, extra, flag, key);
@@ -303,8 +303,8 @@ thread_insert(void *arg)
         else
             testutil_check(session->commit_transaction(session, NULL));
 #endif
-        if (i % 1000 == 0 && i != 0) {
-            if (i % 10000 == 0)
+        if (i % WT_THOUSAND == 0 && i != 0) {
+            if (i % (10 * WT_THOUSAND) == 0)
                 fprintf(stderr, "*");
             else
                 fprintf(stderr, ".");

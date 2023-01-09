@@ -49,7 +49,7 @@
  * table.
  */
 
-#define N_RECORDS 10000
+#define N_RECORDS (10 * WT_THOUSAND)
 
 /*
  * get_stat_total --

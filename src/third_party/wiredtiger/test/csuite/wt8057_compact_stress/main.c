@@ -37,7 +37,7 @@
  * process and verifies that the data across two tables match after restart.
  */
 
-#define NUM_RECORDS 100000
+#define NUM_RECORDS (100 * WT_THOUSAND)
 #define TIMEOUT 40
 
 static bool compact_error;

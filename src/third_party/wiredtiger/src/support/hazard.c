@@ -388,7 +388,7 @@ __wt_hazard_check_assert(WT_SESSION_IMPL *session, void *ref, bool waitfor)
             return (true);
         if (!waitfor || ++i > 100)
             break;
-        __wt_sleep(0, 10000);
+        __wt_sleep(0, 10 * WT_THOUSAND);
     }
     __wt_errx(session,
       "hazard pointer reference to discarded object: (%p: session %p name %s: %s, line %d)",

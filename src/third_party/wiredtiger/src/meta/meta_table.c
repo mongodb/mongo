@@ -73,7 +73,7 @@ __wt_metadata_cursor_open(WT_SESSION_IMPL *session, const char *config, WT_CURSO
      */
     btree = CUR2BT(*cursorp);
 
-#define WT_EVICT_META_SKEW 10000
+#define WT_EVICT_META_SKEW (10 * WT_THOUSAND)
     /*
      * Skew eviction so metadata almost always stays in cache.
      *

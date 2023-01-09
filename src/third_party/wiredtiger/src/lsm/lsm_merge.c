@@ -91,8 +91,8 @@ __lsm_merge_aggressive_update(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree)
     /*
      * If there is no estimate for how long it's taking to fill chunks pick 10 seconds.
      */
-    msec_to_create_merge =
-      lsm_tree->merge_min * (lsm_tree->chunk_fill_ms == 0 ? 10000 : lsm_tree->chunk_fill_ms);
+    msec_to_create_merge = lsm_tree->merge_min *
+      (lsm_tree->chunk_fill_ms == 0 ? (10 * WT_THOUSAND) : lsm_tree->chunk_fill_ms);
 
     /*
      * Don't consider getting aggressive until enough time has passed that we should have created

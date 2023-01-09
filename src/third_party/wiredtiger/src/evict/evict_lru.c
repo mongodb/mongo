@@ -95,7 +95,7 @@ __evict_entry_priority(WT_SESSION_IMPL *session, WT_REF *ref)
 
     read_gen += btree->evict_priority;
 
-#define WT_EVICT_INTL_SKEW 1000
+#define WT_EVICT_INTL_SKEW WT_THOUSAND
     if (F_ISSET(ref, WT_REF_FLAG_INTERNAL))
         read_gen += WT_EVICT_INTL_SKEW;
 
@@ -450,7 +450,7 @@ __evict_server(WT_SESSION_IMPL *session, bool *did_work)
 
     __wt_epoch(session, &now);
 
-#define WT_CACHE_STUCK_TIMEOUT_MS 300000
+#define WT_CACHE_STUCK_TIMEOUT_MS (300 * WT_THOUSAND)
     time_diff_ms = WT_TIMEDIFF_MS(now, cache->stuck_time);
 
 #ifdef HAVE_DIAGNOSTIC
@@ -965,7 +965,7 @@ __wt_evict_file_exclusive_off(WT_SESSION_IMPL *session)
 /*
  * We will do a fresh re-tune every that many milliseconds to adjust to significant phase changes.
  */
-#define EVICT_FORCE_RETUNE 25000
+#define EVICT_FORCE_RETUNE (25 * WT_THOUSAND)
 
 /*
  * __evict_tune_workers --
@@ -1149,7 +1149,7 @@ __evict_lru_pages(WT_SESSION_IMPL *session, bool is_server)
 
     /* If a worker thread found the queue empty, pause. */
     if (ret == WT_NOTFOUND && !is_server && F_ISSET(conn, WT_CONN_EVICTION_RUN))
-        __wt_cond_wait(session, conn->evict_threads.wait_cond, 10000, NULL);
+        __wt_cond_wait(session, conn->evict_threads.wait_cond, 10 * WT_THOUSAND, NULL);
 
     WT_TRACK_OP_END(session);
     return (ret == WT_NOTFOUND ? 0 : ret);
@@ -2447,7 +2447,7 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, bool readonly, d
             break;
         case WT_NOTFOUND:
             /* Allow the queue to re-populate before retrying. */
-            __wt_cond_wait(session, conn->evict_threads.wait_cond, 10000, NULL);
+            __wt_cond_wait(session, conn->evict_threads.wait_cond, 10 * WT_THOUSAND, NULL);
             cache->app_waits++;
             break;
         default:

@@ -27,7 +27,7 @@
  */
 #include <test_util.h>
 
-#define MAX_KEYS 100000
+#define MAX_KEYS (100 * WT_THOUSAND)
 
 static const char *const conn_config =
   "create,cache_size=100MB,log=(archive=false,enabled=true,file_max=100K),statistics=(all),"

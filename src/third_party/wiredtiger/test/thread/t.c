@@ -68,8 +68,8 @@ main(int argc, char *argv[])
     ftype = ROW;
     log_print = 0;
     multiple_files = 0;
-    nkeys = 1000;
-    max_nops = 10000;
+    nkeys = WT_THOUSAND;
+    max_nops = 10 * WT_THOUSAND;
     readers = 10;
     runs = 1;
     session_per_op = 0;

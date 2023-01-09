@@ -63,7 +63,7 @@ testutil_tiered_sleep(TEST_OPTS *opts, WT_SESSION *session, uint32_t seconds, bo
     bool do_flush;
 
     now = testutil_time_us(session);
-    wake_time = now + 1000000 * seconds;
+    wake_time = now + WT_MILLION * seconds;
     do_flush = false;
     if (do_flush_tier != NULL && opts->tiered_flush_next_us != 0 &&
       opts->tiered_flush_next_us < wake_time) {
@@ -74,7 +74,7 @@ testutil_tiered_sleep(TEST_OPTS *opts, WT_SESSION *session, uint32_t seconds, bo
 
     while (now < wake_time && opts->running) {
         /* Sleep a maximum of one second, so we can make sure we should still be running. */
-        if (now + 1000000 < wake_time)
+        if (now + WT_MILLION < wake_time)
             __wt_sleep(1, 0);
         else
             __wt_sleep(0, wake_time - now);

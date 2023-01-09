@@ -112,7 +112,7 @@ main(int argc, char *argv[])
         /*
          * Run test with 100 Mb file size. Row store case.
          */
-        run_test_clean("100MB", NUM_RECORDS * 1000);
+        run_test_clean("100MB", NUM_RECORDS * WT_THOUSAND);
         flush = true;
     }
 

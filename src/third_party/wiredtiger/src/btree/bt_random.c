@@ -45,7 +45,7 @@ __random_slot_valid(WT_CURSOR_BTREE *cbt, uint32_t slot, bool *validp)
 }
 
 /* Magic constant: 5000 entries in a skip list is enough to forcibly evict. */
-#define WT_RANDOM_SKIP_EVICT_SOON 5000
+#define WT_RANDOM_SKIP_EVICT_SOON (5 * WT_THOUSAND)
 /* Magic constant: 50 entries in a skip list is enough to predict the size. */
 #define WT_RANDOM_SKIP_PREDICT 50
 
@@ -154,7 +154,7 @@ __random_leaf_skip(WT_CURSOR_BTREE *cbt, WT_INSERT_HEAD *ins_head, uint32_t entr
 /* Magic constant: 100 entries in any randomly chosen skip list is enough to select from it. */
 #define WT_RANDOM_SKIP_INSERT_ENOUGH 100
 /* Magic constant: 1000 entries in an initial skip list is enough to always select from it. */
-#define WT_RANDOM_SKIP_INSERT_SMALLEST_ENOUGH 1000
+#define WT_RANDOM_SKIP_INSERT_SMALLEST_ENOUGH WT_THOUSAND
 
 /*
  * __random_leaf_insert --
@@ -255,7 +255,7 @@ __random_leaf_disk(WT_CURSOR_BTREE *cbt, bool *validp)
 /* Magic constant: cursor up to 250 next/previous records before selecting a key. */
 #define WT_RANDOM_CURSOR_MOVE 250
 /* Magic constant: 1000 disk-based entries in a page is enough to always select from them. */
-#define WT_RANDOM_DISK_ENOUGH 1000
+#define WT_RANDOM_DISK_ENOUGH WT_THOUSAND
 
 /*
  * __random_leaf --

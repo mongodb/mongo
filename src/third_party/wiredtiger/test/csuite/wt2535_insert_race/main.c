@@ -99,7 +99,7 @@ main(int argc, char *argv[])
     opts = &_opts;
     memset(opts, 0, sizeof(*opts));
     opts->nthreads = 20;
-    opts->nrecords = 100000;
+    opts->nrecords = 100 * WT_THOUSAND;
     opts->table_type = TABLE_ROW;
     testutil_check(testutil_parse_opts(argc, argv, opts));
     testutil_make_work_dir(opts->home);
@@ -194,12 +194,12 @@ thread_insert_race(void *arg)
             printf("Error in update: %d\n", ret);
         }
         testutil_check(session->commit_transaction(session, NULL));
-        if (i % 10000 == 0) {
+        if (i % (10 * WT_THOUSAND) == 0) {
             printf("insert: %" PRIu64 "\r", i);
             fflush(stdout);
         }
     }
-    if (i > 10000)
+    if (i > 10 * WT_THOUSAND)
         printf("\n");
 
     opts->running = false;

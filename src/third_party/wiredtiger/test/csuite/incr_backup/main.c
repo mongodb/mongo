@@ -40,7 +40,7 @@
 #define MAX_NTABLES 100
 
 #define MAX_KEY_SIZE 100
-#define MAX_VALUE_SIZE 10000
+#define MAX_VALUE_SIZE (10 * WT_THOUSAND)
 #define MAX_MODIFY_ENTRIES 10
 #define MAX_MODIFY_DIFF 500
 
@@ -130,7 +130,7 @@ typedef enum { INSERT, MODIFY, REMOVE, UPDATE, _OPERATION_TYPE_COUNT } OPERATION
  * Having a predictable cycle makes it easy on the checking side (knowing how many total changes
  * have been made) to check the state of the table.
  */
-#define KEYS_PER_TABLE 10000
+#define KEYS_PER_TABLE (10 * WT_THOUSAND)
 #define CHANGES_PER_CYCLE (KEYS_PER_TABLE * _OPERATION_TYPE_COUNT)
 
 /*
@@ -380,7 +380,7 @@ table_changes(WT_SESSION *session, TABLE *table)
     if (__wt_random(&table->rand) % 2 == 0) {
         value = dcalloc(1, table->max_value_size);
         value2 = dcalloc(1, table->max_value_size);
-        nrecords = __wt_random(&table->rand) % 1000;
+        nrecords = __wt_random(&table->rand) % WT_THOUSAND;
         VERBOSE(4, "changing %" PRIu32 " records in %s\n", nrecords, table->name);
         testutil_check(session->open_cursor(session, table->name, NULL, NULL, &cur));
         for (i = 0; i < nrecords; i++) {
@@ -767,7 +767,7 @@ check_table(WT_SESSION *session, TABLE *table)
         else if (op_type == UPDATE || (op_type == MODIFY && change_count < boundary))
             change_count += KEYS_PER_TABLE;
         else if (op_type == MODIFY || (op_type == REMOVE && change_count < boundary))
-            change_count += 20000;
+            change_count += 20 * WT_THOUSAND;
         else
             testutil_assert(false);
         key_value(change_count, key, sizeof(key), &item, &op_type);
@@ -894,9 +894,9 @@ main(int argc, char *argv[])
     if (rough_size == 0)
         file_max = 100 + __wt_random(&rnd) % 100; /* small log files, min 100K */
     else if (rough_size == 1)
-        file_max = 200 + __wt_random(&rnd) % 1000; /* 200K to ~1M */
+        file_max = 200 + __wt_random(&rnd) % WT_THOUSAND; /* 200K to ~1M */
     else
-        file_max = 1000 + __wt_random(&rnd) % 20000; /* 1M to ~20M */
+        file_max = WT_THOUSAND + __wt_random(&rnd) % (20 * WT_THOUSAND); /* 1M to ~20M */
     testutil_check(
       __wt_snprintf(conf, sizeof(conf), "%s,create,%s,log=(enabled=true,file_max=%" PRIu32 "K)",
         CONN_CONFIG_COMMON, backup_verbose, file_max));

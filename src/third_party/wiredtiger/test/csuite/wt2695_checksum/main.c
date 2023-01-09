@@ -123,7 +123,7 @@ main(int argc, char *argv[])
     /*
      * Checksums of power-of-two data chunks.
      */
-    for (i = 0, len = 512; i < 1000; ++i) {
+    for (i = 0, len = 512; i < WT_THOUSAND; ++i) {
         for (j = 0; j < len; ++j)
             data[j] = __wt_random(&rnd) & 0xff;
         hw = __wt_checksum(data, len);
@@ -138,7 +138,7 @@ main(int argc, char *argv[])
     /*
      * Checksums of random data chunks.
      */
-    for (i = 0; i < 1000; ++i) {
+    for (i = 0; i < WT_THOUSAND; ++i) {
         len = __wt_random(&rnd) % DATASIZE;
         for (j = 0; j < len; ++j)
             data[j] = __wt_random(&rnd) & 0xff;

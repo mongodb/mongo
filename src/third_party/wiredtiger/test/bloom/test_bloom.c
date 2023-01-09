@@ -69,7 +69,7 @@ main(int argc, char *argv[])
 
     /* Set default configuration values. */
     g.c_cache = 10;
-    g.c_ops = 100000;
+    g.c_ops = 100 * WT_THOUSAND;
     g.c_key_max = 100;
     g.c_k = 8;
     g.c_factor = 16;

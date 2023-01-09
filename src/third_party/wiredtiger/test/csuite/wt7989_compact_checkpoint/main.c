@@ -37,7 +37,7 @@
  * with "verbose=[compact,compact_progress]". There's a chance these two cases are different.
  */
 
-#define NUM_RECORDS 1000000
+#define NUM_RECORDS WT_MILLION
 #define CHECKPOINT_NUM 3
 #define HOME_BUF_SIZE 512
 #define STAT_BUF_SIZE 128

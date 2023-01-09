@@ -233,7 +233,7 @@ op_cursor(void *arg)
     } else {
         /* Put some data in if asked to. */
         if (args->testopts->do_data_ops) {
-            for (i = 0; i < 1000; i++) {
+            for (i = 0; i < WT_THOUSAND; i++) {
                 cursor->set_key(cursor, i);
                 cursor->set_value(cursor, "abcdef");
                 cursor->insert(cursor);

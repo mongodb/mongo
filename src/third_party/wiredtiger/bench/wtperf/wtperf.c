@@ -195,13 +195,13 @@ track_operation(TRACK *trk, uint64_t usecs)
     /*
      * Update a latency bucket. First buckets: usecs from 100us to 1000us at 100us each.
      */
-    if (v < 1000)
+    if (v < WT_THOUSAND)
         ++trk->us[v];
 
     /*
      * Second buckets: milliseconds from 1ms to 1000ms, at 1ms each.
      */
-    else if (v < ms_to_us(1000))
+    else if (v < ms_to_us(WT_THOUSAND))
         ++trk->ms[us_to_ms(v)];
 
     /*
@@ -528,7 +528,7 @@ worker(void *arg)
                 else
                     trk = &thread->truncate_sleep;
                 /* Pause between truncate attempts */
-                (void)usleep(1000);
+                (void)usleep(WT_THOUSAND);
                 break;
             }
             goto op_err;
@@ -1482,13 +1482,13 @@ scan_worker(void *arg)
     if (opts->scan_icount != 0) {
         end_id = opts->scan_icount;
         tot_items = ((uint64_t)opts->scan_icount * pct) / 100;
-        incr = (uint64_t)opts->scan_table_count * 1000 + 1;
+        incr = (uint64_t)opts->scan_table_count * WT_THOUSAND + 1;
         table_start = opts->table_count;
         ntables = opts->scan_table_count;
     } else {
         end_id = opts->icount;
         tot_items = ((uint64_t)opts->icount * pct) / 100;
-        incr = (uint64_t)opts->table_count * 1000 + 1;
+        incr = (uint64_t)opts->table_count * WT_THOUSAND + 1;
         table_start = 0;
         ntables = opts->table_count;
     }
@@ -1609,7 +1609,7 @@ execute_populate(WTPERF *wtperf)
          * Sleep for 100th of a second, report_interval is in second granularity, each 100th
          * increment of elapsed is a single increment of interval.
          */
-        (void)usleep(10000);
+        (void)usleep(10 * WT_THOUSAND);
         if (opts->report_interval == 0 || ++elapsed < 100)
             continue;
         elapsed = 0;
@@ -2953,7 +2953,7 @@ wtperf_rand(WTPERF_THREAD *thread)
         rval = (uint64_t)(double)sqrtl((long double)rval128);
 
 #else
-#define SELECT_LATEST_RANGE 1000
+#define SELECT_LATEST_RANGE WT_THOUSAND
         /* If we don't have 128-bit integers, we simply select a number from a fixed sized group of
          * recently inserted records.
          */

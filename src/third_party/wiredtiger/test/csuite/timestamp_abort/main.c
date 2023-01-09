@@ -71,7 +71,7 @@ static char home[1024]; /* Program working dir */
 /* Include worker threads and prepare extra sessions */
 #define SESSION_MAX (MAX_TH + 3 + MAX_TH * PREPARE_PCT)
 #define STAT_WAIT 1
-#define USEC_STAT 10000
+#define USEC_STAT (10 * WT_THOUSAND)
 
 static const char *table_pfx = "table";
 static const char *const uri_collection = "collection";
@@ -281,7 +281,7 @@ thread_ts_run(void *arg)
 
     __wt_seconds((WT_SESSION_IMPL *)session, &last_reconfig);
     /* Update the oldest/stable timestamps every 1 millisecond. */
-    for (last_ts = 0;; __wt_sleep(0, 1000)) {
+    for (last_ts = 0;; __wt_sleep(0, WT_THOUSAND)) {
         /* Get the last committed timestamp periodically in order to update the oldest
          * timestamp. */
         ts = maximum_stable_ts(active_timestamps, nth);

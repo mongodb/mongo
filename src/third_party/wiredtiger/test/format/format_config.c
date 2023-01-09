@@ -1185,7 +1185,7 @@ config_pct(TABLE *table)
         if (config_explicit(table, list[i].name))
             pct += *list[i].vp;
         else {
-            list[i].order = mmrand(NULL, 1, 1000);
+            list[i].order = mmrand(NULL, 1, WT_THOUSAND);
             slot_available = true;
         }
 
@@ -1197,7 +1197,7 @@ config_pct(TABLE *table)
         WARN("operation percentages %s than 100, resetting to random values",
           pct > 100 ? "greater" : "less");
         for (i = 0; i < WT_ELEMENTS(list); ++i)
-            list[i].order = mmrand(NULL, 1, 1000);
+            list[i].order = mmrand(NULL, 1, WT_THOUSAND);
         pct = 0;
     }
 

@@ -44,7 +44,7 @@ main(int argc, char *argv[])
     WT_CURSOR *c;
     WT_SESSION *session;
     char *jsonkey, *jsonvalue;
-    char projection[1000];
+    char projection[WT_THOUSAND];
 
     opts = &_opts;
     memset(opts, 0, sizeof(*opts));

@@ -626,7 +626,7 @@ __log_file_server(void *arg)
         }
 
         /* Wait until the next event. */
-        __wt_cond_wait(session, conn->log_file_cond, 100000, NULL);
+        __wt_cond_wait(session, conn->log_file_cond, 100 * WT_THOUSAND, NULL);
     }
 
     if (0) {
@@ -1022,8 +1022,8 @@ __wt_logmgr_open(WT_SESSION_IMPL *session)
      */
     WT_RET(__wt_open_internal_session(
       conn, "log-wrlsn-server", false, session_flags, 0, &conn->log_wrlsn_session));
-    WT_RET(__wt_cond_auto_alloc(
-      conn->log_wrlsn_session, "log write lsn server", 10000, WT_MILLION, &conn->log_wrlsn_cond));
+    WT_RET(__wt_cond_auto_alloc(conn->log_wrlsn_session, "log write lsn server", 10 * WT_THOUSAND,
+      WT_MILLION, &conn->log_wrlsn_cond));
     WT_RET(__wt_thread_create(
       conn->log_wrlsn_session, &conn->log_wrlsn_tid, __log_wrlsn_server, conn->log_wrlsn_session));
     conn->log_wrlsn_tid_set = true;
@@ -1042,7 +1042,7 @@ __wt_logmgr_open(WT_SESSION_IMPL *session)
         WT_RET(__wt_open_internal_session(
           conn, "log-server", false, session_flags, 0, &conn->log_session));
         WT_RET(__wt_cond_auto_alloc(
-          conn->log_session, "log server", 50000, WT_MILLION, &conn->log_cond));
+          conn->log_session, "log server", 50 * WT_THOUSAND, WT_MILLION, &conn->log_cond));
 
         /*
          * Start the thread.

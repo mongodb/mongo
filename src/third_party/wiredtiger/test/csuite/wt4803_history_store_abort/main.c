@@ -37,7 +37,7 @@
  * expecting to and vice versa.
  */
 
-#define NUM_KEYS 2000
+#define NUM_KEYS (2 * WT_THOUSAND)
 
 /*
  * This is a global flag that should be set before running test_hs_workload. It lets the child

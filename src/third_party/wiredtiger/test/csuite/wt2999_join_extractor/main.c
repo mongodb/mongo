@@ -131,7 +131,7 @@ main(int argc, char *argv[])
     key = 10;
     val[0] = 20;
     val[1] = 30;
-    for (i = 0; i < 100000; ++i) {
+    for (i = 0; i < 100 * WT_THOUSAND; ++i) {
         key += i;
         val[0] += i;
         val[1] += i;

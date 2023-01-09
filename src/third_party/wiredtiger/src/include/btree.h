@@ -54,7 +54,7 @@
 #define WT_BTREE_MAX_ADDR_COOKIE 255 /* Maximum address cookie */
 
 /* Evict pages if we see this many consecutive deleted records. */
-#define WT_BTREE_DELETE_THRESHOLD 1000
+#define WT_BTREE_DELETE_THRESHOLD WT_THOUSAND
 
 /*
  * Minimum size of the chunks (in percentage of the page size) a page gets split into during
@@ -130,7 +130,7 @@ struct __wt_btree {
     bool prefix_compression;      /* Prefix compression */
     u_int prefix_compression_min; /* Prefix compression min */
 
-#define WT_SPLIT_DEEPEN_MIN_CHILD_DEF 10000
+#define WT_SPLIT_DEEPEN_MIN_CHILD_DEF (10 * WT_THOUSAND)
     u_int split_deepen_min_child; /* Minimum entries to deepen tree */
 #define WT_SPLIT_DEEPEN_PER_CHILD_DEF 100
     u_int split_deepen_per_child; /* Entries per child when deepened */

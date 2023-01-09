@@ -147,7 +147,7 @@ CONFIG configuration_list[] = {{"assert.read_timestamp", "assert read_timestamp"
   {"format.independent_thread_rng", "configure independent thread RNG space", C_BOOL, 75, 0, 0,
     V_GLOBAL_FORMAT_INDEPENDENT_THREAD_RNG},
 
-  {"format.major_timeout", "long-running operations timeout (minutes)", C_IGNORE, 0, 0, 1000,
+  {"format.major_timeout", "long-running operations timeout (minutes)", C_IGNORE, 0, 0, WT_THOUSAND,
     V_GLOBAL_FORMAT_MAJOR_TIMEOUT},
 
   /*
@@ -162,7 +162,7 @@ CONFIG configuration_list[] = {{"assert.read_timestamp", "assert read_timestamp"
   {"logging.compression", "logging compression (off | lz4 | snappy | zlib | zstd)",
     C_IGNORE | C_STRING, 0, 0, 0, V_GLOBAL_LOGGING_COMPRESSION},
 
-  {"logging.file_max", "maximum log file size (KB)", 0x0, 100, 512000, 2097152,
+  {"logging.file_max", "maximum log file size (KB)", 0x0, 100, 512 * WT_THOUSAND, 2097152,
     V_GLOBAL_LOGGING_FILE_MAX},
 
   {"logging.prealloc", "configure log file pre-allocation", C_BOOL, 50, 0, 0,
@@ -177,7 +177,7 @@ CONFIG configuration_list[] = {{"assert.read_timestamp", "assert read_timestamp"
     V_TABLE_LSM_BLOOM},
 
   {"lsm.bloom_bit_count", "number of bits per item for bloom filters", C_TABLE | C_TYPE_LSM, 4, 64,
-    1000, V_TABLE_LSM_BLOOM_BIT_COUNT},
+    WT_THOUSAND, V_TABLE_LSM_BLOOM_BIT_COUNT},
 
   {"lsm.bloom_hash_count", "number of hash values per item for bloom filters", C_TABLE | C_TYPE_LSM,
     4, 32, 100, V_TABLE_LSM_BLOOM_HASH_COUNT},

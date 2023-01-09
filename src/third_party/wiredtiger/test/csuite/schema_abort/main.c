@@ -511,7 +511,7 @@ thread_ts_run(void *arg)
             }
         } else
 ts_wait:
-            __wt_sleep(0, 1000);
+            __wt_sleep(0, WT_THOUSAND);
     }
     /* NOTREACHED */
 }

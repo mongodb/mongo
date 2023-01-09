@@ -177,7 +177,7 @@ fill_db(void)
      * and file creation records. Then subtract out a few more records to be conservative.
      */
     units = (K_SIZE + V_SIZE) / 128 + 1;
-    min_key = 90000 / (units * 128) - 15;
+    min_key = (90 * WT_THOUSAND) / (units * 128) - 15;
     max_key = min_key * 2;
     first = true;
     for (i = 0; i < max_key; ++i) {

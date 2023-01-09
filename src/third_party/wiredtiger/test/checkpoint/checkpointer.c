@@ -127,7 +127,7 @@ clock_thread(void *arg)
          * Random value between 5000 and 10000.
          */
         delay = __wt_random(&rnd) % 5001;
-        __wt_sleep(0, delay + 5000);
+        __wt_sleep(0, delay + 5 * WT_THOUSAND);
     }
 
     testutil_check(wt_session->close(wt_session, NULL));

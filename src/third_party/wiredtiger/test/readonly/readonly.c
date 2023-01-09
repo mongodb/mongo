@@ -53,7 +53,7 @@ static const char *const uri = "table:main";
     "operation_tracking=(enabled=false),readonly=false,statistics=(all),statistics_log=(json,on_" \
     "close,wait=1)"
 #define MAX_VAL 4096
-#define MAX_KV 10000
+#define MAX_KV (10 * WT_THOUSAND)
 
 #define EXPECT_ERR 1
 #define EXPECT_SUCCESS 0

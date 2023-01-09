@@ -598,7 +598,7 @@ __blkcache_init(WT_SESSION_IMPL *session, size_t cache_size, u_int hash_size, u_
     WT_RET(__wt_thread_create(
       session, &blkcache->evict_thread_tid, __blkcache_eviction_thread, (void *)session));
     blkcache->evict_aggressive = -((int)evict_aggressive);
-    blkcache->min_num_references = 1000; /* initialize to a large value */
+    blkcache->min_num_references = WT_THOUSAND; /* initialize to a large value */
 
     blkcache->type = type;
 

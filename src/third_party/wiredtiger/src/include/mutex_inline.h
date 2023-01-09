@@ -197,7 +197,7 @@ __wt_spin_init(WT_SESSION_IMPL *session, WT_SPINLOCK *t, const char *name)
 {
     DWORD windows_error;
 
-    if (InitializeCriticalSectionAndSpinCount(&t->lock, 4000) == 0) {
+    if (InitializeCriticalSectionAndSpinCount(&t->lock, 4 * WT_THOUSAND) == 0) {
         windows_error = __wt_getlasterror();
         __wt_errx(session, "%s: InitializeCriticalSectionAndSpinCount: %s", name,
           __wt_formatmessage(session, windows_error));

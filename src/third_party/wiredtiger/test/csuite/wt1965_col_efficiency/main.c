@@ -88,7 +88,7 @@ thread_func(void *arg)
 
             ++g_ts;
             /* 5K updates/sec */
-            (void)usleep(1000000ULL * NR_THREADS / 5000);
+            (void)usleep(1ULL * WT_MILLION * NR_THREADS / (5 * WT_THOUSAND));
         }
     }
 

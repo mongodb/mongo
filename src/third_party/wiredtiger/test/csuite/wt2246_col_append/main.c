@@ -38,8 +38,6 @@
 /* Don't move into shared function there is a cross platform solution */
 #include <signal.h>
 
-#define MILLION 1000000
-
 /* Needs to be global for signal handling. */
 static TEST_OPTS *opts, _opts;
 
@@ -147,7 +145,7 @@ main(int argc, char *argv[])
         testutil_check(__wt_thread_join(NULL, &idlist[i]));
 
     ce = clock();
-    printf("%" PRIu64 "M records: %.2lf processor seconds\n", opts->max_inserted_id / MILLION,
+    printf("%" PRIu64 "M records: %.2lf processor seconds\n", opts->max_inserted_id / WT_MILLION,
       (ce - cs) / (double)CLOCKS_PER_SEC);
 
     testutil_cleanup(opts);

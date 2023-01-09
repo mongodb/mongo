@@ -129,7 +129,7 @@ __bloom_open_cursor(WT_BLOOM *bloom, WT_CURSOR *owner)
  * Bump the cache priority for Bloom filters: this makes eviction favor pages from other trees over
  * Bloom filters.
  */
-#define WT_EVICT_BLOOM_SKEW 1000
+#define WT_EVICT_BLOOM_SKEW WT_THOUSAND
     __wt_evict_priority_set(session, WT_EVICT_BLOOM_SKEW);
 
     bloom->c = c;

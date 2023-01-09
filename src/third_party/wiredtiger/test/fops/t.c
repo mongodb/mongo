@@ -75,7 +75,7 @@ main(int argc, char *argv[])
 
     testutil_check(pthread_rwlock_init(&single, NULL));
 
-    nops = 1000;
+    nops = WT_THOUSAND;
     nthreads = 10;
     runs = 1;
     use_txn = false;

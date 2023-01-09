@@ -29,7 +29,7 @@
 #include "test_util.h"
 
 static const char name[] = "lsm:test";
-#define NUM_DOCS 100000
+#define NUM_DOCS (100 * WT_THOUSAND)
 #define NUM_QUERIES (NUM_DOCS / 100)
 
 /*

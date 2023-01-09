@@ -256,9 +256,9 @@ typedef struct {
     /*
      * Latency buckets.
      */
-    uint32_t us[1000]; /* < 1us ... 1000us */
-    uint32_t ms[1000]; /* < 1ms ... 1000ms */
-    uint32_t sec[100]; /* < 1s 2s ... 100s */
+    uint32_t us[WT_THOUSAND]; /* < 1us ... 1000us */
+    uint32_t ms[WT_THOUSAND]; /* < 1ms ... 1000ms */
+    uint32_t sec[100];        /* < 1s 2s ... 100s */
 } TRACK;
 
 struct __wtperf_thread {    /* Per-thread structure */

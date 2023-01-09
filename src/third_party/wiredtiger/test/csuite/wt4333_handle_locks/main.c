@@ -29,7 +29,7 @@
 
 #include <signal.h>
 
-#define MAXKEY 10000
+#define MAXKEY (10 * WT_THOUSAND)
 #define PERIOD 60
 #define HOME_LEN 256
 

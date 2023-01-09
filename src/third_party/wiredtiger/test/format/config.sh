@@ -36,7 +36,7 @@ typedef struct {
     u_int off; /* Value offset */
 } CONFIG;
 
-#define V_MAX_TABLES_CONFIG 1000
+#define V_MAX_TABLES_CONFIG WT_THOUSAND
 
 END_OF_HEADER_FILE_PREFIX
 
@@ -171,7 +171,7 @@ CONFIG configuration_list[] = {
 
 {"format.independent_thread_rng", "configure independent thread RNG space", C_BOOL, 75, 0, 0}
 
-{"format.major_timeout", "long-running operations timeout (minutes)", C_IGNORE, 0, 0, 1000}
+{"format.major_timeout", "long-running operations timeout (minutes)", C_IGNORE, 0, 0, WT_THOUSAND}
 
 /*
  * 0%
@@ -184,7 +184,7 @@ CONFIG configuration_list[] = {
 
 {"logging.compression", "logging compression (off | lz4 | snappy | zlib | zstd)", C_IGNORE | C_STRING, 0, 0, 0}
 
-{"logging.file_max", "maximum log file size (KB)", 0x0, 100, 512000, 2097152}
+{"logging.file_max", "maximum log file size (KB)", 0x0, 100, 512 * WT_THOUSAND, 2097152}
 
 {"logging.prealloc", "configure log file pre-allocation", C_BOOL, 50, 0, 0}
 
@@ -194,7 +194,7 @@ CONFIG configuration_list[] = {
 
 {"lsm.bloom", "configure bloom filters", C_BOOL | C_TABLE | C_TYPE_LSM, 95, 0, 0}
 
-{"lsm.bloom_bit_count", "number of bits per item for bloom filters", C_TABLE | C_TYPE_LSM, 4, 64, 1000}
+{"lsm.bloom_bit_count", "number of bits per item for bloom filters", C_TABLE | C_TYPE_LSM, 4, 64, WT_THOUSAND}
 
 {"lsm.bloom_hash_count", "number of hash values per item for bloom filters", C_TABLE | C_TYPE_LSM, 4, 32, 100}
 

@@ -52,7 +52,7 @@ static bool use_columns = false;
 #define ROW_KEY_FORMAT ("%010" PRIu64)
 
 #define MAX_CKPT_INVL 5 /* Maximum interval between checkpoints */
-#define MAX_DATA 1000
+#define MAX_DATA WT_THOUSAND
 #define MAX_TIME 40
 #define MIN_TIME 10
 

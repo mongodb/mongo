@@ -315,7 +315,8 @@ page_dump:
         }
 
         /* Report progress (unless verifying checkpoints which happens during live operations). */
-        if (checkpoint == NULL && ((rows < 5000 && rows % 10 == 0) || rows % 5000 == 0))
+        if (checkpoint == NULL &&
+          ((rows < (5 * WT_THOUSAND) && rows % 10 == 0) || rows % (5 * WT_THOUSAND) == 0))
             track(buf, rows);
         last_match = base_keyno;
     }

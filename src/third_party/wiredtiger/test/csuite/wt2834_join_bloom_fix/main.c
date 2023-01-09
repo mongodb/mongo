@@ -39,8 +39,8 @@
  *
  * Failure mode: We get results back from our join.
  */
-#define N_RECORDS 100000
-#define N_INSERT 1000000
+#define N_RECORDS (100 * WT_THOUSAND)
+#define N_INSERT WT_MILLION
 
 void populate(TEST_OPTS *opts);
 
@@ -179,7 +179,7 @@ populate(TEST_OPTS *opts)
         if (__wt_random(&rnd) % 11 == 0)
             post = 54321;
         else
-            post = i % 100000;
+            post = i % (100 * WT_THOUSAND);
         if (__wt_random(&rnd) % 4 == 0) {
             balance = -100;
             flag = 1;

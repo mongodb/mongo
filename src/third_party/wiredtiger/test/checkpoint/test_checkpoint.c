@@ -63,8 +63,8 @@ main(int argc, char *argv[])
     g.checkpoint_name = "WiredTigerCheckpoint";
     g.debug_mode = false;
     g.home = dmalloc(512);
-    g.nkeys = 10000;
-    g.nops = 100000;
+    g.nkeys = 10 * WT_THOUSAND;
+    g.nops = 100 * WT_THOUSAND;
     g.ntables = 3;
     g.nworkers = 1;
     g.evict_reposition_timing_stress = false;

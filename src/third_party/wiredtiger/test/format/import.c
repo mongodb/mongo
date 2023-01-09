@@ -43,7 +43,7 @@ static void verify_import(WT_SESSION *);
  * The number of entries in the import table, primary use for validating contents after import.
  * There is no benefit to varying the number of entries in the import table.
  */
-#define IMPORT_ENTRIES 1000
+#define IMPORT_ENTRIES WT_THOUSAND
 #define IMPORT_TABLE_CONFIG "key_format=i,value_format=i"
 #define IMPORT_URI "table:import"
 #define IMPORT_URI_FILE "file:import.wt"

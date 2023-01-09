@@ -71,12 +71,12 @@
 #define BIG_SIZE (1024 * 10)
 #define BIG_CONTENTS "<Big String Contents>"
 #define MAX_ARGS 20
-#define MAX_OP_RANGE 1000
+#define MAX_OP_RANGE WT_THOUSAND
 #define STDERR_FILE "stderr.txt"
 #define STDOUT_FILE "stdout.txt"
 #define TESTS_PER_CALIBRATION 2
 #define TESTS_WITH_RECALIBRATION 5
-#define VERBOSE_PRINT 10000
+#define VERBOSE_PRINT (10 * WT_THOUSAND)
 
 static int check_results(TEST_OPTS *, uint64_t *);
 static void check_values(WT_CURSOR *, int, int, int, char *);
@@ -625,7 +625,7 @@ subtest_populate(TEST_OPTS *opts, bool close_test)
             printf("  %" PRIu64 "/%" PRIu64 "\n", (i + 1), nrecords);
         /* Attempt to isolate the failures to checkpointing. */
         if (i == (nrecords / 100)) {
-            enable_failures(opts->nops, 1000000);
+            enable_failures(opts->nops, WT_MILLION);
             /* CHECK should expect failures. */
             CHECK(session->checkpoint(session, NULL), true);
             disable_failures();
@@ -674,7 +674,7 @@ main(int argc, char *argv[])
     argc -= __wt_optind;
     argv += __wt_optind;
     if (opts->nrecords == 0)
-        opts->nrecords = 50000;
+        opts->nrecords = 50 * WT_THOUSAND;
     if (opts->table_type == TABLE_FIX)
         testutil_die(ENOTSUP, "Fixed-length column store not supported");
 

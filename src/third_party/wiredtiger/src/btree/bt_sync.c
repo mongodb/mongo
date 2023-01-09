@@ -666,7 +666,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
                 ++internal_pages;
                 /* Slow down checkpoints. */
                 if (FLD_ISSET(conn->debug_flags, WT_CONN_DEBUG_SLOW_CKPT))
-                    __wt_sleep(0, 10000);
+                    __wt_sleep(0, 10 * WT_THOUSAND);
             } else {
                 leaf_bytes += page->memory_footprint;
                 ++leaf_pages;
@@ -713,7 +713,7 @@ __wt_sync_file(WT_SESSION_IMPL *session, WT_CACHE_OP syncop)
                 ++conn->ckpt_write_pages;
 
                 /* Periodically log checkpoint progress. */
-                if (conn->ckpt_write_pages % 5000 == 0)
+                if (conn->ckpt_write_pages % (5 * WT_THOUSAND) == 0)
                     __wt_checkpoint_progress(session, false);
             }
         }

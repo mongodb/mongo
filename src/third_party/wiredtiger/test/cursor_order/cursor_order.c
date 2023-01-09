@@ -66,9 +66,9 @@ main(int argc, char *argv[])
     cfg->append_inserters = 1;
     cfg->conn = NULL;
     cfg->ftype = ROW;
-    cfg->max_nops = 1000000;
+    cfg->max_nops = WT_MILLION;
     cfg->multiple_files = false;
-    cfg->nkeys = 1000;
+    cfg->nkeys = WT_THOUSAND;
     cfg->reverse_scanners = 5;
     cfg->reverse_scan_ops = 10;
     cfg->thread_finish = false;

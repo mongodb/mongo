@@ -226,7 +226,7 @@ thread_run(void *arg)
         /*
          * If configured, run compaction on database after each epoch of 100000 operations.
          */
-        if (compaction && i >= 100000 && i % 100000 == 0) {
+        if (compaction && i >= (100 * WT_THOUSAND) && i % (100 * WT_THOUSAND) == 0) {
             printf("Running compaction in Thread %" PRIu32 "\n", td->id);
             if (columnar_table)
                 testutil_check(session->compact(session, col_uri, NULL));

@@ -31,7 +31,7 @@
 
 #define TIMEOUT 1
 
-#define NUM_RECORDS 800000
+#define NUM_RECORDS (800 * WT_THOUSAND)
 
 /* Constants and variables declaration. */
 /*

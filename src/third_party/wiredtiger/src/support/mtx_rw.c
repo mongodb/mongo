@@ -231,7 +231,7 @@ stall:
     /* Wait for our group to start. */
     time_start = l->stat_read_count_off != -1 && WT_STAT_ENABLED(session) ? __wt_clock(session) : 0;
     for (pause_cnt = 0; ticket != l->u.s.current; pause_cnt++) {
-        if (pause_cnt < 1000)
+        if (pause_cnt < WT_THOUSAND)
             WT_PAUSE();
         else if (pause_cnt < 1200)
             __wt_yield();
@@ -397,7 +397,7 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
       l->stat_write_count_off != -1 && WT_STAT_ENABLED(session) ? __wt_clock(session) : 0;
     for (pause_cnt = 0, old.u.v = l->u.v; ticket != old.u.s.current || old.u.s.readers_active != 0;
          pause_cnt++, old.u.v = l->u.v) {
-        if (pause_cnt < 1000)
+        if (pause_cnt < WT_THOUSAND)
             WT_PAUSE();
         else if (pause_cnt < 1200)
             __wt_yield();

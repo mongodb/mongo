@@ -194,7 +194,8 @@ table_load(TABLE *base, TABLE *table)
          * When first starting up, report the progress for every 10 keys in the first 5K keys. After
          * 5K records, report every 5K keys.
          */
-        report_progress = (keyno < 5000 && keyno % 10 == 0) || keyno % 5000 == 0;
+        report_progress =
+          (keyno < (5 * WT_THOUSAND) && keyno % 10 == 0) || keyno % (5 * WT_THOUSAND) == 0;
         /* Report on progress. */
         if (report_progress)
             track(track_buf, keyno);

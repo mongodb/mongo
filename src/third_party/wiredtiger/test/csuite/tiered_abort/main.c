@@ -168,7 +168,7 @@ thread_ts_run(void *arg)
 
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
     /* Update the oldest/stable timestamps every 1 millisecond. */
-    for (last_ts = 0;; __wt_sleep(0, 1000)) {
+    for (last_ts = 0;; __wt_sleep(0, WT_THOUSAND)) {
         /* Get the last committed timestamp periodically in order to update the oldest timestamp. */
         ts = maximum_stable_ts(active_timestamps, nth);
         if (ts == last_ts)

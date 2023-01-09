@@ -26,7 +26,7 @@
 #define WT_BLKCACHE_HASHSIZE_MAX WT_GIGABYTE
 
 /* How often we compute the total size of the files open in the block manager. */
-#define WT_BLKCACHE_FILESIZE_EST_FREQ 5000
+#define WT_BLKCACHE_FILESIZE_EST_FREQ (5 * WT_THOUSAND)
 
 #define WT_BLKCACHE_MINREF_INCREMENT 20      /* Eviction references window */
 #define WT_BLKCACHE_EVICT_OTHER 0            /* Not evicting for various reasons */

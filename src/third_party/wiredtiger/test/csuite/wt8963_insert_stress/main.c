@@ -35,7 +35,7 @@
  * suite does not allow overriding validation at the moment.
  */
 
-#define THREAD_NUM_ITERATIONS 200000
+#define THREAD_NUM_ITERATIONS (200 * WT_THOUSAND)
 #define NUM_THREADS 110
 #define KEY_MAX UINT32_MAX
 #define TABLE_CONFIG_FMT "key_format=%s,value_format=%s,memory_page_image_max=50MB"

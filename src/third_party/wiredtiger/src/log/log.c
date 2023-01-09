@@ -359,7 +359,7 @@ __wt_log_force_sync(WT_SESSION_IMPL *session, WT_LSN *min_lsn)
      */
     while (log->sync_lsn.l.file < min_lsn->l.file) {
         __wt_cond_signal(session, S2C(session)->log_file_cond);
-        __wt_cond_wait(session, log->log_sync_cond, 10000, NULL);
+        __wt_cond_wait(session, log->log_sync_cond, 10 * WT_THOUSAND, NULL);
     }
     __wt_spin_lock(session, &log->log_sync_lock);
 
@@ -1977,7 +1977,7 @@ __wt_log_release(WT_SESSION_IMPL *session, WT_LOGSLOT *slot, bool *freep)
          */
         if (log->sync_lsn.l.file < slot->slot_end_lsn.l.file ||
           __wt_spin_trylock(session, &log->log_sync_lock) != 0) {
-            __wt_cond_wait(session, log->log_sync_cond, 10000, NULL);
+            __wt_cond_wait(session, log->log_sync_cond, 10 * WT_THOUSAND, NULL);
             continue;
         }
         locked = true;
@@ -2702,11 +2702,11 @@ __log_write_internal(WT_SESSION_IMPL *session, WT_ITEM *record, WT_LSN *lsnp, ui
     if (LF_ISSET(WT_LOG_FLUSH)) {
         /* Wait for our writes to reach the OS */
         while (__wt_log_cmp(&log->write_lsn, &lsn) <= 0 && myslot.slot->slot_error == 0)
-            __wt_cond_wait(session, log->log_write_cond, 10000, NULL);
+            __wt_cond_wait(session, log->log_write_cond, 10 * WT_THOUSAND, NULL);
     } else if (LF_ISSET(WT_LOG_FSYNC)) {
         /* Wait for our writes to reach disk */
         while (__wt_log_cmp(&log->sync_lsn, &lsn) <= 0 && myslot.slot->slot_error == 0)
-            __wt_cond_wait(session, log->log_sync_cond, 10000, NULL);
+            __wt_cond_wait(session, log->log_sync_cond, 10 * WT_THOUSAND, NULL);
     }
 
 err:

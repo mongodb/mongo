@@ -554,7 +554,7 @@ thread_run(void *arg)
     for (i = 0;; ++i) {
 again:
         /*
-        if (i > 0 && i % 10000 == 0)
+        if (i > 0 && i % (10 * WT_THOUSAND) == 0)
                 printf("Thread %" PRIu32
                     " completed %" PRIu64 " entries\n",
                     td->id, i);
@@ -569,7 +569,7 @@ again:
          * Every 1000th record write a very large value that exceeds the log buffer size. This
          * forces us to use the unbuffered path.
          */
-        if (i % 1000 == 0) {
+        if (i % WT_THOUSAND == 0) {
             cursor->set_value(cursor, large);
         } else {
             cursor->set_value(cursor, buf2);
@@ -957,7 +957,7 @@ check_db(uint32_t nth, uint32_t datasize, pid_t pid, bool directio, uint32_t fla
  * thread id, so they are interleaved. Once we have the neighborhood where some keys may be missing,
  * we'll back up to do a scan from that point.
  */
-#define CHECK_INCR 1000
+#define CHECK_INCR WT_THOUSAND
     for (id = 0;; id += CHECK_INCR) {
         gen_kv(keybuf, kvsize, id, 0, large_arr[0], true);
         cursor->set_key(cursor, keybuf);
@@ -1036,7 +1036,7 @@ check_db(uint32_t nth, uint32_t datasize, pid_t pid, bool directio, uint32_t fla
         /*
          * Every 1000th record is large.
          */
-        if (id % 1000 == 0)
+        if (id % WT_THOUSAND == 0)
             TEST_STREQ(large_arr[th], gotvalue, "main table large value");
         else
             TEST_STREQ(&keybuf[kvsize], gotvalue, "main table value");
