@@ -1,0 +1,88 @@
+# Golden test output of ABTPlanGeneration/LowerHashJoinNode
+
+==== VARIATION: Hash join with one equality ====
+-- INPUT:
+HashJoin [joinType: Inner]
+|   |   Condition
+|   |       otherID = ID
+|   Evaluation []
+|   |   BindBlock:
+|   |       [ID]
+|   |           FunctionCall [getField]
+|   |           |   Const ["id"]
+|   |           Variable [scan1]
+|   PhysicalScan [{'<root>': scan1}, otherColl]
+|       BindBlock:
+|           [scan1]
+|               Source []
+Evaluation []
+|   BindBlock:
+|       [otherID]
+|           FunctionCall [getField]
+|           |   Const ["other_id"]
+|           Variable [scan0]
+PhysicalScan [{'<root>': scan0}, collName]
+    BindBlock:
+        [scan0]
+            Source []
+
+-- OUTPUT:
+[9] hj 
+    left [s4] [] 
+        [7] project [s4 = getField(s3, "id")] 
+        [5] scan s3 none none none none none [] @"<collUUID>" true false 
+    right [s2] [] 
+        [3] project [s2 = getField(s1, "other_id")] 
+        [1] scan s1 none none none none none [] @"<collUUID>" true false 
+
+
+==== VARIATION: Hash join with two equalities ====
+-- INPUT:
+HashJoin [joinType: Inner]
+|   |   Condition
+|   |       proj0 = proj2
+|   |       proj1 = proj3
+|   Evaluation []
+|   |   BindBlock:
+|   |       [proj3]
+|   |           FunctionCall [getField]
+|   |           |   Const ["state_id"]
+|   |           Variable [scan1]
+|   Evaluation []
+|   |   BindBlock:
+|   |       [proj2]
+|   |           FunctionCall [getField]
+|   |           |   Const ["cityField"]
+|   |           Variable [scan1]
+|   PhysicalScan [{'<root>': scan1}, otherColl]
+|       BindBlock:
+|           [scan1]
+|               Source []
+Evaluation []
+|   BindBlock:
+|       [proj1]
+|           FunctionCall [getField]
+|           |   Const ["state"]
+|           Variable [scan0]
+Evaluation []
+|   BindBlock:
+|       [proj0]
+|           FunctionCall [getField]
+|           |   Const ["city"]
+|           Variable [scan0]
+PhysicalScan [{'<root>': scan0}, collName]
+    BindBlock:
+        [scan0]
+            Source []
+
+-- OUTPUT:
+[23] hj 
+    left [s5, s6] [] 
+        [21] project [s6 = getField(s4, "state_id")] 
+        [19] project [s5 = getField(s4, "cityField")] 
+        [17] scan s4 none none none none none [] @"<collUUID>" true false 
+    right [s2, s3] [] 
+        [15] project [s3 = getField(s1, "state")] 
+        [13] project [s2 = getField(s1, "city")] 
+        [11] scan s1 none none none none none [] @"<collUUID>" true false 
+
