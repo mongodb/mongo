@@ -8,19 +8,26 @@
 
 load('jstests/libs/ingress_handshake_metrics_helpers.js');
 
-let st = new ShardingTest({shards: 0, other: {auth: ''}});
-let conn = st.s;
+let runTest = (connectionHealthLoggingOn) => {
+    let st = new ShardingTest({shards: 0, other: {auth: ''}});
+    let conn = st.s;
 
-jsTestLog("Setting up users and test data.");
-let runTest = ingressHandshakeMetricsTest(conn, {
-    preAuthDelayMillis: 50,
-    postAuthDelayMillis: 100,
-    helloProcessingDelayMillis: 50,
-    helloResponseDelayMillis: 100
-});
+    jsTestLog("Setting up users and test data.");
+    let runMetricsTest = ingressHandshakeMetricsTest(conn, {
+        connectionHealthLoggingOn: connectionHealthLoggingOn,
+        preAuthDelayMillis: 50,
+        postAuthDelayMillis: 100,
+        helloProcessingDelayMillis: 50,
+        helloResponseDelayMillis: 100
+    });
 
-jsTestLog("Connecting to mongos and running the test.");
-runTest();
+    jsTestLog("Connecting to mongos and running the test.");
+    runMetricsTest();
 
-st.stop();
+    st.stop();
+};
+
+// Parameterized on enabling/disabling connection health logging.
+runTest(true);
+runTest(false);
 })();

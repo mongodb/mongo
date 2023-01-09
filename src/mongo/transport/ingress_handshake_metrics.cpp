@@ -29,6 +29,7 @@
 #include "mongo/transport/ingress_handshake_metrics.h"
 
 #include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/time_support.h"
@@ -42,6 +43,10 @@ const auto getIngressHandshakeMetricsDecoration =
 
 bool connHealthMetricsEnabled() {
     return gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCV();
+}
+
+bool connHealthMetricsLoggingEnabled() {
+    return gEnableDetailedConnectionHealthMetricLogLines;
 }
 
 CounterMetric totalTimeToFirstNonAuthCommandMillis("network.totalTimeToFirstNonAuthCommandMillis",
@@ -85,9 +90,12 @@ void IngressHandshakeMetrics::onCommandReceived(const Command* command) {
 
     auto lastAuthOrStartTicks = _lastHandshakeCommandTicks.value_or(*_sessionStartedTicks);
     auto elapsedSinceAuth = now - lastAuthOrStartTicks;
-    LOGV2(6788700,
-          "Received first command on ingress connection since session start or auth handshake",
-          "elapsed"_attr = _tickSource->ticksTo<Milliseconds>(elapsedSinceAuth));
+
+    if (connHealthMetricsLoggingEnabled()) {
+        LOGV2(6788700,
+              "Received first command on ingress connection since session start or auth handshake",
+              "elapsed"_attr = _tickSource->ticksTo<Milliseconds>(elapsedSinceAuth));
+    }
 
     auto elapsedSinceStart = now - *_sessionStartedTicks;
     totalTimeToFirstNonAuthCommandMillis.increment(
@@ -114,7 +122,8 @@ void IngressHandshakeMetrics::onCommandProcessed(const Command* command,
 
 void IngressHandshakeMetrics::onResponseSent(Milliseconds processingDuration,
                                              Milliseconds sendingDuration) {
-    if (MONGO_likely(_helloSucceeded || !_helloReceivedTime || !connHealthMetricsEnabled()))
+    if (MONGO_likely(_helloSucceeded || !_helloReceivedTime) || !connHealthMetricsEnabled() ||
+        !connHealthMetricsLoggingEnabled())
         return;
 
     LOGV2(6724100,

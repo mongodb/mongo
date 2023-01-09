@@ -35,6 +35,7 @@
 #include "mongo/client/authenticate.h"
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/user.h"
+#include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/icu.h"
@@ -104,12 +105,15 @@ void SASLServerMechanismRegistry::advertiseMechanismNamesForUser(OperationContex
 
     UserHandle user;
     const auto swUser = [&] {
-        ScopedCallbackTimer timer([&](Microseconds elapsed) {
-            LOGV2(6788603,
-                  "Auth metrics report",
-                  "metric"_attr = "sasl_acquireUser",
-                  "micros"_attr = elapsed.count());
-        });
+        if (gEnableDetailedConnectionHealthMetricLogLines) {
+            ScopedCallbackTimer timer([&](Microseconds elapsed) {
+                LOGV2(6788603,
+                      "Auth metrics report",
+                      "metric"_attr = "sasl_acquireUser",
+                      "micros"_attr = elapsed.count());
+            });
+        }
+
         return authManager->acquireUser(opCtx, UserRequest(userName, boost::none));
     }();
 

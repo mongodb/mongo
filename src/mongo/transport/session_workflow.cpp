@@ -39,6 +39,7 @@
 #include "mongo/config.h"
 #include "mongo/db/client.h"
 #include "mongo/db/client_strand.h"
+#include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/query/kill_cursors_gen.h"
 #include "mongo/db/stats/counters.h"
@@ -203,6 +204,10 @@ struct SplitTimerPolicy {
             return;
         BSONObjBuilder bob;
         splitTimer->appendIntervals(bob);
+
+        if (!gEnableDetailedConnectionHealthMetricLogLines) {
+            return;
+        }
 
         logv2::LogSeverity severity = sessionWorkflowDelaySendMessage.shouldFail()
             ? logv2::LogSeverity::Info()

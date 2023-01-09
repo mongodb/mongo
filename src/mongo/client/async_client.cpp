@@ -41,6 +41,7 @@
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
@@ -315,18 +316,20 @@ Future<rpc::UniqueReply> AsyncDBClient::runCommand(
             const auto timeElapsedMicros =
                 durationCount<Microseconds>(fromConnAcquiredTimer.get()->elapsed());
             totalTimeForEgressConnectionAcquiredToWireMicros.increment(timeElapsedMicros);
-            if (timeElapsedMicros >= 1000 ||
-                MONGO_unlikely(alwaysLogConnAcquisitionToWireTime.shouldFail())) {
-                // Log slow acquisition times at info level but rate limit it to prevent spamming
-                // users.
-                static auto& logSeverity = *new logv2::SeveritySuppressor{
-                    Seconds{1}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(2)};
-                LOGV2_DEBUG(
-                    6496702,
-                    logSeverity().toInt(),
-                    "Acquired connection for remote operation and completed writing to wire",
-                    "durationMicros"_attr = timeElapsedMicros);
+
+            if ((!gEnableDetailedConnectionHealthMetricLogLines || timeElapsedMicros < 1000) &&
+                !MONGO_unlikely(alwaysLogConnAcquisitionToWireTime.shouldFail())) {
+                return;
             }
+
+            // Log slow acquisition times at info level but rate limit it to prevent spamming
+            // users.
+            static auto& logSeverity = *new logv2::SeveritySuppressor{
+                Seconds{1}, logv2::LogSeverity::Info(), logv2::LogSeverity::Debug(2)};
+            LOGV2_DEBUG(6496702,
+                        logSeverity().toInt(),
+                        "Acquired connection for remote operation and completed writing to wire",
+                        "durationMicros"_attr = timeElapsedMicros);
         }
     };
 

@@ -54,7 +54,7 @@ function authnFailureIncrementsServerStatusTotalAuthTime(mongodRunner) {
 }
 
 // Test that a successful authentication is logged correctly
-function authnSuccessLogsMetricsReportWithSuccessStatus(mongodRunner) {
+function authnSuccessLogsMetricsReportWithSuccessStatus(mongodRunner, connectionHealthLoggingOn) {
     jsTest.log(
         "============================ authnSuccessLogsMetricsReportWithSuccessStatus ============================");
 
@@ -65,44 +65,59 @@ function authnSuccessLogsMetricsReportWithSuccessStatus(mongodRunner) {
     expectedSuccessLogs += 1;
 
     admin.auth('admin', 'pwd');
-    assert.soon(
-        () => checkLog.checkContainsWithCountJson(
-            mongodRunner,
-            5286306,
-            {
-                "result": 0,
-                "metrics": {"conversation_duration": {"summary": [{"step": 1}, {"step": 2}]}}
-            },
-            expectedSuccessLogs,
-            null,
-            true),
-        "Did not find expected 1 successful metric log entries");
+    if (connectionHealthLoggingOn) {
+        assert.soon(
+            () => checkLog.checkContainsWithCountJson(
+                mongodRunner,
+                5286306,
+                {
+                    "result": 0,
+                    "metrics": {"conversation_duration": {"summary": [{"step": 1}, {"step": 2}]}}
+                },
+                expectedSuccessLogs,
+                null,
+                true),
+            "Did not find expected 1 successful metric log entries");
+    } else {
+        assert.eq(checkLog.checkContainsWithCountJson(mongodRunner, 5286306, {}),
+                  false,
+                  "Expected not to find metric log entries");
+    }
+
     admin.logout();
 }
 
 // Test that authentication failure is logged correctly
-function authnFailureLogsMetricsReportWithFailedStatus(mongodRunner) {
+function authnFailureLogsMetricsReportWithFailedStatus(mongodRunner, connectionHealthLoggingOn) {
     jsTest.log(
         "============================ authnFailureLogsMetricsReportWithFailedStatus ============================");
 
     const admin = mongodRunner.getDB("admin");
     admin.auth('admin', 'wrong');
     expectedFailureLogs += 1;
-    assert.soon(
-        () => checkLog.checkContainsWithCountJson(
-            mongodRunner,
-            5286307,
-            {"result": 18, "metrics": {"conversation_duration": {"summary": [{"step": 1}]}}},
-            expectedFailureLogs,
-            null,
-            true),
-        "Did not find expected 1 failure metric log entries");
+
+    if (connectionHealthLoggingOn) {
+        assert.soon(
+            () => checkLog.checkContainsWithCountJson(
+                mongodRunner,
+                5286307,
+                {"result": 18, "metrics": {"conversation_duration": {"summary": [{"step": 1}]}}},
+                expectedFailureLogs,
+                null,
+                true),
+            "Did not find expected 1 failure metric log entries");
+    } else {
+        assert.eq(checkContainsWithCountJson(mongodRunner, 5286307, {}),
+                  false,
+                  "Expected not to find failure metric log entries");
+    }
+
     admin.logout();
 }
 
 // Test that multiple successful authentications across the same client produce the correct log
 // output and do not e.g. combine summaries or results
-function multipleAuthnSuccessLogsMultipleCorrectReports(mongodRunner) {
+function multipleAuthnSuccessLogsMultipleCorrectReports(mongodRunner, connectionHealthLoggingOn) {
     jsTest.log(
         "============================ multipleAuthnSuccessLogsMultipleCorrectReports ============================");
 
@@ -114,22 +129,28 @@ function multipleAuthnSuccessLogsMultipleCorrectReports(mongodRunner) {
 
     expectedSuccessLogs += 2;
 
-    assert.soon(
-        () => checkLog.checkContainsWithCountJson(
-            mongodRunner,
-            5286306,
-            {
-                "result": 0,
-                "metrics": {"conversation_duration": {"summary": [{"step": 1}, {"step": 2}]}}
-            },
-            expectedSuccessLogs,
-            null,
-            true),
-        "Did not find expected 2 successful metric log entries");
+    if (connectionHealthLoggingOn) {
+        assert.soon(
+            () => checkLog.checkContainsWithCountJson(
+                mongodRunner,
+                5286306,
+                {
+                    "result": 0,
+                    "metrics": {"conversation_duration": {"summary": [{"step": 1}, {"step": 2}]}}
+                },
+                expectedSuccessLogs,
+                null,
+                true),
+            "Did not find expected 2 successful metric log entries");
+    } else {
+        assert.eq(checkLog.checkContainsWithCountJson(mongodRunner, 5286306, {}),
+                  false,
+                  "Expected not to find successful metric log entries");
+    }
 }
 
 // Test that multiple authentication failure is logged correctly
-function authnFailureLogsMetricsReportWithFailedStatus(mongodRunner) {
+function authnFailureLogsMetricsReportWithFailedStatus(mongodRunner, connectionHealthLoggingOn) {
     jsTest.log(
         "============================ authnFailureLogsMetricsReportWithFailedStatus ============================");
 
@@ -138,21 +159,29 @@ function authnFailureLogsMetricsReportWithFailedStatus(mongodRunner) {
     admin.auth('admin', 'wrong_2');
 
     expectedFailureLogs += 2;
-    assert.soon(
-        () => checkLog.checkContainsWithCountJson(
-            mongodRunner,
-            5286307,
-            {"result": 18, "metrics": {"conversation_duration": {"summary": [{"step": 1}]}}},
-            expectedFailureLogs,
-            null,
-            true),
-        "Did not find expected 2 failure metric log entries");
+
+    if (connectionHealthLoggingOn) {
+        assert.soon(
+            () => checkLog.checkContainsWithCountJson(
+                mongodRunner,
+                5286307,
+                {"result": 18, "metrics": {"conversation_duration": {"summary": [{"step": 1}]}}},
+                expectedFailureLogs,
+                null,
+                true),
+            "Did not find expected 2 failure metric log entries");
+    } else {
+        assert.eq(checkLog.checkContainsWithCountJson(mongodRunner, 5286307, {}),
+                  false,
+                  "Expected not to find failure metric log entries");
+    }
+
     admin.logout();
 }
 
 // Test that multiple mixed authentications across the same client produce the correct log output
 // and do not e.g. combine summaries or results
-function multipleAuthnMixedLogsMultipleCorrectReports(mongodRunner) {
+function multipleAuthnMixedLogsMultipleCorrectReports(mongodRunner, connectionHealthLoggingOn) {
     jsTest.log(
         "============================ multipleAuthnMixedLogsMultipleCorrectReports ============================");
 
@@ -163,49 +192,68 @@ function multipleAuthnMixedLogsMultipleCorrectReports(mongodRunner) {
 
     expectedSuccessLogs += 1;
 
-    assert.soon(
-        () => checkLog.checkContainsWithCountJson(
-            mongodRunner,
-            5286306,
-            {
-                "result": 0,
-                "metrics": {"conversation_duration": {"summary": [{"step": 1}, {"step": 2}]}}
-            },
-            expectedSuccessLogs,
-            null,
-            true),
-        "Did not find expected 1 successful metric log entries");
+    if (connectionHealthLoggingOn) {
+        assert.soon(
+            () => checkLog.checkContainsWithCountJson(
+                mongodRunner,
+                5286306,
+                {
+                    "result": 0,
+                    "metrics": {"conversation_duration": {"summary": [{"step": 1}, {"step": 2}]}}
+                },
+                expectedSuccessLogs,
+                null,
+                true),
+            "Did not find expected 1 successful metric log entries");
+    } else {
+        assert.eq(checkLog.checkContainsWithCountJson(mongodRunner, 5286306, {}),
+                  false,
+                  "Expected not to find successful metric log entries");
+    }
 
     expectedFailureLogs += 1;
 
     admin.auth('admin', 'wrong');
 
-    assert.soon(
-        () => checkLog.checkContainsWithCountJson(
-            mongodRunner,
-            5286307,
-            {"result": 18, "metrics": {"conversation_duration": {"summary": [{"step": 1}]}}},
-            expectedFailureLogs,
-            null,
-            true),
-        "Did not find expected 1 failure metric log entries");
+    if (connectionHealthLoggingOn) {
+        assert.soon(
+            () => checkLog.checkContainsWithCountJson(
+                mongodRunner,
+                5286307,
+                {"result": 18, "metrics": {"conversation_duration": {"summary": [{"step": 1}]}}},
+                expectedFailureLogs,
+                null,
+                true),
+            "Did not find expected 1 failure metric log entries");
+    } else {
+        assert.eq(checkLog.checkContainsWithCountJson(mongodRunner, 5286307, {}),
+                  false,
+                  "Expected not to find failure metric log entries");
+    }
 }
 
-const mongod = MongoRunner.runMongod();
+let runTest = (connectionHealthLoggingOn) => {
+    const mongod = MongoRunner.runMongod(
+        {setParameter: {enableDetailedConnectionHealthMetricLogLines: connectionHealthLoggingOn}});
 
-try {
-    mongod.getDB("admin").createUser(
-        {user: 'admin', pwd: 'pwd', roles: ['root'], mechanisms: ['SCRAM-SHA-256']});
+    try {
+        mongod.getDB("admin").createUser(
+            {user: 'admin', pwd: 'pwd', roles: ['root'], mechanisms: ['SCRAM-SHA-256']});
 
-    authnSuccessLogsMetricsReportWithSuccessStatus(mongod);
-    authnFailureLogsMetricsReportWithFailedStatus(mongod);
-    multipleAuthnSuccessLogsMultipleCorrectReports(mongod);
-    multipleAuthnMixedLogsMultipleCorrectReports(mongod);
+        authnSuccessLogsMetricsReportWithSuccessStatus(mongod, connectionHealthLoggingOn);
+        authnFailureLogsMetricsReportWithFailedStatus(mongod, connectionHealthLoggingOn);
+        multipleAuthnSuccessLogsMultipleCorrectReports(mongod, connectionHealthLoggingOn);
+        multipleAuthnMixedLogsMultipleCorrectReports(mongod, connectionHealthLoggingOn);
 
-    authnSuccessIncrementsServerStatusTotalAuthTime(mongod);
-    authnFailureIncrementsServerStatusTotalAuthTime(mongod);
+        authnSuccessIncrementsServerStatusTotalAuthTime(mongod, connectionHealthLoggingOn);
+        authnFailureIncrementsServerStatusTotalAuthTime(mongod, connectionHealthLoggingOn);
 
-} finally {
-    MongoRunner.stopMongod(mongod);
-}
+    } finally {
+        MongoRunner.stopMongod(mongod);
+    }
+};
+
+// Parameterized on enabling/disabling connection health logging.
+runTest(true);
+runTest(false);
 })();

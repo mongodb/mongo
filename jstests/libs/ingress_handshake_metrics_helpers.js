@@ -12,6 +12,7 @@ function ingressHandshakeMetricsTest(conn, options) {
         guestCredentials = {user: 'guest', pwd: 'guest'},
         dbName = 'test',
         collectionName = 'test_coll',
+        connectionHealthLoggingOn,
         preAuthDelayMillis,
         postAuthDelayMillis,
         helloProcessingDelayMillis,
@@ -31,6 +32,11 @@ function ingressHandshakeMetricsTest(conn, options) {
 
         db.createUser(Object.assign(guestCredentials, {roles: jsTest.readOnlyUserRoles}));
         db[collectionName].insert({foo: 42});
+
+        if (!connectionHealthLoggingOn) {
+            assert.commandWorked(conn.adminCommand(
+                {setParameter: 1, enableDetailedConnectionHealthMetricLogLines: false}));
+        }
     }
 
     function performAuthTestConnection() {
@@ -85,7 +91,14 @@ function ingressHandshakeMetricsTest(conn, options) {
 
         performAuthTestConnection();
 
-        assert(timingLogLineExists, "No matching 'first non-auth command' log line");
+        if (connectionHealthLoggingOn) {
+            assert(timingLogLineExists, "No matching 'first non-auth command' log line");
+        } else {
+            assert.eq(
+                timingLogLineExists(),
+                false,
+                "Found 'first non-auth command log line' despite disabling connection health logging");
+        }
 
         let metricAfterTest = getTotalTimeToFirstNonAuthCommandMillis();
         assert.gte(metricAfterTest - metricBeforeTest, totalDelayMillis);
@@ -93,7 +106,15 @@ function ingressHandshakeMetricsTest(conn, options) {
 
     function performHelloMetricsTest() {
         performHelloTestConnection();
-        assert(helloCompletedLogLineExists, "No matching 'hello completed' log line");
+
+        if (connectionHealthLoggingOn) {
+            assert(helloCompletedLogLineExists, "No matching 'hello completed' log line");
+        } else {
+            assert.eq(
+                helloCompletedLogLineExists(),
+                false,
+                "Found 'hello completed' log line despite disabling conection health logging");
+        }
     }
 
     // Setup the test and return the function that will perform the test when called

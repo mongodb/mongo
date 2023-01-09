@@ -32,6 +32,7 @@
 
 #include "mongo/config.h"
 #include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/transport/asio/asio_utils.h"
@@ -733,9 +734,11 @@ Future<bool> AsioSession::maybeHandshakeSSLForIngress(const MutableBufferSequenc
                 LOGV2_DEBUG(4908001, 2, "Client connected without SNI extension");
             }
             const auto handshakeDurationMillis = durationCount<Milliseconds>(startTimer.elapsed());
-            LOGV2(6723804,
-                  "Ingress TLS handshake complete",
-                  "durationMillis"_attr = handshakeDurationMillis);
+            if (gEnableDetailedConnectionHealthMetricLogLines) {
+                LOGV2(6723804,
+                      "Ingress TLS handshake complete",
+                      "durationMillis"_attr = handshakeDurationMillis);
+            }
             totalIngressTLSConnections.increment(1);
             totalIngressTLSHandshakeTimeMillis.increment(handshakeDurationMillis);
             if (SSLPeerInfo::forSession(shared_from_this()).subjectName().empty()) {

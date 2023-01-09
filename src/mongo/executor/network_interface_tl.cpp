@@ -35,6 +35,7 @@
 #include "mongo/config.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/wire_version.h"
@@ -472,10 +473,12 @@ void NetworkInterfaceTL::CommandStateBase::setTimer() {
     const auto timeoutCode = requestOnAny.timeoutCode;
     if (nowVal >= deadline) {
         connTimeoutWaitTime = stopwatch.elapsed();
-        LOGV2(6496501,
-              "Operation timed out while waiting to acquire connection",
-              "requestId"_attr = requestOnAny.id,
-              "duration"_attr = connTimeoutWaitTime);
+        if (gEnableDetailedConnectionHealthMetricLogLines) {
+            LOGV2(6496501,
+                  "Operation timed out while waiting to acquire connection",
+                  "requestId"_attr = requestOnAny.id,
+                  "duration"_attr = connTimeoutWaitTime);
+        }
         uasserted(timeoutCode,
                   str::stream() << "Remote command timed out while waiting to get a "
                                    "connection from the pool, took "
@@ -844,10 +847,12 @@ void NetworkInterfaceTL::RequestManager::trySend(
         if (cmdState->finishLine.arriveStrongly()) {
             if (swConn.getStatus() == cmdState->requestOnAny.timeoutCode) {
                 cmdState->connTimeoutWaitTime = cmdState->stopwatch.elapsed();
-                LOGV2(6496500,
-                      "Operation timed out while waiting to acquire connection",
-                      "requestId"_attr = cmdState->requestOnAny.id,
-                      "duration"_attr = cmdState->connTimeoutWaitTime);
+                if (gEnableDetailedConnectionHealthMetricLogLines) {
+                    LOGV2(6496500,
+                          "Operation timed out while waiting to acquire connection",
+                          "requestId"_attr = cmdState->requestOnAny.id,
+                          "duration"_attr = cmdState->connTimeoutWaitTime);
+                }
             }
 
             auto& reactor = cmdState->interface->_reactor;

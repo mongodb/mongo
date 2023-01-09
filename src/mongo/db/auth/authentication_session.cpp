@@ -33,6 +33,7 @@
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/authentication_metrics.h"
 #include "mongo/db/client.h"
+#include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
@@ -339,16 +340,18 @@ void AuthenticationSession::markSuccessful() {
 
     BSONObj metrics = _metricsRecorder.capture();
 
-    LOGV2(5286306,
-          "Successfully authenticated",
-          "client"_attr = _client->getRemote(),
-          "isSpeculative"_attr = _isSpeculative,
-          "isClusterMember"_attr = _isClusterMember,
-          "mechanism"_attr = _mechName,
-          "user"_attr = _userName.getUser(),
-          "db"_attr = _userName.getDB(),
-          "result"_attr = Status::OK().code(),
-          "metrics"_attr = metrics);
+    if (gEnableDetailedConnectionHealthMetricLogLines) {
+        LOGV2(5286306,
+              "Successfully authenticated",
+              "client"_attr = _client->getRemote(),
+              "isSpeculative"_attr = _isSpeculative,
+              "isClusterMember"_attr = _isClusterMember,
+              "mechanism"_attr = _mechName,
+              "user"_attr = _userName.getUser(),
+              "db"_attr = _userName.getDB(),
+              "result"_attr = Status::OK().code(),
+              "metrics"_attr = metrics);
+    }
 }
 
 void AuthenticationSession::markFailed(const Status& status) {
@@ -363,17 +366,19 @@ void AuthenticationSession::markFailed(const Status& status) {
 
     BSONObj metrics = _metricsRecorder.capture();
 
-    LOGV2(5286307,
-          "Failed to authenticate",
-          "client"_attr = _client->getRemote(),
-          "isSpeculative"_attr = _isSpeculative,
-          "isClusterMember"_attr = _isClusterMember,
-          "mechanism"_attr = _mechName,
-          "user"_attr = _userName.getUser(),
-          "db"_attr = _userName.getDB(),
-          "error"_attr = status,
-          "result"_attr = status.code(),
-          "metrics"_attr = metrics);
+    if (gEnableDetailedConnectionHealthMetricLogLines) {
+        LOGV2(5286307,
+              "Failed to authenticate",
+              "client"_attr = _client->getRemote(),
+              "isSpeculative"_attr = _isSpeculative,
+              "isClusterMember"_attr = _isClusterMember,
+              "mechanism"_attr = _mechName,
+              "user"_attr = _userName.getUser(),
+              "db"_attr = _userName.getDB(),
+              "error"_attr = status,
+              "result"_attr = status.code(),
+              "metrics"_attr = metrics);
+    }
 }
 
 }  // namespace mongo

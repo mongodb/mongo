@@ -304,6 +304,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/auth/cluster_auth_mode',
         '$BUILD_DIR/mongo/util/options_parser/options_parser',
+        'connection_health_metrics_parameter',
         'server_base',
     ],
 )
@@ -350,6 +351,17 @@ env.Library(
     LIBDEPS=[
         'repl/repl_settings',
         'service_context',
+    ],
+)
+
+env.Library(
+    target="connection_health_metrics_parameter",
+    source=[
+        "connection_health_metrics_parameter.idl",
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/util/options_parser/options_parser',
     ],
 )
 

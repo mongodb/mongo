@@ -123,6 +123,7 @@ if not get_option('ssl') == 'off':
             '$BUILD_DIR/mongo/base/secure_allocator',
             '$BUILD_DIR/mongo/crypto/sha_block_${MONGO_CRYPTO}',
             '$BUILD_DIR/mongo/db/auth/cluster_auth_mode',
+            '$BUILD_DIR/mongo/db/connection_health_metrics_parameter',
             '$BUILD_DIR/mongo/db/server_base',
             '$BUILD_DIR/mongo/db/service_context',
             '$BUILD_DIR/mongo/util/background_job',

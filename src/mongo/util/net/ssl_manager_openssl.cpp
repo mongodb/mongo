@@ -47,6 +47,7 @@
 #include "mongo/base/secure_allocator.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"
+#include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
@@ -1023,7 +1024,8 @@ Future<OCSPFetchResponse> dispatchOCSPRequests(SSL_CTX* context,
                 // 2. The last OCSP response returns and the status of the certificate is still
                 //    unknown.
                 ScopeGuard logLatencyGuard([requestLatency, purpose]() {
-                    if (purpose != OCSPPurpose::kClientVerify) {
+                    if (purpose != OCSPPurpose::kClientVerify ||
+                        !gEnableDetailedConnectionHealthMetricLogLines) {
                         return;
                     }
                     LOGV2_INFO(6840101,
@@ -3313,7 +3315,7 @@ Future<SSLPeerInfo> SSLManagerOpenSSL::parseAndValidatePeerCertificate(
     // TODO: check optional cipher restriction, using cert.
     auto peerSubject = getCertificateSubjectX509Name(peerCert.get());
     const auto cipher = SSL_get_current_cipher(conn);
-    if (!serverGlobalParams.quiet.load()) {
+    if (!serverGlobalParams.quiet.load() && gEnableDetailedConnectionHealthMetricLogLines) {
         LOGV2_INFO(6723801,
                    "Accepted TLS connection from peer",
                    "peerSubject"_attr = peerSubject,

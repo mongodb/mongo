@@ -45,6 +45,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/config.h"
+#include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
@@ -2067,7 +2068,7 @@ Future<SSLPeerInfo> SSLManagerWindows::parseAndValidatePeerCertificate(
     }
     const auto cipher = std::wstring(cipherInfo.szCipherSuite);
 
-    if (!serverGlobalParams.quiet.load()) {
+    if (!serverGlobalParams.quiet.load() && gEnableDetailedConnectionHealthMetricLogLines) {
         LOGV2_INFO(6723802,
                    "Accepted TLS connection from peer",
                    "peerSubjectName"_attr = peerSubjectName,

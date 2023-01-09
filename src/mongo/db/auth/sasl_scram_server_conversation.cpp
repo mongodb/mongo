@@ -43,6 +43,7 @@
 #include "mongo/db/auth/sasl_mechanism_policies.h"
 #include "mongo/db/auth/sasl_mechanism_registry.h"
 #include "mongo/db/auth/sasl_options.h"
+#include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/base64.h"
@@ -207,12 +208,15 @@ StatusWith<std::tuple<bool, std::string>> SaslSCRAMServerMechanism<Policy>::_fir
     auto authManager = AuthorizationManager::get(opCtx->getServiceContext());
 
     auto swUser = [&]() {
-        ScopedCallbackTimer timer([&](Microseconds elapsed) {
-            LOGV2(6788604,
-                  "Auth metrics report",
-                  "metric"_attr = "acquireUser",
-                  "micros"_attr = elapsed.count());
-        });
+        if (gEnableDetailedConnectionHealthMetricLogLines) {
+            ScopedCallbackTimer timer([&](Microseconds elapsed) {
+                LOGV2(6788604,
+                      "Auth metrics report",
+                      "metric"_attr = "acquireUser",
+                      "micros"_attr = elapsed.count());
+            });
+        }
+
         return authManager->acquireUser(opCtx, UserRequest(user, boost::none));
     }();
 

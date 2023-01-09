@@ -37,6 +37,7 @@
 #include "mongo/config.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/executor/network_interface_tl_gen.h"
 #include "mongo/logv2/log.h"
@@ -66,6 +67,10 @@ auto makeSeveritySuppressor() {
 
 bool connHealthMetricsEnabled() {
     return gFeatureFlagConnHealthMetrics.isEnabledAndIgnoreFCV();
+}
+
+bool connHealthMetricsLoggingEnabled() {
+    return gEnableDetailedConnectionHealthMetricLogLines;
 }
 
 void logSlowConnection(const HostAndPort& peer, const ConnectionMetrics& connMetrics) {
@@ -434,14 +439,16 @@ void TLConnection::setup(Milliseconds timeout, SetupCallback cb, std::string ins
             if (status.isOK()) {
                 if (connHealthMetricsEnabled()) {
                     totalConnectionEstablishmentTime.increment(_connMetrics.total().count());
-                    if (_connMetrics.total() >=
-                        Milliseconds(gSlowConnectionThresholdMillis.load())) {
+                    if (connHealthMetricsLoggingEnabled() &&
+                        _connMetrics.total() >=
+                            Milliseconds(gSlowConnectionThresholdMillis.load())) {
                         logSlowConnection(_peer, _connMetrics);
                     }
                 }
                 handler->promise.emplaceValue();
             } else {
-                if (ErrorCodes::isNetworkTimeoutError(status) && connHealthMetricsEnabled()) {
+                if (ErrorCodes::isNetworkTimeoutError(status) && connHealthMetricsEnabled() &&
+                    connHealthMetricsLoggingEnabled()) {
                     logSlowConnection(_peer, _connMetrics);
                 }
                 LOGV2_DEBUG(22584,

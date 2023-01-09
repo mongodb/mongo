@@ -41,6 +41,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/crypto/sha256_block.h"
+#include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
 #include "mongo/transport/ssl_connection_context.h"
@@ -1675,7 +1676,7 @@ Future<SSLPeerInfo> SSLManagerApple::parseAndValidatePeerCertificate(
     // The cipher will be presented as a number.
     ::SSLCipherSuite cipher;
     uassertOSStatusOK(::SSLGetNegotiatedCipher(ssl, &cipher));
-    if (!serverGlobalParams.quiet.load()) {
+    if (!serverGlobalParams.quiet.load() && gEnableDetailedConnectionHealthMetricLogLines) {
         LOGV2_INFO(6723803,
                    "Accepted TLS connection from peer",
                    "peerSubjectName"_attr = peerSubjectName,

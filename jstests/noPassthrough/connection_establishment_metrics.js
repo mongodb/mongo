@@ -39,7 +39,8 @@ function validateSlowConnectionLogEntry(entry) {
     }
     assert.eq(total, entry.attr.totalTimeMillis);
 }
-function validateLogAndExtractEntry() {
+
+function validateLogAndExtractEntry(st) {
     const mongosLog = assert.commandWorked(st.s.adminCommand({getLog: "global"}));
     let queryLogEntry = null;
     for (const line of findMatchingLogLines(mongosLog.log, {id: 6496400})) {
@@ -52,59 +53,98 @@ function validateLogAndExtractEntry() {
     return queryLogEntry;
 }
 
+function validateLogAndExtractCountAndEntry(st) {
+    const mongosLog = assert.commandWorked(st.s.adminCommand({getLog: "global"}));
+    let queryLogEntry = null;
+    let matchingLines = findMatchingLogLines(mongosLog.log, {id: 6496400});
+    for (const line of matchingLines) {
+        let entry = JSON.parse(line);
+        validateSlowConnectionLogEntry(entry);
+        if (entry.attr.totalTimeMillis >= kConnectionEstablishmentDelayMillis) {
+            queryLogEntry = entry;
+        }
+    }
+    return {count: matchingLines.length, entry: queryLogEntry};
+}
+
 const kConnectionEstablishmentDelayMillis = 250;
 const kDBName = 'TestDB';
 const kCollectionName = 'sharded_coll';
 const kKeyName = 'foo';
 
-let st = new ShardingTest({shards: 1});
+let runTest = (connectionHealthLoggingOn) => {
+    let st = new ShardingTest({shards: 1});
 
-jsTestLog("Setting up the test collection.");
+    if (!connectionHealthLoggingOn) {
+        assert.commandWorked(st.s.adminCommand(
+            {setParameter: 1, enableDetailedConnectionHealthMetricLogLines: false}));
+    }
 
-assert.commandWorked(st.s.adminCommand({enableSharding: kDBName}));
-assert.commandWorked(
-    st.s.adminCommand({shardcollection: `${kDBName}.${kCollectionName}`, key: {[kKeyName]: 1}}));
+    const initialLogEntryCount = validateLogAndExtractCountAndEntry(st).count;
 
-let db = st.getDB(kDBName);
-assert.commandWorked(db[kCollectionName].insertOne({primaryOnly: true, [kKeyName]: 42}));
+    jsTestLog("Setting up the test collection.");
 
-jsTestLog("Activating the delay in connection establishment.");
-let connDelayFailPoint = configureFailPoint(
-    st.s, 'asioTransportLayerDelayConnection', {millis: kConnectionEstablishmentDelayMillis});
-assert.commandWorked(st.s.adminCommand(
-    {setParameter: 1, slowConnectionThresholdMillis: kConnectionEstablishmentDelayMillis}));
-assert.commandWorked(
-    st.s.adminCommand({dropConnections: 1, hostAndPort: [st.rs0.getPrimary().host]}));
+    assert.commandWorked(st.s.adminCommand({enableSharding: kDBName}));
+    assert.commandWorked(st.s.adminCommand(
+        {shardcollection: `${kDBName}.${kCollectionName}`, key: {[kKeyName]: 1}}));
 
-jsTestLog("Running the query.");
+    let db = st.getDB(kDBName);
+    assert.commandWorked(db[kCollectionName].insertOne({primaryOnly: true, [kKeyName]: 42}));
 
-function runTestQuery(db) {
-    return startParallelShell(
-        funWithArgs((host, dbName, collName, keyName) => {
-            let conn = new Mongo(host);
-            assert.eq(1,
-                      conn.getDB(dbName)
-                          .getCollection(collName)
-                          .find({primaryOnly: true, [keyName]: 42})
-                          .itcount());
-        }, db.getMongo().host, db.getName(), kCollectionName, kKeyName), null, true);
-}
-let queryShell = runTestQuery(db);
+    jsTestLog("Activating the delay in connection establishment.");
+    let connDelayFailPoint = configureFailPoint(
+        st.s, 'asioTransportLayerDelayConnection', {millis: kConnectionEstablishmentDelayMillis});
+    assert.commandWorked(st.s.adminCommand(
+        {setParameter: 1, slowConnectionThresholdMillis: kConnectionEstablishmentDelayMillis}));
+    assert.commandWorked(
+        st.s.adminCommand({dropConnections: 1, hostAndPort: [st.rs0.getPrimary().host]}));
 
-jsTestLog("Checking the mongos log.");
+    jsTestLog("Running the query.");
 
-assert.soon(() => validateLogAndExtractEntry() != null,
-            "Slow connection establishment log entry not found.");
+    function runTestQuery(db) {
+        return startParallelShell(
+            funWithArgs((host, dbName, collName, keyName) => {
+                let conn = new Mongo(host);
+                assert.eq(1,
+                          conn.getDB(dbName)
+                              .getCollection(collName)
+                              .find({primaryOnly: true, [keyName]: 42})
+                              .itcount());
+            }, db.getMongo().host, db.getName(), kCollectionName, kKeyName), null, true);
+    }
+    let queryShell = runTestQuery(db);
 
-queryShell();
-connDelayFailPoint.off();
+    if (connectionHealthLoggingOn) {
+        jsTestLog("Checking the mongos log.");
 
-jsTestLog("Checking the output of serverStatus.");
-let queryLogEntry = validateLogAndExtractEntry();
-let status = assert.commandWorked(st.s.adminCommand({serverStatus: 1}));
-printjson(status);
-assert.gte(status.metrics.network.totalEgressConnectionEstablishmentTimeMillis,
-           queryLogEntry.attr.totalTimeMillis);
+        assert.soon(() => validateLogAndExtractCountAndEntry(st).entry != null,
+                    "Slow connection establishment log entry not found.");
 
-st.stop();
+        queryShell();
+        connDelayFailPoint.off();
+
+        jsTestLog("Checking the output of serverStatus.");
+        let queryLogEntry = validateLogAndExtractCountAndEntry(st).entry;
+        let status = assert.commandWorked(st.s.adminCommand({serverStatus: 1}));
+        printjson(status);
+        assert.gte(status.metrics.network.totalEgressConnectionEstablishmentTimeMillis,
+                   queryLogEntry.attr.totalTimeMillis);
+    } else {
+        assert.eq(validateLogAndExtractCountAndEntry(st).count, initialLogEntryCount);
+
+        queryShell();
+        connDelayFailPoint.off();
+
+        jsTestLog("Checking the output of serverStatus.");
+        let status = assert.commandWorked(st.s.adminCommand({serverStatus: 1}));
+        printjson(status);
+        assert.gte(status.metrics.network.totalEgressConnectionEstablishmentTimeMillis, 0);
+    }
+
+    st.stop();
+};
+
+// Parameter is connectionHealthLoggingOn == true/false
+runTest(true);
+runTest(false);
 })();

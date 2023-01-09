@@ -39,6 +39,7 @@
 #include "mongo/crypto/mechanism_scram.h"
 #include "mongo/db/auth/sasl_mechanism_registry.h"
 #include "mongo/db/auth/user.h"
+#include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/password_digest.h"
@@ -129,12 +130,15 @@ StatusWith<std::tuple<bool, std::string>> SASLPlainServerMechanism::stepImpl(
 
     // The authentication database is also the source database for the user.
     auto swUser = [&]() {
-        ScopedCallbackTimer timer([&](Microseconds elapsed) {
-            LOGV2(6788606,
-                  "Auth metrics report",
-                  "metric"_attr = "plain_acquireUser",
-                  "micros"_attr = elapsed.count());
-        });
+        if (gEnableDetailedConnectionHealthMetricLogLines) {
+            ScopedCallbackTimer timer([&](Microseconds elapsed) {
+                LOGV2(6788606,
+                      "Auth metrics report",
+                      "metric"_attr = "plain_acquireUser",
+                      "micros"_attr = elapsed.count());
+            });
+        }
+
         return authManager->acquireUser(opCtx, getUserRequest());
     }();
 
