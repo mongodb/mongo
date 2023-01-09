@@ -39,6 +39,18 @@
 #include "mongo/s/stale_exception.h"
 
 namespace mongo::catalog_helper {
+namespace {
+MONGO_FAIL_POINT_DEFINE(setAutoGetCollectionWait);
+
+/**
+ * Defines sorting order for NamespaceStrings based on what their ResourceId would be for locking.
+ */
+struct ResourceIdNssComparator {
+    bool operator()(const NamespaceString& lhs, const NamespaceString& rhs) const {
+        return ResourceId(RESOURCE_COLLECTION, lhs) < ResourceId(RESOURCE_COLLECTION, rhs);
+    }
+};
+}  // namespace
 
 void assertMatchingDbVersion(OperationContext* opCtx, const StringData& dbName) {
     const auto receivedVersion = OperationShardingState::get(opCtx).getDbVersion(dbName);
@@ -90,6 +102,61 @@ void assertIsPrimaryShardForDb(OperationContext* opCtx, const StringData& dbName
             str::stream() << "This is not the primary shard for the database " << dbName
                           << ". Expected: " << primaryShardId << " Actual: " << thisShardId,
             primaryShardId == thisShardId);
+}
+
+void acquireCollectionLocksInResourceIdOrder(
+    OperationContext* opCtx,
+    const NamespaceStringOrUUID& nsOrUUID,
+    LockMode modeColl,
+    Date_t deadline,
+    const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs,
+    std::vector<CollectionNamespaceOrUUIDLock>* collLocks) {
+    invariant(collLocks->empty());
+    auto catalog = CollectionCatalog::get(opCtx);
+
+    // Use a set so that we can easily dedupe namespaces to avoid locking the same collection twice.
+    std::set<NamespaceString, ResourceIdNssComparator> temp;
+    std::set<NamespaceString, ResourceIdNssComparator> verifyTemp;
+    do {
+        // Clear the data structures when/if we loop more than once.
+        collLocks->clear();
+        temp.clear();
+        verifyTemp.clear();
+
+        // Create a single set with all the resolved namespaces sorted by ascending
+        // ResourceId(RESOURCE_COLLECTION, nss).
+        temp.insert(catalog->resolveNamespaceStringOrUUID(opCtx, nsOrUUID));
+        for (const auto& secondaryNssOrUUID : secondaryNssOrUUIDs) {
+            invariant(secondaryNssOrUUID.db() == nsOrUUID.db(),
+                      str::stream()
+                          << "Unable to acquire locks for collections across different databases ("
+                          << secondaryNssOrUUID << " vs " << nsOrUUID << ")");
+            temp.insert(catalog->resolveNamespaceStringOrUUID(opCtx, secondaryNssOrUUID));
+        }
+
+        // Acquire all of the locks in order. And clear the 'catalog' because the locks will access
+        // a fresher one internally.
+        catalog = nullptr;
+        for (auto& nss : temp) {
+            collLocks->emplace_back(opCtx, nss, modeColl, deadline);
+        }
+
+        // Check that the namespaces have NOT changed after acquiring locks. It's possible to race
+        // with a rename collection when the given NamespaceStringOrUUID is a UUID, and consequently
+        // fail to lock the correct namespace.
+        //
+        // The catalog reference must be refreshed to see the latest Collection data. Otherwise we
+        // won't see any concurrent DDL/catalog operations.
+        auto catalog = CollectionCatalog::get(opCtx);
+        verifyTemp.insert(catalog->resolveNamespaceStringOrUUID(opCtx, nsOrUUID));
+        for (const auto& secondaryNssOrUUID : secondaryNssOrUUIDs) {
+            verifyTemp.insert(catalog->resolveNamespaceStringOrUUID(opCtx, secondaryNssOrUUID));
+        }
+    } while (temp != verifyTemp);
+}
+
+void setAutoGetCollectionWaitFailpointExecute(std::function<void(const BSONObj&)> callback) {
+    setAutoGetCollectionWait.execute(callback);
 }
 
 }  // namespace mongo::catalog_helper

@@ -47,7 +47,6 @@
 namespace mongo {
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(setAutoGetCollectionWait);
 MONGO_FAIL_POINT_DEFINE(hangBeforeAutoGetCollectionLockFreeShardedStateAccess);
 
 /**
@@ -123,76 +122,6 @@ void verifyDbAndCollection(OperationContext* opCtx,
     }
 }
 
-/**
- * Defines sorting order for NamespaceStrings based on what their ResourceId would be for locking.
- */
-struct ResourceIdNssComparator {
-    bool operator()(const NamespaceString& lhs, const NamespaceString& rhs) const {
-        return ResourceId(RESOURCE_COLLECTION, lhs) < ResourceId(RESOURCE_COLLECTION, rhs);
-    }
-};
-
-/**
- * Fills the input 'collLocks' with CollectionLocks, acquiring locks on namespaces 'nsOrUUID' and
- * 'secondaryNssOrUUIDs' in ResourceId(RESOURCE_COLLECTION, nss) order.
- *
- * The namespaces will be resolved, the locks acquired, and then the namespaces will be checked for
- * changes in case there is a race with rename and a UUID no longer matches the locked namespace.
- *
- * Handles duplicate namespaces across 'nsOrUUID' and 'secondaryNssOrUUIDs'. Only one lock will be
- * taken on each namespace.
- */
-void acquireCollectionLocksInResourceIdOrder(
-    OperationContext* opCtx,
-    const NamespaceStringOrUUID& nsOrUUID,
-    LockMode modeColl,
-    Date_t deadline,
-    const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs,
-    std::vector<CollectionNamespaceOrUUIDLock>* collLocks) {
-    invariant(collLocks->empty());
-    auto catalog = CollectionCatalog::get(opCtx);
-
-    // Use a set so that we can easily dedupe namespaces to avoid locking the same collection twice.
-    std::set<NamespaceString, ResourceIdNssComparator> temp;
-    std::set<NamespaceString, ResourceIdNssComparator> verifyTemp;
-    do {
-        // Clear the data structures when/if we loop more than once.
-        collLocks->clear();
-        temp.clear();
-        verifyTemp.clear();
-
-        // Create a single set with all the resolved namespaces sorted by ascending
-        // ResourceId(RESOURCE_COLLECTION, nss).
-        temp.insert(catalog->resolveNamespaceStringOrUUID(opCtx, nsOrUUID));
-        for (const auto& secondaryNssOrUUID : secondaryNssOrUUIDs) {
-            invariant(secondaryNssOrUUID.db() == nsOrUUID.db(),
-                      str::stream()
-                          << "Unable to acquire locks for collections across different databases ("
-                          << secondaryNssOrUUID << " vs " << nsOrUUID << ")");
-            temp.insert(catalog->resolveNamespaceStringOrUUID(opCtx, secondaryNssOrUUID));
-        }
-
-        // Acquire all of the locks in order. And clear the 'catalog' because the locks will access
-        // a fresher one internally.
-        catalog = nullptr;
-        for (auto& nss : temp) {
-            collLocks->emplace_back(opCtx, nss, modeColl, deadline);
-        }
-
-        // Check that the namespaces have NOT changed after acquiring locks. It's possible to race
-        // with a rename collection when the given NamespaceStringOrUUID is a UUID, and consequently
-        // fail to lock the correct namespace.
-        //
-        // The catalog reference must be refreshed to see the latest Collection data. Otherwise we
-        // won't see any concurrent DDL/catalog operations.
-        auto catalog = CollectionCatalog::get(opCtx);
-        verifyTemp.insert(catalog->resolveNamespaceStringOrUUID(opCtx, nsOrUUID));
-        for (const auto& secondaryNssOrUUID : secondaryNssOrUUIDs) {
-            verifyTemp.insert(catalog->resolveNamespaceStringOrUUID(opCtx, secondaryNssOrUUID));
-        }
-    } while (temp != verifyTemp);
-}
-
 }  // namespace
 
 AutoGetDb::AutoGetDb(OperationContext* opCtx,
@@ -216,6 +145,54 @@ AutoGetDb::AutoGetDb(OperationContext* opCtx,
     // The 'primary' database must be version checked for sharding.
     // TODO SERVER-63706 Pass dbName directly
     catalog_helper::assertMatchingDbVersion(opCtx, _dbName.toStringWithTenantId());
+}
+
+AutoGetDb AutoGetDb::createForAutoGetCollection(
+    OperationContext* opCtx,
+    const NamespaceStringOrUUID& nsOrUUID,
+    LockMode modeColl,
+    const auto_get_collection::OptionsWithSecondaryCollections& options) {
+    auto& deadline = options._deadline;
+
+    invariant(!opCtx->isLockFreeReadsOp());
+
+    // Acquire the global/RSTL and all the database locks (may or may not be multiple
+    // databases).
+
+    Lock::DBLockSkipOptions dbLockOptions;
+    dbLockOptions.skipRSTLLock = [&] {
+        const auto& maybeNss = nsOrUUID.nss();
+
+        if (maybeNss) {
+            const auto& nss = *maybeNss;
+            return repl::canCollectionSkipRSTLLockAcquisition(nss);
+        }
+        return false;
+    }();
+    dbLockOptions.skipFlowControlTicket = [&nsOrUUID] {
+        const auto& maybeNss = nsOrUUID.nss();
+
+        if (maybeNss) {
+            const auto& nss = *maybeNss;
+            bool notReplicated = !nss.isReplicated();
+            // TODO: Improve comment
+            //
+            // If the 'opCtx' is in a multi document transaction, pure reads on the
+            // transaction session collections would acquire the global lock in the IX
+            // mode and acquire a flow control ticket.
+            bool isTransactionCollection =
+                nss == NamespaceString::kSessionTransactionsTableNamespace ||
+                nss == NamespaceString::kTransactionCoordinatorsNamespace;
+            return notReplicated || isTransactionCollection;
+        }
+        return false;
+    }();
+    // TODO SERVER-67817 Use NamespaceStringOrUUID::db() instead.
+    return AutoGetDb(opCtx,
+                     nsOrUUID.nss() ? nsOrUUID.nss()->dbName() : *nsOrUUID.dbName(),
+                     isSharedLockMode(modeColl) ? MODE_IS : MODE_IX,
+                     deadline,
+                     std::move(dbLockOptions));
 }
 
 Database* AutoGetDb::ensureDbExists(OperationContext* opCtx) {
@@ -290,49 +267,7 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
                                      LockMode modeColl,
                                      Options options,
                                      bool verifyWriteEligible)
-    : _autoDb([&] {
-          auto& deadline = options._deadline;
-
-          invariant(!opCtx->isLockFreeReadsOp());
-
-          // Acquire the global/RSTL and all the database locks (may or may not be multiple
-          // databases).
-
-          Lock::DBLockSkipOptions dbLockOptions;
-          dbLockOptions.skipRSTLLock = [&] {
-              const auto& maybeNss = nsOrUUID.nss();
-
-              if (maybeNss) {
-                  const auto& nss = *maybeNss;
-                  return repl::canCollectionSkipRSTLLockAcquisition(nss);
-              }
-              return false;
-          }();
-          dbLockOptions.skipFlowControlTicket = [&nsOrUUID] {
-              const auto& maybeNss = nsOrUUID.nss();
-
-              if (maybeNss) {
-                  const auto& nss = *maybeNss;
-                  bool notReplicated = !nss.isReplicated();
-                  // TODO: Improve comment
-                  //
-                  // If the 'opCtx' is in a multi document transaction, pure reads on the
-                  // transaction session collections would acquire the global lock in the IX mode
-                  // and acquire a flow control ticket.
-                  bool isTransactionCollection =
-                      nss == NamespaceString::kSessionTransactionsTableNamespace ||
-                      nss == NamespaceString::kTransactionCoordinatorsNamespace;
-                  return notReplicated || isTransactionCollection;
-              }
-              return false;
-          }();
-          // TODO SERVER-67817 Use NamespaceStringOrUUID::db() instead.
-          return AutoGetDb(opCtx,
-                           nsOrUUID.nss() ? nsOrUUID.nss()->dbName() : *nsOrUUID.dbName(),
-                           isSharedLockMode(modeColl) ? MODE_IS : MODE_IX,
-                           deadline,
-                           std::move(dbLockOptions));
-      }()) {
+    : _autoDb(AutoGetDb::createForAutoGetCollection(opCtx, nsOrUUID, modeColl, options)) {
 
     auto& viewMode = options._viewMode;
     auto& deadline = options._deadline;
@@ -355,12 +290,12 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
         uassertStatusOK(nsOrUUID.isNssValid());
         _collLocks.emplace_back(opCtx, nsOrUUID, modeColl, deadline);
     } else {
-        acquireCollectionLocksInResourceIdOrder(
+        catalog_helper::acquireCollectionLocksInResourceIdOrder(
             opCtx, nsOrUUID, modeColl, deadline, secondaryNssOrUUIDs, &_collLocks);
     }
 
     // Wait for a configured amount of time after acquiring locks if the failpoint is enabled
-    setAutoGetCollectionWait.execute(
+    catalog_helper::setAutoGetCollectionWaitFailpointExecute(
         [&](const BSONObj& data) { sleepFor(Milliseconds(data["waitForMillis"].numberInt())); });
 
     auto catalog = CollectionCatalog::get(opCtx);
@@ -512,7 +447,7 @@ AutoGetCollectionLockFree::AutoGetCollectionLockFree(OperationContext* opCtx,
     auto& viewMode = options._viewMode;
 
     // Wait for a configured amount of time after acquiring locks if the failpoint is enabled
-    setAutoGetCollectionWait.execute(
+    catalog_helper::setAutoGetCollectionWaitFailpointExecute(
         [&](const BSONObj& data) { sleepFor(Milliseconds(data["waitForMillis"].numberInt())); });
 
     auto catalog = CollectionCatalog::get(opCtx);

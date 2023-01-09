@@ -172,12 +172,12 @@ private:
  * NOTE: Must not be used with any locks held, because it needs to block waiting on the committed
  * snapshot to become available, and can potentially release and reacquire locks.
  */
-class AutoGetCollectionForRead
+class AutoGetCollectionForReadLegacy
     : public AutoGetCollectionForReadBase<AutoGetCollection, EmplaceAutoGetCollectionForRead> {
 public:
-    AutoGetCollectionForRead(OperationContext* opCtx,
-                             const NamespaceStringOrUUID& nsOrUUID,
-                             AutoGetCollection::Options = {});
+    AutoGetCollectionForReadLegacy(OperationContext* opCtx,
+                                   const NamespaceStringOrUUID& nsOrUUID,
+                                   AutoGetCollection::Options = {});
 
     /**
      * Indicates whether any namespace in 'secondaryNssOrUUIDs' is a view or sharded.
@@ -191,6 +191,103 @@ public:
 private:
     // Tracks whether any secondary collection namespaces is a view or sharded.
     bool _secondaryNssIsAViewOrSharded = false;
+};
+
+/**
+ * Locked version of AutoGetCollectionForRead for setting up an operation for read that ensured that
+ * the read will be performed against an appropriately committed snapshot if the operation is using
+ * a readConcern of 'majority'.
+ *
+ * Use this when you want to read the contents of a collection, but you are not at the top-level of
+ * some command. This will ensure your reads obey any requested readConcern, but will not update the
+ * status of CurrentOp, or add a Top entry.
+ *
+ * Any collections specified in 'secondaryNssOrUUIDs' will be checked that their minimum visible
+ * timestamp supports read concern, throwing a SnapshotUnavailable on error. Additional collection
+ * and/or database locks will be acquired for 'secondaryNssOrUUIDs' namespaces.
+ * TODO SERVER-72608: This class should never throw SnapshotUnavailable.
+ */
+class AutoGetCollectionForReadPITCatalog {
+public:
+    AutoGetCollectionForReadPITCatalog(OperationContext* opCtx,
+                                       const NamespaceStringOrUUID& nsOrUUID,
+                                       AutoGetCollection::Options = {});
+
+    explicit operator bool() const {
+        return static_cast<bool>(getCollection());
+    }
+
+    const Collection* operator->() const {
+        return getCollection().get();
+    }
+
+    const CollectionPtr& operator*() const {
+        return getCollection();
+    }
+
+    const CollectionPtr& getCollection() const;
+    const ViewDefinition* getView() const;
+    const NamespaceString& getNss() const;
+
+    bool isAnySecondaryNamespaceAViewOrSharded() const {
+        return _secondaryNssIsAViewOrSharded;
+    }
+
+private:
+    // The caller was expecting to conflict with batch application before entering this
+    // function.
+    // i.e. the caller does not currently have a ShouldNotConflict... block in scope.
+    bool _callerWasConflicting;
+    // If this field is set, the reader will not take the ParallelBatchWriterMode lock and conflict
+    // with secondary batch application. This stays in scope with the _autoColl so that locks are
+    // taken and released in the right order.
+    boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock>
+        _shouldNotConflictWithSecondaryBatchApplicationBlock;
+
+    // Ordering matters, the _collLocks should destruct before the _autoGetDb releases the
+    // rstl/global/database locks.
+    AutoGetDb _autoDb;
+    std::vector<CollectionNamespaceOrUUIDLock> _collLocks;
+
+    CollectionPtr _coll = nullptr;
+    std::shared_ptr<const ViewDefinition> _view;
+
+    // If the object was instantiated with a UUID, contains the resolved namespace, otherwise it is
+    // the same as the input namespace string
+    NamespaceString _resolvedNss;
+
+    // Tracks whether any secondary collection namespaces is a view or sharded.
+    bool _secondaryNssIsAViewOrSharded = false;
+};
+
+
+class AutoGetCollectionForRead {
+public:
+    AutoGetCollectionForRead(OperationContext* opCtx,
+                             const NamespaceStringOrUUID& nsOrUUID,
+                             AutoGetCollection::Options = {});
+
+    explicit operator bool() const {
+        return static_cast<bool>(getCollection());
+    }
+
+    const Collection* operator->() const {
+        return getCollection().get();
+    }
+
+    const CollectionPtr& operator*() const {
+        return getCollection();
+    }
+
+    const CollectionPtr& getCollection() const;
+    const ViewDefinition* getView() const;
+    const NamespaceString& getNss() const;
+
+    bool isAnySecondaryNamespaceAViewOrSharded() const;
+
+private:
+    boost::optional<AutoGetCollectionForReadLegacy> _legacy;
+    boost::optional<AutoGetCollectionForReadPITCatalog> _pitCatalog;
 };
 
 /**

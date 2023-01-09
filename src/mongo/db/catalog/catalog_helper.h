@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/s/database_version.h"
 
@@ -49,5 +50,28 @@ void assertMatchingDbVersion(OperationContext* opCtx, const StringData& dbName);
  * `IllegalOperation` if it is not.
  */
 void assertIsPrimaryShardForDb(OperationContext* opCtx, const StringData& dbName);
+
+/**
+ * Fills the input 'collLocks' with CollectionLocks, acquiring locks on namespaces 'nsOrUUID' and
+ * 'secondaryNssOrUUIDs' in ResourceId(RESOURCE_COLLECTION, nss) order.
+ *
+ * The namespaces will be resolved, the locks acquired, and then the namespaces will be checked for
+ * changes in case there is a race with rename and a UUID no longer matches the locked namespace.
+ *
+ * Handles duplicate namespaces across 'nsOrUUID' and 'secondaryNssOrUUIDs'. Only one lock will be
+ * taken on each namespace.
+ */
+void acquireCollectionLocksInResourceIdOrder(
+    OperationContext* opCtx,
+    const NamespaceStringOrUUID& nsOrUUID,
+    LockMode modeColl,
+    Date_t deadline,
+    const std::vector<NamespaceStringOrUUID>& secondaryNssOrUUIDs,
+    std::vector<CollectionNamespaceOrUUIDLock>* collLocks);
+
+/**
+ * Executes the provided callback on the 'setAutoGetCollectionWait' FailPoint.
+ */
+void setAutoGetCollectionWaitFailpointExecute(std::function<void(const BSONObj&)> callback);
 
 }  // namespace mongo::catalog_helper

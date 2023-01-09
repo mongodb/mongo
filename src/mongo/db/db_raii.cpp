@@ -31,12 +31,15 @@
 
 #include "mongo/db/catalog/catalog_helper.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/repl/collection_utils.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/storage/capped_snapshots.h"
 #include "mongo/db/storage/snapshot_helper.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
@@ -119,6 +122,33 @@ void assertCollectionChangesCompatibleWithReadTimestamp(OperationContext* opCtx,
                           << readTimestamp->toString() << ". Collection minimum timestamp is "
                           << minSnapshot->toString());
     }
+}
+
+/**
+ * Performs some sanity checks on the collection and database.
+ */
+void verifyDbAndCollectionReadIntent(OperationContext* opCtx,
+                                     LockMode modeColl,
+                                     const NamespaceStringOrUUID& nsOrUUID,
+                                     const NamespaceString& resolvedNss,
+                                     CollectionPtr& coll,
+                                     Database* db) {
+    invariant(!nsOrUUID.uuid() || coll,
+              str::stream() << "Collection for " << resolvedNss.ns()
+                            << " disappeared after successfully resolving " << nsOrUUID.toString());
+
+    invariant(!nsOrUUID.uuid() || db,
+              str::stream() << "Database for " << resolvedNss.ns()
+                            << " disappeared after successfully resolving " << nsOrUUID.toString());
+
+    // In most cases we expect modifications for system.views to upgrade MODE_IX to MODE_X before
+    // taking the lock. One exception is a query by UUID of system.views in a transaction. Usual
+    // queries of system.views (by name, not UUID) within a transaction are rejected. However, if
+    // the query is by UUID we can't determine whether the namespace is actually system.views until
+    // we take the lock here. So we have this one last assertion.
+    uassert(7195700,
+            "Modifications to system.views must take an exclusive lock",
+            !resolvedNss.isSystemDotViews() || modeColl != MODE_IX);
 }
 
 /**
@@ -619,9 +649,10 @@ void EmplaceAutoGetCollectionForRead::emplace(boost::optional<AutoGetCollection>
         _opCtx, _nsOrUUID, _collectionLockMode, _options, AutoGetCollection::ForReadTag{});
 }
 
-AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
-                                                   const NamespaceStringOrUUID& nsOrUUID,
-                                                   AutoGetCollection::Options options)
+AutoGetCollectionForReadLegacy::AutoGetCollectionForReadLegacy(
+    OperationContext* opCtx,
+    const NamespaceStringOrUUID& nsOrUUID,
+    AutoGetCollection::Options options)
     : AutoGetCollectionForReadBase(opCtx,
                                    EmplaceAutoGetCollectionForRead(opCtx, nsOrUUID, options)) {
     const auto& secondaryNssOrUUIDs = options._secondaryNssOrUUIDs;
@@ -643,6 +674,236 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
                 opCtx, catalog.get(), *resolvedNamespaces);
         }
     }
+}
+
+AutoGetCollectionForReadPITCatalog::AutoGetCollectionForReadPITCatalog(
+    OperationContext* opCtx,
+    const NamespaceStringOrUUID& nsOrUUID,
+    AutoGetCollection::Options options)
+    : _callerWasConflicting(opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()),
+      _shouldNotConflictWithSecondaryBatchApplicationBlock(
+          [&]() -> boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock> {
+              if (allowSecondaryReadsDuringBatchApplication_DONT_USE(opCtx).value_or(true) &&
+                  opCtx->getServiceContext()->getStorageEngine()->supportsReadConcernSnapshot()) {
+                  return boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock>(
+                      opCtx->lockState());
+              }
+
+              return boost::none;
+          }()),
+      _autoDb(AutoGetDb::createForAutoGetCollection(
+          opCtx, nsOrUUID, getLockModeForQuery(opCtx, nsOrUUID.nss()), options)) {
+
+    const auto modeColl = getLockModeForQuery(opCtx, nsOrUUID.nss());
+    const auto viewMode = options._viewMode;
+    const auto deadline = options._deadline;
+    const auto& secondaryNssOrUUIDs = options._secondaryNssOrUUIDs;
+
+    // Acquire the collection locks. If there's only one lock, then it can simply be taken. If
+    // there are many, however, the locks must be taken in _ascending_ ResourceId order to avoid
+    // deadlocks across threads.
+    if (secondaryNssOrUUIDs.empty()) {
+        uassertStatusOK(nsOrUUID.isNssValid());
+        _collLocks.emplace_back(opCtx, nsOrUUID, modeColl, deadline);
+    } else {
+        catalog_helper::acquireCollectionLocksInResourceIdOrder(
+            opCtx, nsOrUUID, modeColl, deadline, secondaryNssOrUUIDs, &_collLocks);
+    }
+
+    // Wait for a configured amount of time after acquiring locks if the failpoint is enabled
+    catalog_helper::setAutoGetCollectionWaitFailpointExecute(
+        [&](const BSONObj& data) { sleepFor(Milliseconds(data["waitForMillis"].numberInt())); });
+
+    auto catalog = CollectionCatalog::get(opCtx);
+    auto databaseHolder = DatabaseHolder::get(opCtx);
+
+    _resolvedNss = catalog->resolveNamespaceStringOrUUID(opCtx, nsOrUUID);
+
+    // During batch application on secondaries, there is a potential to read inconsistent states
+    // that would normally be protected by the PBWM lock. In order to serve secondary reads
+    // during this period, we default to not acquiring the lock (by setting
+    // _shouldNotConflictWithSecondaryBatchApplicationBlock). On primaries, we always read at a
+    // consistent time, so not taking the PBWM lock is not a problem. On secondaries, we have to
+    // guarantee we read at a consistent state, so we must read at the lastApplied timestamp,
+    // which is set after each complete batch.
+
+    // Once we have our locks, check whether or not we should override the ReadSource that was
+    // set before acquiring locks.
+    const bool shouldReadAtLastApplied =
+        SnapshotHelper::changeReadSourceIfNeeded(opCtx, _resolvedNss);
+    // Update readSource in case it was updated.
+    const auto readSource = opCtx->recoveryUnit()->getTimestampReadSource();
+
+    // Check that the collections are all safe to use. First acquire collection from our catalog.
+    _coll = catalog->lookupCollectionByNamespace(opCtx, _resolvedNss);
+
+    // If we are reading with a PIT timestamp validate the collection's minValid snapshot. If it
+    // doesn't match we need to instantiate a collection instance from the storage snapshot. Also,
+    // if we are reading with a timestamp but not finding any collection in the catalog try to
+    // instantiate from the snapshot as it may have existed at that timestamp.
+    // TODO SERVER-68271: Use common logic to determine if we need to call openCollection.
+    const auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
+    if (readTimestamp && (!_coll || *readTimestamp < _coll->getMinimumValidSnapshot())) {
+        // TODO SERVER-70846: openCollection does not set a yield handler. Perform the lookup again
+        // to get a proper CollectionPtr from the catalog.
+        [[maybe_unused]] auto collPtr = catalog->openCollection(opCtx, _resolvedNss, readTimestamp);
+        _coll = catalog->lookupCollectionByNamespace(opCtx, _resolvedNss);
+    }
+
+    // Validate collection instance
+    checkCollectionUUIDMismatch(opCtx, _resolvedNss, _coll, options._expectedUUID);
+    verifyDbAndCollectionReadIntent(
+        opCtx, modeColl, nsOrUUID, _resolvedNss, _coll, _autoDb.getDb());
+    for (auto& secondaryNssOrUUID : secondaryNssOrUUIDs) {
+        auto secondaryResolvedNss =
+            catalog->resolveNamespaceStringOrUUID(opCtx, secondaryNssOrUUID);
+        auto secondaryColl = catalog->lookupCollectionByNamespace(opCtx, secondaryResolvedNss);
+        auto secondaryDbName = secondaryNssOrUUID.dbName() ? secondaryNssOrUUID.dbName()
+                                                           : secondaryNssOrUUID.nss()->dbName();
+        verifyDbAndCollectionReadIntent(opCtx,
+                                        MODE_IS,
+                                        secondaryNssOrUUID,
+                                        secondaryResolvedNss,
+                                        secondaryColl,
+                                        databaseHolder->getDb(opCtx, *secondaryDbName));
+    }
+
+    if (_coll) {
+        // Fetch and store the sharding collection description data needed for use during the
+        // operation. The shardVersion will be checked later if the shard filtering metadata is
+        // fetched, ensuring both that the collection description info used here and the routing
+        // table are consistent with the read request's shardVersion.
+        //
+        // Note: sharding versioning for an operation has no concept of multiple collections.
+        auto scopedCss = CollectionShardingState::acquire(opCtx, _resolvedNss);
+        scopedCss->checkShardVersionOrThrow(opCtx);
+
+        auto collDesc = scopedCss->getCollectionDescription(opCtx);
+        if (collDesc.isSharded()) {
+            _coll.setShardKeyPattern(collDesc.getKeyPattern());
+        }
+
+        auto readConcernArgs = repl::ReadConcernArgs::get(opCtx);
+        assertReadConcernSupported(
+            _coll, readConcernArgs, opCtx->recoveryUnit()->getTimestampReadSource());
+
+        checkInvariantsForReadOptions(_coll->ns(),
+                                      readConcernArgs.getArgsAfterClusterTime(),
+                                      readSource,
+                                      readTimestamp,
+                                      _callerWasConflicting,
+                                      shouldReadAtLastApplied);
+
+        // Check secondary collections and verify they are valid for use.
+        if (!secondaryNssOrUUIDs.empty()) {
+            auto resolvedNamespaces =
+                resolveSecondaryNamespacesOrUUIDs(opCtx, catalog.get(), secondaryNssOrUUIDs);
+
+            _secondaryNssIsAViewOrSharded = !resolvedNamespaces.has_value();
+
+            // If no secondary namespace is a view or is sharded, resolve namespaces and check their
+            // that their minVisible timestamps are compatible with the read timestamp.
+            // TODO SERVER-72608: We should not throw SnapshotUnavailable
+            if (resolvedNamespaces) {
+                assertAllNamespacesAreCompatibleForReadTimestamp(
+                    opCtx, catalog.get(), *resolvedNamespaces);
+            }
+        }
+
+        return;
+    }
+
+    // No Collection found, try and lookup view.
+    const auto receivedShardVersion{
+        OperationShardingState::get(opCtx).getShardVersion(_resolvedNss)};
+
+    if (!options._expectedUUID) {
+        // We only need to look up a view if an expected collection UUID was not provided. If this
+        // namespace were a view, the collection UUID mismatch check would have failed above.
+        if ((_view = catalog->lookupView(opCtx, _resolvedNss))) {
+            uassert(ErrorCodes::CommandNotSupportedOnView,
+                    str::stream() << "Taking " << _resolvedNss.ns()
+                                  << " lock for timeseries is not allowed",
+                    viewMode == auto_get_collection::ViewMode::kViewsPermitted ||
+                        !_view->timeseries());
+
+            uassert(ErrorCodes::CommandNotSupportedOnView,
+                    str::stream() << "Namespace " << _resolvedNss.ns()
+                                  << " is a view, not a collection",
+                    viewMode == auto_get_collection::ViewMode::kViewsPermitted);
+
+            uassert(StaleConfigInfo(_resolvedNss,
+                                    *receivedShardVersion,
+                                    ShardVersion::UNSHARDED() /* wantedVersion */,
+                                    ShardingState::get(opCtx)->shardId()),
+                    str::stream() << "Namespace " << _resolvedNss
+                                  << " is a view therefore the shard "
+                                  << "version attached to the request must be unset or UNSHARDED",
+                    !receivedShardVersion || *receivedShardVersion == ShardVersion::UNSHARDED());
+
+            return;
+        }
+    }
+
+    // There is neither a collection nor a view for the namespace, so if we reached to this point
+    // there are the following possibilities depending on the received shard version:
+    //   1. ShardVersion::UNSHARDED: The request comes from a router and the operation entails the
+    //      implicit creation of an unsharded collection. We can continue.
+    //   2. ShardVersion::IGNORED: The request comes from a router that broadcasted the same to all
+    //      shards, but this shard doesn't own any chunks for the collection. We can continue.
+    //   3. boost::none: The request comes from client directly connected to the shard. We can
+    //      continue.
+    //   4. Any other value: The request comes from a stale router on a collection or a view which
+    //      was deleted time ago (or the user manually deleted it from from underneath of sharding).
+    //      We return a stale config error so that the router recovers.
+
+    uassert(StaleConfigInfo(_resolvedNss,
+                            *receivedShardVersion,
+                            boost::none /* wantedVersion */,
+                            ShardingState::get(opCtx)->shardId()),
+            str::stream() << "No metadata for namespace " << _resolvedNss << " therefore the shard "
+                          << "version attached to the request must be unset, UNSHARDED or IGNORED",
+            !receivedShardVersion || *receivedShardVersion == ShardVersion::UNSHARDED() ||
+                *receivedShardVersion == ShardVersion::IGNORED());
+}
+
+const CollectionPtr& AutoGetCollectionForReadPITCatalog::getCollection() const {
+    return _coll;
+}
+
+const ViewDefinition* AutoGetCollectionForReadPITCatalog::getView() const {
+    return _view.get();
+}
+
+const NamespaceString& AutoGetCollectionForReadPITCatalog::getNss() const {
+    return _resolvedNss;
+}
+
+AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
+                                                   const NamespaceStringOrUUID& nsOrUUID,
+                                                   AutoGetCollection::Options options) {
+    if (!feature_flags::gPointInTimeCatalogLookups.isEnabledAndIgnoreFCV()) {
+        _legacy.emplace(opCtx, nsOrUUID, options);
+    } else {
+        _pitCatalog.emplace(opCtx, nsOrUUID, options);
+    }
+}
+
+const CollectionPtr& AutoGetCollectionForRead::getCollection() const {
+    return _pitCatalog ? _pitCatalog->getCollection() : _legacy->getCollection();
+}
+
+const ViewDefinition* AutoGetCollectionForRead::getView() const {
+    return _pitCatalog ? _pitCatalog->getView() : _legacy->getView();
+}
+
+const NamespaceString& AutoGetCollectionForRead::getNss() const {
+    return _pitCatalog ? _pitCatalog->getNss() : _legacy->getNss();
+}
+
+bool AutoGetCollectionForRead::isAnySecondaryNamespaceAViewOrSharded() const {
+    return _pitCatalog ? _pitCatalog->isAnySecondaryNamespaceAViewOrSharded()
+                       : _legacy->isAnySecondaryNamespaceAViewOrSharded();
 }
 
 AutoGetCollectionForReadLockFreeLegacy::EmplaceHelper::EmplaceHelper(

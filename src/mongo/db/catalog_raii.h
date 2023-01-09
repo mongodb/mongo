@@ -39,6 +39,42 @@
 #include "mongo/db/views/view.h"
 
 namespace mongo {
+namespace auto_get_collection {
+enum class ViewMode { kViewsPermitted, kViewsForbidden };
+
+template <typename T>
+struct OptionsBase {
+    T viewMode(ViewMode viewMode) {
+        _viewMode = viewMode;
+        return std::move(*static_cast<T*>(this));
+    }
+
+    T deadline(Date_t deadline) {
+        _deadline = std::move(deadline);
+        return std::move(*static_cast<T*>(this));
+    }
+
+    T expectedUUID(boost::optional<UUID> expectedUUID) {
+        _expectedUUID = expectedUUID;
+        return std::move(*static_cast<T*>(this));
+    }
+
+    ViewMode _viewMode = ViewMode::kViewsForbidden;
+    Date_t _deadline = Date_t::max();
+    boost::optional<UUID> _expectedUUID;
+};
+
+struct Options : OptionsBase<Options> {};
+struct OptionsWithSecondaryCollections : OptionsBase<OptionsWithSecondaryCollections> {
+    OptionsWithSecondaryCollections secondaryNssOrUUIDs(
+        std::vector<NamespaceStringOrUUID> secondaryNssOrUUIDs) {
+        _secondaryNssOrUUIDs = std::move(secondaryNssOrUUIDs);
+        return std::move(*this);
+    }
+
+    std::vector<NamespaceStringOrUUID> _secondaryNssOrUUIDs;
+};
+}  // namespace auto_get_collection
 
 /**
  * RAII-style class, which acquires a lock on the specified database in the requested mode and
@@ -54,7 +90,6 @@ namespace mongo {
 class AutoGetDb {
     AutoGetDb(const AutoGetDb&) = delete;
     AutoGetDb& operator=(const AutoGetDb&) = delete;
-    friend class AutoGetCollection;
 
     AutoGetDb(OperationContext* opCtx,
               const DatabaseName& dbName,
@@ -69,6 +104,12 @@ public:
               Date_t deadline = Date_t::max());
 
     AutoGetDb(AutoGetDb&&) = default;
+
+    static AutoGetDb createForAutoGetCollection(
+        OperationContext* opCtx,
+        const NamespaceStringOrUUID& nsOrUUID,
+        LockMode modeColl,
+        const auto_get_collection::OptionsWithSecondaryCollections& options);
 
     /**
      * Returns the database, or nullptr if it didn't exist.
@@ -123,43 +164,6 @@ public:
 private:
     Lock::CollectionLock _lock;
 };
-
-namespace auto_get_collection {
-enum class ViewMode { kViewsPermitted, kViewsForbidden };
-
-template <typename T>
-struct OptionsBase {
-    T viewMode(ViewMode viewMode) {
-        _viewMode = viewMode;
-        return std::move(*static_cast<T*>(this));
-    }
-
-    T deadline(Date_t deadline) {
-        _deadline = std::move(deadline);
-        return std::move(*static_cast<T*>(this));
-    }
-
-    T expectedUUID(boost::optional<UUID> expectedUUID) {
-        _expectedUUID = expectedUUID;
-        return std::move(*static_cast<T*>(this));
-    }
-
-    ViewMode _viewMode = ViewMode::kViewsForbidden;
-    Date_t _deadline = Date_t::max();
-    boost::optional<UUID> _expectedUUID;
-};
-
-struct Options : OptionsBase<Options> {};
-struct OptionsWithSecondaryCollections : OptionsBase<OptionsWithSecondaryCollections> {
-    OptionsWithSecondaryCollections secondaryNssOrUUIDs(
-        std::vector<NamespaceStringOrUUID> secondaryNssOrUUIDs) {
-        _secondaryNssOrUUIDs = std::move(secondaryNssOrUUIDs);
-        return std::move(*this);
-    }
-
-    std::vector<NamespaceStringOrUUID> _secondaryNssOrUUIDs;
-};
-}  // namespace auto_get_collection
 
 /**
  * RAII-style class, which acquires global, database, and collection locks according to the chart
