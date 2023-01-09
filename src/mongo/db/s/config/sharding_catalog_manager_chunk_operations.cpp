@@ -1792,13 +1792,18 @@ void ShardingCatalogManager::splitOrMarkJumbo(OperationContext* opCtx,
                 Grid::get(opCtx)->getBalancerConfiguration()->getMaxChunkSizeBytes());
         }();
 
-        const auto splitPoints = uassertStatusOK(
+        // Limit the search to one split point: this code path is reached when a migration fails due
+        // to ErrorCodes::ChunkTooBig. In case there is a too frequent shard key, only select the
+        // next key in order to split the range in jumbo chunk + remaining range.
+        const int limit = 1;
+        auto splitPoints = uassertStatusOK(
             shardutil::selectChunkSplitPoints(opCtx,
                                               chunk.getShardId(),
                                               nss,
                                               cm.getShardKeyPattern(),
                                               ChunkRange(chunk.getMin(), chunk.getMax()),
-                                              maxChunkSizeBytes));
+                                              maxChunkSizeBytes,
+                                              limit));
 
         if (splitPoints.empty()) {
             LOGV2(21873,
@@ -1852,6 +1857,9 @@ void ShardingCatalogManager::splitOrMarkJumbo(OperationContext* opCtx,
             return;
         }
 
+        // Resize the vector because in multiversion scenarios the `autoSplitVector` command may end
+        // up ignoring the `limit` parameter and returning the whole list of split points.
+        splitPoints.resize(limit);
         uassertStatusOK(
             shardutil::splitChunkAtMultiplePoints(opCtx,
                                                   chunk.getShardId(),

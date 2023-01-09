@@ -75,3 +75,7 @@ commands:
         maxChunkSizeBytes:
             type: safeInt64
             description: "Max chunk size of the collection expressed in bytes"
+        limit:
+            type: int
+            description: "Max number of split points to look for"
+            optional: true
