@@ -876,19 +876,22 @@ TEST_F(RenameRangeDeletionsTest, BasicRenameRangeDeletionsTest) {
     restoreRangeDeletionTasksForRename(_opCtx, kToNss);
     deleteRangeDeletionTasksForRename(_opCtx, kNss, kToNss);
 
-    // Make sure just range deletions for the TO collection are found
-    ASSERT_EQ(10, rangeDeletionsStore.count(_opCtx));
+    const auto targetRangeDeletionsQuery = BSON(RangeDeletionTask::kNssFieldName << kToNss.ns());
+
+    // Make sure range deletions for the TO collection are found
+    ASSERT_EQ(10, rangeDeletionsStore.count(_opCtx, targetRangeDeletionsQuery));
     int foundTasks = 0;
-    rangeDeletionsStore.forEach(_opCtx, BSONObj(), [&](const RangeDeletionTask& newTask) {
-        auto task = tasks.at(foundTasks++);
-        ASSERT_EQ(newTask.getNss(), kToNss);
-        ASSERT_EQ(newTask.getCollectionUuid(), task.getCollectionUuid());
-        ASSERT_EQ(newTask.getDonorShardId(), task.getDonorShardId());
-        ASSERT(SimpleBSONObjComparator::kInstance.evaluate(newTask.getRange().toBSON() ==
-                                                           task.getRange().toBSON()));
-        ASSERT(newTask.getWhenToClean() == task.getWhenToClean());
-        return true;
-    });
+    rangeDeletionsStore.forEach(
+        _opCtx, targetRangeDeletionsQuery, [&](const RangeDeletionTask& newTask) {
+            auto task = tasks.at(foundTasks++);
+            ASSERT_EQ(newTask.getNss(), kToNss);
+            ASSERT_EQ(newTask.getCollectionUuid(), task.getCollectionUuid());
+            ASSERT_EQ(newTask.getDonorShardId(), task.getDonorShardId());
+            ASSERT(SimpleBSONObjComparator::kInstance.evaluate(newTask.getRange().toBSON() ==
+                                                               task.getRange().toBSON()));
+            ASSERT(newTask.getWhenToClean() == task.getWhenToClean());
+            return true;
+        });
     ASSERT_EQ(foundTasks, numTasks);
 
     // Make sure no garbage is left in intermediate collection
@@ -928,19 +931,22 @@ TEST_F(RenameRangeDeletionsTest, IdempotentRenameRangeDeletionsTest) {
         deleteRangeDeletionTasksForRename(_opCtx, kNss, kToNss);
     }
 
-    // Make sure just range deletions for the TO collection are found
-    ASSERT_EQ(10, rangeDeletionsStore.count(_opCtx));
+    const auto targetRangeDeletionsQuery = BSON(RangeDeletionTask::kNssFieldName << kToNss.ns());
+
+    // Make sure range deletions for the TO collection are found
+    ASSERT_EQ(10, rangeDeletionsStore.count(_opCtx, targetRangeDeletionsQuery));
     int foundTasks = 0;
-    rangeDeletionsStore.forEach(_opCtx, BSONObj(), [&](const RangeDeletionTask& newTask) {
-        auto task = tasks.at(foundTasks++);
-        ASSERT_EQ(newTask.getNss(), kToNss);
-        ASSERT_EQ(newTask.getCollectionUuid(), task.getCollectionUuid());
-        ASSERT_EQ(newTask.getDonorShardId(), task.getDonorShardId());
-        ASSERT(SimpleBSONObjComparator::kInstance.evaluate(newTask.getRange().toBSON() ==
-                                                           task.getRange().toBSON()));
-        ASSERT(newTask.getWhenToClean() == task.getWhenToClean());
-        return true;
-    });
+    rangeDeletionsStore.forEach(
+        _opCtx, targetRangeDeletionsQuery, [&](const RangeDeletionTask& newTask) {
+            auto task = tasks.at(foundTasks++);
+            ASSERT_EQ(newTask.getNss(), kToNss);
+            ASSERT_EQ(newTask.getCollectionUuid(), task.getCollectionUuid());
+            ASSERT_EQ(newTask.getDonorShardId(), task.getDonorShardId());
+            ASSERT(SimpleBSONObjComparator::kInstance.evaluate(newTask.getRange().toBSON() ==
+                                                               task.getRange().toBSON()));
+            ASSERT(newTask.getWhenToClean() == task.getWhenToClean());
+            return true;
+        });
     ASSERT_EQ(foundTasks, numTasks);
 
     // Make sure no garbage is left in intermediate collection
