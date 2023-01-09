@@ -150,7 +150,7 @@ public:
 
 protected:
     friend class AsioTransportLayer;
-    friend AsioTransportLayer::BatonASIO;
+    friend class AsioTransportLayer::AsioNetworkingBaton;
 
 #ifdef MONGO_CONFIG_SSL
     // Constructs a SSL socket required to initiate SSL handshake for egress connections.

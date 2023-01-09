@@ -73,7 +73,7 @@
 // asio_session.h has some header dependencies that require it to be the last header.
 
 #ifdef __linux__
-#include "mongo/transport/baton_asio_linux.h"
+#include "mongo/transport/asio_networking_baton.h"
 #endif
 
 #include "mongo/transport/asio_session.h"
@@ -1675,7 +1675,7 @@ AsioTransportLayer::createTransientSSLContext(const TransientSSLParams& transien
 BatonHandle AsioTransportLayer::makeBaton(OperationContext* opCtx) const {
     invariant(!opCtx->getBaton());
 
-    auto baton = std::make_shared<BatonASIO>(opCtx);
+    auto baton = std::make_shared<AsioNetworkingBaton>(opCtx);
     opCtx->setBaton(baton);
 
     return baton;

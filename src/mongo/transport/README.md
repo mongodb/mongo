@@ -73,7 +73,7 @@ to the client.
 ## See Also
 For details on egress networking, see [this document][egress_networking]. For 
 details on command dispatch, see [this document][command_dispatch]. For details 
-on *NetworkingBaton* and *BatonASIO*, see [this document][baton].
+on *NetworkingBaton* and *AsioNetworkingBaton*, see [this document][baton].
 
 [ServiceExecutor]: service_executor.h
 [ServiceStateMachine]: service_state_machine.h

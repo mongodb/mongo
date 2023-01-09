@@ -836,11 +836,12 @@ TEST_F(AsioTransportLayerWithServiceContextTest, ShutdownDuringSSLHandshake) {
 #ifdef __linux__
 
 /**
- * Creates a connection between a client and a server, then runs tests against the `BatonASIO`
- * associated with the server-side of the connection (i.e., `Client`). The client-side of this
- * connection is associated with `_connThread`, and the server-side is wrapped inside `_client`.
+ * Creates a connection between a client and a server, then runs tests against the
+ * `AsioNetworkingBaton` associated with the server-side of the connection (i.e., `Client`). The
+ * client-side of this connection is associated with `_connThread`, and the server-side is wrapped
+ * inside `_client`.
  */
-class BatonASIOLinuxTest : public LockerNoopServiceContextTest {
+class LinuxAsioNetworkingBatonTest : public LockerNoopServiceContextTest {
     // A service entry point that accepts one, and only one, connection.
     class SingleSessionSEP : public ServiceEntryPoint {
     public:
@@ -946,7 +947,7 @@ void waitForTimesEntered(const FailPointEnableBlock& fp, FailPoint::EntryCountT 
     fp->waitForTimesEntered(fp.initialTimesEntered() + times);
 }
 
-TEST_F(BatonASIOLinuxTest, CanWait) {
+TEST_F(LinuxAsioNetworkingBatonTest, CanWait) {
     auto opCtx = client().makeOperationContext();
     BatonHandle baton = opCtx->getBaton();  // ensures the baton outlives its opCtx.
 
@@ -958,7 +959,7 @@ TEST_F(BatonASIOLinuxTest, CanWait) {
     ASSERT_FALSE(netBaton->canWait());
 }
 
-TEST_F(BatonASIOLinuxTest, MarkKillOnClientDisconnect) {
+TEST_F(LinuxAsioNetworkingBatonTest, MarkKillOnClientDisconnect) {
     auto opCtx = client().makeOperationContext();
     opCtx->markKillOnClientDisconnect();
     ASSERT_FALSE(opCtx->isKillPending());
@@ -970,7 +971,7 @@ TEST_F(BatonASIOLinuxTest, MarkKillOnClientDisconnect) {
     ASSERT_EQ(opCtx->getKillStatus(), ErrorCodes::ClientDisconnect);
 }
 
-TEST_F(BatonASIOLinuxTest, Schedule) {
+TEST_F(LinuxAsioNetworkingBatonTest, Schedule) {
     // Note that the baton runs all scheduled jobs on the main test thread, so it's safe to use
     // assertions inside tasks scheduled on the baton.
     auto opCtx = client().makeOperationContext();
@@ -1005,7 +1006,7 @@ TEST_F(BatonASIOLinuxTest, Schedule) {
     ASSERT_FALSE(pending);
 }
 
-TEST_F(BatonASIOLinuxTest, AddAndRemoveSession) {
+TEST_F(LinuxAsioNetworkingBatonTest, AddAndRemoveSession) {
     auto opCtx = client().makeOperationContext();
     auto baton = opCtx->getBaton()->networking();
 
@@ -1015,7 +1016,7 @@ TEST_F(BatonASIOLinuxTest, AddAndRemoveSession) {
     ASSERT_THROWS_CODE(future.get(), DBException, ErrorCodes::CallbackCanceled);
 }
 
-TEST_F(BatonASIOLinuxTest, AddAndRemoveSessionWhileInPoll) {
+TEST_F(LinuxAsioNetworkingBatonTest, AddAndRemoveSessionWhileInPoll) {
     // Attempts to add and remove a session while the baton is polling. This, for example, could
     // happen on `mongos` while an operation is blocked, waiting for `AsyncDBClient` to create an
     // egress connection, and then the connection has to be ended for some reason before the baton
@@ -1027,7 +1028,7 @@ TEST_F(BatonASIOLinuxTest, AddAndRemoveSessionWhileInPoll) {
         auto baton = opCtx->getBaton()->networking();
         auto session = client().session();
 
-        FailPointEnableBlock fp("blockBatonASIOBeforePoll");
+        FailPointEnableBlock fp("blockAsioNetworkingBatonBeforePoll");
         isReady.set();
         waitForTimesEntered(fp, 1);
 
@@ -1041,19 +1042,19 @@ TEST_F(BatonASIOLinuxTest, AddAndRemoveSessionWhileInPoll) {
     ASSERT_FALSE(cancelSessionResult.get(opCtx.get()));
 }
 
-TEST_F(BatonASIOLinuxTest, WaitAndNotify) {
-    // Exercises the underlying `wait` and `notify` functionality through `BatonASIO::run` and
-    // `BatonASIO::schedule`, respectively. Here is how this is done:
-    // 1) The main thread starts polling (from inside `run`) when waiting on the notification.
-    // 2) Once the main thread is ready to poll, `thread` notifies it through `baton->schedule`.
-    // 3) `schedule` calls into `notify` internally, which should interrupt the polling.
-    // 4) Once polling is interrupted, `baton` runs the scheduled job and sets the notification.
+TEST_F(LinuxAsioNetworkingBatonTest, WaitAndNotify) {
+    // Exercises the underlying `wait` and `notify` functionality through `AsioNetworkingBaton::run`
+    // and `AsioNetworkingBaton::schedule`, respectively. Here is how this is done: 1) The main
+    // thread starts polling (from inside `run`) when waiting on the notification. 2) Once the main
+    // thread is ready to poll, `thread` notifies it through `baton->schedule`. 3) `schedule` calls
+    // into `notify` internally, which should interrupt the polling. 4) Once polling is interrupted,
+    // `baton` runs the scheduled job and sets the notification.
     auto opCtx = client().makeOperationContext();
 
     Notification<void> notification;
     MilestoneThread thread([&](Notification<void>& isReady) {
         auto baton = opCtx->getBaton()->networking();
-        FailPointEnableBlock fp("blockBatonASIOBeforePoll");
+        FailPointEnableBlock fp("blockAsioNetworkingBatonBeforePoll");
         isReady.set();
         waitForTimesEntered(fp, 1);
         baton->schedule([&](Status) { notification.set(); });
@@ -1067,22 +1068,22 @@ void blockIfBatonPolls(Client& client,
     Notification<void> notification;
     auto opCtx = client.makeOperationContext();
 
-    FailPointEnableBlock fp("blockBatonASIOBeforePoll");
+    FailPointEnableBlock fp("blockAsioNetworkingBatonBeforePoll");
 
     modifyBaton(opCtx->getBaton(), notification);
 
-    // This will internally call into `BatonASIO::run()`, which will block forever (since the
-    // failpoint is enabled) if the baton starts polling.
+    // This will internally call into `AsioNetworkingBaton::run()`, which will block forever (since
+    // the failpoint is enabled) if the baton starts polling.
     notification.get(opCtx.get());
 }
 
-TEST_F(BatonASIOLinuxTest, BatonWithPendingTasksNeverPolls) {
+TEST_F(LinuxAsioNetworkingBatonTest, BatonWithPendingTasksNeverPolls) {
     blockIfBatonPolls(client(), [](const BatonHandle& baton, Notification<void>& notification) {
         baton->schedule([&](Status) { notification.set(); });
     });
 }
 
-TEST_F(BatonASIOLinuxTest, BatonWithAnExpiredTimerNeverPolls) {
+TEST_F(LinuxAsioNetworkingBatonTest, BatonWithAnExpiredTimerNeverPolls) {
     auto timer = makeDummyTimer();
     auto clkSource = getServiceContext()->getPreciseClockSource();
 
@@ -1102,7 +1103,7 @@ TEST_F(BatonASIOLinuxTest, BatonWithAnExpiredTimerNeverPolls) {
     });
 }
 
-TEST_F(BatonASIOLinuxTest, WaitUntilWithUncancellableTokenFiresAtDeadline) {
+TEST_F(LinuxAsioNetworkingBatonTest, WaitUntilWithUncancellableTokenFiresAtDeadline) {
     auto opCtx = client().makeOperationContext();
     auto baton = opCtx->getBaton()->networking();
     auto deadline = Date_t::now() + Milliseconds(10);
@@ -1115,7 +1116,7 @@ TEST_F(BatonASIOLinuxTest, WaitUntilWithUncancellableTokenFiresAtDeadline) {
     ASSERT_EQ(fut.getNoThrow(opCtx.get()), Status::OK());
 }
 
-TEST_F(BatonASIOLinuxTest, WaitUntilWithCanceledTokenIsCanceled) {
+TEST_F(LinuxAsioNetworkingBatonTest, WaitUntilWithCanceledTokenIsCanceled) {
     CancellationSource source;
     auto token = source.token();
     auto opCtx = client().makeOperationContext();
@@ -1127,11 +1128,11 @@ TEST_F(BatonASIOLinuxTest, WaitUntilWithCanceledTokenIsCanceled) {
     ASSERT_EQ(fut.getNoThrow(opCtx.get()), expectedError);
 }
 
-TEST_F(BatonASIOLinuxTest, NotifyInterruptsRunUntilBeforeTimeout) {
+TEST_F(LinuxAsioNetworkingBatonTest, NotifyInterruptsRunUntilBeforeTimeout) {
     auto opCtx = client().makeOperationContext();
     MilestoneThread thread([&](Notification<void>& isReady) {
         auto baton = opCtx->getBaton();
-        FailPointEnableBlock fp("blockBatonASIOBeforePoll");
+        FailPointEnableBlock fp("blockAsioNetworkingBatonBeforePoll");
         isReady.set();
         waitForTimesEntered(fp, 1);
         baton->notify();
@@ -1142,21 +1143,21 @@ TEST_F(BatonASIOLinuxTest, NotifyInterruptsRunUntilBeforeTimeout) {
     ASSERT(state == Waitable::TimeoutState::NoTimeout);
 }
 
-TEST_F(BatonASIOLinuxTest, RunUntilProperlyTimesout) {
+TEST_F(LinuxAsioNetworkingBatonTest, RunUntilProperlyTimesout) {
     auto opCtx = client().makeOperationContext();
     auto clkSource = getServiceContext()->getPreciseClockSource();
     const auto state = opCtx->getBaton()->run_until(clkSource, clkSource->now() + Milliseconds(1));
     ASSERT(state == Waitable::TimeoutState::Timeout);
 }
 
-TEST_F(BatonASIOLinuxTest, AddAndRemoveTimerWhileInPoll) {
+TEST_F(LinuxAsioNetworkingBatonTest, AddAndRemoveTimerWhileInPoll) {
     auto opCtx = client().makeOperationContext();
     Notification<bool> cancelTimerResult;
 
     MilestoneThread thread([&](Notification<void>& isReady) {
         auto baton = opCtx->getBaton()->networking();
 
-        FailPointEnableBlock fp("blockBatonASIOBeforePoll");
+        FailPointEnableBlock fp("blockAsioNetworkingBatonBeforePoll");
         isReady.set();
         waitForTimesEntered(fp, 1);
 
@@ -1171,7 +1172,7 @@ TEST_F(BatonASIOLinuxTest, AddAndRemoveTimerWhileInPoll) {
     ASSERT_FALSE(cancelTimerResult.get(opCtx.get()));
 }
 
-DEATH_TEST_F(BatonASIOLinuxTest, AddAnAlreadyAddedSession, "invariant") {
+DEATH_TEST_F(LinuxAsioNetworkingBatonTest, AddAnAlreadyAddedSession, "invariant") {
     auto opCtx = client().makeOperationContext();
     auto baton = opCtx->getBaton()->networking();
     auto session = client().session();
@@ -1180,11 +1181,11 @@ DEATH_TEST_F(BatonASIOLinuxTest, AddAnAlreadyAddedSession, "invariant") {
     baton->addSession(*session, transport::NetworkingBaton::Type::In).getAsync([](Status) {});
 }
 
-// This could be considered a test for either `AsioSession` or `BatonASIOLinux`, as it's testing the
-// interaction between the two when `AsioSession` calls `addSession` and `cancelAsyncOperations` on
-// the networking baton. This is currently added to the `BatonASIOLinuxTest` fixture to utilize the
-// existing infrastructure.
-TEST_F(BatonASIOLinuxTest, CancelAsyncOperationsInterruptsOngoingOperations) {
+// This could be considered a test for either `AsioSession` or `AsioNetworkingBatonLinux`, as it's
+// testing the interaction between the two when `AsioSession` calls `addSession` and
+// `cancelAsyncOperations` on the networking baton. This is currently added to the
+// `LinuxAsioNetworkingBatonTest` fixture to utilize the existing infrastructure.
+TEST_F(LinuxAsioNetworkingBatonTest, CancelAsyncOperationsInterruptsOngoingOperations) {
     MilestoneThread thread([&](Notification<void>& isReady) {
         // Blocks the main thread as it schedules an opportunistic read, but before it starts
         // polling on the networking baton. Then it cancels the operation before unblocking the main
@@ -1201,7 +1202,7 @@ TEST_F(BatonASIOLinuxTest, CancelAsyncOperationsInterruptsOngoingOperations) {
                        ErrorCodes::CallbackCanceled);
 }
 
-TEST_F(BatonASIOLinuxTest, AsyncOpsMakeProgressWhenSessionAddedToDetachedBaton) {
+TEST_F(LinuxAsioNetworkingBatonTest, AsyncOpsMakeProgressWhenSessionAddedToDetachedBaton) {
     Notification<void> ready;
     auto opCtx = client().makeOperationContext();
 

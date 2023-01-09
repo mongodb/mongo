@@ -10,7 +10,7 @@ path. A total of four baton classes are available today:
 - [Baton][baton]
 - [DefaultBaton][defaultBaton]
 - [NetworkingBaton][networkingBaton]
-- [BatonASIO][batonASIO]
+- [AsioNetworkingBaton][asioNetworkingBaton]
 
 ## Baton Hierarchy
 
@@ -39,9 +39,9 @@ and using `OperationContext::getBaton()::schedule(...)`.
 
 Note that this baton is not available for an `OperationContext` that belongs to 
 a `ServiceContext` with an `AsioTransportLayer` transport layer. In that case, 
-the aforementioned interface will return a handle to *BatonASIO*.
+the aforementioned interface will return a handle to *AsioNetworkingBaton*.
 
-### BatonASIO
+### AsioNetworkingBaton
 
 This baton is only available for Linux and extends *NetworkingBaton* to 
 implement a networking reactor. It utilizes `poll(2)` and `eventfd(2)` to allow 
@@ -60,6 +60,6 @@ must be non-blocking and preferably short-lived to ensure forward progress.
 [baton]:https://github.com/mongodb/mongo/blob/5906d967c3144d09fab6a4cc1daddb295df19ffb/src/mongo/db/baton.h#L61-L178
 [defaultBaton]: https://github.com/mongodb/mongo/blob/9cfe13115e92a43d1b9273ee1d5817d548264ba7/src/mongo/db/default_baton.h#L46-L75
 [networkingBaton]: https://github.com/mongodb/mongo/blob/9cfe13115e92a43d1b9273ee1d5817d548264ba7/src/mongo/transport/baton.h#L61-L96
-[batonASIO]: https://github.com/mongodb/mongo/blob/9cfe13115e92a43d1b9273ee1d5817d548264ba7/src/mongo/transport/baton_asio_linux.h#L60-L529
+[asioNetworkingBaton]: https://github.com/mongodb/mongo/blob/9cfe13115e92a43d1b9273ee1d5817d548264ba7/src/mongo/transport/baton_asio_linux.h#L60-L529
 [example]: https://github.com/mongodb/mongo/blob/262e5a961fa7221bfba5722aeea2db719f2149f5/src/mongo/s/multi_statement_transaction_requests_sender.cpp#L91-L99
 

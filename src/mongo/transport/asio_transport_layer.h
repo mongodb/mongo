@@ -234,7 +234,7 @@ public:
 #endif
 
 private:
-    class BatonASIO;
+    class AsioNetworkingBaton;
     class AsioSession;
     class ASIOReactor;
 

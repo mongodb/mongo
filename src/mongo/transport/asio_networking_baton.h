@@ -53,11 +53,11 @@ namespace transport {
  *
  * We implement our networking reactor on top of poll + eventfd for wakeups
  */
-class AsioTransportLayer::BatonASIO : public NetworkingBaton {
+class AsioTransportLayer::AsioNetworkingBaton : public NetworkingBaton {
 public:
-    BatonASIO(OperationContext* opCtx) : _opCtx(opCtx) {}
+    AsioNetworkingBaton(OperationContext* opCtx) : _opCtx(opCtx) {}
 
-    ~BatonASIO() {
+    ~AsioNetworkingBaton() {
         invariant(!_opCtx);
         invariant(_sessions.empty());
         invariant(_scheduled.empty());
@@ -105,11 +105,11 @@ private:
     bool _cancelTimer(size_t timerId) noexcept;
 
     /*
-     * Internally, `BatonASIO` thinks in terms of synchronized units of work. This is because a
-     * baton effectively represents a green thread with the potential to add or remove work (i.e.,
-     * jobs) at any time. Thus, scheduled jobs must release their lock before executing any task
-     * external to the baton (e.g., `OutOfLineExecutor::Task`, `TransportSession:promise`, and
-     * `ReactorTimer::promise`).
+     * Internally, `AsioNetworkingBaton` thinks in terms of synchronized units of work. This is
+     * because a baton effectively represents a green thread with the potential to add or remove
+     * work (i.e., jobs) at any time. Thus, scheduled jobs must release their lock before executing
+     * any task external to the baton (e.g., `OutOfLineExecutor::Task`, `TransportSession:promise`,
+     * and `ReactorTimer::promise`).
      */
     using Job = unique_function<void(stdx::unique_lock<Mutex>)>;
 
@@ -141,7 +141,7 @@ private:
 
     void detachImpl() noexcept override;
 
-    Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "BatonASIO::_mutex");
+    Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "AsioNetworkingBaton::_mutex");
 
     OperationContext* _opCtx;
 
