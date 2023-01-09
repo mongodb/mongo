@@ -417,6 +417,13 @@ public:
      */
     LogicalTime getOperationTime() const;
 
+    /**
+     * Returns an unowned pointer to the ServiceContext used to create this transaction.
+     */
+    ServiceContext* getParentServiceContext() const {
+        return _service;
+    }
+
 private:
     class TransactionState {
     public:

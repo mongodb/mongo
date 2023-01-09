@@ -66,6 +66,7 @@ env.Library(
 env.Library(
     target='transaction_api',
     source=[
+        'internal_transaction_metrics.cpp',
         'transaction_api.cpp',
     ],
     LIBDEPS_PRIVATE=[

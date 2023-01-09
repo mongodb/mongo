@@ -40,6 +40,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
+#include "mongo/db/transaction/internal_transaction_metrics.h"
 #include "mongo/db/transaction/transaction_api.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/thread_pool_task_executor.h"
@@ -879,6 +880,11 @@ TEST_F(TxnAPITest, OwnSession_RetriesOnTransientError) {
     ASSERT(swResult.getStatus().isOK());
     ASSERT(swResult.getValue().getEffectiveStatus().isOK());
 
+    ASSERT_EQ(1, InternalTransactionMetrics::get(opCtx())->getStarted());
+    ASSERT_EQ(1, InternalTransactionMetrics::get(opCtx())->getRetriedTransactions());
+    ASSERT_EQ(0, InternalTransactionMetrics::get(opCtx())->getRetriedCommits());
+    ASSERT_EQ(1, InternalTransactionMetrics::get(opCtx())->getSucceeded());
+
     auto lastRequest = mockClient()->getLastSentRequest();
     assertTxnMetadata(lastRequest,
                       attempt /* txnNumber */,
@@ -922,6 +928,11 @@ TEST_F(TxnAPITest, OwnSession_RetriesOnTransientClientError) {
     ASSERT(swResult.getStatus().isOK());
     ASSERT(swResult.getValue().getEffectiveStatus().isOK());
 
+    ASSERT_EQ(1, InternalTransactionMetrics::get(opCtx())->getStarted());
+    ASSERT_EQ(1, InternalTransactionMetrics::get(opCtx())->getRetriedTransactions());
+    ASSERT_EQ(0, InternalTransactionMetrics::get(opCtx())->getRetriedCommits());
+    ASSERT_EQ(1, InternalTransactionMetrics::get(opCtx())->getSucceeded());
+
     auto lastRequest = mockClient()->getLastSentRequest();
     assertTxnMetadata(lastRequest,
                       attempt /* txnNumber */,
@@ -959,6 +970,11 @@ TEST_F(TxnAPITest, OwnSession_CommitError) {
     ASSERT_EQ(swResult.getValue().cmdStatus, ErrorCodes::InternalError);
     ASSERT(swResult.getValue().wcError.toStatus().isOK());
     ASSERT_EQ(swResult.getValue().getEffectiveStatus(), ErrorCodes::InternalError);
+
+    ASSERT_EQ(1, InternalTransactionMetrics::get(opCtx())->getStarted());
+    ASSERT_EQ(0, InternalTransactionMetrics::get(opCtx())->getRetriedTransactions());
+    ASSERT_EQ(0, InternalTransactionMetrics::get(opCtx())->getRetriedCommits());
+    ASSERT_EQ(0, InternalTransactionMetrics::get(opCtx())->getSucceeded());
 
     auto lastRequest = mockClient()->getLastSentRequest();
     assertTxnMetadata(lastRequest,
@@ -1001,6 +1017,11 @@ TEST_F(TxnAPITest, OwnSession_TransientCommitError) {
     ASSERT(swResult.getStatus().isOK());
     ASSERT(swResult.getValue().getEffectiveStatus().isOK());
 
+    ASSERT_EQ(1, InternalTransactionMetrics::get(opCtx())->getStarted());
+    ASSERT_EQ(1, InternalTransactionMetrics::get(opCtx())->getRetriedTransactions());
+    ASSERT_EQ(0, InternalTransactionMetrics::get(opCtx())->getRetriedCommits());
+    ASSERT_EQ(1, InternalTransactionMetrics::get(opCtx())->getSucceeded());
+
     auto lastRequest = mockClient()->getLastSentRequest();
     assertTxnMetadata(lastRequest,
                       attempt /* txnNumber */,
@@ -1036,6 +1057,12 @@ TEST_F(TxnAPITest, OwnSession_RetryableCommitError) {
         });
     ASSERT(swResult.getStatus().isOK());
     ASSERT(swResult.getValue().getEffectiveStatus().isOK());
+
+    ASSERT_EQ(1, InternalTransactionMetrics::get(opCtx())->getStarted());
+    ASSERT_EQ(0, InternalTransactionMetrics::get(opCtx())->getRetriedTransactions());
+    ASSERT_EQ(1, InternalTransactionMetrics::get(opCtx())->getRetriedCommits());
+    ASSERT_EQ(1, InternalTransactionMetrics::get(opCtx())->getSucceeded());
+
 
     auto lastRequest = mockClient()->getLastSentRequest();
     assertTxnMetadata(lastRequest,
@@ -1073,6 +1100,11 @@ TEST_F(TxnAPITest, OwnSession_NonRetryableCommitWCError) {
     ASSERT_EQ(swResult.getValue().wcError.toStatus(), ErrorCodes::WriteConcernFailed);
     ASSERT_EQ(swResult.getValue().getEffectiveStatus(), ErrorCodes::WriteConcernFailed);
 
+    ASSERT_EQ(1, InternalTransactionMetrics::get(opCtx())->getStarted());
+    ASSERT_EQ(0, InternalTransactionMetrics::get(opCtx())->getRetriedTransactions());
+    ASSERT_EQ(0, InternalTransactionMetrics::get(opCtx())->getRetriedCommits());
+    ASSERT_EQ(0, InternalTransactionMetrics::get(opCtx())->getSucceeded());
+
     auto lastRequest = mockClient()->getLastSentRequest();
     assertTxnMetadata(lastRequest,
                       0 /* txnNumber */,
@@ -1106,6 +1138,11 @@ TEST_F(TxnAPITest, OwnSession_RetryableCommitWCError) {
         });
     ASSERT(swResult.getStatus().isOK());
     ASSERT(swResult.getValue().getEffectiveStatus().isOK());
+
+    ASSERT_EQ(1, InternalTransactionMetrics::get(opCtx())->getStarted());
+    ASSERT_EQ(0, InternalTransactionMetrics::get(opCtx())->getRetriedTransactions());
+    ASSERT_EQ(1, InternalTransactionMetrics::get(opCtx())->getRetriedCommits());
+    ASSERT_EQ(1, InternalTransactionMetrics::get(opCtx())->getSucceeded());
 
     auto lastRequest = mockClient()->getLastSentRequest();
     assertTxnMetadata(lastRequest,

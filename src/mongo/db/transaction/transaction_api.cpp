@@ -50,6 +50,7 @@
 #include "mongo/db/session/internal_session_pool.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/session/session_catalog.h"
+#include "mongo/db/transaction/internal_transaction_metrics.h"
 #include "mongo/db/transaction_validation.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/task_executor.h"
@@ -253,6 +254,7 @@ void logNextStep(Transaction::ErrorHandlingStep nextStep, const BSONObj& txnInfo
 }
 
 SemiFuture<CommitResult> TransactionWithRetries::run(Callback callback) noexcept {
+    InternalTransactionMetrics::get(_internalTxn->getParentServiceContext())->incrementStarted();
     _internalTxn->setCallback(std::move(callback));
 
     return AsyncTry([this, bodyAttempts = 0]() mutable {
@@ -264,6 +266,7 @@ SemiFuture<CommitResult> TransactionWithRetries::run(Callback callback) noexcept
         .until([](StatusOrStatusWith<CommitResult> txnStatus) {
             // Commit retries should be handled within _runCommitWithRetries().
             invariant(txnStatus != ErrorCodes::TransactionAPIMustRetryCommit);
+
             return txnStatus.isOK() || txnStatus != ErrorCodes::TransactionAPIMustRetryTransaction;
         })
         .withBackoffBetweenIterations(kExponentialBackoff)
@@ -287,6 +290,8 @@ ExecutorFuture<void> TransactionWithRetries::_runBodyHandleErrors(int bodyAttemp
                 iassert(bodyStatus);
             } else if (nextStep == Transaction::ErrorHandlingStep::kRetryTransaction) {
                 return _bestEffortAbort().then([this, bodyStatus] {
+                    InternalTransactionMetrics::get(_internalTxn->getParentServiceContext())
+                        ->incrementRetriedTransactions();
                     _internalTxn->primeForTransactionRetry();
                     iassert(Status(ErrorCodes::TransactionAPIMustRetryTransaction,
                                    str::stream() << "Must retry body loop on internal body error: "
@@ -301,6 +306,8 @@ ExecutorFuture<CommitResult> TransactionWithRetries::_runCommitHandleErrors(int 
     return _internalTxn->commit().thenRunOn(_executor).onCompletion(
         [this, commitAttempts](StatusWith<CommitResult> swCommitResult) {
             if (swCommitResult.isOK() && swCommitResult.getValue().getEffectiveStatus().isOK()) {
+                InternalTransactionMetrics::get(_internalTxn->getParentServiceContext())
+                    ->incrementSucceeded();
                 // Commit succeeded so return to the caller.
                 return ExecutorFuture<CommitResult>(_executor, swCommitResult);
             }
@@ -313,11 +320,15 @@ ExecutorFuture<CommitResult> TransactionWithRetries::_runCommitHandleErrors(int 
             } else if (nextStep == Transaction::ErrorHandlingStep::kAbortAndDoNotRetry) {
                 MONGO_UNREACHABLE;
             } else if (nextStep == Transaction::ErrorHandlingStep::kRetryTransaction) {
+                InternalTransactionMetrics::get(_internalTxn->getParentServiceContext())
+                    ->incrementRetriedTransactions();
                 _internalTxn->primeForTransactionRetry();
                 iassert(Status(ErrorCodes::TransactionAPIMustRetryTransaction,
                                str::stream() << "Must retry body loop on commit error: "
                                              << swCommitResult.getStatus()));
             } else if (nextStep == Transaction::ErrorHandlingStep::kRetryCommit) {
+                InternalTransactionMetrics::get(_internalTxn->getParentServiceContext())
+                    ->incrementRetriedCommits();
                 _internalTxn->primeForCommitRetry();
                 iassert(Status(ErrorCodes::TransactionAPIMustRetryCommit,
                                str::stream() << "Must retry commit loop on internal commit error: "
