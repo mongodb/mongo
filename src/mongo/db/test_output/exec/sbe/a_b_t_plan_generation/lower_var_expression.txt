@@ -14,5 +14,5 @@ PhysicalScan [{'<root>': scan0}, collName]
             Source []
 
 -- OUTPUT:
-[3] project [s2 = getField(s1, "a")] 
-[1] scan s1 none none none none none [] @"<collUUID>" true false 
+[1] project [s2 = getField(s1, "a")] 
+[0] scan s1 none none none none none [] @"<collUUID>" true false 

@@ -18,8 +18,8 @@ PhysicalScan [{'<root>': scan0}, collName]
             Source []
 
 -- OUTPUT:
-[3] filter {(((getField(s1, "a") <=> 23) >= 0ll) ?: false)} 
-[1] scan s1 none none none none none [] @"<collUUID>" true false 
+[1] filter {(((getField(s1, "a") <=> 23) >= 0ll) ?: false)} 
+[0] scan s1 none none none none none [] @"<collUUID>" true false 
 
 ==== VARIATION: filter for constant: true ====
 -- INPUT:
@@ -33,5 +33,5 @@ PhysicalScan [{'<root>': scan0}, collName]
             Source []
 
 -- OUTPUT:
-[7] cfilter {(true ?: false)} 
-[5] scan s1 none none none none none [] @"<collUUID>" true false 
+[1] cfilter {(true ?: false)} 
+[0] scan s1 none none none none none [] @"<collUUID>" true false 

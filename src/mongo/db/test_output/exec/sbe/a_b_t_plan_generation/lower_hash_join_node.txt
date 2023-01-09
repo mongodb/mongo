@@ -27,13 +27,13 @@ PhysicalScan [{'<root>': scan0}, collName]
             Source []
 
 -- OUTPUT:
-[9] hj 
+[4] hj 
     left [s4] [] 
-        [7] project [s4 = getField(s3, "id")] 
-        [5] scan s3 none none none none none [] @"<collUUID>" true false 
+        [3] project [s4 = getField(s3, "id")] 
+        [2] scan s3 none none none none none [] @"<collUUID>" true false 
     right [s2] [] 
-        [3] project [s2 = getField(s1, "other_id")] 
-        [1] scan s1 none none none none none [] @"<collUUID>" true false 
+        [1] project [s2 = getField(s1, "other_id")] 
+        [0] scan s1 none none none none none [] @"<collUUID>" true false 
 
 
 ==== VARIATION: Hash join with two equalities ====
@@ -76,13 +76,13 @@ PhysicalScan [{'<root>': scan0}, collName]
             Source []
 
 -- OUTPUT:
-[23] hj 
+[6] hj 
     left [s5, s6] [] 
-        [21] project [s6 = getField(s4, "state_id")] 
-        [19] project [s5 = getField(s4, "cityField")] 
-        [17] scan s4 none none none none none [] @"<collUUID>" true false 
+        [5] project [s6 = getField(s4, "state_id")] 
+        [4] project [s5 = getField(s4, "cityField")] 
+        [3] scan s4 none none none none none [] @"<collUUID>" true false 
     right [s2, s3] [] 
-        [15] project [s3 = getField(s1, "state")] 
-        [13] project [s2 = getField(s1, "city")] 
-        [11] scan s1 none none none none none [] @"<collUUID>" true false 
+        [2] project [s3 = getField(s1, "state")] 
+        [1] project [s2 = getField(s1, "city")] 
+        [0] scan s1 none none none none none [] @"<collUUID>" true false 
 

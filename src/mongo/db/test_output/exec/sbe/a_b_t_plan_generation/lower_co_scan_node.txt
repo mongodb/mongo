@@ -5,4 +5,4 @@
 CoScan []
 
 -- OUTPUT:
-[1] coscan 
+[0] coscan 

@@ -17,9 +17,9 @@ PhysicalScan [{'<root>': scan0}, collName]
             Source []
 
 -- OUTPUT:
-[5] unique [s2] 
-[3] project [s2 = getField(s1, "a")] 
-[1] scan s1 none none none none none [] @"<collUUID>" true false 
+[2] unique [s2] 
+[1] project [s2 = getField(s1, "a")] 
+[0] scan s1 none none none none none [] @"<collUUID>" true false 
 
 ==== VARIATION: Lower unique node with multiple keys ====
 -- INPUT:
@@ -52,8 +52,8 @@ PhysicalScan [{'<root>': scan0}, collName]
             Source []
 
 -- OUTPUT:
-[15] unique [s2, s3, s4] 
-[13] project [s4 = getField(s1, "c")] 
-[11] project [s3 = getField(s1, "b")] 
-[9] project [s2 = getField(s1, "a")] 
-[7] scan s1 none none none none none [] @"<collUUID>" true false 
+[4] unique [s2, s3, s4] 
+[3] project [s4 = getField(s1, "c")] 
+[2] project [s3 = getField(s1, "b")] 
+[1] project [s2 = getField(s1, "a")] 
+[0] scan s1 none none none none none [] @"<collUUID>" true false 

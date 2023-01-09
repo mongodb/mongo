@@ -115,6 +115,7 @@ protected:
         // so reset the node map.
         _nodeMap = NodeToGroupPropsMap{};
         _fieldProjMap = {{}, {ProjectionName{scanLabel}}, {}};
+        lastNodeGenerated = 0;
     }
 
     ScanDefinition buildScanDefinition() {
@@ -149,7 +150,6 @@ protected:
                     CostType::fromDouble(0),
                     {false}};
         properties::setPropertyOverwrite(n._physicalProps, properties::ProjectionRequirement({}));
-        n._planNodeId = getNextNodeID();
         return n;
     }
     void runPathLowering(ABT& tree) {

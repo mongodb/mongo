@@ -8,7 +8,7 @@ PhysicalScan [{'<root>': root0}, collName]
             Source []
 
 -- OUTPUT:
-[1] scan s1 none none none none none [] @"<collUUID>" true false 
+[0] scan s1 none none none none none [] @"<collUUID>" true false 
 
 ==== VARIATION: Physical scan with RID projection (not parallel) ====
 -- INPUT:
@@ -18,7 +18,7 @@ PhysicalScan [{'<rid>': RID0}, collName]
             Source []
 
 -- OUTPUT:
-[3] scan none s1 none none none none [] @"<collUUID>" true false 
+[0] scan none s1 none none none none [] @"<collUUID>" true false 
 
 ==== VARIATION: Physical scan with root and RID projections (not parallel) ====
 -- INPUT:
@@ -30,7 +30,7 @@ PhysicalScan [{'<rid>': RID0, '<root>': root0}, collName]
             Source []
 
 -- OUTPUT:
-[5] scan s2 s1 none none none none [] @"<collUUID>" true false 
+[0] scan s2 s1 none none none none [] @"<collUUID>" true false 
 
 ==== VARIATION: Physical scan with root, RID and field projections (not parallel) ====
 -- INPUT:
@@ -44,7 +44,7 @@ PhysicalScan [{'<rid>': RID0, '<root>': root0, 'field': field2}, collName]
             Source []
 
 -- OUTPUT:
-[7] scan s2 s1 none none none none [s3 = field] @"<collUUID>" true false 
+[0] scan s2 s1 none none none none [s3 = field] @"<collUUID>" true false 
 
 ==== VARIATION: Physical scan with root projection (parallel) ====
 -- INPUT:
@@ -54,7 +54,7 @@ PhysicalScan [{'<root>': root0}, collName, parallel]
             Source []
 
 -- OUTPUT:
-[9] pscan s1 none none none none none [] @"<collUUID>" 
+[0] pscan s1 none none none none none [] @"<collUUID>" 
 
 ==== VARIATION: Physical scan with RID projection (parallel) ====
 -- INPUT:
@@ -64,7 +64,7 @@ PhysicalScan [{'<rid>': RID0}, collName, parallel]
             Source []
 
 -- OUTPUT:
-[11] pscan none s1 none none none none [] @"<collUUID>" 
+[0] pscan none s1 none none none none [] @"<collUUID>" 
 
 ==== VARIATION: Physical scan with root and RID projections (parallel) ====
 -- INPUT:
@@ -76,7 +76,7 @@ PhysicalScan [{'<rid>': RID0, '<root>': root0}, collName, parallel]
             Source []
 
 -- OUTPUT:
-[13] pscan s2 s1 none none none none [] @"<collUUID>" 
+[0] pscan s2 s1 none none none none [] @"<collUUID>" 
 
 ==== VARIATION: Physical scan with root, RID and field projections (parallel) ====
 -- INPUT:
@@ -90,4 +90,4 @@ PhysicalScan [{'<rid>': RID0, '<root>': root0, 'field': field2}, collName, paral
             Source []
 
 -- OUTPUT:
-[15] pscan s2 s1 none none none none [s3 = field] @"<collUUID>" 
+[0] pscan s2 s1 none none none none [s3 = field] @"<collUUID>" 
