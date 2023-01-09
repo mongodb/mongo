@@ -1749,9 +1749,6 @@ buildvariants:
   - name: search_auth
   - name: search_ssl
   - name: secondary_reads_passthrough_gen
-  - name: server_selection_json_test_TG
-    distros:
-    - rhel80-xlarge
   - name: session_jscore_passthrough
   - name: sharding_api_version_jscore_passthrough_gen
   - name: test_api_version_compatibility
