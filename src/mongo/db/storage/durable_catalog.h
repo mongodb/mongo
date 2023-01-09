@@ -123,11 +123,12 @@ public:
     /**
      * Create an entry in the catalog for an orphaned collection found in the
      * storage engine. Return the generated ns of the collection.
-     * Note that this function does not recreate the _id index on the collection because it does not
-     * have access to index catalog.
+     * Note that this function does not recreate the _id index on the for non-clustered collections
+     * because it does not have access to index catalog.
      */
     virtual StatusWith<std::string> newOrphanedIdent(OperationContext* opCtx,
-                                                     std::string ident) = 0;
+                                                     std::string ident,
+                                                     const CollectionOptions& optionsWithUUID) = 0;
 
     virtual std::string getFilesystemPathForDb(const std::string& dbName) const = 0;
 

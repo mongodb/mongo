@@ -98,7 +98,9 @@ public:
         return _rs;
     }
 
-    StatusWith<std::string> newOrphanedIdent(OperationContext* opCtx, std::string ident);
+    StatusWith<std::string> newOrphanedIdent(OperationContext* opCtx,
+                                             std::string ident,
+                                             const CollectionOptions& optionsWithUUID);
 
     std::string getFilesystemPathForDb(const std::string& dbName) const;
 

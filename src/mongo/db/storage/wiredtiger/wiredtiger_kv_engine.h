@@ -383,6 +383,8 @@ public:
 
     Status reconfigureLogging() override;
 
+    KeyFormat getKeyFormat(OperationContext* opCtx, StringData ident) const override;
+
 private:
     class WiredTigerSessionSweeper;
 

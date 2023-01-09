@@ -35,6 +35,7 @@
 
 #include "mongo/db/audit.h"
 #include "mongo/db/catalog/catalog_control.h"
+#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog_raii.h"
@@ -201,19 +202,36 @@ void StorageEngineImpl::loadCatalog(OperationContext* opCtx, LastShutdownState l
                     // If the catalog does not have information about this
                     // collection, we create an new entry for it.
                     WriteUnitOfWork wuow(opCtx);
-                    StatusWith<std::string> statusWithNs = _catalog->newOrphanedIdent(opCtx, ident);
+
+                    auto keyFormat = _engine->getKeyFormat(opCtx, ident);
+                    bool isClustered = keyFormat == KeyFormat::String;
+                    CollectionOptions optionsWithUUID;
+                    optionsWithUUID.uuid.emplace(UUID::gen());
+                    if (isClustered) {
+                        optionsWithUUID.clusteredIndex =
+                            clustered_util::makeDefaultClusteredIdIndex();
+                    }
+
+                    StatusWith<std::string> statusWithNs =
+                        _catalog->newOrphanedIdent(opCtx, ident, optionsWithUUID);
+
                     if (statusWithNs.isOK()) {
                         wuow.commit();
                         auto orphanCollNs = statusWithNs.getValue();
                         LOGV2(22247,
                               "Successfully created an entry in the catalog for orphaned "
                               "collection",
-                              "namespace"_attr = orphanCollNs);
-                        LOGV2_WARNING(22265,
-                                      "Collection does not have an _id index. Please manually "
-                                      "build the index",
-                                      "namespace"_attr = orphanCollNs);
+                              "namespace"_attr = orphanCollNs,
+                              "options"_attr = optionsWithUUID);
 
+                        if (!isClustered) {
+                            // The _id index is already implicitly created on collections clustered
+                            // by _id.
+                            LOGV2_WARNING(22265,
+                                          "Collection does not have an _id index. Please manually "
+                                          "build the index",
+                                          "namespace"_attr = orphanCollNs);
+                        }
                         StorageRepairObserver::get(getGlobalServiceContext())
                             ->benignModification(str::stream() << "Orphan collection created: "
                                                                << statusWithNs.getValue());

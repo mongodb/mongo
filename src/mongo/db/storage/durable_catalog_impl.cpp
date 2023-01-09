@@ -554,8 +554,8 @@ bool DurableCatalogImpl::isCollectionIdent(StringData ident) const {
         ident.find("collection/") != std::string::npos;
 }
 
-StatusWith<std::string> DurableCatalogImpl::newOrphanedIdent(OperationContext* opCtx,
-                                                             std::string ident) {
+StatusWith<std::string> DurableCatalogImpl::newOrphanedIdent(
+    OperationContext* opCtx, std::string ident, const CollectionOptions& optionsWithUUID) {
     // The collection will be named local.orphan.xxxxx.
     std::string identNs = ident;
     std::replace(identNs.begin(), identNs.end(), '-', '_');
@@ -563,9 +563,6 @@ StatusWith<std::string> DurableCatalogImpl::newOrphanedIdent(OperationContext* o
     NamespaceString nss(NamespaceString(NamespaceString::kOrphanCollectionDb,
                                         NamespaceString::kOrphanCollectionPrefix + identNs));
 
-    // Generate a new UUID for the orphaned collection.
-    CollectionOptions optionsWithUUID;
-    optionsWithUUID.uuid.emplace(UUID::gen());
     BSONObj obj;
     {
         BSONObjBuilder b;
