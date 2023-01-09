@@ -34,7 +34,7 @@ function runTest(targetFCV) {
 
     // Startup with 5.x binary, with FCV set to 5.x.
     {
-        const conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: '5.0', noCleanData: true});
+        const conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: targetFCV, noCleanData: true});
 
         const db = conn.getDB('test');
         const coll = db['partial_indexes_downgrade'];
