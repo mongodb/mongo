@@ -24,8 +24,11 @@ let adminDb = m.getDB('admin');
 assert.eq(getParameter(adminDb, "diagnosticDataCollectionStatsNamespaces"), ["local.startup_log"]);
 
 // Validate that collection stats are collected
-let doc = verifyGetDiagnosticData(adminDb);
-assert.eq(doc.collectionStats["local.startup_log"].ns, "local.startup_log");
+let doc;
+assert.soon(() => {
+    doc = verifyGetDiagnosticData(adminDb);
+    return doc.collectionStats["local.startup_log"].ns == "local.startup_log";
+});
 
 // Validate that incorrect changes have no effect
 assert.commandFailed(setParameter(adminDb, {"diagnosticDataCollectionStatsNamespaces": ["local"]}));
