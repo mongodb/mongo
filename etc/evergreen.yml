@@ -7751,10 +7751,6 @@ buildvariants:
     test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux
     multiversion_platform: amzn64
     multiversion_edition: enterprise
-    has_packages: true
-    packager_script: packager_enterprise.py
-    packager_arch: x86_64
-    packager_distro: amazon
     repo_edition: enterprise
     scons_cache_scope: shared
     virtualenv: /opt/mongodbtoolchain/v3/bin/virtualenv
@@ -7785,10 +7781,7 @@ buildvariants:
   - name: slow1_gen
   - name: snmp
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
-  - name: .publish
+  - name: push
     distros:
     - amazon1-2018-small
   - name: generate_buildid_to_debug_symbols_mapping
@@ -7806,10 +7799,6 @@ buildvariants:
     test_flags: --excludeWithAnyTags=incompatible_with_amazon_linux
     multiversion_platform: amazon
     multiversion_edition: targeted
-    has_packages: true
-    packager_script: packager.py
-    packager_arch: x86_64
-    packager_distro: amazon
     repo_edition: org
     scons_cache_scope: shared
     virtualenv: /opt/mongodbtoolchain/v3/bin/virtualenv
@@ -7840,10 +7829,7 @@ buildvariants:
   - name: .sharding .txns
   - name: .ssl
   - name: .stitch
-  - name: test_packages
-    distros:
-    - ubuntu2004-package
-  - name: .publish
+  - name: push
     distros:
     - amazon1-2018-small
   - name: generate_buildid_to_debug_symbols_mapping
