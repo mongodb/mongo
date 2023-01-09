@@ -456,11 +456,6 @@ void restoreRangeDeletionTasksForRename(OperationContext* opCtx, const Namespace
 void deleteRangeDeletionTasksForRename(OperationContext* opCtx,
                                        const NamespaceString& fromNss,
                                        const NamespaceString& toNss) {
-    // Delete range deletion tasks associated to the source collection
-    PersistentTaskStore<RangeDeletionTask> rangeDeletionsStore(
-        NamespaceString::kRangeDeletionNamespace);
-    rangeDeletionsStore.remove(opCtx, BSON(RangeDeletionTask::kNssFieldName << fromNss.ns()));
-
     // Delete already restored snapshots associated to the target collection
     PersistentTaskStore<RangeDeletionTask> rangeDeletionsForRenameStore(
         NamespaceString::kRangeDeletionForRenameNamespace);
