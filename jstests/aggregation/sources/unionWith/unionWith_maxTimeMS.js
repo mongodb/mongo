@@ -1,9 +1,5 @@
 /**
  * Tests that maxTimeMS is respected even in an inner $unionWith pipeline.
- * @tags: [
- *   #TODO SERVER-72405 Unblock this test from the telemetry passthrough
- *   exclude_from_telemetry_passthrough,
- * ]
  */
 
 (function() {
