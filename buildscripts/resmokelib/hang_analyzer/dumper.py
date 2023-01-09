@@ -448,7 +448,15 @@ class GDBDumper(Dumper):
 
         cmds = self._prefix() + self._process_specific(pinfo, take_dump, logger) + self._postfix()
 
-        call([dbg, "--quiet", "--nx"] + list(
+        # gcore is both a command within GDB and a script packaged alongside gdb. The gcore script
+        # invokes the gdb binary with --readnever to avoid spending time loading the debug symbols
+        # prior to taking the core dump. The debug symbols are unneeded to generate the core dump.
+        #
+        # For reference
+        # https://sourceware.org/git/?p=binutils-gdb.git;a=blob;f=gdb/gcore.in;h=34860de630cf0ee766e102eb82f7a3fddba6b368#l101
+        skip_reading_symbols_on_take_dump = ["--readnever"] if take_dump else []
+
+        call([dbg, "--quiet", "--nx"] + skip_reading_symbols_on_take_dump + list(
             itertools.chain.from_iterable([['-ex', b] for b in cmds])), logger)
 
         self._root_logger.info("Done analyzing %s processes with PIDs %s", pinfo.name,
