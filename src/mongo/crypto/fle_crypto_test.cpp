@@ -2768,6 +2768,12 @@ TEST(RangeTest, Decimal128_Bounds_Precision) {
 
     ASSERT_EIBB(5E-30, 10E-30, 1E-30, 35, boost::multiprecision::uint128_t("400000"));
 
+    // Test a range that requires > 64 bits.
+    ASSERT_EIBB(5, "18446744073709551616", ".1", 1, 49)
+    // Test a range that requires > 64 bits.
+    // min has more places after the decimal than precision.
+    ASSERT_EIBB(5, "18446744073709551616", ".01", 1, 49)
+
 #undef ASSERT_EIBB
 #undef ASSERT_EIBB_OVERFLOW
 }

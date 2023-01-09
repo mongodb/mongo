@@ -4004,6 +4004,11 @@ OSTType_Decimal128 getTypeInfoDecimal128(Decimal128 value,
         //
         // Returns 3141.0
         Decimal128 v_prime2 = v_prime.subtract(min.get()).scale(precision.get());
+        // Round the number down again. min may have a fractional value with more decimal places
+        // than the precision (e.g. .001). Subtracting min may have resulted in v_prime2 with
+        // a non-zero fraction. v_prime2 is expected to have no fractional value when
+        // converting to int128.
+        v_prime2 = v_prime2.round(Decimal128::kRoundTowardZero);
 
         invariant(v_prime2.logarithm(Decimal128(2)).isLess(Decimal128(128)));
 
