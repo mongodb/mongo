@@ -267,6 +267,11 @@ var $config = extendWorkload($config, function($config, $super) {
 
         // Store an in-memory representation of the documents in the collection.
         this.expectedDocs = db[collName].find().toArray();
+
+        // Make sure the 'operations' collection is created before we start running the FSM states.
+        // This prevents failures in suites where states run in transactions, as creating a
+        // collection within a multi-shard transaction is not allowed.
+        db.createCollection("operations");
     };
 
     $config.teardown = function teardown(db, collName, cluster) {
