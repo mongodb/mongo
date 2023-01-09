@@ -42,6 +42,7 @@ while (collectionInfos.hasNext()) {
 assert.neq(null, systemViewsUUID, "did not find UUID for system.views");
 
 session.startTransaction({readConcern: {level: "snapshot"}});
-assert.commandFailedWithCode(testDB.runCommand({find: systemViewsUUID, filter: {}}), 51070);
+assert.commandFailedWithCode(testDB.runCommand({find: systemViewsUUID, filter: {}}),
+                             [51070, 7195700]);
 assert.commandFailedWithCode(session.abortTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 }());
