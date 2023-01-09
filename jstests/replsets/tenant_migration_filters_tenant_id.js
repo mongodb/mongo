@@ -11,12 +11,12 @@
  * ]
  */
 
-(function() {
-"use strict";
+import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {
+    isNamespaceForTenant,
+} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/uuid_util.js");
-load("jstests/replsets/libs/tenant_migration_test.js");
-load("jstests/replsets/libs/tenant_migration_util.js");
 
 const tenantIdPrefix = "tenantId";
 const baseDBName = "testDB";
@@ -32,7 +32,7 @@ const runTest = (baseTenantId, dbName, shouldMatch) => {
 
     const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
-    assert.eq(shouldMatch, TenantMigrationUtil.isNamespaceForTenant(baseTenantId, dbName));
+    assert.eq(shouldMatch, isNamespaceForTenant(baseTenantId, dbName));
     tenantMigrationTest.insertDonorDB(dbName, collName);
 
     // Run a migration with the base tenant ID.
@@ -66,4 +66,3 @@ for (const {makeTenantId, shouldMatch} of testCases) {
     const tenantId = makeTenantId(baseTenantId);
     runTest(baseTenantId, `${tenantId}_${baseDBName}`, shouldMatch);
 }
-})();

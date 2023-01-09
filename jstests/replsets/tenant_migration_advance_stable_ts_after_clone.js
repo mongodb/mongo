@@ -12,11 +12,10 @@
  * ]
  */
 
-(function() {
-"use strict";
+import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {isShardMergeEnabled} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/fail_point_util.js");
-load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/libs/uuid_util.js");  // For extractUUIDFromObject().
 load("jstests/replsets/rslib.js");
 
@@ -40,10 +39,10 @@ const recipientPrimary = tmt.getRecipientPrimary();
 // suites will execute this test without featureFlagShardMerge enabled (despite the
 // presence of the featureFlagShardMerge tag above), which means the test will attempt
 // to run a multi-tenant migration and fail.
-if (!TenantMigrationUtil.isShardMergeEnabled(recipientPrimary.getDB("admin"))) {
+if (!isShardMergeEnabled(recipientPrimary.getDB("admin"))) {
     tmt.stop();
     jsTestLog("Skipping Shard Merge-specific test");
-    return;
+    quit();
 }
 
 // Insert a doc on the recipient with {writeConcern: majority} to advance the stable timestamp. We
@@ -121,4 +120,3 @@ assert(bsonWoCompare(majorityWriteTs, donorAdvancedStableTs) >= 0);
 
 TenantMigrationTest.assertCommitted(tmt.waitForMigrationToComplete(migrationOpts));
 tmt.stop();
-})();

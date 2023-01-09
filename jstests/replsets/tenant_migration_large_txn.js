@@ -14,14 +14,15 @@
  * ]
  */
 
-(function() {
-"use strict";
+import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {
+    runMigrationAsync,
+} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
-load("jstests/replsets/libs/tenant_migration_test.js");
-load("jstests/replsets/libs/tenant_migration_util.js");
+load('jstests/replsets/rslib.js');  // 'createRstArgs'
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
@@ -61,13 +62,12 @@ const migrationOpts = {
     recipientConnString: tenantMigrationTest.getRecipientConnString(),
     tenantId: kTenantId,
 };
-const donorRstArgs = TenantMigrationUtil.createRstArgs(tenantMigrationTest.getDonorRst());
+const donorRstArgs = createRstArgs(tenantMigrationTest.getDonorRst());
 
 // Start a migration, and pause it after the donor has majority-committed the initial state doc.
 const dataSyncFp =
     configureFailPoint(donorPrimary, "pauseTenantMigrationBeforeLeavingDataSyncState");
-const migrationThread =
-    new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
+const migrationThread = new Thread(runMigrationAsync, migrationOpts, donorRstArgs);
 migrationThread.start();
 dataSyncFp.wait();
 
@@ -96,4 +96,3 @@ txnThread.join();
 assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 
 tenantMigrationTest.stop();
-})();

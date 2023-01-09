@@ -14,14 +14,16 @@
  * ]
  */
 
-(function() {
+import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {
+    forgetMigrationAsync,
+    isShardMergeEnabled,
+} from "jstests/replsets/libs/tenant_migration_util.js";
 
-"use strict";
 load("jstests/libs/uuid_util.js");        // For extractUUIDFromObject().
 load("jstests/libs/fail_point_util.js");  // For configureFailPoint().
 load("jstests/libs/parallelTester.js");   // For the Thread().
-load("jstests/replsets/libs/tenant_migration_test.js");
-load("jstests/replsets/libs/tenant_migration_util.js");
+load('jstests/replsets/rslib.js');        // For 'createRstArgs'
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
@@ -29,11 +31,10 @@ const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 // suites will execute this test without featureFlagShardMerge enabled (despite the
 // presence of the featureFlagShardMerge tag above), which means the test will attempt
 // to run a multi-tenant migration and fail.
-if (!TenantMigrationUtil.isShardMergeEnabled(
-        tenantMigrationTest.getDonorPrimary().getDB("admin"))) {
+if (!isShardMergeEnabled(tenantMigrationTest.getDonorPrimary().getDB("admin"))) {
     tenantMigrationTest.stop();
     jsTestLog("Skipping Shard Merge-specific test");
-    return;
+    quit();
 }
 
 const kMigrationId = UUID();
@@ -209,11 +210,10 @@ const fpBeforePersistingRejectReadsBeforeTimestamp = configureFailPoint(
 }
 
 jsTestLog("Issuing a forget migration command.");
-const forgetMigrationThread =
-    new Thread(TenantMigrationUtil.forgetMigrationAsync,
-               migrationOpts.migrationIdString,
-               TenantMigrationUtil.createRstArgs(tenantMigrationTest.getDonorRst()),
-               true /* retryOnRetryableErrors */);
+const forgetMigrationThread = new Thread(forgetMigrationAsync,
+                                         migrationOpts.migrationIdString,
+                                         createRstArgs(tenantMigrationTest.getDonorRst()),
+                                         true /* retryOnRetryableErrors */);
 forgetMigrationThread.start();
 
 {
@@ -246,4 +246,3 @@ forgetMigrationThread.start();
 }
 
 tenantMigrationTest.stop();
-})();

@@ -9,10 +9,7 @@
  * @tags: [requires_sharding]
  */
 
-(function() {
-'use strict';
-
-load('jstests/auth/lib/commands_builtin_roles.js');
+import {runAllCommandsBuiltinRoles} from "jstests/auth/lib/commands_builtin_roles.js";
 
 const dbPath = MongoRunner.toRealDir("$dataDir/commands_built_in_roles_sharded/");
 mkdir(dbPath);
@@ -32,4 +29,3 @@ const conn = new ShardingTest({
 });
 runAllCommandsBuiltinRoles(conn);
 conn.stop();
-})();

@@ -11,15 +11,17 @@
  * ]
  */
 
-(function() {
-"use strict";
+import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {
+    getNumBlockedReads,
+    getNumBlockedWrites,
+    makeX509OptionsForTest
+} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
 load("jstests/libs/write_concern_util.js");
-load("jstests/replsets/libs/tenant_migration_test.js");
-load("jstests/replsets/libs/tenant_migration_util.js");
 
 function startReadThread(node, dbName, collName, afterClusterTime) {
     let readThread = new Thread((host, dbName, collName, afterClusterTime) => {
@@ -49,7 +51,7 @@ function setup() {
     const donorRst = new ReplSetTest({
         nodes: 3,
         name: "donorRst",
-        nodeOptions: Object.assign(TenantMigrationUtil.makeX509OptionsForTest().donor, {
+        nodeOptions: Object.assign(makeX509OptionsForTest().donor, {
             setParameter: {
                 tenantMigrationGarbageCollectionDelayMS: 1,
                 ttlMonitorSleepSecs: 1,
@@ -109,7 +111,7 @@ const kCollName = "testColl";
     const donorDoc = donorsColl.findOne({_id: migrationId});
     assert.neq(null, donorDoc);
     const readThread = startReadThread(laggedSecondary, dbName, kCollName, donorDoc.blockTimestamp);
-    assert.soon(() => TenantMigrationUtil.getNumBlockedReads(laggedSecondary, tenantId) == 1);
+    assert.soon(() => getNumBlockedReads(laggedSecondary, tenantId) == 1);
 
     // Disable snapshotting on that secondary, and wait for the migration to abort and be garbage
     // collected. That way the secondary is guaranteed to observe the write to set expireAt before
@@ -157,7 +159,7 @@ const kCollName = "testColl";
     const donorDoc = donorsColl.findOne({_id: migrationId});
     assert.neq(null, donorDoc);
     const readThread = startReadThread(laggedSecondary, dbName, kCollName, donorDoc.blockTimestamp);
-    assert.soon(() => TenantMigrationUtil.getNumBlockedReads(laggedSecondary, tenantId) == 1);
+    assert.soon(() => getNumBlockedReads(laggedSecondary, tenantId) == 1);
 
     // Disable snapshotting on that secondary, and wait for the migration to commit and be garbage
     // collected. That way the secondary is guaranteed to observe the write to set expireAt before
@@ -203,8 +205,8 @@ const kCollName = "testColl";
     assert.neq(null, donorDoc);
     const readThread = startReadThread(donorPrimary, dbName, kCollName, donorDoc.blockTimestamp);
     const writeThread = startWriteThread(donorPrimary, dbName, kCollName);
-    assert.soon(() => TenantMigrationUtil.getNumBlockedReads(donorPrimary, tenantId) == 1);
-    assert.soon(() => TenantMigrationUtil.getNumBlockedWrites(donorPrimary, tenantId) == 1);
+    assert.soon(() => getNumBlockedReads(donorPrimary, tenantId) == 1);
+    assert.soon(() => getNumBlockedWrites(donorPrimary, tenantId) == 1);
 
     // Cannot delete the donor state doc since it has not been marked as garbage collectable.
     assert.commandFailedWithCode(donorsColl.remove({}), ErrorCodes.IllegalOperation);
@@ -221,5 +223,4 @@ const kCollName = "testColl";
     blockingFp.off();
 
     teardown();
-})();
 })();

@@ -3,10 +3,10 @@
  * @tags: [featureFlagShardMerge]
  */
 
-(function() {
-"use strict";
-
-load("jstests/replsets/libs/tenant_migration_util.js");
+import {
+    isShardMergeEnabled,
+    makeMigrationCertificatesForTest
+} from "jstests/replsets/libs/tenant_migration_util.js";
 load("jstests/libs/fail_point_util.js");
 
 function runTest(downgradeFCV) {
@@ -20,7 +20,7 @@ function runTest(downgradeFCV) {
     // suites will execute this test without featureFlagShardMerge enabled (despite the
     // presence of the featureFlagShardMerge tag above), which means the test will attempt
     // to run a multi-tenant migration and fail.
-    if (!TenantMigrationUtil.isShardMergeEnabled(primary.getDB("admin"))) {
+    if (!isShardMergeEnabled(primary.getDB("admin"))) {
         rst.stopSet();
         jsTestLog("Skipping Shard Merge-specific test");
         return;
@@ -29,7 +29,7 @@ function runTest(downgradeFCV) {
     const adminDB = primary.getDB("admin");
     const kDummyConnStr = "mongodb://localhost/?replicaSet=foo";
     const readPreference = {mode: 'primary'};
-    const migrationCertificates = TenantMigrationUtil.makeMigrationCertificatesForTest();
+    const migrationCertificates = makeMigrationCertificatesForTest();
 
     // A function, not a constant, to ensure unique UUIDs.
     function donorStartMigrationCmd() {
@@ -109,7 +109,7 @@ function runTest(downgradeFCV) {
     configureFailPoint(primary, "returnResponseOkForRecipientForgetMigrationCmd");
 
     // Preconditions: the shard merge feature is enabled and our fresh RS is on the latest FCV.
-    assert(TenantMigrationUtil.isShardMergeEnabled(adminDB));
+    assert(isShardMergeEnabled(adminDB));
     assert.eq(getFCVConstants().latest,
               adminDB.system.version.findOne({_id: 'featureCompatibilityVersion'}).version);
 
@@ -135,4 +135,3 @@ function runTest(downgradeFCV) {
 }
 
 runFeatureFlagMultiversionTest('featureFlagShardMerge', runTest);
-})();

@@ -23,10 +23,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/replsets/libs/tenant_migration_test.js");
+import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 load("jstests/replsets/rslib.js");
 load("jstests/libs/uuid_util.js");
 
@@ -114,4 +111,3 @@ const migrationOpts2 = {
 TenantMigrationTest.assertCommitted(tenantMigrationTest.runMigration(migrationOpts2));
 
 tenantMigrationTest.stop();
-})();

@@ -15,15 +15,15 @@
  * ]
  */
 
-(function() {
-"use strict";
+import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {
+    makeX509OptionsForTest,
+} from "jstests/replsets/libs/tenant_migration_util.js";
 
-load("jstests/replsets/libs/tenant_migration_test.js");
-load("jstests/replsets/libs/tenant_migration_util.js");
 load("jstests/libs/fail_point_util.js");  // For configureFailPoint().
 load("jstests/libs/uuid_util.js");        // For extractUUIDFromObject().
 
-const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
+const migrationX509Options = makeX509OptionsForTest();
 
 const donorRst = new ReplSetTest({
     nodes: 1,
@@ -327,4 +327,3 @@ assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migration
 
 donorRst.stopSet();
 recipientRst.stopSet();
-})();

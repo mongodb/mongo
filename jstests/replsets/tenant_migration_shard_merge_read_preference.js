@@ -12,21 +12,22 @@
  * ]
  */
 
-(function() {
-"use strict";
+import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {
+    isShardMergeEnabled,
+} from "jstests/replsets/libs/tenant_migration_util.js";
+
 load("jstests/libs/uuid_util.js");
-load("jstests/replsets/libs/tenant_migration_test.js");
-load("jstests/replsets/libs/tenant_migration_util.js");
 
 const tenantMigrationTest =
     new TenantMigrationTest({name: jsTestName(), enableRecipientTesting: false});
 
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
 
-if (!TenantMigrationUtil.isShardMergeEnabled(donorPrimary.getDB("admin"))) {
+if (!isShardMergeEnabled(donorPrimary.getDB("admin"))) {
     tenantMigrationTest.stop();
     jsTestLog("Skipping Shard Merge-specific test");
-    return;
+    quit();
 }
 
 const failingMigrationOpts = {
@@ -45,4 +46,3 @@ const succeessfulMigrationOpts = {
 assert.commandWorked(tenantMigrationTest.startMigration(succeessfulMigrationOpts));
 
 tenantMigrationTest.stop();
-})();

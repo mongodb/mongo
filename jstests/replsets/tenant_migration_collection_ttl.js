@@ -12,13 +12,11 @@
  * ]
  */
 
-(function() {
-"use strict";
+import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {isShardMergeEnabled} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
-load("jstests/replsets/libs/tenant_migration_test.js");
-load("jstests/replsets/libs/tenant_migration_util.js");
 
 const garbageCollectionOpts = {
     // Set the delay before a donor state doc is garbage collected to be short to speed
@@ -108,7 +106,7 @@ function assertTTLDeleteExpiredDocs(dbName, node) {
 // 1. At the recipient, the TTL deletions are suspended during the cloning phase.
 // 2. At the donor, TTL deletions are not suspended before blocking state.
 (() => {
-    if (TenantMigrationUtil.isShardMergeEnabled(donorPrimary.getDB("admin"))) {
+    if (isShardMergeEnabled(donorPrimary.getDB("admin"))) {
         jsTestLog(
             "Skip: featureFlagShardMerge enabled, but shard merge does not use logical cloning");
         return;
@@ -234,4 +232,3 @@ function assertTTLDeleteExpiredDocs(dbName, node) {
 })();
 
 tenantMigrationTest.stop();
-})();

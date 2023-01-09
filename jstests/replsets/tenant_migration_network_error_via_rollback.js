@@ -17,17 +17,17 @@
  * ]
  */
 
-(function() {
-"use strict";
+import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {
+    makeX509OptionsForTest,
+} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");  // for 'extractUUIDFromObject'
-load("jstests/replsets/libs/tenant_migration_test.js");
-load("jstests/replsets/libs/tenant_migration_util.js");
 load("jstests/replsets/rslib.js");  // for 'stopServerReplication'
 
 function runTest({failPointName, failPointData = {}, batchSize = 10 * 1000}) {
-    const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
+    const migrationX509Options = makeX509OptionsForTest();
 
     const donorRst = new ReplSetTest({
         name: "recipientRst",
@@ -295,4 +295,3 @@ switch (caseNum) {
         // Unreachable.
         assert(false);
 }
-})();

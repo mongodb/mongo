@@ -10,11 +10,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/replsets/libs/tenant_migration_test.js");
-load("jstests/replsets/libs/tenant_migration_util.js");
+import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 load("jstests/replsets/rslib.js");
 load("jstests/libs/uuid_util.js");
 
@@ -136,4 +132,3 @@ tenantMigrationTest2.waitForMigrationGarbageCollection(migrationId2, kTenantId);
 
 tenantMigrationTest2.stop();
 tenantMigrationTest.stop();
-})();

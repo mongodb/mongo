@@ -13,14 +13,16 @@
  * ]
  */
 
-(function() {
-"use strict";
+import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {
+    isShardMergeEnabled,
+    runMigrationAsync
+} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
-load("jstests/replsets/libs/tenant_migration_test.js");
-load("jstests/replsets/libs/tenant_migration_util.js");
+load("jstests/replsets/rslib.js");  // 'createRstArgs'
 
 // Index builds should be blocked by the tenant access blocker, not maxNumActiveUserIndexBuilds.
 const tenantMigrationTest = new TenantMigrationTest(
@@ -32,10 +34,10 @@ const donorPrimary = tenantMigrationTest.getDonorPrimary();
 // suites will execute this test without featureFlagShardMerge enabled (despite the
 // presence of the featureFlagShardMerge tag above), which means the test will attempt
 // to run a multi-tenant migration and fail.
-if (!TenantMigrationUtil.isShardMergeEnabled(donorPrimary.getDB("admin"))) {
+if (!isShardMergeEnabled(donorPrimary.getDB("admin"))) {
     tenantMigrationTest.stop();
     jsTestLog("Skipping Shard Merge-specific test");
-    return;
+    quit();
 }
 
 const kTenant1Id = ObjectId().str;
@@ -64,7 +66,7 @@ const migrationOpts = {
     recipientConnString: tenantMigrationTest.getRecipientConnString(),
     tenantIds: tojson([ObjectId(kTenant1Id), ObjectId(kTenant2Id)])
 };
-const donorRstArgs = TenantMigrationUtil.createRstArgs(tenantMigrationTest.getDonorRst());
+const donorRstArgs = createRstArgs(tenantMigrationTest.getDonorRst());
 
 // Put some data in the non-empty collections, and create the empty one.
 const db1 = donorPrimary.getDB(kTenant1DbName);
@@ -107,8 +109,7 @@ jsTestLog("Starting a migration and pausing after majority-committing the initia
 // Start a migration, and pause it after the donor has majority-committed the initial state doc.
 const dataSyncFp =
     configureFailPoint(donorPrimary, "pauseTenantMigrationBeforeLeavingDataSyncState");
-const migrationThread =
-    new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
+const migrationThread = new Thread(runMigrationAsync, migrationOpts, donorRstArgs);
 migrationThread.start();
 dataSyncFp.wait();
 
@@ -179,4 +180,3 @@ assert.commandFailedWithCode(db2[kNewCollName2].createIndex({d: 1}),
 assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 
 tenantMigrationTest.stop();
-})();

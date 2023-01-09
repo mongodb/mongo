@@ -3,21 +3,36 @@
  * tenant_migration_concurrent_writes_on_donor*tests.
  */
 
-'use strict';
+import {getTenantMigrationAccessBlocker} from "jstests/replsets/libs/tenant_migration_util.js";
 
-var TenantMigrationConcurrentWriteUtil = (function() {});
+const kTestDoc = {
+    x: -1
+};
+const kTestDoc2 = {
+    x: -2
+};
+const kTestIndexKey = {
+    x: 1
+};
+const kExpireAfterSeconds = 1000000;
+const kTestIndex = {
+    key: kTestIndexKey,
+    name: "testIndex",
+    expireAfterSeconds: kExpireAfterSeconds
+};
+const kNumInitialDocs = 2;  // num initial docs to insert into test collections.
+const kTxnNumber = NumberLong(0);
 
 /**
  * Asserts that the TenantMigrationAccessBlocker for the given tenant on the given node has the
  * expected statistics.
  */
-function checkTenantMigrationAccessBlockerForConcurrentWritesTest(node, tenantId, {
+export function checkTenantMigrationAccessBlockerForConcurrentWritesTest(node, tenantId, {
     numBlockedWrites = 0,
     numTenantMigrationCommittedErrors = 0,
     numTenantMigrationAbortedErrors = 0
 }) {
-    const mtab =
-        TenantMigrationUtil.getTenantMigrationAccessBlocker({donorNode: node, tenantId}).donor;
+    const mtab = getTenantMigrationAccessBlocker({donorNode: node, tenantId}).donor;
     if (!mtab) {
         assert.eq(0, numBlockedWrites);
         assert.eq(0, numTenantMigrationCommittedErrors);
@@ -32,7 +47,7 @@ function checkTenantMigrationAccessBlockerForConcurrentWritesTest(node, tenantId
     assert.eq(mtab.numTenantMigrationAbortedErrors, numTenantMigrationAbortedErrors, tojson(mtab));
 }
 
-function runCommandForConcurrentWritesTest(testOpts, expectedError) {
+export function runCommandForConcurrentWritesTest(testOpts, expectedError) {
     let res;
     if (testOpts.isMultiUpdate && !testOpts.testInTransaction) {
         // Multi writes outside a transaction cannot be automatically retried, so we return a
@@ -101,8 +116,8 @@ function runCommandForConcurrentWritesTest(testOpts, expectedError) {
     }
 }
 
-function createCollectionAndInsertDocsForConcurrentWritesTest(
-    primaryDB, collName, numDocs = TenantMigrationConcurrentWriteUtil.kNumInitialDocs) {
+export function createCollectionAndInsertDocsForConcurrentWritesTest(
+    primaryDB, collName, numDocs = kNumInitialDocs) {
     const createCollCommand = {create: collName};
     assert.commandWorked(primaryDB.runCommand(createCollCommand));
 
@@ -120,7 +135,7 @@ function cleanUpForConcurrentWritesTest(dbName, donorPrimary) {
     assert.commandWorked(donorDB.dropDatabase());
 }
 
-function makeTestOptionsForConcurrentWritesTest(
+export function makeTestOptionsForConcurrentWritesTest(
     primary, testCase, dbName, collName, testInTransaction, testAsRetryableWrite) {
     assert(!testInTransaction || !testAsRetryableWrite);
 
@@ -131,7 +146,7 @@ function makeTestOptionsForConcurrentWritesTest(
     let command = testCase.command(dbName, collName);
 
     if (testInTransaction || testAsRetryableWrite) {
-        command.txnNumber = TenantMigrationConcurrentWriteUtil.kTxnNumber;
+        command.txnNumber = kTxnNumber;
     }
     if (testInTransaction) {
         command.startTransaction = true;
@@ -153,7 +168,7 @@ function makeTestOptionsForConcurrentWritesTest(
     };
 }
 
-function runTestForConcurrentWritesTest(
+export function runTestForConcurrentWritesTest(
     primary, testCase, testFunc, dbName, collName, {testInTransaction, testAsRetryableWrite} = {}) {
     const testOpts = makeTestOptionsForConcurrentWritesTest(
         primary, testCase, dbName, collName, testInTransaction, testAsRetryableWrite);
@@ -173,7 +188,7 @@ function runTestForConcurrentWritesTest(
     cleanUpForConcurrentWritesTest(dbName, primary);
 }
 
-function setupTestForConcurrentWritesTest(testCase, collName, testOpts) {
+export function setupTestForConcurrentWritesTest(testCase, collName, testOpts) {
     if (testCase.explicitlyCreateCollection) {
         createCollectionAndInsertDocsForConcurrentWritesTest(testOpts.primaryDB, collName);
     }
@@ -191,41 +206,17 @@ const isOnlySupportedOnStandalone = "is only supported on standalone";
 const isOnlySupportedOnShardedCluster = "is only supported on sharded cluster";
 const isDeprecated = "is deprecated";
 
-TenantMigrationConcurrentWriteUtil.kTestDoc = {
-    x: -1
-};
-TenantMigrationConcurrentWriteUtil.kTestDoc2 = {
-    x: -2
-};
-
-TenantMigrationConcurrentWriteUtil.kTestIndexKey = {
-    x: 1
-};
-TenantMigrationConcurrentWriteUtil.kExpireAfterSeconds = 1000000;
-TenantMigrationConcurrentWriteUtil.kTestIndex = {
-    key: TenantMigrationConcurrentWriteUtil.kTestIndexKey,
-    name: "testIndex",
-    expireAfterSeconds: TenantMigrationConcurrentWriteUtil.kExpireAfterSeconds
-};
-
 function insertTestDoc(primaryDB, collName) {
-    assert.commandWorked(primaryDB.runCommand(
-        {insert: collName, documents: [TenantMigrationConcurrentWriteUtil.kTestDoc]}));
+    assert.commandWorked(primaryDB.runCommand({insert: collName, documents: [kTestDoc]}));
 }
 
 function insertTwoTestDocs(primaryDB, collName) {
-    assert.commandWorked(primaryDB.runCommand({
-        insert: collName,
-        documents: [
-            TenantMigrationConcurrentWriteUtil.kTestDoc,
-            TenantMigrationConcurrentWriteUtil.kTestDoc2
-        ]
-    }));
+    assert.commandWorked(
+        primaryDB.runCommand({insert: collName, documents: [kTestDoc, kTestDoc2]}));
 }
 
 function createTestIndex(primaryDB, collName) {
-    assert.commandWorked(primaryDB.runCommand(
-        {createIndexes: collName, indexes: [TenantMigrationConcurrentWriteUtil.kTestIndex]}));
+    assert.commandWorked(primaryDB.runCommand({createIndexes: collName, indexes: [kTestIndex]}));
 }
 
 function countDocs(db, collName, query) {
@@ -250,494 +241,475 @@ function indexExists(db, collName, targetIndex) {
             bsonWoCompare(index.expireAfterSeconds, targetIndex.expireAfterSeconds) === 0);
 }
 
-TenantMigrationConcurrentWriteUtil.kNumInitialDocs =
-    2;  // num initial docs to insert into test collections.
-TenantMigrationConcurrentWriteUtil.kTxnNumber = NumberLong(0);
-
-TenantMigrationConcurrentWriteUtil.testCases = {
-    _addShard: {skip: isNotRunOnUserDatabase},
-    _cloneCollectionOptionsFromPrimaryShard: {skip: isNotRunOnUserDatabase},
-    _configsvrAddShard: {skip: isNotRunOnUserDatabase},
-    _configsvrAddShardToZone: {skip: isNotRunOnUserDatabase},
-    _configsvrBalancerCollectionStatus: {skip: isNotRunOnUserDatabase},
-    _configsvrBalancerStart: {skip: isNotRunOnUserDatabase},
-    _configsvrBalancerStatus: {skip: isNotRunOnUserDatabase},
-    _configsvrBalancerStop: {skip: isNotRunOnUserDatabase},
-    _configsvrClearJumboFlag: {skip: isNotRunOnUserDatabase},
-    _configsvrCommitChunksMerge: {skip: isNotRunOnUserDatabase},
-    _configsvrCommitChunkMigration: {skip: isNotRunOnUserDatabase},
-    _configsvrCommitChunkSplit: {skip: isNotRunOnUserDatabase},
-    _configsvrCommitIndex: {skip: isNotRunOnUserDatabase},
-    _configsvrCommitMovePrimary:
-        {skip: isNotRunOnUserDatabase},  // Can be removed once 6.0 is last LTS
-    _configsvrCreateDatabase: {skip: isNotRunOnUserDatabase},
-    _configsvrDropIndexCatalogEntry: {skip: isNotRunOnUserDatabase},
-    _configsvrEnsureChunkVersionIsGreaterThan: {skip: isNotRunOnUserDatabase},
-    _configsvrMoveChunk: {skip: isNotRunOnUserDatabase},  // Can be removed once 6.0 is last LTS
-    _configsvrMovePrimary: {skip: isNotRunOnUserDatabase},
-    _configsvrMoveRange: {skip: isNotRunOnUserDatabase},
-    _configsvrRefineCollectionShardKey: {skip: isNotRunOnUserDatabase},
-    _configsvrRemoveShard: {skip: isNotRunOnUserDatabase},
-    _configsvrRemoveShardFromZone: {skip: isNotRunOnUserDatabase},
-    _configsvrUpdateZoneKeyRange: {skip: isNotRunOnUserDatabase},
-    _flushDatabaseCacheUpdates: {skip: isNotRunOnUserDatabase},
-    _flushDatabaseCacheUpdatesWithWriteConcern: {skip: isNotRunOnUserDatabase},
-    _flushReshardingStateChange: {skip: isNotRunOnUserDatabase},
-    _flushRoutingTableCacheUpdates: {skip: isNotRunOnUserDatabase},
-    _flushRoutingTableCacheUpdatesWithWriteConcern: {skip: isNotRunOnUserDatabase},
-    _getNextSessionMods: {skip: isNotRunOnUserDatabase},
-    _getUserCacheGeneration: {skip: isNotRunOnUserDatabase},
-    _hashBSONElement: {skip: isNotRunOnUserDatabase},
-    _isSelf: {skip: isNotRunOnUserDatabase},
-    _killOperations: {skip: isNotRunOnUserDatabase},
-    _mergeAuthzCollections: {skip: isNotRunOnUserDatabase},
-    _migrateClone: {skip: isNotRunOnUserDatabase},
-    _recvChunkAbort: {skip: isNotRunOnUserDatabase},
-    _recvChunkCommit: {skip: isNotRunOnUserDatabase},
-    _recvChunkReleaseCritSec: {skip: isNotRunOnUserDatabase},
-    _recvChunkStart: {skip: isNotRunOnUserDatabase},
-    _recvChunkStatus: {skip: isNotRunOnUserDatabase},
-    _shardsvrCloneCatalogData: {skip: isNotRunOnUserDatabase},
-    _shardsvrCommitIndexParticipant: {skip: isOnlySupportedOnShardedCluster},
-    _shardsvrCompactStructuredEncryptionData: {skip: isOnlySupportedOnShardedCluster},
-    _shardsvrCreateCollection: {skip: isOnlySupportedOnShardedCluster},
-    _shardsvrCreateCollectionParticipant: {skip: isOnlySupportedOnShardedCluster},
-    _shardsvrRegisterIndex: {skip: isOnlySupportedOnShardedCluster},
-    _shardsvrDropIndexCatalogEntryParticipant: {skip: isOnlySupportedOnShardedCluster},
-    _shardsvrMovePrimary: {skip: isNotRunOnUserDatabase},
-    _shardsvrSetAllowMigrations: {skip: isOnlySupportedOnShardedCluster},
-    _shardsvrRenameCollection: {skip: isOnlySupportedOnShardedCluster},
-    _shardsvrUnregisterIndex: {skip: isOnlySupportedOnShardedCluster},
-    _transferMods: {skip: isNotRunOnUserDatabase},
-    abortTransaction: {
-        skip: isNotWriteCommand  // aborting unprepared transaction doesn't create an abort oplog
-                                 // entry.
-    },
-    aggregate: {
-        explicitlyCreateCollection: true,
-        command: function(dbName, collName) {
-            return {
-                aggregate: collName,
-                pipeline: [{$out: collName + "Out"}],
-                cursor: {batchSize: 1}
-            };
+export const TenantMigrationConcurrentWriteUtil = {
+    kTestDoc,
+    kTestDoc2,
+    kTestIndexKey,
+    kExpireAfterSeconds,
+    kTestIndex,
+    kNumInitialDocs,
+    kTxnNumber,
+    testCases: {
+        _addShard: {skip: isNotRunOnUserDatabase},
+        _cloneCollectionOptionsFromPrimaryShard: {skip: isNotRunOnUserDatabase},
+        _configsvrAddShard: {skip: isNotRunOnUserDatabase},
+        _configsvrAddShardToZone: {skip: isNotRunOnUserDatabase},
+        _configsvrBalancerCollectionStatus: {skip: isNotRunOnUserDatabase},
+        _configsvrBalancerStart: {skip: isNotRunOnUserDatabase},
+        _configsvrBalancerStatus: {skip: isNotRunOnUserDatabase},
+        _configsvrBalancerStop: {skip: isNotRunOnUserDatabase},
+        _configsvrClearJumboFlag: {skip: isNotRunOnUserDatabase},
+        _configsvrCommitChunksMerge: {skip: isNotRunOnUserDatabase},
+        _configsvrCommitChunkMigration: {skip: isNotRunOnUserDatabase},
+        _configsvrCommitChunkSplit: {skip: isNotRunOnUserDatabase},
+        _configsvrCommitIndex: {skip: isNotRunOnUserDatabase},
+        _configsvrCommitMovePrimary:
+            {skip: isNotRunOnUserDatabase},  // Can be removed once 6.0 is last LTS
+        _configsvrCreateDatabase: {skip: isNotRunOnUserDatabase},
+        _configsvrDropIndexCatalogEntry: {skip: isNotRunOnUserDatabase},
+        _configsvrEnsureChunkVersionIsGreaterThan: {skip: isNotRunOnUserDatabase},
+        _configsvrMoveChunk: {skip: isNotRunOnUserDatabase},  // Can be removed once 6.0 is last LTS
+        _configsvrMovePrimary: {skip: isNotRunOnUserDatabase},
+        _configsvrMoveRange: {skip: isNotRunOnUserDatabase},
+        _configsvrRefineCollectionShardKey: {skip: isNotRunOnUserDatabase},
+        _configsvrRemoveShard: {skip: isNotRunOnUserDatabase},
+        _configsvrRemoveShardFromZone: {skip: isNotRunOnUserDatabase},
+        _configsvrUpdateZoneKeyRange: {skip: isNotRunOnUserDatabase},
+        _flushDatabaseCacheUpdates: {skip: isNotRunOnUserDatabase},
+        _flushDatabaseCacheUpdatesWithWriteConcern: {skip: isNotRunOnUserDatabase},
+        _flushReshardingStateChange: {skip: isNotRunOnUserDatabase},
+        _flushRoutingTableCacheUpdates: {skip: isNotRunOnUserDatabase},
+        _flushRoutingTableCacheUpdatesWithWriteConcern: {skip: isNotRunOnUserDatabase},
+        _getNextSessionMods: {skip: isNotRunOnUserDatabase},
+        _getUserCacheGeneration: {skip: isNotRunOnUserDatabase},
+        _hashBSONElement: {skip: isNotRunOnUserDatabase},
+        _isSelf: {skip: isNotRunOnUserDatabase},
+        _killOperations: {skip: isNotRunOnUserDatabase},
+        _mergeAuthzCollections: {skip: isNotRunOnUserDatabase},
+        _migrateClone: {skip: isNotRunOnUserDatabase},
+        _recvChunkAbort: {skip: isNotRunOnUserDatabase},
+        _recvChunkCommit: {skip: isNotRunOnUserDatabase},
+        _recvChunkReleaseCritSec: {skip: isNotRunOnUserDatabase},
+        _recvChunkStart: {skip: isNotRunOnUserDatabase},
+        _recvChunkStatus: {skip: isNotRunOnUserDatabase},
+        _shardsvrCloneCatalogData: {skip: isNotRunOnUserDatabase},
+        _shardsvrCommitIndexParticipant: {skip: isOnlySupportedOnShardedCluster},
+        _shardsvrCompactStructuredEncryptionData: {skip: isOnlySupportedOnShardedCluster},
+        _shardsvrCreateCollection: {skip: isOnlySupportedOnShardedCluster},
+        _shardsvrCreateCollectionParticipant: {skip: isOnlySupportedOnShardedCluster},
+        _shardsvrRegisterIndex: {skip: isOnlySupportedOnShardedCluster},
+        _shardsvrDropIndexCatalogEntryParticipant: {skip: isOnlySupportedOnShardedCluster},
+        _shardsvrMovePrimary: {skip: isNotRunOnUserDatabase},
+        _shardsvrSetAllowMigrations: {skip: isOnlySupportedOnShardedCluster},
+        _shardsvrRenameCollection: {skip: isOnlySupportedOnShardedCluster},
+        _shardsvrUnregisterIndex: {skip: isOnlySupportedOnShardedCluster},
+        _transferMods: {skip: isNotRunOnUserDatabase},
+        abortTransaction: {
+            skip: isNotWriteCommand  // aborting unprepared transaction doesn't create an abort
+                                     // oplog entry.
         },
-        assertCommandSucceeded: function(db, dbName, collName) {
-            assert(collectionExists(db, collName + "Out"));
-        },
-        assertCommandFailed: function(db, dbName, collName) {
-            assert(!collectionExists(db, collName + "Out"));
-        }
-    },
-    appendOplogNote: {skip: isNotRunOnUserDatabase},
-    applyOps: {skip: isNotSupportedInServerless},
-    authenticate: {skip: isAuthCommand},
-    buildInfo: {skip: isNotWriteCommand},
-    captrunc: {skip: isNotSupportedInServerless},
-    checkShardingIndex: {skip: isNotRunOnUserDatabase},
-    cleanupOrphaned: {skip: isNotRunOnUserDatabase},
-    clearLog: {skip: isNotRunOnUserDatabase},
-    cloneCollectionAsCapped: {skip: isNotSupportedInServerless},
-    collMod: {
-        explicitlyCreateCollection: true,
-        setUp: createTestIndex,
-        command: function(dbName, collName) {
-            return {
-                collMod: collName,
-                index: {
-                    keyPattern: TenantMigrationConcurrentWriteUtil.kTestIndexKey,
-                    expireAfterSeconds: TenantMigrationConcurrentWriteUtil.kExpireAfterSeconds + 1
-                }
-            };
-        },
-        assertCommandSucceeded: function(db, dbName, collName) {
-            assert(indexExists(db, collName, {
-                key: TenantMigrationConcurrentWriteUtil.kTestIndexKey,
-                expireAfterSeconds: TenantMigrationConcurrentWriteUtil.kExpireAfterSeconds + 1
-            }));
-        },
-        assertCommandFailed: function(db, dbName, collName) {
-            assert(!indexExists(db, collName, {
-                key: TenantMigrationConcurrentWriteUtil.kTestIndexKey,
-                expireAfterSeconds: TenantMigrationConcurrentWriteUtil.kExpireAfterSeconds + 1
-            }));
-        }
-    },
-    collStats: {skip: isNotWriteCommand},
-    commitTransaction: {
-        isTransactionCommand: true,
-        runAgainstAdminDb: true,
-        setUp: function(primaryDB, collName) {
-            assert.commandWorked(primaryDB.runCommand({
-                insert: collName,
-                documents: [TenantMigrationConcurrentWriteUtil.kTestDoc],
-                txnNumber: NumberLong(TenantMigrationConcurrentWriteUtil.kTxnNumber),
-                startTransaction: true,
-                autocommit: false
-            }));
-        },
-        command: function(dbName, collName) {
-            return {
-                commitTransaction: 1,
-                txnNumber: NumberLong(TenantMigrationConcurrentWriteUtil.kTxnNumber),
-                autocommit: false,
-                writeConcern: {w: "majority"}
-            };
-        },
-        assertCommandSucceeded: function(db, dbName, collName) {
-            assert.eq(countDocs(db, collName), 1);
-        },
-        assertCommandFailed: function(db, dbName, collName) {
-            assert.eq(countDocs(db, collName), 0);
-        }
-    },
-    compact: {skip: isNotSupportedInServerless},
-    configureFailPoint: {skip: isNotRunOnUserDatabase},
-    connPoolStats: {skip: isNotRunOnUserDatabase},
-    connPoolSync: {skip: isNotRunOnUserDatabase},
-    connectionStatus: {skip: isNotRunOnUserDatabase},
-    convertToCapped: {skip: isNotSupportedInServerless},
-    coordinateCommitTransaction: {skip: isNotRunOnUserDatabase},
-    count: {skip: isNotWriteCommand},
-    cpuload: {skip: isNotRunOnUserDatabase},
-    create: {
-        testInTransaction: true,
-        command: function(dbName, collName) {
-            return {create: collName};
-        },
-        assertCommandSucceeded: function(db, dbName, collName) {
-            assert(collectionExists(db, collName));
-        },
-        assertCommandFailed: function(db, dbName, collName) {
-            assert(!collectionExists(db, collName));
-        }
-    },
-    createIndexes: {
-        testInTransaction: true,
-        explicitlyCreateCollection: true,
-        setUp: function(primaryDB, collName, testInTransaction) {
-            if (testInTransaction) {
-                // Drop the collection that was explicitly created above since inside transactions
-                // the index to create must either be on a non-existing collection, or on a new
-                // empty collection created earlier in the same transaction.
-                assert.commandWorked(primaryDB.runCommand({drop: collName}));
+        aggregate: {
+            explicitlyCreateCollection: true,
+            command: function(dbName, collName) {
+                return {
+                    aggregate: collName,
+                    pipeline: [{$out: collName + "Out"}],
+                    cursor: {batchSize: 1}
+                };
+            },
+            assertCommandSucceeded: function(db, dbName, collName) {
+                assert(collectionExists(db, collName + "Out"));
+            },
+            assertCommandFailed: function(db, dbName, collName) {
+                assert(!collectionExists(db, collName + "Out"));
             }
         },
-        command: function(dbName, collName) {
-            return {
-                createIndexes: collName,
-                indexes: [TenantMigrationConcurrentWriteUtil.kTestIndex]
-            };
-        },
-        assertCommandSucceeded: function(db, dbName, collName) {
-            assert(indexExists(db, collName, TenantMigrationConcurrentWriteUtil.kTestIndex));
-        },
-        assertCommandFailed: function(db, dbName, collName) {
-            assert(!collectionExists(db, collName) ||
-                   !indexExists(db, collName, TenantMigrationConcurrentWriteUtil.kTestIndex));
-        }
-    },
-    createRole: {skip: isAuthCommand},
-    createUser: {skip: isAuthCommand},
-    currentOp: {skip: isNotRunOnUserDatabase},
-    dataSize: {skip: isNotWriteCommand},
-    dbCheck: {skip: isNotWriteCommand},
-    dbHash: {skip: isNotWriteCommand},
-    dbStats: {skip: isNotWriteCommand},
-    delete: {
-        testInTransaction: true,
-        testAsRetryableWrite: true,
-        setUp: insertTestDoc,
-        command: function(dbName, collName) {
-            return {
-                delete: collName,
-                deletes: [{q: TenantMigrationConcurrentWriteUtil.kTestDoc, limit: 1}]
-            };
-        },
-        isBatchWrite: true,
-        assertCommandSucceeded: function(db, dbName, collName) {
-            assert.eq(countDocs(db, collName, TenantMigrationConcurrentWriteUtil.kTestDoc), 0);
-        },
-        assertCommandFailed: function(db, dbName, collName) {
-            assert.eq(countDocs(db, collName, TenantMigrationConcurrentWriteUtil.kTestDoc), 1);
-        }
-    },
-    distinct: {skip: isNotWriteCommand},
-    donorForgetMigration: {skip: isNotRunOnUserDatabase},
-    donorStartMigration: {skip: isNotRunOnUserDatabase},
-    donorWaitForMigrationToCommit: {skip: isNotRunOnUserDatabase},
-    driverOIDTest: {skip: isNotRunOnUserDatabase},
-    drop: {
-        explicitlyCreateCollection: true,
-        command: function(dbName, collName) {
-            return {drop: collName};
-        },
-        assertCommandSucceeded: function(db, dbName, collName) {
-            assert(!collectionExists(db, collName));
-        },
-        assertCommandFailed: function(db, dbName, collName) {
-            assert(collectionExists(db, collName));
-        }
-    },
-    dropAllRolesFromDatabase: {skip: isAuthCommand},
-    dropAllUsersFromDatabase: {skip: isAuthCommand},
-    dropConnections: {skip: isNotRunOnUserDatabase},
-    dropDatabase: {
-        explicitlyCreateCollection: true,
-        command: function(dbName, collName) {
-            return {dropDatabase: 1};
-        },
-        assertCommandSucceeded: function(db, dbName, collName) {
-            assert(!databaseExists(db, dbName));
-        },
-        assertCommandFailed: function(db, dbName, collName) {
-            assert(databaseExists(db, dbName));
-        }
-    },
-    dropIndexes: {
-        explicitlyCreateCollection: true,
-        setUp: createTestIndex,
-        command: function(dbName, collName) {
-            return {dropIndexes: collName, index: "*"};
-        },
-        assertCommandSucceeded: function(db, dbName, collName) {
-            assert(!indexExists(db, collName, TenantMigrationConcurrentWriteUtil.kTestIndex));
-        },
-        assertCommandFailed: function(db, dbName, collName) {
-            assert(indexExists(db, collName, TenantMigrationConcurrentWriteUtil.kTestIndex));
-        }
-    },
-    dropRole: {skip: isAuthCommand},
-    dropUser: {skip: isAuthCommand},
-    echo: {skip: isNotRunOnUserDatabase},
-    emptycapped: {skip: isNotSupportedInServerless},
-    endSessions: {skip: isNotRunOnUserDatabase},
-    explain: {skip: isNotRunOnUserDatabase},
-    features: {skip: isNotRunOnUserDatabase},
-    filemd5: {skip: isNotWriteCommand},
-    find: {skip: isNotWriteCommand},
-    findAndModify: {
-        testInTransaction: true,
-        testAsRetryableWrite: true,
-        setUp: insertTestDoc,
-        command: function(dbName, collName) {
-            return {
-                findAndModify: collName,
-                query: TenantMigrationConcurrentWriteUtil.kTestDoc,
-                remove: true
-            };
-        },
-        assertCommandSucceeded: function(db, dbName, collName) {
-            assert.eq(countDocs(db, collName, TenantMigrationConcurrentWriteUtil.kTestDoc), 0);
-        },
-        assertCommandFailed: function(db, dbName, collName) {
-            assert.eq(countDocs(db, collName, TenantMigrationConcurrentWriteUtil.kTestDoc), 1);
-        }
-    },
-    flushRouterConfig: {skip: isNotRunOnUserDatabase},
-    fsync: {skip: isNotRunOnUserDatabase},
-    fsyncUnlock: {skip: isNotRunOnUserDatabase},
-    getCmdLineOpts: {skip: isNotRunOnUserDatabase},
-    getDatabaseVersion: {skip: isNotRunOnUserDatabase},
-    getDefaultRWConcern: {skip: isNotRunOnUserDatabase},
-    getDiagnosticData: {skip: isNotRunOnUserDatabase},
-    getFreeMonitoringStatus: {skip: isNotRunOnUserDatabase},
-    getLog: {skip: isNotRunOnUserDatabase},
-    getMore: {skip: isNotWriteCommand},
-    getParameter: {skip: isNotRunOnUserDatabase},
-    getShardMap: {skip: isNotRunOnUserDatabase},
-    getShardVersion: {skip: isNotRunOnUserDatabase},
-    getnonce: {skip: "removed in v6.3"},
-    godinsert: {skip: isNotRunOnUserDatabase},
-    grantPrivilegesToRole: {skip: isAuthCommand},
-    grantRolesToRole: {skip: isAuthCommand},
-    grantRolesToUser: {skip: isAuthCommand},
-    hello: {skip: isNotRunOnUserDatabase},
-    hostInfo: {skip: isNotRunOnUserDatabase},
-    httpClientRequest: {skip: isNotRunOnUserDatabase},
-    insert: {
-        testInTransaction: true,
-        testAsRetryableWrite: true,
-        explicitlyCreateCollection: true,
-        command: function(dbName, collName) {
-            return {insert: collName, documents: [TenantMigrationConcurrentWriteUtil.kTestDoc]};
-        },
-        isBatchWrite: true,
-        assertCommandSucceeded: function(db, dbName, collName) {
-            assert.eq(countDocs(db, collName, TenantMigrationConcurrentWriteUtil.kTestDoc), 1);
-        },
-        assertCommandFailed: function(db, dbName, collName) {
-            assert.eq(countDocs(db, collName, TenantMigrationConcurrentWriteUtil.kTestDoc), 0);
-        }
-    },
-    internalRenameIfOptionsAndIndexesMatch: {skip: isNotRunOnUserDatabase},
-    invalidateUserCache: {skip: isNotRunOnUserDatabase},
-    killAllSessions: {skip: isNotRunOnUserDatabase},
-    killAllSessionsByPattern: {skip: isNotRunOnUserDatabase},
-    killCursors: {skip: isNotWriteCommand},
-    killOp: {skip: isNotRunOnUserDatabase},
-    killSessions: {skip: isNotRunOnUserDatabase},
-    listCollections: {skip: isNotRunOnUserDatabase},
-    listCommands: {skip: isNotRunOnUserDatabase},
-    listDatabases: {skip: isNotRunOnUserDatabase},
-    listIndexes: {skip: isNotWriteCommand},
-    lockInfo: {skip: isNotRunOnUserDatabase},
-    logRotate: {skip: isNotRunOnUserDatabase},
-    logout: {skip: isNotRunOnUserDatabase},
-    makeSnapshot: {skip: isNotRunOnUserDatabase},
-    mapReduce: {
-        command: function(dbName, collName) {
-            return {
-                mapReduce: collName,
-                map: function mapFunc() {
-                    emit(this.x, 1);
-                },
-                reduce: function reduceFunc(key, values) {
-                    return Array.sum(values);
-                },
-                out: {replace: collName + "MrOut"},
-            };
-        },
-        assertCommandSucceeded: function(db, dbName, collName) {
-            assert(collectionExists(db, collName + "MrOut"));
-        },
-        assertCommandFailed: function(db, dbName, collName) {
-            assert(!collectionExists(db, collName + "MrOut"));
-        }
-    },
-    mergeChunks: {skip: isNotRunOnUserDatabase},
-    moveChunk: {skip: isNotRunOnUserDatabase},
-    ping: {skip: isNotRunOnUserDatabase},
-    planCacheClear: {skip: isNotWriteCommand},
-    planCacheClearFilters: {skip: isNotWriteCommand},
-    planCacheListFilters: {skip: isNotWriteCommand},
-    planCacheSetFilter: {skip: isNotWriteCommand},
-    prepareTransaction: {skip: isOnlySupportedOnShardedCluster},
-    profile: {skip: isNotRunOnUserDatabase},
-    reIndex: {skip: isOnlySupportedOnStandalone},
-    reapLogicalSessionCacheNow: {skip: isNotRunOnUserDatabase},
-    refreshLogicalSessionCacheNow: {skip: isNotRunOnUserDatabase},
-    refreshSessions: {skip: isNotRunOnUserDatabase},
-    recipientVoteImportedFiles: {skip: isNotRunOnUserDatabase},
-    renameCollection: {
-        runAgainstAdminDb: true,
-        explicitlyCreateCollection: true,
-        command: function(dbName, collName) {
-            return {
-                renameCollection: dbName + "." + collName,
-                to: dbName + "." + collName + "Renamed"
-            };
-        },
-        assertCommandSucceeded: function(db, dbName, collName) {
-            assert(!collectionExists(db, collName));
-            assert(collectionExists(db, collName + "Renamed"));
-        },
-        assertCommandFailed: function(db, dbName, collName) {
-            assert(collectionExists(db, collName));
-            assert(!collectionExists(db, collName + "Renamed"));
-        }
-    },
-    replSetAbortPrimaryCatchUp: {skip: isNotRunOnUserDatabase},
-    replSetFreeze: {skip: isNotRunOnUserDatabase},
-    replSetGetConfig: {skip: isNotRunOnUserDatabase},
-    replSetGetRBID: {skip: isNotRunOnUserDatabase},
-    replSetGetStatus: {skip: isNotRunOnUserDatabase},
-    replSetHeartbeat: {skip: isNotRunOnUserDatabase},
-    replSetInitiate: {skip: isNotRunOnUserDatabase},
-    replSetMaintenance: {skip: isNotRunOnUserDatabase},
-    replSetReconfig: {skip: isNotRunOnUserDatabase},
-    replSetRequestVotes: {skip: isNotRunOnUserDatabase},
-    replSetResizeOplog: {skip: isNotRunOnUserDatabase},
-    replSetStepDown: {skip: isNotRunOnUserDatabase},
-    replSetStepUp: {skip: isNotRunOnUserDatabase},
-    replSetSyncFrom: {skip: isNotRunOnUserDatabase},
-    replSetTest: {skip: isNotRunOnUserDatabase},
-    replSetTestEgress: {skip: isNotRunOnUserDatabase},
-    replSetUpdatePosition: {skip: isNotRunOnUserDatabase},
-    revokePrivilegesFromRole: {skip: isAuthCommand},
-    revokeRolesFromRole: {skip: isAuthCommand},
-    revokeRolesFromUser: {skip: isAuthCommand},
-    rolesInfo: {skip: isNotWriteCommand},
-    rotateCertificates: {skip: isAuthCommand},
-    saslContinue: {skip: isAuthCommand},
-    saslStart: {skip: isAuthCommand},
-    sbe: {skip: isNotRunOnUserDatabase},
-    serverStatus: {skip: isNotRunOnUserDatabase},
-    setAllowMigrations: {skip: isNotRunOnUserDatabase},
-    setCommittedSnapshot: {skip: isNotRunOnUserDatabase},
-    setDefaultRWConcern: {skip: isNotRunOnUserDatabase},
-    setFeatureCompatibilityVersion: {skip: isNotRunOnUserDatabase},
-    setFreeMonitoring: {skip: isNotRunOnUserDatabase},
-    setIndexCommitQuorum: {skip: isNotRunOnUserDatabase},
-    setParameter: {skip: isNotRunOnUserDatabase},
-    setShardVersion: {skip: isNotRunOnUserDatabase},
-    shardingState: {skip: isNotRunOnUserDatabase},
-    shutdown: {skip: isNotRunOnUserDatabase},
-    sleep: {skip: isNotRunOnUserDatabase},
-    splitChunk: {skip: isNotRunOnUserDatabase},
-    splitVector: {skip: isNotRunOnUserDatabase},
-    stageDebug: {skip: isNotRunOnUserDatabase},
-    startRecordingTraffic: {skip: isNotRunOnUserDatabase},
-    startSession: {skip: isNotRunOnUserDatabase},
-    stopRecordingTraffic: {skip: isNotRunOnUserDatabase},
-    top: {skip: isNotRunOnUserDatabase},
-    update: {
-        testInTransaction: true,
-        testAsRetryableWrite: true,
-        setUp: insertTestDoc,
-        command: function(dbName, collName) {
-            return {
-                update: collName,
-                updates: [{
-                    q: TenantMigrationConcurrentWriteUtil.kTestDoc,
-                    u: {$set: {y: 0}},
-                    upsert: false,
-                    multi: false
-                }]
-            };
-        },
-        isBatchWrite: true,
-        assertCommandSucceeded: function(db, dbName, collName) {
-            assert.eq(countDocs(db,
+        appendOplogNote: {skip: isNotRunOnUserDatabase},
+        applyOps: {skip: isNotSupportedInServerless},
+        authenticate: {skip: isAuthCommand},
+        buildInfo: {skip: isNotWriteCommand},
+        captrunc: {skip: isNotSupportedInServerless},
+        checkShardingIndex: {skip: isNotRunOnUserDatabase},
+        cleanupOrphaned: {skip: isNotRunOnUserDatabase},
+        clearLog: {skip: isNotRunOnUserDatabase},
+        cloneCollectionAsCapped: {skip: isNotSupportedInServerless},
+        collMod: {
+            explicitlyCreateCollection: true,
+            setUp: createTestIndex,
+            command: function(dbName, collName) {
+                return {
+                    collMod: collName,
+                    index: {keyPattern: kTestIndexKey, expireAfterSeconds: kExpireAfterSeconds + 1}
+                };
+            },
+            assertCommandSucceeded: function(db, dbName, collName) {
+                assert(
+                    indexExists(db,
                                 collName,
-                                Object.assign({y: 0}, TenantMigrationConcurrentWriteUtil.kTestDoc)),
-                      1);
+                                {key: kTestIndexKey, expireAfterSeconds: kExpireAfterSeconds + 1}));
+            },
+            assertCommandFailed: function(db, dbName, collName) {
+                assert(!indexExists(
+                    db,
+                    collName,
+                    {key: kTestIndexKey, expireAfterSeconds: kExpireAfterSeconds + 1}));
+            }
         },
-        assertCommandFailed: function(db, dbName, collName) {
-            assert.eq(countDocs(db,
-                                collName,
-                                Object.assign({y: 0}, TenantMigrationConcurrentWriteUtil.kTestDoc)),
-                      0);
-        }
-    },
-    multiUpdate: {
-        testInTransaction: true,
-        testAsRetryableWrite: false,
-        setUp: insertTwoTestDocs,
-        command: function(dbName, collName) {
-            return {
-                update: collName,
-                updates: [{q: {}, u: {$set: {y: 0}}, upsert: false, multi: true}]
-            };
+        collStats: {skip: isNotWriteCommand},
+        commitTransaction: {
+            isTransactionCommand: true,
+            runAgainstAdminDb: true,
+            setUp: function(primaryDB, collName) {
+                assert.commandWorked(primaryDB.runCommand({
+                    insert: collName,
+                    documents: [kTestDoc],
+                    txnNumber: NumberLong(kTxnNumber),
+                    startTransaction: true,
+                    autocommit: false
+                }));
+            },
+            command: function(dbName, collName) {
+                return {
+                    commitTransaction: 1,
+                    txnNumber: NumberLong(kTxnNumber),
+                    autocommit: false,
+                    writeConcern: {w: "majority"}
+                };
+            },
+            assertCommandSucceeded: function(db, dbName, collName) {
+                assert.eq(countDocs(db, collName), 1);
+            },
+            assertCommandFailed: function(db, dbName, collName) {
+                assert.eq(countDocs(db, collName), 0);
+            }
         },
-        isBatchWrite: true,
-        isMultiUpdate: true,
-        assertCommandSucceeded: function(db, dbName, collName) {
-            assert.eq(countDocs(db, collName, Object.assign({y: 0})), 2);
+        compact: {skip: isNotSupportedInServerless},
+        configureFailPoint: {skip: isNotRunOnUserDatabase},
+        connPoolStats: {skip: isNotRunOnUserDatabase},
+        connPoolSync: {skip: isNotRunOnUserDatabase},
+        connectionStatus: {skip: isNotRunOnUserDatabase},
+        convertToCapped: {skip: isNotSupportedInServerless},
+        coordinateCommitTransaction: {skip: isNotRunOnUserDatabase},
+        count: {skip: isNotWriteCommand},
+        cpuload: {skip: isNotRunOnUserDatabase},
+        create: {
+            testInTransaction: true,
+            command: function(dbName, collName) {
+                return {create: collName};
+            },
+            assertCommandSucceeded: function(db, dbName, collName) {
+                assert(collectionExists(db, collName));
+            },
+            assertCommandFailed: function(db, dbName, collName) {
+                assert(!collectionExists(db, collName));
+            }
         },
-        assertCommandFailed: function(db, dbName, collName) {
-            assert.eq(countDocs(db, collName, Object.assign({y: 0})), 0);
-        }
-    },
-    updateRole: {skip: isAuthCommand},
-    updateUser: {skip: isNotRunOnUserDatabase},
-    usersInfo: {skip: isNotRunOnUserDatabase},
-    validate: {skip: isNotWriteCommand},
-    voteCommitIndexBuild: {skip: isNotRunOnUserDatabase},
-    waitForFailPoint: {skip: isNotRunOnUserDatabase},
-    waitForOngoingChunkSplits: {skip: isNotRunOnUserDatabase},
-    whatsmysni: {skip: isNotRunOnUserDatabase},
-    whatsmyuri: {skip: isNotRunOnUserDatabase}
+        createIndexes: {
+            testInTransaction: true,
+            explicitlyCreateCollection: true,
+            setUp: function(primaryDB, collName, testInTransaction) {
+                if (testInTransaction) {
+                    // Drop the collection that was explicitly created above since inside
+                    // transactions the index to create must either be on a non-existing
+                    // collection, or on a new empty collection created earlier in the same
+                    // transaction.
+                    assert.commandWorked(primaryDB.runCommand({drop: collName}));
+                }
+            },
+            command: function(dbName, collName) {
+                return {createIndexes: collName, indexes: [kTestIndex]};
+            },
+            assertCommandSucceeded: function(db, dbName, collName) {
+                assert(indexExists(db, collName, kTestIndex));
+            },
+            assertCommandFailed: function(db, dbName, collName) {
+                assert(!collectionExists(db, collName) || !indexExists(db, collName, kTestIndex));
+            }
+        },
+        createRole: {skip: isAuthCommand},
+        createUser: {skip: isAuthCommand},
+        currentOp: {skip: isNotRunOnUserDatabase},
+        dataSize: {skip: isNotWriteCommand},
+        dbCheck: {skip: isNotWriteCommand},
+        dbHash: {skip: isNotWriteCommand},
+        dbStats: {skip: isNotWriteCommand},
+        delete: {
+            testInTransaction: true,
+            testAsRetryableWrite: true,
+            setUp: insertTestDoc,
+            command: function(dbName, collName) {
+                return {delete: collName, deletes: [{q: kTestDoc, limit: 1}]};
+            },
+            isBatchWrite: true,
+            assertCommandSucceeded: function(db, dbName, collName) {
+                assert.eq(countDocs(db, collName, kTestDoc), 0);
+            },
+            assertCommandFailed: function(db, dbName, collName) {
+                assert.eq(countDocs(db, collName, kTestDoc), 1);
+            }
+        },
+        distinct: {skip: isNotWriteCommand},
+        donorForgetMigration: {skip: isNotRunOnUserDatabase},
+        donorStartMigration: {skip: isNotRunOnUserDatabase},
+        donorWaitForMigrationToCommit: {skip: isNotRunOnUserDatabase},
+        driverOIDTest: {skip: isNotRunOnUserDatabase},
+        drop: {
+            explicitlyCreateCollection: true,
+            command: function(dbName, collName) {
+                return {drop: collName};
+            },
+            assertCommandSucceeded: function(db, dbName, collName) {
+                assert(!collectionExists(db, collName));
+            },
+            assertCommandFailed: function(db, dbName, collName) {
+                assert(collectionExists(db, collName));
+            }
+        },
+        dropAllRolesFromDatabase: {skip: isAuthCommand},
+        dropAllUsersFromDatabase: {skip: isAuthCommand},
+        dropConnections: {skip: isNotRunOnUserDatabase},
+        dropDatabase: {
+            explicitlyCreateCollection: true,
+            command: function(dbName, collName) {
+                return {dropDatabase: 1};
+            },
+            assertCommandSucceeded: function(db, dbName, collName) {
+                assert(!databaseExists(db, dbName));
+            },
+            assertCommandFailed: function(db, dbName, collName) {
+                assert(databaseExists(db, dbName));
+            }
+        },
+        dropIndexes: {
+            explicitlyCreateCollection: true,
+            setUp: createTestIndex,
+            command: function(dbName, collName) {
+                return {dropIndexes: collName, index: "*"};
+            },
+            assertCommandSucceeded: function(db, dbName, collName) {
+                assert(!indexExists(db, collName, kTestIndex));
+            },
+            assertCommandFailed: function(db, dbName, collName) {
+                assert(indexExists(db, collName, kTestIndex));
+            }
+        },
+        dropRole: {skip: isAuthCommand},
+        dropUser: {skip: isAuthCommand},
+        echo: {skip: isNotRunOnUserDatabase},
+        emptycapped: {skip: isNotSupportedInServerless},
+        endSessions: {skip: isNotRunOnUserDatabase},
+        explain: {skip: isNotRunOnUserDatabase},
+        features: {skip: isNotRunOnUserDatabase},
+        filemd5: {skip: isNotWriteCommand},
+        find: {skip: isNotWriteCommand},
+        findAndModify: {
+            testInTransaction: true,
+            testAsRetryableWrite: true,
+            setUp: insertTestDoc,
+            command: function(dbName, collName) {
+                return {findAndModify: collName, query: kTestDoc, remove: true};
+            },
+            assertCommandSucceeded: function(db, dbName, collName) {
+                assert.eq(countDocs(db, collName, kTestDoc), 0);
+            },
+            assertCommandFailed: function(db, dbName, collName) {
+                assert.eq(countDocs(db, collName, kTestDoc), 1);
+            }
+        },
+        flushRouterConfig: {skip: isNotRunOnUserDatabase},
+        fsync: {skip: isNotRunOnUserDatabase},
+        fsyncUnlock: {skip: isNotRunOnUserDatabase},
+        getCmdLineOpts: {skip: isNotRunOnUserDatabase},
+        getDatabaseVersion: {skip: isNotRunOnUserDatabase},
+        getDefaultRWConcern: {skip: isNotRunOnUserDatabase},
+        getDiagnosticData: {skip: isNotRunOnUserDatabase},
+        getFreeMonitoringStatus: {skip: isNotRunOnUserDatabase},
+        getLog: {skip: isNotRunOnUserDatabase},
+        getMore: {skip: isNotWriteCommand},
+        getParameter: {skip: isNotRunOnUserDatabase},
+        getShardMap: {skip: isNotRunOnUserDatabase},
+        getShardVersion: {skip: isNotRunOnUserDatabase},
+        getnonce: {skip: "removed in v6.3"},
+        godinsert: {skip: isNotRunOnUserDatabase},
+        grantPrivilegesToRole: {skip: isAuthCommand},
+        grantRolesToRole: {skip: isAuthCommand},
+        grantRolesToUser: {skip: isAuthCommand},
+        hello: {skip: isNotRunOnUserDatabase},
+        hostInfo: {skip: isNotRunOnUserDatabase},
+        httpClientRequest: {skip: isNotRunOnUserDatabase},
+        insert: {
+            testInTransaction: true,
+            testAsRetryableWrite: true,
+            explicitlyCreateCollection: true,
+            command: function(dbName, collName) {
+                return {insert: collName, documents: [kTestDoc]};
+            },
+            isBatchWrite: true,
+            assertCommandSucceeded: function(db, dbName, collName) {
+                assert.eq(countDocs(db, collName, kTestDoc), 1);
+            },
+            assertCommandFailed: function(db, dbName, collName) {
+                assert.eq(countDocs(db, collName, kTestDoc), 0);
+            }
+        },
+        internalRenameIfOptionsAndIndexesMatch: {skip: isNotRunOnUserDatabase},
+        invalidateUserCache: {skip: isNotRunOnUserDatabase},
+        killAllSessions: {skip: isNotRunOnUserDatabase},
+        killAllSessionsByPattern: {skip: isNotRunOnUserDatabase},
+        killCursors: {skip: isNotWriteCommand},
+        killOp: {skip: isNotRunOnUserDatabase},
+        killSessions: {skip: isNotRunOnUserDatabase},
+        listCollections: {skip: isNotRunOnUserDatabase},
+        listCommands: {skip: isNotRunOnUserDatabase},
+        listDatabases: {skip: isNotRunOnUserDatabase},
+        listIndexes: {skip: isNotWriteCommand},
+        lockInfo: {skip: isNotRunOnUserDatabase},
+        logRotate: {skip: isNotRunOnUserDatabase},
+        logout: {skip: isNotRunOnUserDatabase},
+        makeSnapshot: {skip: isNotRunOnUserDatabase},
+        mapReduce: {
+            command: function(dbName, collName) {
+                return {
+                    mapReduce: collName,
+                    map: function mapFunc() {
+                        emit(this.x, 1);
+                    },
+                    reduce: function reduceFunc(key, values) {
+                        return Array.sum(values);
+                    },
+                    out: {replace: collName + "MrOut"},
+                };
+            },
+            assertCommandSucceeded: function(db, dbName, collName) {
+                assert(collectionExists(db, collName + "MrOut"));
+            },
+            assertCommandFailed: function(db, dbName, collName) {
+                assert(!collectionExists(db, collName + "MrOut"));
+            }
+        },
+        mergeChunks: {skip: isNotRunOnUserDatabase},
+        moveChunk: {skip: isNotRunOnUserDatabase},
+        ping: {skip: isNotRunOnUserDatabase},
+        planCacheClear: {skip: isNotWriteCommand},
+        planCacheClearFilters: {skip: isNotWriteCommand},
+        planCacheListFilters: {skip: isNotWriteCommand},
+        planCacheSetFilter: {skip: isNotWriteCommand},
+        prepareTransaction: {skip: isOnlySupportedOnShardedCluster},
+        profile: {skip: isNotRunOnUserDatabase},
+        reIndex: {skip: isOnlySupportedOnStandalone},
+        reapLogicalSessionCacheNow: {skip: isNotRunOnUserDatabase},
+        refreshLogicalSessionCacheNow: {skip: isNotRunOnUserDatabase},
+        refreshSessions: {skip: isNotRunOnUserDatabase},
+        recipientVoteImportedFiles: {skip: isNotRunOnUserDatabase},
+        renameCollection: {
+            runAgainstAdminDb: true,
+            explicitlyCreateCollection: true,
+            command: function(dbName, collName) {
+                return {
+                    renameCollection: dbName + "." + collName,
+                    to: dbName + "." + collName + "Renamed"
+                };
+            },
+            assertCommandSucceeded: function(db, dbName, collName) {
+                assert(!collectionExists(db, collName));
+                assert(collectionExists(db, collName + "Renamed"));
+            },
+            assertCommandFailed: function(db, dbName, collName) {
+                assert(collectionExists(db, collName));
+                assert(!collectionExists(db, collName + "Renamed"));
+            }
+        },
+        replSetAbortPrimaryCatchUp: {skip: isNotRunOnUserDatabase},
+        replSetFreeze: {skip: isNotRunOnUserDatabase},
+        replSetGetConfig: {skip: isNotRunOnUserDatabase},
+        replSetGetRBID: {skip: isNotRunOnUserDatabase},
+        replSetGetStatus: {skip: isNotRunOnUserDatabase},
+        replSetHeartbeat: {skip: isNotRunOnUserDatabase},
+        replSetInitiate: {skip: isNotRunOnUserDatabase},
+        replSetMaintenance: {skip: isNotRunOnUserDatabase},
+        replSetReconfig: {skip: isNotRunOnUserDatabase},
+        replSetRequestVotes: {skip: isNotRunOnUserDatabase},
+        replSetResizeOplog: {skip: isNotRunOnUserDatabase},
+        replSetStepDown: {skip: isNotRunOnUserDatabase},
+        replSetStepUp: {skip: isNotRunOnUserDatabase},
+        replSetSyncFrom: {skip: isNotRunOnUserDatabase},
+        replSetTest: {skip: isNotRunOnUserDatabase},
+        replSetTestEgress: {skip: isNotRunOnUserDatabase},
+        replSetUpdatePosition: {skip: isNotRunOnUserDatabase},
+        revokePrivilegesFromRole: {skip: isAuthCommand},
+        revokeRolesFromRole: {skip: isAuthCommand},
+        revokeRolesFromUser: {skip: isAuthCommand},
+        rolesInfo: {skip: isNotWriteCommand},
+        rotateCertificates: {skip: isAuthCommand},
+        saslContinue: {skip: isAuthCommand},
+        saslStart: {skip: isAuthCommand},
+        sbe: {skip: isNotRunOnUserDatabase},
+        serverStatus: {skip: isNotRunOnUserDatabase},
+        setAllowMigrations: {skip: isNotRunOnUserDatabase},
+        setCommittedSnapshot: {skip: isNotRunOnUserDatabase},
+        setDefaultRWConcern: {skip: isNotRunOnUserDatabase},
+        setFeatureCompatibilityVersion: {skip: isNotRunOnUserDatabase},
+        setFreeMonitoring: {skip: isNotRunOnUserDatabase},
+        setIndexCommitQuorum: {skip: isNotRunOnUserDatabase},
+        setParameter: {skip: isNotRunOnUserDatabase},
+        setShardVersion: {skip: isNotRunOnUserDatabase},
+        shardingState: {skip: isNotRunOnUserDatabase},
+        shutdown: {skip: isNotRunOnUserDatabase},
+        sleep: {skip: isNotRunOnUserDatabase},
+        splitChunk: {skip: isNotRunOnUserDatabase},
+        splitVector: {skip: isNotRunOnUserDatabase},
+        stageDebug: {skip: isNotRunOnUserDatabase},
+        startRecordingTraffic: {skip: isNotRunOnUserDatabase},
+        startSession: {skip: isNotRunOnUserDatabase},
+        stopRecordingTraffic: {skip: isNotRunOnUserDatabase},
+        top: {skip: isNotRunOnUserDatabase},
+        update: {
+            testInTransaction: true,
+            testAsRetryableWrite: true,
+            setUp: insertTestDoc,
+            command: function(dbName, collName) {
+                return {
+                    update: collName,
+                    updates: [{q: kTestDoc, u: {$set: {y: 0}}, upsert: false, multi: false}]
+                };
+            },
+            isBatchWrite: true,
+            assertCommandSucceeded: function(db, dbName, collName) {
+                assert.eq(countDocs(db, collName, Object.assign({y: 0}, kTestDoc)), 1);
+            },
+            assertCommandFailed: function(db, dbName, collName) {
+                assert.eq(countDocs(db, collName, Object.assign({y: 0}, kTestDoc)), 0);
+            }
+        },
+        multiUpdate: {
+            testInTransaction: true,
+            testAsRetryableWrite: false,
+            setUp: insertTwoTestDocs,
+            command: function(dbName, collName) {
+                return {
+                    update: collName,
+                    updates: [{q: {}, u: {$set: {y: 0}}, upsert: false, multi: true}]
+                };
+            },
+            isBatchWrite: true,
+            isMultiUpdate: true,
+            assertCommandSucceeded: function(db, dbName, collName) {
+                assert.eq(countDocs(db, collName, Object.assign({y: 0})), 2);
+            },
+            assertCommandFailed: function(db, dbName, collName) {
+                assert.eq(countDocs(db, collName, Object.assign({y: 0})), 0);
+            }
+        },
+        updateRole: {skip: isAuthCommand},
+        updateUser: {skip: isNotRunOnUserDatabase},
+        usersInfo: {skip: isNotRunOnUserDatabase},
+        validate: {skip: isNotWriteCommand},
+        voteCommitIndexBuild: {skip: isNotRunOnUserDatabase},
+        waitForFailPoint: {skip: isNotRunOnUserDatabase},
+        waitForOngoingChunkSplits: {skip: isNotRunOnUserDatabase},
+        whatsmysni: {skip: isNotRunOnUserDatabase},
+        whatsmyuri: {skip: isNotRunOnUserDatabase}
+    }
 };
 
 function validateTestCase(testCase) {

@@ -13,12 +13,15 @@
  * ]
  */
 
-(function() {
-"use strict";
+import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {
+    getTenantMigrationAccessBlocker,
+    isShardMergeEnabled,
+    makeX509OptionsForTest,
+} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
-load("jstests/replsets/libs/tenant_migration_test.js");
 
 let expectedNumRecipientSyncDataCmdSent = 0;
 let expectedNumRecipientForgetMigrationCmdSent = 0;
@@ -45,8 +48,7 @@ function testDonorForgetMigrationAfterMigrationCompletes(
 
     // Wait for garbage collection on donor.
     donorRst.nodes.forEach((node) => {
-        assert.soon(() => null ==
-                        TenantMigrationUtil.getTenantMigrationAccessBlocker({donorNode: node}));
+        assert.soon(() => null == getTenantMigrationAccessBlocker({donorNode: node}));
     });
 
     assert.soon(() => 0 === donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).count({
@@ -62,8 +64,7 @@ function testDonorForgetMigrationAfterMigrationCompletes(
 
     // Wait for garbage collection on recipient.
     recipientRst.nodes.forEach((node) => {
-        assert.soon(() => null ==
-                        TenantMigrationUtil.getTenantMigrationAccessBlocker({recipientNode: node}));
+        assert.soon(() => null == getTenantMigrationAccessBlocker({recipientNode: node}));
     });
 
     assert.soon(() => 0 ===
@@ -86,7 +87,7 @@ const sharedOptions = {
         ttlMonitorSleepSecs: 1,
     }
 };
-const x509Options = TenantMigrationUtil.makeX509OptionsForTest();
+const x509Options = makeX509OptionsForTest();
 
 const donorRst = new ReplSetTest({
     nodes: [{}, {rsConfig: {priority: 0}}, {rsConfig: {priority: 0}}],
@@ -144,8 +145,7 @@ function testStats(node, {
     // Wait for the migration to enter the blocking state.
     blockingFp.wait();
 
-    let mtab = TenantMigrationUtil.getTenantMigrationAccessBlocker(
-        {donorNode: donorPrimary, tenantId: kTenantId});
+    let mtab = getTenantMigrationAccessBlocker({donorNode: donorPrimary, tenantId: kTenantId});
     assert.eq(mtab.donor.state, TenantMigrationTest.DonorAccessState.kBlockWritesAndReads);
     assert(mtab.donor.blockTimestamp);
 
@@ -158,7 +158,7 @@ function testStats(node, {
             .next();
     assert.eq(donorDoc.state, "blocking");
     assert.eq(donorDoc.blockTimestamp, blockOplogEntry.ts);
-    if (TenantMigrationUtil.isShardMergeEnabled(donorPrimary.getDB("admin"))) {
+    if (isShardMergeEnabled(donorPrimary.getDB("admin"))) {
         assert.eq(donorDoc.protocol, "shard merge");
         assert.eq(donorDoc.tenantIds, [ObjectId(kTenantId)]);
     }
@@ -183,8 +183,7 @@ function testStats(node, {
     assert.eq(donorDoc.commitOrAbortOpTime.ts, commitOplogEntry.ts);
 
     assert.soon(() => {
-        mtab = TenantMigrationUtil.getTenantMigrationAccessBlocker(
-            {donorNode: donorPrimary, tenantId: kTenantId});
+        mtab = getTenantMigrationAccessBlocker({donorNode: donorPrimary, tenantId: kTenantId});
         return mtab.donor.state === TenantMigrationTest.DonorAccessState.kReject;
     });
     assert(mtab.donor.commitOpTime);
@@ -227,8 +226,7 @@ function testStats(node, {
 
     let mtab;
     assert.soon(() => {
-        mtab = TenantMigrationUtil.getTenantMigrationAccessBlocker(
-            {donorNode: donorPrimary, tenantId: kTenantId});
+        mtab = getTenantMigrationAccessBlocker({donorNode: donorPrimary, tenantId: kTenantId});
         return mtab.donor.state === TenantMigrationTest.DonorAccessState.kAborted;
     });
     assert(mtab.donor.abortOpTime);
@@ -269,8 +267,7 @@ function testStats(node, {
 
     let mtab;
     assert.soon(() => {
-        mtab = TenantMigrationUtil.getTenantMigrationAccessBlocker(
-            {donorNode: donorPrimary, tenantId: kTenantId});
+        mtab = getTenantMigrationAccessBlocker({donorNode: donorPrimary, tenantId: kTenantId});
         return mtab.donor.state === TenantMigrationTest.DonorAccessState.kAborted;
     });
     assert(mtab.donor.abortOpTime);
@@ -317,4 +314,3 @@ configDonorsColl.dropIndex({expireAt: 1});
 tenantMigrationTest.stop();
 donorRst.stopSet();
 recipientRst.stopSet();
-})();

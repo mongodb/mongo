@@ -15,18 +15,20 @@
  * ]
  */
 
-(function() {
-"use strict";
+import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {makeX509OptionsForTest} from "jstests/replsets/libs/tenant_migration_util.js";
+import {
+    getServerlessOperationLock,
+    ServerlessLockType
+} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
-load("jstests/replsets/libs/tenant_migration_test.js");
-const {ServerlessLockType, getServerlessOperationLock} = TenantMigrationUtil;
 
 const donorRst = new ReplSetTest({
     nodes: 1,
     name: 'donor',
-    nodeOptions: Object.assign(TenantMigrationUtil.makeX509OptionsForTest().donor, {
+    nodeOptions: Object.assign(makeX509OptionsForTest().donor, {
         setParameter:
             // In order to deterministically validate that in-memory state is preserved during
             // recovery, this failpoint prevents active migrations from continuing on process
@@ -145,4 +147,3 @@ if (donorDoc && !donorDoc.expireAt) {
 
 tenantMigrationTest.stop();
 donorRst.stopSet();
-})();

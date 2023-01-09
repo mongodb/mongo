@@ -11,13 +11,11 @@
  * ]
  */
 
-(function() {
-"use strict";
+import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {isShardMergeEnabled} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
-load("jstests/replsets/libs/tenant_migration_test.js");
-load("jstests/replsets/libs/tenant_migration_util.js");
 
 (() => {
     const tenantMigrationTest =
@@ -25,7 +23,7 @@ load("jstests/replsets/libs/tenant_migration_util.js");
 
     const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 
-    if (!TenantMigrationUtil.isShardMergeEnabled(recipientPrimary.getDB("admin"))) {
+    if (!isShardMergeEnabled(recipientPrimary.getDB("admin"))) {
         tenantMigrationTest.stop();
         jsTestLog("Skipping Shard Merge-specific test");
         return;
@@ -77,5 +75,4 @@ load("jstests/replsets/libs/tenant_migration_util.js");
         tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
 
     tenantMigrationTest.stop();
-})();
 })();

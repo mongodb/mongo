@@ -10,12 +10,9 @@
  * ]
  */
 
-(function() {
-"use strict";
-
+import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
-load("jstests/replsets/libs/tenant_migration_test.js");
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 const tenantId = ObjectId().str;
@@ -47,4 +44,3 @@ for (const db of [...tenantDBs, ...nonTenantDBs]) {
 }
 
 tenantMigrationTest.stop();
-})();

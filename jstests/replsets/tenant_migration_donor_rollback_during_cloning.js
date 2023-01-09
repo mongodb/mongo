@@ -15,16 +15,14 @@
  * ]
  */
 
-(function() {
-"use strict";
+import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {makeX509OptionsForTest} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");           // for 'extractUUIDFromObject'
 load("jstests/libs/write_concern_util.js");  // for 'stopReplicationOnSecondaries'
-load("jstests/replsets/libs/tenant_migration_test.js");
-load("jstests/replsets/libs/tenant_migration_util.js");
 
-const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
+const migrationX509Options = makeX509OptionsForTest();
 
 const recipientRst =
     new ReplSetTest({name: "recipientRst", nodes: 1, nodeOptions: migrationX509Options.recipient});
@@ -353,4 +351,3 @@ runTest('tenantId3',
         "tenantCollectionClonerHangAfterGettingOperationTime");
 
 recipientRst.stopSet();
-})();

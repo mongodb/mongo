@@ -14,13 +14,19 @@
  * ]
  */
 
-(function() {
-"use strict";
+import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {
+    forgetMigrationAsync,
+    getExternalKeys,
+    isShardMergeEnabled,
+    kExternalKeysNs,
+    makeX509OptionsForTest
+} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
-load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/libs/parallelTester.js");
+load("jstests/replsets/rslib.js");  // `createRstArgs`
 
 const kExternalKeysTTLIndexName = "ExternalKeysTTLIndex";
 const kTenantIdPrefix = "testTenantId";
@@ -35,7 +41,7 @@ let makeTenantId = function() {
 
 function waitForExternalKeysTTLIndex(conn) {
     assert.soon(() => {
-        const indexSpecs = conn.getCollection(TenantMigrationUtil.kExternalKeysNs).getIndexSpecs();
+        const indexSpecs = conn.getCollection(kExternalKeysNs).getIndexSpecs();
         const hasIndex = indexSpecs.some(indexSpec => {
             return indexSpec.name === kExternalKeysTTLIndexName &&
                 indexSpec.key.ttlExpiresAt === 1 && indexSpec.expireAfterSeconds === 0;
@@ -51,15 +57,14 @@ function waitForExternalKeysTTLIndex(conn) {
 
 function waitForExternalKeysToBeDeleted(conn, migrationId) {
     assert.soonNoExcept(() => {
-        const externalKeys = TenantMigrationUtil.getExternalKeys(conn, migrationId);
+        const externalKeys = getExternalKeys(conn, migrationId);
         assert.eq(0, externalKeys.length, tojson(externalKeys));
         return true;
     });
 }
 
 function verifyExternalKeys(conn, {migrationId, expectTTLValue}) {
-    const externalKeys =
-        conn.getCollection(TenantMigrationUtil.kExternalKeysNs).find({migrationId}).toArray();
+    const externalKeys = conn.getCollection(kExternalKeysNs).find({migrationId}).toArray();
     assert.gt(externalKeys.length, 0);
 
     externalKeys.forEach(key => {
@@ -118,7 +123,7 @@ function makeTestParams() {
     (() => {
         jsTestLog("Basic case with multiple migrations");
         const {tmt, teardown} = setup();
-        if (TenantMigrationUtil.isShardMergeEnabled(tmt.getDonorPrimary().getDB("admin"))) {
+        if (isShardMergeEnabled(tmt.getDonorPrimary().getDB("admin"))) {
             // This test runs multiple concurrent migrations, which shard merge can't handle.
             jsTestLog(
                 "Skip: featureFlagShardMerge is enabled and this test runs multiple concurrent migrations, which shard merge can't handle.");
@@ -216,7 +221,7 @@ function makeTestParams() {
 
 (() => {
     function setup() {
-        const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
+        const migrationX509Options = makeX509OptionsForTest();
         const donorRst = new ReplSetTest({
             nodes: 3,
             name: "donorRst",
@@ -331,10 +336,8 @@ function makeTestParams() {
 
         const fp = configureFailPoint(
             donorPrimary, "pauseTenantMigrationBeforeMarkingExternalKeysGarbageCollectable");
-        const forgetMigrationThread = new Thread(TenantMigrationUtil.forgetMigrationAsync,
-                                                 migrationOpts.migrationIdString,
-                                                 TenantMigrationUtil.createRstArgs(donorRst),
-                                                 true);
+        const forgetMigrationThread = new Thread(
+            forgetMigrationAsync, migrationOpts.migrationIdString, createRstArgs(donorRst), true);
         forgetMigrationThread.start();
         fp.wait();
 
@@ -369,10 +372,8 @@ function makeTestParams() {
 
         const fp = configureFailPoint(
             recipientPrimary, "pauseTenantMigrationBeforeMarkingExternalKeysGarbageCollectable");
-        const forgetMigrationThread = new Thread(TenantMigrationUtil.forgetMigrationAsync,
-                                                 migrationOpts.migrationIdString,
-                                                 TenantMigrationUtil.createRstArgs(donorRst),
-                                                 true);
+        const forgetMigrationThread = new Thread(
+            forgetMigrationAsync, migrationOpts.migrationIdString, createRstArgs(donorRst), true);
         forgetMigrationThread.start();
         fp.wait();
 
@@ -411,10 +412,8 @@ function makeTestParams() {
 
         const fp = configureFailPoint(
             donorPrimary, "pauseTenantMigrationDonorBeforeMarkingStateGarbageCollectable");
-        const forgetMigrationThread = new Thread(TenantMigrationUtil.forgetMigrationAsync,
-                                                 migrationOpts.migrationIdString,
-                                                 TenantMigrationUtil.createRstArgs(donorRst),
-                                                 true);
+        const forgetMigrationThread = new Thread(
+            forgetMigrationAsync, migrationOpts.migrationIdString, createRstArgs(donorRst), true);
         forgetMigrationThread.start();
         fp.wait();
 
@@ -457,10 +456,8 @@ function makeTestParams() {
 
         const fp = configureFailPoint(
             recipientPrimary, "fpAfterReceivingRecipientForgetMigration", {action: "hang"});
-        const forgetMigrationThread = new Thread(TenantMigrationUtil.forgetMigrationAsync,
-                                                 migrationOpts.migrationIdString,
-                                                 TenantMigrationUtil.createRstArgs(donorRst),
-                                                 true);
+        const forgetMigrationThread = new Thread(
+            forgetMigrationAsync, migrationOpts.migrationIdString, createRstArgs(donorRst), true);
         forgetMigrationThread.start();
         fp.wait();
 
@@ -481,5 +478,4 @@ function makeTestParams() {
         waitForExternalKeysToBeDeleted(tmt.getDonorPrimary(), migrationId);
         teardown();
     }
-})();
 })();

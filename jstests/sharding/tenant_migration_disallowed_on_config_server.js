@@ -10,10 +10,8 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/replsets/libs/tenant_migration_test.js");
+import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {donorStartMigrationWithProtocol} from "jstests/replsets/libs/tenant_migration_util.js";
 
 const st = new ShardingTest({shards: 1});
 const donorRstShard = st.rs0;
@@ -28,14 +26,14 @@ const tenantMigrationTest =
 // Run tenant migration commands on config servers.
 let donorPrimary = donorRstConfig.getPrimary();
 
-let cmdObj = TenantMigrationUtil.donorStartMigrationWithProtocol({
+let cmdObj = donorStartMigrationWithProtocol({
     donorStartMigration: 1,
     tenantId: ObjectId().str,
     migrationId: UUID(),
     recipientConnectionString: tenantMigrationTest.getRecipientConnString(),
     readPreference: {mode: "primary"}
 },
-                                                                 donorPrimary.getDB("admin"));
+                                             donorPrimary.getDB("admin"));
 assert.commandFailedWithCode(donorPrimary.adminCommand(cmdObj), ErrorCodes.IllegalOperation);
 
 cmdObj = {
@@ -72,4 +70,3 @@ assert.commandFailedWithCode(donorPrimary.adminCommand(cmdObj), ErrorCodes.Illeg
 tenantMigrationTest.stop();
 recipientRst.stopSet();
 st.stop();
-})();

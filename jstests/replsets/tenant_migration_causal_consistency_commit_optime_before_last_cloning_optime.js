@@ -16,12 +16,11 @@
  * ]
  */
 
-(function() {
-"use strict";
+import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {makeX509OptionsForTest} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
-load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/replsets/rslib.js");
 
 function assertCanFindWithReadConcern(conn, dbName, collName, expectedDoc, readConcern) {
@@ -38,7 +37,7 @@ let makeTenantId = function() {
 
 // Local read concern case.
 (() => {
-    const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
+    const migrationX509Options = makeX509OptionsForTest();
 
     // Simulate a lagged node by setting secondaryDelaySecs on one recipient secondary. Verify this
     // does not prevent reading all the tenant's data after the migration commits.
@@ -204,4 +203,3 @@ let makeTenantId = function() {
 })();
 
 // Snapshot read concern is tested in replsets/tenant_migration_concurrent_reads_on_recipient.js
-})();
