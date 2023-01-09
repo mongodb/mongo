@@ -52,8 +52,10 @@ REGISTER_DOCUMENT_SOURCE(sample,
                          AllowedWithApiStrict::kAlways);
 
 DocumentSource::GetNextResult DocumentSourceSample::doGetNext() {
-    if (_size == 0)
+    if (_size == 0) {
+        pSource->dispose();
         return GetNextResult::makeEOF();
+    }
 
     if (!_sortStage->isPopulated()) {
         // Exhaust source stage, add random metadata, and push all into sorter.

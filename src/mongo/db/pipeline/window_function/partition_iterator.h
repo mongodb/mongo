@@ -77,6 +77,13 @@ public:
         return (*this)[0];
     }
 
+    /**
+     * Returns true if iterator execution is paused.
+     */
+    bool isPaused() {
+        return _state == IteratorState::kPauseExecution;
+    }
+
     enum class AdvanceResult {
         kAdvanced,
         kNewPartition,
@@ -287,6 +294,9 @@ private:
     enum class IteratorState {
         // Default state, no documents have been pulled into the cache.
         kNotInitialized,
+        // Input sources do not have a result to be processed yet, but there may be more results in
+        // the future.
+        kPauseExecution,
         // Iterating the current partition. We don't know where the current partition ends, or
         // whether it's the last partition.
         kIntraPartition,
