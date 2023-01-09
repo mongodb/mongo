@@ -240,6 +240,15 @@ int setUpInvalidData(OperationContext* opCtx) {
     return 1;
 }
 
+/**
+ * Convenience function to convert ValidateResults to a BSON object.
+ */
+BSONObj resultToBSON(const ValidateResults& vr) {
+    BSONObjBuilder builder;
+    vr.appendToResultObj(&builder, true /* debugging */);
+    return builder.obj();
+}
+
 class CollectionValidationColumnStoreIndexTest : public CollectionValidationDiskTest {
 protected:
     CollectionValidationColumnStoreIndexTest() : CollectionValidationDiskTest() {}
@@ -520,6 +529,74 @@ protected:
                 return results;
             });
     }
+
+    /**
+     * This method repairs the (possible) index corruptions by running the validate command and
+     * returns the results from this command (after doing some common assertions). In addition,
+     * before returning this result, another call to the validate command is done to repair the
+     * index again. It's expected that this second call to index repair will not lead to any repair,
+     * as it's done in the first call (if any corruption exists).
+     */
+    std::pair<BSONObj, ValidateResults> repairIndexCorruptions(const NamespaceString& nss,
+                                                               int numDocs) {
+        auto opCtx = operationContext();
+        const auto repairResults1 =
+            foregroundValidate(nss,
+                               opCtx,
+                               /*valid*/ true,
+                               /*numRecords*/ numDocs,
+                               /*numInvalidDocuments*/ 0,
+                               /*numErrors*/ 0,
+                               {CollectionValidation::ValidateMode::kForeground},
+                               CollectionValidation::RepairMode::kFixErrors);
+
+        ASSERT_EQ(repairResults1.size(), 1);
+
+        const auto& repairResult1 = repairResults1[0];
+        const auto& validateResults1 = repairResult1.second;
+        auto obj = resultToBSON(validateResults1);
+        ASSERT(validateResults1.valid) << obj;
+
+        ASSERT_EQ(validateResults1.missingIndexEntries.size(), 0U) << obj;
+        ASSERT_EQ(validateResults1.extraIndexEntries.size(), 0U) << obj;
+        ASSERT_EQ(validateResults1.corruptRecords.size(), 0U) << obj;
+        ASSERT_EQ(validateResults1.numRemovedCorruptRecords, 0U) << obj;
+        ASSERT_EQ(validateResults1.numDocumentsMovedToLostAndFound, 0U) << obj;
+        ASSERT_EQ(validateResults1.numOutdatedMissingIndexEntry, 0U) << obj;
+
+        // After the first round of repair, if we do a second round of repair, it should always
+        // validate without requiring any actual repair anymore.
+        const auto repairResults2 =
+            foregroundValidate(nss,
+                               opCtx,
+                               /*valid*/ true,
+                               /*numRecords*/ numDocs,
+                               /*numInvalidDocuments*/ 0,
+                               /*numErrors*/ 0,
+                               {CollectionValidation::ValidateMode::kForeground},
+                               CollectionValidation::RepairMode::kFixErrors);
+        ASSERT_EQ(repairResults2.size(), 1);
+
+        const auto& validateResults2 = repairResults2[0].second;
+        obj = resultToBSON(validateResults2);
+        ASSERT(validateResults2.valid) << obj;
+        ASSERT_FALSE(validateResults2.repaired) << obj;
+
+        const auto warningsWithoutTransientErrors = omitTransientWarnings(validateResults2);
+        ASSERT_EQ(warningsWithoutTransientErrors.warnings.size(), 0U) << obj;
+        ASSERT_EQ(validateResults2.missingIndexEntries.size(), 0U) << obj;
+        ASSERT_EQ(validateResults2.extraIndexEntries.size(), 0U) << obj;
+        ASSERT_EQ(validateResults2.corruptRecords.size(), 0U) << obj;
+        ASSERT_EQ(validateResults2.numRemovedCorruptRecords, 0U) << obj;
+        ASSERT_EQ(validateResults2.numRemovedExtraIndexEntries, 0U) << obj;
+        ASSERT_EQ(validateResults2.numInsertedMissingIndexEntries, 0U) << obj;
+        ASSERT_EQ(validateResults2.numDocumentsMovedToLostAndFound, 0U) << obj;
+        ASSERT_EQ(validateResults2.numOutdatedMissingIndexEntry, 0U) << obj;
+
+        // return the result of initial repair command, so that tests can do further checks on that
+        // result if needed.
+        return repairResult1;
+    }
 };
 
 // Verify that calling validate() on an empty collection with different validation levels returns an
@@ -760,10 +837,7 @@ TEST_F(CollectionValidationTest, ValidateOldUniqueIndexKeyWarning) {
 
     for (const auto& result : results) {
         const auto& validateResults = result.second;
-        BSONObjBuilder builder;
-        const bool debugging = true;
-        validateResults.appendToResultObj(&builder, debugging);
-        const auto obj = builder.obj();
+        const auto obj = resultToBSON(validateResults);
         ASSERT(validateResults.valid) << obj;
         const auto warningsWithoutTransientErrors = omitTransientWarnings(validateResults);
         ASSERT_EQ(warningsWithoutTransientErrors.warnings.size(), 1U) << obj;
@@ -816,10 +890,7 @@ TEST_F(CollectionValidationColumnStoreIndexTest, SingleInvalidIndexEntryCSI) {
 
                     for (const auto& result : results) {
                         const auto& validateResults = result.second;
-                        BSONObjBuilder builder;
-                        const bool debugging = true;
-                        validateResults.appendToResultObj(&builder, debugging);
-                        const auto obj = builder.obj();
+                        const auto obj = resultToBSON(validateResults);
                         ASSERT_FALSE(validateResults.valid) << obj;
 
                         const auto warningsWithoutTransientErrors =
@@ -871,6 +942,21 @@ TEST_F(CollectionValidationColumnStoreIndexTest, SingleInvalidIndexEntryCSI) {
                         ASSERT_EQ(validateResults.numDocumentsMovedToLostAndFound, 0U) << obj;
                         ASSERT_EQ(validateResults.numOutdatedMissingIndexEntry, 0U) << obj;
                     }
+
+                    const auto& repairResult = repairIndexCorruptions(nss, numDocs);
+                    const auto& validateResults = repairResult.second;
+                    const auto obj = resultToBSON(validateResults);
+                    ASSERT(validateResults.valid) << obj;
+                    ASSERT(validateResults.repaired) << obj;
+
+                    const auto warningsWithoutTransientErrors =
+                        omitTransientWarnings(validateResults);
+                    ASSERT_EQ(warningsWithoutTransientErrors.warnings.size(), 1U) << obj;
+                    ASSERT_STRING_CONTAINS(warningsWithoutTransientErrors.warnings[0],
+                                           "Inserted 1 missing index entries.")
+                        << obj;
+                    ASSERT_EQ(validateResults.numRemovedExtraIndexEntries, 1U) << obj;
+                    ASSERT_EQ(validateResults.numInsertedMissingIndexEntries, 1U) << obj;
                 }
             }
         }
@@ -926,10 +1012,7 @@ TEST_F(CollectionValidationColumnStoreIndexTest, SingleExtraIndexEntry) {
 
                 for (const auto& result : results) {
                     const auto& validateResults = result.second;
-                    BSONObjBuilder builder;
-                    const bool debugging = true;
-                    validateResults.appendToResultObj(&builder, debugging);
-                    const auto obj = builder.obj();
+                    const auto obj = resultToBSON(validateResults);
                     ASSERT_FALSE(validateResults.valid) << obj;
 
                     const auto warningsWithoutTransientErrors =
@@ -963,6 +1046,19 @@ TEST_F(CollectionValidationColumnStoreIndexTest, SingleExtraIndexEntry) {
                     ASSERT_EQ(validateResults.numInsertedMissingIndexEntries, 0U) << obj;
                     ASSERT_EQ(validateResults.numDocumentsMovedToLostAndFound, 0U) << obj;
                     ASSERT_EQ(validateResults.numOutdatedMissingIndexEntry, 0U) << obj;
+                }
+
+                {
+                    const auto& repairResult = repairIndexCorruptions(nss, numDocs);
+                    const auto& validateResults = repairResult.second;
+                    const auto obj = resultToBSON(validateResults);
+                    ASSERT(validateResults.repaired) << obj;
+
+                    const auto warningsWithoutTransientErrors =
+                        omitTransientWarnings(validateResults);
+                    ASSERT_EQ(warningsWithoutTransientErrors.warnings.size(), 0U) << obj;
+                    ASSERT_EQ(validateResults.numRemovedExtraIndexEntries, 1U) << obj;
+                    ASSERT_EQ(validateResults.numInsertedMissingIndexEntries, 0U) << obj;
                 }
             }
         }
@@ -1002,10 +1098,7 @@ TEST_F(CollectionValidationColumnStoreIndexTest, SingleMissingIndexEntryCSI) {
 
                     for (const auto& result : results) {
                         const auto& validateResults = result.second;
-                        BSONObjBuilder builder;
-                        const bool debugging = true;
-                        validateResults.appendToResultObj(&builder, debugging);
-                        const auto obj = builder.obj();
+                        const auto obj = resultToBSON(validateResults);
                         ASSERT_FALSE(validateResults.valid) << obj;
 
                         const auto warningsWithoutTransientErrors =
@@ -1041,6 +1134,22 @@ TEST_F(CollectionValidationColumnStoreIndexTest, SingleMissingIndexEntryCSI) {
                         ASSERT_EQ(validateResults.numInsertedMissingIndexEntries, 0U) << obj;
                         ASSERT_EQ(validateResults.numDocumentsMovedToLostAndFound, 0U) << obj;
                         ASSERT_EQ(validateResults.numOutdatedMissingIndexEntry, 0U) << obj;
+                    }
+
+                    {
+                        const auto& repairResult = repairIndexCorruptions(nss, numDocs);
+                        const auto& validateResults = repairResult.second;
+                        const auto obj = resultToBSON(validateResults);
+                        ASSERT(validateResults.repaired) << obj;
+
+                        const auto warningsWithoutTransientErrors =
+                            omitTransientWarnings(validateResults);
+                        ASSERT_EQ(warningsWithoutTransientErrors.warnings.size(), 1U) << obj;
+                        ASSERT_STRING_CONTAINS(warningsWithoutTransientErrors.warnings[0],
+                                               "Inserted 1 missing index entries.")
+                            << obj;
+                        ASSERT_EQ(validateResults.numRemovedExtraIndexEntries, 0U) << obj;
+                        ASSERT_EQ(validateResults.numInsertedMissingIndexEntries, 1U) << obj;
                     }
                 }
             }
@@ -1090,10 +1199,7 @@ TEST_F(CollectionValidationColumnStoreIndexTest, MultipleInvalidIndexEntryCSI) {
 
     for (const auto& result : results) {
         const auto& validateResults = result.second;
-        BSONObjBuilder builder;
-        const bool debugging = true;
-        validateResults.appendToResultObj(&builder, debugging);
-        const auto obj = builder.obj();
+        const auto obj = resultToBSON(validateResults);
         ASSERT_FALSE(validateResults.valid) << obj;
 
         const auto warningsWithoutTransientErrors = omitTransientWarnings(validateResults);
@@ -1118,6 +1224,21 @@ TEST_F(CollectionValidationColumnStoreIndexTest, MultipleInvalidIndexEntryCSI) {
         ASSERT_EQ(validateResults.numInsertedMissingIndexEntries, 0U) << obj;
         ASSERT_EQ(validateResults.numDocumentsMovedToLostAndFound, 0U) << obj;
         ASSERT_EQ(validateResults.numOutdatedMissingIndexEntry, 0U) << obj;
+    }
+
+    {
+        const auto& repairResult = repairIndexCorruptions(kNss, numDocs);
+        const auto& validateResults = repairResult.second;
+        const auto obj = resultToBSON(validateResults);
+        ASSERT(validateResults.repaired) << obj;
+
+        const auto warningsWithoutTransientErrors = omitTransientWarnings(validateResults);
+        ASSERT_EQ(warningsWithoutTransientErrors.warnings.size(), 1U) << obj;
+        ASSERT_STRING_CONTAINS(warningsWithoutTransientErrors.warnings[0],
+                               "Inserted 3 missing index entries.")
+            << obj;
+        ASSERT_EQ(validateResults.numRemovedExtraIndexEntries, 5U) << obj;
+        ASSERT_EQ(validateResults.numInsertedMissingIndexEntries, 3U) << obj;
     }
 }
 

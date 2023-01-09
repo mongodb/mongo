@@ -67,6 +67,8 @@ int64_t ColumnIndexConsistency::traverseIndex(OperationContext* opCtx,
         }
     }
 
+    _investigateSuspects(opCtx, index);
+
     return numIndexEntries;
 }
 
@@ -76,7 +78,7 @@ void ColumnIndexConsistency::traverseRecord(OperationContext* opCtx,
                                             const RecordId& recordId,
                                             const BSONObj& record,
                                             ValidateResults* results) {
-    ColumnStoreAccessMethod* csam = dynamic_cast<ColumnStoreAccessMethod*>(index->accessMethod());
+    ColumnStoreAccessMethod* csam = checked_cast<ColumnStoreAccessMethod*>(index->accessMethod());
 
     // Shred the record.
     csam->getKeyGen().visitCellsForInsert(
@@ -95,13 +97,8 @@ void ColumnIndexConsistency::traverseRecord(OperationContext* opCtx,
         });
 }
 
-void ColumnIndexConsistency::_addIndexEntryErrors(OperationContext* opCtx,
-                                                  const IndexCatalogEntry* index,
-                                                  ValidateResults* results) {
-
-    if (_firstPhase) {
-        return;
-    }
+void ColumnIndexConsistency::_investigateSuspects(OperationContext* opCtx,
+                                                  const IndexCatalogEntry* index) {
 
     const auto indexName = index->descriptor()->indexName();
 
@@ -112,7 +109,7 @@ void ColumnIndexConsistency::_addIndexEntryErrors(OperationContext* opCtx,
     const auto& csiCursor = csiCursorIt->second;
 
     const ColumnStoreAccessMethod* csam =
-        dynamic_cast<ColumnStoreAccessMethod*>(index->accessMethod());
+        checked_cast<ColumnStoreAccessMethod*>(index->accessMethod());
 
     for (const auto rowId : _suspects) {
         // Gather all paths for this RecordId.
@@ -147,16 +144,10 @@ void ColumnIndexConsistency::_addIndexEntryErrors(OperationContext* opCtx,
                     if (!csiCell) {
                         // Rowstore has entry that index doesn't
                         _missingIndexEntries.emplace_back(rowCell);
-                        results->missingIndexEntries.push_back(
-                            _generateInfo(csam->indexName(), recordId, path, rowId));
                     } else if (csiCell->value != rowCell.value) {
                         // Rowstore and index values diverge
                         _extraIndexEntries.emplace_back(csiCell.get());
                         _missingIndexEntries.emplace_back(rowCell);
-                        results->missingIndexEntries.push_back(_generateInfo(
-                            csam->indexName(), recordId, path, rowId, csiCell->value));
-                        results->extraIndexEntries.push_back(
-                            _generateInfo(csam->indexName(), recordId, path, rowId, rowCell.value));
                     }
                     if (paths.count(rowCell.path) == 1) {
                         paths.erase(rowCell.path);
@@ -170,11 +161,21 @@ void ColumnIndexConsistency::_addIndexEntryErrors(OperationContext* opCtx,
         for (const auto& kv : paths) {
             for (int i = 0; i < kv.second; i++) {
                 _extraIndexEntries.emplace_back(kv.first, rowId, ""_sd);
-                results->extraIndexEntries.push_back(
-                    _generateInfo(csam->indexName(), recordId, kv.first, rowId));
             }
         }
     }
+}
+
+
+void ColumnIndexConsistency::_addIndexEntryErrors(OperationContext* opCtx,
+                                                  const IndexCatalogEntry* index,
+                                                  ValidateResults* results) {
+
+    if (_firstPhase) {
+        return;
+    }
+
+    ColumnStoreAccessMethod* csam = checked_cast<ColumnStoreAccessMethod*>(index->accessMethod());
 
     if (!_missingIndexEntries.empty() || !_extraIndexEntries.empty()) {
         StringBuilder ss;
@@ -187,12 +188,20 @@ void ColumnIndexConsistency::_addIndexEntryErrors(OperationContext* opCtx,
         ss << "Detected " << _missingIndexEntries.size() << " missing index entries.";
         results->warnings.push_back(ss.str());
         results->valid = false;
+        for (const auto& ent : _missingIndexEntries) {
+            results->missingIndexEntries.push_back(
+                _generateInfo(csam->indexName(), RecordId(ent.rid), ent.path, ent.rid, ent.value));
+        }
     }
     if (!_extraIndexEntries.empty()) {
         StringBuilder ss;
         ss << "Detected " << _extraIndexEntries.size() << " extra index entries.";
         results->warnings.push_back(ss.str());
         results->valid = false;
+        for (const auto& ent : _extraIndexEntries) {
+            results->extraIndexEntries.push_back(
+                _generateInfo(csam->indexName(), RecordId(ent.rid), ent.path, ent.rid, ent.value));
+        }
     }
 }
 
@@ -211,8 +220,48 @@ void ColumnIndexConsistency::addIndexEntryErrors(OperationContext* opCtx,
     }
 }
 
+void ColumnIndexConsistency::repairIndexEntries(OperationContext* opCtx,
+                                                const IndexCatalogEntry* index,
+                                                ValidateResults* results) {
+
+    ColumnStoreAccessMethod* csam = checked_cast<ColumnStoreAccessMethod*>(index->accessMethod());
+
+    writeConflictRetry(opCtx, "removingExtraColumnIndexEntries", _validateState->nss().ns(), [&] {
+        WriteUnitOfWork wunit(opCtx);
+        auto& indexResults = results->indexResultsMap[csam->indexName()];
+        auto cursor = csam->writableStorage()->newWriteCursor(opCtx);
+
+        for (auto it = _extraIndexEntries.begin(); it != _extraIndexEntries.end();) {
+            cursor->remove(it->path, it->rid);
+            results->numRemovedExtraIndexEntries++;
+            indexResults.keysTraversed--;
+            it = _extraIndexEntries.erase(it);
+        }
+
+        for (auto it = _missingIndexEntries.begin(); it != _missingIndexEntries.end();) {
+            cursor->insert(it->path, it->rid, it->value);
+            results->numInsertedMissingIndexEntries++;
+            indexResults.keysTraversed++;
+            it = _missingIndexEntries.erase(it);
+        }
+        wunit.commit();
+    });
+
+    results->repaired = true;
+}
+
 void ColumnIndexConsistency::repairIndexEntries(OperationContext* opCtx, ValidateResults* results) {
-    // TODO SERVER-71560 Repair should be implemented.
+    int numColumnStoreIndexes = 0;
+    for (const auto& index : _validateState->getIndexes()) {
+        const IndexDescriptor* descriptor = index->descriptor();
+        if (descriptor->getAccessMethodName() == IndexNames::COLUMN) {
+            ++numColumnStoreIndexes;
+            uassert(7106123,
+                    "The current implementation only supports a single column-store index.",
+                    numColumnStoreIndexes <= 1);
+            repairIndexEntries(opCtx, index.get(), results);
+        }
+    }
 }
 
 void ColumnIndexConsistency::validateIndexKeyCount(OperationContext* opCtx,

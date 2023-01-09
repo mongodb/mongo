@@ -92,7 +92,14 @@ public:
     }
 
     /**
-     * If repair mode enabled, try inserting _missingIndexEntries into indexes.
+     * If repair mode enabled, tries to repair the given column-store index.
+     */
+    void repairIndexEntries(OperationContext* opCtx,
+                            const IndexCatalogEntry* index,
+                            ValidateResults* results);
+
+    /**
+     * If repair mode enabled, tries to repair the column-store indexes.
      */
     void repairIndexEntries(OperationContext* opCtx, ValidateResults* results);
 
@@ -179,6 +186,8 @@ private:
     void _addIndexEntryErrors(OperationContext* opCtx,
                               const IndexCatalogEntry* index,
                               ValidateResults* results);
+
+    void _investigateSuspects(OperationContext* opCtx, const IndexCatalogEntry* index);
 
     void _tabulateEntry(const FullCellView& cell, int step);
 

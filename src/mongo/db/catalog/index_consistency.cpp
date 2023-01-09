@@ -432,6 +432,7 @@ void KeyStringIndexConsistency::addIndexKey(OperationContext* opCtx,
                 results->numRemovedExtraIndexEntries += numDeleted;
                 results->repaired = true;
                 indexInfo->numKeys--;
+                _extraIndexEntries.erase(key);
                 return;
             }
 
