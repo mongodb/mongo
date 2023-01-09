@@ -8,8 +8,8 @@ selector:
   exclude_files:
   # TODO SERVER-68339 UBSAN has spurious warnings for column store indexes' encoding of large
   # doubles.
-  - jstests/core/index_bounds_number_edge_cases.js
-  - jstests/core/type_bracket.js
+  - jstests/core/**/index_bounds_number_edge_cases.js
+  - jstests/core/**/type_bracket.js
 
   exclude_with_any_tags:
   - assumes_no_implicit_index_creation

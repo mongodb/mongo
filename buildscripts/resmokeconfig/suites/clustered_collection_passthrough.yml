@@ -10,61 +10,61 @@ selector:
   exclude_files:
 
   # Assumes the _id index is real.
-  - jstests/core/collmod_convert_to_ttl.js
-  - jstests/core/index_create_too_many.js
+  - jstests/core/**/collmod_convert_to_ttl.js
+  - jstests/core/**/index_create_too_many.js
   # Uses returnKey().
-  - jstests/core/index_diag.js
+  - jstests/core/**/index_diag.js
   # Expects 'idIndex' field in the listCollections output.
-  - jstests/core/list_collections1.js
-  - jstests/core/explain_shell_helpers.js
+  - jstests/core/**/list_collections1.js
+  - jstests/core/**/explain_shell_helpers.js
   - jstests/core/txns/list_collections_not_blocked_by_txn.js
   # Doesn't expect clusteredIndex options on the collection.
-  - jstests/core/list_collections_filter.js
+  - jstests/core/**/list_collections_filter.js
   # Compares the result of listIndexes to numIndexesBefore in the createIndex output.
-  - jstests/core/index_signature.js
+  - jstests/core/**/index_signature.js
   # Assumes the collection is not clustered by default.
   - jstests/core/timeseries/clustered_index_options.js
   - jstests/core/timeseries/timeseries_expire_collmod.js
   # Doesn't expect a failpoint to be enabled.
-  - jstests/core/set_param1.js
+  - jstests/core/**/set_param1.js
   # Expects a correct index count in dbStats.
-  - jstests/core/dbstats.js
+  - jstests/core/**/dbstats.js
   # Expects queries on _id to use IDHACK in explain.
-  - jstests/core/agg_hint.js
-  - jstests/core/explain_shell_helpers.js
-  - jstests/core/projection_dotted_paths.js
-  - jstests/core/wildcard_index_projection.js
-  - jstests/core/find_and_modify_pipeline_update.js
-  - jstests/core/update_pipeline_shell_helpers.js
-  - jstests/core/idhack.js
+  - jstests/core/**/agg_hint.js
+  - jstests/core/**/explain_shell_helpers.js
+  - jstests/core/**/projection_dotted_paths.js
+  - jstests/core/**/wildcard_index_projection.js
+  - jstests/core/**/find_and_modify_pipeline_update.js
+  - jstests/core/**/update_pipeline_shell_helpers.js
+  - jstests/core/**/idhack.js
   # Uses the unsupported 'autoIndexId' option.
-  - jstests/core/queryoptimizera.js
-  - jstests/core/index9.js
+  - jstests/core/**/queryoptimizera.js
+  - jstests/core/**/index9.js
   # Expects the collection creation options not to change.
-  - jstests/core/internal_rename_if_options_and_indexes_match.js
+  - jstests/core/**/internal_rename_if_options_and_indexes_match.js
   # The _id index is expected to not have a 'unique' field.
-  - jstests/core/list_indexes.js
+  - jstests/core/**/list_indexes.js
   # Expects createIndex with 'clustered' option fails on a non-clustered collection.
-  - jstests/core/clustered_collection_create_index_clustered.js
+  - jstests/core/**/clustered_collection_create_index_clustered.js
   # Tries to drop the clustered index.
-  - jstests/core/drop_index.js
-  - jstests/core/drop_indexes.js
+  - jstests/core/**/drop_index.js
+  - jstests/core/**/drop_indexes.js
   # Expects to see IXSCAN over _id (cluster key).
-  - jstests/core/find_and_modify_hint.js
-  - jstests/core/covered_index_sort_2.js
+  - jstests/core/**/find_and_modify_hint.js
+  - jstests/core/**/covered_index_sort_2.js
   # TODO (SERVER-60824): Resolve sort exceeded memory limit.
-  - jstests/core/sortg.js
+  - jstests/core/**/sortg.js
   # Expects duplicate key error to have _id index use specified.
-  - jstests/core/uniqueness.js
+  - jstests/core/**/uniqueness.js
   # Expects to see the usage of _id_ index by using $indexStats.
-  - jstests/core/index_stats.js
+  - jstests/core/**/index_stats.js
   # TODO (SERVER-62707): bound collscans with regexes.
-  - jstests/core/index_bounds_pipe.js
+  - jstests/core/**/index_bounds_pipe.js
   # Expects an index on _id to cover the query.
-  - jstests/core/covered_index_simple_id.js
+  - jstests/core/**/covered_index_simple_id.js
   # TODO (SERVER-61259): $text not supported: "No query solutions"
-  - jstests/core/fts6.js
-  - jstests/core/fts_projection.js
+  - jstests/core/**/fts6.js
+  - jstests/core/**/fts_projection.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod

@@ -21,89 +21,89 @@ selector:
 
   # This test runs createIndexes commands without asserting they succeed and depends on a particular
   # index to exist.
-  - jstests/core/index_many2.js
+  - jstests/core/**/index_many2.js
 
   #
   # From retryable writes jscore stepdown passthrough
   #
 
   # No-op retries are not ignored by top, the profiler, or opcount.
-  - jstests/core/operation_latency_histogram.js
-  - jstests/core/profile2.js
-  - jstests/core/profile3.js
-  - jstests/core/profile_findandmodify.js
-  - jstests/core/top.js
+  - jstests/core/**/operation_latency_histogram.js
+  - jstests/core/**/profile2.js
+  - jstests/core/**/profile3.js
+  - jstests/core/**/profile_findandmodify.js
+  - jstests/core/**/top.js
   - jstests/core/views/views_stats.js
 
   # TODO SERVER-31242: findAndModify no-op retry should respect the fields option.
-  - jstests/core/crud_api.js
-  - jstests/core/find_and_modify.js
-  - jstests/core/find_and_modify2.js
-  - jstests/core/find_and_modify_server6865.js
-  - jstests/core/fts_find_and_modify.js
-  - jstests/core/project_with_collation.js
+  - jstests/core/**/crud_api.js
+  - jstests/core/**/find_and_modify.js
+  - jstests/core/**/find_and_modify2.js
+  - jstests/core/**/find_and_modify_server6865.js
+  - jstests/core/**/fts_find_and_modify.js
+  - jstests/core/**/project_with_collation.js
 
   # Stepdown commands during fsync lock will fail.
-  - jstests/core/currentop.js
-  - jstests/core/fsync.js
-  - jstests/core/killop_drop_collection.js
+  - jstests/core/**/currentop.js
+  - jstests/core/**/fsync.js
+  - jstests/core/**/killop_drop_collection.js
 
   # Expect drops/creates to fail or have a certain response:
-  - jstests/core/explain_upsert.js
-  - jstests/core/indexes_multiple_commands.js
+  - jstests/core/**/explain_upsert.js
+  - jstests/core/**/indexes_multiple_commands.js
 
   # Expect certain responses, but retries of successfully completed commands may return
   # different values:
-  - jstests/core/create_indexes.js
-  - jstests/core/objid5.js
+  - jstests/core/**/create_indexes.js
+  - jstests/core/**/objid5.js
 
   # Expect results to return in a certain order, secondaries may apply ops out of order.
-  - jstests/core/coveredIndex1.js
-  - jstests/core/sortc.js
+  - jstests/core/**/coveredIndex1.js
+  - jstests/core/**/sortc.js
 
   # Spawns new mongo shells, which don't retry connecting on stepdown errors.
-  - jstests/core/shell_connection_strings.js
+  - jstests/core/**/shell_connection_strings.js
 
-  - jstests/core/bench_test*.js # benchRun() used for writes
-  - jstests/core/benchrun_pipeline_updates.js # benchRun() used for writes
-  - jstests/core/connection_string_validation.js # Does not expect a replica set connection string.
-  - jstests/core/explain_large_bounds.js # Stepdown can timeout waiting for global lock.
-  - jstests/core/list_collections_filter.js # Temporary collections are dropped on failover.
-  - jstests/core/startup_log.js # Checks pid, which is different on each server.
+  - jstests/core/**/bench_test*.js # benchRun() used for writes
+  - jstests/core/**/benchrun_pipeline_updates.js # benchRun() used for writes
+  - jstests/core/**/connection_string_validation.js # Does not expect a replica set connection string.
+  - jstests/core/**/explain_large_bounds.js # Stepdown can timeout waiting for global lock.
+  - jstests/core/**/list_collections_filter.js # Temporary collections are dropped on failover.
+  - jstests/core/**/startup_log.js # Checks pid, which is different on each server.
 
   #
   # Denylists specific to this suite
   #
 
-  - jstests/core/api_version_parameters.js
-  - jstests/core/benchrun_pipeline_updates.js
-  - jstests/core/bypass_doc_validation.js
-  - jstests/core/collation.js
-  - jstests/core/command_json_schema_field.js
-  - jstests/core/command_let_variables.js
-  - jstests/core/commands_namespace_parsing.js
-  - jstests/core/crud_ops_do_not_throw_locktimeout.js
-  - jstests/core/disallow_system_views_user_writes.js
-  - jstests/core/doc_validation.js
-  - jstests/core/explain_includes_command.js
-  - jstests/core/explain_multi_plan.js
-  - jstests/core/explain_shell_helpers.js
-  - jstests/core/explain_uuid.js
-  - jstests/core/expr.js
-  - jstests/core/field_name_validation.js
-  - jstests/core/index_partial_read_ops.js
-  - jstests/core/index_stats.js
+  - jstests/core/**/api_version_parameters.js
+  - jstests/core/**/benchrun_pipeline_updates.js
+  - jstests/core/**/bypass_doc_validation.js
+  - jstests/core/**/collation.js
+  - jstests/core/**/command_json_schema_field.js
+  - jstests/core/**/command_let_variables.js
+  - jstests/core/**/commands_namespace_parsing.js
+  - jstests/core/**/crud_ops_do_not_throw_locktimeout.js
+  - jstests/core/**/disallow_system_views_user_writes.js
+  - jstests/core/**/doc_validation.js
+  - jstests/core/**/explain_includes_command.js
+  - jstests/core/**/explain_multi_plan.js
+  - jstests/core/**/explain_shell_helpers.js
+  - jstests/core/**/explain_uuid.js
+  - jstests/core/**/expr.js
+  - jstests/core/**/field_name_validation.js
+  - jstests/core/**/index_partial_read_ops.js
+  - jstests/core/**/index_stats.js
   - jstests/core/json_schema/misc_validation.js
-  - jstests/core/noop_writes.js
-  - jstests/core/operation_latency_histogram.js
-  - jstests/core/profile_findandmodify.js
-  - jstests/core/profile_mapreduce.js
-  - jstests/core/sortl.js
-  - jstests/core/system_profile.js
-  - jstests/core/top.js
-  - jstests/core/update_arrayFilters.js
-  - jstests/core/update_pipeline_shell_helpers.js
-  - jstests/core/verify_update_mods.js
+  - jstests/core/**/noop_writes.js
+  - jstests/core/**/operation_latency_histogram.js
+  - jstests/core/**/profile_findandmodify.js
+  - jstests/core/**/profile_mapreduce.js
+  - jstests/core/**/sortl.js
+  - jstests/core/**/system_profile.js
+  - jstests/core/**/top.js
+  - jstests/core/**/update_arrayFilters.js
+  - jstests/core/**/update_pipeline_shell_helpers.js
+  - jstests/core/**/verify_update_mods.js
   - jstests/core/views/invalid_system_views.js
   - jstests/core/views/views_all_commands.js
   exclude_with_any_tags:

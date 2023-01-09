@@ -9,7 +9,7 @@ selector:
   # Duplicate namespace may cause cloner to try and clone view instead of collection
   - jstests/core/views/duplicate_ns.js
   # Change stream pre-images are not cloned during initial sync.
-  - jstests/core/write_change_stream_pit_preimage.js
+  - jstests/core/**/write_change_stream_pit_preimage.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod

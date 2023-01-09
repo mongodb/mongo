@@ -20,7 +20,7 @@
 #
 last-continuous:
   all:
-  - test_file: jstests/core/check_shard_index.js
+  - test_file: jstests/core/administrative/check_shard_index.js
     ticket: SERVER-50792
   - test_file: jstests/sharding/refine_collection_shard_key_basic.js
     ticket: SERVER-50792
@@ -172,17 +172,17 @@ last-continuous:
     ticket: SERVER-63129
   - test_file: jstests/replsets/buildindexes_false_commit_quorum.js
     ticket: SERVER-63531
-  - test_file: jstests/core/in_with_mixed_values.js
+  - test_file: jstests/core/query/in/in_with_mixed_values.js
     ticket: SERVER-64141
   - test_file: jstests/sharding/refine_collection_shard_key_basic.js
     ticket: SERVER-64142
-  - test_file: jstests/core/plan_cache_sbe.js
+  - test_file: jstests/core/query/plan_cache/plan_cache_sbe.js
     ticket: SERVER-64315
   - test_file: jstests/core/sbe/plan_cache_sbe_with_or_queries.js
     ticket: SERVER-64315
   - test_file: jstests/core/sbe_plan_cache_autoparameterize_collscan.js
     ticket: SERVER-64315
-  - test_file: jstests/core/wildcard_index_cached_plans.js
+  - test_file: jstests/core/index/wildcard/wildcard_index_cached_plans.js
     ticket: SERVER-64315
   - test_file: jstests/sharding/resharding_metrics_increment.js
     ticket: SERVER-64395
@@ -216,27 +216,27 @@ last-continuous:
     ticket: SERVER-66078
   - test_file: jstests/replsets/initial_sync_with_partial_transaction.js
     ticket: SERVER-66089
-  - test_file: jstests/core/or_to_in.js
+  - test_file: jstests/core/query/or/or_to_in.js
     ticket: SERVER-66379
-  - test_file: jstests/core/where_multiple_plans.js
+  - test_file: jstests/core/query/where/where_multiple_plans.js
     ticket: SERVER-66389
   - test_file: jstests/sharding/resharding_metrics.js
     ticket: SERVER-66422
   - test_file: jstests/concurrency/fsm_workloads/find_flip_sbe_enabled.js
     ticket: SERVER-66445
-  - test_file: jstests/core/index_stats.js
+  - test_file: jstests/core/index/index_stats.js
     ticket: SERVER-66445
-  - test_file: jstests/core/wildcard_index_cached_plans.js
+  - test_file: jstests/core/index/wildcard/wildcard_index_cached_plans.js
     ticket: SERVER-66445
-  - test_file: jstests/core/index_filter_commands_invalidate_plan_cache_entries.js
+  - test_file: jstests/core/index/index_filter_commands_invalidate_plan_cache_entries.js
     ticket: SERVER-66445
-  - test_file: jstests/core/idhack.js
+  - test_file: jstests/core/query/idhack.js
     ticket: SERVER-66445
   - test_file: jstests/core/sbe/sbe_explain_rejected_plans.js
     ticket: SERVER-66445
-  - test_file: jstests/core/plan_cache_list_shapes.js
+  - test_file: jstests/core/query/plan_cache/plan_cache_list_shapes.js
     ticket: SERVER-66445
-  - test_file: jstests/core/plan_cache_list_plans.js
+  - test_file: jstests/core/query/plan_cache/plan_cache_list_plans.js
     ticket: SERVER-66445
   - test_file: jstests/replsets/dbhash_lock_acquisition.js
     ticket: SERVER-66719
@@ -292,20 +292,20 @@ last-continuous:
     ticket: SERVER-71689
   - test_file: jstests/sharding/hidden_index.js
     ticket: SERVER-71638
-  - test_file: jstests/core/project_with_collation.js
+  - test_file: jstests/core/query/project/project_with_collation.js
     ticket: SERVER-72416
   - test_file: jstests/core/collation.js
     ticket: SERVER-72416
-  - test_file: jstests/core/or_to_in.js
+  - test_file: jstests/core/query/or/or_to_in.js
     ticket: SERVER-72416
   - test_file: src/mongo/db/modules/enterprise/jstests/fcbis/oplog_rollover.js
     ticket: SERVER-72422
   suites: null
 last-lts:
   all:
-  - test_file: jstests/core/null_query_semantics.js
+  - test_file: jstests/core/query/null_query_semantics.js
     ticket: SERVER-21929
-  - test_file: jstests/core/or_to_in.js
+  - test_file: jstests/core/query/or/or_to_in.js
     ticket: SERVER-21929
   - test_file: jstests/aggregation/sources/lookup/lookup_null_semantics.js
     ticket: SERVER-21929
@@ -315,7 +315,7 @@ last-lts:
     ticket: SERVER-37904
   - test_file: jstests/sharding/scaled_collection_stats.js
     ticket: SERVER-43902
-  - test_file: jstests/core/apply_ops_system_dot_views.js
+  - test_file: jstests/core/administrative/apply_ops/apply_ops_system_dot_views.js
     ticket: SERVER-47469
   - test_file: jstests/concurrency/fsm_workloads/view_catalog_direct_system_writes.js
     ticket: SERVER-47469
@@ -347,7 +347,7 @@ last-lts:
     ticket: SERVER-50640
   - test_file: jstests/sharding/safe_secondary_reads_single_migration_waitForDelete.js
     ticket: SERVER-50640
-  - test_file: jstests/core/check_shard_index.js
+  - test_file: jstests/core/administrative/check_shard_index.js
     ticket: SERVER-50792
   - test_file: jstests/sharding/refine_collection_shard_key_basic.js
     ticket: SERVER-50792
@@ -555,13 +555,13 @@ last-lts:
     ticket: SERVER-63531
   - test_file: jstests/sharding/refine_collection_shard_key_basic.js
     ticket: SERVER-64142
-  - test_file: jstests/core/plan_cache_sbe.js
+  - test_file: jstests/core/query/plan_cache/plan_cache_sbe.js
     ticket: SERVER-64315
   - test_file: jstests/core/sbe/plan_cache_sbe_with_or_queries.js
     ticket: SERVER-64315
   - test_file: jstests/core/sbe_plan_cache_autoparameterize_collscan.js
     ticket: SERVER-64315
-  - test_file: jstests/core/wildcard_index_cached_plans.js
+  - test_file: jstests/core/index/wildcard/wildcard_index_cached_plans.js
     ticket: SERVER-64315
   - test_file: jstests/sharding/resharding_metrics_increment.js
     ticket: SERVER-64395
@@ -593,27 +593,27 @@ last-lts:
     ticket: SERVER-66078
   - test_file: jstests/replsets/initial_sync_with_partial_transaction.js
     ticket: SERVER-66089
-  - test_file: jstests/core/or_to_in.js
+  - test_file: jstests/core/query/or/or_to_in.js
     ticket: SERVER-66379
-  - test_file: jstests/core/where_multiple_plans.js
+  - test_file: jstests/core/query/where/where_multiple_plans.js
     ticket: SERVER-66389
   - test_file: jstests/sharding/resharding_metrics.js
     ticket: SERVER-66422
   - test_file: jstests/concurrency/fsm_workloads/find_flip_sbe_enabled.js
     ticket: SERVER-66445
-  - test_file: jstests/core/index_stats.js
+  - test_file: jstests/core/index/index_stats.js
     ticket: SERVER-66445
-  - test_file: jstests/core/wildcard_index_cached_plans.js
+  - test_file: jstests/core/index/wildcard/wildcard_index_cached_plans.js
     ticket: SERVER-66445
-  - test_file: jstests/core/index_filter_commands_invalidate_plan_cache_entries.js
+  - test_file: jstests/core/index/index_filter_commands_invalidate_plan_cache_entries.js
     ticket: SERVER-66445
-  - test_file: jstests/core/idhack.js
+  - test_file: jstests/core/query/idhack.js
     ticket: SERVER-66445
   - test_file: jstests/core/sbe/sbe_explain_rejected_plans.js
     ticket: SERVER-66445
-  - test_file: jstests/core/plan_cache_list_shapes.js
+  - test_file: jstests/core/query/plan_cache/plan_cache_list_shapes.js
     ticket: SERVER-66445
-  - test_file: jstests/core/plan_cache_list_plans.js
+  - test_file: jstests/core/query/plan_cache/plan_cache_list_plans.js
     ticket: SERVER-66445
   - test_file: jstests/replsets/dbhash_lock_acquisition.js
     ticket: SERVER-66719
@@ -667,11 +667,11 @@ last-lts:
     ticket: SERVER-71689
   - test_file: jstests/sharding/hidden_index.js
     ticket: SERVER-71638
-  - test_file: jstests/core/project_with_collation.js
+  - test_file: jstests/core/query/project/project_with_collation.js
     ticket: SERVER-72416
   - test_file: jstests/core/collation.js
     ticket: SERVER-72416
-  - test_file: jstests/core/or_to_in.js
+  - test_file: jstests/core/query/or/or_to_in.js
     ticket: SERVER-72416
   - test_file: src/mongo/db/modules/enterprise/jstests/fcbis/oplog_rollover.js
     ticket: SERVER-72422

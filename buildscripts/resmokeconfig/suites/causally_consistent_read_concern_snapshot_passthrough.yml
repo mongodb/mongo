@@ -10,8 +10,8 @@ selector:
   # non-transaction snapshot reads.
   - jstests/core/txns/**/*.js
   # These tests use benchRun(), which isn't configured to use the overridden writeConcern.
-  - jstests/core/bench_test*.js
-  - jstests/core/benchrun_pipeline_updates.js # benchRun() used for writes
+  - jstests/core/**/bench_test*.js
+  - jstests/core/**/benchrun_pipeline_updates.js # benchRun() used for writes
   exclude_with_any_tags:
   - assumes_standalone_mongod
   # The next two tags correspond to the special errors thrown by the

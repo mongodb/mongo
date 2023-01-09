@@ -16,17 +16,17 @@ selector:
   # The set_param1.js test attempts to compare the response from running the {getParameter: "*"}
   # command multiple times, which may observe the change to the "transactionLifetimeLimitSeconds"
   # server parameter.
-  - jstests/core/set_param1.js
+  - jstests/core/**/set_param1.js
 
   # These test run commands using legacy queries, which are not supported on sessions.
-  - jstests/core/comment_field.js
-  - jstests/core/exhaust.js
+  - jstests/core/**/comment_field.js
+  - jstests/core/**/exhaust.js
 
   # Unacknowledged writes prohibited in an explicit session.
-  - jstests/core/batch_write_command_w0.js
-  - jstests/core/crud_api.js
+  - jstests/core/**/batch_write_command_w0.js
+  - jstests/core/**/crud_api.js
 
-  - jstests/core/connection_string_validation.js # Does not expect a replica set connection string.
+  - jstests/core/**/connection_string_validation.js # Does not expect a replica set connection string.
 
   # TODO: SERVER-71487 Legacy shell does not carry over encryption information through
   # getMores in reconfig suites.

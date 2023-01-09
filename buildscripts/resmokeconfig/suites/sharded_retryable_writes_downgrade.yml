@@ -11,65 +11,65 @@ selector:
   - jstests/core/txns/**/*.js
 
   # No-op retries are not ignored by top, the profiler, or opcount.
-  - jstests/core/operation_latency_histogram.js
-  - jstests/core/profile2.js
-  - jstests/core/profile3.js
-  - jstests/core/profile_findandmodify.js
-  - jstests/core/top.js
+  - jstests/core/**/operation_latency_histogram.js
+  - jstests/core/**/profile2.js
+  - jstests/core/**/profile3.js
+  - jstests/core/**/profile_findandmodify.js
+  - jstests/core/**/top.js
   - jstests/core/views/views_stats.js
 
   # TODO SERVER-31242: findAndModify no-op retry should respect the fields option.
-  - jstests/core/crud_api.js
-  - jstests/core/find_and_modify.js
-  - jstests/core/find_and_modify2.js
-  - jstests/core/find_and_modify_server6865.js
-  - jstests/core/project_with_collation.js
+  - jstests/core/**/crud_api.js
+  - jstests/core/**/find_and_modify.js
+  - jstests/core/**/find_and_modify2.js
+  - jstests/core/**/find_and_modify_server6865.js
+  - jstests/core/**/project_with_collation.js
 
   # Stepdown commands during fsync lock will fail.
-  - jstests/core/currentop.js
-  - jstests/core/fsync.js
-  - jstests/core/killop_drop_collection.js
+  - jstests/core/**/currentop.js
+  - jstests/core/**/fsync.js
+  - jstests/core/**/killop_drop_collection.js
 
   # Expect drops/creates to fail or have a certain response:
-  - jstests/core/explain_upsert.js
-  - jstests/core/indexes_multiple_commands.js
+  - jstests/core/**/explain_upsert.js
+  - jstests/core/**/indexes_multiple_commands.js
 
   # Expect certain responses, but retries of successfully completed commands may return
   # different values:
-  - jstests/core/create_indexes.js
-  - jstests/core/objid5.js
+  - jstests/core/**/create_indexes.js
+  - jstests/core/**/objid5.js
 
   # Expect results to return in a certain order, secondaries may apply ops out of order.
-  - jstests/core/coveredIndex1.js
-  - jstests/core/sortc.js
+  - jstests/core/**/coveredIndex1.js
+  - jstests/core/**/sortc.js
 
-  - jstests/core/bench_test*.js # benchRun() used for writes
-  - jstests/core/benchrun_pipeline_updates.js # benchRun() used for writes
-  - jstests/core/connection_string_validation.js # Does not expect a replica set connection string.
-  - jstests/core/explain_large_bounds.js # Stepdown can timeout waiting for global lock.
-  - jstests/core/list_collections_filter.js # Temporary collections are dropped on failover.
-  - jstests/core/startup_log.js # Checks pid, which is different on each server.
+  - jstests/core/**/bench_test*.js # benchRun() used for writes
+  - jstests/core/**/benchrun_pipeline_updates.js # benchRun() used for writes
+  - jstests/core/**/connection_string_validation.js # Does not expect a replica set connection string.
+  - jstests/core/**/explain_large_bounds.js # Stepdown can timeout waiting for global lock.
+  - jstests/core/**/list_collections_filter.js # Temporary collections are dropped on failover.
+  - jstests/core/**/startup_log.js # Checks pid, which is different on each server.
 
   # Creates new mongo connection but won't retry connecting.
-  - jstests/core/shell_connection_strings.js
+  - jstests/core/**/shell_connection_strings.js
 
   # Inserts enough data that recovery takes more than 8 seconds, so we never get a working primary.
-  - jstests/core/geo_s2ordering.js
+  - jstests/core/**/geo_s2ordering.js
 
   # The following tests fail because a certain command or functionality is not supported on
   # mongos. This command or functionality is placed in a comment next to the failing test.
-  - jstests/core/dbhash.js  # dbhash.
-  - jstests/core/dbhash2.js  # dbhash.
+  - jstests/core/**/dbhash.js  # dbhash.
+  - jstests/core/**/dbhash2.js  # dbhash.
 
   # The following tests fail because mongos behaves differently from mongod when testing certain
   # functionality. The differences are in a comment next to the failing test.
-  - jstests/core/explain_missing_database.js  # Behavior with no db different on mongos.
-  - jstests/core/geo_2d_explain.js  # executionSuccess in different spot in explain().
-  - jstests/core/geo_s2explain.js  # inputStage in different spot in explain().
-  - jstests/core/geo_s2sparse.js  # keysPerIndex in different spot in validate().
+  - jstests/core/**/explain_missing_database.js  # Behavior with no db different on mongos.
+  - jstests/core/**/geo_2d_explain.js  # executionSuccess in different spot in explain().
+  - jstests/core/**/geo_s2explain.js  # inputStage in different spot in explain().
+  - jstests/core/**/geo_s2sparse.js  # keysPerIndex in different spot in validate().
 
   # This file is testing resmoke's multiversion framework, not Server behavior
-  - jstests/core/mixed_version_replica_set.js
+  - jstests/core/**/mixed_version_replica_set.js
 
   # TODO SERVER-61050
   - jstests/core/timeseries/timeseries_merge.js

@@ -14,9 +14,9 @@ selector:
   # The set_param1.js test attempts to compare the response from running the {getParameter: "*"}
   # command multiple times, which may observe the change to the "transactionLifetimeLimitSeconds"
   # server parameter.
-  - jstests/core/set_param1.js
+  - jstests/core/**/set_param1.js
   # Different explain format
-  - jstests/core/or_to_in.js
+  - jstests/core/**/or_to_in.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod

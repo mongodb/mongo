@@ -8,12 +8,12 @@ selector:
   - jstests/core/txns/**/*.js
 
   # These test run commands using legacy queries, which are not supported on sessions.
-  - jstests/core/comment_field.js
-  - jstests/core/exhaust.js
+  - jstests/core/**/comment_field.js
+  - jstests/core/**/exhaust.js
 
   # Unacknowledged writes prohibited in an explicit session.
-  - jstests/core/crud_api.js
-  - jstests/core/batch_write_command_w0.js
+  - jstests/core/**/crud_api.js
+  - jstests/core/**/batch_write_command_w0.js
 
 executor:
   archive:

@@ -9,46 +9,46 @@ selector:
   - jstests/core/txns/**/*.js
 
   # No-op retries are not ignored by top, the profiler, or opcount.
-  - jstests/core/operation_latency_histogram.js
-  - jstests/core/profile2.js
-  - jstests/core/profile3.js
-  - jstests/core/profile_findandmodify.js
-  - jstests/core/top.js
+  - jstests/core/**/operation_latency_histogram.js
+  - jstests/core/**/profile2.js
+  - jstests/core/**/profile3.js
+  - jstests/core/**/profile_findandmodify.js
+  - jstests/core/**/top.js
   - jstests/core/views/views_stats.js
 
   # TODO SERVER-31242: findAndModify no-op retry should respect the fields option.
-  - jstests/core/crud_api.js
-  - jstests/core/find_and_modify.js
-  - jstests/core/find_and_modify2.js
-  - jstests/core/find_and_modify_server6865.js
+  - jstests/core/**/crud_api.js
+  - jstests/core/**/find_and_modify.js
+  - jstests/core/**/find_and_modify2.js
+  - jstests/core/**/find_and_modify_server6865.js
 
   # Stepdown commands during fsync lock will fail.
-  - jstests/core/currentop.js
-  - jstests/core/fsync.js
-  - jstests/core/killop_drop_collection.js
+  - jstests/core/**/currentop.js
+  - jstests/core/**/fsync.js
+  - jstests/core/**/killop_drop_collection.js
 
   # Expect drops/creates to fail or have a certain response:
-  - jstests/core/explain_upsert.js
-  - jstests/core/indexes_multiple_commands.js
+  - jstests/core/**/explain_upsert.js
+  - jstests/core/**/indexes_multiple_commands.js
 
   # Expect certain responses, but retries of successfully completed commands may return
   # different values:
-  - jstests/core/create_indexes.js
-  - jstests/core/objid5.js
+  - jstests/core/**/create_indexes.js
+  - jstests/core/**/objid5.js
 
   # Expect results to return in a certain order, secondaries may apply ops out of order.
-  - jstests/core/coveredIndex1.js
-  - jstests/core/sortc.js
+  - jstests/core/**/coveredIndex1.js
+  - jstests/core/**/sortc.js
 
-  - jstests/core/bench_test*.js # benchRun() used for writes
-  - jstests/core/benchrun_pipeline_updates.js # benchRun() used for writes
-  - jstests/core/connection_string_validation.js # Does not expect a replica set connection string.
-  - jstests/core/explain_large_bounds.js # Stepdown can timeout waiting for global lock.
-  - jstests/core/list_collections_filter.js # Temporary collections are dropped on failover.
-  - jstests/core/startup_log.js # Checks pid, which is different on each server.
+  - jstests/core/**/bench_test*.js # benchRun() used for writes
+  - jstests/core/**/benchrun_pipeline_updates.js # benchRun() used for writes
+  - jstests/core/**/connection_string_validation.js # Does not expect a replica set connection string.
+  - jstests/core/**/explain_large_bounds.js # Stepdown can timeout waiting for global lock.
+  - jstests/core/**/list_collections_filter.js # Temporary collections are dropped on failover.
+  - jstests/core/**/startup_log.js # Checks pid, which is different on each server.
 
   # Creates new mongo connection but won't retry connecting.
-  - jstests/core/shell_connection_strings.js
+  - jstests/core/**/shell_connection_strings.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod

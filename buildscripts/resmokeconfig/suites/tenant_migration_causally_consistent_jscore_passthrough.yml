@@ -16,19 +16,19 @@ selector:
   # Skip any tests that run with auth explicitly.
   - jstests/core/*[aA]uth*.js
   # This test uses `benchRun` which spawns connections which do not inherit the causal session.
-  - jstests/core/benchrun_pipeline_updates.js
+  - jstests/core/**/benchrun_pipeline_updates.js
 
   #
   # Denylists from session_jscore_passthrough.yml
   #
 
   # These test run commands using legacy queries, which are not supported on sessions.
-  - jstests/core/comment_field.js
-  - jstests/core/exhaust.js
+  - jstests/core/**/comment_field.js
+  - jstests/core/**/exhaust.js
 
   # Unacknowledged writes prohibited in an explicit session.
-  - jstests/core/crud_api.js
-  - jstests/core/batch_write_command_w0.js
+  - jstests/core/**/crud_api.js
+  - jstests/core/**/batch_write_command_w0.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod

@@ -8,33 +8,33 @@ selector:
   exclude_files:
   # Tests that query the system.profile collection cannot run in this suite since an initial sync
   # may insert unexpected operations into the profile collection.
-  - jstests/core/profile_list_collections.js
-  - jstests/core/profile_list_indexes.js
-  - jstests/core/recursion.js
-  - jstests/core/system_profile.js
+  - jstests/core/**/profile_list_collections.js
+  - jstests/core/**/profile_list_indexes.js
+  - jstests/core/**/recursion.js
+  - jstests/core/**/system_profile.js
   # operation_latency_histogram.js and geo_s2cursorlimitskip.js do not expect concurrent reads
   # against their test collections.
-  - jstests/core/operation_latency_histogram.js
-  - jstests/core/geo_s2cursorlimitskip.js
+  - jstests/core/**/operation_latency_histogram.js
+  - jstests/core/**/geo_s2cursorlimitskip.js
   # These tests run getLatestProfilerEntry(). The downstream syncing node affects the profiler.
-  - jstests/core/profile_agg.js
-  - jstests/core/profile_count.js
-  - jstests/core/profile_delete.js
-  - jstests/core/profile_distinct.js
-  - jstests/core/profile_find.js
-  - jstests/core/profile_findandmodify.js
-  - jstests/core/profile_getmore.js
-  - jstests/core/profile_insert.js
-  - jstests/core/profile_mapreduce.js
-  - jstests/core/profile_sampling.js
-  - jstests/core/profile_update.js
+  - jstests/core/**/profile_agg.js
+  - jstests/core/**/profile_count.js
+  - jstests/core/**/profile_delete.js
+  - jstests/core/**/profile_distinct.js
+  - jstests/core/**/profile_find.js
+  - jstests/core/**/profile_findandmodify.js
+  - jstests/core/**/profile_getmore.js
+  - jstests/core/**/profile_insert.js
+  - jstests/core/**/profile_mapreduce.js
+  - jstests/core/**/profile_sampling.js
+  - jstests/core/**/profile_update.js
   - jstests/core/txns/transactions_profiling.js
   # The downstream syncing node affects the top output.
-  - jstests/core/top.js
+  - jstests/core/**/top.js
   # The following tests use fsyncLock which will fail if FCBIS has a backup cursor open.
-  - jstests/core/currentop.js
-  - jstests/core/fsync.js
-  - jstests/core/killop_drop_collection.js
+  - jstests/core/**/currentop.js
+  - jstests/core/**/fsync.js
+  - jstests/core/**/killop_drop_collection.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod

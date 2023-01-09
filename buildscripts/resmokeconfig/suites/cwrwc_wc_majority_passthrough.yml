@@ -11,7 +11,7 @@ selector:
   - jstests/core/txns/**/*.js
   # The shellkillop.js test spawns a parallel shell without using startParallelShell() and therefore
   # doesn't inherit the w="majority" write concern when performing its writes.
-  - jstests/core/shellkillop.js
+  - jstests/core/**/shellkillop.js
   exclude_with_any_tags:
   ##
   # The next three tags correspond to the special errors thrown by the

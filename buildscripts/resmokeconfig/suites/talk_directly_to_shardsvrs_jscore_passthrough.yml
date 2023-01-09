@@ -10,7 +10,7 @@ selector:
   # case. That is not always true when the test driver use a replica set connection string. As this
   # test sets fail point with error code NotWritablePrimary, the test driver changes its topology to
   # ReplicaSetNoPrimary and create a new connection once it get the primary again.
-  - jstests/core/failcommand_failpoint.js
+  - jstests/core/**/failcommand_failpoint.js
   # TODO: SERVER-71487 Legacy shell does not carry over encryption information through
   # getMores in reconfig suites.
   - src/mongo/db/modules/*/jstests/fle2/query/*getMore*.js

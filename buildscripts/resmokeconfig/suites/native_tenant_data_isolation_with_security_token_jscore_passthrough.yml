@@ -20,53 +20,53 @@ selector:
   - requires_scripting
   exclude_files:
   # server-side javascript is not supported in serverless mode.
-  - jstests/core/system_js_drop.js
-  - jstests/core/system_js_access.js
-  - jstests/core/where_system_js.js
+  - jstests/core/**/system_js_drop.js
+  - jstests/core/**/system_js_access.js
+  - jstests/core/**/where_system_js.js
   # setLogLevel calls setParameter command which is not allowed with security token.
-  - jstests/core/list_all_local_sessions.js
-  - jstests/core/list_all_sessions.js
+  - jstests/core/**/list_all_local_sessions.js
+  - jstests/core/**/list_all_sessions.js
   - jstests/core/txns/timestamped_reads_wait_for_prepare_oplog_visibility.js
   # cursor.close() calls killCursors command which is not allowed with security token.
-  - jstests/core/list_collections1.js
-  - jstests/core/list_indexes.js
+  - jstests/core/**/list_collections1.js
+  - jstests/core/**/list_indexes.js
   # collection.getPlanCache().* calls planCache* commands which are not allowed with security token.
-  - jstests/core/cached_plan_trial_does_not_discard_work.js
-  - jstests/core/collation_plan_cache.js
-  - jstests/core/explode_for_sort_plan_cache.js
-  - jstests/core/index_filter_commands.js
-  - jstests/core/index_filter_commands_invalidate_plan_cache_entries.js
-  - jstests/core/introspect_hidden_index_plan_cache_entries.js
-  - jstests/core/neq_null_correctly_cache.js
-  - jstests/core/operation_latency_histogram.js
-  - jstests/core/plan_cache_list_plans.js
-  - jstests/core/plan_cache_sbe.js
-  - jstests/core/plan_cache_shell_helpers.js
-  - jstests/core/plan_cache_stats_shard_and_host.js
-  - jstests/core/profile_query_hash.js
+  - jstests/core/**/cached_plan_trial_does_not_discard_work.js
+  - jstests/core/**/collation_plan_cache.js
+  - jstests/core/**/explode_for_sort_plan_cache.js
+  - jstests/core/**/index_filter_commands.js
+  - jstests/core/**/index_filter_commands_invalidate_plan_cache_entries.js
+  - jstests/core/**/introspect_hidden_index_plan_cache_entries.js
+  - jstests/core/**/neq_null_correctly_cache.js
+  - jstests/core/**/operation_latency_histogram.js
+  - jstests/core/**/plan_cache_list_plans.js
+  - jstests/core/**/plan_cache_sbe.js
+  - jstests/core/**/plan_cache_shell_helpers.js
+  - jstests/core/**/plan_cache_stats_shard_and_host.js
+  - jstests/core/**/profile_query_hash.js
   - jstests/core/sbe/from_plan_cache_flag.js
   - jstests/core/sbe/plan_cache_sbe_with_or_queries.js
   - jstests/core/sbe_plan_cache_autoparameterize_collscan.js
   - jstests/core/timeseries/bucket_unpacking_with_sort_plan_cache.js
-  - jstests/core/wildcard_index_cached_plans.js
+  - jstests/core/**/wildcard_index_cached_plans.js
   # FixtureHelpers.getPrimaries() calls connectionStatus command which is not allowed with security token.
   - jstests/core/txns/transaction_too_large_for_cache.js
   # defaultPrompt() calls buildInfo command which is not allowed with security token.
   - jstests/core/txns/shell_prompt_in_transaction.js
   # Cannot test the user is not allowed to create indexes in config.transactions as the
   # inject_security_token.js runs command on tenant's config.transactions.
-  - jstests/core/create_indexes.js
+  - jstests/core/**/create_indexes.js
   # checkLog calls getLog command which is not allowed  with security token.
-  - jstests/core/doc_validation_options.js
+  - jstests/core/**/doc_validation_options.js
   # exhaust does not use runCommand (required by the inject_security_token.js override).
-  - jstests/core/exhaust.js
+  - jstests/core/**/exhaust.js
   # This test does not use same connection on same database (required by the inject_security_token.js override).
   - jstests/core/txns/write_conflicts_with_non_txns.js
   # In a multitenancy environment the catalog will always return tenant-prefixed entries, and the
   # override we use in this suite checks for the absence of a prefix breaking the list_catalog tests.
-  - jstests/core/list_catalog.js
+  - jstests/core/**/list_catalog.js
   # This test uses '_hashBSONElement' command that cannot be run with security token.
-  - jstests/core/index_key_expression.js
+  - jstests/core/**/index_key_expression.js
 
 executor:
   archive:

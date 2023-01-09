@@ -8,25 +8,25 @@ selector:
   - jstests/core/txns/**/*.js
 
   # Parallel shell is not causally consistent
-  - jstests/core/benchrun_pipeline_updates.js
-  - jstests/core/crud_ops_do_not_throw_locktimeout.js
-  - jstests/core/cursora.js
-  - jstests/core/find_and_modify_concurrent_update.js
-  - jstests/core/shellstartparallel.js
-  - jstests/core/loadserverscripts.js
-  - jstests/core/fsync.js
+  - jstests/core/**/benchrun_pipeline_updates.js
+  - jstests/core/**/crud_ops_do_not_throw_locktimeout.js
+  - jstests/core/**/cursora.js
+  - jstests/core/**/find_and_modify_concurrent_update.js
+  - jstests/core/**/shellstartparallel.js
+  - jstests/core/**/loadserverscripts.js
+  - jstests/core/**/fsync.js
   # benchRun cannot be overridden to be causally consistent
-  - jstests/core/bench_test*.js
-  - jstests/core/benchrun_pipeline_updates.js
+  - jstests/core/**/bench_test*.js
+  - jstests/core/**/benchrun_pipeline_updates.js
   # getMore is not causal consistent because afterClusterTime has been specified
   # by the preceding find command which establishes the cursor. Therefore,
   # getMore cannot be guaranteed to get executed after commands in between find
   # and getMore.
-  - jstests/core/drop3.js
-  - jstests/core/ord.js
-  - jstests/core/tailable_cursor_invalidation.js
-  - jstests/core/tailable_skip_limit.js
-  - jstests/core/collation.js
+  - jstests/core/**/drop3.js
+  - jstests/core/**/ord.js
+  - jstests/core/**/tailable_cursor_invalidation.js
+  - jstests/core/**/tailable_skip_limit.js
+  - jstests/core/**/collation.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod

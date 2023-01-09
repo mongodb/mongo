@@ -8,23 +8,23 @@ selector:
   # The following tests perform a write with a writeConcern of w=2 when 'testingReplication' is
   # true. This causes the test to hang because the secondary is running with the "rsSyncApplyStop"
   # failpoint enabled.
-  - jstests/core/geo_update_btree.js
+  - jstests/core/**/geo_update_btree.js
   # The following tests create large oplog entries, which can cause the secondary to fall off the
   # primary's oplog when run as a part of burn_in_tests.
-  - jstests/core/max_doc_size.js
-  - jstests/core/mr_bigobject.js
-  - jstests/core/capped_large_docs.js
-  - jstests/core/capped_resize.js
-  - jstests/core/exhaust.js
+  - jstests/core/**/max_doc_size.js
+  - jstests/core/**/mr_bigobject.js
+  - jstests/core/**/capped_large_docs.js
+  - jstests/core/**/capped_resize.js
+  - jstests/core/**/exhaust.js
   # The following tests also create large oplog entries due to the maximum blocking sort size being
   # 100 MB.
-  - jstests/core/explain_execution_error.js
-  - jstests/core/sortb.js
-  - jstests/core/sortg.js
-  - jstests/core/sortj.js
+  - jstests/core/**/explain_execution_error.js
+  - jstests/core/**/sortb.js
+  - jstests/core/**/sortg.js
+  - jstests/core/**/sortj.js
   # The following test tries to directly query secondaries, which fails if the secondary has been
   # killed.
-  - jstests/core/column_store_index_compression.js
+  - jstests/core/**/column_store_index_compression.js
   exclude_with_any_tags:
   - assumes_standalone_mongod
   # emptycapped is not supported with rollback using recover-to-timestamp.

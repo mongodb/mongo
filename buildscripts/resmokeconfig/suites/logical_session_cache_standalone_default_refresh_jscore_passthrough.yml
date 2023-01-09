@@ -8,16 +8,16 @@ selector:
   - jstests/core/txns/**/*.js
   # This test expects a fixed number of operations. The logical session cache will perform its own
   # operations, inflating the number of operations and causing the test to fail.
-  - jstests/core/opcounters_write_cmd.js
+  - jstests/core/**/opcounters_write_cmd.js
   # These tests expect the logical session cache refresh thread to be turned off, so that refreshes
   # can be triggered deterministically.
-  - jstests/core/list_all_local_sessions.js
-  - jstests/core/list_all_sessions.js
-  - jstests/core/list_sessions.js
+  - jstests/core/**/list_all_local_sessions.js
+  - jstests/core/**/list_all_sessions.js
+  - jstests/core/**/list_sessions.js
   # These tests verify that an expected number of update operations were tracked in the server
   # status metrics, but the logical session cache refresh causes additional updates to be recorded.
-  - jstests/core/find_and_modify_metrics.js
-  - jstests/core/update_metrics.js
+  - jstests/core/**/find_and_modify_metrics.js
+  - jstests/core/**/update_metrics.js
 
 executor:
   archive:

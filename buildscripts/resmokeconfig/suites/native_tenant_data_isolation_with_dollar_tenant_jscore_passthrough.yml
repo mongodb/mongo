@@ -31,23 +31,23 @@ selector:
   - featureFlagColumnstoreIndexes
   exclude_files:
   # The "exhaust" function does not use runCommand (required by the inject_security_token.js override).
-  - jstests/core/exhaust.js
+  - jstests/core/**/exhaust.js
   # These following tests use benchRun which does not use runCommand (required by the inject_dollar_tenant.js override).
-  - jstests/core/bench_test1.js
-  - jstests/core/bench_test2.js
-  - jstests/core/benchrun_cmd_param_error.js
-  - jstests/core/benchrun_pipeline_updates.js
+  - jstests/core/**/bench_test1.js
+  - jstests/core/**/bench_test2.js
+  - jstests/core/**/benchrun_cmd_param_error.js
+  - jstests/core/**/benchrun_pipeline_updates.js
   # These tests run "applyOps" command which does not depend on $tenant to pass in tenant information.
   # The tenantId is provided in the oplog entries provided to the applyOps command.
-  - jstests/core/apply_ops*.js
-  - jstests/core/bypass_doc_validation.js
-  - jstests/core/collation.js
-  - jstests/core/collmod_convert_to_unique_apply_ops.js
-  - jstests/core/collmod_without_uuid.js
-  - jstests/core/list_collections1.js
-  - jstests/core/list_collections_filter.js
-  - jstests/core/list_collections_no_views.js
-  - jstests/core/rename_collection_staytemp.js
+  - jstests/core/**/apply_ops*.js
+  - jstests/core/**/bypass_doc_validation.js
+  - jstests/core/**/collation.js
+  - jstests/core/**/collmod_convert_to_unique_apply_ops.js
+  - jstests/core/**/collmod_without_uuid.js
+  - jstests/core/**/list_collections1.js
+  - jstests/core/**/list_collections_filter.js
+  - jstests/core/**/list_collections_no_views.js
+  - jstests/core/**/rename_collection_staytemp.js
   - jstests/core/txns/commands_banning_txnnumber_outside_transactions.js
   - jstests/core/txns/commands_not_allowed_in_txn.js
   - jstests/core/txns/prepare_transaction_fails_on_temp_collections.js
@@ -57,29 +57,29 @@ selector:
   - jstests/core/views/views_all_commands.js
   - jstests/core/views/views_creation.js
   # This test expects a specific error message, which does not match the error message generated in authentication mode.
-  - jstests/core/commands_with_uuid.js
+  - jstests/core/**/commands_with_uuid.js
   # Sharding command "splictVector" is not tenant aware.
-  - jstests/core/splitvector.js
+  - jstests/core/**/splitvector.js
   # Sharding command "_shardsvrCreateGlobalIndex" is not tenant aware.
   - jstests/core/txns/global_index.js
   # Operations on config.system.sessions are not tenant aware, so cannot be tested with the injected dollar tenant.
-  - jstests/core/list_all_sessions.js
-  - jstests/core/list_sessions.js
-  - jstests/core/api_version_pipeline_stages.js
+  - jstests/core/**/list_all_sessions.js
+  - jstests/core/**/list_sessions.js
+  - jstests/core/**/api_version_pipeline_stages.js
   # Operations on config.transactions are not tenant aware, so cannot be tested with the injected dollar tenant.
   - jstests/core/txns/no_writes_to_config_transactions_with_prepared_transaction.js
   - jstests/core/txns/commit_prepared_transaction.js
-  - jstests/core/create_indexes.js
+  - jstests/core/**/create_indexes.js
   # In a multitenancy environment the catalog will always return tenant-prefixed entries, so the
   # list_catalog test will be broken as it checks for non-tenant-prefixed entries.
-  - jstests/core/list_catalog.js
+  - jstests/core/**/list_catalog.js
   # TODO SERVER-72285: currentOp requests with dollar tenant cannot get operations being executed by the tenant.
-  - jstests/core/crud_ops_do_not_throw_locktimeout.js
-  - jstests/core/currentop.js
-  - jstests/core/currentop_waiting_for_latch.js
-  - jstests/core/failcommand_failpoint.js
-  - jstests/core/fsync.js
-  - jstests/core/killop_drop_collection.js
+  - jstests/core/**/crud_ops_do_not_throw_locktimeout.js
+  - jstests/core/**/currentop.js
+  - jstests/core/**/currentop_waiting_for_latch.js
+  - jstests/core/**/failcommand_failpoint.js
+  - jstests/core/**/fsync.js
+  - jstests/core/**/killop_drop_collection.js
   - jstests/core/txns/kill_cursors_in_transaction.js
   - jstests/core/txns/kill_sessions_kills_transaction.js
   - jstests/core/txns/transactions_block_ddl.js
@@ -87,9 +87,9 @@ selector:
   - jstests/core/txns/new_transactions_on_session_with_prepared_txn_block_behind_prepare.js
   - jstests/core/txns/write_conflicts_with_non_txns.js
   # TODO SERVER-72291: rolesInfo commmand is failed when querying relative roles by the tenant.
-  - jstests/core/roles_info.js
+  - jstests/core/**/roles_info.js
   # TODO SERVER-72083: tenant information of bulkWrite command cannot be parsed correctly.
-  - jstests/core/bulk_write.js
+  - jstests/core/**/bulk_write.js
   # TODO SERVER-72357: cannot get the expected error due to an authorization contract issue.
   - jstests/core/txns/multi_statement_transaction_command_args.js
 

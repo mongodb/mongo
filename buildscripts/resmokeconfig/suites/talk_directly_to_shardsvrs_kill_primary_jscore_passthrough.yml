@@ -8,59 +8,59 @@ selector:
   # case. That is not always true when the test driver use a replica set connection string. As this
   # test sets fail point with error code NotWritablePrimary, the test driver changes its topology to
   # ReplicaSetNoPrimary and create a new connection once it get the primary again.
-  - jstests/core/failcommand_failpoint.js
+  - jstests/core/**/failcommand_failpoint.js
 
   # Transactions do not support retryability of individual operations.
   # TODO: Remove this once it is supported (SERVER-33952).
   - jstests/core/txns/**/*.js
 
   # No-op retries are not ignored by top.
-  - jstests/core/operation_latency_histogram.js
+  - jstests/core/**/operation_latency_histogram.js
 
   # Expect drops/creates to fail or have a certain response:
-  - jstests/core/explain_upsert.js
-  - jstests/core/indexes_multiple_commands.js
+  - jstests/core/**/explain_upsert.js
+  - jstests/core/**/indexes_multiple_commands.js
 
   # Expect certain responses, but retries of successfully completed commands may return
   # different values:
-  - jstests/core/create_indexes.js
-  - jstests/core/objid5.js
+  - jstests/core/**/create_indexes.js
+  - jstests/core/**/objid5.js
 
   # Expect results to return in a certain order, secondaries may apply ops out of order.
-  - jstests/core/coveredIndex1.js
-  - jstests/core/sortc.js
+  - jstests/core/**/coveredIndex1.js
+  - jstests/core/**/sortc.js
 
   # TODO SERVER-31242: findAndModify no-op retry should respect the fields option.
-  - jstests/core/find_and_modify.js
-  - jstests/core/find_and_modify2.js
-  - jstests/core/find_and_modify_server6865.js
+  - jstests/core/**/find_and_modify.js
+  - jstests/core/**/find_and_modify2.js
+  - jstests/core/**/find_and_modify_server6865.js
 
-  - jstests/core/bench_test*.js # benchRun() used for writes
-  - jstests/core/benchrun_pipeline_updates.js # benchRun() used for writes
-  - jstests/core/explain_large_bounds.js # Stepdown can timeout waiting for global lock.
+  - jstests/core/**/bench_test*.js # benchRun() used for writes
+  - jstests/core/**/benchrun_pipeline_updates.js # benchRun() used for writes
+  - jstests/core/**/explain_large_bounds.js # Stepdown can timeout waiting for global lock.
 
   # Creates new mongo connection but won't retry connecting.
-  - jstests/core/shell_connection_strings.js
+  - jstests/core/**/shell_connection_strings.js
 
   # The next two tests have no tag "requires_non_retryable_commands" but errors thrown by
   # the network_error_and_txn_override.js override when it refuses to run a certain command.
   # "Refusing to run a test that issues commands that are not blindly retryable"
-  - jstests/core/profile3.js
-  - jstests/core/list_collections_filter.js
+  - jstests/core/**/profile3.js
+  - jstests/core/**/list_collections_filter.js
   # The next two tests have no tag "requires_non_retryable_writes" but errors thrown by
   # the network_error_and_txn_override.js override when it refuses to run a certain command.
   # "Refusing to run a test that issues non-retryable write operations since the test likely makes
   # assertions on the write results and can lead to spurious failures if a network error occurs"
-  - jstests/core/crud_api.js
+  - jstests/core/**/crud_api.js
   - jstests/core/views/views_stats.js
   # The next one test has no tag "does_not_support_stepdowns" but errors thrown by
   # the network_error_and_txn_override.js override when it refuses to run a certain command.
   # "Refusing to run a test that issues commands that may return different values after a failover"
-  - jstests/core/fsync.js
+  - jstests/core/**/fsync.js
 
   # Expect failure to connect server with an empty connection string.
   # But, network_error_and_txn_override.js override keeps retrying forever.
-  - jstests/core/connection_string_validation.js
+  - jstests/core/**/connection_string_validation.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod
