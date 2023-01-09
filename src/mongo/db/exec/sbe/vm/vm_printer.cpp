@@ -26,8 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-
-#include <boost/format.hpp>
+#include <iomanip>
 
 #include "mongo/db/exec/sbe/values/value_printer.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
@@ -124,7 +123,11 @@ template <typename charT, typename traits>
 std::basic_ostream<charT, traits>& operator<<(
     std::basic_ostream<charT, traits>& os,
     const CodeFragmentFormatter<CodeFragmentPrinter::PrintFormat::Stable>::PcPointerFmt& a) {
-    return os << (boost::format("0x%04x") % (a.pcPointer - a.pcBegin));
+
+    auto flags = os.flags();
+    os << "0x" << std::hex << std::setw(4) << std::setfill('0') << (a.pcPointer - a.pcBegin);
+    os.flags(flags);
+    return os;
 }
 
 template <typename charT, typename traits>

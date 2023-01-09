@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 #include <algorithm>
-#include <boost/format.hpp>
 
 #include "mongo/db/exec/sbe/values/makeobj_spec.h"
 #include "mongo/db/exec/sbe/values/sort_spec.h"
@@ -334,7 +333,7 @@ template <typename T>
 void ValuePrinter<T>::writeNormalizedDouble(double value) {
     std::stringstream ss;
     ss.precision(std::numeric_limits<double>::max_digits10);
-    ss << (boost::format("%f") % value);
+    ss << value;
     stream << ss.str();
 }
 

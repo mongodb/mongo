@@ -26,7 +26,7 @@ Const [32]
 Const [3.14]
 
 -- OUTPUT:
-3.140000L 
+3.1400000000000001L 
 
 ==== VARIATION: decimal ====
 -- INPUT:
