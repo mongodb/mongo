@@ -272,9 +272,23 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
 void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
                                                const StringData& dbName,
                                                const DatabaseVersion& expectedDbVersion,
-                                               const ShardId& toShard) {
+                                               const ShardId& toShardId) {
     // Hold the shard lock until the entire commit finishes to serialize with removeShard.
     Lock::SharedLock shardLock(opCtx->lockState(), _kShardMembershipLock);
+
+    const auto toShardDoc = [&] {
+        DBDirectClient dbClient(opCtx);
+        return dbClient.findOne(NamespaceString::kConfigsvrShardsNamespace,
+                                BSON(ShardType::name << toShardId));
+    }();
+    uassert(ErrorCodes::ShardNotFound,
+            "Requested primary shard {} does not exist"_format(toShardId.toString()),
+            !toShardDoc.isEmpty());
+
+    const auto toShardEntry = uassertStatusOK(ShardType::fromBSON(toShardDoc));
+    uassert(ErrorCodes::ShardNotFound,
+            "Requested primary shard {} is draining"_format(toShardId.toString()),
+            !toShardEntry.getDraining());
 
     const auto updateOp = [&] {
         const auto query = [&] {
@@ -293,7 +307,7 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
             const auto newDbVersion = expectedDbVersion.makeUpdated();
 
             BSONObjBuilder bsonBuilder;
-            bsonBuilder.append(DatabaseType::kPrimaryFieldName, toShard);
+            bsonBuilder.append(DatabaseType::kPrimaryFieldName, toShardId);
             bsonBuilder.append(DatabaseType::kVersionFieldName, newDbVersion.toBSON());
             return BSON("$set" << bsonBuilder.obj());
         }();
