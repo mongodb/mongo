@@ -129,7 +129,10 @@ BSONObj WiredTigerOperationStats::toBSON() {
     for (auto const& stat : _stats) {
         // Find the user consumable name for this statistic.
         auto statIt = _statNameMap.find(stat.first);
-        invariant(statIt != _statNameMap.end());
+
+        // Ignore the session statistic that is not reported for the slow operations.
+        if (statIt == _statNameMap.end())
+            continue;
 
         auto statName = statIt->second.first;
         Section subs = statIt->second.second;
