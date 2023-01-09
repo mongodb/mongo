@@ -941,10 +941,6 @@ buildvariants:
       --excludeWithAnyTags=incompatible_with_windows_tls
       --excludeWithAnyTags=incompatible_with_shard_merge
     external_auth_jobs_max: 1
-    # Uncomment expansion and `burn_in_tasks_gen` task below and add resmoke task name to burn-in.
-    # WARNING! Task splitting is not supported for burn-in tasks. Large unsplitted `_gen` tasks may
-    # run too long and hit execution timeouts.
-    # burn_in_task_name: jsCore
   tasks:
   - name: cqf
   - name: cqf_disabled_pipeline_opt
@@ -953,7 +949,6 @@ buildvariants:
   - name: query_golden_classic
   - name: query_golden_cqf
   - name: burn_in_tests_gen
-  # - name: burn_in_tasks_gen
   - name: audit
   - name: auth_audit_gen
   - name: buildscripts_test
@@ -1537,10 +1532,6 @@ buildvariants:
     test_flags: >-
       --additionalFeatureFlagsFile all_feature_flags.txt
       --excludeWithAnyTags=incompatible_with_shard_merge
-    # Uncomment expansion and `burn_in_tasks_gen` task below and add resmoke task name to burn-in.
-    # WARNING! Task splitting is not supported for burn-in tasks. Large unsplitted `_gen` tasks may
-    # run too long and hit execution timeouts.
-    # burn_in_task_name: jsCore
   depends_on:
   - name: archive_dist_test
     variant: *linux_x86_dynamic_compile_variant_name
@@ -1562,8 +1553,6 @@ buildvariants:
   - name: lint_fuzzer_sanity_patch
   - name: test_api_version_compatibility
   - name: burn_in_tests_gen
-  - name: burn_in_tags_gen
-  # - name: burn_in_tasks_gen
   - name: check_feature_flag_tags
   - name: check_for_todos
   - name: .aggfuzzer
@@ -1571,6 +1560,7 @@ buildvariants:
   - name: aggregation_repeat_queries
   - name: audit
   - name: .auth
+  - name: burn_in_tags_gen
   - name: buildscripts_test
   - name: resmoke_end2end_tests
   - name: unittest_shell_hang_analyzer_gen
