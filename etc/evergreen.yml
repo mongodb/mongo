@@ -2985,8 +2985,7 @@ buildvariants:
     distros:
     - rhel80-build
 
-- <<: *linux_x86_dynamic_compile_variant_dependency
-  name: &enterprise-rhel80-fixed-service-executor-64-bit enterprise-rhel80-fixed-service-executor-64-bit
+- name: &enterprise-rhel80-fixed-service-executor-64-bit enterprise-rhel80-fixed-service-executor-64-bit
   display_name: "~ Enterprise RHEL 8.0 (with FixedServiceExecutor)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
@@ -3004,6 +3003,7 @@ buildvariants:
       --mongosSetParameters="{initialServiceExecutorUseDedicatedThread: false}"
       --mongodSetParameters="{initialServiceExecutorUseDedicatedThread: false}"
     large_distro_name: rhel80-build
+    compile_variant: *enterprise-rhel80-fixed-service-executor-64-bit
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
@@ -3026,8 +3026,7 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.csrs
 
-- <<: *linux_x86_dynamic_compile_variant_dependency
-  name: &enterprise-rhel80-sdam-replica-set-monitor-64-bit enterprise-rhel80-sdam-replica-set-monitor-64-bit
+- name: &enterprise-rhel80-sdam-replica-set-monitor-64-bit enterprise-rhel80-sdam-replica-set-monitor-64-bit
   display_name: "~ Enterprise RHEL 8.0 (with SdamReplicaSetMonitor)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
@@ -3046,6 +3045,7 @@ buildvariants:
       --mongodSetParameters="{replicaSetMonitorProtocol: sdam}"
       --excludeWithAnyTags=requires_streamable_rsm
     large_distro_name: rhel80-build
+    compile_variant: *enterprise-rhel80-sdam-replica-set-monitor-64-bit
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
@@ -3066,8 +3066,7 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.csrs
 
-- <<: *linux_x86_dynamic_compile_variant_dependency
-  name: &enterprise-rhel80-sharding-task-executor-pool-rsm-matchPrimary-64-bit enterprise-rhel80-sharding-task-executor-pool-rsm-matchPrimary-64-bit
+- name: &enterprise-rhel80-sharding-task-executor-pool-rsm-matchPrimary-64-bit enterprise-rhel80-sharding-task-executor-pool-rsm-matchPrimary-64-bit
   display_name: "~ Enterprise RHEL 8.0 (with {ShardingTaskExecutorPoolReplicaSetMatching: \"matchPrimaryNode\"})"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
@@ -3085,6 +3084,7 @@ buildvariants:
       --mongosSetParameters="ShardingTaskExecutorPoolReplicaSetMatching: \"matchPrimaryNode\""
       --excludeWithAnyTags=sets_replica_set_matching_strategy
     large_distro_name: rhel80-build
+    compile_variant: *enterprise-rhel80-sharding-task-executor-pool-rsm-matchPrimary-64-bit
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
@@ -3105,8 +3105,7 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.csrs
 
-- <<: *linux_x86_dynamic_compile_variant_dependency
-  name: &enterprise-rhel80-sharding-task-executor-pool-rsm-matchBusiest-64-bit enterprise-rhel80-sharding-task-executor-pool-rsm-matchBusiest-64-bit
+- name: &enterprise-rhel80-sharding-task-executor-pool-rsm-matchBusiest-64-bit enterprise-rhel80-sharding-task-executor-pool-rsm-matchBusiest-64-bit
   display_name: "~ Enterprise RHEL 8.0 (with {ShardingTaskExecutorPoolReplicaSetMatching: \"matchBusiestNode\"})"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
@@ -3129,6 +3128,7 @@ buildvariants:
       --mongosSetParameters="ShardingTaskExecutorPoolReplicaSetMatching: \"matchBusiestNode\""
       --excludeWithAnyTags=sets_replica_set_matching_strategy
     large_distro_name: rhel80-build
+    compile_variant: *enterprise-rhel80-sharding-task-executor-pool-rsm-matchBusiest-64-bit
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
@@ -3149,8 +3149,7 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.csrs
 
-- <<: *linux_x86_dynamic_compile_variant_dependency
-  name: &enterprise-rhel80-sharding-task-executor-pool-rsm-disabled-64-bit enterprise-rhel80-sharding-task-executor-pool-rsm-disabled-64-bit
+- name: &enterprise-rhel80-sharding-task-executor-pool-rsm-disabled-64-bit enterprise-rhel80-sharding-task-executor-pool-rsm-disabled-64-bit
   display_name: "~ Enterprise RHEL 8.0 (with {ShardingTaskExecutorPoolReplicaSetMatching: \"disabled\"})"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
@@ -3173,6 +3172,7 @@ buildvariants:
       --mongosSetParameters="ShardingTaskExecutorPoolReplicaSetMatching: \"disabled\""
       --excludeWithAnyTags=sets_replica_set_matching_strategy
     large_distro_name: rhel80-build
+    compile_variant: *enterprise-rhel80-sharding-task-executor-pool-rsm-disabled-64-bit
   tasks:
   - name: compile_test_and_package_parallel_core_stream_TG
     distros:
@@ -3193,8 +3193,7 @@ buildvariants:
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: .sharding .common !.csrs
 
-- <<: *linux_x86_dynamic_compile_variant_dependency
-  name: &enterprise-rhel80-join-ingress-sessions-on-shutdown enterprise-rhel80-join-ingress-sessions-on-shutdown
+- name: &enterprise-rhel80-join-ingress-sessions-on-shutdown enterprise-rhel80-join-ingress-sessions-on-shutdown
   display_name: "~ Enterprise RHEL 8.0 (with {joinIngressSessionsOnShutdown: \"true\"})"
   activate: false
   run_on:
@@ -3215,6 +3214,7 @@ buildvariants:
         --mongosSetParameters="joinIngressSessionsOnShutdown: \"true\""
         --mongodSetParameters="joinIngressSessionsOnShutdown: \"true\""
     large_distro_name: rhel80-build
+    compile_variant: *enterprise-rhel80-join-ingress-sessions-on-shutdown
   tasks:
   - name: compile_test_and_package_serial_TG
     distros:
