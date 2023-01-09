@@ -72,6 +72,12 @@ protected:
         orphanCleanupDelaySecs.store(1);
     }
 
+    void tearDown() override {
+        // Restore original `orphanCleanupDelaySecs` value for next unit tests
+        orphanCleanupDelaySecs.store(_defaultOrphanCleanupDelaySecs);
+        ShardServerTestFixture::tearDown();
+    }
+
     /**
      * Returns an instance of CollectionMetadata which has no chunks owned by 'thisShard'.
      */
@@ -184,6 +190,9 @@ protected:
     }
 
     std::shared_ptr<MetadataManager> _manager;
+
+private:
+    const int _defaultOrphanCleanupDelaySecs = orphanCleanupDelaySecs.load();
 };
 
 // The 'pending' field must not be set in order for a range deletion task to succeed, but the
