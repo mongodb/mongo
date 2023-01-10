@@ -13,15 +13,14 @@
  * ]
  */
 
-import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {
-    getServerlessOperationLock,
-    ServerlessLockType
-} from "jstests/replsets/libs/tenant_migration_util.js";
+(function() {
+"use strict";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
 load("jstests/libs/write_concern_util.js");
+load("jstests/replsets/libs/tenant_migration_test.js");
+const {ServerlessLockType, getServerlessOperationLock} = TenantMigrationUtil;
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
@@ -111,3 +110,4 @@ if (recipientDoc && !recipientDoc.expireAt) {
 restartServerReplication(initialSyncNode);
 
 tenantMigrationTest.stop();
+})();

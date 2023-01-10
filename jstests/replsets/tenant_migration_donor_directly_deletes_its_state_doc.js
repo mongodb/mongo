@@ -14,9 +14,12 @@
  * ]
  */
 
-import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+(function() {
+"use strict";
+
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
+load("jstests/replsets/libs/tenant_migration_test.js");
 
 (() => {
     jsTest.log("Test case where the TTL monitor deletes the state doc first");
@@ -132,4 +135,5 @@ load("jstests/libs/uuid_util.js");
     // TODO (SERVER-61717): Confirm the instance eventually stops showing up in the POS map.
 
     tmt.stop();
+})();
 })();

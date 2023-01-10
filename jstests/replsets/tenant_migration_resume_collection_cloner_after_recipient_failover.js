@@ -11,21 +11,20 @@
  * ]
  */
 
-import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {
-    checkTenantDBHashes,
-    makeX509OptionsForTest,
-} from "jstests/replsets/libs/tenant_migration_util.js";
-
-load("jstests/libs/fail_point_util.js");
-load("jstests/libs/uuid_util.js");  // for 'extractUUIDFromObject'
+(function() {
+"use strict";
 
 const tenantMigrationFailoverTest = function(isTimeSeries, createCollFn, docs) {
+    load("jstests/libs/fail_point_util.js");
+    load("jstests/libs/uuid_util.js");  // for 'extractUUIDFromObject'
+    load("jstests/replsets/libs/tenant_migration_test.js");
+    load("jstests/replsets/libs/tenant_migration_util.js");
+
     const batchSize = 2;
     const recipientRst = new ReplSetTest({
         nodes: 2,
         name: jsTestName() + "_recipient",
-        nodeOptions: Object.assign(makeX509OptionsForTest().recipient, {
+        nodeOptions: Object.assign(TenantMigrationUtil.makeX509OptionsForTest().recipient, {
             setParameter: {
                 // Use a batch size of 2 so that collection cloner requires more than a single
                 // batch to complete.
@@ -102,7 +101,7 @@ const tenantMigrationFailoverTest = function(isTimeSeries, createCollFn, docs) {
     recipientColl = newRecipientPrimary.getDB(dbName).getCollection(collName);
     assert.eq(docs.length, recipientColl.find().itcount());
     assert.docEq(docs, recipientColl.find().sort({_id: 1}).toArray());
-    checkTenantDBHashes({
+    TenantMigrationUtil.checkTenantDBHashes({
         donorRst: tenantMigrationTest.getDonorRst(),
         recipientRst: tenantMigrationTest.getRecipientRst(),
         tenantId
@@ -129,3 +128,4 @@ jsTestLog("Running tenant migration test for regular collection");
 tenantMigrationFailoverTest(false,
                             (db, collName) => db.createCollection(collName),
                             [{_id: 0}, {_id: "string"}, {_id: UUID()}, {_id: new Date()}]);
+})();

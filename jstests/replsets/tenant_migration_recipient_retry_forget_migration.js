@@ -10,19 +10,21 @@
  * ]
  */
 
-import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {getCertificateAndPrivateKey} from "jstests/replsets/libs/tenant_migration_util.js";
+(function() {
 
+"use strict";
 load("jstests/libs/fail_point_util.js");  // For configureFailPoint().
 load("jstests/libs/parallelTester.js");   // For Thread()
 load("jstests/libs/uuid_util.js");        // For extractUUIDFromObject().
+load("jstests/replsets/libs/tenant_migration_test.js");
+load("jstests/replsets/libs/tenant_migration_util.js");
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
 const migrationId = UUID();
 const tenantId = 'testTenantId';
 const recipientCertificateForDonor =
-    getCertificateAndPrivateKey("jstests/libs/tenant_migration_recipient.pem");
+    TenantMigrationUtil.getCertificateAndPrivateKey("jstests/libs/tenant_migration_recipient.pem");
 
 const dbName = tenantMigrationTest.tenantDB(tenantId, "test");
 const collName = "coll";
@@ -113,3 +115,4 @@ assert.eq(currOp.state, 3 /* kDone */, currOp);
 assert(currOp.hasOwnProperty("expireAt"), currOp);
 
 tenantMigrationTest.stop();
+})();

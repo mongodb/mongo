@@ -16,12 +16,14 @@
  * ]
  */
 
-import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {getTenantMigrationAccessBlocker} from "jstests/replsets/libs/tenant_migration_util.js";
+(function() {
+'use strict';
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
+load("jstests/replsets/libs/tenant_migration_test.js");
+load("jstests/replsets/libs/tenant_migration_util.js");
 
 const tenantMigrationTest = new TenantMigrationTest({
     name: jsTestName(),
@@ -42,7 +44,8 @@ function checkTenantMigrationAccessBlocker(node, tenantId, {
     numTenantMigrationCommittedErrors = 0,
     numTenantMigrationAbortedErrors = 0
 }) {
-    const mtab = getTenantMigrationAccessBlocker({donorNode: node, tenantId}).donor;
+    const mtab =
+        TenantMigrationUtil.getTenantMigrationAccessBlocker({donorNode: node, tenantId}).donor;
     if (!mtab) {
         assert.eq(0, numBlockedReads);
         assert.eq(0, numTenantMigrationCommittedErrors);
@@ -61,10 +64,14 @@ function checkTenantMigrationAccessBlocker(node, tenantId, {
  * To be used to resume a migration that is paused after entering the blocking state. Waits for the
  * number of blocked reads to reach 'targetNumBlockedReads' and unpauses the migration.
  */
-async function resumeMigrationAfterBlockingRead(host, tenantId, targetNumBlockedReads) {
-    const {getNumBlockedReads} = await import("jstests/replsets/libs/tenant_migration_util.js");
+function resumeMigrationAfterBlockingRead(host, tenantId, targetNumBlockedReads) {
+    load("jstests/libs/fail_point_util.js");
+    load("jstests/replsets/libs/tenant_migration_util.js");
     const primary = new Mongo(host);
-    assert.soon(() => getNumBlockedReads(primary, tenantId) == targetNumBlockedReads);
+
+    assert.soon(() => TenantMigrationUtil.getNumBlockedReads(primary, tenantId) ==
+                    targetNumBlockedReads);
+
     assert.commandWorked(primary.adminCommand(
         {configureFailPoint: "pauseTenantMigrationBeforeLeavingBlockingState", mode: "off"}));
 }
@@ -509,3 +516,4 @@ for (const [testName, testFunc] of Object.entries(testFuncs)) {
 }
 
 tenantMigrationTest.stop();
+})();

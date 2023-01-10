@@ -15,14 +15,15 @@
  * ]
  */
 
-import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {runMigrationAsync} from "jstests/replsets/libs/tenant_migration_util.js";
+(function() {
+"use strict";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");           // for 'extractUUIDFromObject'
 load("jstests/libs/parallelTester.js");      // for 'Thread'
 load("jstests/libs/write_concern_util.js");  // for 'stopReplicationOnSecondaries'
-load("jstests/replsets/rslib.js");           // 'createRstArgs'
+load("jstests/replsets/libs/tenant_migration_test.js");
+load("jstests/replsets/libs/tenant_migration_util.js");
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
@@ -64,8 +65,9 @@ const waitBeforeCloning = configureFailPoint(recipientDb, "hangBeforeClonerStage
 // Start a migration and wait for recipient to hang before querying the donor in the cloning phase.
 // At this point, we have waited for the listIndex results to be majority committed on the donor,
 // so we can stop server replication.
-const donorRstArgs = createRstArgs(tenantMigrationTest.getDonorRst());
-const migrationThread = new Thread(runMigrationAsync, migrationOpts, donorRstArgs);
+const donorRstArgs = TenantMigrationUtil.createRstArgs(tenantMigrationTest.getDonorRst());
+const migrationThread =
+    new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
 migrationThread.start();
 waitBeforeCloning.wait();
 stopReplicationOnSecondaries(donorRst);
@@ -98,3 +100,4 @@ restartReplicationOnSecondaries(donorRst);
 waitBeforeFetchingTransactions.off();
 TenantMigrationTest.assertCommitted(migrationThread.returnData());
 tenantMigrationTest.stop();
+})();

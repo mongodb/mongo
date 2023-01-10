@@ -11,16 +11,14 @@
  * ]
  */
 
-import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {
-    isShardMergeEnabled,
-    runMigrationAsync
-} from "jstests/replsets/libs/tenant_migration_util.js";
+(function() {
+"use strict";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
-load('jstests/replsets/rslib.js');  // 'createRstArgs'
+load("jstests/replsets/libs/tenant_migration_test.js");
+load("jstests/replsets/libs/tenant_migration_util.js");
 
 const tenantMigrationTest = new TenantMigrationTest({
     name: jsTestName(),
@@ -33,10 +31,10 @@ const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 // suites will execute this test without featureFlagShardMerge enabled (despite the
 // presence of the featureFlagShardMerge tag above), which means the test will attempt
 // to run a multi-tenant migration and fail.
-if (!isShardMergeEnabled(recipientPrimary.getDB("admin"))) {
+if (!TenantMigrationUtil.isShardMergeEnabled(recipientPrimary.getDB("admin"))) {
     tenantMigrationTest.stop();
     jsTestLog("Skipping Shard Merge-specific test");
-    quit();
+    return;
 }
 
 const kTenantId = ObjectId();
@@ -71,7 +69,7 @@ const migrationOpts = {
     tenantIds: tojson([kTenantId]),
 };
 
-const donorRstArgs = createRstArgs(tenantMigrationTest.getDonorRst());
+const donorRstArgs = TenantMigrationUtil.createRstArgs(tenantMigrationTest.getDonorRst());
 
 jsTestLog("Test that recipientVoteImportedFiles fails with no migration started");
 voteShouldFail(migrationId);
@@ -79,7 +77,8 @@ voteShouldFail(migrationId);
 jsTestLog("Start a migration and pause after cloning");
 const fpAfterStartingOplogApplierMigrationRecipientInstance = configureFailPoint(
     recipientPrimary, "fpAfterStartingOplogApplierMigrationRecipientInstance", {action: "hang"});
-const migrationThread = new Thread(runMigrationAsync, migrationOpts, donorRstArgs);
+const migrationThread =
+    new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
 migrationThread.start();
 
 jsTestLog("Wait for recipient to log 'Waiting for all nodes to call recipientVoteImportedFiles'");
@@ -104,3 +103,4 @@ tenantMigrationTest.waitForMigrationGarbageCollection(migrationId, kTenantId.str
 jsTestLog("Test that recipientVoteImportedFiles fails after migration is forgotten");
 voteShouldFail(migrationId);
 tenantMigrationTest.stop();
+})();

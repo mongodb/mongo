@@ -5,8 +5,10 @@
  * that aren't part of the global "roles" array.
  */
 
-import {roles} from "jstests/auth/lib/commands_builtin_roles.js";
-import {authCommandsLib} from "jstests/auth/lib/commands_lib.js";
+(function() {
+'use strict';
+
+load('jstests/auth/lib/commands_builtin_roles.js');
 
 function checkForNonExistentRoles() {
     const tests = authCommandsLib.tests;
@@ -31,3 +33,4 @@ function checkForNonExistentRoles() {
 }
 
 checkForNonExistentRoles();
+})();

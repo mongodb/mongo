@@ -14,8 +14,12 @@
  * ]
  */
 
-import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+(function() {
+"use strict";
+
 load("jstests/core/txns/libs/prepare_helpers.js");
+load("jstests/replsets/libs/tenant_migration_test.js");
+load("jstests/replsets/libs/tenant_migration_util.js");
 load("jstests/replsets/rslib.js");
 load("jstests/libs/uuid_util.js");
 
@@ -135,3 +139,4 @@ TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComple
 validateTransactionEntryonRecipient(sessionIdBeforeMigration);
 
 tenantMigrationTest.stop();
+})();

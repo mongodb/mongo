@@ -13,6 +13,7 @@
 "use strict";
 
 load("jstests/libs/fail_point_util.js");
+load("jstests/replsets/libs/tenant_migration_util.js");
 
 const kDbName = "testDb";
 const kCollName = "testColl";

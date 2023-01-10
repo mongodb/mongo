@@ -11,8 +11,11 @@
  * ]
  */
 
-import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+(function() {
+"use strict";
+
 load("jstests/libs/uuid_util.js");
+load("jstests/replsets/libs/tenant_migration_test.js");
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
@@ -59,3 +62,4 @@ TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComple
 assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 
 tenantMigrationTest.stop();
+})();

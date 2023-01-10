@@ -10,8 +10,10 @@
  *   serverless,
  * ]
  */
+(function() {
+"use strict";
 
-import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+load("jstests/replsets/libs/tenant_migration_test.js");
 
 const kGarbageCollectionDelayMS = 5 * 1000;
 const donorRst = new ReplSetTest({
@@ -107,3 +109,4 @@ const collection = session.getDatabase(dbName)[collName];
 
 donorRst.stopSet();
 tenantMigrationTest.stop();
+})();

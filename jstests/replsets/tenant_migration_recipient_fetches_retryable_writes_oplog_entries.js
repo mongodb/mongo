@@ -10,10 +10,10 @@
  *   serverless,
  * ]
  */
+(function() {
+"use strict";
 
-import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {isShardMergeEnabled} from "jstests/replsets/libs/tenant_migration_util.js";
-
+load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/libs/uuid_util.js");        // For extractUUIDFromObject().
 load("jstests/libs/fail_point_util.js");  // For configureFailPoint().
 load("jstests/libs/parallelTester.js");   // For Thread.
@@ -64,7 +64,8 @@ function runTest({storeFindAndModifyImagesInSideCollection = false}) {
     const secondTenantSession = rsConn.startSession({retryWrites: true});
     const secondTenantCollection = secondTenantSession.getDatabase(kDbName2)[kCollName];
 
-    const isShardMergeEnabledOnDonor = isShardMergeEnabled(donorRst.getPrimary().getDB("adminDB"));
+    const isShardMergeEnabled =
+        TenantMigrationUtil.isShardMergeEnabled(donorRst.getPrimary().getDB("adminDB"));
 
     jsTestLog("Run retryable writes prior to the migration");
 
@@ -171,7 +172,7 @@ function runTest({storeFindAndModifyImagesInSideCollection = false}) {
 
     // Only for shardMerge we expect to have the other tenantId. Otherwise only for the provided
     // tenantId.
-    assert.eq(isShardMergeEnabledOnDonor ? 1 : 0,
+    assert.eq(isShardMergeEnabled ? 1 : 0,
               recipientOplogBuffer.find({"entry.o._id": "retryableWrite1"}).itcount());
 
     // Ensure the retryable write oplog entries that should not be in `kOplogBufferNS` are in fact
@@ -193,3 +194,4 @@ function runTest({storeFindAndModifyImagesInSideCollection = false}) {
 
 runTest({storeFindAndModifyImagesInSideCollection: false});
 runTest({storeFindAndModifyImagesInSideCollection: true});
+})();

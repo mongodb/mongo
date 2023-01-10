@@ -11,14 +11,14 @@
  * ]
  */
 
-import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {
-    makeX509OptionsForTest,
-} from "jstests/replsets/libs/tenant_migration_util.js";
+(function() {
+"use strict";
 
 load("jstests/libs/analyze_plan.js");
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
+load("jstests/replsets/libs/tenant_migration_test.js");
+load("jstests/replsets/libs/tenant_migration_util.js");
 
 const getQueryExplainIndexScanStage = function(coll) {
     const explain = coll.find().hint({"a.b": 1, "a.c": 1}).explain();
@@ -35,7 +35,7 @@ const verifyMultiKeyIndex = function(coll, isMultiKey, multiKeyPath) {
 const recipientRst = new ReplSetTest({
     nodes: 2,
     name: jsTestName() + "_recipient",
-    nodeOptions: Object.assign(makeX509OptionsForTest().recipient, {
+    nodeOptions: Object.assign(TenantMigrationUtil.makeX509OptionsForTest().recipient, {
         setParameter: {
             // Allow reads on recipient before migration completes for testing.
             'failpoint.tenantMigrationRecipientNotRejectReads': tojson({mode: 'alwaysOn'}),
@@ -132,3 +132,4 @@ verifyMultiKeyIndex(recipientColl2, true, {"a.b": ["a", "a.b"], "a.c": ["a"]});
 
 tenantMigrationTest.stop();
 recipientRst.stopSet();
+})();

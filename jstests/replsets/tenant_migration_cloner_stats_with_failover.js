@@ -21,9 +21,12 @@
  * ]
  */
 
-import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+(function() {
+"use strict";
 load("jstests/libs/uuid_util.js");        // For extractUUIDFromObject().
 load("jstests/libs/fail_point_util.js");  // For configureFailPoint().
+load("jstests/replsets/libs/tenant_migration_test.js");
+load("jstests/replsets/libs/tenant_migration_util.js");
 
 // Limit the batch size to test the stat in between batches.
 const tenantMigrationTest = new TenantMigrationTest(
@@ -144,3 +147,4 @@ assert.eq(currOp.databases.databasesClonedBeforeFailover, 1, res);
 assert.eq(currOp.databases[dbName2].clonedCollectionsBeforeFailover, 1, res);
 
 tenantMigrationTest.stop();
+})();

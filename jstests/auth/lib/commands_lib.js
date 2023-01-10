@@ -91,10 +91,7 @@ one argument, the connection object.
 
 */
 
-import {
-    isShardMergeEnabled,
-    makeMigrationCertificatesForTest
-} from "jstests/replsets/libs/tenant_migration_util.js";
+load("jstests/replsets/libs/tenant_migration_util.js");
 
 // constants
 
@@ -102,13 +99,13 @@ import {
 // when using the roles in 'roles_read', the 'read' role will only be granted on 'firstDbName'. In
 // particular, this means that when 'runOnDb' is 'secondDbName', the test user with the 'read' role
 // should not be able to perform read operations.
-export const firstDbName = "roles_commands_1";
-export const secondDbName = "roles_commands_2";
-export const adminDbName = "admin";
-export const authErrCode = 13;
-export const commandNotSupportedCode = 115;
-let shard0name = "shard0000";
-const migrationCertificates = makeMigrationCertificatesForTest();
+var firstDbName = "roles_commands_1";
+var secondDbName = "roles_commands_2";
+var adminDbName = "admin";
+var authErrCode = 13;
+var commandNotSupportedCode = 115;
+var shard0name = "shard0000";
+const migrationCertificates = TenantMigrationUtil.makeMigrationCertificatesForTest();
 
 function buildTenantMigrationCmd(cmd, state) {
     const {isShardMergeEnabled} = state;
@@ -206,7 +203,7 @@ load("jstests/libs/uuid_util.js");
 // For isReplSet
 load("jstests/libs/fixture_helpers.js");
 
-export const authCommandsLib = {
+var authCommandsLib = {
 
     /************* TEST CASES ****************/
 
@@ -2227,7 +2224,7 @@ export const authCommandsLib = {
           command: {
             bulkWrite: 1,
             ops: [
-              {insert: 0, document: {skey: "MongoDB"}},
+              {insert: 0, document: {skey: "MongoDB"}}, 
               {insert: 1, document: {skey: "MongoDB"}}],
             nsInfo: [{ns: firstDbName + ".coll"}, {ns: secondDbName + ".coll1"}]
           },
@@ -2243,7 +2240,7 @@ export const authCommandsLib = {
           command: {
             bulkWrite: 1,
             ops: [
-              {insert: 0, document: {skey: "MongoDB"}},
+              {insert: 0, document: {skey: "MongoDB"}}, 
               {insert: 1, document: {skey: "MongoDB"}}],
             nsInfo: [{ns: firstDbName + ".coll"}, {ns: secondDbName + ".coll1"}],
             bypassDocumentValidation: true,
@@ -2253,11 +2250,11 @@ export const authCommandsLib = {
             runOnDb: adminDbName,
             privileges: [
               {
-                resource: {db: firstDbName, collection: "coll"},
+                resource: {db: firstDbName, collection: "coll"}, 
                 actions: ['insert', 'bypassDocumentValidation']
               },
               {
-                resource: {db: secondDbName, collection: "coll1"},
+                resource: {db: secondDbName, collection: "coll1"}, 
                 actions: ['insert', 'bypassDocumentValidation']
               }
             ]
@@ -3820,7 +3817,7 @@ export const authCommandsLib = {
         {
           testname: "donorStartMigration",
           setup: (db) => {
-              return {isShardMergeEnabled: isShardMergeEnabled(db)};
+              return {isShardMergeEnabled: TenantMigrationUtil.isShardMergeEnabled(db)};
           },
           command: (state) => {
               return buildTenantMigrationCmd({
@@ -3848,7 +3845,7 @@ export const authCommandsLib = {
         {
           testname: "recipientSyncData",
           setup: (db) => {
-              return {isShardMergeEnabled: isShardMergeEnabled(db)};
+              return {isShardMergeEnabled: TenantMigrationUtil.isShardMergeEnabled(db)};
           },
           command: (state) => {
               return buildTenantMigrationCmd({
@@ -3876,7 +3873,7 @@ export const authCommandsLib = {
         {
           testname: "recipientForgetMigration",
           setup: (db) => {
-              return {isShardMergeEnabled: isShardMergeEnabled(db)};
+              return {isShardMergeEnabled: TenantMigrationUtil.isShardMergeEnabled(db)};
           },
           command: (state) => {
               return buildTenantMigrationCmd({
@@ -6704,14 +6701,7 @@ export const authCommandsLib = {
      *  An array of strings. Each string in the array reports
      *  a particular test error.
      */
-    runOneTest: function(conn, t, impls, options) {
-        options = options || {};
-
-        const isMongos = !!options.isMongos || this.isMongos(conn);
-        if (options.shard0Name) {
-          shard0name = options.shard0Name;
-        }
-
+    runOneTest: function(conn, t, impls, isMongos) {
         jsTest.log("Running test: " + t.testname);
 
         if (t.skipTest && t.skipTest(conn)) {
@@ -6763,9 +6753,7 @@ export const authCommandsLib = {
     /**
      * Top-level test runner
      */
-    runTests: function(conn, impls, options) {
-      options = options || {};
-      options.isMongos = options.isMongos || this.isMongos(conn);
+    runTests: function(conn, impls) {
 
         // impls must provide implementations of a few functions
         assert("createUsers" in impls);
@@ -6775,9 +6763,9 @@ export const authCommandsLib = {
 
         var failures = [];
 
-
+        const isMongos = this.isMongos(conn);
         for (var i = 0; i < this.tests.length; i++) {
-            const res = this.runOneTest(conn, this.tests[i], impls, options);
+            res = this.runOneTest(conn, this.tests[i], impls, isMongos);
             failures = failures.concat(res);
         }
 
@@ -6786,4 +6774,5 @@ export const authCommandsLib = {
         });
         assert.eq(0, failures.length);
     }
+
 };

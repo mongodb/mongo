@@ -12,9 +12,13 @@
  * ]
  */
 
-import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+(function() {
+
+"use strict";
 load("jstests/libs/uuid_util.js");        // For extractUUIDFromObject().
 load("jstests/libs/fail_point_util.js");  // For configureFailPoint().
+load("jstests/replsets/libs/tenant_migration_test.js");
+load("jstests/replsets/libs/tenant_migration_util.js");
 
 const tenantMigrationTest =
     new TenantMigrationTest({name: jsTestName(), sharedOptions: {nodes: 2}});
@@ -52,3 +56,4 @@ jsTestLog("Waiting for migration to complete.");
 TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
 
 tenantMigrationTest.stop();
+})();

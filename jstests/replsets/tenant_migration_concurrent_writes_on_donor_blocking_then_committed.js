@@ -10,18 +10,15 @@
  *   serverless,
  * ]
  */
-
-import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {
-    checkTenantMigrationAccessBlockerForConcurrentWritesTest,
-    runCommandForConcurrentWritesTest,
-    runTestForConcurrentWritesTest,
-    TenantMigrationConcurrentWriteUtil
-} from "jstests/replsets/tenant_migration_concurrent_writes_on_donor_util.js";
+(function() {
+'use strict';
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
+load("jstests/replsets/libs/tenant_migration_test.js");
+load("jstests/replsets/libs/tenant_migration_util.js");
+load("jstests/replsets/tenant_migration_concurrent_writes_on_donor_util.js");
 
 const tenantMigrationTest = new TenantMigrationTest({
     name: jsTestName(),
@@ -39,10 +36,14 @@ const kTenantDefinedDbName = "0";
  * To be used to resume a migration that is paused after entering the blocking state. Waits for the
  * number of blocked reads to reach 'targetNumBlockedWrites' and unpauses the migration.
  */
-async function resumeMigrationAfterBlockingWrite(host, tenantId, targetNumBlockedWrites) {
-    const {getNumBlockedWrites} = await import("jstests/replsets/libs/tenant_migration_util.js");
+function resumeMigrationAfterBlockingWrite(host, tenantId, targetNumBlockedWrites) {
+    load("jstests/libs/fail_point_util.js");
+    load("jstests/replsets/libs/tenant_migration_util.js");
     const primary = new Mongo(host);
-    assert.soon(() => getNumBlockedWrites(primary, tenantId) == targetNumBlockedWrites);
+
+    assert.soon(() => TenantMigrationUtil.getNumBlockedWrites(primary, tenantId) ==
+                    targetNumBlockedWrites);
+
     assert.commandWorked(primary.adminCommand(
         {configureFailPoint: "pauseTenantMigrationBeforeLeavingBlockingState", mode: "off"}));
 }
@@ -124,3 +125,4 @@ for (const [commandName, testCase] of Object.entries(testCases)) {
 }
 
 tenantMigrationTest.stop();
+})();

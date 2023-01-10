@@ -1,6 +1,4 @@
-import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {makeX509OptionsForTest} from "jstests/replsets/libs/tenant_migration_util.js";
-
+load("jstests/replsets/libs/tenant_migration_util.js");
 load("jstests/replsets/rslib.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
@@ -56,7 +54,7 @@ export function doWriteOperations(rstArgs, tenantIds) {
 export function addRecipientNodes({rst, numNodes, recipientTagName}) {
     numNodes = numNodes || 3;  // default to three nodes
     const recipientNodes = [];
-    const options = makeX509OptionsForTest();
+    const options = TenantMigrationUtil.makeX509OptionsForTest();
     jsTestLog(`Adding ${numNodes} non-voting recipient nodes to donor`);
     for (let i = 0; i < numNodes; ++i) {
         recipientNodes.push(rst.add(options.donor));

@@ -12,19 +12,15 @@
  *   serverless,
  * ]
  */
-
-import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {
-    forgetMigrationAsync,
-    makeX509OptionsForTest,
-    runMigrationAsync,
-} from "jstests/replsets/libs/tenant_migration_util.js";
+(function() {
+"use strict";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/replsets/libs/rollback_test.js");
-load("jstests/replsets/rslib.js");  // 'createRstArgs'
+load("jstests/replsets/libs/tenant_migration_test.js");
+load("jstests/replsets/libs/tenant_migration_util.js");
 
 const kTenantId = ObjectId().str;
 
@@ -35,7 +31,7 @@ const kMaxSleepTimeMS = 250;
 // state.
 const kGarbageCollectionDelayMS = 30 * 1000;
 
-const migrationX509Options = makeX509OptionsForTest();
+const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
 
 const recipientRst = new ReplSetTest({
     name: "recipientRst",
@@ -87,7 +83,7 @@ function testRollBack(setUpFunc, rollbackOpsFunc, steadyStateFunc) {
 
     const tenantMigrationTest =
         new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
-    const donorRstArgs = createRstArgs(donorRst);
+    const donorRstArgs = TenantMigrationUtil.createRstArgs(donorRst);
     setUpFunc(tenantMigrationTest, donorRstArgs);
 
     let originalDonorPrimary = donorRst.getPrimary();
@@ -133,8 +129,10 @@ function testRollbackInitialState() {
         const donorPrimary = tenantMigrationTest.getDonorPrimary();
 
         // Start the migration asynchronously and wait for the primary to insert the state doc.
-        migrationThread = new Thread(
-            runMigrationAsync, migrationOpts, donorRstArgs, {retryOnRetryableErrors: true});
+        migrationThread = new Thread(TenantMigrationUtil.runMigrationAsync,
+                                     migrationOpts,
+                                     donorRstArgs,
+                                     {retryOnRetryableErrors: true});
         migrationThread.start();
         assert.soon(() => {
             return 1 === donorPrimary.getCollection(TenantMigrationTest.kConfigDonorsNS).count({
@@ -177,8 +175,10 @@ function testRollBackStateTransition(pauseFailPoint, setUpFailPoints, nextState)
         setUpFailPoints.forEach(failPoint => configureFailPoint(donorPrimary, failPoint));
         pauseFp = configureFailPoint(donorPrimary, pauseFailPoint);
 
-        migrationThread = new Thread(
-            runMigrationAsync, migrationOpts, donorRstArgs, {retryOnRetryableErrors: true});
+        migrationThread = new Thread(TenantMigrationUtil.runMigrationAsync,
+                                     migrationOpts,
+                                     donorRstArgs,
+                                     {retryOnRetryableErrors: true});
         migrationThread.start();
         pauseFp.wait();
     };
@@ -230,7 +230,7 @@ function testRollBackMarkingStateGarbageCollectable() {
 
         // Run donorForgetMigration and wait for the primary to do the write to mark the state doc
         // as garbage collectable.
-        forgetMigrationThread = new Thread(forgetMigrationAsync,
+        forgetMigrationThread = new Thread(TenantMigrationUtil.forgetMigrationAsync,
                                            migrationOpts.migrationIdString,
                                            donorRstArgs,
                                            true /* retryOnRetryableErrors */);
@@ -273,12 +273,11 @@ function testRollBackRandom() {
     let migrationThread;
 
     let setUpFunc = (tenantMigrationTest, donorRstArgs) => {
-        migrationThread = new Thread(async (donorRstArgs, migrationOpts) => {
-            const {runMigrationAsync, forgetMigrationAsync} =
-                await import("jstests/replsets/libs/tenant_migration_util.js");
-            assert.commandWorked(await runMigrationAsync(
+        migrationThread = new Thread((donorRstArgs, migrationOpts) => {
+            load("jstests/replsets/libs/tenant_migration_util.js");
+            assert.commandWorked(TenantMigrationUtil.runMigrationAsync(
                 migrationOpts, donorRstArgs, {retryOnRetryableErrors: true}));
-            assert.commandWorked(await forgetMigrationAsync(
+            assert.commandWorked(TenantMigrationUtil.forgetMigrationAsync(
                 migrationOpts.migrationIdString, donorRstArgs, true /* retryOnRetryableErrors */));
         }, donorRstArgs, migrationOpts);
 
@@ -329,3 +328,4 @@ jsTest.log("Test roll back random");
 testRollBackRandom();
 
 recipientRst.stopSet();
+}());

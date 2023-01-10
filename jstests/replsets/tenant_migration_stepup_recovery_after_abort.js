@@ -10,11 +10,12 @@
  * ]
  */
 
-import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {makeX509OptionsForTest} from "jstests/replsets/libs/tenant_migration_util.js";
+(function() {
+"use strict";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
+load("jstests/replsets/libs/tenant_migration_test.js");
 
 // Set the delay before a state doc is garbage collected to be short to speed up the test.
 const kGarbageCollectionParams = {
@@ -25,8 +26,8 @@ const kGarbageCollectionParams = {
 const donorRst = new ReplSetTest({
     nodes: 3,
     name: "donor",
-    nodeOptions:
-        Object.assign(makeX509OptionsForTest().donor, {setParameter: kGarbageCollectionParams})
+    nodeOptions: Object.assign(TenantMigrationUtil.makeX509OptionsForTest().donor,
+                               {setParameter: kGarbageCollectionParams})
 });
 
 donorRst.startSet();
@@ -66,3 +67,4 @@ tenantMigrationTest.waitForMigrationGarbageCollection(migrationId, tenantId);
 
 donorRst.stopSet();
 tenantMigrationTest.stop();
+})();

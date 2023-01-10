@@ -13,16 +13,14 @@
  * ]
  */
 
-import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {
-    runTenantMigrationCommand,
-    tryAbortMigrationAsync
-} from "jstests/replsets/libs/tenant_migration_util.js";
+(function() {
+"use strict";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
-load("jstests/replsets/rslib.js");  // 'createRstArgs'
+load("jstests/replsets/libs/tenant_migration_test.js");
+load("jstests/replsets/libs/tenant_migration_util.js");
 
 function makeTenantId() {
     return ObjectId().str;
@@ -77,11 +75,11 @@ const tenantMigrationTest =
 
     fp.wait();
 
-    const donorRstArgs = createRstArgs(tenantMigrationTest.getDonorRst());
-    const tryAbortThread = new Thread(tryAbortMigrationAsync,
+    const donorRstArgs = TenantMigrationUtil.createRstArgs(tenantMigrationTest.getDonorRst());
+    const tryAbortThread = new Thread(TenantMigrationUtil.tryAbortMigrationAsync,
                                       {migrationIdString: migrationId1, tenantId: tenantId},
                                       donorRstArgs,
-                                      runTenantMigrationCommand);
+                                      TenantMigrationUtil.runTenantMigrationCommand);
     tryAbortThread.start();
 
     // Wait for donorAbortMigration command to start.
@@ -114,3 +112,4 @@ const tenantMigrationTest =
 })();
 
 tenantMigrationTest.stop();
+})();

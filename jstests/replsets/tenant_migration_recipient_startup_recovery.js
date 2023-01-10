@@ -13,16 +13,17 @@
  * ]
  */
 
-import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {makeX509OptionsForTest} from "jstests/replsets/libs/tenant_migration_util.js";
+(function() {
+"use strict";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
+load("jstests/replsets/libs/tenant_migration_test.js");
 
 const recipientRst = new ReplSetTest({
     nodes: 1,
     name: 'recipient',
-    nodeOptions: Object.assign(makeX509OptionsForTest().recipient, {
+    nodeOptions: Object.assign(TenantMigrationUtil.makeX509OptionsForTest().recipient, {
         setParameter:
             {"failpoint.PrimaryOnlyServiceSkipRebuildingInstances": tojson({mode: "alwaysOn"})}
     })
@@ -107,3 +108,4 @@ if (recipientDoc) {
 
 tenantMigrationTest.stop();
 recipientRst.stopSet();
+})();

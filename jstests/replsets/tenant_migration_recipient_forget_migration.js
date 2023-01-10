@@ -10,16 +10,14 @@
  * ]
  */
 
-import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {
-    forgetMigrationAsync,
-    isShardMergeEnabled
-} from "jstests/replsets/libs/tenant_migration_util.js";
+(function() {
 
+"use strict";
 load("jstests/libs/uuid_util.js");        // For extractUUIDFromObject().
 load("jstests/libs/fail_point_util.js");  // For configureFailPoint().
 load("jstests/libs/parallelTester.js");   // For Thread(), used for async forgetMigration.
-load('jstests/replsets/rslib.js');        // 'createRstArgs'
+load("jstests/replsets/libs/tenant_migration_test.js");
+load("jstests/replsets/libs/tenant_migration_util.js");
 
 const tenantMigrationTest = new TenantMigrationTest({
     name: jsTestName(),
@@ -32,8 +30,8 @@ const kReadPreference = {
     mode: "primary"
 };
 
-const isShardMergeEnabledOnDonorPrimary =
-    isShardMergeEnabled(tenantMigrationTest.getDonorPrimary().getDB("admin"));
+const isShardMergeEnabled =
+    TenantMigrationUtil.isShardMergeEnabled(tenantMigrationTest.getDonorPrimary().getDB("admin"));
 
 const oplogBufferCollectionName = (migrationIdString) =>
     `repl.migration.oplog_${migrationIdString}`;
@@ -42,7 +40,7 @@ const donatedFilesCollectionName = (migrationIdString) => `donatedFiles.${migrat
 const assertTempCollectionsExist = (conn, migrationIdString) => {
     const collections = conn.getDB("config").getCollectionNames();
     assert(collections.includes(oplogBufferCollectionName(migrationIdString)), collections);
-    if (isShardMergeEnabledOnDonorPrimary) {
+    if (isShardMergeEnabled) {
         assert(collections.includes(donatedFilesCollectionName(migrationIdString)), collections);
     }
 };
@@ -50,7 +48,7 @@ const assertTempCollectionsExist = (conn, migrationIdString) => {
 const assertTempCollectionsDoNotExist = (conn, migrationIdString) => {
     const collections = conn.getDB("config").getCollectionNames();
     assert(!collections.includes(oplogBufferCollectionName(migrationIdString)), collections);
-    if (isShardMergeEnabledOnDonorPrimary) {
+    if (isShardMergeEnabled) {
         assert(!collections.includes(donatedFilesCollectionName(migrationIdString)), collections);
     }
 };
@@ -73,10 +71,11 @@ const assertTempCollectionsDoNotExist = (conn, migrationIdString) => {
                            {action: "hang"});
 
     jsTestLog("Issuing a forget migration command.");
-    const forgetMigrationThread = new Thread(forgetMigrationAsync,
-                                             migrationOpts.migrationIdString,
-                                             createRstArgs(tenantMigrationTest.getDonorRst()),
-                                             true /* retryOnRetryableErrors */);
+    const forgetMigrationThread =
+        new Thread(TenantMigrationUtil.forgetMigrationAsync,
+                   migrationOpts.migrationIdString,
+                   TenantMigrationUtil.createRstArgs(tenantMigrationTest.getDonorRst()),
+                   true /* retryOnRetryableErrors */);
     forgetMigrationThread.start();
 
     fpBeforeDroppingTempCollections.wait();
@@ -115,10 +114,11 @@ const assertTempCollectionsDoNotExist = (conn, migrationIdString) => {
                            {action: "hang"});
 
     jsTestLog("Issuing a forget migration command.");
-    const forgetMigrationThread = new Thread(forgetMigrationAsync,
-                                             migrationOpts.migrationIdString,
-                                             createRstArgs(tenantMigrationTest.getDonorRst()),
-                                             true /* retryOnRetryableErrors */);
+    const forgetMigrationThread =
+        new Thread(TenantMigrationUtil.forgetMigrationAsync,
+                   migrationOpts.migrationIdString,
+                   TenantMigrationUtil.createRstArgs(tenantMigrationTest.getDonorRst()),
+                   true /* retryOnRetryableErrors */);
     forgetMigrationThread.start();
 
     fpBeforeDroppingTempCollections.wait();
@@ -142,3 +142,4 @@ const assertTempCollectionsDoNotExist = (conn, migrationIdString) => {
 })();
 
 tenantMigrationTest.stop();
+})();

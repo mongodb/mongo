@@ -13,12 +13,12 @@
  * ]
  */
 
-import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {
-    isShardMergeEnabled,
-} from "jstests/replsets/libs/tenant_migration_util.js";
+(function() {
+"use strict";
 
 load("jstests/core/txns/libs/prepare_helpers.js");
+load("jstests/replsets/libs/tenant_migration_test.js");
+load("jstests/replsets/libs/tenant_migration_util.js");
 load("jstests/replsets/rslib.js");
 load("jstests/libs/uuid_util.js");
 
@@ -39,10 +39,10 @@ const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 // suites will execute this test without featureFlagShardMerge enabled (despite the
 // presence of the featureFlagShardMerge tag above), which means the test will attempt
 // to run a multi-tenant migration and fail.
-if (!isShardMergeEnabled(donorPrimary.getDB("admin"))) {
+if (!TenantMigrationUtil.isShardMergeEnabled(donorPrimary.getDB("admin"))) {
     tenantMigrationTest.stop();
     jsTestLog("Skipping Shard Merge-specific test");
-    quit();
+    return;
 }
 
 function validateTransactionEntryonRecipient(sessionId) {
@@ -153,3 +153,4 @@ validateTransactionEntryonRecipient(sessionIdBeforeMigration);
 validateTransactionEntryonRecipient(sessionIdForOtherTenant);
 
 tenantMigrationTest.stop();
+})();

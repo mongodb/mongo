@@ -11,25 +11,22 @@
  * ]
  */
 
-import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {
-    checkTenantDBHashes,
-    makeX509OptionsForTest,
-    runMigrationAsync,
-} from "jstests/replsets/libs/tenant_migration_util.js";
+(function() {
+"use strict";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");            // for 'extractUUIDFromObject'
 load("jstests/libs/parallelTester.js");       // for 'Thread'
 load("jstests/libs/write_concern_util.js");   // for 'stopReplicationOnSecondaries'
 load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
-load('jstests/replsets/rslib.js');            // For 'createRstArgs'
+load("jstests/replsets/libs/tenant_migration_test.js");
+load("jstests/replsets/libs/tenant_migration_util.js");
 
 const recipientRst = new ReplSetTest({
     nodes: 3,
     name: jsTestName() + "_recipient",
     // Use a batch size of 2 so that we can hang in the middle of tenant oplog application.
-    nodeOptions: Object.assign(makeX509OptionsForTest().recipient,
+    nodeOptions: Object.assign(TenantMigrationUtil.makeX509OptionsForTest().recipient,
                                {setParameter: {tenantApplierBatchSizeOps: 2}})
 });
 
@@ -68,8 +65,9 @@ let waitAfterDatabaseClone = configureFailPoint(
 let waitInOplogApplier = configureFailPoint(recipientPrimary, "hangInTenantOplogApplication");
 
 // Start a migration and wait for recipient to hang in the tenant database cloner.
-const donorRstArgs = createRstArgs(donorRst);
-const migrationThread = new Thread(runMigrationAsync, migrationOpts, donorRstArgs);
+const donorRstArgs = TenantMigrationUtil.createRstArgs(donorRst);
+const migrationThread =
+    new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
 migrationThread.start();
 waitAfterDatabaseClone.wait();
 
@@ -109,10 +107,11 @@ resultsArr = appliedNoOps.toArray();
 assert.eq(3, appliedNoOps.count(), appliedNoOps);
 assert.eq(docsToApply[2], resultsArr[2].o2.o, resultsArr);
 
-checkTenantDBHashes({
+TenantMigrationUtil.checkTenantDBHashes({
     donorRst: tenantMigrationTest.getDonorRst(),
     recipientRst: tenantMigrationTest.getRecipientRst(),
     tenantId
 });
 tenantMigrationTest.stop();
 recipientRst.stopSet();
+})();

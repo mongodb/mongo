@@ -14,13 +14,15 @@
  * ]
  */
 
-import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {makeX509OptionsForTest} from "jstests/replsets/libs/tenant_migration_util.js";
+(function() {
+"use strict";
 
+load("jstests/replsets/libs/tenant_migration_test.js");
+load("jstests/replsets/libs/tenant_migration_util.js");
 load("jstests/libs/uuid_util.js");
 
 function testOplogCloning(ordered) {
-    const migrationX509Options = makeX509OptionsForTest();
+    const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
     const kGarbageCollectionParams = {
         // Set the delay before a donor state doc is garbage collected to be short to speed up
         // the test.
@@ -280,3 +282,4 @@ function testOplogCloning(ordered) {
 
 testOplogCloning(true);
 testOplogCloning(false);
+})();

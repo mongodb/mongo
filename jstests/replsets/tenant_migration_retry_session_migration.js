@@ -15,9 +15,11 @@
  * ]
  */
 
-import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {checkTenantDBHashes} from "jstests/replsets/libs/tenant_migration_util.js";
+(function() {
+"use strict";
 
+load("jstests/replsets/libs/tenant_migration_test.js");
+load("jstests/replsets/libs/tenant_migration_util.js");
 load("jstests/replsets/rslib.js");
 load("jstests/libs/uuid_util.js");
 
@@ -154,10 +156,11 @@ assert.commandWorked(recipientPrimary.getDB(kDbName).runCommand({
 
 // The dbhash between the donor and the recipient should still match after retrying
 // commitTransaction and the retryable writes because they should be noop.
-checkTenantDBHashes({
+TenantMigrationUtil.checkTenantDBHashes({
     donorRst: tenantMigrationTest.getDonorRst(),
     recipientRst: tenantMigrationTest.getRecipientRst(),
     tenantId: kTenantId
 });
 
 tenantMigrationTest.stop();
+})();

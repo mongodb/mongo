@@ -11,8 +11,11 @@
  * ]
  */
 
-import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+(function() {
+"use strict";
+
 load("jstests/libs/uuid_util.js");
+load("jstests/replsets/libs/tenant_migration_test.js");
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
@@ -56,3 +59,4 @@ assert.eq(1, findRes.length, `find result: ${tojson(findRes)}`);
 assert.eq([doc1], findRes);
 
 tenantMigrationTest.stop();
+})();

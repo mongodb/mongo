@@ -17,13 +17,15 @@
  * ]
  */
 
-import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {runMigrationAsync} from "jstests/replsets/libs/tenant_migration_util.js";
+(function() {
+'use strict';
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
-load("jstests/replsets/rslib.js");  // 'createRstArgs'
+load("jstests/replsets/libs/tenant_migration_test.js");
+load("jstests/replsets/libs/tenant_migration_util.js");
+load("jstests/replsets/rslib.js");
 
 const kCollName = "testColl";
 const kTenantDefinedDbName = "0";
@@ -67,8 +69,9 @@ function testRejectAllReadsAfterCloningDone({testCase, dbName, collName, tenantM
     let beforeFetchingTransactionsFp = configureFailPoint(
         recipientPrimary, "fpBeforeFetchingCommittedTransactions", {action: "hang"});
 
-    const donorRstArgs = createRstArgs(donorRst);
-    const runMigrationThread = new Thread(runMigrationAsync, migrationOpts, donorRstArgs);
+    const donorRstArgs = TenantMigrationUtil.createRstArgs(donorRst);
+    const runMigrationThread =
+        new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
     runMigrationThread.start();
     beforeFetchingTransactionsFp.wait();
 
@@ -115,8 +118,9 @@ function testRejectOnlyReadsWithAtClusterTimeLessThanRejectReadsBeforeTimestamp(
     let waitForRejectReadsBeforeTsFp = configureFailPoint(
         recipientPrimary, "fpAfterWaitForRejectReadsBeforeTimestamp", {action: "hang"});
 
-    const donorRstArgs = createRstArgs(donorRst);
-    const runMigrationThread = new Thread(runMigrationAsync, migrationOpts, donorRstArgs);
+    const donorRstArgs = TenantMigrationUtil.createRstArgs(donorRst);
+    const runMigrationThread =
+        new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
     runMigrationThread.start();
     waitForRejectReadsBeforeTsFp.wait();
 
@@ -442,3 +446,4 @@ for (const [testName, testFunc] of Object.entries(testFuncs)) {
     }
 }
 tenantMigrationTest.stop();
+})();

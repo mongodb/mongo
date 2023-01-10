@@ -11,12 +11,14 @@
  * ]
  */
 
-import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {getNumBlockedReads} from "jstests/replsets/libs/tenant_migration_util.js";
+(function() {
+"use strict";
 
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
+load("jstests/replsets/libs/tenant_migration_test.js");
+load("jstests/replsets/libs/tenant_migration_util.js");
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
@@ -60,9 +62,10 @@ let readThread = new Thread((host, dbName, collName, afterClusterTime) => {
 readThread.start();
 
 // Shut down the donor after the read starts blocking.
-assert.soon(() => getNumBlockedReads(donorPrimary, kTenantId) == 1);
+assert.soon(() => TenantMigrationUtil.getNumBlockedReads(donorPrimary, kTenantId) == 1);
 donorRst.stop(donorPrimary);
 readThread.join();
 
 donorRst.stopSet();
 tenantMigrationTest.stop();
+})();

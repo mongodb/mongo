@@ -10,7 +10,10 @@
  * ]
  */
 
-import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+(function() {
+"use strict";
+
+load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/libs/uuid_util.js");
 
 function assertNoCertificateOrPrivateKeyLogsForCmd(conn, cmdName) {
@@ -56,3 +59,4 @@ const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 })();
 
 tenantMigrationTest.stop();
+})();

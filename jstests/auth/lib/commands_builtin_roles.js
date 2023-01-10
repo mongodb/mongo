@@ -5,21 +5,14 @@
  * in jstests/auth/lib/commands_lib.js
  */
 
-import {
-    adminDbName,
-    authCommandsLib,
-    authErrCode,
-    commandNotSupportedCode,
-    firstDbName
-} from "jstests/auth/lib/commands_lib.js";
-
-load("jstests/libs/fail_point_util.js");
-
 // This test involves killing all sessions, which will not work as expected if the kill command is
 // sent with an implicit session.
 TestData.disableImplicitSessions = true;
 
-export const roles = [
+load("jstests/auth/lib/commands_lib.js");
+load("jstests/libs/fail_point_util.js");
+
+var roles = [
     {key: "read", role: "read", dbname: firstDbName},
     {key: "readLocal", role: {role: "read", db: "local"}, dbname: adminDbName},
     {key: "readAnyDatabase", role: "readAnyDatabase", dbname: adminDbName},
@@ -139,7 +132,7 @@ function createUsers(conn) {
 
     assert(adminDb.auth("admin", "password"));
     for (var i = 0; i < roles.length; i++) {
-        const r = roles[i];
+        r = roles[i];
         r.db = conn.getDB(r.dbname);
         r.db.createUser({user: "user|" + r.key, pwd: "password", roles: [r.role]});
     }
@@ -150,7 +143,7 @@ function createUsers(conn) {
  * This tests the authorization of commands with builtin roles for a given server configuration
  * represented in 'conn'.
  */
-export function runAllCommandsBuiltinRoles(conn) {
+function runAllCommandsBuiltinRoles(conn) {
     const testFunctionImpls = {createUsers: createUsers, runOneTest: runOneTest};
     authCommandsLib.runTests(conn, testFunctionImpls);
 }

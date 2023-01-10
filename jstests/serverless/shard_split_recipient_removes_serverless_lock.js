@@ -5,13 +5,11 @@
  * @tags: [requires_fcv_62, serverless]
  */
 
-import {
-    getServerlessOperationLock,
-    ServerlessLockType
-} from "jstests/replsets/libs/tenant_migration_util.js";
 import {ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
 
 load("jstests/libs/fail_point_util.js");
+load("jstests/replsets/libs/tenant_migration_util.js");
+const {ServerlessLockType, getServerlessOperationLock} = TenantMigrationUtil;
 
 // Skip db hash check because secondary is left with a different config.
 TestData.skipCheckDBHashes = true;

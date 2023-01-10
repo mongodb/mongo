@@ -10,15 +10,11 @@
  *   serverless,
  * ]
  */
-
-import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {
-    getCertificateAndPrivateKey,
-    isShardMergeEnabled,
-    makeX509OptionsForTest,
-} from "jstests/replsets/libs/tenant_migration_util.js";
+(function() {
+'use strict';
 
 load("jstests/libs/uuid_util.js");
+load("jstests/replsets/libs/tenant_migration_test.js");
 
 function getRecipientSyncDataMetrics(recipientPrimary) {
     return recipientPrimary.adminCommand({serverStatus: 1}).metrics.commands.recipientSyncData;
@@ -51,7 +47,7 @@ function assertNoCertificateOrPrivateKey(string) {
     assert(!string.includes("PRIVATE KEY"), "found private key");
 }
 
-const {donor: donorNodeOptions} = makeX509OptionsForTest();
+const {donor: donorNodeOptions} = TenantMigrationUtil.makeX509OptionsForTest();
 donorNodeOptions.setParameter = donorNodeOptions.setParameter || {};
 Object.assign(donorNodeOptions.setParameter, {
     tenantMigrationGarbageCollectionDelayMS: 1 * 1000,
@@ -274,7 +270,7 @@ function testConcurrentConflictingMigrations({
 
 // Test different tenantIds.
 (() => {
-    if (isShardMergeEnabled(donorPrimary.getDB("admin"))) {
+    if (TenantMigrationUtil.isShardMergeEnabled(donorPrimary.getDB("admin"))) {
         jsTestLog(
             "Skip: featureFlagShardMerge is enabled and this test tests migrations with different tenant ids.");
         return;
@@ -329,7 +325,7 @@ function testConcurrentConflictingMigrations({
 
 // Test different cloning read preference.
 (() => {
-    if (isShardMergeEnabled(donorPrimary.getDB("admin"))) {
+    if (TenantMigrationUtil.isShardMergeEnabled(donorPrimary.getDB("admin"))) {
         jsTestLog(
             "Skip: featureFlagShardMerge is enabled and this test tests migration's secondary read preference.");
         return;
@@ -355,13 +351,13 @@ function testConcurrentConflictingMigrations({
 })();
 
 const kDonorCertificateAndPrivateKey =
-    getCertificateAndPrivateKey("jstests/libs/tenant_migration_donor.pem");
-const kExpiredDonorCertificateAndPrivateKey =
-    getCertificateAndPrivateKey("jstests/libs/tenant_migration_donor_expired.pem");
+    TenantMigrationUtil.getCertificateAndPrivateKey("jstests/libs/tenant_migration_donor.pem");
+const kExpiredDonorCertificateAndPrivateKey = TenantMigrationUtil.getCertificateAndPrivateKey(
+    "jstests/libs/tenant_migration_donor_expired.pem");
 const kRecipientCertificateAndPrivateKey =
-    getCertificateAndPrivateKey("jstests/libs/tenant_migration_recipient.pem");
-const kExpiredRecipientCertificateAndPrivateKey =
-    getCertificateAndPrivateKey("jstests/libs/tenant_migration_recipient_expired.pem");
+    TenantMigrationUtil.getCertificateAndPrivateKey("jstests/libs/tenant_migration_recipient.pem");
+const kExpiredRecipientCertificateAndPrivateKey = TenantMigrationUtil.getCertificateAndPrivateKey(
+    "jstests/libs/tenant_migration_recipient_expired.pem");
 
 // Test different donor certificates.
 (() => {
@@ -412,3 +408,4 @@ const kExpiredRecipientCertificateAndPrivateKey =
 })();
 
 teardown();
+})();

@@ -11,9 +11,11 @@
  * ]
  */
 
-import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {getCertificateAndPrivateKey} from "jstests/replsets/libs/tenant_migration_util.js";
+(function() {
+"use strict";
 
+load("jstests/replsets/libs/tenant_migration_test.js");
+load("jstests/replsets/libs/tenant_migration_util.js");
 load("jstests/libs/uuid_util.js");
 
 function makeTestNs(tenantId) {
@@ -31,9 +33,9 @@ function setup() {
 }
 
 const kDonorCertificateAndPrivateKey =
-    getCertificateAndPrivateKey("jstests/libs/tenant_migration_donor.pem");
+    TenantMigrationUtil.getCertificateAndPrivateKey("jstests/libs/tenant_migration_donor.pem");
 const kRecipientCertificateAndPrivateKey =
-    getCertificateAndPrivateKey("jstests/libs/tenant_migration_recipient.pem");
+    TenantMigrationUtil.getCertificateAndPrivateKey("jstests/libs/tenant_migration_recipient.pem");
 
 (() => {
     jsTest.log("Test valid donor and recipient certificates");
@@ -183,8 +185,8 @@ const kRecipientCertificateAndPrivateKey =
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
         tenantId: tenantId,
-        donorCertificateForRecipient:
-            getCertificateAndPrivateKey("jstests/libs/tenant_migration_donor_expired.pem"),
+        donorCertificateForRecipient: TenantMigrationUtil.getCertificateAndPrivateKey(
+            "jstests/libs/tenant_migration_donor_expired.pem"),
         recipientCertificateForDonor: kRecipientCertificateAndPrivateKey,
     };
     const {dbName, collName} = makeTestNs(tenantId);
@@ -302,8 +304,8 @@ const kRecipientCertificateAndPrivateKey =
         migrationIdString: extractUUIDFromObject(migrationId),
         tenantId: tenantId,
         donorCertificateForRecipient: kDonorCertificateAndPrivateKey,
-        recipientCertificateForDonor:
-            getCertificateAndPrivateKey("jstests/libs/tenant_migration_recipient_expired.pem"),
+        recipientCertificateForDonor: TenantMigrationUtil.getCertificateAndPrivateKey(
+            "jstests/libs/tenant_migration_recipient_expired.pem"),
     };
     const {dbName, collName} = makeTestNs(tenantId);
 
@@ -341,7 +343,7 @@ const kRecipientCertificateAndPrivateKey =
 
 if (!TestData.auth) {
     jsTestLog("Skipping testing authorization since auth is not enabled");
-    quit();
+    return;
 }
 
 (() => {
@@ -352,7 +354,7 @@ if (!TestData.auth) {
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
         tenantId: tenantId,
-        donorCertificateForRecipient: getCertificateAndPrivateKey(
+        donorCertificateForRecipient: TenantMigrationUtil.getCertificateAndPrivateKey(
             "jstests/libs/tenant_migration_donor_insufficient_privileges.pem"),
         recipientCertificateForDonor: kRecipientCertificateAndPrivateKey,
     };
@@ -375,7 +377,7 @@ if (!TestData.auth) {
         migrationIdString: extractUUIDFromObject(migrationId),
         tenantId: tenantId,
         donorCertificateForRecipient: kDonorCertificateAndPrivateKey,
-        recipientCertificateForDonor: getCertificateAndPrivateKey(
+        recipientCertificateForDonor: TenantMigrationUtil.getCertificateAndPrivateKey(
             "jstests/libs/tenant_migration_recipient_insufficient_privileges.pem"),
     };
     const {dbName, collName} = makeTestNs(tenantId);
@@ -386,4 +388,5 @@ if (!TestData.auth) {
     tenantMigrationTest.verifyRecipientDB(
         tenantId, dbName, collName, false /* migrationCommitted */);
     teardown();
+})();
 })();

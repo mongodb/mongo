@@ -11,8 +11,10 @@
  *   serverless,
  * ]
  */
+(function() {
+"use strict";
 
-import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/libs/uuid_util.js");        // For extractUUIDFromObject().
 load("jstests/libs/fail_point_util.js");  // For configureFailPoint().
 load("jstests/libs/parallelTester.js");   // For Thread.
@@ -104,3 +106,4 @@ assert.eq(0, bsonWoCompare(cmdResponse, retryResponse), retryResponse);
 
 assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 tenantMigrationTest.stop();
+})();

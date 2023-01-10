@@ -5,7 +5,6 @@
  * @tags: [requires_fcv_62, serverless]
  */
 
-import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {
     assertMigrationState,
     findSplitOperation,
@@ -13,6 +12,7 @@ import {
 } from "jstests/serverless/libs/shard_split_test.js";
 
 load("jstests/libs/fail_point_util.js");  // for "configureFailPoint"
+load("jstests/replsets/libs/tenant_migration_test.js");
 
 // Skip db hash check because secondary is left with a different config.
 TestData.skipCheckDBHashes = true;

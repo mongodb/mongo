@@ -10,19 +10,16 @@
  *   serverless,
  * ]
  */
-
-import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {
-    getCertificateAndPrivateKey,
-    makeX509OptionsForTest
-} from "jstests/replsets/libs/tenant_migration_util.js";
-
+(function() {
+"use strict";
 load("jstests/libs/uuid_util.js");           // For extractUUIDFromObject().
 load("jstests/libs/fail_point_util.js");     // For configureFailPoint().
 load("jstests/libs/write_concern_util.js");  // for 'stopReplicationOnSecondaries'
 load("jstests/libs/parallelTester.js");      // For Thread()
+load("jstests/replsets/libs/tenant_migration_test.js");
+load("jstests/replsets/libs/tenant_migration_util.js");
 
-const migrationX509Options = makeX509OptionsForTest();
+const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
 
 const recipientRst = new ReplSetTest({
     name: "recipRst",
@@ -121,8 +118,8 @@ function runRollbackAfterLoneRecipientForgetMigrationCommand(tenantId) {
     const kMigrationId = UUID();
     const kTenantId = tenantId;
     const kReadPreference = {mode: "primary"};
-    const recipientCertificateForDonor =
-        getCertificateAndPrivateKey("jstests/libs/tenant_migration_recipient.pem");
+    const recipientCertificateForDonor = TenantMigrationUtil.getCertificateAndPrivateKey(
+        "jstests/libs/tenant_migration_recipient.pem");
 
     const dbName = tenantMigrationTest.tenantDB(kTenantId, "testDB");
     const collName = "testColl";
@@ -221,3 +218,4 @@ runRollbackAfterMigrationCommitted(ObjectId().str);
 runRollbackAfterLoneRecipientForgetMigrationCommand(ObjectId().str);
 
 recipientRst.stopSet();
+})();

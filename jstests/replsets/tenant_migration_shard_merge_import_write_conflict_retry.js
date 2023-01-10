@@ -14,11 +14,11 @@
  *   serverless,
  * ]
  */
-
-import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {isShardMergeEnabled} from "jstests/replsets/libs/tenant_migration_util.js";
+(function() {
+"use strict";
 
 load("jstests/libs/uuid_util.js");
+load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/libs/fail_point_util.js");
 
 const migrationId = UUID();
@@ -26,10 +26,10 @@ const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 const donorPrimary = tenantMigrationTest.getDonorPrimary();
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
 
-if (!isShardMergeEnabled(recipientPrimary.getDB("admin"))) {
+if (!TenantMigrationUtil.isShardMergeEnabled(recipientPrimary.getDB("admin"))) {
     tenantMigrationTest.stop();
     jsTestLog("Skipping Shard Merge-specific test");
-    quit();
+    return;
 }
 
 const kDataDir =
@@ -87,3 +87,4 @@ tenantMigrationTest.getRecipientRst().nodes.forEach(node => {
 });
 
 tenantMigrationTest.stop();
+})();

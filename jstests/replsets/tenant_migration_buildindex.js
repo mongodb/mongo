@@ -10,24 +10,23 @@
  * ]
  */
 
-import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {
-    isShardMergeEnabled,
-    runMigrationAsync
-} from "jstests/replsets/libs/tenant_migration_util.js";
+(function() {
+"use strict";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
-load("jstests/replsets/rslib.js");  // 'createRstArgs'
+load("jstests/replsets/libs/tenant_migration_test.js");
+load("jstests/replsets/libs/tenant_migration_util.js");
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 // TODO (SERVER-63517): This test assumes the donor blocks only some tenants. Replace this test with
 // tenant_migration_buildindex_shard_merge.js.
-if (isShardMergeEnabled(tenantMigrationTest.getDonorPrimary().getDB("adminDB"))) {
+if (TenantMigrationUtil.isShardMergeEnabled(
+        tenantMigrationTest.getDonorPrimary().getDB("adminDB"))) {
     jsTestLog("Skip: incompatible with featureFlagShardMerge");
     tenantMigrationTest.stop();
-    quit();
+    return;
 }
 
 const kTenantId = ObjectId().str;
@@ -63,7 +62,7 @@ const migrationOpts = {
     recipientConnString: tenantMigrationTest.getRecipientConnString(),
     tenantId: kTenantId,
 };
-const donorRstArgs = createRstArgs(tenantMigrationTest.getDonorRst());
+const donorRstArgs = TenantMigrationUtil.createRstArgs(tenantMigrationTest.getDonorRst());
 
 // Put some data in the non-empty collections, and create the empty one.
 const db = donorPrimary.getDB(kDbName);
@@ -106,7 +105,8 @@ jsTestLog("Starting a migration and pausing after majority-committing the initia
 // Start a migration, and pause it after the donor has majority-committed the initial state doc.
 const dataSyncFp =
     configureFailPoint(donorPrimary, "pauseTenantMigrationBeforeLeavingDataSyncState");
-const migrationThread = new Thread(runMigrationAsync, migrationOpts, donorRstArgs);
+const migrationThread =
+    new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
 migrationThread.start();
 dataSyncFp.wait();
 
@@ -163,3 +163,4 @@ assert.commandFailedWithCode(db[kNewCollName2].createIndex({b: 1}),
 assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 
 tenantMigrationTest.stop();
+})();

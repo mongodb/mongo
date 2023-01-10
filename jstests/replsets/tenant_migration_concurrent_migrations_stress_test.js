@@ -14,9 +14,13 @@
  * ]
  */
 
-import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+(function() {
+"use strict";
+
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");  // for 'extractUUIDFromObject'
+load("jstests/replsets/libs/tenant_migration_test.js");
+load("jstests/replsets/libs/tenant_migration_util.js");
 load("jstests/replsets/rslib.js");  // for 'setLogVerbosity'
 
 const kMigrationsCount = 300;
@@ -217,3 +221,4 @@ for (let i = 0; i < kMigrationsCount; ++i) {
 }
 
 tenantMigrationTest.stop();
+})();

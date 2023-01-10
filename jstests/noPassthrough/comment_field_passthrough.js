@@ -7,10 +7,12 @@
  *   requires_sharding,
  * ]
  */
+(function() {
 
-import {authCommandsLib, firstDbName, secondDbName} from "jstests/auth/lib/commands_lib.js";
+"use strict";
 
-load("jstests/libs/fail_point_util.js");  // Helper to enable/disable failpoints easily.
+load("jstests/auth/lib/commands_lib.js");  // Provides an exhaustive list of commands.
+load("jstests/libs/fail_point_util.js");   // Helper to enable/disable failpoints easily.
 
 const tests = authCommandsLib.tests;
 
@@ -18,10 +20,13 @@ const tests = authCommandsLib.tests;
 const denylistedTests =
     ["startRecordingTraffic", "stopRecordingTraffic", "addShardToZone", "removeShardFromZone"];
 
-function runTests(tests, conn, impls, options) {
+function runTests(tests, conn, impls) {
+    const firstDb = conn.getDB(firstDbName);
+    const secondDb = conn.getDB(secondDbName);
+    const isMongos = authCommandsLib.isMongos(conn);
     for (const test of tests) {
         if (!denylistedTests.includes(test.testname)) {
-            authCommandsLib.runOneTest(conn, test, impls, options);
+            authCommandsLib.runOneTest(conn, test, impls, isMongos);
         }
     }
 }
@@ -68,6 +73,8 @@ MongoRunner.stopMongod(conn);
 // Test with a sharded cluster. Some tests require the first shard's name acquired from the
 // auth commands library to be up-to-date in order to set up correctly.
 conn = new ShardingTest({shards: 1, mongos: 2});
-runTests(tests, conn, impls, {shard0name: conn.shard0.shardName});
+shard0name = conn.shard0.shardName;
+runTests(tests, conn, impls);
 
 conn.stop();
+})();

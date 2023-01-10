@@ -11,16 +11,11 @@
  * ]
  */
 
-import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-import {
-    createCollectionAndInsertDocsForConcurrentWritesTest,
-    makeTestOptionsForConcurrentWritesTest,
-    runCommandForConcurrentWritesTest,
-    TenantMigrationConcurrentWriteUtil
-} from "jstests/replsets/tenant_migration_concurrent_writes_on_donor_util.js";
 import {assertMigrationState, ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
 
 load("jstests/libs/fail_point_util.js");
+load("jstests/replsets/libs/tenant_migration_test.js");
+load("jstests/replsets/tenant_migration_concurrent_writes_on_donor_util.js");
 
 TestData.skipCheckDBHashes = true;
 const tenantMigrationTest = new ShardSplitTest({

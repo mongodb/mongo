@@ -7,11 +7,15 @@
  * ]
  */
 
-import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+(function() {
+"use strict";
+
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");       // for 'extractUUIDFromObject'
 load("jstests/libs/parallelTester.js");  // for 'Thread'
 load("jstests/replsets/rslib.js");       // for 'setLogVerbosity'
+load("jstests/replsets/libs/tenant_migration_test.js");
+load("jstests/replsets/libs/tenant_migration_util.js");
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
@@ -61,3 +65,4 @@ tenantMigrationTest.waitForDonorNodesToReachState(
 assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));
 
 tenantMigrationTest.stop();
+})();
