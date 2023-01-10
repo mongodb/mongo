@@ -4,3 +4,4 @@
 -r components/testing.req
 
 -r components/aws.req
+-r components/tooling_metrics.req
