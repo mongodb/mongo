@@ -443,6 +443,40 @@ TEST(IDLOneTypeTests, TestBase64StringNegative) {
     }
 }
 
+TEST(IDLStructTests, EpochsParse) {
+    IDLParserContext ctxt("epoch");
+
+    auto sameTimeDoc = BSON("unix" << 1234567890 << "ecma" << 1234567890000);
+    auto sameTime = Struct_with_epochs::parse(ctxt, sameTimeDoc);
+    ASSERT_EQ(sameTime.getUnix(), sameTime.getEcma());
+    ASSERT_EQ(sameTime.getUnix().toDurationSinceEpoch(), Seconds{1234567890});
+    ASSERT_EQ(sameTime.getEcma().toDurationSinceEpoch(), Seconds{1234567890});
+
+    auto invalidTimeDoc = BSON("unix"
+                               << "bob"
+                               << "ecma" << 1234567890000);
+    ASSERT_THROWS_CODE_AND_WHAT(Struct_with_epochs::parse(ctxt, invalidTimeDoc),
+                                AssertionException,
+                                ErrorCodes::BadValue,
+                                "Epoch value must be numeric, got: string");
+}
+
+TEST(IDLStructTests, EpochSerialize) {
+    Struct_with_epochs writeVal;
+    writeVal.setUnix(Date_t::fromDurationSinceEpoch(Days{1}));
+    writeVal.setEcma(Date_t::fromDurationSinceEpoch(Days{2}));
+    BSONObjBuilder builder;
+    writeVal.serialize(&builder);
+    auto obj = builder.obj();
+
+    auto unixElem = obj["unix"];
+    auto ecmaElem = obj["ecma"];
+    ASSERT_EQ(unixElem.type(), NumberLong);
+    ASSERT_EQ(unixElem.numberLong(), 86400);
+    ASSERT_EQ(ecmaElem.type(), NumberLong);
+    ASSERT_EQ(ecmaElem.numberLong(), 2 * 86400 * 1000);
+}
+
 // Postive: Test any type
 TEST(IDLOneTypeTests, TestAnyType) {
     IDLParserContext ctxt("root");

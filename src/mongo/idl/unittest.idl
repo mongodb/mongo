@@ -896,7 +896,17 @@ structs:
                 type: array<string>
                 validator: { callback: 'validateAllCapsArray' }
 
+##################################################################################################
+#
+# Date types
+#
+##################################################################################################
 
+    struct_with_epochs:
+        description: A struct expecting a unix epoch and a millis epoch.
+        fields:
+            unix: unixEpoch
+            ecma: millisEpoch
 
 ##################################################################################################
 #
