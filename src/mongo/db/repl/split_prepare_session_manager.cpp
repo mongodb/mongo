@@ -32,22 +32,78 @@
 namespace mongo {
 namespace repl {
 
-SplitPrepareSessionManager::SplitPrepareSessionManager(const InternalSessionPool* sessionPool)
+SplitPrepareSessionManager::SplitPrepareSessionManager(InternalSessionPool* sessionPool)
     : _sessionPool(sessionPool) {}
 
-std::vector<LogicalSessionId> SplitPrepareSessionManager::splitSession(
+const std::vector<PooledSession>& SplitPrepareSessionManager::splitSession(
     const LogicalSessionId& sessionId, TxnNumber txnNumber, int numSplits) {
-    return {};
+    invariant(numSplits > 0);
+    stdx::lock_guard<Latch> lk(_mutex);
+
+    auto [it, succ] =
+        _splitSessionMap.try_emplace(sessionId, txnNumber, std::vector<PooledSession>());
+
+    // The session must not be split before.
+    invariant(succ);
+
+    auto& sessions = it->second.second;
+    sessions.reserve(numSplits);
+
+    for (int i = 0; i < numSplits; i++) {
+        sessions.push_back(_sessionPool->acquireSystemSession());
+    }
+
+    return sessions;
 }
 
-boost::optional<std::vector<LogicalSessionId>> SplitPrepareSessionManager::getSplitSessionIds(
+boost::optional<const std::vector<PooledSession>&> SplitPrepareSessionManager::getSplitSessions(
     const LogicalSessionId& sessionId, TxnNumber txnNumber) const {
-    return {};
+    stdx::lock_guard<Latch> lk(_mutex);
+
+    auto it = _splitSessionMap.find(sessionId);
+    if (it == _splitSessionMap.end()) {
+        return boost::none;
+    }
+
+    // The txnNumber must not change after the session was split.
+    invariant(txnNumber == it->second.first);
+
+    return it->second.second;
+}
+
+bool SplitPrepareSessionManager::isSessionSplit(const LogicalSessionId& sessionId,
+                                                TxnNumber txnNumber) const {
+    stdx::lock_guard<Latch> lk(_mutex);
+
+    auto it = _splitSessionMap.find(sessionId);
+    if (it == _splitSessionMap.end()) {
+        return false;
+    }
+
+    // The txnNumber must not change after the session was split.
+    invariant(txnNumber == it->second.first);
+
+    return true;
 }
 
 void SplitPrepareSessionManager::releaseSplitSessions(const LogicalSessionId& sessionId,
                                                       TxnNumber txnNumber) {
-    return;
+    stdx::lock_guard<Latch> lk(_mutex);
+
+    auto it = _splitSessionMap.find(sessionId);
+
+    // The session must already be split and tracked.
+    invariant(it != _splitSessionMap.end());
+
+    // The txnNumber must not change after the session was split.
+    invariant(txnNumber == it->second.first);
+
+    auto& sessions = it->second.second;
+    for (const auto& sess : sessions) {
+        _sessionPool->release(sess);
+    }
+
+    _splitSessionMap.erase(it);
 }
 
 }  // namespace repl

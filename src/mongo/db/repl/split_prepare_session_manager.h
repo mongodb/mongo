@@ -36,6 +36,8 @@
 namespace mongo {
 namespace repl {
 
+using PooledSession = InternalSessionPool::Session;
+
 /**
  * This class manages the sessions for split prepared transactions.
  *
@@ -46,26 +48,33 @@ namespace repl {
  * by both primaries and secondaries.
  */
 class SplitPrepareSessionManager {
-    explicit SplitPrepareSessionManager(const InternalSessionPool* sessionPool);
     SplitPrepareSessionManager(const SplitPrepareSessionManager&) = delete;
     SplitPrepareSessionManager& operator=(const SplitPrepareSessionManager&) = delete;
 
 public:
+    explicit SplitPrepareSessionManager(InternalSessionPool* sessionPool);
+
     /**
      * Creates split sessions for the given top-level session and track the mapping.
      *
      * Asserts if the given session is already split.
      */
-    std::vector<LogicalSessionId> splitSession(const LogicalSessionId& sessionId,
-                                               TxnNumber txnNumber,
-                                               int numSplits);
+    const std::vector<PooledSession>& splitSession(const LogicalSessionId& sessionId,
+                                                   TxnNumber txnNumber,
+                                                   int numSplits);
 
     /**
      * Returns a vector of split sessions for the given top-level session, or nothing if
      * the given session has not been split.
      */
-    boost::optional<std::vector<LogicalSessionId>> getSplitSessionIds(
+    boost::optional<const std::vector<PooledSession>&> getSplitSessions(
         const LogicalSessionId& sessionId, TxnNumber txnNumber) const;
+
+    /**
+     * Returns true if the given session has been split, or false otherwise. This can be
+     * used as an alternative to getSplitSessionIds() when the result is not needed.
+     */
+    bool isSessionSplit(const LogicalSessionId& sessionId, TxnNumber txnNumber) const;
 
     /**
      * Releases all the split sessions of the give top-level session into the session pool
@@ -80,7 +89,10 @@ private:
     mutable Mutex _mutex = MONGO_MAKE_LATCH("SplitPrepareSessionManager::_mutex");
 
     // The global session pool storing reusable sessions, from which split sessions are acquired.
-    const InternalSessionPool* _sessionPool;
+    InternalSessionPool* _sessionPool;
+
+    // A map to track top-level sessions and their splits.
+    LogicalSessionIdMap<std::pair<TxnNumber, std::vector<PooledSession>>> _splitSessionMap;
 };
 
 }  // namespace repl
