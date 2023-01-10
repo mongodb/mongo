@@ -19,6 +19,11 @@ assertDocumentCount = function(db, count) {
  * deleted. MongoDB does not always delete data immediately with a catalog change.
  */
 const waitForDatabaseDirectoryRemoval = function(dbName, dbDirPath) {
+    // The periodic task to drop data tables for two-phase commit runs once per second and
+    // in standalone mode, without timestamps, can execute table drops immediately. It should
+    // only take a couple seconds for the periodic task to start removing any data tables.
+    // However, slow disk access may delay the actual removal of the directory.
+    // Therefore, we should be conservative and use the default timeout in assert.soon().
     assert.soon(
         function() {
             const files = listFiles(dbDirPath).filter(function(path) {
@@ -31,8 +36,7 @@ const waitForDatabaseDirectoryRemoval = function(dbName, dbDirPath) {
             }
         },
         "dbpath contained '" + dbName +
-            "' directory when it should have been removed: " + tojson(listFiles(dbDirPath)),
-        10 * 1000);  // The periodic task to run data table cleanup runs once a second.
+            "' directory when it should have been removed: " + tojson(listFiles(dbDirPath)));
 };
 
 /**
