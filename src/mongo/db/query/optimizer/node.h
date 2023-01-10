@@ -755,6 +755,12 @@ class GroupByNode : public ABTOpFixedArity<5>, public Node {
     using Base = ABTOpFixedArity<5>;
 
 public:
+    /**
+     * groupByProjectionNames: The group keys for the group operation. These bindings are also
+     * accessible to parents of this node. aggregationProjectionNames: The output bindings for each
+     * aggregation function. aggregationExpressions: The aggregation functions to compute the values
+     * for the groups.
+     */
     GroupByNode(ProjectionNameVector groupByProjectionNames,
                 ProjectionNameVector aggregationProjectionNames,
                 ABTVector aggregationExpressions,

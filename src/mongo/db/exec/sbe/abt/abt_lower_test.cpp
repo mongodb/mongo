@@ -318,6 +318,40 @@ TEST_F(ABTPlanGeneration, LowerFilterNode) {
                                _node(scanForTest()))));
 }
 
+TEST_F(ABTPlanGeneration, LowerGroupByNode) {
+    GoldenTestContext ctx(&goldenTestConfig);
+    ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
+
+    std::vector<GroupNodeType> groupTypes{
+        GroupNodeType::Complete, GroupNodeType::Local, GroupNodeType::Global};
+
+    for (const auto& groupType : groupTypes) {
+        runNodeVariation(
+            ctx,
+            str::stream() << "GroupByNode one output with type "
+                          << GroupNodeTypeEnum::toString[static_cast<int>(groupType)],
+            _node(make<GroupByNode>(
+                ProjectionNameVector{"key1", "key2"},
+                ProjectionNameVector{"outFunc1"},
+                makeSeq(make<FunctionCall>("$sum", makeSeq(make<Variable>("aggInput1")))),
+                groupType,
+                createBindings({{"a", "key1"}, {"b", "key2"}, {"c", "aggInput1"}}))));
+
+        runNodeVariation(
+            ctx,
+            str::stream() << "GroupByNode multiple outputs with type "
+                          << GroupNodeTypeEnum::toString[static_cast<int>(groupType)],
+            _node(make<GroupByNode>(
+                ProjectionNameVector{"key1", "key2"},
+                ProjectionNameVector{"outFunc1", "outFunc2"},
+                makeSeq(make<FunctionCall>("$sum", makeSeq(make<Variable>("aggInput1"))),
+                        make<FunctionCall>("$sum", makeSeq(make<Variable>("aggInput2")))),
+                groupType,
+                createBindings(
+                    {{"a", "key1"}, {"b", "key2"}, {"c", "aggInput1"}, {"d", "aggInput2"}}))));
+    }
+}
+
 TEST_F(ABTPlanGeneration, LowerHashJoinNode) {
     GoldenTestContext ctx(&goldenTestConfig);
     ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
@@ -367,6 +401,7 @@ TEST_F(ABTPlanGeneration, LowerHashJoinNode) {
                                               std::move(child1),
                                               std::move(child2))));
 }
+
 
 TEST_F(ABTPlanGeneration, LowerLimitSkipNode) {
     GoldenTestContext ctx(&goldenTestConfig);

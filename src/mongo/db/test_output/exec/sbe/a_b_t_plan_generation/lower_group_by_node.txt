@@ -1,0 +1,277 @@
+# Golden test output of ABTPlanGeneration/LowerGroupByNode
+
+==== VARIATION: GroupByNode one output with type Complete ====
+-- INPUT:
+GroupBy []
+|   |   groupings: 
+|   |       RefBlock: 
+|   |           Variable [key1]
+|   |           Variable [key2]
+|   aggregations: 
+|       [outFunc1]
+|           FunctionCall [$sum]
+|           Variable [aggInput1]
+Evaluation []
+|   BindBlock:
+|       [aggInput1]
+|           FunctionCall [getField]
+|           |   Const ["c"]
+|           Variable [scan0]
+Evaluation []
+|   BindBlock:
+|       [key2]
+|           FunctionCall [getField]
+|           |   Const ["b"]
+|           Variable [scan0]
+Evaluation []
+|   BindBlock:
+|       [key1]
+|           FunctionCall [getField]
+|           |   Const ["a"]
+|           Variable [scan0]
+PhysicalScan [{'<root>': scan0}, collName]
+    BindBlock:
+        [scan0]
+            Source []
+
+-- OUTPUT:
+[4] group [s2, s3] [s5 = sum(s4)] 
+[3] project [s4 = getField(s1, "c")] 
+[2] project [s3 = getField(s1, "b")] 
+[1] project [s2 = getField(s1, "a")] 
+[0] scan s1 none none none none none [] @"<collUUID>" true false 
+
+==== VARIATION: GroupByNode multiple outputs with type Complete ====
+-- INPUT:
+GroupBy []
+|   |   groupings: 
+|   |       RefBlock: 
+|   |           Variable [key1]
+|   |           Variable [key2]
+|   aggregations: 
+|       [outFunc1]
+|           FunctionCall [$sum]
+|           Variable [aggInput1]
+|       [outFunc2]
+|           FunctionCall [$sum]
+|           Variable [aggInput2]
+Evaluation []
+|   BindBlock:
+|       [aggInput2]
+|           FunctionCall [getField]
+|           |   Const ["d"]
+|           Variable [scan0]
+Evaluation []
+|   BindBlock:
+|       [aggInput1]
+|           FunctionCall [getField]
+|           |   Const ["c"]
+|           Variable [scan0]
+Evaluation []
+|   BindBlock:
+|       [key2]
+|           FunctionCall [getField]
+|           |   Const ["b"]
+|           Variable [scan0]
+Evaluation []
+|   BindBlock:
+|       [key1]
+|           FunctionCall [getField]
+|           |   Const ["a"]
+|           Variable [scan0]
+PhysicalScan [{'<root>': scan0}, collName]
+    BindBlock:
+        [scan0]
+            Source []
+
+-- OUTPUT:
+[5] group [s2, s3] [s6 = sum(s4), s7 = sum(s5)] 
+[4] project [s5 = getField(s1, "d")] 
+[3] project [s4 = getField(s1, "c")] 
+[2] project [s3 = getField(s1, "b")] 
+[1] project [s2 = getField(s1, "a")] 
+[0] scan s1 none none none none none [] @"<collUUID>" true false 
+
+==== VARIATION: GroupByNode one output with type Local ====
+-- INPUT:
+GroupBy [Local]
+|   |   groupings: 
+|   |       RefBlock: 
+|   |           Variable [key1]
+|   |           Variable [key2]
+|   aggregations: 
+|       [outFunc1]
+|           FunctionCall [$sum]
+|           Variable [aggInput1]
+Evaluation []
+|   BindBlock:
+|       [aggInput1]
+|           FunctionCall [getField]
+|           |   Const ["c"]
+|           Variable [scan0]
+Evaluation []
+|   BindBlock:
+|       [key2]
+|           FunctionCall [getField]
+|           |   Const ["b"]
+|           Variable [scan0]
+Evaluation []
+|   BindBlock:
+|       [key1]
+|           FunctionCall [getField]
+|           |   Const ["a"]
+|           Variable [scan0]
+PhysicalScan [{'<root>': scan0}, collName]
+    BindBlock:
+        [scan0]
+            Source []
+
+-- OUTPUT:
+[4] group [s2, s3] [s5 = sum(s4)] 
+[3] project [s4 = getField(s1, "c")] 
+[2] project [s3 = getField(s1, "b")] 
+[1] project [s2 = getField(s1, "a")] 
+[0] scan s1 none none none none none [] @"<collUUID>" true false 
+
+==== VARIATION: GroupByNode multiple outputs with type Local ====
+-- INPUT:
+GroupBy [Local]
+|   |   groupings: 
+|   |       RefBlock: 
+|   |           Variable [key1]
+|   |           Variable [key2]
+|   aggregations: 
+|       [outFunc1]
+|           FunctionCall [$sum]
+|           Variable [aggInput1]
+|       [outFunc2]
+|           FunctionCall [$sum]
+|           Variable [aggInput2]
+Evaluation []
+|   BindBlock:
+|       [aggInput2]
+|           FunctionCall [getField]
+|           |   Const ["d"]
+|           Variable [scan0]
+Evaluation []
+|   BindBlock:
+|       [aggInput1]
+|           FunctionCall [getField]
+|           |   Const ["c"]
+|           Variable [scan0]
+Evaluation []
+|   BindBlock:
+|       [key2]
+|           FunctionCall [getField]
+|           |   Const ["b"]
+|           Variable [scan0]
+Evaluation []
+|   BindBlock:
+|       [key1]
+|           FunctionCall [getField]
+|           |   Const ["a"]
+|           Variable [scan0]
+PhysicalScan [{'<root>': scan0}, collName]
+    BindBlock:
+        [scan0]
+            Source []
+
+-- OUTPUT:
+[5] group [s2, s3] [s6 = sum(s4), s7 = sum(s5)] 
+[4] project [s5 = getField(s1, "d")] 
+[3] project [s4 = getField(s1, "c")] 
+[2] project [s3 = getField(s1, "b")] 
+[1] project [s2 = getField(s1, "a")] 
+[0] scan s1 none none none none none [] @"<collUUID>" true false 
+
+==== VARIATION: GroupByNode one output with type Global ====
+-- INPUT:
+GroupBy [Global]
+|   |   groupings: 
+|   |       RefBlock: 
+|   |           Variable [key1]
+|   |           Variable [key2]
+|   aggregations: 
+|       [outFunc1]
+|           FunctionCall [$sum]
+|           Variable [aggInput1]
+Evaluation []
+|   BindBlock:
+|       [aggInput1]
+|           FunctionCall [getField]
+|           |   Const ["c"]
+|           Variable [scan0]
+Evaluation []
+|   BindBlock:
+|       [key2]
+|           FunctionCall [getField]
+|           |   Const ["b"]
+|           Variable [scan0]
+Evaluation []
+|   BindBlock:
+|       [key1]
+|           FunctionCall [getField]
+|           |   Const ["a"]
+|           Variable [scan0]
+PhysicalScan [{'<root>': scan0}, collName]
+    BindBlock:
+        [scan0]
+            Source []
+
+-- OUTPUT:
+[4] group [s2, s3] [s5 = sum(s4)] 
+[3] project [s4 = getField(s1, "c")] 
+[2] project [s3 = getField(s1, "b")] 
+[1] project [s2 = getField(s1, "a")] 
+[0] scan s1 none none none none none [] @"<collUUID>" true false 
+
+==== VARIATION: GroupByNode multiple outputs with type Global ====
+-- INPUT:
+GroupBy [Global]
+|   |   groupings: 
+|   |       RefBlock: 
+|   |           Variable [key1]
+|   |           Variable [key2]
+|   aggregations: 
+|       [outFunc1]
+|           FunctionCall [$sum]
+|           Variable [aggInput1]
+|       [outFunc2]
+|           FunctionCall [$sum]
+|           Variable [aggInput2]
+Evaluation []
+|   BindBlock:
+|       [aggInput2]
+|           FunctionCall [getField]
+|           |   Const ["d"]
+|           Variable [scan0]
+Evaluation []
+|   BindBlock:
+|       [aggInput1]
+|           FunctionCall [getField]
+|           |   Const ["c"]
+|           Variable [scan0]
+Evaluation []
+|   BindBlock:
+|       [key2]
+|           FunctionCall [getField]
+|           |   Const ["b"]
+|           Variable [scan0]
+Evaluation []
+|   BindBlock:
+|       [key1]
+|           FunctionCall [getField]
+|           |   Const ["a"]
+|           Variable [scan0]
+PhysicalScan [{'<root>': scan0}, collName]
+    BindBlock:
+        [scan0]
+            Source []
+
+-- OUTPUT:
+[5] group [s2, s3] [s6 = sum(s4), s7 = sum(s5)] 
+[4] project [s5 = getField(s1, "d")] 
+[3] project [s4 = getField(s1, "c")] 
+[2] project [s3 = getField(s1, "b")] 
+[1] project [s2 = getField(s1, "a")] 
+[0] scan s1 none none none none none [] @"<collUUID>" true false 
