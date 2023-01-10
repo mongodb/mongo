@@ -832,10 +832,18 @@ ExecutorFuture<void> TenantMigrationDonorService::Instance::_sendRecipientForget
     MigrationRecipientCommonData commonData(
         _migrationUuid, donorConnString.toString(), _readPreference);
     commonData.setRecipientCertificateForDonor(_recipientCertificateForDonor);
-    if (_protocol == MigrationProtocolEnum::kMultitenantMigrations) {
-        commonData.setTenantId(boost::optional<StringData>(_tenantId));
-    } else {
-        commonData.setTenantIds(_tenantIds);
+    {
+        stdx::lock_guard<Latch> lg(_mutex);
+        if (_protocol == MigrationProtocolEnum::kMultitenantMigrations) {
+            commonData.setTenantId(boost::optional<StringData>(_tenantId));
+        } else {
+            commonData.setTenantIds(_tenantIds);
+            if (_stateDoc.getState() == TenantMigrationDonorStateEnum::kCommitted) {
+                request.setDecision(MigrationDecisionEnum::kCommitted);
+            } else {
+                request.setDecision(MigrationDecisionEnum::kAborted);
+            }
+        }
     }
 
     commonData.setProtocol(_protocol);

@@ -170,7 +170,7 @@ inline Status validatePrivateKeyPEMPayload(const StringData& payload) {
 }
 
 
-inline void protocolTenantIdCompatibilityCheck(const MigrationProtocolEnum& protocol,
+inline void protocolTenantIdCompatibilityCheck(const MigrationProtocolEnum protocol,
                                                const boost::optional<StringData>& tenantId) {
     switch (protocol) {
         case MigrationProtocolEnum::kShardMerge: {
@@ -193,8 +193,7 @@ inline void protocolTenantIdCompatibilityCheck(const MigrationProtocolEnum& prot
 }
 
 inline void protocolTenantIdsCompatibilityCheck(
-    const MigrationProtocolEnum& protocol,
-    const boost::optional<std::vector<TenantId>>& tenantIds) {
+    const MigrationProtocolEnum protocol, const boost::optional<std::vector<TenantId>>& tenantIds) {
     if (serverGlobalParams.featureCompatibility.isLessThan(
             multiversion::FeatureCompatibilityVersion::kVersion_6_3)) {
         uassert(ErrorCodes::InvalidOptions,
@@ -224,7 +223,7 @@ inline void protocolTenantIdsCompatibilityCheck(
 }
 
 inline void protocolStorageOptionsCompatibilityCheck(OperationContext* opCtx,
-                                                     const MigrationProtocolEnum& protocol) {
+                                                     const MigrationProtocolEnum protocol) {
     if (protocol != MigrationProtocolEnum::kShardMerge)
         return;
 
@@ -240,7 +239,7 @@ inline void protocolStorageOptionsCompatibilityCheck(OperationContext* opCtx,
 }
 
 inline void protocolReadPreferenceCompatibilityCheck(OperationContext* opCtx,
-                                                     const MigrationProtocolEnum& protocol,
+                                                     const MigrationProtocolEnum protocol,
                                                      const ReadPreferenceSetting& readPreference) {
     if (protocol != MigrationProtocolEnum::kShardMerge)
         return;

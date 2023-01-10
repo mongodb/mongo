@@ -220,5 +220,17 @@ nullTimestamps.forEach((nullTs) => {
                                  ErrorCodes.BadValue);
 });
 
+// The decision field must not be set for recipientForgetMigration with multitenant migration
+assert.commandFailedWithCode(recipientPrimary.adminCommand({
+    recipientForgetMigration: 1,
+    migrationId: UUID(),
+    tenantId: ObjectId().str,
+    donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
+    readPreference,
+    recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
+    decision: "committed"
+}),
+                             ErrorCodes.InvalidOptions);
+
 tenantMigrationTest.stop();
 })();

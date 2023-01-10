@@ -42,6 +42,14 @@ imports:
   - "mongo/db/repl/replication_types.idl"
   - "mongo/util/net/hostandport.idl"
 
+enums:
+    MigrationDecision:
+        description: "Whether the migration committed or aborted."
+        type: string
+        values:
+            kCommitted: "committed"
+            kAborted: "aborted"
+
 structs:
     recipientSyncDataResponse:
         description: "Response for the 'recipientSyncData' command"
@@ -158,3 +166,8 @@ commands:
     inline_chained_structs: true
     chained_structs:
       MigrationRecipientCommonData: MigrationRecipientCommonData
+    fields:
+      decision:
+        description: "Enumeration that defines whether the migration committed or aborted. This field applies only for shard merge protocol"
+        type: MigrationDecision
+        optional: true

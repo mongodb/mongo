@@ -197,5 +197,18 @@ assert.commandFailedWithCode(recipientPrimary.adminCommand({
     recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor,
 }),
                              ErrorCodes.InvalidOptions);
+
+// The decision field must be set for recipientForgetMigration with shard merge
+assert.commandFailedWithCode(recipientPrimary.adminCommand({
+    recipientForgetMigration: 1,
+    protocol: "shard merge",
+    migrationId: UUID(),
+    tenantIds: [ObjectId()],
+    donorConnectionString: tenantMigrationTest.getDonorRst().getURL(),
+    readPreference,
+    recipientCertificateForDonor: migrationCertificates.recipientCertificateForDonor
+}),
+                             ErrorCodes.InvalidOptions);
+
 tenantMigrationTest.stop();
 })();
