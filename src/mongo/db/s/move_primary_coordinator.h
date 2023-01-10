@@ -70,6 +70,13 @@ private:
     std::vector<NamespaceString> getUnshardedCollections(OperationContext* opCtx);
 
     /**
+     * Ensures that there are no orphaned collections in the recipient's catalog data, asserting
+     * otherwise.
+     */
+    void assertNoOrphanedDataOnRecipient(
+        OperationContext* opCtx, const std::vector<NamespaceString>& collectionsToClone) const;
+
+    /**
      * Requests to the recipient to clone all the collections of the given database currently owned
      * by this shard. Once the cloning is complete, the recipient returns the list of the actually
      * cloned collections as part of the response.
@@ -108,6 +115,12 @@ private:
      * Drops stale collections on the donor.
      */
     void dropStaleDataOnDonor(OperationContext* opCtx) const;
+
+    /**
+     * Drops possible orphaned collections on the recipient.
+     */
+    void dropOrphanedDataOnRecipient(OperationContext* opCtx,
+                                     std::shared_ptr<executor::ScopedTaskExecutor> executor);
 
     /**
      * Blocks write operations on the database, causing them to fail with the

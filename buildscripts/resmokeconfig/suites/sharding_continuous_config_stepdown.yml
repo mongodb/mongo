@@ -166,7 +166,7 @@ selector:
   - jstests/sharding/regex_targeting.js
   # Calls movePrimary after data has been inserted into an unsharded collection, so will fail if
   # a stepdown causes the command to be sent again.
-  - jstests/sharding/move_primary_clone_test.js
+  - jstests/sharding/move_primary_clone.js
   - jstests/sharding/mongos_validate_writes.js
   - jstests/sharding/movePrimary1.js
   # Asserts that the _flushDatabaseCacheUpdates at the end of _configsvrCreateDatabase is sent, but

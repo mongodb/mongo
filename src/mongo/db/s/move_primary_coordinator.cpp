@@ -29,10 +29,15 @@
 
 #include "mongo/db/s/move_primary_coordinator.h"
 
+#include <algorithm>
+
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/client/connpool.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/commands/list_collections_filter.h"
 #include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/s/sharding_state.h"
@@ -112,7 +117,7 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
     return ExecutorFuture<void>(**executor)
         .then(_buildPhaseHandler(
             Phase::kClone,
-            [this, anchor = shared_from_this()] {
+            [this, executor = executor, anchor = shared_from_this()] {
                 const auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
@@ -131,10 +136,16 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                 });
 
                 if (!_firstExecution) {
+                    // The previous execution failed with a retryable error and the recipient may
+                    // have cloned part of the data. Orphaned data on recipient must be dropped and
+                    // the `movePrimary` operation must fail in order to delegate to the caller the
+                    // decision to retry the operation.
+                    dropOrphanedDataOnRecipient(opCtx, executor);
+
                     uasserted(
                         7120202,
-                        "movePrimary operation on database {} failed cloning data to shard {}"_format(
-                            _dbName.toString(), _doc.getToShardId().toString()));
+                        "movePrimary operation on database {} failed cloning data to recipient"_format(
+                            _dbName.toString()));
                 }
 
                 blockWritesLegacy(opCtx);
@@ -144,16 +155,21 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                     hangBeforeCloningCatalogData.pauseWhileSet(opCtx);
                 }
 
-                _doc.setCollectionsToClone(getUnshardedCollections(opCtx));
+                const auto& collectionsToClone = getUnshardedCollections(opCtx);
+                assertNoOrphanedDataOnRecipient(opCtx, collectionsToClone);
+
+                _doc.setCollectionsToClone(collectionsToClone);
                 _updateStateDocument(opCtx, StateDoc(_doc));
 
                 const auto cloneResponse = cloneDataToRecipient(opCtx);
                 const auto cloneStatus = Shard::CommandResponse::getEffectiveStatus(cloneResponse);
                 if (!cloneStatus.isOK() || !checkClonedData(cloneResponse.getValue())) {
+                    dropOrphanedDataOnRecipient(opCtx, executor);
+
                     uasserted(
                         cloneStatus.isOK() ? 7120204 : cloneStatus.code(),
-                        "movePrimary operation on database {} failed cloning data to shard {}"_format(
-                            _dbName.toString(), _doc.getToShardId().toString()));
+                        "movePrimary operation on database {} failed cloning data to recipient"_format(
+                            _dbName.toString()));
                 }
 
                 // TODO (SERVER-71566): Temporary solution to cover the case of stepping down before
@@ -262,9 +278,8 @@ std::vector<NamespaceString> MovePrimaryCoordinator::getUnshardedCollections(
     OperationContext* opCtx) {
     const auto allCollections = [&] {
         DBDirectClient dbClient(opCtx);
-        const auto collInfos = dbClient.getCollectionInfos(_dbName,
-                                                           BSON("type"
-                                                                << "collection"));
+        const auto collInfos =
+            dbClient.getCollectionInfos(_dbName, ListCollectionsFilter::makeTypeCollectionFilter());
 
         std::vector<NamespaceString> colls;
         for (const auto& collInfo : collInfos) {
@@ -298,6 +313,44 @@ std::vector<NamespaceString> MovePrimaryCoordinator::getUnshardedCollections(
                         std::back_inserter(unshardedCollections));
 
     return unshardedCollections;
+}
+
+void MovePrimaryCoordinator::assertNoOrphanedDataOnRecipient(
+    OperationContext* opCtx, const std::vector<NamespaceString>& collectionsToClone) const {
+    auto allCollections = [&] {
+        const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
+        const auto toShard = uassertStatusOK(shardRegistry->getShard(opCtx, _doc.getToShardId()));
+
+        const auto listCommand = [&] {
+            BSONObjBuilder commandBuilder;
+            commandBuilder.append("listCollections", 1);
+            commandBuilder.append("filter", ListCollectionsFilter::makeTypeCollectionFilter());
+            return commandBuilder.obj();
+        }();
+
+        const auto listResponse = uassertStatusOK(
+            toShard->runExhaustiveCursorCommand(opCtx,
+                                                ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                                                _dbName.toString(),
+                                                listCommand,
+                                                Milliseconds(-1)));
+
+        std::vector<NamespaceString> colls;
+        for (const auto& bsonColl : listResponse.docs) {
+            std::string collName;
+            uassertStatusOK(bsonExtractStringField(bsonColl, "name", &collName));
+            colls.push_back({_dbName, collName});
+        }
+
+        std::sort(colls.begin(), colls.end());
+        return colls;
+    }();
+
+    for (const auto& nss : collectionsToClone) {
+        uassert(ErrorCodes::NamespaceExists,
+                "Found orphaned collection {} on recipient"_format(nss.toString()),
+                !std::binary_search(allCollections.cbegin(), allCollections.cend(), nss));
+    };
 }
 
 StatusWith<Shard::CommandResponse> MovePrimaryCoordinator::cloneDataToRecipient(
@@ -416,6 +469,27 @@ void MovePrimaryCoordinator::dropStaleDataOnDonor(OperationContext* opCtx) const
                           "namespace"_attr = nss,
                           "error"_attr = redact(dropStatus));
         }
+    }
+}
+
+void MovePrimaryCoordinator::dropOrphanedDataOnRecipient(
+    OperationContext* opCtx, std::shared_ptr<executor::ScopedTaskExecutor> executor) {
+    if (!_doc.getCollectionsToClone()) {
+        // A retryable error occurred before to persist the collections to clone, consequently no
+        // data has been cloned yet.
+        return;
+    }
+
+    // Make a copy of this container since `_updateSession` changes the coordinator document.
+    const auto collectionsToClone = *_doc.getCollectionsToClone();
+    for (const auto& nss : collectionsToClone) {
+        _updateSession(opCtx);
+        sharding_ddl_util::sendDropCollectionParticipantCommandToShards(opCtx,
+                                                                        nss,
+                                                                        {_doc.getToShardId()},
+                                                                        **executor,
+                                                                        getCurrentSession(),
+                                                                        false /* fromMigrate */);
     }
 }
 

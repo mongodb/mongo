@@ -558,6 +558,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/commands/cluster_server_parameter_commands_invocation',
         '$BUILD_DIR/mongo/db/commands/core',
         '$BUILD_DIR/mongo/db/commands/create_command',
+        '$BUILD_DIR/mongo/db/commands/list_collections_filter',
         '$BUILD_DIR/mongo/db/commands/mongod_fcv',
         '$BUILD_DIR/mongo/db/commands/rename_collection_idl',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
