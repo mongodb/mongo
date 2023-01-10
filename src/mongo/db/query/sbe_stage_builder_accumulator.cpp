@@ -205,6 +205,21 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulatorAvg(
     return aggs;
 }
 
+std::vector<std::unique_ptr<sbe::EExpression>> buildCombinePartialAggsAvg(
+    const AccumulationExpression& expr,
+    const sbe::value::SlotVector& inputSlots,
+    boost::optional<sbe::value::SlotId> collatorSlot,
+    sbe::value::FrameIdGenerator& frameIdGenerator) {
+    tassert(7039539,
+            "partial agg combiner for $avg should have exactly two input slots",
+            inputSlots.size() == 2);
+
+    std::vector<std::unique_ptr<sbe::EExpression>> aggs;
+    aggs.push_back(makeFunction("aggMergeDoubleDoubleSums", makeVariable(inputSlots[0])));
+    aggs.push_back(makeFunction("sum", makeVariable(inputSlots[1])));
+    return aggs;
+}
+
 std::unique_ptr<sbe::EExpression> buildFinalizeAvg(StageBuilderState& state,
                                                    const AccumulationExpression& expr,
                                                    const sbe::value::SlotVector& aggSlots) {
@@ -286,6 +301,20 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulatorSum(
     sbe::value::FrameIdGenerator& frameIdGenerator) {
     std::vector<std::unique_ptr<sbe::EExpression>> aggs;
     aggs.push_back(makeFunction("aggDoubleDoubleSum", std::move(arg)));
+    return aggs;
+}
+
+std::vector<std::unique_ptr<sbe::EExpression>> buildCombinePartialAggsSum(
+    const AccumulationExpression& expr,
+    const sbe::value::SlotVector& inputSlots,
+    boost::optional<sbe::value::SlotId> collatorSlot,
+    sbe::value::FrameIdGenerator& frameIdGenerator) {
+    tassert(7039530,
+            "partial agg combiner for $sum should have exactly one input slot",
+            inputSlots.size() == 1);
+    auto arg = makeVariable(inputSlots[0]);
+    std::vector<std::unique_ptr<sbe::EExpression>> aggs;
+    aggs.push_back(makeFunction("aggMergeDoubleDoubleSums", std::move(arg)));
     return aggs;
 }
 
@@ -470,6 +499,20 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulatorStdDev(
     return aggs;
 }
 
+std::vector<std::unique_ptr<sbe::EExpression>> buildCombinePartialAggsStdDev(
+    const AccumulationExpression& expr,
+    const sbe::value::SlotVector& inputSlots,
+    boost::optional<sbe::value::SlotId> collatorSlot,
+    sbe::value::FrameIdGenerator& frameIdGenerator) {
+    tassert(7039540,
+            "partial agg combiner for stddev should have exactly one input slot",
+            inputSlots.size() == 1);
+    auto arg = makeVariable(inputSlots[0]);
+    std::vector<std::unique_ptr<sbe::EExpression>> aggs;
+    aggs.push_back(makeFunction("aggMergeStdDevs", std::move(arg)));
+    return aggs;
+}
+
 std::unique_ptr<sbe::EExpression> buildFinalizePartialStdDev(sbe::value::SlotId stdDevSlot) {
     // To support the sharding behavior, the mongos splits $group into two separate $group
     // stages one at the mongos-side and the other at the shard-side. This stage builder builds
@@ -631,12 +674,16 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildCombinePartialAggregates(
 
     static const StringDataMap<BuildAggCombinerFn> kAggCombinerBuilders = {
         {AccumulatorAddToSet::kName, &buildCombinePartialAggsAddToSet},
+        {AccumulatorAvg::kName, &buildCombinePartialAggsAvg},
         {AccumulatorFirst::kName, &buildCombinePartialAggsFirst},
         {AccumulatorLast::kName, &buildCombinePartialAggsLast},
         {AccumulatorMax::kName, &buildCombinePartialAggsMax},
         {AccumulatorMergeObjects::kName, &buildCombinePartialAggsMergeObjects},
         {AccumulatorMin::kName, &buildCombinePartialAggsMin},
         {AccumulatorPush::kName, &buildCombinePartialAggsPush},
+        {AccumulatorStdDevPop::kName, &buildCombinePartialAggsStdDev},
+        {AccumulatorStdDevSamp::kName, &buildCombinePartialAggsStdDev},
+        {AccumulatorSum::kName, &buildCombinePartialAggsSum},
     };
 
     auto accExprName = acc.expr.name;
