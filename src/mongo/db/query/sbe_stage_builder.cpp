@@ -1000,7 +1000,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                      resultSlot,
                                                      root->nodeId(),
                                                      &_slotIdGenerator,
-                                                     _state.slotVarMap);
+                                                     _state.slotVarMap,
+                                                     &outputs);
     stage = std::move(outStage);
 
     auto collatorSlot = _data.env->getSlotIfExists("collator"_sd);
@@ -3018,7 +3019,8 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
                                                          resultSlot,
                                                          root->nodeId(),
                                                          &_slotIdGenerator,
-                                                         _state.slotVarMap);
+                                                         _state.slotVarMap,
+                                                         &outputs);
         stage = std::move(outStage);
 
         for (size_t i = 0; i < fields.size(); ++i) {
