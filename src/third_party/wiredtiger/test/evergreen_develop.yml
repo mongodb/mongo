@@ -18,11 +18,11 @@ buildvariants:
       LD_LIBRARY_PATH=$WT_BUILDDIR:$WT_BUILDDIR/test/utility/
     CC_OPTIMIZE_LEVEL: -DCC_OPTIMIZE_LEVEL=-O3
     HAVE_DIAGNOSTIC: -DHAVE_DIAGNOSTIC=0
-    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v3_gcc.cmake
+    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v4_gcc.cmake
     CMAKE_INSTALL_PREFIX: -DCMAKE_INSTALL_PREFIX=$(pwd)/cmake_build/LOCAL_INSTALL
-    python_binary: '/opt/mongodbtoolchain/v3/bin/python3'
-    pip3_binary: '/opt/mongodbtoolchain/v3/bin/pip3'
-    virtualenv_binary: '/opt/mongodbtoolchain/v3/bin/virtualenv'
+    python_binary: '/opt/mongodbtoolchain/v4/bin/python3'
+    pip3_binary: '/opt/mongodbtoolchain/v4/bin/pip3'
+    virtualenv_binary: '/opt/mongodbtoolchain/v4/bin/virtualenv'
     smp_command: -j $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
     cmake_generator: Ninja
     make_command: ninja
@@ -86,14 +86,14 @@ buildvariants:
   - ubuntu2004-test
   expansions:
     test_env_vars:
-      PATH=/opt/mongodbtoolchain/v3/bin:$PATH
+      PATH=/opt/mongodbtoolchain/v4/bin:$PATH
       WT_TOPDIR=$(git rev-parse --show-toplevel)
       WT_BUILDDIR=$WT_TOPDIR/cmake_build
       LD_LIBRARY_PATH=$WT_BUILDDIR
       LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so
     make_command: ninja
     cmake_generator: Ninja
-    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v3_gcc.cmake
+    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v4_gcc.cmake
     CMAKE_INSTALL_PREFIX: -DCMAKE_INSTALL_PREFIX=$(pwd)/cmake_build/LOCAL_INSTALL
   tasks:
     - name: coverage-report
