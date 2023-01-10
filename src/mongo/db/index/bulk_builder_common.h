@@ -185,7 +185,7 @@ public:
               logAttrs(_ns),
               "index"_attr = _indexName,
               "keysInserted"_attr = _keysInserted,
-              "duration"_attr = Milliseconds(Seconds(timer.seconds())));
+              "duration"_attr = duration_cast<Milliseconds>(timer.elapsed()));
         return Status::OK();
     }
 
