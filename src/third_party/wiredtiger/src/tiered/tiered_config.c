@@ -60,7 +60,7 @@ __wt_tiered_bucket_config(
   WT_SESSION_IMPL *session, const char *cfg[], WT_BUCKET_STORAGE **bstoragep)
 {
     WT_BUCKET_STORAGE *bstorage, *new;
-    WT_CONFIG_ITEM auth, bucket, cachedir, name, prefix;
+    WT_CONFIG_ITEM auth, bucket, cachedir, name, prefix, shared;
     WT_CONNECTION_IMPL *conn;
     WT_DECL_ITEM(buf);
     WT_DECL_RET;
@@ -101,6 +101,7 @@ __wt_tiered_bucket_config(
     if (prefix.len == 0)
         WT_ERR_MSG(session, EINVAL, "table tiered storage requires bucket_prefix to be set");
     WT_ERR(__wt_config_gets(session, cfg, "tiered_storage.cache_directory", &cachedir));
+    WT_ERR_NOTFOUND_OK(__wt_config_gets(session, cfg, "tiered_storage.shared", &shared), false);
 
     hash = __wt_hash_city64(bucket.str, bucket.len);
     hash_bucket = hash & (conn->hash_size - 1);
@@ -124,6 +125,8 @@ __wt_tiered_bucket_config(
     WT_ERR(storage->ss_customize_file_system(
       storage, &session->iface, new->bucket, new->auth_token, buf->data, &new->file_system));
     new->storage_source = storage;
+    if (shared.val)
+        new->tiered_shared = true;
 
     /* If we're creating a new bucket storage, parse the other settings into it. */
     TAILQ_INSERT_HEAD(&nstorage->bucketqh, new, q);

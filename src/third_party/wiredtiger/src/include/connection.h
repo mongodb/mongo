@@ -54,6 +54,7 @@ struct __wt_bucket_storage {
     int owned;                         /* Storage needs to be terminated */
     uint64_t retain_secs;              /* Tiered period */
     const char *auth_token;            /* Tiered authentication cookie */
+    bool tiered_shared;                /* Tiered shared */
     WT_FILE_SYSTEM *file_system;       /* File system for bucket */
     WT_STORAGE_SOURCE *storage_source; /* Storage source callbacks */
     /* Linked list of bucket storage entries */
