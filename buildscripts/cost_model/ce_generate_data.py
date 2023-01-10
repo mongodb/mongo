@@ -38,7 +38,8 @@ from config import CollectionTemplate, FieldTemplate, DataType
 from data_generator import CollectionInfo, DataGenerator
 from database_instance import DatabaseInstance
 import parameters_extractor
-from ce_generate_data_settings import database_config, data_generator_config
+#from ce_generate_data_settings import database_config, data_generator_config
+from ce_data_settings import database_config, data_generator_config
 
 __all__ = []
 
@@ -62,11 +63,16 @@ class CollectionTemplateEncoder(json.JSONEncoder):
 
 
 class OidEncoder(json.JSONEncoder):
+    cur_oid = -1
+
     def default(self, o):
-        # TODO: doesn't work, what is the type of OectIds?
+        # TODO: doesn't work, what is the type of ObjectIds?
         #if isinstance(o, OectId):
-        if hasattr(o, '__str__'):  # This will handle OectIds
-            return str(o)
+        if hasattr(o, '__str__'):  # This will handle ObjectIds
+            #return str(o) this is the real OID of the document
+            # Replace the OID with a consequtive int number as needed by the query generator
+            OidEncoder.cur_oid += 1
+            return OidEncoder.cur_oid
         return super(OidEncoder, self).default(o)
 
 
@@ -103,6 +109,11 @@ async def main():
     with DatabaseInstance(database_config) as database_instance:
 
         # 2. Generate random data and populate collections with it.
+        old_db_collections = await database_instance.database.list_collection_names()
+        for coll_name in old_db_collections:
+            collection = database_instance.database[coll_name]
+            collection.drop()
+
         generator = DataGenerator(database_instance, data_generator_config)
         await generator.populate_collections()
 
