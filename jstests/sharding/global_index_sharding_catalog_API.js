@@ -43,7 +43,7 @@ const collectionUUID = st.s.getCollection('config.collections').findOne({_id: ns
 st.rs0.getPrimary().adminCommand({
     _shardsvrRegisterIndex: nss,
     keyPattern: index1Pattern,
-    options: {},
+    options: {global: true},
     name: index1Name,
     collectionUUID: collectionUUID,
     indexCollectionUUID: UUID(),
@@ -123,7 +123,7 @@ assert.eq(indexVersionRS0, indexVersionRS1);
 st.rs0.getPrimary().adminCommand({
     _shardsvrRegisterIndex: 'foo.test',
     keyPattern: index2Pattern,
-    options: {},
+    options: {global: true},
     name: index2Name,
     collectionUUID: collectionUUID,
     indexCollectionUUID: UUID(),
@@ -255,7 +255,7 @@ assert.eq(0, st.rs1.getPrimary().getCollection(shardIndexCatalog).countDocuments
 st.rs0.getPrimary().adminCommand({
     _shardsvrRegisterIndex: nss,
     keyPattern: index1Pattern,
-    options: {},
+    options: {global: true},
     name: index1Name,
     collectionUUID: collectionUUID,
     indexCollectionUUID: UUID(),
@@ -281,7 +281,7 @@ st.rs0.getPrimary().adminCommand({
 st.rs0.getPrimary().adminCommand({
     _shardsvrRegisterIndex: nss,
     keyPattern: index2Pattern,
-    options: {},
+    options: {global: true},
     name: index2Name,
     collectionUUID: collectionUUID,
     indexCollectionUUID: UUID(),
@@ -330,7 +330,7 @@ assert.eq(0, st.rs1.getPrimary().getCollection(shardIndexCatalog).countDocuments
 st.rs0.getPrimary().adminCommand({
     _shardsvrRegisterIndex: nss,
     keyPattern: index1Pattern,
-    options: {},
+    options: {global: true},
     name: index1Name,
     collectionUUID: collectionUUID,
     indexCollectionUUID: UUID(),
@@ -367,7 +367,7 @@ assert.eq(2, st.rs1.getPrimary().getCollection(shardIndexCatalog).countDocuments
 st.rs0.getPrimary().adminCommand({
     _shardsvrRegisterIndex: nss,
     keyPattern: index3Pattern,
-    options: {},
+    options: {global: true},
     name: index3Name,
     collectionUUID: collectionUUID,
     indexCollectionUUID: UUID(),
@@ -377,7 +377,7 @@ st.rs0.getPrimary().adminCommand({
 st.rs0.getPrimary().adminCommand({
     _shardsvrRegisterIndex: nss,
     keyPattern: index4Pattern,
-    options: {},
+    options: {global: true},
     name: index4Name,
     collectionUUID: collectionUUID,
     indexCollectionUUID: UUID(),

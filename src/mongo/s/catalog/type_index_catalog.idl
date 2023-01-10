@@ -58,3 +58,11 @@ structs:
                 description: "UUID of the collection which backs this index. If there
                             is not indexCollectionUUID then the index is not global."
                 optional: true
+
+    IndexOptionsType:
+        description: "Option fields found in the option object"
+        strict: false
+        fields:
+            global:
+                type: optionalBool
+                description: "If true then the index entry represent a global index"

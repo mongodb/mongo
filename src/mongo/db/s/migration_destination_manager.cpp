@@ -314,7 +314,7 @@ void replaceGlobalIndexesInShardIfNeeded(OperationContext* opCtx,
 
     if (optGii) {
         std::vector<IndexCatalogType> indexes;
-        optGii->forEachGlobalIndex([&](const auto& index) {
+        optGii->forEachIndex([&](const auto& index) {
             indexes.push_back(index);
             return true;
         });

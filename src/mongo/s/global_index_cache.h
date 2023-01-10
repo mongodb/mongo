@@ -56,10 +56,20 @@ public:
     void remove(const StringData& name, const CollectionIndexes& collectionIndexes);
 
     template <typename Callable>
-    void forEachGlobalIndex(Callable&& handler) const {
+    void forEachIndex(Callable&& handler) const {
         for (auto it = _indexes.begin(); it != _indexes.end(); it++) {
             if (!handler(it->second))
                 return;
+        }
+    }
+
+    template <typename Callable>
+    void forEachGlobalIndex(Callable&& handler) const {
+        for (auto it = _indexes.begin(); it != _indexes.end(); it++) {
+            auto options = it->second.getOptions();
+            if (options.getBoolField(IndexOptionsType::kGlobalFieldName) && !handler(it->second)) {
+                return;
+            }
         }
     }
 
