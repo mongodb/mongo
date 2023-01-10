@@ -628,6 +628,7 @@ StatusWith<BSONObj> ShardingCatalogManager::commitChunkSplit(
         newChunk.setMin(startKey);
         newChunk.setMax(endKey);
         newChunk.setEstimatedSizeBytes(boost::none);
+        newChunk.setJumbo(false);
 
         op.append("o", newChunk.toConfigBSON());
 

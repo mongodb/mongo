@@ -617,5 +617,54 @@ TEST_F(SplitChunkTest, CantCommitSplitFromChunkSplitterDuringDefragmentation) {
                                            false /* fromChunkSplitter*/));
 }
 
+TEST_F(SplitChunkTest, SplitJumboChunkShouldUnsetJumboFlag) {
+    const auto& nss = _nss2;
+    const auto collTimestamp = Timestamp(42);
+    const auto collEpoch = OID::gen();
+    const auto collUuid = UUID::gen();
+
+    ChunkType chunk;
+    chunk.setName(OID::gen());
+    chunk.setCollectionUUID(collUuid);
+
+    auto origVersion = ChunkVersion(1, 0, collEpoch, collTimestamp);
+    chunk.setVersion(origVersion);
+    chunk.setShard(ShardId(_shardName));
+    chunk.setJumbo(true);
+
+    auto chunkMin = BSON("a" << 1);
+    auto chunkMax = BSON("a" << 10);
+    chunk.setMin(chunkMin);
+    chunk.setMax(chunkMax);
+
+    auto chunkSplitPoint = BSON("a" << 5);
+    std::vector<BSONObj> splitPoints{chunkSplitPoint};
+
+    setupCollection(nss, _keyPattern, {chunk});
+
+    ASSERT_EQ(true, chunk.getJumbo());
+
+    uassertStatusOK(ShardingCatalogManager::get(operationContext())
+                        ->commitChunkSplit(operationContext(),
+                                           nss,
+                                           collEpoch,
+                                           collTimestamp,
+                                           ChunkRange(chunkMin, chunkMax),
+                                           splitPoints,
+                                           "shard0000",
+                                           false /* fromChunkSplitter*/));
+
+    // Both resulting chunks must not be jumbo
+    auto chunkDocLeft =
+        getChunkDoc(operationContext(), collUuid, chunkMin, collEpoch, collTimestamp);
+    ASSERT_OK(chunkDocLeft.getStatus());
+
+    auto chunkDocRight =
+        getChunkDoc(operationContext(), collUuid, chunkSplitPoint, collEpoch, collTimestamp);
+    ASSERT_OK(chunkDocRight.getStatus());
+
+    ASSERT_EQ(false, chunkDocLeft.getValue().getJumbo());
+    ASSERT_EQ(false, chunkDocRight.getValue().getJumbo());
+}
 }  // namespace
 }  // namespace mongo
