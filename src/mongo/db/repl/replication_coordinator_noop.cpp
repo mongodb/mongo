@@ -614,7 +614,10 @@ void ReplicationCoordinatorNoOp::recordIfCWWCIsSetOnConfigServerOnStartup(Operat
 ReplicationCoordinatorNoOp::WriteConcernTagChanges*
 ReplicationCoordinatorNoOp::getWriteConcernTagChanges() {
     MONGO_UNREACHABLE;
-    return nullptr;
+}
+
+SplitPrepareSessionManager* ReplicationCoordinatorNoOp::getSplitPrepareSessionManager() {
+    MONGO_UNREACHABLE;
 }
 
 }  // namespace repl

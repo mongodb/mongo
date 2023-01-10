@@ -421,6 +421,8 @@ public:
 
     virtual WriteConcernTagChanges* getWriteConcernTagChanges() override;
 
+    virtual SplitPrepareSessionManager* getSplitPrepareSessionManager() override;
+
 private:
     void _setMyLastAppliedOpTimeAndWallTime(WithLock lk,
                                             const OpTimeAndWallTime& opTimeAndWallTime);
@@ -450,6 +452,8 @@ private:
     bool _resetLastOpTimesCalled = false;
     bool _alwaysAllowWrites = false;
     bool _canAcceptNonLocalWrites = false;
+
+    SplitPrepareSessionManager _splitSessionManager;
 };
 
 }  // namespace repl

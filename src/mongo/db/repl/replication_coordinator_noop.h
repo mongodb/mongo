@@ -349,6 +349,8 @@ public:
 
     virtual WriteConcernTagChanges* getWriteConcernTagChanges() override;
 
+    virtual SplitPrepareSessionManager* getSplitPrepareSessionManager() override;
+
 private:
     ServiceContext* const _service;
 };

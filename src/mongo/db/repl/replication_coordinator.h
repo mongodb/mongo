@@ -40,6 +40,7 @@
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/split_horizon.h"
+#include "mongo/db/repl/split_prepare_session_manager.h"
 #include "mongo/db/repl/sync_source_selector.h"
 #include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/executor/task_executor.h"
@@ -1182,6 +1183,12 @@ public:
     };
 
     virtual WriteConcernTagChanges* getWriteConcernTagChanges() = 0;
+
+    /**
+     * Returns a SplitPrepareSessionManager that manages the sessions for split
+     * prepared transactions.
+     */
+    virtual SplitPrepareSessionManager* getSplitPrepareSessionManager() = 0;
 
 protected:
     ReplicationCoordinator();

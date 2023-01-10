@@ -647,5 +647,9 @@ ReplicationCoordinatorEmbedded::getWriteConcernTagChanges() {
     UASSERT_NOT_IMPLEMENTED;
 }
 
+repl::SplitPrepareSessionManager* ReplicationCoordinatorEmbedded::getSplitPrepareSessionManager() {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
 }  // namespace embedded
 }  // namespace mongo

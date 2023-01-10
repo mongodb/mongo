@@ -340,7 +340,8 @@ ReplicationCoordinatorImpl::ReplicationCoordinatorImpl(
               _startElectSelfIfEligibleV1(StartElectionReasonEnum::kElectionTimeout);
           },
           [this](int64_t limit) { return _nextRandomInt64_inlock(limit); }),
-      _random(prngSeed) {
+      _random(prngSeed),
+      _splitSessionManager(InternalSessionPool::get(service)) {
 
     _termShadow.store(OpTime::kUninitializedTerm);
 
@@ -6332,6 +6333,10 @@ void ReplicationCoordinatorImpl::_validateDefaultWriteConcernOnShardStartup(With
 ReplicationCoordinatorImpl::WriteConcernTagChanges*
 ReplicationCoordinatorImpl::getWriteConcernTagChanges() {
     return &_writeConcernTagChanges;
+}
+
+SplitPrepareSessionManager* ReplicationCoordinatorImpl::getSplitPrepareSessionManager() {
+    return &_splitSessionManager;
 }
 
 }  // namespace repl

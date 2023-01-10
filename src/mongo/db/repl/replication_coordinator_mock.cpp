@@ -62,7 +62,9 @@ ReplSettings createReplSettingsForSingleNodeReplSet() {
 
 ReplicationCoordinatorMock::ReplicationCoordinatorMock(ServiceContext* service,
                                                        const ReplSettings& settings)
-    : _service(service), _settings(settings) {}
+    : _service(service),
+      _settings(settings),
+      _splitSessionManager(InternalSessionPool::get(service)) {}
 
 ReplicationCoordinatorMock::ReplicationCoordinatorMock(ServiceContext* service,
                                                        StorageInterface* storage)
@@ -810,7 +812,10 @@ void ReplicationCoordinatorMock::recordIfCWWCIsSetOnConfigServerOnStartup(Operat
 ReplicationCoordinatorMock::WriteConcernTagChanges*
 ReplicationCoordinatorMock::getWriteConcernTagChanges() {
     MONGO_UNREACHABLE;
-    return nullptr;
+}
+
+SplitPrepareSessionManager* ReplicationCoordinatorMock::getSplitPrepareSessionManager() {
+    return &_splitSessionManager;
 }
 
 }  // namespace repl

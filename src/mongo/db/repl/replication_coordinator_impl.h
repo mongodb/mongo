@@ -425,6 +425,8 @@ public:
 
     virtual void recordIfCWWCIsSetOnConfigServerOnStartup(OperationContext* opCtx) final;
 
+    virtual SplitPrepareSessionManager* getSplitPrepareSessionManager() override;
+
     // ================== Test support API ===================
 
     /**
@@ -1855,6 +1857,9 @@ private:
 
     // An optional promise created when entering drain mode for shard split.
     boost::optional<Promise<void>> _finishedDrainingPromise;  // (M)
+
+    // Pointer to the SplitPrepareSessionManager owned by this ReplicationCoordinator.
+    SplitPrepareSessionManager _splitSessionManager;  // (S)
 };
 
 }  // namespace repl

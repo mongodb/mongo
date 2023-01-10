@@ -817,6 +817,7 @@ env.Library(
         '$BUILD_DIR/mongo/util/net/network',
         'optime',
         'replication_process',
+        'split_prepare_session_manager',
     ],
 )
 
