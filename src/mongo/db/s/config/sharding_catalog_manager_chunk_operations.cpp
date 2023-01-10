@@ -530,6 +530,7 @@ ShardingCatalogManager::_splitChunkInTransaction(OperationContext* opCtx,
                     newChunk.setMin(startKey);
                     newChunk.setMax(endKey);
                     newChunk.setEstimatedSizeBytes(boost::none);
+                    newChunk.setJumbo(false);
 
                     // build an update operation against the chunks collection of the config
                     // database with upsert true
