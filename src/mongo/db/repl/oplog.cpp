@@ -2072,6 +2072,10 @@ Status applyCommand_inlock(OperationContext* opCtx,
             }
             case ErrorCodes::BackgroundOperationInProgressForDatabase: {
                 invariant(mode == OplogApplication::Mode::kInitialSync);
+
+                // Aborting an index build involves writing to the catalog. This write needs to be
+                // timestamped. It will be given 'writeTime' as the commit timestamp.
+                TimestampBlock tsBlock(opCtx, writeTime);
                 abortIndexBuilds(opCtx,
                                  entry.getCommandType(),
                                  nss,
@@ -2091,6 +2095,10 @@ Status applyCommand_inlock(OperationContext* opCtx,
 
                 // This error is only possible during initial sync mode.
                 invariant(mode == OplogApplication::Mode::kInitialSync);
+
+                // Aborting an index build involves writing to the catalog. This write needs to be
+                // timestamped. It will be given 'writeTime' as the commit timestamp.
+                TimestampBlock tsBlock(opCtx, writeTime);
                 abortIndexBuilds(
                     opCtx, entry.getCommandType(), ns, "Aborting index builds during initial sync");
                 LOGV2_DEBUG(4665901,
