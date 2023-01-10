@@ -69,7 +69,7 @@ public:
 
         boost::optional<UUID> uuid() const {
             if (action == Action::kCreatedCollection || action == Action::kWritableCollection ||
-                action == Action::kRenamedCollection || action == Action::kOpenedCollection)
+                action == Action::kRenamedCollection)
                 return collection->uuid();
             return externalUUID;
         }
@@ -114,7 +114,8 @@ public:
 
         // Storage for the actual collection.
         // Set for actions kWritableCollection, kCreatedCollection, kRecreatedCollection,
-        // kOpenedCollection (nullptr otherwise).
+        // kOpenedCollection (nullptr otherwise). It may also be nullptr for the kOpenedCollection
+        // action if the collection was found not to exist.
         std::shared_ptr<Collection> collection;
 
         // True if the collection was created during this transaction for the first time.
@@ -223,7 +224,10 @@ public:
     /**
      * Manages the lifetime of the collection instance from an earlier point-in-time.
      */
-    void openCollection(OperationContext* opCtx, std::shared_ptr<Collection> coll);
+    void openCollection(OperationContext* opCtx,
+                        std::shared_ptr<Collection> coll,
+                        const NamespaceString& ns,
+                        const boost::optional<UUID>& uuid);
 
     /**
      * Returns all entries without releasing them.

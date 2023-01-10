@@ -800,12 +800,19 @@ CollectionPtr CollectionCatalog::openCollection(OperationContext* opCtx,
         }
 
         auto catalogEntry = DurableCatalog::get(opCtx)->getCatalogEntry(opCtx, catalogId);
+
+        auto latestCollection = lookupCollectionByNamespaceForRead(opCtx, nss);
+
+        // If pendingCollection is nullptr, the collection is being dropped, so latestCollection
+        // must be non-nullptr and must contain a uuid.
+        auto uuid = pendingCollection ? pendingCollection->uuid() : latestCollection->uuid();
+
         if (catalogEntry.isEmpty() ||
             nss != DurableCatalog::getNamespaceFromCatalogEntry(catalogEntry)) {
+            uncommittedCatalogUpdates.openCollection(opCtx, nullptr, nss, uuid);
             return CollectionPtr();
         }
 
-        auto latestCollection = lookupCollectionByNamespaceForRead(opCtx, nss);
         auto metadata = DurableCatalog::getMetadataFromCatalogEntry(catalogEntry);
 
         // Use the pendingCollection if there is no latestCollection or if the metadata of the
@@ -816,20 +823,23 @@ CollectionPtr CollectionCatalog::openCollection(OperationContext* opCtx,
             // with this snapshot, then the change came from an uncommitted update by an operation
             // operating on this snapshot.
             invariant(pendingCollection && pendingCollection->isMetadataEqual(metadata));
-            uncommittedCatalogUpdates.openCollection(opCtx, pendingCollection);
+            // TODO(SERVER-72193): Test this code path.
+            uncommittedCatalogUpdates.openCollection(opCtx, pendingCollection, nss, uuid);
             return CollectionPtr(pendingCollection.get(), CollectionPtr::NoYieldTag{});
         }
 
         invariant(latestCollection->isMetadataEqual(metadata));
         // TODO SERVER-71817 remove const cast
         uncommittedCatalogUpdates.openCollection(
-            opCtx, std::const_pointer_cast<Collection>(latestCollection));
+            opCtx, std::const_pointer_cast<Collection>(latestCollection), nss, uuid);
         return CollectionPtr(latestCollection.get(), CollectionPtr::NoYieldTag{});
     }
 
     // Try to find a catalog entry matching 'readTimestamp'.
     auto catalogEntry = _fetchPITCatalogEntry(opCtx, nss, readTimestamp);
     if (!catalogEntry) {
+        // TODO(SERVER-72193): Test this code path.
+        uncommittedCatalogUpdates.openCollection(opCtx, nullptr, nss, boost::none);
         return CollectionPtr();
     }
 
@@ -837,7 +847,8 @@ CollectionPtr CollectionCatalog::openCollection(OperationContext* opCtx,
 
     // Return the in-memory Collection instance if it is compatible with the read timestamp.
     if (isExistingCollectionCompatible(latestCollection, readTimestamp)) {
-        uncommittedCatalogUpdates.openCollection(opCtx, latestCollection);
+        uncommittedCatalogUpdates.openCollection(
+            opCtx, latestCollection, nss, latestCollection->uuid());
         return CollectionPtr(latestCollection.get(), CollectionPtr::NoYieldTag{});
     }
 
@@ -846,7 +857,8 @@ CollectionPtr CollectionCatalog::openCollection(OperationContext* opCtx,
     auto compatibleCollection =
         _createCompatibleCollection(opCtx, latestCollection, readTimestamp, catalogEntry.get());
     if (compatibleCollection) {
-        uncommittedCatalogUpdates.openCollection(opCtx, compatibleCollection);
+        uncommittedCatalogUpdates.openCollection(
+            opCtx, compatibleCollection, nss, compatibleCollection->uuid());
         return CollectionPtr(compatibleCollection.get(), CollectionPtr::NoYieldTag{});
     }
 
@@ -854,9 +866,12 @@ CollectionPtr CollectionCatalog::openCollection(OperationContext* opCtx,
     // Collection instance from scratch.
     auto newCollection = _createNewPITCollection(opCtx, readTimestamp, catalogEntry.get());
     if (newCollection) {
-        uncommittedCatalogUpdates.openCollection(opCtx, newCollection);
+        uncommittedCatalogUpdates.openCollection(opCtx, newCollection, nss, newCollection->uuid());
         return CollectionPtr(newCollection.get(), CollectionPtr::NoYieldTag{});
     }
+
+    // TODO(SERVER-72193): Test this code path.
+    uncommittedCatalogUpdates.openCollection(opCtx, nullptr, nss, boost::none);
     return CollectionPtr();
 }
 

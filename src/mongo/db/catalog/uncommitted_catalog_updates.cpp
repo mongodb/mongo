@@ -235,8 +235,14 @@ void UncommittedCatalogUpdates::removeView(const NamespaceString& nss) {
 }
 
 void UncommittedCatalogUpdates::openCollection(OperationContext* opCtx,
-                                               std::shared_ptr<Collection> coll) {
-    _entries.push_back({Entry::Action::kOpenedCollection, coll, coll->ns()});
+                                               std::shared_ptr<Collection> coll,
+                                               const NamespaceString& ns,
+                                               const boost::optional<UUID>& uuid) {
+    if (coll) {
+        invariant(ns == coll->ns());
+        invariant(uuid == coll->uuid());
+    }
+    _entries.push_back({Entry::Action::kOpenedCollection, coll, ns, uuid});
 }
 
 const std::vector<UncommittedCatalogUpdates::Entry>& UncommittedCatalogUpdates::entries() const {
