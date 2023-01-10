@@ -13,18 +13,16 @@
  * ]
  */
 
-(function() {
-'use strict';
+import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {makeX509Options} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
-load("jstests/replsets/libs/tenant_migration_test.js");
-load("jstests/replsets/libs/tenant_migration_util.js");
 
-const x509Options0 = TenantMigrationUtil.makeX509Options("jstests/libs/rs0.pem");
-const x509Options1 = TenantMigrationUtil.makeX509Options("jstests/libs/rs1.pem");
-const x509Options2 = TenantMigrationUtil.makeX509Options("jstests/libs/rs2.pem");
+const x509Options0 = makeX509Options("jstests/libs/rs0.pem");
+const x509Options1 = makeX509Options("jstests/libs/rs1.pem");
+const x509Options2 = makeX509Options("jstests/libs/rs2.pem");
 
 const rst0 = new ReplSetTest({nodes: 1, name: 'rst0', nodeOptions: x509Options0});
 const rst1 = new ReplSetTest({nodes: 1, name: 'rst1', nodeOptions: x509Options1});
@@ -193,4 +191,3 @@ const kTenantIdPrefix = "testTenantId";
 rst0.stopSet();
 rst1.stopSet();
 rst2.stopSet();
-})();

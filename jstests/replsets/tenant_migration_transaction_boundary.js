@@ -21,11 +21,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/replsets/libs/tenant_migration_test.js");
-load("jstests/replsets/libs/tenant_migration_util.js");
+import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 load("jstests/replsets/rslib.js");
 load("jstests/libs/uuid_util.js");
 
@@ -85,4 +81,3 @@ TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComple
 assert.eq(recipientPrimary.getCollection(tenantNS).countDocuments({}), 3);
 assert.eq(recipientPrimary.getCollection(tenantNS).count(), 3);
 tenantMigrationTest.stop();
-})();

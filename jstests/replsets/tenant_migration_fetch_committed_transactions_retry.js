@@ -18,12 +18,9 @@
  * ]
  */
 
-(function() {
-"use strict";
-
+import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 load("jstests/aggregation/extras/utils.js");
 load("jstests/libs/fail_point_util.js");
-load("jstests/replsets/libs/tenant_migration_test.js");
 load("jstests/libs/uuid_util.js");
 
 let tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), sharedOptions: {nodes: 1}});
@@ -273,5 +270,4 @@ const assertTransactionEntries = (donorTxnEntries, recipientTxnEntries) => {
     assertTransactionEntries(updatedDonorTxnEntries, recipientTxnEntries);
 
     tenantMigrationTest.stop();
-})();
 })();

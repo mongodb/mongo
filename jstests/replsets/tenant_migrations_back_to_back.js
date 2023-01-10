@@ -13,15 +13,13 @@
  * ]
  */
 
-(function() {
-"use strict";
+import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {runMigrationAsync} from "jstests/replsets/libs/tenant_migration_util.js";
 
-load("jstests/replsets/libs/tenant_migration_test.js");
-load("jstests/replsets/libs/tenant_migration_util.js");
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");  // for 'Thread'
 load("jstests/libs/uuid_util.js");
-load("jstests/replsets/rslib.js");  // for 'getLastOpTime'
+load("jstests/replsets/rslib.js");  // for 'getLastOpTime', 'createRstArgs'
 
 const kTenantId = ObjectId().str;
 const tenantMigrationTest =
@@ -46,9 +44,8 @@ const preMigrationTimestamp = getLastOpTime(donorPrimary).ts;
 let waitForRejectReadsBeforeTsFp = configureFailPoint(
     recipientPrimary, "fpAfterWaitForRejectReadsBeforeTimestamp", {action: "hang"});
 
-const donorRstArgs = TenantMigrationUtil.createRstArgs(tenantMigrationTest.getDonorRst());
-const migrationThread =
-    new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
+const donorRstArgs = createRstArgs(tenantMigrationTest.getDonorRst());
+const migrationThread = new Thread(runMigrationAsync, migrationOpts, donorRstArgs);
 migrationThread.start();
 waitForRejectReadsBeforeTsFp.wait();
 
@@ -80,7 +77,7 @@ jsTestLog("Running a back-to-back migration");
 const tenantMigrationTest2 = new TenantMigrationTest(
     {name: jsTestName() + "2", donorRst: tenantMigrationTest.getRecipientRst()});
 const donor2Primary = tenantMigrationTest2.getDonorPrimary();
-const donor2RstArgs = TenantMigrationUtil.createRstArgs(tenantMigrationTest2.getDonorRst());
+const donor2RstArgs = createRstArgs(tenantMigrationTest2.getDonorRst());
 const migration2Id = UUID();
 const migrationOpts2 = {
     migrationIdString: extractUUIDFromObject(migration2Id),
@@ -92,8 +89,7 @@ const newDonorRst = recipientRst;
 
 let waitAfterCreatingMtab =
     configureFailPoint(donor2Primary, "pauseTenantMigrationBeforeLeavingBlockingState");
-const migration2Thread =
-    new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts2, donor2RstArgs);
+const migration2Thread = new Thread(runMigrationAsync, migrationOpts2, donor2RstArgs);
 migration2Thread.start();
 // At this point, 'donor2Primary' should have both a recipient and donor access blocker. The donor
 // access blocker has entered the blocking state, and the recipient access blocker should
@@ -158,4 +154,3 @@ TenantMigrationTest.assertCommitted(migration2Thread.returnData());
 
 tenantMigrationTest2.stop();
 tenantMigrationTest.stop();
-})();

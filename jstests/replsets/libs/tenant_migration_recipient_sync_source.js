@@ -2,11 +2,12 @@
  * Helper functions for running tests related to sync source selection during a tenant migration.
  */
 
+import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {makeX509OptionsForTest} from "jstests/replsets/libs/tenant_migration_util.js";
+
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
 load("jstests/libs/write_concern_util.js");
-load("jstests/replsets/libs/tenant_migration_test.js");
-load("jstests/replsets/libs/tenant_migration_util.js");
 load('jstests/replsets/rslib.js');
 
 /**
@@ -18,12 +19,12 @@ load('jstests/replsets/rslib.js');
  * 'startApplyingDonorOpTime' stored in the recipient state document. As a result, neither nodes are
  * eligible sync sources for the migration.
  */
-const setUpMigrationSyncSourceTest = function() {
+export function setUpMigrationSyncSourceTest() {
     const donorRst = new ReplSetTest({
         name: `${jsTestName()}_donor`,
         nodes: 3,
         settings: {chainingAllowed: false},
-        nodeOptions: Object.assign(TenantMigrationUtil.makeX509OptionsForTest().donor, {
+        nodeOptions: Object.assign(makeX509OptionsForTest().donor, {
             setParameter: {
                 tenantMigrationExcludeDonorHostTimeoutMS: 30 * 1000,
                 // Allow non-timestamped reads on donor after migration completes for testing.
@@ -153,4 +154,4 @@ const setUpMigrationSyncSourceTest = function() {
         delayedSecondary,
         hangAfterCreatingConnections: hangNewRecipientPrimaryAfterCreatingConnections
     };
-};
+}

@@ -7,10 +7,7 @@
  * in jstests/auth/lib/commands_lib.js
  */
 
-(function() {
-'use strict';
-
-load('jstests/auth/lib/commands_builtin_roles.js');
+import {runAllCommandsBuiltinRoles} from "jstests/auth/lib/commands_builtin_roles.js";
 
 const dbPath = MongoRunner.toRealDir("$dataDir/commands_built_in_roles_standalone/");
 mkdir(dbPath);
@@ -24,4 +21,3 @@ const opts = {
 const conn = MongoRunner.runMongod(opts);
 runAllCommandsBuiltinRoles(conn);
 MongoRunner.stopMongod(conn);
-})();

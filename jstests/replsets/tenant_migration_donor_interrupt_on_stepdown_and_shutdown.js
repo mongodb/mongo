@@ -10,14 +10,18 @@
  * ]
  */
 
-(function() {
-"use strict";
+import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {
+    forgetMigrationAsync,
+    isShardMergeEnabled,
+    runMigrationAsync,
+    tryAbortMigrationAsync
+} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
-load("jstests/replsets/libs/tenant_migration_test.js");
-load("jstests/replsets/libs/tenant_migration_util.js");
+load("jstests/replsets/rslib.js");  // 'createRstArgs'
 
 const kMaxSleepTimeMS = 100;
 const kTenantId = "testTenantId";
@@ -39,7 +43,7 @@ function testDonorStartMigrationInterrupt(interruptFunc, verifyCmdResponseFunc) 
     const donorRst = tenantMigrationTest.getDonorRst();
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
 
-    if (TenantMigrationUtil.isShardMergeEnabled(donorPrimary.getDB("admin"))) {
+    if (isShardMergeEnabled(donorPrimary.getDB("admin"))) {
         // TODO SERVER-63390: Remove this conditional and ensure test(s) run
         // successfully for shard merge.
         jsTestLog("Skipping Shard Merge-incompatible test");
@@ -54,10 +58,9 @@ function testDonorStartMigrationInterrupt(interruptFunc, verifyCmdResponseFunc) 
         recipientConnString: tenantMigrationTest.getRecipientConnString(),
     };
 
-    const donorRstArgs = TenantMigrationUtil.createRstArgs(donorRst);
+    const donorRstArgs = createRstArgs(donorRst);
 
-    const runMigrationThread =
-        new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
+    const runMigrationThread = new Thread(runMigrationAsync, migrationOpts, donorRstArgs);
     runMigrationThread.start();
 
     // Wait for donorStartMigration command to start.
@@ -82,7 +85,7 @@ function testDonorForgetMigrationInterrupt(interruptFunc, verifyCmdResponseFunc)
     const donorRst = tenantMigrationTest.getDonorRst();
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
 
-    if (TenantMigrationUtil.isShardMergeEnabled(donorPrimary.getDB("admin"))) {
+    if (isShardMergeEnabled(donorPrimary.getDB("admin"))) {
         // TODO SERVER-63390: Remove this conditional and ensure test(s) run
         // successfully for shard merge.
         jsTestLog("Skipping Shard Merge-incompatible test");
@@ -97,12 +100,12 @@ function testDonorForgetMigrationInterrupt(interruptFunc, verifyCmdResponseFunc)
         recipientConnString: tenantMigrationTest.getRecipientConnString(),
     };
 
-    const donorRstArgs = TenantMigrationUtil.createRstArgs(donorRst);
+    const donorRstArgs = createRstArgs(donorRst);
 
     TenantMigrationTest.assertCommitted(
         tenantMigrationTest.runMigration(migrationOpts, {automaticForgetMigration: false}));
-    const forgetMigrationThread = new Thread(
-        TenantMigrationUtil.forgetMigrationAsync, migrationOpts.migrationIdString, donorRstArgs);
+    const forgetMigrationThread =
+        new Thread(forgetMigrationAsync, migrationOpts.migrationIdString, donorRstArgs);
     forgetMigrationThread.start();
 
     // Wait for the donorForgetMigration command to start.
@@ -130,7 +133,7 @@ function testDonorAbortMigrationInterrupt(interruptFunc, verifyCmdResponseFunc, 
     const donorRst = tenantMigrationTest.getDonorRst();
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
 
-    if (TenantMigrationUtil.isShardMergeEnabled(donorPrimary.getDB("admin"))) {
+    if (isShardMergeEnabled(donorPrimary.getDB("admin"))) {
         // TODO SERVER-63390: Remove this conditional and ensure test(s) run
         // successfully for shard merge.
         jsTestLog("Skipping Shard Merge-incompatible test");
@@ -145,7 +148,7 @@ function testDonorAbortMigrationInterrupt(interruptFunc, verifyCmdResponseFunc, 
         recipientConnString: tenantMigrationTest.getRecipientConnString(),
     };
 
-    const donorRstArgs = TenantMigrationUtil.createRstArgs(donorRst);
+    const donorRstArgs = createRstArgs(donorRst);
 
     // If we passed in a valid failpoint we set it, otherwise we let the migration run normally.
     if (fpName) {
@@ -154,9 +157,8 @@ function testDonorAbortMigrationInterrupt(interruptFunc, verifyCmdResponseFunc, 
 
     assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
 
-    const tryAbortThread = new Thread(TenantMigrationUtil.tryAbortMigrationAsync,
-                                      {migrationIdString: migrationOpts.migrationIdString},
-                                      donorRstArgs);
+    const tryAbortThread = new Thread(
+        tryAbortMigrationAsync, {migrationIdString: migrationOpts.migrationIdString}, donorRstArgs);
     tryAbortThread.start();
 
     // Wait for donorAbortMigration command to start.
@@ -259,5 +261,4 @@ function assertCmdSucceededOrInterruptedDueToShutDown(cmdThread) {
             donorRst.stopSet();
         }, assertCmdSucceededOrInterruptedDueToShutDown, fpName);
     });
-})();
 })();

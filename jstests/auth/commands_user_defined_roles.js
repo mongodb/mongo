@@ -9,6 +9,15 @@ in jstests/auth/lib/commands_lib.js.
 
 */
 
+import {
+    adminDbName,
+    authCommandsLib,
+    authErrCode,
+    commandNotSupportedCode
+} from "jstests/auth/lib/commands_lib.js";
+
+load("jstests/libs/fail_point_util.js");
+
 // This test involves killing all sessions, which will not work as expected if the kill command is
 // sent with an implicit session.
 TestData.disableImplicitSessions = true;
@@ -16,9 +25,6 @@ TestData.disableImplicitSessions = true;
 // constants
 var testUser = "userDefinedRolesTestUser";
 var testRole = "userDefinedRolesTestRole";
-
-load("jstests/auth/lib/commands_lib.js");
-load("jstests/libs/fail_point_util.js");
 
 function doTestSetup(conn, t, testcase, privileges) {
     const admin = conn.getDB('admin');

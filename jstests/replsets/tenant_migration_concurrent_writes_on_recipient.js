@@ -11,14 +11,16 @@
  * ]
  */
 
-(function() {
-'use strict';
+import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {
+    isShardMergeEnabled,
+    runMigrationAsync
+} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
-load("jstests/replsets/libs/tenant_migration_test.js");
-load("jstests/replsets/libs/tenant_migration_util.js");
+load("jstests/replsets/rslib.js");  // 'createRstArgs'
 
 const tenantMigrationTest =
     new TenantMigrationTest({name: jsTestName(), quickGarbageCollection: true});
@@ -57,13 +59,12 @@ function cleanup(dbName) {
     let waitForRejectReadsBeforeTsFp = configureFailPoint(
         recipientPrimary, "fpAfterWaitForRejectReadsBeforeTimestamp", {action: "hang"});
 
-    const donorRstArgs = TenantMigrationUtil.createRstArgs(donorRst);
-    const runMigrationThread =
-        new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
+    const donorRstArgs = createRstArgs(donorRst);
+    const runMigrationThread = new Thread(runMigrationAsync, migrationOpts, donorRstArgs);
     runMigrationThread.start();
     startOplogFetcherFp.wait();
 
-    if (!TenantMigrationUtil.isShardMergeEnabled(donorPrimary.getDB("adminDB"))) {
+    if (!isShardMergeEnabled(donorPrimary.getDB("adminDB"))) {
         // Write before cloning is done.
         assert.commandFailedWithCode(tenantCollOnRecipient.remove({_id: 1}),
                                      ErrorCodes.SnapshotTooOld);
@@ -178,4 +179,3 @@ function cleanup(dbName) {
     cleanup(donorDB);
 })();
 tenantMigrationTest.stop();
-})();

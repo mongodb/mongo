@@ -12,10 +12,10 @@
  * ]
  */
 
+import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {assertMigrationState, ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
 
 load("jstests/libs/fail_point_util.js");
-load("jstests/replsets/libs/tenant_migration_test.js");
 
 const shardSplitTest = new ShardSplitTest({quickGarbageCollection: true});
 shardSplitTest.addRecipientNodes();

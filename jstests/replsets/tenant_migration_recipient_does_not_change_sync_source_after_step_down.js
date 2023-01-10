@@ -15,13 +15,11 @@
  * ]
  */
 
-(function() {
-"use strict";
+import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {makeX509OptionsForTest} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
-load("jstests/replsets/libs/tenant_migration_test.js");
-load("jstests/replsets/libs/tenant_migration_util.js");
 
 // Verify the recipient's current sync source is the expected one.
 const verifySyncSource = function(conn, migrationId, expectedSyncSource) {
@@ -36,7 +34,7 @@ const batchSize = 2;
 const recipientRst = new ReplSetTest({
     nodes: 2,
     name: jsTestName() + "_recipient",
-    nodeOptions: Object.assign(TenantMigrationUtil.makeX509OptionsForTest().recipient, {
+    nodeOptions: Object.assign(makeX509OptionsForTest().recipient, {
         setParameter: {
             // Use a batch size of 2 so that collection cloner requires more than a single
             // batch to complete.
@@ -119,4 +117,3 @@ verifySyncSource(recipientPrimary, migrationId, donorPrimary.host);
 
 tenantMigrationTest.stop();
 recipientRst.stopSet();
-})();

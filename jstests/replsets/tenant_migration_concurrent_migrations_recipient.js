@@ -14,13 +14,9 @@
  * ]
  */
 
-(function() {
-"use strict";
-
+import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");  // for 'extractUUIDFromObject'
-load("jstests/replsets/libs/tenant_migration_test.js");
-load("jstests/replsets/libs/tenant_migration_util.js");
 
 TestData.logComponentVerbosity = {
     accessControl: {verbosity: 3}
@@ -78,4 +74,3 @@ migrationOptsArray.forEach((migrationOpts) => {
 });
 
 tenantMigrationTest.stop();
-})();

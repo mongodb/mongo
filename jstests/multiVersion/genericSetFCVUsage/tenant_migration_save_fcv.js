@@ -8,20 +8,23 @@
  *  ]
  */
 
-(function() {
-"use strict";
+import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {
+    isShardMergeEnabled,
+    makeX509OptionsForTest,
+    runMigrationAsync
+} from "jstests/replsets/libs/tenant_migration_util.js";
+
+load("jstests/libs/fail_point_util.js");
+load("jstests/libs/uuid_util.js");       // for 'extractUUIDFromObject'
+load("jstests/libs/parallelTester.js");  // for 'Thread'
+load("jstests/replsets/rslib.js");       // 'createRstArgs'
 
 function runTest(downgradeFCV) {
-    load("jstests/libs/fail_point_util.js");
-    load("jstests/libs/uuid_util.js");       // for 'extractUUIDFromObject'
-    load("jstests/libs/parallelTester.js");  // for 'Thread'
-    load("jstests/replsets/libs/tenant_migration_test.js");
-    load("jstests/replsets/libs/tenant_migration_util.js");
-
     const recipientRst = new ReplSetTest({
         nodes: 2,
         name: jsTestName() + "_recipient",
-        nodeOptions: TenantMigrationUtil.makeX509OptionsForTest().recipient
+        nodeOptions: makeX509OptionsForTest().recipient
     });
 
     recipientRst.startSet();
@@ -50,13 +53,12 @@ function runTest(downgradeFCV) {
         recipientDb, "fpAfterRecordingRecipientPrimaryStartingFCV", {action: "hang"});
 
     // Start a migration and wait for recipient to hang at the failpoint.
-    const donorRstArgs = TenantMigrationUtil.createRstArgs(tenantMigrationTest.getDonorRst());
-    const migrationThread =
-        new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
+    const donorRstArgs = createRstArgs(tenantMigrationTest.getDonorRst());
+    const migrationThread = new Thread(runMigrationAsync, migrationOpts, donorRstArgs);
     migrationThread.start();
     hangAfterSavingFCV.wait();
 
-    const isRunningMergeProtocol = TenantMigrationUtil.isShardMergeEnabled(recipientDb);
+    const isRunningMergeProtocol = isShardMergeEnabled(recipientDb);
 
     // Downgrade the FCV for the recipient set.
     assert.commandWorked(
@@ -89,4 +91,3 @@ runTest(lastContinuousFCV);
 if (lastContinuousFCV != lastLTSFCV) {
     runTest(lastLTSFCV);
 }
-})();

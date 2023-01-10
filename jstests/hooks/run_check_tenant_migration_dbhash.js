@@ -1,9 +1,9 @@
 // Does a dbhash check between the donor and recipient primaries during a tenant migration.
-'use strict';
 
-(function() {
-
-load("jstests/replsets/libs/tenant_migration_util.js");
+import {
+    checkIfRetryableErrorForTenantDbHashCheck,
+    checkTenantDBHashes
+} from "jstests/replsets/libs/tenant_migration_util.js";
 
 const excludedDBs = ["testTenantMigration"];
 const testDBName = "testTenantMigration";
@@ -32,7 +32,7 @@ while (true) {
 
         break;
     } catch (e) {
-        if (!TenantMigrationUtil.checkIfRetryableErrorForTenantDbHashCheck(e)) {
+        if (!checkIfRetryableErrorForTenantDbHashCheck(e)) {
             throw e;
         }
         print(`Got error: ${tojson(e)}. Retrying ReplSetTest setup on retryable error.`);
@@ -44,11 +44,10 @@ const skipTempCollections = TestData.skipTempCollections ? true : false;
 // We assume every db is under the tenant being migrated.
 if (TestData.tenantIds) {
     TestData.tenantIds.forEach(
-        tenantId => TenantMigrationUtil.checkTenantDBHashes(
+        tenantId => checkTenantDBHashes(
             {donorRst, recipientRst, tenantId, excludedDBs, skipTempCollections}));
 } else {
-    TenantMigrationUtil.checkTenantDBHashes(
-        {donorRst, recipientRst, tenantId, excludedDBs, skipTempCollections});
+    checkTenantDBHashes({donorRst, recipientRst, tenantId, excludedDBs, skipTempCollections});
 }
 
 // Mark that we have completed the dbhash check.
@@ -60,4 +59,3 @@ if (TestData.useLocalDBForDBCheck) {
     assert.commandWorked(donorDB.runCommand(
         {insert: dbhashCollName, documents: [{_id: migrationId}], writeConcern: {w: "majority"}}));
 }
-})();

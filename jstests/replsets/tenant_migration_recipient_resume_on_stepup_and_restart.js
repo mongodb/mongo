@@ -13,14 +13,17 @@
  * ]
  */
 
-(function() {
-"use strict";
+import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {
+    forgetMigrationAsync,
+    makeX509OptionsForTest,
+    runMigrationAsync,
+} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");
 load("jstests/libs/uuid_util.js");
-load("jstests/replsets/libs/tenant_migration_test.js");
-load("jstests/replsets/libs/tenant_migration_util.js");
+load('jstests/replsets/rslib.js');  // 'createRstArgs'
 
 const kMaxSleepTimeMS = 100;
 const kTenantId = "testTenantId";
@@ -32,7 +35,7 @@ const kGarbageCollectionDelayMS = 30 * 1000;
 // Set the TTL monitor to run at a smaller interval to speed up the test.
 const kTTLMonitorSleepSecs = 1;
 
-const migrationX509Options = TenantMigrationUtil.makeX509OptionsForTest();
+const migrationX509Options = makeX509OptionsForTest();
 
 /**
  * Runs the donorStartMigration command to start a migration, and interrupts the migration on the
@@ -58,10 +61,9 @@ function testRecipientSyncDataInterrupt(interruptFunc, recipientRestarted) {
         tenantId: kTenantId,
         recipientConnString: tenantMigrationTest.getRecipientConnString(),
     };
-    const donorRstArgs = TenantMigrationUtil.createRstArgs(donorRst);
+    const donorRstArgs = createRstArgs(donorRst);
 
-    const runMigrationThread =
-        new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
+    const runMigrationThread = new Thread(runMigrationAsync, migrationOpts, donorRstArgs);
     runMigrationThread.start();
 
     // Wait for recipientSyncData command to start.
@@ -129,11 +131,11 @@ function testRecipientForgetMigrationInterrupt(interruptFunc) {
         tenantId: kTenantId,
         recipientConnString: recipientRst.getURL(),
     };
-    const donorRstArgs = TenantMigrationUtil.createRstArgs(donorRst);
+    const donorRstArgs = createRstArgs(donorRst);
 
     TenantMigrationTest.assertCommitted(
         tenantMigrationTest.runMigration(migrationOpts, {automaticForgetMigration: false}));
-    const forgetMigrationThread = new Thread(TenantMigrationUtil.forgetMigrationAsync,
+    const forgetMigrationThread = new Thread(forgetMigrationAsync,
                                              migrationOpts.migrationIdString,
                                              donorRstArgs,
                                              false /* retryOnRetryableErrors */);
@@ -200,5 +202,4 @@ function testRecipientForgetMigrationInterrupt(interruptFunc) {
         recipientRst.awaitSecondaryNodes();
         recipientRst.getPrimary();
     });
-})();
 })();

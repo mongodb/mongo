@@ -10,12 +10,8 @@
  * ]
  */
 
-(function() {
-
-"use strict";
+import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 load("jstests/libs/uuid_util.js");  // For extractUUIDFromObject().
-load("jstests/replsets/libs/tenant_migration_test.js");
-load("jstests/replsets/libs/tenant_migration_util.js");
 
 const kGarbageCollectionParams = {
     // Set the delay to 20s so that we can see the `expireAt` set prior to the document vanishing.
@@ -85,4 +81,3 @@ jsTestLog("Waiting for the state document to have been deleted.");
 tenantMigrationTest.waitForMigrationGarbageCollection(kMigrationId, kTenantId);
 
 tenantMigrationTest.stop();
-})();

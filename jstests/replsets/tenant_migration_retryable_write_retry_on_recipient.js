@@ -11,14 +11,16 @@
  * ]
  */
 
-(function() {
-"use strict";
+import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {
+    isShardMergeEnabled,
+    runMigrationAsync
+} from "jstests/replsets/libs/tenant_migration_util.js";
 
-load("jstests/replsets/libs/tenant_migration_test.js");
-load("jstests/replsets/libs/tenant_migration_util.js");
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallelTester.js");  // for 'Thread'
 load("jstests/libs/uuid_util.js");
+load("jstests/replsets/rslib.js");  // 'createRstArgs'
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
@@ -36,10 +38,10 @@ const recipientDb = recipientPrimary.getDB(kDbName);
 // wrongly restarts the Shard Merge protocol. It copies and imports donor files again, and
 // eventually hits an invariant in TenantFileImporterService, which doesn't support restart.
 // Once we fix Shard Merge to not resume on stepup, this test will work as-is.
-if (TenantMigrationUtil.isShardMergeEnabled(donorPrimary.getDB("adminDB"))) {
+if (isShardMergeEnabled(donorPrimary.getDB("adminDB"))) {
     jsTestLog("Skip: featureFlagShardMerge enabled, but shard merge does not survive stepup");
     tenantMigrationTest.stop();
-    return;
+    quit();
 }
 
 jsTestLog("Run a migration to the end of cloning");
@@ -164,9 +166,8 @@ assert.commandWorked(
 assert.commandWorked(
     donorDb.runCommand(beforeWrites.retryableFindAndModifyUpdateWithPreImageCommand));
 
-const donorRstArgs = TenantMigrationUtil.createRstArgs(tenantMigrationTest.getDonorRst());
-const migrationThread =
-    new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
+const donorRstArgs = createRstArgs(tenantMigrationTest.getDonorRst());
+const migrationThread = new Thread(runMigrationAsync, migrationOpts, donorRstArgs);
 migrationThread.start();
 waitBeforeFetchingTransactions.wait();
 
@@ -295,4 +296,3 @@ testRecipientRetryableWrites(recipient2Db, duringWrites);
 
 tenantMigrationTest2.stop();
 tenantMigrationTest.stop();
-})();

@@ -6,10 +6,10 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/replsets/libs/tenant_migration_util.js");
+import {
+    isShardMergeEnabled,
+    makeMigrationCertificatesForTest
+} from "jstests/replsets/libs/tenant_migration_util.js";
 load("jstests/libs/fail_point_util.js");
 
 function runTest(nodeOptions) {
@@ -21,7 +21,7 @@ function runTest(nodeOptions) {
     // suites will execute this test without featureFlagShardMerge enabled (despite the
     // presence of the featureFlagShardMerge tag above), which means the test will attempt
     // to run a multi-tenant migration and fail.
-    if (!TenantMigrationUtil.isShardMergeEnabled(rst.getPrimary().getDB("admin"))) {
+    if (!isShardMergeEnabled(rst.getPrimary().getDB("admin"))) {
         rst.stopSet();
         jsTestLog("Skipping Shard Merge-specific test");
         return;
@@ -31,7 +31,7 @@ function runTest(nodeOptions) {
     const adminDB = primary.getDB("admin");
     const kDummyConnStr = "mongodb://localhost/?replicaSet=foo";
     const readPreference = {mode: 'primary'};
-    const migrationCertificates = TenantMigrationUtil.makeMigrationCertificatesForTest();
+    const migrationCertificates = makeMigrationCertificatesForTest();
 
     // Enable below fail points to prevent starting the donor/recipient POS instance.
     configureFailPoint(primary, "returnResponseCommittedForDonorStartMigrationCmd");
@@ -39,7 +39,7 @@ function runTest(nodeOptions) {
     configureFailPoint(primary, "returnResponseOkForRecipientForgetMigrationCmd");
 
     // Ensure the feature flag is enabled and FCV is latest
-    assert(TenantMigrationUtil.isShardMergeEnabled(adminDB));
+    assert(isShardMergeEnabled(adminDB));
     assert.eq(getFCVConstants().latest,
               adminDB.system.version.findOne({_id: 'featureCompatibilityVersion'}).version);
 
@@ -165,4 +165,3 @@ runTest({directoryperdb: ""});
 
 // Shard merge is not allowed when directoryForIndexes is enabled
 runTest({"wiredTigerDirectoryForIndexes": ""});
-})();

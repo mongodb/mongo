@@ -12,13 +12,11 @@
  * ]
  */
 
-(function() {
-"use strict";
+import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {isShardMergeEnabled} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
-load("jstests/replsets/libs/tenant_migration_test.js");
-load("jstests/replsets/libs/tenant_migration_util.js");
 
 // An object that mirrors the donor migration states.
 const migrationStates = {
@@ -50,8 +48,7 @@ function checkStandardFieldsOK(ops, {
     assert(op.migrationStart instanceof Date);
     assert.eq(op.recipientConnectionString, tenantMigrationTest.getRecipientRst().getURL());
 
-    if (TenantMigrationUtil.isShardMergeEnabled(
-            tenantMigrationTest.getDonorPrimary().getDB("admin"))) {
+    if (isShardMergeEnabled(tenantMigrationTest.getDonorPrimary().getDB("admin"))) {
         assert.eq(op.tenantId, undefined);
     } else {
         assert.eq(bsonWoCompare(op.tenantId, kTenantId), 0);
@@ -236,5 +233,4 @@ function checkStandardFieldsOK(ops, {
     assert(res.inprog[0].expireAt instanceof Date);
 
     tenantMigrationTest.stop();
-})();
 })();

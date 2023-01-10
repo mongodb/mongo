@@ -15,14 +15,15 @@
  * ]
  */
 
-(function() {
-"use strict";
+import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
+import {
+    runMigrationAsync,
+} from "jstests/replsets/libs/tenant_migration_util.js";
 
 load("jstests/libs/clustered_collections/clustered_collection_util.js");  // ClusteredCollectionUtil
 load("jstests/libs/parallelTester.js");                                   // Thread()
 load("jstests/libs/uuid_util.js");                                        // extractUUIDFromObject()
-load("jstests/replsets/libs/tenant_migration_test.js");                   // TenantMigrationTest
-load("jstests/replsets/libs/tenant_migration_util.js");                   // TenantMigrationUtil
+load('jstests/replsets/rslib.js');                                        // 'createRstArgs'
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
@@ -62,9 +63,8 @@ const runTenantMigration = () => {
         recipientConnString: tenantMigrationTest.getRecipientConnString(),
         tenantId: kTenantId,
     };
-    const donorRstArgs = TenantMigrationUtil.createRstArgs(tenantMigrationTest.getDonorRst());
-    const migrationThread =
-        new Thread(TenantMigrationUtil.runMigrationAsync, migrationOpts, donorRstArgs);
+    const donorRstArgs = createRstArgs(tenantMigrationTest.getDonorRst());
+    const migrationThread = new Thread(runMigrationAsync, migrationOpts, donorRstArgs);
     migrationThread.start();
 
     TenantMigrationTest.assertCommitted(migrationThread.returnData());
@@ -98,4 +98,3 @@ runTenantMigration();
 validateMigrationResults();
 
 tenantMigrationTest.stop();
-})();
