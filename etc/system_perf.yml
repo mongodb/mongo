@@ -1484,14 +1484,7 @@ buildvariants:
     run_on:
       - "rhel70-perf-single"
     depends_on: *_compile_amazon2
-    # TODO SERVER-72433 unblock linkbench
-    # tasks: *classic_engine_1nodereplset_tasks
-    tasks:
-      - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
-    #  - name: linkbench
-      - name: linkbench2
-      - name: snapshot_reads
+    tasks: *classic_engine_1nodereplset_tasks
 
   - name: linux-1-node-replSet-all-feature-flags
     display_name: Linux 1-Node ReplSet (all feature flags) Legacy
