@@ -39,8 +39,15 @@
 
 namespace mongo::optimizer {
 namespace {
-unittest::TempDir tempDir("ABTPipelineTest");
+std::unique_ptr<unittest::TempDir> tempDir;
+
+MONGO_INITIALIZER_WITH_PREREQUISITES(ABTPipelineTestInitTempDir, ("SetTempDirDefaultRoot"))
+(InitializerContext*) {
+    if (!tempDir) {
+        tempDir = std::make_unique<unittest::TempDir>("ABTPipelineTest");
+    }
 }
+}  // namespace
 
 std::unique_ptr<mongo::Pipeline, mongo::PipelineDeleter> parsePipeline(
     const NamespaceString& nss,
@@ -64,7 +71,7 @@ std::unique_ptr<mongo::Pipeline, mongo::PipelineDeleter> parsePipeline(
         ctx->setResolvedNamespace(resolvedNss.ns, resolvedNss);
     }
 
-    ctx->tempDir = tempDir.path();
+    ctx->tempDir = tempDir->path();
 
     return Pipeline::parse(request.getPipeline(), ctx);
 }
