@@ -53,6 +53,8 @@ class Locker {
     friend class UninterruptibleLockGuard;
 
 public:
+    using LockTimeoutCallback = std::function<void()>;
+
     virtual ~Locker() {}
 
     /**
@@ -181,7 +183,10 @@ public:
      *
      * It may throw an exception if it is interrupted.
      */
-    virtual void lockRSTLComplete(OperationContext* opCtx, LockMode mode, Date_t deadline) = 0;
+    virtual void lockRSTLComplete(OperationContext* opCtx,
+                                  LockMode mode,
+                                  Date_t deadline,
+                                  const LockTimeoutCallback& onTimeout = nullptr) = 0;
 
     /**
      * Unlocks the RSTL when the transaction becomes prepared. This is used to bypass two-phase

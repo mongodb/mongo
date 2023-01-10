@@ -120,7 +120,10 @@ public:
         MONGO_UNREACHABLE;
     }
 
-    virtual void lockRSTLComplete(OperationContext* opCtx, LockMode mode, Date_t deadline) {
+    virtual void lockRSTLComplete(OperationContext* opCtx,
+                                  LockMode mode,
+                                  Date_t deadline,
+                                  const LockTimeoutCallback& onTimeout) {
         MONGO_UNREACHABLE;
     }
 

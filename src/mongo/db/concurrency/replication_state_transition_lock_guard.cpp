@@ -60,7 +60,8 @@ ReplicationStateTransitionLockGuard::~ReplicationStateTransitionLockGuard() {
     _unlock();
 }
 
-void ReplicationStateTransitionLockGuard::waitForLockUntil(mongo::Date_t deadline) {
+void ReplicationStateTransitionLockGuard::waitForLockUntil(
+    mongo::Date_t deadline, const Locker::LockTimeoutCallback& onTimeout) {
     // We can return early if the lock request was already satisfied.
     if (_result == LOCK_OK) {
         return;
@@ -68,7 +69,7 @@ void ReplicationStateTransitionLockGuard::waitForLockUntil(mongo::Date_t deadlin
 
     _result = LOCK_INVALID;
     // Wait for the completion of the lock request for the RSTL.
-    _opCtx->lockState()->lockRSTLComplete(_opCtx, _mode, deadline);
+    _opCtx->lockState()->lockRSTLComplete(_opCtx, _mode, deadline, onTimeout);
     _result = LOCK_OK;
 }
 

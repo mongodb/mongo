@@ -32,6 +32,7 @@
 #include <boost/optional.hpp>
 
 #include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -70,7 +71,7 @@ public:
     /**
      * Waits for RSTL to be granted.
      */
-    void waitForLockUntil(Date_t deadline);
+    void waitForLockUntil(Date_t deadline, const Locker::LockTimeoutCallback& onTimeout = nullptr);
 
     /**
      * Release and reacquire the RSTL.
