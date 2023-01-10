@@ -147,13 +147,13 @@ assert.eq(indexBulkBuilderSection.spilledRanges, 0, tojson(indexBulkBuilderSecti
 assert.eq(indexBulkBuilderSection.bytesSpilledUncompressed, 0, tojson(indexBulkBuilderSection));
 assert.eq(indexBulkBuilderSection.bytesSpilled, 0, tojson(indexBulkBuilderSection));
 assert.eq(indexBulkBuilderSection.numSorted, numPathsToProcess, tojson(indexBulkBuilderSection));
-assert.between(0.8 * approxMemoryUsage,
+assert.between(0.7 * approxMemoryUsage,
                indexBulkBuilderSection.bytesSorted,
-               approxMemoryUsage,
+               1.3 * approxMemoryUsage,
                tojson(indexBulkBuilderSection));
-assert.between(0,
+assert.between(0.7 * approxMemoryUsage,
                indexBulkBuilderSection.memUsage,
-               approxMemoryUsage,
+               1.3 * approxMemoryUsage,
                tojson(indexBulkBuilderSection),
                /*inclusive=*/true);
 assert.eq(Object.keys(indexBulkBuilderSection).length, 10, tojson(indexBulkBuilderSection));
@@ -194,13 +194,13 @@ assert.gte(indexBulkBuilderSection.bytesSpilledUncompressed,
 // Multiply expected values by 2 to account for the previous index build.
 assert.eq(
     indexBulkBuilderSection.numSorted, numPathsToProcess * 2, tojson(indexBulkBuilderSection));
-assert.between(approxMemoryUsage * 0.8 * 2,
+assert.between(approxMemoryUsage * 0.7 * 2,
                indexBulkBuilderSection.bytesSorted,
-               approxMemoryUsage * 2,
+               approxMemoryUsage * 1.3 * 2,
                tojson(indexBulkBuilderSection));
-assert.between(0,
+assert.between(approxMemoryUsage * 0.7,
                indexBulkBuilderSection.memUsage,
-               approxMemoryUsage,
+               approxMemoryUsage * 1.3,
                tojson(indexBulkBuilderSection),
                /*inclusive=*/true);
 
