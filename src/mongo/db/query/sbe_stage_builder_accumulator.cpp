@@ -205,6 +205,21 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulatorAvg(
     return aggs;
 }
 
+std::vector<std::unique_ptr<sbe::EExpression>> buildCombinePartialAggsAvg(
+    const AccumulationExpression& expr,
+    const sbe::value::SlotVector& inputSlots,
+    boost::optional<sbe::value::SlotId> collatorSlot,
+    sbe::value::FrameIdGenerator& frameIdGenerator) {
+    tassert(7039539,
+            "partial agg combiner for $avg should have exactly two input slots",
+            inputSlots.size() == 2);
+
+    std::vector<std::unique_ptr<sbe::EExpression>> aggs;
+    aggs.push_back(makeFunction("aggMergeDoubleDoubleSums", makeVariable(inputSlots[0])));
+    aggs.push_back(makeFunction("sum", makeVariable(inputSlots[1])));
+    return aggs;
+}
+
 std::unique_ptr<sbe::EExpression> buildFinalizeAvg(StageBuilderState& state,
                                                    const AccumulationExpression& expr,
                                                    const sbe::value::SlotVector& aggSlots) {
@@ -244,7 +259,6 @@ std::unique_ptr<sbe::EExpression> buildFinalizeAvg(StageBuilderState& state,
     }
 }
 
-namespace {
 std::tuple<bool, boost::optional<sbe::value::TypeTags>, boost::optional<sbe::value::Value>>
 getCountAddend(const AccumulationExpression& expr) {
     auto constArg = dynamic_cast<ExpressionConstant*>(expr.argument.get());
@@ -273,7 +287,6 @@ getCountAddend(const AccumulationExpression& expr) {
             return {false, boost::none, boost::none};
     }
 }
-}  // namespace
 
 std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulatorSum(
     const AccumulationExpression& expr,
@@ -289,6 +302,30 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulatorSum(
     }
 
     aggs.push_back(makeFunction("aggDoubleDoubleSum", std::move(arg)));
+    return aggs;
+}
+
+std::vector<std::unique_ptr<sbe::EExpression>> buildCombinePartialAggsSum(
+    const AccumulationExpression& expr,
+    const sbe::value::SlotVector& inputSlots,
+    boost::optional<sbe::value::SlotId> collatorSlot,
+    sbe::value::FrameIdGenerator& frameIdGenerator) {
+    tassert(7039530,
+            "partial agg combiner for $sum should have exactly one input slot",
+            inputSlots.size() == 1);
+    auto arg = makeVariable(inputSlots[0]);
+    std::vector<std::unique_ptr<sbe::EExpression>> aggs;
+
+    // If the user specifies a count-like accumulator like {$sum: 1}, then we optimize the plan to
+    // use the simple "sum" accumulator rather than a DoubleDouble summation. Therefore, the partial
+    // aggregates are simple sums and we require nothing special to combine multiple DoubleDouble
+    // summations.
+    if (auto [isCount, _1, _2] = getCountAddend(expr); isCount) {
+        aggs.push_back(makeFunction("sum", std::move(arg)));
+        return aggs;
+    }
+
+    aggs.push_back(makeFunction("aggMergeDoubleDoubleSums", std::move(arg)));
     return aggs;
 }
 
@@ -428,6 +465,20 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildAccumulatorStdDev(
     sbe::value::FrameIdGenerator& frameIdGenerator) {
     std::vector<std::unique_ptr<sbe::EExpression>> aggs;
     aggs.push_back(makeFunction("aggStdDev", std::move(arg)));
+    return aggs;
+}
+
+std::vector<std::unique_ptr<sbe::EExpression>> buildCombinePartialAggsStdDev(
+    const AccumulationExpression& expr,
+    const sbe::value::SlotVector& inputSlots,
+    boost::optional<sbe::value::SlotId> collatorSlot,
+    sbe::value::FrameIdGenerator& frameIdGenerator) {
+    tassert(7039540,
+            "partial agg combiner for stddev should have exactly one input slot",
+            inputSlots.size() == 1);
+    auto arg = makeVariable(inputSlots[0]);
+    std::vector<std::unique_ptr<sbe::EExpression>> aggs;
+    aggs.push_back(makeFunction("aggMergeStdDevs", std::move(arg)));
     return aggs;
 }
 
@@ -581,12 +632,16 @@ std::vector<std::unique_ptr<sbe::EExpression>> buildCombinePartialAggregates(
 
     static const StringDataMap<BuildAggCombinerFn> kAggCombinerBuilders = {
         {AccumulatorAddToSet::kName, &buildCombinePartialAggsAddToSet},
+        {AccumulatorAvg::kName, &buildCombinePartialAggsAvg},
         {AccumulatorFirst::kName, &buildCombinePartialAggsFirst},
         {AccumulatorLast::kName, &buildCombinePartialAggsLast},
         {AccumulatorMax::kName, &buildCombinePartialAggsMax},
         {AccumulatorMergeObjects::kName, &buildCombinePartialAggsMergeObjects},
         {AccumulatorMin::kName, &buildCombinePartialAggsMin},
         {AccumulatorPush::kName, &buildCombinePartialAggsPush},
+        {AccumulatorStdDevPop::kName, &buildCombinePartialAggsStdDev},
+        {AccumulatorStdDevSamp::kName, &buildCombinePartialAggsStdDev},
+        {AccumulatorSum::kName, &buildCombinePartialAggsSum},
     };
 
     auto accExprName = acc.expr.name;

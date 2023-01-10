@@ -1379,35 +1379,40 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::aggSum(value::TypeTags 
     return genericAdd(accTag, accValue, fieldTag, fieldValue);
 }
 
+template <bool merging>
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggDoubleDoubleSum(
     ArityType arity) {
-
     auto [_, fieldTag, fieldValue] = getFromStack(1);
     // Move the incoming accumulator state from the stack. Given that we are now the owner of the
     // state we are free to do any in-place update as we see fit.
     auto [accTag, accValue] = moveOwnedFromStack(0);
-    value::ValueGuard guard{accTag, accValue};
 
     // Initialize the accumulator.
     if (accTag == value::TypeTags::Nothing) {
         std::tie(accTag, accValue) = value::makeNewArray();
-        value::ValueGuard guard{accTag, accValue};
+        value::ValueGuard newArrGuard{accTag, accValue};
         auto arr = value::getArrayView(accValue);
         arr->reserve(AggSumValueElems::kMaxSizeOfArray);
 
-        // The order of the following three elements should match to 'AggSumValueElems'.
+        // The order of the following three elements should match to 'AggSumValueElems'. An absent
+        // 'kDecimalTotal' element means that we've not seen any decimal value. So, we're not adding
+        // 'kDecimalTotal' element yet.
         arr->push_back(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(0));
         arr->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.0));
         arr->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.0));
-        // The absent 'kDecimalTotal' element means that we've not seen any decimal value. So, we're
-        // not adding 'kDecimalTotal' element yet.
-        aggDoubleDoubleSumImpl(arr, fieldTag, fieldValue);
-        guard.reset();
-        return {true, accTag, accValue};
+        newArrGuard.reset();
     }
-    tassert(5755317, "The result slot must be Array-typed", accTag == value::TypeTags::Array);
 
-    aggDoubleDoubleSumImpl(value::getArrayView(accValue), fieldTag, fieldValue);
+    value::ValueGuard guard{accTag, accValue};
+    tassert(5755317, "The result slot must be Array-typed", accTag == value::TypeTags::Array);
+    auto accumulator = value::getArrayView(accValue);
+
+    if constexpr (merging) {
+        aggMergeDoubleDoubleSumsImpl(accumulator, fieldTag, fieldValue);
+    } else {
+        aggDoubleDoubleSumImpl(accumulator, fieldTag, fieldValue);
+    }
+
     guard.reset();
     return {true, accTag, accValue};
 }
@@ -1561,31 +1566,37 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinDoubleDoublePart
     return {true, tag, val};
 }
 
+template <bool merging>
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggStdDev(ArityType arity) {
     auto [_, fieldTag, fieldValue] = getFromStack(1);
     // Move the incoming accumulator state from the stack. Given that we are now the owner of the
     // state we are free to do any in-place update as we see fit.
     auto [accTag, accValue] = moveOwnedFromStack(0);
-    value::ValueGuard guard{accTag, accValue};
 
     // Initialize the accumulator.
     if (accTag == value::TypeTags::Nothing) {
-        auto [newAccTag, newAccValue] = value::makeNewArray();
-        value::ValueGuard newGuard{newAccTag, newAccValue};
-        auto arr = value::getArrayView(newAccValue);
+        std::tie(accTag, accValue) = value::makeNewArray();
+        value::ValueGuard newArrGuard{accTag, accValue};
+        auto arr = value::getArrayView(accValue);
         arr->reserve(AggStdDevValueElems::kSizeOfArray);
 
         // The order of the following three elements should match to 'AggStdDevValueElems'.
         arr->push_back(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(0));
         arr->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.0));
         arr->push_back(value::TypeTags::NumberDouble, value::bitcastFrom<double>(0.0));
-        aggStdDevImpl(arr, fieldTag, fieldValue);
-        newGuard.reset();
-        return {true, newAccTag, newAccValue};
+        newArrGuard.reset();
     }
-    tassert(5755210, "The result slot must be Array-typed", accTag == value::TypeTags::Array);
 
-    aggStdDevImpl(value::getArrayView(accValue), fieldTag, fieldValue);
+    value::ValueGuard guard{accTag, accValue};
+    tassert(5755210, "The result slot must be Array-typed", accTag == value::TypeTags::Array);
+    auto accumulator = value::getArrayView(accValue);
+
+    if constexpr (merging) {
+        aggMergeStdDevsImpl(accumulator, fieldTag, fieldValue);
+    } else {
+        aggStdDevImpl(accumulator, fieldTag, fieldValue);
+    }
+
     guard.reset();
     return {true, accTag, accValue};
 }
@@ -5127,13 +5138,17 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
         case Builtin::doubleDoubleSum:
             return builtinDoubleDoubleSum(arity);
         case Builtin::aggDoubleDoubleSum:
-            return builtinAggDoubleDoubleSum(arity);
+            return builtinAggDoubleDoubleSum<false /*merging*/>(arity);
         case Builtin::doubleDoubleSumFinalize:
             return builtinDoubleDoubleSumFinalize(arity);
         case Builtin::doubleDoublePartialSumFinalize:
             return builtinDoubleDoublePartialSumFinalize(arity);
+        case Builtin::aggMergeDoubleDoubleSums:
+            return builtinAggDoubleDoubleSum<true /*merging*/>(arity);
         case Builtin::aggStdDev:
-            return builtinAggStdDev(arity);
+            return builtinAggStdDev<false /*merging*/>(arity);
+        case Builtin::aggMergeStdDevs:
+            return builtinAggStdDev<true /*merging*/>(arity);
         case Builtin::stdDevPopFinalize:
             return builtinStdDevPopFinalize(arity);
         case Builtin::stdDevSampFinalize:
@@ -5357,8 +5372,12 @@ std::string builtinToString(Builtin b) {
             return "doubleDoubleSumFinalize";
         case Builtin::doubleDoublePartialSumFinalize:
             return "doubleDoublePartialSumFinalize";
+        case Builtin::aggMergeDoubleDoubleSums:
+            return "aggMergeDoubleDoubleSums";
         case Builtin::aggStdDev:
             return "aggStdDev";
+        case Builtin::aggMergeStdDevs:
+            return "aggMergeStdDevs";
         case Builtin::stdDevPopFinalize:
             return "stdDevPopFinalize";
         case Builtin::stdDevSampFinalize:

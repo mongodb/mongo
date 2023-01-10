@@ -619,11 +619,30 @@ enum class Builtin : uint8_t {
     collAddToSet,      // agg function to append to a set (with collation)
     collAddToSetCapped,  // agg function to append to a set (with collation), fails when the set
                          // reaches specified size
-    doubleDoubleSum,     // special double summation
+
+    // Special double summation.
+    doubleDoubleSum,
+    // A variant of the standard sum aggregate function which maintains a DoubleDouble as the
+    // accumulator's underlying state.
     aggDoubleDoubleSum,
+    // Converts a DoubleDouble sum into a single numeric scalar for use once the summation is
+    // complete.
     doubleDoubleSumFinalize,
+    // Converts a partial sum into a format suitable for serialization over the wire to the merging
+    // node. The merging node expects the internal state of the DoubleDouble summation to be
+    // serialized in a particular format.
     doubleDoublePartialSumFinalize,
+    // An agg function which can be used to sum a sequence of DoubleDouble inputs, producing the
+    // resulting total as a DoubleDouble.
+    aggMergeDoubleDoubleSums,
+
+    // Implements Welford's online algorithm for computing sample or population standard deviation
+    // in a single pass.
     aggStdDev,
+    // Combines standard deviations that have been partially computed on a subset of the data
+    // using Welford's online algorithm.
+    aggMergeStdDevs,
+
     stdDevPopFinalize,
     stdDevSampFinalize,
     bitTestZero,      // test bitwise mask & value is zero
@@ -1046,11 +1065,19 @@ private:
                                                           value::TypeTags fieldTag,
                                                           value::Value fieldValue);
 
-    void aggDoubleDoubleSumImpl(value::Array* arr, value::TypeTags rhsTag, value::Value rhsValue);
+    void aggDoubleDoubleSumImpl(value::Array* accumulator,
+                                value::TypeTags rhsTag,
+                                value::Value rhsValue);
+    void aggMergeDoubleDoubleSumsImpl(value::Array* accumulator,
+                                      value::TypeTags rhsTag,
+                                      value::Value rhsValue);
 
     // This is an implementation of the following algorithm:
     // https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Welford's_online_algorithm
-    void aggStdDevImpl(value::Array* arr, value::TypeTags rhsTag, value::Value rhsValue);
+    void aggStdDevImpl(value::Array* accumulator, value::TypeTags rhsTag, value::Value rhsValue);
+    void aggMergeStdDevsImpl(value::Array* accumulator,
+                             value::TypeTags rhsTag,
+                             value::Value rhsValue);
 
     FastTuple<bool, value::TypeTags, value::Value> aggStdDevFinalizeImpl(value::Value fieldValue,
                                                                          bool isSamp);
@@ -1175,12 +1202,22 @@ private:
                                                                       CollatorInterface* collator);
     FastTuple<bool, value::TypeTags, value::Value> builtinAddToSetCapped(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinCollAddToSetCapped(ArityType arity);
+
     FastTuple<bool, value::TypeTags, value::Value> builtinDoubleDoubleSum(ArityType arity);
+    // The template parameter is false for a regular DoubleDouble summation and true if merging
+    // partially computed DoubleDouble sums.
+    template <bool merging>
     FastTuple<bool, value::TypeTags, value::Value> builtinAggDoubleDoubleSum(ArityType arity);
+
     FastTuple<bool, value::TypeTags, value::Value> builtinDoubleDoubleSumFinalize(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinDoubleDoublePartialSumFinalize(
         ArityType arity);
+
+    // The template parameter is false for a regular std dev and true if merging partially computed
+    // standard devations.
+    template <bool merging>
     FastTuple<bool, value::TypeTags, value::Value> builtinAggStdDev(ArityType arity);
+
     FastTuple<bool, value::TypeTags, value::Value> builtinStdDevPopFinalize(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinStdDevSampFinalize(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinBitTestZero(ArityType arity);
