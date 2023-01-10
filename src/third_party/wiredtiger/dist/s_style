@@ -69,6 +69,11 @@ else
         }
     fi
 
+    # C++ files must use .cpp as a file extension
+    if [ "${fname##*.}" = "cxx" ]; then
+        echo "$f: C++ files must use .cpp as an extension."
+    fi
+
     # Remove non-ascii characters and substitute some expressions with accepted version.
     tr -cd '[:alnum:][:space:][:punct:]' < $f |
     sed -e '/for /!s/;;$/;/' \

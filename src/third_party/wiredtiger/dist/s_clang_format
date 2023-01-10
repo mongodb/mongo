@@ -51,7 +51,7 @@ exclude=true
 case $# in
 0)
     # Get all source files.
-    search=`find bench examples ext src test -name '*.[ch]' -o -name '*.cxx' -o -name '*.cpp'`
+    search=`find bench examples ext src test -name '*.[ch]' -o -name '*.cpp'`
     ;;
 1)
     # If the -F option is not specified then find every source file.

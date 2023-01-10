@@ -1,5 +1,5 @@
 skip    bench/workgen/workgen/workgen.py
-skip    bench/workgen/workgen_wrap.cxx
+skip    bench/workgen/workgen_wrap.cpp
 skip    cmake/install/wiredtiger.pc.in
 skip    dist/api_config.py
 skip    dist/api_config_gen.py

@@ -1,7 +1,7 @@
 bench/workgen/workgen.h
 bench/workgen/workgen_int.h
 bench/workgen/workgen_time.h
-bench/workgen/workgen_wrap.cxx
+bench/workgen/workgen_wrap.cpp
 src/config/config_def.c
 src/conn/api_strerror.c
 src/include/bitstring_inline.h
