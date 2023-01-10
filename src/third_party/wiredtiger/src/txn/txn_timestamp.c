@@ -452,7 +452,6 @@ set:
 static void
 __txn_assert_after_reads(WT_SESSION_IMPL *session, const char *op, wt_timestamp_t ts)
 {
-#ifdef HAVE_DIAGNOSTIC
     WT_TXN_GLOBAL *txn_global;
     WT_TXN_SHARED *s;
     wt_timestamp_t tmp_timestamp;
@@ -461,31 +460,32 @@ __txn_assert_after_reads(WT_SESSION_IMPL *session, const char *op, wt_timestamp_
 
     txn_global = &S2C(session)->txn_global;
 
-    WT_ORDERED_READ(session_cnt, S2C(session)->session_cnt);
-    WT_STAT_CONN_INCR(session, txn_walk_sessions);
-    WT_STAT_CONN_INCRV(session, txn_sessions_walked, session_cnt);
+    if (EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAG_VISIBILITY)) {
+        WT_ORDERED_READ(session_cnt, S2C(session)->session_cnt);
+        WT_STAT_CONN_INCR(session, txn_walk_sessions);
+        WT_STAT_CONN_INCRV(session, txn_sessions_walked, session_cnt);
 
-    __wt_readlock(session, &txn_global->rwlock);
+        __wt_readlock(session, &txn_global->rwlock);
 
-    /* Walk the array of concurrent transactions. */
-    for (i = 0, s = txn_global->txn_shared_list; i < session_cnt; i++, s++) {
-        __txn_get_read_timestamp(s, &tmp_timestamp);
-        if (tmp_timestamp != WT_TS_NONE && tmp_timestamp >= ts) {
-            __wt_err(session, EINVAL, "%s timestamp %s must be after all active read timestamps %s",
-              op, __wt_timestamp_to_string(ts, ts_string[0]),
-              __wt_timestamp_to_string(tmp_timestamp, ts_string[1]));
+        /* Walk the array of concurrent transactions. */
+        for (i = 0, s = txn_global->txn_shared_list; i < session_cnt; i++, s++) {
+            __txn_get_read_timestamp(s, &tmp_timestamp);
+            if (tmp_timestamp != WT_TS_NONE && tmp_timestamp >= ts) {
+                __wt_err(session, EINVAL,
+                  "%s timestamp %s must be after all active read timestamps %s", op,
+                  __wt_timestamp_to_string(ts, ts_string[0]),
+                  __wt_timestamp_to_string(tmp_timestamp, ts_string[1]));
 
-            __wt_abort(session);
-            /* NOTREACHED */
+                __wt_abort(session);
+                /* NOTREACHED */
+            }
         }
+        __wt_readunlock(session, &txn_global->rwlock);
+    } else {
+        WT_UNUSED(session);
+        WT_UNUSED(op);
+        WT_UNUSED(ts);
     }
-
-    __wt_readunlock(session, &txn_global->rwlock);
-#else
-    WT_UNUSED(session);
-    WT_UNUSED(op);
-    WT_UNUSED(ts);
-#endif
 }
 
 /*

@@ -377,7 +377,6 @@ __wt_col_fix_estimate_auxiliary_space(WT_PAGE *page)
     return (count * 63 + WT_COL_FIX_AUXHEADER_RESERVATION);
 }
 
-#ifdef HAVE_DIAGNOSTIC
 /*
  * __rec_col_fix_get_bitmap_size --
  *     Figure the bitmap size of a new page from the reconciliation info.
@@ -393,7 +392,6 @@ __rec_col_fix_get_bitmap_size(WT_SESSION_IMPL *session, WT_RECONCILE *r)
     /* Subtract off the main page header. */
     return (primary_size - WT_PAGE_HEADER_BYTE_SIZE(S2BT(session)));
 }
-#endif
 
 /*
  * __wt_rec_col_fix_addtw --
@@ -407,8 +405,9 @@ __wt_rec_col_fix_addtw(
     size_t add_len, len;
     uint8_t keyspace[WT_INTPACK64_MAXSIZE], *p;
 
-    WT_ASSERT(session,
-      recno_offset <= ((__rec_col_fix_get_bitmap_size(session, r)) * 8) / S2BT(session)->bitcnt);
+    WT_ASSERT_ALWAYS(session,
+      recno_offset <= ((__rec_col_fix_get_bitmap_size(session, r)) * 8) / S2BT(session)->bitcnt,
+      "Attempting to write time window information into bitmap memory");
 
     key = &r->k;
     val = &r->v;

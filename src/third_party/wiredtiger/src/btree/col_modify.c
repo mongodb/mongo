@@ -16,12 +16,7 @@ static int __col_insert_alloc(WT_SESSION_IMPL *, uint64_t, u_int, WT_INSERT **, 
  */
 int
 __wt_col_modify(WT_CURSOR_BTREE *cbt, uint64_t recno, const WT_ITEM *value, WT_UPDATE *upd_arg,
-  u_int modify_type, bool exclusive
-#ifdef HAVE_DIAGNOSTIC
-  ,
-  bool restore
-#endif
-)
+  u_int modify_type, bool exclusive, bool restore)
 {
     WT_BTREE *btree;
     WT_DECL_RET;
@@ -84,11 +79,13 @@ __wt_col_modify(WT_CURSOR_BTREE *cbt, uint64_t recno, const WT_ITEM *value, WT_U
         }
     } else {
         /* Since on this path we never set append, make sure we aren't appending. */
-        WT_ASSERT(session, recno != WT_RECNO_OOB);
-        WT_ASSERT(session,
+        WT_ASSERT_ALWAYS(
+          session, recno != WT_RECNO_OOB, "Out-of-bound recno provided for a non-append operation");
+        WT_ASSERT_OPTIONAL(session, WT_DIAG_OUT_OF_ORDER,
           cbt->compare == 0 ||
             recno <= (btree->type == BTREE_COL_VAR ? __col_var_last_recno(cbt->ref) :
-                                                     __col_fix_last_recno(cbt->ref)));
+                                                     __col_fix_last_recno(cbt->ref)),
+          "Out-of-bound recno provided for a non-append operation");
     }
 
     /*
@@ -152,7 +149,8 @@ __wt_col_modify(WT_CURSOR_BTREE *cbt, uint64_t recno, const WT_ITEM *value, WT_U
              * If we restore an update chain in update restore eviction, there should be no update
              * on the existing update chain.
              */
-            WT_ASSERT(session, !restore || old_upd == NULL);
+            WT_ASSERT_ALWAYS(session, !restore || old_upd == NULL,
+              "Illegal update on chain during update restore eviction");
 
             /*
              * We can either put multiple new updates or a single update on the update chain.

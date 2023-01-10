@@ -715,7 +715,6 @@ __meta_ckptlist_allocate_new_ckpt(
     return (0);
 }
 
-#ifdef HAVE_DIAGNOSTIC
 /*
  * __assert_ckpt_matches --
  *     Assert that given two checkpoints match.
@@ -727,39 +726,49 @@ __assert_ckpt_matches(WT_SESSION_IMPL *session, WT_CKPT *ckpt_a, WT_CKPT *ckpt_b
      * We are not checking checkpoint time, because there could be a minute difference depending
      * upon when the checkpoint information was generated. This is acceptable.
      */
-    WT_ASSERT(session,
+    WT_ASSERT_ALWAYS(session,
       (ckpt_a->name == NULL && ckpt_b->name == NULL) ||
-        (ckpt_a->name != NULL && ckpt_b->name != NULL && strcmp(ckpt_a->name, ckpt_b->name) == 0));
-    WT_ASSERT(session, ckpt_a->order == ckpt_b->order);
-    WT_ASSERT(session, ckpt_a->size == ckpt_b->size);
-    WT_ASSERT(session, ckpt_a->write_gen == ckpt_b->write_gen);
-    WT_ASSERT(session, ckpt_a->run_write_gen == ckpt_b->run_write_gen);
-    WT_ASSERT(session,
+        (ckpt_a->name != NULL && ckpt_b->name != NULL && strcmp(ckpt_a->name, ckpt_b->name) == 0),
+      "Checkpoint names mismatch in __assert_ckpt_matches");
+    WT_ASSERT_ALWAYS(session, ckpt_a->order == ckpt_b->order,
+      "Checkpoint order mismatch in __assert_ckpt_matches ");
+    WT_ASSERT_ALWAYS(
+      session, ckpt_a->size == ckpt_b->size, "Checkpoint size mismatch in __assert_ckpt_matches");
+    WT_ASSERT_ALWAYS(session, ckpt_a->write_gen == ckpt_b->write_gen,
+      "Checkpoint write generation config mismatch in __assert_ckpt_matches");
+    WT_ASSERT_ALWAYS(session, ckpt_a->run_write_gen == ckpt_b->run_write_gen,
+      "Checkpoint runtime write generation config mismatch in __assert_ckpt_matches");
+    WT_ASSERT_ALWAYS(session,
       ckpt_a->ta.newest_start_durable_ts == ckpt_b->ta.newest_start_durable_ts &&
         ckpt_a->ta.newest_stop_durable_ts == ckpt_b->ta.newest_stop_durable_ts &&
         ckpt_a->ta.oldest_start_ts == ckpt_b->ta.oldest_start_ts &&
         ckpt_a->ta.newest_txn == ckpt_b->ta.newest_txn &&
         ckpt_a->ta.newest_stop_ts == ckpt_b->ta.newest_stop_ts &&
         ckpt_a->ta.newest_stop_txn == ckpt_b->ta.newest_stop_txn &&
-        ckpt_a->ta.prepare == ckpt_b->ta.prepare);
+        ckpt_a->ta.prepare == ckpt_b->ta.prepare,
+      "Checkpoint metadata mismatch in __assert_ckpt_matches");
     /*
      * The two WT_CKPT structures are created through different paths, specifically in one path the
      * WT_CKPT.addr and WT_CKPT.raw fields are taken from a configuration file as strings including
      * a training nul byte. Use the minimum size of the data to ignore that nul byte. Passing nul
      * pointers to memcmp is undefined, so handle that separately.
      */
-    WT_ASSERT(session,
+    WT_ASSERT_ALWAYS(session,
       (ckpt_a->addr.data == NULL && ckpt_b->addr.data == NULL) ||
         (ckpt_a->addr.data != NULL && ckpt_b->addr.data != NULL &&
           memcmp(ckpt_a->addr.data, ckpt_b->addr.data,
-            WT_MIN(ckpt_a->addr.size, ckpt_b->addr.size)) == 0));
-    WT_ASSERT(session,
+            WT_MIN(ckpt_a->addr.size, ckpt_b->addr.size)) == 0),
+      "Checkpoint data/size mismatch in __assert_ckpt_matches");
+    WT_ASSERT_ALWAYS(session,
       (ckpt_a->raw.data == NULL && ckpt_b->raw.data == NULL) ||
         (ckpt_a->raw.data != NULL && ckpt_b->raw.data != NULL &&
           memcmp(ckpt_a->raw.data, ckpt_b->raw.data, WT_MIN(ckpt_a->raw.size, ckpt_b->raw.size)) ==
-            0));
-    WT_ASSERT(session, ckpt_a->bpriv == NULL && ckpt_b->bpriv == NULL);
-    WT_ASSERT(session, ckpt_a->flags == ckpt_b->flags);
+            0),
+      "Checkpoint data/size mismatch in __assert_ckpt_matches");
+    WT_ASSERT_ALWAYS(session, ckpt_a->bpriv == NULL && ckpt_b->bpriv == NULL,
+      "Checkpoint block manager mismatch in __assert_ckpt_matches");
+    WT_ASSERT_ALWAYS(session, ckpt_a->flags == ckpt_b->flags,
+      "Checkpoint flags mismatch in __assert_ckpt_matches");
 }
 
 /*
@@ -781,7 +790,6 @@ __assert_checkpoint_list_matches(WT_SESSION_IMPL *session, WT_CKPT *saved_list, 
         ((ckpt_saved != NULL && ckpt_saved->order == 0) &&
           (ckpt_new != NULL && ckpt_new->order == 0)));
 }
-#endif
 
 /*
  * __wt_meta_ckptlist_get --
@@ -793,9 +801,7 @@ __wt_meta_ckptlist_get(
   WT_SESSION_IMPL *session, const char *fname, bool update, WT_CKPT **ckptbasep, size_t *allocated)
 {
     WT_BTREE *btree;
-#ifdef HAVE_DIAGNOSTIC
     WT_CKPT *ckptbase_comp;
-#endif
     WT_DECL_RET;
     char *config;
 
@@ -821,18 +827,18 @@ __wt_meta_ckptlist_get(
               session, ckptbasep, &btree->ckpt_bytes_allocated, NULL));
         if (allocated != NULL)
             *allocated = btree->ckpt_bytes_allocated;
-#ifdef HAVE_DIAGNOSTIC
-        /*
-         * Sanity check: Let's compare to a list generated from metadata. There should be no
-         * differences.
-         */
-        WT_ERR(__wt_metadata_search(session, fname, &config));
-        if ((ret = __wt_meta_ckptlist_get_from_config(
-               session, update, &ckptbase_comp, NULL, config)) == 0)
-            __assert_checkpoint_list_matches(session, *ckptbasep, ckptbase_comp);
-        __wt_meta_ckptlist_free(session, &ckptbase_comp);
-        WT_ERR(ret);
-#endif
+        if (EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAG_DATA_VALIDATION)) {
+            /*
+             * Sanity check: Let's compare to a list generated from metadata. There should be no
+             * differences.
+             */
+            WT_ERR(__wt_metadata_search(session, fname, &config));
+            if ((ret = __wt_meta_ckptlist_get_from_config(
+                   session, update, &ckptbase_comp, NULL, config)) == 0)
+                __assert_checkpoint_list_matches(session, *ckptbasep, ckptbase_comp);
+            __wt_meta_ckptlist_free(session, &ckptbase_comp);
+            WT_ERR(ret);
+        }
     } else {
         WT_ERR(__wt_metadata_search(session, fname, &config));
         WT_ERR(__wt_meta_ckptlist_get_from_config(session, update, ckptbasep, allocated, config));

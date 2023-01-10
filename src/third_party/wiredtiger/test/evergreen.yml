@@ -1174,6 +1174,21 @@ tasks:
             set -o errexit
             set -o verbose
             ${test_env_vars|} test/unittest/unittests
+
+  - name: unittest-assertions
+    commands:
+      - func: "get project"
+      - func: "compile wiredtiger"
+        vars:
+          HAVE_UNITTEST: -DHAVE_UNITTEST=1 -DHAVE_UNITTEST_ASSERTS=1 -DHAVE_DIAGNOSTIC=0
+      - command: shell.exec
+        params:
+          working_dir: "wiredtiger/cmake_build"
+          script: |
+            set -o errexit
+            set -o verbose
+            ${test_env_vars|} test/unittest/unittests
+
   # End of normal make check test tasks
 
   # Start of cppsuite test tasks.
@@ -4739,6 +4754,7 @@ buildvariants:
     - name: unit-test-long-nonstandalone
       distros: ubuntu2004-large
     - name: ".data-validation-stress-test-nonstandalone"
+    - name: unittest-assertions
 
 - name: ubuntu2004-asan
   display_name: "! Ubuntu 20.04 ASAN"

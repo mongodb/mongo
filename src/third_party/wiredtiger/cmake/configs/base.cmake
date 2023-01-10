@@ -124,6 +124,12 @@ config_bool(
 )
 
 config_bool(
+    HAVE_UNITTEST_ASSERTS
+    "Enable C++ Catch2 based WiredTiger unit tests. Special configuration for testing assertions"
+    DEFAULT OFF
+)
+
+config_bool(
     HAVE_ATTACH
     "Enable to pause for debugger attach on failure"
     DEFAULT OFF
@@ -364,6 +370,10 @@ endif()
 
 if (NON_BARRIER_DIAGNOSTIC_YIELDS AND NOT HAVE_DIAGNOSTIC)
     message(FATAL_ERROR "`NON_BARRIER_DIAGNOSTIC_YIELDS` can only be enabled when `HAVE_DIAGNOSTIC` is enabled.")
+endif()
+
+if (HAVE_UNITTEST_ASSERTS AND NOT HAVE_UNITTEST)
+    message(FATAL_ERROR "`HAVE_UNITTEST_ASSERTS` can only be enabled when `HAVE_UNITTEST` is enabled.")
 endif()
 
 if(WT_WIN)

@@ -585,6 +585,19 @@ struct __wt_connection_impl {
     /* AUTOMATIC FLAG VALUE GENERATION STOP 16 */
     uint16_t debug_flags;
 
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
+#define WT_DIAG_ALL 0x01u
+#define WT_DIAG_CONCURRENT_ACCESS 0x02u
+#define WT_DIAG_DATA_VALIDATION 0x04u
+#define WT_DIAG_INVALID_OP 0x08u
+#define WT_DIAG_OUT_OF_ORDER 0x10u
+#define WT_DIAG_PANIC 0x20u
+#define WT_DIAG_SLOW_OPERATION 0x40u
+#define WT_DIAG_VISIBILITY 0x80u
+    /* AUTOMATIC FLAG VALUE GENERATION STOP 16 */
+    /* Categories of assertions that can be runtime enabled. */
+    uint16_t extra_diagnostics_flags;
+
     /* Verbose settings for our various categories. */
     WT_VERBOSE_LEVEL verbose[WT_VERB_NUM_CATEGORIES];
 

@@ -214,7 +214,9 @@ __clsm_enter(WT_CURSOR_LSM *clsm, bool reset, bool update)
                     switch_txn = clsm->chunks[i]->switch_txn;
                     if (WT_TXNID_LT(switch_txn, pinned_id))
                         break;
-                    WT_ASSERT(session, !__wt_txn_visible_all(session, switch_txn, WT_TS_NONE));
+                    WT_ASSERT_OPTIONAL(session, WT_DIAG_VISIBILITY,
+                      !__wt_txn_visible_all(session, switch_txn, WT_TS_NONE),
+                      "Switch transaction is not globally visible");
                 }
             }
         }
@@ -663,38 +665,42 @@ retry:
     clsm->dsk_gen = lsm_tree->dsk_gen;
 
 err:
-#ifdef HAVE_DIAGNOSTIC
-    /* Check that all cursors are open as expected. */
-    if (ret == 0 && F_ISSET(clsm, WT_CLSM_OPEN_READ)) {
-        for (i = 0; i != clsm->nchunks; i++) {
-            cursor = clsm->chunks[i]->cursor;
-            chunk = lsm_tree->chunk[i + start_chunk];
+    if (EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAG_DATA_VALIDATION)) {
+        /* Check that all cursors are open as expected. */
+        if (ret == 0 && F_ISSET(clsm, WT_CLSM_OPEN_READ)) {
+            for (i = 0; i != clsm->nchunks; i++) {
+                cursor = clsm->chunks[i]->cursor;
+                chunk = lsm_tree->chunk[i + start_chunk];
 
-            /* Make sure the first cursor is open. */
-            WT_ASSERT(session, cursor != NULL);
+                /* Make sure the first cursor is open. */
+                WT_ASSERT_ALWAYS(
+                  session, cursor != NULL, "Failed to open cursors for all LSM chunks");
 
-            /* Easy case: the URIs should match. */
-            WT_ASSERT(session, strcmp(cursor->uri, chunk->uri) == 0);
+                /* Easy case: the URIs should match. */
+                WT_ASSERT_ALWAYS(session, strcmp(cursor->uri, chunk->uri) == 0,
+                  "Cursor URI does not match the LSM tree URI");
 
-            /*
-             * Make sure the checkpoint config matches when not using a custom data source.
-             */
-            if (lsm_tree->custom_generation == 0 ||
-              chunk->generation < lsm_tree->custom_generation) {
-                checkpoint = ((WT_CURSOR_BTREE *)cursor)->dhandle->checkpoint;
-                WT_ASSERT(session,
-                  (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) && !chunk->empty) ? checkpoint != NULL :
-                                                                           checkpoint == NULL);
+                /*
+                 * Make sure the checkpoint config matches when not using a custom data source.
+                 */
+                if (lsm_tree->custom_generation == 0 ||
+                  chunk->generation < lsm_tree->custom_generation) {
+                    checkpoint = ((WT_CURSOR_BTREE *)cursor)->dhandle->checkpoint;
+                    WT_ASSERT_ALWAYS(session,
+                      (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) && !chunk->empty) ? checkpoint != NULL :
+                                                                               checkpoint == NULL,
+                      "LSM tree checkpoint config does not match");
+                }
+
+                /* Make sure the Bloom config matches. */
+                WT_ASSERT_ALWAYS(session,
+                  (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM) && !F_ISSET(clsm, WT_CLSM_MERGE)) ?
+                    clsm->chunks[i]->bloom != NULL :
+                    clsm->chunks[i]->bloom == NULL,
+                  "LSM Bloom config does not match");
             }
-
-            /* Make sure the Bloom config matches. */
-            WT_ASSERT(session,
-              (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM) && !F_ISSET(clsm, WT_CLSM_MERGE)) ?
-                clsm->chunks[i]->bloom != NULL :
-                clsm->chunks[i]->bloom == NULL);
         }
     }
-#endif
     if (locked)
         __wt_lsm_tree_readunlock(session, lsm_tree);
     return (ret);

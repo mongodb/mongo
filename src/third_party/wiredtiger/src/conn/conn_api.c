@@ -1957,6 +1957,51 @@ err:
 }
 
 /*
+ * __wt_extra_diagnostics_config --
+ *     Set diagnostic assertions configuration.
+ */
+int
+__wt_extra_diagnostics_config(WT_SESSION_IMPL *session, const char *cfg[])
+{
+    static const WT_NAME_FLAG extra_diagnostics_types[] = {{"all", WT_DIAG_ALL},
+      {"concurrent_access", WT_DIAG_CONCURRENT_ACCESS},
+      {"data_validation", WT_DIAG_DATA_VALIDATION}, {"invalid_op", WT_DIAG_INVALID_OP},
+      {"out_of_order", WT_DIAG_OUT_OF_ORDER}, {"panic", WT_DIAG_PANIC},
+      {"slow_operation", WT_DIAG_SLOW_OPERATION}, {"visibility", WT_DIAG_VISIBILITY}, {NULL, 0}};
+
+    WT_CONNECTION_IMPL *conn;
+    WT_CONFIG_ITEM cval, sval;
+    WT_DECL_RET;
+    const WT_NAME_FLAG *ft;
+    uint16_t flags;
+
+    conn = S2C(session);
+
+    WT_RET(__wt_config_gets(session, cfg, "extra_diagnostics", &cval));
+
+#ifdef HAVE_DIAGNOSTIC
+    flags = WT_DIAG_ALL;
+    for (ft = extra_diagnostics_types; ft->name != NULL; ft++) {
+        if ((ret = __wt_config_subgets(session, &cval, ft->name, &sval)) == 0 && sval.val != 0)
+            WT_RET_MSG(session, EINVAL,
+              "WiredTiger has been compiled with HAVE_DIAGNOSTIC=1 and all assertions are always "
+              "enabled. This cannot be configured.");
+        WT_RET_NOTFOUND_OK(ret);
+    }
+#else
+    flags = 0;
+    for (ft = extra_diagnostics_types; ft->name != NULL; ft++) {
+        if ((ret = __wt_config_subgets(session, &cval, ft->name, &sval)) == 0 && sval.val != 0)
+            LF_SET(ft->flag);
+        WT_RET_NOTFOUND_OK(ret);
+    }
+#endif
+
+    conn->extra_diagnostics_flags = flags;
+    return (0);
+}
+
+/*
  * __wt_debug_mode_config --
  *     Set debugging configuration.
  */
@@ -2838,6 +2883,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler, const char *c
     WT_ERR(__wt_verbose_config(session, cfg, false));
     WT_ERR(__wt_timing_stress_config(session, cfg));
     WT_ERR(__wt_blkcache_setup(session, cfg, false));
+    WT_ERR(__wt_extra_diagnostics_config(session, cfg));
     WT_ERR(__wt_conn_optrack_setup(session, cfg, false));
     WT_ERR(__conn_session_size(session, cfg, &conn->session_size));
     WT_ERR(__wt_config_gets(session, cfg, "session_scratch_max", &cval));

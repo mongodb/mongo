@@ -192,13 +192,8 @@ __rts_btree_col_modify(WT_SESSION_IMPL *session, WT_REF *ref, WT_UPDATE *upd, ui
     WT_ERR(__wt_col_search(&cbt, recno, ref, true, NULL));
 
     /* Apply the modification. */
-    if (!dryrun) {
-#ifdef HAVE_DIAGNOSTIC
+    if (!dryrun)
         WT_ERR(__wt_col_modify(&cbt, recno, NULL, upd, WT_UPDATE_INVALID, true, false));
-#else
-        WT_ERR(__wt_col_modify(&cbt, recno, NULL, upd, WT_UPDATE_INVALID, true));
-#endif
-    }
 
 err:
     /* Free any resources that may have been cached in the cursor. */
@@ -227,13 +222,8 @@ __rts_btree_row_modify(WT_SESSION_IMPL *session, WT_REF *ref, WT_UPDATE *upd, WT
     WT_ERR(__wt_row_search(&cbt, key, true, ref, true, NULL));
 
     /* Apply the modification. */
-    if (!dryrun) {
-#ifdef HAVE_DIAGNOSTIC
+    if (!dryrun)
         WT_ERR(__wt_row_modify(&cbt, key, NULL, upd, WT_UPDATE_INVALID, true, false));
-#else
-        WT_ERR(__wt_row_modify(&cbt, key, NULL, upd, WT_UPDATE_INVALID, true));
-#endif
-    }
 
 err:
     /* Free any resources that may have been cached in the cursor. */
@@ -269,10 +259,8 @@ __rts_btree_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip,
     char ts_string[4][WT_TS_INT_STRING_SIZE];
     char tw_string[WT_TIME_STRING_SIZE];
     bool dryrun;
-    bool valid_update_found;
-#ifdef HAVE_DIAGNOSTIC
     bool first_record;
-#endif
+    bool valid_update_found;
 
     dryrun = S2C(session)->rts->dryrun;
 
@@ -283,9 +271,7 @@ __rts_btree_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip,
     hs_durable_ts = hs_start_ts = hs_stop_durable_ts = WT_TS_NONE;
     hs_btree_id = S2BT(session)->id;
     valid_update_found = false;
-#ifdef HAVE_DIAGNOSTIC
     first_record = true;
-#endif
 
     /* Allocate buffers for the data store and history store key. */
     WT_ERR(__wt_scr_alloc(session, 0, &hs_key));
@@ -425,10 +411,11 @@ __rts_btree_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip,
          * changes before the transaction fixes the history store update to have a proper stop
          * timestamp. It is a rare scenario.
          */
-        WT_ASSERT(session,
+        WT_ASSERT_ALWAYS(session,
           hs_stop_durable_ts <= newer_hs_durable_ts || hs_start_ts == hs_stop_durable_ts ||
             hs_start_ts == newer_hs_durable_ts || newer_hs_durable_ts == hs_durable_ts ||
-            first_record || hs_stop_durable_ts == WT_TS_MAX);
+            first_record || hs_stop_durable_ts == WT_TS_MAX,
+          "Out of order history store updates detected");
 
         if (hs_stop_durable_ts < newer_hs_durable_ts)
             WT_STAT_CONN_DATA_INCR(session, txn_rts_hs_stop_older_than_newer_start);
@@ -473,9 +460,7 @@ __rts_btree_ondisk_fixup_key(WT_SESSION_IMPL *session, WT_REF *ref, WT_ROW *rip,
          * stop time point as a tombstone when we rollback the history store record.
          */
         newer_hs_durable_ts = hs_durable_ts;
-#ifdef HAVE_DIAGNOSTIC
         first_record = false;
-#endif
 
         if (!dryrun)
             WT_ERR(hs_cursor->remove(hs_cursor));

@@ -37,7 +37,9 @@ __wt_ref_out(WT_SESSION_IMPL *session, WT_REF *ref)
      * state, so our check can race with readers without indicating a real problem. If we find a
      * hazard pointer, wait for it to be cleared.
      */
-    WT_ASSERT(session, __wt_hazard_check_assert(session, ref, true));
+    WT_ASSERT_OPTIONAL(session, WT_DIAG_CONCURRENT_ACCESS,
+      __wt_hazard_check_assert(session, ref, true),
+      "Attempted to free a page with active hazard pointers");
 
     /* Check we are not evicting an accessible internal page with an active split generation. */
     WT_ASSERT(session,
@@ -351,7 +353,9 @@ __wt_free_ref_index(WT_SESSION_IMPL *session, WT_PAGE *page, WT_PAGE_INDEX *pind
          * Used when unrolling splits and other error paths where there should never have been a
          * hazard pointer taken.
          */
-        WT_ASSERT(session, __wt_hazard_check_assert(session, ref, false));
+        WT_ASSERT_OPTIONAL(session, WT_DIAG_CONCURRENT_ACCESS,
+          __wt_hazard_check_assert(session, ref, false),
+          "Attempting to discard ref to a page with hazard pointers");
 
         __wt_free_ref(session, ref, page->type, free_pages);
     }

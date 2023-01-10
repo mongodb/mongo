@@ -523,11 +523,7 @@ __instantiate_col_var(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE_DELETED *pa
                 WT_ASSERT(session, cbt.slot == WT_COL_SLOT(page, cip));
 
                 /* Attach the tombstone, using the update-restore path. */
-#ifdef HAVE_DIAGNOSTIC
                 WT_ERR(__wt_col_modify(&cbt, recno + j, NULL, upd, WT_UPDATE_INVALID, true, true));
-#else
-                WT_ERR(__wt_col_modify(&cbt, recno + j, NULL, upd, WT_UPDATE_INVALID, true));
-#endif
                 /* Null the pointer so we don't free it twice. */
                 upd = NULL;
             }

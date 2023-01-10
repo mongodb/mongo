@@ -57,10 +57,8 @@ __wt_session_cursor_cache_sweep(WT_SESSION_IMPL *session, bool big_sweep)
     WT_CONNECTION_IMPL *conn;
     WT_CURSOR *cursor, *cursor_tmp;
     WT_CURSOR_LIST *cached_list;
-    WT_DECL_RET;
-#ifdef HAVE_DIAGNOSTIC
     WT_DATA_HANDLE *saved_dhandle;
-#endif
+    WT_DECL_RET;
     uint64_t now, sweep_max, sweep_min;
     uint32_t i, nbuckets, nclosed, nexamined, position;
     int t_ret;
@@ -106,9 +104,7 @@ __wt_session_cursor_cache_sweep(WT_SESSION_IMPL *session, bool big_sweep)
     position = session->cursor_sweep_position;
     productive = true;
     nbuckets = nclosed = nexamined = 0;
-#ifdef HAVE_DIAGNOSTIC
     saved_dhandle = session->dhandle;
-#endif
 
     /* Turn off caching so that cursor close doesn't try to cache. */
     F_CLR(session, WT_SESSION_CACHE_CURSORS);
@@ -146,7 +142,8 @@ __wt_session_cursor_cache_sweep(WT_SESSION_IMPL *session, bool big_sweep)
     WT_STAT_CONN_INCRV(session, cursor_sweep_examined, nexamined);
     WT_STAT_CONN_INCRV(session, cursor_sweep_closed, nclosed);
 
-    WT_ASSERT(session, session->dhandle == saved_dhandle);
+    WT_ASSERT_ALWAYS(
+      session, session->dhandle == saved_dhandle, "Session dhandle changed during cursor sweep");
     return (ret);
 }
 
@@ -491,6 +488,7 @@ __session_reconfigure(WT_SESSION *wt_session, const char *config)
         session->cache_max_wait_us = (uint64_t)(cval.val * WT_THOUSAND);
     WT_ERR_NOTFOUND_OK(ret, false);
 
+    WT_ERR_NOTFOUND_OK(ret, false);
 err:
     API_END_RET_NOTFOUND_MAP(session, ret);
 }
@@ -2498,6 +2496,11 @@ __open_session(WT_CONNECTION_IMPL *conn, WT_EVENT_HANDLER *event_handler, const 
 
     session_ret->name = NULL;
     session_ret->id = i;
+
+#ifdef HAVE_UNITTEST_ASSERTS
+    session_ret->unittest_assert_hit = false;
+    memset(session->unittest_assert_msg, 0, WT_SESSION_UNITTEST_BUF_LEN);
+#endif
 
     /*
      * Initialize the pseudo random number generator. We're not seeding it, so all of the sessions

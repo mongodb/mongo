@@ -14,8 +14,8 @@
 #include "connection_wrapper.h"
 #include "../utils.h"
 
-ConnectionWrapper::ConnectionWrapper(const std::string &db_home)
-    : _conn_impl(nullptr), _conn(nullptr), _db_home(db_home)
+ConnectionWrapper::ConnectionWrapper(const std::string &db_home, const char *cfg_str)
+    : _conn_impl(nullptr), _conn(nullptr), _db_home(db_home), _cfg_str(cfg_str)
 {
     struct stat sb;
     /*
@@ -31,7 +31,7 @@ ConnectionWrapper::ConnectionWrapper(const std::string &db_home)
     } else {
         utils::throwIfNonZero(mkdir(_db_home.c_str(), 0700));
     }
-    utils::throwIfNonZero(wiredtiger_open(_db_home.c_str(), nullptr, "create", &_conn));
+    utils::throwIfNonZero(wiredtiger_open(_db_home.c_str(), nullptr, cfg_str, &_conn));
 }
 
 ConnectionWrapper::~ConnectionWrapper()
@@ -42,10 +42,10 @@ ConnectionWrapper::~ConnectionWrapper()
 }
 
 WT_SESSION_IMPL *
-ConnectionWrapper::createSession()
+ConnectionWrapper::createSession(std::string cfg)
 {
     WT_SESSION *sess;
-    _conn->open_session(_conn, nullptr, nullptr, &sess);
+    _conn->open_session(_conn, nullptr, cfg.c_str(), &sess);
 
     auto sess_impl = (WT_SESSION_IMPL *)sess;
     _conn_impl = S2C(sess_impl);

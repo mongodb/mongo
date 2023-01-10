@@ -72,8 +72,8 @@ __wt_block_checkpoint_load(WT_SESSION_IMPL *session, WT_BLOCK *block, const uint
         live_open = block->live_open;
         block->live_open = true;
         __wt_spin_unlock(session, &block->live_lock);
-        WT_ERR_ASSERT(
-          session, live_open == false, EBUSY, "%s: attempt to re-open live file", block->name);
+        WT_ERR_ASSERT(session, WT_DIAG_CONCURRENT_ACCESS, live_open == false, EBUSY,
+          "%s: attempt to re-open live file", block->name);
 
         ci = &block->live;
         WT_ERR(__wt_block_ckpt_init(session, ci, "live"));
@@ -319,7 +319,6 @@ __ckpt_extlist_fblocks(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el
     return (__wt_block_insert_ext(session, block, &block->live.ckpt_avail, el->offset, el->size));
 }
 
-#ifdef HAVE_DIAGNOSTIC
 /*
  * __ckpt_verify --
  *     Diagnostic code, confirm we get what we expect in the checkpoint array.
@@ -350,7 +349,6 @@ __ckpt_verify(WT_SESSION_IMPL *session, WT_CKPT *ckptbase)
         }
     return (0);
 }
-#endif
 
 /*
  * __ckpt_add_blkmod_entry --
@@ -488,9 +486,8 @@ __ckpt_process(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
     ci = &block->live;
     fatal = locked = false;
 
-#ifdef HAVE_DIAGNOSTIC
-    WT_RET(__ckpt_verify(session, ckptbase));
-#endif
+    if (EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAG_DATA_VALIDATION))
+        WT_RET(__ckpt_verify(session, ckptbase));
 
     /*
      * Checkpoints are a two-step process: first, write a new checkpoint to disk (including all the
@@ -584,7 +581,7 @@ __ckpt_process(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_CKPT *ckptbase)
          */
         if (next_ckpt->bpriv == NULL && !F_ISSET(next_ckpt, WT_CKPT_ADD)) {
             WT_ERR(__ckpt_extlist_read(session, block, next_ckpt, &local));
-            WT_ERR_ASSERT(session, local == true, WT_PANIC,
+            WT_ERR_ASSERT(session, WT_DIAG_INVALID_OP, local == true, WT_PANIC,
               "tiered storage checkpoint follows local checkpoint");
         }
     }

@@ -208,6 +208,16 @@ struct __wt_session_impl {
     uint8_t dump_raw; /* Configure debugging page dump */
 #endif
 
+#ifdef HAVE_UNITTEST_ASSERTS
+/*
+ * Unit testing assertions requires overriding abort logic and instead capturing this information to
+ * be checked by the unit test.
+ */
+#define WT_SESSION_UNITTEST_BUF_LEN 100
+    bool unittest_assert_hit;
+    char unittest_assert_msg[WT_SESSION_UNITTEST_BUF_LEN];
+#endif
+
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_SESSION_LOCKED_CHECKPOINT 0x0001u
 #define WT_SESSION_LOCKED_HANDLE_LIST_READ 0x0002u

@@ -476,7 +476,6 @@ __wt_writeunlock(WT_SESSION_IMPL *session, WT_RWLOCK *l)
     WT_DIAGNOSTIC_YIELD;
 }
 
-#ifdef HAVE_DIAGNOSTIC
 /*
  * __wt_rwlock_islocked --
  *     Return if a read/write lock is currently locked for reading or writing.
@@ -491,4 +490,3 @@ __wt_rwlock_islocked(WT_SESSION_IMPL *session, WT_RWLOCK *l)
     old.u.v = l->u.v;
     return (old.u.s.current != old.u.s.next || old.u.s.readers_active != 0);
 }
-#endif

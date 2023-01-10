@@ -945,9 +945,7 @@ __curhs_insert(WT_CURSOR *cursor)
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
     WT_UPDATE *hs_tombstone, *hs_upd;
-#ifdef HAVE_DIAGNOSTIC
     int exact;
-#endif
 
     hs_cursor = (WT_CURSOR_HS *)cursor;
     file_cursor = hs_cursor->file_cursor;
@@ -1004,22 +1002,23 @@ __curhs_insert(WT_CURSOR *cursor)
     /* We no longer own the update memory, the page does; don't free it under any circumstances. */
     hs_tombstone = hs_upd = NULL;
 
-#ifdef HAVE_DIAGNOSTIC
-    /* Do a search again and call next to check the key order. */
-    ret = __curhs_file_cursor_search_near(session, file_cursor, &exact);
-    /* We can get not found if the inserted history store record is obsolete. */
-    WT_ASSERT(session, ret == 0 || ret == WT_NOTFOUND);
+    if (EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAG_OUT_OF_ORDER)) {
+        /* Do a search again and call next to check the key order. */
+        ret = __curhs_file_cursor_search_near(session, file_cursor, &exact);
+        /* We can get not found if the inserted history store record is obsolete. */
+        WT_ASSERT_ALWAYS(session, ret == 0 || ret == WT_NOTFOUND,
+          "Key order verification failed for history store insertion. ret: %d", ret);
 
-    /*
-     * If a globally visible tombstone is inserted and the page is evicted during search_near then
-     * the key would be removed. Hence, a search_near would return a non-zero exact value.
-     * Therefore, check that exact is zero before calling next.
-     */
-    if (ret == 0 && exact == 0)
-        WT_ERR_NOTFOUND_OK(__curhs_file_cursor_next(session, file_cursor), false);
-    else if (ret == WT_NOTFOUND)
-        ret = 0;
-#endif
+        /*
+         * If a globally visible tombstone is inserted and the page is evicted during search_near
+         * then the key would be removed. Hence, a search_near would return a non-zero exact value.
+         * Therefore, check that exact is zero before calling next.
+         */
+        if (ret == 0 && exact == 0)
+            WT_ERR_NOTFOUND_OK(__curhs_file_cursor_next(session, file_cursor), false);
+        else if (ret == WT_NOTFOUND)
+            ret = 0;
+    }
 
     /* Insert doesn't maintain a position across calls, clear resources. */
 err:

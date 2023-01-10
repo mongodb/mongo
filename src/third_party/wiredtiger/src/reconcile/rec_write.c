@@ -830,7 +830,6 @@ static int
 __rec_write(WT_SESSION_IMPL *session, WT_ITEM *buf, uint8_t *addr, size_t *addr_sizep,
   size_t *compressed_sizep, bool checkpoint, bool checkpoint_io, bool compressed)
 {
-#ifdef HAVE_DIAGNOSTIC
     WT_BTREE *btree;
     WT_DECL_ITEM(ctmp);
     WT_DECL_RET;
@@ -838,44 +837,55 @@ __rec_write(WT_SESSION_IMPL *session, WT_ITEM *buf, uint8_t *addr, size_t *addr_
     size_t result_len;
 
     btree = S2BT(session);
+    result_len = 0;
 
-    /* Checkpoint calls are different than standard calls. */
-    WT_ASSERT(session,
-      (!checkpoint && addr != NULL && addr_sizep != NULL) ||
-        (checkpoint && addr == NULL && addr_sizep == NULL));
+    if (EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAG_DATA_VALIDATION)) {
+        /* Checkpoint calls are different than standard calls. */
+        WT_ASSERT_ALWAYS(session,
+          (!checkpoint && addr != NULL && addr_sizep != NULL) ||
+            (checkpoint && addr == NULL && addr_sizep == NULL),
+          "Incorrect arguments passed to rec_write for a checkpoint call");
 
-    /* In-memory databases shouldn't write pages. */
-    WT_ASSERT(session, !F_ISSET(S2C(session), WT_CONN_IN_MEMORY));
+        /* In-memory databases shouldn't write pages. */
+        WT_ASSERT_ALWAYS(session, !F_ISSET(S2C(session), WT_CONN_IN_MEMORY),
+          "Attempted to write page to disk when WiredTiger is configured to be in-memory");
 
-    /*
-     * We're passed a table's disk image. Decompress if necessary and verify the image. Always check
-     * the in-memory length for accuracy.
-     */
-    dsk = buf->mem;
-    if (compressed) {
-        WT_ASSERT(session, __wt_scr_alloc(session, dsk->mem_size, &ctmp));
+        /*
+         * We're passed a table's disk image. Decompress if necessary and verify the image. Always
+         * check the in-memory length for accuracy.
+         */
+        dsk = buf->mem;
+        if (compressed) {
+            WT_ASSERT_ALWAYS(session, __wt_scr_alloc(session, dsk->mem_size, &ctmp),
+              "Failed to allocate scratch buffer");
 
-        memcpy(ctmp->mem, buf->data, WT_BLOCK_COMPRESS_SKIP);
-        WT_ASSERT(session,
-          btree->compressor->decompress(btree->compressor, &session->iface,
-            (uint8_t *)buf->data + WT_BLOCK_COMPRESS_SKIP, buf->size - WT_BLOCK_COMPRESS_SKIP,
-            (uint8_t *)ctmp->data + WT_BLOCK_COMPRESS_SKIP, ctmp->memsize - WT_BLOCK_COMPRESS_SKIP,
-            &result_len) == 0);
-        WT_ASSERT(session, dsk->mem_size == result_len + WT_BLOCK_COMPRESS_SKIP);
-        ctmp->size = result_len + WT_BLOCK_COMPRESS_SKIP;
+            memcpy(ctmp->mem, buf->data, WT_BLOCK_COMPRESS_SKIP);
+            WT_ASSERT_ALWAYS(session,
+              btree->compressor->decompress(btree->compressor, &session->iface,
+                (uint8_t *)buf->data + WT_BLOCK_COMPRESS_SKIP, buf->size - WT_BLOCK_COMPRESS_SKIP,
+                (uint8_t *)ctmp->data + WT_BLOCK_COMPRESS_SKIP,
+                ctmp->memsize - WT_BLOCK_COMPRESS_SKIP, &result_len) == 0,
+              "Disk image decompression failed");
+            WT_ASSERT_ALWAYS(session, dsk->mem_size == result_len + WT_BLOCK_COMPRESS_SKIP,
+              "Incorrect disk image size after decompression");
+            ctmp->size = result_len + WT_BLOCK_COMPRESS_SKIP;
 
-        /* Return an error rather than assert because the test suite tests that the error hits. */
-        ret = __wt_verify_dsk(session, "[write-check]", ctmp);
+            /*
+             * Return an error rather than assert because the test suite tests that the error hits.
+             */
+            ret = __wt_verify_dsk(session, "[write-check]", ctmp);
 
-        __wt_scr_free(session, &ctmp);
-    } else {
-        WT_ASSERT(session, dsk->mem_size == buf->size);
+            __wt_scr_free(session, &ctmp);
+        } else {
+            WT_ASSERT_ALWAYS(session, dsk->mem_size == buf->size, "Unexpected disk image size");
 
-        /* Return an error rather than assert because the test suite tests that the error hits. */
-        ret = __wt_verify_dsk(session, "[write-check]", buf);
+            /*
+             * Return an error rather than assert because the test suite tests that the error hits.
+             */
+            ret = __wt_verify_dsk(session, "[write-check]", buf);
+        }
+        WT_RET(ret);
     }
-    WT_RET(ret);
-#endif
 
     return (__wt_blkcache_write(
       session, buf, addr, addr_sizep, compressed_sizep, checkpoint, checkpoint_io, compressed));
@@ -2703,8 +2713,6 @@ __rec_hs_wrapup(WT_SESSION_IMPL *session, WT_RECONCILE *r)
      */
     WT_ASSERT_ALWAYS(session, !WT_IS_HS(btree->dhandle) && !WT_IS_METADATA(btree->dhandle),
       "Attempting to write updates from the history store or metadata file into the history store");
-    /* Flag as unused for non diagnostic builds. */
-    WT_UNUSED(btree);
 
     /*
      * Delete the updates left in the history store by prepared rollback first before moving updates

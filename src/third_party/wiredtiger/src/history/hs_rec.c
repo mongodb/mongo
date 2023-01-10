@@ -59,7 +59,6 @@ __hs_verbose_cache_stats(WT_SESSION_IMPL *session, WT_BTREE *btree)
     if (WT_VERBOSE_ISSET(session, WT_VERB_HS))
         cache->hs_verb_gen_write = ckpt_gen_current;
 }
-
 /*
  * __hs_insert_record --
  *     A helper function to insert the record into the history store including stop time point.
@@ -69,21 +68,17 @@ __hs_insert_record(WT_SESSION_IMPL *session, WT_CURSOR *cursor, WT_BTREE *btree,
   const uint8_t type, const WT_ITEM *hs_value, WT_TIME_WINDOW *tw, bool error_on_ts_ordering)
 {
     WT_CURSOR_BTREE *hs_cbt;
-    WT_DECL_ITEM(hs_key);
-#ifdef HAVE_DIAGNOSTIC
     WT_DECL_ITEM(existing_val);
-#endif
+    WT_DECL_ITEM(hs_key);
     WT_DECL_RET;
-    wt_timestamp_t hs_start_ts;
-#ifdef HAVE_DIAGNOSTIC
     wt_timestamp_t durable_timestamp_diag;
+    wt_timestamp_t hs_start_ts;
     wt_timestamp_t hs_stop_durable_ts_diag;
-    uint64_t upd_type_full_diag;
-    int cmp;
-#endif
-    bool hs_read_all_flag;
     uint64_t counter, hs_counter;
+    uint64_t upd_type_full_diag;
     uint32_t hs_btree_id;
+    int cmp;
+    bool hs_read_all_flag;
 
     counter = hs_counter = 0;
 
@@ -111,11 +106,6 @@ __hs_insert_record(WT_SESSION_IMPL *session, WT_CURSOR *cursor, WT_BTREE *btree,
 
     /* Allocate buffers for the history store and search key. */
     WT_ERR(__wt_scr_alloc(session, 0, &hs_key));
-
-#ifdef HAVE_DIAGNOSTIC
-    /* Allocate buffer for the existing history store value for the same key. */
-    WT_ERR(__wt_scr_alloc(session, 0, &existing_val));
-#endif
 
     hs_cbt = __wt_curhs_get_cbt(cursor);
 
@@ -145,40 +135,48 @@ __hs_insert_record(WT_SESSION_IMPL *session, WT_CURSOR *cursor, WT_BTREE *btree,
     if (ret == 0) {
         WT_ERR(cursor->get_key(cursor, &hs_btree_id, hs_key, &hs_start_ts, &hs_counter));
 
-#ifdef HAVE_DIAGNOSTIC
-        if (tw->start_ts == hs_start_ts) {
-            WT_ERR(cursor->get_value(cursor, &hs_stop_durable_ts_diag, &durable_timestamp_diag,
-              &upd_type_full_diag, existing_val));
-            WT_ERR(__wt_compare(session, NULL, existing_val, hs_value, &cmp));
-            /*
-             * The same value should not be inserted again unless:
-             * 1. The previous entry is already deleted (i.e. the stop timestamp is globally
-             * visible)
-             * 2. It came from a different transaction
-             * 3. It came from the same transaction but with a different timestamp
-             * 4. The prepared rollback left the history store entry when checkpoint is in progress.
-             */
-            if (cmp == 0) {
-                if (!__wt_txn_tw_stop_visible_all(session, &hs_cbt->upd_value->tw) &&
-                  tw->start_txn != WT_TXN_NONE &&
-                  tw->start_txn == hs_cbt->upd_value->tw.start_txn &&
-                  tw->start_ts == hs_cbt->upd_value->tw.start_ts && tw->start_ts != tw->stop_ts) {
-                    /*
-                     * If we have issues with duplicate history store records, we want to be able to
-                     * distinguish between modifies and full updates. Since modifies are not
-                     * idempotent, having them inserted multiple times can cause invalid values to
-                     * be read.
-                     */
-                    WT_ASSERT(session,
-                      type != WT_UPDATE_MODIFY && (uint8_t)upd_type_full_diag != WT_UPDATE_MODIFY);
+        if (EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAG_OUT_OF_ORDER | WT_DIAG_VISIBILITY)) {
+            /* Allocate buffer for the existing history store value for the same key. */
+            WT_ERR(__wt_scr_alloc(session, 0, &existing_val));
+
+            if (tw->start_ts == hs_start_ts) {
+                WT_ERR(cursor->get_value(cursor, &hs_stop_durable_ts_diag, &durable_timestamp_diag,
+                  &upd_type_full_diag, existing_val));
+                WT_ERR(__wt_compare(session, NULL, existing_val, hs_value, &cmp));
+                /*
+                 * The same value should not be inserted again unless:
+                 * 1. The previous entry is already deleted (i.e. the stop timestamp is globally
+                 * visible)
+                 * 2. It came from a different transaction
+                 * 3. It came from the same transaction but with a different timestamp
+                 * 4. The prepared rollback left the history store entry when checkpoint is in
+                 * progress.
+                 */
+                if (cmp == 0) {
+                    if (!__wt_txn_tw_stop_visible_all(session, &hs_cbt->upd_value->tw) &&
+                      tw->start_txn != WT_TXN_NONE &&
+                      tw->start_txn == hs_cbt->upd_value->tw.start_txn &&
+                      tw->start_ts == hs_cbt->upd_value->tw.start_ts &&
+                      tw->start_ts != tw->stop_ts) {
+                        /*
+                         * If we have issues with duplicate history store records, we want to be
+                         * able to distinguish between modifies and full updates. Since modifies are
+                         * not idempotent, having them inserted multiple times can cause invalid
+                         * values to be read.
+                         */
+                        WT_ASSERT_ALWAYS(session,
+                          type != WT_UPDATE_MODIFY &&
+                            (uint8_t)upd_type_full_diag != WT_UPDATE_MODIFY,
+                          "Duplicate modifies inserted into the history store can result in "
+                          "invalid reads");
+                    }
                 }
+                counter = hs_counter + 1;
             }
-            counter = hs_counter + 1;
+        } else {
+            if (tw->start_ts == hs_start_ts)
+                counter = hs_counter + 1;
         }
-#else
-        if (tw->start_ts == hs_start_ts)
-            counter = hs_counter + 1;
-#endif
     }
 
     /*
@@ -1079,9 +1077,8 @@ __hs_delete_record(
 {
     WT_DECL_RET;
     bool hs_read_committed;
-#ifdef HAVE_DIAGNOSTIC
+
     WT_TIME_WINDOW *hs_tw;
-#endif
 
     if (r->hs_cursor == NULL)
         WT_RET(__wt_curhs_open(session, NULL, &r->hs_cursor));
@@ -1100,20 +1097,34 @@ __hs_delete_record(
         WT_ASSERT(session, tombstone != NULL && __wt_txn_upd_visible_all(session, tombstone));
         ret = 0;
     } else {
-#ifdef HAVE_DIAGNOSTIC
-        __wt_hs_upd_time_window(r->hs_cursor, &hs_tw);
-        WT_ASSERT(session, hs_tw->start_txn == WT_TXN_NONE || hs_tw->start_txn == upd->txnid);
-        WT_ASSERT(session, hs_tw->start_ts == WT_TS_NONE || hs_tw->start_ts == upd->start_ts);
-        WT_ASSERT(session,
-          hs_tw->durable_start_ts == WT_TS_NONE || hs_tw->durable_start_ts == upd->durable_ts);
-        if (tombstone != NULL) {
-            WT_ASSERT(session, hs_tw->stop_txn == tombstone->txnid);
-            WT_ASSERT(session, hs_tw->stop_ts == tombstone->start_ts);
-            WT_ASSERT(session, hs_tw->durable_stop_ts == tombstone->durable_ts);
-        } else
-            WT_ASSERT(session, !WT_TIME_WINDOW_HAS_STOP(hs_tw));
-#endif
-
+        /*
+         * If we're deleting a record that is already in the history store this implies we're
+         * rolling back a prepared transaction and need to pull the history store update back into
+         * the update chain, then delete it from the history store. These checks ensure we've
+         * retrieved the correct update from the history store.
+         */
+        if (EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAG_VISIBILITY)) {
+            __wt_hs_upd_time_window(r->hs_cursor, &hs_tw);
+            WT_ASSERT_ALWAYS(session,
+              hs_tw->start_txn == WT_TXN_NONE || hs_tw->start_txn == upd->txnid,
+              "Retrieved wrong update from history store: start txn id mismatch");
+            WT_ASSERT_ALWAYS(session,
+              hs_tw->start_ts == WT_TS_NONE || hs_tw->start_ts == upd->start_ts,
+              "Retrieved wrong update from history store: start timestamp mismatch");
+            WT_ASSERT_ALWAYS(session,
+              hs_tw->durable_start_ts == WT_TS_NONE || hs_tw->durable_start_ts == upd->durable_ts,
+              "Retrieved wrong update from history store: durable start timestamp mismatch");
+            if (tombstone != NULL) {
+                WT_ASSERT_ALWAYS(session, hs_tw->stop_txn == tombstone->txnid,
+                  "Retrieved wrong update from history store: stop txn id mismatch");
+                WT_ASSERT_ALWAYS(session, hs_tw->stop_ts == tombstone->start_ts,
+                  "Retrieved wrong update from history store: stop timestamp mismatch");
+                WT_ASSERT_ALWAYS(session, hs_tw->durable_stop_ts == tombstone->durable_ts,
+                  "Retrieved wrong update from history store: durable stop timestamp mismatch");
+            } else
+                WT_ASSERT_ALWAYS(session, !WT_TIME_WINDOW_HAS_STOP(hs_tw),
+                  "Retrieved wrong update from history store: empty tombstone with stop timestamp");
+        }
         WT_ERR(r->hs_cursor->remove(r->hs_cursor));
     }
 done:

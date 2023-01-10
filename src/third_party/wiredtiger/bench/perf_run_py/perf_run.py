@@ -124,6 +124,36 @@ def detailed_perf_stats(config: PerfConfig, reported_stats: List[PerfStat]):
 
     return as_dict
 
+def configure_for_extra_accuracy(config: PerfConfig, arguments: List[str]) -> List[str]:
+    """
+    When the `extra_accuracy` flag is set we want to run each test multiple times to 
+    ensure a more stable result. However, this can take a lot of time for longer tests 
+    so limit them to only a few minutes.
+    """
+
+    new_run_max = 5
+    new_run_time="run_time=240"
+    print("==================")
+    print(f"Extra accuracy flag set. Overriding runmax to {new_run_max} and setting -o {new_run_time}")
+    print("==================")
+    
+    config.run_max = new_run_max
+
+    if arguments:
+        for (i, arg) in enumerate(arguments):
+            if arg.startswith("-o "):
+                if "run_time=" in arg:
+                    print("Error: Attempting to set `run_time` but it has already been set via the `-args` flag`")
+                    exit(1)
+                else:
+                    arguments[i] = arg + "," + new_run_time
+                    return
+                    
+    # There is no `-o` argument yet. Add one.
+    if not(arguments):
+        arguments = []
+    arguments += [f"-o {new_run_time}"]
+    return arguments
 
 def run_test_wrapper(config: PerfConfig, index: int = 0, arguments: List[str] = None):
     for test_run in range(config.run_max):
@@ -188,6 +218,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument('-args', '--arguments', help='Additional arguments to pass into the test')
     parser.add_argument('-ops', '--operations', help='List of operations to report metrics for')
     parser.add_argument('-v', '--verbose', action="store_true", help='be verbose')
+    parser.add_argument('-a', '--improved_accuracy', action='store_true', help='Enable stable runs and results')
     args = parser.parse_args()
 
     if args.verbose:
@@ -238,7 +269,8 @@ def parse_json_args(args: argparse.Namespace) -> Tuple[List[str], List[str], Per
                         run_max=args.runmax,
                         verbose=args.verbose,
                         git_root=args.git_root,
-                        json_info=json_info)
+                        json_info=json_info,
+                        improved_accuracy=args.improved_accuracy)
 
     batch_file_contents = None
     if config.batch_file:
@@ -289,13 +321,17 @@ def run_perf_tests(config: PerfConfig,
             if args.verbose:
                 print("Batch test {}: Arguments: {}, Operations: {}".
                       format(index,  content["arguments"], content["operations"]))
-                perf_stats = PerfStatCollection(content["operations"])
-                if not args.reuse:
-                    run_test_wrapper(config=config, index=index, arguments=content["arguments"])
-                reported_stats += process_results(config, perf_stats, index=index)
+            perf_stats = PerfStatCollection(content["operations"])
+            if not args.reuse:
+                if (config.improved_accuracy):
+                    arguments = configure_for_extra_accuracy(config, content["arguments"])
+                run_test_wrapper(config=config, index=index, arguments=content["arguments"])
+            reported_stats += process_results(config, perf_stats, index=index)
     else:
         perf_stats = PerfStatCollection(operations)
         if not args.reuse:
+            if (config.improved_accuracy):
+                arguments = configure_for_extra_accuracy(config, arguments)
             run_test_wrapper(config=config, index=0, arguments=arguments)
         reported_stats = process_results(config, perf_stats)
 
