@@ -426,6 +426,62 @@ TEST_F(ABTPlanGeneration, LowerLimitSkipNode) {
         _node(make<LimitSkipNode>(properties::LimitSkipRequirement(4, 2), _node(scanForTest()))));
 }
 
+TEST_F(ABTPlanGeneration, LowerMergeJoinNode) {
+    GoldenTestContext ctx(&goldenTestConfig);
+    ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
+
+    std::vector<CollationOp> ops = {CollationOp::Ascending, CollationOp::Descending};
+    // Run a variation for each supported collation.
+    for (auto& op : ops) {
+        auto child1 = createBindings(
+            {{"other_id", "proj0"}},
+            _node(make<PhysicalScanNode>(
+                FieldProjectionMap{{}, {ProjectionName{"scan0"}}, {}}, "collName", false)),
+            "scan0");
+        auto child2 = createBindings(
+            {{"id", "proj1"}},
+            _node(make<PhysicalScanNode>(
+                FieldProjectionMap{{}, {ProjectionName{"scan1"}}, {}}, "otherColl", false)),
+            "scan1");
+        runNodeVariation(ctx,
+                         str::stream() << "Lower merge join with one projection (collation="
+                                       << CollationOpEnum::toString[static_cast<int>(op)] << ")",
+                         _node(make<MergeJoinNode>(ProjectionNameVector{ProjectionName{"proj0"}},
+                                                   ProjectionNameVector{ProjectionName{"proj1"}},
+                                                   std::vector<CollationOp>{op},
+                                                   std::move(child1),
+                                                   std::move(child2))));
+    }
+
+    // Run variations with two projections and every possible combination of collation.
+    for (auto& op1 : ops) {
+        for (auto& op2 : ops) {
+            auto child1 = createBindings(
+                {{"other_id", "proj0"}, {"city", "proj2"}},
+                _node(make<PhysicalScanNode>(
+                    FieldProjectionMap{{}, {ProjectionName{"scan0"}}, {}}, "collName", false)),
+                "scan0");
+            auto child2 = createBindings(
+                {{"id", "proj1"}, {"city", "proj3"}},
+                _node(make<PhysicalScanNode>(
+                    FieldProjectionMap{{}, {ProjectionName{"scan1"}}, {}}, "otherColl", false)),
+                "scan1");
+
+            runNodeVariation(
+                ctx,
+                str::stream() << "Lower merge join with two projections (collation="
+                              << CollationOpEnum::toString[static_cast<int>(op1)] << ", "
+                              << CollationOpEnum::toString[static_cast<int>(op2)] << ")",
+                _node(make<MergeJoinNode>(
+                    ProjectionNameVector{ProjectionName{"proj0"}, ProjectionName{"proj2"}},
+                    ProjectionNameVector{ProjectionName{"proj1"}, ProjectionName{"proj3"}},
+                    std::vector<CollationOp>{op1, op2},
+                    std::move(child1),
+                    std::move(child2))));
+        }
+    }
+}
+
 TEST_F(ABTPlanGeneration, LowerPhysicalScanNode) {
     GoldenTestContext ctx(&goldenTestConfig);
     ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
