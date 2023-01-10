@@ -141,7 +141,10 @@ public:
     virtual bool unlockGlobal();
 
     virtual LockResult lockRSTLBegin(OperationContext* opCtx, LockMode mode);
-    virtual void lockRSTLComplete(OperationContext* opCtx, LockMode mode, Date_t deadline);
+    virtual void lockRSTLComplete(OperationContext* opCtx,
+                                  LockMode mode,
+                                  Date_t deadline,
+                                  const LockTimeoutCallback& onTimeout);
 
     virtual bool unlockRSTLforPrepare();
 
@@ -234,7 +237,7 @@ public:
                              ResourceId resId,
                              LockMode mode,
                              Date_t deadline) {
-        _lockComplete(opCtx, resId, mode, deadline);
+        _lockComplete(opCtx, resId, mode, deadline, nullptr);
     }
 
 private:
@@ -277,14 +280,15 @@ private:
      * @param mode Mode which was passed to an earlier _lockBegin call. Must match.
      * @param deadline The absolute time point when this lock acquisition will time out, if not yet
      * granted.
+     * @param onTimeout Callback which will run if the lock acquisition is about to time out.
      *
      * Throws an exception if it is interrupted.
      */
-    void _lockComplete(OperationContext* opCtx, ResourceId resId, LockMode mode, Date_t deadline);
-
-    void _lockComplete(ResourceId resId, LockMode mode, Date_t deadline) {
-        _lockComplete(nullptr, resId, mode, deadline);
-    }
+    void _lockComplete(OperationContext* opCtx,
+                       ResourceId resId,
+                       LockMode mode,
+                       Date_t deadline,
+                       const LockTimeoutCallback& onTimeout);
 
     /**
      * The main functionality of the unlock method, except accepts iterator in order to avoid
