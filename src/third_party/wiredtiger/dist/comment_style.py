@@ -109,7 +109,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-t', '--test', default=False,
                         help='Run self tests', action='store_true')
-    parser.add_argument('-f', '--fast', default=False,
+    parser.add_argument('-F', '--fast', default=False,
                         help='Use fast mode by only checking files changed in git',
                         action='store_true')
     args = parser.parse_args()
