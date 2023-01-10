@@ -115,6 +115,11 @@ inline auto _cbool(const bool val) {
     return ExprHolder{Constant::boolean(val)};
 }
 
+// Empty array constant.
+inline auto _cemptyarr() {
+    return ExprHolder{Constant::emptyArray()};
+}
+
 // Variable.
 inline auto operator"" _var(const char* c, size_t len) {
     return ExprHolder{make<Variable>(ProjectionName{{c, len}})};

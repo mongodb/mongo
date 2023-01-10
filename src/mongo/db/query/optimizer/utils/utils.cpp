@@ -374,13 +374,12 @@ public:
             return {};
         }
         const sbe::value::Array* arr = sbe::value::getArrayView(val);
-        if (arr->size() == 0) {
-            // For now we do not support empty arrays. Need to translate into null bounds.
-            return {};
-        }
 
-        ABT elementBound = Constant::createFromCopy(arr->getAt(0).first, arr->getAt(0).second);
-        // Create new interval which uses the first element of the array.
+        // Create new interval which uses the first element of the array, or "undefined" if the
+        // interval is the empty array.
+        ABT elementBound = arr->size() == 0
+            ? make<Constant>(sbe::value::TypeTags::bsonUndefined, 0)
+            : Constant::createFromCopy(arr->getAt(0).first, arr->getAt(0).second);
         const IntervalReqExpr::Node& newInterval =
             IntervalReqExpr::makeSingularDNF(IntervalRequirement{
                 {true /*inclusive*/, elementBound}, {true /*inclusive*/, elementBound}});

@@ -2267,7 +2267,7 @@ TEST(LogicalRewriter, SargableNodeRIN) {
     using namespace unit_test_abt_literals;
     auto prefixId = PrefixId::createForTests();
 
-    // Construct a query which tests "a" = 1 and "b" = 2 and "c" = 3.
+    // Construct a query which tests "a" = 1 and "c" = 2 and "e" = 3.
     ABT rootNode = NodeBuilder{}
                        .root("root")
                        .filter(_evalf(_get("e", _traverse1(_cmp("Eq", "3"_cint64))), "root"_var))
@@ -2420,6 +2420,71 @@ TEST(LogicalRewriter, SargableNodeRIN) {
         "    }\n"
         "}\n",
         ExplainGenerator::explainIntervalExpr(ci.at(2)._eqPrefixes.at(2)._interval));
+}
+
+TEST(LogicalRewriter, EmptyArrayIndexBounds) {
+    using namespace unit_test_abt_literals;
+    auto prefixId = PrefixId::createForTests();
+
+    // Construct a query which tests coll.find({a: []})
+    ABT rootNode = NodeBuilder{}
+                       .root("root")
+                       .filter(_evalf(_get("a",
+                                           _composea(_cmp("Eq", _cemptyarr()),
+                                                     _traverse1(_cmp("Eq", _cemptyarr())))),
+                                      "root"_var))
+                       .finish(_scan("root", "c1"));
+
+    // We have one index on "a".
+    auto phaseManager = makePhaseManager(
+        {OptPhase::MemoSubstitutionPhase},
+        prefixId,
+        {{{"c1",
+           createScanDef(
+               {},
+               {{"index1",
+                 IndexDefinition{{{makeNonMultikeyIndexPath("a"), CollationOp::Ascending}},
+                                 false /*isMultiKey*/,
+                                 {DistributionType::Centralized},
+                                 {}}}})}}},
+        boost::none /*costModel*/,
+        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
+
+    phaseManager.optimize(rootNode);
+
+    ASSERT_EXPLAIN_V2_AUTO(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       root\n"
+        "|   RefBlock: \n"
+        "|       Variable [root]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [root]\n"
+        "|   PathGet [a]\n"
+        "|   PathComposeA []\n"
+        "|   |   PathTraverse [1]\n"
+        "|   |   PathCompare [Eq]\n"
+        "|   |   Const [[]]\n"
+        "|   PathCompare [Eq]\n"
+        "|   Const [[]]\n"
+        "Sargable [Complete]\n"
+        "|   |   |   |   |   requirementsMap: \n"
+        "|   |   |   |   |       refProjection: root, path: 'PathGet [a] PathIdentity []', interv"
+        "als: {{{=Const [undefined]}} U {{=Const [[]]}}}, perfOnly\n"
+        "|   |   |   |   candidateIndexes: \n"
+        "|   |   |   |       candidateId: 1, index1, {}, {0}, {{{=Const [undefined]}} U {{=Const "
+        "[[]]}}}\n"
+        "|   |   |   scanParams: \n"
+        "|   |   |       {}\n"
+        "|   |   BindBlock:\n"
+        "|   RefBlock: \n"
+        "|       Variable [root]\n"
+        "Scan [c1]\n"
+        "    BindBlock:\n"
+        "        [root]\n"
+        "            Source []\n",
+        rootNode);
 }
 
 }  // namespace

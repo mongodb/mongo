@@ -15,6 +15,8 @@ for (let i = 0; i < 10; i++) {
     assert.commandWorked(t.insert({a: [2], b: 1}));
     assert.commandWorked(t.insert({a: [[2]], b: 1}));
     assert.commandWorked(t.insert({a: [0, 1], b: 1}));
+    assert.commandWorked(t.insert({a: [], b: 1}));
+    assert.commandWorked(t.insert({a: [3, []], b: 1}));
 }
 
 assert.commandWorked(t.createIndex({a: 1}));
@@ -49,6 +51,17 @@ assert.commandWorked(bulk.execute());
     assertValueOnPath([2], indexUnionNode, "children.0.interval.0.lowBound.bound.value");
     assertValueOnPath("IndexScan", indexUnionNode, "children.1.nodeType");
     assertValueOnPath(2, indexUnionNode, "children.1.interval.0.lowBound.bound.value");
+}
+
+{
+    const res = t.explain("executionStats").aggregate([{$match: {a: {$eq: []}}}]);
+    assert.eq(20, res.executionStats.nReturned);
+    const indexUnionNode = navigateToPlanPath(res, "child.child.leftChild.child");
+    assertValueOnPath("Union", indexUnionNode, "nodeType");
+    assertValueOnPath("IndexScan", indexUnionNode, "children.0.nodeType");
+    assertValueOnPath(undefined, indexUnionNode, "children.0.interval.0.lowBound.bound.value");
+    assertValueOnPath("IndexScan", indexUnionNode, "children.1.nodeType");
+    assertValueOnPath([], indexUnionNode, "children.1.interval.0.lowBound.bound.value");
 }
 
 assert.commandWorked(t.dropIndex({a: 1}));
