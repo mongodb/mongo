@@ -109,15 +109,13 @@ structs:
                 type:
                     variant: [string, array<string>]
                 cpp_name: audience
-            iat:
-                description: Time at which the JWT was issued. (Unix Epoch)
-                type: safeInt64
-                cpp_name: issuedAtEpoch
+            nbf:
+                description: Time at which the JWT becomes valid. (Unix Epoch)
+                type: unixEpoch
+                cpp_name: notBefore
+                optional: true
             exp:
                 description: Time at which the JWT expires. (Unix Epoch)
-                type: safeInt64
-                cpp_name: expirationEpoch
-            auth_time:
-                description: Time when the authentication occurred. (Unix Epoch)
-                type: safeInt64
-                optional: true
+                type: unixEpoch
+                cpp_name: expiration
+                optional: false # RFC7519 marks this optional, but we refuse to accept non-expiring tokens.
