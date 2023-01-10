@@ -58,7 +58,7 @@ constexpr auto kInsertGroupMaxOpCount = 64;
 
 }  // namespace
 
-InsertGroup::InsertGroup(std::vector<const OplogEntry*>* ops,
+InsertGroup::InsertGroup(std::vector<ApplierOperation>* ops,
                          OperationContext* opCtx,
                          InsertGroup::Mode mode,
                          const bool isDataConsistent,
@@ -96,7 +96,7 @@ StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(
 
     // Make sure to include the first op in the group size.
     size_t groupSize = entry.getObject().objsize();
-    auto opCount = std::vector<const OplogEntry*>::size_type(1);
+    auto opCount = std::vector<ApplierOperation>::size_type(1);
     auto groupNamespace = entry.getNss();
 
     /**
@@ -114,7 +114,7 @@ StatusWith<InsertGroup::ConstIterator> InsertGroup::groupAndApplyInserts(
      * will point to the first op that *can't* be added to the current insert group.
      */
     auto endOfGroupableOpsIterator =
-        std::find_if(it + 1, _end, [&](const OplogEntry* nextEntry) -> bool {
+        std::find_if(it + 1, _end, [&](ApplierOperation nextEntry) -> bool {
             auto opNamespace = nextEntry->getNss();
             groupSize += nextEntry->getObject().objsize();
             opCount += 1;

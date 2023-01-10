@@ -876,7 +876,7 @@ TEST_F(StorageTimestampTest, SecondaryArrayInsertTimes) {
 
     std::vector<repl::OplogEntry> oplogEntries;
     oplogEntries.reserve(docsToInsert);
-    std::vector<const repl::OplogEntry*> opPtrs;
+    std::vector<repl::ApplierOperation> opPtrs;
     BSONObjBuilder oplogEntryBuilders[docsToInsert];
     for (std::int32_t idx = 0; idx < docsToInsert; ++idx) {
         auto o = BSON("_id" << idx);
@@ -892,7 +892,7 @@ TEST_F(StorageTimestampTest, SecondaryArrayInsertTimes) {
         oplogEntryBuilders[idx].appendElementsUnique(oplogCommon);
         // Insert ops to be applied.
         oplogEntries.push_back(repl::OplogEntry(oplogEntryBuilders[idx].done()));
-        opPtrs.push_back(&(oplogEntries.back()));
+        opPtrs.emplace_back(&(oplogEntries.back()));
     }
 
     repl::OplogEntryOrGroupedInserts groupedInserts(opPtrs.cbegin(), opPtrs.cend());
@@ -2524,7 +2524,7 @@ public:
           _taskFuture(taskFuture) {}
 
     Status applyOplogBatchPerWorker(OperationContext* opCtx,
-                                    std::vector<const repl::OplogEntry*>* operationsToApply,
+                                    std::vector<repl::ApplierOperation>* operationsToApply,
                                     WorkerMultikeyPathInfo* pathInfo,
                                     bool isDataConsistent) override;
 
@@ -2542,7 +2542,7 @@ private:
 // and this test case fails without crashing the entire suite.
 Status SecondaryReadsDuringBatchApplicationAreAllowedApplier::applyOplogBatchPerWorker(
     OperationContext* opCtx,
-    std::vector<const repl::OplogEntry*>* operationsToApply,
+    std::vector<repl::ApplierOperation>* operationsToApply,
     WorkerMultikeyPathInfo* pathInfo,
     const bool isDataConsistent) {
     if (!_testOpCtx->lockState()->isLockHeldForMode(resourceIdParallelBatchWriterMode, MODE_X)) {
@@ -2874,8 +2874,11 @@ TEST_F(StorageTimestampTest, TimestampIndexOplogApplicationOnPrimary) {
             auto start = repl::makeStartIndexBuildOplogEntry(
                 startBuildOpTime, nss, "field_1", keyPattern, collUUID, indexBuildUUID);
             const bool dataIsConsistent = true;
-            ASSERT_OK(repl::applyOplogEntryOrGroupedInserts(
-                _opCtx, &start, repl::OplogApplication::Mode::kSecondary, dataIsConsistent));
+            ASSERT_OK(
+                repl::applyOplogEntryOrGroupedInserts(_opCtx,
+                                                      repl::ApplierOperation{&start},
+                                                      repl::OplogApplication::Mode::kSecondary,
+                                                      dataIsConsistent));
 
             // We cannot use the OperationContext to wait for the thread to reach the fail point
             // because it also uses the ClockSourceMock.
@@ -2901,8 +2904,10 @@ TEST_F(StorageTimestampTest, TimestampIndexOplogApplicationOnPrimary) {
         auto commit = repl::makeCommitIndexBuildOplogEntry(
             startBuildOpTime, nss, "field_1", keyPattern, collUUID, indexBuildUUID);
         const bool dataIsConsistent = true;
-        ASSERT_OK(repl::applyOplogEntryOrGroupedInserts(
-            _opCtx, &commit, repl::OplogApplication::Mode::kSecondary, dataIsConsistent));
+        ASSERT_OK(repl::applyOplogEntryOrGroupedInserts(_opCtx,
+                                                        repl::ApplierOperation{&commit},
+                                                        repl::OplogApplication::Mode::kSecondary,
+                                                        dataIsConsistent));
 
         // Reacquire read lock to check index metadata.
         AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IS);

@@ -109,7 +109,7 @@ void OplogApplierUtils::processCrudOp(
 uint32_t OplogApplierUtils::addToWriterVector(
     OperationContext* opCtx,
     OplogEntry* op,
-    std::vector<std::vector<const OplogEntry*>>* writerVectors,
+    std::vector<std::vector<ApplierOperation>>* writerVectors,
     CachedCollectionProperties* collPropertiesCache,
     boost::optional<uint32_t> forceWriterId) {
 
@@ -134,12 +134,12 @@ uint32_t OplogApplierUtils::addToWriterVector(
     if (writer.empty()) {
         writer.reserve(8);  // Skip a few growth rounds
     }
-    writer.push_back(op);
+    writer.emplace_back(op);
     return writerId;
 }
 
-void OplogApplierUtils::stableSortByNamespace(std::vector<const OplogEntry*>* oplogEntryPointers) {
-    auto nssComparator = [](const OplogEntry* l, const OplogEntry* r) {
+void OplogApplierUtils::stableSortByNamespace(std::vector<ApplierOperation>* oplogEntryPointers) {
+    auto nssComparator = [](ApplierOperation l, ApplierOperation r) {
         if (l->getNss().isCommand()) {
             if (r->getNss().isCommand())
                 // l == r; now compare the namespace
@@ -157,7 +157,7 @@ void OplogApplierUtils::stableSortByNamespace(std::vector<const OplogEntry*>* op
 
 void OplogApplierUtils::addDerivedOps(OperationContext* opCtx,
                                       std::vector<OplogEntry>* derivedOps,
-                                      std::vector<std::vector<const OplogEntry*>>* writerVectors,
+                                      std::vector<std::vector<ApplierOperation>>* writerVectors,
                                       CachedCollectionProperties* collPropertiesCache,
                                       bool serial) {
     boost::optional<uint32_t>
@@ -305,7 +305,7 @@ Status OplogApplierUtils::applyOplogEntryOrGroupedInsertsCommon(
 
 Status OplogApplierUtils::applyOplogBatchCommon(
     OperationContext* opCtx,
-    std::vector<const OplogEntry*>* ops,
+    std::vector<ApplierOperation>* ops,
     OplogApplication::Mode oplogApplicationMode,
     bool allowNamespaceNotFoundErrorsOnCrudOps,
     const bool isDataConsistent,
@@ -334,7 +334,7 @@ Status OplogApplierUtils::applyOplogBatchCommon(
         // If we didn't create a group, try to apply the op individually.
         try {
             const Status status = applyOplogEntryOrGroupedInserts(
-                opCtx, &entry, oplogApplicationMode, isDataConsistent);
+                opCtx, ApplierOperation{&entry}, oplogApplicationMode, isDataConsistent);
 
             if (!status.isOK()) {
                 // Tried to apply an update operation but the document is missing, there must be

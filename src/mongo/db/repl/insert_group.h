@@ -48,13 +48,13 @@ class InsertGroup {
     InsertGroup& operator=(const InsertGroup&) = delete;
 
 public:
-    using ConstIterator = std::vector<const OplogEntry*>::const_iterator;
+    using ConstIterator = std::vector<ApplierOperation>::const_iterator;
     using Mode = OplogApplication::Mode;
     typedef std::function<Status(
         OperationContext*, const OplogEntryOrGroupedInserts&, OplogApplication::Mode, bool)>
         ApplyFunc;
 
-    InsertGroup(std::vector<const OplogEntry*>* ops,
+    InsertGroup(std::vector<ApplierOperation>* ops,
                 OperationContext* opCtx,
                 Mode mode,
                 bool isDataConsistent,

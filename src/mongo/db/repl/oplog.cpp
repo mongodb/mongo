@@ -1377,7 +1377,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 const auto insertOps = opOrGroupedInserts.getGroupedInserts();
                 WriteUnitOfWork wuow(opCtx);
                 if (!opCtx->writesAreReplicated()) {
-                    for (const auto iOp : insertOps) {
+                    for (const auto& iOp : insertOps) {
                         invariant(iOp->getTerm());
                         insertObjs.emplace_back(
                             iOp->getObject(), iOp->getTimestamp(), iOp->getTerm().value());
@@ -1388,7 +1388,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
                     // the recipient.
                     std::vector<OplogSlot> slots = getNextOpTimes(opCtx, insertOps.size());
                     auto slotIter = slots.begin();
-                    for (const auto iOp : insertOps) {
+                    for (const auto& iOp : insertOps) {
                         insertObjs.emplace_back(
                             iOp->getObject(), slotIter->getTimestamp(), slotIter->getTerm());
                         slotIter++;

@@ -122,11 +122,11 @@ private:
     bool _shouldStopApplying(Status status);
 
     void _applyOplogBatch(TenantOplogBatch* batch);
-    Status _applyOplogBatchPerWorker(std::vector<const OplogEntry*>* ops);
+    Status _applyOplogBatchPerWorker(std::vector<ApplierOperation>* ops);
     void _checkNsAndUuidsBelongToTenant(OperationContext* opCtx, const TenantOplogBatch& batch);
     OpTimePair _writeNoOpEntries(OperationContext* opCtx, const TenantOplogBatch& batch);
 
-    using TenantNoOpEntry = std::pair<const OplogEntry*, std::vector<OplogSlot>::iterator>;
+    using TenantNoOpEntry = std::pair<ApplierOperation, std::vector<OplogSlot>::iterator>;
     void _writeNoOpsForRange(OpObserver* opObserver,
                              std::vector<TenantNoOpEntry>::const_iterator begin,
                              std::vector<TenantNoOpEntry>::const_iterator end);
@@ -137,8 +137,8 @@ private:
                                             const OplogEntryOrGroupedInserts& entryOrGroupedInserts,
                                             OplogApplication::Mode oplogApplicationMode,
                                             bool isDataConsistent);
-    std::vector<std::vector<const OplogEntry*>> _fillWriterVectors(OperationContext* opCtx,
-                                                                   TenantOplogBatch* batch);
+    std::vector<std::vector<ApplierOperation>> _fillWriterVectors(OperationContext* opCtx,
+                                                                  TenantOplogBatch* batch);
 
     /**
      * Sets the _finalStatus to the new status if and only if the old status is "OK".

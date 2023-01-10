@@ -928,9 +928,9 @@ void TenantOplogApplier::_writeNoOpsForRange(OpObserver* opObserver,
         });
 }
 
-std::vector<std::vector<const OplogEntry*>> TenantOplogApplier::_fillWriterVectors(
+std::vector<std::vector<ApplierOperation>> TenantOplogApplier::_fillWriterVectors(
     OperationContext* opCtx, TenantOplogBatch* batch) {
-    std::vector<std::vector<const OplogEntry*>> writerVectors(
+    std::vector<std::vector<ApplierOperation>> writerVectors(
         _writerPool->getStats().options.maxThreads);
     CachedCollectionProperties collPropertiesCache;
 
@@ -1062,7 +1062,7 @@ Status TenantOplogApplier::_applyOplogEntryOrGroupedInserts(
     return status;
 }
 
-Status TenantOplogApplier::_applyOplogBatchPerWorker(std::vector<const OplogEntry*>* ops) {
+Status TenantOplogApplier::_applyOplogBatchPerWorker(std::vector<ApplierOperation>* ops) {
     auto opCtx = cc().makeOperationContext();
     opCtx->setEnforceConstraints(false);
     tenantMigrationInfo(opCtx.get()) = boost::make_optional<TenantMigrationInfo>(_migrationUuid);

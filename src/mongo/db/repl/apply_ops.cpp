@@ -169,7 +169,7 @@ Status _applyOps(OperationContext* opCtx,
                     const bool isDataConsistent = true;
                     return repl::applyOperation_inlock(opCtx,
                                                        ctx.db(),
-                                                       &entry,
+                                                       ApplierOperation{&entry},
                                                        alwaysUpsert,
                                                        oplogApplicationMode,
                                                        isDataConsistent);

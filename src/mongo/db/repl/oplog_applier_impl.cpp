@@ -116,7 +116,7 @@ void _addOplogChainOpsToWriterVectors(OperationContext* opCtx,
                                       std::vector<std::vector<OplogEntry>>* derivedOps,
                                       OplogEntry* op,
                                       CachedCollectionProperties* collPropertiesCache,
-                                      std::vector<std::vector<const OplogEntry*>>* writerVectors) {
+                                      std::vector<std::vector<ApplierOperation>>* writerVectors) {
     std::vector<OplogEntry> txnOps;
     bool shouldSerialize = false;
     std::tie(txnOps, shouldSerialize) =
@@ -544,7 +544,7 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
         //   and create a pseudo oplog.
         std::vector<std::vector<OplogEntry>> derivedOps;
 
-        std::vector<std::vector<const OplogEntry*>> writerVectors(
+        std::vector<std::vector<ApplierOperation>> writerVectors(
             _writerPool->getStats().options.maxThreads);
         fillWriterVectors(opCtx, &ops, &writerVectors, &derivedOps);
 
@@ -685,7 +685,7 @@ StatusWith<OpTime> OplogApplierImpl::_applyOplogBatch(OperationContext* opCtx,
 void OplogApplierImpl::_deriveOpsAndFillWriterVectors(
     OperationContext* opCtx,
     std::vector<OplogEntry>* ops,
-    std::vector<std::vector<const OplogEntry*>>* writerVectors,
+    std::vector<std::vector<ApplierOperation>>* writerVectors,
     std::vector<std::vector<OplogEntry>>* derivedOps,
     SessionUpdateTracker* sessionUpdateTracker) noexcept {
 
@@ -785,7 +785,7 @@ void OplogApplierImpl::_deriveOpsAndFillWriterVectors(
 void OplogApplierImpl::fillWriterVectors(
     OperationContext* opCtx,
     std::vector<OplogEntry>* ops,
-    std::vector<std::vector<const OplogEntry*>>* writerVectors,
+    std::vector<std::vector<ApplierOperation>>* writerVectors,
     std::vector<std::vector<OplogEntry>>* derivedOps) noexcept {
 
     SessionUpdateTracker sessionUpdateTracker;
@@ -802,7 +802,7 @@ void OplogApplierImpl::fillWriterVectors(
 void OplogApplierImpl::fillWriterVectors_forTest(
     OperationContext* opCtx,
     std::vector<OplogEntry>* ops,
-    std::vector<std::vector<const OplogEntry*>>* writerVectors,
+    std::vector<std::vector<ApplierOperation>>* writerVectors,
     std::vector<std::vector<OplogEntry>>* derivedOps) noexcept {
     fillWriterVectors(opCtx, ops, writerVectors, derivedOps);
 }
@@ -858,7 +858,7 @@ Status applyOplogEntryOrGroupedInserts(OperationContext* opCtx,
 }
 
 Status OplogApplierImpl::applyOplogBatchPerWorker(OperationContext* opCtx,
-                                                  std::vector<const OplogEntry*>* ops,
+                                                  std::vector<ApplierOperation>* ops,
                                                   WorkerMultikeyPathInfo* workerMultikeyPathInfo,
                                                   const bool isDataConsistent) {
     UnreplicatedWritesBlock uwb(opCtx);

@@ -81,7 +81,7 @@ Status _applyOperationsForTransaction(OperationContext* opCtx,
             const bool isDataConsistent = true;
             auto status = repl::applyOperation_inlock(opCtx,
                                                       coll.getDb(),
-                                                      &op,
+                                                      repl::ApplierOperation{&op},
                                                       false /*alwaysUpsert*/,
                                                       oplogApplicationMode,
                                                       isDataConsistent);

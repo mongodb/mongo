@@ -274,7 +274,7 @@ void OplogApplierImplTest::_testApplyOplogEntryOrGroupedInsertsCrudOperation(
     };
 
     ASSERT_EQ(_applyOplogEntryOrGroupedInsertsWrapper(
-                  _opCtx.get(), &op, OplogApplication::Mode::kSecondary),
+                  _opCtx.get(), ApplierOperation{&op}, OplogApplication::Mode::kSecondary),
               expectedError);
     ASSERT_EQ(applyOpCalled, expectedApplyOpCalled);
 }
@@ -295,9 +295,9 @@ Status OplogApplierImplTest::runOpsSteadyState(std::vector<OplogEntry> ops) {
         getConsistencyMarkers(),
         getStorageInterface(),
         repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary));
-    std::vector<const OplogEntry*> opsPtrs;
+    std::vector<ApplierOperation> opsPtrs;
     for (auto& op : ops) {
-        opsPtrs.push_back(&op);
+        opsPtrs.emplace_back(&op);
     }
     WorkerMultikeyPathInfo pathInfo;
     const bool dataIsConsistent = true;

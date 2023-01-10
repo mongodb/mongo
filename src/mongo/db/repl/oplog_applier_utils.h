@@ -69,7 +69,7 @@ public:
      * This special sort behavior is required because DDL operations need to run before
      * create/update/delete operations in a multi-doc transaction.
      */
-    static void stableSortByNamespace(std::vector<const OplogEntry*>* oplogEntryPointers);
+    static void stableSortByNamespace(std::vector<ApplierOperation>* oplogEntryPointers);
 
     /**
      * Updates a CRUD op's hash and isForCappedCollection field if necessary.
@@ -87,7 +87,7 @@ public:
      */
     static uint32_t addToWriterVector(OperationContext* opCtx,
                                       OplogEntry* op,
-                                      std::vector<std::vector<const OplogEntry*>>* writerVectors,
+                                      std::vector<std::vector<ApplierOperation>>* writerVectors,
                                       CachedCollectionProperties* collPropertiesCache,
                                       boost::optional<uint32_t> forceWriterId = boost::none);
     /**
@@ -97,7 +97,7 @@ public:
      */
     static void addDerivedOps(OperationContext* opCtx,
                               std::vector<OplogEntry>* derivedOps,
-                              std::vector<std::vector<const OplogEntry*>>* writerVectors,
+                              std::vector<std::vector<ApplierOperation>>* writerVectors,
                               CachedCollectionProperties* collPropertiesCache,
                               bool serial);
 
@@ -132,7 +132,7 @@ public:
      */
     static Status applyOplogBatchCommon(
         OperationContext* opCtx,
-        std::vector<const OplogEntry*>* ops,
+        std::vector<ApplierOperation>* ops,
         OplogApplication::Mode oplogApplicationMode,
         bool allowNamespaceNotFoundErrorsOnCrudOps,
         bool isDataConsistent,

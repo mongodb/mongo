@@ -54,14 +54,14 @@ BSONObj OplogEntryOrGroupedInserts::toBSON() const {
     // Populate the "ts" field with an array of all the grouped inserts' timestamps.
     {
         BSONArrayBuilder tsArrayBuilder(groupedInsertBuilder.subarrayStart("ts"));
-        for (auto op : _entryOrGroupedInserts) {
+        for (const auto& op : _entryOrGroupedInserts) {
             tsArrayBuilder.append(op->getTimestamp());
         }
     }
     // Populate the "t" (term) field with an array of all the grouped inserts' terms.
     {
         BSONArrayBuilder tArrayBuilder(groupedInsertBuilder.subarrayStart("t"));
-        for (auto op : _entryOrGroupedInserts) {
+        for (const auto& op : _entryOrGroupedInserts) {
             long long term = OpTime::kUninitializedTerm;
             auto parsedTerm = op->getTerm();
             if (parsedTerm)
@@ -72,7 +72,7 @@ BSONObj OplogEntryOrGroupedInserts::toBSON() const {
     // Populate the "o" field with an array of all the grouped inserts.
     {
         BSONArrayBuilder oArrayBuilder(groupedInsertBuilder.subarrayStart("o"));
-        for (auto op : _entryOrGroupedInserts) {
+        for (const auto& op : _entryOrGroupedInserts) {
             oArrayBuilder.append(op->getObject());
         }
     }

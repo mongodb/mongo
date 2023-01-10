@@ -34,6 +34,24 @@
 
 namespace mongo {
 namespace repl {
+
+enum ApplicationInstruction { applyOplogEntry, startSplitPrepare, splitPrepareOplogEntry };
+struct ApplierOperation {
+    ApplicationInstruction instruction;
+    const OplogEntry* op;
+    LogicalSessionId subSession;
+
+    explicit ApplierOperation(const OplogEntry* op) : instruction(applyOplogEntry), op(op) {}
+
+    const OplogEntry* operator->() const {
+        return op;
+    }
+
+    const OplogEntry& operator*() const {
+        return *op;
+    }
+};
+
 /**
  * This is a class for a single oplog entry or grouped inserts to be applied in
  * applyOplogEntryOrGroupedInserts. This class is immutable and can only be initialized using
@@ -41,19 +59,19 @@ namespace repl {
  */
 class OplogEntryOrGroupedInserts {
 public:
-    using ConstIterator = std::vector<const OplogEntry*>::const_iterator;
+    using ConstIterator = std::vector<ApplierOperation>::const_iterator;
 
     OplogEntryOrGroupedInserts() = delete;
 
     // This initializes it as a single oplog entry.
-    OplogEntryOrGroupedInserts(const OplogEntry* op) : _entryOrGroupedInserts({op}) {}
+    OplogEntryOrGroupedInserts(ApplierOperation op) : _entryOrGroupedInserts({op}) {}
 
     // This initializes it as grouped inserts.
     OplogEntryOrGroupedInserts(ConstIterator begin, ConstIterator end)
         : _entryOrGroupedInserts(begin, end) {
         // Performs sanity checks to confirm that the batch is valid.
         invariant(!_entryOrGroupedInserts.empty());
-        for (auto op : _entryOrGroupedInserts) {
+        for (const auto& op : _entryOrGroupedInserts) {
             // Every oplog entry must be an insert.
             invariant(op->getOpType() == OpTypeEnum::kInsert);
             // Every oplog entry must be in the same namespace.
@@ -70,7 +88,7 @@ public:
         return _entryOrGroupedInserts.size() > 1;
     }
 
-    const std::vector<const OplogEntry*>& getGroupedInserts() const {
+    const std::vector<ApplierOperation>& getGroupedInserts() const {
         invariant(isGroupedInserts());
         return _entryOrGroupedInserts;
     }
@@ -80,7 +98,7 @@ public:
 
 private:
     // A single oplog entry or a batch of grouped insert oplog entries to be applied.
-    std::vector<const OplogEntry*> _entryOrGroupedInserts;
+    std::vector<ApplierOperation> _entryOrGroupedInserts;
 };
 }  // namespace repl
 }  // namespace mongo

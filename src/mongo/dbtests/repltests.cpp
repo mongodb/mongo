@@ -249,8 +249,12 @@ protected:
                 auto nextTimestamp = std::max(lastApplied + 1, Timestamp(1, 1));
                 ASSERT_OK(_opCtx.recoveryUnit()->setTimestamp(nextTimestamp));
                 const bool dataIsConsistent = true;
-                uassertStatusOK(applyOperation_inlock(
-                    &_opCtx, ctx.db(), &entry, false, getOplogApplicationMode(), dataIsConsistent));
+                uassertStatusOK(applyOperation_inlock(&_opCtx,
+                                                      ctx.db(),
+                                                      ApplierOperation{&entry},
+                                                      false,
+                                                      getOplogApplicationMode(),
+                                                      dataIsConsistent));
                 wunit.commit();
             }
         }
