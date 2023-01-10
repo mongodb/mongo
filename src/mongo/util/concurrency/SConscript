@@ -22,6 +22,17 @@ env.Library(
     ],
 )
 
+# TODO SERVER-72616: This can go away once TicketBroker is implemented in terms of atomic
+# wait/notify in C++20.
+if env.TargetOSIs('linux'):
+    env.Library(
+        target='ticket_broker',
+        source=['ticket_broker.cpp'],
+        LIBDEPS=[
+            '$BUILD_DIR/mongo/base',
+        ],
+    )
+
 env.Library(
     target='ticketholder',
     source=[
@@ -52,10 +63,8 @@ env.Library(
 env.CppUnitTest(
     target='util_concurrency_test',
     source=[
-        'spin_lock_test.cpp',
-        'thread_pool_test.cpp',
-        'ticketholder_test.cpp',
-        'with_lock_test.cpp',
+        'spin_lock_test.cpp', 'thread_pool_test.cpp', 'ticketholder_test.cpp',
+        'ticket_broker_test.cpp' if env.TargetOSIs('linux') else [], 'with_lock_test.cpp'
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
@@ -63,6 +72,7 @@ env.CppUnitTest(
         'spin_lock',
         'thread_pool',
         'thread_pool_test_fixture',
+        'ticket_broker' if env.TargetOSIs('linux') else [],
         'ticketholder',
     ],
 )
