@@ -159,16 +159,20 @@ bool useTwoPhaseProtocol(OperationContext* opCtx,
 
 StatusWith<ClusterWriteWithoutShardKeyResponse> runTwoPhaseWriteProtocol(OperationContext* opCtx,
                                                                          NamespaceString nss,
-                                                                         BSONObj cmdObj,
-                                                                         int stmtId) {
+                                                                         BSONObj cmdObj) {
+    if (opCtx->isRetryableWrite()) {
+        tassert(7260900,
+                "Retryable writes must have an explicit stmtId",
+                cmdObj.hasField(write_ops::WriteCommandRequestBase::kStmtIdsFieldName) ||
+                    cmdObj.hasField(write_ops::WriteCommandRequestBase::kStmtIdFieldName));
+    }
 
     // Shared state for the transaction below.
     struct SharedBlock {
-        SharedBlock(NamespaceString nss_, BSONObj cmdObj_, int stmtId_)
-            : nss(std::move(nss_)), cmdObj(cmdObj_), stmtId(stmtId_) {}
+        SharedBlock(NamespaceString nss_, BSONObj cmdObj_)
+            : nss(std::move(nss_)), cmdObj(cmdObj_) {}
         NamespaceString nss;
         BSONObj cmdObj;
-        int stmtId;
         ClusterWriteWithoutShardKeyResponse clusterWriteResponse;
     };
 
@@ -177,11 +181,10 @@ StatusWith<ClusterWriteWithoutShardKeyResponse> runTwoPhaseWriteProtocol(Operati
         Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),
         TransactionRouterResourceYielder::makeForLocalHandoff());
 
-    auto sharedBlock = std::make_shared<SharedBlock>(nss, cmdObj, stmtId);
+    auto sharedBlock = std::make_shared<SharedBlock>(nss, cmdObj);
     auto swResult = txn.runNoThrow(
         opCtx, [sharedBlock](const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
-            ClusterQueryWithoutShardKey clusterQueryWithoutShardKeyCommand(sharedBlock->cmdObj,
-                                                                           sharedBlock->stmtId);
+            ClusterQueryWithoutShardKey clusterQueryWithoutShardKeyCommand(sharedBlock->cmdObj);
             auto queryRes = txnClient
                                 .runCommand(sharedBlock->nss.db(),
                                             clusterQueryWithoutShardKeyCommand.toBSON({}))

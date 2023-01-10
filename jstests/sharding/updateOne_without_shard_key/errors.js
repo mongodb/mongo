@@ -90,7 +90,8 @@ const testCases = [
     },
     {
         logMessage:
-            "Three updates in a batch, one BadValue and two FailedToParse expected. If this command is run in a transaction, it will abort upon first error.",
+            "Three updates in a batch, one BadValue and two FailedToParse expected. If this " +
+            "command is run in a transaction, it will abort upon first error.",
         errorCode: [ErrorCodes.BadValue, ErrorCodes.FailedToParse],
         index: [0, 1, 2],
         cmdObj: {
@@ -114,7 +115,8 @@ const testCases = [
     },
     {
         logMessage:
-            "Three deletes in a batch, one successful, two BadValues expected. If this command is run in a transaction, it will abort upon first error.",
+            "Three deletes in a batch, one successful, two BadValues expected. If this command is" +
+            " run in a transaction, it will abort upon first error.",
         errorCode: [ErrorCodes.BadValue],
         index: [0, 2],
         cmdObj: {
@@ -130,18 +132,25 @@ const testCases = [
 ];
 
 testCases.forEach(testCase => {
-    jsTest.log(testCase.logMessage);
+    jsTest.log(testCase.logMessage + "\n" +
+               "Running as non-retryable write.");
     runCommandAndCheckError(testCase);
 
+    jsTest.log(testCase.logMessage + "\n" +
+               "Running as non-retryable write in a session.");
     const logicalSessionFields = {lsid: {id: UUID()}};
     runCommandAndCheckError(testCase, logicalSessionFields);
 
+    jsTest.log(testCase.logMessage + "\n" +
+               "Running as retryable write.");
     const retryableWriteFields = {
         lsid: {id: UUID()},
         txnNumber: NumberLong(0),
     };
     runCommandAndCheckError(testCase, retryableWriteFields);
 
+    jsTest.log(testCase.logMessage + "\n" +
+               "Running in a transaction.");
     const transactionFields =
         {lsid: {id: UUID()}, txnNumber: NumberLong(0), startTransaction: true, autocommit: false};
     runCommandAndCheckError(testCase, transactionFields);

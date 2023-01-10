@@ -69,7 +69,7 @@ var WriteWithoutShardKeyTestUtil = (function() {
                     }
                 });
 
-                assert(docsHaveFieldMatchArray.length == 1);
+                assert.eq(docsHaveFieldMatchArray.length, 1);
             }
         });
     }
@@ -129,6 +129,14 @@ var WriteWithoutShardKeyTestUtil = (function() {
                         break;
                     default:
                         dbConn = conn.getDB(testCase.dbName);
+                }
+
+                if (config == Configurations.sessionRetryableWrite) {
+                    const retryableWriteFields = {
+                        lsid: {id: UUID()},
+                        txnNumber: NumberLong(0),
+                    };
+                    Object.assign(newCmdObj, retryableWriteFields);
                 }
                 allMatchedDocs = insertDocsAndRunCommand(dbConn,
                                                          testCase.collName,

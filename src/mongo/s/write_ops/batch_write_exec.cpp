@@ -378,24 +378,12 @@ void executeTwoPhaseWrite(OperationContext* opCtx,
                           std::map<ShardId, std::unique_ptr<TargetedWriteBatch>>& childBatches,
                           BatchWriteExecStats* stats,
                           const BatchedCommandRequest& clientRequest,
-                          int currentWriteIndex,
                           bool& abortBatch) {
-
-    // Extract the current write from the batch and construct a command object with the
-    // write by itself.
-    BSONObj cmdObj;
-    if (clientRequest.getBatchType() == BatchedCommandRequest::BatchType_Update) {
-        auto updateInBatch = clientRequest.getUpdateRequest().getUpdates().at(currentWriteIndex);
-        write_ops::UpdateCommandRequest updateRequest(clientRequest.getNS(), {updateInBatch});
-        cmdObj = updateRequest.toBSON({}).getOwned();
-    } else {
-        auto deleteInBatch = clientRequest.getDeleteRequest().getDeletes().at(currentWriteIndex);
-        write_ops::DeleteCommandRequest deleteRequest(clientRequest.getNS(), {deleteInBatch});
-        cmdObj = deleteRequest.toBSON({}).getOwned();
-    }
+    auto targetedWrite = childBatches.begin()->second.get();
+    auto cmdObj = batchOp.buildBatchRequest(*targetedWrite, targeter).toBSON();
 
     auto swRes = write_without_shard_key::runTwoPhaseWriteProtocol(
-        opCtx, clientRequest.getNS(), std::move(cmdObj), currentWriteIndex);
+        opCtx, clientRequest.getNS(), std::move(cmdObj));
 
     Status responseStatus = swRes.getStatus();
     BatchedCommandResponse batchedCommandResponse;
@@ -541,14 +529,8 @@ void BatchWriteExec::executeBatch(OperationContext* opCtx,
 
                 // Execute the two phase write protocol for writes that cannot directly target a
                 // shard. If there are any transaction errors, 'abortBatch' will be set.
-                executeTwoPhaseWrite(opCtx,
-                                     targeter,
-                                     batchOp,
-                                     childBatches,
-                                     stats,
-                                     clientRequest,
-                                     childBatches.begin()->second->getWrites()[0]->writeOpRef.first,
-                                     abortBatch);
+                executeTwoPhaseWrite(
+                    opCtx, targeter, batchOp, childBatches, stats, clientRequest, abortBatch);
             } else {
                 // Tries to execute all of the child batches. If there are any transaction errors,
                 // 'abortBatch' will be set.

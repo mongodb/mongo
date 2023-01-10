@@ -65,8 +65,7 @@ bool useTwoPhaseProtocol(OperationContext* opCtx,
  **/
 StatusWith<ClusterWriteWithoutShardKeyResponse> runTwoPhaseWriteProtocol(OperationContext* opCtx,
                                                                          NamespaceString nss,
-                                                                         BSONObj cmdObj,
-                                                                         int stmtId);
+                                                                         BSONObj cmdObj);
 
 }  // namespace write_without_shard_key
 }  // namespace mongo

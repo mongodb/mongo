@@ -104,8 +104,7 @@ public:
 
             LOGV2(6962300,
                   "Running read phase for a write without a shard key.",
-                  "clientWriteRequest"_attr = request().getWriteCmd(),
-                  "stmtIdInBatch"_attr = request().getStmtId());
+                  "clientWriteRequest"_attr = request().getWriteCmd());
 
             // Get all shard ids for shards that have chunks in the desired namespace.
             const NamespaceString nss(

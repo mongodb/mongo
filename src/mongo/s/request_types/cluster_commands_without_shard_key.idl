@@ -73,9 +73,6 @@ commands:
       writeCmd:
         description: "The original write command."
         type: object
-      stmtId:
-        description: "The stmtId of the write statement in the original batch write."
-        type: int
   _clusterWriteWithoutShardKey:
     command_name: _clusterWriteWithoutShardKey
     cpp_name: ClusterWriteWithoutShardKey
