@@ -1248,8 +1248,9 @@ optimizer::ProjectionName makeVariableName(sbe::value::SlotId slotId);
 optimizer::ProjectionName makeLocalVariableName(sbe::FrameId frameId, sbe::value::SlotId slotId);
 
 optimizer::ABT generateABTNullOrMissing(optimizer::ProjectionName var);
-optimizer::ABT generateABTNonStringCheck(optimizer::ProjectionName var);
 optimizer::ABT generateABTNonArrayCheck(optimizer::ProjectionName var);
+optimizer::ABT generateABTNonObjectCheck(optimizer::ProjectionName var);
+optimizer::ABT generateABTNonStringCheck(optimizer::ProjectionName var);
 optimizer::ABT generateABTNullishOrNotRepresentableInt32Check(optimizer::ProjectionName var);
 optimizer::ABT generateABTNegativeCheck(optimizer::ProjectionName var);
 /**
@@ -1282,5 +1283,12 @@ optimizer::ABT buildABTMultiBranchConditional(ABTCaseValuePair headCase, Ts... r
 
 template <>
 optimizer::ABT buildABTMultiBranchConditional(optimizer::ABT defaultCase);
+
+/**
+ * Converts a std::vector of ABTCaseValuePairs into a chain of optimizer::If expressions in the
+ * same manner as the 'buildABTMultiBranchConditional()' function.
+ */
+optimizer::ABT buildABTMultiBranchConditionalFromCaseValuePairs(
+    std::vector<ABTCaseValuePair> caseValuePairs, optimizer::ABT defaultValue);
 
 }  // namespace mongo::stage_builder

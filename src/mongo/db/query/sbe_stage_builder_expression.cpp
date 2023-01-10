@@ -893,6 +893,9 @@ public:
         visitMultiBranchLogicExpression(expr, sbe::EPrimBinary::logicAnd);
     }
     void visit(const ExpressionAnyElementTrue* expr) final {
+        if (_context->hasAllAbtEligibleEntries(1)) {
+            return visitABT(expr);
+        }
         auto frameId = _context->state.frameId();
         auto binds = sbe::makeEs(_context->popExpr());
         sbe::EVariable inputRef(frameId, 0);
@@ -916,6 +919,30 @@ public:
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(resultExpr)));
     }
+
+    void visitABT(const ExpressionAnyElementTrue* expr) {
+        auto arg = _context->popABTExpr();
+        auto argName = makeLocalVariableName(_context->state.frameId(), 0);
+
+        auto lambdaArgName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto lambdaBody = makeFillEmptyFalse(
+            makeABTFunction("coerceToBool", optimizer::make<optimizer::Variable>(lambdaArgName)));
+        auto lambdaExpr = optimizer::make<optimizer::LambdaAbstraction>(std::move(lambdaArgName),
+                                                                        std::move(lambdaBody));
+
+        auto resultExpr = optimizer::make<optimizer::If>(
+            makeFillEmptyFalse(
+                makeABTFunction("isArray", optimizer::make<optimizer::Variable>(argName))),
+            makeABTFunction("traverseF",
+                            optimizer::make<optimizer::Variable>(argName),
+                            std::move(lambdaExpr),
+                            optimizer::Constant::boolean(false)),
+            makeABTFail(ErrorCodes::Error{7158300}, "$anyElementTrue's argument must be an array"));
+
+        _context->pushExpr(optimizer::make<optimizer::Let>(
+            std::move(argName), std::move(arg), std::move(resultExpr)));
+    }
+
     void visit(const ExpressionArray* expr) final {
         unsupportedExpression(expr->getOpName());
     }
@@ -953,6 +980,10 @@ public:
         // 2. Else, if the argument is a BSON document, return its size.
         // 3. Else, raise an error.
 
+        if (_context->hasAllAbtEligibleEntries(1)) {
+            return visitABT(expr);
+        }
+
         auto frameId = _context->state.frameId();
         auto binds = sbe::makeEs(_context->popExpr());
         sbe::EVariable inputRef(frameId, 0);
@@ -968,6 +999,22 @@ public:
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(bsonSizeExpr)));
     }
+
+    void visitABT(const ExpressionBsonSize* expr) {
+        auto arg = _context->popABTExpr();
+        auto argName = makeLocalVariableName(_context->state.frameId(), 0);
+
+        auto bsonSizeExpr = buildABTMultiBranchConditional(
+            ABTCaseValuePair{generateABTNullOrMissing(argName), optimizer::Constant::null()},
+            ABTCaseValuePair{
+                generateABTNonObjectCheck(argName),
+                makeABTFail(ErrorCodes::Error{7158301}, "$bsonSize requires a document input")},
+            makeABTFunction("bsonSize", optimizer::make<optimizer::Variable>(argName)));
+
+        _context->pushExpr(optimizer::make<optimizer::Let>(
+            std::move(argName), std::move(arg), std::move(bsonSizeExpr)));
+    }
+
     void visit(const ExpressionCeil* expr) final {
         auto frameId = _context->state.frameId();
         auto binds = sbe::makeEs(_context->popExpr());
@@ -2166,6 +2213,10 @@ public:
         }
     }
     void visit(const ExpressionFilter* expr) final {
+        if (_context->hasAllAbtEligibleEntries(2)) {
+            return visitABT(expr);
+        }
+
         // Remove index tracking current child of $filter expression, since it is not used anymore.
         _context->filterExprChildrenCounter.pop();
 
@@ -2219,6 +2270,57 @@ public:
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(resultExpr)));
     }
+
+    void visitABT(const ExpressionFilter* expr) {
+        // Remove index tracking current child of $filter expression, since it is not used anymore.
+        _context->filterExprChildrenCounter.pop();
+
+        _context->ensureArity(2);
+        // Extract filter predicate expression and sub-tree.
+        auto filterExpr = _context->popABTExpr();
+        auto inputExpr = _context->popABTExpr();
+
+        // We no longer need this mapping because filter predicate which expects it was already
+        // compiled.
+        _context->environment.erase(expr->getVariableId());
+
+        tassert(7158304,
+                "Expected frame id for the current element variable of $filter expression",
+                !_context->filterExprFrameStack.empty());
+        auto lambdaFrameId = _context->filterExprFrameStack.top();
+        auto lambdaParamId = sbe::value::SlotId{0};
+        _context->filterExprFrameStack.pop();
+
+        auto lambdaParamName = makeLocalVariableName(lambdaFrameId, lambdaParamId);
+
+        // If coerceToBool() returns true we return the lambda input, otherwise we return Nothing.
+        // This will effectively cause all elements in the array that coerce to False to get
+        // filtered out, and only the elements that coerce to True will remain.
+        auto lambdaBodyExpr = optimizer::make<optimizer::If>(
+            makeFillEmptyFalse(makeABTFunction("coerceToBool", std::move(filterExpr))),
+            optimizer::make<optimizer::Variable>(lambdaParamName),
+            optimizer::Constant::nothing());
+
+        auto lambdaExpr = optimizer::make<optimizer::LambdaAbstraction>(std::move(lambdaParamName),
+                                                                        std::move(lambdaBodyExpr));
+
+        auto inputName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto traversePExpr = makeABTFunction("traverseP",
+                                             optimizer::make<optimizer::Variable>(inputName),
+                                             std::move(lambdaExpr),
+                                             optimizer::Constant::int32(1));
+
+        // If input is null or missing, we do not evaluate filter predicate and return Null.
+        auto resultExpr = buildABTMultiBranchConditional(
+            ABTCaseValuePair{generateABTNullOrMissing(inputName), optimizer::Constant::null()},
+            ABTCaseValuePair{
+                makeABTFunction("isArray", optimizer::make<optimizer::Variable>(inputName)),
+                std::move(traversePExpr)},
+            makeABTFail(ErrorCodes::Error{7158305}, "input to $filter must be an array"));
+        _context->pushExpr(optimizer::make<optimizer::Let>(
+            std::move(inputName), std::move(inputExpr), std::move(resultExpr)));
+    }
+
     void visit(const ExpressionFloor* expr) final {
         auto frameId = _context->state.frameId();
         auto binds = sbe::makeEs(_context->popExpr());
@@ -2483,12 +2585,22 @@ public:
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(multiplyExpr)));
     }
     void visit(const ExpressionNot* expr) final {
-        _context->pushExpr(
-            makeNot(makeFillEmptyFalse(makeFunction("coerceToBool", _context->popExpr()))));
+        if (_context->hasAllAbtEligibleEntries(1)) {
+            _context->pushExpr(makeNot(
+                makeFillEmptyFalse(makeABTFunction("coerceToBool", _context->popABTExpr()))));
+        } else {
+            _context->pushExpr(
+                makeNot(makeFillEmptyFalse(makeFunction("coerceToBool", _context->popExpr()))));
+        }
     }
     void visit(const ExpressionObject* expr) final {
         auto&& childExprs = expr->getChildExpressions();
         size_t childSize = childExprs.size();
+
+        if (_context->hasAllAbtEligibleEntries(childSize)) {
+            return visitABT(expr);
+        }
+
         _context->ensureArity(childSize);
 
         // The expression argument for 'newObj' must be a sequence of a field name constant
@@ -2503,6 +2615,31 @@ public:
 
         _context->pushExpr(sbe::makeE<sbe::EFunction>("newObj"_sd, std::move(exprs)));
     }
+
+    void visitABT(const ExpressionObject* expr) {
+        const auto& childExprs = expr->getChildExpressions();
+        size_t childSize = childExprs.size();
+        _context->ensureArity(childSize);
+
+        // The expression argument for 'newObj' must be a sequence of a field name constant
+        // expression and an expression for the value. So, we need 2 * childExprs.size() elements in
+        // the expressions vector.
+        optimizer::ABTVector exprs;
+        exprs.reserve(childSize * 2);
+
+        // We iterate over child expressions in reverse, because they will be popped from stack in
+        // reverse order.
+        for (auto rit = childExprs.rbegin(); rit != childExprs.rend(); ++rit) {
+            exprs.push_back(_context->popABTExpr());
+            exprs.push_back(optimizer::Constant::str(rit->first));
+        }
+
+        // Lastly we need to reverse it to get the correct order of arguments.
+        std::reverse(exprs.begin(), exprs.end());
+
+        _context->pushExpr(optimizer::make<optimizer::FunctionCall>("newObj", std::move(exprs)));
+    }
+
     void visit(const ExpressionOr* expr) final {
         visitMultiBranchLogicExpression(expr, sbe::EPrimBinary::logicOr);
     }
@@ -2584,6 +2721,10 @@ public:
         unsupportedExpression("$reduce");
     }
     void visit(const ExpressionReplaceOne* expr) final {
+        if (_context->hasAllAbtEligibleEntries(3)) {
+            return visitABT(expr);
+        }
+
         auto frameId = _context->state.frameId();
 
         auto replacement = _context->popExpr();
@@ -2659,6 +2800,91 @@ public:
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(replaceOneExpr)));
     }
+
+    void visitABT(const ExpressionReplaceOne* expr) {
+        _context->ensureArity(3);
+
+        auto replacementArg = _context->popABTExpr();
+        auto findArg = _context->popABTExpr();
+        auto inputArg = _context->popABTExpr();
+
+        auto inputArgName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto findArgName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto replacementArgName = makeLocalVariableName(_context->state.frameId(), 0);
+
+        auto inputArgNullName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto findArgNullName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto replacementArgNullName = makeLocalVariableName(_context->state.frameId(), 0);
+
+        auto checkNull = optimizer::make<optimizer::BinaryOp>(
+            optimizer::Operations::Or,
+            optimizer::make<optimizer::BinaryOp>(
+                optimizer::Operations::Or,
+                optimizer::make<optimizer::Variable>(inputArgNullName),
+                optimizer::make<optimizer::Variable>(findArgNullName)),
+            optimizer::make<optimizer::Variable>(replacementArgNullName));
+
+        // Check if find string is empty, and if so return the the concatenation of the replacement
+        // string and the input string, otherwise replace the first occurrence of the find string.
+        auto isEmptyFindStr =
+            optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Eq,
+                                                 optimizer::make<optimizer::Variable>(findArgName),
+                                                 optimizer::Constant::str(""_sd));
+
+        auto replaceOneExpr = optimizer::make<optimizer::If>(
+            std::move(isEmptyFindStr),
+            makeABTFunction("concat",
+                            optimizer::make<optimizer::Variable>(replacementArgName),
+                            optimizer::make<optimizer::Variable>(inputArgName)),
+            makeABTFunction("replaceOne",
+                            optimizer::make<optimizer::Variable>(inputArgName),
+                            optimizer::make<optimizer::Variable>(findArgName),
+                            optimizer::make<optimizer::Variable>(replacementArgName)));
+
+        auto generateTypeCheckCaseValuePair = [](optimizer::ProjectionName paramName,
+                                                 optimizer::ProjectionName paramIsNullName,
+                                                 StringData param) {
+            return ABTCaseValuePair{
+                makeNot(optimizer::make<optimizer::BinaryOp>(
+                    optimizer::Operations::Or,
+                    optimizer::make<optimizer::Variable>(std::move(paramIsNullName)),
+                    makeABTFunction("isString",
+                                    optimizer::make<optimizer::Variable>(std::move(paramName))))),
+                makeABTFail(ErrorCodes::Error{7158302},
+                            str::stream()
+                                << "$replaceOne requires that '" << param << "' be a string")};
+        };
+
+        // Order here is important because we want to preserve the precedence of failures in MQL.
+        replaceOneExpr = buildABTMultiBranchConditional(
+            generateTypeCheckCaseValuePair(inputArgName, inputArgNullName, "input"),
+            generateTypeCheckCaseValuePair(findArgName, findArgNullName, "find"),
+            generateTypeCheckCaseValuePair(
+                replacementArgName, replacementArgNullName, "replacement"),
+            ABTCaseValuePair{checkNull, optimizer::Constant::null()},
+            std::move(replaceOneExpr));
+
+        replaceOneExpr =
+            optimizer::make<optimizer::Let>(std::move(replacementArgNullName),
+                                            generateABTNullOrMissing(replacementArgName),
+                                            std::move(replaceOneExpr));
+        replaceOneExpr = optimizer::make<optimizer::Let>(std::move(findArgNullName),
+                                                         generateABTNullOrMissing(findArgName),
+                                                         std::move(replaceOneExpr));
+        replaceOneExpr = optimizer::make<optimizer::Let>(std::move(inputArgNullName),
+                                                         generateABTNullOrMissing(inputArgName),
+                                                         std::move(replaceOneExpr));
+
+        replaceOneExpr = optimizer::make<optimizer::Let>(
+            std::move(replacementArgName), std::move(replacementArg), std::move(replaceOneExpr));
+        replaceOneExpr = optimizer::make<optimizer::Let>(
+            std::move(findArgName), std::move(findArg), std::move(replaceOneExpr));
+        replaceOneExpr = optimizer::make<optimizer::Let>(
+            std::move(inputArgName), std::move(inputArg), std::move(replaceOneExpr));
+
+        _context->pushExpr(std::move(replaceOneExpr));
+    }
+
     void visit(const ExpressionReplaceAll* expr) final {
         unsupportedExpression(expr->getOpName());
     }
@@ -2969,8 +3195,7 @@ public:
         visitConditionalExpression(expr);
     }
     void visit(const ExpressionTestApiVersion* expr) final {
-        _context->pushExpr(
-            makeConstant(sbe::value::TypeTags::NumberInt32, sbe::value::bitcastFrom<int32_t>(1)));
+        _context->pushExpr(optimizer::Constant::int32(1));
     }
     void visit(const ExpressionToLower* expr) final {
         generateStringCaseConversionExpression(_context, "toLower");
@@ -3276,6 +3501,10 @@ private:
      * AST.
      */
     void visitConditionalExpression(const Expression* expr) {
+        if (_context->hasAllAbtEligibleEntries(expr->getChildren().size())) {
+            return visitABTConditionalExpression(expr);
+        }
+
         // The default case is always the last child in the ExpressionSwitch. If it is unspecified
         // in the user's query, it is a nullptr. In ExpressionCond, the last child is the "else"
         // branch, and it is guaranteed not to be nullptr.
@@ -3303,6 +3532,33 @@ private:
 
         _context->pushExpr(buildMultiBranchConditionalFromCaseValuePairs(std::move(cases),
                                                                          std::move(defaultExpr)));
+    }
+
+    void visitABTConditionalExpression(const Expression* expr) {
+        // The default case is always the last child in the ExpressionSwitch. If it is unspecified
+        // in the user's query, it is a nullptr. In ExpressionCond, the last child is the "else"
+        // branch, and it is guaranteed not to be nullptr.
+        auto defaultExpr = expr->getChildren().back() != nullptr
+            ? _context->popABTExpr()
+            : makeABTFail(ErrorCodes::Error{7158303},
+                          "$switch could not find a matching branch for an "
+                          "input, and no default was specified.");
+
+        size_t numCases = expr->getChildren().size() / 2;
+        std::vector<ABTCaseValuePair> cases;
+        cases.reserve(numCases);
+
+        for (size_t i = 0; i < numCases; ++i) {
+            auto valueExpr = _context->popABTExpr();
+            auto conditionExpr =
+                makeFillEmptyFalse(makeABTFunction("coerceToBool", _context->popABTExpr()));
+            cases.emplace_back(std::move(conditionExpr), std::move(valueExpr));
+        }
+
+        std::reverse(cases.begin(), cases.end());
+
+        _context->pushExpr(buildABTMultiBranchConditionalFromCaseValuePairs(
+            std::move(cases), std::move(defaultExpr)));
     }
 
     void generateDayOfExpression(StringData exprName, const Expression* expr) {

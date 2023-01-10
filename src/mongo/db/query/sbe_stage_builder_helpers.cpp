@@ -1412,12 +1412,16 @@ optimizer::ABT generateABTNullOrMissing(optimizer::ProjectionName var) {
                                                         getBSONTypeMask(BSONType::Undefined))}));
 }
 
-optimizer::ABT generateABTNonStringCheck(optimizer::ProjectionName var) {
-    return makeNot(makeABTFunction("isString", optimizer::make<optimizer::Variable>(var)));
-}
-
 optimizer::ABT generateABTNonArrayCheck(optimizer::ProjectionName var) {
     return makeNot(makeABTFunction("isArray", optimizer::make<optimizer::Variable>(var)));
+}
+
+optimizer::ABT generateABTNonObjectCheck(optimizer::ProjectionName var) {
+    return makeNot(makeABTFunction("isObject", optimizer::make<optimizer::Variable>(var)));
+}
+
+optimizer::ABT generateABTNonStringCheck(optimizer::ProjectionName var) {
+    return makeNot(makeABTFunction("isString", optimizer::make<optimizer::Variable>(var)));
 }
 
 optimizer::ABT generateABTNullishOrNotRepresentableInt32Check(optimizer::ProjectionName var) {
@@ -1451,6 +1455,17 @@ optimizer::ABT makeABTFail(ErrorCodes::Error error, StringData errorMessage) {
 template <>
 optimizer::ABT buildABTMultiBranchConditional(optimizer::ABT defaultCase) {
     return defaultCase;
+}
+
+optimizer::ABT buildABTMultiBranchConditionalFromCaseValuePairs(
+    std::vector<ABTCaseValuePair> caseValuePairs, optimizer::ABT defaultValue) {
+    return std::accumulate(
+        std::make_reverse_iterator(std::make_move_iterator(caseValuePairs.end())),
+        std::make_reverse_iterator(std::make_move_iterator(caseValuePairs.begin())),
+        std::move(defaultValue),
+        [](auto&& expression, auto&& caseValuePair) {
+            return buildABTMultiBranchConditional(std::move(caseValuePair), std::move(expression));
+        });
 }
 
 }  // namespace mongo::stage_builder
