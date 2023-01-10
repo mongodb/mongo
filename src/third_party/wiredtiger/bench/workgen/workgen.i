@@ -185,6 +185,8 @@ WorkgenFrozenClass(WorkloadOptions)
             if not self.args.keep:
                 shutil.rmtree(self.args.home, True)
                 os.mkdir(self.args.home)
+            if self.args.verbose:
+                self._verbose = True;
         return self
 %}
 };
