@@ -746,7 +746,7 @@ private:
 
         // (Generic FCV reference): TODO SERVER-60912: When kLastLTS is 6.0, remove this FCV-gated
         // downgrade code.
-        if (!feature_flags::gTimeseriesMetricIndexes.isEnabledOnVersion(requestedVersion)) {
+        if (requestedVersion == multiversion::GenericFCV::kLastLTS) {
             for (const auto& tenantDbName : DatabaseHolder::get(opCtx)->getNames()) {
                 const auto& dbName = tenantDbName.dbName();
                 Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
@@ -762,8 +762,7 @@ private:
                             // in 5.2 and up. If the user tries to downgrade the cluster to an
                             // earlier version, they must first remove all incompatible secondary
                             // indexes on time-series measurements.
-                            if (requestedVersion == multiversion::GenericFCV::kLastLTS &&
-                                collection->getTimeseriesOptions()) {
+                            if (collection->getTimeseriesOptions()) {
                                 uassert(
                                     ErrorCodes::CannotDowngrade,
                                     str::stream()
