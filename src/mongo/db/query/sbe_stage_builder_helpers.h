@@ -1246,6 +1246,7 @@ optimizer::ABT makeNot(optimizer::ABT e);
 
 optimizer::ProjectionName makeVariableName(sbe::value::SlotId slotId);
 optimizer::ProjectionName makeLocalVariableName(sbe::FrameId frameId, sbe::value::SlotId slotId);
+optimizer::ABT makeVariable(optimizer::ProjectionName var);
 
 optimizer::ABT generateABTNullOrMissing(optimizer::ProjectionName var);
 optimizer::ABT generateABTNegativeCheck(optimizer::ProjectionName var);
@@ -1293,5 +1294,4 @@ optimizer::ABT buildABTMultiBranchConditional(optimizer::ABT defaultCase);
  */
 optimizer::ABT buildABTMultiBranchConditionalFromCaseValuePairs(
     std::vector<ABTCaseValuePair> caseValuePairs, optimizer::ABT defaultValue);
-
 }  // namespace mongo::stage_builder

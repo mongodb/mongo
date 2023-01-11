@@ -1404,6 +1404,10 @@ optimizer::ProjectionName makeLocalVariableName(sbe::FrameId frameId, sbe::value
     return optimizer::ProjectionName{varName};
 }
 
+optimizer::ABT makeVariable(optimizer::ProjectionName var) {
+    return optimizer::make<optimizer::Variable>(std::move(var));
+}
+
 optimizer::ABT generateABTNullOrMissing(optimizer::ProjectionName var) {
     return makeFillEmptyTrue(optimizer::make<optimizer::FunctionCall>(
         "typeMatch",
