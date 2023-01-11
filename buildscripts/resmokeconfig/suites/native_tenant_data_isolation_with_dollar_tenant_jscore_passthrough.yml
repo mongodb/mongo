@@ -25,6 +25,8 @@ selector:
   - requires_auth
   # Sharding commands are not tenant aware.
   - requires_sharding
+  # TODO SERVER-72173: tenant information is dropped off when trying to profile operation.
+  - requires_profiling
   # Columnstore indexes are under development and cannot be used without enabling the feature flag
   - featureFlagColumnstoreIndexes
   exclude_files:

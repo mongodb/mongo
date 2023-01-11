@@ -88,7 +88,8 @@ void profile(OperationContext* opCtx, NetworkOp op) {
 
     const BSONObj p = b.done();
 
-    const auto ns = CurOp::get(opCtx)->getNSS();
+    const auto ns = CurOp::get(opCtx)->getNS();
+    const string dbName(nsToDatabase(ns));
 
     try {
         // We create a new opCtx so that we aren't interrupted by having the original operation
@@ -106,7 +107,7 @@ void profile(OperationContext* opCtx, NetworkOp op) {
         });
         AlternativeClientRegion acr(newClient);
         const auto dbProfilingNS =
-            NamespaceString(ns.dbName(), NamespaceString::kSystemDotProfileCollectionName);
+            NamespaceString(dbName, NamespaceString::kSystemDotProfileCollectionName);
         AutoGetCollection autoColl(newCtx.get(), dbProfilingNS, MODE_IX);
         Database* const db = autoColl.getDb();
         if (!db) {
