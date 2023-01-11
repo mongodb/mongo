@@ -40,7 +40,9 @@ function assertPreImagesCollectionOnPrimaryMatchesSecondary() {
     }
     const preImagesCollOnPrimary = getPreImagesCollection(replTest.getPrimary());
     const preImagesCollOnSecondary = getPreImagesCollection(replTest.getSecondary());
-    assert.eq(preImagesCollOnPrimary.count(), preImagesCollOnSecondary.count(), detailedError);
+    assert.eq(preImagesCollOnPrimary.find().itcount(),
+              preImagesCollOnSecondary.find().itcount(),
+              detailedError);
     assert.eq(preImagesCollOnPrimary.hashAllDocs(),
               preImagesCollOnSecondary.hashAllDocs(),
               detailedError);
