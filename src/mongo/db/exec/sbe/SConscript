@@ -277,6 +277,7 @@ env.CppUnitTest(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/optimizer/optimizer_rewrites',
+        '$BUILD_DIR/mongo/db/query/optimizer/unit_test_utils',
         '$BUILD_DIR/mongo/unittest/unittest',
         'query_sbe_abt',
     ],

@@ -32,12 +32,14 @@
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/explain.h"
+#include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/node.h"
 #include "mongo/db/query/optimizer/node_defs.h"
 #include "mongo/db/query/optimizer/props.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/rewrites/path_lower.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
+#include "mongo/db/query/optimizer/utils/unit_test_utils.h"
 #include "mongo/unittest/golden_test.h"
 #include "mongo/unittest/unittest.h"
 #include <vector>
@@ -88,7 +90,11 @@ protected:
         return str;
     }
 
-    void runNodeVariation(GoldenTestContext& gctx, const std::string& name, const ABT& n) {
+    void runNodeVariation(GoldenTestContext& gctx,
+                          const std::string& name,
+                          const ABT& n,
+                          boost::optional<opt::unordered_map<std::string, IndexDefinition>>
+                              collIndexDefs = boost::none) {
         auto& stream = gctx.outStream();
         if (stream.tellp()) {
             stream << std::endl;
@@ -103,7 +109,9 @@ protected:
         sbe::value::SlotIdGenerator ids;
         opt::unordered_map<std::string, ScanDefinition> scanDefs;
 
-        scanDefs.insert({"collName", buildScanDefinition()});
+        scanDefs.insert({"collName",
+                         collIndexDefs.has_value() ? buildScanDefinition(collIndexDefs.value())
+                                                   : buildScanDefinition()});
         scanDefs.insert({"otherColl", buildScanDefinition()});
 
         Metadata md(scanDefs);
@@ -118,13 +126,13 @@ protected:
         lastNodeGenerated = 0;
     }
 
-    ScanDefinition buildScanDefinition() {
+    ScanDefinition buildScanDefinition(
+        opt::unordered_map<std::string, IndexDefinition> indexDefs = {}) {
         ScanDefOptions opts;
         opts.insert({"type", "mongod"});
         opts.insert({"database", "test"});
         opts.insert({"uuid", UUID::gen().toString()});
 
-        opt::unordered_map<std::string, IndexDefinition> indexDefs;
         MultikeynessTrie trie;
         DistributionAndPaths dnp(DistributionType::Centralized);
         bool exists = true;
@@ -402,6 +410,45 @@ TEST_F(ABTPlanGeneration, LowerHashJoinNode) {
                                               std::move(child2))));
 }
 
+TEST_F(ABTPlanGeneration, LowerIndexScanNode) {
+    GoldenTestContext ctx(&goldenTestConfig);
+    ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
+    // Generate for simple interval and compound interval
+    opt::unordered_map<std::string, IndexDefinition> indexDefs = {
+        {"index0", makeIndexDefinition("a", CollationOp::Ascending, false)}};
+
+    for (int i = 0; i <= 1; i++) {
+        bool isReversed = i == 1;
+        auto reversedString = isReversed ? "reverse" : "forward";
+        // Basic index scan with RID
+        runNodeVariation(ctx,
+                         str::stream() << "Basic " << reversedString << " index scan with RID",
+                         _node(make<IndexScanNode>(
+                             FieldProjectionMap{{ProjectionName{"rid"}}, {}, {}},
+                             "collName",
+                             "index0",
+                             CompoundIntervalRequirement{IntervalRequirement(
+                                 BoundRequirement(i > 0, Constant::fromDouble(23 + i * 4)),
+                                 BoundRequirement(i == 0, Constant::fromDouble(35 + i * 100)))},
+                             isReversed)),
+                         indexDefs);
+
+
+        // Covering index scan with one field
+        runNodeVariation(
+            ctx,
+            str::stream() << "Covering " << reversedString << " index scan with one field",
+            _node(make<IndexScanNode>(
+                FieldProjectionMap{{}, {}, {{"<indexKey> 0", ProjectionName{"proj0"}}}},
+                "collName",
+                "index0",
+                CompoundIntervalRequirement{IntervalRequirement(
+                    BoundRequirement(i >= 0, Constant::fromDouble(23 + (i + 1) * 3)),
+                    BoundRequirement(i > 0, Constant::fromDouble(35 + ((i * 3) * (i * 4)))))},
+                isReversed)),
+            indexDefs);
+    }
+}
 
 TEST_F(ABTPlanGeneration, LowerLimitSkipNode) {
     GoldenTestContext ctx(&goldenTestConfig);
