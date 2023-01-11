@@ -86,7 +86,7 @@ if (isShardMergeEnabled(donorPrimary.getDB("admin"))) {
 }
 
 const recipientPrimary = tenantMigrationTest.getRecipientPrimary();
-const kTenantId = "testTenantId";
+const kTenantId = ObjectId().str;
 const migrationId = UUID();
 const kDbName = tenantMigrationTest.tenantDB(kTenantId, "testDB");
 const kCollName = "retryable_write_secondary_oplog_application";

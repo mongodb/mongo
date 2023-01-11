@@ -36,7 +36,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
-#include "mongo/db/repl/tenant_migration_decoration.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/tenant_migration_recipient_access_blocker.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/cancellation.h"
@@ -52,7 +52,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(tenantMigrationRecipientNotRejectReads);
 
-}
+}  // namespace
 
 TenantMigrationRecipientAccessBlocker::TenantMigrationRecipientAccessBlocker(
     ServiceContext* serviceContext, const UUID& migrationId)
@@ -77,18 +77,7 @@ SharedSemiFuture<void> TenantMigrationRecipientAccessBlocker::getCanReadFuture(
         return SharedSemiFuture<void>();
     }
 
-    // Exclude internal reads decorated with 'tenantMigrationInfo' from any logic.
-    if (repl::tenantMigrationInfo(opCtx).has_value()) {
-        LOGV2_DEBUG(5492000,
-                    1,
-                    "Internal tenant read got excluded from the MTAB filtering",
-                    "migrationId"_attr = getMigrationId(),
-                    "opId"_attr = opCtx->getOpID());
-        return SharedSemiFuture<void>();
-    }
-
-    if (opCtx->getClient()->session() &&
-        (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient)) {
+    if (tenant_migration_access_blocker::shouldExcludeRead(opCtx)) {
         LOGV2_DEBUG(5739900,
                     1,
                     "Internal tenant read got excluded from the MTAB filtering",

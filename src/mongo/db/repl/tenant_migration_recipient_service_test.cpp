@@ -460,7 +460,7 @@ protected:
         TenantMigrationRecipientDocument initialStateDocument(
             migrationId,
             "donor-rs/localhost:12345",
-            "tenantA",
+            OID::gen().toString(),
             kDefaultStartMigrationTimestamp,
             ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()));
         initialStateDocument.setProtocol(protocol);
@@ -489,7 +489,7 @@ TEST_F(TenantMigrationRecipientServiceTest, BasicTenantMigrationRecipientService
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         "donor-rs/localhost:12345",
-        "tenantA",
+        OID::gen().toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -515,7 +515,7 @@ TEST_F(TenantMigrationRecipientServiceTest, InstanceReportsErrorOnFailureWhilePe
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         "donor-rs/localhost:12345",
-        "tenantA",
+        OID::gen().toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet::primaryOnly()));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -552,7 +552,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_P
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        OID::gen().toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -604,7 +604,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_S
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        OID::gen().toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::SecondaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -657,7 +657,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        OID::gen().toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -716,7 +716,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        OID::gen().toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -789,7 +789,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        OID::gen().toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::Nearest));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -851,7 +851,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        OID::gen().toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryPreferred));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -921,7 +921,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        OID::gen().toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryPreferred));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -994,7 +994,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        OID::gen().toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::SecondaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -1056,7 +1056,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        OID::gen().toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::SecondaryPreferred));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -1136,7 +1136,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        OID::gen().toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryPreferred));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -1195,7 +1195,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        OID::gen().toString(),
         startMigrationDonorTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryPreferred));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -1257,7 +1257,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_P
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        OID::gen().toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryPreferred));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -1302,7 +1302,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientConnection_B
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         "broken,connect,string,no,set,name",
-        "tenantA",
+        OID::gen().toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -1325,7 +1325,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         "localhost:12345",
-        "tenantA",
+        OID::gen().toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -1354,7 +1354,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientGetStartOpTi
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        OID::gen().toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -1398,7 +1398,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientGetStartOpTi
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        OID::gen().toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -1433,7 +1433,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        OID::gen().toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -1471,7 +1471,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientStartOplogFe
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        OID::gen().toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -1529,7 +1529,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientStartsCloner
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        OID::gen().toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -1588,7 +1588,7 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogFetcherFailsDuringOplogApplicat
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        OID::gen().toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -1642,10 +1642,11 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogFetcherResumesFromTopOfOplogBuf
     getTopologyManager()->setTopologyDescription(replSet.getTopologyDescription(clock()));
     insertTopOfOplog(&replSet, initialOpTime);
 
+    const auto tenantId = OID::gen().toString();
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        tenantId,
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -1685,7 +1686,7 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogFetcherResumesFromTopOfOplogBuf
     const OpTime resumeOpTime(Timestamp(2, 1), initialOpTime.getTerm());
     auto resumeOplogBson = makeOplogEntry(resumeOpTime,
                                           OpTypeEnum::kInsert,
-                                          NamespaceString("tenantA_foo.bar"),
+                                          NamespaceString(tenantId + "_foo.bar"),
                                           UUID::gen(),
                                           BSON("doc" << 2),
                                           boost::none /* o2 */)
@@ -1718,7 +1719,7 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogFetcherResumesFromTopOfOplogBuf
     // Feed the oplog fetcher the last doc required for us to be considered consistent.
     auto dataConsistentOplogEntry = makeOplogEntry(dataConsistentOpTime,
                                                    OpTypeEnum::kInsert,
-                                                   NamespaceString("tenantA_foo.bar"),
+                                                   NamespaceString(tenantId + "_foo.bar"),
                                                    UUID::gen(),
                                                    BSON("doc" << 3),
                                                    boost::none /* o2 */);
@@ -1750,10 +1751,11 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogFetcherNoDocInBufferToResumeFro
     getTopologyManager()->setTopologyDescription(replSet.getTopologyDescription(clock()));
     insertTopOfOplog(&replSet, startFetchingOpTime);
 
+    const auto tenantId = OID::gen().toString();
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        tenantId,
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -1813,7 +1815,7 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogFetcherNoDocInBufferToResumeFro
            OplogFetcher::StartingPoint::kEnqueueFirstDoc);
 
     // Feed the oplog fetcher the last doc required for the recipient to be considered consistent.
-    const auto tenantNss = NamespaceString("tenantA_foo.bar");
+    const auto tenantNss = NamespaceString(tenantId + "_foo.bar");
     auto resumeFetchingOplogEntry = makeOplogEntry(resumeFetchingOpTime,
                                                    OpTypeEnum::kInsert,
                                                    tenantNss,
@@ -1860,10 +1862,11 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierResumesFromLastNoOpOplog
     getTopologyManager()->setTopologyDescription(replSet.getTopologyDescription(clock()));
     insertTopOfOplog(&replSet, clonerFinishedOpTime);
 
+    const auto tenantId = OID::gen().toString();
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        tenantId,
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -1906,7 +1909,7 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierResumesFromLastNoOpOplog
     }
     // Create and insert two tenant migration no-op entries into the oplog. The oplog applier should
     // resume from the no-op entry with the most recent donor opTime.
-    const auto insertNss = NamespaceString("tenantA_foo.bar");
+    const auto insertNss = NamespaceString(tenantId + "_foo.bar");
     const auto earlierOplogBson = makeOplogEntry(earlierThanResumeOpTime,
                                                  OpTypeEnum::kInsert,
                                                  insertNss,
@@ -1995,10 +1998,11 @@ TEST_F(TenantMigrationRecipientServiceTest,
     getTopologyManager()->setTopologyDescription(replSet.getTopologyDescription(clock()));
     insertTopOfOplog(&replSet, startApplyingOpTime);
 
+    const auto tenantId = OID::gen().toString();
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        tenantId,
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -2051,7 +2055,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
     //       'fromTenantMigrate' field. This oplog entry does not satisfy the conditions
     //       for the oplog applier to resume applying from so we default to apply from
     //       'startDonorApplyingOpTime'.
-    const auto insertNss = NamespaceString("tenantA_foo.bar");
+    const auto insertNss = NamespaceString(tenantId + "_foo.bar");
     const auto beforeStartApplyingOpTime = OpTime(Timestamp(1, 1), 1);
     const auto entryBeforeStartApplyingOpTime = makeOplogEntry(
                                                     beforeStartApplyingOpTime,
@@ -2125,7 +2129,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
 
     auto dataConsistentOplogEntry = makeOplogEntry(dataConsistentOpTime,
                                                    OpTypeEnum::kInsert,
-                                                   NamespaceString("tenantA_foo.bar"),
+                                                   NamespaceString(tenantId + "_foo.bar"),
                                                    UUID::gen(),
                                                    BSON("doc" << 3),
                                                    boost::none /* o2 */);
@@ -2168,10 +2172,11 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierResumesFromStartDonorApp
     getTopologyManager()->setTopologyDescription(replSet.getTopologyDescription(clock()));
     insertTopOfOplog(&replSet, startApplyingOpTime);
 
+    const auto tenantId = OID::gen().toString();
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        tenantId,
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -2214,7 +2219,7 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierResumesFromStartDonorApp
     //       'fromTenantMigrate' field. This oplog entry does not satisfy the conditions
     //       for the oplog applier to resume applying from so we default to applying and
     //       batching from the start of the buffer collection.
-    const auto insertNss = NamespaceString("tenantA_foo.bar");
+    const auto insertNss = NamespaceString(tenantId + "_foo.bar");
     const auto afterStartApplyingOpTime = OpTime(Timestamp(3, 1), 1);
     const auto entryAfterStartApplyingOpTime = makeOplogEntry(
                                                    afterStartApplyingOpTime,
@@ -2271,7 +2276,7 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierResumesFromStartDonorApp
 
     auto dataConsistentOplogEntry = makeOplogEntry(dataConsistentOpTime,
                                                    OpTypeEnum::kInsert,
-                                                   NamespaceString("tenantA_foo.bar"),
+                                                   NamespaceString(tenantId + "_foo.bar"),
                                                    UUID::gen(),
                                                    BSON("doc" << 3),
                                                    boost::none /* o2 */);
@@ -2314,10 +2319,11 @@ TEST_F(TenantMigrationRecipientServiceTest,
     getTopologyManager()->setTopologyDescription(replSet.getTopologyDescription(clock()));
     insertTopOfOplog(&replSet, startFetchingOpTime);
 
+    const auto tenantId = OID::gen().toString();
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        tenantId,
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -2358,7 +2364,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
     OplogBuffer::Batch batch1;
     batch1.push_back(makeOplogEntry(startFetchingOpTime,
                                     OpTypeEnum::kInsert,
-                                    NamespaceString("tenantA_foo.bar"),
+                                    NamespaceString(tenantId + "_foo.bar"),
                                     UUID::gen(),
                                     BSON("doc" << 2),
                                     boost::none /* o2 */)
@@ -2369,7 +2375,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
 
     auto dataConsistentOplogEntry = makeOplogEntry(dataConsistentOpTime,
                                                    OpTypeEnum::kInsert,
-                                                   NamespaceString("tenantA_foo.bar"),
+                                                   NamespaceString(tenantId + "_foo.bar"),
                                                    UUID::gen(),
                                                    BSON("doc" << 3),
                                                    boost::none /* o2 */);
@@ -2427,7 +2433,7 @@ TEST_F(TenantMigrationRecipientServiceTest, OplogApplierFails) {
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        OID::gen().toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -2497,7 +2503,7 @@ TEST_F(TenantMigrationRecipientServiceTest, StoppingApplierAllowsCompletion) {
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        OID::gen().toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -2553,7 +2559,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientAddResumeTok
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        OID::gen().toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -2657,7 +2663,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_BeforeRun) 
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        OID::gen().toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -2696,7 +2702,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_FailToIniti
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        OID::gen().toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -2731,10 +2737,11 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_WaitUntilSt
     getTopologyManager()->setTopologyDescription(replSet.getTopologyDescription(clock()));
     insertTopOfOplog(&replSet, topOfOplogOpTime);
 
+    const std::string tenantId = OID::gen().toString();
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        tenantId,
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -2786,7 +2793,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_WaitUntilSt
           "preStateDoc"_attr = initialStateDocument.toBSON(),
           "postStateDoc"_attr = doc.toBSON());
     ASSERT_EQ(doc.getDonorConnectionString(), replSet.getConnectionString());
-    ASSERT_EQ(doc.getTenantId(), "tenantA");
+    ASSERT_EQ(doc.getTenantId(), tenantId);
     ASSERT_TRUE(doc.getReadPreference().equals(ReadPreferenceSetting(ReadPreference::PrimaryOnly)));
     ASSERT_TRUE(doc.getState() == TenantMigrationRecipientStateEnum::kDone);
     ASSERT_TRUE(doc.getExpireAt() != boost::none);
@@ -2818,10 +2825,11 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_AfterStartO
     getTopologyManager()->setTopologyDescription(replSet.getTopologyDescription(clock()));
     insertTopOfOplog(&replSet, topOfOplogOpTime);
 
+    const std::string tenantId = OID::gen().toString();
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        tenantId,
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -2853,7 +2861,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_AfterStartO
           "preStateDoc"_attr = initialStateDocument.toBSON(),
           "postStateDoc"_attr = doc.toBSON());
     ASSERT_EQ(doc.getDonorConnectionString(), replSet.getConnectionString());
-    ASSERT_EQ(doc.getTenantId(), "tenantA");
+    ASSERT_EQ(doc.getTenantId(), tenantId);
     ASSERT_TRUE(doc.getReadPreference().equals(ReadPreferenceSetting(ReadPreference::PrimaryOnly)));
     ASSERT_TRUE(doc.getState() == TenantMigrationRecipientStateEnum::kDone);
     ASSERT_TRUE(doc.getExpireAt() != boost::none);
@@ -2886,10 +2894,11 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_AfterConsis
     getTopologyManager()->setTopologyDescription(replSet.getTopologyDescription(clock()));
     insertTopOfOplog(&replSet, topOfOplogOpTime);
 
+    const std::string tenantId = OID::gen().toString();
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        tenantId,
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -2920,7 +2929,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_AfterConsis
               "preStateDoc"_attr = initialStateDocument.toBSON(),
               "postStateDoc"_attr = doc.toBSON());
         ASSERT_EQ(doc.getDonorConnectionString(), replSet.getConnectionString());
-        ASSERT_EQ(doc.getTenantId(), "tenantA");
+        ASSERT_EQ(doc.getTenantId(), tenantId);
         ASSERT_TRUE(
             doc.getReadPreference().equals(ReadPreferenceSetting(ReadPreference::PrimaryOnly)));
         ASSERT_TRUE(doc.getState() == TenantMigrationRecipientStateEnum::kConsistent);
@@ -2949,7 +2958,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_AfterConsis
               "preStateDoc"_attr = initialStateDocument.toBSON(),
               "postStateDoc"_attr = doc.toBSON());
         ASSERT_EQ(doc.getDonorConnectionString(), replSet.getConnectionString());
-        ASSERT_EQ(doc.getTenantId(), "tenantA");
+        ASSERT_EQ(doc.getTenantId(), tenantId);
         ASSERT_TRUE(
             doc.getReadPreference().equals(ReadPreferenceSetting(ReadPreference::PrimaryOnly)));
         ASSERT_TRUE(doc.getState() == TenantMigrationRecipientStateEnum::kDone);
@@ -2978,10 +2987,11 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_AfterFail) 
     getTopologyManager()->setTopologyDescription(replSet.getTopologyDescription(clock()));
     insertTopOfOplog(&replSet, topOfOplogOpTime);
 
+    const std::string tenantId = OID::gen().toString();
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        tenantId,
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -3015,7 +3025,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_AfterFail) 
               "preStateDoc"_attr = initialStateDocument.toBSON(),
               "postStateDoc"_attr = doc.toBSON());
         ASSERT_EQ(doc.getDonorConnectionString(), replSet.getConnectionString());
-        ASSERT_EQ(doc.getTenantId(), "tenantA");
+        ASSERT_EQ(doc.getTenantId(), tenantId);
         ASSERT_TRUE(
             doc.getReadPreference().equals(ReadPreferenceSetting(ReadPreference::PrimaryOnly)));
         ASSERT_TRUE(doc.getState() == TenantMigrationRecipientStateEnum::kStarted);
@@ -3037,7 +3047,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_AfterFail) 
               "preStateDoc"_attr = initialStateDocument.toBSON(),
               "postStateDoc"_attr = doc.toBSON());
         ASSERT_EQ(doc.getDonorConnectionString(), replSet.getConnectionString());
-        ASSERT_EQ(doc.getTenantId(), "tenantA");
+        ASSERT_EQ(doc.getTenantId(), tenantId);
         ASSERT_TRUE(
             doc.getReadPreference().equals(ReadPreferenceSetting(ReadPreference::PrimaryOnly)));
         ASSERT_TRUE(doc.getState() == TenantMigrationRecipientStateEnum::kDone);
@@ -3064,10 +3074,11 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_FailToMarkG
     MockReplicaSet replSet("donorSet", 3, true /* hasPrimary */, true /* dollarPrefixHosts */);
     getTopologyManager()->setTopologyDescription(replSet.getTopologyDescription(clock()));
 
+    const std::string tenantId = OID::gen().toString();
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        tenantId,
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -3101,7 +3112,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientForgetMigration_FailToMarkG
               "preStateDoc"_attr = initialStateDocument.toBSON(),
               "postStateDoc"_attr = doc.toBSON());
         ASSERT_EQ(doc.getDonorConnectionString(), replSet.getConnectionString());
-        ASSERT_EQ(doc.getTenantId(), "tenantA");
+        ASSERT_EQ(doc.getTenantId(), tenantId);
         ASSERT_TRUE(
             doc.getReadPreference().equals(ReadPreferenceSetting(ReadPreference::PrimaryOnly)));
         ASSERT_TRUE(doc.getState() == TenantMigrationRecipientStateEnum::kStarted);
@@ -3123,7 +3134,7 @@ TEST_F(TenantMigrationRecipientServiceTest, TenantMigrationRecipientServiceRecor
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        OID::gen().toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -3162,7 +3173,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        OID::gen().toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -3202,7 +3213,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        OID::gen().toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -3250,7 +3261,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        OID::gen().toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -3289,7 +3300,7 @@ TEST_F(TenantMigrationRecipientServiceTest, WaitUntilMigrationReachesReturnAfter
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        OID::gen().toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -3353,7 +3364,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientReceivesRetriableFetcherErr
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        OID::gen().toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -3421,7 +3432,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientReceivesNonRetriableFetcher
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        OID::gen().toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -3484,7 +3495,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientWillNotRetryOnExternalInter
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        OID::gen().toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -3547,7 +3558,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientWillNotRetryOnReceivingForg
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        OID::gen().toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -3623,7 +3634,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientReceivesRetriableClonerErro
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        OID::gen().toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -3700,7 +3711,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientReceivesNonRetriableClonerE
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        OID::gen().toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -3759,7 +3770,7 @@ TEST_F(TenantMigrationRecipientServiceTest, IncrementNumRestartsDueToRecipientFa
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        OID::gen().toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -3815,7 +3826,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
     TenantMigrationRecipientDocument initialStateDocument(
         migrationUUID,
         replSet.getConnectionString(),
-        "tenantA",
+        OID::gen().toString(),
         kDefaultStartMigrationTimestamp,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly));
     initialStateDocument.setProtocol(MigrationProtocolEnum::kMultitenantMigrations);
@@ -3916,7 +3927,7 @@ TEST_F(TenantMigrationRecipientServiceTest,
 
     // Insert a state doc to simulate running a migration with an existing state doc NOT marked for
     // garbage collection.
-    const std::string kTenantId = "tenantA";
+    const std::string kTenantId = OID::gen().toString();
     const std::string kConnectionString = "donor-rs/localhost:12345";
     const UUID existingMigrationId = UUID::gen();
     TenantMigrationRecipientDocument previousStateDoc(
@@ -3986,7 +3997,7 @@ TEST_F(TenantMigrationRecipientServiceTest, RecipientFailsDueToOperationConflict
 
     // Insert a state doc to simulate running a migration with an existing state doc NOT marked for
     // garbage collection.
-    const std::string kTenantId = "tenantA";
+    const std::string kTenantId = OID::gen().toString();
     const std::string kConnectionString = "donor-rs/localhost:12345";
     const UUID existingMigrationId = UUID::gen();
     TenantMigrationRecipientDocument previousStateDoc(

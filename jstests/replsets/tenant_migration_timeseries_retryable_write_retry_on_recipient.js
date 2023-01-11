@@ -29,7 +29,7 @@ function testRetryOnRecipient(ordered) {
 
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
 
-    const kTenantId = "testTenantId";
+    const kTenantId = ObjectId().str;
     const kDbName = tenantMigrationTest.tenantDB(kTenantId, "tsDb");
     const kCollNameBefore = "tsCollBefore";
     const kCollNameDuring = "tsCollDuring";

@@ -44,6 +44,7 @@
 #include "mongo/db/cursor_server_params_gen.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/multitenancy.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/tenant_file_cloner.h"
 #include "mongo/db/repl/tenant_migration_shared_data.h"
@@ -120,8 +121,12 @@ std::string _getPathRelativeTo(const std::string& path, const std::string& baseP
 }  // namespace
 
 void wiredTigerImportFromBackupCursor(OperationContext* opCtx,
+                                      const UUID& migrationId,
                                       const std::vector<CollectionImportMetadata>& metadatas,
                                       const std::string& importPath) {
+    // Disable replication because this logic is executed on all nodes during a Shard Merge.
+    repl::UnreplicatedWritesBlock uwb(opCtx);
+
     for (auto&& collectionMetadata : metadatas) {
         /*
          * Move one collection file and one or more index files from temp dir to dbpath.
@@ -151,11 +156,12 @@ void wiredTigerImportFromBackupCursor(OperationContext* opCtx,
         /*
          * Import the collection and index(es).
          */
-        BSONObjBuilder storageMetadata;
-        buildStorageMetadata(collectionMetadata.importArgs, storageMetadata);
+        BSONObjBuilder storageMetadataBuilder;
+        buildStorageMetadata(collectionMetadata.importArgs, storageMetadataBuilder);
         for (const auto& indexImportArgs : collectionMetadata.indexes) {
-            buildStorageMetadata(indexImportArgs, storageMetadata);
+            buildStorageMetadata(indexImportArgs, storageMetadataBuilder);
         }
+        const auto storageMetadata = storageMetadataBuilder.done();
 
         const auto nss = collectionMetadata.ns;
         writeConflictRetry(opCtx, "importCollection", nss.ns(), [&] {
@@ -188,8 +194,9 @@ void wiredTigerImportFromBackupCursor(OperationContext* opCtx,
                 DurableCatalog::get(opCtx)->importCollection(opCtx,
                                                              collectionMetadata.ns,
                                                              collectionMetadata.catalogObject,
-                                                             storageMetadata.done(),
+                                                             storageMetadata,
                                                              importOptions));
+
             const auto md = durableCatalog->getMetaData(opCtx, importResult.catalogId);
             for (const auto& index : md->indexes) {
                 uassert(6114301, "Cannot import non-ready indexes", index.ready);
@@ -205,6 +212,19 @@ void wiredTigerImportFromBackupCursor(OperationContext* opCtx,
                 makeCountsChange(ownedCollection->getRecordStore(), collectionMetadata));
 
             CollectionCatalog::get(opCtx)->onCreateCollection(opCtx, std::move(ownedCollection));
+
+            auto importedCatalogEntry =
+                storageEngine->getCatalog()->getCatalogEntry(opCtx, importResult.catalogId);
+            opCtx->getServiceContext()->getOpObserver()->onImportCollection(
+                opCtx,
+                migrationId,
+                nss,
+                collectionMetadata.numRecords,
+                collectionMetadata.dataSize,
+                importedCatalogEntry,
+                storageMetadata,
+                /*dryRun=*/false);
+
             wunit.commit();
 
             LOGV2(6114300,

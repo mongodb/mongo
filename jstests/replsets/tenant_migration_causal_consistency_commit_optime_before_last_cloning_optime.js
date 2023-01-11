@@ -30,11 +30,6 @@ function assertCanFindWithReadConcern(conn, dbName, collName, expectedDoc, readC
     assert.eq(expectedDoc, res.cursor.firstBatch[0], tojson(res));
 }
 
-let counter = 0;
-let makeTenantId = function() {
-    return "tenant-" + counter++;
-};
-
 // Local read concern case.
 (() => {
     const migrationX509Options = makeX509OptionsForTest();
@@ -55,13 +50,13 @@ let makeTenantId = function() {
 
     const tmt = new TenantMigrationTest({name: jsTestName(), recipientRst});
 
-    const tenantId = makeTenantId();
+    const tenantId = ObjectId().str;
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
-        tenantId: tenantId,
+        tenantId,
     };
 
-    const dbName = tenantId + "_test";
+    const dbName = `${tenantId}_test`;
     const collName = "foo";
 
     // Insert tenant data to be copied. Save the operationTime to use for afterClusterTime reads
@@ -113,13 +108,13 @@ let makeTenantId = function() {
 (() => {
     const tmt = new TenantMigrationTest({name: jsTestName(), sharedOptions: {nodes: 3}});
 
-    const tenantId = makeTenantId();
+    const tenantId = ObjectId().str;
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(UUID()),
-        tenantId: tenantId,
+        tenantId,
     };
 
-    const dbName = tenantId + "_test";
+    const dbName = `${tenantId}_test`;
     const collName = "foo";
 
     // Insert tenant data to be copied.

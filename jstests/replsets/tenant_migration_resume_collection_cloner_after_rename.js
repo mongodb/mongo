@@ -42,7 +42,7 @@ recipientRst.initiate();
 
 const tenantMigrationTest =
     new TenantMigrationTest({name: jsTestName(), recipientRst: recipientRst});
-const tenantId = "testTenantId";
+const tenantId = ObjectId().str;
 const dbName = tenantMigrationTest.tenantDB(tenantId, "testDB");
 const collName = "testColl";
 
@@ -58,7 +58,7 @@ const migrationIdString = extractUUIDFromObject(migrationId);
 const migrationOpts = {
     migrationIdString: migrationIdString,
     recipientConnString: tenantMigrationTest.getRecipientConnString(),
-    tenantId: tenantId,
+    tenantId,
 };
 
 // Configure a fail point to have the recipient primary hang after cloning 2 documents.

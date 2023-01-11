@@ -39,6 +39,7 @@
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
 #include "mongo/db/repl/tenant_migration_conflict_info.h"
+#include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
 #include "mongo/db/serverless/shard_split_state_machine_gen.h"
 #include "mongo/db/serverless/shard_split_utils.h"
@@ -157,16 +158,6 @@ void addTenantMigrationRecipientAccessBlocker(ServiceContext* serviceContext,
         std::make_shared<TenantMigrationRecipientAccessBlocker>(serviceContext, migrationId);
 
     TenantMigrationAccessBlockerRegistry::get(serviceContext).add(tenantId, mtab);
-}
-
-boost::optional<std::string> parseTenantIdFromDB(StringData dbName) {
-    auto pos = dbName.find("_");
-    if (pos == std::string::npos || pos == 0) {
-        // Not a tenant database.
-        return boost::none;
-    }
-
-    return dbName.toString().substr(0, pos);
 }
 
 TenantMigrationDonorDocument parseDonorStateDocument(const BSONObj& doc) {
@@ -555,6 +546,12 @@ bool inRecoveryMode(OperationContext* opCtx) {
     auto memberState = replCoord->getMemberState();
 
     return memberState.startup() || memberState.startup2() || memberState.rollback();
+}
+
+bool shouldExcludeRead(OperationContext* opCtx) {
+    return repl::tenantMigrationInfo(opCtx) || opCtx->getClient()->isInDirectClient() ||
+        (opCtx->getClient()->session() &&
+         (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient));
 }
 
 }  // namespace tenant_migration_access_blocker

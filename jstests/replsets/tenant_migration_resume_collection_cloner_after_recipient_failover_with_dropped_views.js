@@ -38,7 +38,7 @@ const tenantMigrationFailoverTest = function(isTimeSeries, createCollFn) {
     const donorRst = tenantMigrationTest.getDonorRst();
     const donorPrimary = donorRst.getPrimary();
 
-    const tenantId = "testTenantId";
+    const tenantId = ObjectId().str;
     const dbName = tenantMigrationTest.tenantDB(tenantId, "testDB");
     const donorDB = donorPrimary.getDB(dbName);
     const collName = "testColl";
@@ -59,7 +59,7 @@ const tenantMigrationFailoverTest = function(isTimeSeries, createCollFn) {
     const migrationOpts = {
         migrationIdString: migrationIdString,
         recipientConnString: tenantMigrationTest.getRecipientConnString(),
-        tenantId: tenantId,
+        tenantId,
     };
 
     const recipientPrimary = recipientRst.getPrimary();
@@ -67,14 +67,14 @@ const tenantMigrationFailoverTest = function(isTimeSeries, createCollFn) {
     const recipientSystemViewsColl = recipientDb.getCollection("system.views");
 
     // Configure a fail point to have the recipient primary hang after cloning
-    // "testTenantId_testDB.system.views" collection.
+    // "<OID>_testDB.system.views" collection.
     const hangDuringCollectionClone =
         configureFailPoint(recipientPrimary,
                            "tenantMigrationHangCollectionClonerAfterHandlingBatchResponse",
                            {nss: recipientSystemViewsColl.getFullName()});
 
     // Start the migration and wait for the migration to hang after cloning
-    // "testTenantId_testDB.system.views" collection.
+    // "<OID>_testDB.system.views" collection.
     assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
     hangDuringCollectionClone.wait();
 
@@ -82,7 +82,7 @@ const tenantMigrationFailoverTest = function(isTimeSeries, createCollFn) {
     recipientRst.awaitLastOpCommitted();
     const newRecipientPrimary = recipientRst.getSecondaries()[0];
 
-    // Verify that a view has been registered for "testTenantId_testDB.testColl" on the new
+    // Verify that a view has been registered for "<OID>_testDB.testColl" on the new
     // recipient primary.
     let collectionInfo = getCollectionInfo(newRecipientPrimary);
     assert.eq(1, collectionInfo.length);

@@ -46,7 +46,7 @@ recipientRst.initiate();
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), donorRst, recipientRst});
 
-const kTenantId = "testTenantId";
+const kTenantId = ObjectId().str;
 const kDbName = tenantMigrationTest.tenantDB(kTenantId, "testDb");
 const kCollName = "testColl";
 const kNs = `${kDbName}.${kCollName}`;
@@ -197,7 +197,7 @@ sessionsOnDonor.push({
 //     },
 //     "txnNumber" : NumberLong(0),
 //     "op" : "n",
-//     "ns" : "testTenantId_testDb.testColl",
+//     "ns" : "<OID>_testDb.testColl",
 //     "ui" : UUID("1aa099b9-879f-4cd5-b58e-0a654abfeb58"),
 //     "o" : {
 //         "_id" : ObjectId("5fa4d04d04c649017b6558ff"),
@@ -221,7 +221,7 @@ sessionsOnDonor.push({
 //     },
 //     "txnNumber" : NumberLong(0),
 //     "op" : "d",
-//     "ns" : "testTenantId_testDb.testColl",
+//     "ns" : "<OID>_testDb.testColl",
 //     "ui" : UUID("1aa099b9-879f-4cd5-b58e-0a654abfeb58"),
 //     "o" : {
 //         "_id" : ObjectId("5fa4d04d04c649017b6558ff")

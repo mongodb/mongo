@@ -62,7 +62,7 @@ void addTenantMigrationRecipientAccessBlocker(ServiceContext* serviceContext,
 /**
  * Parse the tenantId from a database name, or return boost::none if there is no tenantId.
  */
-boost::optional<std::string> parseTenantIdFromDB(StringData dbName);
+boost::optional<std::string> parseTenantIdFromDB(const DatabaseName& dbName);
 
 /**
  * Returns a TenantMigrationDonorDocument constructed from the given bson doc and validate the
@@ -129,6 +129,11 @@ void performNoopWrite(OperationContext* opCtx, StringData msg);
  * by tenant_migration_access_blocker::recoverTenantMigrationAccessBlockers.
  */
 bool inRecoveryMode(OperationContext* opCtx);
+
+/*
+ * Returns true if a read should be excluded from access blocker filtering.
+ */
+bool shouldExcludeRead(OperationContext* opCtx);
 
 }  // namespace tenant_migration_access_blocker
 

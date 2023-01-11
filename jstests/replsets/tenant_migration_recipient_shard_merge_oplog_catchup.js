@@ -33,7 +33,7 @@ if (!isShardMergeEnabled(donorPrimary.getDB("admin"))) {
 
 // Insert some documents before migration start so that this collection gets cloned by file cloner.
 const collName = "testColl";
-const tenantDB0 = tenantMigrationTest.tenantDB("Tenant0", "DB");
+const tenantDB0 = tenantMigrationTest.tenantDB(ObjectId().str, "DB");
 assert.commandWorked(donorPrimary.getDB(tenantDB0)[collName].insert({_id: 0}));
 
 const failpoint = "pauseTenantMigrationBeforeLeavingDataSyncState";

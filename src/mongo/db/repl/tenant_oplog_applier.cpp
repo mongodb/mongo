@@ -55,6 +55,7 @@
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/database_name_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTenantMigration
 
@@ -64,6 +65,21 @@ namespace repl {
 
 MONGO_FAIL_POINT_DEFINE(hangInTenantOplogApplication);
 MONGO_FAIL_POINT_DEFINE(fpBeforeTenantOplogApplyingBatch);
+
+bool shouldIgnore(const MigrationProtocolEnum& protocol, const OplogEntry& entry) {
+    const auto ns = entry.getNss();
+    if (protocol == MigrationProtocolEnum::kMultitenantMigrations) {
+        return ns.isOnInternalDb();
+    }
+
+    const auto tenantId = DatabaseNameUtil::parseTenantIdFromDatabaseName(ns.dbName());
+
+    // TODO SERVER-62491: Return false if tenantId is TenantId::kSystemTenantId
+    const auto ignore = !tenantId.has_value();
+
+    invariant(!ignore || ns.isOnInternalDb());
+    return ignore;
+}
 
 TenantOplogApplier::TenantOplogApplier(const UUID& migrationUuid,
                                        const MigrationProtocolEnum& protocol,
@@ -957,7 +973,7 @@ std::vector<std::vector<ApplierOperation>> TenantOplogApplier::_fillWriterVector
             auto expansions = &batch->expansions[op.expansionsEntry];
             bool tenantOp = false;
             for (auto&& entry : *expansions) {
-                if (entry.getNss().isOnInternalDb()) {
+                if (shouldIgnore(_protocol, entry)) {
                     uassert(6114521,
                             "Can't have a transaction with operations on both tenant and internal "
                             "collections.",
@@ -986,7 +1002,7 @@ std::vector<std::vector<ApplierOperation>> TenantOplogApplier::_fillWriterVector
                                              &collPropertiesCache,
                                              isTransactionWithCommand /* serial */);
         } else {
-            if (op.entry.getNss().isOnInternalDb()) {
+            if (shouldIgnore(_protocol, op.entry)) {
                 op.ignore = true;
                 continue;
             }

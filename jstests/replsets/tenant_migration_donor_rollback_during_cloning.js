@@ -149,7 +149,7 @@ function runTest(tenantId,
     // into a non-tenant DB, so this data will not be migrated but will still advance the cluster
     // time.
     tenantMigrationTest.insertDonorDB(
-        tenantMigrationTest.nonTenantDB(tenantId, 'alternateDB'),
+        tenantMigrationTest.tenantDB(ObjectId().str, 'alternateDB'),
         'alternateColl',
         [{x: "Tom Petty", y: "Free Fallin"}, {x: "Sushin Shyam", y: "Cherathukal"}]);
 

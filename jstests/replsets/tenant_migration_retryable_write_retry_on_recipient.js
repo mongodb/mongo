@@ -24,7 +24,7 @@ load("jstests/replsets/rslib.js");  // 'createRstArgs'
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
-const kTenantId = "testTenantId";
+const kTenantId = ObjectId().str;
 const kDbName = tenantMigrationTest.tenantDB(kTenantId, "testDb");
 const kCollNameBefore = "testCollBefore";
 const kCollNameDuring = "testCollDuring";

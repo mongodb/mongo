@@ -19,7 +19,7 @@ const tenantId = ObjectId().str;
 
 const dbNames = ["db0", "db1", "db2"];
 const tenantDBs = dbNames.map(dbName => tenantMigrationTest.tenantDB(tenantId, dbName));
-const nonTenantDBs = dbNames.map(dbName => tenantMigrationTest.nonTenantDB(tenantId, dbName));
+const nonTenantDBs = dbNames.map(dbName => tenantMigrationTest.tenantDB(ObjectId().str, dbName));
 const collNames = ["coll0", "coll1"];
 
 for (const db of [...tenantDBs, ...nonTenantDBs]) {

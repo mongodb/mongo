@@ -138,8 +138,7 @@ Status TenantMigrationDonorAccessBlocker::waitUntilCommittedOrAborted(OperationC
 SharedSemiFuture<void> TenantMigrationDonorAccessBlocker::getCanReadFuture(OperationContext* opCtx,
                                                                            StringData command) {
     // Exclude internal client requests
-    if (opCtx->getClient()->session() &&
-        (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient)) {
+    if (tenant_migration_access_blocker::shouldExcludeRead(opCtx)) {
         LOGV2_DEBUG(6397500,
                     1,
                     "Internal tenant read got excluded from the MTAB filtering",

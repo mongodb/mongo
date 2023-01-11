@@ -53,7 +53,7 @@ const tenantMigrationTest = new TenantMigrationTest({
     sharedOptions: {setParameter: {tenantMigrationExcludeDonorHostTimeoutMS: 1000}}
 });
 
-const tenantId = "testTenantId";
+const tenantId = ObjectId().str;
 const tenantDB = tenantMigrationTest.tenantDB(tenantId, "testDB");
 const collName = "testColl";
 

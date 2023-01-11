@@ -26,7 +26,7 @@ load("jstests/replsets/rslib.js");           // 'createRstArgs'
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 
-const tenantId = "testTenantId";
+const tenantId = ObjectId().str;
 const dbName = tenantMigrationTest.tenantDB(tenantId, "testDB");
 const collName = "testColl";
 
@@ -49,7 +49,7 @@ const migrationId = UUID();
 const migrationOpts = {
     migrationIdString: extractUUIDFromObject(migrationId),
     recipientConnString: tenantMigrationTest.getRecipientConnString(),
-    tenantId: tenantId,
+    tenantId,
 };
 
 // Configure fail point to have the recipient primary hang before the query stage.

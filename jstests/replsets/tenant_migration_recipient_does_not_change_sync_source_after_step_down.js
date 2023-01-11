@@ -53,7 +53,7 @@ const tenantMigrationTest =
 const donorRst = tenantMigrationTest.getDonorRst();
 const donorPrimary = donorRst.getPrimary();
 
-const tenantId = "testTenantId";
+const tenantId = ObjectId().str;
 const dbName = tenantMigrationTest.tenantDB(tenantId, "testDB");
 const collName = "testColl";
 
@@ -68,7 +68,7 @@ const migrationIdString = extractUUIDFromObject(migrationId);
 const migrationOpts = {
     migrationIdString: migrationIdString,
     recipientConnString: tenantMigrationTest.getRecipientConnString(),
-    tenantId: tenantId,
+    tenantId,
     readPreference: {mode: "primary"},  // only sync from donor's primary
 };
 

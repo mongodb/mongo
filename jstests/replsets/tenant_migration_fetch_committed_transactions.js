@@ -25,7 +25,7 @@ const collName = "testColl";
 
 const tenantMigrationTest = new TenantMigrationTest({name: jsTestName()});
 const tenantDB = tenantMigrationTest.tenantDB(tenantId, "testDB");
-const nonTenantDB = tenantMigrationTest.nonTenantDB(tenantId, "testDB");
+const nonTenantDB = tenantMigrationTest.tenantDB(ObjectId().str, "testDB");
 const tenantNS = `${tenantDB}.${collName}`;
 
 const donorPrimary = tenantMigrationTest.getDonorPrimary();

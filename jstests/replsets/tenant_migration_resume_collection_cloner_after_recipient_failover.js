@@ -43,7 +43,7 @@ const tenantMigrationFailoverTest = function(isTimeSeries, createCollFn, docs) {
         new TenantMigrationTest({name: jsTestName(), recipientRst: recipientRst});
     const donorPrimary = tenantMigrationTest.getDonorPrimary();
 
-    const tenantId = "testTenantId";
+    const tenantId = ObjectId().str;
     const dbName = tenantMigrationTest.tenantDB(tenantId, "testDB");
     const donorDB = donorPrimary.getDB(dbName);
     const collName = "testColl";
@@ -59,7 +59,7 @@ const tenantMigrationFailoverTest = function(isTimeSeries, createCollFn, docs) {
     const migrationOpts = {
         migrationIdString: migrationIdString,
         recipientConnString: tenantMigrationTest.getRecipientConnString(),
-        tenantId: tenantId,
+        tenantId,
     };
 
     // Configure a fail point to have the recipient primary hang after cloning 2 documents.

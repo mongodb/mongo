@@ -48,10 +48,9 @@ const tenantMigrationTest =
 const recipientRst = tenantMigrationTest.getRecipientRst();
 const donorPrimary = donorRst.getPrimary();
 
-const kTenantIdPrefix = "testTenantId";
 const kCollName = "testColl";
 const kTenantDefinedDbName = "0";
-const kTenantId = `${kTenantIdPrefix}-multiWrites`;
+const kTenantId = ObjectId().str;
 const kDbName = tenantMigrationTest.tenantDB(kTenantId, kTenantDefinedDbName);
 
 const kRecords = 500;

@@ -25,7 +25,7 @@ load("jstests/libs/uuid_util.js");
 
 let tenantMigrationTest = new TenantMigrationTest({name: jsTestName(), sharedOptions: {nodes: 1}});
 
-const tenantId = "testTenantId";
+const tenantId = ObjectId().str;
 const collName = "testColl";
 const transactionsNS = "config.transactions";
 

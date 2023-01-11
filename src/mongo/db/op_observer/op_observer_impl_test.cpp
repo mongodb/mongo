@@ -343,8 +343,8 @@ protected:
     const NamespaceString nss3{boost::none, "testDB3", "testColl3"};
     const UUID uuid3{UUID::gen()};
 
-    const std::string kTenantId = "tenantId";
-    const NamespaceString kNssUnderTenantId{boost::none, "tenantId_db", "testColl"};
+    const std::string kTenantId = OID::gen().toString();
+    const NamespaceString kNssUnderTenantId{boost::none, kTenantId + "_db", "testColl"};
     const UUID kNssUnderTenantIdUUID{UUID::gen()};
 
     ReadWriteConcernDefaultsLookupMock _lookupMock;

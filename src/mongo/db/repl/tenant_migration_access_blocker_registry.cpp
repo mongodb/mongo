@@ -29,9 +29,9 @@
 
 
 #include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
-#include "mongo/db/repl/tenant_migration_access_blocker.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/database_name_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTenantMigration
 
@@ -221,8 +221,7 @@ boost::optional<MtabPair> TenantMigrationAccessBlockerRegistry::getAccessBlocker
     const DatabaseName& dbName) {
     stdx::lock_guard<Latch> lg(_mutex);
     auto donorAccessBlocker = _getAllTenantDonorAccessBlocker(lg, dbName);
-    const auto tenantId =
-        tenant_migration_access_blocker::parseTenantIdFromDB(dbName.toStringWithTenantId());
+    const auto tenantId = DatabaseNameUtil::parseTenantIdFromDatabaseName(dbName);
 
     if (!tenantId && donorAccessBlocker) {
         return MtabPair{donorAccessBlocker};
@@ -232,7 +231,7 @@ boost::optional<MtabPair> TenantMigrationAccessBlockerRegistry::getAccessBlocker
         return boost::none;
     }
 
-    const auto& it = _tenantMigrationAccessBlockers.find(tenantId.get());
+    const auto& it = _tenantMigrationAccessBlockers.find(tenantId->toString());
 
     if (it != _tenantMigrationAccessBlockers.end() && donorAccessBlocker) {
         return MtabPair{donorAccessBlocker, it->second.getRecipientAccessBlocker()};

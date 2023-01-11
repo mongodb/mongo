@@ -593,13 +593,6 @@ export class TenantMigrationTest {
     }
 
     /**
-     * Crafts a database name that does not belong to the tenant.
-     */
-    nonTenantDB(tenantId, dbName) {
-        return `non_${tenantId}_${dbName}`;
-    }
-
-    /**
      * Returns the TenantMigrationAccessBlocker serverStatus output for the migration or shard merge
      * for the given node.
      */

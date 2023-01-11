@@ -39,7 +39,7 @@ namespace mongo {
 class TenantMigrationAccessBlockerUtilTest : public ServiceContextTest {
 public:
     const TenantId kTenantId = TenantId(OID::gen());
-    const DatabaseName kTenantDB = DatabaseName(kTenantId, "db");
+    const DatabaseName kTenantDB = DatabaseName(kTenantId.toString() + "_ db");
 
     void setUp() {
         _opCtx = makeOperationContext();

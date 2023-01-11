@@ -55,14 +55,111 @@ namespace {
 const auto getChangeCollectionManager =
     ServiceContext::declareDecoration<boost::optional<ChangeStreamChangeCollectionManager>>();
 
+// Helper used to determine whether or not a given oplog entry should be used to create a change
+// collection entry.
+bool shouldSkipOplogEntry(const BSONObj& oplogEntry) {
+    auto nss = oplogEntry.getStringField(repl::OplogEntry::kNssFieldName);
+
+    // Avoid writing entry with empty 'ns' field, for eg. 'periodic noop' entry.
+    if (nss.empty()) {
+        return true;
+    }
+
+    if (nss == "config.$cmd"_sd) {
+        if (auto objectFieldElem = oplogEntry[repl::OplogEntry::kObjectFieldName]) {
+            // The oplog entry might be a drop command on the change collection. Check if
+            // the drop request is for the already deleted change collection, as such do not
+            // attempt to write to the change collection if that is the case. This scenario
+            // is possible because 'WriteUnitOfWork' will stage the changes and while
+            // committing the staged 'CollectionImpl::insertDocuments' change the collection
+            // object might have already been deleted.
+            if (auto dropFieldElem = objectFieldElem["drop"_sd]) {
+                return dropFieldElem.String() == NamespaceString::kChangeCollectionName;
+            }
+
+            // Do not write the change collection's own 'create' oplog entry. This is
+            // because the secondaries will not be able to capture this oplog entry and as
+            // such, will result in inconsistent state of the change collection in the
+            // primary and the secondary.
+            if (auto createFieldElem = objectFieldElem["create"_sd]) {
+                return createFieldElem.String() == NamespaceString::kChangeCollectionName;
+            }
+        }
+    }
+
+    if (nss == "admin.$cmd"_sd) {
+        if (auto objectFieldElem = oplogEntry[repl::OplogEntry::kObjectFieldName]) {
+            // The oplog entry might be a batch delete command on a change collection, avoid
+            // inserting such oplog entries back to the change collection.
+            if (auto applyOpsFieldElem = objectFieldElem["applyOps"_sd]) {
+                const auto nestedOperations = repl::ApplyOps::extractOperations(oplogEntry);
+                for (auto& op : nestedOperations) {
+                    if (op.getNss().isChangeCollection() &&
+                        op.getOpType() == repl::OpTypeEnum::kDelete) {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+
+    const auto opTypeFieldElem = oplogEntry.getStringField(repl::OplogEntry::kOpTypeFieldName);
+
+    // The oplog entry might be a single delete command on a change collection, avoid
+    // inserting such oplog entries back to the change collection.
+    if (opTypeFieldElem == repl::OpType_serializer(repl::OpTypeEnum::kDelete) &&
+        NamespaceString(nss).isChangeCollection()) {
+        return true;
+    }
+
+    return false;
+}
+
 /**
  * Creates a Document object from the supplied oplog entry, performs necessary modifications to it
- * and then returns it as a BSON object.
+ * and then returns it as a BSON object. Can return boost::none if the entry should be skipped.
  */
-BSONObj createChangeCollectionEntryFromOplog(const BSONObj& oplogEntry) {
-    Document oplogDoc(oplogEntry);
-    MutableDocument changeCollDoc(oplogDoc);
-    changeCollDoc["_id"] = Value(oplogDoc["ts"]);
+boost::optional<BSONObj> createChangeCollectionEntryFromOplog(const BSONObj& oplogEntry) {
+    if (shouldSkipOplogEntry(oplogEntry)) {
+        return boost::none;
+    }
+
+    const auto isFromTenantMigration =
+        oplogEntry.hasField(repl::OplogEntry::kFromTenantMigrationFieldName);
+    const auto isNoop = oplogEntry.getStringField(repl::OplogEntry::kOpTypeFieldName) ==
+        repl::OpType_serializer(repl::OpTypeEnum::kNoop);
+
+    // Skip CRUD writes on user DBs from Tenant Migrations. Instead, extract that nested 'o2' from
+    // the corresponding noop write to ensure that change events for user DB writes that took place
+    // during a Tenant Migration are on the Donor timeline.
+    const auto oplogDoc = [&]() -> boost::optional<Document> {
+        if (!isFromTenantMigration) {
+            return Document(oplogEntry);
+        }
+
+        if (!isNoop) {
+            return boost::none;
+        }
+
+        const auto o2 = oplogEntry.getObjectField(repl::OplogEntry::kObject2FieldName);
+        if (o2.isEmpty()) {
+            return boost::none;
+        }
+
+        if (shouldSkipOplogEntry(o2)) {
+            return boost::none;
+        }
+
+        return Document(o2);
+    }();
+
+    if (!oplogDoc) {
+        return boost::none;
+    }
+
+    MutableDocument changeCollDoc(oplogDoc.get());
+    changeCollDoc[repl::OplogEntry::k_idFieldName] =
+        Value(oplogDoc->getField(repl::OplogEntry::kTimestampFieldName));
 
     auto readyChangeCollDoc = changeCollDoc.freeze();
     return readyChangeCollDoc.toBson();
@@ -81,8 +178,7 @@ public:
      * collection when the 'write()' method is called.
      */
     void add(InsertStatement insertStatement) {
-        if (auto tenantId = _extractTenantId(insertStatement);
-            tenantId && _shouldAddEntry(insertStatement)) {
+        if (auto tenantId = _extractTenantId(insertStatement); tenantId) {
             _tenantStatementsMap[*tenantId].push_back(std::move(insertStatement));
         }
     }
@@ -136,65 +232,6 @@ private:
         }
 
         return boost::none;
-    }
-
-    bool _shouldAddEntry(const InsertStatement& insertStatement) {
-        auto& oplogDoc = insertStatement.doc;
-
-        if (auto nssFieldElem = oplogDoc[repl::OplogEntry::kNssFieldName]) {
-            // Avoid writing entry with empty 'ns' field, for eg. 'periodic noop' entry.
-            if (nssFieldElem.String().empty()) {
-                return false;
-            }
-
-            if (nssFieldElem.String() == "config.$cmd"_sd) {
-                if (auto objectFieldElem = oplogDoc[repl::OplogEntry::kObjectFieldName]) {
-                    // The oplog entry might be a drop command on the change collection. Check if
-                    // the drop request is for the already deleted change collection, as such do not
-                    // attempt to write to the change collection if that is the case. This scenario
-                    // is possible because 'WriteUnitOfWork' will stage the changes and while
-                    // committing the staged 'CollectionImpl::insertDocuments' change the collection
-                    // object might have already been deleted.
-                    if (auto dropFieldElem = objectFieldElem["drop"_sd]) {
-                        return dropFieldElem.String() != NamespaceString::kChangeCollectionName;
-                    }
-
-                    // Do not write the change collection's own 'create' oplog entry. This is
-                    // because the secondaries will not be able to capture this oplog entry and as
-                    // such, will result in inconsistent state of the change collection in the
-                    // primary and the secondary.
-                    if (auto createFieldElem = objectFieldElem["create"_sd]) {
-                        return createFieldElem.String() != NamespaceString::kChangeCollectionName;
-                    }
-                }
-            }
-
-            if (nssFieldElem.String() == "admin.$cmd"_sd) {
-                if (auto objectFieldElem = oplogDoc[repl::OplogEntry::kObjectFieldName]) {
-                    // The oplog entry might be a batch delete command on a change collection, avoid
-                    // inserting such oplog entries back to the change collection.
-                    if (auto applyOpsFieldElem = objectFieldElem["applyOps"_sd]) {
-                        const auto nestedOperations = repl::ApplyOps::extractOperations(oplogDoc);
-                        for (auto& op : nestedOperations) {
-                            if (op.getNss().isChangeCollection() &&
-                                op.getOpType() == repl::OpTypeEnum::kDelete) {
-                                return false;
-                            }
-                        }
-                    }
-                }
-            }
-
-            // The oplog entry might be a single delete command on a change collection, avoid
-            // inserting such oplog entries back to the change collection.
-            if (auto opTypeFieldElem = oplogDoc[repl::OplogEntry::kOpTypeFieldName];
-                opTypeFieldElem &&
-                opTypeFieldElem.String() == repl::OpType_serializer(repl::OpTypeEnum::kDelete)) {
-                return !NamespaceString(nssFieldElem.String()).isChangeCollection();
-            }
-        }
-
-        return true;
     }
 
     // Mode required to access change collections.
@@ -280,10 +317,10 @@ void ChangeStreamChangeCollectionManager::insertDocumentsToChangeCollection(
 
         // Create an insert statement that should be written at the timestamp 'ts' for a particular
         // tenant.
-        auto changeCollDoc = createChangeCollectionEntryFromOplog(record.data.toBson());
-
-        changeCollectionsWriter.add(
-            InsertStatement{std::move(changeCollDoc), ts, repl::OpTime::kUninitializedTerm});
+        if (auto changeCollDoc = createChangeCollectionEntryFromOplog(record.data.toBson())) {
+            changeCollectionsWriter.add(InsertStatement{
+                std::move(changeCollDoc.get()), ts, repl::OpTime::kUninitializedTerm});
+        }
     }
 
     // Write documents to change collections and throw exception in case of any failure.
@@ -320,10 +357,10 @@ Status ChangeStreamChangeCollectionManager::insertDocumentsToChangeCollection(
         // initialized. The corresponding change collection insertion will not be timestamped.
         auto oplogSlot = oplogEntryIter->oplogSlot;
 
-        auto changeCollDoc = createChangeCollectionEntryFromOplog(oplogDoc);
-
-        changeCollectionsWriter.add(InsertStatement{
-            std::move(changeCollDoc), oplogSlot.getTimestamp(), oplogSlot.getTerm()});
+        if (auto changeCollDoc = createChangeCollectionEntryFromOplog(oplogDoc)) {
+            changeCollectionsWriter.add(InsertStatement{
+                std::move(changeCollDoc.get()), oplogSlot.getTimestamp(), oplogSlot.getTerm()});
+        }
     }
 
     // Write documents to change collections.

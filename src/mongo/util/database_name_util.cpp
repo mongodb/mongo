@@ -34,6 +34,8 @@
 #include "mongo/util/str.h"
 #include <ostream>
 
+#include "mongo/logv2/log_debug.h"
+
 namespace mongo {
 
 std::string DatabaseNameUtil::serialize(const DatabaseName& dbName) {
@@ -101,6 +103,26 @@ DatabaseName DatabaseNameUtil::deserialize(boost::optional<TenantId> tenantId, S
         massert(7005301, "TenantId must match that in db prefix", tenantId == dbName.tenantId());
     }
     return dbName;
+}
+
+boost::optional<TenantId> DatabaseNameUtil::parseTenantIdFromDatabaseName(
+    const DatabaseName& dbName) {
+    if (gMultitenancySupport) {
+        return dbName.tenantId();
+    }
+
+    const auto pos = dbName.db().find('_');
+    if (pos == std::string::npos || pos == 0) {
+        // Not a tenant database.
+        return boost::none;
+    }
+
+    const auto statusWith = OID::parse(dbName.db().substr(0, pos));
+    if (!statusWith.isOK()) {
+        return boost::none;
+    }
+
+    return TenantId(statusWith.getValue());
 }
 
 }  // namespace mongo

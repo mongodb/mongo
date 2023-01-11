@@ -72,6 +72,11 @@ public:
      * eg. deserialize(boost::none, "foo") -> DatabaseName(boost::none, "foo")
      */
     static DatabaseName deserialize(boost::optional<TenantId> tenantId, StringData db);
+
+    /**
+     * Parses the TenantID from the provided DatabaseName.
+     */
+    static boost::optional<TenantId> parseTenantIdFromDatabaseName(const DatabaseName& dbName);
 };
 
 }  // namespace mongo

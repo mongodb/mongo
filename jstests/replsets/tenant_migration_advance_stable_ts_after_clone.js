@@ -19,8 +19,8 @@ load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");  // For extractUUIDFromObject().
 load("jstests/replsets/rslib.js");
 
-const kUnrelatedDbNameDonor = "unrelatedDBDonor";
-const kUnrelatedDbNameRecipient = "unrelatedDBRecipient";
+const kUnrelatedDbNameDonor = `${ObjectId().str}_unrelatedDBDonor`;
+const kUnrelatedDbNameRecipient = `${ObjectId().str}_unrelatedDBRecipient`;
 const collName = "foo";
 const tenantId = ObjectId().str;
 const migrationId = UUID();

@@ -42,7 +42,7 @@ function runDropTest({failPointName, failPointData, expectedLog, createNew}) {
     const tenantMigrationTest =
         new TenantMigrationTest({name: jsTestName(), recipientRst: recipientRst});
 
-    const tenantId = "testTenantId";
+    const tenantId = ObjectId().str;
     const dbName = tenantMigrationTest.tenantDB(tenantId, "testDB");
     const collName = "testColl";
 
@@ -61,7 +61,7 @@ function runDropTest({failPointName, failPointData, expectedLog, createNew}) {
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
         recipientConnString: tenantMigrationTest.getRecipientConnString(),
-        tenantId: tenantId,
+        tenantId,
     };
     const donorRstArgs = createRstArgs(tenantMigrationTest.getDonorRst());
 

@@ -42,6 +42,7 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/database_name_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTenantMigration
 
@@ -51,8 +52,16 @@ namespace mongo {
 using namespace fmt::literals;
 
 namespace {
-bool shouldImport(NamespaceString ns) {
-    return !(ns.isLocal() || ns.isAdminDB() || ns.isConfigDB());
+bool shouldImport(const NamespaceString& ns) {
+    const auto tenantId = DatabaseNameUtil::parseTenantIdFromDatabaseName(ns.dbName());
+    // TODO SERVER-62491: Return false if tenantId is TenantId::kSystemTenantId
+    if (tenantId) {
+        return true;
+    }
+
+    // We expect only internal databases to not have a tenant id.
+    invariant(ns.isOnInternalDb());
+    return false;
 }
 
 // catalogEntry is like {idxIdent: {myIndex: "index-12-345", myOtherIndex: "index-67-890"}}.
@@ -174,7 +183,8 @@ std::vector<CollectionImportMetadata> wiredTigerRollbackToStableAndGetMetadata(
         WT_ITEM catalogValue;
         uassertWTOK(mdbCatalogCursor->get_value(mdbCatalogCursor, &catalogValue), session);
         BSONObj rawCatalogEntry(static_cast<const char*>(catalogValue.data));
-        NamespaceString ns{rawCatalogEntry["ns"].String()};
+        NamespaceString ns(NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(
+            rawCatalogEntry.getStringField("ns")));
         if (!shouldImport(ns)) {
             LOGV2_DEBUG(6113801, 1, "Not importing donor collection", "ns"_attr = ns);
             continue;
