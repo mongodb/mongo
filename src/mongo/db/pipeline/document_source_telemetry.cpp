@@ -99,48 +99,50 @@ Value DocumentSourceTelemetry::serialize(boost::optional<ExplainOptions::Verbosi
     return Value{Document{{kStageName, Document{}}}};
 }
 
-void DocumentSourceTelemetry::buildTelemetryStoreIterator() {
-    auto&& telemetryStore = getTelemetryStore(getContext()->opCtx);
-
-    // Here we start a new thread which runs until the document source finishes iterating the
-    // telemetry store.
-    stdx::thread producer([&] {
-        telemetryStore.forEachPartition(
-            [&](const std::function<TelemetryStore::Partition()>& getPartition) {
-                // Block here waiting for the queue to be empty. Locking the partition will block
-                // telemetry writers. We want to delay lock acquisition as long as possible.
-                _queue.waitForEmpty();
-
-                // Now get the locked partition.
-                auto partition = getPartition();
-
-                // Capture the time at which reading the partition begins to indicate to the caller
-                // when the snapshot began.
-                const auto partitionReadTime =
-                    Timestamp{Timestamp(Date_t::now().toMillisSinceEpoch() / 1000, 0)};
-                for (auto&& [key, metrics] : *partition) {
-                    Document d{{{"key", metrics.redactKey(key, _redactFieldNames)},
-                                {"metrics", metrics.toBSON()},
-                                {"asOf", partitionReadTime}}};
-                    _queue.push(std::move(d));
-                }
-            });
-        _queue.closeProducerEnd();
-    });
-    producer.detach();
-}
-
 DocumentSource::GetNextResult DocumentSourceTelemetry::doGetNext() {
-    if (!_initialized) {
-        buildTelemetryStoreIterator();
-        _initialized = true;
-    }
+    /**
+     * We maintain nested iterators:
+     * - Outer one over the set of partitions.
+     * - Inner one over the set of entries in a "materialized" partition.
+     *
+     * When an inner iterator is present and contains more elements, we can return the next element.
+     * When the inner iterator is exhausted, we move to the next element in the outer iterator and
+     * create a new inner iterator. When the outer iterator is exhausted, we have finished iterating
+     * over the telemetry store entries.
+     *
+     * The inner iterator iterates over a materialized container of all entries in the partition.
+     * This is done to reduce the time under which the partition lock is held.
+     */
+    while (true) {
+        // First, attempt to exhaust all elements in the materialized partition.
+        if (!_materializedPartition.empty()) {
+            // Move out of the container reference.
+            auto doc = std::move(_materializedPartition.front());
+            _materializedPartition.pop_front();
+            return {std::move(doc)};
+        }
 
-    auto maybeResult = _queue.pop();
-    if (maybeResult) {
-        return {std::move(*maybeResult)};
-    } else {
-        return DocumentSource::GetNextResult::makeEOF();
+        TelemetryStore& _telemetryStore = getTelemetryStore(getContext()->opCtx);
+
+        // Materialized partition is exhausted, move to the next.
+        _currentPartition++;
+        if (_currentPartition >= _telemetryStore.numPartitions()) {
+            return DocumentSource::GetNextResult::makeEOF();
+        }
+
+        // We only keep the partition (which holds a lock) for the time needed to materialize it to
+        // a set of Document instances.
+        auto&& partition = _telemetryStore.getPartition(_currentPartition);
+
+        // Capture the time at which reading the partition begins to indicate to the caller
+        // when the snapshot began.
+        const auto partitionReadTime =
+            Timestamp{Timestamp(Date_t::now().toMillisSinceEpoch() / 1000, 0)};
+        for (auto&& [key, metrics] : *partition) {
+            _materializedPartition.push_back({{"key", metrics.redactKey(key, _redactFieldNames)},
+                                              {"metrics", metrics.toBSON()},
+                                              {"asOf", partitionReadTime}});
+        }
     }
 }
 

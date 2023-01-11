@@ -111,77 +111,27 @@ public:
 
     void addVariableRefs(std::set<Variables::Id>* refs) const final {}
 
-    // When true, redact field names from returned query shapes.
-    bool _redactFieldNames;
-
 private:
-    /**
-     * A wrapper around the producer/consumer queue which allows waiting for it to be empty.
-     */
-    class QueueWrapper {
-
-    public:
-        void push(Document doc) {
-            _queue.push(std::move(doc));
-        }
-
-        boost::optional<Document> pop() {
-            try {
-                // First, wait for the queue be non-empty. We do this before locking the queue's
-                // mutation mutex.
-                _queue.waitForNonEmpty(Interruptible::notInterruptible());
-
-                // Now, pop() will succeed. Obtain the lock before popping.
-                stdx::unique_lock lk{_mutex};
-                Document d = _queue.pop();
-                // Notify the cv since we've popped.
-                _waitForEmpty.notify_one();
-                return d;
-            } catch (const ExceptionFor<ErrorCodes::ProducerConsumerQueueConsumed>&) {
-                _waitForEmpty.notify_one();
-                return {};
-            }
-        }
-
-        void closeProducerEnd() {
-            _queue.closeProducerEnd();
-        }
-
-        /**
-         * Wait for the queue to be empty.
-         */
-        void waitForEmpty() {
-            stdx::unique_lock lk{_mutex};
-            _waitForEmpty.wait(lk, [&] { return _queue.getStats().queueDepth == 0; });
-        }
-
-    private:
-        /**
-         * Underlying queue implementation.
-         */
-        SingleProducerSingleConsumerQueue<Document> _queue;
-
-        /**
-         * Mutex to synchronize pop() and waitForEmpty().
-         */
-        mongo::Mutex _mutex;
-
-        /**
-         * Condition variable used to wait for the queue to be empty.
-         */
-        stdx::condition_variable _waitForEmpty;
-    };
-
     DocumentSourceTelemetry(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                             bool redactFieldNames = false)
         : DocumentSource(kStageName, expCtx), _redactFieldNames(redactFieldNames) {}
+
     GetNextResult doGetNext() final;
 
-    void buildTelemetryStoreIterator();
+    /**
+     * The current partition materialized as a set of Document instances. We pop from the queue and
+     * return DocumentSource results.
+     */
+    std::deque<Document> _materializedPartition;
 
-    bool _initialized = false;
+    /**
+     * Iterator over all telemetry partitions. This is incremented when we exhaust the current
+     * _materializedPartition.
+     */
+    TelemetryStore::PartitionId _currentPartition = -1;
 
-    QueueWrapper _queue;
+    // When true, redact field names from returned query shapes.
+    bool _redactFieldNames;
 };
 
 }  // namespace mongo

@@ -55,6 +55,7 @@ private:
 public:
     using Lru = LRUKeyValue<KeyType, ValueType, BudgetEstimator, KeyHasher, Eq>;
     using Partition = typename Partitioned<Lru, Partitioner>::OnePartition;
+    using PartitionId = typename Partitioned<Lru, Partitioner>::PartitionId;
 
     /**
      * Initialize plan cache with the total cache size in bytes and number of partitions.
@@ -179,6 +180,10 @@ public:
         for (size_t partitionId = 0; partitionId < _numPartitions; ++partitionId) {
             op([&]() { return _partitionedCache->lockOnePartitionById(partitionId); });
         }
+    }
+
+    Partition getPartition(PartitionId partitionId) {
+        return _partitionedCache->lockOnePartitionById(partitionId);
     }
 
 private:
