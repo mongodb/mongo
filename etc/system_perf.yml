@@ -899,13 +899,24 @@ tasks:
             {scale: 4,
              columnstore: true}
 
-  - name: external_data_source
+  # Named Pipes single concurrent query benchmarks
+  - name: external_data_source_1
     priority: 5
     commands:
       - func: f_run_dsi_workload
         vars:
           mongodb_setup: "external_data_source"
-          test_control: "external_data_source"
+          test_control: "external_data_source_1"
+
+  # Named Pipes four concurrent query benchmarks
+  - name: external_data_source_4
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          mongodb_setup: "external_data_source"
+          test_control: "external_data_source_4"
+
 
   - name: tpch_1_normalized
     priority: 5
@@ -1329,7 +1340,8 @@ buildvariants:
       - name: bestbuy_agg_merge_wordcount
       - name: bestbuy_4_analytics
       - name: bestbuy_4_analytics_columnstore
-      - name: external_data_source
+      - name: external_data_source_1
+      - name: external_data_source_4
       - name: bestbuy_query
       - name: cursor_manager
       - name: map_reduce_workloads
