@@ -1,0 +1,79 @@
+# Golden test output of ABTPlanGeneration/LowerNestedLoopJoinNode
+
+==== VARIATION: Nested loop join with equality predicate (Inner join) ====
+-- INPUT:
+NestedLoopJoin [joinType: Inner, {proj0}]
+|   |   BinaryOp [FillEmpty]
+|   |   |   Const [false]
+|   |   BinaryOp [Eq]
+|   |   |   Variable [proj1]
+|   |   Variable [proj0]
+|   Evaluation []
+|   |   BindBlock:
+|   |       [proj1]
+|   |           FunctionCall [getField]
+|   |           |   Const ["id"]
+|   |           Variable [scan1]
+|   PhysicalScan [{'<root>': scan1}, otherColl]
+|       BindBlock:
+|           [scan1]
+|               Source []
+Evaluation []
+|   BindBlock:
+|       [proj0]
+|           FunctionCall [getField]
+|           |   Const ["city"]
+|           Variable [scan0]
+PhysicalScan [{'<root>': scan0}, collName]
+    BindBlock:
+        [scan0]
+            Source []
+
+-- OUTPUT:
+[4] nlj inner [] [s2] {((s2 == s4) ?: false)} 
+    left 
+        [1] project [s2 = getField(s1, "city")] 
+        [0] scan s1 none none none none none [] @"<collUUID>" true false 
+    right 
+        [3] project [s4 = getField(s3, "id")] 
+        [2] scan s3 none none none none none [] @"<collUUID>" true false 
+
+
+==== VARIATION: Nested loop join with equality predicate (Left join) ====
+-- INPUT:
+NestedLoopJoin [joinType: Left, {proj0}]
+|   |   BinaryOp [FillEmpty]
+|   |   |   Const [false]
+|   |   BinaryOp [Eq]
+|   |   |   Variable [proj1]
+|   |   Variable [proj0]
+|   Evaluation []
+|   |   BindBlock:
+|   |       [proj1]
+|   |           FunctionCall [getField]
+|   |           |   Const ["id"]
+|   |           Variable [scan1]
+|   PhysicalScan [{'<root>': scan1}, otherColl]
+|       BindBlock:
+|           [scan1]
+|               Source []
+Evaluation []
+|   BindBlock:
+|       [proj0]
+|           FunctionCall [getField]
+|           |   Const ["city"]
+|           Variable [scan0]
+PhysicalScan [{'<root>': scan0}, collName]
+    BindBlock:
+        [scan0]
+            Source []
+
+-- OUTPUT:
+[4] nlj left [] [s2] {((s2 == s4) ?: false)} 
+    left 
+        [1] project [s2 = getField(s1, "city")] 
+        [0] scan s1 none none none none none [] @"<collUUID>" true false 
+    right 
+        [3] project [s4 = getField(s3, "id")] 
+        [2] scan s3 none none none none none [] @"<collUUID>" true false 
+

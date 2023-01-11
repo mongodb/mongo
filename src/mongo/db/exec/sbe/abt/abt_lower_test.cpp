@@ -482,6 +482,39 @@ TEST_F(ABTPlanGeneration, LowerMergeJoinNode) {
     }
 }
 
+TEST_F(ABTPlanGeneration, LowerNestedLoopJoinNode) {
+    GoldenTestContext ctx(&goldenTestConfig);
+    ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
+
+    // Run a variation for both supported join types.
+    std::vector<JoinType> joins = {JoinType::Inner, JoinType::Left};
+    for (auto& joinType : joins) {
+        auto child1 = createBindings(
+            {{"city", "proj0"}},
+            _node(make<PhysicalScanNode>(
+                FieldProjectionMap{{}, {ProjectionName{"scan0"}}, {}}, "collName", false)),
+            "scan0");
+        auto child2 = createBindings(
+            {{"id", "proj1"}},
+            _node(make<PhysicalScanNode>(
+                FieldProjectionMap{{}, {ProjectionName{"scan1"}}, {}}, "otherColl", false)),
+            "scan1");
+
+        runNodeVariation(
+            ctx,
+            str::stream() << "Nested loop join with equality predicate ("
+                          << JoinTypeEnum::toString[static_cast<int>(joinType)] << " join)",
+            _node(make<NestedLoopJoinNode>(
+                joinType,
+                ProjectionNameSet{"proj0"},
+                _path(make<EvalFilter>(
+                    make<PathCompare>(Operations::Eq, make<Variable>(ProjectionName{"proj1"})),
+                    make<Variable>(ProjectionName{"proj0"}))),
+                std::move(child1),
+                std::move(child2))));
+    }
+}
+
 TEST_F(ABTPlanGeneration, LowerPhysicalScanNode) {
     GoldenTestContext ctx(&goldenTestConfig);
     ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);

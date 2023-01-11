@@ -244,6 +244,18 @@ const SpecificStats* LoopJoinStage::getSpecificStats() const {
 std::vector<DebugPrinter::Block> LoopJoinStage::debugPrint() const {
     auto ret = PlanStage::debugPrint();
 
+    switch (_joinType) {
+        case JoinType::Inner:
+            ret.emplace_back(DebugPrinter::Block("inner"));
+            break;
+        case JoinType::Left:
+            ret.emplace_back(DebugPrinter::Block("left"));
+            break;
+        case JoinType::Right:
+            ret.emplace_back(DebugPrinter::Block("right"));
+            break;
+    }
+
     ret.emplace_back(DebugPrinter::Block("[`"));
     for (size_t idx = 0; idx < _outerProjects.size(); ++idx) {
         if (idx) {
