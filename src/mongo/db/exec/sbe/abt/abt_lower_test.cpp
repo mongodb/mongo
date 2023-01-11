@@ -602,6 +602,56 @@ TEST_F(ABTPlanGeneration, LowerPhysicalScanNode) {
     }
 }
 
+TEST_F(ABTPlanGeneration, LowerSortedMergeNode) {
+    GoldenTestContext ctx(&goldenTestConfig);
+    ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
+
+    std::vector<CollationOp> ops = {CollationOp::Ascending, CollationOp::Descending};
+    auto runVariations = [&](auto req, auto op, auto& suffix) {
+        runNodeVariation(ctx,
+                         str::stream() << "one source " << suffix,
+                         _node(make<SortedMergeNode>(
+                             req, makeSeq(createBindings({{"a", "proj0"}, {"b", "proj1"}})))));
+
+        auto left = createBindings({{"a", "proj0"}, {"b", "proj1"}});
+        auto right = createBindings({{"a", "proj0"}, {"b", "proj1"}});
+        runNodeVariation(
+            ctx,
+            str::stream() << "two sources " << suffix,
+            _node(make<SortedMergeNode>(req, makeSeq(std::move(left), std::move(right)))));
+
+
+        auto child1 = createBindings({{"a", "proj0"}, {"b", "proj1"}});
+        auto child2 = createBindings({{"a", "proj0"}, {"b", "proj1"}});
+        auto child3 = createBindings({{"a", "proj0"}, {"b", "proj1"}});
+        auto child4 = createBindings({{"a", "proj0"}, {"b", "proj1"}});
+        auto child5 = createBindings({{"a", "proj0"}, {"b", "proj1"}});
+        runNodeVariation(ctx,
+                         str::stream() << "five sources " << suffix,
+                         _node(make<SortedMergeNode>(req,
+                                                     makeSeq(std::move(child1),
+                                                             std::move(child2),
+                                                             std::move(child3),
+                                                             std::move(child4),
+                                                             std::move(child5)))));
+    };
+    for (auto& op : ops) {
+        runVariations(properties::CollationRequirement(
+                          ProjectionCollationSpec({{ProjectionName{"proj0"}, op}})),
+                      op,
+                      str::stream()
+                          << "sorted on `a` " << CollationOpEnum::toString[static_cast<int>(op)]);
+        for (auto& op2 : ops) {
+            runVariations(properties::CollationRequirement(ProjectionCollationSpec(
+                              {{ProjectionName{"proj0"}, op}, {ProjectionName{"proj1"}, op2}})),
+                          op,
+                          str::stream()
+                              << "sorted on `a` " << CollationOpEnum::toString[static_cast<int>(op)]
+                              << " and `b` " << CollationOpEnum::toString[static_cast<int>(op2)]);
+        }
+    }
+}
+
 TEST_F(ABTPlanGeneration, LowerUnionNode) {
     GoldenTestContext ctx(&goldenTestConfig);
     ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
