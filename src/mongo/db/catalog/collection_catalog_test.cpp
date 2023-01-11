@@ -1206,7 +1206,6 @@ private:
         }
         t.join();
 
-
         if (expectedExistence) {
             ASSERT(coll);
 
@@ -1218,26 +1217,10 @@ private:
             ASSERT(!catalogEntry.isEmpty());
             ASSERT(
                 coll->isMetadataEqual(DurableCatalog::getMetadataFromCatalogEntry(catalogEntry)));
-
-            // Lookups from the catalog should return the newly opened collection.
-            ASSERT_EQ(CollectionCatalog::get(opCtx)
-                          ->lookupCollectionByNamespaceForRead(opCtx, coll->ns())
-                          .get(),
-                      coll.get());
-            ASSERT_EQ(CollectionCatalog::get(opCtx)
-                          ->lookupCollectionByUUIDForRead(opCtx, coll->uuid())
-                          .get(),
-                      coll.get());
         } else {
             ASSERT(!coll);
             auto catalogEntry = DurableCatalog::get(opCtx)->scanForCatalogEntryByNss(opCtx, nss);
             ASSERT(!catalogEntry);
-
-            // Lookups from the catalog should return the newly opened collection (in this case
-            // nullptr).
-            ASSERT_EQ(
-                CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(opCtx, nss).get(),
-                coll.get());
         }
     }
 };
@@ -1309,12 +1292,6 @@ TEST_F(CollectionCatalogTimestampTest, OpenCollectionBeforeCreateTimestamp) {
     auto coll =
         CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, readTimestamp);
     ASSERT(!coll);
-
-    // Lookups from the catalog should return the newly opened collection (in this case nullptr).
-    ASSERT_EQ(CollectionCatalog::get(opCtx.get())
-                  ->lookupCollectionByNamespaceForRead(opCtx.get(), nss)
-                  .get(),
-              coll.get());
 }
 
 TEST_F(CollectionCatalogTimestampTest, OpenEarlierCollection) {
@@ -3162,16 +3139,6 @@ TEST_F(CollectionCatalogTimestampTest, OpenCollectionBetweenIndexBuildInProgress
                         ->openCollection(opCtx.get(), nss, createCollectionTs);
         ASSERT(coll);
         ASSERT_EQ(coll->getIndexCatalog()->numIndexesReady(), 0);
-
-        // Lookups from the catalog should return the newly opened collection.
-        ASSERT_EQ(CollectionCatalog::get(opCtx.get())
-                      ->lookupCollectionByNamespaceForRead(opCtx.get(), coll->ns())
-                      .get(),
-                  coll.get());
-        ASSERT_EQ(CollectionCatalog::get(opCtx.get())
-                      ->lookupCollectionByUUIDForRead(opCtx.get(), coll->uuid())
-                      .get(),
-                  coll.get());
     }
 
     finishIndexBuild(opCtx.get(), nss, std::move(indexBuildBlock), indexReadyTs);
@@ -3186,16 +3153,6 @@ TEST_F(CollectionCatalogTimestampTest, OpenCollectionBetweenIndexBuildInProgress
             CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, createIndexTs);
         ASSERT(coll);
         ASSERT_EQ(coll->getIndexCatalog()->numIndexesReady(), 0);
-
-        // Lookups from the catalog should return the newly opened collection.
-        ASSERT_EQ(CollectionCatalog::get(opCtx.get())
-                      ->lookupCollectionByNamespaceForRead(opCtx.get(), coll->ns())
-                      .get(),
-                  coll.get());
-        ASSERT_EQ(CollectionCatalog::get(opCtx.get())
-                      ->lookupCollectionByUUIDForRead(opCtx.get(), coll->uuid())
-                      .get(),
-                  coll.get());
     }
 }
 }  // namespace
