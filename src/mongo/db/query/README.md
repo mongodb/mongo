@@ -3,7 +3,7 @@
 *Disclaimer*: This is a work in progress. It is not complete and we will
 do our best to complete it in a timely manner.
 
-## Overview
+# Overview
 
 The query system generally is responsible for interpreting the user's
 request, finding an optimal way to satisfy it, and to actually compute
@@ -42,7 +42,7 @@ replica set where all the data is expected to be found locally. We plan
 to add documentation for the sharded case in the src/mongo/s/query/
 directory later.
 
-### Command Parsing & Validation
+## Command Parsing & Validation
 
 The following commands are generally maintained by the query team, with
 the majority of our focus given to the first two.
@@ -76,7 +76,7 @@ a BSONObj - we don't yet know that it has a `$or` inside. For this
 process, we prefer using an Interface Definition Language (IDL) tool to
 generate the parser and actually generate the C++ class itself.
 
-### The Interface Definition Language
+## The Interface Definition Language
 
 You can find some files ending with '.idl' as examples, a snippet may
 look like this:
@@ -113,7 +113,7 @@ The generated file will have methods to get and set all the members, and
 will return a boost::optional for optional fields. In the example above,
 it will generate a CountCommandRequest::getQuery() method, among others.
 
-### Other actions performed during this stage
+## Other actions performed during this stage
 
 As stated before, the MQL elements are unparsed - the query here is
 still an "object", stored in BSON without any scrutiny at this point.
@@ -122,7 +122,7 @@ This is how we begin to transition into the next phase where we piece
 apart the MQL. Before we do that, there are a number of important things
 that happen on these structures.
 
-#### Various initializations and setup
+### Various initializations and setup
 
 Pretty early on we will set up context on the "OperationContext" such as
 the request's read concern, read preference, maxTimeMs, etc. The
@@ -156,7 +156,7 @@ request. The most obvious reason this is required is that the
 ExpressionContext holds parsing state like the variable resolution
 tracking and the maximum sub-pipeline depth reached so far.
 
-#### Authorization checking
+### Authorization checking
 
 In many but not all cases, we have now parsed enough to check whether
 the user is allowed to perform this request. We usually only need the
@@ -188,7 +188,7 @@ detailed arguments to the stages. You can check out the
 `LiteParsedPipeline` API to see what kinds of questions we can answer
 with just the stage names and pipeline structure.
 
-#### Additional Validation
+### Additional Validation
 
 In most cases the IDL will take care of all the validation we need at
 this point. There are some constraints that are awkward or impossible to
@@ -196,7 +196,7 @@ express via the IDL though. For example, it is invalid to specify both
 `remove: true` and `new: true` to the findAndModify command. This would
 be requesting the post-image of a delete, which is nothing.
 
-#### Non-materialized view resolution
+### Non-materialized view resolution
 
 We have a feature called 'non-materialized read only views' which allows
 the user to store a 'view' in the database that mostly presents itself
@@ -209,12 +209,12 @@ predicate. In some cases this means a find command will switch over and
 run as an aggregate command, since views are defined in terms of
 aggregation pipelines.
 
-## Query Language Parsing & Validation
+# Query Language Parsing & Validation
 
 Once we have parsed the command and checked authorization, we move on to parsing the individual
 parts of the query. Once again, we will focus on the find and aggregate commands.
 
-### Find command parsing
+## Find command parsing
 The find command is parsed entirely by the IDL. The IDL parser first creates a FindCommandRequest.
 As mentioned above, the IDL parser does all of the required type checking and stores all options for
 the query. The FindCommandRequest is then turned into a CanonicalQuery. The CanonicalQuery
@@ -228,15 +228,15 @@ tree of MatchExpressions from the filter BSON object. The parser performs some v
 same time -- for example, type validation and checking the number of arguments for expressions are
 both done here.
 
-### Aggregate Command Parsing
+## Aggregate Command Parsing
 
-#### LiteParsedPipeline
+### LiteParsedPipeline
 In the process of parsing an aggregation we create two versions of the pipeline: a
 LiteParsedPipeline (that contains LiteParsedDocumentSource objects) and the Pipeline (that contains
 DocumentSource objects) that is eventually used for execution.  See the above section on
 authorization checking for more details.
 
-#### DocumentSource
+### DocumentSource
 Before talking about the aggregate command as a whole, we will first briefly discuss
 the concept of a DocumentSource. A DocumentSource represents one stage in the an aggregation
 pipeline. For each stage in the pipeline, we create another DocumentSource. A DocumentSource
@@ -247,14 +247,14 @@ will remain as a DocumentSourceGroup. Each DocumentSource has its own parser tha
 validation of its internal fields and arguments and then generates the DocumentSource that will be
 added to the final pipeline.
 
-#### Pipeline
+### Pipeline
 The pipeline parser uses the individual document source parsers to parse the entire pipeline
 argument of the aggregate command. The parsing process is fairly simple -- for each object in the
 user specified pipeline lookup the document source parser for the stage name, and then parse the
 object using that parser. The final pipeline is composed of the DocumentSources generated by the
 individual parsers.
 
-#### Aggregation Command
+### Aggregation Command
 When an aggregation is run, the first thing that happens is the request is parsed into a
 LiteParsedPipeline. As mentioned above, the LiteParsedPipeline is used to check options and
 permissions on namespaces. More checks are done in addition to those performed by the
@@ -263,7 +263,7 @@ BSON object is parsed again into the pipeline using the DocumentSource parsers t
 above. Note that we use the original BSON for parsing the pipeline and DocumentSources as opposed
 to continuing from the LiteParsedPipeline. This could be improved in the future.
 
-### Other command parsing
+## Other command parsing
 As mentioned above, there are several other commands maintained by the query team. We will quickly
 give a summary of how each is parsed, but not get into the same level of detail.
 
@@ -282,7 +282,7 @@ give a summary of how each is parsed, but not get into the same level of detail.
   query portion is delegated to the query parser and if this is an update (rather than a delete) it
   uses the same parser as the update command.
 
-## Plan caching
+# Plan caching
 
 Plan caching is a technique in which the plans produced by the query optimizer are stored and
 subsequently reused when the client re-issues the same or similar queries. This is purely a
@@ -293,7 +293,7 @@ execution engine and another for the slot-based execution engine (SBE). Although
 code and behaviors, the two plan caches have some important differences and are described separately
 below.
 
-### Classic plan cache
+## Classic plan cache
 
 The classic plan cache (of type
 [`mongo::PlanCache`](https://github.com/mongodb/mongo/blob/f28a9f718268ca84644aa77e98ca7ee9651bd5b6/src/mongo/db/query/classic_plan_cache.h#L243-L248)
@@ -318,7 +318,7 @@ and `PlanStage` tree need to be reconstructed from scratch when recovering plans
 cache, there is still a major performance benefit achieved by avoiding the cost of repeated runtime
 plan selection.
 
-### SBE plan cache
+## SBE plan cache
 
 The SBE plan cache is also an in-memory map from key to cache entry (see
 [`sbe::PlanCache`](https://github.com/mongodb/mongo/blob/a04e1c1812a28ebfb9a2684859097ade649a1184/src/mongo/db/query/sbe_plan_cache.h#L224-L229)).
@@ -366,7 +366,7 @@ process. However, for queries using SBE, it is valuable to avoid not just multi-
 compilation to `sbe::PlanStage`. For this reason, single-solution queries result in SBE plan cache
 entries.
 
-### Cache eviction and invalidation
+## Cache eviction and invalidation
 
 Both the classic and SBE plan caches avoid growing too large by implementing a least-recently used
 (LRU) eviction policy.
@@ -377,7 +377,7 @@ per-collection plan cache instance, so the entire object can be flushed of its c
 Invalidation in the case of the SBE plan cache, on the other hand, requires the traversal of the
 cache to identify all cache entries associated with a particular collection.
 
-### Cached plan replanning
+## Cached plan replanning
 
 For both the classic and SBE plan caches, each cache entry has an associated "works" value. The
 naming derives from the classic engine's `PlanStage::work()` method, but for SBE this is actually
@@ -399,7 +399,7 @@ not subject to replanning. Plans with just a single query solution as well as pl
 subplanning rooted $or queries are pinned. Although pinned plans cannot be evicted through
 replanning, they can get invalidated by other means such as DDL events or LRU replacement.
 
-### Inactive cache entries
+## Inactive cache entries
 
 When cache entries are first created, they are considered inactive. This means that the cache
 entries exist but are unused. Inactive cache entries can be promoted to active when a query of the
@@ -407,3 +407,80 @@ same shape runs and exhibits similar or better trial period performance, as meas
 "works". Although the full mechanism is not described here, the goal of this behavior is to avoid
 situations where a plan cache entry is created with an unreasonably high works value. When this
 happens, the plan can get stuck in the cache since replanning will never kick in.
+
+# Column Store Indexes
+
+There is now a `ColumnStore` interface, akin to the `RecordStore` and `SortedDataInterface` base
+classes.
+
+The `RecordStore` represents a collection keyed (and sorted) by generated `RecordId`s and otherwise
+the values (documents) are unsorted: the key-values are RecordId-Document.
+
+The `SortedDataInterface` represents sorted indexes, mapping index key value to `RecordId` where the
+sort is done on index key value.
+
+The `ColumnStore` differs from both of these, mapping document paths directly to their values, and
+does not sort by value but rather by path with `RecordId` postfix. A `ColumnStore` contains key-value
+entries per path in a collection document:
+
+Example input documents:
+```
+{
+  _id: new ObjectId("..."),
+  version: 2,
+  author: {
+   first: "Charlie",
+   last: "Swanson"
+  }
+},
+{
+  _id: new ObjectId("..."),
+  version: 3,
+  author: {
+   first: "Charlie",
+   last: "Swanson"
+  },
+  viewed: true
+}
+```
+High-level view of the column store data format:
+```
+(_id\01, {vals: [ ObjectId("...") ]})
+(_id\02, {vals: [ ObjectId("...") ]})
+(author\01, {flags: [HAS_SUBPATHS]})
+(author\02, {flags: [HAS_SUBPATHS]})
+(author.first\01, {vals: [ "Charlie" ]})
+(author.first\02, {vals: [ "Charlie" ]})
+(author.last\01, {vals: [ "Swanson" ]})
+(author.last\02, {vals: [ "Swanson" ]})
+(version\01, {vals: [ 2 ]})
+(version\02, {vals: [ 3 ]})
+(viewed\02, {vals: [ true ]})
+(\xFF1, {flags: [HAS_SUBPATHS]})
+(\xFF2, {flags: [HAS_SUBPATHS]})
+```
+
+## Code Structure
+
+The `ColumnStore` base class is the storage access point for columnar data. It supports reads and
+writes to the column store storage table. The `ColumnStore` component is not involved in generating
+the column key-values from the original collection document: that is the purview of another component,
+the `ColumnKeyGenerator`.
+
+The `ColumnKeyGenerator` represents a different subsystem, connected with the `ColumnStore` via the
+`IndexAccessMethod` interface. The `ColumnKeyGenerator` internally leverages the `ColumnShredder`
+class to disassemble documents into path-cell (key-value) pairs for storage. The `ColumnStoreAccessMethod`
+ties the `ColumnKeyGenerator` and `ColumnStore` together, encoding (via column_cell.h helper
+functions) the `UnencodedCellView`s produced by the `ColumnKeyGenerator` into final buffers / `CellView`s
+that the storage engine will receive.
+
+_Code spelunking entry points:_
+
+* The [IndexAccessMethod](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/index_access_method.h) is invoked by the [IndexCatalogImpl](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/catalog/index_catalog_impl.cpp#L1714-L1715).
+  * The [ColumnStoreAccessMethod](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/columns_access_method.h#L39), note the [write paths](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/columns_access_method.cpp#L269-L286) that use the ColumnKeyGenerator.
+
+* The [ColumnKeyGenerator](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/column_key_generator.h#L146) produces many [UnencodedCellView](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/column_key_generator.h#L111) via the [ColumnShredder](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/column_key_generator.cpp#L163-L176) with the [ColumnProjectionTree & ColumnProjectionNode](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/column_key_generator.h#L46-L101) classes defining the desired path projections.
+
+* The [column_cell.h/cpp](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/column_cell.h#L44-L50) helpers are leveraged throughout [ColumnStoreAccessMethod write methods](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/columns_access_method.cpp#L281) to encode ColumnKeyGenerator UnencodedCellView cells into final buffers for storage write.
+
+* The ColumnStoreAccessMethod [invokes the WiredTigerColumnStore](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/columns_access_method.cpp#L318) with the final encoded path-cell (key-value) entries for storage.
