@@ -109,6 +109,8 @@ selector:
   - jstests/core/**/index_multikey.js
   # "Error: [20] != [40] are not equal : H "
   - jstests/core/**/explain1.js
+  # "Error: "[5] != [9] are not equal" BF-27300
+  - jstests/core/**/explain4.js
   # "Error: assert failed : Expected an index scan for predicate"
   - jstests/core/timeseries/timeseries_index_partial.js
   # "Error: The field '$const' is not valid for an index specification."
