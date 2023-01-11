@@ -146,9 +146,8 @@ bool isTimeseries(OperationContext* opCtx, const Request& request) {
     // collection does not yet exist, this check may return false unnecessarily. As a result, an
     // insert attempt into the time-series namespace will either succeed or fail, depending on who
     // wins the race.
-    return CollectionCatalog::get(opCtx)
-        ->lookupCollectionByNamespaceForRead(opCtx, bucketNss)
-        .get();
+    auto coll = CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(opCtx, bucketNss);
+    return (coll && coll->getTimeseriesOptions());
 }
 
 NamespaceString makeTimeseriesBucketsNamespace(const NamespaceString& nss) {

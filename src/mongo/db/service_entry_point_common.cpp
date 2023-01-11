@@ -1708,12 +1708,10 @@ void ExecCommandDatabase::_initiateCommand() {
         // possible that a stale mongos may send the request over a view namespace. In this case, we
         // initialize the 'OperationShardingState' with buckets namespace.
         auto bucketNss = _invocation->ns().makeTimeseriesBucketsNamespace();
-        auto namespaceForSharding = CollectionCatalog::get(opCtx)
-                                        ->lookupCollectionByNamespaceForRead(opCtx, bucketNss)
-                                        .get()
-            ? bucketNss
-            : _invocation->ns();
-
+        auto coll =
+            CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(opCtx, bucketNss);
+        auto namespaceForSharding =
+            (coll && coll->getTimeseriesOptions()) ? bucketNss : _invocation->ns();
         boost::optional<ShardVersion> shardVersion;
         if (auto shardVersionElem = request.body[ShardVersion::kShardVersionField]) {
             shardVersion = ShardVersion::parse(shardVersionElem);
