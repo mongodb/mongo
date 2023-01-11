@@ -33,8 +33,7 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     // Inherithed methods get overridden to tolerate the interruption of
-    // internal transactions on the config server during the execution of setFCV
-    // TODO SERVER-70131: remove the overrides if internal transactions are no longer interrupted.
+    // internal transactions on the config server during the execution of setFCV.
     $config.states.enableSharding = function(db, collName) {
         try {
             $super.states.enableSharding.apply(this, arguments);
