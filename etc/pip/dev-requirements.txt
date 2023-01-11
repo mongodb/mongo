@@ -8,5 +8,5 @@
 -r components/evergreen.req
 -r components/aws.req
 -r components/jiraclient.req
-
+-r components/build_metrics.req
 -r components/tooling_metrics.req
