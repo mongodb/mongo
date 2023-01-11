@@ -385,7 +385,7 @@ thread_run(void *arg)
     WT_ITEM data;
     WT_SESSION *prepared_session, *session;
     THREAD_DATA *td;
-    uint64_t i, active_ts;
+    uint64_t i, iter, active_ts;
     char cbuf[MAX_VAL], lbuf[MAX_VAL], obuf[MAX_VAL];
     char kname[64], tscfg[64], uri[128];
     bool durable_ahead_commit, use_prep;
@@ -456,7 +456,7 @@ thread_run(void *arg)
      */
     printf("Thread %" PRIu32 " starts at %" PRIu64 "\n", td->info, td->start);
     active_ts = 0;
-    for (i = td->start;; ++i) {
+    for (i = td->start, iter = 0;; ++i, ++iter) {
         testutil_check(session->begin_transaction(session, NULL));
         if (use_prep)
             testutil_check(prepared_session->begin_transaction(prepared_session, NULL));
@@ -466,7 +466,7 @@ thread_run(void *arg)
              * Set the active timestamp to the first of the three timestamps we reserve for use this
              * iteration. Use the first reserved timestamp.
              */
-            active_ts = RESERVED_TIMESTAMPS_FOR_ITERATION(td->info, i);
+            active_ts = RESERVED_TIMESTAMPS_FOR_ITERATION(td->info, iter);
             testutil_check(
               __wt_snprintf(tscfg, sizeof(tscfg), "commit_timestamp=%" PRIx64, active_ts));
             /*
