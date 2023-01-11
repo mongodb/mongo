@@ -48,16 +48,16 @@ MigrationBatchFetcher<Inserter>::MigrationBatchFetcher(
     std::shared_ptr<MigrationCloningProgressSharedState> migrationProgress,
     bool parallelFetchingSupported)
     : _nss{std::move(nss)},
-      _migrationConcurrency{
+      _chunkMigrationConcurrency{
           mongo::feature_flags::gConcurrencyInChunkMigration.isEnabledAndIgnoreFCV()
-              ? migrationConcurrency.load()
+              ? chunkMigrationConcurrency.load()
               : 1},
       _sessionId{std::move(sessionId)},
       _inserterWorkers{[&]() {
           ThreadPool::Options options;
           options.poolName = "ChunkMigrationInserters";
-          options.minThreads = _migrationConcurrency;
-          options.maxThreads = _migrationConcurrency;
+          options.minThreads = _chunkMigrationConcurrency;
+          options.maxThreads = _chunkMigrationConcurrency;
           options.onCreateThread = Inserter::onCreateThread;
           return std::make_unique<ThreadPool>(options);
       }()},
@@ -93,7 +93,7 @@ BSONObj MigrationBatchFetcher<Inserter>::_fetchBatch(OperationContext* opCtx) {
 
 template <typename Inserter>
 void MigrationBatchFetcher<Inserter>::fetchAndScheduleInsertion() {
-    auto numFetchers = _isParallelFetchingSupported ? _migrationConcurrency : 1;
+    auto numFetchers = _isParallelFetchingSupported ? _chunkMigrationConcurrency : 1;
     auto fetchersThreadPool = [&]() {
         ThreadPool::Options options;
         options.poolName = "ChunkMigrationFetchers";
@@ -162,7 +162,7 @@ void MigrationBatchFetcher<Inserter>::_runFetcher() try {
                           _collectionUuid,
                           _migrationProgress,
                           _migrationId,
-                          _migrationConcurrency};
+                          _chunkMigrationConcurrency};
 
         _inserterWorkers->schedule([batchSize,
                                     fetchTime,
