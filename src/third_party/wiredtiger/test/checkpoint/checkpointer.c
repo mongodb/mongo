@@ -184,7 +184,7 @@ real_checkpointer(void)
     WT_RAND_STATE rnd;
     WT_SESSION *session;
     wt_timestamp_t stable_ts, oldest_ts, verify_ts;
-    uint32_t delay;
+    uint64_t delay;
     int ret;
     char buf[128], flush_tier_config[128], timestamp_buf[64];
     const char *checkpoint_config, *ts_config;

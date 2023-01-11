@@ -57,7 +57,7 @@ testutil_tiered_begin(TEST_OPTS *opts)
  *     exit.
  */
 void
-testutil_tiered_sleep(TEST_OPTS *opts, WT_SESSION *session, uint32_t seconds, bool *do_flush_tier)
+testutil_tiered_sleep(TEST_OPTS *opts, WT_SESSION *session, uint64_t seconds, bool *do_flush_tier)
 {
     uint64_t now, wake_time;
     bool do_flush;

@@ -418,7 +418,7 @@ void testutil_wiredtiger_open(
   TEST_OPTS *, const char *, const char *, WT_EVENT_HANDLER *, WT_CONNECTION **, bool, bool);
 void testutil_tiered_begin(TEST_OPTS *);
 void testutil_tiered_flush_complete(TEST_OPTS *, WT_SESSION *, void *);
-void testutil_tiered_sleep(TEST_OPTS *, WT_SESSION *, uint32_t, bool *);
+void testutil_tiered_sleep(TEST_OPTS *, WT_SESSION *, uint64_t, bool *);
 uint64_t testutil_time_us(WT_SESSION *);
 void testutil_work_dir_from_path(char *, size_t, const char *);
 WT_THREAD_RET thread_append(void *);
