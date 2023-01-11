@@ -107,7 +107,7 @@ private:
     NamespaceString _nss;
 
     // Size of thread pools.
-    int _migrationConcurrency;
+    int _chunkMigrationConcurrency;
 
     MigrationSessionId _sessionId;
 
