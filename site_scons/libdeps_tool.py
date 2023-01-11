@@ -417,19 +417,20 @@ class LibdepLinter:
                                                             Constants.LibdepsDependents)
         deps_depends += self._get_deps_dependents_with_types("Program",
                                                              Constants.ProgdepsDependents)
+        deps_depends = [(_get_node_with_ixes(self.env, dep[0], dep[1]), dep[1])
+                        for dep in deps_depends]
         self.__class__.dangling_dep_dependents.update(deps_depends)
 
     @linter_final_check
     def linter_rule_no_dangling_dep_final_check(self):
         # At this point the SConscripts have defined all the build items,
         # and so we can go check any DEPS_DEPENDENTS listed and make sure a builder
-        # was instanciated to build them.
+        # was instantiated to build them.
         for dep_dependent in self.__class__.dangling_dep_dependents:
-            dep_node = _get_node_with_ixes(self.env, dep_dependent[0], dep_dependent[1])
-            if not dep_node.has_builder():
+            if not dep_dependent[0].has_builder():
                 self._raise_libdep_lint_exception(
                     textwrap.dedent(f"""\
-                        Found reverse dependency linked to node '{dep_node}'
+                        Found reverse dependency linked to node '{dep_dependent[0]}'
                         which will never be built by any builder.
                         Remove the reverse dependency or add a way to build it."""))
 
