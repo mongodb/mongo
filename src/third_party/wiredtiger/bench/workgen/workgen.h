@@ -446,6 +446,16 @@ struct WorkloadOptions {
     double stable_timestamp_lag;
     double timestamp_advance;
     bool max_idle_table_cycle_fatal;
+    /* Dynamic create/drop options */
+    int create_count;
+    int create_interval;
+    std::string create_prefix;
+    int create_target;
+    int create_trigger;
+    int drop_count;
+    int drop_interval;
+    int drop_target;
+    int drop_trigger;
 
     WorkloadOptions();
     WorkloadOptions(const WorkloadOptions &other);
@@ -492,10 +502,6 @@ struct Workload {
 	}
 	os << "]";
     }
-    void add_table(const std::string& uri);
-    void remove_table(const std::string& uri);
-    const std::vector<std::string> get_tables();
-    const std::vector<std::string> garbage_collection();
     int run(WT_CONNECTION *conn);
 };
 
