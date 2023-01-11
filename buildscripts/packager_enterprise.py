@@ -142,7 +142,7 @@ class EnterpriseDistro(packager.Distro):
                 return ["ubuntu1804", "ubuntu2004", "ubuntu2204"]
         if arch == "aarch64":
             if self.dname == 'redhat':
-                return ["rhel82"]
+                return ["rhel82", "rhel90"]
             if self.dname == 'amazon2':
                 return ["amazon2"]
             return []

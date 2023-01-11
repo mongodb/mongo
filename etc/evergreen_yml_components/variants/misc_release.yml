@@ -1086,6 +1086,111 @@ buildvariants:
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
+- name: rhel90-arm64
+  display_name: RHEL 9.0 arm64
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  run_on:
+  - rhel90-arm64-small
+  expansions:
+    push_path: linux
+    push_bucket: downloads.mongodb.org
+    push_name: linux
+    push_arch: aarch64-rhel90
+    compile_flags: --ssl MONGO_DISTMOD=rhel90 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: aarch64
+    packager_distro: rhel90
+    repo_edition: org
+    scons_cache_scope: shared
+    large_distro_name: rhel90-arm64-large
+  tasks:
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - rhel90-arm64-large
+  - name: aggregation
+  - name: .auth !.audit !.multiversion
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .misc_js
+  - name: .concurrency .common
+    distros:
+    - rhel90-arm64-large
+  - name: concurrency_replication_causal_consistency_gen
+  - name: disk_wiredtiger
+  - name: free_monitoring
+  - name: .jscore .common
+  - name: .jstestfuzz .common
+  - name: .logical_session_cache .one_sec
+  - name: replica_sets_gen
+  - name: .replica_sets .common
+  - name: .sharding .txns
+  - name: .sharding .common !.csrs !.multiversion
+  - name: .ssl
+  - name: .stitch
+  - name: test_packages
+    distros:
+    - ubuntu2004-package
+  - name: .publish
+  - name: generate_buildid_to_debug_symbols_mapping
+
+- name: enterprise-rhel-90-arm64
+  display_name: "Enterprise RHEL 9.0 arm64"
+  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
+  modules:
+  - enterprise
+  run_on:
+  - rhel90-arm64-small
+  expansions:
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
+    push_path: linux
+    push_bucket: downloads.10gen.com
+    push_name: linux
+    push_arch: aarch64-enterprise-rhel90
+    compile_flags: --ssl MONGO_DISTMOD=rhel90 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+    crypt_task_compile_flags: SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique" CCFLAGS="-fno-gnu-unique"
+    has_packages: true
+    packager_script: packager_enterprise.py
+    packager_arch: aarch64
+    packager_distro: rhel90
+    repo_edition: enterprise
+    scons_cache_scope: shared
+  tasks:
+  - name: compile_test_and_package_serial_TG
+    distros:
+    - rhel90-arm64-large
+  - name: .aggfuzzer !.multiversion
+  - name: audit
+  - name: auth_audit_gen
+  - name: auth_gen
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: .encrypt !.sharding !.replica_sets !.aggregation !.jscore
+  - name: external_auth
+  - name: external_auth_aws
+  - name: .jscore .common !.decimal !.sharding
+  - name: jsCore_txns_large_txns_format
+  - name: .jstestfuzz .common
+  - name: .logical_session_cache .one_sec
+  - name: replica_sets_auth_gen
+  - name: replica_sets_jscore_passthrough
+  - name: .replica_sets .multi_oplog
+  - name: sasl
+  - name: search
+  - name: search_auth
+  - name: search_ssl
+  - name: sharding_auth_audit_gen
+  - name: sharding_auth_gen
+  - name: snmp
+  - name: .stitch
+  - name: .crypt
+    distros:
+    - rhel90-arm64-large
+  - name: .publish_crypt
+  - name: test_packages
+    distros:
+    - ubuntu2004-package
+  - name: .publish
+  - name: generate_buildid_to_debug_symbols_mapping
+
 - name: suse12
   display_name: SUSE 12
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.

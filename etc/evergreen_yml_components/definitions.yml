@@ -313,6 +313,7 @@ variables:
   - enterprise-rhel-82-arm64
   - enterprise-rhel-83-s390x
   - enterprise-rhel-90-64-bit
+  - enterprise-rhel-90-arm64
   - enterprise-suse12-64
   - enterprise-suse15-64
   - enterprise-ubuntu1804-64
@@ -342,6 +343,7 @@ variables:
   - enterprise-rhel-70-64-bit
   - enterprise-rhel-82-arm64
   - enterprise-rhel-90-64-bit
+  - enterprise-rhel-90-arm64
   - enterprise-amazon2-arm64
   - enterprise-ubuntu1804-64
   - enterprise-ubuntu2204-64
@@ -368,11 +370,13 @@ variables:
   - rhel80
   - rhel-82-arm64
   - rhel90
+  - rhel90-arm64
   - enterprise-rhel-80-64-bit
   - enterprise-rhel-80-64-bit-suggested  # For testing selinux.
   - enterprise-rhel-82-arm64
   - enterprise-rhel-83-s390x
   - enterprise-rhel-90-64-bit
+  - enterprise-rhel-90-arm64
   - suse12
   - enterprise-suse12-64
   - suse15
