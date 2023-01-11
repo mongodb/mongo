@@ -1248,11 +1248,14 @@ optimizer::ProjectionName makeVariableName(sbe::value::SlotId slotId);
 optimizer::ProjectionName makeLocalVariableName(sbe::FrameId frameId, sbe::value::SlotId slotId);
 
 optimizer::ABT generateABTNullOrMissing(optimizer::ProjectionName var);
+optimizer::ABT generateABTNegativeCheck(optimizer::ProjectionName var);
+optimizer::ABT generateABTNonPositiveCheck(optimizer::ProjectionName var);
+optimizer::ABT generateABTNonNumericCheck(optimizer::ProjectionName var);
+optimizer::ABT generateABTLongLongMinCheck(optimizer::ProjectionName var);
 optimizer::ABT generateABTNonArrayCheck(optimizer::ProjectionName var);
 optimizer::ABT generateABTNonObjectCheck(optimizer::ProjectionName var);
 optimizer::ABT generateABTNonStringCheck(optimizer::ProjectionName var);
 optimizer::ABT generateABTNullishOrNotRepresentableInt32Check(optimizer::ProjectionName var);
-optimizer::ABT generateABTNegativeCheck(optimizer::ProjectionName var);
 /**
  * Generates an ABT that checks if the input expression is NaN _assuming that_ it has
  * already been verified to be numeric.

@@ -349,14 +349,14 @@ TEST_F(SbeStageBuilderGroupTest, TestIdNumericExprOnNonNumericData) {
                                                            << "2"))};
 
     runGroupAggregationToFail(
-        R"({_id: {"$add": ["$a", "$b"]}})", docs, static_cast<ErrorCodes::Error>(4974201));
+        R"({_id: {"$add": ["$a", "$b"]}})", docs, static_cast<ErrorCodes::Error>(7157723));
 
     runGroupAggregationToFail(
-        R"({_id: {"$multiply": ["$b", 1000]}})", docs, static_cast<ErrorCodes::Error>(5073102));
+        R"({_id: {"$multiply": ["$b", 1000]}})", docs, static_cast<ErrorCodes::Error>(7157721));
 
     runGroupAggregationToFail(R"({_id: {"$divide": [{"$multiply": ["$a", 1000]}, "$b"]}})",
                               docs,
-                              static_cast<ErrorCodes::Error>(5073101));
+                              static_cast<ErrorCodes::Error>(7157719));
 }
 
 TEST_F(SbeStageBuilderGroupTest, TestIdObjectExpression) {
