@@ -22,9 +22,9 @@ from pkg_resources import parse_version
 
 import SCons
 import SCons.Script
-from mongo_tooling_metrics.client import get_mongo_metrics_client
-from mongo_tooling_metrics.errors import ExternalHostException
-from mongo_tooling_metrics.lib.top_level_metrics import SConsToolingMetrics
+from buildscripts.metrics.metrics_datatypes import SConsToolingMetrics
+from buildscripts.metrics.tooling_exit_hook import initialize_exit_hook
+from buildscripts.metrics.tooling_metrics_utils import register_metrics_collection_atexit
 from site_scons.mongo import build_profiles
 
 # This must be first, even before EnsureSConsVersion, if
@@ -1590,23 +1590,15 @@ env.AddMethod(lambda env, name, **kwargs: add_option(name, **kwargs), 'AddOption
 
 # The placement of this is intentional. Here we setup an atexit method to store tooling metrics.
 # We should only register this function after env, env_vars and the parser have been properly initialized.
-try:
-    metrics_client = get_mongo_metrics_client()
-    metrics_client.register_metrics(
-        SConsToolingMetrics,
-        utc_starttime=datetime.utcnow(),
-        artifact_dir=env.Dir('$BUILD_DIR').get_abspath(),
-        env_vars=env_vars,
-        env=env,
-        parser=_parser,
-        args=sys.argv,
-    )
-except ExternalHostException as _:
-    pass
-except Exception as _:
-    print(
-        "This MongoDB Virtual Workstation could not connect to the internal cluster\nThis is a non-issue, but if this message persists feel free to reach out in #server-dev-platform"
-    )
+register_metrics_collection_atexit(
+    SConsToolingMetrics.generate_metrics, {
+        "utc_starttime": datetime.utcnow(),
+        "env_vars": env_vars,
+        "env": env,
+        "parser": _parser,
+        "args": sys.argv,
+        "exit_hook": initialize_exit_hook(),
+    })
 
 if get_option('build-metrics'):
     env['BUILD_METRICS_ARTIFACTS_DIR'] = '$BUILD_ROOT/$VARIANT_DIR'
