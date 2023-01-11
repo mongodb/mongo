@@ -37,6 +37,26 @@
 
 namespace mongo {
 
+namespace {
+
+void insertOplogEntry(OperationContext* opCtx,
+                      repl::MutableOplogEntry&& oplogEntry,
+                      StringData opStr) {
+    writeConflictRetry(opCtx, opStr, NamespaceString::kRsOplogNamespace.ns(), [&] {
+        AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
+        WriteUnitOfWork wunit(opCtx);
+        const auto& oplogOpTime = repl::logOp(opCtx, &oplogEntry);
+        uassert(8423339,
+                str::stream() << "Failed to create new oplog entry for oplog with opTime: "
+                              << oplogEntry.getOpTime().toString() << ": "
+                              << redact(oplogEntry.toBSON()),
+                !oplogOpTime.isNull());
+        wunit.commit();
+    });
+}
+
+}  // namespace
+
 void notifyChangeStreamsOnShardCollection(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           const UUID& uuid,
@@ -56,18 +76,42 @@ void notifyChangeStreamsOnShardCollection(OperationContext* opCtx,
     oplogEntry.setOpTime(repl::OpTime());
     oplogEntry.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
 
-    writeConflictRetry(
-        opCtx, "ShardCollectionWritesOplog", NamespaceString::kRsOplogNamespace.ns(), [&] {
-            AutoGetOplog oplogWrite(opCtx, OplogAccessMode::kWrite);
-            WriteUnitOfWork wunit(opCtx);
-            const auto& oplogOpTime = repl::logOp(opCtx, &oplogEntry);
-            uassert(8423339,
-                    str::stream() << "Failed to create new oplog entry for oplog with opTime: "
-                                  << oplogEntry.getOpTime().toString() << ": "
-                                  << redact(oplogEntry.toBSON()),
-                    !oplogOpTime.isNull());
-            wunit.commit();
-        });
+    insertOplogEntry(opCtx, std::move(oplogEntry), "ShardCollectionWritesOplog");
+}
+
+void notifyChangeStreamsOnDatabaseAdded(OperationContext* opCtx,
+                                        const DatabaseName& dbName,
+                                        const ShardId& primaryShard,
+                                        bool isImported) {
+    repl::MutableOplogEntry oplogEntry;
+    oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
+    oplogEntry.setNss(NamespaceString(dbName));
+    oplogEntry.setTid(dbName.tenantId());
+    oplogEntry.setObject(BSON("msg" << BSON("enableSharding" << dbName.db())));
+    oplogEntry.setObject2(BSON("enableSharding" << dbName.db() << "primaryShard" << primaryShard
+                                                << "isImported" << isImported));
+
+    oplogEntry.setOpTime(repl::OpTime());
+    oplogEntry.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
+
+    insertOplogEntry(opCtx, std::move(oplogEntry), "DbAddedToConfigCatalogWritesOplog");
+}
+
+void notifyChangeStreamsOnMovePrimary(OperationContext* opCtx,
+                                      const DatabaseName& dbName,
+                                      const ShardId& oldPrimary,
+                                      const ShardId& newPrimary) {
+    repl::MutableOplogEntry oplogEntry;
+    oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
+    oplogEntry.setNss(NamespaceString(dbName));
+    oplogEntry.setTid(dbName.tenantId());
+    oplogEntry.setObject(BSON("msg" << BSON("movePrimary" << dbName.db())));
+    oplogEntry.setObject2(
+        BSON("movePrimary" << dbName.db() << "from" << oldPrimary << "to" << newPrimary));
+    oplogEntry.setOpTime(repl::OpTime());
+    oplogEntry.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
+
+    insertOplogEntry(opCtx, std::move(oplogEntry), "MovePrimaryWritesOplog");
 }
 
 void notifyChangeStreamsOnAddShard(OperationContext* opCtx,

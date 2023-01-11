@@ -51,4 +51,27 @@ void notifyChangeStreamsOnAddShard(OperationContext* opCtx,
                                    const ShardId& shardName,
                                    const ConnectionString& connStr);
 
+/**
+ * Writes a no-op oplog entry to match the addition of a database to the sharding catalog;
+ * such database may have been either created or imported into the cluster (as part of an
+ * addShard operation).
+ * @param dbName the name of the database being added
+ * @param primaryShard the primary shard ID assigned to the database being added (it may differ from
+ * the shard ID of the RS where this method gets invoked)
+ * @param isImported false when dbName is added to the sharding catalog by a database creation
+ * request, true when the addition is the result of an addShard operation.
+ */
+void notifyChangeStreamsOnDatabaseAdded(OperationContext* opCtx,
+                                        const DatabaseName& dbName,
+                                        const ShardId& primaryShard,
+                                        bool isImported);
+
+/**
+ * Writes a no-op oplog entry on movePrimary event.
+ */
+void notifyChangeStreamsOnMovePrimary(OperationContext* opCtx,
+                                      const DatabaseName& dbName,
+                                      const ShardId& oldPrimary,
+                                      const ShardId& newPrimary);
+
 }  // namespace mongo
