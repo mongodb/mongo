@@ -132,11 +132,12 @@ withPinnedCursor({
         assert.commandWorked(db.runCommand({killCursors: coll.getName(), cursors: [cursorId]}));
     },
     sessionId: pinnedCursorSession,
-    runGetMoreFunc: () => {
+    runGetMoreFunc: (collName, cursorId, sessionId) => {
         assert.commandFailed(
             db.runCommand({getMore: cursorId, collection: collName, lsid: sessionId}));
     },
     failPointName: failPointName,
+    assertEndCounts: false,
 });
 
 MongoRunner.stopMongod(conn);

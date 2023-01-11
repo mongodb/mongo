@@ -58,7 +58,7 @@ const rs0Conn = st.rs0.getPrimary();
 const testParameters = {
     conn: rs0Conn,
     failPointName: "waitAfterPinningCursorBeforeGetMoreBatch",
-    runGetMoreFunc: function() {
+    runGetMoreFunc: function(collName, cursorId) {
         const response = db.runCommand({getMore: cursorId, collection: collName});
         // We expect that the operation will get interrupted and fail.
         assert.commandFailedWithCode(response, ErrorCodes.CursorKilled);
@@ -105,7 +105,7 @@ for (let conn of connsToRunOn) {
     // batch is returned to the client but a subsequent getMore will fail with a
     // 'CursorNotFound' error.
     testParameters.failPointName = "waitBeforeUnpinningOrDeletingCursorAfterGetMoreBatch";
-    testParameters.runGetMoreFunc = function() {
+    testParameters.runGetMoreFunc = function(collName, cursorId) {
         const getMoreCmd = {getMore: cursorId, collection: collName, batchSize: 2};
         // We expect that the first getMore will succeed, while the second fails because the
         // cursor has been killed.

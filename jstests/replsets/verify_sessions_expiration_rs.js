@@ -129,12 +129,12 @@ withPinnedCursor({
         let db = coll.getDB();
         assert.commandWorked(db.runCommand({killCursors: coll.getName(), cursors: [cursorId]}));
     },
-    runGetMoreFunc: () => {
+    runGetMoreFunc: (collName, cursorId) => {
         db.runCommand({getMore: cursorId, collection: collName});
     },
-    failPointName: failPointName
-},
-                 /* assertEndCounts */ false);
+    failPointName: failPointName,
+    assertEndCounts: false,
+});
 
 replTest.stopSet();
 })();

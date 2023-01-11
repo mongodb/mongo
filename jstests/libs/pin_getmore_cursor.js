@@ -1,17 +1,26 @@
 /**
- * Pins a cursor in a seperate shell and then runs the given function.
+ * Creates a cursor, then pins it in a parallel shell by using the provided 'failPointName' and
+ * 'runGetMoreFunc'. Runs 'assertFunction' while the cursor is pinned, then unpins it.
+ *
  * 'conn': a connection to an instance of a mongod or mongos.
  * 'sessionId': The id present if the database is currently in a session.
  * 'dbName': the database to use with the cursor.
- * 'assertFunction': a function containing the test to be run after a cursor is pinned and hanging.
- * 'runGetMoreFunc': A function to generate a string that will be executed in the parallel shell.
- * 'failPointName': The string name of the failpoint where the cursor will hang. The function turns
- * the failpoint on, the assert function should turn it off whenever it is appropriate for the test.
- * 'assertEndCounts': The boolean indicating whether we want to assert the number of open or
- * pinned cursors.
+ *
+ * 'assertFunction(cursorId, coll)':
+ *   A function containing the test to be run while the cursor is pinned.
+ *
+ * 'runGetMoreFunc':
+ *   A function to be executed in the parallel shell. It is expected to hit the fail point, defined
+ *   in 'failPointName' by calling 'db.runCommand({getMore: cursorId, collection: collName})' but
+ *   it can do additional validation on the result of the command or run other commands.
+ *
+ * 'failPointName': name of the failpoint where 'runGetMoreFunc' is expected to hang.
+ *
+ * 'assertEndCounts': whether to assert zero pinned cursors an the end.
  */
 
 load("jstests/libs/curop_helpers.js");  // For waitForCurOpByFailPoint().
+load('jstests/libs/parallel_shell_helpers.js');
 
 function withPinnedCursor(
     {conn, sessionId, db, assertFunction, runGetMoreFunc, failPointName, assertEndCounts}) {
@@ -27,40 +36,55 @@ function withPinnedCursor(
     }
     let cleanup = null;
     try {
-        // Enable the specified failpoint.
-        assert.commandWorked(
-            db.adminCommand({configureFailPoint: failPointName, mode: "alwaysOn"}));
-
         // Issue an initial find in order to create a cursor and obtain its cursorID.
         let cmdRes = db.runCommand({find: coll.getName(), batchSize: 2});
         assert.commandWorked(cmdRes);
         const cursorId = cmdRes.cursor.id;
         assert.neq(cursorId, NumberLong(0));
 
-        // Let the cursor hang in a different shell with the information it needs to do a getMore.
-        let code = "let cursorId = " + cursorId.toString() + ";";
-        code += "let collName = '" + coll.getName() + "';";
-        if (sessionId) {
-            code += "let sessionId = " + tojson(sessionId) + ";";
-        }
-        code += "(" + runGetMoreFunc.toString() + ")();";
-        code += "db.active_cursor_sentinel.insert({});";
-        cleanup = startParallelShell(code, conn.port);
+        // Enable the specified failpoint.
+        assert.commandWorked(
+            db.adminCommand({configureFailPoint: failPointName, mode: "alwaysOn"}));
+
+        // In a different shell pin the cursor by calling 'getMore' on it that would be blocked by
+        // the failpoint.
+        cleanup =
+            startParallelShell(funWithArgs(function(runGetMoreFunc, collName, cursorId, sessionId) {
+                                   runGetMoreFunc(collName, cursorId, sessionId);
+                                   db.active_cursor_sentinel.insert({});
+                               }, runGetMoreFunc, coll.getName(), cursorId, sessionId), conn.port);
 
         // Wait until we know the failpoint has been reached.
         waitForCurOpByFailPointNoNS(db, failPointName, {}, {localOps: true, allUsers: true});
+
+        // The assert function might initiate killing of the cursor. Because the cursor is pinned,
+        // it actually won't be killed until the pin is removed but it will interrupt 'getMore' in
+        // the parallel shell after the failpoint is unset.
         assertFunction(cursorId, coll);
 
-        // Eventually the cursor should be cleaned up.
+        // Unsetting the failpoint allows getMore in the parallel shell to proceed and unpins the
+        // cursor, which will either exhaust or detect interrupt (if 'assertFunction' killed the
+        // cursor).
         assert.commandWorked(db.adminCommand({configureFailPoint: failPointName, mode: "off"}));
 
+        // Wait for the parallel shell to be done with 'getMore' command. We'd know when it moves on
+        // to inserting the sentinel object.
         assert.soon(() => db.active_cursor_sentinel.find().itcount() > 0);
 
+        // Give the server up to 5 sec to dispose of the cursor.
         if (assertEndCounts) {
-            assert.eq(db.serverStatus().metrics.cursor.open.pinned, 0);
+            assert.retry(
+                () => {
+                    return db.serverStatus().metrics.cursor.open.pinned == 0;
+                },
+                "Expected 0 pinned cursors, but have " + tojson(db.serverStatus().metrics.cursor),
+                10 /* num_attempts */,
+                500 /* intervalMS */);
         }
 
-        // Trying to kill the cursor again should result in the cursor not being found.
+        // By now either getMore in the parallel shell has exhausted the cursor, or the cursor has
+        // been killed by 'assertFunction'. In both cases, an attempt to kill the cursor again
+        // should report it as not found.
         cmdRes = db.runCommand({killCursors: coll.getName(), cursors: [cursorId]});
         assert.commandWorked(cmdRes);
         assert.eq(cmdRes.cursorsKilled, []);

@@ -41,9 +41,8 @@ withPinnedCursor({
     sessionId: null,
     db: conn.getDB("test"),
     assertFunction: runTest,
-    runGetMoreFunc: function() {
-        const response =
-            assert.commandWorked(db.runCommand({getMore: cursorId, collection: collName}));
+    runGetMoreFunc: function(collName, cursorId) {
+        assert.commandWorked(db.runCommand({getMore: cursorId, collection: collName}));
     },
     failPointName: failPointName,
     assertEndCounts: true
@@ -58,9 +57,8 @@ withPinnedCursor({
     sessionId: null,
     db: st.s.getDB("test"),
     assertFunction: runTest,
-    runGetMoreFunc: function() {
-        const response =
-            assert.commandWorked(db.runCommand({getMore: cursorId, collection: collName}));
+    runGetMoreFunc: function(collName, cursorId) {
+        assert.commandWorked(db.runCommand({getMore: cursorId, collection: collName}));
     },
     failPointName: failPointName,
     assertEndCounts: true
