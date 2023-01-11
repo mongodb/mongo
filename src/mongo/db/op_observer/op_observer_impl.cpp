@@ -676,7 +676,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
         } catch (const DBException&) {
             // If a previous operation left the view catalog in an invalid state, our inserts can
             // fail even if all the definitions are valid. Reloading may help us reset the state.
-            CollectionCatalog::get(opCtx)->reloadViews(opCtx, nss.dbName()).ignore();
+            CollectionCatalog::get(opCtx)->reloadViews(opCtx, nss.dbName());
         }
     } else if (nss == NamespaceString::kSessionTransactionsTableNamespace && !lastOpTime.isNull()) {
         for (auto it = first; it != last; it++) {
@@ -933,7 +933,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
     if (args.coll->ns().coll() == "system.js") {
         Scope::storedFuncMod(opCtx);
     } else if (args.coll->ns().isSystemDotViews()) {
-        CollectionCatalog::get(opCtx)->reloadViews(opCtx, args.coll->ns().dbName()).ignore();
+        CollectionCatalog::get(opCtx)->reloadViews(opCtx, args.coll->ns().dbName());
     } else if (args.coll->ns() == NamespaceString::kSessionTransactionsTableNamespace &&
                !opTime.writeOpTime.isNull()) {
         auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
@@ -1107,7 +1107,7 @@ void OpObserverImpl::onDelete(OperationContext* opCtx,
     if (nss.coll() == "system.js") {
         Scope::storedFuncMod(opCtx);
     } else if (nss.isSystemDotViews()) {
-        CollectionCatalog::get(opCtx)->reloadViews(opCtx, nss.dbName()).ignore();
+        CollectionCatalog::get(opCtx)->reloadViews(opCtx, nss.dbName());
     } else if (nss == NamespaceString::kSessionTransactionsTableNamespace &&
                !opTime.writeOpTime.isNull()) {
         auto mongoDSessionCatalog = MongoDSessionCatalog::get(opCtx);
@@ -1395,9 +1395,9 @@ void OpObserverImpl::postRenameCollection(OperationContext* const opCtx,
                                           const boost::optional<UUID>& dropTargetUUID,
                                           bool stayTemp) {
     if (fromCollection.isSystemDotViews())
-        CollectionCatalog::get(opCtx)->reloadViews(opCtx, fromCollection.dbName()).ignore();
+        CollectionCatalog::get(opCtx)->reloadViews(opCtx, fromCollection.dbName());
     if (toCollection.isSystemDotViews())
-        CollectionCatalog::get(opCtx)->reloadViews(opCtx, toCollection.dbName()).ignore();
+        CollectionCatalog::get(opCtx)->reloadViews(opCtx, toCollection.dbName());
 }
 
 void OpObserverImpl::onRenameCollection(OperationContext* const opCtx,

@@ -753,24 +753,25 @@ Status CollectionCatalog::dropView(OperationContext* opCtx, const NamespaceStrin
     return result;
 }
 
-Status CollectionCatalog::reloadViews(OperationContext* opCtx, const DatabaseName& dbName) const {
+void CollectionCatalog::reloadViews(OperationContext* opCtx, const DatabaseName& dbName) const {
+    // Two-phase locking ensures that all locks are held while a Change's commit() or
+    // rollback()function runs, for thread saftey. And, MODE_X locks always opt for two-phase
+    // locking.
     invariant(opCtx->lockState()->isCollectionLockedForMode(
-        NamespaceString(dbName, NamespaceString::kSystemDotViewsCollectionName), MODE_IS));
+        NamespaceString(dbName, NamespaceString::kSystemDotViewsCollectionName), MODE_X));
 
     auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
     if (uncommittedCatalogUpdates.shouldIgnoreExternalViewChanges(dbName)) {
-        return Status::OK();
+        return;
     }
 
     LOGV2_DEBUG(22546, 1, "Reloading view catalog for database", "db"_attr = dbName.toString());
 
     ViewsForDatabase viewsForDb;
-    auto status = viewsForDb.reload(opCtx, _lookupSystemViews(opCtx, dbName));
-    CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
-        catalog._replaceViewsForDatabase(dbName, std::move(viewsForDb));
-    });
+    viewsForDb.reload(opCtx, _lookupSystemViews(opCtx, dbName)).ignore();
 
-    return status;
+    uncommittedCatalogUpdates.replaceViewsForDatabase(dbName, std::move(viewsForDb));
+    PublishCatalogUpdates::ensureRegisteredWithRecoveryUnit(opCtx, uncommittedCatalogUpdates);
 }
 
 CollectionPtr CollectionCatalog::openCollection(OperationContext* opCtx,
