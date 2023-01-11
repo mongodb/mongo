@@ -113,7 +113,7 @@ void ColumnIndexConsistency::_investigateSuspects(OperationContext* opCtx,
 
     for (const auto rowId : _suspects) {
         // Gather all paths for this RecordId.
-        StringMap<int> paths;
+        StringMap<CellValue> paths;
         PathValue nextPath = "";
         while (auto next = csiCursor->seekAtOrPast(nextPath, rowId)) {
             if (next->rid < rowId) {
@@ -122,7 +122,10 @@ void ColumnIndexConsistency::_investigateSuspects(OperationContext* opCtx,
             }
 
             if (next->rid == rowId) {
-                paths[next->path]++;
+                auto insert_ok = paths.try_emplace(next->path, next->value);
+                tassert(7106113,
+                        "Can't have multiple identical paths in the same document",
+                        insert_ok.second);
             }
             nextPath.assign(next->path.rawData(), next->path.size());
             nextPath += '\x01';  // Next possible path (\0 is not allowed).
@@ -141,27 +144,24 @@ void ColumnIndexConsistency::_investigateSuspects(OperationContext* opCtx,
                         FullCellView{path, rowId, CellView(_cellBuilder.buf(), _cellBuilder.len())};
 
                     const auto csiCell = csiCursor->seekExact(path, rowId);
-                    if (!csiCell) {
+                    auto it = paths.find(rowCell.path);
+                    if (it == paths.end()) {
                         // Rowstore has entry that index doesn't
                         _missingIndexEntries.emplace_back(rowCell);
-                    } else if (csiCell->value != rowCell.value) {
-                        // Rowstore and index values diverge
-                        _extraIndexEntries.emplace_back(csiCell.get());
-                        _missingIndexEntries.emplace_back(rowCell);
-                    }
-                    if (paths.count(rowCell.path) == 1) {
-                        paths.erase(rowCell.path);
                     } else {
-                        paths[rowCell.path]--;
+                        if (it->second != rowCell.value) {
+                            // Rowstore and index values diverge
+                            _extraIndexEntries.emplace_back(csiCell.get());
+                            _missingIndexEntries.emplace_back(rowCell);
+                        }
+                        paths.erase(it);
                     }
                 });
         }
 
         // Extra paths in index that don't exist in the row-store.
         for (const auto& kv : paths) {
-            for (int i = 0; i < kv.second; i++) {
-                _extraIndexEntries.emplace_back(kv.first, rowId, ""_sd);
-            }
+            _extraIndexEntries.emplace_back(kv.first, rowId, kv.second);
         }
     }
 }
