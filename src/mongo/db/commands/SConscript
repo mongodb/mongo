@@ -89,7 +89,6 @@ env.Library(
         '$BUILD_DIR/mongo/logv2/logv2_options',
         '$BUILD_DIR/mongo/rpc/message',
         '$BUILD_DIR/mongo/util/net/http_client',
-        'bulk_write_command',
         'test_commands_enabled',
     ],
 )
@@ -273,24 +272,44 @@ env.Library(
 )
 
 env.Library(
-    target='bulk_write_command',
+    target='bulk_write_parser',
     source=[
         'bulk_write.idl',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/crypto/fle_fields',
+        '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/server_options_core',
+        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
+    ],
+)
+
+env.Library(
+    target='bulk_write_command',
+    source=[
         'bulk_write.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/crypto/fle_fields',
         '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/db/auth/authprivilege',
+        '$BUILD_DIR/mongo/db/catalog/document_validation',
         '$BUILD_DIR/mongo/db/commands',
         '$BUILD_DIR/mongo/db/not_primary_error_tracker',
+        '$BUILD_DIR/mongo/db/ops/write_ops',
+        '$BUILD_DIR/mongo/db/ops/write_ops_exec',
         '$BUILD_DIR/mongo/db/ops/write_ops_parsers',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/server_feature_flags',
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/session/logical_session_id_helpers',
         '$BUILD_DIR/mongo/logv2/logv2_options',
         '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
+        'bulk_write_parser',
     ],
 )
 
@@ -415,6 +434,7 @@ env.Library(
         '$BUILD_DIR/mongo/s/grid',
         '$BUILD_DIR/mongo/util/log_and_backoff',
         '$BUILD_DIR/mongo/util/net/http_client',
+        'bulk_write_command',
         'core',
         'create_command',
         'current_op_common',

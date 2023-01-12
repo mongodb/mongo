@@ -30,7 +30,6 @@
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
-#include "mongo/db/catalog/collection_operation_source.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/collection_write_path.h"
@@ -61,7 +60,6 @@
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/record_id_helpers.h"
-#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_conflict_info.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
@@ -169,56 +167,6 @@ void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
     }
 }
 
-/**
- * Sets the Client's LastOp to the system OpTime if needed. This is especially helpful for
- * adjusting the client opTime for cases when batched write performed multiple writes, but
- * when the last write was a no-op (which will not advance the client opTime).
- */
-class LastOpFixer {
-public:
-    LastOpFixer(OperationContext* opCtx, const NamespaceString& ns)
-        : _opCtx(opCtx), _isOnLocalDb(ns.isLocal()) {}
-
-    ~LastOpFixer() {
-        // We don't need to do this if we are in a multi-document transaction as read-only/noop
-        // transactions will always write another noop entry at transaction commit time which we can
-        // use to wait for writeConcern.
-        if (!_opCtx->inMultiDocumentTransaction() && _needToFixLastOp && !_isOnLocalDb) {
-            // If this operation has already generated a new lastOp, don't bother setting it
-            // here. No-op updates will not generate a new lastOp, so we still need the
-            // guard to fire in that case. Operations on the local DB aren't replicated, so they
-            // don't need to bump the lastOp.
-            replClientInfo().setLastOpToSystemLastOpTimeIgnoringCtxInterrupted(_opCtx);
-            LOGV2_DEBUG(20888,
-                        5,
-                        "Set last op to system time: {timestamp}",
-                        "Set last op to system time",
-                        "timestamp"_attr = replClientInfo().getLastOp().getTimestamp());
-        }
-    }
-
-    void startingOp() {
-        _needToFixLastOp = true;
-        _opTimeAtLastOpStart = replClientInfo().getLastOp();
-    }
-
-    void finishedOpSuccessfully() {
-        // If the op was successful and bumped LastOp, we don't need to do it again. However, we
-        // still need to for no-ops and all failing ops.
-        _needToFixLastOp = (replClientInfo().getLastOp() == _opTimeAtLastOpStart);
-    }
-
-private:
-    repl::ReplClientInfo& replClientInfo() {
-        return repl::ReplClientInfo::forClient(_opCtx->getClient());
-    }
-
-    OperationContext* const _opCtx;
-    bool _needToFixLastOp = true;
-    const bool _isOnLocalDb;
-    repl::OpTime _opTimeAtLastOpStart;
-};
-
 void assertCanWrite_inlock(OperationContext* opCtx, const NamespaceString& nss) {
     uassert(ErrorCodes::PrimarySteppedDown,
             str::stream() << "Not primary while writing to " << nss.ns(),
@@ -260,7 +208,7 @@ void makeCollection(OperationContext* opCtx, const NamespaceString& ns) {
 bool handleError(OperationContext* opCtx,
                  const DBException& ex,
                  const NamespaceString& nss,
-                 const write_ops::WriteCommandRequestBase& wholeOp,
+                 const bool ordered,
                  bool isMultiUpdate,
                  WriteResult* out) {
     NotPrimaryErrorTracker::get(opCtx->getClient()).recordError(ex.code());
@@ -331,7 +279,7 @@ bool handleError(OperationContext* opCtx,
     }
 
     out->results.emplace_back(ex.toStatus());
-    return !wholeOp.getOrdered();
+    return !ordered;
 }
 
 void insertDocuments(OperationContext* opCtx,
@@ -410,11 +358,84 @@ void assertTimeseriesBucketsCollectionNotFound(const NamespaceString& ns) {
                             << ns.getTimeseriesViewNamespace());
 }
 
+template <typename T>
+StmtId getStmtIdForWriteOp(OperationContext* opCtx, const T& wholeOp, size_t opIndex) {
+    return opCtx->isRetryableWrite() ? write_ops::getStmtIdForWriteAt(wholeOp, opIndex)
+                                     : kUninitializedStmtId;
+}
+
+SingleWriteResult makeWriteResultForInsertOrDeleteRetry() {
+    SingleWriteResult res;
+    res.setN(1);
+    res.setNModified(0);
+    return res;
+}
+
+
+// Returns the flags that determine the type of document validation we want to
+// perform. First item in the tuple determines whether to bypass document validation altogether,
+// second item determines if _safeContent_ array can be modified in an encrypted collection.
+std::tuple<bool, bool> getDocumentValidationFlags(OperationContext* opCtx,
+                                                  const write_ops::WriteCommandRequestBase& req) {
+    auto& encryptionInfo = req.getEncryptionInformation();
+    const bool fleCrudProcessed = getFleCrudProcessed(opCtx, encryptionInfo);
+    return std::make_tuple(req.getBypassDocumentValidation(), fleCrudProcessed);
+}
+}  // namespace
+
+LastOpFixer::LastOpFixer(OperationContext* opCtx, const NamespaceString& ns)
+    : _opCtx(opCtx), _isOnLocalDb(ns.isLocal()) {}
+
+LastOpFixer::~LastOpFixer() {
+    // We don't need to do this if we are in a multi-document transaction as read-only/noop
+    // transactions will always write another noop entry at transaction commit time which we can
+    // use to wait for writeConcern.
+    if (!_opCtx->inMultiDocumentTransaction() && _needToFixLastOp && !_isOnLocalDb) {
+        // If this operation has already generated a new lastOp, don't bother setting it
+        // here. No-op updates will not generate a new lastOp, so we still need the
+        // guard to fire in that case. Operations on the local DB aren't replicated, so they
+        // don't need to bump the lastOp.
+        replClientInfo().setLastOpToSystemLastOpTimeIgnoringCtxInterrupted(_opCtx);
+        LOGV2_DEBUG(20888,
+                    5,
+                    "Set last op to system time: {timestamp}",
+                    "Set last op to system time",
+                    "timestamp"_attr = replClientInfo().getLastOp().getTimestamp());
+    }
+}
+
+void LastOpFixer::startingOp() {
+    _needToFixLastOp = true;
+    _opTimeAtLastOpStart = replClientInfo().getLastOp();
+}
+
+void LastOpFixer::finishedOpSuccessfully() {
+    // If the op was successful and bumped LastOp, we don't need to do it again. However, we
+    // still need to for no-ops and all failing ops.
+    _needToFixLastOp = (replClientInfo().getLastOp() == _opTimeAtLastOpStart);
+}
+
+bool getFleCrudProcessed(OperationContext* opCtx,
+                         const boost::optional<EncryptionInformation>& encryptionInfo) {
+    if (encryptionInfo && encryptionInfo->getCrudProcessed().value_or(false)) {
+        uassert(6666201,
+                "External users cannot have crudProcessed enabled",
+                AuthorizationSession::get(opCtx->getClient())
+                    ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                       ActionType::internal));
+
+        return true;
+    }
+    return false;
+}
+
 /**
  * Returns true if caller should try to insert more documents. Does nothing else if batch is empty.
  */
 bool insertBatchAndHandleErrors(OperationContext* opCtx,
-                                const write_ops::InsertCommandRequest& wholeOp,
+                                const NamespaceString& nss,
+                                const boost::optional<mongo::UUID>& collectionUUID,
+                                bool ordered,
                                 std::vector<InsertStatement>& batch,
                                 LastOpFixer* lastOpFixer,
                                 WriteResult* out,
@@ -428,15 +449,15 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
         &hangDuringBatchInsert,
         opCtx,
         "hangDuringBatchInsert",
-        [&wholeOp]() {
+        [&nss]() {
             LOGV2(20889,
                   "Batch insert - hangDuringBatchInsert fail point enabled for namespace "
                   "{namespace}. Blocking until fail point is disabled",
                   "Batch insert - hangDuringBatchInsert fail point enabled for a namespace. "
                   "Blocking until fail point is disabled",
-                  "namespace"_attr = wholeOp.getNamespace());
+                  "namespace"_attr = nss);
         },
-        wholeOp.getNamespace());
+        nss);
 
     if (MONGO_unlikely(failAllInserts.shouldFail())) {
         uasserted(ErrorCodes::InternalError, "failAllInserts failpoint active!");
@@ -445,26 +466,25 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
     boost::optional<AutoGetCollection> collection;
     auto acquireCollection = [&] {
         while (true) {
-            collection.emplace(
-                opCtx,
-                wholeOp.getNamespace(),
-                fixLockModeForSystemDotViewsChanges(wholeOp.getNamespace(), MODE_IX),
-                AutoGetCollection::Options{}.expectedUUID(wholeOp.getCollectionUUID()));
+            collection.emplace(opCtx,
+                               nss,
+                               fixLockModeForSystemDotViewsChanges(nss, MODE_IX),
+                               AutoGetCollection::Options{}.expectedUUID(collectionUUID));
             if (*collection) {
                 break;
             }
 
             if (source == OperationSource::kTimeseriesInsert) {
-                assertTimeseriesBucketsCollectionNotFound(wholeOp.getNamespace());
+                assertTimeseriesBucketsCollectionNotFound(nss);
             }
 
             collection.reset();  // unlock.
-            makeCollection(opCtx, wholeOp.getNamespace());
+            makeCollection(opCtx, nss);
         }
 
-        curOp.raiseDbProfileLevel(CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(
-            wholeOp.getNamespace().dbName()));
-        assertCanWrite_inlock(opCtx, wholeOp.getNamespace());
+        curOp.raiseDbProfileLevel(
+            CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nss.dbName()));
+        assertCanWrite_inlock(opCtx, nss);
 
         CurOpFailpointHelpers::waitWhileFailPointEnabled(
             &hangWithLockDuringBatchInsert, opCtx, "hangWithLockDuringBatchInsert");
@@ -481,12 +501,7 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
         if (inTxn) {
             // It is not safe to ignore errors from collection creation while inside a
             // multi-document transaction.
-            auto canContinue = handleError(opCtx,
-                                           ex,
-                                           wholeOp.getNamespace(),
-                                           wholeOp.getWriteCommandRequestBase(),
-                                           false /* multiUpdate */,
-                                           out);
+            auto canContinue = handleError(opCtx, ex, nss, ordered, false /* multiUpdate */, out);
             invariant(!canContinue);
             return false;
         }
@@ -533,7 +548,7 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
         ServerWriteConcernMetrics::get(opCtx)->recordWriteConcernForInsert(
             opCtx->getWriteConcern());
         try {
-            writeConflictRetry(opCtx, "insert", wholeOp.getNamespace().ns(), [&] {
+            writeConflictRetry(opCtx, "insert", nss.ns(), [&] {
                 try {
                     if (!collection)
                         acquireCollection();
@@ -564,12 +579,7 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
                 }
             });
         } catch (const DBException& ex) {
-            bool canContinue = handleError(opCtx,
-                                           ex,
-                                           wholeOp.getNamespace(),
-                                           wholeOp.getWriteCommandRequestBase(),
-                                           false /* multiUpdate */,
-                                           out);
+            bool canContinue = handleError(opCtx, ex, nss, ordered, false /* multiUpdate */, out);
 
             if (!canContinue) {
                 // Failed in ordered batch, or in a transaction, or from some unrecoverable error.
@@ -579,45 +589,6 @@ bool insertBatchAndHandleErrors(OperationContext* opCtx,
     }
 
     return true;
-}
-
-template <typename T>
-StmtId getStmtIdForWriteOp(OperationContext* opCtx, const T& wholeOp, size_t opIndex) {
-    return opCtx->isRetryableWrite() ? write_ops::getStmtIdForWriteAt(wholeOp, opIndex)
-                                     : kUninitializedStmtId;
-}
-
-SingleWriteResult makeWriteResultForInsertOrDeleteRetry() {
-    SingleWriteResult res;
-    res.setN(1);
-    res.setNModified(0);
-    return res;
-}
-
-
-// Returns the flags that determine the type of document validation we want to
-// perform. First item in the tuple determines whether to bypass document validation altogether,
-// second item determines if _safeContent_ array can be modified in an encrypted collection.
-std::tuple<bool, bool> getDocumentValidationFlags(OperationContext* opCtx,
-                                                  const write_ops::WriteCommandRequestBase& req) {
-    auto& encryptionInfo = req.getEncryptionInformation();
-    const bool fleCrudProcessed = getFleCrudProcessed(opCtx, encryptionInfo);
-    return std::make_tuple(req.getBypassDocumentValidation(), fleCrudProcessed);
-}
-}  // namespace
-
-bool getFleCrudProcessed(OperationContext* opCtx,
-                         const boost::optional<EncryptionInformation>& encryptionInfo) {
-    if (encryptionInfo && encryptionInfo->getCrudProcessed().value_or(false)) {
-        uassert(6666201,
-                "External users cannot have crudProcessed enabled",
-                AuthorizationSession::get(opCtx->getClient())
-                    ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                       ActionType::internal));
-
-        return true;
-    }
-    return false;
 }
 
 WriteResult performInserts(OperationContext* opCtx,
@@ -717,8 +688,14 @@ WriteResult performInserts(OperationContext* opCtx,
                 continue;  // Add more to batch before inserting.
         }
 
-        out.canContinue =
-            insertBatchAndHandleErrors(opCtx, wholeOp, batch, &lastOpFixer, &out, source);
+        out.canContinue = insertBatchAndHandleErrors(opCtx,
+                                                     wholeOp.getNamespace(),
+                                                     wholeOp.getCollectionUUID(),
+                                                     wholeOp.getOrdered(),
+                                                     batch,
+                                                     &lastOpFixer,
+                                                     &out,
+                                                     source);
         batch.clear();  // We won't need the current batch any more.
         bytesInBatch = 0;
 
@@ -741,7 +718,7 @@ WriteResult performInserts(OperationContext* opCtx,
                 out.canContinue = handleError(opCtx,
                                               ex,
                                               wholeOp.getNamespace(),
-                                              wholeOp.getWriteCommandRequestBase(),
+                                              wholeOp.getOrdered(),
                                               false /* multiUpdate */,
                                               &out);
             }
@@ -1110,8 +1087,8 @@ WriteResult performUpdates(OperationContext* opCtx,
             forgoOpCounterIncrements = true;
             lastOpFixer.finishedOpSuccessfully();
         } catch (const DBException& ex) {
-            out.canContinue = handleError(
-                opCtx, ex, ns, wholeOp.getWriteCommandRequestBase(), singleOp.getMulti(), &out);
+            out.canContinue =
+                handleError(opCtx, ex, ns, wholeOp.getOrdered(), singleOp.getMulti(), &out);
             if (!out.canContinue) {
                 break;
             }
@@ -1343,8 +1320,8 @@ WriteResult performDeletes(OperationContext* opCtx,
                                                         source));
             lastOpFixer.finishedOpSuccessfully();
         } catch (const DBException& ex) {
-            out.canContinue = handleError(
-                opCtx, ex, ns, wholeOp.getWriteCommandRequestBase(), false /* multiUpdate */, &out);
+            out.canContinue =
+                handleError(opCtx, ex, ns, wholeOp.getOrdered(), false /* multiUpdate */, &out);
             if (!out.canContinue)
                 break;
         }
