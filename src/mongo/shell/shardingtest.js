@@ -1188,9 +1188,8 @@ var ShardingTest = function(params) {
 
     let isCatalogShardMode =
         otherParams.hasOwnProperty('catalogShard') ? otherParams.catalogShard : false;
-    if (typeof Testdata !== 'undefined') {
-        isCatalogShardMode = isCatalogShardMode || Testdata.catalogShard;
-    }
+
+    isCatalogShardMode = isCatalogShardMode || jsTestOptions().catalogShard;
 
     if ("shardAsReplicaSet" in otherParams) {
         throw new Error("Use of deprecated option 'shardAsReplicaSet'");
