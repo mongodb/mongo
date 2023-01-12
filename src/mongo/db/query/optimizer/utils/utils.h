@@ -260,20 +260,8 @@ public:
         // noop
     }
 
-    /**
-     * Concatenate 'prefix' and 'suffix' by modifying 'prefix' in place.
-     */
-    static void appendInPlace(ABT& prefix, ABT suffix) {
-        PathAppender instance{std::move(suffix)};
-        algebra::transport<true>(prefix, instance);
-    }
-
-    /**
-     * Return the concatenation of 'prefix' and 'suffix'.
-     */
-    [[nodiscard]] static ABT append(ABT prefix, ABT suffix) {
-        appendInPlace(prefix, std::move(suffix));
-        return prefix;
+    void append(ABT& prefix) {
+        return algebra::transport<true>(prefix, *this);
     }
 
 private:
@@ -338,39 +326,6 @@ bool simplifyPartialSchemaReqPaths(const ProjectionName& scanProjName,
  */
 bool checkPathContainsTraverse(const ABT& path);
 
-/**
- * Try to check whether the predicate 'lhs' is a subset of 'rhs'.
- *
- * True means 'lhs' is contained in 'rhs': every document that matches
- * 'lhs' also matches 'rhs'.
- *
- * False means either:
- * - Not a subset: there is a counterexample.
- * - Not sure: this function was unable to determine one way or the other.
- */
-bool isSubsetOfPartialSchemaReq(const PartialSchemaRequirements& lhs,
-                                const PartialSchemaRequirements& rhs);
-
-/**
- * Computes the intersection of two PartialSchemeRequirements objects.
- * On success, returns true and stores the result in 'target'.
- * On failure, returns false and leaves 'target' in an unspecified state.
- *
- * Assumes 'target' comes before 'source', so 'source' may refer to bindings
- * produced by 'target'.
- *
- * The intersection:
- * - is a predicate that matches iff both original predicates match.
- * - has all the bindings from 'target' and 'source', but excluding
- *   bindings that would be redundant (have the same key). Each
- *   redundant binding gets an entry in 'projectionRenames', which maps
- *   the redundant name to the de-duplicated name.
- *
- * "Failure" means we are unable to represent the result as a PartialSchemaRequirements.
- * This can happen when:
- * - The resulting predicate is always false.
- * - 'source' reads from a projection bound by 'target'.
- */
 bool intersectPartialSchemaReq(PartialSchemaRequirements& target,
                                const PartialSchemaRequirements& source,
                                ProjectionRenames& projectionRenames);

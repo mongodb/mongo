@@ -85,9 +85,6 @@ struct PartialSchemaKey {
     PartialSchemaKey(boost::optional<ProjectionName> projectionName, ABT path);
 
     bool operator==(const PartialSchemaKey& other) const;
-    bool operator!=(const PartialSchemaKey& other) const {
-        return !(*this == other);
-    }
 
     // Referred, or input projection name.
     boost::optional<ProjectionName> _projectionName;

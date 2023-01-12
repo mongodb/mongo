@@ -182,11 +182,6 @@ public:
 
     ABT::reference_type getNode(MemoLogicalNodeId nodeMemoId) const;
 
-    /**
-     * Update the group's logical properties by looking at its first logical node.
-     * This includes the 'CardinalityEstimate' property, which has an overall estimate
-     * and a per-PartialSchemaRequirement estimate.
-     */
     void estimateCE(const Context& ctx, GroupIdType groupId);
 
     MemoLogicalNodeId addNode(const Context& ctx,

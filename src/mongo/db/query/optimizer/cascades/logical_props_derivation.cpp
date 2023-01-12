@@ -93,20 +93,17 @@ static void populateDistributionPaths(const PartialSchemaRequirements& req,
     }
 }
 
-/**
- * Check that every predicate in 'reqMap' is either an equality predicate, or fully open.
- */
 static bool computeEqPredsOnly(const PartialSchemaRequirements& reqMap) {
-    PartialSchemaKeySet equalityKeys;
-    PartialSchemaKeySet fullyOpenKeys;
+    PartialSchemaRequirements equalitiesReqMap;
+    PartialSchemaRequirements fullyOpenReqMap;
 
     for (const auto& [key, req] : reqMap) {
         const auto& intervals = req.getIntervals();
         if (auto singularInterval = IntervalReqExpr::getSingularDNF(intervals)) {
             if (singularInterval->isFullyOpen()) {
-                fullyOpenKeys.insert(key);
+                fullyOpenReqMap.emplace(key, req);
             } else if (singularInterval->isEquality()) {
-                equalityKeys.insert(key);
+                equalitiesReqMap.emplace(key, req);
             } else {
                 // Encountered a non-equality and not-fully-open interval.
                 return false;
@@ -117,8 +114,8 @@ static bool computeEqPredsOnly(const PartialSchemaRequirements& reqMap) {
         }
     }
 
-    for (const auto& key : fullyOpenKeys) {
-        if (equalityKeys.count(key) == 0) {
+    for (const auto& [key, req] : fullyOpenReqMap) {
+        if (equalitiesReqMap.count(key) == 0) {
             // No possible match for fully open requirement.
             return false;
         }
@@ -228,7 +225,12 @@ public:
         auto& satisfiedPartialIndexes = indexingAvailability.getSatisfiedPartialIndexes();
         for (const auto& [indexDefName, indexDef] : scanDef.getIndexDefs()) {
             if (!indexDef.getPartialReqMap().empty()) {
-                if (isSubsetOfPartialSchemaReq(node.getReqMap(), indexDef.getPartialReqMap())) {
+                auto intersection = node.getReqMap();
+                // We specifically ignore projectionRenames here.
+                ProjectionRenames projectionRenames_unused;
+                if (intersectPartialSchemaReq(
+                        intersection, indexDef.getPartialReqMap(), projectionRenames_unused) &&
+                    intersection == node.getReqMap()) {
                     satisfiedPartialIndexes.insert(indexDefName);
                 }
             }

@@ -432,19 +432,6 @@ SargableNode::SargableNode(PartialSchemaRequirements reqMap,
                 "SargableNode cannot reference an internally bound projection",
                 boundsProjectionNameSet.count(*key._projectionName) == 0);
     }
-
-    // Assert that non-multikey paths have at most one requirement.
-    {
-        PartialSchemaKeySet seen;
-        for (auto&& [key, req] : reqMap) {
-            if (!checkPathContainsTraverse(key._path)) {
-                auto inserted = seen.insert(key).second;
-                tassert(7155020,
-                        "SargableNode should not have two predicates on the same non-multikey path",
-                        inserted);
-            }
-        }
-    }
 }
 
 bool SargableNode::operator==(const SargableNode& other) const {

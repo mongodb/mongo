@@ -137,10 +137,6 @@ function prettyInterval(compoundInterval) {
     // Takes an array of intervals, each one applying to one component of a compound index key.
     // Try to format it as a string.
     // If either bound is not Constant, return the original JSON unchanged.
-    if (!Arrays.isArray(compoundInterval)) {
-        return compoundInterval;
-    }
-
     let result = '';
     for (const {lowBound, highBound} of compoundInterval) {
         if (lowBound.bound.nodeType !== 'Const' || highBound.bound.nodeType !== 'Const') {
