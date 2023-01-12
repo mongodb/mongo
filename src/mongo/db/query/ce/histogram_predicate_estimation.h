@@ -35,8 +35,6 @@
 
 namespace mongo::optimizer::ce {
 
-constexpr double kInvalidEstimate = -1.0;
-
 enum class EstimationType { kEqual, kLess, kLessOrEqual, kGreater, kGreaterOrEqual };
 enum class EstimationAlgo { HistogramV1, HistogramV2, HistogramV3 };
 
@@ -69,15 +67,6 @@ EstimationResult estimate(const stats::ScalarHistogram& h,
                           sbe::value::TypeTags tag,
                           sbe::value::Value val,
                           EstimationType type);
-
-/**
- * Given an array histogram, an interval, and the input cardinality, estimates the cardinality of
- * the interval.
- */
-CEType estimateIntervalCardinality(const stats::ArrayHistogram& estimator,
-                                   const IntervalRequirement& interval,
-                                   CEType inputCardinality,
-                                   bool includeScalar);
 
 /**
  * Estimates the cardinality of an equality predicate given an ArrayHistogram and an SBE value and

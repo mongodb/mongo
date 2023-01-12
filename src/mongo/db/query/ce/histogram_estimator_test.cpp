@@ -882,34 +882,39 @@ TEST_F(CEHistogramTest, TestTypeCounters) {
                    makeIndexDefinition("mixed", CollationOp::Ascending, /* isMultiKey */ true)}});
 
     // Tests for scalar type counts only.
-    // For object-only intervals in a scalar histogram, we always return object count, no matter
-    // what the bounds are. Since we have a scalar histogram for "scalar", we expect all $elemMatch
-    // queries to have a cardinality of 0.
+    // For object-only intervals in a scalar histogram, we apply a heuristic to the object count.
+    // Since we have a scalar histogram for "scalar", we expect all $elemMatch queries to have a
+    // cardinality of 0.
+    constexpr double kObjEq = 14.142;                  // Equality selectivity is sqrt(200)/200.
+    constexpr double kObjClosedRange = 0.2 * kNumObj;  // Closed-range selectivity is 0.2.
+    constexpr double kObjOpenRange = 0.33 * kNumObj;   // Open-range selectivity is 0.33.
 
-    // Test object equality.
-    ASSERT_EQ_ELEMMATCH_CE(t, kNumObj, 0.0, "scalar", "{$eq: {}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, kNumObj, 0.0, "scalar", "{$eq: {a: 1}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, kNumObj, 0.0, "scalar", "{$eq: {b: 2, c: 3}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, kNumObj, 0.0, "scalar", "{$lt: {b: 2, c: 3}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, kNumObj, 0.0, "scalar", "{$gt: {b: 2, c: 3}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, kNumObj, 0.0, "scalar", "{$gte: {b: 2, c: 3}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, kNumObj, 0.0, "scalar", "{$lte: {b: 2, c: 3}}");
+    // Test object equality. Note that $gt/$gte queries on objects are closed range because of the
+    // upper bound on object type.
+    ASSERT_EQ_ELEMMATCH_CE(t, kObjEq, 0.0, "scalar", "{$eq: {}}");
+    ASSERT_EQ_ELEMMATCH_CE(t, kObjEq, 0.0, "scalar", "{$eq: {a: 1}}");
+    ASSERT_EQ_ELEMMATCH_CE(t, kObjEq, 0.0, "scalar", "{$eq: {b: 2, c: 3}}");
+    ASSERT_EQ_ELEMMATCH_CE(t, kObjClosedRange, 0.0, "scalar", "{$lt: {b: 2, c: 3}}");
+    ASSERT_EQ_ELEMMATCH_CE(t, kObjOpenRange, 0.0, "scalar", "{$gt: {b: 2, c: 3}}");
+    ASSERT_EQ_ELEMMATCH_CE(t, kObjOpenRange, 0.0, "scalar", "{$gte: {b: 2, c: 3}}");
+    ASSERT_EQ_ELEMMATCH_CE(t, kObjClosedRange, 0.0, "scalar", "{$lte: {b: 2, c: 3}}");
 
     // Test intervals including the empty object. Note that range queries on objects do not generate
     // point equalities, so these fall back onto logic in interval estimation that identifies that
-    // the generated intervals are subsets of the object type interval. Note: we don't even generate
-    // a SargableNode for the first case. The generated bounds are:
-    // [{}, {}) because {} is the "minimum" value for the object type.
+    // the generated intervals are subsets of the object type interval. Additionally, we don't
+    // generate a SargableNode for the first case. The generated bounds are [{}, {}) because {} is
+    // the "minimum" value for the object type.
     ASSERT_EQ_ELEMMATCH_CE(t, 0.0, 0.0, "scalar", "{$lt: {}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, kNumObj, 0.0, "scalar", "{$gt: {}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, kNumObj, 0.0, "scalar", "{$gte: {}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, kNumObj, 0.0, "scalar", "{$lte: {}}");
+    ASSERT_EQ_ELEMMATCH_CE(t, kObjOpenRange, 0.0, "scalar", "{$gt: {}}");
+    ASSERT_EQ_ELEMMATCH_CE(t, kObjOpenRange, 0.0, "scalar", "{$gte: {}}");
+    // Note: this query is equivalent to {$eq: {}}.
+    ASSERT_EQ_ELEMMATCH_CE(t, kObjEq, 0.0, "scalar", "{$lte: {}}");
 
     // Rather than combining the intervals together, in the following cases we generate two
-    // object-only intervals in the requirements map with the following bounds. Each individual
-    // interval is estimated as having a cardinality of 'kNumObj', before we apply conjunctive
+    // object-only intervals in the requirements map. Each individual interval is estimated
+    // separately by applying a heuristic selectivity on object count, before we apply conjunctive
     // exponential backoff to combine them.
-    constexpr double k2ObjCard = 89.4427;  // == 200/1000 * sqrt(200/1000) * 1000
+    constexpr double k2ObjCard = 10.2762;  // == 40/1000 * sqrt(66/1000) * 1000
     ASSERT_EQ_ELEMMATCH_CE(t, k2ObjCard, 0.0, "scalar", "{$gt: {}, $lte: {b: 2, c: 3}}");
     ASSERT_EQ_ELEMMATCH_CE(t, k2ObjCard, 0.0, "scalar", "{$gte: {}, $lte: {b: 2, c: 3}}");
     ASSERT_EQ_ELEMMATCH_CE(t, k2ObjCard, 0.0, "scalar", "{$gte: {}, $lt: {b: 2, c: 3}}");
@@ -936,32 +941,33 @@ TEST_F(CEHistogramTest, TestTypeCounters) {
 
     // Tests for array type counts only.
     // For object-only intervals in an array histogram, if we're using $elemMatch on an object-only
-    // interval, we always return object count. While we have no scalar type counts for "array",
-    // non-$elemMatch queries should also match objects embedded in arrays, so we still return
-    // object count in that case.
+    // interval, we always return the array object count modified by a heuristic. While we have no
+    // scalar type counts for "array", non-$elemMatch queries should also match objects embedded in
+    // arrays, so we return the same estimate for both cases.
 
     // Test object equality.
-    ASSERT_EQ_ELEMMATCH_CE(t, kNumObj, kNumObj, "array", "{$eq: {}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, kNumObj, kNumObj, "array", "{$eq: {a: 1}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, kNumObj, kNumObj, "array", "{$eq: {b: 2, c: 3}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, kNumObj, kNumObj, "array", "{$lt: {b: 2, c: 3}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, kNumObj, kNumObj, "array", "{$gt: {b: 2, c: 3}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, kNumObj, kNumObj, "array", "{$gte: {b: 2, c: 3}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, kNumObj, kNumObj, "array", "{$lte: {b: 2, c: 3}}");
+    ASSERT_EQ_ELEMMATCH_CE(t, kObjEq, kObjEq, "array", "{$eq: {}}");
+    ASSERT_EQ_ELEMMATCH_CE(t, kObjEq, kObjEq, "array", "{$eq: {a: 1}}");
+    ASSERT_EQ_ELEMMATCH_CE(t, kObjEq, kObjEq, "array", "{$eq: {b: 2, c: 3}}");
+    ASSERT_EQ_ELEMMATCH_CE(t, kObjClosedRange, kObjClosedRange, "array", "{$lt: {b: 2, c: 3}}");
+    ASSERT_EQ_ELEMMATCH_CE(t, kObjOpenRange, kObjOpenRange, "array", "{$gt: {b: 2, c: 3}}");
+    ASSERT_EQ_ELEMMATCH_CE(t, kObjOpenRange, kObjOpenRange, "array", "{$gte: {b: 2, c: 3}}");
+    ASSERT_EQ_ELEMMATCH_CE(t, kObjClosedRange, kObjClosedRange, "array", "{$lte: {b: 2, c: 3}}");
 
     // Test intervals including the empty object.
     // Note: we don't even generate a SargableNode for the first case. The generated bounds are:
     // [{}, {}) because {} is the "minimum" value for the object type.
     ASSERT_EQ_ELEMMATCH_CE(t, 0.0, 0.0, "array", "{$lt: {}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, kNumObj, kNumObj, "array", "{$gt: {}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, kNumObj, kNumObj, "array", "{$gte: {}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, kNumObj, kNumObj, "array", "{$lte: {}}");
+    ASSERT_EQ_ELEMMATCH_CE(t, kObjOpenRange, kObjOpenRange, "array", "{$gt: {}}");
+    ASSERT_EQ_ELEMMATCH_CE(t, kObjOpenRange, kObjOpenRange, "array", "{$gte: {}}");
+    // Note: this query is equivalent to {$eq: {}}.
+    ASSERT_EQ_ELEMMATCH_CE(t, kObjEq, kObjEq, "array", "{$lte: {}}");
 
     // Similar to above, here we have two object intervals for non-$elemMatch queries. However, for
     // $elemMatch queries, we have the following intervals in the requirements map:
     //  1. [[], BinData(0, )) with CE 1000
-    //  2. The actual object interval, e.g. ({}, {b: 2, c: 3}] with CE 200
-    constexpr double kArrEMCard = kNumObj;  // == 200/1000 * sqrt(1000/1000) * 1000
+    //  2. The actual object interval, e.g. ({}, {b: 2, c: 3}] with CE 0.2*200
+    constexpr double kArrEMCard = kObjClosedRange;  // == 40/1000 * sqrt(1000/1000) * 1000
     ASSERT_EQ_ELEMMATCH_CE(t, k2ObjCard, kArrEMCard, "array", "{$gt: {}, $lte: {b: 2, c: 3}}");
     ASSERT_EQ_ELEMMATCH_CE(t, k2ObjCard, kArrEMCard, "array", "{$gte: {}, $lte: {b: 2, c: 3}}");
     ASSERT_EQ_ELEMMATCH_CE(t, k2ObjCard, kArrEMCard, "array", "{$gte: {}, $lt: {b: 2, c: 3}}");
@@ -981,64 +987,81 @@ TEST_F(CEHistogramTest, TestTypeCounters) {
     // Note that for ranges including null (e.g. {$lt: null}) we don't generate any SargableNodes.
     ASSERT_EQ_ELEMMATCH_CE(t, kNumNull, kNumNull, "array", "{$eq: null}");
 
-    // Test boolean count estimate.
-    ASSERT_EQ_ELEMMATCH_CE(t, kNumBool, kNumBool, "array", "{$eq: true}");
-    ASSERT_EQ_ELEMMATCH_CE(t, kNumBool, kNumBool, "array", "{$eq: false}");
+    // Test boolean count estimate; within arrays, the count of any boolean value is estimated as
+    // 0.5*count of all arrays including booleans.
+    constexpr double kBoolEst = 0.5 * kNumBool;
+    ASSERT_EQ_ELEMMATCH_CE(t, kBoolEst, kBoolEst, "array", "{$eq: true}");
+    ASSERT_EQ_ELEMMATCH_CE(t, kBoolEst, kBoolEst, "array", "{$eq: false}");
 
     // Tests for mixed type counts only. Regular match predicates should be estimated as the sum of
-    // the scalar and array counts (e.g. for objects, 'kNumObj'), while elemMatch predicates
-    // should be estimated without scalars, returning the array type count (for objects this is
-    // 'kNumObjMA').
+    // the scalar and array counts (e.g. for objects, 'kNumObj') modified heuristically,
+    // while elemMatch predicates should be estimated without scalars, returning the array type
+    // count (for objects this is 'kNumObjMA') * a heuristic selectivity.
+    constexpr double kObjEqMS = 12.2474;   // 150*sqrt(150)/150
+    constexpr double kObjOpenMS = 49.5;    // 0.33*150
+    constexpr double kObjClosedMS = 30.0;  // 0.2*150
+    constexpr double kObjEqMA = 7.07107;   // 50*sqrt(50)/50
+    // We use different selectivities here because the input cardinality is smaller.
+    constexpr double kObjOpenMA = 22.5;    // 0.45*50
+    constexpr double kObjClosedMA = 16.5;  // 0.33*50
 
     // Test object equality.
-    ASSERT_EQ_ELEMMATCH_CE(t, kNumObj, kNumObjMA, "mixed", "{$eq: {}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, kNumObj, kNumObjMA, "mixed", "{$eq: {a: 1}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, kNumObj, kNumObjMA, "mixed", "{$eq: {b: 2, c: 3}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, kNumObj, kNumObjMA, "mixed", "{$lt: {b: 2, c: 3}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, kNumObj, kNumObjMA, "mixed", "{$gt: {b: 2, c: 3}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, kNumObj, kNumObjMA, "mixed", "{$gte: {b: 2, c: 3}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, kNumObj, kNumObjMA, "mixed", "{$lte: {b: 2, c: 3}}");
+    ASSERT_EQ_ELEMMATCH_CE(t, kObjEqMS + kObjEqMA, kObjEqMA, "mixed", "{$eq: {}}");
+    ASSERT_EQ_ELEMMATCH_CE(t, kObjEqMS + kObjEqMA, kObjEqMA, "mixed", "{$eq: {a: 1}}");
+    ASSERT_EQ_ELEMMATCH_CE(t, kObjEqMS + kObjEqMA, kObjEqMA, "mixed", "{$eq: {b: 2, c: 3}}");
+    ASSERT_EQ_ELEMMATCH_CE(
+        t, kObjClosedMS + kObjClosedMA, kObjClosedMA, "mixed", "{$lt: {b: 2, c: 3}}");
+    ASSERT_EQ_ELEMMATCH_CE(t, kObjOpenMS + kObjOpenMA, kObjOpenMA, "mixed", "{$gt: {b: 2, c: 3}}");
+    ASSERT_EQ_ELEMMATCH_CE(t, kObjOpenMS + kObjOpenMA, kObjOpenMA, "mixed", "{$gte: {b: 2, c: 3}}");
+    ASSERT_EQ_ELEMMATCH_CE(
+        t, kObjClosedMS + kObjClosedMA, kObjClosedMA, "mixed", "{$lte: {b: 2, c: 3}}");
 
     // Test intervals including the empty object.
     // Note: we don't even generate a SargableNode for the first case. The generated bounds are:
     // [{}, {}) because {} is the "minimum" value for the object type.
     ASSERT_EQ_ELEMMATCH_CE(t, 0.0, 0.0, "mixed", "{$lt: {}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, kNumObj, kNumObjMA, "mixed", "{$gt: {}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, kNumObj, kNumObjMA, "mixed", "{$gte: {}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, kNumObj, kNumObjMA, "mixed", "{$lte: {}}");
+    ASSERT_EQ_ELEMMATCH_CE(t, kObjOpenMS + kObjOpenMA, kObjOpenMA, "mixed", "{$gt: {}}");
+    ASSERT_EQ_ELEMMATCH_CE(t, kObjOpenMS + kObjOpenMA, kObjOpenMA, "mixed", "{$gte: {}}");
+    // Note: same as {$eq: {}}.
+    ASSERT_EQ_ELEMMATCH_CE(t, kObjEqMS + kObjEqMA, kObjEqMA, "mixed", "{$lte: {}}");
 
     // Similar to above, here we have two object intervals for non-$elemMatch queries. However, for
     // $elemMatch queries, we have the following intervals in the requirements map:
-    //  1. [[], BinData(0, )) with CE 1000
-    //  2. The actual object interval, e.g. ({}, {b: 2, c: 3}] with CE 50
-    constexpr double kMixEMCard = kNumObjMA;  // == 50/1000 * sqrt(1000/1000) * 1000
-    ASSERT_EQ_ELEMMATCH_CE(t, k2ObjCard, kMixEMCard, "mixed", "{$gt: {}, $lte: {b: 2, c: 3}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, k2ObjCard, kMixEMCard, "mixed", "{$gte: {}, $lte: {b: 2, c: 3}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, k2ObjCard, kMixEMCard, "mixed", "{$gte: {}, $lt: {b: 2, c: 3}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, k2ObjCard, kMixEMCard, "mixed", "{$gt: {}, $lt: {b: 2, c: 3}}");
+    //  1. [[], BinData(0, ))
+    //  2. The actual object interval, e.g. ({}, {b: 2, c: 3}]
+    constexpr double k2ObjClosed = 12.4773;
+    ASSERT_EQ_ELEMMATCH_CE(t, k2ObjClosed, kObjClosedMA, "mixed", "{$gt: {}, $lte: {b: 2, c: 3}}");
+    ASSERT_EQ_ELEMMATCH_CE(t, k2ObjClosed, kObjClosedMA, "mixed", "{$gte: {}, $lte: {b: 2, c: 3}}");
+    ASSERT_EQ_ELEMMATCH_CE(t, k2ObjClosed, kObjClosedMA, "mixed", "{$gte: {}, $lt: {b: 2, c: 3}}");
+    ASSERT_EQ_ELEMMATCH_CE(t, k2ObjClosed, kObjClosedMA, "mixed", "{$gt: {}, $lt: {b: 2, c: 3}}");
 
     // Test intervals including {a: 1}; similar to above, we have two object intervals.
-    ASSERT_EQ_ELEMMATCH_CE(t, k2ObjCard, kMixEMCard, "mixed", "{$gt: {a: 1}, $lte: {b: 2, c: 3}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, k2ObjCard, kMixEMCard, "mixed", "{$gte: {a: 1}, $lte: {b: 2, c: 3}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, k2ObjCard, kMixEMCard, "mixed", "{$gte: {a: 1}, $lt: {b: 2, c: 3}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, k2ObjCard, kMixEMCard, "mixed", "{$gt: {a: 1}, $lt: {b: 2, c: 3}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, k2ObjCard, kMixEMCard, "mixed", "{$gt: {a: 1}, $lte: {a: 3}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, k2ObjCard, kMixEMCard, "mixed", "{$gte: {a: 1}, $lte: {a: 3}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, k2ObjCard, kMixEMCard, "mixed", "{$gte: {a: 1}, $lt: {a: 3}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, k2ObjCard, kMixEMCard, "mixed", "{$gt: {a: 1}, $lt: {a: 3}}");
+    ASSERT_EQ_ELEMMATCH_CE(
+        t, k2ObjClosed, kObjClosedMA, "mixed", "{$gt: {a: 1}, $lte: {b: 2, c: 3}}");
+    ASSERT_EQ_ELEMMATCH_CE(
+        t, k2ObjClosed, kObjClosedMA, "mixed", "{$gte: {a: 1}, $lte: {b: 2, c: 3}}");
+    ASSERT_EQ_ELEMMATCH_CE(
+        t, k2ObjClosed, kObjClosedMA, "mixed", "{$gte: {a: 1}, $lt: {b: 2, c: 3}}");
+    ASSERT_EQ_ELEMMATCH_CE(
+        t, k2ObjClosed, kObjClosedMA, "mixed", "{$gt: {a: 1}, $lt: {b: 2, c: 3}}");
+    ASSERT_EQ_ELEMMATCH_CE(t, k2ObjClosed, kObjClosedMA, "mixed", "{$gt: {a: 1}, $lte: {a: 3}}");
+    ASSERT_EQ_ELEMMATCH_CE(t, k2ObjClosed, kObjClosedMA, "mixed", "{$gte: {a: 1}, $lte: {a: 3}}");
+    ASSERT_EQ_ELEMMATCH_CE(t, k2ObjClosed, kObjClosedMA, "mixed", "{$gte: {a: 1}, $lt: {a: 3}}");
+    ASSERT_EQ_ELEMMATCH_CE(t, k2ObjClosed, kObjClosedMA, "mixed", "{$gt: {a: 1}, $lt: {a: 3}}");
 
     // Test that for null, we always return null count.
     // Note that for ranges including null (e.g. {$lt: null}) we don't generate any SargableNodes.
     ASSERT_EQ_ELEMMATCH_CE(t, kNumNull, kNumNullMA, "mixed", "{$eq: null}");
 
-    // Test boolean count estimate.
-    ASSERT_EQ_ELEMMATCH_CE(t, kNumTrueMS + kNumBoolMA, kNumBoolMA, "mixed", "{$eq: true}");
-    ASSERT_EQ_ELEMMATCH_CE(t, kNumFalseMS + kNumBoolMA, kNumBoolMA, "mixed", "{$eq: false}");
+    // Test boolean count estimate; this is estimated as half the count of arrays that include
+    // booleans.
+    constexpr double kBoolEstMA = 0.5 * kNumBoolMA;
+    ASSERT_EQ_ELEMMATCH_CE(t, kNumTrueMS + kBoolEstMA, kBoolEstMA, "mixed", "{$eq: true}");
+    ASSERT_EQ_ELEMMATCH_CE(t, kNumFalseMS + kBoolEstMA, kBoolEstMA, "mixed", "{$eq: false}");
 
     // Test combinations of the three fields/ type counters.
-    constexpr double k3ObjCard =
-        59.814;  // == 200/1000 * sqrt(200/1000) * sqrt(sqrt(200/1000)) * 1000
-    constexpr double k4ObjCard = 48.914;
+    constexpr double k3ObjCard = 0.626998;
+    constexpr double k4ObjCard = 0.935085;
     ASSERT_MATCH_CE_NODE(t,
                          "{scalar: {$eq: {a: 1}}, mixed: {$eq: {b: 1}}, array: {$eq: {c: 1}}}",
                          k3ObjCard,
@@ -1059,16 +1082,14 @@ TEST_F(CEHistogramTest, TestTypeCounters) {
                     " array: {$elemMatch: {$gt: {a: 1}, $lte: {a: 2, b: 4, c: 3}}}}",
                     0.0);
 
-    // The 'array' interval estimate is 50, but the 'mixed' interval estimate is 200.
-    constexpr double kArrMixObjEMCard = 22.3607;  // == 50/1000 * sqrt(200/1000) * 1000
     ASSERT_MATCH_CE_NODE(t,
                          "{mixed: {$elemMatch: {$eq: {b: 1}}}, array: {$elemMatch: {$eq: {c: 1}}}}",
-                         kArrMixObjEMCard,
+                         0.840896,
                          isSargable4);
     ASSERT_MATCH_CE_NODE(t,
                          "{mixed: {$elemMatch: {$lt: {b: 1}}},"
                          " array: {$elemMatch: {$gt: {a: 1}, $lte: {a: 2, b: 4, c: 3}}}}",
-                         kArrMixObjEMCard,
+                         3.30,
                          isSargable4);
 }
 
@@ -1121,7 +1142,8 @@ TEST_F(CEHistogramTest, TestNestedArrayTypeCounterPredicates) {
     ASSERT_EQ_ELEMMATCH_CE(t, 0.0, 0.0, "na", "{$eq: true}");
     ASSERT_EQ_ELEMMATCH_CE(t, 0.0, 0.0, "na", "{$eq: null}");
     // We don't have any objects in arrays, so don't count them.
-    ASSERT_EQ_ELEMMATCH_CE(t, kNumObj, 0.0, "na", "{$eq: {a: 1}}");
+    constexpr double kObjEq = 19.748;  // sqrt(390)
+    ASSERT_EQ_ELEMMATCH_CE(t, kObjEq, 0.0, "na", "{$eq: {a: 1}}");
 
     // Quick equality test to see if regular array histogram estimation still works as expected.
     ASSERT_EQ_ELEMMATCH_CE(t, kNumArr1 + kNum1, kNumArr1, "na", "{$eq: 1}");
@@ -1144,33 +1166,33 @@ TEST_F(CEHistogramTest, TestNestedArrayTypeCounterPredicates) {
     // - For the case where we see equality to the array, we have a disjunction of intervals in the
     // same entry of the SargableNode requirements map. For the case of {$eq: [1]}, for example, we
     // have: [[1], [1]] U [1, 1]. As a result, we estimate each point interval separately:
-    //   - [[1], [1]]: We estimate the nested array interval as 'kNumNestArr'.
+    //   - [[1], [1]]: We estimate the nested array interval as 'kNestArrEst'.
     //   - [1, 1]: We estimate the regular point interval as 'kNumArr1' + 'kNum1'.
     // We then combine the results by exponential backoff. Note that we will NOT match {na: 1};
     // however, because of the way the interval is defined, our estimate suggests that we would.
     // TODO: is there a way to know this on the CE side?
-    constexpr double kArr1EqCard = 505.531;  // (1 - (1 - 500.0/1000) * sqrt(1 - 22.0/1000)) * 1000
-    constexpr double kArr2EqCard = 508.319;  // (1 - (1 - 500.0/1000) * sqrt(1 - 33.0/1000)) * 1000
-    constexpr double kArr3EqCard = 513.944;  // (1 - (1 - 500.0/1000) * sqrt(1 - 55.0/1000)) * 1000
-    ASSERT_EQ_ELEMMATCH_CE_NODE(t, kArr1EqCard, kNumNestArr, "na", "{$eq: [1]}", isSargable);
-    ASSERT_EQ_ELEMMATCH_CE_NODE(t, kArr2EqCard, kNumNestArr, "na", "{$eq: [2]}", isSargable);
-    ASSERT_EQ_ELEMMATCH_CE_NODE(t, kArr3EqCard, kNumNestArr, "na", "{$eq: [3]}", isSargable);
+    constexpr double kArr1EqCard = 33.1745;
+    constexpr double kArr2EqCard = 43.8725;
+    constexpr double kArr3EqCard = 65.6252;
+    constexpr double kNestArrEst = 22.3607;
+    ASSERT_EQ_ELEMMATCH_CE_NODE(t, kArr1EqCard, kNestArrEst, "na", "{$eq: [1]}", isSargable);
+    ASSERT_EQ_ELEMMATCH_CE_NODE(t, kArr2EqCard, kNestArrEst, "na", "{$eq: [2]}", isSargable);
+    ASSERT_EQ_ELEMMATCH_CE_NODE(t, kArr3EqCard, kNestArrEst, "na", "{$eq: [3]}", isSargable);
     // For the last case, we have the interval [[1, 2, 3], [1, 2, 3]] U [1, 1].
     // TODO: is this interval semantically correct?
-    ASSERT_EQ_ELEMMATCH_CE_NODE(t, kArr1EqCard, kNumNestArr, "na", "{$eq: [1, 2, 3]}", isSargable);
+    ASSERT_EQ_ELEMMATCH_CE_NODE(t, kArr1EqCard, kNestArrEst, "na", "{$eq: [1, 2, 3]}", isSargable);
 
     // Now, we test the case of nested arrays.
     // - $elemMatch, once again, returns the number of nested arrays.
     // - Simple equality generates two intervals. We estimate both intervals using the nested array
     // type count. For {$eq: [[1, 2, 3]]}, we get:
     //   - [[1, 2, 3], [1, 2, 3]] U [[[1, 2, 3]]], [[1, 2, 3]]]
-    constexpr double kNestedEqCard =
-        646.447;  // (1 - (1 - 500.0/1000) * sqrt(1 - 500.0/1000)) * 1000
+    constexpr double kNestedEqCard = 33.3528;
     ASSERT_EQ_ELEMMATCH_CE_NODE(
-        t, kNestedEqCard, kNumNestArr, "na", "{$eq: [[1, 2, 3]]}", isSargable);
-    ASSERT_EQ_ELEMMATCH_CE_NODE(t, kNestedEqCard, kNumNestArr, "na", "{$eq: [[1]]}", isSargable);
-    ASSERT_EQ_ELEMMATCH_CE_NODE(t, kNestedEqCard, kNumNestArr, "na", "{$eq: [[2]]}", isSargable);
-    ASSERT_EQ_ELEMMATCH_CE_NODE(t, kNestedEqCard, kNumNestArr, "na", "{$eq: [[3]]}", isSargable);
+        t, kNestedEqCard, kNestArrEst, "na", "{$eq: [[1, 2, 3]]}", isSargable);
+    ASSERT_EQ_ELEMMATCH_CE_NODE(t, kNestedEqCard, kNestArrEst, "na", "{$eq: [[1]]}", isSargable);
+    ASSERT_EQ_ELEMMATCH_CE_NODE(t, kNestedEqCard, kNestArrEst, "na", "{$eq: [[2]]}", isSargable);
+    ASSERT_EQ_ELEMMATCH_CE_NODE(t, kNestedEqCard, kNestArrEst, "na", "{$eq: [[3]]}", isSargable);
 
     // Note: we can't convert range queries on arrays to SargableNodes yet. If we ever can, we
     // should add some more tests here.
@@ -1178,27 +1200,49 @@ TEST_F(CEHistogramTest, TestNestedArrayTypeCounterPredicates) {
 
 TEST_F(CEHistogramTest, TestFallbackForNonConstIntervals) {
     // This is a sanity test to validate fallback for an interval with non-const bounds.
-    IntervalRequirement intervalLowNonConst{
-        BoundRequirement(true /*inclusive*/, make<Variable>("v1")),
-        BoundRequirement::makePlusInf()};
 
-    IntervalRequirement intervalHighNonConst{
-        BoundRequirement::makeMinusInf(),
-        BoundRequirement(true /*inclusive*/, make<Variable>("v2"))};
+    // Validate we pick a histogram when we can.
+    {
+        IntervalRequirement interval{BoundRequirement(true /*inclusive*/, Constant::int32(1)),
+                                     BoundRequirement(true /*inclusive*/, Constant::int32(2))};
+        const auto [mode, low, high] = analyzeIntervalEstimationMode(interval);
+        ASSERT_EQ(mode, kUseHistogram);
+        ASSERT(low && high);
+    }
 
-    IntervalRequirement intervalEqNonConst{
-        BoundRequirement(true /*inclusive*/, make<Variable>("v3")),
-        BoundRequirement(true /*inclusive*/, make<Variable>("v3"))};
+    // Validate that we use type counts for non-histogrammable types.
+    {
+        IntervalRequirement interval{BoundRequirement(true /*inclusive*/, Constant::boolean(true)),
+                                     BoundRequirement(true /*inclusive*/, Constant::boolean(true))};
+        const auto [mode, low, high] = analyzeIntervalEstimationMode(interval);
+        ASSERT_EQ(mode, kUseTypeCounts);
+        ASSERT(low && !high);
+    }
 
-    const auto estInterval = [](const auto& interval) {
-        const auto ah = ArrayHistogram::make();
-        return estimateIntervalCardinality(
-            *ah, interval, {100} /* inputCardinality */, true /* includeScalar */);
-    };
+    // Validate cases where we have non-const bounds.
+    {
+        IntervalRequirement interval{BoundRequirement(true /*inclusive*/, make<Variable>("v1")),
+                                     BoundRequirement::makePlusInf()};
+        const auto [mode, low, high] = analyzeIntervalEstimationMode(interval);
+        ASSERT_EQ(mode, kFallback);
+        ASSERT(!low && !high);
+    }
 
-    ASSERT_EQ(estInterval(intervalLowNonConst)._value, -1.0);
-    ASSERT_EQ(estInterval(intervalHighNonConst)._value, -1.0);
-    ASSERT_EQ(estInterval(intervalEqNonConst)._value, -1.0);
+    {
+        IntervalRequirement interval{BoundRequirement::makeMinusInf(),
+                                     BoundRequirement(true /*inclusive*/, make<Variable>("v2"))};
+        const auto [mode, low, high] = analyzeIntervalEstimationMode(interval);
+        ASSERT_EQ(mode, kFallback);
+        ASSERT(!low && !high);
+    }
+
+    {
+        IntervalRequirement interval{BoundRequirement(true /*inclusive*/, make<Variable>("v3")),
+                                     BoundRequirement(true /*inclusive*/, make<Variable>("v3"))};
+        const auto [mode, low, high] = analyzeIntervalEstimationMode(interval);
+        ASSERT_EQ(mode, kFallback);
+        ASSERT(!low && !high);
+    }
 }
 
 TEST_F(CEHistogramTest, TestHistogramNeq) {

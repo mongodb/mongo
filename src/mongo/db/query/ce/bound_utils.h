@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,40 +27,43 @@
  *    it in the license file.
  */
 
-#pragma once
-
-#include "mongo/db/query/optimizer/cascades/interfaces.h"
-#include "mongo/db/query/stats/collection_statistics.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/optimizer/index_bounds.h"
 
 namespace mongo::optimizer::ce {
 
-enum IntervalEstimationMode { kUseHistogram, kUseTypeCounts, kFallback };
-using IntervalEstimation =
-    std::tuple<IntervalEstimationMode,
-               boost::optional<std::reference_wrapper<const BoundRequirement>>,
-               boost::optional<std::reference_wrapper<const BoundRequirement>>>;
+/**
+ * Helper function to extract a tag & value from an ABT node if it turns out to be a Constant node
+ * with constant bounds (or boost::none if not).
+ */
+boost::optional<std::pair<sbe::value::TypeTags, sbe::value::Value>> getConstTypeVal(const ABT& abt);
 
 /**
- * Analyzes an interval to define an estimation mode and summarize the bounds. This method is in the
- * header for unit tests to use.
+ * Helper function to extract a tag from 'abt' if it turns out to be a Constant node with constant
+ * bounds (or boost::none if not).
  */
-IntervalEstimation analyzeIntervalEstimationMode(const IntervalRequirement& interval);
+boost::optional<sbe::value::TypeTags> getConstTypeTag(const ABT& abt);
 
-class HistogramTransport;
+/**
+ * Helper function to extract an sbe tag & value from the given 'boundReq' if possible, or
+ * boost::none if not.
+ */
+boost::optional<std::pair<sbe::value::TypeTags, sbe::value::Value>> getBound(
+    const BoundRequirement& boundReq);
 
-class HistogramEstimator : public cascades::CardinalityEstimator {
-public:
-    HistogramEstimator(std::shared_ptr<stats::CollectionStatistics> stats,
-                       std::unique_ptr<cascades::CardinalityEstimator> fallbackCE);
-    ~HistogramEstimator();
+/**
+ * Helper function to extract the TypeTag from the given 'boundReq' or boost::none if not.
+ */
+boost::optional<sbe::value::TypeTags> getBoundReqTypeTag(const BoundRequirement& boundReq);
 
-    CEType deriveCE(const Metadata& metadata,
-                    const cascades::Memo& memo,
-                    const properties::LogicalProps& logicalProps,
-                    ABT::reference_type logicalNodeRef) const final;
+/**
+ * Helper function to return the interval corresponding to a given 'type'.
+ */
+IntervalRequirement getMinMaxIntervalForType(sbe::value::TypeTags type);
 
-private:
-    std::unique_ptr<HistogramTransport> _transport;
-};
+/**
+ * Helper function to determine if the given 'interval' is a subset of the given 'type'.
+ */
+bool isIntervalSubsetOfType(const IntervalRequirement& interval, sbe::value::TypeTags type);
 
 }  // namespace mongo::optimizer::ce

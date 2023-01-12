@@ -30,18 +30,105 @@
 #include "mongo/db/query/ce/histogram_estimator.h"
 
 #include "mongo/db/pipeline/abt/utils.h"
+
+#include "mongo/db/query/ce/bound_utils.h"
+#include "mongo/db/query/ce/heuristic_predicate_estimation.h"
 #include "mongo/db/query/ce/histogram_predicate_estimation.h"
+
 #include "mongo/db/query/cqf_command_utils.h"
+
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/utils/abt_hash.h"
 #include "mongo/db/query/optimizer/utils/ce_math.h"
 #include "mongo/db/query/optimizer/utils/memo_utils.h"
+
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo::optimizer::ce {
+
 namespace {
+/**
+ * Returns how many values of the given type are known by the array histogram, and may apply
+ * heuristics to adjust the count estimate for the case where the counters don't have enough
+ * information for us to accurately estimate the given interval.
+ */
+CEType estimateIntervalByTypeCount(const stats::ArrayHistogram& ah,
+                                   const IntervalRequirement& interval,
+                                   const BoundRequirement& bound,
+                                   CEType childResult,
+                                   bool includeScalar) {
+    const auto [tag, val] = *getBound(bound);
+    CEType count{0.0};
+
+    if (includeScalar) {
+        // Include scalar type count estimate.
+        switch (tag) {
+            case sbe::value::TypeTags::Boolean: {
+                // In the case of booleans, we have separate true/false counters we can use.
+                const bool estTrue = sbe::value::bitcastTo<bool>(val);
+                if (estTrue) {
+                    count = {ah.getTrueCount()};
+                } else {
+                    count = {ah.getFalseCount()};
+                }
+                break;
+            }
+            case sbe::value::TypeTags::Array: {
+                // Note that if we are asked by the optimizer to estimate an interval whose bounds
+                // are arrays, this means we are trying to estimate equality on nested arrays. In
+                // this case, we do not want to include the "scalar" type counter for the array
+                // type, because this will cause us to estimate the nested array case as counting
+                // all arrays, regardless of whether or not they are nested.
+                break;
+            }
+            case sbe::value::TypeTags::Null: {
+                // The predicate {$eq: null} matches both missing and null values.
+                count = {ah.getTypeCount(sbe::value::TypeTags::Nothing)};
+                count += {ah.getTypeCount(sbe::value::TypeTags::Null)};
+                break;
+            }
+            default: {
+                // We know the total count of values for this type; however, the interval given will
+                // likely not include all values. We therefore heuristically apply a default
+                // selectivity to the count of values of that type.
+                if (const CEType tc{ah.getTypeCount(tag)}; tc > 0.0) {
+                    count = heuristicIntervalCard(interval, tc);
+                }
+            }
+        }
+    }
+
+    if (ah.isArray()) {
+        // If this histogram includes an array counter for this type, add its value to the estimate.
+        const CEType tagArrCount{ah.getArrayTypeCount(tag)};
+        if (tagArrCount > 0.0) {
+            switch (tag) {
+                case sbe::value::TypeTags::Boolean: {
+                    // We have a count of all arrays that contain any booleans and we assume that
+                    // half of them will match for true and the other half will match for false. As
+                    // a note, we could have arrays which contain both values and match in both
+                    // cases.
+                    count += kDefaultArrayBoolSel * tagArrCount;
+                    break;
+                }
+                case sbe::value::TypeTags::Null: {
+                    // We have an exact count of arrays that contain nulls, so we want to return it.
+                    count += tagArrCount;
+                    break;
+                }
+                default: {
+                    // We heuristically assume a default selectivity for the given tag.
+                    count += heuristicIntervalCard(interval, tagArrCount);
+                }
+            }
+        }
+    }
+
+    return count;
+}
+
 /**
  * This transport combines chains of PathGets and PathTraverses into an MQL-like string path.
  */
@@ -76,6 +163,43 @@ std::string serializePath(const ABT& path) {
 }
 
 }  // namespace
+
+IntervalEstimation analyzeIntervalEstimationMode(const IntervalRequirement& interval) {
+    const auto& lowBound = interval.getLowBound();
+    const auto lowTag = getBoundReqTypeTag(lowBound);
+    if (!lowTag) {
+        return {kFallback, boost::none, boost::none};
+    }
+
+    const auto& highBound = interval.getHighBound();
+    const auto highTag = getBoundReqTypeTag(highBound);
+    if (!highTag) {
+        return {kFallback, boost::none, boost::none};
+    }
+
+    // Check if this interval deals with a type that should be estimated via histograms. We may get
+    // an interval where one bound is histogrammable but the other is not, as in the case where we
+    // have an upper or lower bound which is exclusive and is the first value in the next
+    // type-bracket which is not histogrammable.
+    if (stats::canEstimateTypeViaHistogram(*lowTag) ||
+        stats::canEstimateTypeViaHistogram(*highTag)) {
+        return {kUseHistogram,
+                boost::make_optional(std::reference_wrapper(lowBound)),
+                boost::make_optional(std::reference_wrapper(highBound))};
+    }
+
+    // If neither type is histogrammable, we may still be able to estimate this interval using type
+    // counts; check if this interval includes only values of one type.
+    if (lowTag == highTag || isIntervalSubsetOfType(interval, *lowTag)) {
+        return {
+            kUseTypeCounts, boost::make_optional(std::reference_wrapper(lowBound)), boost::none};
+    } else if (isIntervalSubsetOfType(interval, *highTag)) {
+        return {
+            kUseTypeCounts, boost::none, boost::make_optional(std::reference_wrapper(highBound))};
+    }
+
+    return {kFallback, boost::none, boost::none};
+}
 
 class HistogramTransport {
 public:
@@ -118,6 +242,12 @@ public:
             return {0.0};
         }
 
+        const auto useFallbackEstimator = [&](const std::string& serializedPath) {
+            OPTIMIZER_DEBUG_LOG(
+                7151300, 5, "Falling back to heuristic CE", "path"_attr = serializedPath);
+            return _fallbackCE->deriveCE(metadata, memo, logicalProps, n.ref());
+        };
+
         // Initial first pass through the requirements map to extract information about each path.
         std::map<std::string, SargableConjunct> conjunctRequirements;
         for (const auto& [key, req] : node.getReqMap()) {
@@ -154,9 +284,7 @@ public:
                 // the fallback (currently HeuristicCE), we can't combine heuristic & histogram
                 // estimates. In this case, default to Heuristic if we don't have a histogram for
                 // any of the predicates.
-                OPTIMIZER_DEBUG_LOG(
-                    7151300, 5, "Falling back to heuristic CE", "path"_attr = serializedPath);
-                return _fallbackCE->deriveCE(metadata, memo, logicalProps, n.ref());
+                return useFallbackEstimator(serializedPath);
             }
 
             // Add this path to the map. If this is not a 'PathArr' interval, add it to the vector
@@ -191,11 +319,54 @@ public:
                     std::vector<SelectivityType> conjSelectivities;
                     for (const auto& conjunct : conjuncts) {
                         const auto& interval = conjunct.cast<IntervalReqExpr::Atom>()->getExpr();
-                        auto cardinality =
-                            ce::estimateIntervalCardinality(conjunctReq.histogram,
-                                                            interval,
-                                                            childResult,
-                                                            conjunctReq.includeScalar);
+
+                        CEType cardinality;
+                        if (interval.isFullyOpen()) {
+                            // No need to estimate, as we're just going to return all inputs.
+                            cardinality = childResult;
+                        } else {
+                            // Determine how this interval will be estimated.
+                            const auto [mode, lowBound, highBound] =
+                                analyzeIntervalEstimationMode(interval);
+                            switch (mode) {
+                                case IntervalEstimationMode::kUseHistogram: {
+                                    const auto [lowTag, lowVal] = *getBound(lowBound->get());
+                                    if (interval.isEquality()) {
+                                        cardinality = estimateCardEq(conjunctReq.histogram,
+                                                                     lowTag,
+                                                                     lowVal,
+                                                                     conjunctReq.includeScalar);
+                                    } else {
+                                        const auto [highTag, highVal] = *getBound(highBound->get());
+                                        cardinality =
+                                            estimateCardRange(conjunctReq.histogram,
+                                                              lowBound->get().isInclusive(),
+                                                              lowTag,
+                                                              lowVal,
+                                                              highBound->get().isInclusive(),
+                                                              highTag,
+                                                              highVal,
+                                                              conjunctReq.includeScalar);
+                                    }
+                                    break;
+                                }
+                                case IntervalEstimationMode::kUseTypeCounts: {
+                                    const auto bound = lowBound ? *lowBound : *highBound;
+                                    cardinality =
+                                        estimateIntervalByTypeCount(conjunctReq.histogram,
+                                                                    interval,
+                                                                    bound,
+                                                                    childResult,
+                                                                    conjunctReq.includeScalar);
+                                    break;
+                                }
+                                case IntervalEstimationMode::kFallback: {
+                                    return useFallbackEstimator(serializedPath);
+                                }
+                                default: { MONGO_UNREACHABLE; }
+                            }
+                        }
+
                         OPTIMIZER_DEBUG_LOG(7151301,
                                             5,
                                             "Estimated path and interval using histograms.",
@@ -204,30 +375,17 @@ public:
                                                 ExplainGenerator::explainInterval(interval),
                                             "ce"_attr = cardinality._value);
 
-                        // We may still not have been able to estimate the interval using
-                        // histograms, for instance if the interval bounds were non-Constant. In
-                        // this case, we should fallback to heuristics.
-                        if (cardinality < 0) {
-                            OPTIMIZER_DEBUG_LOG(7151302,
-                                                5,
-                                                "Falling back to heuristic CE",
-                                                "path"_attr = serializedPath,
-                                                "interval"_attr =
-                                                    ExplainGenerator::explainInterval(interval));
-                            return _fallbackCE->deriveCE(metadata, memo, logicalProps, n.ref());
-                        }
-
                         // We have to convert the cardinality to a selectivity. The histogram
                         // returns the cardinality for the entire collection; however, fewer records
                         // may be expected at the SargableNode.
                         conjSelectivities.push_back(cardinality / totalCard);
                     }
 
-                    auto backoff = ce::conjExponentialBackoff(std::move(conjSelectivities));
+                    const auto backoff = conjExponentialBackoff(std::move(conjSelectivities));
                     disjSelectivities.push_back(backoff);
                 }
 
-                auto backoff = ce::disjExponentialBackoff(std::move(disjSelectivities));
+                const auto backoff = disjExponentialBackoff(std::move(disjSelectivities));
                 OPTIMIZER_DEBUG_LOG(7151303,
                                     5,
                                     "Estimating disjunction on path using histograms",
@@ -241,7 +399,7 @@ public:
 
         // The elements of the PartialSchemaRequirements map represent an implicit conjunction.
         if (!topLevelSelectivities.empty()) {
-            auto backoff = ce::conjExponentialBackoff(std::move(topLevelSelectivities));
+            const auto backoff = conjExponentialBackoff(std::move(topLevelSelectivities));
             childResult *= backoff;
         }
         OPTIMIZER_DEBUG_LOG(7151304,

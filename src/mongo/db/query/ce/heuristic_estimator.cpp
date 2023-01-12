@@ -29,214 +29,14 @@
 
 #include "mongo/db/query/ce/heuristic_estimator.h"
 
+#include "mongo/db/query/ce/heuristic_predicate_estimation.h"
+
 #include "mongo/db/query/optimizer/cascades/memo.h"
 #include "mongo/db/query/optimizer/utils/ce_math.h"
+
 #include "mongo/util/assert_util.h"
 
 namespace mongo::optimizer::ce {
-// Invalid estimate - an arbitrary negative value used for initialization.
-constexpr SelectivityType kInvalidSel{-1.0};
-
-constexpr SelectivityType kDefaultFilterSel{0.1};
-constexpr SelectivityType kDefaultExistsSel{0.70};
-
-// The selectivities used in the piece-wise function for open-range intervals.
-// Note that we assume a smaller input cardinality will result in a less selective range.
-constexpr SelectivityType kSmallCardOpenRangeSel{0.70};
-constexpr SelectivityType kMediumCardOpenRangeSel{0.45};
-constexpr SelectivityType kLargeCardOpenRangeSel{0.33};
-
-// The selectivities used in the piece-wise function for closed-range intervals.
-// Note that we assume a smaller input cardinality will result in a less selective range.
-constexpr SelectivityType kSmallCardClosedRangeSel{0.50};
-constexpr SelectivityType kMediumCardClosedRangeSel{0.33};
-constexpr SelectivityType kLargeCardClosedRangeSel{0.20};
-
-// Global and Local selectivity should multiply to the Complete selectivity.
-constexpr SelectivityType kDefaultCompleteGroupSel{0.01};
-constexpr SelectivityType kDefaultLocalGroupSel{0.02};
-constexpr SelectivityType kDefaultGlobalGroupSel{0.5};
-
-// The following constants are the steps used in the piece-wise functions that select selectivies
-// based on input cardinality.
-constexpr CEType kSmallLimit{20.0};
-constexpr CEType kMediumLimit{100.0};
-
-// Assumed average number of elements in an array. This is a unitless constant.
-constexpr double kDefaultAverageArraySize{10.0};
-
-/**
- * Default selectivity of equalities. To avoid super small selectivities for small
- * cardinalities, that would result in 0 cardinality for many small inputs, the
- * estimate is scaled as inputCard grows. The bigger inputCard, the smaller the
- * selectivity.
- */
-SelectivityType equalitySel(const CEType inputCard) {
-    uassert(6716604, "Zero cardinality must be handled by the caller.", inputCard > 0.0);
-    if (inputCard <= 1.0) {
-        // If the input has < 1 values, it cannot be reduced any further by a condition.
-        return {1.0};
-    }
-    return {1.0 / std::sqrt(inputCard._value)};
-}
-
-/**
- * Default selectivity of intervals with bounds on both ends. These intervals are
- * considered less selective than equalities.
- * Examples: (a > 'abc' AND a < 'hta'), (0 < b <= 13)
- */
-SelectivityType closedRangeSel(const CEType inputCard) {
-    SelectivityType sel = kInvalidSel;
-    if (inputCard < kSmallLimit) {
-        sel = kSmallCardClosedRangeSel;
-    } else if (inputCard < kMediumLimit) {
-        sel = kMediumCardClosedRangeSel;
-    } else {
-        sel = kLargeCardClosedRangeSel;
-    }
-    return sel;
-}
-
-/**
- * Default selectivity of intervals open on one end. These intervals are
- * considered less selective than those with both ends specified by the user query.
- * Examples: (a > 'xyz'), (b <= 13)
- */
-SelectivityType openRangeSel(const CEType inputCard) {
-    SelectivityType sel = kInvalidSel;
-    if (inputCard < kSmallLimit) {
-        sel = kSmallCardOpenRangeSel;
-    } else if (inputCard < kMediumLimit) {
-        sel = kMediumCardOpenRangeSel;
-    } else {
-        sel = kLargeCardOpenRangeSel;
-    }
-    return sel;
-}
-
-mongo::sbe::value::TypeTags constType(const Constant* constBoundPtr) {
-    if (constBoundPtr == nullptr) {
-        return mongo::sbe::value::TypeTags::Nothing;
-    }
-    const auto [tag, val] = constBoundPtr->get();
-    return tag;
-}
-
-mongo::sbe::value::TypeTags boundType(const BoundRequirement& bound) {
-    return constType(bound.getBound().cast<Constant>());
-}
-
-SelectivityType intervalSel(const IntervalRequirement& interval, const CEType inputCard) {
-    SelectivityType sel = kInvalidSel;
-    if (interval.isFullyOpen()) {
-        sel = {1.0};
-    } else if (interval.isEquality()) {
-        sel = equalitySel(inputCard);
-    } else if (interval.getHighBound().isPlusInf() || interval.getLowBound().isMinusInf() ||
-               boundType(interval.getLowBound()) != boundType(interval.getHighBound())) {
-        // The interval has an actual bound only on one of it ends if:
-        // - one of the bounds is infinite, or
-        // - both bounds are of a different type - this is the case when due to type bracketing
-        //   one of the bounds is the lowest/highest value of the previous/next type.
-        // TODO: Notice that sometimes type bracketing uses a min/max value from the same type,
-        // so sometimes we may not detect an open-ended interval.
-        sel = openRangeSel(inputCard);
-    } else {
-        sel = closedRangeSel(inputCard);
-    }
-    uassert(6716603, "Invalid selectivity.", validSelectivity(sel));
-    return sel;
-}
-
-SelectivityType operationSel(const Operations op, const CEType inputCard) {
-    switch (op) {
-        case Operations::Eq:
-            return equalitySel(inputCard);
-        case Operations::Neq:
-            return negateSel(equalitySel(inputCard));
-        case Operations::EqMember:
-            // Reached when the query has $in. We don't handle it yet.
-            return kDefaultFilterSel;
-        case Operations::Gt:
-        case Operations::Gte:
-        case Operations::Lt:
-        case Operations::Lte:
-            return openRangeSel(inputCard);
-        default:
-            MONGO_UNREACHABLE;
-    }
-}
-
-SelectivityType intervalSel(const PathCompare& left,
-                            const PathCompare& right,
-                            const CEType inputCard) {
-    if (left.op() == Operations::EqMember || right.op() == Operations::EqMember) {
-        // Reached when the query has $in. We don't handle it yet.
-        return kDefaultFilterSel;
-    }
-
-    bool lowBoundUnknown = false;
-    bool highBoundUnknown = false;
-    boost::optional<mongo::sbe::value::TypeTags> lowBoundType;
-    boost::optional<mongo::sbe::value::TypeTags> highBoundType;
-
-    for (const auto& compare : {left, right}) {
-        switch (compare.op()) {
-            case Operations::Eq: {
-                // This branch is reached when we have a conjunction of equalities on the same path.
-                uassert(6777601,
-                        "Expected conjunction of equalities.",
-                        left.op() == Operations::Eq && right.op() == Operations::Eq);
-
-                const auto leftConst = left.getVal().cast<Constant>();
-                const auto rightConst = right.getVal().cast<Constant>();
-                if (leftConst && rightConst && !(*leftConst == *rightConst)) {
-                    // Equality comparison on different constants is a contradiction.
-                    return {0.0};
-                }
-                // We can't tell if the equalities result in a contradiction or not, so we use the
-                // default equality selectivity.
-                return equalitySel(inputCard);
-            }
-            case Operations::Gt:
-            case Operations::Gte:
-                lowBoundUnknown = lowBoundUnknown || compare.getVal().is<Variable>();
-                lowBoundType = constType(compare.getVal().cast<Constant>());
-                break;
-            case Operations::Lt:
-            case Operations::Lte:
-                highBoundUnknown = highBoundUnknown || compare.getVal().is<Variable>();
-                highBoundType = constType(compare.getVal().cast<Constant>());
-                break;
-            default:
-                MONGO_UNREACHABLE;
-        }
-    }
-
-    if (lowBoundType && highBoundType &&
-        (lowBoundType == highBoundType || lowBoundUnknown || highBoundUnknown)) {
-        // Interval is closed only if:
-        // - it has low and high bounds
-        // - bounds are of the same type
-        //
-        // If bounds are of a different type, it implies that one bound is the
-        // lowest/highest value of the previous/next type and has been added for type bracketing
-        // purposes. We treat such bounds as infinity.
-        //
-        // If there are unknown boundaries (Variables), we assume that they are of the same type
-        // as the other bound.
-        //
-        // TODO: Notice that sometimes type bracketing uses a min/max value from the same type,
-        // so sometimes we may not detect an open-ended interval.
-        return closedRangeSel(inputCard);
-    }
-
-    if (lowBoundType || highBoundType) {
-        return openRangeSel(inputCard);
-    }
-
-    MONGO_UNREACHABLE;
-}
 
 /**
  * Heuristic selectivity estimation for EvalFilter nodes. Used for estimating cardinalities of
@@ -285,7 +85,7 @@ public:
                                           CEType inputCard,
                                           EvalFilterSelectivityResult /*childResult*/) {
         // Note that the result will be ignored if this operation is part of an interval.
-        const SelectivityType sel = operationSel(node.op(), inputCard);
+        const SelectivityType sel = heuristicOperationSel(node.op(), inputCard);
         return {{}, &node, sel};
     }
 
@@ -297,7 +97,7 @@ public:
             leftChildResult.path == rightChildResult.path;
 
         const SelectivityType sel = isInterval
-            ? intervalSel(*leftChildResult.compare, *rightChildResult.compare, inputCard)
+            ? heuristicIntervalSel(*leftChildResult.compare, *rightChildResult.compare, inputCard)
             : conjunctionSel(leftChildResult.selectivity, rightChildResult.selectivity);
 
         return {{}, nullptr, sel};
@@ -440,7 +240,7 @@ public:
                 std::vector<SelectivityType> conjSelectivities;
                 for (const auto& conjunct : conjuncts) {
                     const auto& interval = conjunct.cast<IntervalReqExpr::Atom>()->getExpr();
-                    const SelectivityType sel = intervalSel(interval, childResult);
+                    const SelectivityType sel = heuristicIntervalSel(interval, childResult);
                     conjSelectivities.push_back(sel);
                 }
                 conjSel = conjExponentialBackoff(std::move(conjSelectivities));

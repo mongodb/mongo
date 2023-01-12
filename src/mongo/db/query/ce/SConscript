@@ -5,12 +5,46 @@ Import("env")
 env = env.Clone()
 
 env.Library(
+    target="ce_utils",
+    source=[
+        'bound_utils.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/pipeline/abt_utils',
+        '$BUILD_DIR/mongo/db/query/optimizer/optimizer_rewrites',
+    ],
+)
+
+env.Library(
+    target="ce_heuristic_estimation",
+    source=[
+        'heuristic_predicate_estimation.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/query/optimizer/optimizer_memo',
+        'ce_utils',
+    ],
+)
+
+env.Library(
+    target="ce_histogram_estimation",
+    source=[
+        'histogram_predicate_estimation.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/stats/stats_histograms',
+        'ce_utils',
+    ],
+)
+
+env.Library(
     target="query_ce_heuristic",
     source=[
         'heuristic_estimator.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/query/optimizer/optimizer_memo',
+        'ce_heuristic_estimation',
     ],
 )
 
@@ -29,13 +63,13 @@ env.Library(
     target="query_ce_histogram",
     source=[
         'histogram_estimator.cpp',
-        'histogram_predicate_estimation.cpp',
+    ],
+    LIBDEPS=[
+        'ce_histogram_estimation',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/pipeline/abt_utils',
         '$BUILD_DIR/mongo/db/query/optimizer/optimizer_memo',
-        '$BUILD_DIR/mongo/db/query/optimizer/optimizer_rewrites',
-        '$BUILD_DIR/mongo/db/query/stats/stats_histograms',
+        'ce_heuristic_estimation',
     ],
 )
 
