@@ -796,8 +796,8 @@ void SessionWorkflow::Impl::_cleanupExhaustResources() {
 
 void SessionWorkflow::Impl::_cleanupSession(const Status& status) {
     LOGV2_DEBUG(5127900, 2, "Ending session", "error"_attr = status);
-    _taskRunner = {};
     _cleanupExhaustResources();
+    _taskRunner = {};
     _sep->onClientDisconnect(client());
 }
 
