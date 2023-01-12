@@ -1,0 +1,29 @@
+# Golden test output of ABTPlanGeneration/LowerSeekNode
+
+==== VARIATION: index seek ====
+-- INPUT:
+NestedLoopJoin [joinType: Inner, {rid}]
+|   |   Const [true]
+|   LimitSkip []
+|   |   limitSkip:
+|   |       limit: 1
+|   |       skip: 0
+|   Seek [ridProjection: rid, {'<root>': scan0}, collName]
+|   |   BindBlock:
+|   |       [scan0]
+|   |           Source []
+|   RefBlock: 
+|       Variable [rid]
+IndexScan [{'<rid>': rid}, scanDefName: collName, indexDefName: index0, interval: {(Const [23], Const [35]]}]
+    BindBlock:
+        [rid]
+            Source []
+
+-- OUTPUT:
+[3] nlj inner [] [s1] {true} 
+    left 
+        [0] ixseek ks(2ll, 0, 23L, 2ll) ks(2ll, 0, 35L, 2ll) none s1 none [] @"<collUUID>" @"<collUUID>" true 
+    right 
+        [2] limitskip 1 0 
+        [1] seek s1 s2 none none none none none [] @"<collUUID>" true false 
+

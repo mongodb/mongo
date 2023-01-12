@@ -602,6 +602,35 @@ TEST_F(ABTPlanGeneration, LowerPhysicalScanNode) {
     }
 }
 
+TEST_F(ABTPlanGeneration, LowerSeekNode) {
+    GoldenTestContext ctx(&goldenTestConfig);
+    ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
+
+    auto indexScan =
+        _node(make<IndexScanNode>(FieldProjectionMap{{ProjectionName{"rid"}}, {}, {}},
+                                  "collName",
+                                  "index0",
+                                  CompoundIntervalRequirement{IntervalRequirement(
+                                      BoundRequirement(false, Constant::fromDouble(23)),
+                                      BoundRequirement(true, Constant::fromDouble(35)))},
+                                  false));
+
+    auto seek = _node(make<LimitSkipNode>(
+        properties::LimitSkipRequirement(1, 0),
+        _node(make<SeekNode>(ProjectionName{"rid"}, _fieldProjMap, "collName"))));
+
+    opt::unordered_map<std::string, IndexDefinition> indexDefs = {
+        {"index0", makeIndexDefinition("a", CollationOp::Ascending, false)}};
+
+    runNodeVariation(ctx,
+                     "index seek",
+                     _node(make<NestedLoopJoinNode>(JoinType::Inner,
+                                                    ProjectionNameSet{"rid"},
+                                                    Constant::boolean(true),
+                                                    std::move(indexScan),
+                                                    std::move(seek))),
+                     indexDefs);
+}
 TEST_F(ABTPlanGeneration, LowerSortedMergeNode) {
     GoldenTestContext ctx(&goldenTestConfig);
     ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
