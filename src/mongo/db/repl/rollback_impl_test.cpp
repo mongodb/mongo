@@ -47,6 +47,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_config_version.h"
 #include "mongo/stdx/thread.h"
@@ -2038,6 +2039,51 @@ TEST_F(RollbackImplObserverInfoTest,
     auto cmdObj = BSON("renameCollection" << fromNss.ns() << "to" << toNss.ns());
     auto cmdOp =
         makeCommandOp(Timestamp(2, 2), UUID::gen(), fromNss.getCommandNS().ns(), cmdObj, 2);
+
+    std::set<NamespaceString> expectedNamespaces = {fromNss, toNss};
+    auto namespaces =
+        unittest::assertGet(_rollback->_namespacesForOp_forTest(OplogEntry(cmdOp.first)));
+    ASSERT(expectedNamespaces == namespaces);
+}
+
+TEST_F(RollbackImplObserverInfoTest,
+       NamespacesForOpsExtractsNamespacesOfRenameCollectionOplogEntryWithMultitenancy) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+
+    boost::optional<TenantId> tid(OID::gen());
+    auto fromNss = NamespaceString(tid, "test", "source");
+    auto toNss = NamespaceString(tid, "test", "dest");
+
+    auto cmdObj = BSON("renameCollection" << NamespaceStringUtil::serialize(fromNss) << "to"
+                                          << NamespaceStringUtil::serialize(toNss));
+    auto cmdOp = makeCommandOp(
+        Timestamp(2, 2), UUID::gen(), NamespaceStringUtil::serialize(fromNss), cmdObj, 2);
+
+
+    std::set<NamespaceString> expectedNamespaces = {fromNss, toNss};
+    auto namespaces =
+        unittest::assertGet(_rollback->_namespacesForOp_forTest(OplogEntry(cmdOp.first)));
+    ASSERT(expectedNamespaces == namespaces);
+}
+
+TEST_F(RollbackImplObserverInfoTest,
+       NamespacesForOpsExtractsNamespacesOfRenameCollectionOplogEntryRequiresTenantId) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+
+    boost::optional<TenantId> tid(OID::gen());
+    auto fromNss = NamespaceString(tid, "test", "source");
+    auto toNss = NamespaceString(tid, "test", "dest");
+
+    auto cmdObj = BSON("renameCollection" << NamespaceStringUtil::serialize(fromNss) << "to"
+                                          << NamespaceStringUtil::serialize(toNss));
+    auto cmdOp = makeCommandOp(Timestamp(2, 2),
+                               UUID::gen(),
+                               NamespaceStringUtil::serialize(fromNss),
+                               cmdObj,
+                               2,
+                               boost::none,
+                               tid);
 
     std::set<NamespaceString> expectedNamespaces = {fromNss, toNss};
     auto namespaces =

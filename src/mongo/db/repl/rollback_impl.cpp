@@ -418,8 +418,10 @@ StatusWith<std::set<NamespaceString>> RollbackImpl::_namespacesForOp(const Oplog
         switch (oplogEntry.getCommandType()) {
             case OplogEntry::CommandType::kRenameCollection: {
                 // Add both the 'from' and 'to' namespaces.
-                namespaces.insert(NamespaceString(firstElem.valueStringDataSafe()));
-                namespaces.insert(NamespaceString(obj.getStringField("to")));
+                namespaces.insert(NamespaceStringUtil::deserialize(
+                    opNss.tenantId(), firstElem.valueStringDataSafe()));
+                namespaces.insert(
+                    NamespaceStringUtil::deserialize(opNss.tenantId(), obj.getStringField("to")));
                 break;
             }
             case OplogEntry::CommandType::kDropDatabase: {
@@ -1042,7 +1044,8 @@ Status RollbackImpl::_processRollbackOp(OperationContext* opCtx, const OplogEntr
             if (auto countResult = _parseDroppedCollectionCount(oplogEntry)) {
                 PendingDropInfo info;
                 info.count = *countResult;
-                info.nss = NamespaceString(oplogEntry.getObject()[kToFieldName].String());
+                info.nss = NamespaceStringUtil::deserialize(
+                    opNss.tenantId(), oplogEntry.getObject()[kToFieldName].String());
                 _pendingDrops[dropTargetUUID] = info;
                 _newCounts[dropTargetUUID] = info.count;
             } else {
@@ -1239,7 +1242,7 @@ boost::optional<BSONObj> RollbackImpl::_findDocumentById(OperationContext* opCtx
                                                          UUID uuid,
                                                          NamespaceString nss,
                                                          BSONElement id) {
-    auto document = _storageInterface->findById(opCtx, {nss.db().toString(), uuid}, id);
+    auto document = _storageInterface->findById(opCtx, {nss.dbName(), uuid}, id);
     if (document.isOK()) {
         return document.getValue();
     } else if (document.getStatus().code() == ErrorCodes::NoSuchKey) {

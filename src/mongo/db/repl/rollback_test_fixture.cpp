@@ -175,7 +175,8 @@ std::pair<BSONObj, RecordId> RollbackTest::makeCommandOp(Timestamp ts,
                                                          StringData nss,
                                                          BSONObj cmdObj,
                                                          int recordId,
-                                                         boost::optional<BSONObj> o2) {
+                                                         boost::optional<BSONObj> o2,
+                                                         boost::optional<TenantId> tid) {
 
     BSONObjBuilder bob;
     bob.append("ts", ts);
@@ -183,6 +184,8 @@ std::pair<BSONObj, RecordId> RollbackTest::makeCommandOp(Timestamp ts,
     if (uuid) {  // Not all ops have UUID fields.
         uuid.value().appendToBuilder(&bob, "ui");
     }
+    if (tid)
+        tid->serializeToBSON("tid", &bob);
     bob.append("ns", nss);
     bob.append("o", cmdObj);
     if (o2) {

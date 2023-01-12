@@ -97,7 +97,8 @@ public:
                                                       StringData nss,
                                                       BSONObj cmdObj,
                                                       int recordId,
-                                                      boost::optional<BSONObj> o2 = boost::none);
+                                                      boost::optional<BSONObj> o2 = boost::none,
+                                                      boost::optional<TenantId> tid = boost::none);
 
     /**
      * Creates an oplog entry with a recordId for a command operation. The oplog entry will not have
