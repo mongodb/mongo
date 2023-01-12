@@ -60,7 +60,6 @@ venv
 /src/third_party/*/*.lastbuildstate
 /buildscripts/libdeps/graph_visualizer_web_stack/build
 /buildscripts/libdeps/graph_visualizer_web_stack/node_modules
-package-lock.json
 libdeps.graphml
 build-metrics.json
 config.log
@@ -168,8 +167,11 @@ CMakeLists.txt
 # XCode projects
 .xcworkspace
 
-# Visual Studio and VSCode projects
-.vscode/
+# VSCode projects
+.vscode/**
+!.vscode/linux-virtual-workstation.code-workspace
+
+# Visual Studio projects
 .vs/
 /x64/
 
@@ -253,3 +255,7 @@ report.json
 
 # suggested resmoke binary location
 dist-test/
+
+# node extra stuff (for someone installing eslint)
+node_modules/
+package-lock.json
