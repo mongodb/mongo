@@ -76,13 +76,13 @@ certain properties:
 
 In order to support queries on the time-series collection that could benefit from indexed access
 rather than collection scans, indexes may be created on the time, meta-data, and meta-data subfields
-of a time-series collection. Starting in v5.2, indexes on time-series collection measurement fields
+of a time-series collection. Starting in v6.0, indexes on time-series collection measurement fields
 are permitted. The index key specification provided by the user via `createIndex` will be converted
 to the underlying buckets collection's schema.
 * The details for mapping the index specification between the time-series collection and the
   underlying buckets collection may be found in
   [timeseries_index_schema_conversion_functions.h](timeseries_index_schema_conversion_functions.h).
-* Newly supported index types in v5.2 and up
+* Newly supported index types in v6.0 and up
   [store the original user index definition](https://github.com/mongodb/mongo/blob/cf80c11bc5308d9b889ed61c1a3eeb821839df56/src/mongo/db/timeseries/timeseries_commands_conversion_helper.cpp#L140-L147)
   on the transformed index definition. When mapping the bucket collection index to the time-series
   collection index, the original user index definition is returned.
@@ -106,17 +106,19 @@ Supported index types on the time field:
 * [Multikey](https://docs.mongodb.com/manual/core/index-multikey/).
 * [Indexes with collations](https://docs.mongodb.com/manual/indexes/#indexes-and-collation).
 
-Supported index types on the meta-data field and meta-data subfields:
+Supported index types on the metaField or its subfields:
 * All of the supported index types on the time field.
-* [2d](https://docs.mongodb.com/manual/core/2d/) in v5.2 and up.
-* [2dsphere](https://docs.mongodb.com/manual/core/2dsphere/) in v5.2 and up.
-* [Partial](https://docs.mongodb.com/manual/core/index-partial/) in v5.2 and up.
+* [2d](https://docs.mongodb.com/manual/core/2d/) from v6.0.
+* [2dsphere](https://docs.mongodb.com/manual/core/2dsphere/) from v6.0.
+* [Partial](https://docs.mongodb.com/manual/core/index-partial/) from v6.0.
 
-Supported index types on measurement fields in v5.2 and up only:
-* [Single](https://docs.mongodb.com/manual/core/index-single/).
-* [Compound](https://docs.mongodb.com/manual/core/index-compound/).
-* [2dsphere](https://docs.mongodb.com/manual/core/2dsphere/).
-* [Partial](https://docs.mongodb.com/manual/core/index-partial/).
+Supported index types on measurement fields in v6.0 and up only:
+* [Single](https://docs.mongodb.com/manual/core/index-single/) from v6.0.
+* [Compound](https://docs.mongodb.com/manual/core/index-compound/) from v6.0.
+* [2dsphere](https://docs.mongodb.com/manual/core/2dsphere/) from v6.0.
+* [Partial](https://docs.mongodb.com/manual/core/index-partial/) from v6.0.
+* [TTL](https://docs.mongodb.com/manual/core/index-ttl/) from v6.3. Must be used in conjunction with
+  a `partialFilterExpression` based on the metaField or its subfields.
 
 Index types that are not supported on time-series collections include
 [unique](https://docs.mongodb.com/manual/core/index-unique/), and
@@ -127,59 +129,103 @@ Index types that are not supported on time-series collections include
 In order to facilitate efficient bucketing, we maintain the set of open buckets in the
 `BucketCatalog` found in [bucket_catalog.h](bucket_catalog.h). At a high level, we attempt to group
 writes from concurrent writers into batches which can be committed together to minimize the number
-of underlying document writes. A writer will insert each document in its input batch to the
-`BucketCatalog`, which will return a handle to a `BucketCatalog::WriteBatch`. Upon finishing its
-inserts, the writer will check each write batch. If no other writer has already claimed commit
-rights to a batch, it will claim the rights and commit the batch itself; otherwise, it will set the
-batch aside to wait on later. When it has checked all batches, the writer will wait on each
-remaining batch to be committed by another writer.
+of underlying document writes. A writer will attempt to insert each document in its input batch to
+the `BucketCatalog`, which will return either a handle to a `BucketCatalog::WriteBatch` or
+information that can be used to retrieve a bucket from disk to reopen. A second attempt to insert
+the document, potentially into the reopened bucket, should return a `BucketCatalog::WriteBatch`.
+Upon finishing all of its inserts, the writer will check each write batch. If no other writer has
+already claimed commit rights to a batch, it will claim the rights and commit the batch itself;
+otherwise, it will set the batch aside to wait on later. When it has checked all batches, the writer
+will wait on each remaining batch to be committed by another writer.
 
 Internally, the `BucketCatalog` maintains a list of updates to each bucket document. When a batch
 is committed, it will pivot the insertions into the column-format for the buckets as well as
 determine any updates necessary for the `control` fields (e.g. `control.min` and `control.max`).
-
-Any time a bucket document is updated without going through the `BucketCatalog`, the writer needs
-to call `BucketCatalog::clear` for the document or namespace in question so that it can update its
-internal state and avoid writing any data which may corrupt the bucket format. This is typically
-handled by an op observer, but may be necessary to call from other places.
-
-A bucket is closed either manually, by setting the optional `control.closed` flag, or automatically
-by the `BucketCatalog` in a number of situations. If the `BucketCatalog` is using more memory than
-it's given threshold (controlled by the server parameter
-`timeseriesIdleBucketExpiryMemoryUsageThreshold`), it will start to close idle buckets. A bucket is
-considered idle if it is open and it does not have any uncommitted measurements pending. The
-`BucketCatalog` will also close a bucket if it contains more than the maximum number of measurements
-(`timeseriesBucketMaxCount`), if it contains more than the maximum amount of data
-(`timeseriesBucketMaxSize`), or if a new measurement would cause the bucket to span a greater
-amount of time between it's oldest and newest time stamp than is allowed (currently hard-coded to
-one hour). If an incoming measurement is schematically incompatible relative to the measurements 
-which have already landed in a given bucket, that bucket will be closed and is tracked with the
-`numBucketsClosedDueToSchemaChange` metric.
 
 The first time a write batch is committed for a given bucket, the newly-formed document is
 inserted. On subsequent batch commits, we perform an update operation. Instead of generating the
 full document (a so-called "classic" update), we create a DocDiff directly (a "delta" or "v2"
 update).
 
-# Granularity
+Any time a bucket document is updated without going through the `BucketCatalog`, the writer needs
+to notify the `BucketCatalog` by calling `timeseries::handleDirectWrite` or `BucketCatalog::clear` 
+so that it can update its internal state and avoid writing any data which may corrupt the bucket
+format.
 
-The `granularity` option for a time-series collection can be set at creation to be 'seconds',
-'minutes' or 'hours'. A later `collMod` operation can change the option from 'seconds' to 'minutes'
-or from 'minutes' to 'hours', but no other transitions are currently allowed. This parameter is
-intended to convey the rough time period between measurements in a given time-series, and is used to
-tweak other internal parameters that affect bucketing.
+### Bucket Reopening
 
-The maximum span of time that a single bucket is allowed to cover is controlled by `granularity`,
-with the maximum span being set to one hour for 'seconds', 24 hours for 'minutes', and 30 days
-for 'hours'.
+If an initial attempt to insert a measurement finds no open bucket, or finds an open bucket that is
+not suitable to house the incoming measurement, the `BucketCatalog` may return some information to
+the caller that can be used to retrieve a bucket from disk to reopen. In some cases, this will be
+the `_id` of an archived bucket (more details below). In other cases, this will be a set of filters
+to use for a query.
+
+The filters will include an exact match on the `metaField`, a range match on the `timeField`, and a
+missing or `false` value for `control.closed`. At least for v6.3, the filters will also specify
+`control.version: 1` to disallow selecting compressed buckets. The last restriction is for
+performance, and may be removed in the future if we improve decompression speed or deem the benefits
+to outweigh the cost.
+
+The query-based reopening path relies on a `{<metaField>: 1, <timeField>: 1}` index to execute
+efficiently. This index is created by default for new time series collections created in v6.3+. If
+the index does not exist, then query-based reopening will not be used.
+
+### Bucket Closure and Archival
+
+A bucket is permanently closed by setting the optional `control.closed` flag, which makes it
+ineligible for reopening. This can be done manually (e.g. for Online Archive), or automatically
+by the `BucketCatalog` in a number of situations, for instance if it contains more than the maximum
+number of measurements (`timeseriesBucketMaxCount`), if it contains more than the maximum amount of
+data (`timeseriesBucketMaxSize`), or if it detects a schema change.
+
+If the `BucketCatalog` is using more memory than it's given threshold (controlled by the server
+parameter `timeseriesIdleBucketExpiryMemoryUsageThreshold`), it will start to archive or close idle
+buckets. A bucket is considered idle if it is open and it does not have any uncommitted measurements
+pending. Archiving a bucket removes most of its in-memory state from the `BucketCatalog`, but
+retains a small record for quicker reopening in case we try to insert another measurement which
+would fit in the archived bucket. If, after archiving all open idle buckets, the memory usage still
+exceeds the limit, the `BucketCatalog` will remove archived bucket entries to reclaim more memory. A
+bucket closed in this way remains eligible for query-based reopening.
+
+The `BucketCatalog` will also close a bucket if a new measurement would cause the bucket to span a
+greater amount of time between its oldest and newest timestamp than is allowed by the collection
+settings. Such buckets remain eligible for reopening.
+
+Finally, the `BucketCatalog` will archive a bucket if a new measurement's timestamp is earlier than
+the minimum timestamp for the current open bucket for it's time series.
+
+When a bucket is closed during insertion, the `BucketCatalog` will either open a new bucket or
+reopen an old one in order to accomodate the new measurement.
+
+# Bucketing Parameters
+
+The maximum span of time that a single bucket is allowed to cover is controlled by
+`bucketMaxSpanSeconds`.
 
 When a new bucket is opened by the `BucketCatalog`, the timestamp component of its `_id`, and
 equivalently the value of its `control.min.<time field>`, will be taken from the first measurement
-inserted to the bucket and rounded down based on the `granularity`. It will be rounded down to the
-nearest minute for 'seconds', the nearest hour for 'minutes', and the nearest day for 'hours'. This
-rounding may not be perfect in the case of leap seconds and other irregularities in the calendar,
-and will generally be accomplished by basic modulus aritmetic operating on the number of seconds
-since the epoch, assuming 60 seconds per minute, 60 minutes per hour, and 24 hours per day.
+inserted to the bucket and rounded down based on the `bucketRoundingSeconds`. This rounding will 
+generally be accomplished by basic modulus arithmetic operating on the number of seconds since the
+epoch i.e. for an input timestamp `t` and a rounding value `r`, the rounded timestamp will be
+taken as `t - (t % r)`.
+
+A user may choose to set `bucketMaxSpanSeconds` and `bucketRoundingSeconds` directly when creating a
+new collection in order to use "fixed bucketing". In this case we require that these two values are
+equal to each other, strictly positive, and no more than 31536000 (365 days).
+
+In most cases though, the user will instead want to use the `granularity` option. This option is
+intended to convey the scale of the time between measurements in a given time-series, and encodes
+some reasonable presets of "seconds", "minutes" and "hours". These presets correspond to
+`bucketMaxSpanSeconds` values of 3600 (1 hour), 86400 (1 day), and 2592000 (30 days); and
+`bucketRoundingSeconds` values of 60 (1 minute), 3600 (1 hour), and 86400 (1 day), respectively.
+
+If the user does not specify any bucketing parameters when creating a collection, the default value
+is `{granularity: "seconds"}`.
+
+A `collMod` operation can change these settings as long as the net effect is that
+`bucketMaxSpanSeconds` and `bucketRoundingSeconds` do not decrease, and the values remain in the
+valid ranges. Notably, one can convert from fixed range bucketing to one of the `granularity`
+presets or vice versa, as long as the associated seconds parameters do not decrease as a result.
 
 # Updates and Deletes
 
