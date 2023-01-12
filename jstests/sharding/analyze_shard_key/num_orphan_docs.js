@@ -20,6 +20,7 @@ function testAnalyzeShardKeyUnshardedCollection(conn) {
     assert.commandWorked(coll.insert([{candidateKey: 1}]));
 
     const res = conn.adminCommand({analyzeShardKey: ns, key: candidateKey});
+    assert.commandWorked(res);
     assert.eq(res.numDocs, 1, res);
     assert.eq(res.cardinality, 1, res);
     assert.eq(bsonWoCompare(res.frequency, {p99: 1, p95: 1, p90: 1, p80: 1, p50: 1}), 0, res);
