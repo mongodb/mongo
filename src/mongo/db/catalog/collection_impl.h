@@ -305,13 +305,6 @@ public:
     StatusWith<std::vector<BSONObj>> addCollationDefaultsToIndexSpecsForCreate(
         OperationContext* opCtx, const std::vector<BSONObj>& indexSpecs) const final;
 
-    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makePlanExecutor(
-        OperationContext* opCtx,
-        const CollectionPtr& yieldableCollection,
-        PlanYieldPolicy::YieldPolicy yieldPolicy,
-        ScanDirection scanDirection,
-        const boost::optional<RecordId>& resumeAfterRecordId) const final;
-
     void indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) final;
 
     void onDeregisterFromCatalog(OperationContext* opCtx) final;

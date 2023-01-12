@@ -48,6 +48,7 @@
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/get_executor.h"
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
 #include "mongo/db/repl/replication_coordinator.h"
@@ -715,10 +716,10 @@ void RollbackImpl::_correctRecordStoreCounts(OperationContext* opCtx) {
             invariant(coll == collToScan.getCollection(),
                       str::stream() << "Catalog returned invalid collection: " << nss.ns() << " ("
                                     << uuid.toString() << ")");
-            auto exec = collToScan->makePlanExecutor(opCtx,
-                                                     collToScan.getCollection(),
-                                                     PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
-                                                     Collection::ScanDirection::kForward);
+            auto exec = getCollectionScanExecutor(opCtx,
+                                                  collToScan.getCollection(),
+                                                  PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY,
+                                                  CollectionScanDirection::kForward);
             long long countFromScan = 0;
             PlanExecutor::ExecState state;
             while (PlanExecutor::ADVANCED ==

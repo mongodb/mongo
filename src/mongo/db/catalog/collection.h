@@ -58,8 +58,6 @@
 
 namespace mongo {
 
-class CollectionPtr;
-
 /**
  * Holds information update an update operation.
  */
@@ -699,16 +697,6 @@ public:
      */
     virtual StatusWith<std::vector<BSONObj>> addCollationDefaultsToIndexSpecsForCreate(
         OperationContext* opCtx, const std::vector<BSONObj>& indexSpecs) const = 0;
-
-    /**
-     * Returns a plan executor for a collection scan over this collection.
-     */
-    virtual std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makePlanExecutor(
-        OperationContext* opCtx,
-        const CollectionPtr& yieldableCollection,
-        PlanYieldPolicy::YieldPolicy yieldPolicy,
-        ScanDirection scanDirection,
-        const boost::optional<RecordId>& resumeAfterRecordId = boost::none) const = 0;
 
     virtual void indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) = 0;
 

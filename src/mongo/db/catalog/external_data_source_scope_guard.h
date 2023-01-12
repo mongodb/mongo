@@ -35,6 +35,7 @@
 #include "mongo/db/pipeline/external_data_source_option_gen.h"
 
 namespace mongo {
+
 /**
  * This class makes sure that virtual collections that are created for external data sources are
  * dropped when it's destroyed.
@@ -81,4 +82,5 @@ private:
     OperationContext* _opCtx;
     std::vector<NamespaceString> _toBeDroppedVirtualCollections;
 };
+
 }  // namespace mongo

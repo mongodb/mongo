@@ -32,7 +32,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/db/commands/external_data_source_scope_guard.h"
+#include "mongo/db/catalog/external_data_source_scope_guard.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"

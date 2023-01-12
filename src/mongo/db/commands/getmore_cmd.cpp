@@ -28,7 +28,6 @@
  */
 
 #include <fmt/format.h>
-#include <memory>
 #include <string>
 
 #include "mongo/bson/util/bson_extract.h"
@@ -37,10 +36,10 @@
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/external_data_source_scope_guard.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/external_data_source_scope_guard.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/cursor_manager.h"

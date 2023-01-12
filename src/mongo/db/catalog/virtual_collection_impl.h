@@ -490,18 +490,6 @@ public:
         return Status(ErrorCodes::UnknownError, "unknown");
     }
 
-    // This method is used in context of rollback and index build which are not supported for a
-    // virtual collection.
-    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> makePlanExecutor(
-        OperationContext* opCtx,
-        const CollectionPtr& yieldableCollection,
-        PlanYieldPolicy::YieldPolicy yieldPolicy,
-        ScanDirection scanDirection,
-        const boost::optional<RecordId>& resumeAfterRecordId) const final {
-        unimplementedTasserted();
-        return nullptr;
-    }
-
     void indexBuildSuccess(OperationContext* opCtx, IndexCatalogEntry* index) final {
         unimplementedTasserted();
     }

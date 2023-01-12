@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/commands/external_data_source_scope_guard.h"
+#include "mongo/db/catalog/external_data_source_scope_guard.h"
 
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/drop_collection.h"
@@ -41,6 +41,7 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
+
 ExternalDataSourceScopeGuard::ExternalDataSourceScopeGuard(
     OperationContext* opCtx,
     const std::vector<std::pair<NamespaceString, std::vector<ExternalDataSourceInfo>>>&
@@ -84,4 +85,5 @@ void ExternalDataSourceScopeGuard::dropVirtualCollections() noexcept {
         }
     });
 }
+
 }  // namespace mongo

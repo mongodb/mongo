@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/commands/run_aggregate.h"
 
 #include <boost/optional.hpp>
@@ -39,10 +38,10 @@
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/external_data_source_scope_guard.h"
 #include "mongo/db/change_stream_change_collection_manager.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
 #include "mongo/db/change_stream_serverless_helpers.h"
-#include "mongo/db/commands/external_data_source_scope_guard.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"

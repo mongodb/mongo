@@ -55,7 +55,6 @@
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collection_query_info.h"
-#include "mongo/db/query/internal_plans.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/capped_snapshots.h"
@@ -1291,18 +1290,6 @@ StatusWith<std::vector<BSONObj>> CollectionImpl::addCollationDefaultsToIndexSpec
     }
 
     return newIndexSpecs;
-}
-
-std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> CollectionImpl::makePlanExecutor(
-    OperationContext* opCtx,
-    const CollectionPtr& yieldableCollection,
-    PlanYieldPolicy::YieldPolicy yieldPolicy,
-    ScanDirection scanDirection,
-    const boost::optional<RecordId>& resumeAfterRecordId) const {
-    auto isForward = scanDirection == ScanDirection::kForward;
-    auto direction = isForward ? InternalPlanner::FORWARD : InternalPlanner::BACKWARD;
-    return InternalPlanner::collectionScan(
-        opCtx, &yieldableCollection, yieldPolicy, direction, resumeAfterRecordId);
 }
 
 Status CollectionImpl::rename(OperationContext* opCtx, const NamespaceString& nss, bool stayTemp) {

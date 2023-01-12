@@ -341,4 +341,20 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
     ParsedUpdate* parsedUpdate,
     boost::optional<ExplainOptions::Verbosity> verbosity,
     UpdateStageParams::DocumentCounter&& documentCounter = nullptr);
+
+/**
+ * Direction of collection scan plan executor returned by makeCollectionScanPlanExecutor() below.
+ */
+enum class CollectionScanDirection {
+    kForward = 1,
+    kBackward = -1,
+};
+
+std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getCollectionScanExecutor(
+    OperationContext* opCtx,
+    const CollectionPtr& collection,
+    PlanYieldPolicy::YieldPolicy yieldPolicy,
+    CollectionScanDirection scanDirection,
+    const boost::optional<RecordId>& resumeAfterRecordId = boost::none);
+
 }  // namespace mongo

@@ -3018,4 +3018,17 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDist
         return {nullptr};
     }
 }
+
+std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> getCollectionScanExecutor(
+    OperationContext* opCtx,
+    const CollectionPtr& yieldableCollection,
+    PlanYieldPolicy::YieldPolicy yieldPolicy,
+    CollectionScanDirection scanDirection,
+    const boost::optional<RecordId>& resumeAfterRecordId) {
+    auto isForward = scanDirection == CollectionScanDirection::kForward;
+    auto direction = isForward ? InternalPlanner::FORWARD : InternalPlanner::BACKWARD;
+    return InternalPlanner::collectionScan(
+        opCtx, &yieldableCollection, yieldPolicy, direction, resumeAfterRecordId);
+}
+
 }  // namespace mongo

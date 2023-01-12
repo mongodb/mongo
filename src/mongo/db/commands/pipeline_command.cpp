@@ -27,16 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <algorithm>
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/create_collection.h"
+#include "mongo/db/catalog/external_data_source_scope_guard.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/external_data_source_scope_guard.h"
 #include "mongo/db/commands/run_aggregate.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"

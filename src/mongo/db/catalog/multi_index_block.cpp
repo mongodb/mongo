@@ -27,16 +27,10 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/catalog/multi_index_block.h"
-
-#include <ostream>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/simple_bsonelement_comparator.h"
-#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/multi_index_block_gen.h"
 #include "mongo/db/client.h"
@@ -46,6 +40,7 @@
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/get_executor.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_conflict_info.h"
@@ -65,7 +60,6 @@
 #include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
-
 
 namespace mongo {
 
@@ -602,8 +596,8 @@ void MultiIndexBlock::_doCollectionScan(OperationContext* opCtx,
         yieldPolicy = PlanYieldPolicy::YieldPolicy::WRITE_CONFLICT_RETRY_ONLY;
     }
 
-    auto exec = collection->makePlanExecutor(
-        opCtx, collection, yieldPolicy, Collection::ScanDirection::kForward, resumeAfterRecordId);
+    auto exec = getCollectionScanExecutor(
+        opCtx, collection, yieldPolicy, CollectionScanDirection::kForward, resumeAfterRecordId);
 
     // The phase will be kCollectionScan when resuming an index build from the collection
     // scan phase.
