@@ -1112,9 +1112,7 @@ std::vector<std::unique_ptr<QuerySolutionNode>> QueryPlannerAccess::collapseEqui
  * This helper determines if a query can be covered depending on the query projection.
  */
 bool projNeedsFetch(const CanonicalQuery& query) {
-    // If nothing is being projected, the query is fully covered without a fetch.
-    // This is trivially true for a count query.
-    if (query.isCount()) {
+    if (query.isCountLike()) {
         return false;
     }
 

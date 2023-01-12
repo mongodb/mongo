@@ -196,14 +196,14 @@ bool hintMatchesColumnStoreIndex(const BSONObj& hintObj, const ColumnIndexEntry&
 
 /**
  * Returns the dependencies for the CanonicalQuery, split by those needed to answer the filter,
- * and those needed for "everything else" which is the project and sort.
+ * and those needed for "everything else", e.g. project, sort and shard filter.
  */
-std::pair<DepsTracker, DepsTracker> computeDeps(const QueryPlannerParams& params,
-                                                const CanonicalQuery& query) {
+std::pair<DepsTracker /* filter */, DepsTracker /* other */> computeDeps(
+    const QueryPlannerParams& params, const CanonicalQuery& query) {
     DepsTracker filterDeps;
     match_expression::addDependencies(query.root(), &filterDeps);
     DepsTracker outputDeps;
-    if ((!query.getProj() || query.getProj()->requiresDocument()) && !query.isCount()) {
+    if ((!query.getProj() || query.getProj()->requiresDocument()) && !query.isCountLike()) {
         outputDeps.needWholeDocument = true;
         return {std::move(filterDeps), std::move(outputDeps)};
     }
@@ -212,7 +212,7 @@ std::pair<DepsTracker, DepsTracker> computeDeps(const QueryPlannerParams& params
             outputDeps.fields.emplace(field.fieldNameStringData());
         }
     }
-    if (query.isCount()) {
+    if (query.isCountLike()) {
         // If this is a count, we won't have required projections, but may still need to output the
         // shard filter.
         return {std::move(filterDeps), std::move(outputDeps)};

@@ -26,7 +26,7 @@ YW4ADAAAABBhAAEAAAAAAAAAAAAAAAAAAG5ubm4FAAAAAGZe
 YW4ACQAAAAhhAAEAAAAAAAAAAAAAAG5ubm4FAAAAAGZe
 ==== VARIATION: sbe, query={}, sort={}, proj={a: false}
 YW4ACQAAAAhhAAAAAAAAAAAAAAAAAG5ubm4FAAAAAGZe
-==== VARIATION: sbe, query={}, sort={}, proj={}, isCount=true
+==== VARIATION: sbe, query={}, sort={}, proj={}, isCountLike=true
 YW4ABQAAAAAAAQAAAAAAAAAAbm5ubgUAAAAAZl4=
 ==== VARIATION: sbe, query={a: 1}, sort={a: 1}, proj={}, allowDiskUse=0, returnKey=0, requestResumeToken=0
 ZXEAYT8AAAAABQAAAAB+YWEAAAAAAAAAAAAAbm5ubgUAAAAAZl4=

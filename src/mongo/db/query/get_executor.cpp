@@ -770,7 +770,7 @@ public:
         invariant(solutions.size() > 0);
 
         // See if one of our solutions is a fast count hack in disguise.
-        if (_cq->isCount()) {
+        if (_cq->isCountLike()) {
             for (size_t i = 0; i < solutions.size(); ++i) {
                 if (turnIxscanIntoCount(solutions[i].get())) {
                     auto result = releaseResult();
@@ -1023,7 +1023,7 @@ protected:
 
                 if (statusWithQs.isOK()) {
                     auto querySolution = std::move(statusWithQs.getValue());
-                    if (_cq->isCount() && turnIxscanIntoCount(querySolution.get())) {
+                    if (_cq->isCountLike() && turnIxscanIntoCount(querySolution.get())) {
                         LOGV2_DEBUG(5968201,
                                     2,
                                     "Using fast count",
@@ -1178,7 +1178,7 @@ protected:
 
             if (statusWithQs.isOK()) {
                 auto querySolution = std::move(statusWithQs.getValue());
-                if (_cq->isCount() && turnIxscanIntoCount(querySolution.get())) {
+                if (_cq->isCountLike() && turnIxscanIntoCount(querySolution.get())) {
                     LOGV2_DEBUG(
                         20923, 2, "Using fast count", "query"_attr = redact(_cq->toStringShort()));
                 }
@@ -1591,12 +1591,13 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
 
         // Use SBE if 'canonicalQuery' is SBE compatible.
         if (!canonicalQuery->getForceClassicEngine() && canonicalQuery->isSbeCompatible()) {
-            auto statusWithExecutor = attemptToGetSlotBasedExecutor(opCtx,
-                                                                    collections,
-                                                                    std::move(canonicalQuery),
-                                                                    extractAndAttachPipelineStages,
-                                                                    yieldPolicy,
-                                                                    plannerParams);
+            auto statusWithExecutor =
+                attemptToGetSlotBasedExecutor(opCtx,
+                                              collections,
+                                              std::move(canonicalQuery),
+                                              std::move(extractAndAttachPipelineStages),
+                                              yieldPolicy,
+                                              plannerParams);
             if (!statusWithExecutor.isOK()) {
                 return StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>(
                     statusWithExecutor.getStatus());
@@ -1639,7 +1640,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
     return getExecutor(opCtx,
                        multi,
                        std::move(canonicalQuery),
-                       extractAndAttachPipelineStages,
+                       std::move(extractAndAttachPipelineStages),
                        yieldPolicy,
                        QueryPlannerParams{plannerOptions});
 }
@@ -1667,7 +1668,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     return getExecutor(opCtx,
                        collections,
                        std::move(canonicalQuery),
-                       extractAndAttachPipelineStages,
+                       std::move(extractAndAttachPipelineStages),
                        yieldPolicy,
                        plannerParams);
 }
@@ -1684,7 +1685,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorFind
     return getExecutorFind(opCtx,
                            multi,
                            std::move(canonicalQuery),
-                           extractAndAttachPipelineStages,
+                           std::move(extractAndAttachPipelineStages),
                            permitYield,
                            QueryPlannerParams{plannerOptions});
 }
@@ -2162,8 +2163,8 @@ boost::optional<size_t> boundsHasExactlyOneNullOrNullAndEmptyInterval(const Inde
 }
 
 /**
- * Returns 'true' if the provided solution 'soln' can be rewritten to use
- * a fast counting stage.  Mutates the tree in 'soln->root'.
+ * Returns 'true' if the provided solution 'soln' can be rewritten to use a fast counting stage.
+ * Mutates the tree in 'soln->root'.
  *
  * Otherwise, returns 'false'.
  */
@@ -2389,7 +2390,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
         MatchExpressionParser::kAllowAllSpecialFeatures,
         ProjectionPolicies::findProjectionPolicies(),
         {} /* empty pipeline */,
-        true /* isCount */);
+        true /* isCountLike */);
 
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();

@@ -365,7 +365,7 @@ void QueryPlannerTest::runQueryFull(
                                      MatchExpressionParser::kAllowAllSpecialFeatures,
                                      ProjectionPolicies::findProjectionPolicies(),
                                      std::move(pipeline),
-                                     isCount);
+                                     isCountLike);
     ASSERT_OK(statusWithCQ.getStatus());
     cq = std::move(statusWithCQ.getValue());
     cq->setSbeCompatible(markQueriesSbeCompatible);
@@ -446,7 +446,7 @@ void QueryPlannerTest::runInvalidQueryFull(const BSONObj& query,
                                      MatchExpressionParser::kAllowAllSpecialFeatures,
                                      ProjectionPolicies::findProjectionPolicies(),
                                      {},
-                                     isCount);
+                                     isCountLike);
     ASSERT_OK(statusWithCQ.getStatus());
     cq = std::move(statusWithCQ.getValue());
     cq->setSbeCompatible(markQueriesSbeCompatible);
@@ -479,7 +479,7 @@ void QueryPlannerTest::runQueryAsCommand(const BSONObj& cmdObj) {
                                      MatchExpressionParser::kAllowAllSpecialFeatures,
                                      ProjectionPolicies::findProjectionPolicies(),
                                      {},
-                                     isCount);
+                                     isCountLike);
     ASSERT_OK(statusWithCQ.getStatus());
     cq = std::move(statusWithCQ.getValue());
     cq->setSbeCompatible(markQueriesSbeCompatible);
@@ -511,7 +511,7 @@ void QueryPlannerTest::runInvalidQueryAsCommand(const BSONObj& cmdObj) {
                                      MatchExpressionParser::kAllowAllSpecialFeatures,
                                      ProjectionPolicies::findProjectionPolicies(),
                                      {},
-                                     isCount);
+                                     isCountLike);
     ASSERT_OK(statusWithCQ.getStatus());
     cq = std::move(statusWithCQ.getValue());
     cq->setSbeCompatible(markQueriesSbeCompatible);

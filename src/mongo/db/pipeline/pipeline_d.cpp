@@ -122,7 +122,6 @@ namespace {
  *    - The foreign collection is neither sharded nor a view.
  */
 std::vector<std::unique_ptr<InnerPipelineStageInterface>> findSbeCompatibleStagesForPushdown(
-    const intrusive_ptr<ExpressionContext>& expCtx,
     const MultipleCollectionAccessor& collections,
     const CanonicalQuery* cq,
     const Pipeline* pipeline) {
@@ -212,23 +211,16 @@ void trimPipelineStages(Pipeline* pipeline, size_t stagesToRemove) {
     }
 }
 
-StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExecutor(
+std::unique_ptr<FindCommandRequest> createFindCommand(
     const intrusive_ptr<ExpressionContext>& expCtx,
-    const MultipleCollectionAccessor& collections,
     const NamespaceString& nss,
     BSONObj queryObj,
     BSONObj projectionObj,
-    const QueryMetadataBitSet& metadataRequested,
     BSONObj sortObj,
     SkipThenLimit skipThenLimit,
-    const GroupFromFirstDocumentTransformation* groupForDistinctScan,
-    const AggregateCommandRequest* aggRequest,
-    const QueryPlannerParams& plannerOpts,
-    const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
-    Pipeline* pipeline,
-    bool* hasNoRequirements) {
-    invariant(hasNoRequirements);
+    const AggregateCommandRequest* aggRequest) {
     auto findCommand = std::make_unique<FindCommandRequest>(nss);
+
     query_request_helper::setTailableMode(expCtx->tailableMode, findCommand.get());
     findCommand->setFilter(queryObj.getOwned());
     findCommand->setProjection(projectionObj.getOwned());
@@ -240,7 +232,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
         findCommand->setLimit(static_cast<std::int64_t>(*limit));
     }
 
-    const bool isExplain = static_cast<bool>(expCtx->explain);
     if (aggRequest) {
         findCommand->setAllowDiskUse(aggRequest->getAllowDiskUse());
         findCommand->setHint(aggRequest->getHint().value_or(BSONObj()).getOwned());
@@ -251,27 +242,51 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
     // collator is simple.
     findCommand->setCollation(expCtx->getCollatorBSON().getOwned());
 
-    const ExtensionsCallbackReal extensionsCallback(expCtx->opCtx, &nss);
+    return findCommand;
+}
 
+StatusWith<std::unique_ptr<CanonicalQuery>> createCanonicalQuery(
+    const intrusive_ptr<ExpressionContext>& expCtx,
+    const NamespaceString& nss,
+    std::unique_ptr<FindCommandRequest> findCommand,
+    const QueryMetadataBitSet& metadataRequested,
+    const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
+    bool isCountLike) {
     // Reset the 'sbeCompatible' flag before canonicalizing the 'findCommand' to potentially allow
     // SBE to execute the portion of the query that's pushed down, even if the portion of the query
     // that is not pushed down contains expressions not supported by SBE.
     expCtx->sbeCompatible = true;
 
-    // This query might be eligible for count optimizations, since the remaining stages in the
-    // pipeline don't actually need to read any data produced by the query execution layer.
-    const bool isCount = *hasNoRequirements;
-
     auto cq = CanonicalQuery::canonicalize(expCtx->opCtx,
                                            std::move(findCommand),
-                                           isExplain,
+                                           static_cast<bool>(expCtx->explain),
                                            expCtx,
-                                           extensionsCallback,
+                                           ExtensionsCallbackReal(expCtx->opCtx, &nss),
                                            matcherFeatures,
                                            ProjectionPolicies::aggregateProjectionPolicies(),
                                            {} /* empty pipeline */,
-                                           isCount);
+                                           isCountLike);
 
+    if (cq.isOK()) {
+        // Mark the metadata that's requested by the pipeline on the CQ.
+        cq.getValue()->requestAdditionalMetadata(metadataRequested);
+    }
+    return cq;
+}
+
+StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExecutor(
+    const intrusive_ptr<ExpressionContext>& expCtx,
+    const MultipleCollectionAccessor& collections,
+    const NamespaceString& nss,
+    std::unique_ptr<FindCommandRequest> findCommand,
+    const QueryMetadataBitSet& metadataRequested,
+    const GroupFromFirstDocumentTransformation* groupForDistinctScan,
+    const QueryPlannerParams& plannerOpts,
+    const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
+    Pipeline* pipeline,
+    bool isCountLike) {
+    auto cq = createCanonicalQuery(
+        expCtx, nss, std::move(findCommand), metadataRequested, matcherFeatures, isCountLike);
     if (!cq.isOK()) {
         // Return an error instead of uasserting, since there are cases where the combination of
         // sort and projection will result in a bad query, but when we try with a different
@@ -280,9 +295,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
         // another attempt.
         return {cq.getStatus()};
     }
-
-    // Mark the metadata that's requested by the pipeline on the CQ.
-    cq.getValue()->requestAdditionalMetadata(metadataRequested);
 
     if (groupForDistinctScan) {
         // When the pipeline includes a $group that groups by a single field
@@ -319,49 +331,25 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> attemptToGetExe
         }
     }
 
-    auto permitYield = true;
+    // Queries that can use SBE may push down compatible pipeline stages. 'getExecutorFind' will
+    // call this lambda in two phases: 1) determine compatible stages and attach them to the
+    // canonical query, and 2) finalize the push down and trim the pushed-down stages from the
+    // original pipeline.
+    auto extractAndAttachPipelineStages = [&collections, &pipeline](auto* canonicalQuery,
+                                                                    bool attachOnly) {
+        if (attachOnly) {
+            canonicalQuery->setPipeline(
+                findSbeCompatibleStagesForPushdown(collections, canonicalQuery, pipeline));
+        } else {
+            trimPipelineStages(pipeline, canonicalQuery->pipeline().size());
+        }
+    };
+
     return getExecutorFind(expCtx->opCtx,
                            collections,
                            std::move(cq.getValue()),
-                           [&](auto* canonicalQuery, bool attachOnly) {
-                               // Queries that can use SBE may push down compatible pipeline stages.
-                               // This is done by calling this lambda in two phases: 1) determine
-                               // compatible stages and attach them to the canonical query, and 2)
-                               // finalize the push down and trim the pushed-down stages from the
-                               // original pipeline.
-                               if (attachOnly) {
-                                   canonicalQuery->setPipeline(findSbeCompatibleStagesForPushdown(
-                                       expCtx, collections, canonicalQuery, pipeline));
-                               } else {
-                                   // Not attaching - we need to trim the already pushed down
-                                   // pipeline stages from the pipeline.
-                                   trimPipelineStages(pipeline, canonicalQuery->pipeline().size());
-
-                                   // hasNoRequirements determines whether $cursor stage could use
-                                   // kEmptyDocuments cursor type. If we are pushing down some
-                                   // stages but cannot optimize out the aggregation layer
-                                   // completely, even if the source documents don't need to be
-                                   // accessed, the $cursor stage might still produce a document so
-                                   // must reset hasNoRequirements.
-                                   // An example of this is if we have a count query that would have
-                                   // emitted 1000 kEmptyDocuments from the $cursor before counting
-                                   // with a $group stage -- when the $group is pushed down, the
-                                   // $cursor stage will now emit a single non-empty document with
-                                   // {count:1000}.
-                                   bool hasPushedDownGroupStage = std::any_of(
-                                       canonicalQuery->pipeline().begin(),
-                                       canonicalQuery->pipeline().end(),
-                                       [](const auto& stage) {
-                                           return dynamic_cast<DocumentSourceGroup*>(
-                                                      stage->documentSource()) != nullptr;
-                                       });
-                                   if (canonicalQuery->isCount() && hasPushedDownGroupStage &&
-                                       !canonicalQuery->pipeline().back()->isLastSource()) {
-                                       *hasNoRequirements = false;
-                                   }
-                               }
-                           },
-                           permitYield,
+                           std::move(extractAndAttachPipelineStages),
+                           true /* permitYield */,
                            plannerOpts);
 }
 
@@ -1626,10 +1614,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
     SkipThenLimit skipThenLimit,
     const AggregateCommandRequest* aggRequest,
     const MatchExpressionParser::AllowedFeatureSet& matcherFeatures,
-    bool* hasNoRequirements,
+    bool* shouldProduceEmptyDocs,
     bool timeseriesBoundedSortOptimization,
     QueryPlannerParams plannerOpts) {
-    invariant(hasNoRequirements);
+    invariant(shouldProduceEmptyDocs);
 
     bool isChangeStream =
         pipeline->peekFront() && pipeline->peekFront()->constraints().isChangeStreamStage();
@@ -1676,10 +1664,10 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
     // stages that remain in the pipeline after pushdown. In particular, any dependencies for a
     // $match or $sort pushed down into the query layer will not be reflected here.
     auto deps = pipeline->getDependencies(unavailableMetadata);
-    *hasNoRequirements = deps.hasNoRequirements();
+    *shouldProduceEmptyDocs = deps.hasNoRequirements();
 
     BSONObj projObj;
-    if (!*hasNoRequirements) {
+    if (!*shouldProduceEmptyDocs) {
         // Build a BSONObj representing a projection eligible for pushdown. If there is an inclusion
         // projection at the front of the pipeline, it will be removed and handled by the PlanStage
         // layer. If a projection cannot be pushed down, an empty BSONObj will be returned.
@@ -1704,20 +1692,23 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
     if (rewrittenGroupStage) {
         // See if the query system can handle the $group and $sort stage using a DISTINCT_SCAN
         // (SERVER-9507).
-        auto swExecutorGrouped = attemptToGetExecutor(expCtx,
-                                                      collections,
-                                                      nss,
-                                                      queryObj,
-                                                      projObj,
-                                                      deps.metadataDeps(),
-                                                      sortObj,
-                                                      SkipThenLimit{boost::none, boost::none},
-                                                      rewrittenGroupStage.get(),
-                                                      aggRequest,
-                                                      plannerOpts,
-                                                      matcherFeatures,
-                                                      pipeline,
-                                                      hasNoRequirements);
+        auto swExecutorGrouped =
+            attemptToGetExecutor(expCtx,
+                                 collections,
+                                 nss,
+                                 createFindCommand(expCtx,
+                                                   nss,
+                                                   queryObj,
+                                                   projObj,
+                                                   sortObj,
+                                                   SkipThenLimit{boost::none, boost::none},
+                                                   aggRequest),
+                                 deps.metadataDeps(),
+                                 rewrittenGroupStage.get(),
+                                 plannerOpts,
+                                 matcherFeatures,
+                                 pipeline,
+                                 *shouldProduceEmptyDocs /* isCountLike */);
 
         if (swExecutorGrouped.isOK()) {
             // Any $limit stage before the $group stage should make the pipeline ineligible for this
@@ -1754,20 +1745,24 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::prep
     auto collatorStash =
         isChangeStream ? expCtx->temporarilyChangeCollator(std::move(collatorForCursor)) : nullptr;
 
-    return attemptToGetExecutor(expCtx,
-                                collections,
-                                nss,
-                                queryObj,
-                                projObj,
-                                deps.metadataDeps(),
-                                sortObj,
-                                skipThenLimit,
-                                nullptr, /* groupForDistinctScan */
-                                aggRequest,
-                                plannerOpts,
-                                matcherFeatures,
-                                pipeline,
-                                hasNoRequirements);
+    auto executor = attemptToGetExecutor(
+        expCtx,
+        collections,
+        nss,
+        createFindCommand(expCtx, nss, queryObj, projObj, sortObj, skipThenLimit, aggRequest),
+        deps.metadataDeps(),
+        nullptr, /* groupForDistinctScan */
+        plannerOpts,
+        matcherFeatures,
+        pipeline,
+        *shouldProduceEmptyDocs /* isCountLike */);
+
+    // While constructing the executor, some stages might have been lowered from the 'pipeline' into
+    // the executor, so we need to recheck whether the executor's layer can still produce an empty
+    // document.
+    *shouldProduceEmptyDocs = pipeline->getDependencies(unavailableMetadata).hasNoRequirements();
+
+    return executor;
 }
 
 Timestamp PipelineD::getLatestOplogTimestamp(const Pipeline* pipeline) {

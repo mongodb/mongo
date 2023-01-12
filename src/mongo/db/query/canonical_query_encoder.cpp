@@ -1117,7 +1117,7 @@ std::string encodeSBE(const CanonicalQuery& cq) {
     bufBuilder.appendBuf(proj.objdata(), proj.objsize());
     bufBuilder.appendStr(strBuilderEncoded, false /* includeEndingNull */);
     bufBuilder.appendChar(cq.getForceGenerateRecordId() ? 1 : 0);
-    bufBuilder.appendChar(cq.isCount() ? 1 : 0);
+    bufBuilder.appendChar(cq.isCountLike() ? 1 : 0);
 
     encodeFindCommandRequest(cq.getFindCommandRequest(), &bufBuilder);
 

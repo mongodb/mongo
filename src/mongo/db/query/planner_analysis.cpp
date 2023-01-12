@@ -1204,7 +1204,7 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
         solnRoot = addSortKeyGeneratorStageIfNeeded(query, hasSortStage, std::move(solnRoot));
 
         // If there's no projection, we must fetch, as the user wants the entire doc.
-        if (!solnRoot->fetched() && !query.isCount()) {
+        if (!solnRoot->fetched() && !query.isCountLike()) {
             auto fetch = std::make_unique<FetchNode>();
             fetch->children.push_back(std::move(solnRoot));
             solnRoot = std::move(fetch);

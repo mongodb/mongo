@@ -252,8 +252,8 @@ protected:
         markQueriesSbeCompatible = sbeCompatible;
     }
 
-    void setCountQuery() {
-        isCount = true;
+    void setIsCountLike() {
+        isCountLike = true;
     }
 
     //
@@ -279,8 +279,8 @@ protected:
     // Value used for the forceGenerateRecordId flag in the CanonicalQuery objects created by the
     // test.
     bool forceRecordId = false;
-    // Value used for the isCount flag in the CanonicalQuery objects created by the test.
-    bool isCount = false;
+    // Value used for the 'isCountLike' flag in the CanonicalQuery objects created by the test.
+    bool isCountLike = false;
 };
 
 }  // namespace mongo

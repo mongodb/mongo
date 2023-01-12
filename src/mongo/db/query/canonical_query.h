@@ -75,7 +75,7 @@ public:
             MatchExpressionParser::kDefaultSpecialFeatures,
         const ProjectionPolicies& projectionPolicies = ProjectionPolicies::findProjectionPolicies(),
         std::vector<std::unique_ptr<InnerPipelineStageInterface>> pipeline = {},
-        bool isCount = false);
+        bool isCountLike = false);
 
     /**
      * For testing or for internal clients to use.
@@ -293,8 +293,8 @@ public:
      * query with a pushed-down group may be considered a count at the data access layer but not
      * above the canonical query.
      */
-    bool isCount() const {
-        return _isCount;
+    bool isCountLike() const {
+        return _isCountLike;
     }
 
 private:
@@ -308,7 +308,7 @@ private:
                 std::unique_ptr<MatchExpression> root,
                 const ProjectionPolicies& projectionPolicies,
                 std::vector<std::unique_ptr<InnerPipelineStageInterface>> pipeline,
-                bool isCount);
+                bool isCountLike);
 
     // Initializes '_sortPattern', adding any metadata dependencies implied by the sort.
     //
@@ -361,8 +361,14 @@ private:
     // A map from assigned InputParamId's to parameterised MatchExpression's.
     std::vector<const MatchExpression*> _inputParamIdToExpressionMap;
 
-    // True if this is a count-like query, i.e. can emit empty documents.
-    bool _isCount = false;
+    // "True" for queries that after doing a scan of an index can produce an empty document and
+    // still be correct. For example, this applies to queries like [{$match: {x: 42}}, {$count:
+    // "c"}] in presence of index on "x". The stage that follows the index scan doesn't have to be
+    // $count but it must have no dependencies on the fields from the prior stages. Note, that
+    // [{$match: {x: 42}}, {$group: {_id: "$y"}}, {$count: "c"}]] is _not_ "count like" because
+    // the first $group stage needs to access field "y" and this access cannot be incorporated into
+    // the index scan.
+    bool _isCountLike = false;
 };
 
 }  // namespace mongo

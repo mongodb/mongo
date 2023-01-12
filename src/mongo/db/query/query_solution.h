@@ -1272,8 +1272,7 @@ struct DistinctNode : public QuerySolutionNodeWithSortSet {
 };
 
 /**
- * Some count queries reduce to counting how many keys are between two entries in a
- * Btree.
+ * Some count queries reduce to counting how many keys are between two entries in a Btree.
  */
 struct CountScanNode : public QuerySolutionNodeWithSortSet {
     CountScanNode(IndexEntry index) : index(std::move(index)) {}

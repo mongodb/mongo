@@ -71,7 +71,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     MatchExpressionParser::AllowedFeatureSet allowedFeatures,
     const ProjectionPolicies& projectionPolicies,
     std::vector<std::unique_ptr<InnerPipelineStageInterface>> pipeline,
-    bool isCount) {
+    bool isCountLike) {
     auto status = query_request_helper::validateFindCommandRequest(*findCommand);
     if (!status.isOK()) {
         return status;
@@ -141,7 +141,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
                  std::move(me),
                  projectionPolicies,
                  std::move(pipeline),
-                 isCount);
+                 isCountLike);
 
     if (!initStatus.isOK()) {
         return initStatus;
@@ -174,7 +174,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
                                  root->shallowClone(),
                                  ProjectionPolicies::findProjectionPolicies(),
                                  {} /* an empty pipeline */,
-                                 baseQuery.isCount());
+                                 baseQuery.isCountLike());
 
     if (!initStatus.isOK()) {
         return initStatus;
@@ -189,7 +189,7 @@ Status CanonicalQuery::init(OperationContext* opCtx,
                             std::unique_ptr<MatchExpression> root,
                             const ProjectionPolicies& projectionPolicies,
                             std::vector<std::unique_ptr<InnerPipelineStageInterface>> pipeline,
-                            bool isCount) {
+                            bool isCountLike) {
     _expCtx = expCtx;
     _findCommand = std::move(findCommand);
 
@@ -198,7 +198,7 @@ Status CanonicalQuery::init(OperationContext* opCtx,
                               ->get<QueryFrameworkControl>("internalQueryFrameworkControl")
                               ->_data.get() == QueryFrameworkControlEnum::kForceClassicEngine;
 
-    _isCount = isCount;
+    _isCountLike = isCountLike;
 
     auto validStatus = isValid(root.get(), *_findCommand);
     if (!validStatus.isOK()) {

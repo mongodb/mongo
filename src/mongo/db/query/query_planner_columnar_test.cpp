@@ -1182,7 +1182,7 @@ TEST_F(QueryPlannerColumnarTest, NoColumnIndexCoversQuery) {
 }
 
 TEST_F(QueryPlannerColumnarTest, ColumnIndexForCount) {
-    setCountQuery();
+    setIsCountLike();
     addColumnStoreIndexAndEnableFilterSplitting();
 
     runQuerySortProj(BSONObj(), BSONObj(), BSONObj());
@@ -1198,7 +1198,7 @@ TEST_F(QueryPlannerColumnarTest, ColumnIndexForCount) {
 }
 
 TEST_F(QueryPlannerColumnarTest, ColumnIndexForCountIncludesShardFilter) {
-    setCountQuery();
+    setIsCountLike();
     addColumnStoreIndexAndEnableFilterSplitting();
 
     params.options |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
@@ -1221,7 +1221,7 @@ TEST_F(QueryPlannerColumnarTest, ColumnIndexForCountIncludesShardFilter) {
 }
 
 TEST_F(QueryPlannerColumnarTest, ColumnIndexForCountWithColumnPathFilter) {
-    setCountQuery();
+    setIsCountLike();
     addColumnStoreIndexAndEnableFilterSplitting();
 
     runQuerySortProj(BSON("a" << BSON("$gt" << 3)), BSONObj(), BSONObj());
@@ -1237,7 +1237,7 @@ TEST_F(QueryPlannerColumnarTest, ColumnIndexForCountWithColumnPathFilter) {
 }
 
 TEST_F(QueryPlannerColumnarTest, ColumnIndexForCountWithPostAssemblyFilter) {
-    setCountQuery();
+    setIsCountLike();
     addColumnStoreIndexAndEnableFilterSplitting();
 
     runQuerySortProj(

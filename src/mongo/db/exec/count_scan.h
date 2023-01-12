@@ -80,13 +80,12 @@ struct CountScanParams {
 };
 
 /**
- * Used by the count command. Scans an index from a start key to an end key. Creates a
- * WorkingSetMember for each matching index key in RID_AND_OBJ state. It has a null record id and an
- * empty object with a null snapshot id rather than real data. Returning real data is unnecessary
- * since all we need is the count.
+ * Used when don't need to return the actual records from the index or the collection (e.g. count
+ * command and some cases of aggregation).
  *
- * Only created through the getExecutorCount() path, as count is the only operation that doesn't
- * care about its data.
+ * Scans an index from a start key to an end key. Creates a WorkingSetMember for each matching index
+ * key in RID_AND_OBJ state. It has a null record id and an empty object with a null snapshot id
+ * rather than real data. Returning real data is unnecessary since all we need is the count.
  */
 class CountScan final : public RequiresIndexStage {
 public:
