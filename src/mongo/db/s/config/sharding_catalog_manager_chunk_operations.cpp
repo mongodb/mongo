@@ -917,25 +917,11 @@ ShardingCatalogManager::commitChunksMerge(OperationContext* opCtx,
 
     // 5. log changes
     BSONObjBuilder logDetail;
-    {
-        initialVersion.serialize("prevShardVersion", &logDetail);
-        mergeVersion.serialize("mergedVersion", &logDetail);
-        logDetail.append("owningShard", shardId);
-        BSONArrayBuilder b(logDetail.subarrayStart("merged"));
-
-        // Pad some slack to avoid exceeding max BSON size
-        const auto kBSONObjMaxLogDetailSize = BSONObjMaxUserSize - 3 * 1024;
-        for (const auto& chunkToMerge : *chunksToMerge) {
-            auto chunkBSON = chunkToMerge.toConfigBSON();
-
-            // Truncate the log if BSON log size exceeds BSONObjMaxUserSize
-            if (logDetail.len() + chunkBSON.objsize() >= kBSONObjMaxLogDetailSize) {
-                logDetail.append("mergedChunksArrayTruncatedToDontExceedMaxBSONSize", true);
-                break;
-            }
-            b.append(chunkBSON);
-        }
-    }
+    initialVersion.serialize("prevShardVersion", &logDetail);
+    mergeVersion.serialize("mergedVersion", &logDetail);
+    logDetail.append("owningShard", shardId);
+    chunkRange.append(&logDetail);
+    logDetail.append("numChunks", static_cast<int>(chunksToMerge->size()));
 
     ShardingLogging::get(opCtx)->logChange(
         opCtx, "merge", nss.ns(), logDetail.obj(), WriteConcernOptions());
