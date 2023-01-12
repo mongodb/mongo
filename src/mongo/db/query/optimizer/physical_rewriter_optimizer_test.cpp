@@ -6067,8 +6067,8 @@ TEST(PhysRewriter, ResidualFilterPathIsBalanced) {
             .root("root")
             .filter(_evalf(_get("a",
                                 _traverse1(_composea(
-                                    _composea(_cmp("Eq", "0"_cint64), _cmp("Eq", "1"_cint64)),
-                                    _composea(_cmp("Eq", "2"_cint64), _cmp("Eq", "3"_cint64))))),
+                                    _composea(_cmp("Lte", "0"_cint64), _cmp("Eq", "1"_cint64)),
+                                    _composea(_cmp("Gt", "2"_cint64), _cmp("Gte", "3"_cint64))))),
                            "root"_var))
             .finish(_scan("root", "c1"));
 
@@ -6088,7 +6088,7 @@ TEST(PhysRewriter, ResidualFilterPathIsBalanced) {
     // The FilterNode is first converted to a SargableNode, then it's converted back to a FilterNode
     // because it can't be satisfied with an index. The path under the resulting FilterNode should
     // be balanced.
-    ASSERT_EXPLAIN_V2(
+    ASSERT_EXPLAIN_V2_AUTO(
         "Root []\n"
         "|   |   projections: \n"
         "|   |       root\n"
@@ -6100,14 +6100,90 @@ TEST(PhysRewriter, ResidualFilterPathIsBalanced) {
         "|   PathTraverse [1]\n"
         "|   PathComposeA []\n"
         "|   |   PathComposeA []\n"
-        "|   |   |   PathCompare [Eq]\n"
-        "|   |   |   Const [2]\n"
-        "|   |   PathCompare [Eq]\n"
-        "|   |   Const [1]\n"
+        "|   |   |   PathCompare [Gte]\n"
+        "|   |   |   Const [3]\n"
+        "|   |   PathCompare [Lte]\n"
+        "|   |   Const [0]\n"
         "|   PathComposeA []\n"
         "|   |   PathCompare [Eq]\n"
-        "|   |   Const [3]\n"
-        "|   PathCompare [Eq]\n"
+        "|   |   Const [1]\n"
+        "|   PathCompare [Gt]\n"
+        "|   Const [2]\n"
+        "PhysicalScan [{'<root>': root, 'a': evalTemp_0}, c1]\n"
+        "    BindBlock:\n"
+        "        [evalTemp_0]\n"
+        "            Source []\n"
+        "        [root]\n"
+        "            Source []\n",
+        optimized);
+}
+
+TEST(PhysRewriter, DisjunctiveEqsConsolidatedIntoEqMember) {
+    using namespace properties;
+    using namespace unit_test_abt_literals;
+
+    const auto [tag1, val1] = sbe::value::makeNewArray();
+    sbe::value::Array* arr1 = sbe::value::getArrayView(val1);
+    for (int i = 1; i < 4; i++) {
+        arr1->push_back(sbe::value::TypeTags::NumberInt32, i);
+    }
+    ABT arrayConst1 = make<Constant>(tag1, val1);
+
+    const auto [tag2, val2] = sbe::value::makeNewArray();
+    sbe::value::Array* arr2 = sbe::value::getArrayView(val2);
+    for (int i = 5; i < 8; i++) {
+        arr2->push_back(sbe::value::TypeTags::NumberInt32, i);
+    }
+    ABT arrayConst2 = make<Constant>(tag2, val2);
+
+    ABT root =
+        NodeBuilder{}
+            .root("root")
+            .filter(_evalf(_get("a",
+                                _traverse1(_composea(
+                                    _composea(_composea(_cmp("EqMember", ExprHolder{arrayConst1}),
+                                                        _cmp("Eq", "8"_cint64)),
+                                              _composea(_cmp("EqMember", ExprHolder{arrayConst2}),
+                                                        _cmp("Eq", "4"_cint64))),
+                                    _composea(_cmp("Gt", "0"_cint64), _cmp("Lt", "20"_cint64))))),
+                           "root"_var))
+            .finish(_scan("root", "c1"));
+
+    auto prefixId = PrefixId::createForTests();
+    auto phaseManager = makePhaseManager(
+        {OptPhase::MemoSubstitutionPhase,
+         OptPhase::MemoExplorationPhase,
+         OptPhase::MemoImplementationPhase},
+        prefixId,
+        {{{"c1", createScanDef({}, {})}}},
+        boost::none /*costModel*/,
+        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
+
+    ABT optimized = root;
+    phaseManager.optimize(optimized);
+    ASSERT_EQ(2, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+
+    // The FilterNode is first converted to a SargableNode, then it's converted back to a FilterNode
+    // because it can't be satisfied with an index. The path under the resulting FilterNode should
+    // be combined into one EqMember path that accounts for all original separate Eq and EqMember
+    // paths, as well as one Gt path and one Lt path.
+    ASSERT_EXPLAIN_V2_AUTO(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       root\n"
+        "|   RefBlock: \n"
+        "|       Variable [root]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [evalTemp_0]\n"
+        "|   PathTraverse [1]\n"
+        "|   PathComposeA []\n"
+        "|   |   PathCompare [Lt]\n"
+        "|   |   Const [20]\n"
+        "|   PathComposeA []\n"
+        "|   |   PathCompare [EqMember]\n"
+        "|   |   Const [[1, 2, 3, 4, 5, 6, 7, 8]]\n"
+        "|   PathCompare [Gt]\n"
         "|   Const [0]\n"
         "PhysicalScan [{'<root>': root, 'a': evalTemp_0}, c1]\n"
         "    BindBlock:\n"
@@ -6120,8 +6196,8 @@ TEST(PhysRewriter, ResidualFilterPathIsBalanced) {
 
 TEST(PhysRewriter, EqMemberSargable) {
     using namespace properties;
+    using namespace unit_test_abt_literals;
 
-    ABT scanNode = make<ScanNode>("root", "c1");
 
     const auto [tag, val] = sbe::value::makeNewArray();
     sbe::value::Array* arr = sbe::value::getArrayView(val);
@@ -6130,15 +6206,12 @@ TEST(PhysRewriter, EqMemberSargable) {
     }
     ABT arrayConst = make<Constant>(tag, val);
 
-    ABT filterNode = make<FilterNode>(
-        make<EvalFilter>(
-            make<PathGet>("a",
-                          make<PathTraverse>(PathTraverse::kSingleLevel,
-                                             make<PathCompare>(Operations::EqMember, arrayConst))),
-            make<Variable>("root")),
-        std::move(scanNode));
     ABT rootNode =
-        make<RootNode>(ProjectionRequirement{ProjectionNameVector{"root"}}, std::move(filterNode));
+        NodeBuilder{}
+            .root("root")
+            .filter(
+                _evalf(_get("a", _traverse1(_cmp("EqMember", ExprHolder{arrayConst}))), "root"_var))
+            .finish(_scan("root", "c1"));
 
     {
         auto prefixId = PrefixId::createForTests();

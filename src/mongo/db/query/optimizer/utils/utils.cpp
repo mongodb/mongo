@@ -1496,6 +1496,70 @@ bool checkMaybeHasNull(const IntervalReqExpr::Node& intervals, const ConstFoldFn
     return PartialSchemaReqMayContainNullTransport{}.check(intervals, constFold);
 }
 
+/**
+ * Identifies all Eq or EqMember nodes in the childResults. If there is more than one,
+ * they are consolidated into one larger EqMember node with a new array containing
+ * all of the individual node's value.
+ */
+static void consolidateEqDisjunctions(ABTVector& childResults) {
+    ABTVector newResults;
+    const auto [eqMembersTag, eqMembersVal] = sbe::value::makeNewArray();
+    sbe::value::ValueGuard guard{eqMembersTag, eqMembersVal};
+    const auto eqMembersArray = sbe::value::getArrayView(eqMembersVal);
+
+    for (size_t index = 0; index < childResults.size(); index++) {
+        ABT& child = childResults.at(index);
+        if (const auto pathCompare = child.cast<PathCompare>();
+            pathCompare != nullptr && pathCompare->getVal().is<Constant>()) {
+            switch (pathCompare->op()) {
+                case Operations::EqMember: {
+                    // Unpack this node's values into the new eqMembersArray.
+                    const auto [arrayTag, arrayVal] = pathCompare->getVal().cast<Constant>()->get();
+                    if (arrayTag != sbe::value::TypeTags::Array) {
+                        continue;
+                    }
+
+                    const auto valsArray = sbe::value::getArrayView(arrayVal);
+                    for (size_t j = 0; j < valsArray->size(); j++) {
+                        const auto [tag, val] = valsArray->getAt(j);
+                        // If this is found to be a bottleneck, could be implemented with moving,
+                        // rather than copying, the values into the array (same in Eq case).
+                        const auto [newTag, newVal] = sbe::value::copyValue(tag, val);
+                        eqMembersArray->push_back(newTag, newVal);
+                    }
+                    break;
+                }
+                case Operations::Eq: {
+                    // Copy this node's value into the new eqMembersArray.
+                    const auto [tag, val] = pathCompare->getVal().cast<Constant>()->get();
+                    const auto [newTag, newVal] = sbe::value::copyValue(tag, val);
+                    eqMembersArray->push_back(newTag, newVal);
+                    break;
+                }
+                default:
+                    newResults.emplace_back(std::move(child));
+                    continue;
+            }
+        } else {
+            newResults.emplace_back(std::move(child));
+        }
+    }
+
+    // Add a node to the newResults with the combined Eq/EqMember values under one EqMember; if
+    // there is only one value, add an Eq node with that value.
+    if (eqMembersArray->size() > 1) {
+        guard.reset();
+        newResults.emplace_back(
+            make<PathCompare>(Operations::EqMember, make<Constant>(eqMembersTag, eqMembersVal)));
+    } else if (eqMembersArray->size() == 1) {
+        const auto [eqConstantTag, eqConstantVal] = eqMembersArray->getAt(0);
+        newResults.emplace_back(
+            make<PathCompare>(Operations::Eq, make<Constant>(eqConstantTag, eqConstantVal)));
+    }
+
+    std::swap(childResults, newResults);
+}
+
 class PartialSchemaReqLowerTransport {
 public:
     PartialSchemaReqLowerTransport(const bool hasBoundProjName,
@@ -1554,8 +1618,12 @@ public:
     }
 
     ABT transport(const IntervalReqExpr::Disjunction& node, ABTVector childResults) {
-        // Construct a balanced additive composition tree.
-        maybeComposePaths<PathComposeA>(childResults);
+        if (childResults.size() > 1) {
+            // Consolidate Eq and EqMember disjunctions, then construct a balanced additive
+            // composition tree.
+            consolidateEqDisjunctions(childResults);
+            maybeComposePaths<PathComposeA>(childResults);
+        }
         return std::move(childResults.front());
     }
 
