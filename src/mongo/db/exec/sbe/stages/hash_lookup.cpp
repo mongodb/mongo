@@ -585,6 +585,13 @@ PlanState HashLookupStage::getNext() {
     return trackPlanState(state);
 }
 
+void HashLookupStage::saveChildrenState(bool relinquishCursor, bool disableSlotAccess) {
+    // HashLookupStage::getNext() only guarantees that outer child's getNext() was called. Thus,
+    // it is safe to propagate disableSlotAccess to the outer child, but not to the inner child.
+    innerChild()->saveState(relinquishCursor, false);
+    outerChild()->saveState(relinquishCursor, disableSlotAccess);
+}
+
 void HashLookupStage::close() {
     auto optTimer(getOptTimer(_opCtx));
 

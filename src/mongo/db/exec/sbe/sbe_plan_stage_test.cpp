@@ -105,9 +105,19 @@ std::pair<value::TypeTags, value::Value> PlanStageTestFixture::getAllResults(
     auto resultsView = value::getArrayView(resultsVal);
     // Loop and repeatedly call getNext() until we reach the end, storing the values produced
     // into the array.
-    for (auto st = stage->getNext(); st == PlanState::ADVANCED; st = stage->getNext()) {
+    size_t i = 0;
+    for (auto st = stage->getNext(); st == PlanState::ADVANCED; st = stage->getNext(), ++i) {
         auto [tag, val] = accessor->copyOrMoveValue();
         resultsView->push_back(tag, val);
+
+        // Test out saveState() and restoreState() for 50% of the documents (the first document,
+        // the third document, the fifth document, and so on).
+        if (i % 2 == 0) {
+            const bool relinquishCursor = true;
+            const bool disableSlotAccess = true;
+            stage->saveState(relinquishCursor, disableSlotAccess);
+            stage->restoreState(relinquishCursor);
+        }
     }
 
     guard.reset();
@@ -122,7 +132,8 @@ std::pair<value::TypeTags, value::Value> PlanStageTestFixture::getAllResultsMult
     auto resultsView = value::getArrayView(resultsVal);
 
     // Loop and repeatedly call getNext() until we reach the end.
-    for (auto st = stage->getNext(); st == PlanState::ADVANCED; st = stage->getNext()) {
+    size_t j = 0;
+    for (auto st = stage->getNext(); st == PlanState::ADVANCED; st = stage->getNext(), ++j) {
         // Create a new SBE array (`arr`) containing the values produced by each SlotAccessor
         // and insert `arr` into the array of results.
         auto [arrTag, arrVal] = value::makeNewArray();
@@ -134,6 +145,15 @@ std::pair<value::TypeTags, value::Value> PlanStageTestFixture::getAllResultsMult
         }
         guard.reset();
         resultsView->push_back(arrTag, arrVal);
+
+        // Test out saveState() and restoreState() for 50% of the documents (the first document,
+        // the third document, the fifth document, and so on).
+        if (j % 2 == 0) {
+            const bool relinquishCursor = true;
+            const bool disableSlotAccess = true;
+            stage->saveState(relinquishCursor, disableSlotAccess);
+            stage->restoreState(relinquishCursor);
+        }
     }
 
     resultsGuard.reset();

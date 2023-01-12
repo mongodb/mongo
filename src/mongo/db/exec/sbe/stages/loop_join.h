@@ -90,6 +90,9 @@ public:
     std::vector<DebugPrinter::Block> debugPrint() const final;
     size_t estimateCompileTimeSize() const final;
 
+protected:
+    void saveChildrenState(bool relinquishCursor, bool disableSlotAccess) final;
+
 private:
     PlanState getNextOuterSide() {
         _isReadingLeftSide = true;

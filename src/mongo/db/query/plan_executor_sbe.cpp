@@ -140,7 +140,11 @@ void PlanExecutorSBE::saveState() {
         _opCtx->recoveryUnit()->setAbandonSnapshotMode(RecoveryUnit::AbandonSnapshotMode::kCommit);
         _opCtx->recoveryUnit()->abandonSnapshot();
     } else {
-        _root->saveState(true /* relinquish cursor */);
+        // Discard the slots as we won't access them before subsequent PlanExecutorSBE::getNext()
+        // method call.
+        const bool relinquishCursor = true;
+        const bool discardSlotState = true;
+        _root->saveState(relinquishCursor, discardSlotState);
     }
 
     _yieldPolicy->setYieldable(nullptr);

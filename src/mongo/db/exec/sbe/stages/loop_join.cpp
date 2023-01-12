@@ -191,6 +191,13 @@ PlanState LoopJoinStage::getNext() {
     }
 }
 
+void LoopJoinStage::saveChildrenState(bool relinquishCursor, bool disableSlotAccess) {
+    // LoopJoinStage::getNext() only guarantees that the inner child's getNext() was called. Thus,
+    // it is safe to propagate disableSlotAccess to the inner child, but not to the outer child.
+    _children[1]->saveState(relinquishCursor, disableSlotAccess);
+    _children[0]->saveState(relinquishCursor, false);
+}
+
 void LoopJoinStage::close() {
     auto optTimer(getOptTimer(_opCtx));
 

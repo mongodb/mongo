@@ -102,6 +102,9 @@ public:
     std::vector<DebugPrinter::Block> debugPrint() const final;
     size_t estimateCompileTimeSize() const final;
 
+protected:
+    void saveChildrenState(bool relinquishCursor, bool disableSlotAccess) final;
+
 private:
     using HashTableType = std::unordered_map<value::MaterializedRow,  // NOLINT
                                              std::vector<size_t>,

@@ -167,17 +167,23 @@ public:
      * The 'relinquishCursor' parameter indicates whether cursors should be reset and all data
      * should be copied.
      *
+     * When 'relinquishCursor' is true, the 'disableSlotAccess' parameter indicates whether this
+     * stage is allowed to discard slot state before saving. When 'relinquishCursor' is false, the
+     * 'disableSlotAccess' parameter has no effect.
+     *
      * TODO SERVER-59620: Remove the 'relinquishCursor' parameter once all callers pass 'false'.
      */
-    void saveState(bool relinquishCursor) {
+    void saveState(bool relinquishCursor, bool disableSlotAccess = false) {
         auto stage = static_cast<T*>(this);
         stage->_commonStats.yields++;
+
+        if (relinquishCursor && disableSlotAccess) {
+            stage->disableSlotAccess();
+        }
+
         stage->doSaveState(relinquishCursor);
-        // Save the children in a right to left order so dependent stages (i.e. one using correlated
-        // slots) are saved first.
-        auto& children = stage->_children;
-        for (auto it = children.rbegin(); it != children.rend(); it++) {
-            (*it)->saveState(relinquishCursor);
+        if (!stage->_children.empty()) {
+            saveChildrenState(relinquishCursor, disableSlotAccess);
         }
 
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
@@ -230,6 +236,25 @@ protected:
     enum class SaveState { kNotSaved, kSavedFull, kSavedNotFull };
     SaveState _saveState{SaveState::kNotSaved};
 #endif
+
+    virtual void saveChildrenState(bool relinquishCursor, bool disableSlotAccess) {
+        // clang-format off
+        static const StringDataSet propagateSet = {
+            "branch", "cfilter", "efilter", "exchangep", "filter",   "limit", "limitskip",
+            "lspool", "mkbson",  "mkobj",   "project",   "traverse", "union", "unique"};
+        // clang-format on
+
+        auto stage = static_cast<T*>(this);
+        if (!propagateSet.count(stage->getCommonStats()->stageType)) {
+            disableSlotAccess = false;
+        }
+
+        // Save the children in a right to left order so dependent stages (i.e. one using correlated
+        // slots) are saved first.
+        for (auto it = stage->_children.rbegin(); it != stage->_children.rend(); ++it) {
+            (*it)->saveState(relinquishCursor, disableSlotAccess);
+        }
+    }
 
     static bool shouldCopyValue(value::TypeTags tag) {
         switch (tag) {
