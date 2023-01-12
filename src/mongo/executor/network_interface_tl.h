@@ -229,6 +229,10 @@ private:
         void continueExhaustRequest(std::shared_ptr<RequestState> requestState,
                                     StatusWith<RemoteCommandResponse> swResponse);
 
+        // Protects against race between reactor thread restarting stopwatch during exhaust
+        // request and main thread reading stopwatch elapsed time during shutdown.
+        Mutex stopwatchMutex = MONGO_MAKE_LATCH("NetworkInterfaceTL::ExhaustCommandState::mutex");
+
         Promise<void> promise;
         Promise<RemoteCommandResponse> finalResponsePromise;
         RemoteCommandOnReplyFn onReplyFn;
@@ -336,7 +340,8 @@ private:
 
     void _run();
 
-    Status _killOperation(std::shared_ptr<RequestState> requestStateToKill);
+    Status _killOperation(std::shared_ptr<RequestState> requestStateToKill,
+                          RequestManager* requestManager);
 
     std::string _instanceName;
     ServiceContext* _svcCtx = nullptr;

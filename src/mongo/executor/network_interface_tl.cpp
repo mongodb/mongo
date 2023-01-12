@@ -800,7 +800,7 @@ void NetworkInterfaceTL::RequestManager::killOperationsForPendingRequests() {
                     "target"_attr = requestState->request->target,
                     "requestId"_attr = requestState->request->id);
 
-        auto status = requestState->interface()->_killOperation(requestState);
+        auto status = requestState->interface()->_killOperation(requestState, this);
         if (!status.isOK()) {
             LOGV2_DEBUG(4664810, 2, "Failed to send remote _killOperations", "error"_attr = status);
         }
@@ -873,6 +873,10 @@ void NetworkInterfaceTL::RequestManager::trySend(
         ->startConnAcquiredTimer();
     std::shared_ptr<RequestState> requestState;
 
+    bool logSetMaxTimeMSHedge = false;
+    bool logSetMaxTimeMS = false;
+    RemoteCommandRequestImpl<HostAndPort>* request;
+    Milliseconds hedgingMaxTimeMS;
     {
         stdx::lock_guard<Latch> lk(mutex);
 
@@ -899,6 +903,34 @@ void NetworkInterfaceTL::RequestManager::trySend(
         requestState->request = RemoteCommandRequest(cmdState->requestOnAny, idx);
         requestState->host = requestState->request->target;
 
+        request = &requestState->request.value();
+        if (requestState->isHedge) {
+            invariant(request->options.hedgeOptions.isHedgeEnabled);
+            invariant(WireSpec::instance().get()->isInternalClient);
+
+            hedgingMaxTimeMS = Milliseconds(request->options.hedgeOptions.maxTimeMSForHedgedReads);
+            if (request->timeout == RemoteCommandRequest::kNoTimeout ||
+                hedgingMaxTimeMS < request->timeout) {
+                logSetMaxTimeMSHedge = true;
+                request->timeout = hedgingMaxTimeMS;
+            }
+
+            if (cmdState->interface->_svcCtx) {
+                auto hm = HedgingMetrics::get(cmdState->interface->_svcCtx);
+                invariant(hm);
+                hm->incrementNumTotalHedgedOperations();
+            }
+        }
+
+        if (request->timeout != RemoteCommandRequest::kNoTimeout &&
+            WireSpec::instance().get()->isInternalClient) {
+            logSetMaxTimeMS = true;
+            BSONObjBuilder updatedCmdBuilder;
+            updatedCmdBuilder.appendElements(request->cmdObj);
+            updatedCmdBuilder.append("maxTimeMSOpOnly", request->timeout.count());
+            request->cmdObj = updatedCmdBuilder.obj();
+        }
+
         requests.at(currentSentIdx) = requestState;
     }
 
@@ -908,45 +940,23 @@ void NetworkInterfaceTL::RequestManager::trySend(
                 "requestId"_attr = cmdState->requestOnAny.id,
                 "target"_attr = cmdState->requestOnAny.target[idx]);
 
-    auto request = &requestState->request.value();
-
-    if (requestState->isHedge) {
-        invariant(request->options.hedgeOptions.isHedgeEnabled);
-        invariant(WireSpec::instance().get()->isInternalClient);
-
-        auto hedgingMaxTimeMS = Milliseconds(request->options.hedgeOptions.maxTimeMSForHedgedReads);
-        if (request->timeout == RemoteCommandRequest::kNoTimeout ||
-            hedgingMaxTimeMS < request->timeout) {
-            LOGV2_DEBUG(4647200,
-                        2,
-                        "Set maxTimeMSOpOnly for hedged request",
-                        "originalMaxTime"_attr = request->timeout,
-                        "reducedMaxTime"_attr = hedgingMaxTimeMS,
-                        "requestId"_attr = cmdState->requestOnAny.id,
-                        "target"_attr = cmdState->requestOnAny.target[idx]);
-            request->timeout = hedgingMaxTimeMS;
-        }
-
-        if (cmdState->interface->_svcCtx) {
-            auto hm = HedgingMetrics::get(cmdState->interface->_svcCtx);
-            invariant(hm);
-            hm->incrementNumTotalHedgedOperations();
-        }
+    if (logSetMaxTimeMSHedge) {
+        LOGV2_DEBUG(4647200,
+                    2,
+                    "Set maxTimeMSOpOnly for hedged request",
+                    "originalMaxTime"_attr = request->timeout,
+                    "reducedMaxTime"_attr = hedgingMaxTimeMS,
+                    "requestId"_attr = cmdState->requestOnAny.id,
+                    "target"_attr = cmdState->requestOnAny.target[idx]);
     }
 
-    if (request->timeout != RemoteCommandRequest::kNoTimeout &&
-        WireSpec::instance().get()->isInternalClient) {
+    if (logSetMaxTimeMS) {
         LOGV2_DEBUG(4924402,
                     2,
                     "Set maxTimeMSOpOnly for request",
                     "maxTimeMSOpOnly"_attr = request->timeout,
                     "requestId"_attr = cmdState->requestOnAny.id,
                     "target"_attr = cmdState->requestOnAny.target[idx]);
-
-        BSONObjBuilder updatedCmdBuilder;
-        updatedCmdBuilder.appendElements(request->cmdObj);
-        updatedCmdBuilder.append("maxTimeMSOpOnly", request->timeout.count());
-        request->cmdObj = updatedCmdBuilder.obj();
     }
 
     networkInterfaceHangCommandsAfterAcquireConn.pauseWhileSet();
@@ -1052,6 +1062,7 @@ auto NetworkInterfaceTL::ExhaustCommandState::make(NetworkInterfaceTL* interface
     state->promise = std::move(promise);
     std::move(future)
         .onError([state](Status error) {
+            stdx::lock_guard<Latch> lk(state->stopwatchMutex);
             state->onReplyFn(RemoteCommandOnAnyResponse(
                 boost::none, std::move(error), state->stopwatch.elapsed()));
         })
@@ -1141,10 +1152,14 @@ void NetworkInterfaceTL::ExhaustCommandState::continueExhaustRequest(
         return;
 
     // Reset the stopwatch to measure the correct duration for the following reply
-    stopwatch.restart();
+    {
+        stdx::lock_guard<Latch> lk(stopwatchMutex);
+        stopwatch.restart();
+    }
     if (deadline != kNoExpirationDate) {
         deadline = stopwatch.start() + requestOnAny.timeout;
     }
+
     if (!catchingInvoke([&] { setTimer(); },
                         [&](Status& err) { finalResponsePromise.setError(err); },
                         "Exhaust command setTimer"))
@@ -1231,8 +1246,10 @@ void NetworkInterfaceTL::cancelCommand(const TaskExecutor::CallbackHandle& cbHan
                        << redact(cmdStateToCancel->requestOnAny.toString())});
 }
 
-Status NetworkInterfaceTL::_killOperation(std::shared_ptr<RequestState> requestStateToKill) try {
+Status NetworkInterfaceTL::_killOperation(std::shared_ptr<RequestState> requestStateToKill,
+                                          RequestManager* requestManager) try {
     auto [target, sslMode] = [&] {
+        stdx::lock_guard<Latch> lk(requestManager->mutex);
         invariant(requestStateToKill->request);
         auto request = requestStateToKill->request.value();
         return std::make_pair(request.target, request.sslMode);
