@@ -228,8 +228,34 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
             }
         }
 
-        std::vector<NamespaceString> collectionsToDrop;
         auto catalog = CollectionCatalog::get(opCtx);
+
+        // Drop the database views collection first, to ensure that time-series view namespaces are
+        // removed before their underlying buckets collections. This ensures oplog order, such that
+        // a time-series view may be missing while the buckets collection exists, but a time-series
+        // view is never present without its corresponding buckets collection.
+        auto viewCollPtr = catalog->lookupCollectionByNamespace(
+            opCtx, NamespaceString(dbName, NamespaceString::kSystemDotViewsCollectionName));
+        if (viewCollPtr) {
+            ++numCollections;
+            const auto& nss = viewCollPtr->ns();
+            LOGV2(7193700,
+                  "dropDatabase {dbName} - dropping collection: {nss}",
+                  "dropDatabase - dropping collection",
+                  "db"_attr = dbName,
+                  "namespace"_attr = nss);
+
+            writeConflictRetry(opCtx, "dropDatabase_views_collection", nss.ns(), [&] {
+                WriteUnitOfWork wunit(opCtx);
+                fassert(7193701, db->dropCollectionEvenIfSystem(opCtx, nss));
+                wunit.commit();
+            });
+        }
+
+        // Refresh the catalog so the views collection isn't present.
+        catalog = CollectionCatalog::get(opCtx);
+
+        std::vector<NamespaceString> collectionsToDrop;
         for (auto collIt = catalog->begin(opCtx, db->name()); collIt != catalog->end(opCtx);
              ++collIt) {
             auto collection = *collIt;
