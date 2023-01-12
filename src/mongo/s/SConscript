@@ -368,6 +368,7 @@ env.Library(
         'is_mongos.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/server_options_core',
     ],
 )
