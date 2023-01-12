@@ -64,11 +64,19 @@ boost::optional<IntervalReqExpr::Node> intersectDNFIntervals(
  * inequality, and trailing open intervals.
  * reverseSource flag indicates the sourceInterval corresponds to a descending index, so the bounds
  * are flipped before combining with the target.
- * TODO: support Recursive Index Navigation.
  */
 bool combineCompoundIntervalsDNF(CompoundIntervalReqExpr::Node& targetIntervals,
                                  const IntervalReqExpr::Node& sourceIntervals,
-                                 bool reverseSource = false);
+                                 bool reverseSource);
+
+/**
+ * Similar to combineCompoundIntervalsDNF in the sense that the source interval can be considered a
+ * fully open one. We want to extend the target multi-component interval with one more entry, such
+ * that do not constrain the result. If the last entry's lower bound was inclusive, then we append
+ * MinKey, otherwise MaxKey. We do the opposite for the high bound. We also reverse high and low if
+ * the reverseSource flag is set.
+ */
+void padCompoundIntervalsDNF(CompoundIntervalReqExpr::Node& targetIntervals, bool reverseSource);
 
 /**
  * Converts intervals into a normal form. Atoms are compared using the ABT comparison order. Atoms

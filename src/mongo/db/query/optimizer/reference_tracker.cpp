@@ -522,16 +522,9 @@ struct Collector {
                                                 CollectedInfo filterResult) {
         CollectedInfo result{};
 
+        // Note correlated projections might be coming either from the left child or from the
+        // parent.
         const ProjectionNameSet& correlatedProjNames = node.getCorrelatedProjectionNames();
-        {
-            const ProjectionNameSet& leftProjections = leftChildResult.getProjections();
-            for (const ProjectionName& projName : correlatedProjNames) {
-                tassert(6624099,
-                        str::stream()
-                            << "Correlated projection must exist in left child: " << projName,
-                        leftProjections.find(projName) != leftProjections.cend());
-            }
-        }
 
         result.merge(std::move(leftChildResult));
 

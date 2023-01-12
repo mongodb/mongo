@@ -186,6 +186,7 @@ using ResidualRequirementsWithCE = std::vector<ResidualRequirementWithCE>;
 // for the entire compound interval, and we do so by determining if there are ANY exclusive simple
 // low bounds or high bounds. In this case the compound bound is exclusive (on the low or the high
 // side respectively).
+// TODO: SERVER-72784: Update representation of compound index bounds.
 using CompoundIntervalRequirement = std::vector<IntervalRequirement>;
 
 // Unions and conjunctions of individual compound intervals.

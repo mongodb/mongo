@@ -229,6 +229,10 @@ properties::LogicalProps createInitialScanProps(const ProjectionName& projection
  */
 ProjectionNameSet extractReferencedColumns(const properties::PhysProps& properties);
 
+// Use a union node to restrict the set of projections we expose up the tree. The union node is
+// optimized away during lowering.
+void restrictProjections(ProjectionNameVector projNames, ABT& input);
+
 struct CollationSplitResult {
     bool _validSplit = false;
     ProjectionCollationSpec _leftCollation;

@@ -414,19 +414,6 @@ public:
                 MONGO_UNREACHABLE;
         }
 
-        const auto& requiredProjections =
-            getPropertyConst<ProjectionRequirement>(_physProps).getProjections();
-        const ProjectionName& ridProjName = _ridProjections.at(scanDefName);
-        const bool needsRID = requiredProjections.find(ridProjName).has_value();
-
-        const ProjectionName& scanProjectionName = indexingAvailability.getScanProjection();
-        const GroupIdType scanGroupId = indexingAvailability.getScanGroupId();
-        const LogicalProps& scanLogicalProps = _memo.getLogicalProps(scanGroupId);
-        const CEType scanGroupCE =
-            getPropertyConst<CardinalityEstimate>(scanLogicalProps).getEstimate();
-
-        const PartialSchemaRequirements& reqMap = node.getReqMap();
-
         if (indexReqTarget != IndexReqTarget::Index &&
             hasProperty<CollationRequirement>(_physProps)) {
             // PhysicalScan or Seek cannot satisfy any collation requirement.
@@ -434,6 +421,8 @@ public:
             return;
         }
 
+        const ProjectionName& scanProjectionName = indexingAvailability.getScanProjection();
+        const PartialSchemaRequirements& reqMap = node.getReqMap();
         for (const auto& [key, req] : reqMap) {
             if (key._projectionName != scanProjectionName) {
                 // We can only satisfy partial schema requirements using our root projection.
@@ -441,12 +430,15 @@ public:
             }
         }
 
+        const auto& requiredProjections =
+            getPropertyConst<ProjectionRequirement>(_physProps).getProjections();
+        const ProjectionName& ridProjName = _ridProjections.at(scanDefName);
+
+        bool needsRID = false;
         bool requiresRootProjection = false;
         {
             auto projectionsLeftToSatisfy = requiredProjections;
-            if (needsRID) {
-                projectionsLeftToSatisfy.erase(ridProjName);
-            }
+            needsRID = projectionsLeftToSatisfy.erase(ridProjName);
             if (indexReqTarget != IndexReqTarget::Index) {
                 // Deliver root projection if required.
                 requiresRootProjection = projectionsLeftToSatisfy.erase(scanProjectionName);
@@ -463,6 +455,11 @@ public:
                 return;
             }
         }
+
+        const GroupIdType scanGroupId = indexingAvailability.getScanGroupId();
+        const LogicalProps& scanLogicalProps = _memo.getLogicalProps(scanGroupId);
+        const CEType scanGroupCE =
+            getPropertyConst<CardinalityEstimate>(scanLogicalProps).getEstimate();
 
         const auto& ceProperty = getPropertyConst<CardinalityEstimate>(_logicalProps);
         const CEType currentGroupCE = ceProperty.getEstimate();

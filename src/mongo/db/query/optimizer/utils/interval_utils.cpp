@@ -394,6 +394,52 @@ bool combineCompoundIntervalsDNF(CompoundIntervalReqExpr::Node& targetIntervals,
     return true;
 }
 
+void padCompoundIntervalsDNF(CompoundIntervalReqExpr::Node& targetIntervals,
+                             const bool reverseSource) {
+    CompoundIntervalReqExpr::NodeVector newDisjunction;
+
+    for (const auto& targetConjunction :
+         targetIntervals.cast<CompoundIntervalReqExpr::Disjunction>()->nodes()) {
+        CompoundIntervalReqExpr::NodeVector newConjunction;
+
+        for (const auto& targetConjunct :
+             targetConjunction.cast<CompoundIntervalReqExpr::Conjunction>()->nodes()) {
+            const auto& targetInterval =
+                targetConjunct.cast<CompoundIntervalReqExpr::Atom>()->getExpr();
+
+            IntervalRequirement sourceInterval;
+            if (!targetInterval.empty()) {
+                const auto& lastInterval = targetInterval.back();
+                if (!lastInterval.getLowBound().isInclusive()) {
+                    sourceInterval.getLowBound() = {false /*inclusive*/, Constant::maxKey()};
+                }
+                if (!lastInterval.getHighBound().isInclusive()) {
+                    sourceInterval.getHighBound() = {false /*inclusive*/, Constant::minKey()};
+                }
+            }
+
+            auto newInterval = targetInterval;
+            if (reverseSource) {
+                auto newSource = sourceInterval;
+                newSource.reverse();
+                newInterval.push_back(std::move(newSource));
+            } else {
+                newInterval.push_back(sourceInterval);
+            }
+            newConjunction.emplace_back(
+                CompoundIntervalReqExpr::make<CompoundIntervalReqExpr::Atom>(
+                    std::move(newInterval)));
+        }
+
+        newDisjunction.emplace_back(
+            CompoundIntervalReqExpr::make<CompoundIntervalReqExpr::Conjunction>(
+                std::move(newConjunction)));
+    }
+
+    targetIntervals = CompoundIntervalReqExpr::make<CompoundIntervalReqExpr::Disjunction>(
+        std::move(newDisjunction));
+}
+
 /**
  * Transport which updates an interval to be in a normal form. Children of each conjunction and
  * disjunction node are consistently ordered. We order the Atoms first by low bound, then by high

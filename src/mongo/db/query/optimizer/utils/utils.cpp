@@ -142,6 +142,10 @@ ProjectionNameSet extractReferencedColumns(const properties::PhysProps& properti
     return PropertiesAffectedColumnsExtractor::extract(properties);
 }
 
+void restrictProjections(ProjectionNameVector projNames, ABT& input) {
+    input = make<UnionNode>(std::move(projNames), makeSeq(std::move(input)));
+}
+
 CollationSplitResult splitCollationSpec(const boost::optional<ProjectionName>& ridProjName,
                                         const ProjectionCollationSpec& collationSpec,
                                         const ProjectionNameSet& leftProjections,
@@ -1119,18 +1123,26 @@ public:
 };
 
 /**
- * Pad compound interval with supplied simple intervals
+ * Pad compound interval with supplied simple interval.
+ */
+static void extendCompoundInterval(const IndexCollationSpec& indexCollationSpec,
+                                   CompoundIntervalReqExpr::Node& expr,
+                                   const size_t indexField,
+                                   IntervalReqExpr::Node interval) {
+    const bool reverse = indexCollationSpec.at(indexField)._op == CollationOp::Descending;
+    if (!combineCompoundIntervalsDNF(expr, std::move(interval), reverse)) {
+        uasserted(6624159, "Cannot combine compound interval with simple interval.");
+    }
+}
+
+/**
+ * Pad compound interval with unconstrained simple interval.
  */
 static void padCompoundInterval(const IndexCollationSpec& indexCollationSpec,
                                 CompoundIntervalReqExpr::Node& expr,
-                                const size_t startIndex,
-                                std::vector<IntervalReqExpr::Node> intervals) {
-    for (size_t i = startIndex; i < startIndex + intervals.size(); i++) {
-        const bool reverse = indexCollationSpec.at(i)._op == CollationOp::Descending;
-        if (!combineCompoundIntervalsDNF(expr, std::move(intervals.at(i - startIndex)), reverse)) {
-            uasserted(6624159, "Cannot combine with an open interval");
-        }
-    }
+                                const size_t indexField) {
+    const bool reverse = indexCollationSpec.at(indexField)._op == CollationOp::Descending;
+    padCompoundIntervalsDNF(expr, reverse);
 }
 
 /**
@@ -1151,12 +1163,10 @@ static bool extendCompoundInterval(PrefixId& prefixId,
     while (!combineCompoundIntervalsDNF(eqPrefixes.back()._interval, requiredInterval, reverse)) {
         // Should exit after at most one iteration.
 
-        // Pad old prefix with open intervals to the end.
-        padCompoundInterval(
-            indexCollationSpec,
-            eqPrefixes.back()._interval,
-            indexField,
-            {indexCollationSpec.size() - indexField, IntervalReqExpr::makeSingularDNF()});
+        for (size_t i = 0; i < indexCollationSpec.size() - indexField; i++) {
+            // Pad old prefix with open intervals to the end.
+            padCompoundInterval(indexCollationSpec, eqPrefixes.back()._interval, i + indexField);
+        }
 
         if (eqPrefixes.size() < maxIndexEqPrefixes) {
             // Begin new equality prefix.
@@ -1172,10 +1182,10 @@ static bool extendCompoundInterval(PrefixId& prefixId,
 
                 // Create point bounds using the projections.
                 const BoundRequirement eqBound{true /*inclusive*/, make<Variable>(tempProjName)};
-                padCompoundInterval(indexCollationSpec,
-                                    eqPrefixes.back()._interval,
-                                    i,
-                                    {IntervalReqExpr::makeSingularDNF(eqBound, eqBound)});
+                extendCompoundInterval(indexCollationSpec,
+                                       eqPrefixes.back()._interval,
+                                       i,
+                                       IntervalReqExpr::makeSingularDNF(eqBound, eqBound));
             }
         } else {
             // Too many equality prefixes.
@@ -1266,10 +1276,7 @@ static bool computeCandidateIndexEntry(PrefixId& prefixId,
 
         if (!foundSuitableField) {
             // We cannot constrain the current index field.
-            padCompoundInterval(indexCollationSpec,
-                                eqPrefixes.back()._interval,
-                                indexField,
-                                {IntervalReqExpr::makeSingularDNF()});
+            padCompoundInterval(indexCollationSpec, eqPrefixes.back()._interval, indexField);
         }
     }
 
@@ -1918,7 +1925,7 @@ ABT lowerRIDIntersectHashJoin(PrefixId& prefixId,
     // Use a union node to restrict the rid projection name coming from the right child in order
     // to ensure we do not have the same rid from both children. This node is optimized away
     // during lowering.
-    rightChild = make<UnionNode>(std::move(sortedProjections), makeSeq(std::move(rightChild)));
+    restrictProjections(std::move(sortedProjections), rightChild);
     nodeCEMap.emplace(rightChild.cast<Node>(), rightCE);
 
     ABT result = make<HashJoinNode>(JoinType::Inner,
@@ -1963,7 +1970,7 @@ ABT lowerRIDIntersectMergeJoin(PrefixId& prefixId,
     // Use a union node to restrict the rid projection name coming from the right child in order
     // to ensure we do not have the same rid from both children. This node is optimized away
     // during lowering.
-    rightChild = make<UnionNode>(std::move(sortedProjections), makeSeq(std::move(rightChild)));
+    restrictProjections(std::move(sortedProjections), rightChild);
     nodeCEMap.emplace(rightChild.cast<Node>(), rightCE);
 
     ABT result = make<MergeJoinNode>(ProjectionNameVector{ridProjName},
@@ -2116,7 +2123,7 @@ public:
         } else if (!outerMap._ridProjection && !outerProjNames.empty()) {
             // Prevent rid projection from leaking out if we do not require it, and also auxiliary
             // left and right side projections.
-            result = make<UnionNode>(std::move(outerProjNames), makeSeq(std::move(result)));
+            restrictProjections(std::move(outerProjNames), result);
             _nodeCEMap.emplace(result.cast<Node>(), ce);
         }
 
