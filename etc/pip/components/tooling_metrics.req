@@ -1,4 +1,1 @@
-distro == 1.5.0
-GitPython ~= 3.1.7
-pydantic ~= 1.8.2
-dnspython == 2.1.0
+mongo-tooling-metrics == 1.0.5

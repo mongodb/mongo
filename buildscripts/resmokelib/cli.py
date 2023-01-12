@@ -4,9 +4,9 @@ from datetime import datetime
 import time
 import os
 import psutil
-from buildscripts.metrics.metrics_datatypes import ResmokeToolingMetrics
-from buildscripts.metrics.tooling_exit_hook import initialize_exit_hook
-from buildscripts.metrics.tooling_metrics_utils import register_metrics_collection_atexit
+from mongo_tooling_metrics.client import get_mongo_metrics_client
+from mongo_tooling_metrics.errors import ExternalHostException
+from mongo_tooling_metrics.lib.top_level_metrics import ResmokeToolingMetrics
 from buildscripts.resmokelib import parser
 
 
@@ -27,8 +27,15 @@ def main(argv):
         "For example: resmoke.py run -h\n"
         "Note: bisect and setup-multiversion subcommands have been moved to db-contrib-tool (https://github.com/10gen/db-contrib-tool#readme).\n"
     )
-    register_metrics_collection_atexit(ResmokeToolingMetrics.generate_metrics, {
-        "utc_starttime": datetime.utcfromtimestamp(__start_time),
-        "exit_hook": initialize_exit_hook()
-    })
+    try:
+        metrics_client = get_mongo_metrics_client()
+        metrics_client.register_metrics(ResmokeToolingMetrics,
+                                        utc_starttime=datetime.utcfromtimestamp(__start_time))
+    except ExternalHostException as _:
+        pass
+    except Exception as _:  # pylint: disable=broad-except
+        print(
+            "This MongoDB Virtual Workstation could not connect to the internal cluster\nThis is a non-issue, but if this message persists feel free to reach out in #server-dev-platform"
+        )
+
     subcommand.execute()
