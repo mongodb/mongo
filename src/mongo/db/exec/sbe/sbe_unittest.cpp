@@ -28,9 +28,46 @@
  */
 
 #include "mongo/db/exec/sbe/sbe_unittest.h"
+#include "mongo/logv2/log.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo::sbe {
 
 unittest::GoldenTestConfig goldenTestConfigSbe{"src/mongo/db/test_output/exec/sbe"};
 
+void GoldenSBETestFixture::run() {
+    GoldenTestContext ctx(&goldenTestConfigSbe);
+    ctx.validateOnClose(false);
+    auto guard = ScopeGuard([&] { gctx = nullptr; });
+    gctx = &ctx;
+    gctx->printTestHeader(GoldenTestContext::HeaderFormat::Text);
+
+    if (_debug) {
+        try {
+            Test::run();
+        } catch (::mongo::unittest::TestAssertionFailureException&) {
+            std::cout << "== Golden test failed before output comparison. ==" << std::endl;
+            std::cout << "Output so far:" << std::endl << ctx.getOutputString() << std::endl;
+            std::cout.flush();
+            throw;
+        }
+    } else {
+        Test::run();
+    }
+
+    ctx.verifyOutput();
+}
+
+void GoldenSBETestFixture::printVariation(const std::string& name) {
+    auto& os = gctx->outStream();
+    _variationCount++;
+    os << "==== VARIATION ";
+    if (!name.empty()) {
+        os << name;
+    } else {
+        os << _variationCount;
+    }
+    os << std::endl;
+}  // namespace mongo::sbe
 }  // namespace mongo::sbe

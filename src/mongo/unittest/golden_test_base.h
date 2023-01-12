@@ -199,6 +199,27 @@ public:
      */
     boost::filesystem::path getTestPath() const;
 
+    /**
+     * Returns the output accumulated in the stream.
+     */
+    std::string getOutputString() const {
+        return _outStream.str();
+    }
+
+    /**
+     * Sets whether the context should verify the output in the destructor.
+     */
+    bool validateOnClose() const {
+        return _validateOnClose;
+    }
+
+    /**
+     * Returns whether the context should verify the output in the destrutor.
+     */
+    void validateOnClose(bool value) {
+        _validateOnClose = value;
+    }
+
 protected:
     static std::string sanitizeName(const std::string& str);
     const GoldenTestEnvironment* getEnv() const {

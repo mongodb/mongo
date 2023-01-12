@@ -117,4 +117,57 @@ TEST_F(SBELocalBindTest, NestedBind2) {
     executeAndPrintVariation(os, *compiledExpr);
 }
 
+TEST_F(SBELocalBindTest, BinaryOperatorLhsVariable) {
+    auto& os = gctx->outStream();
+
+    value::ViewOfValueAccessor slotAccessor;
+    FrameId frame = 10;
+    auto expr = sbe::makeE<ELocalBind>(
+        frame,
+        makeEs(makeC(makeInt32(10))),
+        makeE<EPrimBinary>(EPrimBinary::Op::sub, makeE<EVariable>(frame, 0), makeC(makeInt32(20))));
+    printInputExpression(os, *expr);
+
+    auto compiledExpr = compileExpression(*expr);
+    printCompiledExpression(os, *compiledExpr);
+
+    executeAndPrintVariation(os, *compiledExpr);
+}
+
+TEST_F(SBELocalBindTest, BinaryOperatorRhsVariable) {
+    auto& os = gctx->outStream();
+
+    value::ViewOfValueAccessor slotAccessor;
+    FrameId frame = 10;
+    auto expr = sbe::makeE<ELocalBind>(
+        frame,
+        makeEs(makeC(makeInt32(10))),
+        makeE<EPrimBinary>(EPrimBinary::Op::sub, makeC(makeInt32(20)), makeE<EVariable>(frame, 0)));
+    printInputExpression(os, *expr);
+
+    auto compiledExpr = compileExpression(*expr);
+    printCompiledExpression(os, *compiledExpr);
+
+    executeAndPrintVariation(os, *compiledExpr);
+}
+
+TEST_F(SBELocalBindTest, BinaryOperatorBothVariables) {
+    auto& os = gctx->outStream();
+
+    value::ViewOfValueAccessor slotAccessor;
+    FrameId frame = 10;
+    auto expr = sbe::makeE<ELocalBind>(frame,
+                                       makeEs(makeC(makeInt32(10)), makeC(makeInt32(20))),
+                                       makeE<EPrimBinary>(EPrimBinary::Op::sub,
+                                                          makeE<EVariable>(frame, 0),
+                                                          makeE<EVariable>(frame, 1)));
+    printInputExpression(os, *expr);
+
+    auto compiledExpr = compileExpression(*expr);
+    printCompiledExpression(os, *compiledExpr);
+
+    executeAndPrintVariation(os, *compiledExpr);
+}
+
+
 }  // namespace mongo::sbe

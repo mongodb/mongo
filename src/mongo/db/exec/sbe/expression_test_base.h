@@ -57,7 +57,7 @@ namespace mongo::sbe {
  * After setting up the compiled expression in steps 1--3, the test can run it multiple times with
  * different values, repeating steps 3--5.
  */
-class EExpressionTestFixture : public mongo::unittest::Test {
+class EExpressionTestFixture : public virtual SBETestFixture {
 protected:
     EExpressionTestFixture() : _ctx{std::make_unique<sbe::RuntimeEnvironment>()} {
         _ctx.root = &_emptyStage;
@@ -280,13 +280,7 @@ protected:
         return makeC(p.first, p.second);
     }
 
-    template <typename Stream>
-    value::ValuePrinter<Stream> makeValuePrinter(Stream& stream) {
-        return value::ValuePrinters::make(
-            stream, PrintOptions().useTagForAmbiguousValues(true).normalizeOutput(true));
-    }
-
-private:
+protected:
     value::SlotIdGenerator _slotIdGenerator;
     CoScanStage _emptyStage{kEmptyPlanNodeId};
     CompileCtx _ctx;
@@ -295,37 +289,6 @@ private:
 };
 
 
-class GoldenEExpressionTestFixture : public EExpressionTestFixture {
-public:
-    GoldenEExpressionTestFixture() {}
-
-    void run() {
-        GoldenTestContext ctx(&goldenTestConfigSbe);
-        auto guard = ScopeGuard([&] { gctx = nullptr; });
-        gctx = &ctx;
-        gctx->printTestHeader(GoldenTestContext::HeaderFormat::Text);
-        Test::run();
-    }
-
-protected:
-    GoldenTestContext* gctx;
-};
-
-class ValueVectorGuard {
-    ValueVectorGuard() = delete;
-    ValueVectorGuard& operator=(const ValueVectorGuard&) = delete;
-
-public:
-    ValueVectorGuard(std::vector<TypedValue>& values) : _values(values) {}
-
-    ~ValueVectorGuard() {
-        for (auto p : _values) {
-            value::releaseValue(p.first, p.second);
-        }
-    }
-
-private:
-    std::vector<TypedValue>& _values;
-};
+class GoldenEExpressionTestFixture : public EExpressionTestFixture, public GoldenSBETestFixture {};
 
 }  // namespace mongo::sbe

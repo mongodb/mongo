@@ -201,6 +201,7 @@ env.CppUnitTest(
         'expressions/sbe_trunc_builtin_test.cpp',
         'expressions/sbe_ts_second_ts_increment_test.cpp',
         'expressions/sbe_variable_test.cpp',
+        'sbe_code_fragment_test.cpp',
         'sbe_column_scan_test.cpp',
         'sbe_filter_test.cpp',
         'sbe_hash_agg_test.cpp',

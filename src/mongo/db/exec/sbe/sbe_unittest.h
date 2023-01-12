@@ -34,6 +34,8 @@
 #include "mongo/unittest/unittest.h"
 
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/exec/sbe/values/value_printer.h"
+#include "mongo/db/exec/sbe/vm/vm_printer.h"
 #include <sstream>
 
 namespace mongo::sbe {
@@ -41,9 +43,37 @@ namespace mongo::sbe {
 using namespace mongo::unittest;
 using namespace mongo::unittest::match;
 
-using TypedValue = std::pair<value::TypeTags, value::Value>;
+typedef std::pair<value::TypeTags, value::Value> TypedValue;
 
 extern unittest::GoldenTestConfig goldenTestConfigSbe;
+
+class SBETestFixture : public virtual mongo::unittest::Test {
+protected:
+    template <typename Stream>
+    value::ValuePrinter<Stream> makeValuePrinter(Stream& stream) {
+        return value::ValuePrinters::make(
+            stream, PrintOptions().useTagForAmbiguousValues(true).normalizeOutput(true));
+    }
+
+    vm::CodeFragmentPrinter makeCodeFragmentPrinter() {
+        return vm::CodeFragmentPrinter(vm::CodeFragmentPrinter::PrintFormat::Stable);
+    }
+};
+
+class GoldenSBETestFixture : public virtual SBETestFixture {
+public:
+    GoldenSBETestFixture(bool debug = false) : _debug(debug), _variationCount(0) {}
+
+    void run();
+    void printVariation(const std::string& name = "");
+
+protected:
+    GoldenTestContext* gctx;
+
+private:
+    bool _debug;
+    int _variationCount;
+};
 
 /** SBE Value Equal to. */
 class ValueEq : public Matcher {
@@ -64,6 +94,23 @@ public:
 
 private:
     TypedValue _v;
+};
+
+class ValueVectorGuard {
+    ValueVectorGuard() = delete;
+    ValueVectorGuard& operator=(const ValueVectorGuard&) = delete;
+
+public:
+    ValueVectorGuard(std::vector<TypedValue>& values) : _values(values) {}
+
+    ~ValueVectorGuard() {
+        for (auto p : _values) {
+            value::releaseValue(p.first, p.second);
+        }
+    }
+
+private:
+    std::vector<TypedValue>& _values;
 };
 
 }  // namespace mongo::sbe

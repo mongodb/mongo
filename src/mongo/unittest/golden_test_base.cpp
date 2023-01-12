@@ -157,7 +157,7 @@ std::string GoldenTestContextBase::sanitizeName(const std::string& str) {
 }
 
 void GoldenTestContextBase::verifyOutput() {
-    std::string actualStr = _outStream.str();
+    std::string actualStr = getOutputString();
 
     fs::path goldenDataPath = getGoldenDataPath();
     if (!fs::exists(goldenDataPath)) {
