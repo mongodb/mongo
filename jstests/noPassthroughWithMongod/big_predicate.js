@@ -132,7 +132,7 @@ function testMaxDepth() {
 
     // When ASAN is on, filtering on a long field exceeds the stack limit, causing a segfault.
     if (_isAddressSanitizerActive()) {
-        fieldDepth = depth * 3 / 4;
+        fieldDepth = depth / 2;
         jsTestLog("Lowering the maximum depth from " + depth + " to " + fieldDepth +
                   " because the address sanitizer is active.");
         assert.commandWorked(coll.update({foo: 1}, {
