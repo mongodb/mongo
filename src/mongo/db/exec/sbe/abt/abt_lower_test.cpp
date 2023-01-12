@@ -652,6 +652,52 @@ TEST_F(ABTPlanGeneration, LowerSortedMergeNode) {
     }
 }
 
+TEST_F(ABTPlanGeneration, LowerSpoolNodes) {
+    // This test tests both SpoolProducerNode and SpoolConsumerNode.
+    GoldenTestContext ctx(&goldenTestConfig);
+    ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
+    std::vector<SpoolProducerType> spoolPTypes = {SpoolProducerType::Eager,
+                                                  SpoolProducerType::Lazy};
+    std::vector<SpoolConsumerType> spoolCTypes = {SpoolConsumerType::Regular,
+                                                  SpoolConsumerType::Stack};
+    for (const auto& spoolProdType : spoolPTypes) {
+        for (const auto& spoolConsumeType : spoolCTypes) {
+            auto leftTree = _node(make<SpoolProducerNode>(spoolProdType,
+                                                          1,
+                                                          ProjectionNameVector{"proj0"},
+                                                          Constant::boolean(true),
+                                                          createBindings({{"a", "proj0"}})));
+            auto rightTree =
+                _node(make<SpoolConsumerNode>(spoolConsumeType, 1, ProjectionNameVector{"proj0"}));
+            runNodeVariation(
+                ctx,
+                str::stream() << "Spool in union with "
+                              << SpoolProducerTypeEnum::toString[static_cast<int>(spoolProdType)]
+                              << " producer and "
+                              << SpoolConsumerTypeEnum::toString[static_cast<int>(spoolConsumeType)]
+                              << " consumer",
+                _node(make<UnionNode>(ProjectionNameVector{"proj0"},
+                                      makeSeq(std::move(leftTree), std::move(rightTree)))));
+        }
+    }
+
+    // Test with a more interesting filter.
+    auto filterTree = _path(make<EvalFilter>(
+        make<PathGet>("b", make<PathCompare>(Operations::Gte, Constant::int32(23))),
+        make<Variable>("scan0")));
+    auto leftTree = _node(make<SpoolProducerNode>(SpoolProducerType::Lazy,
+                                                  1,
+                                                  ProjectionNameVector{"proj0"},
+                                                  std::move(filterTree),
+                                                  createBindings({{"a", "proj0"}})));
+    auto rightTree =
+        _node(make<SpoolConsumerNode>(SpoolConsumerType::Stack, 1, ProjectionNameVector{"proj0"}));
+    runNodeVariation(ctx,
+                     "Spool in union with filter expression",
+                     _node(make<UnionNode>(ProjectionNameVector{"proj0"},
+                                           makeSeq(std::move(leftTree), std::move(rightTree)))));
+}
+
 TEST_F(ABTPlanGeneration, LowerUnionNode) {
     GoldenTestContext ctx(&goldenTestConfig);
     ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);

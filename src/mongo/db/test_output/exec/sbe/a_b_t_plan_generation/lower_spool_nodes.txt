@@ -1,0 +1,189 @@
+# Golden test output of ABTPlanGeneration/LowerSpoolNodes
+
+==== VARIATION: Spool in union with Eager producer and Regular consumer ====
+-- INPUT:
+Union []
+|   |   BindBlock:
+|   |       [proj0]
+|   |           Source []
+|   SpoolConsumer [Regular, id: 1]
+|       BindBlock:
+|           [proj0]
+|               Source []
+SpoolProducer [Eager, id: 1]
+|   |   Const [true]
+|   BindBlock:
+|       [proj0]
+|           Source []
+Evaluation []
+|   BindBlock:
+|       [proj0]
+|           FunctionCall [getField]
+|           |   Const ["a"]
+|           Variable [scan0]
+PhysicalScan [{'<root>': scan0}, collName]
+    BindBlock:
+        [scan0]
+            Source []
+
+-- OUTPUT:
+[4] union [s4] 
+    branch0 [s2] 
+        [2] espool sp1 [s2] 
+        [1] project [s2 = getField(s1, "a")] 
+        [0] scan s1 none none none none none [] @"<collUUID>" true false 
+    branch1 [s3] 
+        [3] cspool sp1 [s3] 
+
+
+==== VARIATION: Spool in union with Eager producer and Stack consumer ====
+-- INPUT:
+Union []
+|   |   BindBlock:
+|   |       [proj0]
+|   |           Source []
+|   SpoolConsumer [Stack, id: 1]
+|       BindBlock:
+|           [proj0]
+|               Source []
+SpoolProducer [Eager, id: 1]
+|   |   Const [true]
+|   BindBlock:
+|       [proj0]
+|           Source []
+Evaluation []
+|   BindBlock:
+|       [proj0]
+|           FunctionCall [getField]
+|           |   Const ["a"]
+|           Variable [scan0]
+PhysicalScan [{'<root>': scan0}, collName]
+    BindBlock:
+        [scan0]
+            Source []
+
+-- OUTPUT:
+[4] union [s4] 
+    branch0 [s2] 
+        [2] espool sp1 [s2] 
+        [1] project [s2 = getField(s1, "a")] 
+        [0] scan s1 none none none none none [] @"<collUUID>" true false 
+    branch1 [s3] 
+        [3] sspool sp1 [s3] 
+
+
+==== VARIATION: Spool in union with Lazy producer and Regular consumer ====
+-- INPUT:
+Union []
+|   |   BindBlock:
+|   |       [proj0]
+|   |           Source []
+|   SpoolConsumer [Regular, id: 1]
+|       BindBlock:
+|           [proj0]
+|               Source []
+SpoolProducer [Lazy, id: 1]
+|   |   Const [true]
+|   BindBlock:
+|       [proj0]
+|           Source []
+Evaluation []
+|   BindBlock:
+|       [proj0]
+|           FunctionCall [getField]
+|           |   Const ["a"]
+|           Variable [scan0]
+PhysicalScan [{'<root>': scan0}, collName]
+    BindBlock:
+        [scan0]
+            Source []
+
+-- OUTPUT:
+[4] union [s4] 
+    branch0 [s2] 
+        [2] lspool sp1 [s2] {true} 
+        [1] project [s2 = getField(s1, "a")] 
+        [0] scan s1 none none none none none [] @"<collUUID>" true false 
+    branch1 [s3] 
+        [3] cspool sp1 [s3] 
+
+
+==== VARIATION: Spool in union with Lazy producer and Stack consumer ====
+-- INPUT:
+Union []
+|   |   BindBlock:
+|   |       [proj0]
+|   |           Source []
+|   SpoolConsumer [Stack, id: 1]
+|       BindBlock:
+|           [proj0]
+|               Source []
+SpoolProducer [Lazy, id: 1]
+|   |   Const [true]
+|   BindBlock:
+|       [proj0]
+|           Source []
+Evaluation []
+|   BindBlock:
+|       [proj0]
+|           FunctionCall [getField]
+|           |   Const ["a"]
+|           Variable [scan0]
+PhysicalScan [{'<root>': scan0}, collName]
+    BindBlock:
+        [scan0]
+            Source []
+
+-- OUTPUT:
+[4] union [s4] 
+    branch0 [s2] 
+        [2] lspool sp1 [s2] {true} 
+        [1] project [s2 = getField(s1, "a")] 
+        [0] scan s1 none none none none none [] @"<collUUID>" true false 
+    branch1 [s3] 
+        [3] sspool sp1 [s3] 
+
+
+==== VARIATION: Spool in union with filter expression ====
+-- INPUT:
+Union []
+|   |   BindBlock:
+|   |       [proj0]
+|   |           Source []
+|   SpoolConsumer [Stack, id: 1]
+|       BindBlock:
+|           [proj0]
+|               Source []
+SpoolProducer [Lazy, id: 1]
+|   |   BinaryOp [FillEmpty]
+|   |   |   Const [false]
+|   |   BinaryOp [Gte]
+|   |   |   Const [0]
+|   |   BinaryOp [Cmp3w]
+|   |   |   Const [23]
+|   |   FunctionCall [getField]
+|   |   |   Const ["b"]
+|   |   Variable [scan0]
+|   BindBlock:
+|       [proj0]
+|           Source []
+Evaluation []
+|   BindBlock:
+|       [proj0]
+|           FunctionCall [getField]
+|           |   Const ["a"]
+|           Variable [scan0]
+PhysicalScan [{'<root>': scan0}, collName]
+    BindBlock:
+        [scan0]
+            Source []
+
+-- OUTPUT:
+[4] union [s4] 
+    branch0 [s2] 
+        [2] lspool sp1 [s2] {(((getField(s1, "b") <=> 23) >= 0ll) ?: false)} 
+        [1] project [s2 = getField(s1, "a")] 
+        [0] scan s1 none none none none none [] @"<collUUID>" true false 
+    branch1 [s3] 
+        [3] sspool sp1 [s3] 
+
