@@ -137,7 +137,7 @@ function createIndexes(coll, fields) {
 /**
  * Creates statistics for each field in the 'fields' array.
  */
-function analyzeFields(coll, fields) {
+function analyzeFields(db, coll, fields) {
     for (const field of fields) {
         assert.commandWorked(db.runCommand({analyze: coll.getName(), key: field}));
     }

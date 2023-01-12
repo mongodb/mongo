@@ -1,6 +1,6 @@
 load("jstests/libs/analyze_plan.js");
 
-/*
+/**
  * Utility for checking if the query optimizer is enabled.
  */
 function checkCascadesOptimizerEnabled(theDB) {
