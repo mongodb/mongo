@@ -446,7 +446,7 @@ TEST(IDLOneTypeTests, TestBase64StringNegative) {
 TEST(IDLStructTests, EpochsParse) {
     IDLParserContext ctxt("epoch");
 
-    auto sameTimeDoc = BSON("unix" << 1234567890 << "ecma" << 1234567890000);
+    auto sameTimeDoc = BSON("unix" << 1234567890LL << "ecma" << 1234567890000LL);
     auto sameTime = Struct_with_epochs::parse(ctxt, sameTimeDoc);
     ASSERT_EQ(sameTime.getUnix(), sameTime.getEcma());
     ASSERT_EQ(sameTime.getUnix().toDurationSinceEpoch(), Seconds{1234567890});
@@ -454,7 +454,7 @@ TEST(IDLStructTests, EpochsParse) {
 
     auto invalidTimeDoc = BSON("unix"
                                << "bob"
-                               << "ecma" << 1234567890000);
+                               << "ecma" << 1234567890000LL);
     ASSERT_THROWS_CODE_AND_WHAT(Struct_with_epochs::parse(ctxt, invalidTimeDoc),
                                 AssertionException,
                                 ErrorCodes::BadValue,
