@@ -23,7 +23,6 @@ load(`${dataDir}${dbName}.data`);
 print(`Loading ${dataSet.length} collections.\n`);
 loadJSONDataset(testDB, dataSet, dbMetadata);
 
-// TODO: use internalCascadesOptimizerDisableIndexes to test with/without multikey info
 for (const collMetadata of dbMetadata) {
     const collName = collMetadata.collectionName;
     const coll = testDB[collName];

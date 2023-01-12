@@ -34,7 +34,7 @@ function importDataset(dbName, dataDir, dbMetadata) {
                                       '--drop');
         assert.eq(restore_rc, 0);
 
-        // Create single-field indexes
+        // Create single-field indexes and analyze each field.
         analyzeAndIndexEnabledFields(testDB, coll, collMetadata.fields);
 
         // TODO: Create compound indexes. I doubt we will need it for CE testing.
@@ -53,16 +53,14 @@ function loadJSONDataset(db, dataSet, dbMetadata) {
     assert.commandWorked(
         db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
 
-    for (dataElem of dataSet) {
+    for (const dataElem of dataSet) {
         print(`\nInserting collection: ${dataElem.collName}`);
         coll = db[dataElem.collName];
         coll.drop();
         assert.commandWorked(coll.insertMany(dataElem.collData, {ordered: false}));
     }
 
-    // TODO: check that each dataSet field is present in collMetadata.
-
-    // Create single-field indexes
+    // Create single-field indexes and analyze each field.
     for (const collMetadata of dbMetadata) {
         print(`\nIndexing collection: ${collMetadata.collectionName}`);
         coll = db[collMetadata.collectionName];

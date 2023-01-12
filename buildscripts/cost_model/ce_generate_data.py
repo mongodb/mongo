@@ -33,12 +33,11 @@ import json
 import os
 import subprocess
 from pathlib import Path
-from bson.json_util import dumps
+import bson
 from config import CollectionTemplate, FieldTemplate, DataType
 from data_generator import CollectionInfo, DataGenerator
 from database_instance import DatabaseInstance
 import parameters_extractor
-#from ce_generate_data_settings import database_config, data_generator_config
 from ce_data_settings import database_config, data_generator_config
 
 __all__ = []
@@ -51,11 +50,11 @@ class CollectionTemplateEncoder(json.JSONEncoder):
             for card in o.cardinalities:
                 name = f'{o.name}_{card}'
                 collections.append(
-                    dict(collectionName=name, fields=o.fields, compound_indexes=o.compound_indexes,
+                    dict(collectionName=name, fields=o.fields, compoundIndexes=o.compound_indexes,
                          cardinality=card))
             return collections
         elif isinstance(o, FieldTemplate):
-            return dict(fieldName=o.name, data_type=o.data_type, indexed=o.indexed)
+            return dict(fieldName=o.name, dataType=o.data_type, indexed=o.indexed)
         elif isinstance(o, DataType):
             return o.name.lower()
         # Let the base class default method raise the TypeError
@@ -66,10 +65,7 @@ class OidEncoder(json.JSONEncoder):
     cur_oid = -1
 
     def default(self, o):
-        # TODO: doesn't work, what is the type of ObjectIds?
-        #if isinstance(o, OectId):
-        if hasattr(o, '__str__'):  # This will handle ObjectIds
-            #return str(o) this is the real OID of the document
+        if isinstance(o, bson.objectid.ObjectId):
             # Replace the OID with a consequtive int number as needed by the query generator
             OidEncoder.cur_oid += 1
             return OidEncoder.cur_oid
@@ -87,7 +83,6 @@ async def dump_collection_to_json(db, dump_path, database_name, collections):
             doc_pos = 1
             data_file.write(f'{{collName: "{coll_name}", collData: [\n')
             async for doc in collection.find({}):
-                #data_file.write(dumps(doc))
                 data_file.write(json.dumps(doc, cls=OidEncoder))
                 if doc_pos < doc_count:
                     data_file.write(',')

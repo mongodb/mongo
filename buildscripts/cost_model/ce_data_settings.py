@@ -75,7 +75,7 @@ uniform_int_mix_1 = [
     int_distributions['uniform_int_10000000_1000']
 ]
 int_distributions['mixed_int_uniform_1'] = RandomDistribution.mixed(children=uniform_int_mix_1,
-                                                                    weight=[0.1, 0.1, 0.1])
+                                                                    weight=[1, 1, 1])
 
 unf_norm_chi_int_mix_1 = [
     int_distributions['uniform_int_10000_10'], int_distributions['uniform_int_1000000_100'],
@@ -89,15 +89,19 @@ int_distributions['mixed_int_unf_norm_chi_1'] = RandomDistribution.mixed(
 ################################################################################
 # Collection templates
 ################################################################################
-#collection_cardinalities = [100, 1000, 10000, 100000]
+# In order to enable quicker Evergreen testing, and to reduce the size of the generated file
+# that is committed to git, by default we generate only 100 and 1000 document collections.
+# These are not sufficient for actual CE accuracy testing. Whenever one needs to estimate CE
+# accuracy, they should generate larger datasets offline. To achieve this, set
+# collection_cardinalities = [100, 1000, 10000, 100000]
+# Notice that such sizes result in several minutes load time on the JS test side.
 collection_cardinalities = [100, 1000]
 
-field_templates = []
-
-for dist in int_distributions:
-    field_templates.append(
-        config.FieldTemplate(name=f'{dist}', data_type=config.DataType.INTEGER,
-                             distribution=int_distributions[dist], indexed=True))
+field_templates = [
+    config.FieldTemplate(name=f'{dist}', data_type=config.DataType.INTEGER,
+                         distribution=int_distributions[dist], indexed=True)
+    for dist in int_distributions
+]
 
 ce_data = config.CollectionTemplate(name="ce_data", fields=field_templates, compound_indexes=[],
                                     cardinalities=collection_cardinalities)
