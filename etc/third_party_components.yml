@@ -224,6 +224,14 @@ components:
     local_directory_path: src/third_party/variant-1.4.0
     team_owner: "Service Architecture"
 
+  nlohmann.json.decomposed:
+    homepage_url: https://github.com/nlohmann/json
+    open_hub_url: https://www.openhub.net/p/nlohmann_json
+    release_monitoring_id: 11152
+    local_directory_path: src/third_party/wiredtiger/test/3rdparty/nlohmann
+    is_test_only: true
+    team_owner: "Wiredtiger"
+
   ocspbuilder:
     homepage_url: https://github.com/wbond/ocspbuilder
     open_hub_url: N/A
