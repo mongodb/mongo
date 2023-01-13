@@ -66,19 +66,46 @@ if (!FeatureFlagUtil.isEnabled(db, "InternalWritesAreReplicatedTransactionally")
 
 // This document removal request will be replicated over two applyOps oplog entries,
 // each containing two delete operations.
-const ex = assert.throws(() => {
-    coll.remove({});
-});
-jsTestLog('Exception from removing documents: ' + tojson(ex));
+const result = assert.commandWorked(coll.remove({}));
+jsTestLog('delete result: ' + tojson(result));
+assert.eq(result.nRemoved, docIds.length);
+assert.eq(coll.countDocuments({}), 0);
 
-// Attempting to log multiple oplog entries for batched deletes should result in a fatal assertion
-// with the message: Multi timestamp constraint violated. Transactions setting multiple timestamps
-// must set the first timestamp prior to any writes.
+// Check oplog entries generated for the large batched write.
+// Query returns any oplog entries where the applyOps array contains an operation with a namespace
+// matching the test collection namespace.
+// Oplog entries will be returned in reverse timestamp order (most recent first).
+const ops = rst.findOplog(primary, {
+                   op: 'c',
+                   ns: 'admin.$cmd',
+                   'o.applyOps': {$elemMatch: {op: 'd', ns: coll.getFullName()}}
+               })
+                .toArray();
+jsTestLog('applyOps oplog entries: ' + tojson(ops));
+assert.eq(2, ops.length, 'Should have two applyOps oplog entries');
+const deletedDocIds = ops.map((entry) => entry.o.applyOps.map((op) => op.o._id)).flat();
+jsTestLog('deleted doc _ids: ' + tojson(deletedDocIds));
+assert.sameMembers(deletedDocIds, docIds);
+assert.eq(ops[0].o.count,
+          docIds.length,
+          'last oplog entry should contain total count of operations in chain: ' + tojson(ops[0]));
+assert(ops[1].o.partialTxn,
+       'non-terminal oplog entry should have partialTxn field set to true: ' + tojson(ops[1]));
+assert(!ops[0].hasOwnProperty('prevOpTime'));
+assert(!ops[1].hasOwnProperty('prevOpTime'));
+
+// Secondary oplog application will reject the first applyOps entry in the oplog chain because it
+// is expecting a multi-document transaction with the 'lsid' and 'txnNumber' fields.
+// TODO(SERVER-70572): Remove this check when oplog application supports chained applyOps entries
+// for batch writes.
 assert.soon(function() {
-    return rawMongoProgramOutput().search(/Fatal assertion.*4877100/) >= 0;
+    return rawMongoProgramOutput().search(/Invariant failure.*op\.getSessionId\(\)/) >= 0;
 });
+const secondary = rst.getSecondary();
+rst.stop(secondary, /*signal=*/undefined, {allowedExitCode: MongoRunner.EXIT_ABORT});
 
-rst.stop(primary.nodeId, /*signal=*/undefined, {allowedExitCode: MongoRunner.EXIT_ABORT});
-
-rst.stopSet();
+// TODO(SERVER-70572): Secondary oplog application cannot apply chain of applyOps oplog entries
+// for batched writes, so the collections in a replica set will be inconsistent.
+// Therefore, we skip checking collection/db hashes across a replica set until this is resolved.
+rst.stopSet(/*signal=*/undefined, /*forRestart=*/false, {skipCheckDBHashes: true});
 })();

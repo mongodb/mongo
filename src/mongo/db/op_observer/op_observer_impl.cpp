@@ -1867,6 +1867,14 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx) {
         uassert(ErrorCodes::TransactionTooLarge,
                 "batched writes must generate a single applyOps entry",
                 applyOpsOplogSlotAndOperationAssignment.applyOpsEntries.size() == 1);
+    } else if (applyOpsOplogSlotAndOperationAssignment.applyOpsEntries.size() > 1) {
+        // Batched writes spanning multiple oplog entries create/reserve multiple oplog entries in
+        // the same WriteUnitOfWork. Because of this, such batched writes will set multiple
+        // timestamps, violating the multi timestamp constraint. It's safe to ignore the multi
+        // timestamp constraints here.
+        // TODO(SERVER-72723): implement rollback logic for batched writes spanning multiple
+        // entries.
+        opCtx->recoveryUnit()->ignoreAllMultiTimestampConstraints();
     }
 
     // Storage transaction commit is the last place inside a transaction that can throw an
