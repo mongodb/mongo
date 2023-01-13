@@ -55,7 +55,6 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
                                  bool returnOwnedBson,
                                  NamespaceString nss,
                                  bool isOpen,
-                                 Microseconds timeElapsedPlanning,
                                  std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
                                  bool generatedByBonsai)
     : _state{isOpen ? State::kOpened : State::kClosed},
@@ -126,7 +125,6 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
                                                   std::move(candidates.plans),
                                                   isMultiPlan,
                                                   isCachedCandidate,
-                                                  timeElapsedPlanning,
                                                   opCtx->getTelemetryKey(),
                                                   _rootData.debugInfo);
 }

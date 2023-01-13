@@ -125,16 +125,14 @@ PlanExecutorImpl::PlanExecutorImpl(OperationContext* opCtx,
                                    const CollectionPtr& collection,
                                    bool returnOwnedBson,
                                    NamespaceString nss,
-                                   PlanYieldPolicy::YieldPolicy yieldPolicy,
-                                   Microseconds timeElapsedPlanning)
+                                   PlanYieldPolicy::YieldPolicy yieldPolicy)
     : _opCtx(opCtx),
       _cq(std::move(cq)),
       _expCtx(_cq ? _cq->getExpCtx() : expCtx),
       _workingSet(std::move(ws)),
       _qs(std::move(qs)),
       _root(std::move(rt)),
-      _planExplainer(
-          plan_explainer_factory::make(_root.get(), timeElapsedPlanning, opCtx->getTelemetryKey())),
+      _planExplainer(plan_explainer_factory::make(_root.get(), opCtx->getTelemetryKey())),
       _mustReturnOwnedBson(returnOwnedBson),
       _nss(std::move(nss)) {
     invariant(!_expCtx || _expCtx->opCtx == _opCtx);

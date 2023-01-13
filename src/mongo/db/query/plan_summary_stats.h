@@ -86,9 +86,6 @@ struct PlanSummaryStats {
     // Time elapsed while executing this plan.
     QueryExecTime executionTime;
 
-    // Time elapsed while runtime planning, measured in microseconds.
-    Microseconds planningTimeMicros{0};
-
     // Did this plan use an in-memory sort stage?
     bool hasSortStage = false;
 

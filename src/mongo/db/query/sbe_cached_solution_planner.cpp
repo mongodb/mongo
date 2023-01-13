@@ -125,16 +125,15 @@ CandidatePlans CachedSolutionPlanner::plan(
                                                         std::move(roots[0].first),
                                                         std::move(roots[0].second),
                                                         maxReadsBeforeReplan);
+
     auto explainer = plan_explainer_factory::make(
         candidate.root.get(),
         &candidate.data,
         candidate.solution.get(),
-        {},                                    /* optimizedData */
-        {},                                    /* rejectedCandidates */
-        false,                                 /* isMultiPlan */
-        true,                                  /* isFromPlanCache */
-        _opCtx->getElapsedQueryPlanningTime(), /* metric stored in PlanExplainer via PlanExecutor
-                                                 construction*/
+        {},    /* optimizedData */
+        {},    /* rejectedCandidates */
+        false, /* isMultiPlan */
+        true,  /* isFromPlanCache */
         _opCtx->getTelemetryKey(),
         candidate.data.debugInfo
             ? std::make_unique<plan_cache_debug_info::DebugInfoSBE>(*candidate.data.debugInfo)

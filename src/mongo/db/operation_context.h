@@ -30,7 +30,6 @@
 #pragma once
 
 #include "mongo/util/assert_util.h"
-#include "mongo/util/duration.h"
 #include <boost/optional.hpp>
 #include <cstddef>
 #include <memory>
@@ -390,31 +389,6 @@ public:
      */
     Microseconds getElapsedTime() const {
         return _elapsedTime.elapsed();
-    }
-
-    void beginPlanningTimer() {
-        // TODO: SERVER-71143 If possible, change this to a tassert to guarantee this is not called
-        // more than once. This may not be possible as runAggregate(), which calls this function,
-        // can be called recursively.
-        if (_planningTimer != nullptr) {
-            return;
-        }
-        _planningTimer = std::make_unique<Timer>(getServiceContext()->getTickSource());
-    }
-
-    Microseconds getElapsedQueryPlanningTime() {
-        // This information has been requested before.
-        if (_timeElapsedPlanning > Microseconds{0}) {
-            return _timeElapsedPlanning;
-        }
-        // First time receiving the request.
-        if (_planningTimer != nullptr) {
-            _timeElapsedPlanning = _planningTimer->elapsed();
-            return _timeElapsedPlanning;
-        }
-        // This is an inner cursor/PlanExecutor, their metrics don't get saved to the telemetry
-        // cache.
-        return Microseconds{-1};
     }
 
     BSONObj getTelemetryKey() const {
@@ -833,8 +807,6 @@ private:
     // Timer counting the elapsed time since the construction of this OperationContext.
     Timer _elapsedTime;
 
-    std::unique_ptr<Timer> _planningTimer = nullptr;
-    Microseconds _timeElapsedPlanning;
     BSONObj _originalQueryBSON;
     bool _writesAreReplicated = true;
     bool _shouldIncrementLatencyStats = true;

@@ -76,7 +76,6 @@ void PlanExplainerPipeline::getSummaryStats(PlanSummaryStats* statsOut) const {
     if (_nReturned) {
         statsOut->nReturned = _nReturned;
     }
-    statsOut->planningTimeMicros = _timeElapsedPlanning;
 }
 
 PlanExplainer::PlanStatsDetails PlanExplainerPipeline::getWinningPlanStats(

@@ -98,8 +98,7 @@ public:
                      const CollectionPtr& collection,
                      bool returnOwnedBson,
                      NamespaceString nss,
-                     PlanYieldPolicy::YieldPolicy yieldPolicy,
-                     Microseconds timeElapsedPlanning);
+                     PlanYieldPolicy::YieldPolicy yieldPolicy);
 
     virtual ~PlanExecutorImpl();
     CanonicalQuery* getCanonicalQuery() const final;

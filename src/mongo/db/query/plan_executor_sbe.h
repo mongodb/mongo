@@ -51,7 +51,6 @@ public:
                     bool returnOwnedBson,
                     NamespaceString nss,
                     bool isOpen,
-                    Microseconds timeElapsedPlanning,
                     std::unique_ptr<PlanYieldPolicySBE> yieldPolicy,
                     bool generatedByBonsai);
 

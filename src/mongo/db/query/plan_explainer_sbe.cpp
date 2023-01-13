@@ -398,7 +398,6 @@ void PlanExplainerSBE::getSummaryStats(PlanSummaryStats* statsOut) const {
     statsOut->nReturned = common->advances;
     statsOut->fromMultiPlanner = isMultiPlan();
     statsOut->fromPlanCache = isFromCache();
-    statsOut->planningTimeMicros = _timeElapsedPlanning;
     statsOut->totalKeysExamined = 0;
     statsOut->totalDocsExamined = 0;
     statsOut->replanReason = _rootData->replanReason;

@@ -19,8 +19,7 @@ var findProfilerFilter = {op: "query", ns: "test.query_planning_time_metric"};
 
 function verifyProfilerLog(profilerFilter) {
     let profileObj = getLatestProfilerEntry(db, profilerFilter);
-    printjson(profileObj);
-    assert(profileObj.planningTimeMicros > 0);
+    assert.gt(profileObj.planningTimeMicros, 0);
 }
 
 // agg query
@@ -46,7 +45,7 @@ verifyProfilerLog(commandProfilerFilter);
 coll.aggregate([{$unionWith: {coll: collTwo.getName()}}], {cursor: {batchSize: 2}});
 verifyProfilerLog(commandProfilerFilter);
 
-// $lookup has inner executor (cursor??), we want to confirm we are only reporting metrics from the
+// $lookup has inner executor/cursor, we want to confirm we are only reporting metrics from the
 // outer executor associated with planning the query.
 coll.aggregate({
     $lookup: {from: collTwo.getName(), localField: "foo", foreignField: "bar", as: "merged_docs"}

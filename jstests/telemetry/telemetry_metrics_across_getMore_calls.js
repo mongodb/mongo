@@ -5,7 +5,6 @@
  *   exclude_from_telemetry_passthrough,
  * ]
  */
-load("jstests/libs/profiler.js");           // For getLatestProfilerEntry.
 load("jstests/libs/feature_flag_util.js");  // For FeatureFlagUtil.
 
 (function() {
@@ -28,25 +27,27 @@ coll.drop();
 
 function verifyMetrics(batch) {
     batch.forEach(element => {
-        assert(element.metrics.docsScanned.sum > element.metrics.docsScanned.min);
-        assert(element.metrics.docsScanned.sum >= element.metrics.docsScanned.max);
-        assert(element.metrics.docsScanned.min <= element.metrics.docsScanned.max);
+        assert.gt(element.metrics.docsScanned.sum, element.metrics.docsScanned.min);
+        assert.gte(element.metrics.docsScanned.sum, element.metrics.docsScanned.max);
+        assert.lte(element.metrics.docsScanned.min, element.metrics.docsScanned.max);
 
         // Ensure execution count does not increase with subsequent getMore() calls.
         assert.eq(element.metrics.execCount.sum,
                   element.metrics.execCount.min,
                   element.metrics.execCount.max);
 
-        if (element.metrics.execCount === 1) {
+        if (element.metrics.execCount == 1) {
             // Ensure planning time is > 0 after first batch and does not change with subsequent
             // getMore() calls.
-            assert(queryOptMicros.min > 0);
-            assert.eq(queryOptMicros.sum, queryOptMicros.min, queryOptMicros.max);
+            assert.gt(element.metrics.queryOptMicros.min, 0);
+            assert.eq(element.metrics.queryOptMicros.sum,
+                      element.metrics.queryOptMicros.min,
+                      element.metrics.queryOptMicros.max);
         }
         // Confirm that execution time increases with getMore() calls
-        assert(element.metrics.queryExecMicros.sum > element.metrics.queryExecMicros.min);
-        assert(element.metrics.queryExecMicros.sum > element.metrics.queryExecMicros.max);
-        assert(element.metrics.queryExecMicros.min <= element.metrics.queryExecMicros.max);
+        assert.gt(element.metrics.queryExecMicros.sum, element.metrics.queryExecMicros.min);
+        assert.gt(element.metrics.queryExecMicros.sum, element.metrics.queryExecMicros.max);
+        assert.lte(element.metrics.queryExecMicros.min, element.metrics.queryExecMicros.max);
     });
 }
 
@@ -96,7 +97,7 @@ telStore = testDB.adminCommand({
     ],
     cursor: {}
 });
-assert(telStore.cursor.firstBatch[0].metrics.keysScanned.sum > 0);
+assert.gt(telStore.cursor.firstBatch[0].metrics.keysScanned.sum, 0);
 
 MongoRunner.stopMongod(conn);
 }());

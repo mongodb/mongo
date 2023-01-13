@@ -42,10 +42,8 @@ std::unique_ptr<PlanExplainer> make(PlanStage* root) {
     return std::make_unique<PlanExplainerImpl>(root);
 }
 
-std::unique_ptr<PlanExplainer> make(PlanStage* root,
-                                    Microseconds timeElapsedPlanning,
-                                    BSONObj telemetryKey) {
-    return std::make_unique<PlanExplainerImpl>(root, timeElapsedPlanning, telemetryKey);
+std::unique_ptr<PlanExplainer> make(PlanStage* root, BSONObj telemetryKey) {
+    return std::make_unique<PlanExplainerImpl>(root, telemetryKey);
 }
 std::unique_ptr<PlanExplainer> make(PlanStage* root, const PlanEnumeratorExplainInfo& explainInfo) {
     return std::make_unique<PlanExplainerImpl>(root, explainInfo);
@@ -73,8 +71,7 @@ std::unique_ptr<PlanExplainer> make(sbe::PlanStage* root,
                                               std::move(optimizerData),
                                               std::move(rejectedCandidates),
                                               isMultiPlan,
-                                              false,           /* isFromPlanCache */
-                                              Microseconds{0}, /* timeElapsedPlanning*/
+                                              false, /* isFromPlanCache */
                                               BSONObj(),
                                               debugInfoSBE);
 }
@@ -87,7 +84,6 @@ std::unique_ptr<PlanExplainer> make(
     std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
     bool isMultiPlan,
     bool isFromPlanCache,
-    Microseconds timeElapsedPlanning,
     BSONObj telemetryKey,
     std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfoSBE) {
     // TODO SERVER-64882: Consider invariant(debugInfoSBE) as we may not need to create a
@@ -105,7 +101,6 @@ std::unique_ptr<PlanExplainer> make(
                                               std::move(rejectedCandidates),
                                               isMultiPlan,
                                               isFromPlanCache,
-                                              timeElapsedPlanning,
                                               telemetryKey,
                                               debugInfoSBE);
 }

@@ -1551,7 +1551,6 @@ void OpDebug::setPlanSummaryMetrics(const PlanSummaryStats& planSummaryStats) {
     keysSorted = planSummaryStats.keysSorted;
     fromMultiPlanner = planSummaryStats.fromMultiPlanner;
     fromPlanCache = planSummaryStats.fromPlanCache;
-    planningTime = planSummaryStats.planningTimeMicros;
     replanReason = planSummaryStats.replanReason;
 }
 

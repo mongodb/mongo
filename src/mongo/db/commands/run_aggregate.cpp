@@ -630,12 +630,9 @@ std::vector<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> createLegacyEx
             // There are separate ExpressionContexts for each exchange pipeline, so make sure to
             // pass the pipeline's ExpressionContext to the plan executor factory.
             auto pipelineExpCtx = pipelineIt->getContext();
-            auto planningTimeElapsed = pipelineExpCtx->opCtx->getElapsedQueryPlanningTime();
             execs.emplace_back(
                 plan_executor_factory::make(std::move(pipelineExpCtx),
                                             std::move(pipelineIt),
-                                            planningTimeElapsed, /* metric stored in PlanExplainer
-                                                                    via PlanExecutor construction*/
                                             aggregation_request_helper::getResumableScanType(
                                                 request, liteParsedPipeline.hasChangeStream())));
         }
@@ -949,7 +946,7 @@ Status runAggregate(OperationContext* opCtx,
 
         expCtx->startExpressionCounters();
         auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
-        opCtx->beginPlanningTimer();
+        curOp->beginQueryPlanningTimer();
         expCtx->stopExpressionCounters();
 
         if (!request.getAllowDiskUse().value_or(true)) {

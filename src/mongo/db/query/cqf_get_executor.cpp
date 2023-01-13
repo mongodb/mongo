@@ -346,25 +346,19 @@ static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> optimizeAndCreateExe
                                              std::make_unique<YieldPolicyCallbacksImpl>(nss));
 
     sbePlan->prepare(data.ctx);
-    auto
-        planExec = uassertStatusOK(plan_executor_factory::make(opCtx,
-                                                               std::move(cq),
-                                                               nullptr /*solution*/,
-                                                               {std::move(sbePlan),
-                                                                std::move(data)},
-                                                               std::make_unique<ABTPrinter>(
-                                                                   std::move(abt),
-                                                                   phaseManager
-                                                                       .getNodeToGroupPropsMap()),
-                                                               MultipleCollectionAccessor(
-                                                                   collection),
-                                                               QueryPlannerParams::Options::DEFAULT,
-                                                               nss,
-                                                               std::move(yieldPolicy),
-                                                               false /*isFromPlanCache*/,
-                                                               true /* generatedByBonsai */,
-                                                               opCtx
-                                                                   ->getElapsedQueryPlanningTime() /* metric stored in PlanExplainer via PlanExecutor construction*/));
+    CurOp::get(opCtx)->stopQueryPlanningTimer();
+    auto planExec = uassertStatusOK(plan_executor_factory::make(
+        opCtx,
+        std::move(cq),
+        nullptr /*solution*/,
+        {std::move(sbePlan), std::move(data)},
+        std::make_unique<ABTPrinter>(std::move(abt), phaseManager.getNodeToGroupPropsMap()),
+        MultipleCollectionAccessor(collection),
+        QueryPlannerParams::Options::DEFAULT,
+        nss,
+        std::move(yieldPolicy),
+        false /*isFromPlanCache*/,
+        true /* generatedByBonsai */));
     return planExec;
 }
 

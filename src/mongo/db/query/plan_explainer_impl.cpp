@@ -670,7 +670,6 @@ void PlanExplainerImpl::getSummaryStats(PlanSummaryStats* statsOut) const {
     std::vector<const PlanStage*> stages;
     flattenExecTree(_root, &stages);
 
-    statsOut->planningTimeMicros = _timeElapsedPlanning;
     statsOut->totalKeysExamined = 0;
     statsOut->totalDocsExamined = 0;
 

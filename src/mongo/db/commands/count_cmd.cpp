@@ -244,7 +244,8 @@ public:
 
         auto request = CountCommandRequest::parse(
             IDLParserContext("count", false /* apiStrict */, dbName.tenantId()), cmdObj);
-        opCtx->beginPlanningTimer();
+        auto curOp = CurOp::get(opCtx);
+        curOp->beginQueryPlanningTimer();
         if (shouldDoFLERewrite(request)) {
             processFLECountD(opCtx, nss, &request);
         }
@@ -314,7 +315,6 @@ public:
         auto exec = std::move(statusWithPlanExecutor.getValue());
 
         // Store the plan summary string in CurOp.
-        auto curOp = CurOp::get(opCtx);
         {
             stdx::lock_guard<Client> lk(*opCtx->getClient());
             curOp->setPlanSummary_inlock(exec->getPlanExplainer().getPlanSummary());

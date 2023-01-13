@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include "mongo/util/duration.h"
 #include <memory>
 
 #include "mongo/config.h"
@@ -285,7 +286,7 @@ public:
     Status errInfo = Status::OK();
 
     // Amount of time spent planning the query. Begins after parsing and ends
-    // at creation of PlanExecutor.
+    // after optimizations.
     Microseconds planningTime{0};
 
     // response info
@@ -695,6 +696,37 @@ public:
 
         return computeElapsedTimeTotal(start, _end.load()) - _totalPausedDuration;
     }
+    /**
+    * The planningTimeMicros metric, reported in the system profiler and in telemetry, is measured
+    * using the Curop instance's _tickSource. Currently, _tickSource is only paused in places where
+    logical work is being done. If this were to change, and _tickSource
+    were to be paused during query planning for reasons unrelated to the work of
+    planning/optimization, it would break the planning time measurement below.
+    *
+    */
+    void beginQueryPlanningTimer() {
+        // This is an inner executor/cursor, the metrics for which don't get tracked by
+        // OpDebug::planningTime.
+        if (_queryPlanningStart.load() != 0) {
+            return;
+        }
+        _queryPlanningStart = _tickSource->getTicks();
+    }
+
+    void stopQueryPlanningTimer() {
+        // The planningTime metric is defined as being done once PrepareExecutionHelper::prepare()
+        // is hit, which calls this function to stop the timer. As certain queries like $lookup
+        // require inner cursors/executors that will follow this same codepath, it is important to
+        // make sure the metric exclusively captures the time associated with the outermost cursor.
+        // This is done by making sure planningTime has not already been set and that start has been
+        // marked (as inner executors are prepared outside of the codepath that begins the planning
+        // timer).
+        auto start = _queryPlanningStart.load();
+        if (debug().planningTime == Microseconds{0} && start != 0) {
+            _queryPlanningEnd = _tickSource->getTicks();
+            debug().planningTime = computeElapsedTimeTotal(start, _queryPlanningEnd.load());
+        }
+    }
 
     /**
      * 'opDescription' must be either an owned BSONObj or guaranteed to outlive the OperationContext
@@ -898,6 +930,9 @@ private:
     UserAcquisitionStats _userAcquisitionStats;
 
     TickSource* _tickSource = nullptr;
+    // These values are used to calculate the amount of time spent planning a query.
+    std::atomic<TickSource::Tick> _queryPlanningStart{0};  // NOLINT
+    std::atomic<TickSource::Tick> _queryPlanningEnd{0};    // NOLINT
 };
 
 }  // namespace mongo
