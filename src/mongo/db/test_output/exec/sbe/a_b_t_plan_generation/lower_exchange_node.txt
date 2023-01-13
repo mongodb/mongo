@@ -1,0 +1,101 @@
+# Golden test output of ABTPlanGeneration/LowerExchangeNode
+
+==== VARIATION: Lower exchange node of type HashPartitioning ====
+-- INPUT:
+Exchange []
+|   |   distribution: 
+|   |       type: HashPartitioning
+|   |           projections: 
+|   |               proj0
+|   RefBlock: 
+|       Variable [proj0]
+Evaluation []
+|   BindBlock:
+|       [proj0]
+|           FunctionCall [getField]
+|           |   Const ["a"]
+|           Variable [scan0]
+PhysicalScan [{'<root>': scan0}, collName]
+    BindBlock:
+        [scan0]
+            Source []
+
+-- OUTPUT:
+[0] exchange [s2] 1 hash 
+[1] project [s2 = getField(s1, "a")] 
+[2] scan s1 none none none none none [] @"<collUUID>" true false 
+
+==== VARIATION: Lower exchange node of type Centralized ====
+-- INPUT:
+Exchange []
+|   |   distribution: 
+|   |       type: Centralized
+|   |           projections: 
+|   |               proj0
+|   RefBlock: 
+|       Variable [proj0]
+Evaluation []
+|   BindBlock:
+|       [proj0]
+|           FunctionCall [getField]
+|           |   Const ["a"]
+|           Variable [scan0]
+PhysicalScan [{'<root>': scan0}, collName]
+    BindBlock:
+        [scan0]
+            Source []
+
+-- OUTPUT:
+[0] exchange [s2] 1 bcast 
+[1] project [s2 = getField(s1, "a")] 
+[2] scan s1 none none none none none [] @"<collUUID>" true false 
+
+==== VARIATION: Lower exchange node of type RoundRobin ====
+-- INPUT:
+Exchange []
+|   |   distribution: 
+|   |       type: RoundRobin
+|   |           projections: 
+|   |               proj0
+|   RefBlock: 
+|       Variable [proj0]
+Evaluation []
+|   BindBlock:
+|       [proj0]
+|           FunctionCall [getField]
+|           |   Const ["a"]
+|           Variable [scan0]
+PhysicalScan [{'<root>': scan0}, collName]
+    BindBlock:
+        [scan0]
+            Source []
+
+-- OUTPUT:
+[0] exchange [s2] 1 round 
+[1] project [s2 = getField(s1, "a")] 
+[2] scan s1 none none none none none [] @"<collUUID>" true false 
+
+==== VARIATION: Lower exchange node of type Replicated ====
+-- INPUT:
+Exchange []
+|   |   distribution: 
+|   |       type: Replicated
+|   |           projections: 
+|   |               proj0
+|   RefBlock: 
+|       Variable [proj0]
+Evaluation []
+|   BindBlock:
+|       [proj0]
+|           FunctionCall [getField]
+|           |   Const ["a"]
+|           Variable [scan0]
+PhysicalScan [{'<root>': scan0}, collName]
+    BindBlock:
+        [scan0]
+            Source []
+
+-- OUTPUT:
+[0] exchange [s2] 1 bcast 
+[1] project [s2 = getField(s1, "a")] 
+[2] scan s1 none none none none none [] @"<collUUID>" true false 

@@ -305,6 +305,64 @@ TEST_F(ABTPlanGeneration, LowerMultipleEvaluationNodes) {
                      createBindings({{"a", "proj0"}, {"b", "proj1"}}));
 }
 
+TEST_F(ABTPlanGeneration, LowerExchangeNode) {
+    GoldenTestContext ctx(&goldenTestConfig);
+    ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
+
+    // Exchange doesn't support UnknownPartitioning or RangePartitioning.
+    std::vector<DistributionType> supportedDistributionTypes = {DistributionType::HashPartitioning,
+                                                                DistributionType::Centralized,
+                                                                DistributionType::RoundRobin,
+                                                                DistributionType::Replicated};
+    for (const auto& exchangeType : supportedDistributionTypes) {
+
+        properties::PhysProps physProps;
+        properties::DistributionRequirement distReq{
+            properties::DistributionAndProjections(exchangeType, ProjectionNameVector{"proj0"})};
+
+        properties::setPropertyOverwrite<properties::DistributionRequirement>(physProps, distReq);
+        properties::setPropertyOverwrite(
+            physProps,
+            properties::ProjectionRequirement(ProjectionNameOrderPreservingSet({"proj0"})));
+        NodeProps exchangeNodeProp{getNextNodeID(),
+                                   {},
+                                   {},
+                                   physProps,
+                                   boost::none,
+                                   CostType::fromDouble(0),
+                                   CostType::fromDouble(0),
+                                   {false}};
+
+        properties::PhysProps evalPhysProps;
+        properties::DistributionRequirement evalDistReq{properties::DistributionAndProjections(
+            DistributionType::Centralized, ProjectionNameVector{})};
+        properties::setPropertyOverwrite<properties::DistributionRequirement>(evalPhysProps,
+                                                                              evalDistReq);
+        NodeProps evalNodeProp{getNextNodeID(),
+                               {},
+                               {},
+                               evalPhysProps,
+                               boost::none,
+                               CostType::fromDouble(0),
+                               CostType::fromDouble(0),
+                               {false}};
+
+
+        auto field = make<EvalPath>(make<PathGet>(FieldNameType("a"), make<PathIdentity>()),
+                                    make<Variable>(ProjectionName("scan0")));
+        runPathLowering(field);
+        ABT evalNode =
+            make<EvaluationNode>(ProjectionName("proj0"), std::move(field), _node(scanForTest()));
+
+        runNodeVariation(
+            ctx,
+            str::stream() << "Lower exchange node of type "
+                          << DistributionTypeEnum::toString[static_cast<int>(exchangeType)],
+            _node(make<ExchangeNode>(distReq, _node(std::move(evalNode), evalNodeProp)),
+                  exchangeNodeProp));
+    }
+}
+
 TEST_F(ABTPlanGeneration, LowerFilterNode) {
     GoldenTestContext ctx(&goldenTestConfig);
     ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
