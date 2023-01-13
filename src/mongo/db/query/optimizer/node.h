@@ -882,6 +882,7 @@ public:
     const ProjectionNameVector& getProjections() const;
 
     const ABT& getChild() const;
+    ABT& getChild();
 
 private:
     ProjectionNameVector _projections;

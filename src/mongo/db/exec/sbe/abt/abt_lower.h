@@ -197,14 +197,25 @@ private:
 
     sbe::value::SlotVector convertProjectionsToSlots(const ProjectionNameVector& projectionNames);
     sbe::value::SlotVector convertRequiredProjectionsToSlots(
-        const NodeProps& props,
-        bool removeRIDProjection,
-        const sbe::value::SlotVector& toExclude = {});
+        const NodeProps& props, const sbe::value::SlotVector& toExclude = {});
 
     std::unique_ptr<sbe::EExpression> convertBoundsToExpr(
         bool isLower, const IndexDefinition& indexDef, const CompoundIntervalRequirement& interval);
 
     std::unique_ptr<sbe::PlanStage> generateInternal(const ABT& n);
+
+    /**
+     * Maps a projection name to a slot by updating _slotMap field.
+     * By default it will tassert rather than overwrite an existing entry--it's the caller's
+     * responsibility not to call this twice with the same projName. With 'canOverwrite = true' it
+     * is allowed to overwrite an existing entry. This is useful for nodes that intentionally use
+     * the same projName for two different values. For example, two independent index scans could
+     * both use the same projName for RID. Or, Unwind uses the same projName both for the original
+     * array, and the unwound elements.
+     */
+    void mapProjToSlot(const ProjectionName& projName,
+                       sbe::value::SlotId slot,
+                       bool canOverwrite = false);
 
     const VariableEnvironment& _env;
     SlotVarMap& _slotMap;

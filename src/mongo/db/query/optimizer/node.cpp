@@ -862,6 +862,10 @@ const ABT& UniqueNode::getChild() const {
     return get<0>();
 }
 
+ABT& UniqueNode::getChild() {
+    return get<0>();
+}
+
 SpoolProducerNode::SpoolProducerNode(const SpoolProducerType type,
                                      const int64_t spoolId,
                                      ProjectionNameVector projections,

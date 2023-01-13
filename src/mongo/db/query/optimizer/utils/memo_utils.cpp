@@ -33,6 +33,7 @@
 
 
 namespace mongo::optimizer {
+using namespace properties;
 
 class MemoLatestPlanExtractor {
 public:
@@ -61,8 +62,7 @@ public:
     ABT extractLatest(const GroupIdType groupId, opt::unordered_set<GroupIdType>& visitedGroups) {
         if (!visitedGroups.insert(groupId).second) {
             const GroupIdType scanGroupId =
-                properties::getPropertyConst<properties::IndexingAvailability>(
-                    _memo.getLogicalProps(groupId))
+                getPropertyConst<IndexingAvailability>(_memo.getLogicalProps(groupId))
                     .getScanGroupId();
             uassert(
                 6624357, "Visited the same non-scan group more than once", groupId == scanGroupId);
@@ -98,56 +98,155 @@ public:
     /**
      * Physical delegator node.
      */
-    void transport(ABT& n, const MemoPhysicalDelegatorNode& node, const MemoPhysicalNodeId /*id*/) {
+    void operator()(ABT& n,
+                    MemoPhysicalDelegatorNode& node,
+                    MemoPhysicalNodeId /*id*/,
+                    ProjectionNameOrderPreservingSet /*required*/) {
         n = extract(node.getNodeId());
     }
 
-    /**
-     * Other ABT types.
-     */
-    template <typename T, typename... Ts>
-    void transport(ABT& /*n*/, const T& node, MemoPhysicalNodeId id, Ts&&...) {
-        if constexpr (std::is_base_of_v<Node, T>) {
-            using namespace properties;
+    void addNodeProps(const Node* node,
+                      MemoPhysicalNodeId id,
+                      ProjectionNameOrderPreservingSet required) {
+        const auto& physicalResult = *_memo.getPhysicalNodes(id._groupId).at(id._index);
+        const auto& nodeInfo = *physicalResult._nodeInfo;
 
-            const auto& physicalResult = *_memo.getPhysicalNodes(id._groupId).at(id._index);
-            const auto& nodeInfo = *physicalResult._nodeInfo;
+        LogicalProps logicalProps = _memo.getLogicalProps(id._groupId);
+        PhysProps physProps = physicalResult._physProps;
+        if (!_metadata.isParallelExecution()) {
+            // Do not display availability and requirement if under centralized setting.
+            removeProperty<DistributionAvailability>(logicalProps);
+            removeProperty<DistributionRequirement>(physProps);
+        }
+        setPropertyOverwrite(physProps, ProjectionRequirement{std::move(required)});
 
-            LogicalProps logicalProps = _memo.getLogicalProps(id._groupId);
-            PhysProps physProps = physicalResult._physProps;
-            if (!_metadata.isParallelExecution()) {
-                // Do not display availability and requirement if under centralized setting.
-                removeProperty<DistributionAvailability>(logicalProps);
-                removeProperty<DistributionRequirement>(physProps);
+        boost::optional<ProjectionName> ridProjName;
+        if (hasProperty<IndexingRequirement>(physProps)) {
+            const auto& scanDefName =
+                getPropertyConst<IndexingAvailability>(logicalProps).getScanDefName();
+            ridProjName = _ridProjections.at(scanDefName);
+        }
+
+        _nodeToGroupPropsMap.emplace(node,
+                                     NodeProps{_planNodeId++,
+                                               id,
+                                               std::move(logicalProps),
+                                               std::move(physProps),
+                                               std::move(ridProjName),
+                                               nodeInfo._cost,
+                                               nodeInfo._localCost,
+                                               nodeInfo._adjustedCE});
+    }
+
+    void operator()(ABT& n,
+                    NestedLoopJoinNode& node,
+                    MemoPhysicalNodeId id,
+                    ProjectionNameOrderPreservingSet required) {
+        addNodeProps(&node, id, required);
+
+        // Obtain correlated projections from the left child, non-correlated from the right child.
+        ProjectionNameOrderPreservingSet requiredInner = required;
+        ProjectionNameOrderPreservingSet requiredOuter;
+        for (const ProjectionName& projectionName : node.getCorrelatedProjectionNames()) {
+            requiredInner.erase(projectionName);
+            if (required.find(projectionName)) {
+                requiredOuter.emplace_back(projectionName);
+            }
+        }
+
+        node.getLeftChild().visit(*this, id, std::move(requiredOuter));
+        node.getRightChild().visit(*this, id, std::move(requiredInner));
+    }
+
+    void operator()(ABT& n,
+                    GroupByNode& node,
+                    MemoPhysicalNodeId id,
+                    ProjectionNameOrderPreservingSet required) {
+        addNodeProps(&node, id, required);
+
+        // Propagate the input projections only.
+        for (const auto& projName : node.getAggregationProjectionNames()) {
+            required.erase(projName);
+        }
+        for (const auto& expr : node.getAggregationExpressions()) {
+            if (const auto fnPtr = expr.cast<FunctionCall>();
+                fnPtr != nullptr && fnPtr->nodes().size() == 1) {
+                if (const auto varPtr = fnPtr->nodes().front().cast<Variable>()) {
+                    required.emplace_back(varPtr->name());
+                }
+            }
+        }
+
+        node.getChild().visit(*this, id, std::move(required));
+    }
+
+    template <class T>
+    void operator()(ABT& n,
+                    T& node,
+                    MemoPhysicalNodeId id,
+                    ProjectionNameOrderPreservingSet required) {
+        using namespace algebra::detail;
+
+        if constexpr (is_one_of_v<T,
+                                  PhysicalScanNode,
+                                  ValueScanNode,
+                                  CoScanNode,
+                                  IndexScanNode,
+                                  SeekNode,
+                                  SpoolConsumerNode>) {
+            // Nullary nodes.
+            addNodeProps(&node, id, std::move(required));
+        } else if constexpr (is_one_of_v<T,
+                                         FilterNode,
+                                         EvaluationNode,
+                                         UnwindNode,
+                                         UniqueNode,
+                                         SpoolProducerNode,
+                                         CollationNode,
+                                         LimitSkipNode,
+                                         ExchangeNode,
+                                         RootNode>) {
+            // Unary nodes.
+            addNodeProps(&node, id, required);
+            node.getChild().visit(*this, id, std::move(required));
+        } else if constexpr (is_one_of_v<T, SortedMergeNode, UnionNode>) {
+            // N-ary nodes.
+            addNodeProps(&node, id, required);
+            for (auto& child : node.nodes()) {
+                child.visit(*this, id, required);
+            }
+        } else if constexpr (is_one_of_v<T, MergeJoinNode, HashJoinNode>) {
+            // HashJoin and MergeJoin.
+            addNodeProps(&node, id, required);
+
+            // Do not require RID from the inner child.
+            auto requiredInner = required;
+            if (const auto& ridProjName = _nodeToGroupPropsMap.at(&node)._ridProjName) {
+                requiredInner.erase(*ridProjName);
             }
 
-            boost::optional<ProjectionName> ridProjName;
-            if (hasProperty<IndexingRequirement>(physProps)) {
-                const auto& scanDefName =
-                    getPropertyConst<IndexingAvailability>(logicalProps).getScanDefName();
-                ridProjName = _ridProjections.at(scanDefName);
-            }
-
-            _nodeToGroupPropsMap.emplace(&node,
-                                         NodeProps{_planNodeId++,
-                                                   id,
-                                                   std::move(logicalProps),
-                                                   std::move(physProps),
-                                                   std::move(ridProjName),
-                                                   nodeInfo._cost,
-                                                   nodeInfo._localCost,
-                                                   nodeInfo._adjustedCE});
+            node.getLeftChild().visit(*this, id, std::move(required));
+            node.getRightChild().visit(*this, id, std::move(requiredInner));
+        } else {
+            // Other ABT types.
+            static_assert(!canBePhysicalNode<T>(), "Physical node must implement its visitor");
         }
     }
 
-    ABT extract(const MemoPhysicalNodeId nodeId) {
+    ABT extract(MemoPhysicalNodeId nodeId) {
         const auto& result = *_memo.getPhysicalNodes(nodeId._groupId).at(nodeId._index);
         uassert(6624143,
                 "Physical delegator must be pointing to an optimized result.",
                 result._nodeInfo.has_value());
         ABT node = result._nodeInfo->_node;
 
-        algebra::transport<true>(node, *this, nodeId);
+        if (hasProperty<ProjectionRequirement>(result._physProps)) {
+            node.visit(*this,
+                       nodeId,
+                       getPropertyConst<ProjectionRequirement>(result._physProps).getProjections());
+        } else {
+            node.visit(*this, nodeId, ProjectionNameOrderPreservingSet{});
+        }
         return node;
     }
 
@@ -161,7 +260,7 @@ private:
     int32_t _planNodeId;
 };
 
-std::pair<ABT, NodeToGroupPropsMap> extractPhysicalPlan(const MemoPhysicalNodeId id,
+std::pair<ABT, NodeToGroupPropsMap> extractPhysicalPlan(MemoPhysicalNodeId id,
                                                         const Metadata& metadata,
                                                         const RIDProjectionsMap& ridProjections,
                                                         const cascades::Memo& memo) {
