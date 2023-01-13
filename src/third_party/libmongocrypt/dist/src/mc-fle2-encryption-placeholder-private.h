@@ -22,6 +22,7 @@
 #include "mongocrypt.h"
 #include "mongocrypt-private.h"
 #include "mc-fle2-find-range-payload-private.h"
+#include "mc-optional-private.h"
 
 /** FLE2RangeFindSpecEdgesInfo represents the information needed to generate
  * edges for a range find query. It is encoded inside an FLE2RangeFindSpec. See
@@ -46,6 +47,9 @@ typedef struct {
    // indexMax is the maximum value for the encrypted index that this query is
    // using.
    bson_iter_t indexMax;
+   // precision determines the number of digits after the decimal point for
+   // floating point values.
+   mc_optional_uint32_t precision;
 } mc_FLE2RangeFindSpecEdgesInfo_t;
 
 /** FLE2RangeFindSpec represents the range find specification that is encoded
@@ -85,6 +89,9 @@ typedef struct {
    bson_iter_t min;
    // max is the Queryable Encryption max bound for range.
    bson_iter_t max;
+   // precision determines the number of digits after the decimal point for
+   // floating point values.
+   mc_optional_uint32_t precision;
 } mc_FLE2RangeInsertSpec_t;
 
 bool

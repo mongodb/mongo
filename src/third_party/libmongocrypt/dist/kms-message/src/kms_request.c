@@ -20,6 +20,7 @@
 #include "kms_message_private.h"
 #include "kms_request_opt_private.h"
 #include "kms_port.h"
+#include <limits.h> /* CHAR_BIT */
 
 static kms_kv_list_t *
 parse_query_params (kms_request_str_t *q)
@@ -288,7 +289,8 @@ kms_request_append_header_field_value (kms_request_t *request,
    }
 
    v = request->header_fields->kvs[request->header_fields->len - 1].value;
-   kms_request_str_append_chars (v, value, len);
+   KMS_ASSERT (len <= SSIZE_MAX);
+   kms_request_str_append_chars (v, value, (ssize_t) len);
 
    return true;
 }
@@ -304,7 +306,8 @@ kms_request_append_payload (kms_request_t *request,
       return false;
    }
 
-   kms_request_str_append_chars (request->payload, payload, len);
+   KMS_ASSERT (len <= SSIZE_MAX);
+   kms_request_str_append_chars (request->payload, payload, (ssize_t) len);
 
    return true;
 }
@@ -619,7 +622,7 @@ kms_request_hmac (_kms_crypto_t *crypto,
                   kms_request_str_t *data)
 {
    return crypto->sha256_hmac (
-      crypto->ctx, key->str, (int) key->len, data->str, data->len, out);
+      crypto->ctx, key->str, key->len, data->str, data->len, out);
 }
 
 static bool

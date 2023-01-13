@@ -29,6 +29,8 @@ _pair_expired (_mongocrypt_cache_t *cache, _mongocrypt_cache_pair_t *pair)
    BSON_ASSERT_PARAM (pair);
 
    current = bson_get_monotonic_time () / 1000;
+   BSON_ASSERT (current >= INT64_MIN + pair->last_updated);
+   BSON_ASSERT (cache->expiration <= INT64_MAX);
    return (current - pair->last_updated) > (int64_t) cache->expiration;
 }
 
@@ -307,6 +309,7 @@ _mongocrypt_cache_dump (_mongocrypt_cache_t *cache)
    _mongocrypt_mutex_lock (&cache->mutex);
    count = 0;
    for (pair = cache->pair; pair != NULL; pair = pair->next) {
+      /* don't check that int64_t fits in int, since this is only diagnostic */
       printf ("entry:%d last_updated:%d\n", count, (int) pair->last_updated);
       if (cache->dump_attr) {
          printf ("- attr:");

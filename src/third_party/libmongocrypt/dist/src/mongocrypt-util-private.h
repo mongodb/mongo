@@ -70,4 +70,15 @@ mc_iter_document_as_bson (const bson_iter_t *iter,
                           bson_t *bson,
                           mongocrypt_status_t *status);
 
+// mc_isnan is a wrapper around isnan. It avoids a conversion warning on glibc.
+bool
+mc_isnan (double d);
+// mc_isinf is a wrapper around isinf. It avoids a conversion warning on glibc.
+bool
+mc_isinf (double d);
+// mc_isfinite is a wrapper around isfinite. It avoids a conversion warning on
+// glibc.
+bool
+mc_isfinite (double d);
+
 #endif /* MONGOCRYPT_UTIL_PRIVATE_H */

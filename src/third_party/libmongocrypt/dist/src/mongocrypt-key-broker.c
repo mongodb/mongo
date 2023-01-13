@@ -421,7 +421,7 @@ _mongocrypt_key_broker_filter (_mongocrypt_key_broker_t *kb,
          BSON_ASSERT (key_str);
          if (!bson_append_value (&names,
                                  key_str,
-                                 (uint32_t) strlen (key_str),
+                                 (int) strlen (key_str),
                                  &key_alt_name->value)) {
             bson_destroy (&ids);
             bson_destroy (&names);
@@ -549,7 +549,7 @@ _mongocrypt_key_broker_add_doc (_mongocrypt_key_broker_t *kb,
 
    /* Check that the returned key doc's provider matches. */
    kek_provider = key_doc->kek.kms_provider;
-   if (0 == (kek_provider & kms_providers->configured_providers)) {
+   if (0 == ((int) kek_provider & kms_providers->configured_providers)) {
       _key_broker_fail_w_msg (
          kb, "client not configured with KMS provider necessary to decrypt");
       goto done;
@@ -557,6 +557,7 @@ _mongocrypt_key_broker_add_doc (_mongocrypt_key_broker_t *kb,
 
    /* If the KMS provider is local, decrypt immediately. Otherwise, create the
     * HTTP KMS request. */
+   BSON_ASSERT (kb->crypt);
    if (kek_provider == MONGOCRYPT_KMS_PROVIDER_LOCAL) {
       if (!_mongocrypt_unwrap_key (kb->crypt->crypto,
                                    &kms_providers->local.key,

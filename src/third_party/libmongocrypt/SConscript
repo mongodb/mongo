@@ -124,6 +124,7 @@ env.Library(
         'dist/src/mc-range-encoding.c',
         'dist/src/mc-range-mincover.c',
         'dist/src/mc-rangeopts.c',
+        'dist/src/mc-reader.c',
         'dist/src/mc-tokens.c',
         'dist/src/mongocrypt-binary.c',
         'dist/src/mongocrypt-buffer.c',

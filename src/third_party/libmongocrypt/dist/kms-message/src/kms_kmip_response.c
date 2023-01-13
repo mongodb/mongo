@@ -7,6 +7,7 @@
 
 #include <stdlib.h>
 #include <inttypes.h>
+#include <limits.h> /* CHAR_BIT */
 
 static bool
 check_and_require_kmip (kms_response_t *res)
@@ -200,7 +201,8 @@ kms_kmip_response_get_unique_identifier (kms_response_t *res)
       goto fail;
    }
 
-   nullterminated = kms_request_str_new_from_chars (uid, len);
+   KMS_ASSERT (len <= SSIZE_MAX);
+   nullterminated = kms_request_str_new_from_chars (uid, (ssize_t) len);
 
 fail:
    kmip_reader_destroy (reader);

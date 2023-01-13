@@ -91,7 +91,7 @@ const char *
 tmp_buf (const _mongocrypt_buffer_t *buf)
 {
    static char storage[1024];
-   uint32_t i, n;
+   size_t i, n;
 
    BSON_ASSERT_PARAM (buf);
 
@@ -240,8 +240,8 @@ _mongocrypt_new_string_from_bytes (const void *in, int len)
    char *out;
    char *ret;
 
-   out_size += len > max_bytes ? sizeof ("...") : 1 /* for null */;
-   out = bson_malloc0 (out_size);
+   out_size += len > max_bytes ? (int) sizeof ("...") : 1 /* for null */;
+   out = bson_malloc0 ((size_t) out_size);
    BSON_ASSERT (out);
 
    ret = out;
@@ -267,7 +267,8 @@ _mongocrypt_new_json_string_from_binary (mongocrypt_binary_t *binary)
       char *hex;
       char *full_str;
 
-      hex = _mongocrypt_new_string_from_bytes (binary->data, binary->len);
+      BSON_ASSERT (binary->len <= (uint32_t) INT_MAX);
+      hex = _mongocrypt_new_string_from_bytes (binary->data, (int) binary->len);
       full_str = bson_strdup_printf ("(malformed) %s", hex);
       bson_free (hex);
       return full_str;
@@ -392,7 +393,8 @@ mongocrypt_setopt_kms_provider_local (mongocrypt_t *crypt,
 
    if (crypt->log.trace_enabled) {
       char *key_val;
-      key_val = _mongocrypt_new_string_from_bytes (key->data, key->len);
+      BSON_ASSERT (key->len <= (uint32_t) INT_MAX);
+      key_val = _mongocrypt_new_string_from_bytes (key->data, (int) key->len);
 
       _mongocrypt_log (&crypt->log,
                        MONGOCRYPT_LOG_LEVEL_TRACE,
@@ -1082,14 +1084,12 @@ _mongocrypt_validate_and_copy_string (const char *in,
       return false;
    }
 
-   if (in_len == -1) {
-      in_len = (uint32_t) strlen (in);
-   }
+   const size_t len = in_len < 0 ? strlen (in) : (size_t) in_len;
 
-   if (!bson_utf8_validate (in, in_len, false)) {
+   if (!bson_utf8_validate (in, len, false)) {
       return false;
    }
-   *out = bson_strndup (in, in_len);
+   *out = bson_strndup (in, len);
    return true;
 }
 
@@ -1536,9 +1536,12 @@ mongocrypt_setopt_append_crypt_shared_lib_search_path (mongocrypt_t *crypt,
    // Dup the path string for us to manage
    mstr pathdup = mstr_copy_cstr (path);
    // Increase array len
+   BSON_ASSERT (crypt->opts.n_crypt_shared_lib_search_paths < INT_MAX);
    const int new_len = crypt->opts.n_crypt_shared_lib_search_paths + 1;
-   mstr *const new_array = bson_realloc (
-      crypt->opts.crypt_shared_lib_search_paths, sizeof (mstr) * new_len);
+   BSON_ASSERT (new_len > 0 && sizeof (mstr) <= SIZE_MAX / (size_t) new_len);
+   mstr *const new_array =
+      bson_realloc (crypt->opts.crypt_shared_lib_search_paths,
+                    sizeof (mstr) * (size_t) new_len);
 
    // Store the path
    new_array[new_len - 1] = pathdup;
@@ -1590,7 +1593,7 @@ _mongocrypt_needs_credentials_for_provider (mongocrypt_t *crypt,
       return false;
    }
 
-   return (crypt->opts.kms_providers.need_credentials & provider) != 0;
+   return (crypt->opts.kms_providers.need_credentials & (int) provider) != 0;
 }
 
 void

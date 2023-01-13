@@ -164,6 +164,7 @@ _crypto_state_init (const _mongocrypt_buffer_t *key,
    state->key_object_length = _aes256_key_blob_length;
 
    /* Allocate temporary buffer for key import */
+   BSON_ASSERT (sizeof (BCRYPT_KEY_DATA_BLOB_HEADER) + key->len <= UINT32_MAX);
    keyBlobLength = sizeof (BCRYPT_KEY_DATA_BLOB_HEADER) + key->len;
    keyBlob = bson_malloc0 (keyBlobLength);
    BSON_ASSERT (keyBlob);
@@ -418,10 +419,14 @@ _cng_ctr_crypto_generate (cng_ctr_encrypt_state *state,
 static void
 _cng_ctr_crypto_advance (cng_ctr_encrypt_state *state)
 {
-   BSON_ASSERT (state);
+   BSON_ASSERT_PARAM (state);
+
+   /* Assert rather than return false/NULL since this function's type is void */
+   BSON_ASSERT (sizeof (BCRYPT_KEY_DATA_BLOB_HEADER) <=
+                UINT32_MAX - state->input_block_len);
 
    uint32_t carry = 1;
-   for (int i = state->input_block_len - 1; i >= 0 && carry != 0; --i) {
+   for (int i = (int) state->input_block_len - 1; i >= 0 && carry != 0; --i) {
       uint32_t bpp = (uint32_t) (state->input_block[i]) + carry;
       carry = bpp >> 8;
       state->input_block[i] = bpp & 0xFF;
@@ -433,8 +438,8 @@ _cng_ctr_crypto_next (cng_ctr_encrypt_state *state,
                       mongocrypt_status_t *status,
                       unsigned char *mask)
 {
-   BSON_ASSERT (state);
-   BSON_ASSERT (mask);
+   BSON_ASSERT_PARAM (state);
+   BSON_ASSERT_PARAM (mask);
 
    if (state->output_block_ptr >= state->output_block_len) {
       _cng_ctr_crypto_advance (state);
@@ -470,6 +475,11 @@ _cng_ctr_crypto_state_init (const _mongocrypt_buffer_t *key,
 
    state = bson_malloc0 (sizeof (*state));
    BSON_ASSERT (state);
+
+   if (UINT32_MAX - key->len < sizeof (BCRYPT_KEY_DATA_BLOB_HEADER)) {
+      CLIENT_ERR ("key is too long");
+      goto fail;
+   }
 
    state->key_handle = INVALID_HANDLE_VALUE;
 

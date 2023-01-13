@@ -79,7 +79,9 @@ typedef struct {
 
 typedef struct {
    double value;
-   /* Double does not support 'min' or 'max' arguments. See SERVER-70066. */
+   mc_optional_double_t min;
+   mc_optional_double_t max;
+   mc_optional_uint32_t precision;
 } mc_getTypeInfoDouble_args_t;
 
 /* mc_getTypeInfoDouble encodes the double `args.value` into an OSTType_Double

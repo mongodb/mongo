@@ -23,10 +23,6 @@
 #include <math.h>        // INFINITY
 #include "mlib/thread.h" // mlib_once_flag
 
-/* Enable -Wconversion as error for only this file.
- * Other libmongocrypt files warn for -Wconversion. */
-MC_BEGIN_CONVERSION_ERRORS
-
 static mc_FLE2RangeOperator_t
 get_operator_type (const char *key)
 {
@@ -125,6 +121,7 @@ parse_aggregate_expression (const bson_t *orig,
                             mongocrypt_status_t *status)
 {
    BSON_ASSERT_PARAM (orig);
+   BSON_ASSERT_PARAM (in);
    BSON_ASSERT_PARAM (out);
    BSON_ASSERT (status || true);
 
@@ -189,6 +186,7 @@ parse_match_expression (const bson_t *orig,
                         mongocrypt_status_t *status)
 {
    BSON_ASSERT_PARAM (orig);
+   BSON_ASSERT_PARAM (in);
    BSON_ASSERT_PARAM (out);
    BSON_ASSERT (status || true);
 
@@ -241,6 +239,9 @@ mc_FLE2RangeFindDriverSpec_parse (mc_FLE2RangeFindDriverSpec_t *spec,
                                   const bson_t *in,
                                   mongocrypt_status_t *status)
 {
+   BSON_ASSERT_PARAM (in);
+   BSON_ASSERT (status || true);
+
    *spec = (mc_FLE2RangeFindDriverSpec_t){0};
    // `in` may be an Aggregate Expression with this form:
    // {$and: [{$gt: ["$age", 5]}, {$lt:["$age", 50]}]}
@@ -378,6 +379,7 @@ mc_makeRangeFindPlaceholder (mc_makeRangeFindPlaceholder_args_t *args,
                              _mongocrypt_buffer_t *out,
                              mongocrypt_status_t *status)
 {
+   BSON_ASSERT_PARAM (args);
    BSON_ASSERT_PARAM (out);
    BSON_ASSERT (status || true);
 
@@ -394,6 +396,7 @@ mc_makeRangeFindPlaceholder (mc_makeRangeFindPlaceholder_args_t *args,
    }
 
    // create edgesInfo.
+
    if (!args->isStub) {
       TRY (bson_append_iter (edgesInfo, "lowerBound", -1, &args->lowerBound));
       TRY (BSON_APPEND_BOOL (edgesInfo, "lbIncluded", args->lbIncluded));
@@ -401,6 +404,11 @@ mc_makeRangeFindPlaceholder (mc_makeRangeFindPlaceholder_args_t *args,
       TRY (BSON_APPEND_BOOL (edgesInfo, "ubIncluded", args->ubIncluded));
       TRY (bson_append_iter (edgesInfo, "indexMin", -1, &args->indexMin));
       TRY (bson_append_iter (edgesInfo, "indexMax", -1, &args->indexMax));
+      if (args->precision.set) {
+         BSON_ASSERT (args->precision.value <= INT32_MAX);
+         TRY (BSON_APPEND_INT32 (
+            edgesInfo, "precision", (int32_t) args->precision.value));
+      }
       TRY (BSON_APPEND_DOCUMENT (v, "edgesInfo", edgesInfo));
    }
 
@@ -421,6 +429,7 @@ mc_makeRangeFindPlaceholder (mc_makeRangeFindPlaceholder_args_t *args,
    TRY (BSON_APPEND_INT64 (p, "s", args->sparsity));
 #undef TRY
 
+   BSON_ASSERT (p->len < UINT32_MAX);
    _mongocrypt_buffer_resize (out, p->len + 1u);
    out->subtype = BSON_SUBTYPE_ENCRYPTED;
    out->data[0] = MC_SUBTYPE_FLE2EncryptionPlaceholder;
@@ -455,6 +464,8 @@ mc_FLE2RangeFindDriverSpec_to_placeholders (
    _mongocrypt_buffer_t p1 = {0}, p2 = {0};
    bson_t infDoc = BSON_INITIALIZER;
    bson_iter_t negInf, posInf;
+   bson_t minMaxDoc = BSON_INITIALIZER;
+   bson_iter_t indexMin, indexMax;
    bool ok = false;
 
    BCON_APPEND (
@@ -470,6 +481,30 @@ mc_FLE2RangeFindDriverSpec_to_placeholders (
    TRY (bson_iter_init_find (&posInf, &infDoc, "p"));
    TRY (bson_iter_init_find (&negInf, &infDoc, "n"));
 
+   // Apply default index min/max values.
+   {
+      bson_type_t index_type;
+      if (spec->lower.set) {
+         index_type = bson_iter_type (&spec->lower.value);
+      } else if (spec->upper.set) {
+         index_type = bson_iter_type (&spec->upper.value);
+      } else {
+         CLIENT_ERR ("expected lower or upper bound to be set");
+         goto fail;
+      }
+      if (!mc_RangeOpts_appendMin (
+             range_opts, index_type, "indexMin", &minMaxDoc, status)) {
+         goto fail;
+      }
+      if (!mc_RangeOpts_appendMax (
+             range_opts, index_type, "indexMax", &minMaxDoc, status)) {
+         goto fail;
+      }
+
+      TRY (bson_iter_init_find (&indexMin, &minMaxDoc, "indexMin"));
+      TRY (bson_iter_init_find (&indexMax, &minMaxDoc, "indexMax"));
+   }
+
    bson_init (out);
 
    mc_makeRangeFindPlaceholder_args_t args = {
@@ -483,8 +518,9 @@ mc_FLE2RangeFindDriverSpec_to_placeholders (
       .payloadId = payloadId,
       .firstOp = spec->firstOp,
       .secondOp = spec->secondOp,
-      .indexMin = range_opts->min,
-      .indexMax = range_opts->max,
+      .indexMin = indexMin,
+      .indexMax = indexMax,
+      .precision = range_opts->precision,
       .maxContentionCounter = maxContentionCounter,
       .sparsity = range_opts->sparsity};
 
@@ -582,6 +618,7 @@ mc_FLE2RangeFindDriverSpec_to_placeholders (
 fail:
    _mongocrypt_buffer_cleanup (&p2);
    _mongocrypt_buffer_cleanup (&p1);
+   bson_destroy (&minMaxDoc);
    bson_destroy (&infDoc);
    return ok;
 }
@@ -619,5 +656,3 @@ mc_getNextPayloadId (void)
    }
    return ret;
 }
-
-MC_END_CONVERSION_ERRORS

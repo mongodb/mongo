@@ -65,11 +65,13 @@ mcr_dll_path (mcr_dll dll)
    DWORD acc_size = 512;
    while (!ret_str.data && !ret_error) {
       // Loop until we allocate a large enough buffer or get an error
-      wchar_t *path = calloc (acc_size + 1, sizeof (wchar_t));
+      wchar_t *path = calloc ((size_t) acc_size + 1u, sizeof (wchar_t));
       SetLastError (0);
       GetModuleFileNameW (dll._native_handle, path, acc_size);
       if (GetLastError () == ERROR_INSUFFICIENT_BUFFER) {
          // Try again with more buffer
+         /* DWORD is a 32-bit unsigned integer */
+         assert (acc_size <= UINT32_MAX / 2u);
          acc_size *= 2;
       } else if (GetLastError () != 0) {
          ret_error = GetLastError ();

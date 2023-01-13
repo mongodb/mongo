@@ -24,8 +24,6 @@
 #include "mc-range-mincover-private.h"
 #include "mongocrypt-private.h"
 
-MC_BEGIN_CONVERSION_ERRORS
-
 struct _mc_mincover_t {
    /* mincover is an array of `char*` edge strings. */
    mc_array_t mincover;
@@ -43,7 +41,7 @@ const char *
 mc_mincover_get (mc_mincover_t *mincover, size_t index)
 {
    BSON_ASSERT_PARAM (mincover);
-   if (index > mincover->mincover.len - 1) {
+   if (mincover->mincover.len == 0 || index > mincover->mincover.len - 1u) {
       return NULL;
    }
    return _mc_array_index (&mincover->mincover, char *, index);
@@ -74,11 +72,57 @@ mc_mincover_destroy (mc_mincover_t *mincover)
 #include "mc-range-mincover-generator.template.h"
 #undef BITS
 
+// Check bounds and return an error message including the original inputs.
+#define CHECK_BOUNDS(args, FMT)                                                \
+   if (1) {                                                                    \
+      if ((args).min.set) {                                                    \
+         if ((args).upperBound < (args).min.value) {                           \
+            CLIENT_ERR (                                                       \
+               "Upper bound (%" FMT                                            \
+               ") must be greater than or equal to the range minimum (%" FMT   \
+               ")",                                                            \
+               (args).upperBound,                                              \
+               (args).min.value);                                              \
+            return false;                                                      \
+         }                                                                     \
+         if (!(args).includeUpperBound &&                                      \
+             (args).upperBound <= (args).min.value) {                          \
+            CLIENT_ERR ("Upper bound (%" FMT                                   \
+                        ") must be greater than the range minimum (%" FMT      \
+                        ") if upper bound is excluded from range",             \
+                        (args).upperBound,                                     \
+                        (args).min.value);                                     \
+            return false;                                                      \
+         }                                                                     \
+      }                                                                        \
+      if ((args).max.set) {                                                    \
+         if ((args).lowerBound > (args).max.value) {                           \
+            CLIENT_ERR (                                                       \
+               "Lower bound (%" FMT                                            \
+               ") must be less than or equal to the range maximum (%" FMT ")", \
+               (args).lowerBound,                                              \
+               (args).max.value);                                              \
+            return false;                                                      \
+         }                                                                     \
+         if (!(args).includeLowerBound &&                                      \
+             (args).lowerBound >= (args).max.value) {                          \
+            CLIENT_ERR ("Lower bound (%" FMT                                   \
+                        ") must be less than the range maximum (%" FMT         \
+                        ") if lower bound is excluded from range",             \
+                        (args).lowerBound,                                     \
+                        (args).max.value);                                     \
+            return false;                                                      \
+         }                                                                     \
+      }                                                                        \
+   } else                                                                      \
+      (void) 0
+
 mc_mincover_t *
 mc_getMincoverInt32 (mc_getMincoverInt32_args_t args,
                      mongocrypt_status_t *status)
 {
    BSON_ASSERT_PARAM (status);
+   CHECK_BOUNDS (args, PRId32);
    mc_OSTType_Int32 a, b;
    if (!mc_getTypeInfo32 ((mc_getTypeInfo32_args_t){.min = args.min,
                                                     .max = args.max,
@@ -127,6 +171,7 @@ mc_getMincoverInt64 (mc_getMincoverInt64_args_t args,
                      mongocrypt_status_t *status)
 {
    BSON_ASSERT_PARAM (status);
+   CHECK_BOUNDS (args, PRId64);
    mc_OSTType_Int64 a, b;
    if (!mc_getTypeInfo64 ((mc_getTypeInfo64_args_t){.min = args.min,
                                                     .max = args.max,
@@ -173,15 +218,23 @@ mc_getMincoverDouble (mc_getMincoverDouble_args_t args,
                       mongocrypt_status_t *status)
 {
    BSON_ASSERT_PARAM (status);
+   CHECK_BOUNDS (args, "g");
+
    mc_OSTType_Double a, b;
    if (!mc_getTypeInfoDouble (
-          (mc_getTypeInfoDouble_args_t){.value = args.lowerBound},
+          (mc_getTypeInfoDouble_args_t){.value = args.lowerBound,
+                                        .min = args.min,
+                                        .max = args.max,
+                                        .precision = args.precision},
           &a,
           status)) {
       return NULL;
    }
    if (!mc_getTypeInfoDouble (
-          (mc_getTypeInfoDouble_args_t){.value = args.upperBound},
+          (mc_getTypeInfoDouble_args_t){.value = args.upperBound,
+                                        .min = args.min,
+                                        .max = args.max,
+                                        .precision = args.precision},
           &b,
           status)) {
       return NULL;
@@ -209,5 +262,3 @@ mc_getMincoverDouble (mc_getMincoverDouble_args_t args,
    MinCoverGenerator_destroy_u64 (mcg);
    return mc;
 }
-
-MC_END_CONVERSION_ERRORS

@@ -65,6 +65,9 @@ mc_getEdgesInt64 (mc_getEdgesInt64_args_t args, mongocrypt_status_t *status);
 typedef struct {
    double value;
    size_t sparsity;
+   mc_optional_double_t min;
+   mc_optional_double_t max;
+   mc_optional_uint32_t precision;
 } mc_getEdgesDouble_args_t;
 
 // mc_getEdgesDouble implements the Edge Generation algorithm described in

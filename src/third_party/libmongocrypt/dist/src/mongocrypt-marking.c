@@ -259,10 +259,11 @@ _mongocrypt_marking_cleanup (_mongocrypt_marking_t *marking)
          return true;                                                          \
       }                                                                        \
                                                                                \
+      BSON_ASSERT (counter >= 0);                                              \
       /* InsertUpdatePayload continues through *fromDataTokenAndCounter */     \
       mc_##Name##DerivedFromDataTokenAndCounter_t *fromTokenAndCounter =       \
          mc_##Name##DerivedFromDataTokenAndCounter_new (                       \
-            crypto, fromDataToken, counter, status);                           \
+            crypto, fromDataToken, (uint64_t) counter, status);                \
       mc_##Name##DerivedFromDataToken_destroy (fromDataToken);                 \
       if (!fromTokenAndCounter) {                                              \
          return false;                                                         \
@@ -298,7 +299,10 @@ _fle2_placeholder_aes_ctr_encrypt (_mongocrypt_key_broker_t *kb,
    _mongocrypt_crypto_t *crypto = kb->crypt->crypto;
    _mongocrypt_buffer_t iv;
    const uint32_t cipherlen =
-      _mongocrypt_fle2_calculate_ciphertext_len (in->len);
+      _mongocrypt_fle2_calculate_ciphertext_len (in->len, status);
+   if (cipherlen == 0) {
+      return false;
+   }
    uint32_t written = 0;
 
    _mongocrypt_buffer_init_size (out, cipherlen);
@@ -336,7 +340,10 @@ _fle2_placeholder_aead_encrypt (_mongocrypt_key_broker_t *kb,
    _mongocrypt_crypto_t *crypto = kb->crypt->crypto;
    _mongocrypt_buffer_t iv, key;
    const uint32_t cipherlen =
-      _mongocrypt_fle2aead_calculate_ciphertext_len (in->len);
+      _mongocrypt_fle2aead_calculate_ciphertext_len (in->len, status);
+   if (cipherlen == 0) {
+      return false;
+   }
    uint32_t written = 0;
    bool res;
 
@@ -680,10 +687,18 @@ get_edges (mc_FLE2RangeInsertSpec_t *insertSpec,
    }
 
    else if (value_type == BSON_TYPE_DOUBLE) {
-      return mc_getEdgesDouble (
-         (mc_getEdgesDouble_args_t){.value = bson_iter_double (&insertSpec->v),
-                                    .sparsity = sparsity},
-         status);
+      mc_getEdgesDouble_args_t args = {
+         .value = bson_iter_double (&insertSpec->v), .sparsity = sparsity};
+      if (insertSpec->precision.set) {
+         // If precision is set, pass min/max/precision to mc_getEdgesDouble.
+         // Do not pass min/max if precision is not set. All three must be set
+         // or all three must be unset in mc_getTypeInfoDouble.
+         args.min = OPT_DOUBLE (bson_iter_double (&insertSpec->min));
+         args.max = OPT_DOUBLE (bson_iter_double (&insertSpec->max));
+         args.precision = insertSpec->precision;
+      }
+
+      return mc_getEdgesDouble (args, status);
    }
 
 
@@ -820,6 +835,8 @@ _mongocrypt_fle2_placeholder_to_insert_update_ciphertextForRange (
 
    // g:= array<EdgeTokenSet>
    {
+      BSON_ASSERT (placeholder->sparsity >= 0 &&
+                   (uint64_t) placeholder->sparsity <= (uint64_t) SIZE_MAX);
       edges = get_edges (&insertSpec, (size_t) placeholder->sparsity, status);
       if (!edges) {
          goto fail;
@@ -1000,7 +1017,7 @@ fail:
 static bool
 isInfinite (bson_iter_t *iter)
 {
-   return isinf (bson_iter_double (iter));
+   return mc_isinf (bson_iter_double (iter));
 }
 
 // mc_get_mincover_from_FLE2RangeFindSpec creates and returns a mincover from an
@@ -1117,21 +1134,32 @@ mc_get_mincover_from_FLE2RangeFindSpec (mc_FLE2RangeFindSpec_t *findSpec,
                bson_iter_date_time (&findSpec->edgesInfo.value.indexMax)),
             .sparsity = sparsity},
          status);
-   case BSON_TYPE_DOUBLE:
+   case BSON_TYPE_DOUBLE: {
       BSON_ASSERT (bson_iter_type (&lowerBound) == BSON_TYPE_DOUBLE);
       BSON_ASSERT (bson_iter_type (&upperBound) == BSON_TYPE_DOUBLE);
       BSON_ASSERT (bson_iter_type (&findSpec->edgesInfo.value.indexMin) ==
                    BSON_TYPE_DOUBLE);
       BSON_ASSERT (bson_iter_type (&findSpec->edgesInfo.value.indexMax) ==
                    BSON_TYPE_DOUBLE);
-      return mc_getMincoverDouble (
-         (mc_getMincoverDouble_args_t){
-            .lowerBound = bson_iter_double (&lowerBound),
-            .includeLowerBound = includeLowerBound,
-            .upperBound = bson_iter_double (&upperBound),
-            .includeUpperBound = includeUpperBound,
-            .sparsity = sparsity},
-         status);
+
+      mc_getMincoverDouble_args_t args = {
+         .lowerBound = bson_iter_double (&lowerBound),
+         .includeLowerBound = includeLowerBound,
+         .upperBound = bson_iter_double (&upperBound),
+         .includeUpperBound = includeUpperBound,
+         .sparsity = sparsity};
+      if (findSpec->edgesInfo.value.precision.set) {
+         // If precision is set, pass min/max/precision to mc_getMincoverDouble.
+         // Do not pass min/max if precision is not set. All three must be set
+         // or all three must be unset in mc_getTypeInfoDouble.
+         args.min =
+            OPT_DOUBLE (bson_iter_double (&findSpec->edgesInfo.value.indexMin));
+         args.max =
+            OPT_DOUBLE (bson_iter_double (&findSpec->edgesInfo.value.indexMax));
+         args.precision = findSpec->edgesInfo.value.precision;
+      }
+      return mc_getMincoverDouble (args, status);
+   }
    case BSON_TYPE_DECIMAL128:
       CLIENT_ERR ("FLE2 find not yet implemented for type: %s",
                   mc_bson_type_to_string (bsonType));
@@ -1171,6 +1199,7 @@ _mongocrypt_fle2_placeholder_to_find_ciphertextForRange (
    BSON_ASSERT_PARAM (kb);
    BSON_ASSERT_PARAM (marking);
    BSON_ASSERT_PARAM (ciphertext);
+   BSON_ASSERT (kb->crypt);
 
    _mongocrypt_crypto_t *crypto = kb->crypt->crypto;
    mc_FLE2EncryptionPlaceholder_t *placeholder = &marking->fle2;
@@ -1180,6 +1209,7 @@ _mongocrypt_fle2_placeholder_to_find_ciphertextForRange (
    _mongocrypt_buffer_t tokenKey = {0};
 
    BSON_ASSERT (marking->type == MONGOCRYPT_MARKING_FLE2_ENCRYPTION);
+   BSON_ASSERT (placeholder);
    BSON_ASSERT (placeholder->type == MONGOCRYPT_FLE2_PLACEHOLDER_TYPE_FIND);
    BSON_ASSERT (placeholder->algorithm == MONGOCRYPT_FLE2_ALGORITHM_RANGE);
    _mongocrypt_ciphertext_init (ciphertext);
@@ -1217,6 +1247,8 @@ _mongocrypt_fle2_placeholder_to_find_ciphertextForRange (
 
       // g:= array<EdgeFindTokenSet>
       {
+         BSON_ASSERT (placeholder->sparsity >= 0 &&
+                      (uint64_t) placeholder->sparsity <= (uint64_t) SIZE_MAX);
          mincover = mc_get_mincover_from_FLE2RangeFindSpec (
             &findSpec, (size_t) placeholder->sparsity, status);
          if (!mincover) {
@@ -1314,6 +1346,7 @@ _mongocrypt_fle2_placeholder_to_FLE2UnindexedEncryptedValue (
    bool res = false;
 
    BSON_ASSERT (marking->type == MONGOCRYPT_MARKING_FLE2_ENCRYPTION);
+   BSON_ASSERT (placeholder);
    BSON_ASSERT (placeholder->algorithm == MONGOCRYPT_FLE2_ALGORITHM_UNINDEXED);
    _mongocrypt_ciphertext_init (ciphertext);
    _mongocrypt_buffer_from_iter (&plaintext, &placeholder->v_iter);
@@ -1411,7 +1444,11 @@ _mongocrypt_fle1_marking_to_ciphertext (_mongocrypt_key_broker_t *kb,
    }
 
    _mongocrypt_buffer_from_iter (&plaintext, &marking->v_iter);
-   ciphertext->data.len = _mongocrypt_calculate_ciphertext_len (plaintext.len);
+   ciphertext->data.len =
+      _mongocrypt_calculate_ciphertext_len (plaintext.len, status);
+   if (ciphertext->data.len == 0) {
+      goto fail;
+   }
    ciphertext->data.data = bson_malloc (ciphertext->data.len);
    BSON_ASSERT (ciphertext->data.data);
 

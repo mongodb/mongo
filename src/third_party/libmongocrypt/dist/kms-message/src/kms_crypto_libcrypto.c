@@ -15,12 +15,14 @@
  */
 
 #include "kms_crypto.h"
+#include "kms_message_private.h"
 
 #ifdef KMS_MESSAGE_ENABLE_CRYPTO_LIBCRYPTO
 
 #include <openssl/sha.h>
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
+#include <limits.h> /* INT_MAX, LONG_MAX */
 
 #if OPENSSL_VERSION_NUMBER < 0x10100000L || \
    (defined(LIBRESSL_VERSION_NUMBER) && LIBRESSL_VERSION_NUMBER < 0x20700000L)
@@ -82,9 +84,10 @@ kms_sha256_hmac (void *unused_ctx,
                  size_t len,
                  unsigned char *hash_out)
 {
+   KMS_ASSERT (key_len <= INT_MAX);
    return HMAC (EVP_sha256 (),
                 key_input,
-                key_len,
+                (int) key_len,
                 (unsigned char *) input,
                 len,
                 hash_out,
@@ -105,10 +108,11 @@ kms_sign_rsaes_pkcs1_v1_5 (void *unused_ctx,
    size_t signature_out_len = 256;
 
    ctx = EVP_MD_CTX_new ();
+   KMS_ASSERT (private_key_len <= LONG_MAX);
    pkey = d2i_PrivateKey (EVP_PKEY_RSA,
                           NULL,
                           (const unsigned char **) &private_key,
-                          private_key_len);
+                          (long) private_key_len);
    if (!pkey) {
       goto cleanup;
    }

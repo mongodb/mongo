@@ -21,7 +21,9 @@ typedef enum {
    FLE2RangeOperator_kGt = 1,
    FLE2RangeOperator_kGte = 2,
    FLE2RangeOperator_kLt = 3,
-   FLE2RangeOperator_kLte = 4
+   FLE2RangeOperator_kLte = 4,
+   FLE2RangeOperator_min_val = FLE2RangeOperator_kNone,
+   FLE2RangeOperator_max_val = FLE2RangeOperator_kLte
 } mc_FLE2RangeOperator_t;
 
 #endif // MC_FLE2_RANGE_OPERATOR_PRIVATE_H

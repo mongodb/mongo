@@ -15,6 +15,7 @@
  */
 
 #include "kms_crypto.h"
+#include "kms_message_private.h" /* KMS_ASSERT */
 
 #ifdef KMS_MESSAGE_ENABLE_CRYPTO_COMMON_CRYPTO
 
@@ -44,7 +45,8 @@ kms_sha256 (void *unused_ctx,
 {
    CC_SHA256_CTX ctx;
    CC_SHA256_Init (&ctx);
-   CC_SHA256_Update (&ctx, input, len);
+   KMS_ASSERT (len <= (size_t) UINT32_MAX);
+   CC_SHA256_Update (&ctx, input, (uint32_t) len);
    CC_SHA256_Final (hash_out, &ctx);
    return true;
 }
@@ -125,7 +127,9 @@ kms_sign_rsaes_pkcs1_v1_5 (void *unused_ctx,
    }
 
    key_ref = (SecKeyRef) CFArrayGetValueAtIndex (out_ref, 0);
-   data_to_sign_ref = CFDataCreate (NULL, (const uint8_t *) input, input_len);
+   KMS_ASSERT (input_len <= (size_t) LONG_MAX);
+   data_to_sign_ref =
+      CFDataCreate (NULL, (const uint8_t *) input, (long) input_len);
    if (!data_to_sign_ref) {
       goto cleanup;
    }
@@ -140,7 +144,7 @@ kms_sign_rsaes_pkcs1_v1_5 (void *unused_ctx,
    }
    memcpy (signature_out,
            CFDataGetBytePtr (signature_ref),
-           CFDataGetLength (signature_ref));
+           (size_t) CFDataGetLength (signature_ref));
 
    ret = true;
 cleanup:

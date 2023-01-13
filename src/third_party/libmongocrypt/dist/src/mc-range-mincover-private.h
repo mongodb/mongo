@@ -76,6 +76,9 @@ typedef struct {
    double upperBound;
    bool includeUpperBound;
    size_t sparsity;
+   mc_optional_double_t min;
+   mc_optional_double_t max;
+   mc_optional_uint32_t precision;
 } mc_getMincoverDouble_args_t;
 
 // mc_getMincoverDouble implements the Mincover Generation algorithm described

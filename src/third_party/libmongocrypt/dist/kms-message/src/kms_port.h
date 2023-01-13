@@ -25,6 +25,8 @@
 char *
 kms_strndup (const char *src, size_t len);
 #else
+#include <strings.h>
+
 #define kms_strndup strndup
 #define kms_strcasecmp strcasecmp
 #endif

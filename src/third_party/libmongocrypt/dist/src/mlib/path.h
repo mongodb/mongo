@@ -143,7 +143,7 @@ mpath_filename (mstr_view path, mpath_format f)
    while (it != path.data && !mpath_is_sep (it[-1], f)) {
       --it;
    }
-   size_t off = it - path.data;
+   size_t off = (size_t) (it - path.data);
    mstr_view fname = mstrv_subview (path, off, path.len);
    if (fname.len == 0) {
       return mstrv_lit (".");
@@ -179,6 +179,7 @@ mpath_join (mstr_view base, mstr_view suffix, mpath_format f)
       return mstr_append (base, suffix);
    }
    // We must insert a path separator between the two strings
+   assert (base.len <= SIZE_MAX - suffix.len - 1u);
    mstr_mut r = mstr_new (base.len + suffix.len + 1);
    char *p = r.data;
    memcpy (p, base.data, base.len);
@@ -234,6 +235,7 @@ mpath_root_path (mstr_view path, mpath_format f)
 {
    mstr_view rname = mpath_root_name (path, f);
    mstr_view rdir = mpath_root_directory (path, f);
+   assert (rname.len <= SIZE_MAX - rdir.len);
    return mstrv_subview (path, 0, rname.len + rdir.len);
 }
 

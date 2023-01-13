@@ -31,12 +31,14 @@
 #endif
 #endif
 
+#include "mc-check-conversions-private.h"
 #include "mongocrypt-util-private.h"
 #include "mongocrypt-private.h" // CLIENT_ERR
 
 #include "mlib/thread.h"
 
 #include <errno.h>
+#include <math.h> // isinf, isnan, isfinite
 
 #ifdef _WIN32
 #include <windows.h>
@@ -177,3 +179,25 @@ mc_iter_document_as_bson (const bson_iter_t *iter,
 
    return true;
 }
+
+/* Avoid a conversion warning on glibc for isnan, isinf, and isfinite. Refer:
+ * MONGOCRYPT-501. */
+MC_BEGIN_CONVERSION_IGNORE
+
+bool
+mc_isnan (double d)
+{
+   return isnan (d);
+}
+bool
+mc_isinf (double d)
+{
+   return isinf (d);
+}
+bool
+mc_isfinite (double d)
+{
+   return isfinite (d);
+}
+
+MC_END_CONVERSION_IGNORE

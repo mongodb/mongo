@@ -107,12 +107,13 @@ _parse_int (const char *str, int *result)
 static bool
 _parse_int_from_view (const char *str, int start, int end, int *result)
 {
-   char *num_str = malloc (end - start + 1);
+   KMS_ASSERT (end >= start);
+   char *num_str = malloc ((size_t) (end - start + 1));
    KMS_ASSERT (num_str);
 
    bool ret;
 
-   strncpy (num_str, str + start, end - start);
+   strncpy (num_str, str + start, (size_t) (end - start));
    num_str[end - start] = '\0';
    ret = _parse_int (num_str, result);
    free (num_str);
@@ -122,7 +123,8 @@ _parse_int_from_view (const char *str, int start, int end, int *result)
 static bool
 _parse_hex_from_view (const char *str, int len, int *result)
 {
-   *result = unhexlify (str, len);
+   KMS_ASSERT (len >= 0);
+   *result = unhexlify (str, (size_t) len);
    if (*result < 0) {
       return false;
    }

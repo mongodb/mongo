@@ -42,6 +42,14 @@
       _mongocrypt_buffer_cleanup (&self->data);                      \
       bson_free (self);                                              \
    }                                                                 \
+   /* Constructor. From raw buffer */                                \
+   T *CONCAT (Prefix, _new_from_buffer) (_mongocrypt_buffer_t * buf) \
+   {                                                                 \
+      BSON_ASSERT (buf->len == MONGOCRYPT_HMAC_SHA256_LEN);          \
+      T *t = bson_malloc (sizeof (T));                               \
+      _mongocrypt_buffer_set_to (buf, &t->data);                     \
+      return t;                                                      \
+   }                                                                 \
    /* Constructor. Parameter list given as variadic args. */         \
    T *CONCAT (Prefix, _new) (_mongocrypt_crypto_t * crypto,          \
                              __VA_ARGS__,                            \

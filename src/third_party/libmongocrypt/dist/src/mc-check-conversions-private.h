@@ -19,18 +19,18 @@
 
 // gcc 4.6 added support for "diagnostic push".
 #if (__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6)
-#define MC_BEGIN_CONVERSION_ERRORS \
+#define MC_BEGIN_CONVERSION_IGNORE \
    _Pragma ("GCC diagnostic push") \
-      _Pragma ("GCC diagnostic error \"-Wconversion\"")
-#define MC_END_CONVERSION_ERRORS _Pragma ("GCC diagnostic pop")
+      _Pragma ("GCC diagnostic ignored \"-Wconversion\"")
+#define MC_END_CONVERSION_IGNORE _Pragma ("GCC diagnostic pop")
 #elif defined(__clang__)
-#define MC_BEGIN_CONVERSION_ERRORS   \
+#define MC_BEGIN_CONVERSION_IGNORE   \
    _Pragma ("clang diagnostic push") \
-      _Pragma ("clang diagnostic error \"-Wconversion\"")
-#define MC_END_CONVERSION_ERRORS _Pragma ("clang diagnostic pop")
+      _Pragma ("clang diagnostic ignored \"-Wconversion\"")
+#define MC_END_CONVERSION_IGNORE _Pragma ("clang diagnostic pop")
 #else
-#define MC_BEGIN_CONVERSION_ERRORS
-#define MC_END_CONVERSION_ERRORS
+#define MC_BEGIN_CONVERSION_IGNORE
+#define MC_END_CONVERSION_IGNORE
 #endif
 
 #endif /* MC_CHECK_CONVERSIONS_PRIVATE */

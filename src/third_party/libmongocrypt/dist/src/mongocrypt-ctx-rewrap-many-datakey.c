@@ -39,7 +39,6 @@ _finalize (mongocrypt_ctx_t *ctx, mongocrypt_binary_t *out)
          bson_t bson;
          bson_t elem = BSON_INITIALIZER;
 
-
          if (!mongocrypt_ctx_finalize (iter->dkctx, &bin)) {
             return _mongocrypt_ctx_fail_w_msg (
                ctx, "failed to encrypt datakey with new provider");
@@ -71,6 +70,7 @@ _finalize (mongocrypt_ctx_t *ctx, mongocrypt_binary_t *out)
                                         NULL);
 
          /* Preserve key ID of original document. */
+         BSON_ASSERT (iter->doc);
          BSON_ASSERT (BSON_APPEND_BINARY (&elem,
                                           "_id",
                                           BSON_SUBTYPE_UUID,

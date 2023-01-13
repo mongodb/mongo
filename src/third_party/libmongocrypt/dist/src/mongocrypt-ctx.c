@@ -93,8 +93,10 @@ mongocrypt_ctx_setopt_key_id (mongocrypt_ctx_t *ctx,
 
    if (ctx->crypt->log.trace_enabled && key_id && key_id->data) {
       char *key_id_val;
+      /* this should never happen, so assert rather than return false */
+      BSON_ASSERT (key_id->len <= INT_MAX);
       key_id_val =
-         _mongocrypt_new_string_from_bytes (key_id->data, key_id->len);
+         _mongocrypt_new_string_from_bytes (key_id->data, (int) key_id->len);
       _mongocrypt_log (&ctx->crypt->log,
                        MONGOCRYPT_LOG_LEVEL_TRACE,
                        "%s (%s=\"%s\")",
@@ -283,7 +285,8 @@ mongocrypt_ctx_setopt_algorithm (mongocrypt_ctx_t *ctx,
                        "%s (%s=\"%.*s\")",
                        BSON_FUNC,
                        "algorithm",
-                       (int) calculated_len,
+                       calculated_len <= (size_t) INT_MAX ? (int) calculated_len
+                                                          : INT_MAX,
                        algorithm);
    }
 
@@ -303,13 +306,14 @@ mongocrypt_ctx_setopt_algorithm (mongocrypt_ctx_t *ctx,
       ctx->opts.index_type.value = MONGOCRYPT_INDEX_TYPE_NONE;
       ctx->opts.index_type.set = true;
    } else if (mstr_eq_ignore_case (
-                 algo_str, mstrv_lit (MONGOCRYPT_ALGORITHM_RANGE_STR))) {
-      ctx->opts.index_type.value = MONGOCRYPT_INDEX_TYPE_RANGE;
+                 algo_str, mstrv_lit (MONGOCRYPT_ALGORITHM_RANGEPREVIEW_STR))) {
+      ctx->opts.index_type.value = MONGOCRYPT_INDEX_TYPE_RANGEPREVIEW;
       ctx->opts.index_type.set = true;
    } else {
-      char *error = bson_strdup_printf ("unsupported algorithm string \"%.*s\"",
-                                        (int) algo_str.len,
-                                        algo_str.data);
+      char *error = bson_strdup_printf (
+         "unsupported algorithm string \"%.*s\"",
+         algo_str.len <= (size_t) INT_MAX ? (int) algo_str.len : INT_MAX,
+         algo_str.data);
       _mongocrypt_ctx_fail_w_msg (ctx, error);
       bson_free (error);
       return false;
@@ -803,8 +807,10 @@ mongocrypt_ctx_setopt_masterkey_aws (mongocrypt_ctx_t *ctx,
    bson_append_utf8 (&as_bson,
                      MONGOCRYPT_STR_AND_LEN ("provider"),
                      MONGOCRYPT_STR_AND_LEN ("aws"));
+   BSON_ASSERT (region_len <= INT_MAX);
    bson_append_utf8 (
       &as_bson, MONGOCRYPT_STR_AND_LEN ("region"), region, region_len);
+   BSON_ASSERT (cmk_len <= INT_MAX);
    bson_append_utf8 (&as_bson, MONGOCRYPT_STR_AND_LEN ("key"), cmk, cmk_len);
    bin = mongocrypt_binary_new_from_data ((uint8_t *) bson_get_data (&as_bson),
                                           as_bson.len);
@@ -894,7 +900,7 @@ _mongocrypt_ctx_init (mongocrypt_ctx_t *ctx,
          return _mongocrypt_ctx_fail_w_msg (ctx, "master key required");
       }
       if (!ctx->crypt->opts.use_need_kms_credentials_state &&
-          !(ctx->opts.kek.kms_provider &
+          !((int) ctx->opts.kek.kms_provider &
             _mongocrypt_ctx_kms_providers (ctx)->configured_providers)) {
          return _mongocrypt_ctx_fail_w_msg (
             ctx, "requested kms provider not configured");
@@ -909,7 +915,7 @@ _mongocrypt_ctx_init (mongocrypt_ctx_t *ctx,
    if (ctx->opts.kek.kms_provider) {
       if (!((ctx->crypt->opts.kms_providers.need_credentials |
              ctx->crypt->opts.kms_providers.configured_providers) &
-            ctx->opts.kek.kms_provider)) {
+            (int) ctx->opts.kek.kms_provider)) {
          return _mongocrypt_ctx_fail_w_msg (
             ctx, "kms provider required by datakey is not configured");
       }
@@ -1196,12 +1202,15 @@ mongocrypt_ctx_setopt_query_type (mongocrypt_ctx_t *ctx,
       ctx->opts.query_type.value = MONGOCRYPT_QUERY_TYPE_EQUALITY;
       ctx->opts.query_type.set = true;
    } else if (mstr_eq_ignore_case (
-                 qt_str, mstrv_lit (MONGOCRYPT_QUERY_TYPE_RANGE_STR))) {
-      ctx->opts.query_type.value = MONGOCRYPT_QUERY_TYPE_RANGE;
+                 qt_str, mstrv_lit (MONGOCRYPT_QUERY_TYPE_RANGEPREVIEW_STR))) {
+      ctx->opts.query_type.value = MONGOCRYPT_QUERY_TYPE_RANGEPREVIEW;
       ctx->opts.query_type.set = true;
    } else {
+      /* don't check if qt_str.len fits in int; we want the diagnostic output */
       char *error = bson_strdup_printf (
-         "Unsupported query_type \"%.*s\"", (int) qt_str.len, qt_str.data);
+         "Unsupported query_type \"%.*s\"",
+         qt_str.len <= (size_t) INT_MAX ? (int) qt_str.len : INT_MAX,
+         qt_str.data);
       _mongocrypt_ctx_fail_w_msg (ctx, error);
       bson_free (error);
       return false;
@@ -1217,8 +1226,8 @@ _mongocrypt_index_type_to_string (mongocrypt_index_type_t val)
       return "None";
    case MONGOCRYPT_INDEX_TYPE_EQUALITY:
       return "Equality";
-   case MONGOCRYPT_INDEX_TYPE_RANGE:
-      return "Range";
+   case MONGOCRYPT_INDEX_TYPE_RANGEPREVIEW:
+      return "RangePreview";
    default:
       return "Unknown";
    }
@@ -1230,8 +1239,8 @@ _mongocrypt_query_type_to_string (mongocrypt_query_type_t val)
    switch (val) {
    case MONGOCRYPT_QUERY_TYPE_EQUALITY:
       return "Equality";
-   case MONGOCRYPT_QUERY_TYPE_RANGE:
-      return "Range";
+   case MONGOCRYPT_QUERY_TYPE_RANGEPREVIEW:
+      return "RangePreview";
    default:
       return "Unknown";
    }

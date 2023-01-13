@@ -130,6 +130,10 @@ _mongocrypt_serialize_ciphertext (_mongocrypt_ciphertext_t *ciphertext,
    if (ciphertext->key_id.len != 16) {
       return false;
    }
+   if (ciphertext->key_id.len > (UINT32_MAX - ciphertext->data.len - 1) ||
+       ciphertext->key_id.len > (SIZE_MAX - ciphertext->data.len - 1)) {
+      return false;
+   }
 
    _mongocrypt_buffer_init (out);
    offset = 0;
@@ -139,7 +143,8 @@ _mongocrypt_serialize_ciphertext (_mongocrypt_ciphertext_t *ciphertext,
 
    out->owned = true;
 
-   out->data[offset] = ciphertext->blob_subtype;
+   /* ciphertext->blob_subtype is an enum and easily fits in uint8_t */
+   out->data[offset] = (uint8_t) ciphertext->blob_subtype;
    offset += 1;
 
    memcpy (out->data + offset, ciphertext->key_id.data, ciphertext->key_id.len);
@@ -165,7 +170,7 @@ _mongocrypt_ciphertext_serialize_associated_data (
 {
    BSON_ASSERT_PARAM (ciphertext);
 
-   int32_t bytes_written = 0;
+   uint32_t bytes_written = 0;
 
    if (!out) {
       return false;
@@ -184,6 +189,10 @@ _mongocrypt_ciphertext_serialize_associated_data (
    if ((ciphertext->blob_subtype !=
         MC_SUBTYPE_FLE1DeterministicEncryptedValue) &&
        (ciphertext->blob_subtype != MC_SUBTYPE_FLE1RandomEncryptedValue)) {
+      return false;
+   }
+
+   if (ciphertext->key_id.len > (UINT32_MAX - 2)) {
       return false;
    }
 

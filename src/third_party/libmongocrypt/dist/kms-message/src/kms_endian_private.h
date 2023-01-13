@@ -104,7 +104,7 @@
 static KMS_MSG_INLINE uint16_t
 __kms_uint16_swap_slow (uint16_t v) /* IN */
 {
-   return ((v & 0x00FF) << 8) | ((v & 0xFF00) >> 8);
+   return (uint16_t) (((v & 0x00FF) << 8) | ((v & 0xFF00) >> 8));
 }
 
 

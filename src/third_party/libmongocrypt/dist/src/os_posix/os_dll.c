@@ -72,7 +72,7 @@ mcr_dll_path (mcr_dll dll)
    uintptr_t needle = ((uintptr_t) dll._native_handle & ~UINT64_C (0x3));
    // Iterate each loaded dyld image
    /// NOTE: Not thread safe. Is there a thread-safe way to do this?
-   for (size_t idx = 0; idx < _dyld_image_count (); ++idx) {
+   for (uint32_t idx = 0; idx < _dyld_image_count (); ++idx) {
       // Get the filepath:
       /// NOTE: Between here and `dlopen`, `dyld_name` could be invalidated by
       /// a concurrent call to `dlclose()`. Is there a better way?

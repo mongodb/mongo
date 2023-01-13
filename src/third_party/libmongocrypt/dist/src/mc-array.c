@@ -84,8 +84,11 @@ _mc_array_append_vals (mc_array_t *array, const void *data, uint32_t n_elements)
    BSON_ASSERT_PARAM (array);
    BSON_ASSERT_PARAM (data);
 
+   BSON_ASSERT (array->len <= SIZE_MAX / array->element_size);
    off = array->element_size * array->len;
+   BSON_ASSERT (n_elements <= SIZE_MAX / array->element_size);
    len = (size_t) n_elements * array->element_size;
+   BSON_ASSERT (len <= SIZE_MAX - off);
    if ((off + len) > array->allocated) {
       next_size = bson_next_power_of_two (off + len);
       array->data = (void *) bson_realloc (array->data, next_size);
@@ -94,5 +97,6 @@ _mc_array_append_vals (mc_array_t *array, const void *data, uint32_t n_elements)
 
    memcpy ((uint8_t *) array->data + off, data, len);
 
+   BSON_ASSERT (array->len <= SIZE_MAX - n_elements);
    array->len += n_elements;
 }

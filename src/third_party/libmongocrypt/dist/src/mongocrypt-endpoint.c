@@ -70,7 +70,7 @@ _mongocrypt_endpoint_new (const char *endpoint_raw,
    pos = strstr (endpoint->original, "://");
    if (pos) {
       endpoint->protocol =
-         bson_strndup (endpoint->original, pos - endpoint->original);
+         bson_strndup (endpoint->original, (size_t) (pos - endpoint->original));
       pos += 3;
    } else {
       pos = endpoint->original;
@@ -81,7 +81,8 @@ _mongocrypt_endpoint_new (const char *endpoint_raw,
    prev = pos;
    pos = strstr (pos, ".");
    if (pos) {
-      endpoint->subdomain = bson_strndup (prev, pos - prev);
+      BSON_ASSERT (pos >= prev);
+      endpoint->subdomain = bson_strndup (prev, (size_t) (pos - prev));
       pos += 1;
    } else {
       if (!opts || !opts->allow_empty_subdomain) {
@@ -110,8 +111,11 @@ _mongocrypt_endpoint_new (const char *endpoint_raw,
    }
 
    if (host_end) {
-      endpoint->domain = bson_strndup (prev, host_end - prev);
-      endpoint->host = bson_strndup (host_start, host_end - host_start);
+      BSON_ASSERT (host_end >= prev);
+      endpoint->domain = bson_strndup (prev, (size_t) (host_end - prev));
+      BSON_ASSERT (host_end >= host_start);
+      endpoint->host =
+         bson_strndup (host_start, (size_t) (host_end - host_start));
    } else {
       endpoint->domain = bson_strdup (prev);
       endpoint->host = bson_strdup (host_start);
@@ -123,9 +127,10 @@ _mongocrypt_endpoint_new (const char *endpoint_raw,
       qmark = strstr (pos, "?");
       slash = strstr (pos, "/");
       if (slash) {
-         endpoint->port = bson_strndup (prev, slash - prev);
+         endpoint->port = bson_strndup (prev, (size_t) (slash - prev));
       } else if (qmark) {
-         endpoint->port = bson_strndup (prev, qmark - prev);
+         BSON_ASSERT (qmark >= prev);
+         endpoint->port = bson_strndup (prev, (size_t) (qmark - prev));
       } else {
          endpoint->port = bson_strdup (prev);
       }
@@ -138,7 +143,7 @@ _mongocrypt_endpoint_new (const char *endpoint_raw,
       prev = slash + 1;
       qmark = strstr (prev, "?");
       if (qmark) {
-         endpoint->path = bson_strndup (prev, qmark - prev);
+         endpoint->path = bson_strndup (prev, (size_t) (qmark - prev));
       } else {
          endpoint->path = bson_strdup (prev);
       }
@@ -192,7 +197,9 @@ _mongocrypt_endpoint_copy (_mongocrypt_endpoint_t *src)
    return endpoint;
 }
 
-void _mongocrypt_apply_default_port (char **endpoint_raw, char *port) {
+void
+_mongocrypt_apply_default_port (char **endpoint_raw, char *port)
+{
    BSON_ASSERT_PARAM (endpoint_raw);
    BSON_ASSERT_PARAM (port);
    BSON_ASSERT (*endpoint_raw);

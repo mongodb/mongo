@@ -72,7 +72,7 @@ _recurse (_recurse_state_t *state)
          BSON_ASSERT (
             _mongocrypt_buffer_from_binary_iter (&value, &state->iter));
 
-         if (value.subtype == 6 && value.len > 0 &&
+         if (value.subtype == BSON_SUBTYPE_ENCRYPTED && value.len > 0 &&
              _check_first_byte (value.data[0], state->match)) {
             bool ret;
             /* call the right callback. */
@@ -81,9 +81,11 @@ _recurse (_recurse_state_t *state)
                ret =
                   state->transform_cb (state->ctx, &value, &value_out, status);
                if (ret) {
+                  const uint32_t key_len = bson_iter_key_len (&state->iter);
+                  BSON_ASSERT (key_len <= INT_MAX);
                   bson_append_value (state->copy,
                                      bson_iter_key (&state->iter),
-                                     bson_iter_key_len (&state->iter),
+                                     (int) key_len,
                                      &value_out);
                   bson_value_destroy (&value_out);
                }
@@ -110,9 +112,11 @@ _recurse (_recurse_state_t *state)
          }
 
          if (state->copy) {
+            const uint32_t key_len = bson_iter_key_len (&state->iter);
+            BSON_ASSERT (key_len <= INT_MAX);
             bson_append_array_begin (state->copy,
                                      bson_iter_key (&state->iter),
-                                     bson_iter_key_len (&state->iter),
+                                     (int) key_len,
                                      &state->child);
             child_state.copy = &state->child;
          }
@@ -138,9 +142,11 @@ _recurse (_recurse_state_t *state)
          }
          /* TODO: check for errors everywhere. */
          if (state->copy) {
+            const uint32_t key_len = bson_iter_key_len (&state->iter);
+            BSON_ASSERT (key_len <= INT_MAX);
             bson_append_document_begin (state->copy,
                                         bson_iter_key (&state->iter),
-                                        bson_iter_key_len (&state->iter),
+                                        (int) key_len,
                                         &state->child);
             child_state.copy = &state->child;
          }
@@ -161,9 +167,11 @@ _recurse (_recurse_state_t *state)
       }
 
       if (state->copy) {
+         const uint32_t key_len = bson_iter_key_len (&state->iter);
+         BSON_ASSERT (key_len <= INT_MAX);
          bson_append_value (state->copy,
                             bson_iter_key (&state->iter),
-                            bson_iter_key_len (&state->iter),
+                            (int) key_len,
                             bson_iter_value (&state->iter));
       }
    }
@@ -197,7 +205,8 @@ _mongocrypt_transform_binary_in_bson (_mongocrypt_transform_callback_t cb,
  * _mongocrypt_traverse_binary_in_bson
  *
  *    Traverse the BSON being iterated with iter, and call cb for every binary
- *    subtype 06 value where the first byte corresponds to 'match'.
+ *    subtype 06 (BSON_SUBTYPE_ENCRYPTED) value where the first byte corresponds
+ *    to 'match'.
  *
  * Return:
  *    True on success. Returns false on failure and sets error.

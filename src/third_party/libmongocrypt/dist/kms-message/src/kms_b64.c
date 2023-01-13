@@ -47,10 +47,7 @@
 
 #include "kms_message/kms_b64.h"
 #include "kms_message/kms_message.h"
-
-#define Assert(Cond) \
-   if (!(Cond))      \
-   abort ()
+#include "kms_message_private.h"
 
 static const char Base64[] =
    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -136,13 +133,13 @@ kms_message_b64_ntop (uint8_t const *src,
       srclength -= 3;
 
       output[0] = input[0] >> 2;
-      output[1] = ((input[0] & 0x03) << 4) + (input[1] >> 4);
-      output[2] = ((input[1] & 0x0f) << 2) + (input[2] >> 6);
+      output[1] = (uint8_t) (((input[0] & 0x03) << 4) + (input[1] >> 4));
+      output[2] = (uint8_t) (((input[1] & 0x0f) << 2) + (input[2] >> 6));
       output[3] = input[2] & 0x3f;
-      Assert (output[0] < 64);
-      Assert (output[1] < 64);
-      Assert (output[2] < 64);
-      Assert (output[3] < 64);
+      KMS_ASSERT (output[0] < 64);
+      KMS_ASSERT (output[1] < 64);
+      KMS_ASSERT (output[2] < 64);
+      KMS_ASSERT (output[3] < 64);
 
       if (datalength + 4 > targsize) {
          return -1;
@@ -162,11 +159,11 @@ kms_message_b64_ntop (uint8_t const *src,
          input[i] = *src++;
       }
       output[0] = input[0] >> 2;
-      output[1] = ((input[0] & 0x03) << 4) + (input[1] >> 4);
-      output[2] = ((input[1] & 0x0f) << 2) + (input[2] >> 6);
-      Assert (output[0] < 64);
-      Assert (output[1] < 64);
-      Assert (output[2] < 64);
+      output[1] = (uint8_t) (((input[0] & 0x03) << 4) + (input[1] >> 4));
+      output[2] = (uint8_t) (((input[1] & 0x0f) << 2) + (input[2] >> 6));
+      KMS_ASSERT (output[0] < 64);
+      KMS_ASSERT (output[1] < 64);
+      KMS_ASSERT (output[2] < 64);
 
       if (datalength + 4 > targsize) {
          return -1;
@@ -267,7 +264,7 @@ static const uint8_t b64rmap_invalid = 0xff;
 void
 kms_message_b64_initialize_rmap (void)
 {
-   int i;
+   uint16_t i;
    unsigned char ch;
 
    /* Null: end of string, stop parsing */
@@ -288,7 +285,7 @@ kms_message_b64_initialize_rmap (void)
 
    /* Fill reverse mapping for base64 chars */
    for (i = 0; Base64[i] != '\0'; ++i)
-      b64rmap[(uint8_t) Base64[i]] = i;
+      b64rmap[(uint8_t) Base64[i]] = (uint8_t) i;
 }
 
 static int
@@ -319,14 +316,14 @@ b64_pton_do (char const *src, uint8_t *target, size_t targsize)
       case 0:
          if ((size_t) tarindex >= targsize)
             return (-1);
-         target[tarindex] = ofs << 2;
+         target[tarindex] = (uint8_t) (ofs << 2);
          state = 1;
          break;
       case 1:
          if ((size_t) tarindex + 1 >= targsize)
             return (-1);
          target[tarindex] |= ofs >> 4;
-         target[tarindex + 1] = (ofs & 0x0f) << 4;
+         target[tarindex + 1] = (uint8_t) ((ofs & 0x0f) << 4);
          tarindex++;
          state = 2;
          break;
@@ -334,7 +331,7 @@ b64_pton_do (char const *src, uint8_t *target, size_t targsize)
          if ((size_t) tarindex + 1 >= targsize)
             return (-1);
          target[tarindex] |= ofs >> 2;
-         target[tarindex + 1] = (ofs & 0x03) << 6;
+         target[tarindex + 1] = (uint8_t) ((ofs & 0x03) << 6);
          tarindex++;
          state = 3;
          break;

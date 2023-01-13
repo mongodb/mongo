@@ -73,6 +73,7 @@ typedef struct {
    bson_iter_t indexMax;
    int64_t maxContentionCounter;
    int64_t sparsity;
+   mc_optional_uint32_t precision;
 } mc_makeRangeFindPlaceholder_args_t;
 
 // mc_makeRangeFindPlaceholder creates a placeholder to be consumed by

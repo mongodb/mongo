@@ -405,6 +405,7 @@ _mongocrypt_parse_optional_binary (const bson_t *bson,
          CLIENT_ERR ("unable to parse base64 from UTF-8 field %s", dotkey);
          return false;
       }
+      BSON_ASSERT (out_len <= UINT32_MAX);
       out->len = (uint32_t) out_len;
       out->owned = true;
    } else if (BSON_ITER_HOLDS_BINARY (&child)) {

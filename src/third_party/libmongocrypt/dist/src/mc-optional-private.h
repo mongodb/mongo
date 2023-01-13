@@ -38,6 +38,22 @@ typedef struct {
 
 typedef struct {
    bool set;
+   uint32_t value;
+} mc_optional_uint32_t;
+
+#define OPT_U32(val)            \
+   (mc_optional_uint32_t)       \
+   {                            \
+      .set = true, .value = val \
+   }
+
+#define OPT_U32_C(val)          \
+   {                            \
+      .set = true, .value = val \
+   }
+
+typedef struct {
+   bool set;
    int64_t value;
 } mc_optional_int64_t;
 
@@ -48,6 +64,22 @@ typedef struct {
    }
 
 #define OPT_I64_C(val)          \
+   {                            \
+      .set = true, .value = val \
+   }
+
+typedef struct {
+   bool set;
+   uint64_t value;
+} mc_optional_uint64_t;
+
+#define OPT_U64(val)            \
+   (mc_optional_uint64_t)       \
+   {                            \
+      .set = true, .value = val \
+   }
+
+#define OPT_U64_C(val)          \
    {                            \
       .set = true, .value = val \
    }

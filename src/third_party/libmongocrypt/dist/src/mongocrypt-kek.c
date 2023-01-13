@@ -295,7 +295,9 @@ _mongocrypt_kek_copy_to (const _mongocrypt_kek_t *src, _mongocrypt_kek_t *dst)
 void
 _mongocrypt_kek_cleanup (_mongocrypt_kek_t *kek)
 {
-   BSON_ASSERT_PARAM (kek);
+   if (!kek) {
+      return;
+   }
 
    if (kek->kms_provider == MONGOCRYPT_KMS_PROVIDER_AWS) {
       bson_free (kek->provider.aws.cmk);

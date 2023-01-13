@@ -25,6 +25,7 @@
 #include <ctype.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <limits.h> /* CHAR_BIT */
 
 bool rfc_3986_tab[256] = {0};
 bool kms_initialized = false;
@@ -216,12 +217,15 @@ kms_request_str_append_chars (kms_request_str_t *str,
                               const char *appended,
                               ssize_t len)
 {
+   size_t str_len;
    if (len < 0) {
-      len = strlen (appended);
+      str_len = strlen (appended);
+   } else {
+      str_len = (size_t) len;
    }
-   kms_request_str_reserve (str, (size_t) len);
-   memcpy (str->str + str->len, appended, (size_t) len);
-   str->len += len;
+   kms_request_str_reserve (str, str_len);
+   memcpy (str->str + str->len, appended, str_len);
+   str->len += str_len;
    str->str[str->len] = '\0';
 }
 
@@ -245,7 +249,7 @@ kms_request_str_append_lowercase (kms_request_str_t *str,
    for (; i < str->len; ++i) {
       p = &str->str[i];
       /* ignore UTF-8 non-ASCII chars, which have 1 in the top bit */
-      if ((*p & (0x1U << 7U)) == 0) {
+      if (((unsigned int) (*p) & (0x1U << 7U)) == 0) {
          *p = (char) tolower (*p);
       }
    }
@@ -384,7 +388,8 @@ kms_request_str_append_hex (kms_request_str_t *str,
    char *hex_chars;
 
    hex_chars = hexlify (data, len);
-   kms_request_str_append_chars (str, hex_chars, len * 2);
+   KMS_ASSERT (len <= SSIZE_MAX / 2);
+   kms_request_str_append_chars (str, hex_chars, (ssize_t) (len * 2));
    free (hex_chars);
 
    return true;
@@ -410,7 +415,8 @@ delete_last_segment (kms_request_str_t *str, bool is_absolute)
       return;
    }
 
-   for (i = str->len - 1; i >= 0; --i) {
+   KMS_ASSERT (str->len < SSIZE_MAX);
+   for (i = (ssize_t) str->len - 1; i >= 0; --i) {
       if (str->str[i] == '/') {
          if (i == 0 && is_absolute) {
             str->len = 1;

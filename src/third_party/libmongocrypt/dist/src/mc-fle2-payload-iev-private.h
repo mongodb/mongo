@@ -20,6 +20,7 @@
 #include "mongocrypt-buffer-private.h"
 #include "mongocrypt-status-private.h"
 #include "mongocrypt-crypto-private.h"
+#include "mc-tokens-private.h"
 
 /**
  * FLE2IndexedEncryptedValue represents an FLE2 encrypted value. It is
@@ -36,14 +37,14 @@
 /* clang-format off */
 /*
  * FLE2IndexedEqualityEncryptedValue has the following data layout:
- *   
+ *
  * struct {
  *   uint8_t fle_blob_subtype = 7;
  *   uint8_t S_KeyId[16];
  *   uint8_t original_bson_type;
  *   uint8_t InnerEncrypted[InnerEncrypted_length];
  * } FLE2IndexedEqualityEncryptedValue
- * 
+ *
  * InnerEncrypted is the output of: Encrypt(key=ServerDataLevel1Token, plaintext=Inner)
  * ServerDataLevel1Token is created from the key identified by S_KeyId.
  *
@@ -77,7 +78,7 @@
  * } edges[edgeCount];
  *
  * libmongocrypt ignores the edges.
- * 
+ *
  * See https://github.com/mongodb/mongo/blob/fa94f5fb6216a1cc1e23f5ad4df05295b380070e/src/mongo/crypto/fle_crypto.h#L897
  * for the server representation of FLE2IndexedEqualityEncryptedPayload.
  */
@@ -86,8 +87,21 @@
 typedef struct _mc_FLE2IndexedEqualityEncryptedValue_t
    mc_FLE2IndexedEncryptedValue_t;
 
+struct _mc_FLE2IndexedEqualityEncryptedValueTokens {
+   _mongocrypt_buffer_t edc;
+   _mongocrypt_buffer_t esc;
+   _mongocrypt_buffer_t ecc;
+   uint64_t counter;
+};
+
+typedef struct _mc_FLE2IndexedEqualityEncryptedValueTokens
+   mc_FLE2IndexedEqualityEncryptedValueTokens;
+
 mc_FLE2IndexedEncryptedValue_t *
 mc_FLE2IndexedEncryptedValue_new (void);
+
+mc_FLE2IndexedEqualityEncryptedValueTokens *
+mc_FLE2IndexedEqualityEncryptedValueTokens_new (void);
 
 bool
 mc_FLE2IndexedEncryptedValue_parse (mc_FLE2IndexedEncryptedValue_t *iev,
@@ -117,6 +131,18 @@ mc_FLE2IndexedEncryptedValue_add_S_Key (_mongocrypt_crypto_t *crypto,
                                         const _mongocrypt_buffer_t *S_Key,
                                         mongocrypt_status_t *status);
 
+/* mc_FLE2IndexedEncryptedValue_decrypt decrypts InnerEncrypted with the
+ * ServerDataEncryptionLevel1Token on the server-side. Returns false and sets
+ * @status on error. It is an error to call before
+ * mc_FLE2IndexedEncryptedValue_parse. */
+bool
+mc_FLE2IndexedEncryptedValue_decrypt_equality (
+   _mongocrypt_crypto_t *crypto,
+   mc_FLE2IndexedEncryptedValue_t *iev,
+   mc_ServerDataEncryptionLevel1Token_t *token,
+   mc_FLE2IndexedEqualityEncryptedValueTokens *indexed_tokens,
+   mongocrypt_status_t *status);
+
 /* mc_FLE2IndexedEncryptedValue_get_K_KeyId returns Inner.K_KeyId.
  * Returns NULL and sets @status on error. It is an error to call before
  * mc_FLE2IndexedEncryptedValue_add_S_Key. */
@@ -144,5 +170,10 @@ mc_FLE2IndexedEncryptedValue_get_ClientValue (
 
 void
 mc_FLE2IndexedEncryptedValue_destroy (mc_FLE2IndexedEncryptedValue_t *iev);
+
+void
+mc_FLE2IndexedEqualityEncryptedValueTokens_destroy (
+   mc_FLE2IndexedEqualityEncryptedValueTokens *tokens);
+
 
 #endif /* MONGOCRYPT_INDEXED_ENCRYPTED_VALUE_PRIVATE_H */

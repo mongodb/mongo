@@ -1124,9 +1124,14 @@ _marking_to_bson_value (void *ctx,
        (ciphertext.blob_subtype == MC_SUBTYPE_FLE2FindRangePayload)) {
       /* ciphertext_data is already a BSON object, just need to prepend
        * blob_subtype */
+      if (ciphertext.data.len > UINT32_MAX - 1u) {
+         CLIENT_ERR ("ciphertext too long");
+         goto fail;
+      }
       _mongocrypt_buffer_init_size (&serialized_ciphertext,
                                     ciphertext.data.len + 1);
-      serialized_ciphertext.data[0] = ciphertext.blob_subtype;
+      /* ciphertext->blob_subtype is an enum and easily fits in uint8_t */
+      serialized_ciphertext.data[0] = (uint8_t) ciphertext.blob_subtype;
       memcpy (serialized_ciphertext.data + 1,
               ciphertext.data.data,
               ciphertext.data.len);
@@ -1141,7 +1146,7 @@ _marking_to_bson_value (void *ctx,
    out->value_type = BSON_TYPE_BINARY;
    out->value.v_binary.data = serialized_ciphertext.data;
    out->value.v_binary.data_len = serialized_ciphertext.len;
-   out->value.v_binary.subtype = (bson_subtype_t) 6;
+   out->value.v_binary.subtype = (bson_subtype_t) BSON_SUBTYPE_ENCRYPTED;
 
    ret = true;
 
@@ -1211,6 +1216,10 @@ generate_delete_tokens (_mongocrypt_crypto_t *crypto,
       }
 
       /* Get the TokenKey from the last 32 bytes of IndexKey */
+      if (IndexKey.len < MONGOCRYPT_TOKEN_KEY_LEN) {
+         CLIENT_ERR ("IndexKey too short");
+         goto loop_fail;
+      }
       if (!_mongocrypt_buffer_from_subrange (&TokenKey,
                                              &IndexKey,
                                              IndexKey.len -
@@ -1430,6 +1439,10 @@ _fle2_append_compactionTokens (_mongocrypt_crypto_t *crypto,
          goto ecoc_fail;
       }
       /* The last 32 bytes of the user key are the token key. */
+      if (key.len < MONGOCRYPT_TOKEN_KEY_LEN) {
+         CLIENT_ERR ("key too short");
+         goto ecoc_fail;
+      }
       if (!_mongocrypt_buffer_from_subrange (&tokenkey,
                                              &key,
                                              key.len - MONGOCRYPT_TOKEN_KEY_LEN,
@@ -1810,7 +1823,7 @@ _fle2_finalize_explicit (mongocrypt_ctx_t *ctx, mongocrypt_binary_t *out)
    marking.type = MONGOCRYPT_MARKING_FLE2_ENCRYPTION;
    if (ctx->opts.query_type.set) {
       switch (ctx->opts.query_type.value) {
-      case MONGOCRYPT_QUERY_TYPE_RANGE:
+      case MONGOCRYPT_QUERY_TYPE_RANGEPREVIEW:
       case MONGOCRYPT_QUERY_TYPE_EQUALITY:
          marking.fle2.type = MONGOCRYPT_FLE2_PLACEHOLDER_TYPE_FIND;
          break;
@@ -1830,7 +1843,7 @@ _fle2_finalize_explicit (mongocrypt_ctx_t *ctx, mongocrypt_binary_t *out)
    case MONGOCRYPT_INDEX_TYPE_NONE:
       marking.fle2.algorithm = MONGOCRYPT_FLE2_ALGORITHM_UNINDEXED;
       break;
-   case MONGOCRYPT_INDEX_TYPE_RANGE:
+   case MONGOCRYPT_INDEX_TYPE_RANGEPREVIEW:
       marking.fle2.algorithm = MONGOCRYPT_FLE2_ALGORITHM_RANGE;
       break;
    default:
@@ -2295,7 +2308,7 @@ _permitted_for_encryption (bson_iter_t *iter,
       CLIENT_ERR ("BSON type invalid for encryption");
       goto fail;
    case BSON_TYPE_BINARY:
-      if (bson_value->value.v_binary.subtype == 6) {
+      if (bson_value->value.v_binary.subtype == BSON_SUBTYPE_ENCRYPTED) {
          CLIENT_ERR ("BSON binary subtype 6 is invalid for encryption");
          goto fail;
       }
@@ -2335,9 +2348,11 @@ fail:
    return ret;
 }
 
-bool
-mongocrypt_ctx_explicit_encrypt_init (mongocrypt_ctx_t *ctx,
-                                      mongocrypt_binary_t *msg)
+// explicit_encrypt_init is common code shared by
+// mongocrypt_ctx_explicit_encrypt_init and
+// mongocrypt_ctx_explicit_encrypt_expression_init.
+static bool
+explicit_encrypt_init (mongocrypt_ctx_t *ctx, mongocrypt_binary_t *msg)
 {
    _mongocrypt_ctx_encrypt_t *ectx;
    bson_t as_bson;
@@ -2446,7 +2461,7 @@ mongocrypt_ctx_explicit_encrypt_init (mongocrypt_ctx_t *ctx,
    }
 
    if (ctx->opts.index_type.set &&
-       ctx->opts.index_type.value == MONGOCRYPT_INDEX_TYPE_RANGE) {
+       ctx->opts.index_type.value == MONGOCRYPT_INDEX_TYPE_RANGEPREVIEW) {
       if (!ctx->opts.contention_factor.set) {
          return _mongocrypt_ctx_fail_w_msg (
             ctx, "contention factor is required for range indexed algorithm");
@@ -2470,8 +2485,9 @@ mongocrypt_ctx_explicit_encrypt_init (mongocrypt_ctx_t *ctx,
       bool matches = false;
 
       switch (ctx->opts.query_type.value) {
-      case MONGOCRYPT_QUERY_TYPE_RANGE:
-         matches = (ctx->opts.index_type.value == MONGOCRYPT_INDEX_TYPE_RANGE);
+      case MONGOCRYPT_QUERY_TYPE_RANGEPREVIEW:
+         matches =
+            (ctx->opts.index_type.value == MONGOCRYPT_INDEX_TYPE_RANGEPREVIEW);
          break;
       case MONGOCRYPT_QUERY_TYPE_EQUALITY:
          matches =
@@ -2550,6 +2566,37 @@ mongocrypt_ctx_explicit_encrypt_init (mongocrypt_ctx_t *ctx,
 
    (void) _mongocrypt_key_broker_requests_done (&ctx->kb);
    return _mongocrypt_ctx_state_from_key_broker (ctx);
+}
+
+bool
+mongocrypt_ctx_explicit_encrypt_init (mongocrypt_ctx_t *ctx,
+                                      mongocrypt_binary_t *msg)
+{
+   if (!explicit_encrypt_init (ctx, msg)) {
+      return false;
+   }
+   if (ctx->opts.query_type.set &&
+       ctx->opts.query_type.value == MONGOCRYPT_QUERY_TYPE_RANGEPREVIEW) {
+      return _mongocrypt_ctx_fail_w_msg (
+         ctx,
+         "Encrypt may not be used for range queries. Use EncryptExpression.");
+   }
+   return true;
+}
+
+bool
+mongocrypt_ctx_explicit_encrypt_expression_init (mongocrypt_ctx_t *ctx,
+                                                 mongocrypt_binary_t *msg)
+{
+   if (!explicit_encrypt_init (ctx, msg)) {
+      return false;
+   }
+   if (!ctx->opts.query_type.set ||
+       ctx->opts.query_type.value != MONGOCRYPT_QUERY_TYPE_RANGEPREVIEW) {
+      return _mongocrypt_ctx_fail_w_msg (
+         ctx, "EncryptExpression may only be used for range queries.");
+   }
+   return true;
 }
 
 static bool

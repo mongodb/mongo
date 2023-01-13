@@ -45,30 +45,36 @@ typedef struct {
 } _mongocrypt_crypto_t;
 
 uint32_t
-_mongocrypt_calculate_ciphertext_len (uint32_t plaintext_len);
+_mongocrypt_calculate_ciphertext_len (uint32_t plaintext_len,
+                                      mongocrypt_status_t *status);
 
 /* _mongocrypt_fle2aead_calculate_ciphertext_len returns the required length of
  * the ciphertext for _mongocrypt_fle2aead_do_encryption. */
 uint32_t
-_mongocrypt_fle2aead_calculate_ciphertext_len (uint32_t plaintext_len);
+_mongocrypt_fle2aead_calculate_ciphertext_len (uint32_t plaintext_len,
+                                               mongocrypt_status_t *status);
 
 /* _mongocrypt_fle2_calculate_ciphertext_len returns the required length of
  * the ciphertext for _mongocrypt_fle2_do_encryption. */
 uint32_t
-_mongocrypt_fle2_calculate_ciphertext_len (uint32_t plaintext_len);
+_mongocrypt_fle2_calculate_ciphertext_len (uint32_t plaintext_len,
+                                           mongocrypt_status_t *status);
 
 uint32_t
-_mongocrypt_calculate_plaintext_len (uint32_t ciphertext_len);
+_mongocrypt_calculate_plaintext_len (uint32_t ciphertext_len,
+                                     mongocrypt_status_t *status);
 
 /* _mongocrypt_fle2aead_calculate_plaintext_len returns the required length of
  * the plaintext for _mongocrypt_fle2aead_do_decryption. */
 uint32_t
-_mongocrypt_fle2aead_calculate_plaintext_len (uint32_t ciphertext_len);
+_mongocrypt_fle2aead_calculate_plaintext_len (uint32_t ciphertext_len,
+                                              mongocrypt_status_t *status);
 
 /* _mongocrypt_fle2_calculate_plaintext_len returns the required length of
  * the plaintext for _mongocrypt_fle2_do_decryption. */
 uint32_t
-_mongocrypt_fle2_calculate_plaintext_len (uint32_t ciphertext_len);
+_mongocrypt_fle2_calculate_plaintext_len (uint32_t ciphertext_len,
+                                          mongocrypt_status_t *status);
 
 bool
 _mongocrypt_do_encryption (_mongocrypt_crypto_t *crypto,

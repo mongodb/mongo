@@ -157,14 +157,24 @@ mc_FLE2UnindexedEncryptedValue_decrypt (_mongocrypt_crypto_t *crypto,
     * original_bson_type */
    _mongocrypt_buffer_t AD;
    _mongocrypt_buffer_init (&AD);
+   if (uev->key_uuid.len > UINT32_MAX - 2) {
+      CLIENT_ERR ("mc_FLE2UnindexedEncryptedValue_decrypt expected "
+                  "key UUID length <= %" PRIu32 " got: %" PRIu32,
+                  UINT32_MAX - 2u,
+                  uev->key_uuid.len);
+      return NULL;
+   }
    _mongocrypt_buffer_resize (&AD, 1 + uev->key_uuid.len + 1);
 
    AD.data[0] = MC_SUBTYPE_FLE2UnindexedEncryptedValue;
    memcpy (AD.data + 1, uev->key_uuid.data, uev->key_uuid.len);
    AD.data[1 + uev->key_uuid.len] = uev->original_bson_type;
-   _mongocrypt_buffer_resize (
-      &uev->plaintext,
-      _mongocrypt_fle2aead_calculate_plaintext_len (uev->ciphertext.len));
+   const uint32_t plaintext_len = _mongocrypt_fle2aead_calculate_plaintext_len (
+      uev->ciphertext.len, status);
+   if (plaintext_len == 0) {
+      return NULL;
+   }
+   _mongocrypt_buffer_resize (&uev->plaintext, plaintext_len);
 
    uint32_t bytes_written;
 
@@ -210,6 +220,13 @@ mc_FLE2UnindexedEncryptedValue_encrypt (_mongocrypt_crypto_t *crypto,
    /* Serialize associated data: fle_blob_subtype || key_uuid ||
     * original_bson_type */
    {
+      if (key_uuid->len > UINT32_MAX - 2) {
+         CLIENT_ERR ("mc_FLE2UnindexedEncryptedValue_encrypt expected "
+                     "key UUID length <= %" PRIu32 " got: %" PRIu32,
+                     UINT32_MAX - 2u,
+                     key_uuid->len);
+         goto fail;
+      }
       _mongocrypt_buffer_resize (&AD, 1 + key_uuid->len + 1);
       AD.data[0] = MC_SUBTYPE_FLE2UnindexedEncryptedValue;
       memcpy (AD.data + 1, key_uuid->data, key_uuid->len);
@@ -218,8 +235,12 @@ mc_FLE2UnindexedEncryptedValue_encrypt (_mongocrypt_crypto_t *crypto,
 
    /* Encrypt. */
    {
-      _mongocrypt_buffer_resize (
-         out, _mongocrypt_fle2aead_calculate_ciphertext_len (plaintext->len));
+      const uint32_t cipherlen =
+         _mongocrypt_fle2aead_calculate_ciphertext_len (plaintext->len, status);
+      if (cipherlen == 0) {
+         goto fail;
+      }
+      _mongocrypt_buffer_resize (out, cipherlen);
       uint32_t bytes_written; /* unused. */
       if (!_mongocrypt_fle2aead_do_encryption (
              crypto, &iv, &AD, key, plaintext, out, &bytes_written, status)) {

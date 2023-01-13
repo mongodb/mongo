@@ -20,9 +20,7 @@
 #include "mongocrypt-private.h"
 #include "mongocrypt-util-private.h" // mc_bson_type_to_string
 
-/* Enable -Wconversion as error for only this file.
- * Other libmongocrypt files warn for -Wconversion. */
-MC_BEGIN_CONVERSION_ERRORS
+#include <float.h> // DBL_MAX
 
 // Common logic for testing field name, tracking duplication, and presence.
 #define IF_FIELD(Name, ErrorPrefix)                                            \
@@ -49,7 +47,8 @@ mc_RangeOpts_parse (mc_RangeOpts_t *ro,
                     mongocrypt_status_t *status)
 {
    bson_iter_t iter;
-   bool has_min = false, has_max = false, has_sparsity = false;
+   bool has_min = false, has_max = false, has_sparsity = false,
+        has_precision = false;
    const char *const error_prefix = "Error parsing RangeOpts: ";
 
    BSON_ASSERT_PARAM (ro);
@@ -69,11 +68,13 @@ mc_RangeOpts_parse (mc_RangeOpts_t *ro,
       BSON_ASSERT (field);
 
       IF_FIELD (min, error_prefix)
-      ro->min = iter;
+      ro->min.set = true;
+      ro->min.value = iter;
       END_IF_FIELD
 
       IF_FIELD (max, error_prefix)
-      ro->max = iter;
+      ro->max.set = true;
+      ro->max.value = iter;
       END_IF_FIELD
 
       IF_FIELD (sparsity, error_prefix)
@@ -86,13 +87,96 @@ mc_RangeOpts_parse (mc_RangeOpts_t *ro,
       ro->sparsity = bson_iter_int64 (&iter);
       END_IF_FIELD
 
+      IF_FIELD (precision, error_prefix)
+      {
+         if (!BSON_ITER_HOLDS_INT32 (&iter)) {
+            CLIENT_ERR ("%s'precision' must be an int32", error_prefix);
+            return false;
+         }
+         int32_t val = bson_iter_int32 (&iter);
+         if (val < 0) {
+            CLIENT_ERR ("%s'precision' must be non-negative", error_prefix);
+            return false;
+         }
+         ro->precision = OPT_U32 ((uint32_t) val);
+      }
+      END_IF_FIELD
+
       CLIENT_ERR ("%sUnrecognized field: '%s'", error_prefix, field);
       return false;
    }
 
-   CHECK_HAS (min, error_prefix);
-   CHECK_HAS (max, error_prefix);
+   // Do not error if min/max are not present. min/max are optional.
    CHECK_HAS (sparsity, error_prefix);
+   // Do not error if precision is not present. Precision is optional and only
+   // applies to double/decimal128.
+
+   // Expect precision only to be set for double or decimal128.
+   if (has_precision) {
+      if (!ro->min.set) {
+         CLIENT_ERR ("setting precision requires min");
+         return false;
+      }
+
+      bson_type_t minType = bson_iter_type (&ro->min.value);
+      if (minType != BSON_TYPE_DOUBLE && minType != BSON_TYPE_DECIMAL128) {
+         CLIENT_ERR ("expected 'precision' to be set with double or decimal128 "
+                     "index, but got: %s min",
+                     mc_bson_type_to_string (minType));
+         return false;
+      }
+
+      if (!ro->max.set) {
+         CLIENT_ERR ("setting precision requires max");
+         return false;
+      }
+
+      bson_type_t maxType = bson_iter_type (&ro->max.value);
+      if (maxType != BSON_TYPE_DOUBLE && maxType != BSON_TYPE_DECIMAL128) {
+         CLIENT_ERR ("expected 'precision' to be set with double or decimal128 "
+                     "index, but got: %s max",
+                     mc_bson_type_to_string (maxType));
+         return false;
+      }
+   }
+
+   // Expect min and max to match types.
+   if (ro->min.set && ro->max.set) {
+      bson_type_t minType = bson_iter_type (&ro->min.value),
+                  maxType = bson_iter_type (&ro->max.value);
+      if (minType != maxType) {
+         CLIENT_ERR ("expected 'min' and 'max' to be same type, but got: %s "
+                     "min and %s max",
+                     mc_bson_type_to_string (minType),
+                     mc_bson_type_to_string (maxType));
+         return false;
+      }
+   }
+
+   if (ro->min.set || ro->max.set) {
+      // Setting min/max without precision is error for double and decimal128.
+      if (ro->min.set) {
+         bson_type_t minType = bson_iter_type (&ro->min.value);
+         if (minType == BSON_TYPE_DOUBLE || minType == BSON_TYPE_DECIMAL128) {
+            if (!has_precision) {
+               CLIENT_ERR ("expected 'precision' to be set with 'min' for %s",
+                           mc_bson_type_to_string (minType));
+               return false;
+            }
+         }
+      }
+
+      if (ro->max.set) {
+         bson_type_t maxType = bson_iter_type (&ro->max.value);
+         if (maxType == BSON_TYPE_DOUBLE || maxType == BSON_TYPE_DECIMAL128) {
+            if (!has_precision) {
+               CLIENT_ERR ("expected 'precision' to be set with 'max' for %s",
+                           mc_bson_type_to_string (maxType));
+               return false;
+            }
+         }
+      }
+   }
 
    return true;
 }
@@ -125,16 +209,137 @@ mc_RangeOpts_to_FLE2RangeInsertSpec (const mc_RangeOpts_t *ro,
       CLIENT_ERR ("%sError appending to BSON", error_prefix);
       return false;
    }
-   if (!bson_append_iter (&child, "min", 3, &ro->min)) {
-      CLIENT_ERR ("%sError appending to BSON", error_prefix);
+
+   if (!mc_RangeOpts_appendMin (
+          ro, bson_iter_type (&v_iter), "min", &child, status)) {
       return false;
    }
-   if (!bson_append_iter (&child, "max", 3, &ro->max)) {
-      CLIENT_ERR ("%sError appending to BSON", error_prefix);
+
+   if (!mc_RangeOpts_appendMax (
+          ro, bson_iter_type (&v_iter), "max", &child, status)) {
       return false;
+   }
+
+   if (ro->precision.set) {
+      BSON_ASSERT (ro->precision.value <= INT32_MAX);
+      if (!BSON_APPEND_INT32 (
+             &child, "precision", (int32_t) ro->precision.value)) {
+         CLIENT_ERR ("%sError appending to BSON", error_prefix);
+         return false;
+      }
    }
    if (!bson_append_document_end (out, &child)) {
       CLIENT_ERR ("%sError appending to BSON", error_prefix);
+      return false;
+   }
+   return true;
+}
+
+bool
+mc_RangeOpts_appendMin (const mc_RangeOpts_t *ro,
+                        bson_type_t valueType,
+                        const char *fieldName,
+                        bson_t *out,
+                        mongocrypt_status_t *status)
+{
+   BSON_ASSERT_PARAM (ro);
+   BSON_ASSERT_PARAM (fieldName);
+   BSON_ASSERT_PARAM (out);
+   BSON_ASSERT (status || true);
+
+   if (ro->min.set) {
+      if (bson_iter_type (&ro->min.value) != valueType) {
+         CLIENT_ERR ("expected matching 'min' and value type. Got range option "
+                     "'min' of type %s and value of type %s",
+                     mc_bson_type_to_string (bson_iter_type (&ro->min.value)),
+                     mc_bson_type_to_string (valueType));
+         return false;
+      }
+      if (!bson_append_iter (out, fieldName, -1, &ro->min.value)) {
+         CLIENT_ERR ("failed to append BSON");
+         return false;
+      }
+      return true;
+   }
+
+   if (valueType == BSON_TYPE_INT32) {
+      if (!BSON_APPEND_INT32 (out, fieldName, INT32_MIN)) {
+         CLIENT_ERR ("failed to append BSON");
+         return false;
+      }
+   } else if (valueType == BSON_TYPE_INT64) {
+      if (!BSON_APPEND_INT64 (out, fieldName, INT64_MIN)) {
+         CLIENT_ERR ("failed to append BSON");
+         return false;
+      }
+   } else if (valueType == BSON_TYPE_DATE_TIME) {
+      if (!BSON_APPEND_DATE_TIME (out, fieldName, INT64_MIN)) {
+         CLIENT_ERR ("failed to append BSON");
+         return false;
+      }
+   } else if (valueType == BSON_TYPE_DOUBLE) {
+      if (!BSON_APPEND_DOUBLE (out, fieldName, -DBL_MAX)) {
+         CLIENT_ERR ("failed to append BSON");
+         return false;
+      }
+   } else {
+      CLIENT_ERR ("unsupported BSON type: %s for range",
+                  mc_bson_type_to_string (valueType));
+      return false;
+   }
+   return true;
+}
+
+bool
+mc_RangeOpts_appendMax (const mc_RangeOpts_t *ro,
+                        bson_type_t valueType,
+                        const char *fieldName,
+                        bson_t *out,
+                        mongocrypt_status_t *status)
+{
+   BSON_ASSERT_PARAM (ro);
+   BSON_ASSERT_PARAM (fieldName);
+   BSON_ASSERT_PARAM (out);
+   BSON_ASSERT (status || true);
+
+   if (ro->max.set) {
+      if (bson_iter_type (&ro->max.value) != valueType) {
+         CLIENT_ERR ("expected matching 'max' and value type. Got range option "
+                     "'max' of type %s and value of type %s",
+                     mc_bson_type_to_string (bson_iter_type (&ro->max.value)),
+                     mc_bson_type_to_string (valueType));
+         return false;
+      }
+      if (!bson_append_iter (out, fieldName, -1, &ro->max.value)) {
+         CLIENT_ERR ("failed to append BSON");
+         return false;
+      }
+      return true;
+   }
+
+   if (valueType == BSON_TYPE_INT32) {
+      if (!BSON_APPEND_INT32 (out, fieldName, INT32_MAX)) {
+         CLIENT_ERR ("failed to append BSON");
+         return false;
+      }
+   } else if (valueType == BSON_TYPE_INT64) {
+      if (!BSON_APPEND_INT64 (out, fieldName, INT64_MAX)) {
+         CLIENT_ERR ("failed to append BSON");
+         return false;
+      }
+   } else if (valueType == BSON_TYPE_DATE_TIME) {
+      if (!BSON_APPEND_DATE_TIME (out, fieldName, INT64_MAX)) {
+         CLIENT_ERR ("failed to append BSON");
+         return false;
+      }
+   } else if (valueType == BSON_TYPE_DOUBLE) {
+      if (!BSON_APPEND_DOUBLE (out, fieldName, DBL_MAX)) {
+         CLIENT_ERR ("failed to append BSON");
+         return false;
+      }
+   } else {
+      CLIENT_ERR ("unsupported BSON type: %s for range",
+                  mc_bson_type_to_string (valueType));
       return false;
    }
    return true;
@@ -149,5 +354,3 @@ mc_RangeOpts_cleanup (mc_RangeOpts_t *ro)
 
    bson_destroy (ro->bson);
 }
-
-MC_END_CONVERSION_ERRORS

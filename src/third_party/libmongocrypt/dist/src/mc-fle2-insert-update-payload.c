@@ -262,6 +262,8 @@ mc_FLE2InsertUpdatePayload_serializeForRange (
       if (!bson_append_document_end (&g_bson, &etc_bson)) {
          return false;
       }
+      if (g_index == UINT32_MAX)
+         break;
       g_index++;
    }
 
@@ -289,6 +291,7 @@ mc_FLE2InsertUpdatePayload_decrypt (_mongocrypt_crypto_t *crypto,
    }
 
    _mongocrypt_buffer_t ciphertext;
+   BSON_ASSERT (iup->value.len >= UUID_LEN);
    if (!_mongocrypt_buffer_from_subrange (
           &ciphertext, &iup->value, UUID_LEN, iup->value.len - UUID_LEN)) {
       CLIENT_ERR ("Failed to create ciphertext buffer");
@@ -297,7 +300,7 @@ mc_FLE2InsertUpdatePayload_decrypt (_mongocrypt_crypto_t *crypto,
 
    _mongocrypt_buffer_resize (
       &iup->plaintext,
-      _mongocrypt_fle2aead_calculate_plaintext_len (ciphertext.len));
+      _mongocrypt_fle2aead_calculate_plaintext_len (ciphertext.len, status));
    uint32_t bytes_written; /* ignored */
 
    if (!_mongocrypt_fle2aead_do_decryption (crypto,

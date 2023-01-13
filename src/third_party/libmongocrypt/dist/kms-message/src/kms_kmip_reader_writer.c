@@ -118,7 +118,7 @@ kmip_writer_write_string (kmip_writer_t *writer, kmip_tag_type_t tag, const char
 
    size_t i;
    for (i = 0; i < len; i++) {
-      kmip_writer_write_u8 (writer, str[i]);
+      kmip_writer_write_u8 (writer, (uint8_t) str[i]);
    }
 
    size_t padded_length = compute_padded_length (len);
@@ -137,7 +137,7 @@ kmip_writer_write_bytes (kmip_writer_t *writer, kmip_tag_type_t tag, const char 
 
    size_t i;
    for (i = 0; i < len; i++) {
-      kmip_writer_write_u8 (writer, str[i]);
+      kmip_writer_write_u8 (writer, (uint8_t) str[i]);
    }
 
    size_t padded_length = compute_padded_length (len);
@@ -152,7 +152,8 @@ kmip_writer_write_integer (kmip_writer_t *writer, kmip_tag_type_t tag, int32_t v
    kmip_writer_write_tag_enum (writer, tag);
    kmip_writer_write_u8 (writer, KMIP_ITEM_TYPE_Integer);
    kmip_writer_write_u32 (writer, 4);
-   kmip_writer_write_u32 (writer, value);
+   KMS_ASSERT (value >= 0);
+   kmip_writer_write_u32 (writer, (uint32_t) value);
    kmip_writer_write_u32 (writer, 0);
 }
 
@@ -162,7 +163,8 @@ kmip_writer_write_long_integer (kmip_writer_t *writer, kmip_tag_type_t tag, int6
    kmip_writer_write_tag_enum (writer, tag);
    kmip_writer_write_u8 (writer, KMIP_ITEM_TYPE_LongInteger);
    kmip_writer_write_u32 (writer, 8);
-   kmip_writer_write_u64 (writer, value);
+   KMS_ASSERT (value >= 0);
+   kmip_writer_write_u64 (writer, (uint64_t) value);
 }
 
 void
@@ -171,7 +173,8 @@ kmip_writer_write_enumeration (kmip_writer_t *writer, kmip_tag_type_t tag, int32
    kmip_writer_write_tag_enum (writer, tag);
    kmip_writer_write_u8 (writer, KMIP_ITEM_TYPE_Enumeration);
    kmip_writer_write_u32 (writer, 4);
-   kmip_writer_write_u32 (writer, value);
+   KMS_ASSERT (value >= 0);
+   kmip_writer_write_u32 (writer, (uint32_t) value);
    kmip_writer_write_u32 (writer, 0);
 }
 
@@ -181,7 +184,8 @@ kmip_writer_write_datetime (kmip_writer_t *writer, kmip_tag_type_t tag, int64_t 
    kmip_writer_write_tag_enum (writer, tag);
    kmip_writer_write_u8 (writer, KMIP_ITEM_TYPE_DateTime);
    kmip_writer_write_u32 (writer, 8);
-   kmip_writer_write_u64 (writer, value);
+   KMS_ASSERT (value >= 0);
+   kmip_writer_write_u64 (writer, (uint64_t) value);
 }
 
 void
@@ -442,7 +446,7 @@ kmip_reader_find (kmip_reader_t *reader,
 }
 
 bool
-kmip_reader_find_and_recurse (kmip_reader_t *reader, size_t tag)
+kmip_reader_find_and_recurse (kmip_reader_t *reader, kmip_tag_type_t tag)
 {
    size_t pos;
    size_t length;
@@ -459,7 +463,7 @@ kmip_reader_find_and_recurse (kmip_reader_t *reader, size_t tag)
 
 bool
 kmip_reader_find_and_read_enum (kmip_reader_t *reader,
-                                size_t tag,
+                                kmip_tag_type_t tag,
                                 uint32_t *value)
 {
    size_t pos;
@@ -479,7 +483,7 @@ kmip_reader_find_and_read_enum (kmip_reader_t *reader,
 
 bool
 kmip_reader_find_and_read_bytes (kmip_reader_t *reader,
-                                 size_t tag,
+                                 kmip_tag_type_t tag,
                                  uint8_t **out_ptr,
                                  size_t *out_len)
 {

@@ -122,13 +122,15 @@ _native_crypto_aes_256_cbc_encrypt_with_mode (aes_256_args_t args, CCMode mode)
                   (int) cc_status);
       goto done;
    }
-   *args.bytes_written = intermediate_bytes_written;
+   BSON_ASSERT (intermediate_bytes_written <= UINT32_MAX);
+   *args.bytes_written = (uint32_t) intermediate_bytes_written;
 
-
+   BSON_ASSERT (args.out->len >= *args.bytes_written);
    cc_status = CCCryptorFinal (ctx,
                                args.out->data + *args.bytes_written,
                                args.out->len - *args.bytes_written,
                                &intermediate_bytes_written);
+   BSON_ASSERT (UINT32_MAX - *args.bytes_written >= intermediate_bytes_written);
    *args.bytes_written += intermediate_bytes_written;
 
    if (cc_status != kCCSuccess) {
@@ -212,12 +214,15 @@ _native_crypto_aes_256_cbc_decrypt_with_mode (aes_256_args_t args, CCMode mode)
                   (int) cc_status);
       goto done;
    }
-   *args.bytes_written = intermediate_bytes_written;
+   BSON_ASSERT (intermediate_bytes_written <= UINT32_MAX);
+   *args.bytes_written = (uint32_t) intermediate_bytes_written;
 
+   BSON_ASSERT (args.out->len >= *args.bytes_written);
    cc_status = CCCryptorFinal (ctx,
                                args.out->data + *args.bytes_written,
                                args.out->len - *args.bytes_written,
                                &intermediate_bytes_written);
+   BSON_ASSERT (UINT32_MAX - *args.bytes_written >= intermediate_bytes_written);
    *args.bytes_written += intermediate_bytes_written;
 
    if (cc_status != kCCSuccess) {
@@ -274,7 +279,7 @@ _hmac_with_algorithm (CCHmacAlgorithm algorithm,
    ctx = bson_malloc0 (sizeof (*ctx));
    BSON_ASSERT (ctx);
 
-
+   /* The ->len members are uint32_t and these functions take size_t */
    CCHmacInit (ctx, algorithm, key->data, key->len);
    CCHmacUpdate (ctx, in->data, in->len);
    CCHmacFinal (ctx, out->data);

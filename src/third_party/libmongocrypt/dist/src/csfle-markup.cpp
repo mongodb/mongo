@@ -83,6 +83,7 @@ print_field_info (bson_t *bson, std::string path)
             uint8_t subsubtype = data[0];
             if (subsubtype == 0) {
                // Intent-to-encrypt
+               BSON_ASSERT (len > 0);
                bson_init_static (&encoded, data + 1, len - 1);
                auto s = bson_as_canonical_extended_json (&encoded, nullptr);
                fprintf (stderr,

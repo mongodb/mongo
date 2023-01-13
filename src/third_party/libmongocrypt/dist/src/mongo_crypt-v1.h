@@ -2,6 +2,7 @@
  *    Copyright (C) 2021-present MongoDB, Inc.
  */
 
+// clang-format off
 
 #ifndef MONGO_CRYPT_SUPPORT_H
 #define MONGO_CRYPT_SUPPORT_H

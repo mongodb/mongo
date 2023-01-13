@@ -21,8 +21,6 @@
 #include "mc-range-encoding-private.h"
 #include "mongocrypt-private.h"
 
-MC_BEGIN_CONVERSION_ERRORS
-
 struct _mc_edges_t {
    size_t sparsity;
    /* edges is an array of `char*` edge strings. */
@@ -32,7 +30,6 @@ struct _mc_edges_t {
 static mc_edges_t *
 mc_edges_new (const char *leaf, size_t sparsity, mongocrypt_status_t *status)
 {
-
    BSON_ASSERT_PARAM (leaf);
    if (sparsity < 1) {
       CLIENT_ERR ("sparsity must be 1 or larger");
@@ -65,7 +62,7 @@ const char *
 mc_edges_get (mc_edges_t *edges, size_t index)
 {
    BSON_ASSERT_PARAM (edges);
-   if (index > edges->edges.len - 1u) {
+   if (edges->edges.len == 0 || index > edges->edges.len - 1u) {
       return NULL;
    }
    return _mc_array_index (&edges->edges, char *, index);
@@ -210,7 +207,12 @@ mc_getEdgesDouble (mc_getEdgesDouble_args_t args, mongocrypt_status_t *status)
 {
    mc_OSTType_Double got;
    if (!mc_getTypeInfoDouble (
-          (mc_getTypeInfoDouble_args_t){.value = args.value}, &got, status)) {
+          (mc_getTypeInfoDouble_args_t){.value = args.value,
+                                        .min = args.min,
+                                        .max = args.max,
+                                        .precision = args.precision},
+          &got,
+          status)) {
       return NULL;
    }
 
@@ -226,5 +228,3 @@ mc_getEdgesDouble (mc_getEdgesDouble_args_t args, mongocrypt_status_t *status)
    bson_free (valueBin);
    return ret;
 }
-
-MC_END_CONVERSION_ERRORS

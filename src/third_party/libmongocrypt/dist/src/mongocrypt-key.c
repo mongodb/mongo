@@ -50,7 +50,7 @@ _list_len (_mongocrypt_key_alt_name_t *list)
 {
    uint32_t count = 0;
 
-   while (NULL != list) {
+   while (NULL != list && count < UINT32_MAX) {
       count++;
       list = list->next;
    }
