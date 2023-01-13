@@ -27,14 +27,19 @@
  *    it in the license file.
  */
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
+
 #include "mongo/client/read_preference.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/read_write_concern_defaults.h"
+#include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/session/logical_session_cache_noop.h"
 #include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_chunk.h"
 
@@ -661,6 +666,241 @@ TEST_F(MergeChunkTest, MergingChunksWithDollarPrefixShouldSucceed) {
     ASSERT_EQ(chunk2.getHistory().front().getValidAfter(),
               mergedChunk.getHistory().front().getValidAfter());
     ASSERT_EQ(chunk2.getOnCurrentShardSince(), mergedChunk.getOnCurrentShardSince());
+}
+
+class MergeAllChunksOnShardTest : public ConfigServerTestFixture {
+protected:
+    void setUp() override {
+        ConfigServerTestFixture::setUp();
+        setupShards(_shards);
+
+        DBDirectClient client(operationContext());
+        client.createCollection(NamespaceString::kSessionTransactionsTableNamespace.ns());
+        client.createIndexes(NamespaceString::kSessionTransactionsTableNamespace.ns(),
+                             {MongoDSessionCatalog::getConfigTxnPartialIndexSpec()});
+
+        ReadWriteConcernDefaults::create(getServiceContext(), _lookupMock.getFetchDefaultsFn());
+        LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
+        TransactionCoordinatorService::get(operationContext())
+            ->onShardingInitialization(operationContext(), true);
+    }
+
+    void tearDown() override {
+        TransactionCoordinatorService::get(operationContext())->onStepDown();
+        ConfigServerTestFixture::tearDown();
+    }
+
+    /* Setup shareded collection randomly spreading chunks across shards */
+    void setupCollectionWithRandomRoutingTable() {
+        ChunkVersion collVersion{{_epoch, _ts}, {1, 0}};
+
+        // Generate chunk with the provided parameters and increase current collection version
+        auto generateChunk =
+            [&](ShardType& shard, BSONObj min, BSONObj max, Timestamp& validAfter) -> ChunkType {
+            ChunkType chunk;
+            chunk.setCollectionUUID(_collUuid);
+            chunk.setVersion(collVersion);
+            collVersion.incMinor();
+            chunk.setShard(shard.getName());
+            chunk.setMin(min);
+            chunk.setMax(max);
+            // TODO SERVER-72283 set `onCurrentShardSince` to `validAfter`
+            chunk.setHistory({ChunkHistory{validAfter, shard.getName()}});
+            return chunk;
+        };
+
+        PseudoRandom random(SecureRandom().nextInt64());
+        int numChunks = random.nextInt32(9) + 1;  // minimum 1 chunks, maximum 10 chunks
+        std::vector<ChunkType> chunks;
+
+        // Loop generating random routing table: [MinKey, 0), [1, 2), [2, 3), ... [x, MaxKey]
+        int nextMin;
+        for (int nextMax = 0; nextMax < numChunks; nextMax++) {
+            auto randomShard = _shards.at(random.nextInt64() % _shards.size());
+            auto randomValidAfter = Timestamp(random.nextInt64());
+            // set min as `MinKey` during first iteration, otherwise next min
+            auto min = nextMax == 0 ? _keyPattern.globalMin() : BSON("x" << nextMin);
+            // set max as `MaxKey` during last iteration, otherwise next max
+            auto max = nextMax == numChunks - 1 ? _keyPattern.globalMax() : BSON("x" << nextMax);
+            auto chunk = generateChunk(randomShard, min, max, randomValidAfter);
+            nextMin = nextMax;
+            chunks.push_back(chunk);
+        }
+
+        setupCollection(_nss, _keyPattern, chunks);
+    };
+
+    /* Get routing table for the collection under testing */
+    std::vector<ChunkType> getChunks() {
+        const auto query = BSON(ChunkType::collectionUUID() << _collUuid);
+        auto findResponse = uassertStatusOK(getConfigShard()->exhaustiveFindOnConfig(
+            operationContext(),
+            ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+            repl::ReadConcernLevel::kLocalReadConcern,
+            ChunkType::ConfigNS,
+            query,
+            BSON(ChunkType::min << 1),
+            boost::none));
+
+        std::vector<ChunkType> chunks;
+        for (const auto& doc : findResponse.docs) {
+            chunks.push_back(uassertStatusOK(ChunkType::parseFromConfigBSON(doc, _epoch, _ts)));
+        }
+        return chunks;
+    }
+
+    void assertConsistentRoutingTableWithNoContiguousChunksOnTheSameShard(
+        std::vector<ChunkType> routingTable) {
+        ASSERT_GTE(routingTable.size(), 0);
+
+        ASSERT_EQ(routingTable.front().getMin().woCompare(_keyPattern.globalMin()), 0);
+
+        for (size_t i = 1; i < routingTable.size(); i++) {
+            const auto& prevChunk = routingTable.at(i - 1);
+            const auto& currChunk = routingTable.at(i);
+            ASSERT_EQ(prevChunk.getMax().woCompare(currChunk.getMin()), 0);
+            ASSERT_NOT_EQUALS(prevChunk.getShard().compare(currChunk.getShard()), 0);
+        }
+
+        ASSERT(routingTable.back().getMax().woCompare(_keyPattern.globalMax()) == 0);
+    }
+
+    static void assertConsistentRoutingTableAfterMerges(
+        const std::vector<ChunkType>& originalRoutingTable,
+        const std::vector<ChunkType>& mergedRoutingTable) {
+        ASSERT(originalRoutingTable.size() > 0);
+        ASSERT(mergedRoutingTable.size() > 0);
+        ASSERT(originalRoutingTable.size() >= mergedRoutingTable.size());
+
+        size_t originalIndex = 0, mergedIndex = 0;
+        auto currChunkOriginalRt = originalRoutingTable.at(originalIndex);
+        auto currChunkMergedRt = mergedRoutingTable.at(mergedIndex);
+
+        // Check that the merged routing table is compatible the original one
+        while (currChunkMergedRt.getRange().covers(currChunkOriginalRt.getRange())) {
+            ASSERT_EQ(currChunkOriginalRt.getShard(), currChunkMergedRt.getShard());
+            originalIndex++;
+            if (originalIndex == originalRoutingTable.size()) {
+                break;
+            }
+            currChunkOriginalRt = originalRoutingTable.at(originalIndex);
+            if (currChunkOriginalRt.getRange().getMax().woCompare(
+                    currChunkMergedRt.getRange().getMax()) > 0) {
+                mergedIndex++;
+                currChunkMergedRt = mergedRoutingTable.at(mergedIndex);
+            }
+        }
+
+        // Make sure all chunks have been checked (loop analyzed all chunks)
+        ASSERT_EQ(originalIndex, originalRoutingTable.size());
+        ASSERT_EQ(mergedIndex, mergedRoutingTable.size() - 1);
+    }
+
+    static void assertConsistentChunkVersionsAfterMerges(
+        const std::vector<ChunkType>& originalRoutingTable,
+        const std::vector<ChunkType>& mergedRoutingTable) {
+
+        auto getMaxChunkVersion = [](const std::vector<ChunkType>& routingTable) -> ChunkVersion {
+            auto maxCollVersion = routingTable.front().getVersion();
+            for (const auto& chunk : routingTable) {
+                if (maxCollVersion.isOlderThan(chunk.getVersion())) {
+                    maxCollVersion = chunk.getVersion();
+                }
+            }
+            return maxCollVersion;
+        };
+
+        const auto originalCollVersion = getMaxChunkVersion(originalRoutingTable);
+        const auto mergedCollVersion = getMaxChunkVersion(mergedRoutingTable);
+
+        // Calculate chunks that are in the merged routing table but aren't in the original one
+        std::vector<ChunkType> chunksDiff = [&]() {
+            std::vector<ChunkType> chunksDiff;
+            std::set_difference(mergedRoutingTable.begin(),
+                                mergedRoutingTable.end(),
+                                originalRoutingTable.begin(),
+                                originalRoutingTable.end(),
+                                std::back_inserter(chunksDiff),
+                                [](const ChunkType& l, const ChunkType& r) {
+                                    return l.getRange().toBSON().woCompare(r.getRange().toBSON()) <
+                                        0;
+                                });
+            return chunksDiff;
+        }();
+
+        const int nMerges = chunksDiff.size();
+
+        // Merged max minor version = original max minor version + number of merges
+        ASSERT_EQ(originalCollVersion.minorVersion() + nMerges, mergedCollVersion.minorVersion());
+
+        // Sort `chunksDiff` by minor version and check all intermediate versions are properly set
+        std::sort(chunksDiff.begin(), chunksDiff.end(), [](ChunkType& l, ChunkType& r) {
+            return l.getVersion().isOlderThan(r.getVersion());
+        });
+
+        int expectedMergedChunkMinorVersion = originalCollVersion.minorVersion() + 1;
+        for (const auto& newChunk : chunksDiff) {
+            ASSERT_EQ(newChunk.getVersion().getTimestamp(), originalCollVersion.getTimestamp());
+            ASSERT_EQ(newChunk.getVersion().majorVersion(), originalCollVersion.majorVersion());
+            ASSERT_EQ(newChunk.getVersion().minorVersion(), expectedMergedChunkMinorVersion++);
+        }
+    }
+
+    inline const static auto _shards =
+        std::vector<ShardType>{ShardType{"shard0", "host0:123"}, ShardType{"shard1", "host1:123"}};
+
+    const NamespaceString _nss{"test.coll"};
+    const UUID _collUuid = UUID::gen();
+
+    const OID _epoch = OID::gen();
+    const Timestamp _ts = Timestamp(42);
+
+    const KeyPattern _keyPattern{BSON("x" << 1)};
+
+    ReadWriteConcernDefaultsLookupMock _lookupMock;
+};
+
+/*
+ * Generate random routing tables covering all potential unit test cases (over multiple executions):
+ * - Only one chunk [no merge possible]
+ * - Multiple chunks:
+ * --- None contiguous on same shard(s) [no merge possible]
+ * --- Some contiguous on same shard(s) [some merges possible]
+ *
+ * Then make sure that:
+ * - The routing table before merges is compatible with the routing table after merges
+ * - There are no contiguous chunks on the same shard(s)
+ * - The minor versions on chunks have been increased accordingly to the number of merges
+ */
+TEST_F(MergeAllChunksOnShardTest, MergeAllChunksOnShard) {
+    setupCollectionWithRandomRoutingTable();
+
+    const auto chunksBeforeMerges = getChunks();
+
+    for (const auto& shard : _shards) {
+        uassertStatusOK(ShardingCatalogManager::get(operationContext())
+                            ->commitMergeAllChunksOnShard(
+                                operationContext(), _nss, _collUuid, shard.getName()));
+    }
+
+    const auto chunksAfterMerges = getChunks();
+
+    try {
+        assertConsistentRoutingTableWithNoContiguousChunksOnTheSameShard(chunksAfterMerges);
+        assertConsistentRoutingTableAfterMerges(chunksBeforeMerges, chunksAfterMerges);
+        assertConsistentChunkVersionsAfterMerges(chunksBeforeMerges, chunksAfterMerges);
+    } catch (...) {
+        // Log original and merged routing tables only in case of error
+        LOGV2_INFO(7161200,
+                   "CHUNKS BEFORE MERGE",
+                   "numberOfChunks"_attr = chunksBeforeMerges.size(),
+                   "chunks"_attr = chunksBeforeMerges);
+        LOGV2_INFO(7161201,
+                   "CHUNKS AFTER MERGE",
+                   "numberOfChunks"_attr = chunksAfterMerges.size(),
+                   "chunks"_attr = chunksAfterMerges);
+        throw;
+    }
 }
 
 }  // namespace

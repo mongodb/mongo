@@ -358,6 +358,64 @@ void bumpCollectionMinorVersion(OperationContext* opCtx,
             numDocsExpectedModified == numDocsModified);
 }
 
+void mergeAllChunksOnShardInTransaction(OperationContext* opCtx,
+                                        const UUID& collectionUUID,
+                                        const ShardId& shardId,
+                                        const std::shared_ptr<std::vector<ChunkType>> newChunks) {
+    auto updateChunksFn = [collectionUUID, shardId, newChunks](
+                              const txn_api::TransactionClient& txnClient, ExecutorPtr txnExec) {
+        SemiFuture<void> fut = SemiFuture<void>::makeReady();
+
+        for (auto& chunk : *newChunks) {
+            // Prepare deletion of existing chunks in the range
+            BSONObjBuilder queryBuilder;
+            queryBuilder << ChunkType::collectionUUID << collectionUUID;
+            queryBuilder << ChunkType::shard(shardId.toString());
+            queryBuilder << ChunkType::min(BSON("$gte" << chunk.getMin()));
+            queryBuilder << ChunkType::min(BSON("$lt" << chunk.getMax()));
+
+            write_ops::DeleteCommandRequest deleteOp(ChunkType::ConfigNS);
+            deleteOp.setDeletes([&] {
+                std::vector<write_ops::DeleteOpEntry> deletes;
+                write_ops::DeleteOpEntry entry;
+                entry.setQ(queryBuilder.obj());
+                entry.setMulti(true);
+                return std::vector<write_ops::DeleteOpEntry>{entry};
+            }());
+            deleteOp.getWriteCommandRequestBase().setOrdered(false);
+
+            // Prepare insertion of new chunk covering the whole range
+            write_ops::InsertCommandRequest insertOp(ChunkType::ConfigNS, {chunk.toConfigBSON()});
+
+            fut = std::move(fut)
+                      .thenRunOn(txnExec)
+                      .then([&txnClient, deleteOp = std::move(deleteOp)]() {
+                          return txnClient.runCRUDOp(deleteOp, {});
+                      })
+                      .thenRunOn(txnExec)
+                      .then([](auto removeChunksResponse) {
+                          uassertStatusOK(removeChunksResponse.toStatus());
+                      })
+                      .thenRunOn(txnExec)
+                      .then([&txnClient, insertOp = std::move(insertOp)]() {
+                          return txnClient.runCRUDOp(insertOp, {});
+                      })
+                      .thenRunOn(txnExec)
+                      .then([](auto insertChunkResponse) {
+                          uassertStatusOK(insertChunkResponse.toStatus());
+                      })
+                      .thenRunOn(txnExec)
+                      .semi();
+        }
+
+        return fut;
+    };
+
+    txn_api::SyncTransactionWithRetries txn(
+        opCtx, Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(), nullptr);
+    txn.run(opCtx, updateChunksFn);
+}
+
 }  // namespace
 
 void ShardingCatalogManager::bumpMajorVersionOneChunkPerShard(
@@ -927,6 +985,95 @@ ShardingCatalogManager::commitChunksMerge(OperationContext* opCtx,
         opCtx, "merge", nss.ns(), logDetail.obj(), WriteConcernOptions());
 
     return ShardAndCollectionVersion{mergeVersion /*shardVersion*/, mergeVersion /*collVersion*/};
+}
+
+StatusWith<ShardingCatalogManager::ShardAndCollectionVersion>
+ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
+                                                    const NamespaceString& nss,
+                                                    const UUID& collectionUUID,
+                                                    const ShardId& shardId) {
+    // Mark opCtx as interruptible to ensure that all reads and writes to the metadata collections
+    // under the exclusive _kChunkOpLock happen on the same term.
+    opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+
+    // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk modifications and generate
+    // strictly monotonously increasing collection versions
+    Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
+
+    // 1. Retrieve the collection entry and the initial version.
+    const auto [coll, originalVersion] =
+        uassertStatusOK(getCollectionAndVersion(opCtx, _localConfigShard.get(), nss));
+    auto& collUuid = coll.getUuid();
+    auto newVersion = originalVersion;
+
+    // 2. Retrieve the list of chunks belonging to the requested shard/collection.
+    const auto chunksBelongingToShard =
+        uassertStatusOK(
+            _localConfigShard->exhaustiveFindOnConfig(
+                opCtx,
+                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                repl::ReadConcernLevel::kLocalReadConcern,
+                ChunkType::ConfigNS,
+                BSON(ChunkType::collectionUUID << collUuid << ChunkType::shard(shardId.toString())),
+                BSON(ChunkType::min << 1) /* sort */,
+                boost::none /* limit */))
+            .docs;
+
+    // 3. Prepare the data for the merge.
+    const auto newChunks = [&]() -> std::shared_ptr<std::vector<ChunkType>> {
+        auto newChunks = std::make_shared<std::vector<ChunkType>>();
+
+        BSONObj rangeMin, rangeMax;
+        size_t nChunksInRange = 0;
+
+        // Lambda generating the new chunk to be committed if a merge can be issued on the range
+        auto processRange = [&]() {
+            if (nChunksInRange > 1) {
+                newVersion.incMinor();
+                ChunkType newChunk(collUuid, {rangeMin, rangeMax}, newVersion, shardId);
+                newChunks->push_back(std::move(newChunk));
+            }
+            nChunksInRange = 0;
+        };
+
+        for (const auto& chunkDoc : chunksBelongingToShard) {
+            const auto& currMin = chunkDoc.getObjectField(ChunkType::min());
+            const auto& currMax = chunkDoc.getObjectField(ChunkType::max());
+
+            // TODO SERVER-72283 take into account `onCurrentShardSince` for "mergeable" chunks
+            if (rangeMax.woCompare(currMin) != 0) {
+                processRange();
+            }
+
+            if (nChunksInRange == 0) {
+                rangeMin = currMin;
+            }
+            rangeMax = currMax;
+            nChunksInRange++;
+        }
+        processRange();
+
+        return newChunks;
+    }();
+
+    // If there is no mergeable chunk for the given shard, return success.
+    if (newChunks->empty()) {
+        const auto currentShardVersion =
+            getShardVersion(opCtx, _localConfigShard.get(), coll, shardId, originalVersion);
+
+        // Makes sure that the last thing we read in getCollectionAndVersion and getShardVersion
+        // gets majority written before to return from this command, otherwise next RoutingInfo
+        // cache refresh from the shard may not see those newest information.
+        repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+        return ShardAndCollectionVersion{currentShardVersion, originalVersion};
+    }
+
+    // 4. Commit the new routing table changes to the sharding catalog.
+    mergeAllChunksOnShardInTransaction(opCtx, collectionUUID, shardId, newChunks);
+
+    // TODO SERVER-71924 log merge operations in the changelog
+
+    return ShardAndCollectionVersion{newVersion /*shardVersion*/, newVersion /*collVersion*/};
 }
 
 StatusWith<ShardingCatalogManager::ShardAndCollectionVersion>
