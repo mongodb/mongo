@@ -40,6 +40,7 @@
 #include "mongo/db/query/analyze_command_gen.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/stats/stats_catalog.h"
+#include "mongo/db/query/stats/stats_gen.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 
 namespace mongo {
@@ -48,15 +49,21 @@ namespace {
 StatusWith<BSONObj> analyzeCommandAsAggregationCommand(OperationContext* opCtx,
                                                        StringData db,
                                                        StringData collection,
-                                                       StringData keyPath) {
+                                                       StringData keyPath,
+                                                       boost::optional<double> sampleRate) {
     // Build a pipeline that accomplishes the analyze request. The building code constructs a
     // pipeline that looks like this, assuming the analyze is on the key "a.b.c"
     //
     //      [
+    //          { $match: { $expr: {$lt: [{$rand: {}, sampleRate]} } }, // If sampleRate is
+    //          specified, otherwise this stage is omitted
     //          { $project: { val : "$a.b.c" } },
     //          { $group: {
     //              _id: "a.b.c",
-    //              statistics: { $_internalConstructStats: "$$ROOT" }
+    //              statistics: { $_internalConstructStats: {
+    //                              val: "$$ROOT",
+    //                              sampleRate: sampleRate }
+    //              }
     //          },
     //          { $merge: {
     //              into: "system.statistics." + collection,
@@ -68,19 +75,32 @@ StatusWith<BSONObj> analyzeCommandAsAggregationCommand(OperationContext* opCtx,
     //
     std::string into(str::stream() << NamespaceString::kStatisticsCollectionPrefix << collection);
     FieldPath fieldPath(keyPath);
-    return BSON(
-        "aggregate" << collection << "pipeline"
-                    << BSON_ARRAY(BSON("$project" << BSON("val" << fieldPath.fullPathWithPrefix()))
-                                  << BSON("$group" << BSON("_id" << keyPath << "statistics"
-                                                                 << BSON("$_internalConstructStats"
-                                                                         << "$$ROOT")))
-                                  << BSON("$merge" << BSON("into" << std::move(into) << "on"
-                                                                  << "_id"
-                                                                  << "whenMatched"
-                                                                  << "replace"
-                                                                  << "whenNotMatched"
-                                                                  << "insert")))
-                    << "cursor" << BSONObj());
+
+    BSONArrayBuilder pipelineBuilder;
+
+    if (sampleRate) {
+        pipelineBuilder << BSON(
+            "$match" << BSON(
+                "$expr" << BSON("$lt" << BSON_ARRAY(BSON("$rand" << BSONObj()) << *sampleRate))));
+    }
+
+    InternalConstructStatsAccumulatorParams statsAccumParams;
+    statsAccumParams.setVal("$$ROOT");
+    statsAccumParams.setSampleRate(sampleRate ? *sampleRate : 1.0);
+
+    pipelineBuilder << BSON("$project" << BSON("val" << fieldPath.fullPathWithPrefix()))
+                    << BSON("$group" << BSON("_id" << keyPath << "statistics"
+                                                   << BSON("$_internalConstructStats"
+                                                           << statsAccumParams.toBSON())))
+                    << BSON("$merge" << BSON("into" << std::move(into) << "on"
+                                                    << "_id"
+                                                    << "whenMatched"
+                                                    << "replace"
+                                                    << "whenNotMatched"
+                                                    << "insert"));
+
+    return BSON("aggregate" << collection << "pipeline" << pipelineBuilder.arr() << "cursor"
+                            << BSONObj());
 }
 
 class CmdAnalyze final : public TypedCommand<CmdAnalyze> {
@@ -121,6 +141,13 @@ public:
             const auto& cmd = request();
             const NamespaceString& nss = ns();
 
+            // Sample rate and sample size can't both be present
+            auto sampleRate = cmd.getSampleRate();
+            auto sampleSize = cmd.getSampleSize();
+            uassert(6799705,
+                    "Only one of sample rate and sample size may be present",
+                    !sampleRate || !sampleSize);
+
             // Validate collection
             {
                 AutoGetCollectionForReadMaybeLockFree autoColl(opCtx, nss);
@@ -143,14 +170,16 @@ public:
                         str::stream()
                             << nss.toString() << " is not a normal or clustered collection",
                         isNormalColl || isClusteredColl);
-            }
 
-            // Sample rate and sample size can't both be present
-            auto sampleRate = cmd.getSampleRate();
-            auto sampleSize = cmd.getSampleSize();
-            uassert(6799705,
-                    "Only one of sample rate and sample size may be present",
-                    !sampleRate || !sampleSize);
+                if (sampleSize) {
+                    auto numRecords = collection->numRecords(opCtx);
+                    if (numRecords == 0 || *sampleSize > numRecords) {
+                        sampleRate = 1.0;
+                    } else {
+                        sampleRate = double(*sampleSize) / collection->numRecords(opCtx);
+                    }
+                }
+            }
 
             // Validate key
             auto key = cmd.getKey();
@@ -181,11 +210,11 @@ public:
 
                 // Run Aggregate
                 BSONObj analyzeResult;
-                client.runCommand(
-                    nss.db().toString(),
-                    analyzeCommandAsAggregationCommand(opCtx, nss.db(), nss.coll(), key->toString())
-                        .getValue(),
-                    analyzeResult);
+                client.runCommand(nss.db().toString(),
+                                  analyzeCommandAsAggregationCommand(
+                                      opCtx, nss.db(), nss.coll(), key->toString(), sampleRate)
+                                      .getValue(),
+                                  analyzeResult);
 
                 // We must reset the internal flag.
                 if (!wasInternalClient) {

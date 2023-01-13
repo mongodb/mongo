@@ -83,6 +83,9 @@ structs:
                 type: double
             falseCount:
                 type: double
+            sampleRate:
+                type: double
+                validator: { gte: 0.0, lte: 1.0 }
             emptyArrayCount:
                 type: double
             typeCount:
@@ -100,3 +103,12 @@ structs:
                 type: string
             statistics:
                 type: Statistics
+
+    InternalConstructStatsAccumulatorParams:
+        description: "Schema for the $_internalConstructStats accumulator"
+        fields:
+            val:
+                type: string
+            sampleRate:
+                type: double
+                default: 1.0

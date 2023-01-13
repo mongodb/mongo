@@ -64,6 +64,7 @@ public:
                                                       TypeCounts typeCounts,
                                                       double trueCount = 0.0,
                                                       double falseCount = 0.0,
+                                                      double sampleRate = 1.0,
                                                       bool validate = true);
 
     /**
@@ -79,6 +80,7 @@ public:
                                                       double emptyArrayCount = 0.0,
                                                       double trueCount = 0.0,
                                                       double falseCount = 0.0,
+                                                      double sampleRate = 1.0,
                                                       bool validate = true);
 
     // ArrayHistogram is neither copy-constructible nor copy-assignable.
@@ -140,7 +142,8 @@ private:
     ArrayHistogram(ScalarHistogram scalar,
                    TypeCounts typeCounts,
                    double trueCount = 0.0,
-                   double falseCount = 0.0);
+                   double falseCount = 0.0,
+                   double sampleRate = 1.0);
 
     // Constructor for array field histograms. We have to initialize all array fields in this case.
     ArrayHistogram(ScalarHistogram scalar,
@@ -151,7 +154,8 @@ private:
                    TypeCounts arrayTypeCounts,
                    double emptyArrayCount = 0.0,
                    double trueCount = 0.0,
-                   double falseCount = 0.0);
+                   double falseCount = 0.0,
+                   double sampleRate = 1.0);
 
     /* Fields for all paths. */
 
@@ -164,6 +168,8 @@ private:
     // The counts of true & false booleans.
     double _trueCount;
     double _falseCount;
+    // (The number of documents analyzed) / (number of documents in the collection).
+    double _sampleRate;
 
     /* Fields for array paths (only initialized if arrays are present). */
 
