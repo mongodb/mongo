@@ -10,6 +10,7 @@
 "use strict";
 
 load("jstests/libs/clustered_collections/clustered_collection_util.js");
+load("jstests/libs/ttl_util.js");
 
 // Run TTL monitor constantly to speed up this test.
 const conn = MongoRunner.runMongod(
@@ -41,14 +42,13 @@ function testCollMod(coll, clusterKey, clusterKeyName) {
     assert.commandWorked(coll.insertMany(docs, {ordered: false}));
     assert.eq(coll.find().itcount(), batchSize);
 
-    ClusteredCollectionUtil.waitForTTL(coll.getDB());
+    TTLUtil.waitForPass(coll.getDB());
     assert.eq(coll.find().itcount(), batchSize);
 
     // Shorten the expireAfterSeconds so all the documents in the collection are expired.
     assert.commandWorked(coll.getDB().runCommand({collMod: collName, expireAfterSeconds: 1}));
 
-    ClusteredCollectionUtil.waitForTTL(coll.getDB());
-
+    TTLUtil.waitForPass(coll.getDB());
     // Confirm all documents were deleted once the expireAfterSeconds was shortened.
     assert.eq(coll.find().itcount(), 0);
 
@@ -56,11 +56,11 @@ function testCollMod(coll, clusterKey, clusterKeyName) {
     assert.commandWorked(coll.getDB().runCommand({collMod: collName, expireAfterSeconds: "off"}));
 
     // Ensure there is no outstanding TTL pass in progress that will still remove entries.
-    ClusteredCollectionUtil.waitForTTL(coll.getDB());
+    TTLUtil.waitForPass(coll.getDB());
 
     assert.commandWorked(coll.insert({[clusterKeyFieldName]: now, info: "unexpired"}));
 
-    ClusteredCollectionUtil.waitForTTL(coll.getDB());
+    TTLUtil.waitForPass(coll.getDB());
 
     assert.eq(coll.find().itcount(), 1);
 

@@ -15,6 +15,7 @@
 load('jstests/libs/fixture_helpers.js');  // For 'FixtureHelpers'
 load("jstests/libs/clustered_collections/clustered_collection_util.js");
 load("jstests/core/timeseries/libs/timeseries.js");
+load("jstests/libs/ttl_util.js");
 
 const conn = MongoRunner.runMongod({setParameter: 'ttlMonitorSleepSecs=1'});
 const testDB = conn.getDB(jsTestName());
@@ -58,7 +59,7 @@ TimeseriesTest.run((insert) => {
 
         // Wait for the TTL monitor to process the indexes.
         jsTestLog("Waiting for TTL monitor to process...");
-        ClusteredCollectionUtil.waitForTTL(testDB);
+        TTLUtil.waitForPass(testDB);
 
         // Check the number of bucket documents.
         const expectedCount = (expectDeletion) ? prevCount : prevCount + 1;

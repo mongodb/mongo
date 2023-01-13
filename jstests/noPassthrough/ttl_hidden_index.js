@@ -1,6 +1,8 @@
 // Make sure the TTL index still work after we hide it
 (function() {
 "use strict";
+load("jstests/libs/ttl_util.js");
+
 let runner = MongoRunner.runMongod({setParameter: "ttlMonitorSleepSecs=1"});
 let coll = runner.getDB("test").ttl_hiddenl_index;
 coll.drop();
@@ -18,10 +20,7 @@ assert.commandWorked(coll.insert({x: now}));
 
 // Wait for the TTL monitor to run at least twice (in case we weren't finished setting up our
 // collection when it ran the first time).
-var ttlPass = coll.getDB().serverStatus().metrics.ttl.passes;
-assert.soon(function() {
-    return coll.getDB().serverStatus().metrics.ttl.passes >= ttlPass + 2;
-}, "TTL monitor didn't run before timing out.");
+TTLUtil.waitForPass(coll.getDB());
 
 assert.eq(coll.count(), 0, "We should get 0 documents after TTL monitor run");
 

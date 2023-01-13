@@ -10,6 +10,7 @@
 "use strict";
 load("jstests/libs/clustered_collections/clustered_collection_util.js");
 load('jstests/libs/dateutil.js');
+load('jstests/libs/ttl_util.js');
 
 // Run TTL monitor constantly to speed up this test.
 const conn = MongoRunner.runMongod({setParameter: 'ttlMonitorSleepSecs=1'});
@@ -79,7 +80,7 @@ const insertAndValidateTTL = (coll, ttlFieldName) => {
     }
     assert.commandWorked(coll.insertMany(docs, {ordered: false}));
 
-    ClusteredCollectionUtil.waitForTTL(coll.getDB("test"));
+    TTLUtil.waitForPass(coll.getDB("test"));
 
     // The unexpired documents should still be preserved.
     assert.eq(coll.find().itcount(), batchSize * 2);

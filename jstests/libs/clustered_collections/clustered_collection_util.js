@@ -196,14 +196,4 @@ var ClusteredCollectionUtil = class {
         assert.eq(1, coll.find({[clusterKey]: NumberLong("42")}).itcount());
         coll.drop();
     }
-
-    static waitForTTL(db) {
-        // The 'ttl.passes' metric is incremented when the TTL monitor starts processing the
-        // indexes, so we wait for it to be incremented twice to know that the TTL monitor finished
-        // processing the indexes at least once.
-        const ttlPasses = db.serverStatus().metrics.ttl.passes;
-        assert.soon(function() {
-            return db.serverStatus().metrics.ttl.passes > ttlPasses + 1;
-        });
-    }
 };
