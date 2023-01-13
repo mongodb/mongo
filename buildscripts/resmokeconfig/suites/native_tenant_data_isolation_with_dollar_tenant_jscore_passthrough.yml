@@ -25,8 +25,6 @@ selector:
   - requires_auth
   # Sharding commands are not tenant aware.
   - requires_sharding
-  # TODO SERVER-72173: tenant information is dropped off when trying to profile operation.
-  - requires_profiling
   # Columnstore indexes are under development and cannot be used without enabling the feature flag
   - featureFlagColumnstoreIndexes
   exclude_files:
@@ -80,6 +78,8 @@ selector:
   - jstests/core/**/failcommand_failpoint.js
   - jstests/core/**/fsync.js
   - jstests/core/**/killop_drop_collection.js
+  - jstests/core/administrative/profile/profile_hide_index.js
+  - jstests/core/comment_field.js
   - jstests/core/txns/kill_cursors_in_transaction.js
   - jstests/core/txns/kill_sessions_kills_transaction.js
   - jstests/core/txns/transactions_block_ddl.js

@@ -5,6 +5,7 @@
 //   assumes_superuser_permissions,
 //   creates_and_authenticates_user,
 //   requires_profiling,
+//   requires_auth,
 //   # This test depends on hardcoded database name equality.
 //   tenant_migration_incompatible,
 // ]
