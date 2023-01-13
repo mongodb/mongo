@@ -5491,6 +5491,27 @@ if get_option('ninja') != 'disabled':
     # TODO: API for getting the sconscripts programmatically
     # exists upstream: https://github.com/SCons/scons/issues/3625
     def ninja_generate_deps(env, target, source, for_signature):
+
+        # TODO SERVER-72851 add api for vars files to exec other vars files
+        # this would allow us to get rid of this regex here
+        def find_nested_variable_files(variables_file):
+            variable_files = [variables_file]
+
+            with open(variables_file, 'r') as file:
+                data = file.read()
+                pattern = "exec\\(open\\(['\"](.*)['\"]\, ['\"][a-z]+['\"]\\).read\\(\\)\\)"
+                nested_files = re.findall(pattern, data)
+                for file_name in nested_files:
+                    variable_files.extend(find_nested_variable_files(file_name))
+
+            return variable_files
+
+        # vars files can be from outside of the repo dir and can exec other vars files
+        # so we cannot just glob them
+        variables_files = []
+        for variable_file in variables_files_args:
+            variables_files.extend(find_nested_variable_files(variable_file))
+
         dependencies = env.Flatten([
             'SConstruct',
             glob(os.path.join('src', '**', 'SConscript'), recursive=True),
@@ -5499,6 +5520,7 @@ if get_option('ninja') != 'disabled':
             glob(os.path.join('buildscripts', '**', '*.py'), recursive=True),
             glob(os.path.join('src/third_party/scons-*', '**', '*.py'), recursive=True),
             glob(os.path.join('src/mongo/db/modules', '**', '*.py'), recursive=True),
+            variables_files,
         ])
 
         return dependencies
