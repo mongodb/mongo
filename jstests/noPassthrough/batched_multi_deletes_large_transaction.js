@@ -13,6 +13,8 @@
 (function() {
 'use strict';
 
+load("jstests/libs/feature_flag_util.js");  // for FeatureFlagUtil.isEnabled
+
 const rst = new ReplSetTest({
     nodes: [
         {
@@ -45,13 +47,38 @@ assert.commandWorked(coll.insert(docIds.map((x) => {
 
 // Set up server to split deletes over multiple oplog entries
 // such that each oplog entry contains two delete operations.
-// TODO(SERVER-70572): Update this assertion once multi-oplog batched operations are supported.
-const result = assert.commandFailedWithCode(coll.remove({}),
-                                            ErrorCodes.TransactionTooLarge,
-                                            'batched writes must generate a single applyOps entry');
-jsTestLog('delete result: ' + tojson(result));
-assert.eq(result.nRemoved, 0);
-assert.eq(coll.countDocuments({}), docIds.length);
+if (!FeatureFlagUtil.isEnabled(db, "InternalWritesAreReplicatedTransactionally")) {
+    // Confirm legacy server behavior where mutiple oplog entries are not allowed
+    // for batched writes.
+    const result =
+        assert.commandFailedWithCode(coll.remove({}),
+                                     ErrorCodes.TransactionTooLarge,
+                                     'batched writes must generate a single applyOps entry');
+    jsTestLog('delete result: ' + tojson(result));
+    assert.eq(result.nRemoved, 0);
+    assert.eq(coll.countDocuments({}), docIds.length);
+
+    // Stop test and return early. The rest of the test will test the new multiple oplog entry
+    // behavior.
+    rst.stopSet();
+    return;
+}
+
+// This document removal request will be replicated over two applyOps oplog entries,
+// each containing two delete operations.
+const ex = assert.throws(() => {
+    coll.remove({});
+});
+jsTestLog('Exception from removing documents: ' + tojson(ex));
+
+// Attempting to log multiple oplog entries for batched deletes should result in a fatal assertion
+// with the message: Multi timestamp constraint violated. Transactions setting multiple timestamps
+// must set the first timestamp prior to any writes.
+assert.soon(function() {
+    return rawMongoProgramOutput().search(/Fatal assertion.*4877100/) >= 0;
+});
+
+rst.stop(primary.nodeId, /*signal=*/undefined, {allowedExitCode: MongoRunner.EXIT_ABORT});
 
 rst.stopSet();
 })();

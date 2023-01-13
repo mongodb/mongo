@@ -1857,15 +1857,17 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx) {
                                     getMaxSizeOfBatchedOperationsInSingleOplogEntryBytes(),
                                     /*prepare=*/false);
 
-    // TODO(SERVER-70572): Remove this restriction once multi-oplog batched writes are supported.
-    // Before SERVER-70765, we relied on packTransactionStatementsForApplyOps() to check if the
-    // batch of operations could fit in a single applyOps entry. Now, we pass the size limit to
-    // TransactionOperations::getApplyOpsInfo() and are now able to return an error earlier.
-    // Previously, this used to be a tripwire assertion (tassert). This is now a uassert to be
-    // consistent with packTransactionStatementsForApplyOps().
-    uassert(ErrorCodes::TransactionTooLarge,
-            "batched writes must generate a single applyOps entry",
-            applyOpsOplogSlotAndOperationAssignment.applyOpsEntries.size() == 1);
+    if (!gFeatureFlagInternalWritesAreReplicatedTransactionally.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        // Before SERVER-70765, we relied on packTransactionStatementsForApplyOps() to check if the
+        // batch of operations could fit in a single applyOps entry. Now, we pass the size limit to
+        // TransactionOperations::getApplyOpsInfo() and are now able to return an error earlier.
+        // Previously, this used to be a tripwire assertion (tassert). This is now a uassert to be
+        // consistent with packTransactionStatementsForApplyOps().
+        uassert(ErrorCodes::TransactionTooLarge,
+                "batched writes must generate a single applyOps entry",
+                applyOpsOplogSlotAndOperationAssignment.applyOpsEntries.size() == 1);
+    }
 
     // Storage transaction commit is the last place inside a transaction that can throw an
     // exception. In order to safely allow exceptions to be thrown at that point, this function must
