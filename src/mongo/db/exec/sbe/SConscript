@@ -283,3 +283,16 @@ env.CppUnitTest(
         'query_sbe_abt',
     ],
 )
+
+env.Benchmark(
+    target='abt_lowering_bm',
+    source=[
+        'abt/abt_lower_bm.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/optimizer/optimizer_rewrites',
+        '$BUILD_DIR/mongo/db/query/optimizer/unit_test_utils',
+        '$BUILD_DIR/mongo/unittest/unittest',
+        'query_sbe_abt',
+    ],
+)
