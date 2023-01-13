@@ -463,12 +463,13 @@ RecordId SortedDataIndexAccessMethod::findSingle(OperationContext* opCtx,
     return RecordId();
 }
 
-void SortedDataIndexAccessMethod::validate(OperationContext* opCtx,
-                                           int64_t* numKeys,
-                                           IndexValidateResults* fullResults) const {
-    long long keys = 0;
-    _newInterface->fullValidate(opCtx, &keys, fullResults);
-    *numKeys = keys;
+IndexValidateResults SortedDataIndexAccessMethod::validate(OperationContext* opCtx,
+                                                           bool full) const {
+    return _newInterface->validate(opCtx, full);
+}
+
+int64_t SortedDataIndexAccessMethod::numKeys(OperationContext* opCtx) const {
+    return _newInterface->numEntries(opCtx);
 }
 
 bool SortedDataIndexAccessMethod::appendCustomStats(OperationContext* opCtx,

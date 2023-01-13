@@ -118,37 +118,38 @@ bool WiredTigerIndexUtil::isEmpty(OperationContext* opCtx,
     return false;
 }
 
-bool WiredTigerIndexUtil::validateStructure(OperationContext* opCtx,
+void WiredTigerIndexUtil::validateStructure(OperationContext* opCtx,
                                             const std::string& uri,
-                                            IndexValidateResults* fullResults) {
-    if (fullResults && !WiredTigerRecoveryUnit::get(opCtx)->getSessionCache()->isEphemeral()) {
-        int err = WiredTigerUtil::verifyTable(opCtx, uri, &(fullResults->errors));
-        if (err == EBUSY) {
-            std::string msg = str::stream()
-                << "Could not complete validation of " << uri << ". "
-                << "This is a transient issue as the collection was actively "
-                   "in use by other operations.";
-
-            LOGV2_WARNING(51781,
-                          "Could not complete validation. This is a transient issue as "
-                          "the collection was actively in use by other operations",
-                          "uri"_attr = uri);
-            fullResults->warnings.push_back(msg);
-        } else if (err) {
-            std::string msg = str::stream()
-                << "verify() returned " << wiredtiger_strerror(err) << ". "
-                << "This indicates structural damage. "
-                << "Not examining individual index entries.";
-            LOGV2_ERROR(51782,
-                        "verify() returned an error. This indicates structural damage. Not "
-                        "examining individual index entries.",
-                        "error"_attr = wiredtiger_strerror(err));
-            fullResults->errors.push_back(msg);
-            fullResults->valid = false;
-            return false;
-        }
+                                            IndexValidateResults& results) {
+    if (WiredTigerRecoveryUnit::get(opCtx)->getSessionCache()->isEphemeral()) {
+        return;
     }
-    return true;
+
+    auto err = WiredTigerUtil::verifyTable(opCtx, uri, &results.errors);
+    if (err == EBUSY) {
+        std::string msg = str::stream()
+            << "Could not complete validation of " << uri << ". "
+            << "This is a transient issue as the collection was actively "
+               "in use by other operations.";
+
+        LOGV2_WARNING(51781,
+                      "Could not complete validation. This is a transient issue as "
+                      "the collection was actively in use by other operations",
+                      "uri"_attr = uri);
+
+        results.warnings.push_back(msg);
+    } else if (err) {
+        std::string msg = str::stream() << "verify() returned " << wiredtiger_strerror(err) << ". "
+                                        << "This indicates structural damage. "
+                                        << "Not examining individual index entries.";
+        LOGV2_ERROR(51782,
+                    "verify() returned an error. This indicates structural damage. Not "
+                    "examining individual index entries.",
+                    "error"_attr = wiredtiger_strerror(err));
+
+        results.errors.push_back(msg);
+        results.valid = false;
+    }
 }
 
 }  // namespace mongo

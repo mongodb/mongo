@@ -129,12 +129,16 @@ public:
     virtual Status initializeAsEmpty(OperationContext* opCtx) = 0;
 
     /**
-     * Walk the entire index, checking the internal structure for consistency.
-     * Set numKeys to the number of keys in the index.
+     * Validates the index. If 'full' is false, only performs checks which do not traverse the
+     * index. If 'full' is true, additionally traverses the index and validates its internal
+     * structure.
      */
-    virtual void validate(OperationContext* opCtx,
-                          int64_t* numKeys,
-                          IndexValidateResults* fullResults) const = 0;
+    virtual IndexValidateResults validate(OperationContext* opCtx, bool full) const = 0;
+
+    /**
+     * Returns the number of keys in the index, traversing the index to do so.
+     */
+    virtual int64_t numKeys(OperationContext* opCtx) const = 0;
 
     /**
      * Add custom statistics about this index to BSON object builder, for display.
@@ -554,9 +558,9 @@ public:
 
     Status initializeAsEmpty(OperationContext* opCtx) final;
 
-    void validate(OperationContext* opCtx,
-                  int64_t* numKeys,
-                  IndexValidateResults* fullResults) const final;
+    IndexValidateResults validate(OperationContext* opCtx, bool full) const final;
+
+    int64_t numKeys(OperationContext* opCtx) const final;
 
     bool appendCustomStats(OperationContext* opCtx,
                            BSONObjBuilder* result,

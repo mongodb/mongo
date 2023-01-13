@@ -1726,8 +1726,8 @@ Status WiredTigerKVEngine::createColumnStore(OperationContext* opCtx,
     _ensureIdentPath(ident);
     invariant(desc->getIndexType() == IndexType::INDEX_COLUMN);
 
-    StatusWith<std::string> result =
-        WiredTigerColumnStore::generateCreateString(_canonicalName, ns, *desc);
+    StatusWith<std::string> result = WiredTigerColumnStore::generateCreateString(
+        _canonicalName, ns, *desc, WiredTigerUtil::useTableLogging(ns));
     if (!result.isOK()) {
         return result.getStatus();
     }
@@ -1749,7 +1749,8 @@ std::unique_ptr<ColumnStore> WiredTigerKVEngine::getColumnStore(
     const CollectionOptions& collOptions,
     StringData ident,
     const IndexDescriptor* descriptor) {
-    return std::make_unique<WiredTigerColumnStore>(opCtx, _uri(ident), ident, descriptor);
+    return std::make_unique<WiredTigerColumnStore>(
+        opCtx, _uri(ident), ident, descriptor, WiredTigerUtil::useTableLogging(nss));
 }
 
 std::unique_ptr<RecordStore> WiredTigerKVEngine::makeTemporaryRecordStore(OperationContext* opCtx,

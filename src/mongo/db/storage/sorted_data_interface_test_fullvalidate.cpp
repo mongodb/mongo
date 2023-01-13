@@ -31,6 +31,7 @@
 
 #include <memory>
 
+#include "mongo/db/catalog/validate_results.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/unittest/unittest.h"
 
@@ -67,11 +68,9 @@ TEST(SortedDataInterface, FullValidate) {
     }
 
     {
-        long long numKeysOut;
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        sorted->fullValidate(opCtx.get(), &numKeysOut, nullptr);
-        // fullValidate() can set numKeysOut as the number of existing keys or -1.
-        ASSERT(numKeysOut == nToInsert || numKeysOut == -1);
+        // Full validate will set keysTraversedFromFullValidate to the number of keys.
+        ASSERT(sorted->validate(opCtx.get(), true).keysTraversedFromFullValidate == nToInsert);
     }
 }
 

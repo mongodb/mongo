@@ -67,7 +67,8 @@ public:
 
     static StatusWith<std::string> generateCreateString(const std::string& engineName,
                                                         const NamespaceString& collectionNamespace,
-                                                        const IndexDescriptor& desc);
+                                                        const IndexDescriptor& desc,
+                                                        bool isLogged);
 
     static Status create(OperationContext* opCtx,
                          const std::string& uri,
@@ -76,7 +77,8 @@ public:
     WiredTigerColumnStore(OperationContext* ctx,
                           const std::string& uri,
                           StringData ident,
-                          const IndexDescriptor* desc);
+                          const IndexDescriptor* desc,
+                          bool isLogged);
     ~WiredTigerColumnStore() = default;
 
     //
@@ -94,9 +96,7 @@ public:
     // Whole ColumnStore ops
     //
     Status compact(OperationContext* opCtx) override;
-    void fullValidate(OperationContext* opCtx,
-                      int64_t* numKeysOut,
-                      IndexValidateResults* fullResults) const override;
+    IndexValidateResults validate(OperationContext* opCtx, bool full) const override;
 
     bool appendCustomStats(OperationContext* opCtx,
                            BSONObjBuilder* output,
@@ -106,6 +106,7 @@ public:
     long long getFreeStorageBytes(OperationContext* opCtx) const override;
 
     bool isEmpty(OperationContext* opCtx) override;
+    int64_t numEntries(OperationContext* opCtx) const override;
 
     static std::string makeKey_ForTest(PathView path, RowId id) {
         return makeKey(path, id);
@@ -136,5 +137,6 @@ private:
     uint64_t _tableId;
     const IndexDescriptor* _desc;
     const std::string _indexName;
+    bool _isLogged;
 };
 }  // namespace mongo

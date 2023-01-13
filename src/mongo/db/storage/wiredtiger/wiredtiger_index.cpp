@@ -295,20 +295,37 @@ boost::optional<RecordId> WiredTigerIndex::findLoc(OperationContext* opCtx,
     return boost::none;
 }
 
-void WiredTigerIndex::fullValidate(OperationContext* opCtx,
-                                   long long* numKeysOut,
-                                   IndexValidateResults* fullResults) const {
+IndexValidateResults WiredTigerIndex::validate(OperationContext* opCtx, bool full) const {
     dassert(opCtx->lockState()->isReadLocked());
-    if (!WiredTigerIndexUtil::validateStructure(opCtx, _uri, fullResults)) {
-        return;
+
+    IndexValidateResults results;
+
+    WiredTigerUtil::validateTableLogging(opCtx,
+                                         _uri,
+                                         _isLogged,
+                                         StringData{_indexName},
+                                         results.valid,
+                                         results.errors,
+                                         results.warnings);
+
+    if (!full) {
+        return results;
     }
 
-    auto cursor = newCursor(opCtx);
-    long long count = 0;
-    LOGV2_TRACE_INDEX(20094, "fullValidate");
+    WiredTigerIndexUtil::validateStructure(opCtx, _uri, results);
+    if (results.valid) {
+        results.keysTraversedFromFullValidate = numEntries(opCtx);
+    }
 
-    const auto requestedInfo = TRACING_ENABLED ? Cursor::kKeyAndLoc : Cursor::kJustExistance;
+    return results;
+}
 
+int64_t WiredTigerIndex::numEntries(OperationContext* opCtx) const {
+    int64_t count = 0;
+
+    LOGV2_TRACE_INDEX(20094, "numEntries");
+
+    auto requestedInfo = TRACING_ENABLED ? Cursor::kKeyAndLoc : Cursor::kJustExistance;
     KeyString::Value keyStringForSeek =
         IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(BSONObj(),
                                                               getKeyStringVersion(),
@@ -317,13 +334,13 @@ void WiredTigerIndex::fullValidate(OperationContext* opCtx,
                                                               true  /* inclusive */
         );
 
+    auto cursor = newCursor(opCtx);
     for (auto kv = cursor->seek(keyStringForSeek, requestedInfo); kv; kv = cursor->next()) {
-        LOGV2_TRACE_INDEX(20095, "fullValidate {kv}", "kv"_attr = kv);
+        LOGV2_TRACE_INDEX(20095, "numEntries", "kv"_attr = kv);
         count++;
     }
-    if (numKeysOut) {
-        *numKeysOut = count;
-    }
+
+    return count;
 }
 
 bool WiredTigerIndex::appendCustomStats(OperationContext* opCtx,

@@ -91,7 +91,7 @@ checkLog.containsJson(conn, 5548302);
 // Changing table logging settings.
 assert(checkLog.checkContainsWithCountJson(conn, 22432, undefined, 0));
 checkTableLogSettings(conn, /*enabled=*/false);
-MongoRunner.stopMongod(conn);
+MongoRunner.stopMongod(conn, null, {skipValidation: true});
 
 /**
  * Test 3. Change into a single node replica set again. Table log settings are checked but none are

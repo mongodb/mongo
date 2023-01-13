@@ -141,15 +141,16 @@ public:
     virtual boost::optional<RecordId> findLoc(OperationContext* opCtx,
                                               const KeyString::Value& keyString) const override;
 
-    virtual void fullValidate(OperationContext* opCtx,
-                              long long* numKeysOut,
-                              IndexValidateResults* fullResults) const;
+    virtual IndexValidateResults validate(OperationContext* opCtx, bool full) const;
+
     virtual bool appendCustomStats(OperationContext* opCtx,
                                    BSONObjBuilder* output,
                                    double scale) const;
     virtual Status dupKeyCheck(OperationContext* opCtx, const KeyString::Value& keyString);
 
     virtual bool isEmpty(OperationContext* opCtx);
+
+    virtual int64_t numEntries(OperationContext* opCtx) const;
 
     virtual long long getSpaceUsedBytes(OperationContext* opCtx) const;
 

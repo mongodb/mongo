@@ -100,9 +100,9 @@ public:
 
     Status initializeAsEmpty(OperationContext* opCtx) final;
 
-    void validate(OperationContext* opCtx,
-                  int64_t* numKeys,
-                  IndexValidateResults* fullResults) const final;
+    IndexValidateResults validate(OperationContext* opCtx, bool full) const final;
+
+    int64_t numKeys(OperationContext* opCtx) const final;
 
     bool appendCustomStats(OperationContext* opCtx,
                            BSONObjBuilder* result,

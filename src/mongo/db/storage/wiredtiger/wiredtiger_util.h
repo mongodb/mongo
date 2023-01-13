@@ -315,6 +315,18 @@ public:
                            const std::string& uri,
                            std::vector<std::string>* errors = nullptr);
 
+    /**
+     * Checks the table logging setting in the metadata for the given uri, comparing it against
+     * 'isLogged'. Populates 'valid', 'errors', and 'warnings' accordingly.
+     */
+    static void validateTableLogging(OperationContext* opCtx,
+                                     StringData uri,
+                                     bool isLogged,
+                                     boost::optional<StringData> indexName,
+                                     bool& valid,
+                                     std::vector<std::string>& errors,
+                                     std::vector<std::string>& warnings);
+
     static void notifyStartupComplete();
 
     static bool useTableLogging(const NamespaceString& nss);

@@ -44,7 +44,8 @@ namespace mongo {
 StatusWith<std::string> WiredTigerColumnStore::generateCreateString(
     const std::string& engineName,
     const NamespaceString& collectionNamespace,
-    const IndexDescriptor& desc) {
+    const IndexDescriptor& desc,
+    bool isLogged) {
     StringBuilder sb;
 
     invariant(desc.getIndexType() == INDEX_COLUMN);
@@ -72,7 +73,7 @@ StatusWith<std::string> WiredTigerColumnStore::generateCreateString(
     sb << "key_format=u,";
     sb << "value_format=u,";
 
-    if (WiredTigerUtil::useTableLogging(collectionNamespace)) {
+    if (isLogged) {
         sb << "log=(enabled=true)";
     } else {
         sb << "log=(enabled=false)";
@@ -96,12 +97,14 @@ Status WiredTigerColumnStore::create(OperationContext* opCtx,
 WiredTigerColumnStore::WiredTigerColumnStore(OperationContext* ctx,
                                              const std::string& uri,
                                              StringData ident,
-                                             const IndexDescriptor* desc)
+                                             const IndexDescriptor* desc,
+                                             bool isLogged)
     : ColumnStore(ident),
       _uri(uri),
       _tableId(WiredTigerSession::genTableId()),
       _desc(desc),
-      _indexName(desc->indexName()) {}
+      _indexName(desc->indexName()),
+      _isLogged(isLogged) {}
 
 std::string& WiredTigerColumnStore::makeKeyInBuffer(std::string& buffer, PathView path, RowId rid) {
     buffer.clear();
@@ -211,22 +214,38 @@ void WiredTigerColumnStore::WriteCursor::update(PathView path, RowId rid, CellVi
         return uassertStatusOK(wtRCToStatus(ret, c()->session));
 }
 
-void WiredTigerColumnStore::fullValidate(OperationContext* opCtx,
-                                         int64_t* numKeysOut,
-                                         IndexValidateResults* fullResults) const {
+IndexValidateResults WiredTigerColumnStore::validate(OperationContext* opCtx, bool full) const {
     dassert(opCtx->lockState()->isReadLocked());
-    if (!WiredTigerIndexUtil::validateStructure(opCtx, _uri, fullResults)) {
-        return;
-    }
-    auto cursor = newCursor(opCtx);
-    long long count = 0;
 
+    IndexValidateResults results;
+
+    WiredTigerUtil::validateTableLogging(opCtx,
+                                         _uri,
+                                         _isLogged,
+                                         StringData{_indexName},
+                                         results.valid,
+                                         results.errors,
+                                         results.warnings);
+
+    if (!full) {
+        return results;
+    }
+
+    WiredTigerIndexUtil::validateStructure(opCtx, _uri, results);
+    results.keysTraversedFromFullValidate = numEntries(opCtx);
+
+    return results;
+}
+
+int64_t WiredTigerColumnStore::numEntries(OperationContext* opCtx) const {
+    int64_t count = 0;
+
+    auto cursor = newCursor(opCtx);
     while (cursor->next()) {
-        count++;
+        ++count;
     }
-    if (numKeysOut) {
-        *numKeysOut = count;
-    }
+
+    return count;
 }
 
 class WiredTigerColumnStore::Cursor final : public ColumnStore::Cursor,

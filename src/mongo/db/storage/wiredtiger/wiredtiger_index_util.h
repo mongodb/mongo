@@ -53,9 +53,9 @@ public:
 
     static bool isEmpty(OperationContext* opCtx, const std::string& uri, uint64_t tableId);
 
-    static bool validateStructure(OperationContext* opCtx,
+    static void validateStructure(OperationContext* opCtx,
                                   const std::string& uri,
-                                  IndexValidateResults* fullResults);
+                                  IndexValidateResults& results);
 };
 
 }  // namespace mongo

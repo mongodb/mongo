@@ -142,11 +142,11 @@ public:
     //
 
     /**
-     * TODO: expose full set of args for testing?
+     * Validates the sorted data. If 'full' is false, only performs checks which do not traverse the
+     * data. If 'full' is true, additionally traverses the data and validates its internal
+     * structure.
      */
-    virtual void fullValidate(OperationContext* opCtx,
-                              long long* numKeysOut,
-                              IndexValidateResults* fullResults) const = 0;
+    virtual IndexValidateResults validate(OperationContext* opCtx, bool full) const = 0;
 
     virtual bool appendCustomStats(OperationContext* opCtx,
                                    BSONObjBuilder* output,
@@ -180,15 +180,8 @@ public:
 
     /**
      * Return the number of entries in 'this' index.
-     *
-     * The default implementation should be overridden with a more
-     * efficient one if at all possible.
      */
-    virtual long long numEntries(OperationContext* opCtx) const {
-        long long x = -1;
-        fullValidate(opCtx, &x, nullptr);
-        return x;
-    }
+    virtual int64_t numEntries(OperationContext* opCtx) const = 0;
 
     /*
      * Return the KeyString version for 'this' index.

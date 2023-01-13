@@ -72,6 +72,7 @@ AtomicWord<bool> _validationIsPausedForTest{false};
  * May close or invalidate open cursors.
  */
 void _validateIndexesInternalStructure(OperationContext* opCtx,
+                                       bool full,
                                        ValidateState* validateState,
                                        ValidateResults* results) {
     // Need to use the IndexCatalog here because the 'validateState->indexes' object hasn't been
@@ -94,16 +95,13 @@ void _validateIndexesInternalStructure(OperationContext* opCtx,
                       "index"_attr = descriptor->indexName(),
                       "namespace"_attr = validateState->nss());
 
-        auto& curIndexResults = (results->indexResultsMap)[descriptor->indexName()];
+        auto indexResults = iam->validate(opCtx, full);
 
-        int64_t numValidated;
-        iam->validate(opCtx, &numValidated, &curIndexResults);
-
-        if (!curIndexResults.valid) {
+        if (!indexResults.valid) {
             results->valid = false;
         }
 
-        curIndexResults.keysTraversedFromFullValidate = numValidated;
+        results->indexResultsMap[descriptor->indexName()] = std::move(indexResults);
     }
 }
 
@@ -503,22 +501,18 @@ Status validate(OperationContext* opCtx,
     }
 
     try {
-        // Full record store validation code is executed before we open cursors because it may close
-        // and/or invalidate all open cursors.
-        if (validateState.isFullValidation()) {
-            invariant(opCtx->lockState()->isCollectionLockedForMode(validateState.nss(), MODE_X));
+        invariant(!validateState.isFullIndexValidation() ||
+                  opCtx->lockState()->isCollectionLockedForMode(validateState.nss(), MODE_X));
 
-            // For full record store validation we use the storage engine's validation
-            // functionality.
-            validateState.getCollection()->getRecordStore()->validate(opCtx, results, output);
-        }
-        if (validateState.isFullIndexValidation()) {
-            invariant(opCtx->lockState()->isCollectionLockedForMode(validateState.nss(), MODE_X));
-            // For full index validation, we validate the internal structure of each index and save
-            // the number of keys in the index to compare against _validateIndexes()'s count
-            // results.
-            _validateIndexesInternalStructure(opCtx, &validateState, results);
-        }
+        // Record store validation code is executed before we open cursors because it may close
+        // and/or invalidate all open cursors.
+        validateState.getCollection()->getRecordStore()->validate(
+            opCtx, validateState.isFullValidation(), results);
+
+        // For full index validation, we validate the internal structure of each index and save
+        // the number of keys in the index to compare against _validateIndexes()'s count results.
+        _validateIndexesInternalStructure(
+            opCtx, validateState.isFullIndexValidation(), &validateState, results);
 
         if (!results->valid) {
             _reportInvalidResults(opCtx, &validateState, results, output);

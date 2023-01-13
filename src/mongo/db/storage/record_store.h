@@ -578,9 +578,7 @@ public:
      * Performs record store specific validation to ensure consistency of underlying data
      * structures. If corruption is found, details of the errors will be in the results parameter.
      */
-    virtual void validate(OperationContext* opCtx,
-                          ValidateResults* results,
-                          BSONObjBuilder* output) {}
+    virtual void validate(OperationContext* opCtx, bool full, ValidateResults* results) {}
 
     /**
      * @param scaleSize - amount by which to scale size metrics

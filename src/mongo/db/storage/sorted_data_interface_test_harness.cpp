@@ -135,10 +135,6 @@ TEST(SortedDataInterface, InsertWithDups1) {
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
-
-        long long x = 0;
-        sorted->fullValidate(opCtx.get(), &x, nullptr);
-        ASSERT_EQUALS(2, x);
     }
 }
 

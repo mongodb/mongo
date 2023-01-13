@@ -163,16 +163,12 @@ TimestampedBSONObj makeOplogEntry(OpTime opTime) {
 }
 
 /**
- * Counts the number of keys in an index using an IndexAccessMethod::validate call.
+ * Counts the number of keys in an index.
  */
 int64_t getIndexKeyCount(OperationContext* opCtx,
                          const IndexCatalog* cat,
                          const IndexDescriptor* desc) {
-    auto idx = cat->getEntry(desc)->accessMethod();
-    int64_t numKeys;
-    IndexValidateResults fullRes;
-    idx->validate(opCtx, &numKeys, &fullRes);
-    return numKeys;
+    return cat->getEntry(desc)->accessMethod()->numKeys(opCtx);
 }
 
 std::vector<InsertStatement> transformInserts(std::vector<BSONObj> docs) {

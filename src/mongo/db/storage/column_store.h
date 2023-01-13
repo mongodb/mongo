@@ -324,9 +324,7 @@ public:
     // Whole ColumnStore ops
     //
     virtual Status compact(OperationContext* opCtx) = 0;
-    virtual void fullValidate(OperationContext* opCtx,
-                              int64_t* numKeysOut,
-                              IndexValidateResults* fullResults) const = 0;
+    virtual IndexValidateResults validate(OperationContext* opCtx, bool full) const = 0;
 
     virtual bool appendCustomStats(OperationContext* opCtx,
                                    BSONObjBuilder* output,
@@ -336,11 +334,7 @@ public:
     virtual long long getFreeStorageBytes(OperationContext* opCtx) const = 0;
 
     virtual bool isEmpty(OperationContext* opCtx) = 0;
-    virtual long long numEntries(OperationContext* opCtx) const {
-        int64_t x = -1;
-        fullValidate(opCtx, &x, nullptr);
-        return x;
-    }
+    virtual int64_t numEntries(OperationContext* opCtx) const = 0;
 
     /**
      * If the range [*itPtr, end) begins with a number, returns it and positions *itPtr after the

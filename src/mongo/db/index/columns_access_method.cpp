@@ -458,10 +458,12 @@ Status ColumnStoreAccessMethod::initializeAsEmpty(OperationContext* opCtx) {
     return Status::OK();
 }
 
-void ColumnStoreAccessMethod::validate(OperationContext* opCtx,
-                                       int64_t* numKeys,
-                                       IndexValidateResults* fullResults) const {
-    _store->fullValidate(opCtx, numKeys, fullResults);
+IndexValidateResults ColumnStoreAccessMethod::validate(OperationContext* opCtx, bool full) const {
+    return _store->validate(opCtx, full);
+}
+
+int64_t ColumnStoreAccessMethod::numKeys(OperationContext* opCtx) const {
+    return _store->numEntries(opCtx);
 }
 
 bool ColumnStoreAccessMethod::appendCustomStats(OperationContext* opCtx,

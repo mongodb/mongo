@@ -187,9 +187,7 @@ public:
 
     Status doCompact(OperationContext* opCtx) final;
 
-    virtual void validate(OperationContext* opCtx,
-                          ValidateResults* results,
-                          BSONObjBuilder* output);
+    virtual void validate(OperationContext* opCtx, bool full, ValidateResults* results);
 
     virtual void appendNumericCustomStats(OperationContext* opCtx,
                                           BSONObjBuilder* result,

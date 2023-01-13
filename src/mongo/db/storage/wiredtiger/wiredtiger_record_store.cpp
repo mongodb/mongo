@@ -1752,12 +1752,17 @@ Status WiredTigerRecordStore::doCompact(OperationContext* opCtx) {
     return Status::OK();
 }
 
-void WiredTigerRecordStore::validate(OperationContext* opCtx,
-                                     ValidateResults* results,
-                                     BSONObjBuilder* output) {
+void WiredTigerRecordStore::validate(OperationContext* opCtx, bool full, ValidateResults* results) {
     dassert(opCtx->lockState()->isReadLocked());
 
     if (_isEphemeral) {
+        return;
+    }
+
+    WiredTigerUtil::validateTableLogging(
+        opCtx, _uri, _isLogged, boost::none, results->valid, results->errors, results->warnings);
+
+    if (!full) {
         return;
     }
 

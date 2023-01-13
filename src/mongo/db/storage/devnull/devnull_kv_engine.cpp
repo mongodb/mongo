@@ -224,9 +224,9 @@ public:
         return boost::none;
     }
 
-    virtual void fullValidate(OperationContext* opCtx,
-                              long long* numKeysOut,
-                              IndexValidateResults* fullResults) const {}
+    virtual IndexValidateResults validate(OperationContext* opCtx, bool full) const {
+        return IndexValidateResults{};
+    }
 
     virtual bool appendCustomStats(OperationContext* opCtx,
                                    BSONObjBuilder* output,
@@ -244,6 +244,10 @@ public:
 
     virtual bool isEmpty(OperationContext* opCtx) {
         return true;
+    }
+
+    virtual int64_t numEntries(OperationContext* opCtx) const {
+        return 0;
     }
 
     virtual void printIndexEntryMetadata(OperationContext* opCtx,
