@@ -19,6 +19,7 @@
 		"eslint.validate": [
 			"javascript"
 		],
+		"files.insertFinalNewline": true,
 		"python.autoComplete.extraPaths": [
 			"/opt/mongodbtoolchain/v4/share/gcc-11.3.0/python",
 			"src/third_party/scons-3.1.2/scons-local-3.1.2"
