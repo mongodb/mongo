@@ -309,11 +309,6 @@ public:
                         });
                     break;
                 }
-                case UncommittedCatalogUpdates::Entry::Action::kOpenedCollection: {
-                    // No-op. Collections opened from earlier points in time remain local to the
-                    // operation.
-                    break;
-                }
             };
         }
 
@@ -781,7 +776,7 @@ CollectionPtr CollectionCatalog::openCollection(OperationContext* opCtx,
         return CollectionPtr();
     }
 
-    auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
+    auto& openedCollections = OpenedCollections::get(opCtx);
 
     // When openCollection is called with no timestamp, the namespace must be pending commit. We
     // compare the collection instance in _pendingCommitNamespaces and the collection instance in
@@ -817,14 +812,12 @@ CollectionPtr CollectionCatalog::openCollection(OperationContext* opCtx,
             // with this snapshot, then the change came from an uncommitted update by an operation
             // operating on this snapshot.
             invariant(pendingCollection && pendingCollection->isMetadataEqual(metadata));
-            uncommittedCatalogUpdates.openCollection(opCtx, pendingCollection);
+            openedCollections.store(pendingCollection);
             return CollectionPtr(pendingCollection.get(), CollectionPtr::NoYieldTag{});
         }
 
         invariant(latestCollection->isMetadataEqual(metadata));
-        // TODO SERVER-71817 remove const cast
-        uncommittedCatalogUpdates.openCollection(
-            opCtx, std::const_pointer_cast<Collection>(latestCollection));
+        openedCollections.store(latestCollection);
         return CollectionPtr(latestCollection.get(), CollectionPtr::NoYieldTag{});
     }
 
@@ -838,7 +831,7 @@ CollectionPtr CollectionCatalog::openCollection(OperationContext* opCtx,
 
     // Return the in-memory Collection instance if it is compatible with the read timestamp.
     if (isExistingCollectionCompatible(latestCollection, readTimestamp)) {
-        uncommittedCatalogUpdates.openCollection(opCtx, latestCollection);
+        openedCollections.store(latestCollection);
         return CollectionPtr(latestCollection.get(), CollectionPtr::NoYieldTag{});
     }
 
@@ -847,7 +840,7 @@ CollectionPtr CollectionCatalog::openCollection(OperationContext* opCtx,
     auto compatibleCollection =
         _createCompatibleCollection(opCtx, latestCollection, readTimestamp, catalogEntry.get());
     if (compatibleCollection) {
-        uncommittedCatalogUpdates.openCollection(opCtx, compatibleCollection);
+        openedCollections.store(compatibleCollection);
         return CollectionPtr(compatibleCollection.get(), CollectionPtr::NoYieldTag{});
     }
 
@@ -855,7 +848,7 @@ CollectionPtr CollectionCatalog::openCollection(OperationContext* opCtx,
     // Collection instance from scratch.
     auto newCollection = _createNewPITCollection(opCtx, readTimestamp, catalogEntry.get());
     if (newCollection) {
-        uncommittedCatalogUpdates.openCollection(opCtx, newCollection);
+        openedCollections.store(newCollection);
         return CollectionPtr(newCollection.get(), CollectionPtr::NoYieldTag{});
     }
     return CollectionPtr();
@@ -1100,6 +1093,11 @@ std::shared_ptr<const Collection> CollectionCatalog::lookupCollectionByUUIDForRe
         return uncommittedColl;
     }
 
+    // Return any previously instantiated collection on this namespace for this snapshot
+    if (auto openedColl = OpenedCollections::get(opCtx).lookupByUUID(uuid)) {
+        return openedColl.value();
+    }
+
     auto coll = _lookupCollectionByUUID(uuid);
     return (coll && coll->isCommitted()) ? coll : nullptr;
 }
@@ -1169,6 +1167,16 @@ CollectionPtr CollectionCatalog::lookupCollectionByUUID(OperationContext* opCtx,
         return uncommittedPtr.get();
     }
 
+    // Return any previously instantiated collection on this namespace for this snapshot
+    if (auto openedColl = OpenedCollections::get(opCtx).lookupByUUID(uuid)) {
+
+        return openedColl.value()
+            ? CollectionPtr(opCtx,
+                            openedColl->get(),
+                            LookupCollectionForYieldRestore(openedColl.value()->ns()))
+            : CollectionPtr();
+    }
+
     auto coll = _lookupCollectionByUUID(uuid);
     return (coll && coll->isCommitted())
         ? CollectionPtr(opCtx, coll.get(), LookupCollectionForYieldRestore(coll->ns()))
@@ -1197,6 +1205,11 @@ std::shared_ptr<const Collection> CollectionCatalog::lookupCollectionByNamespace
     // Report the drop or rename as nothing new was created.
     if (found) {
         return nullptr;
+    }
+
+    // Return any previously instantiated collection on this namespace for this snapshot
+    if (auto openedColl = OpenedCollections::get(opCtx).lookupByNamespace(nss)) {
+        return openedColl.value();
     }
 
     auto it = _collections.find(nss);
@@ -1280,6 +1293,11 @@ CollectionPtr CollectionCatalog::lookupCollectionByNamespace(OperationContext* o
         return nullptr;
     }
 
+    // Return any previously instantiated collection on this namespace for this snapshot
+    if (auto openedColl = OpenedCollections::get(opCtx).lookupByNamespace(nss)) {
+        return CollectionPtr(opCtx, openedColl->get(), LookupCollectionForYieldRestore(nss));
+    }
+
     auto it = _collections.find(nss);
     auto coll = (it == _collections.end() ? nullptr : it->second);
     return (coll && coll->isCommitted())
@@ -1297,6 +1315,15 @@ boost::optional<NamespaceString> CollectionCatalog::lookupNSSByUUID(OperationCon
         if (uncommittedPtr)
             return uncommittedPtr->ns();
         return boost::none;
+    }
+
+    // Return any previously instantiated collection on this namespace for this snapshot
+    if (auto openedColl = OpenedCollections::get(opCtx).lookupByUUID(uuid)) {
+        if (openedColl.value()) {
+            return openedColl.value()->ns();
+        } else {
+            return boost::none;
+        }
     }
 
     auto foundIt = _catalog.find(uuid);
@@ -1328,6 +1355,15 @@ boost::optional<UUID> CollectionCatalog::lookupUUIDByNSS(OperationContext* opCtx
         return boost::none;
     }
 
+    // Return any previously instantiated collection on this namespace for this snapshot
+    if (auto openedColl = OpenedCollections::get(opCtx).lookupByNamespace(nss)) {
+        if (openedColl.value()) {
+            return openedColl.value()->uuid();
+        } else {
+            return boost::none;
+        }
+    }
+
     auto it = _collections.find(nss);
     if (it != _collections.end()) {
         const boost::optional<UUID>& uuid = it->second->uuid();
@@ -1347,8 +1383,7 @@ bool CollectionCatalog::containsCollection(OperationContext* opCtx,
                                   [&collection](const UncommittedCatalogUpdates::Entry& entry) {
                                       return entry.collection.get() == collection.get();
                                   });
-    if (entriesIt != entries.end() &&
-        entriesIt->action != UncommittedCatalogUpdates::Entry::Action::kOpenedCollection)
+    if (entriesIt != entries.end())
         return true;
 
     // Verify that we store the same instance in this catalog

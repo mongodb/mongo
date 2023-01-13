@@ -2696,71 +2696,73 @@ TEST_F(CollectionCatalogTimestampTest, CollectionLifetimeTiedToStorageTransactio
                 createIndexTs);
 
     const Timestamp readTimestamp(15, 15);
-    auto& uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx.get());
 
     {
         // Test that the collection is released when the storage snapshot is abandoned.
         OneOffRead oor(opCtx.get(), readTimestamp);
         Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
+
         auto coll =
             CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, readTimestamp);
         ASSERT(coll);
 
-        std::shared_ptr<Collection> fetchedColl =
-            uncommittedCatalogUpdates.lookupCollection(opCtx.get(), nss).collection;
+        std::shared_ptr<const Collection> fetchedColl =
+            OpenedCollections::get(opCtx.get()).lookupByNamespace(nss).value();
         ASSERT(fetchedColl);
         ASSERT_EQ(coll.get(), fetchedColl.get());
         ASSERT_EQ(coll->getSharedIdent(), fetchedColl->getSharedIdent());
 
         opCtx->recoveryUnit()->abandonSnapshot();
-        ASSERT(!uncommittedCatalogUpdates.lookupCollection(opCtx.get(), nss).collection);
+        ASSERT(!OpenedCollections::get(opCtx.get()).lookupByNamespace(nss));
     }
 
     {
         // Test that the collection is released when the storage snapshot is committed.
         OneOffRead oor(opCtx.get(), readTimestamp);
         Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
+
         auto coll =
             CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, readTimestamp);
         ASSERT(coll);
 
         WriteUnitOfWork wuow(opCtx.get());
 
-        std::shared_ptr<Collection> fetchedColl =
-            uncommittedCatalogUpdates.lookupCollection(opCtx.get(), nss).collection;
+        std::shared_ptr<const Collection> fetchedColl =
+            OpenedCollections::get(opCtx.get()).lookupByNamespace(nss).value();
         ASSERT(fetchedColl);
         ASSERT_EQ(coll.get(), fetchedColl.get());
         ASSERT_EQ(coll->getSharedIdent(), fetchedColl->getSharedIdent());
 
         wuow.commit();
-        ASSERT(!uncommittedCatalogUpdates.lookupCollection(opCtx.get(), nss).collection);
+        ASSERT(!OpenedCollections::get(opCtx.get()).lookupByNamespace(nss));
 
         opCtx->recoveryUnit()->abandonSnapshot();
-        ASSERT(!uncommittedCatalogUpdates.lookupCollection(opCtx.get(), nss).collection);
+        ASSERT(!OpenedCollections::get(opCtx.get()).lookupByNamespace(nss));
     }
 
     {
         // Test that the collection is released when the storage snapshot is aborted.
         OneOffRead oor(opCtx.get(), readTimestamp);
         Lock::GlobalLock globalLock(opCtx.get(), MODE_IS);
+
         auto coll =
             CollectionCatalog::get(opCtx.get())->openCollection(opCtx.get(), nss, readTimestamp);
         ASSERT(coll);
 
         boost::optional<WriteUnitOfWork> wuow(opCtx.get());
 
-        std::shared_ptr<Collection> fetchedColl =
-            uncommittedCatalogUpdates.lookupCollection(opCtx.get(), nss).collection;
+        std::shared_ptr<const Collection> fetchedColl =
+            OpenedCollections::get(opCtx.get()).lookupByNamespace(nss).value();
         ASSERT(fetchedColl);
         ASSERT_EQ(coll.get(), fetchedColl.get());
         ASSERT_EQ(coll->getSharedIdent(), fetchedColl->getSharedIdent());
 
         // The storage snapshot is aborted when the WriteUnitOfWork destructor runs.
         wuow.reset();
-        ASSERT(!uncommittedCatalogUpdates.lookupCollection(opCtx.get(), nss).collection);
+        ASSERT(!OpenedCollections::get(opCtx.get()).lookupByNamespace(nss));
 
         opCtx->recoveryUnit()->abandonSnapshot();
-        ASSERT(!uncommittedCatalogUpdates.lookupCollection(opCtx.get(), nss).collection);
+        ASSERT(!OpenedCollections::get(opCtx.get()).lookupByNamespace(nss));
     }
 }
 

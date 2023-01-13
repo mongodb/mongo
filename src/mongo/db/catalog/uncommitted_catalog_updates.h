@@ -39,7 +39,7 @@
 namespace mongo {
 
 /**
- * Decoration on RecoveryUnit to store cloned Collections until they are committed or rolled back.
+ * Decoration on Snapshot to store cloned Collections until they are committed or rolled back.
  */
 class UncommittedCatalogUpdates {
 public:
@@ -63,13 +63,11 @@ public:
             kRemoveViewResource,
             // Dropped index instance
             kDroppedIndex,
-            // Opened a collection instance from an earlier point-in-time
-            kOpenedCollection
         };
 
         boost::optional<UUID> uuid() const {
             if (action == Action::kCreatedCollection || action == Action::kWritableCollection ||
-                action == Action::kRenamedCollection || action == Action::kOpenedCollection)
+                action == Action::kRenamedCollection)
                 return collection->uuid();
             return externalUUID;
         }
@@ -132,8 +130,7 @@ public:
                 entry.action == Entry::Action::kWritableCollection ||
                 entry.action == Entry::Action::kRenamedCollection ||
                 entry.action == Entry::Action::kDroppedCollection ||
-                entry.action == Entry::Action::kRecreatedCollection ||
-                entry.action == Entry::Action::kOpenedCollection);
+                entry.action == Entry::Action::kRecreatedCollection);
     }
 
     /**
@@ -221,11 +218,6 @@ public:
     void removeView(const NamespaceString& nss);
 
     /**
-     * Manages the lifetime of the collection instance from an earlier point-in-time.
-     */
-    void openCollection(OperationContext* opCtx, std::shared_ptr<Collection> coll);
-
-    /**
      * Returns all entries without releasing them.
      */
     const std::vector<Entry>& entries() const;
@@ -278,6 +270,64 @@ private:
     std::vector<Entry> _entries;
 
     stdx::unordered_set<DatabaseName> _ignoreExternalViewChanges;
+};
+
+/**
+ * Decoration on Snapshot to store Collections instantiated from durable catalog data. Lifetime tied
+ * to Snapshot lifetime.
+ */
+class OpenedCollections {
+public:
+    static OpenedCollections& get(OperationContext* opCtx);
+
+    /**
+     * Lookup collection instance by namespace.
+     *
+     * May return nullptr which indicates that the namespace does not exist in the snapshot.
+     *
+     * Returns boost::none if this namespace is unknown to OpenedCollections.
+     */
+    boost::optional<std::shared_ptr<const Collection>> lookupByNamespace(
+        const NamespaceString& ns) const;
+
+    /**
+     * Lookup collection instance by UUID.
+     *
+     * May return nullptr which indicates that the UUID does not exist in the snapshot.
+     *
+     * Returns boost::none if this UUID is unknown to OpenedCollections.
+     */
+    boost::optional<std::shared_ptr<const Collection>> lookupByUUID(UUID uuid) const;
+
+    /**
+     * Stores a Collection instance. Lifetime of instance will be tied to lifetime of opened storage
+     * snapshot.
+     *
+     * Collection instance may be nullptr to indicate that the namespace and/or UUID does not exist
+     * in the snapshot.
+     */
+    void store(std::shared_ptr<const Collection> coll,
+               NamespaceString nss,
+               boost::optional<UUID> uuid);
+
+    /**
+     * Stores a Collection instance. Lifetime of instance will be tied to lifetime of opened storage
+     * snapshot.
+     *
+     * TODO SERVER-72133: Remove this function
+     */
+    void store(std::shared_ptr<const Collection> coll);
+
+private:
+    struct Entry {
+        std::shared_ptr<const Collection> collection;
+        NamespaceString nss;
+        boost::optional<UUID> uuid;
+    };
+
+    // Static storage for one entry. The expected common case is that only a single collection will
+    // be needed so we optimize for that.
+    boost::container::small_vector<Entry, 1> _collections;
 };
 
 }  // namespace mongo

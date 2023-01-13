@@ -31,8 +31,13 @@
 
 namespace mongo {
 
+namespace {
 const RecoveryUnit::Snapshot::Decoration<UncommittedCatalogUpdates> getUncommittedCatalogUpdates =
     RecoveryUnit::Snapshot::declareDecoration<UncommittedCatalogUpdates>();
+
+const RecoveryUnit::Snapshot::Decoration<OpenedCollections> getOpenedCollections =
+    RecoveryUnit::Snapshot::declareDecoration<OpenedCollections>();
+}  // namespace
 
 UncommittedCatalogUpdates& UncommittedCatalogUpdates::get(OperationContext* opCtx) {
     return getUncommittedCatalogUpdates(opCtx->recoveryUnit()->getSnapshot());
@@ -234,11 +239,6 @@ void UncommittedCatalogUpdates::removeView(const NamespaceString& nss) {
     _entries.push_back({Entry::Action::kRemoveViewResource, nullptr, nss});
 }
 
-void UncommittedCatalogUpdates::openCollection(OperationContext* opCtx,
-                                               std::shared_ptr<Collection> coll) {
-    _entries.push_back({Entry::Action::kOpenedCollection, coll, coll->ns()});
-}
-
 const std::vector<UncommittedCatalogUpdates::Entry>& UncommittedCatalogUpdates::entries() const {
     return _entries;
 }
@@ -266,6 +266,45 @@ bool UncommittedCatalogUpdates::isCreatedCollection(OperationContext* opCtx,
                                                     const NamespaceString& nss) {
     const auto& lookupResult = lookupCollection(opCtx, nss);
     return lookupResult.newColl;
+}
+
+OpenedCollections& OpenedCollections::get(OperationContext* opCtx) {
+    return getOpenedCollections(opCtx->recoveryUnit()->getSnapshot());
+}
+
+boost::optional<std::shared_ptr<const Collection>> OpenedCollections::lookupByNamespace(
+    const NamespaceString& ns) const {
+    auto it = std::find_if(_collections.begin(), _collections.end(), [&ns](const auto& entry) {
+        return entry.nss == ns;
+    });
+    if (it != _collections.end()) {
+        return it->collection;
+    }
+    return boost::none;
+}
+
+boost::optional<std::shared_ptr<const Collection>> OpenedCollections::lookupByUUID(
+    UUID uuid) const {
+    auto it = std::find_if(_collections.begin(), _collections.end(), [&uuid](const auto& entry) {
+        if (!entry.uuid)
+            return false;
+
+        return entry.uuid.value() == uuid;
+    });
+    if (it != _collections.end()) {
+        return it->collection;
+    }
+    return boost::none;
+}
+
+void OpenedCollections::store(std::shared_ptr<const Collection> coll,
+                              NamespaceString nss,
+                              boost::optional<UUID> uuid) {
+    _collections.push_back({std::move(coll), std::move(nss), uuid});
+}
+
+void OpenedCollections::store(std::shared_ptr<const Collection> coll) {
+    _collections.push_back({coll, coll->ns(), coll->uuid()});
 }
 
 }  // namespace mongo
