@@ -525,8 +525,9 @@ int Suite::run(const std::vector<std::string>& suites,
         tests += r->_tests;
         if (!r->_fails.empty()) {
             failedSuites.push_back(r->toBSON());
-            for (const std::string& failedTest : r->_fails) {
-                totals._fails.push_back(r->_name + "/" + failedTest);
+            for (size_t i = 0; i < r->_fails.size(); i++) {
+                totals._fails.push_back(r->_name + "/" + r->_fails[i]);
+                totals._messages.push_back(r->_messages[i]);
             }
         }
         asserts += r->_asserts;
@@ -544,6 +545,15 @@ int Suite::run(const std::vector<std::string>& suites,
         }
     }
     LOGV2(23065, "Totals", "totals"_attr = totals.toBSON());
+
+    std::size_t failCount = totals._fails.size();
+    for (std::size_t i = 0; i < failCount; i++) {
+        LOGV2(8423378,
+              "Test Failed",
+              "testName"_attr = totals._fails[i],
+              "exception"_attr = totals._messages[i].type,
+              "error"_attr = totals._messages[i].error);
+    }
 
     // summary
     if (!totals._fails.empty()) {
