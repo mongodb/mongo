@@ -459,6 +459,20 @@ TEST(IDLStructTests, EpochsParse) {
                                 AssertionException,
                                 ErrorCodes::BadValue,
                                 "Epoch value must be numeric, got: string");
+
+    auto notATimeDoc = BSON("unix" << 0 << "ecma" << NAN);
+    ASSERT_THROWS_CODE_AND_WHAT(Struct_with_epochs::parse(ctxt, notATimeDoc),
+                                AssertionException,
+                                ErrorCodes::BadValue,
+                                "Unable to coerce value to an epoch :: caused by :: "
+                                "Unable to coerce NaN/Inf to integral type");
+
+    auto endOfTimeDoc = BSON("unix" << std::numeric_limits<double>::infinity() << "ecma" << 0);
+    ASSERT_THROWS_CODE_AND_WHAT(Struct_with_epochs::parse(ctxt, endOfTimeDoc),
+                                AssertionException,
+                                ErrorCodes::BadValue,
+                                "Unable to coerce value to an epoch :: caused by :: "
+                                "Unable to coerce NaN/Inf to integral type");
 }
 
 TEST(IDLStructTests, EpochSerialize) {
