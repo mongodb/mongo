@@ -43,7 +43,9 @@
 #include "mongo/executor/async_rpc_targeter.h"
 #include "mongo/executor/async_rpc_test_fixture.h"
 #include "mongo/executor/hedged_async_rpc.h"
+#include "mongo/executor/hedging_metrics.h"
 #include "mongo/executor/network_interface.h"
+#include "mongo/executor/network_interface_integration_fixture.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/network_test_env.h"
 #include "mongo/executor/remote_command_request.h"
@@ -74,6 +76,11 @@ public:
     NetworkInterface::Counters getNetworkInterfaceCounters() {
         auto counters = getNetworkInterfaceMock()->getCounters();
         return counters;
+    }
+
+    void setUp() override {
+        AsyncRPCTestFixture::setUp();
+        hm = HedgingMetrics::get(_opCtx->getServiceContext());
     }
 
     /**
@@ -147,6 +154,7 @@ public:
     const RemoteCommandResponse testAlternateIgnorableErrorResponse{
         createErrorResponse(ignorableNetworkTimeoutStatus), Milliseconds(1)};
 
+    HedgingMetrics* hm;
     auto getOpCtx() {
         return _opCtx.get();
     }
@@ -268,6 +276,11 @@ TEST_F(HedgedAsyncRPCTest, FailedTargeting) {
     ASSERT(extraInfo->isLocal());
     auto localError = extraInfo->asLocal();
     ASSERT_EQ(localError, targeterFailStatus);
+
+    // Test metrics where error occurs before hedged command dispatch
+    ASSERT_EQ(hm->getNumTotalOperations(), 0);
+    ASSERT_EQ(hm->getNumTotalHedgedOperations(), 0);
+    ASSERT_EQ(hm->getNumAdvantageouslyHedgedOperations(), 0);
 }
 
 // Ensure that the sendHedgedCommand correctly returns RemoteCommandExecutionError when the executor
@@ -324,7 +337,7 @@ TEST_F(HedgedAsyncRPCTest, FirstCommandFailsWithSignificantError) {
  * When a hedged command is sent and all requests fail with an "ignorable" error, that error
  * propagates upwards.
  */
-TEST_F(HedgedAsyncRPCTest, BothCommandsFailWithSkippableError) {
+TEST_F(HedgedAsyncRPCTest, BothCommandsFailWithIgnorableError) {
     auto resultFuture = sendHedgedCommandWithHosts(testFindCmd, kTwoHosts);
 
     auto network = getNetworkInterfaceMock();
@@ -360,7 +373,7 @@ TEST_F(HedgedAsyncRPCTest, BothCommandsFailWithSkippableError) {
     ASSERT_EQ(remoteError.getRemoteCommandResult(), ignorableMaxTimeMSExpiredStatus);
 }
 
-TEST_F(HedgedAsyncRPCTest, AllCommandsFailWithSkippableError) {
+TEST_F(HedgedAsyncRPCTest, AllCommandsFailWithIgnorableError) {
     auto resultFuture = sendHedgedCommandWithHosts(testFindCmd, kTwoHosts);
 
     auto network = getNetworkInterfaceMock();
@@ -401,7 +414,7 @@ TEST_F(HedgedAsyncRPCTest, AllCommandsFailWithSkippableError) {
  * ignorable error and the second request, which is authoritative, succeeds, we get
  * the success result.
  */
-TEST_F(HedgedAsyncRPCTest, HedgedFailsWithSkippableErrorAuthoritativeSucceeds) {
+TEST_F(HedgedAsyncRPCTest, HedgedFailsWithIgnorableErrorAuthoritativeSucceeds) {
     auto resultFuture = sendHedgedCommandWithHosts(testFindCmd, kTwoHosts);
 
     auto network = getNetworkInterfaceMock();
@@ -430,6 +443,11 @@ TEST_F(HedgedAsyncRPCTest, HedgedFailsWithSkippableErrorAuthoritativeSucceeds) {
     auto res = std::move(resultFuture).get().response;
     ASSERT_EQ(res.getCursor()->getNs(), testNS);
     ASSERT_BSONOBJ_EQ(res.getCursor()->getFirstBatch()[0], testFirstBatch);
+
+    // Test metrics where hedged fails with ignorable error
+    ASSERT_EQ(hm->getNumTotalOperations(), 1);
+    ASSERT_EQ(hm->getNumTotalHedgedOperations(), 1);
+    ASSERT_EQ(hm->getNumAdvantageouslyHedgedOperations(), 0);
 }
 
 /**
@@ -520,7 +538,7 @@ TEST_F(HedgedAsyncRPCTest, AuthoritativeFailsWithFatalErrorHedgedCancelled) {
  * When a hedged command is sent and the first request, which is authoritative, succeeds
  * and the second request, which is hedged, cancels, we get the success result.
  */
-TEST_F(HedgedAsyncRPCTest, FirstCommandFailsWithSkippableErrorNextSucceeds) {
+TEST_F(HedgedAsyncRPCTest, AuthoritativeSucceedsHedgedCancelled) {
     auto resultFuture = sendHedgedCommandWithHosts(testFindCmd, kTwoHosts);
 
     auto network = getNetworkInterfaceMock();
@@ -584,6 +602,11 @@ TEST_F(HedgedAsyncRPCTest, HedgedSucceedsAuthoritativeCancelled) {
     auto res = std::move(resultFuture).get().response;
     ASSERT_EQ(res.getCursor()->getNs(), testNS);
     ASSERT_BSONOBJ_EQ(res.getCursor()->getFirstBatch()[0], testFirstBatch);
+
+    // Test metrics where hedged succeeds
+    ASSERT_EQ(hm->getNumTotalOperations(), 1);
+    ASSERT_EQ(hm->getNumTotalHedgedOperations(), 1);
+    ASSERT_EQ(hm->getNumAdvantageouslyHedgedOperations(), 1);
 }
 
 /**
@@ -679,7 +702,7 @@ TEST_F(HedgedAsyncRPCTest, HedgedFailsWithIgnorableErrorAuthoritativeFailsWithFa
  * When a hedged command is sent and the first request, which is hedged, fails with an ignorable
  * error and the second request, which is authoritative, succeeds, we get the success response.
  */
-TEST_F(HedgedAsyncRPCTest, HedgedFailsWithIgnorableErrorAuthoritativeSucceeds) {
+TEST_F(HedgedAsyncRPCTest, AuthoritativeSucceedsHedgedFailsWithIgnorableError) {
     auto resultFuture = sendHedgedCommandWithHosts(testFindCmd, kTwoHosts);
 
     auto network = getNetworkInterfaceMock();
@@ -751,6 +774,11 @@ TEST_F(HedgedAsyncRPCTest, HedgedFailsWithFatalErrorAuthoritativeCanceled) {
     ASSERT(extraInfo->isRemote());
     auto remoteError = extraInfo->asRemote();
     ASSERT_EQ(remoteError.getRemoteCommandResult(), fatalInternalErrorStatus);
+
+    // Test metrics where hedged fails with fatal error
+    ASSERT_EQ(hm->getNumTotalOperations(), 1);
+    ASSERT_EQ(hm->getNumTotalHedgedOperations(), 1);
+    ASSERT_EQ(hm->getNumAdvantageouslyHedgedOperations(), 1);
 }
 
 /*

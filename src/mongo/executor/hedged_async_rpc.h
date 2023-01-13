@@ -35,10 +35,12 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/db/service_context.h"
 #include "mongo/executor/async_rpc.h"
 #include "mongo/executor/async_rpc_error_info.h"
 #include "mongo/executor/async_rpc_targeter.h"
 #include "mongo/executor/hedge_options_util.h"
+#include "mongo/executor/hedging_metrics.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/rpc/get_status_from_command_result.h"
@@ -55,7 +57,7 @@
 namespace mongo {
 namespace async_rpc {
 
-namespace {
+namespace hedging_rpc_details {
 /**
  * Given a vector of input Futures, whenAnyThat returns a Future which holds the value
  * of the first of those futures to resolve with a status, value, and index that
@@ -95,7 +97,13 @@ Future<SingleResponse> whenAnyThat(std::vector<ExecutorFuture<SingleResponse>>&&
 
     return future;
 }
-}  // namespace
+
+HedgingMetrics* getHedgingMetrics(ServiceContext* svcCtx) {
+    auto hm = HedgingMetrics::get(svcCtx);
+    invariant(hm);
+    return hm;
+}
+}  // namespace hedging_rpc_details
 
 /**
  * sendHedgedCommand is a hedged version of the sendCommand function. It asynchronously executes a
@@ -137,6 +145,10 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
                 *targetsAttempted = targets;
 
                 HedgeOptions opts = getHedgeOptions(CommandType::kCommandName, readPref);
+                auto hm = hedging_rpc_details::getHedgingMetrics(getGlobalServiceContext());
+                if (opts.isHedgeEnabled) {
+                    hm->incrementNumTotalOperations();
+                }
 
                 std::vector<ExecutorFuture<SingleResponse>> requests;
 
@@ -150,6 +162,9 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
                     options->baton = baton;
                     requests.push_back(
                         sendCommand(options, opCtx, std::move(t)).thenRunOn(proxyExec));
+                    if (i > 0) {
+                        hm->incrementNumTotalHedgedOperations();
+                    }
                 }
 
                 /**
@@ -158,14 +173,17 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
                  * "authoritative" request. This is the codepath followed when we are not
                  * hedging or there is only 1 target provided.
                  */
-                return whenAnyThat(
-                    std::move(requests), [](StatusWith<SingleResponse> response, size_t index) {
+                return hedging_rpc_details::whenAnyThat(
+                    std::move(requests), [&](StatusWith<SingleResponse> response, size_t index) {
                         Status commandStatus = response.getStatus();
 
                         if (index == 0) {
                             return true;
                         }
+
                         if (commandStatus.code() == Status::OK()) {
+                            hedging_rpc_details::getHedgingMetrics(getGlobalServiceContext())
+                                ->incrementNumAdvantageouslyHedgedOperations();
                             return true;
                         }
 
@@ -181,6 +199,9 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
                         if (remoteErr && isIgnorableAsHedgeResult(*remoteErr)) {
                             return false;
                         }
+
+                        hedging_rpc_details::getHedgingMetrics(getGlobalServiceContext())
+                            ->incrementNumAdvantageouslyHedgedOperations();
                         return true;
                     });
             });

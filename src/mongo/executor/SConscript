@@ -361,6 +361,7 @@ env.CppUnitTest(
         'connection_pool_executor',
         'egress_tag_closer_manager',
         'hedge_options_util',
+        'hedging_metrics',
         'network_interface_mock',
         'network_interface_tl',
         'network_test_env',
