@@ -122,7 +122,7 @@ static size_t computePartialSchemaReqHash(const PartialSchemaRequirements& reqMa
     size_t result = 17;
 
     IntervalHasher<IntervalReqExpr> intervalHasher;
-    for (const auto& [key, req] : reqMap) {
+    for (const auto& [key, req] : reqMap.conjuncts()) {
         if (const auto& projName = key._projectionName) {
             updateHash(result, ProjectionName::Hasher()(*projName));
         }

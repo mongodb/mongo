@@ -221,11 +221,11 @@ public:
             const ProjectionName& boundVarName = boundPtr->name();
             PartialSchemaRequirements newMap;
 
-            for (auto& [key, req] : pathResult->_reqMap) {
+            for (auto& [key, req] : pathResult->_reqMap.conjuncts()) {
                 if (key._projectionName) {
                     return {};
                 }
-                newMap.emplace(PartialSchemaKey{boundVarName, key._path}, std::move(req));
+                newMap.add(PartialSchemaKey{boundVarName, key._path}, std::move(req));
             }
 
             PartialSchemaReqConversion result{std::move(newMap)};
@@ -291,51 +291,63 @@ public:
             return leftResult;
         }
         // Additive composition: we never have projections in this case; only predicates.
-        for (const auto& [key, req] : leftReqMap) {
+        for (const auto& [key, req] : leftReqMap.conjuncts()) {
             tassert(7155021,
                     "Unexpected binding in ComposeA in PartialSchemaReqConverter",
                     !req.getBoundProjectionName());
         }
-        for (const auto& [key, req] : rightReqMap) {
+        for (const auto& [key, req] : rightReqMap.conjuncts()) {
             tassert(7155022,
                     "Unexpected binding in ComposeA in PartialSchemaReqConverter",
                     !req.getBoundProjectionName());
         }
 
-        auto leftEntry = leftReqMap.begin();
-        auto rightEntry = rightReqMap.begin();
-        auto& [leftKey, leftReq] = *leftEntry;
-        auto& [rightKey, rightReq] = *rightEntry;
-
         {
             // Check if the left and right requirements are all or none perf-only.
             size_t perfOnlyCount = 0;
-            for (const auto& [key, req] : leftReqMap) {
+            for (const auto& [key, req] : leftReqMap.conjuncts()) {
                 if (req.getIsPerfOnly()) {
                     perfOnlyCount++;
                 }
             }
-            for (const auto& [key, req] : rightReqMap) {
+            for (const auto& [key, req] : rightReqMap.conjuncts()) {
                 if (req.getIsPerfOnly()) {
                     perfOnlyCount++;
                 }
             }
-            if (perfOnlyCount != 0 && perfOnlyCount != leftReqMap.size() + rightReqMap.size()) {
+            if (perfOnlyCount != 0 &&
+                perfOnlyCount != leftReqMap.numLeaves() + rightReqMap.numLeaves()) {
                 // For now allow only predicates with the same perf-only flag.
                 return {};
             }
         }
 
-        if (leftReqMap.count(leftKey) == leftReqMap.size() &&
-            rightReqMap.count(leftKey) == rightReqMap.size()) {
+        auto leftEntries = leftReqMap.conjuncts();
+        auto rightEntries = rightReqMap.conjuncts();
+        auto leftEntry = leftEntries.begin();
+        auto rightEntry = rightEntries.begin();
+        auto& [leftKey, leftReq] = *leftEntry;
+        auto& [rightKey, rightReq] = *rightEntry;
+
+        // Do all reqs from both sides use the same key?
+        bool allSameKey = true;
+        for (const auto* reqs : {&leftReqMap, &rightReqMap}) {
+            for (auto&& [k, req] : reqs->conjuncts()) {
+                if (k != leftKey) {
+                    allSameKey = false;
+                    break;
+                }
+            }
+        }
+        if (allSameKey) {
             // All reqs from both sides use the same key (input binding + path).
 
             // Each side is a conjunction, and we're taking a disjunction.
             // Use the fact that OR distributes over AND to build a new conjunction:
             //     (a & b) | (x & y) == (a | x) & (a | y) & (b | x) & (b | y)
             PartialSchemaRequirements resultMap;
-            for (const auto& [rightKey1, rightReq1] : rightReqMap) {
-                for (const auto& [leftKey1, leftReq1] : leftReqMap) {
+            for (const auto& [rightKey1, rightReq1] : rightReqMap.conjuncts()) {
+                for (const auto& [leftKey1, leftReq1] : leftReqMap.conjuncts()) {
                     auto combinedIntervals = leftReq1.getIntervals();
                     combineIntervalsDNF(
                         false /*intersect*/, combinedIntervals, rightReq1.getIntervals());
@@ -346,17 +358,20 @@ public:
                         std::move(combinedIntervals),
                         leftReq1.getIsPerfOnly(),
                     };
-                    resultMap.emplace(leftKey1, combinedReq);
+                    resultMap.add(leftKey1, combinedReq);
                 }
             }
 
             leftReqMap = std::move(resultMap);
             return leftResult;
         }
+        // Left and right don't all use the same key.
 
-        if (leftReqMap.size() != 1 || rightReqMap.size() != 1) {
+        if (leftReqMap.numLeaves() != 1 || rightReqMap.numLeaves() != 1) {
             return {};
         }
+        // Left and right don't all use the same key, but they both have exactly 1 entry.
+        // In other words, leftKey != rightKey.
 
         // Here we can combine if paths differ only by a Traverse element and both intervals
         // are the same, with array bounds. For example:
@@ -490,7 +505,7 @@ public:
         // New map has keys with appended paths.
         PartialSchemaRequirements newMap;
 
-        for (auto& entry : inputResult->_reqMap) {
+        for (const auto& entry : inputResult->_reqMap.conjuncts()) {
             if (entry.first._projectionName) {
                 return {};
             }
@@ -502,7 +517,7 @@ public:
             std::swap(appendedPath.cast<T>()->getPath(), path);
             std::swap(path, appendedPath);
 
-            newMap.emplace(PartialSchemaKey{std::move(path)}, std::move(entry.second));
+            newMap.add(PartialSchemaKey{std::move(path)}, std::move(entry.second));
         }
 
         inputResult->_reqMap = std::move(newMap);
@@ -517,7 +532,7 @@ public:
         if (!inputResult) {
             return {};
         }
-        if (inputResult->_reqMap.size() > 1) {
+        if (inputResult->_reqMap.numConjuncts() > 1) {
             // More than one requirement means we are handling a conjunction inside a traverse.
             // We can change it to a traverse inside a conjunction, but that's an
             // over-approximation, so we have to keep the original predicate.
@@ -683,7 +698,7 @@ boost::optional<PartialSchemaReqConversion> convertExprToPartialSchemaReq(
         return {};
     }
 
-    for (const auto& [key, req] : reqMap) {
+    for (const auto& [key, req] : reqMap.conjuncts()) {
         if (key._path.is<PathIdentity>() && isIntervalReqFullyOpenDNF(req.getIntervals())) {
             // We need to determine either path or interval (or both).
             return {};
@@ -692,11 +707,11 @@ boost::optional<PartialSchemaReqConversion> convertExprToPartialSchemaReq(
 
     // If we over-approximate, we need to switch all requirements to perf-only.
     if (result->_retainPredicate) {
-        for (auto& [key, req] : reqMap) {
+        reqMap.transform([&](const PartialSchemaKey& key, PartialSchemaRequirement& req) {
             if (!req.getIsPerfOnly()) {
                 req = {req.getBoundProjectionName(), req.getIntervals(), true /*isPerfOnly*/};
             }
-        }
+        });
     }
     return result;
 }
@@ -859,13 +874,15 @@ bool simplifyPartialSchemaReqPaths(const ProjectionName& scanProjName,
     };
 
     // Simplify paths by eliminating unnecessary Traverse elements.
-    for (const auto& [key, req] : reqMap) {
+    for (const auto& [key, req] : reqMap.conjuncts()) {
         PartialSchemaKey newKey = key;
         bool simplified = false;
         if (key._projectionName == scanProjName && checkPathContainsTraverse(newKey._path)) {
             simplified |= simplifyTraverseNonArray(newKey._path, multikeynessTrie);
         }
 
+        // Maintain the invariant that Traverse-less keys appear only once:
+        // we can move the conjunction into the intervals and simplify.
         if (prevEntry) {
             if (simplified && prevEntry->first == newKey) {
                 auto& prevReq = prevEntry->second;
@@ -890,7 +907,7 @@ bool simplifyPartialSchemaReqPaths(const ProjectionName& scanProjName,
                            std::move(resultIntervals),
                            req.getIsPerfOnly() && prevReq.getIsPerfOnly()};
             } else {
-                result.insert(std::move(*prevEntry));
+                result.add(std::move(prevEntry->first), std::move(prevEntry->second));
                 prevEntry.reset({std::move(newKey), req});
             }
         } else {
@@ -898,19 +915,26 @@ bool simplifyPartialSchemaReqPaths(const ProjectionName& scanProjName,
         }
     }
     if (prevEntry) {
-        result.insert(std::move(*prevEntry));
+        result.add(std::move(prevEntry->first), std::move(prevEntry->second));
     }
 
     // Intersect and normalize intervals.
-    for (auto& [key, req] : result) {
-        auto resultIntervals = req.getIntervals();
-        if (!simplifyFn(resultIntervals)) {
+    const bool representable =
+        result.simplify([&](const PartialSchemaKey&, PartialSchemaRequirement& req) -> bool {
+            auto resultIntervals = req.getIntervals();
+            if (!simplifyFn(resultIntervals)) {
+                return false;
+            }
+
+            normalizeIntervals(resultIntervals);
+
+            req = {req.getBoundProjectionName(), std::move(resultIntervals), req.getIsPerfOnly()};
             return true;
-        }
-
-        normalizeIntervals(resultIntervals);
-
-        req = {req.getBoundProjectionName(), std::move(resultIntervals), req.getIsPerfOnly()};
+        });
+    if (!representable) {
+        // It simplifies to an always-false predicate, which we do not represent
+        // as PartialSchemaRequirements.
+        return true;
     }
 
     reqMap = std::move(result);
@@ -951,7 +975,7 @@ static bool intersectPartialSchemaReq(PartialSchemaRequirements& reqMap,
         {
             bool success = false;
             // Look for exact match on the path, and if found combine intervals.
-            for (auto& [existingKey, existingReq] : reqMap) {
+            for (auto& [existingKey, existingReq] : reqMap.conjuncts()) {
                 if (existingKey != key) {
                     continue;
                 }
@@ -1002,7 +1026,7 @@ static bool intersectPartialSchemaReq(PartialSchemaRequirements& reqMap,
         }
 
         const bool reqHasBoundProj = req.getBoundProjectionName().has_value();
-        for (const auto& [existingKey, existingReq] : reqMap) {
+        for (const auto& [existingKey, existingReq] : reqMap.conjuncts()) {
             uassert(6624150,
                     "Existing key referring to new requirement.",
                     !reqHasBoundProj ||
@@ -1027,7 +1051,7 @@ static bool intersectPartialSchemaReq(PartialSchemaRequirements& reqMap,
         if (merged) {
             // continue around the loop
         } else {
-            reqMap.emplace(std::move(key), std::move(req));
+            reqMap.add(std::move(key), std::move(req));
             return true;
         }
     }
@@ -1042,7 +1066,7 @@ bool isSubsetOfPartialSchemaReq(const PartialSchemaRequirements& lhs,
     // However, we're assuming that 'rhs' has no projections.
     // If it did have projections, the result (lhs ^ rhs) would have projections
     // and wouldn't match 'lhs'.
-    for (auto&& [key, req] : rhs) {
+    for (const auto& [key, req] : rhs.conjuncts()) {
         tassert(7155010,
                 "isSubsetOfPartialSchemaReq expects 'rhs' to have no projections",
                 !req.getBoundProjectionName());
@@ -1061,7 +1085,7 @@ bool isSubsetOfPartialSchemaReq(const PartialSchemaRequirements& lhs,
 bool intersectPartialSchemaReq(PartialSchemaRequirements& target,
                                const PartialSchemaRequirements& source,
                                ProjectionRenames& projectionRenames) {
-    for (const auto& [key, req] : source) {
+    for (const auto& [key, req] : source.conjuncts()) {
         if (!intersectPartialSchemaReq(target, key, req, projectionRenames)) {
             return false;
         }
@@ -1261,14 +1285,15 @@ static bool computeCandidateIndexEntry(PrefixId& prefixId,
     // Add open interval for the first equality prefix.
     eqPrefixes.emplace_back(0);
 
+    // For each component of the index,
     for (size_t indexField = 0; indexField < indexCollationSpec.size(); indexField++) {
         const auto& indexCollationEntry = indexCollationSpec.at(indexField);
         const bool reverse = indexCollationEntry._op == CollationOp::Descending;
         bool foundSuitableField = false;
 
         PartialSchemaKey indexKey{scanProjName, indexCollationEntry._path};
-        if (auto indexKeyIt = reqMap.find(indexKey); indexKeyIt != reqMap.cend()) {
-            if (const PartialSchemaRequirement& req = indexKeyIt->second;
+        if (auto result = reqMap.findFirstConjunct(indexKey)) {
+            if (const auto& [queryPredPos, req] = *result;
                 fastNullHandling || !req.getIsPerfOnly() || !req.mayReturnNull(constFold)) {
                 const auto& requiredInterval = req.getIntervals();
                 const bool success = extendCompoundInterval(prefixId,
@@ -1297,7 +1322,6 @@ static bool computeCandidateIndexEntry(PrefixId& prefixId,
                 }
                 entry._intervalPrefixSize++;
 
-                const size_t queryPredPos = std::distance(reqMap.cbegin(), indexKeyIt);
                 eqPrefixes.back()._predPosSet.insert(queryPredPos);
 
                 if (const auto& boundProjName = req.getBoundProjectionName()) {
@@ -1341,19 +1365,16 @@ static bool computeCandidateIndexEntry(PrefixId& prefixId,
                 if (fusedPath._numTraversesFused > 0) {
                     allowFuseTraverse[indexField] = false;
                 }
-                auto it = reqMap.find(queryKey);
-                tassert(
-                    6624158, "QueryKey must exist in the requirements map", it != reqMap.cend());
+                auto result = reqMap.findFirstConjunct(queryKey);
+                tassert(6624158, "QueryKey must exist in the requirements map", result);
+                const auto& [index, req] = *result;
 
-                const PartialSchemaRequirement& req = it->second;
                 if (!req.getIsPerfOnly()) {
                     // Only regular requirements are added to residual predicates.
                     const ProjectionName& tempProjName = getExistingOrTempProjForFieldName(
                         prefixId, FieldNameType{encodeIndexKeyName(indexField)}, fieldProjMap);
                     entry._residualRequirements.emplace_back(
-                        PartialSchemaKey{tempProjName, std::move(*fusedPath._suffix)},
-                        req,
-                        std::distance(reqMap.cbegin(), it));
+                        PartialSchemaKey{tempProjName, std::move(*fusedPath._suffix)}, req, index);
                 }
 
                 satisfied = true;
@@ -1396,7 +1417,7 @@ CandidateIndexes computeCandidateIndexes(PrefixId& prefixId,
                                          const ConstFoldFn& constFold) {
     // Contains one instance for each unmatched key.
     PartialSchemaKeySet unsatisfiedKeysInitial;
-    for (const auto& [key, req] : reqMap) {
+    for (const auto& [key, req] : reqMap.conjuncts()) {
         if (req.getIsPerfOnly()) {
             // Perf only do not need to be necessarily satisfied.
             continue;
@@ -1445,7 +1466,7 @@ boost::optional<ScanParams> computeScanParams(PrefixId& prefixId,
     auto& fieldProjMap = result._fieldProjectionMap;
 
     size_t entryIndex = 0;
-    for (const auto& [key, req] : reqMap) {
+    for (const auto& [key, req] : reqMap.conjuncts()) {
         if (req.getIsPerfOnly()) {
             // Ignore perf only requirements.
             continue;
@@ -2352,7 +2373,7 @@ bool pathEndsInTraverse(const optimizer::ABT& path) {
 
 bool hasProperIntervals(const PartialSchemaRequirements& reqMap) {
     // Compute if this node has any proper (not fully open) intervals.
-    for (const auto& [key, req] : reqMap) {
+    for (const auto& [key, req] : reqMap.conjuncts()) {
         if (!isIntervalReqFullyOpenDNF(req.getIntervals())) {
             return true;
         }

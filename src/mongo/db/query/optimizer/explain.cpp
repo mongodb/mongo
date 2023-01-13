@@ -1190,7 +1190,7 @@ public:
 
     void printPartialSchemaReqMap(ExplainPrinter& parent, const PartialSchemaRequirements& reqMap) {
         std::vector<ExplainPrinter> printers;
-        for (const auto& [key, req] : reqMap) {
+        for (const auto& [key, req] : reqMap.conjuncts()) {
             ExplainPrinter local;
 
             if (const auto& projName = key._projectionName) {

@@ -565,7 +565,7 @@ static boost::optional<ABT> mergeSargableNodes(
         return createEmptyValueScanNode(ctx);
     }
 
-    if (mergedReqs.size() > SargableNode::kMaxPartialSchemaReqs) {
+    if (mergedReqs.numLeaves() > SargableNode::kMaxPartialSchemaReqs) {
         return {};
     }
 
@@ -660,19 +660,16 @@ static void convertFilterToSargableNode(ABT::reference_type node,
     }
 
     // Remove any partial schema requirements which do not constrain their input.
-    for (auto it = conversion->_reqMap.cbegin(); it != conversion->_reqMap.cend();) {
+
+    conversion->_reqMap.simplify([](const PartialSchemaKey& key, PartialSchemaRequirement& req) {
         uassert(6624111,
                 "Filter partial schema requirement must contain a variable name.",
-                it->first._projectionName);
+                key._projectionName);
         uassert(6624112,
                 "Filter partial schema requirement cannot bind.",
-                !it->second.getBoundProjectionName());
-        if (isIntervalReqFullyOpenDNF(it->second.getIntervals())) {
-            it = conversion->_reqMap.erase(it);
-        } else {
-            ++it;
-        }
-    }
+                !req.getBoundProjectionName());
+        return true;
+    });
 
     if (conversion->_reqMap.empty()) {
         // If the filter has no constraints after removing no-ops, then replace with its child. We
@@ -690,7 +687,7 @@ static void convertFilterToSargableNode(ABT::reference_type node,
         addEmptyValueScanNode(ctx);
         return;
     }
-    if (conversion->_reqMap.size() > SargableNode::kMaxPartialSchemaReqs) {
+    if (conversion->_reqMap.numLeaves() > SargableNode::kMaxPartialSchemaReqs) {
         // Too many requirements.
         return;
     }
@@ -1128,12 +1125,13 @@ struct SubstituteConvert<EvaluationNode> {
         uassert(6624165,
                 "Should not be getting retainPredicate set for EvalNodes",
                 !conversion->_retainPredicate);
-        if (conversion->_reqMap.size() != 1) {
+        if (conversion->_reqMap.numLeaves() != 1) {
             // For evaluation nodes we expect to create a single entry.
             return;
         }
 
-        for (auto& [key, req] : conversion->_reqMap) {
+        conversion->_reqMap.transform([&](const PartialSchemaKey& key,
+                                          PartialSchemaRequirement& req) {
             req = {
                 evalNode.getProjectionName(), std::move(req.getIntervals()), req.getIsPerfOnly()};
 
@@ -1143,7 +1141,7 @@ struct SubstituteConvert<EvaluationNode> {
             uassert(6624115,
                     "Eval partial schema requirement cannot have a range",
                     isIntervalReqFullyOpenDNF(req.getIntervals()));
-        }
+        });
 
         bool hasEmptyInterval = false;
         auto candidateIndexes = computeCandidateIndexes(ctx.getPrefixId(),
@@ -1172,7 +1170,7 @@ struct SubstituteConvert<EvaluationNode> {
 static void lowerSargableNode(const SargableNode& node, RewriteContext& ctx) {
     ABT n = node.getChild();
     const auto reqMap = node.getReqMap();
-    for (const auto& [key, req] : reqMap) {
+    for (const auto& [key, req] : reqMap.conjuncts()) {
         lowerPartialSchemaRequirement(key, req, n, ctx.getPathToInterval());
     }
     ctx.addNode(n, true /*clear*/);
@@ -1217,14 +1215,13 @@ static SplitRequirementsResult splitRequirements(
                                    boost::optional<ProjectionName> boundProjectionName,
                                    IntervalReqExpr::Node intervals) {
         // We always strip out the perf-only flag.
-        reqMap.emplace(key,
-                       PartialSchemaRequirement{std::move(boundProjectionName),
-                                                std::move(intervals),
-                                                false /*isPerfOnly*/});
+        reqMap.add(key,
+                   PartialSchemaRequirement{
+                       std::move(boundProjectionName), std::move(intervals), false /*isPerfOnly*/});
     };
 
     size_t index = 0;
-    for (const auto& [key, req] : reqMap) {
+    for (const auto& [key, req] : reqMap.conjuncts()) {
 
         if (((1ull << index) & mask) != 0) {
             bool addedToLeft = false;
@@ -1339,16 +1336,16 @@ struct ExploreConvert<SargableNode> {
         std::vector<bool> mayReturnNull;
         {
             // Pre-compute if a requirement's interval is fully open.
-            isFullyOpen.reserve(reqMap.size());
-            for (const auto& [key, req] : reqMap) {
+            isFullyOpen.reserve(reqMap.numLeaves());
+            for (const auto& [key, req] : reqMap.conjuncts()) {
                 isFullyOpen.push_back(isIntervalReqFullyOpenDNF(req.getIntervals()));
             }
 
             if (!hints._fastIndexNullHandling && !isIndex) {
                 // Pre-compute if a requirement's interval may contain nulls, and also has an output
                 // binding.
-                mayReturnNull.reserve(reqMap.size());
-                for (const auto& [key, req] : reqMap) {
+                mayReturnNull.reserve(reqMap.numLeaves());
+                for (const auto& [key, req] : reqMap.conjuncts()) {
                     mayReturnNull.push_back(req.mayReturnNull(ctx.getConstFold()));
                 }
             }
@@ -1359,7 +1356,7 @@ struct ExploreConvert<SargableNode> {
         // try having at least one predicate on the left (mask = 1), and we try all possible
         // subsets. For index intersection however (isIndex = true), we try symmetric partitioning
         // (thus the high bound is 2^(N-1)).
-        const size_t reqSize = reqMap.size();
+        const size_t reqSize = reqMap.numConjuncts();
         const size_t highMask = isIndex ? (1ull << (reqSize - 1)) : (1ull << reqSize);
         for (size_t mask = 1; mask < highMask; mask++) {
             SplitRequirementsResult splitResult = splitRequirements(mask,

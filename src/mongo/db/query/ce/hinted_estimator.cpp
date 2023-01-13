@@ -40,7 +40,7 @@ public:
                      CEType /*bindsResult*/,
                      CEType /*refsResult*/) {
         CEType result = childResult;
-        for (const auto& [key, req] : node.getReqMap()) {
+        for (const auto& [key, req] : node.getReqMap().conjuncts()) {
             if (!isIntervalReqFullyOpenDNF(req.getIntervals())) {
                 auto it = _hints.find(key);
                 if (it != _hints.cend()) {

@@ -75,7 +75,7 @@ public:
     void transport(ABT& n, const SargableNode& node, ABT& childResult, ABT& refs, ABT& binds) {
         ABT result = childResult;
         // Retain only output bindings without applying filters.
-        for (const auto& [key, req] : node.getReqMap()) {
+        for (const auto& [key, req] : node.getReqMap().conjuncts()) {
             if (const auto& boundProjName = req.getBoundProjectionName()) {
                 lowerPartialSchemaRequirement(
                     key,
@@ -161,7 +161,7 @@ public:
         // Here we assume that each requirement is independent.
         // TODO: consider estimating together the entire set of requirements (but caching!)
         CEType result = childResult;
-        for (const auto& [key, req] : node.getReqMap()) {
+        for (const auto& [key, req] : node.getReqMap().conjuncts()) {
             if (req.getIsPerfOnly()) {
                 // Ignore perf-only requirements.
                 continue;

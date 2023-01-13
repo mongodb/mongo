@@ -250,7 +250,7 @@ public:
 
         // Initial first pass through the requirements map to extract information about each path.
         std::map<std::string, SargableConjunct> conjunctRequirements;
-        for (const auto& [key, req] : node.getReqMap()) {
+        for (const auto& [key, req] : node.getReqMap().conjuncts()) {
             if (req.getIsPerfOnly()) {
                 // Ignore perf-only requirements.
                 continue;

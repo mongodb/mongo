@@ -623,7 +623,7 @@ void Memo::estimateCE(const Context& ctx, const GroupIdType groupId) {
         auto& partialSchemaKeyCE = ceProp.getPartialSchemaKeyCE();
         invariant(partialSchemaKeyCE.empty());
 
-        for (const auto& [key, req] : sargablePtr->getReqMap()) {
+        for (const auto& [key, req] : sargablePtr->getReqMap().conjuncts()) {
             ABT singularReq = make<SargableNode>(PartialSchemaRequirements{{key, req}},
                                                  CandidateIndexes{},
                                                  ScanParams{},

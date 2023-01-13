@@ -189,6 +189,111 @@ bool PartialSchemaKeyLessComparator::operator()(const PartialSchemaKey& k1,
     return compareExprAndPaths(k1._path, k2._path) < 0;
 }
 
+void PartialSchemaRequirements::normalize() {
+    std::stable_sort(
+        _repr.begin(),
+        _repr.end(),
+        [lt = PartialSchemaKeyLessComparator{}](const auto& entry1, const auto& entry2) -> bool {
+            return lt(entry1.first, entry2.first);
+        });
+}
+
+PartialSchemaRequirements::PartialSchemaRequirements(
+    std::vector<PartialSchemaRequirements::Entry> entries) {
+    for (Entry& entry : entries) {
+        _repr.push_back(std::move(entry));
+    }
+
+    normalize();
+}
+
+std::set<ProjectionName> PartialSchemaRequirements::getBoundNames() const {
+    std::set<ProjectionName> names;
+    for (auto&& [key, b] : iterateBindings()) {
+        names.insert(b);
+    }
+    return names;
+}
+
+bool PartialSchemaRequirements::operator==(const PartialSchemaRequirements& other) const {
+    return _repr == other._repr;
+}
+
+bool PartialSchemaRequirements::empty() const {
+    return _repr.empty();
+}
+
+size_t PartialSchemaRequirements::numLeaves() const {
+    return _repr.size();
+}
+
+size_t PartialSchemaRequirements::numConjuncts() const {
+    return _repr.size();
+}
+
+boost::optional<ProjectionName> PartialSchemaRequirements::findProjection(
+    const PartialSchemaKey& key) const {
+    for (auto [k, req] : _repr) {
+        if (k == key) {
+            return req.getBoundProjectionName();
+        }
+    }
+    return {};
+}
+
+boost::optional<std::pair<size_t, PartialSchemaRequirement>>
+PartialSchemaRequirements::findFirstConjunct(const PartialSchemaKey& key) const {
+    size_t i = 0;
+    for (auto [k, req] : _repr) {
+        if (k == key) {
+            return {{i, req}};
+        }
+        ++i;
+    }
+    return {};
+}
+
+PartialSchemaRequirements::Bindings PartialSchemaRequirements::iterateBindings() const {
+    Bindings result;
+    for (auto&& [key, req] : _repr) {
+        if (auto binding = req.getBoundProjectionName()) {
+            result.emplace_back(key, *binding);
+        }
+    }
+    return result;
+}
+
+void PartialSchemaRequirements::add(PartialSchemaKey key, PartialSchemaRequirement req) {
+    _repr.emplace_back(std::move(key), std::move(req));
+
+    normalize();
+}
+
+void PartialSchemaRequirements::transform(
+    std::function<void(const PartialSchemaKey&, PartialSchemaRequirement&)> func) {
+    for (auto& [key, req] : _repr) {
+        func(key, req);
+    }
+}
+
+bool PartialSchemaRequirements::simplify(
+    std::function<bool(const PartialSchemaKey&, PartialSchemaRequirement&)> func) {
+    for (auto it = _repr.begin(); it != _repr.end();) {
+        auto& [key, req] = *it;
+
+        if (!func(key, req)) {
+            return false;
+        }
+        if (isIntervalReqFullyOpenDNF(it->second.getIntervals()) && !req.getBoundProjectionName()) {
+            it = _repr.erase(it);
+        } else {
+            ++it;
+        }
+    }
+    return true;
+}
+
+
 ResidualRequirement::ResidualRequirement(PartialSchemaKey key,
                                          PartialSchemaRequirement req,
                                          size_t entryIndex)

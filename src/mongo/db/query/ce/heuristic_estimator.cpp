@@ -223,7 +223,7 @@ public:
 
         SelectivityType topLevelSel{1.0};
         std::vector<SelectivityType> topLevelSelectivities;
-        for (const auto& [key, req] : node.getReqMap()) {
+        for (const auto& [key, req] : node.getReqMap().conjuncts()) {
             if (req.getIsPerfOnly()) {
                 // Ignore perf-only requirements.
                 continue;

@@ -62,6 +62,13 @@ static void populateInitialDistributions(const DistributionAndPaths& distributio
     }
 }
 
+/**
+ * If the projections in 'req' cover every path of 'distributionAndPaths',
+ * then add a new 'DistributionAndProjections' entry to 'distributions'.
+ *
+ * This is used to populate metadata in a SargableNode, so we know what distributions
+ * it can provide, and what projection names matter for each one.
+ */
 static void populateDistributionPaths(const PartialSchemaRequirements& req,
                                       const ProjectionName& scanProjectionName,
                                       const DistributionAndPaths& distributionAndPaths,
@@ -72,12 +79,10 @@ static void populateDistributionPaths(const PartialSchemaRequirements& req,
             ProjectionNameVector distributionProjections;
 
             for (const ABT& path : distributionAndPaths._paths) {
-                auto it = req.find(PartialSchemaKey{scanProjectionName, path});
-                if (it == req.cend()) {
+                if (auto binding = req.findProjection({scanProjectionName, path})) {
+                    distributionProjections.push_back(*binding);
+                } else {
                     break;
-                }
-                if (const auto& boundProjName = it->second.getBoundProjectionName()) {
-                    distributionProjections.push_back(*boundProjName);
                 }
             }
 
@@ -100,7 +105,7 @@ static bool computeEqPredsOnly(const PartialSchemaRequirements& reqMap) {
     PartialSchemaKeySet equalityKeys;
     PartialSchemaKeySet fullyOpenKeys;
 
-    for (const auto& [key, req] : reqMap) {
+    for (const auto& [key, req] : reqMap.conjuncts()) {
         const auto& intervals = req.getIntervals();
         if (auto singularInterval = IntervalReqExpr::getSingularDNF(intervals)) {
             if (singularInterval->isFullyOpen()) {

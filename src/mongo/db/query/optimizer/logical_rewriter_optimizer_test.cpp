@@ -2438,14 +2438,7 @@ TEST(LogicalRewriter, EmptyArrayIndexBounds) {
     auto phaseManager = makePhaseManager(
         {OptPhase::MemoSubstitutionPhase},
         prefixId,
-        {{{"c1",
-           createScanDef(
-               {},
-               {{"index1",
-                 IndexDefinition{{{makeNonMultikeyIndexPath("a"), CollationOp::Ascending}},
-                                 false /*isMultiKey*/,
-                                 {DistributionType::Centralized},
-                                 {}}}})}}},
+        {{{"c1", createScanDef({}, {})}}},
         boost::none /*costModel*/,
         {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
 
@@ -2469,11 +2462,9 @@ TEST(LogicalRewriter, EmptyArrayIndexBounds) {
         "|   Const [[]]\n"
         "Sargable [Complete]\n"
         "|   |   |   |   |   requirementsMap: \n"
-        "|   |   |   |   |       refProjection: root, path: 'PathGet [a] PathIdentity []', interv"
-        "als: {{{=Const [undefined]}} U {{=Const [[]]}}}, perfOnly\n"
+        "|   |   |   |   |       refProjection: root, path: 'PathGet [a] PathTraverse [1] PathIde"
+        "ntity []', intervals: {{{=Const [undefined]}} U {{=Const [[]]}}}, perfOnly\n"
         "|   |   |   |   candidateIndexes: \n"
-        "|   |   |   |       candidateId: 1, index1, {}, {Compound}, {{{=Const [undefined]}} U "
-        "{{=Const [[]]}}}\n"
         "|   |   |   scanParams: \n"
         "|   |   |       {}\n"
         "|   |   BindBlock:\n"

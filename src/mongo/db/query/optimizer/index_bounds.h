@@ -142,13 +142,122 @@ struct PartialSchemaKeyLessComparator {
 };
 
 /**
- * Map from referred (or input) projection name to list of requirements for that projection.
+ * Represents a set of predicates and projections. Cannot represent all predicates/projections:
+ * only those that can typically be answered efficiently with an index.
+ *
  * Only one instance of a path without Traverse elements (non-multikey) is allowed. By contrast
  * several instances of paths with Traverse elements (multikey) are allowed. For example: Get "a"
  * Get "b" Id is allowed just once while Get "a" Traverse Get "b" Id is allowed multiple times.
+ *
+ * The default / empty state represents a conjunction of zero predicates, which means always true.
  */
-using PartialSchemaRequirements =
-    std::multimap<PartialSchemaKey, PartialSchemaRequirement, PartialSchemaKeyLessComparator>;
+class PartialSchemaRequirements {
+public:
+    using Entry = std::pair<PartialSchemaKey, PartialSchemaRequirement>;
+    struct ConstIter {
+        auto begin() const {
+            return _begin;
+        }
+        auto end() const {
+            return _end;
+        }
+        auto cbegin() const {
+            return _begin;
+        }
+        auto cend() const {
+            return _end;
+        }
+
+        std::vector<Entry>::const_iterator _begin;
+        std::vector<Entry>::const_iterator _end;
+    };
+
+    struct Iter {
+        auto begin() const {
+            return _begin;
+        }
+        auto end() const {
+            return _end;
+        }
+        auto cbegin() const {
+            return _begin;
+        }
+        auto cend() const {
+            return _end;
+        }
+
+        std::vector<Entry>::iterator _begin;
+        std::vector<Entry>::iterator _end;
+    };
+
+    PartialSchemaRequirements() = default;
+    PartialSchemaRequirements(std::vector<Entry>);
+    PartialSchemaRequirements(std::initializer_list<Entry> entries)
+        : PartialSchemaRequirements(std::vector<Entry>(entries)) {}
+
+    bool operator==(const PartialSchemaRequirements& other) const;
+
+    /**
+     * Return true if there are zero predicates and zero projections.
+     */
+    bool empty() const;
+
+    size_t numLeaves() const;
+    size_t numConjuncts() const;
+
+    std::set<ProjectionName> getBoundNames() const;
+
+    boost::optional<ProjectionName> findProjection(const PartialSchemaKey&) const;
+
+    /**
+     * Picks the first top-level conjunct matching the given key.
+     *
+     * Result includes the index of the top-level conjunct.
+     */
+    boost::optional<std::pair<size_t, PartialSchemaRequirement>> findFirstConjunct(
+        const PartialSchemaKey&) const;
+
+    ConstIter conjuncts() const {
+        return {_repr.begin(), _repr.end()};
+    }
+
+    Iter conjuncts() {
+        return {_repr.begin(), _repr.end()};
+    }
+
+    using Bindings = std::vector<std::pair<PartialSchemaKey, ProjectionName>>;
+    Bindings iterateBindings() const;
+
+    void add(PartialSchemaKey, PartialSchemaRequirement);
+
+    /**
+     * Apply an in-place transformation to each PartialSchemaRequirement.
+     *
+     * Since the key is only exposed read-only to the callback, we don't need to
+     * worry about restoring the no-Traverseless-duplicates invariant.
+     */
+    void transform(std::function<void(const PartialSchemaKey&, PartialSchemaRequirement&)>);
+
+    /**
+     * Apply a simplification to each PartialSchemaRequirement.
+     *
+     * The callback can return false if an individual PartialSchemaRequirement
+     * simplifies to an always-false predicate.
+     *
+     * This method returns false if the overall result is an always-false predicate.
+     *
+     * This method will also remove any predicates that are trivially true (those will
+     * a fully open DNF interval).
+     */
+    bool simplify(std::function<bool(const PartialSchemaKey&, PartialSchemaRequirement&)>);
+
+private:
+    // Restore the invariant that the entries are sorted by key.
+    void normalize();
+
+    using Repr = std::vector<Entry>;
+    Repr _repr;
+};
 
 /**
  * Used to track cardinality estimates per predicate inside a PartialSchemaRequirement. The order of

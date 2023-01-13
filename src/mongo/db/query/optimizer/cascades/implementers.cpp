@@ -423,7 +423,7 @@ public:
 
         const ProjectionName& scanProjectionName = indexingAvailability.getScanProjection();
         const PartialSchemaRequirements& reqMap = node.getReqMap();
-        for (const auto& [key, req] : reqMap) {
+        for (const auto& [key, req] : reqMap.conjuncts()) {
             if (key._projectionName != scanProjectionName) {
                 // We can only satisfy partial schema requirements using our root projection.
                 return;
@@ -444,7 +444,7 @@ public:
                 requiresRootProjection = projectionsLeftToSatisfy.erase(scanProjectionName);
             }
 
-            for (const auto& entry : reqMap) {
+            for (const auto& entry : reqMap.conjuncts()) {
                 if (const auto& boundProjName = entry.second.getBoundProjectionName()) {
                     // Project field only if it required.
                     projectionsLeftToSatisfy.erase(*boundProjName);
@@ -526,8 +526,10 @@ public:
                 {
                     PartialSchemaKeySet residualQueryKeySet;
                     for (const auto& [residualKey, residualReq, entryIndex] : residualReqs) {
-                        auto entryIt = reqMap.cbegin();
+                        // Find the indexed requirement this residual requirement refers to.
+                        auto entryIt = reqMap.conjuncts().cbegin();
                         std::advance(entryIt, entryIndex);
+
                         residualQueryKeySet.emplace(entryIt->first);
                         residualReqsWithCE.emplace_back(
                             residualKey, residualReq, partialSchemaKeyCE.at(entryIndex).second);
@@ -535,7 +537,7 @@ public:
 
                     if (scanGroupCE > 0.0) {
                         size_t entryIndex = 0;
-                        for (const auto& [key, req] : reqMap) {
+                        for (const auto& [key, req] : reqMap.conjuncts()) {
                             if (residualQueryKeySet.count(key) == 0) {
                                 const SelectivityType sel =
                                     partialSchemaKeyCE.at(entryIndex).second / scanGroupCE;
@@ -1476,10 +1478,9 @@ private:
                     distribAndProjections._projectionNames;
 
                 for (const ABT& partitioningPath : distributionAndPaths._paths) {
-                    if (auto it = reqMap.find(PartialSchemaKey{scanProjection, partitioningPath});
-                        it != reqMap.cend() &&
-                        it->second.getBoundProjectionName() ==
-                            requiredProjections.at(distributionPartitionIndex)) {
+                    if (auto proj = reqMap.findProjection(
+                            PartialSchemaKey{scanProjection, partitioningPath});
+                        proj && *proj == requiredProjections.at(distributionPartitionIndex)) {
                         distributionPartitionIndex++;
                     } else {
                         return false;

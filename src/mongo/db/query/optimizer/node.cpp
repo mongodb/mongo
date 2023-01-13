@@ -372,17 +372,15 @@ const ProjectionName& RIDUnionNode::getScanProjectionName() const {
 
 static ProjectionNameVector createSargableBindings(const PartialSchemaRequirements& reqMap) {
     ProjectionNameVector result;
-    for (const auto& entry : reqMap) {
-        if (const auto& boundProjName = entry.second.getBoundProjectionName()) {
-            result.push_back(*boundProjName);
-        }
+    for (const auto& [key, binding] : reqMap.iterateBindings()) {
+        result.push_back(binding);
     }
     return result;
 }
 
 static ProjectionNameVector createSargableReferences(const PartialSchemaRequirements& reqMap) {
     ProjectionNameOrderPreservingSet result;
-    for (const auto& entry : reqMap) {
+    for (const auto& entry : reqMap.conjuncts()) {
         result.emplace_back(*entry.first._projectionName);
     }
     return result.getVector();
@@ -403,12 +401,12 @@ SargableNode::SargableNode(PartialSchemaRequirements reqMap,
     assertNodeSort(getChild());
     tassert(6624085, "SargableNode requires at least one predicate", !_reqMap.empty());
     tassert(6624086,
-            str::stream() << "SargableNode has too many predicates: " << _reqMap.size(),
-            _reqMap.size() <= kMaxPartialSchemaReqs);
+            str::stream() << "SargableNode has too many predicates: " << _reqMap.numLeaves(),
+            _reqMap.numLeaves() <= kMaxPartialSchemaReqs);
 
     // Assert merged map does not contain duplicate bound projections.
     ProjectionNameSet boundsProjectionNameSet;
-    for (const auto& [key, req] : _reqMap) {
+    for (const auto& [key, req] : _reqMap.conjuncts()) {
         if (const auto& boundProjName = req.getBoundProjectionName()) {
             tassert(6624094,
                     "SargableNode has a multikey requirement with a non-trivial interval which "
@@ -427,7 +425,7 @@ SargableNode::SargableNode(PartialSchemaRequirements reqMap,
     }
 
     // Assert there are no references to internally bound projections.
-    for (const auto& [key, req] : _reqMap) {
+    for (const auto& [key, req] : _reqMap.conjuncts()) {
         tassert(6624088,
                 "SargableNode cannot reference an internally bound projection",
                 boundsProjectionNameSet.count(*key._projectionName) == 0);
@@ -436,7 +434,7 @@ SargableNode::SargableNode(PartialSchemaRequirements reqMap,
     // Assert that non-multikey paths have at most one requirement.
     {
         PartialSchemaKeySet seen;
-        for (auto&& [key, req] : reqMap) {
+        for (auto&& [key, req] : reqMap.conjuncts()) {
             if (!checkPathContainsTraverse(key._path)) {
                 auto inserted = seen.insert(key).second;
                 tassert(7155020,

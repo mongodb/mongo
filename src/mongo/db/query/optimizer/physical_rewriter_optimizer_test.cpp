@@ -4830,7 +4830,7 @@ TEST(PhysRewriter, HashPartitioning) {
         optimized);
 }
 
-TEST(PhysRewriter, IndexPartitioning) {
+TEST(PhysRewriter, IndexPartitioning0) {
     using namespace properties;
     auto prefixId = PrefixId::createForTests();
 
