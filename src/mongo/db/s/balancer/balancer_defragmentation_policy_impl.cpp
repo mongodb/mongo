@@ -58,6 +58,8 @@ const std::string kProgress("progress");
 const std::string kNoPhase("none");
 const std::string kRemainingChunksToProcess("remainingChunksToProcess");
 
+static constexpr int64_t kBigChunkMarker = std::numeric_limits<int64_t>::max();
+
 ChunkVersion getShardVersion(OperationContext* opCtx,
                              const ShardId& shardId,
                              const NamespaceString& nss) {
@@ -309,7 +311,7 @@ public:
                             // the chunk from the list of candidates considered by
                             // MoveAndMergeChunksPhase
                             auto estimatedSize = dataSizeResponse.getValue().maxSizeReached
-                                ? std::numeric_limits<int64_t>::max()
+                                ? kBigChunkMarker
                                 : dataSizeResponse.getValue().sizeBytes;
                             catalogManager->setChunkEstimatedSize(
                                 opCtx,
@@ -519,6 +521,7 @@ public:
                                 _nss, boost::none, moveRequest.getDestinationShard());
 
                         auto transferredAmount = moveRequest.getMovedDataSizeBytes();
+                        invariant(transferredAmount <= _smallChunkSizeThresholdBytes);
                         _shardInfos.at(moveRequest.getSourceShard()).currentSizeBytes -=
                             transferredAmount;
                         _shardInfos.at(moveRequest.getDestinationShard()).currentSizeBytes +=
@@ -607,13 +610,11 @@ public:
 
                         auto& chunkToDelete = mergeRequest.chunkToMove;
                         mergedChunk->range = mergeRequest.asMergedRange();
-                        if (mergedChunk->estimatedSizeBytes !=
-                                std::numeric_limits<int64_t>::max() &&
-                            chunkToDelete->estimatedSizeBytes !=
-                                std::numeric_limits<int64_t>::max()) {
+                        if (mergedChunk->estimatedSizeBytes != kBigChunkMarker &&
+                            chunkToDelete->estimatedSizeBytes != kBigChunkMarker) {
                             mergedChunk->estimatedSizeBytes += chunkToDelete->estimatedSizeBytes;
                         } else {
-                            mergedChunk->estimatedSizeBytes = std::numeric_limits<int64_t>::max();
+                            mergedChunk->estimatedSizeBytes = kBigChunkMarker;
                         }
                         mergedChunk->busyInOperation = false;
                         auto deletedChunkShard = chunkToDelete->shard;
@@ -781,7 +782,7 @@ private:
             return chunkToMove->range.getMin();
         }
 
-        uint64_t getMovedDataSizeBytes() const {
+        int64_t getMovedDataSizeBytes() const {
             return chunkToMove->estimatedSizeBytes;
         }
 
@@ -1022,8 +1023,10 @@ private:
                    mergeableSibling.estimatedSizeBytes) {
             ranking += kConvenientMove;
         }
-        auto estimatedMergedSize =
-            chunkTobeMovedAndMerged.estimatedSizeBytes + mergeableSibling.estimatedSizeBytes;
+        auto estimatedMergedSize = (chunkTobeMovedAndMerged.estimatedSizeBytes == kBigChunkMarker ||
+                                    mergeableSibling.estimatedSizeBytes == kBigChunkMarker)
+            ? kBigChunkMarker
+            : chunkTobeMovedAndMerged.estimatedSizeBytes + mergeableSibling.estimatedSizeBytes;
         if (estimatedMergedSize > _smallChunkSizeThresholdBytes) {
             ranking += mergeableSibling.estimatedSizeBytes < _smallChunkSizeThresholdBytes
                 ? kMergeSolvesTwoPendingChunks
