@@ -97,9 +97,12 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
     // Step 1: rename the ECOC collection if it exists
     auto ecoc = catalog->lookupCollectionByNamespace(opCtx, namespaces.ecocNss);
     auto ecocRename = catalog->lookupCollectionByNamespace(opCtx, namespaces.ecocRenameNss);
-    bool renamed = false;
 
-    if (ecoc && !ecocRename) {
+    if (!ecoc && !ecocRename) {
+        // nothing to compact
+        LOGV2(6548306, "Skipping compaction as there is no ECOC collection to compact");
+        return CompactStats(ECOCStats(), ECStats(), ECStats());
+    } else if (ecoc && !ecocRename) {
         LOGV2(6319901,
               "Renaming the encrypted compaction collection",
               "ecocNss"_attr = namespaces.ecocNss,
@@ -108,14 +111,15 @@ CompactStats compactEncryptedCompactionCollection(OperationContext* opCtx,
         validateAndRunRenameCollection(
             opCtx, namespaces.ecocNss, namespaces.ecocRenameNss, renameOpts);
         ecoc.reset();
-        renamed = true;
     }
 
-    if (!ecocRename && !renamed) {
-        // no pre-existing renamed ECOC collection and the rename did not occur,
-        // so there is nothing to compact
-        LOGV2(6548306, "Skipping compaction as there is no ECOC collection to compact");
-        return CompactStats(ECOCStats(), ECStats(), ECStats());
+    if (!ecoc) {
+        // create ECOC
+        CreateCommand createCmd(namespaces.ecocNss);
+        mongo::ClusteredIndexSpec clusterIdxSpec(BSON("_id" << 1), true);
+        createCmd.setClusteredIndex(
+            stdx::variant<bool, mongo::ClusteredIndexSpec>(std::move(clusterIdxSpec)));
+        uassertStatusOK(createCollection(opCtx, createCmd));
     }
 
     // Step 2: for each encrypted field in compactionTokens, get distinct set of entries 'C'
