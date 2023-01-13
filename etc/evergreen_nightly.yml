@@ -408,3 +408,177 @@ buildvariants:
       distros:
         - rhel80-xlarge
     - name: .sharding
+
+- name: enterprise-rhel-80-64-bit-large-txns-format
+  display_name: "Enterprise RHEL 8.0 (large transactions format)"
+  modules:
+  - enterprise
+  run_on:
+  - rhel80-small
+  cron: "0 4 * * 0"
+  expansions:
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug
+    compile_flags: >-
+      --ssl
+      MONGO_DISTMOD=rhel80
+      -j$(grep -c ^processor /proc/cpuinfo)
+      --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
+      --link-model=dynamic
+    multiversion_platform: rhel80
+    multiversion_edition: enterprise
+    repo_edition: enterprise
+    scons_cache_mode: all
+    scons_cache_scope: shared
+    num_scons_link_jobs_available: 0.99
+    large_distro_name: rhel80-medium
+    test_flags: >-
+      --mongodSetParameters="{maxNumberOfTransactionOperationsInSingleOplogEntry: 2}"
+      --excludeWithAnyTags=exclude_from_large_txns
+  tasks:
+  - name: compile_test_and_package_parallel_core_stream_TG
+    distros:
+    - rhel80-large
+  - name: auth_gen
+  - name: auth_audit_gen
+  - name: causally_consistent_jscore_txns_passthrough
+  - name: change_streams
+  - name: change_streams_whole_db_passthrough
+  - name: change_streams_whole_cluster_passthrough
+  - name: concurrency_replication_gen
+  - name: concurrency_replication_multi_stmt_txn_gen
+  - name: concurrency_sharded_replication_gen
+  - name: concurrency_sharded_replication_with_balancer_gen
+  - name: concurrency_sharded_clusterwide_ops_add_remove_shards_gen
+  - name: concurrency_sharded_local_read_write_multi_stmt_txn_gen
+  - name: concurrency_sharded_local_read_write_multi_stmt_txn_with_balancer_gen
+  - name: concurrency_sharded_multi_stmt_txn_gen
+  - name: concurrency_sharded_multi_stmt_txn_with_balancer_gen
+  - name: concurrency_sharded_multi_stmt_txn_with_stepdowns_gen
+  - name: concurrency_sharded_with_stepdowns_gen
+  - name: concurrency_sharded_with_stepdowns_and_balancer_gen
+  - name: initial_sync_fuzzer_gen
+  - name: jsCore
+  - name: jsCore_txns
+  - name: .logical_session_cache .repl
+  - name: .multi_shard
+  - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
+  - name: multiversion_auth_gen
+  - name: multiversion_gen
+  - name: noPassthrough_gen
+  - name: .replica_sets !.multi_oplog !.large
+  - name: .replica_sets !.multi_oplog .large
+    distros:
+    - rhel80-medium
+  - name: .resharding_fuzzer
+  - name: .rollbackfuzzer
+  - name: .sharding .txns
+  - name: sharding_gen
+  - name: sharding_auth_gen
+  - name: sharding_auth_audit_gen
+  - name: sharding_ese_gen
+  - name: sharding_ese_gcm_gen
+  - name: sharding_csrs_continuous_config_stepdown_gen
+  - name: sharded_multi_stmt_txn_jscore_passthrough
+    distros:
+    - rhel80-medium
+  - name: generate_buildid_to_debug_symbols_mapping
+
+
+- &enterprise-rhel-80-64-bit-dynamic-classic-engine
+  name: enterprise-rhel-80-64-bit-dynamic-classic-engine
+  display_name: "Shared Library Enterprise RHEL 8.0 (Classic Engine)"
+  cron: "0 4 * * 0"
+  modules:
+  - enterprise
+  run_on:
+  - rhel80-small
+  expansions:
+    additional_package_targets: archive-mongocryptd archive-mongocryptd-debug archive-mh archive-mh-debug
+    compile_flags: --ssl MONGO_DISTMOD=rhel80 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars --link-model=dynamic
+    multiversion_platform: rhel80
+    multiversion_edition: enterprise
+    has_packages: false
+    scons_cache_scope: shared
+    scons_cache_mode: all
+    jstestfuzz_num_generated_files: 40
+    jstestfuzz_concurrent_num_files: 10
+    target_resmoke_time: 10
+    max_sub_suites: 5
+    large_distro_name: rhel80-medium
+    num_scons_link_jobs_available: 0.99
+    test_flags: >-
+      --mongodSetParameters="{internalQueryForceClassicEngine: true}"
+  tasks:
+  - name: .aggfuzzer
+  - name: .aggregation
+  - name: .auth
+  - name: .causally_consistent !.sharding
+  - name: .change_stream_fuzzer
+  - name: .change_streams
+  - name: .concurrency !.large !.ubsan !.no_txns !.debug_only
+  - name: .concurrency .large !.ubsan !.no_txns !.debug_only
+    distros:
+    - rhel80-medium
+  - name: .encrypt
+  - name: .integration
+    distros:
+    - rhel80-medium
+  - name: .jscore .common !jsCore
+  - name: .jstestfuzz !.flow_control
+  - name: .misc_js
+  - name: .multi_shard
+  - name: .query_fuzzer
+  - name: .random_multiversion_ds
+  - name: .read_only
+  - name: .read_write_concern !.large
+  - name: .read_write_concern .large
+    distros:
+    - rhel80-medium
+  - name: .replica_sets !.encrypt !.auth
+    distros:
+    - rhel80-xlarge
+  - name: .rollbackfuzzer
+  - name: .sharding .common
+  - name: .sharding .jscore !.wo_snapshot !.multi_stmt
+  - name: .sharding .txns
+  - name: .stitch
+  - name: .serverless
+    distros:
+    - rhel80-xlarge
+  - name: .updatefuzzer
+  - name: audit
+  - name: compile_test_and_package_parallel_core_stream_TG
+    distros:
+    - rhel80-xlarge
+  - name: disk_wiredtiger
+  - name: initial_sync_fuzzer_gen
+  - name: jsCore
+    distros:
+    - rhel80-xlarge
+  - name: jsCore_minimum_batch_size
+  - name: jsCore_txns_large_txns_format
+  - name: json_schema
+  - name: lint_fuzzer_sanity_patch
+  - name: mqlrun
+  - name: multi_stmt_txn_jscore_passthrough_with_migration_gen
+  - name: multiversion_gen
+  - name: .multiversion_sanity_check
+  - name: replica_sets_api_version_jscore_passthrough_gen
+  - name: replica_sets_reconfig_jscore_passthrough_gen
+  - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
+    distros:
+    - rhel80-xlarge
+  - name: replica_sets_reconfig_kill_primary_jscore_passthrough_gen
+    distros:
+    - rhel80-xlarge
+  - name: retryable_writes_jscore_passthrough_gen
+  - name: retryable_writes_jscore_stepdown_passthrough_gen
+  - name: sasl
+  - name: search
+  - name: search_auth
+  - name: search_ssl
+  - name: secondary_reads_passthrough_gen
+  - name: session_jscore_passthrough
+  - name: sharding_api_version_jscore_passthrough_gen
+  - name: snmp
+  - name: test_api_version_compatibility
