@@ -1298,50 +1298,6 @@ functions:
   - *generate_version_expansions
   - *upload_version_expansions
 
-  "generate resmoke constants": &generate_resmoke_constants
-    command: subprocess.exec
-    type: test
-    params:
-      binary: bash
-      args:
-        - "src/evergreen/get_bin_and_fcv_versions.sh"
-
-  "archive resmoke constants": &archive_resmoke_constants
-    command: archive.targz_pack
-    params:
-      target: resmoke_constants.tgz
-      source_dir: "src"
-      include:
-        - ".resmoke_mongo_version.yml"
-        - ".resmoke_mongo_release_values.yml"
-
-  "upload resmoke constants": &upload_remoske_constants
-    command: s3.put
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      local_file: resmoke_constants.tgz
-      remote_file: ${project}/${version_id}/resmoke-constants.tgz
-      bucket: mciuploads
-      permissions: private
-      visibility: signed
-      content_type: application/tar
-      display_name: resmoke constants
-
-  "generate and upload resmoke constants":
-    - *generate_resmoke_constants
-    - *archive_resmoke_constants
-    - *upload_remoske_constants
-
-  "fetch resmoke constants": &fetch_resmoke_constants
-    command: s3.get
-    params:
-      aws_key: ${aws_key}
-      aws_secret: ${aws_secret}
-      remote_file: ${project}/${version_id}/resmoke-constants.tgz
-      bucket: mciuploads
-      extract_to: src
-
   "generate compile expansions":
   - *f_expansions_write
   - command: subprocess.exec
@@ -2429,7 +2385,14 @@ tasks:
 
   - *f_expansions_write
   - *gen_feature_flags
-  - *fetch_resmoke_constants
+
+  - *f_expansions_write
+  - command: subprocess.exec
+    type: test
+    params:
+      binary: bash
+      args:
+      - "src/evergreen/get_bin_and_fcv_versions.sh"
 
   - command: archive.targz_pack
     params:
@@ -4687,7 +4650,6 @@ tasks:
   - func: "set up venv"
   - func: "upload pip requirements"
   - func: "generate and upload version expansions"
-  - func: "generate and upload resmoke constants"
 
 - <<: *gen_task_template
   name: auth_audit_gen
