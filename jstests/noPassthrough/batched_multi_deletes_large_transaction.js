@@ -91,8 +91,10 @@ assert.eq(ops[0].o.count,
           'last oplog entry should contain total count of operations in chain: ' + tojson(ops[0]));
 assert(ops[1].o.partialTxn,
        'non-terminal oplog entry should have partialTxn field set to true: ' + tojson(ops[1]));
-assert(!ops[0].hasOwnProperty('prevOpTime'));
-assert(!ops[1].hasOwnProperty('prevOpTime'));
+assert(ops[0].hasOwnProperty('prevOpTime'));
+assert(ops[1].hasOwnProperty('prevOpTime'));
+assert.eq(ops[0].prevOpTime.ts, ops[1].ts);
+assert.eq(ops[1].prevOpTime.ts, Timestamp());
 
 // Secondary oplog application will reject the first applyOps entry in the oplog chain because it
 // is expecting a multi-document transaction with the 'lsid' and 'txnNumber' fields.

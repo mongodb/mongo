@@ -1902,12 +1902,17 @@ void OpObserverImpl::onBatchedWriteCommit(OperationContext* opCtx) {
                                                   bool firstOp,
                                                   bool lastOp,
                                                   std::vector<StmtId> stmtIdsWritten) {
-            // 'prevOpTime' is not allowed during oplog application because this field
-            // is not part of the the legacy atomic applyOps oplog entry format that
-            // we use to replicate batched writes.
+            // Remove 'prevOpTime' when replicating as a single applyOps oplog entry.
+            // This preserves backwards compatibility with the legacy atomic applyOps oplog
+            // entry format that we use to replicate batched writes.
             // OplogApplierImpl::_deriveOpsAndFillWriterVectors() enforces this restriction
             // using an invariant added in SERVER-43651.
-            oplogEntry->setPrevWriteOpTimeInTransaction(boost::none);
+            // For batched writes that replicate over a chain of applyOps oplog entries, we include
+            // 'prevOpTime' so that oplog application is able to consume all the linked operations,
+            // similar to large multi-document transactions. See SERVER-70572.
+            if (firstOp && lastOp) {
+                oplogEntry->setPrevWriteOpTimeInTransaction(boost::none);
+            }
             return logApplyOps(opCtx,
                                oplogEntry,
                                /*txnState=*/DurableTxnStateEnum::kCommitted,  // unused
