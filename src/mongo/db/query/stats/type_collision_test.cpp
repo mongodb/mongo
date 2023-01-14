@@ -73,7 +73,6 @@ TEST(TypeCollisionTest, ZeroedCollidingTypesHistogram) {
         "{ \
 		trueCount: 0.0, \
 		falseCount: 0.0, \
-		sampleRate: 1.0, \
 		emptyArrayCount: 0.0, \
 		typeCount: [ \
 			{ typeName: \"NumberInt32\", count: 1.0 }, \

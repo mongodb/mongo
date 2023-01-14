@@ -36,7 +36,6 @@
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/stats/max_diff.h"
-#include "mongo/db/query/stats/stats_gen.h"
 #include "mongo/db/query/stats/value_utils.h"
 #include "mongo/logv2/log.h"
 
@@ -47,53 +46,29 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 
-AccumulationExpression parseInternalConstructStats(ExpressionContext* const expCtx,
-                                                   BSONElement elem,
-                                                   VariablesParseState vps) {
-    expCtx->sbeCompatible = false;
+REGISTER_ACCUMULATOR(
+    _internalConstructStats,
+    genericParseSBEUnsupportedSingleExpressionAccumulator<AccumulatorInternalConstructStats>);
 
-    IDLParserContext parser("$_internalConstructStats");
-    tassert(7261401,
-            "expected $_internalConstructStats in the analyze pipeline to an object",
-            elem.isABSONObj());
-    auto params = InternalConstructStatsAccumulatorParams::parse(parser, elem.Obj());
-
-    auto initializer = ExpressionConstant::create(expCtx, Value(BSONNULL));
-    auto argument = Expression::parseOperand(expCtx, elem, vps);
-    return {initializer,
-            argument,
-            [expCtx, params]() {
-                return AccumulatorInternalConstructStats::create(expCtx, params.getSampleRate());
-            },
-            "_internalConstructStats"};
-}
-
-REGISTER_ACCUMULATOR(_internalConstructStats, parseInternalConstructStats);
 
 AccumulatorInternalConstructStats::AccumulatorInternalConstructStats(
-    ExpressionContext* const expCtx, double sampleRate)
-    : AccumulatorState(expCtx), _count(0.0), _sampleRate(sampleRate) {
+    ExpressionContext* const expCtx)
+    : AccumulatorState(expCtx), _count(0.0) {
     assertAllowedInternalIfRequired(
         expCtx->opCtx, "_internalConstructStats", AllowedWithClientType::kInternal);
     _memUsageBytes = sizeof(*this);
 }
 
 intrusive_ptr<AccumulatorState> AccumulatorInternalConstructStats::create(
-    ExpressionContext* const expCtx, double sampleRate) {
-    return new AccumulatorInternalConstructStats(expCtx, sampleRate);
+    ExpressionContext* const expCtx) {
+    return new AccumulatorInternalConstructStats(expCtx);
 }
 
 void AccumulatorInternalConstructStats::processInternal(const Value& input, bool merging) {
     uassert(8423375, "Can not merge analyze pipelines", !merging);
 
     const auto& doc = input.getDocument();
-    // The $project stage in the analyze pipeline outputs a document of the form:
-    //      {val: "some value from the collection"}
-    // The $_internalConstructStats accumulator looks like:
-    //      {$_internalConstructStats: {val: "$$ROOT", sampleRate: 0.5, ...}}
-    // Thus the `input` parameter has the form:
-    //      {val: {_id: ..., val: "some value from the collection"}, sampleRate: 0.5}
-    auto val = doc["val"][InternalConstructStatsAccumulatorParams::kValFieldName];
+    auto val = doc["val"];
 
     LOGV2_DEBUG(6735800, 4, "Extracted document", "val"_attr = val);
     _values.emplace_back(stats::SBEValue(mongo::optimizer::convertFrom(val)));
@@ -106,8 +81,7 @@ Value AccumulatorInternalConstructStats::getValue(bool toBeMerged) {
     uassert(8423374, "Can not merge analyze pipelines", !toBeMerged);
 
     // Generate and serialize maxdiff histogram for scalar and array values.
-    auto arrayHistogram =
-        stats::createArrayEstimator(_values, stats::ScalarHistogram::kMaxBuckets, _sampleRate);
+    auto arrayHistogram = stats::createArrayEstimator(_values, stats::ScalarHistogram::kMaxBuckets);
     auto stats = stats::makeStatistics(_count, arrayHistogram);
 
     return Value(stats);

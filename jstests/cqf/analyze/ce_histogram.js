@@ -127,7 +127,6 @@ function verifyCEForNDV(ndv) {
                 emptyArrayCount: 0.0,
                 trueCount: 0.0,
                 falseCount: 0.0,
-                sampleRate: 1.0,
                 typeCount: [{typeName, count: 0.0}],
             }
         };

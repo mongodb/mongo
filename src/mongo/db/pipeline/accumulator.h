@@ -236,21 +236,20 @@ public:
         return kName.rawData();
     }
 
-    explicit AccumulatorInternalConstructStats(ExpressionContext* expCtx, double);
+    explicit AccumulatorInternalConstructStats(ExpressionContext* expCtx);
 
     void processInternal(const Value& input, bool merging) final;
     Value getValue(bool toBeMerged) final;
     void reset() final;
 
-    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx, double);
+    static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx);
 
     bool isCommutative() const final {
         return true;
     }
 
 private:
-    double _count;  // Can't this be an int?
-    double _sampleRate;
+    double _count;
     std::vector<stats::SBEValue> _values;
 };
 
