@@ -835,6 +835,7 @@ struct __wt_connection_stats {
     int64_t txn_prepared_updates_key_repeated;
     int64_t txn_prepared_updates_rolledback;
     int64_t txn_read_overflow_remove;
+    int64_t txn_rollback_oldest_pinned;
     int64_t txn_prepare;
     int64_t txn_prepare_commit;
     int64_t txn_prepare_active;
@@ -889,7 +890,6 @@ struct __wt_connection_stats {
     int64_t txn_checkpoint;
     int64_t txn_checkpoint_obsolete_applied;
     int64_t txn_checkpoint_skipped;
-    int64_t txn_fail_cache;
     int64_t txn_checkpoint_fsync_post;
     int64_t txn_checkpoint_fsync_post_duration;
     int64_t txn_pinned_range;

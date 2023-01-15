@@ -2402,7 +2402,7 @@ __wt_cache_eviction_worker(WT_SESSION_IMPL *session, bool busy, bool readonly, d
             ret = __wt_txn_is_blocking(session);
             if (ret == WT_ROLLBACK) {
                 --cache->evict_aggressive_score;
-                WT_STAT_CONN_INCR(session, txn_fail_cache);
+                WT_STAT_CONN_INCR(session, txn_rollback_oldest_pinned);
                 __wt_verbose_debug1(
                   session, WT_VERB_TRANSACTION, "%s", session->txn->rollback_reason);
             }

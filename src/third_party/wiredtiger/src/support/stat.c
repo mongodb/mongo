@@ -1715,6 +1715,7 @@ static const char *const __stats_connection_desc[] = {
   "transaction: Number of prepared updates repeated on the same key",
   "transaction: Number of prepared updates rolled back",
   "transaction: number of times overflow removed value is read",
+  "transaction: oldest pinned transaction ID rolled back for eviction",
   "transaction: prepared transactions",
   "transaction: prepared transactions committed",
   "transaction: prepared transactions currently active",
@@ -1770,7 +1771,6 @@ static const char *const __stats_connection_desc[] = {
   "transaction: transaction checkpoints",
   "transaction: transaction checkpoints due to obsolete pages",
   "transaction: transaction checkpoints skipped because database was clean",
-  "transaction: transaction failures due to history store",
   "transaction: transaction fsync calls for checkpoint after allocating the transaction ID",
   "transaction: transaction fsync duration for checkpoint after allocating the transaction ID "
   "(usecs)",
@@ -2322,6 +2322,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->txn_prepared_updates_key_repeated = 0;
     stats->txn_prepared_updates_rolledback = 0;
     stats->txn_read_overflow_remove = 0;
+    stats->txn_rollback_oldest_pinned = 0;
     stats->txn_prepare = 0;
     stats->txn_prepare_commit = 0;
     stats->txn_prepare_active = 0;
@@ -2376,7 +2377,6 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->txn_checkpoint = 0;
     stats->txn_checkpoint_obsolete_applied = 0;
     stats->txn_checkpoint_skipped = 0;
-    stats->txn_fail_cache = 0;
     stats->txn_checkpoint_fsync_post = 0;
     /* not clearing txn_checkpoint_fsync_post_duration */
     /* not clearing txn_pinned_range */
@@ -2947,6 +2947,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->txn_prepared_updates_key_repeated += WT_STAT_READ(from, txn_prepared_updates_key_repeated);
     to->txn_prepared_updates_rolledback += WT_STAT_READ(from, txn_prepared_updates_rolledback);
     to->txn_read_overflow_remove += WT_STAT_READ(from, txn_read_overflow_remove);
+    to->txn_rollback_oldest_pinned += WT_STAT_READ(from, txn_rollback_oldest_pinned);
     to->txn_prepare += WT_STAT_READ(from, txn_prepare);
     to->txn_prepare_commit += WT_STAT_READ(from, txn_prepare_commit);
     to->txn_prepare_active += WT_STAT_READ(from, txn_prepare_active);
@@ -3004,7 +3005,6 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->txn_checkpoint += WT_STAT_READ(from, txn_checkpoint);
     to->txn_checkpoint_obsolete_applied += WT_STAT_READ(from, txn_checkpoint_obsolete_applied);
     to->txn_checkpoint_skipped += WT_STAT_READ(from, txn_checkpoint_skipped);
-    to->txn_fail_cache += WT_STAT_READ(from, txn_fail_cache);
     to->txn_checkpoint_fsync_post += WT_STAT_READ(from, txn_checkpoint_fsync_post);
     to->txn_checkpoint_fsync_post_duration +=
       WT_STAT_READ(from, txn_checkpoint_fsync_post_duration);
