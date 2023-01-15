@@ -177,6 +177,8 @@ conn_stats = [
     ConnStat('memory_allocation', 'memory allocations'),
     ConnStat('memory_free', 'memory frees'),
     ConnStat('memory_grow', 'memory re-allocations'),
+    ConnStat('no_session_sweep_5min', 'number of sessions without a sweep for 5+ minutes'),
+    ConnStat('no_session_sweep_60min', 'number of sessions without a sweep for 60+ minutes'),
     ConnStat('read_io', 'total read I/Os'),
     ConnStat('rwlock_read', 'pthread mutex shared lock read-lock calls'),
     ConnStat('rwlock_write', 'pthread mutex shared lock write-lock calls'),

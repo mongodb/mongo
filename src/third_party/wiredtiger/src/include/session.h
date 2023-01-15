@@ -98,6 +98,8 @@ struct __wt_session_impl {
     uint32_t cursor_sweep_position;  /* Position in cursor_cache for sweep */
     uint64_t last_cursor_big_sweep;  /* Last big sweep for dead cursors */
     uint64_t last_cursor_sweep;      /* Last regular sweep for dead cursors */
+    u_int sweep_warning_5min;        /* Whether the session was without sweep for 5 min. */
+    u_int sweep_warning_60min;       /* Whether the session was without sweep for 60 min. */
 
     WT_CURSOR_BACKUP *bkp_cursor; /* Hot backup cursor */
 

@@ -262,6 +262,72 @@ __sweep_server_run_chk(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __sweep_check_session_sweep --
+ *     Check for any "rogue" sessions, which did not run a session sweep in a long time.
+ */
+static void
+__sweep_check_session_sweep(WT_SESSION_IMPL *session, uint64_t now)
+{
+    WT_CONNECTION_IMPL *conn;
+    WT_SESSION_IMPL *s;
+    uint64_t last, last_cursor_big_sweep, last_sweep;
+    uint32_t i;
+
+    conn = S2C(session);
+
+    for (s = conn->sessions, i = 0; i < conn->session_cnt; ++s, ++i) {
+        /*
+         * Ignore inactive and internal sessions.
+         */
+        if (!s->active)
+            continue;
+        if (F_ISSET(s, WT_SESSION_INTERNAL))
+            continue;
+
+        last_cursor_big_sweep = s->last_cursor_big_sweep;
+        last_sweep = s->last_sweep;
+
+        /*
+         * Get the earlier of the two timestamps, as they refer to sweeps of two different data
+         * structures that reference data handles
+         */
+        last = last_cursor_big_sweep;
+        if (last_sweep != 0 && (last == 0 || last_sweep < last))
+            last = last_sweep;
+        if (last == 0)
+            continue;
+
+        /*
+         * Check if the session did not run a sweep in 5 minutes. Handle the issue only once per
+         * violation.
+         */
+        if (last + 5 * 60 < now) {
+            if (!s->sweep_warning_5min) {
+                s->sweep_warning_5min = 1;
+                WT_STAT_CONN_INCR(session, no_session_sweep_5min);
+            }
+        } else {
+            s->sweep_warning_5min = 0;
+        }
+
+        /*
+         * The same for 60 minutes.
+         */
+        if (last + 60 * 60 < now) {
+            if (!s->sweep_warning_60min) {
+                s->sweep_warning_60min = 1;
+                WT_STAT_CONN_INCR(session, no_session_sweep_60min);
+                __wt_verbose_warning(session, WT_VERB_DEFAULT,
+                  "Session %" PRIu32 " (@: 0x%p name: %s) did not run a sweep for 60 minutes.", i,
+                  (void *)s, s->name == NULL ? "EMPTY" : s->name);
+            }
+        } else {
+            s->sweep_warning_60min = 0;
+        }
+    }
+}
+
+/*
  * __sweep_server --
  *     The handle sweep server thread.
  */
@@ -335,6 +401,11 @@ __sweep_server(void *arg)
 
         if (dead_handles > 0)
             WT_ERR(__sweep_remove_handles(session));
+
+        /*
+         * Check for any "rogue" sessions, which did not run a session sweep in a long time.
+         */
+        __sweep_check_session_sweep(session, now);
 
         /* Remember the last sweep time. */
         last = now;
