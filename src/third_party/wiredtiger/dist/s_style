@@ -33,7 +33,7 @@ if [ "$single_file" -ne 1 ]; then
         -e '/test\/3rdparty/d' \
         -e '/test\/checksum\/power8/d' \
         -e '/checksum\/zseries/d' |
-    xargs $xp -n 1 -I{} sh ./dist/s_style {}
+    xargs $xp -I{} sh ./dist/s_style {}
 else
     # General style correction and cleanup for a single file
     f=$1
