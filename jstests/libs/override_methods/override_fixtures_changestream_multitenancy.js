@@ -29,7 +29,7 @@ ReplSetTest = function(opts) {
         // related parameter.
         if (!newOptions.hasOwnProperty("configsvr")) {
             setParameter = {
-                // TODO SERVER-67267 Pass multitenancy flags here.
+                // TODO SERVER-68341 Pass multitenancy flags here.
                 featureFlagServerlessChangeStreams: true,
                 internalChangeStreamUseTenantIdForTesting: true
             };

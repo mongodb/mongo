@@ -4,18 +4,47 @@ selector:
   roots:
   - jstests/change_streams/**/*.js
   exclude_files:
+  ##
   # TODO SERVER-68341: Implement enable/disable command for mongoQ in the serverless.
   - jstests/change_streams/projection_fakes_internal_event.js
-  # The following test uses the 'find' method directly on 'config'.'system.preimages' collection
-  # while this suite enforces the tenant-specific pre-image collection for the test tenant (a.k.a.
-  # '000000000000000000000000_config'.'system.preimages'), which is not directly accessible
-  # without supporting multi-tenancy.
-  # TODO SERVER-67267 Add 'multitenancySupport' and inject tenant into find commands.
-  - jstests/change_streams/change_streams_lookup_preimage_with_chunk_migration.js
+
+  ##
   # TODO SERVER-70760: This test creates its own sharded cluster and uses transaction. The support
   #                    for transaction on multi-tenancy is not fully available. Unblock this test
   #                    after the support is available.
   - jstests/change_streams/oplog_rewrite/change_stream_basic_match_pushdown_rewrite.js
+
+  ##
+  # These tests run in sharded clusters. The'$tenant' cannot be injected to the sharded cluster
+  # currently, as such these tests cannot work in true multitenant environment.
+  # TODO SERVER-68341: Remove these JS tests from exclusion list.
+  - jstests/change_streams/show_resharding_system_events.js
+  - jstests/change_streams/refine_collection_shard_key_event.js
+  - jstests/change_streams/projection_fakes_internal_event.js
+  - jstests/change_streams/change_streams_lookup_preimage_with_chunk_migration.js
+  - jstests/change_streams/migrate_last_chunk_from_shard_event.js
+  - jstests/change_streams/shard_collection_event.js
+  - jstests/change_streams/create_event_from_chunk_migration.js
+  - jstests/change_streams/oplog_rewrite/change_stream_match_pushdown_documentKey_rewrite.js
+  - jstests/change_streams/oplog_rewrite/change_stream_match_pushdown_fullDocumentBeforeChange_rewrite.js
+  - jstests/change_streams/oplog_rewrite/change_stream_match_pushdown_fullDocument_rewrite.js
+  - jstests/change_streams/oplog_rewrite/change_stream_match_pushdown_operation_type_rewrite.js
+  - jstests/change_streams/oplog_rewrite/change_stream_match_pushdown_to_rewrite.js
+  - jstests/change_streams/oplog_rewrite/change_stream_match_pushdown_updateDescription_rewrite.js
+  - jstests/change_streams/oplog_rewrite/match_pushdown_namespace_rewrite_with_expanded_events.js
+  - jstests/change_streams/oplog_rewrite/change_stream_basic_match_pushdown_rewrite.js
+  - jstests/change_streams/oplog_rewrite/change_stream_match_pushdown_namespace_rewrite.js
+  - jstests/change_streams/reshard_collection_event.js
+
+  ##
+  # These tests issue 'applyOps' command to which '$tenant' cannot be injected.
+  - jstests/change_streams/apply_ops.js
+  - jstests/change_streams/lookup_pit_pre_and_post_image_in_transaction.js
+
+  ##
+  # This test uses 'system' database and '$tenant' cannot be injected in 'system.$cmd' namespace.
+  - jstests/change_streams/global_index.js
+
   exclude_with_any_tags:
   ##
   # The next tags correspond to the special errors thrown by the
@@ -37,17 +66,14 @@ executor:
         TestData:
           defaultReadConcernLevel: null
           enableMajorityReadConcern: ''
+          tenant: "636d957b2646ddfaf9b5e13f"
       # Enable causal consistency for change streams suites using 1 node replica sets. See
       # change_streams.yml for detailed explanation.
-      # TODO SERVER-67267 Load 'inject_tenant_prefix.js', add 'multitenancySupport',
-      #                   'featureFlagSecurityToken' and 'featureFlagRequireTenantID' flags. The
-      #                   'inject_tenant_prefix' should also be called for the
-      #                   'enable_change_stream.py' file.
       eval: >-
         var testingReplication = true;
         load('jstests/libs/override_methods/set_read_and_write_concerns.js');
         load('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
-        load('jstests/libs/override_methods/override_fixtures_changestream_multitenancy.js');
+        load('jstests/libs/override_methods/inject_dollar_tenant.js');
   hooks:
   # The CheckReplDBHash hook waits until all operations have replicated to and have been applied
   # on the secondaries, so we run the ValidateCollections hook after it to ensure we're
@@ -57,6 +83,7 @@ executor:
   - class: CleanEveryN
     n: 20
   - class: EnableChangeStream
+    tenant_id: "636d957b2646ddfaf9b5e13f"
   fixture:
     class: ReplicaSetFixture
     replset_name: "ChangeStreamMultitenantReplSet"
@@ -66,6 +93,6 @@ executor:
       set_parameters:
         enableTestCommands: 1
         featureFlagServerlessChangeStreams: true
-        internalChangeStreamUseTenantIdForTesting: true
-    # TODO SERVER-67267 Set number of nodes to 2 and pass multitenancy flags to the set_parameters.
-    num_nodes: 1
+        featureFlagRequireTenantID: true
+        multitenancySupport: true
+    num_nodes: 2

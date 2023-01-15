@@ -493,15 +493,15 @@ boost::optional<Document> CommonMongodProcessInterface::doLookupSingleDocument(
         auto foreignExpCtx = expCtx->copyWith(
             nss,
             collectionUUID,
-            _getCollectionDefaultCollator(expCtx->opCtx, nss.db(), collectionUUID));
+            _getCollectionDefaultCollator(expCtx->opCtx, nss.dbName(), collectionUUID));
 
         // If we are here, we are either executing the pipeline normally or running in one of the
         // execution stat explain verbosities. In either case, we disable explain on the foreign
         // context so that we actually retrieve the document.
         foreignExpCtx->explain = boost::none;
-
         pipeline = Pipeline::makePipeline({BSON("$match" << documentKey)}, foreignExpCtx, opts);
-    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+    } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
+        LOGV2_DEBUG(6726700, 1, "Namespace not found while looking up document", "error"_attr = ex);
         return boost::none;
     }
 
@@ -696,11 +696,11 @@ void CommonMongodProcessInterface::_reportCurrentOpsForIdleSessions(
 }
 
 std::unique_ptr<CollatorInterface> CommonMongodProcessInterface::_getCollectionDefaultCollator(
-    OperationContext* opCtx, StringData dbName, UUID collectionUUID) {
+    OperationContext* opCtx, const DatabaseName& dbName, UUID collectionUUID) {
     auto it = _collatorCache.find(collectionUUID);
     if (it == _collatorCache.end()) {
         auto collator = [&]() -> std::unique_ptr<CollatorInterface> {
-            AutoGetCollection autoColl(opCtx, {dbName.toString(), collectionUUID}, MODE_IS);
+            AutoGetCollection autoColl(opCtx, {dbName, collectionUUID}, MODE_IS);
             if (!autoColl.getCollection()) {
                 // This collection doesn't exist, so assume a nullptr default collation
                 return nullptr;

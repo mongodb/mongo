@@ -68,6 +68,6 @@ executor:
     shard_options:
       mongod_options:
         set_parameters:
-        # TODO SERVER-67267 Pass multitenancy flags to the set_parameters.
+        # TODO SERVER-68341 Pass multitenancy flags to the set_parameters.
           featureFlagServerlessChangeStreams: true
           internalChangeStreamUseTenantIdForTesting: true

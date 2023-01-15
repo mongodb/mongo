@@ -196,7 +196,7 @@ private:
      * collation.
      */
     std::unique_ptr<CollatorInterface> _getCollectionDefaultCollator(OperationContext* opCtx,
-                                                                     StringData dbName,
+                                                                     const DatabaseName& dbName,
                                                                      UUID collectionUUID);
 
     std::map<UUID, std::unique_ptr<const CollatorInterface>> _collatorCache;
