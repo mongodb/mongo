@@ -250,7 +250,14 @@ public:
           _predecessor(nullptr) {}
 
     IDLParserContext(StringData fieldName, const IDLParserContext* predecessor)
-        : _currentField(fieldName), _predecessor(predecessor) {}
+        : IDLParserContext(fieldName, predecessor, boost::none) {}
+
+    IDLParserContext(StringData fieldName,
+                     const IDLParserContext* predecessor,
+                     boost::optional<TenantId> tenantId)
+        : _currentField(fieldName), _tenantId(tenantId), _predecessor(predecessor) {
+        assertTenantIdMatchesPredecessor(predecessor);
+    }
 
     /**
      * Check that BSON element is a given type or whether the field should be skipped.
@@ -389,6 +396,19 @@ private:
      * See comment on checkAndAssertBinDataType.
      */
     bool checkAndAssertBinDataTypeSlowPath(const BSONElement& element, BinDataType type) const;
+
+    void assertTenantIdMatchesPredecessor(const IDLParserContext* predecessor) {
+        if (!_tenantId || predecessor == nullptr) {
+            return;
+        }
+
+        auto& parentTenantId = predecessor->getTenantId();
+        iassert(8423379,
+                str::stream() << "The IDLParserContext tenantId " << _tenantId->toString()
+                              << " must match the predecessor's tenantId "
+                              << parentTenantId->toString(),
+                !parentTenantId || parentTenantId == _tenantId);
+    }
 
 private:
     // Name of the current field that is being parsed.

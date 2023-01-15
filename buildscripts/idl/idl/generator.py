@@ -1227,8 +1227,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         """
 
         if ast_type.is_struct:
-            self._writer.write_line(
-                'IDLParserContext tempContext(%s, &ctxt);' % (_get_field_constant_name(field)))
+            self._writer.write_line('IDLParserContext tempContext(%s, &ctxt, %s);' %
+                                    (_get_field_constant_name(field), tenant))
             self._writer.write_line('const auto localObject = %s.Obj();' % (element_name))
             return '%s::parse(tempContext, localObject)' % (ast_type.cpp_type, )
         elif ast_type.deserializer and 'BSONElement::' in ast_type.deserializer:
@@ -1252,8 +1252,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
                 # For fields which are enums, pass a IDLParserContext
                 if ast_type.is_enum:
-                    self._writer.write_line('IDLParserContext tempContext(%s, &ctxt);' %
-                                            (_get_field_constant_name(field)))
+                    self._writer.write_line('IDLParserContext tempContext(%s, &ctxt, %s);' %
+                                            (_get_field_constant_name(field), tenant))
                     return common.template_args("${method_name}(tempContext, ${expression})",
                                                 method_name=method_name, expression=expression)
 
@@ -1286,8 +1286,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         cpp_type = cpp_type_info.get_type_name()
 
         self._writer.write_line('std::uint32_t expectedFieldNumber{0};')
-        self._writer.write_line(
-            'const IDLParserContext arrayCtxt(%s, &ctxt);' % (_get_field_constant_name(field)))
+        self._writer.write_line('const IDLParserContext arrayCtxt(%s, &ctxt, %s);' %
+                                (_get_field_constant_name(field), tenant))
         self._writer.write_line('std::vector<%s> values;' % (cpp_type))
         self._writer.write_empty_line()
 
@@ -1505,8 +1505,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     self._writer.write_line(
                         'ctxt.throwMissingField(%s);' % (_get_field_constant_name(field)))
 
-    def gen_doc_sequence_deserializer(self, field):
-        # type: (ast.Field) -> None
+    def gen_doc_sequence_deserializer(self, field, tenant):
+        # type: (ast.Field, str) -> None
         """Generate the C++ deserializer piece for a C++ mongo::OpMsg::DocumentSequence."""
         cpp_type_info = cpp_types.get_cpp_type(field)
         cpp_type = cpp_type_info.get_type_name()
@@ -1522,8 +1522,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
             # Either we are deserializing BSON Objects or IDL structs
             if field.type.is_struct:
-                self._writer.write_line(
-                    'IDLParserContext tempContext(%s, &ctxt);' % (_get_field_constant_name(field)))
+                self._writer.write_line('IDLParserContext tempContext(%s, &ctxt, %s);' %
+                                        (_get_field_constant_name(field), tenant))
                 array_value = '%s::parse(tempContext, sequenceObject)' % (field.type.cpp_type, )
             else:
                 assert field.type.bson_serialization_type == ['object']
@@ -1920,7 +1920,8 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                                 self._writer.write_line(
                                     '%s = true;' % (_get_has_field_member_name(field)))
 
-                            self.gen_doc_sequence_deserializer(field)
+                            self.gen_doc_sequence_deserializer(field,
+                                                               "request.getValidatedTenantId()")
 
                         if first_field:
                             first_field = False

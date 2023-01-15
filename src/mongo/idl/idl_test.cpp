@@ -4059,13 +4059,14 @@ TEST(IDLTypeCommand, TestCommandWithNamespaceMember_WithTenant) {
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
     IDLParserContext ctxt("root");
+    const char* ns1 = "db.coll1";
+    const char* ns2 = "a.b";
+    const char* ns3 = "c.d";
 
     auto testDoc = BSONObjBuilder{}
                        .append("CommandWithNamespaceMember", 1)
-                       .append("field1", "db.coll1")
-                       .append("field2",
-                               BSON_ARRAY("a.b"
-                                          << "c.d"))
+                       .append("field1", ns1)
+                       .append("field2", BSON_ARRAY(ns2 << ns3))
                        .append("$db", "admin")
                        .obj();
 
@@ -4076,13 +4077,84 @@ TEST(IDLTypeCommand, TestCommandWithNamespaceMember_WithTenant) {
     assert_same_types<decltype(testStruct.getField2()),
                       const std::vector<mongo::NamespaceString>&>();
 
-    ASSERT_EQUALS(testStruct.getField1(), NamespaceString(tenantId, "db.coll1"));
-    std::vector<NamespaceString> field2{NamespaceString(tenantId, "a.b"),
-                                        NamespaceString(tenantId, "c.d")};
+    ASSERT_EQUALS(testStruct.getField1(), NamespaceString(tenantId, ns1));
+    std::vector<NamespaceString> field2{NamespaceString(tenantId, ns2),
+                                        NamespaceString(tenantId, ns3)};
     ASSERT_TRUE(field2 == testStruct.getField2());
 
     // Positive: Test we can roundtrip from the just parsed document
     ASSERT_BSONOBJ_EQ(testDoc, serializeCmd(testStruct));
+}
+
+TEST(IDLTypeCommand, TestCommandWithNamespaceStruct_WithTenant) {
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
+    IDLParserContext ctxt("root");
+    const char* ns1 = "db.coll1";
+    const char* ns2 = "a.b";
+    const char* ns3 = "c.d";
+
+    auto nsInfoStructBSON = [&](const char* ns) {
+        BSONObjBuilder builder;
+        builder.append("ns", ns);
+        return builder.obj();
+    };
+    auto testDoc = BSONObjBuilder{}
+                       .append("CommandWithNamespaceStruct", 1)
+                       .append("field1", nsInfoStructBSON(ns1))
+                       .append("$db", "admin")
+                       .append("field2", BSON_ARRAY(nsInfoStructBSON(ns2) << nsInfoStructBSON(ns3)))
+                       .obj();
+
+    const auto tenantId = TenantId(OID::gen());
+    auto testStruct = CommandWithNamespaceStruct::parse(ctxt, makeOMRWithTenant(testDoc, tenantId));
+
+    assert_same_types<decltype(testStruct.getField1()), NamespaceInfoStruct&>();
+    assert_same_types<decltype(testStruct.getField2()), std::vector<NamespaceInfoStruct>&>();
+
+    ASSERT_EQUALS(testStruct.getField1().getNs(), NamespaceString(tenantId, ns1));
+    std::vector<NamespaceString> field2Nss{NamespaceString(tenantId, ns2),
+                                           NamespaceString(tenantId, ns3)};
+    std::vector<NamespaceInfoStruct>& field2 = testStruct.getField2();
+    ASSERT_TRUE(field2Nss[0] == field2[0].getNs());
+    ASSERT_TRUE(field2Nss[1] == field2[1].getNs());
+
+    // Positive: Test we can round trip to a document sequence from the just parsed document
+    {
+        OpMsgRequest loopbackRequest = testStruct.serialize(BSONObj());
+        OpMsgRequest request = makeOMR(testDoc);
+
+        assertOpMsgEquals(request, loopbackRequest);
+        ASSERT_EQUALS(loopbackRequest.sequences.size(), 1UL);
+        ASSERT_EQUALS(loopbackRequest.sequences[0].objs.size(), 2UL);
+    }
+}
+
+TEST(IDLParserContext, TestConstructorWithPredecessorAndDifferentTenant) {
+    // Negative: Test the child IDLParserContext cannot has different tenant id from its
+    // predecessor.
+    RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", true);
+
+    const auto tenantId = TenantId(OID::gen());
+    const auto otherTenantId = TenantId(OID::gen());
+    IDLParserContext ctxt("root", false, tenantId);
+
+    auto nsInfoStructBSON = [&](const char* ns) {
+        BSONObjBuilder builder;
+        builder.append("ns", ns);
+        return builder.obj();
+    };
+    auto testDoc =
+        BSONObjBuilder{}
+            .append("CommandWithNamespaceStruct", 1)
+            .append("field1", nsInfoStructBSON("db.coll1"))
+            .append("$db", "admin")
+            .append("field2", BSON_ARRAY(nsInfoStructBSON("a.b") << nsInfoStructBSON("c.d")))
+            .obj();
+    ASSERT_THROWS_CODE(
+        CommandWithNamespaceStruct::parse(ctxt, makeOMRWithTenant(testDoc, otherTenantId)),
+        DBException,
+        8423379);
 }
 
 void verifyContract(const AuthorizationContract& left, const AuthorizationContract& right) {

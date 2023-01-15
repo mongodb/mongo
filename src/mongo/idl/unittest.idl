@@ -424,6 +424,18 @@ structs:
 
 ##################################################################################################
 #
+# Test struct with namespace string field
+#
+##################################################################################################
+    NamespaceInfoStruct:
+        description: "Test struct with namespace string field."
+        strict: true
+        fields:
+            ns:
+                type: namespacestring
+
+##################################################################################################
+#
 # Test array of simple types
 #
 ##################################################################################################
@@ -1170,6 +1182,18 @@ commands:
                 type: namespacestring
             field2:
                 type: array<namespacestring>
+
+    CommandWithNamespaceStruct:
+        description: UnitTest for a command whose struct field has namespace string data
+        command_name: CommandWithNamespaceStruct
+        namespace: ignored
+        api_version: ""
+        fields:
+            field1:
+                type: NamespaceInfoStruct
+            field2:
+                type: array<NamespaceInfoStruct>
+                supports_doc_sequence: true
 
     AccessCheckNone:
         description: A Stable API command with access_check and none

@@ -297,7 +297,7 @@ void IDLParserContext::appendGenericCommandArguments(const BSONObj& commandPasst
 }
 
 const boost::optional<TenantId>& IDLParserContext::getTenantId() const {
-    if (_predecessor == nullptr)
+    if (_tenantId || _predecessor == nullptr)
         return _tenantId;
 
     return _predecessor->getTenantId();
