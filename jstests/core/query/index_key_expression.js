@@ -58,6 +58,34 @@ const testScenarios = [
         spec: "spec",
         expectedErrorCode: 6868507  // $_internalIndexKey requires 'spec' argument to be an object.
     },
+    {
+        doc: {a: 4, b: 5},
+        spec: {a: {$const: 1}},
+        expectedErrorCode:
+            ErrorCodes.InvalidIndexSpecificationOption  // The field 'a' is not valid
+                                                        // for an index specification.
+    },
+    {
+        doc: {a: 4, b: 5},
+        spec: {a: {$literal: 1}},
+        expectedErrorCode:
+            ErrorCodes.InvalidIndexSpecificationOption  // The field 'a' is not valid for an index
+                                                        // specification.
+    },
+    {
+        doc: {a: 4, b: 5},
+        spec: {$literal: {key: {a: 1}, name: "btreeIndex"}},
+        expectedErrorCode:
+            ErrorCodes.InvalidIndexSpecificationOption  // The field '$literal' is not valid for an
+                                                        // index specification.
+    },
+    {
+        doc: {a: 4, b: 5},
+        spec: {$const: {key: {a: 1}, name: "btreeIndex"}},
+        expectedErrorCode:
+            ErrorCodes.InvalidIndexSpecificationOption  // The field '$const' is not valid for an
+                                                        // index specification.
+    },
 
     //
     // ++++ Btree index tests ++++
@@ -276,7 +304,8 @@ const testScenarios = [
     {
         doc: {a: [1, 2, 3], b: [1, 2, 3]},
         spec: {key: {"a": 1, "b": 1}, name: "btreeIndex"},
-        expectedErrorCode: 171  // CannotIndexParallelArrays.
+        expectedErrorCode:
+            ErrorCodes.CannotIndexParallelArrays  // Cannot index parallel arrays [b] [a].
     },
     {
         doc: {a: "2", b: 3},
@@ -286,23 +315,26 @@ const testScenarios = [
     {
         doc: {a: 2},
         spec: {key: {".a": 1}, name: "btreeIndex"},
-        expectedErrorCode: 67  // Index keys cannot contain an empty field.
+        expectedErrorCode:
+            ErrorCodes.CannotCreateIndex  // Index keys cannot contain an empty field.
     },
     {
         doc: {a: {"": [{c: 1}, {c: 2}]}},
         spec: {key: {"a..c": 1}, name: "btreeIndex"},
-        // expectedIndexKeys: [{"a..c": 1}, {"a..c": 2}],
-        expectedErrorCode: 67  // Index keys cannot contain an empty field.
+        expectedErrorCode:
+            ErrorCodes.CannotCreateIndex  // Index keys cannot contain an empty field.
     },
     {
         doc: {a: 2},
         spec: {key: {"a.": 1}, name: "btreeIndex"},
-        expectedErrorCode: 67  // Index keys cannot contain an empty field.
+        expectedErrorCode:
+            ErrorCodes.CannotCreateIndex  // Index keys cannot contain an empty field.
     },
     {
         doc: {a: {"": 2}},
         spec: {key: {"a.": 1}, name: "btreeIndex"},
-        expectedErrorCode: 67  // Index keys cannot contain an empty field.
+        expectedErrorCode:
+            ErrorCodes.CannotCreateIndex  // Index keys cannot contain an empty field.
     },
 
     //
@@ -1002,7 +1034,8 @@ const testScenarios = [
     {
         doc: {a: {b: "one", c: 2}},
         spec: {key: {"$**": 1, "a.b": 1}, name: "wildcardIndex"},
-        expectedErrorCode: 67  // wildcard indexes do not allow compounding.
+        expectedErrorCode:
+            ErrorCodes.CannotCreateIndex  // wildcard indexes do not allow compounding.
     },
 ];
 

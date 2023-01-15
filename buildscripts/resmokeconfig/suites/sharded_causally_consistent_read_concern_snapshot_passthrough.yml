@@ -50,8 +50,6 @@ selector:
   - jstests/core/timeseries/timeseries_merge.js
   # This test uses `benchRun` which spawns connections which do not inherit the causal session.
   - jstests/core/**/benchrun_pipeline_updates.js
-  # "The field '$const' is not valid for an index specification."
-  - jstests/core/**/index_key_expression.js
 
   exclude_with_any_tags:
   # Tests tagged with the following will fail because they assume collections are not sharded.

@@ -113,8 +113,6 @@ selector:
   - jstests/core/**/explain4.js
   # "Error: assert failed : Expected an index scan for predicate"
   - jstests/core/timeseries/timeseries_index_partial.js
-  # "Error: The field '$const' is not valid for an index specification."
-  - jstests/core/**/index_key_expression.js
 
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos

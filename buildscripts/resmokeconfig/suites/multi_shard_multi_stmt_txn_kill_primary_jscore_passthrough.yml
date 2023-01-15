@@ -264,9 +264,6 @@ selector:
   - jstests/core/**/find_and_modify_server7660.js
   - jstests/core/**/upsert_shell.js
 
-  # "assert: [197] != [[ 6868501 ]] are not equal"
-  - jstests/core/**/index_key_expression.js
-
   exclude_with_any_tags:
   ##
   # The next four tags correspond to the special errors thrown by the auto_retry_on_network_error.js

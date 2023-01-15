@@ -212,9 +212,6 @@ selector:
   # Does not support tojson of command objects.
   - jstests/core/**/SERVER-23626.js
 
-  # "The 'got' response is overriden which causes assertion failures."
-  - jstests/core/**/index_key_expression.js
-
   exclude_with_any_tags:
   - assumes_standalone_mongod
   # Cursor ids will not survive rerouting between replica sets during a shard split.

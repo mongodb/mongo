@@ -468,8 +468,13 @@ Value ExpressionInternalIndexKey::serialize(bool explain) const {
     invariant(_doc);
     invariant(_spec);
 
+    auto specExprConstant = dynamic_cast<ExpressionConstant*>(_spec.get());
+    tassert(7250400, "Failed to dynamic cast the 'spec' to 'ExpressionConstant'", specExprConstant);
+
+    // The 'spec' is always treated as a constant so do not call '_spec->serialize()' which would
+    // wrap the value in an unnecessary '$const' object.
     return Value(DOC(opName << DOC(kDocField << _doc->serialize(explain) << kSpecField
-                                             << _spec->serialize(explain))));
+                                             << specExprConstant->getValue())));
 }
 
 Value ExpressionInternalIndexKey::evaluate(const Document& root, Variables* variables) const {

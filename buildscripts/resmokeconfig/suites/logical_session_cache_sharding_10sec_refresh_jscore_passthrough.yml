@@ -73,8 +73,6 @@ selector:
   - jstests/core/**/index_multikey.js
   - jstests/core/**/optimized_match_explain.js
   - jstests/core/**/sort_array.js
-  # "Error: The field '$const' is not valid for an index specification."
-  - jstests/core/**/index_key_expression.js
 
   exclude_with_any_tags:
   - assumes_standalone_mongod
