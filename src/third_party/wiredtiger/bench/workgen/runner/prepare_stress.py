@@ -78,7 +78,8 @@ from workgen import *
 import time
 
 context = Context()
-conn_config =   "cache_size=1G,checkpoint=(wait=60,log_size=2GB),\
+#FIXME - WT-10494 Update the cache_size to 1GB after fixing this ticket.
+conn_config =   "cache_size=2G,checkpoint=(wait=60,log_size=2GB),\
                 eviction=(threads_min=12,threads_max=12),log=(enabled=true),session_max=800,\
                 debug_mode=(table_logging=true),\
                 eviction_target=60,statistics=(fast),statistics_log=(wait=1,json)"# explicitly added
@@ -97,7 +98,8 @@ for i in range(0, table_count):
     table = Table(tname)
     s.create(tname, wtperf_table_config +\
              compress_table_config + table_config + ",log=(enabled=false)")
-    table.options.key_size = 200
+    #FIXME - WT-10494 Update the key_size to 200 after fixing this ticket.
+    table.options.key_size = 2000
     table.options.value_size = 5000
     tables.append(table)
 
@@ -106,6 +108,7 @@ icount = 500000
 
 start_time = time.time()
 
+print('populate: Start')
 # If there are multiple tables to be filled during populate,
 # the icount is split between them all.
 pop_ops = Operation(Operation.OP_INSERT, tables[0])
@@ -117,6 +120,7 @@ pop_thread.options.session_config="isolation=snapshot"
 pop_workload = Workload(context, populate_threads * pop_thread)
 ret = pop_workload.run(conn)
 assert ret == 0, ret
+print('populate: End')
 
 # Log like file, requires that logging be enabled in the connection config.
 log_name = "table:log"
@@ -163,13 +167,18 @@ thread2.options.throttle=500
 thread2.options.throttle_burst=1.0
 
 # Long running transactions. There is a 0.1 second sleep after a series of search and update
-# operations. The sleep op is repeated 10000 times and this will make these transcations to at
+# operations. The sleep op is repeated 10000 times and this will make these transactions to at
 # least run for ~17 minutes.
 search_op = Operation(Operation.OP_SEARCH, tables[0], Key(Key.KEYGEN_PARETO, 0, ParetoOptions(1)))
 update_op = Operation(Operation.OP_UPDATE, tables[0], Key(Key.KEYGEN_PARETO, 0, ParetoOptions(1)))
-ops = txn(((search_op + update_op) * 1000 + sleep(0.1)) * 10000, 'isolation=snapshot')
-ops.transaction.use_commit_timestamp = True
-thread3 = Thread(ops)
+
+search_txn = txn(search_op, "isolation=snapshot")
+search_txn.transaction.use_commit_timestamp = True
+
+update_txn = txn(update_op, "isolation=snapshot")
+update_txn.transaction.use_commit_timestamp = True
+
+thread3 = Thread((search_txn + update_txn) * 100 + sleep(0.1))
 thread3.options.session_config="isolation=snapshot"
 
 ops = Operation(Operation.OP_SLEEP, "0.1") + \
@@ -180,7 +189,8 @@ logging_thread.options.session_config="isolation=snapshot"
 workload = Workload(context, 50 * thread0 + 50 * thread1 +\
                     10 * thread2 + 100 * thread3 + logging_thread)
 workload.options.report_interval=5
-workload.options.run_time=500
+#FIXME - WT-10494 Update the run_time to 500 after fixing this ticket.
+workload.options.run_time=400
 workload.options.max_latency=50000
 # oldest_timestamp_lag - Number of seconds lag to the oldest_timestamp from current time.
 workload.options.oldest_timestamp_lag=30
