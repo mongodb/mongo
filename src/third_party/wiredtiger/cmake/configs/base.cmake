@@ -288,6 +288,12 @@ config_bool(
 )
 
 config_bool(
+    ENABLE_AZURE
+    "Build the Azure storage extension"
+    DEFAULT OFF
+)
+
+config_bool(
     ENABLE_LLVM
     "Enable compilation of LLVM-based tools and executables i.e. xray & fuzzer."
     DEFAULT OFF
