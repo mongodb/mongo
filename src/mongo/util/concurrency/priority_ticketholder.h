@@ -45,9 +45,12 @@ namespace mongo {
 
 class Ticket;
 /**
- * A ticketholder implementation that uses AdmissionContext::Priority to schedule tasks when under
- * load. Waiters will get placed in a specific internal queue according to the priority they have.
- * Releasers will wake up a waiter from a queue chosen according to some logic.
+ * A ticketholder implementation that centralises all ticket acquisition/releases.  Waiters will get
+ * placed in a specific internal queue according to some logic.  Releasers will wake up a waiter
+ * from a group chosen according to some logic.
+ *
+ * MODIFICATIONS TO THIS CLASS MUST BE ACCOMPANIED BY AN UPDATE OF
+ * src/mongo/tla_plus/PriorityTicketHolder/MCPriorityTicketHolder.tla TO ENSURE IT IS CORRECT
  */
 class PriorityTicketHolder : public TicketHolderWithQueueingStats {
 public:

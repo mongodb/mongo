@@ -1,3 +1,5 @@
 **/*.toolbox
 **/states/
 tla2tools.jar
+**/*.out
+**/*.old
