@@ -74,6 +74,7 @@ class test_truncate20(wttest.WiredTigerTestCase):
         evict_cursor.close()
         self.session.rollback_transaction()
 
+    @wttest.longtest('large number of rows to truncate and checkpoint')
     def test_truncate(self):
         uri = 'table:oplog'
         nrows = 1000000
