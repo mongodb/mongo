@@ -651,7 +651,7 @@ Return the page delete information unpacked from the address.}
 Function for checking thread visibility of a \c WT_PAGE_DELETED.}
 @row{btree_inline.h, Function, \c __wt_page_del_visible_all,
 Function for checking global visibility of a \c WT_PAGE_DELETED.}
-@row{btree_inline.h, Function, \c __wt_page_del_committed,
+@row{btree_inline.h, Function, \c __wt_page_del_committed_set,
 Function for checking whether a \c WT_PAGE_DELETED is committed.}
 @row{btree_inline.h, Function, \c __wt_btcur_skip_page,
 The page-skip function used by cursor next and previous.}

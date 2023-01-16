@@ -1656,7 +1656,7 @@ __wt_page_del_visible(WT_SESSION_IMPL *session, WT_PAGE_DELETED *page_del, bool 
 }
 
 /*
- * __wt_page_del_committed --
+ * __wt_page_del_committed_set --
  *     Return if a truncate operation is resolved. (Since truncations that abort are removed
  *     immediately, "resolved" and "committed" are equivalent here.) The caller should have already
  *     locked the ref and confirmed that the ref's previous state was WT_REF_DELETED. The page_del
@@ -1666,7 +1666,7 @@ __wt_page_del_visible(WT_SESSION_IMPL *session, WT_PAGE_DELETED *page_del, bool 
  *     have been discarded already. (The update list is non-null if the transaction is unresolved.)
  */
 static inline bool
-__wt_page_del_committed(WT_PAGE_DELETED *page_del)
+__wt_page_del_committed_set(WT_PAGE_DELETED *page_del)
 {
     /*
      * There are two possible cases: either page_del is NULL (in which case the deletion is globally

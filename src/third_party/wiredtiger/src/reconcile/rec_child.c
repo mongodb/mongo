@@ -20,6 +20,7 @@ __rec_child_deleted(
     uint8_t prepare_state;
     bool visible, visible_all;
 
+    visible = visible_all = false;
     page_del = ref->page_del;
 
     cmsp->state = WT_CHILD_IGNORE;
@@ -35,13 +36,30 @@ __rec_child_deleted(
      * Check visibility. If the truncation is visible to us, we'll also want to know if it's visible
      * to everyone. Use the special-case logic in __wt_page_del_visible to hide prepared truncations
      * as we can't write them to disk.
+     *
+     * We can't write out uncommitted truncations so we need to check the committed flag on the page
+     * delete structure. The committed flag indicates that the truncation has finished being
+     * processed by the transaction commit call and is a separate concept to the visibility, which
+     * means that while the truncation may be visible it hasn't finished committing. This can occur
+     * with prepared truncations, which go through two distinct phases in __wt_txn_commit:
+     *   - Firstly the operations on the transaction are walked and the page delete structure has
+     *     its prepare state set to resolved. At this stage the truncate can appear to be visible.
+     *   - After the operations have been resolved the page delete structure is marked as being
+     *     committed.
+     *
+     * Given the order of these operations we must perform the inverse sequence. First check the
+     * committed flag and then check the visibility. There is a concurrency concern here as if the
+     * write to the page delete structure is reordered we may see it be set early. However this is
+     * handled by locking the ref in the commit path. Additionally this function locks the ref. Thus
+     * setting the page delete structure committed flag cannot overlap with us checking the flag.
      */
-    if (F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT)) {
-        visible = __wt_page_del_visible(session, page_del, true);
-        visible_all = visible ? __wt_page_del_visible_all(session, page_del, true) : false;
-    } else
-        visible = visible_all = __wt_page_del_visible_all(session, page_del, true);
-
+    if (__wt_page_del_committed_set(page_del)) {
+        if (F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT)) {
+            visible = __wt_page_del_visible(session, page_del, true);
+            visible_all = visible ? __wt_page_del_visible_all(session, page_del, true) : false;
+        } else
+            visible = visible_all = __wt_page_del_visible_all(session, page_del, true);
+    }
     /*
      * If an earlier reconciliation chose to write the fast truncate information to the page, we
      * should select it regardless of visibility unless it is globally visible. This is important as
