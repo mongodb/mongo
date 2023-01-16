@@ -27,11 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <benchmark/benchmark.h>
 
-#include "migration_chunk_cloner_source.h"
+#include "mongo/db/s/migration_chunk_cloner_source.h"
 
 namespace mongo {
 namespace {
