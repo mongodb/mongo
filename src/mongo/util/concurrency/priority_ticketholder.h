@@ -71,10 +71,6 @@ public:
         return result;
     }
 
-    bool recordImmediateTicketStatistics() noexcept override final {
-        return true;
-    };
-
     /**
      * Number of times low priority operations are expedited for ticket admission over normal
      * priority operations.
@@ -94,14 +90,7 @@ public:
     void updateLowPriorityAdmissionBypassThreshold(const int& newBypassThreshold);
 
 private:
-    enum class QueueType : unsigned int {
-        kLowPriority = 0,
-        kNormalPriority = 1,
-        // Exclusively used for statistics tracking. This queue should never have any processes
-        // 'queued'.
-        kImmediatePriority = 2,
-        NumQueues = 3
-    };
+    enum class QueueType : unsigned int { kLowPriority = 0, kNormalPriority = 1, NumQueues = 2 };
 
     boost::optional<Ticket> _tryAcquireImpl(AdmissionContext* admCtx) override final;
 
@@ -158,8 +147,6 @@ private:
                 return QueueType::kLowPriority;
             case AdmissionContext::Priority::kNormal:
                 return QueueType::kNormalPriority;
-            case AdmissionContext::Priority::kImmediate:
-                return QueueType::kImmediatePriority;
             default:
                 MONGO_UNREACHABLE;
         }

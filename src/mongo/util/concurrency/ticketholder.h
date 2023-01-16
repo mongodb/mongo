@@ -66,12 +66,6 @@ public:
     virtual void resize(OperationContext* opCtx, int newSize) noexcept {};
 
     /**
-     * Immediately returns a ticket without impacting the number of tickets available. Reserved for
-     * operations that should never be throttled by the ticketing mechanism.
-     */
-    virtual Ticket acquireImmediateTicket(AdmissionContext* admCtx) = 0;
-
-    /**
      * Attempts to acquire a ticket without blocking.
      * Returns a boolean indicating whether the operation was successful or not.
      */
@@ -98,14 +92,15 @@ public:
 
     virtual void appendStats(BSONObjBuilder& b) const = 0;
 
-private:
     /**
-     * Restricted for releasing tickets acquired via "acquireImmediateTicket". Handles the release
-     * of an immediate ticket, which should never be reused or returned to the ticketing pool of
-     * available tickets.
+     * 'Immediate' admissions don't need to acquire or wait for a ticket. However, they should
+     * report to the TicketHolder for tracking purposes.
+     *
+     * Increments the count of 'immediate' priority admissions reported.
      */
-    virtual void _releaseImmediateTicket(AdmissionContext* admCtx) noexcept = 0;
+    virtual void reportImmediatePriorityAdmission() = 0;
 
+private:
     /**
      * Releases a ticket back into the ticketing pool.
      */
@@ -121,8 +116,6 @@ public:
         : _outof(numTickets), _serviceContext(svcCtx){};
 
     ~TicketHolderWithQueueingStats() override{};
-
-    Ticket acquireImmediateTicket(AdmissionContext* admCtx) override final;
 
     boost::optional<Ticket> tryAcquire(AdmissionContext* admCtx) override;
 
@@ -149,6 +142,18 @@ public:
      */
     int outof() const {
         return _outof.loadRelaxed();
+    }
+
+    /**
+     * Returns the number of 'immediate' priority admissions, which always bypass ticket
+     * acquisition.
+     */
+    int64_t getImmediatePriorityAdmissionsCount() const {
+        return _immediatePriorityAdmissionsCount.loadRelaxed();
+    }
+
+    void reportImmediatePriorityAdmission() override final {
+        _immediatePriorityAdmissionsCount.fetchAndAdd(1);
     }
 
     void appendStats(BSONObjBuilder& b) const override;
@@ -180,19 +185,7 @@ public:
      */
     virtual int available() const = 0;
 
-    /**
-     * 'Immediate' tickets are acquired and released independent of the ticketing pool and queueing
-     * system. Subclasses must define whether they wish to record statistics surrounding 'immediate'
-     * tickets in addition to standard queueing statistics.
-     *
-     * Returns true if statistics surrounding 'immediate' tickets are to be tracked. False
-     * otherwise.
-     */
-    virtual bool recordImmediateTicketStatistics() = 0;
-
 private:
-    void _releaseImmediateTicket(AdmissionContext* admCtx) noexcept final;
-
     void _releaseToTicketPool(AdmissionContext* admCtx) noexcept override final;
 
     virtual boost::optional<Ticket> _tryAcquireImpl(AdmissionContext* admCtx) = 0;
@@ -217,6 +210,7 @@ private:
     Mutex _resizeMutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(2),
                                           "TicketHolderWithQueueingStats::_resizeMutex");
     AtomicWord<int> _outof;
+    AtomicWord<std::int64_t> _immediatePriorityAdmissionsCount;
 
 protected:
     /**
@@ -257,11 +251,7 @@ public:
 
     ~Ticket() {
         if (_ticketholder) {
-            if (_admissionContext->getPriority() == AdmissionContext::Priority::kImmediate) {
-                _ticketholder->_releaseImmediateTicket(_admissionContext);
-            } else {
-                _ticketholder->_releaseToTicketPool(_admissionContext);
-            }
+            _ticketholder->_releaseToTicketPool(_admissionContext);
         }
     }
 

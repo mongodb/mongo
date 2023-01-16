@@ -376,7 +376,7 @@ bool LockerImpl::_acquireTicket(OperationContext* opCtx, LockMode mode, Date_t d
     const bool reader = isSharedLockMode(mode);
 
     if (!shouldWaitForTicket() && holder) {
-        _ticket = holder->acquireImmediateTicket(&_admCtx);
+        holder->reportImmediatePriorityAdmission();
     } else if (mode != MODE_X && mode != MODE_NONE && holder) {
         // MODE_X is exclusive of all other locks, thus acquiring a ticket is unnecessary.
         _clientState.store(reader ? kQueuedReader : kQueuedWriter);

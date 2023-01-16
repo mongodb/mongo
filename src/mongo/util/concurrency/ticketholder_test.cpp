@@ -218,18 +218,8 @@ struct MockAdmission {
 // tickets.
 void resizeTest(OperationContext* opCtx,
                 std::unique_ptr<TicketHolderWithQueueingStats> holder,
-                TickSourceMock<Microseconds>* tickSource,
-                bool testWithOutstandingImmediateOperation = false) {
+                TickSourceMock<Microseconds>* tickSource) {
     Stats stats(holder.get());
-
-    // An outstanding kImmediate priority operation should not impact resize statistics.
-    MockAdmission immediatePriorityAdmission(getGlobalServiceContext(),
-                                             AdmissionContext::Priority::kImmediate);
-    if (testWithOutstandingImmediateOperation) {
-        immediatePriorityAdmission.ticket =
-            holder->acquireImmediateTicket(&immediatePriorityAdmission.admCtx);
-        ASSERT(immediatePriorityAdmission.ticket);
-    }
 
     AdmissionContext admCtx;
     admCtx.setPriority(AdmissionContext::Priority::kNormal);
@@ -280,16 +270,5 @@ TEST_F(TicketHolderTest, ResizeStatsSemaphore) {
 
     resizeTest(
         _opCtx.get(), std::make_unique<SemaphoreTicketHolder>(1, &serviceContext), tickSource);
-}
-
-TEST_F(TicketHolderTest, ResizeStatsSemaphoreWithOutstandingImmediatePriority) {
-    ServiceContext serviceContext;
-    serviceContext.setTickSource(std::make_unique<TickSourceMock<Microseconds>>());
-    auto tickSource = dynamic_cast<TickSourceMock<Microseconds>*>(serviceContext.getTickSource());
-
-    resizeTest(_opCtx.get(),
-               std::make_unique<SemaphoreTicketHolder>(1, &serviceContext),
-               tickSource,
-               true);
 }
 }  // namespace

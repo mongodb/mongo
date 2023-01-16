@@ -130,8 +130,7 @@ boost::optional<Ticket> PriorityTicketHolder::_waitForTicketUntilImpl(OperationC
 }
 
 void PriorityTicketHolder::_releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept {
-    // Tickets acquired with priority kImmediate are not generated from the pool of available
-    // tickets, and thus should never be returned to the pool of available tickets.
+    // 'Immediate' priority operations should bypass the ticketing system completely.
     invariant(admCtx && admCtx->getPriority() != AdmissionContext::Priority::kImmediate);
 
     // We will now proceed to perform dequeueing, we must acquire the growth mutex in order to
@@ -196,22 +195,7 @@ void PriorityTicketHolder::_appendImplStats(BSONObjBuilder& b) const {
         _appendCommonQueueImplStats(bbb, normalPriorityTicketStats);
         bbb.done();
     }
-    {
-        BSONObjBuilder bbb(b.subobjStart("immediatePriority"));
-        // Since 'kImmediate' priority operations will never queue, omit queueing statistics that
-        // will always be 0.
-        const auto& immediateTicketStats = _stats[_enumToInt(QueueType::kImmediatePriority)];
-
-        auto finished = immediateTicketStats.totalFinishedProcessing.loadRelaxed();
-        auto started = immediateTicketStats.totalStartedProcessing.loadRelaxed();
-        bbb.append("startedProcessing", started);
-        bbb.append("processing", std::max(static_cast<int>(started - finished), 0));
-        bbb.append("finishedProcessing", finished);
-        bbb.append("totalTimeProcessingMicros",
-                   immediateTicketStats.totalTimeProcessingMicros.loadRelaxed());
-        bbb.append("newAdmissions", immediateTicketStats.totalNewAdmissions.loadRelaxed());
-        bbb.done();
-    }
+    b.append("immediatePriorityAdmissionsCount", getImmediatePriorityAdmissionsCount());
 }
 
 bool PriorityTicketHolder::_tryAcquireTicket() {

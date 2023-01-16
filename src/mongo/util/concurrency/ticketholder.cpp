@@ -65,15 +65,6 @@ void updateQueueStatsOnTicketAcquisition(ServiceContext* serviceContext,
 }
 }  // namespace
 
-Ticket TicketHolderWithQueueingStats::acquireImmediateTicket(AdmissionContext* admCtx) {
-    invariant(admCtx->getPriority() == AdmissionContext::Priority::kImmediate);
-    if (recordImmediateTicketStatistics()) {
-        auto& queueStats = _getQueueStatsToUse(admCtx);
-        updateQueueStatsOnTicketAcquisition(_serviceContext, queueStats, admCtx);
-    }
-    return Ticket{this, admCtx};
-}
-
 void TicketHolderWithQueueingStats::resize(OperationContext* opCtx, int newSize) noexcept {
     stdx::lock_guard<Latch> lk(_resizeMutex);
 
@@ -86,13 +77,6 @@ void TicketHolderWithQueueingStats::appendStats(BSONObjBuilder& b) const {
     b.append("available", available());
     b.append("totalTickets", outof());
     _appendImplStats(b);
-}
-
-void TicketHolderWithQueueingStats::_releaseImmediateTicket(AdmissionContext* admCtx) noexcept {
-    if (recordImmediateTicketStatistics()) {
-        auto& queueStats = _getQueueStatsToUse(admCtx);
-        updateQueueStatsOnRelease(_serviceContext, queueStats, admCtx);
-    }
 }
 
 void TicketHolderWithQueueingStats::_releaseToTicketPool(AdmissionContext* admCtx) noexcept {
@@ -110,8 +94,7 @@ Ticket TicketHolderWithQueueingStats::waitForTicket(OperationContext* opCtx,
 }
 
 boost::optional<Ticket> TicketHolderWithQueueingStats::tryAcquire(AdmissionContext* admCtx) {
-    // kImmediate operations don't need to 'try' to acquire a ticket, they should always get a
-    // ticket immediately.
+    // 'kImmediate' operations should always bypass the ticketing system.
     invariant(admCtx && admCtx->getPriority() != AdmissionContext::Priority::kImmediate);
     auto ticket = _tryAcquireImpl(admCtx);
 
@@ -127,7 +110,7 @@ boost::optional<Ticket> TicketHolderWithQueueingStats::waitForTicketUntil(Operat
                                                                           AdmissionContext* admCtx,
                                                                           Date_t until,
                                                                           WaitMode waitMode) {
-    invariant(admCtx);
+    invariant(admCtx && admCtx->getPriority() != AdmissionContext::Priority::kImmediate);
 
     // Attempt a quick acquisition first.
     if (auto ticket = tryAcquire(admCtx)) {

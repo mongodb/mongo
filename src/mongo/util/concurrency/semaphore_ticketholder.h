@@ -59,13 +59,6 @@ public:
         return std::max(static_cast<int>(added - removed), 0);
     };
 
-    bool recordImmediateTicketStatistics() noexcept override final {
-        // Historically, operations that now acquire 'immediate' tickets bypassed the ticketing
-        // mechanism completely. Preserve legacy behavior where 'immediate' ticketing is not tracked
-        // in the statistics.
-        return false;
-    }
-
 private:
     boost::optional<Ticket> _waitForTicketUntilImpl(OperationContext* opCtx,
                                                     AdmissionContext* admCtx,

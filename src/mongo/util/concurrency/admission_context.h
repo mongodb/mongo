@@ -57,8 +57,9 @@ public:
      * user and internal, should use this priority unless they qualify as 'kLow' or 'kImmediate'
      * priority.
      *
-     * 'kImmediate': It's crucial that the operation makes forward progress - and acquire a ticket
-     * immediately upon request, without waiting.
+     * 'kImmediate': It's crucial that the operation makes forward progress - bypasses the ticketing
+     * mechanism.
+     *
      * Reserved for operations critical to availability (e.g. replication workers) or observability
      * (e.g. FTDC), and any operation that is releasing resources (e.g. committing or aborting
      * prepared transactions). Should be used sparingly.
