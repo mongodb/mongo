@@ -1408,12 +1408,29 @@ optimizer::ABT makeVariable(optimizer::ProjectionName var) {
     return optimizer::make<optimizer::Variable>(std::move(var));
 }
 
-optimizer::ABT generateABTNullOrMissing(optimizer::ProjectionName var) {
+optimizer::ABT generateABTNullOrMissing(optimizer::ABT var) {
     return makeFillEmptyTrue(optimizer::make<optimizer::FunctionCall>(
         "typeMatch",
-        optimizer::ABTVector{optimizer::make<optimizer::Variable>(var),
+        optimizer::ABTVector{std::move(var),
                              optimizer::Constant::int32(getBSONTypeMask(BSONType::jstNULL) |
                                                         getBSONTypeMask(BSONType::Undefined))}));
+}
+
+optimizer::ABT generateABTNullOrMissing(optimizer::ProjectionName var) {
+    return generateABTNullOrMissing(optimizer::make<optimizer::Variable>(std::move(var)));
+}
+
+optimizer::ABT generateABTNonStringCheck(optimizer::ABT var) {
+    return makeNot(optimizer::make<optimizer::FunctionCall>("isString", optimizer::ABTVector{var}));
+}
+
+optimizer::ABT generateABTNonStringCheck(optimizer::ProjectionName var) {
+    return generateABTNonStringCheck(optimizer::make<optimizer::Variable>(std::move(var)));
+}
+
+optimizer::ABT generateABTNonTimestampCheck(optimizer::ProjectionName var) {
+    return makeNot(optimizer::make<optimizer::FunctionCall>(
+        "isTimestamp", optimizer::ABTVector{optimizer::make<optimizer::Variable>(var)}));
 }
 
 optimizer::ABT generateABTNegativeCheck(optimizer::ProjectionName var) {
@@ -1426,6 +1443,11 @@ optimizer::ABT generateABTNonPositiveCheck(optimizer::ProjectionName var) {
     return optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Lte,
                                                 optimizer::make<optimizer::Variable>(var),
                                                 optimizer::Constant::int32(0));
+}
+
+optimizer::ABT generateABTPositiveCheck(optimizer::ABT var) {
+    return optimizer::make<optimizer::BinaryOp>(
+        optimizer::Operations::Gt, std::move(var), optimizer::Constant::int32(0));
 }
 
 optimizer::ABT generateABTNonNumericCheck(optimizer::ProjectionName var) {
@@ -1453,10 +1475,6 @@ optimizer::ABT generateABTNonArrayCheck(optimizer::ProjectionName var) {
 
 optimizer::ABT generateABTNonObjectCheck(optimizer::ProjectionName var) {
     return makeNot(makeABTFunction("isObject", optimizer::make<optimizer::Variable>(var)));
-}
-
-optimizer::ABT generateABTNonStringCheck(optimizer::ProjectionName var) {
-    return makeNot(makeABTFunction("isString", optimizer::make<optimizer::Variable>(var)));
 }
 
 optimizer::ABT generateABTNullishOrNotRepresentableInt32Check(optimizer::ProjectionName var) {

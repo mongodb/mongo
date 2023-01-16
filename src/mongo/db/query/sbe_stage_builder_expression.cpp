@@ -1441,6 +1441,18 @@ public:
     }
     void visit(const ExpressionDateDiff* expr) final {
         using namespace std::literals;
+
+        auto children = expr->getChildren();
+        invariant(children.size() == 5);
+        auto argCount =
+            3 + (expr->isTimezoneSpecified() ? 1 : 0) + (expr->isStartOfWeekSpecified() ? 1 : 0);
+        _context->ensureArity(argCount);
+
+        if (_context->hasAllAbtEligibleEntries(argCount)) {
+            visitABT(expr);
+            return;
+        }
+
         auto frameId = _context->state.frameId();
         sbe::EExpression::Vector arguments;
         sbe::EExpression::Vector bindings;
@@ -1453,11 +1465,6 @@ public:
         // An auxiliary boolean variable to hold a value of a common subexpression 'unit'=="week"
         // (string).
         sbe::EVariable unitIsWeekRef(frameId, 5);
-
-        auto children = expr->getChildren();
-        invariant(children.size() == 5);
-        _context->ensureArity(3 + (expr->isTimezoneSpecified() ? 1 : 0) +
-                              (expr->isStartOfWeekSpecified() ? 1 : 0));
 
         // Get child expressions.
         auto startOfWeekExpression = expr->isStartOfWeekSpecified() ? _context->popExpr() : nullptr;
@@ -1567,6 +1574,152 @@ public:
         _context->pushExpr(sbe::makeE<sbe::ELocalBind>(
             frameId, std::move(bindings), std::move(dateDiffExpression)));
     }
+    void visitABT(const ExpressionDateDiff* expr) {
+        using namespace std::literals;
+        auto startDateName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto endDateName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto unitName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto timezoneName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto startOfWeekName = makeLocalVariableName(_context->state.frameId(), 0);
+
+        // An auxiliary boolean variable to hold a value of a common subexpression 'unit'=="week"
+        // (string).
+        auto unitIsWeekName = makeLocalVariableName(_context->state.frameId(), 0);
+
+        auto startDateVar = makeVariable(startDateName);
+        auto endDateVar = makeVariable(endDateName);
+        auto unitVar = makeVariable(unitName);
+        auto timezoneVar = makeVariable(timezoneName);
+        auto startOfWeekVar = makeVariable(startOfWeekName);
+        auto unitIsWeekVar = makeVariable(unitIsWeekName);
+
+        auto children = expr->getChildren();
+
+        // Get child expressions.
+        boost::optional<optimizer::ABT> startOfWeekExpression;
+        if (expr->isStartOfWeekSpecified()) {
+            startOfWeekExpression = _context->popABTExpr();
+        }
+        auto timezoneExpression = expr->isTimezoneSpecified() ? _context->popABTExpr()
+                                                              : optimizer::Constant::str("UTC"_sd);
+        auto unitExpression = _context->popABTExpr();
+        auto endDateExpression = _context->popABTExpr();
+        auto startDateExpression = _context->popABTExpr();
+
+        auto timeZoneDBSlot = _context->state.data->env->getSlot("timeZoneDB"_sd);
+        auto timeZoneDBName = _context->registerVariable(timeZoneDBSlot);
+        auto timeZoneDBVar = makeVariable(timeZoneDBName);
+
+        //  Set parameters for an invocation of built-in "dateDiff" function.
+        optimizer::ABTVector arguments;
+        arguments.push_back(timeZoneDBVar);
+        arguments.push_back(startDateVar);
+        arguments.push_back(endDateVar);
+        arguments.push_back(unitVar);
+        arguments.push_back(timezoneVar);
+        if (expr->isStartOfWeekSpecified()) {
+            // Parameter "startOfWeek" - if the time unit is the week, then pass value of parameter
+            // "startOfWeek" of "$dateDiff" expression, otherwise pass a valid default value, since
+            // "dateDiff" built-in function does not accept non-string type values for this
+            // parameter.
+            arguments.push_back(optimizer::make<optimizer::If>(
+                unitIsWeekVar, startOfWeekVar, optimizer::Constant::str("sun"_sd)));
+        }
+
+        // Set bindings for the frame.
+        optimizer::ABTVector bindings;
+        optimizer::ProjectionNameVector bindingNames;
+        bindingNames.push_back(startDateName);
+        bindings.push_back(std::move(startDateExpression));
+        bindingNames.push_back(endDateName);
+        bindings.push_back(std::move(endDateExpression));
+        bindingNames.push_back(unitName);
+        bindings.push_back(std::move(unitExpression));
+        bindingNames.push_back(timezoneName);
+        bindings.push_back(std::move(timezoneExpression));
+        if (expr->isStartOfWeekSpecified()) {
+            bindingNames.push_back(startOfWeekName);
+            bindings.push_back(*startOfWeekExpression);
+            bindingNames.push_back(unitIsWeekName);
+            bindings.push_back(generateABTIsEqualToStringCheck(unitVar, "week"_sd));
+        }
+
+        // Create an expression to invoke built-in "dateDiff" function.
+        auto dateDiffFunctionCall =
+            optimizer::make<optimizer::FunctionCall>("dateDiff", std::move(arguments));
+
+        // Create expressions to check that each argument to "dateDiff" function exists, is not
+        // null, and is of the correct type.
+        std::vector<ABTCaseValuePair> inputValidationCases;
+
+        // Return null if any of the parameters is either null or missing.
+        inputValidationCases.push_back(generateABTReturnNullIfNullOrMissing(startDateVar));
+        inputValidationCases.push_back(generateABTReturnNullIfNullOrMissing(endDateVar));
+        inputValidationCases.push_back(generateABTReturnNullIfNullOrMissing(unitVar));
+        inputValidationCases.push_back(generateABTReturnNullIfNullOrMissing(timezoneVar));
+        if (expr->isStartOfWeekSpecified()) {
+            inputValidationCases.emplace_back(
+                optimizer::make<optimizer::BinaryOp>(optimizer::Operations::And,
+                                                     unitIsWeekVar,
+                                                     generateABTNullOrMissing(startOfWeekName)),
+                optimizer::Constant::null());
+        }
+
+        // "timezone" parameter validation.
+        inputValidationCases.emplace_back(
+            generateABTNonStringCheck(timezoneName),
+            makeABTFail(ErrorCodes::Error{7157919},
+                        "$dateDiff parameter 'timezone' must be a string"));
+        inputValidationCases.emplace_back(
+            makeNot(makeABTFunction("isTimezone", timeZoneDBVar, timezoneVar)),
+            makeABTFail(ErrorCodes::Error{7157920},
+                        "$dateDiff parameter 'timezone' must be a valid timezone"));
+
+        // "startDate" parameter validation.
+        inputValidationCases.emplace_back(generateABTFailIfNotCoercibleToDate(
+            startDateVar, ErrorCodes::Error{7157921}, "$dateDiff"_sd, "startDate"_sd));
+
+        // "endDate" parameter validation.
+        inputValidationCases.emplace_back(generateABTFailIfNotCoercibleToDate(
+            endDateVar, ErrorCodes::Error{7157922}, "$dateDiff"_sd, "endDate"_sd));
+
+        // "unit" parameter validation.
+        inputValidationCases.emplace_back(
+            generateABTNonStringCheck(unitName),
+            makeABTFail(ErrorCodes::Error{7157923}, "$dateDiff parameter 'unit' must be a string"));
+        inputValidationCases.emplace_back(
+            makeNot(makeABTFunction("isTimeUnit", unitVar)),
+            makeABTFail(ErrorCodes::Error{7157924},
+                        "$dateDiff parameter 'unit' must be a valid time unit"));
+
+        // "startOfWeek" parameter validation.
+        if (expr->isStartOfWeekSpecified()) {
+            // If 'timeUnit' value is equal to "week" then validate "startOfWeek" parameter.
+            inputValidationCases.emplace_back(
+                optimizer::make<optimizer::BinaryOp>(optimizer::Operations::And,
+                                                     unitIsWeekVar,
+                                                     generateABTNonStringCheck(startOfWeekName)),
+                makeABTFail(ErrorCodes::Error{7157925},
+                            "$dateDiff parameter 'startOfWeek' must be a string"));
+            inputValidationCases.emplace_back(
+                optimizer::make<optimizer::BinaryOp>(
+                    optimizer::Operations::And,
+                    unitIsWeekVar,
+                    makeNot(makeABTFunction("isDayOfWeek", startOfWeekVar))),
+                makeABTFail(ErrorCodes::Error{7157926},
+                            "$dateDiff parameter 'startOfWeek' must be a valid day of the week"));
+        }
+
+        auto dateDiffExpression = buildABTMultiBranchConditionalFromCaseValuePairs(
+            std::move(inputValidationCases), std::move(dateDiffFunctionCall));
+
+        for (int i = bindings.size() - 1; i >= 0; --i) {
+            dateDiffExpression = optimizer::make<optimizer::Let>(
+                std::move(bindingNames[i]), std::move(bindings[i]), std::move(dateDiffExpression));
+        }
+
+        _context->pushExpr(std::move(dateDiffExpression));
+    }
     void visit(const ExpressionDateFromString* expr) final {
         unsupportedExpression("$dateFromString");
     }
@@ -1575,6 +1728,17 @@ public:
         // to compute a date from parts so we only need to pop if a child exists.
         auto children = expr->getChildren();
         invariant(children.size() == 11);
+
+        auto argCount = 0;
+        for (size_t i = 0; i < 11; i++) {
+            if (children[i]) {
+                argCount++;
+            }
+        }
+        if (_context->hasAllAbtEligibleEntries(argCount)) {
+            visitABT(expr);
+            return;
+        }
 
         auto eTimezone = children[10] ? _context->popExpr() : nullptr;
         auto eIsoDayOfWeek = children[9] ? _context->popExpr() : nullptr;
@@ -1864,10 +2028,323 @@ public:
         _context->pushExpr(sbe::makeE<sbe::ELocalBind>(
             frameId, std::move(operands), std::move(computeDateOrNull)));
     }
+    void visitABT(const ExpressionDateFromParts* expr) {
+        // This expression can carry null children depending on the set of fields provided,
+        // to compute a date from parts so we only need to pop if a child exists.
+        auto children = expr->getChildren();
+
+        boost::optional<optimizer::ABT> eTimezone;
+        if (children[10]) {
+            eTimezone = _context->popABTExpr();
+        }
+        boost::optional<optimizer::ABT> eIsoDayOfWeek;
+        if (children[9]) {
+            eIsoDayOfWeek = _context->popABTExpr();
+        }
+        boost::optional<optimizer::ABT> eIsoWeek;
+        if (children[8]) {
+            eIsoWeek = _context->popABTExpr();
+        }
+        boost::optional<optimizer::ABT> eIsoWeekYear;
+        if (children[7]) {
+            eIsoWeekYear = _context->popABTExpr();
+        }
+        boost::optional<optimizer::ABT> eMillisecond;
+        if (children[6]) {
+            eMillisecond = _context->popABTExpr();
+        }
+        boost::optional<optimizer::ABT> eSecond;
+        if (children[5]) {
+            eSecond = _context->popABTExpr();
+        }
+        boost::optional<optimizer::ABT> eMinute;
+        if (children[4]) {
+            eMinute = _context->popABTExpr();
+        }
+        boost::optional<optimizer::ABT> eHour;
+        if (children[3]) {
+            eHour = _context->popABTExpr();
+        }
+        boost::optional<optimizer::ABT> eDay;
+        if (children[2]) {
+            eDay = _context->popABTExpr();
+        }
+        boost::optional<optimizer::ABT> eMonth;
+        if (children[1]) {
+            eMonth = _context->popABTExpr();
+        }
+        boost::optional<optimizer::ABT> eYear;
+        if (children[0]) {
+            eYear = _context->popABTExpr();
+        }
+
+        auto yearName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto monthName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto dayName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto hourName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto minName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto secName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto millisecName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto timeZoneName = makeLocalVariableName(_context->state.frameId(), 0);
+
+        auto yearVar = makeVariable(yearName);
+        auto monthVar = makeVariable(monthName);
+        auto dayVar = makeVariable(dayName);
+        auto hourVar = makeVariable(hourName);
+        auto minVar = makeVariable(minName);
+        auto secVar = makeVariable(secName);
+        auto millisecVar = makeVariable(millisecName);
+        auto timeZoneVar = makeVariable(timeZoneName);
+
+        // Build a chain of nested bounds checks for each date part that is provided in the
+        // expression. We elide the checks in the case that default values are used. These bound
+        // checks are then used by folding over pairs of ite tests and else branches to implement
+        // short-circuiting in the case that checks fail. To emulate the control flow of MQL for
+        // this expression we interleave type conversion checks with time component bound checks.
+        const auto minInt16 = std::numeric_limits<int16_t>::lowest();
+        const auto maxInt16 = std::numeric_limits<int16_t>::max();
+
+        // Constructs an expression that does a bound check of var over a closed interval [lower,
+        // upper].
+        auto boundedCheck =
+            [](optimizer::ABT& var, int16_t lower, int16_t upper, const std::string& varName) {
+                str::stream errMsg;
+                if (varName == "year" || varName == "isoWeekYear") {
+                    errMsg << "'" << varName << "'"
+                           << " must evaluate to an integer in the range " << lower << " to "
+                           << upper;
+                } else {
+                    errMsg << "'" << varName << "'"
+                           << " must evaluate to a value in the range [" << lower << ", " << upper
+                           << "]";
+                }
+                return std::make_pair(
+                    optimizer::make<optimizer::BinaryOp>(
+                        optimizer::Operations::And,
+                        optimizer::make<optimizer::BinaryOp>(
+                            optimizer::Operations::Gte, var, optimizer::Constant::int32(lower)),
+                        optimizer::make<optimizer::BinaryOp>(
+                            optimizer::Operations::Lte, var, optimizer::Constant::int32(upper))),
+                    makeABTFail(ErrorCodes::Error{7157916}, errMsg));
+            };
+
+        // Here we want to validate each field that is provided as input to the agg expression. To
+        // do this we implement the following checks:
+        // 1) Check if the value in a given slot null or missing.
+        // 2) Check if the value in a given slot is an integral int64.
+        auto fieldConversionBinding = [](optimizer::ABT& expr,
+                                         sbe::value::FrameIdGenerator* frameIdGenerator,
+                                         const std::string& varName) {
+            auto outerName = makeLocalVariableName(frameIdGenerator->generate(), 0);
+            auto outerVar = makeVariable(outerName);
+            auto convertedFieldName = makeLocalVariableName(frameIdGenerator->generate(), 0);
+            auto convertedFieldVar = makeVariable(convertedFieldName);
+
+            return optimizer::make<optimizer::Let>(
+                outerName,
+                expr,
+                optimizer::make<optimizer::If>(
+                    optimizer::make<optimizer::BinaryOp>(
+                        optimizer::Operations::Or,
+                        makeNot(makeABTFunction("exists", outerVar)),
+                        makeABTFunction("isNull", outerVar)),
+                    optimizer::Constant::null(),
+                    optimizer::make<optimizer::Let>(
+                        convertedFieldName,
+                        makeABTFunction("convert",
+                                        outerVar,
+                                        optimizer::Constant::int32(static_cast<int32_t>(
+                                            sbe::value::TypeTags::NumberInt64))),
+                        optimizer::make<optimizer::If>(
+                            makeABTFunction("exists", convertedFieldVar),
+                            convertedFieldVar,
+                            makeABTFail(ErrorCodes::Error{7157917},
+                                        str::stream() << "'" << varName << "'"
+                                                      << " must evaluate to an integer")))));
+        };
+
+        // Build two vectors on the fly to elide bound and conversion for defaulted values.
+        std::vector<std::pair<optimizer::ABT, optimizer::ABT>>
+            boundChecks;  // checks for lower and upper bounds of date fields.
+
+        // Operands is for the outer let bindings.
+        optimizer::ABTVector operands;
+        if (eIsoWeekYear) {
+            boundChecks.push_back(boundedCheck(yearVar, 1, 9999, "isoWeekYear"));
+            operands.push_back(fieldConversionBinding(
+                *eIsoWeekYear, _context->state.frameIdGenerator, "isoWeekYear"));
+            if (!eIsoWeek) {
+                operands.push_back(optimizer::Constant::int32(1));
+            } else {
+                boundChecks.push_back(boundedCheck(monthVar, minInt16, maxInt16, "isoWeek"));
+                operands.push_back(
+                    fieldConversionBinding(*eIsoWeek, _context->state.frameIdGenerator, "isoWeek"));
+            }
+            if (!eIsoDayOfWeek) {
+                operands.push_back(optimizer::Constant::int32(1));
+            } else {
+                boundChecks.push_back(boundedCheck(dayVar, minInt16, maxInt16, "isoDayOfWeek"));
+                operands.push_back(fieldConversionBinding(
+                    *eIsoDayOfWeek, _context->state.frameIdGenerator, "isoDayOfWeek"));
+            }
+        } else {
+            // The regular year/month/day case.
+            if (!eYear) {
+                operands.push_back(optimizer::Constant::int32(1970));
+            } else {
+                boundChecks.push_back(boundedCheck(yearVar, 1, 9999, "year"));
+                operands.push_back(
+                    fieldConversionBinding(*eYear, _context->state.frameIdGenerator, "year"));
+            }
+            if (!eMonth) {
+                operands.push_back(optimizer::Constant::int32(1));
+            } else {
+                boundChecks.push_back(boundedCheck(monthVar, minInt16, maxInt16, "month"));
+                operands.push_back(
+                    fieldConversionBinding(*eMonth, _context->state.frameIdGenerator, "month"));
+            }
+            if (!eDay) {
+                operands.push_back(optimizer::Constant::int32(1));
+            } else {
+                boundChecks.push_back(boundedCheck(dayVar, minInt16, maxInt16, "day"));
+                operands.push_back(
+                    fieldConversionBinding(*eDay, _context->state.frameIdGenerator, "day"));
+            }
+        }
+        if (!eHour) {
+            operands.push_back(optimizer::Constant::int32(0));
+        } else {
+            boundChecks.push_back(boundedCheck(hourVar, minInt16, maxInt16, "hour"));
+            operands.push_back(
+                fieldConversionBinding(*eHour, _context->state.frameIdGenerator, "hour"));
+        }
+        if (!eMinute) {
+            operands.push_back(optimizer::Constant::int32(0));
+        } else {
+            boundChecks.push_back(boundedCheck(minVar, minInt16, maxInt16, "minute"));
+            operands.push_back(
+                fieldConversionBinding(*eMinute, _context->state.frameIdGenerator, "minute"));
+        }
+        if (!eSecond) {
+            operands.push_back(optimizer::Constant::int32(0));
+        } else {
+            // MQL doesn't place bound restrictions on the second field, because seconds carry over
+            // to minutes and can be large ints such as 71,841,012 or even unix epochs.
+            operands.push_back(
+                fieldConversionBinding(*eSecond, _context->state.frameIdGenerator, "second"));
+        }
+        if (!eMillisecond) {
+            operands.push_back(optimizer::Constant::int32(0));
+        } else {
+            // MQL doesn't enforce bound restrictions on millisecond fields because milliseconds
+            // carry over to seconds.
+            operands.push_back(fieldConversionBinding(
+                *eMillisecond, _context->state.frameIdGenerator, "millisecond"));
+        }
+        if (!eTimezone) {
+            operands.push_back(optimizer::Constant::str("UTC"));
+        } else {
+            // Validate that eTimezone is a string.
+            auto timeZoneName = makeLocalVariableName(_context->state.frameId(), 0);
+            auto timeZoneVar = makeVariable(timeZoneName);
+            operands.push_back(optimizer::make<optimizer::Let>(
+                timeZoneName,
+                *eTimezone,
+                optimizer::make<optimizer::If>(
+                    makeABTFunction("isString", timeZoneVar),
+                    timeZoneVar,
+                    makeABTFail(ErrorCodes::Error{7157918},
+                                str::stream() << "'timezone' must evaluate to a string"))));
+        }
+
+        // Make a disjunction of null checks for each date part by over this vector. These checks
+        // are necessary after the initial conversion computation because we need have the outer let
+        // binding evaluate to null if any field is null.
+        auto nullExprs = optimizer::ABTVector{generateABTNullOrMissing(timeZoneName),
+                                              generateABTNullOrMissing(millisecName),
+                                              generateABTNullOrMissing(secName),
+                                              generateABTNullOrMissing(minName),
+                                              generateABTNullOrMissing(hourName),
+                                              generateABTNullOrMissing(dayName),
+                                              generateABTNullOrMissing(monthName),
+                                              generateABTNullOrMissing(yearName)};
+
+        auto checkPartsForNull =
+            makeBalancedBooleanOpTree(optimizer::Operations::Or, std::move(nullExprs));
+
+        // Invocation of the datePartsWeekYear and dateParts functions depend on a TimeZoneDatabase
+        // for datetime computation. This global object is registered as an unowned value in the
+        // runtime environment so we pass the corresponding slot to the datePartsWeekYear and
+        // dateParts functions as a variable.
+        auto timeZoneDBSlot = _context->state.data->env->getSlot("timeZoneDB"_sd);
+        auto timeZoneDBName = _context->registerVariable(timeZoneDBSlot);
+        auto computeDate = makeABTFunction(eIsoWeekYear ? "datePartsWeekYear" : "dateParts",
+                                           makeVariable(timeZoneDBName),
+                                           yearVar,
+                                           monthVar,
+                                           dayVar,
+                                           hourVar,
+                                           minVar,
+                                           secVar,
+                                           millisecVar,
+                                           timeZoneVar);
+
+        using iterPair_t = std::vector<std::pair<optimizer::ABT, optimizer::ABT>>::iterator;
+        auto computeBoundChecks =
+            std::accumulate(std::move_iterator<iterPair_t>(boundChecks.begin()),
+                            std::move_iterator<iterPair_t>(boundChecks.end()),
+                            std::move(computeDate),
+                            [](auto&& acc, auto&& b) {
+                                return optimizer::make<optimizer::If>(
+                                    std::move(b.first), std::move(acc), std::move(b.second));
+                            });
+
+        // This final ite expression allows short-circuting of the null field case. If the nullish,
+        // checks pass, then we check the bounds of each field and invoke the builtins if all checks
+        // pass.
+        auto computeDateOrNull = optimizer::make<optimizer::If>(std::move(checkPartsForNull),
+                                                                optimizer::Constant::null(),
+                                                                std::move(computeBoundChecks));
+
+        _context->pushExpr(optimizer::make<optimizer::Let>(
+            std::move(yearName),
+            std::move(operands[0]),
+            optimizer::make<optimizer::Let>(
+                std::move(monthName),
+                std::move(operands[1]),
+                optimizer::make<optimizer::Let>(
+                    std::move(dayName),
+                    std::move(operands[2]),
+                    optimizer::make<optimizer::Let>(
+                        std::move(hourName),
+                        std::move(operands[3]),
+                        optimizer::make<optimizer::Let>(
+                            std::move(minName),
+                            std::move(operands[4]),
+                            optimizer::make<optimizer::Let>(
+                                std::move(secName),
+                                std::move(operands[5]),
+                                optimizer::make<optimizer::Let>(
+                                    std::move(millisecName),
+                                    std::move(operands[6]),
+                                    optimizer::make<optimizer::Let>(
+                                        std::move(timeZoneName),
+                                        std::move(operands[7]),
+                                        std::move(computeDateOrNull))))))))));
+    }
 
     void visit(const ExpressionDateToParts* expr) final {
-        auto frameId = _context->state.frameId();
         auto children = expr->getChildren();
+        auto argCount =
+            std::count_if(children.begin(),
+                          children.end(),
+                          [](boost::intrusive_ptr<Expression> child) { return child != nullptr; });
+        if (_context->hasAllAbtEligibleEntries(argCount)) {
+            visitABT(expr);
+            return;
+        }
+
+        auto frameId = _context->state.frameId();
         std::unique_ptr<sbe::EExpression> date, timezone, isoflag;
         std::unique_ptr<sbe::EExpression> totalExprDateToParts;
         sbe::EExpression::Vector args;
@@ -1965,15 +2442,92 @@ public:
         _context->pushExpr(sbe::makeE<sbe::ELocalBind>(
             frameId, std::move(operands), std::move(totalDateToPartsFunc)));
     }
+    void visitABT(const ExpressionDateToParts* expr) {
+        auto children = expr->getChildren();
+
+        auto dateName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto timezoneName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto isoflagName = makeLocalVariableName(_context->state.frameId(), 0);
+
+        auto dateVar = makeVariable(dateName);
+        auto timezoneVar = makeVariable(timezoneName);
+        auto isoflagVar = makeVariable(isoflagName);
+
+        // Initialize arguments with values from stack or default values.
+        auto isoflag = optimizer::Constant::boolean(false);
+        if (children[2]) {
+            isoflag = _context->popABTExpr();
+        }
+        auto timezone = optimizer::Constant::str("UTC");
+        if (children[1]) {
+            timezone = _context->popABTExpr();
+        }
+        if (!children[0]) {
+            _context->pushExpr(
+                makeABTFail(ErrorCodes::Error{7157911}, "$dateToParts must include a date"));
+            return;
+        }
+        auto date = _context->popABTExpr();
+
+        auto timeZoneDBSlot = _context->state.data->env->getSlot("timeZoneDB"_sd);
+        auto timeZoneDBName = _context->registerVariable(timeZoneDBSlot);
+        auto timeZoneDBVar = makeVariable(timeZoneDBName);
+
+        auto isoTypeMask = getBSONTypeMask(sbe::value::TypeTags::Boolean);
+
+        // Determine whether to call dateToParts or isoDateToParts.
+        auto checkIsoflagValue = buildABTMultiBranchConditional(
+            ABTCaseValuePair{
+                optimizer::make<optimizer::BinaryOp>(
+                    optimizer::Operations::Eq, isoflagVar, optimizer::Constant::boolean(false)),
+                makeABTFunction("dateToParts", timeZoneDBVar, dateVar, timezoneVar, isoflagVar)},
+            makeABTFunction("isoDateToParts", timeZoneDBVar, dateVar, timezoneVar, isoflagVar));
+
+        // Check that each argument exists, is not null, and is the correct type.
+        auto totalDateToPartsFunc = buildABTMultiBranchConditional(
+            ABTCaseValuePair{generateABTNullOrMissing(timezoneName), optimizer::Constant::null()},
+            ABTCaseValuePair{
+                makeNot(makeABTFunction("isString", timezoneVar)),
+                makeABTFail(ErrorCodes::Error{7157912}, "$dateToParts timezone must be a string")},
+            ABTCaseValuePair{makeNot(makeABTFunction("isTimezone", timeZoneDBVar, timezoneVar)),
+                             makeABTFail(ErrorCodes::Error{7157913},
+                                         "$dateToParts timezone must be a valid timezone")},
+            ABTCaseValuePair{generateABTNullOrMissing(isoflagName), optimizer::Constant::null()},
+            ABTCaseValuePair{
+                makeNot(makeABTFunction(
+                    "typeMatch", isoflagVar, optimizer::Constant::int32(isoTypeMask))),
+                makeABTFail(ErrorCodes::Error{7157914}, "$dateToParts iso8601 must be a boolean")},
+            ABTCaseValuePair{generateABTNullOrMissing(dateName), optimizer::Constant::null()},
+            ABTCaseValuePair{makeNot(makeABTFunction(
+                                 "typeMatch", dateVar, optimizer::Constant::int32(dateTypeMask()))),
+                             makeABTFail(ErrorCodes::Error{7157915},
+                                         "$dateToParts date must have the format of a date")},
+            std::move(checkIsoflagValue));
+
+        _context->pushExpr(optimizer::make<optimizer::Let>(
+            std::move(dateName),
+            std::move(date),
+            optimizer::make<optimizer::Let>(
+                std::move(timezoneName),
+                std::move(timezone),
+                optimizer::make<optimizer::Let>(
+                    std::move(isoflagName), std::move(isoflag), std::move(totalDateToPartsFunc)))));
+    }
+
     void visit(const ExpressionDateToString* expr) final {
         unsupportedExpression("$dateFromString");
     }
     void visit(const ExpressionDateTrunc* expr) final {
         auto children = expr->getChildren();
         invariant(children.size() == 5);
-        _context->ensureArity(2 + (expr->isBinSizeSpecified() ? 1 : 0) +
-                              (expr->isTimezoneSpecified() ? 1 : 0) +
-                              (expr->isStartOfWeekSpecified() ? 1 : 0));
+        auto argCount = 2 + (expr->isBinSizeSpecified() ? 1 : 0) +
+            (expr->isTimezoneSpecified() ? 1 : 0) + (expr->isStartOfWeekSpecified() ? 1 : 0);
+        _context->ensureArity(argCount);
+
+        if (_context->hasAllAbtEligibleEntries(argCount)) {
+            visitABT(expr);
+            return;
+        }
 
         // Get child expressions.
         auto startOfWeekExpression =
@@ -2167,6 +2721,207 @@ public:
                                          buildMultiBranchConditionalFromCaseValuePairs(
                                              std::move(inputValidationCases),
                                              makeConstant(sbe::value::TypeTags::Nothing, 0)))))));
+    }
+    void visitABT(const ExpressionDateTrunc* expr) {
+        auto children = expr->getChildren();
+        invariant(children.size() == 5);
+        _context->ensureArity(2 + (expr->isBinSizeSpecified() ? 1 : 0) +
+                              (expr->isTimezoneSpecified() ? 1 : 0) +
+                              (expr->isStartOfWeekSpecified() ? 1 : 0));
+
+        // Get child expressions.
+        auto startOfWeekExpression = expr->isStartOfWeekSpecified()
+            ? _context->popABTExpr()
+            : optimizer::Constant::str("sun"_sd);
+        auto timezoneExpression = expr->isTimezoneSpecified() ? _context->popABTExpr()
+                                                              : optimizer::Constant::str("UTC"_sd);
+        auto binSizeExpression =
+            expr->isBinSizeSpecified() ? _context->popABTExpr() : optimizer::Constant::int64(1);
+        auto unitExpression = _context->popABTExpr();
+        auto dateExpression = _context->popABTExpr();
+
+        auto timeZoneDBSlot = _context->state.data->env->getSlot("timeZoneDB"_sd);
+        auto timeZoneDBName = _context->registerVariable(timeZoneDBSlot);
+        auto timeZoneDBVar = makeVariable(timeZoneDBName);
+        auto [timezoneDBTag, timezoneDBVal] =
+            _context->state.data->env->getAccessor(timeZoneDBSlot)->getViewOfValue();
+        tassert(7157927,
+                "$dateTrunc first argument must be a timezoneDB object",
+                timezoneDBTag == sbe::value::TypeTags::timeZoneDB);
+        auto timezoneDB = sbe::value::getTimeZoneDBView(timezoneDBVal);
+
+        // Local bind to hold the date expression result
+        auto dateName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto dateVar = makeVariable(dateName);
+
+        // Set parameters for an invocation of built-in "dateTrunc" function.
+        optimizer::ABTVector arguments;
+        arguments.push_back(timeZoneDBVar);
+        arguments.push_back(dateVar);
+        arguments.push_back(unitExpression);
+        arguments.push_back(binSizeExpression);
+        arguments.push_back(timezoneExpression);
+        arguments.push_back(startOfWeekExpression);
+
+        // Create an expression to invoke built-in "dateTrunc" function.
+        auto dateTruncFunctionCall =
+            optimizer::make<optimizer::FunctionCall>("dateTrunc", std::move(arguments));
+        auto dateTruncName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto dateTruncVar = makeVariable(dateTruncName);
+
+        // Local bind to hold the unitIsWeek common subexpression
+        auto unitIsWeekName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto unitIsWeekVar = makeVariable(unitIsWeekName);
+        auto unitIsWeek = generateABTIsEqualToStringCheck(unitExpression, "week"_sd);
+
+        // Create expressions to check that each argument to "dateTrunc" function exists, is not
+        // null, and is of the correct type.
+        std::vector<ABTCaseValuePair> inputValidationCases;
+
+        // Return null if any of the parameters is either null or missing.
+        inputValidationCases.push_back(generateABTReturnNullIfNullOrMissing(dateVar));
+        inputValidationCases.push_back(generateABTReturnNullIfNullOrMissing(unitExpression));
+        inputValidationCases.push_back(generateABTReturnNullIfNullOrMissing(binSizeExpression));
+        inputValidationCases.push_back(generateABTReturnNullIfNullOrMissing(timezoneExpression));
+        inputValidationCases.emplace_back(
+            optimizer::make<optimizer::BinaryOp>(optimizer::Operations::And,
+                                                 unitIsWeekVar,
+                                                 generateABTNullOrMissing(startOfWeekExpression)),
+            optimizer::Constant::null());
+
+        // "timezone" parameter validation.
+        if (timezoneExpression.is<optimizer::Constant>()) {
+            auto [timezoneTag, timezoneVal] = timezoneExpression.cast<optimizer::Constant>()->get();
+            tassert(7157928,
+                    "$dateTrunc parameter 'timezone' must be a string",
+                    sbe::value::isString(timezoneTag));
+            tassert(7157929,
+                    "$dateTrunc parameter 'timezone' must be a valid timezone",
+                    sbe::vm::isValidTimezone(timezoneTag, timezoneVal, timezoneDB));
+        } else {
+            inputValidationCases.emplace_back(
+                generateABTNonStringCheck(timezoneExpression),
+                makeABTFail(ErrorCodes::Error{7157930},
+                            "$dateTrunc parameter 'timezone' must be a string"));
+            inputValidationCases.emplace_back(
+                makeNot(makeABTFunction("isTimezone", timeZoneDBVar, timezoneExpression)),
+                makeABTFail(ErrorCodes::Error{7157931},
+                            "$dateTrunc parameter 'timezone' must be a valid timezone"));
+        }
+
+        // "date" parameter validation.
+        inputValidationCases.emplace_back(generateABTFailIfNotCoercibleToDate(
+            dateVar, ErrorCodes::Error{7157932}, "$dateTrunc"_sd, "date"_sd));
+
+        // "unit" parameter validation.
+        if (unitExpression.is<optimizer::Constant>()) {
+            auto [unitTag, unitVal] = unitExpression.cast<optimizer::Constant>()->get();
+            tassert(7157933,
+                    "$dateTrunc parameter 'unit' must be a string",
+                    sbe::value::isString(unitTag));
+            auto unitString = sbe::value::getStringView(unitTag, unitVal);
+            tassert(7157934,
+                    "$dateTrunc parameter 'unit' must be a valid time unit",
+                    isValidTimeUnit(unitString));
+        } else {
+            inputValidationCases.emplace_back(
+                generateABTNonStringCheck(unitExpression),
+                makeABTFail(ErrorCodes::Error{7157935},
+                            "$dateTrunc parameter 'unit' must be a string"));
+            inputValidationCases.emplace_back(
+                makeNot(makeABTFunction("isTimeUnit", unitExpression)),
+                makeABTFail(ErrorCodes::Error{7157936},
+                            "$dateTrunc parameter 'unit' must be a valid time unit"));
+        }
+
+        // "binSize" parameter validation.
+        if (expr->isBinSizeSpecified()) {
+            if (binSizeExpression.is<optimizer::Constant>()) {
+                auto [binSizeTag, binSizeValue] =
+                    binSizeExpression.cast<optimizer::Constant>()->get();
+                tassert(
+                    7157937,
+                    "$dateTrunc parameter 'binSize' must be coercible to a positive 64-bit integer",
+                    sbe::value::isNumber(binSizeTag));
+                auto [binSizeLongOwn, binSizeLongTag, binSizeLongValue] =
+                    sbe::value::genericNumConvert(
+                        binSizeTag, binSizeValue, sbe::value::TypeTags::NumberInt64);
+                tassert(
+                    7157938,
+                    "$dateTrunc parameter 'binSize' must be coercible to a positive 64-bit integer",
+                    binSizeLongTag != sbe::value::TypeTags::Nothing);
+                auto binSize = sbe::value::bitcastTo<int64_t>(binSizeLongValue);
+                tassert(
+                    7157939,
+                    "$dateTrunc parameter 'binSize' must be coercible to a positive 64-bit integer",
+                    binSize > 0);
+            } else {
+                inputValidationCases.emplace_back(
+                    makeNot(optimizer::make<optimizer::BinaryOp>(
+                        optimizer::Operations::And,
+                        optimizer::make<optimizer::BinaryOp>(
+                            optimizer::Operations::And,
+                            makeABTFunction("isNumber", binSizeExpression),
+                            makeABTFunction(
+                                "exists",
+                                makeABTFunction("convert",
+                                                binSizeExpression,
+                                                optimizer::Constant::int32(static_cast<int32_t>(
+                                                    sbe::value::TypeTags::NumberInt64))))),
+                        generateABTPositiveCheck(binSizeExpression))),
+                    makeABTFail(
+                        ErrorCodes::Error{7157940},
+                        "$dateTrunc parameter 'binSize' must be coercible to a positive 64-bit "
+                        "integer"));
+            }
+        }
+
+        // "startOfWeek" parameter validation.
+        if (expr->isStartOfWeekSpecified()) {
+            if (startOfWeekExpression.is<optimizer::Constant>()) {
+                auto [startOfWeekTag, startOfWeekVal] =
+                    startOfWeekExpression.cast<optimizer::Constant>()->get();
+                tassert(7157941,
+                        "$dateTrunc parameter 'startOfWeek' must be a string",
+                        sbe::value::isString(startOfWeekTag));
+                auto startOfWeekString = sbe::value::getStringView(startOfWeekTag, startOfWeekVal);
+                tassert(7157942,
+                        "$dateTrunc parameter 'startOfWeek' must be a valid day of the week",
+                        isValidDayOfWeek(startOfWeekString));
+            } else {
+                // If 'timeUnit' value is equal to "week" then validate "startOfWeek" parameter.
+                inputValidationCases.emplace_back(
+                    optimizer::make<optimizer::BinaryOp>(
+                        optimizer::Operations::And,
+                        unitIsWeekVar,
+                        generateABTNonStringCheck(startOfWeekExpression)),
+                    makeABTFail(ErrorCodes::Error{7157943},
+                                "$dateTrunc parameter 'startOfWeek' must be a string"));
+                inputValidationCases.emplace_back(
+                    optimizer::make<optimizer::BinaryOp>(
+                        optimizer::Operations::And,
+                        unitIsWeekVar,
+                        makeNot(makeABTFunction("isDayOfWeek", startOfWeekExpression))),
+                    makeABTFail(
+                        ErrorCodes::Error{7157944},
+                        "$dateTrunc parameter 'startOfWeek' must be a valid day of the week"));
+            }
+        }
+
+        _context->pushExpr(optimizer::make<optimizer::Let>(
+            std::move(dateName),
+            std::move(dateExpression),
+            optimizer::make<optimizer::Let>(
+                std::move(dateTruncName),
+                std::move(dateTruncFunctionCall),
+                optimizer::make<optimizer::If>(
+                    makeABTFunction("exists", dateTruncVar),
+                    dateTruncVar,
+                    optimizer::make<optimizer::Let>(
+                        std::move(unitIsWeekName),
+                        std::move(unitIsWeek),
+                        buildABTMultiBranchConditionalFromCaseValuePairs(
+                            std::move(inputValidationCases), optimizer::Constant::nothing()))))));
     }
     void visit(const ExpressionDivide* expr) final {
         _context->ensureArity(2);
@@ -3874,6 +4629,11 @@ public:
     void visit(const ExpressionTsSecond* expr) final {
         _context->ensureArity(1);
 
+        if (_context->hasAllAbtEligibleEntries(1)) {
+            visitABT(expr);
+            return;
+        }
+
         auto tsSecondExpr = makeLocalBind(
             _context->state.frameIdGenerator,
             [&](sbe::EVariable operand) {
@@ -3895,8 +4655,30 @@ public:
         _context->pushExpr(std::move(tsSecondExpr));
     }
 
+    void visitABT(const ExpressionTsSecond* expr) {
+        auto frameId = _context->state.frameId();
+        auto arg = _context->popABTExpr();
+        auto name = makeLocalVariableName(frameId, 0);
+        auto var = makeVariable(name);
+
+        auto tsSecondExpr = buildABTMultiBranchConditional(
+            ABTCaseValuePair{generateABTNullOrMissing(name), optimizer::Constant::null()},
+            ABTCaseValuePair{generateABTNonTimestampCheck(name),
+                             makeABTFail(ErrorCodes::Error{7157900},
+                                         str::stream() << expr->getOpName()
+                                                       << " expects argument of type timestamp")},
+            makeABTFunction("tsSecond", makeVariable(name)));
+        _context->pushExpr(optimizer::make<optimizer::Let>(
+            std::move(name), std::move(arg), std::move(tsSecondExpr)));
+    }
+
     void visit(const ExpressionTsIncrement* expr) final {
         _context->ensureArity(1);
+
+        if (_context->hasAllAbtEligibleEntries(1)) {
+            visitABT(expr);
+            return;
+        }
 
         auto tsIncrementExpr = makeLocalBind(
             _context->state.frameIdGenerator,
@@ -3917,6 +4699,23 @@ public:
             },
             _context->popExpr());
         _context->pushExpr(std::move(tsIncrementExpr));
+    }
+
+    void visitABT(const ExpressionTsIncrement* expr) {
+        auto frameId = _context->state.frameId();
+        auto arg = _context->popABTExpr();
+        auto name = makeLocalVariableName(frameId, 0);
+        auto var = makeVariable(name);
+
+        auto tsIncrementExpr = buildABTMultiBranchConditional(
+            ABTCaseValuePair{generateABTNullOrMissing(name), optimizer::Constant::null()},
+            ABTCaseValuePair{generateABTNonTimestampCheck(name),
+                             makeABTFail(ErrorCodes::Error{7157901},
+                                         str::stream() << expr->getOpName()
+                                                       << " expects argument of type timestamp")},
+            makeABTFunction("tsIncrement", makeVariable(name)));
+        _context->pushExpr(optimizer::make<optimizer::Let>(
+            std::move(name), std::move(arg), std::move(tsIncrementExpr)));
     }
 
     void visit(const ExpressionInternalOwningShard* expr) final {
@@ -4039,15 +4838,21 @@ private:
     }
 
     void generateDayOfExpression(StringData exprName, const Expression* expr) {
+        auto children = expr->getChildren();
+        invariant(children.size() == 2);
+        auto argCount = children[1] ? 2 : 1;
+        _context->ensureArity(argCount);
+
+        if (_context->hasAllAbtEligibleEntries(argCount)) {
+            generateDayOfExpressionABT(exprName, expr);
+            return;
+        }
+
         auto frameId = _context->state.frameId();
         sbe::EExpression::Vector args;
         sbe::EExpression::Vector binds;
         sbe::EVariable dateRef(frameId, 0);
         sbe::EVariable timezoneRef(frameId, 1);
-
-        auto children = expr->getChildren();
-        invariant(children.size() == 2);
-        _context->ensureArity(children[1] ? 2 : 1);
 
         auto timezone = [&]() {
             if (children[1]) {
@@ -4099,6 +4904,50 @@ private:
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(totalDayOfFunc)));
     }
 
+    void generateDayOfExpressionABT(StringData exprName, const Expression* expr) {
+        auto children = expr->getChildren();
+
+        auto dateName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto timezoneName = makeLocalVariableName(_context->state.frameId(), 0);
+
+        auto timezone = children[1] ? _context->popABTExpr() : optimizer::Constant::str("UTC"_sd);
+        auto date = _context->popABTExpr();
+
+        auto timeZoneDBSlot = _context->state.data->env->getSlot("timeZoneDB"_sd);
+        auto timeZoneDBName = _context->registerVariable(timeZoneDBSlot);
+
+        // Check that each argument exists, is not null, and is the correct type.
+        auto totalDayOfFunc = buildABTMultiBranchConditional(
+            ABTCaseValuePair{generateABTNullOrMissing(timezoneName), optimizer::Constant::null()},
+            ABTCaseValuePair{generateABTNonStringCheck(timezoneName),
+                             makeABTFail(ErrorCodes::Error{7157908},
+                                         str::stream() << "$" << exprName.toString()
+                                                       << " timezone must be a string")},
+            ABTCaseValuePair{makeNot(makeABTFunction("isTimezone",
+                                                     makeVariable(timeZoneDBName),
+                                                     makeVariable(timezoneName))),
+                             makeABTFail(ErrorCodes::Error{7157909},
+                                         str::stream() << "$" << exprName.toString()
+                                                       << " timezone must be a valid timezone")},
+            ABTCaseValuePair{generateABTNullOrMissing(dateName), optimizer::Constant::null()},
+            ABTCaseValuePair{makeNot(makeABTFunction("typeMatch",
+                                                     makeVariable(dateName),
+                                                     optimizer::Constant::int32(dateTypeMask()))),
+                             makeABTFail(ErrorCodes::Error{7157910},
+                                         str::stream() << "$" << exprName.toString()
+                                                       << " date must have a format of a date")},
+            makeABTFunction(exprName.toString(),
+                            makeVariable(timeZoneDBName),
+                            makeVariable(dateName),
+                            makeVariable(timezoneName)));
+
+        _context->pushExpr(optimizer::make<optimizer::Let>(
+            std::move(dateName),
+            std::move(date),
+            optimizer::make<optimizer::Let>(
+                std::move(timezoneName), std::move(timezone), std::move(totalDayOfFunc))));
+    }
+
     /**
      * Creates a CaseValuePair such that an exception is thrown if a value of the parameter denoted
      * by variable 'dateRef' is of a type that is not coercible to a date.
@@ -4123,12 +4972,27 @@ private:
                                        << "' must be coercible to date")};
     }
 
+    static ABTCaseValuePair generateABTFailIfNotCoercibleToDate(const optimizer::ABT& dateVar,
+                                                                ErrorCodes::Error errorCode,
+                                                                StringData expressionName,
+                                                                StringData parameterName) {
+        return {makeNot(makeABTFunction(
+                    "typeMatch", dateVar, optimizer::Constant::int32(dateTypeMask()))),
+                makeABTFail(errorCode,
+                            str::stream() << expressionName << " parameter '" << parameterName
+                                          << "' must be coercible to date")};
+    }
+
     /**
      * Creates a CaseValuePair such that Null value is returned if a value of variable denoted by
      * 'variable' is null or missing.
      */
     static CaseValuePair generateReturnNullIfNullOrMissing(const sbe::EVariable& variable) {
         return {generateNullOrMissing(variable), makeConstant(sbe::value::TypeTags::Null, 0)};
+    }
+
+    static ABTCaseValuePair generateABTReturnNullIfNullOrMissing(const optimizer::ABT& name) {
+        return {generateABTNullOrMissing(name), optimizer::Constant::null()};
     }
 
     static CaseValuePair generateReturnNullIfNullOrMissing(std::unique_ptr<sbe::EExpression> expr) {
@@ -4145,6 +5009,15 @@ private:
             sbe::EPrimBinary::logicAnd,
             makeFunction("isString", expr.clone()),
             sbe::makeE<sbe::EPrimBinary>(sbe::EPrimBinary::eq, expr.clone(), makeConstant(string)));
+    }
+
+    static optimizer::ABT generateABTIsEqualToStringCheck(const optimizer::ABT& expr,
+                                                          StringData string) {
+        return optimizer::make<optimizer::BinaryOp>(
+            optimizer::Operations::And,
+            makeABTFunction("isString", expr),
+            optimizer::make<optimizer::BinaryOp>(
+                optimizer::Operations::Eq, expr, optimizer::Constant::str(string)));
     }
 
     /**
@@ -4957,7 +5830,13 @@ private:
         auto children = expr->getChildren();
         auto arity = children.size();
         invariant(arity == 4);
-        _context->ensureArity(children[3] ? 4 : 3);
+        auto argCount = children[3] ? 4 : 3;
+        _context->ensureArity(argCount);
+
+        if (_context->hasAllAbtEligibleEntries(argCount)) {
+            generateDateArithmeticsExpressionABT(expr, dateExprName);
+            return;
+        }
 
         auto timezoneExpr = [&]() {
             if (children[3]) {
@@ -5061,6 +5940,106 @@ private:
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(dateAddExpr)));
     }
+
+    void generateDateArithmeticsExpressionABT(const ExpressionDateArithmetics* expr,
+                                              const std::string& dateExprName) {
+        auto children = expr->getChildren();
+        auto timezoneExpr =
+            children[3] ? _context->popABTExpr() : optimizer::Constant::str("UTC"_sd);
+        auto amountExpr = _context->popABTExpr();
+        auto unitExpr = _context->popABTExpr();
+        auto startDateExpr = _context->popABTExpr();
+
+        auto startDateName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto unitName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto origAmountName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto tzName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto amountName = makeLocalVariableName(_context->state.frameId(), 0);
+
+        auto convertedAmountInt64 = [&]() {
+            if (dateExprName == "dateAdd") {
+                return makeABTFunction("convert",
+                                       makeVariable(origAmountName),
+                                       optimizer::Constant::int32(static_cast<int32_t>(
+                                           sbe::value::TypeTags::NumberInt64)));
+            } else if (dateExprName == "dateSubtract") {
+                return makeABTFunction(
+                    "convert",
+                    optimizer::make<optimizer::UnaryOp>(optimizer::Operations::Neg,
+                                                        makeVariable(origAmountName)),
+                    optimizer::Constant::int32(
+                        static_cast<int32_t>(sbe::value::TypeTags::NumberInt64)));
+            } else {
+                MONGO_UNREACHABLE;
+            }
+        }();
+
+        auto timeZoneDBSlot = _context->state.data->env->getSlot("timeZoneDB"_sd);
+        auto timeZoneDBVar = makeVariable(_context->registerVariable(timeZoneDBSlot));
+
+        optimizer::ABTVector checkNullArg;
+        checkNullArg.push_back(generateABTNullOrMissing(startDateName));
+        checkNullArg.push_back(generateABTNullOrMissing(unitName));
+        checkNullArg.push_back(generateABTNullOrMissing(origAmountName));
+        checkNullArg.push_back(generateABTNullOrMissing(tzName));
+
+        auto checkNullAnyArgument =
+            makeBalancedBooleanOpTree(optimizer::Operations::Or, std::move(checkNullArg));
+
+        auto dateAddExpr = buildABTMultiBranchConditional(
+            ABTCaseValuePair{std::move(checkNullAnyArgument), optimizer::Constant::null()},
+            ABTCaseValuePair{generateABTNonStringCheck(tzName),
+                             makeABTFail(ErrorCodes::Error{7157902},
+                                         str::stream()
+                                             << "$" << dateExprName
+                                             << " expects timezone argument of type string")},
+            ABTCaseValuePair{
+                makeNot(makeABTFunction("isTimezone", timeZoneDBVar, makeVariable(tzName))),
+                makeABTFail(ErrorCodes::Error{7157903},
+                            str::stream() << "$" << dateExprName << " expects a valid timezone")},
+            ABTCaseValuePair{
+                makeNot(makeABTFunction("typeMatch",
+                                        makeVariable(startDateName),
+                                        optimizer::Constant::int32(dateTypeMask()))),
+                makeABTFail(ErrorCodes::Error{7157904},
+                            str::stream() << "$" << dateExprName
+                                          << " must have startDate argument convertable to date")},
+            ABTCaseValuePair{generateABTNonStringCheck(unitName),
+                             makeABTFail(ErrorCodes::Error{7157905},
+                                         str::stream() << "$" << dateExprName
+                                                       << " expects unit argument of type string")},
+            ABTCaseValuePair{
+                makeNot(makeABTFunction("isTimeUnit", makeVariable(unitName))),
+                makeABTFail(ErrorCodes::Error{7157906},
+                            str::stream() << "$" << dateExprName << " expects a valid time unit")},
+            ABTCaseValuePair{makeNot(makeABTFunction("exists", makeVariable(amountName))),
+                             makeABTFail(ErrorCodes::Error{7157907},
+                                         str::stream() << "invalid $" << dateExprName
+                                                       << " 'amount' argument value")},
+            makeABTFunction("dateAdd",
+                            timeZoneDBVar,
+                            makeVariable(startDateName),
+                            makeVariable(unitName),
+                            makeVariable(amountName),
+                            makeVariable(tzName)));
+
+        _context->pushExpr(optimizer::make<optimizer::Let>(
+            std::move(startDateName),
+            std::move(startDateExpr),
+            optimizer::make<optimizer::Let>(
+                std::move(unitName),
+                std::move(unitExpr),
+                optimizer::make<optimizer::Let>(
+                    std::move(origAmountName),
+                    std::move(amountExpr),
+                    optimizer::make<optimizer::Let>(
+                        std::move(tzName),
+                        std::move(timezoneExpr),
+                        optimizer::make<optimizer::Let>(std::move(amountName),
+                                                        std::move(convertedAmountInt64),
+                                                        std::move(dateAddExpr)))))));
+    }
+
 
     void unsupportedExpression(const char* op) const {
         // We're guaranteed to not fire this assertion by implementing a mechanism in the upper
