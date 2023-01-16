@@ -45,65 +45,6 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
 namespace mongo {
-namespace {
-
-/**
- * ResourceMutexes can be constructed during initialization, thus the code must ensure the vector
- * of labels is constructed before items are added to it. This factory encapsulates all members
- * that need to be initialized before first use. A pointer is allocated to an instance of this
- * factory and the first call will construct an instance.
- */
-class ResourceIdFactory {
-public:
-    static ResourceId newResourceIdForMutex(std::string resourceLabel) {
-        ensureInitialized();
-        return resourceIdFactory->_newResourceIdForMutex(std::move(resourceLabel));
-    }
-
-    static std::string nameForId(ResourceId resourceId) {
-        stdx::lock_guard<Latch> lk(resourceIdFactory->labelsMutex);
-        return resourceIdFactory->labels.at(resourceId.getHashId());
-    }
-
-    /**
-     * Must be called in a single-threaded context (e.g: program initialization) before the factory
-     * is safe to use in a multi-threaded context.
-     */
-    static void ensureInitialized() {
-        if (!resourceIdFactory) {
-            resourceIdFactory = new ResourceIdFactory();
-        }
-    }
-
-private:
-    ResourceId _newResourceIdForMutex(std::string resourceLabel) {
-        stdx::lock_guard<Latch> lk(labelsMutex);
-        invariant(nextId == labels.size());
-        labels.push_back(std::move(resourceLabel));
-
-        return ResourceId(RESOURCE_MUTEX, nextId++);
-    }
-
-    static ResourceIdFactory* resourceIdFactory;
-
-    std::uint64_t nextId = 0;
-    std::vector<std::string> labels;
-    Mutex labelsMutex = MONGO_MAKE_LATCH("ResourceIdFactory::labelsMutex");
-};
-
-ResourceIdFactory* ResourceIdFactory::resourceIdFactory;
-
-/**
- * Guarantees `ResourceIdFactory::ensureInitialized` is called at least once during initialization.
- */
-struct ResourceIdFactoryInitializer {
-    ResourceIdFactoryInitializer() {
-        ResourceIdFactory::ensureInitialized();
-    }
-} resourceIdFactoryInitializer;
-
-}  // namespace
-
 
 Lock::ResourceMutex::ResourceMutex(std::string resourceLabel)
     : _rid(ResourceIdFactory::newResourceIdForMutex(std::move(resourceLabel))) {}
@@ -119,6 +60,31 @@ bool Lock::ResourceMutex::isExclusivelyLocked(Locker* locker) {
 
 bool Lock::ResourceMutex::isAtLeastReadLocked(Locker* locker) {
     return locker->isLockHeldForMode(_rid, MODE_IS);
+}
+
+ResourceId Lock::ResourceMutex::ResourceIdFactory::newResourceIdForMutex(
+    std::string resourceLabel) {
+    return _resourceIdFactory()._newResourceIdForMutex(std::move(resourceLabel));
+}
+
+std::string Lock::ResourceMutex::ResourceIdFactory::nameForId(ResourceId resourceId) {
+    stdx::lock_guard<Latch> lk(_resourceIdFactory().labelsMutex);
+    return _resourceIdFactory().labels.at(resourceId.getHashId());
+}
+
+Lock::ResourceMutex::ResourceIdFactory&
+Lock::ResourceMutex::ResourceIdFactory::_resourceIdFactory() {
+    static StaticImmortal<Lock::ResourceMutex::ResourceIdFactory> resourceIdFactory;
+    return resourceIdFactory.value();
+}
+
+ResourceId Lock::ResourceMutex::ResourceIdFactory::_newResourceIdForMutex(
+    std::string resourceLabel) {
+    stdx::lock_guard<Latch> lk(labelsMutex);
+    invariant(nextId == labels.size());
+    labels.push_back(std::move(resourceLabel));
+
+    return ResourceId::makeMutexResourceId(nextId++);
 }
 
 Lock::GlobalLock::GlobalLock(OperationContext* opCtx,

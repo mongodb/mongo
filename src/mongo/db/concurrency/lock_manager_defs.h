@@ -164,7 +164,10 @@ enum ResourceType {
     RESOURCE_COLLECTION,
     RESOURCE_METADATA,
 
-    /** Resource type used for locking general resources not related to the storage hierarchy. */
+    /**
+     * Resource type used for locking general resources not related to the storage hierarchy. These
+     * can't be created manually, use Lock::ResourceMutex::ResourceMutex() instead.
+     */
     RESOURCE_MUTEX,
 
     /** Counts the rest. Always insert new resource types above this entry. */
@@ -233,15 +236,22 @@ class ResourceId {
 public:
     ResourceId() : _fullHash(0) {}
     ResourceId(ResourceType type, const NamespaceString& nss)
-        : _fullHash(fullHash(type, hashStringData(nss.toStringWithTenantId()))) {}
+        : _fullHash(fullHash(type, hashStringData(nss.toStringWithTenantId()))) {
+        verifyNoResourceMutex(type);
+    }
     ResourceId(ResourceType type, const DatabaseName& dbName)
-        : _fullHash(fullHash(type, hashStringData(dbName.toStringWithTenantId()))) {}
+        : _fullHash(fullHash(type, hashStringData(dbName.toStringWithTenantId()))) {
+        verifyNoResourceMutex(type);
+    }
     ResourceId(ResourceType type, const std::string& str)
         : _fullHash(fullHash(type, hashStringData(str))) {
         // Resources of type database or collection must never be passed as a raw string
         invariant(type != RESOURCE_DATABASE && type != RESOURCE_COLLECTION);
+        verifyNoResourceMutex(type);
     }
-    ResourceId(ResourceType type, uint64_t hashId) : _fullHash(fullHash(type, hashId)) {}
+    ResourceId(ResourceType type, uint64_t hashId) : _fullHash(fullHash(type, hashId)) {
+        verifyNoResourceMutex(type);
+    }
 
     bool isValid() const {
         return getType() != RESOURCE_INVALID;
@@ -272,6 +282,20 @@ public:
     }
 
 private:
+    ResourceId(uint64_t fullHash) : _fullHash(fullHash) {}
+
+    // Used to allow Lock::ResourceMutex to create ResourceIds with RESOURCE_MUTEX type
+    static ResourceId makeMutexResourceId(uint64_t hashId) {
+        return ResourceId(fullHash(ResourceType::RESOURCE_MUTEX, hashId));
+    }
+    friend class Lock;
+
+    void verifyNoResourceMutex(ResourceType type) {
+        invariant(
+            type != RESOURCE_MUTEX,
+            "Can't create a ResourceMutex directly, use Lock::ResourceMutex::ResourceMutex().");
+    }
+
     /**
      * The top 'resourceTypeBits' bits of '_fullHash' represent the resource type,
      * while the remaining bits contain the bottom bits of the hashId. This avoids false

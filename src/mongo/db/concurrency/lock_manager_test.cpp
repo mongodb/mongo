@@ -59,9 +59,8 @@ TEST(ResourceId, Semantics) {
 }
 
 TEST(ResourceId, Masking) {
-    const ResourceType maxRes = static_cast<ResourceType>(ResourceTypesCount - 1);
     const uint64_t maxHash = (1ULL << 61) - 1;  //  Only 61 bits usable for hash
-    ResourceType resources[3] = {maxRes, RESOURCE_GLOBAL, RESOURCE_METADATA};
+    ResourceType resources[3] = {RESOURCE_GLOBAL, RESOURCE_COLLECTION, RESOURCE_METADATA};
     uint64_t hashes[3] = {maxHash, maxHash / 3, maxHash / 3 * 2};
 
     //  The test below verifies that types/hashes are stored/retrieved unchanged
@@ -82,6 +81,10 @@ DEATH_TEST_F(ResourceIdTest, StringConstructorMustNotBeCollection, "invariant") 
 
 DEATH_TEST_F(ResourceIdTest, StringConstructorMustNotBeDatabase, "invariant") {
     ResourceId(RESOURCE_DATABASE, "TestDB");
+}
+
+DEATH_TEST_F(ResourceIdTest, CantCreateResourceMutexDirectly, "invariant") {
+    ResourceId(RESOURCE_MUTEX, "TestDB");
 }
 
 //

@@ -131,6 +131,26 @@ public:
 
     private:
         const ResourceId _rid;
+
+        /**
+         * ResourceMutexes can be constructed during initialization, thus the code must ensure the
+         * vector of labels is constructed before items are added to it. This factory encapsulates
+         * all members that need to be initialized before first use.
+         */
+        class ResourceIdFactory {
+        public:
+            static ResourceId newResourceIdForMutex(std::string resourceLabel);
+
+            static std::string nameForId(ResourceId resourceId);
+
+        private:
+            static ResourceIdFactory& _resourceIdFactory();
+            ResourceId _newResourceIdForMutex(std::string resourceLabel);
+
+            std::uint64_t nextId = 0;
+            std::vector<std::string> labels;
+            Mutex labelsMutex = MONGO_MAKE_LATCH("ResourceIdFactory::labelsMutex");
+        };
     };
 
     /**
