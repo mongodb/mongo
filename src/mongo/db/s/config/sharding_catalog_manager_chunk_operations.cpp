@@ -35,6 +35,7 @@
 #include "mongo/client/connection_string.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/distinct_command_gen.h"
@@ -1498,6 +1499,59 @@ void ShardingCatalogManager::upgradeChunksHistory(OperationContext* opCtx,
                 BSON("_flushRoutingTableCacheUpdates" << nss.ns()),
                 Shard::RetryPolicy::kIdempotent)));
     }
+}
+
+Status ShardingCatalogManager::setOnCurrentShardSinceFieldOnChunks(OperationContext* opCtx) {
+    // Take _kChunkOpLock in exclusive mode to prevent concurrent chunk modifications
+    Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
+
+    DBDirectClient dbClient(opCtx);
+
+    // 1st match only chunks with non empty history
+    BSONObj query = BSON("history.0" << BSON("$exists" << true));
+
+    // 2nd use the $set aggregation stage pipeline to set `onCurrentShardSince` to the same value as
+    // the `validAfter` field on the first element of `history` array
+    // [
+    //    {
+    //        $set: {
+    //            onCurrentShardSince: {
+    //                $getField: { field: "validAfter", input: { $first : "$history" } }
+    //        }
+    //    }
+    //  ]
+
+    BSONObj update = BSON(
+        "$set" << BSON(
+            ChunkType::onCurrentShardSince() << BSON(
+                "$getField" << BSON("field" << ChunkHistoryBase::kValidAfterFieldName << "input"
+                                            << BSON("$first" << ("$" + ChunkType::history()))))));
+
+    auto response = dbClient.runCommand([&] {
+        write_ops::UpdateCommandRequest updateOp(ChunkType::ConfigNS);
+
+        updateOp.setUpdates({[&] {
+            // Sending a vector as an update to make sure we use an aggregation pipeline
+            write_ops::UpdateOpEntry entry;
+            entry.setQ(query);
+            entry.setU(std::vector<BSONObj>{update.getOwned()});
+            entry.setMulti(true);
+            entry.setUpsert(false);
+            return entry;
+        }()});
+        updateOp.getWriteCommandRequestBase().setOrdered(false);
+        return updateOp.serialize({});
+    }());
+
+    auto status = getStatusFromWriteCommandReply(response->getCommandReply());
+    if (!status.isOK()) {
+        LOGV2_ERROR(7161602,
+                    "Failed to set onCurrentShardSince field on all config.chunks entries",
+                    "error"_attr = status);
+    }
+
+    // There is no need to wait for majority since it will be done at the end of the upgrade
+    return status;
 }
 
 void ShardingCatalogManager::clearJumboFlag(OperationContext* opCtx,

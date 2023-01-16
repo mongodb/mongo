@@ -507,6 +507,7 @@ private:
         if (serverGlobalParams.clusterRole == ClusterRole::ConfigServer) {
             _cleanupConfigVersionOnUpgrade(opCtx, requestedVersion);
             _createSchemaOnConfigSettings(opCtx, requestedVersion);
+            _setOnCurrentShardSinceFieldOnChunks(opCtx, requestedVersion);
         } else if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
         } else {
             return;
@@ -597,6 +598,15 @@ private:
         if (feature_flags::gConfigSettingsSchema.isEnabledOnVersion(requestedVersion)) {
             LOGV2(6885200, "Creating schema on config.settings");
             uassertStatusOK(ShardingCatalogManager::get(opCtx)->upgradeConfigSettings(opCtx));
+        }
+    }
+
+    // TODO (SERVER-72791): Remove once FCV 7.0 becomes last-lts.
+    void _setOnCurrentShardSinceFieldOnChunks(
+        OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
+        if (feature_flags::gAutoMerger.isEnabledOnVersion(requestedVersion)) {
+            uassertStatusOK(
+                ShardingCatalogManager::get(opCtx)->setOnCurrentShardSinceFieldOnChunks(opCtx));
         }
     }
 
