@@ -601,6 +601,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other, c
     WT_CONNECTION_IMPL *conn;
     WT_CURSOR_STATIC_INIT(iface, __curstat_get_key, /* get-key */
       __curstat_get_value,                          /* get-value */
+      __wt_cursor_get_raw_key_value_notsup,         /* get-raw-key-value */
       __curstat_set_key,                            /* set-key */
       __curstat_set_value,                          /* set-value */
       __wt_cursor_compare_notsup,                   /* compare */

@@ -74,6 +74,18 @@ __wt_cursor_get_value_notsup(WT_CURSOR *cursor, ...)
 }
 
 /*
+ * __wt_cursor_get_raw_key_value_notsup --
+ *     WT_CURSOR.get_raw_key_value not-supported.
+ */
+int
+__wt_cursor_get_raw_key_value_notsup(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value)
+{
+    WT_UNUSED(key);
+    WT_UNUSED(value);
+    return (__wt_cursor_notsup(cursor));
+}
+
+/*
  * __wt_cursor_set_key_notsup --
  *     WT_CURSOR.set_key not-supported.
  */
@@ -565,6 +577,42 @@ __wt_cursor_get_valuev(WT_CURSOR *cursor, va_list ap)
 
 err:
     API_END_RET_STAT(session, ret, cursor_get_value);
+}
+
+/*
+ * __wt_cursor_get_raw_key_value --
+ *     WT_CURSOR->get_raw_key_value default implementation
+ */
+int
+__wt_cursor_get_raw_key_value(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value)
+{
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+
+    CURSOR_API_CALL(cursor, session, get_value, NULL);
+
+    if ((key != NULL) && !F_ISSET(cursor, WT_CURSTD_KEY_SET))
+        WT_ERR(__wt_cursor_kv_not_set(cursor, true));
+
+    if ((value != NULL) && !F_ISSET(cursor, WT_CURSTD_VALUE_SET))
+        WT_ERR(__wt_cursor_kv_not_set(cursor, false));
+
+    /* Force an allocated copy when using cursor copy debug. */
+    if (FLD_ISSET(S2C(session)->debug_flags, WT_CONN_DEBUG_CURSOR_COPY))
+        WT_ERR(__wt_buf_grow(session, &cursor->value, cursor->value.size));
+
+    if (key != NULL) {
+        key->data = cursor->key.data;
+        key->size = cursor->key.size;
+    }
+
+    if (value != NULL) {
+        value->data = cursor->value.data;
+        value->size = cursor->value.size;
+    }
+
+err:
+    API_END_RET(session, ret);
 }
 
 /*

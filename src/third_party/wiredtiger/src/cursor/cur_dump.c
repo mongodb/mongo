@@ -394,6 +394,7 @@ __wt_curdump_create(WT_CURSOR *child, WT_CURSOR *owner, WT_CURSOR **cursorp)
 {
     WT_CURSOR_STATIC_INIT(iface, __curdump_get_key, /* get-key */
       __curdump_get_value,                          /* get-value */
+      __wt_cursor_get_raw_key_value_notsup,         /* get-raw-key-value */
       __curdump_set_key,                            /* set-key */
       __curdump_set_value,                          /* set-value */
       __wt_cursor_compare_notsup,                   /* compare */

@@ -253,6 +253,7 @@ __wt_curbackup_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other,
 {
     WT_CURSOR_STATIC_INIT(iface, __wt_cursor_get_key, /* get-key */
       __wt_cursor_get_value_notsup,                   /* get-value */
+      __wt_cursor_get_raw_key_value_notsup,           /* get-raw-key-value */
       __wt_cursor_set_key_notsup,                     /* set-key */
       __wt_cursor_set_value_notsup,                   /* set-value */
       __wt_cursor_compare_notsup,                     /* compare */

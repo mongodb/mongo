@@ -70,6 +70,9 @@ WT_CURSOR::set_key and WT_CURSOR::set_value in raw mode, the WT_ITEM
 should be equivalent to calling WT_EXTENSION_API::struct_pack for the
 cursor's \c key_format or \c value_format, respectively.
 
+WT_CURSOR::get_raw_key_value can be used to obtain both the key and value
+in raw format in a single function call.
+
 The @ex_ref{ex_schema.c} example creates a table where the value format is
 \c "5sHq", where the initial string is the country, the short is a year,
 and the long is a population.

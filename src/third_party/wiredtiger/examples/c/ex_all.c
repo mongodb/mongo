@@ -192,6 +192,14 @@ cursor_ops(WT_SESSION *session)
     }
 
     {
+        /*! [Get the raw key and value for the current record.] */
+        WT_ITEM key;   /* Get the raw key and value for the current record. */
+        WT_ITEM value; /* Get the raw key and value for the current record. */
+        error_check(cursor->get_raw_key_value(cursor, &key, &value));
+        /*! [Get the raw key and value for the current record.] */
+    }
+
+    {
         /*! [Set the cursor's raw value] */
         WT_ITEM value; /* Set the cursor's raw value. */
         value.data = "another value";
