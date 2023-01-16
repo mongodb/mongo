@@ -434,6 +434,7 @@ struct Transaction {
 // properties are prevented, only existing properties can be set.
 struct WorkloadOptions {
     int max_latency;
+    bool report_enabled;
     std::string report_file;
     int report_interval;
     int run_time;
