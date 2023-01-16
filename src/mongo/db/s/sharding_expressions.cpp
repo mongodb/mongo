@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
 #include "mongo/db/s/sharding_expressions.h"
 
 #include "mongo/client/index_spec.h"
@@ -52,7 +54,6 @@
 
 namespace mongo {
 namespace {
-
 /**
  * The class IndexKeysObjectsGenerator is used to generate the index keys objects for the provided
  * document 'docObj' and the index descriptor 'indexDescriptor'. This class determines the index
@@ -248,7 +249,7 @@ private:
                                           recordId);
     }
 
-    /**
+    /*
      * Generates the key string for the 'wildcard' index type and adds them to the 'keyStrings'.
      */
     void _generateWildcardIndexKeys(KeyStringSet* keyStrings) const {
@@ -358,7 +359,6 @@ private:
     // The ordering to be used for generating the key strings.
     const Ordering _ordering = Ordering::allAscending();
 };
-
 }  // namespace
 
 Value ExpressionInternalOwningShard::evaluate(const Document& root, Variables* variables) const {
@@ -500,4 +500,4 @@ Value ExpressionInternalIndexKey::evaluate(const Document& root, Variables* vari
 REGISTER_STABLE_EXPRESSION(_internalOwningShard, ExpressionInternalOwningShard::parse);
 REGISTER_STABLE_EXPRESSION(_internalIndexKey, ExpressionInternalIndexKey::parse);
 
-}  // namespace mongo
+};  // namespace mongo

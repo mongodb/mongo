@@ -352,6 +352,16 @@ env.Library(
     ],
 )
 
+env.Benchmark(
+    target='chunk_manager_refresh_bm',
+    source=[
+        'chunk_manager_refresh_bm.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/s/sharding_api_d',
+    ],
+)
+
 env.Library(
     target='is_mongos',
     source=[
