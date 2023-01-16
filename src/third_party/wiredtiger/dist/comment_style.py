@@ -135,14 +135,15 @@ if __name__ == '__main__':
 
     result = subprocess.run(command, shell=True, capture_output=True, text=True).stdout.strip('\n')
     count = 0
-    for file_name in result.split('\n'):
-        if file_name in ignore_files:
-            continue
+    if result:
+        for file_name in result.split('\n'):
+            if file_name in ignore_files:
+                continue
 
-        if file_is_cpp(file_name):
-            count += check_cpp_comments(file_name)
-        else:
-            count += check_c_comments(file_name)
+            if file_is_cpp(file_name):
+                count += check_cpp_comments(file_name)
+            else:
+                count += check_c_comments(file_name)
 
     if (count != 0):
         print('Detected ' + str(count) +' comment format issues!')
