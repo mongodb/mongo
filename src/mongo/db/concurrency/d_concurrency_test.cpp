@@ -71,6 +71,8 @@ class UseReaderWriterGlobalThrottling {
 public:
     explicit UseReaderWriterGlobalThrottling(ServiceContext* svcCtx, int numTickets)
         : _svcCtx(svcCtx) {
+        // TODO SERVER-72616: Remove ifdefs once PriorityTicketHolder is available cross-platform.
+#ifdef __linux__
         if constexpr (std::is_same_v<PriorityTicketHolder, TicketHolderImpl>) {
             LOGV2(7130100, "Using PriorityTicketHolder for Reader/Writer global throttling");
             // For simplicity, no low priority operations will ever be expedited in these tests.
@@ -89,6 +91,13 @@ public:
                 std::make_unique<SemaphoreTicketHolder>(numTickets, _svcCtx));
             TicketHolderManager::use(_svcCtx, std::move(ticketHolderManager));
         }
+#else
+        LOGV2(7207205, "Using SemaphoreTicketHolder for Reader/Writer global throttling");
+        auto ticketHolderManager = std::make_unique<TicketHolderManager>(
+            std::make_unique<SemaphoreTicketHolder>(numTickets, _svcCtx),
+            std::make_unique<SemaphoreTicketHolder>(numTickets, _svcCtx));
+        TicketHolderManager::use(_svcCtx, std::move(ticketHolderManager));
+#endif
     }
 
     ~UseReaderWriterGlobalThrottling() noexcept(false) {
@@ -149,8 +158,18 @@ public:
 
     template <class TicketHolderImpl, class F>
     void runWithThrottling(int numTickets, F&& f) {
+        // TODO SERVER-72616: Remove ifdef when PriorityTicketHolder is available cross-platform.
+#ifdef __linux__
         UseReaderWriterGlobalThrottling<TicketHolderImpl> throttle(getServiceContext(), numTickets);
         f();
+#else
+        // We can only test non-PriorityTicketHolder implementations on non-Linux platforms.
+        if constexpr (!std::is_same_v<PriorityTicketHolder, TicketHolderImpl>) {
+            UseReaderWriterGlobalThrottling<TicketHolderImpl> throttle(getServiceContext(),
+                                                                       numTickets);
+            f();
+        }
+#endif
     }
 };
 

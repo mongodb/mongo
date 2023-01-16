@@ -36,7 +36,7 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/concurrency/mutex.h"
-#include "mongo/util/concurrency/ticket_queues.h"
+#include "mongo/util/concurrency/ticket_broker.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/time_support.h"
@@ -44,11 +44,10 @@
 namespace mongo {
 
 class Ticket;
-
 /**
- * A ticketholder implementation that centralises all ticket acquisition/releases.  Waiters will get
- * placed in a specific internal queue according to some logic.  Releasers will wake up a waiter
- * from a group chosen according to some logic.
+ * A ticketholder implementation that uses AdmissionContext::Priority to schedule tasks when under
+ * load. Waiters will get placed in a specific internal queue according to the priority they have.
+ * Releasers will wake up a waiter from a queue chosen according to some logic.
  */
 class PriorityTicketHolder : public TicketHolderWithQueueingStats {
 public:
@@ -62,7 +61,11 @@ public:
     };
 
     int queued() const override final {
-        return _enqueuedElements.loadRelaxed();
+        int result = 0;
+        for (const auto& queue : _brokers) {
+            result += queue.waitingThreadsRelaxed();
+        }
+        return result;
     }
 
     bool recordImmediateTicketStatistics() noexcept override final {
@@ -94,7 +97,7 @@ private:
         // Exclusively used for statistics tracking. This queue should never have any processes
         // 'queued'.
         kImmediatePriority = 2,
-        QueueTypeSize = 3
+        NumQueues = 3
     };
 
     boost::optional<Ticket> _tryAcquireImpl(AdmissionContext* admCtx) override final;
@@ -106,7 +109,7 @@ private:
 
     void _releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept override final;
 
-    void _resize(int newSize, int oldSize) noexcept override final;
+    void _resize(OperationContext* opCtx, int newSize, int oldSize) noexcept override final;
 
     QueueStats& _getQueueStatsToUse(const AdmissionContext* admCtx) noexcept override final;
 
@@ -114,39 +117,38 @@ private:
 
     bool _tryAcquireTicket();
 
+    TicketBroker::WaitingResult _attemptToAcquireTicket(TicketBroker& ticketBroker,
+                                                        Date_t deadline,
+                                                        Milliseconds maxWaitTime);
+
     /**
-     * Wakes up a waiting thread (if it exists) in order for it to attempt to obtain a ticket.
-     * Implementors MUST wake at least one waiting thread if at least one thread is pending to be
-     * woken between all the queues. In other words, attemptToDequeue on each non-empty Queue must
-     * be called until either it returns true at least once or has been called on all queues.
+     * Wakes up a waiting thread (if it exists) and hands-over the current ticket.
+     * Implementors MUST wake at least one waiting thread if at least one thread is waiting in any
+     * of the brokers. In other words, attemptToTransferTicket on each non-empty TicketBroker must
+     * be called until either it returns true at least once or has been called on all brokers.
      *
      * Care must be taken to ensure that only CPU-bound work is performed here and it doesn't block.
+     * We risk stalling all other operations otherwise.
      *
      * When called the following invariants will be held:
-     * - The number of items in each queue will not change during the execution
-     * - No other thread will proceed to wait during the execution of the method
+     * - Successive checks to the number of waiting threads in a TicketBroker will always be <= the
+     * previous value. That is, no new waiters can come in.
+     * - Calling TicketBroker::attemptToTransferTicket will always return false if it has previously
+     * returned false. Successive calls can change the result from true to false, but never the
+     * reverse.
      */
-    void _dequeueWaitingThread(const ticket_queues::SharedLockGuard& sharedQueueLock);
+    bool _dequeueWaitingThread(const stdx::unique_lock<stdx::mutex>& growthLock);
 
-    /**
-     * Returns whether there are higher priority threads pending to get a ticket in front of the
-     * given queue type and not enough tickets for all of them.
-     */
-    bool _hasToWaitForHigherPriority(const ticket_queues::UniqueLockGuard& lk, QueueType queueType);
-
-    unsigned int _enumToInt(QueueType queueType) {
-        return static_cast<unsigned int>(queueType);
-    }
-    unsigned int _enumToInt(QueueType queueType) const {
+    static unsigned int _enumToInt(QueueType queueType) {
         return static_cast<unsigned int>(queueType);
     }
 
-    ticket_queues::Queue& _getQueue(QueueType queueType) {
-        return _queues[_enumToInt(queueType)];
+    TicketBroker& _getBroker(QueueType queueType) {
+        return _brokers[_enumToInt(queueType)];
     }
 
 
-    QueueType _getQueueType(const AdmissionContext* admCtx) {
+    static QueueType _getQueueType(const AdmissionContext* admCtx) {
         auto priority = admCtx->getPriority();
         switch (priority) {
             case AdmissionContext::Priority::kLow:
@@ -160,21 +162,27 @@ private:
         }
     }
 
-    ticket_queues::QueueMutex _queueMutex;
-    std::array<ticket_queues::Queue, static_cast<unsigned int>(QueueType::QueueTypeSize)> _queues;
-    std::array<QueueStats, static_cast<unsigned int>(QueueType::QueueTypeSize)> _stats;
+    // This mutex is meant to be used in order to grow the queue or to prevent it from doing so.
+    //
+    // We use an stdx::mutex here because we want to minimize overhead as much as possible. Using a
+    // normal mongo::Mutex would add some unnecessary metrics counters. Additionally we need this
+    // type as it is part of the TicketBroker API in order to avoid misuse.
+    stdx::mutex _growthMutex;  // NOLINT
+
+    std::array<TicketBroker, static_cast<unsigned int>(QueueType::NumQueues)> _brokers;
+    std::array<QueueStats, static_cast<unsigned int>(QueueType::NumQueues)> _stats;
 
     /**
      * Limits the number times the low priority queue is non-empty and bypassed in favor of the
      * normal priority queue for the next ticket admission.
      *
-     * Updates must be done under the ticket_queues::UniqueLockGuard.
+     * Updates must be done under the _growthMutex.
      */
     int _lowPriorityBypassThreshold;
 
     /**
      * Counts the number of times normal operations are dequeued over operations queued in the low
-     * priority queue.
+     * priority queue. We explicitly use an unsigned type here because rollover is desired.
      */
     AtomicWord<std::uint64_t> _lowPriorityBypassCount{0};
 
@@ -183,7 +191,6 @@ private:
      */
     AtomicWord<std::int64_t> _expeditedLowPriorityAdmissions{0};
     AtomicWord<int> _ticketsAvailable;
-    AtomicWord<int> _enqueuedElements;
     ServiceContext* _serviceContext;
 };
 }  // namespace mongo

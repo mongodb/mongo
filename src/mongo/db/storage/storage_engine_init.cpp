@@ -162,14 +162,30 @@ StorageEngine::LastShutdownState initializeStorageEngine(OperationContext* opCtx
 
         auto svcCtx = opCtx->getServiceContext();
         if (feature_flags::gFeatureFlagDeprioritizeLowPriorityOperations.isEnabledAndIgnoreFCV()) {
+            std::unique_ptr<TicketHolderManager> ticketHolderManager;
+#ifdef __linux__
             LOGV2_DEBUG(6902900, 1, "Using Priority Queue-based ticketing scheduler");
 
             auto lowPriorityBypassThreshold = gLowPriorityAdmissionBypassThreshold.load();
-            auto ticketHolderManager = std::make_unique<TicketHolderManager>(
+            ticketHolderManager = std::make_unique<TicketHolderManager>(
                 std::make_unique<PriorityTicketHolder>(
                     readTransactions, lowPriorityBypassThreshold, svcCtx),
                 std::make_unique<PriorityTicketHolder>(
                     writeTransactions, lowPriorityBypassThreshold, svcCtx));
+#else
+            LOGV2_DEBUG(7207201, 1, "Using semaphore-based ticketing scheduler");
+
+            // PriorityTicketHolder is implemented using an equivalent mechanism to
+            // std::atomic::wait which isn't available until C++20. We've implemented it in Linux
+            // using futex calls. As this hasn't been implemented in non-Linux platforms we fallback
+            // to the existing semaphore implementation even if the feature flag is enabled.
+            //
+            // TODO SERVER-72616: Remove the ifdefs once TicketBroker is implemented with atomic
+            // wait.
+            ticketHolderManager = std::make_unique<TicketHolderManager>(
+                std::make_unique<SemaphoreTicketHolder>(readTransactions, svcCtx),
+                std::make_unique<SemaphoreTicketHolder>(writeTransactions, svcCtx));
+#endif
             TicketHolderManager::use(svcCtx, std::move(ticketHolderManager));
         } else {
             auto ticketHolderManager = std::make_unique<TicketHolderManager>(

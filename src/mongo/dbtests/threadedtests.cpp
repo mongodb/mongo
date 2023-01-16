@@ -238,6 +238,9 @@ class TicketHolderWaits : public ThreadedTest<10> {
 public:
     TicketHolderWaits() : _hotel(rooms) {
         auto client = Client::getCurrent();
+        // TODO SERVER-72616: We can only test PriorityTicketHolder on Linux. Remove ifdefs when
+        // it's available on other platforms.
+#ifdef __linux__
         if constexpr (std::is_same_v<PriorityTicketHolder, TicketHolderImpl>) {
             // When run with the PriorityTicketHolder, scale down the default
             // 'lowPriorityAdmissionBypassThreshold' for test purposes.
@@ -248,6 +251,9 @@ public:
             _tickets =
                 std::make_unique<TicketHolderImpl>(_hotel._nRooms, client->getServiceContext());
         }
+#else
+        _tickets = std::make_unique<TicketHolderImpl>(_hotel._nRooms, client->getServiceContext());
+#endif
     }
 
 private:
@@ -330,7 +336,11 @@ public:
         add<ThreadPoolTest>();
 
         add<TicketHolderWaits<SemaphoreTicketHolder>>();
+// TODO SERVER-72616: We can only test PriorityTicketHolder on Linux. Remove this when it's
+// available on other platforms.
+#ifdef __linux__
         add<TicketHolderWaits<PriorityTicketHolder>>();
+#endif
     }
 };
 

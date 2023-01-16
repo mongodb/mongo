@@ -74,10 +74,10 @@ Ticket TicketHolderWithQueueingStats::acquireImmediateTicket(AdmissionContext* a
     return Ticket{this, admCtx};
 }
 
-void TicketHolderWithQueueingStats::resize(int newSize) noexcept {
+void TicketHolderWithQueueingStats::resize(OperationContext* opCtx, int newSize) noexcept {
     stdx::lock_guard<Latch> lk(_resizeMutex);
 
-    _resize(newSize, _outof.load());
+    _resize(opCtx, newSize, _outof.load());
     _outof.store(newSize);
 }
 

@@ -63,7 +63,7 @@ public:
     /**
      * Adjusts the total number of tickets allocated for the ticket pool to 'newSize'.
      */
-    virtual void resize(int newSize) noexcept {};
+    virtual void resize(OperationContext* opCtx, int newSize) noexcept {};
 
     /**
      * Immediately returns a ticket without impacting the number of tickets available. Reserved for
@@ -138,7 +138,7 @@ public:
     /**
      * Adjusts the total number of tickets allocated for the ticket pool to 'newSize'.
      */
-    void resize(int newSize) noexcept override;
+    void resize(OperationContext* opCtx, int newSize) noexcept override;
 
     virtual int used() const {
         return outof() - available();
@@ -206,7 +206,7 @@ private:
 
     virtual void _releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept = 0;
 
-    virtual void _resize(int newSize, int oldSize) noexcept = 0;
+    virtual void _resize(OperationContext* opCtx, int newSize, int oldSize) noexcept = 0;
 
     /**
      * Fetches the queueing statistics corresponding to the 'admCtx'. All statistics that are queue

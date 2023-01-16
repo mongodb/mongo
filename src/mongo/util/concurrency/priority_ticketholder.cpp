@@ -46,29 +46,51 @@ PriorityTicketHolder::PriorityTicketHolder(int numTickets,
                                            ServiceContext* serviceContext)
     : TicketHolderWithQueueingStats(numTickets, serviceContext),
       _lowPriorityBypassThreshold(lowPriorityBypassThreshold),
-      _serviceContext(serviceContext) {
-    _ticketsAvailable.store(numTickets);
-    _enqueuedElements.store(0);
-}
+      _ticketsAvailable(numTickets),
+      _serviceContext(serviceContext) {}
 
 void PriorityTicketHolder::updateLowPriorityAdmissionBypassThreshold(
     const int& newBypassThreshold) {
-    ticket_queues::UniqueLockGuard uniqueQueueLock(_queueMutex);
+    stdx::unique_lock<stdx::mutex> growthLock(_growthMutex);
     _lowPriorityBypassThreshold = newBypassThreshold;
 }
 
 boost::optional<Ticket> PriorityTicketHolder::_tryAcquireImpl(AdmissionContext* admCtx) {
     invariant(admCtx);
-    // Low priority operations cannot use optimistic ticket acquisition and will go to the queue
-    // instead. This is done to prevent them from skipping the line before other high-priority
-    // operations.
-    if (admCtx->getPriority() >= AdmissionContext::Priority::kNormal) {
-        auto hasAcquired = _tryAcquireTicket();
-        if (hasAcquired) {
-            return Ticket{this, admCtx};
-        }
+
+    // Handed over tickets to queued waiters do not affect this path since they are not accounted
+    // for in the general ticketsAvailable counter.
+    auto hasAcquired = _tryAcquireTicket();
+    if (hasAcquired) {
+        return Ticket{this, admCtx};
     }
     return boost::none;
+}
+
+TicketBroker::WaitingResult PriorityTicketHolder::_attemptToAcquireTicket(
+    TicketBroker& ticketBroker, Date_t deadline, Milliseconds maxWaitTime) {
+    // We are going to enter the broker as a waiter, so we must block releasers momentarily before
+    // registering ourselves as a waiter. Otherwise we risk missing a ticket.
+    stdx::unique_lock growthLock(_growthMutex);
+    // Check if a ticket became present in the general pool. This prevents a potential
+    // deadlock if the following were to happen without a tryAcquire:
+    // * Thread A proceeds to wait for a ticket to be handed over but before it acquires the
+    // growthLock gets descheduled.
+    // * Thread B releases a ticket, sees no waiters and releases to the general pool.
+    // * Thread A acquires the lock and proceeds to wait.
+    //
+    // In this scenario Thread A would spin indefinitely since it never picks up that there is a
+    // ticket in the general pool. It would wait until another thread comes in and hands over a
+    // ticket.
+    if (_tryAcquireTicket()) {
+        TicketBroker::WaitingResult result;
+        result.hasTimedOut = false;
+        result.hasTicket = true;
+        return result;
+    }
+    // We wait for a tiny bit before checking for interruption.
+    auto maxUntil = std::min(deadline, Date_t::now() + maxWaitTime);
+    return ticketBroker.attemptWaitForTicketUntil(std::move(growthLock), maxUntil);
 }
 
 boost::optional<Ticket> PriorityTicketHolder::_waitForTicketUntilImpl(OperationContext* opCtx,
@@ -78,24 +100,33 @@ boost::optional<Ticket> PriorityTicketHolder::_waitForTicketUntilImpl(OperationC
     invariant(admCtx);
 
     auto queueType = _getQueueType(admCtx);
-    auto& queue = _getQueue(queueType);
+    auto& ticketBroker = _getBroker(queueType);
 
     bool interruptible = waitMode == WaitMode::kInterruptible;
 
-    _enqueuedElements.addAndFetch(1);
-    ON_BLOCK_EXIT([&] { _enqueuedElements.subtractAndFetch(1); });
-
-    ticket_queues::UniqueLockGuard uniqueQueueLock(_queueMutex);
-    do {
-        while (_ticketsAvailable.load() <= 0 ||
-               _hasToWaitForHigherPriority(uniqueQueueLock, queueType)) {
-            bool hasTimedOut = !queue.enqueue(uniqueQueueLock, opCtx, until, interruptible);
-            if (hasTimedOut) {
-                return boost::none;
+    while (true) {
+        // We attempt to acquire a ticket for a period of time. This may or may not succeed, in
+        // which case we will retry until timing out or getting interrupted.
+        auto waitingResult = _attemptToAcquireTicket(ticketBroker, until, Milliseconds{500});
+        ScopeGuard rereleaseIfTimedOutOrInterrupted([&] {
+            // We may have gotten a ticket that we can't use, release it back to the ticket pool.
+            if (waitingResult.hasTicket) {
+                _releaseToTicketPoolImpl(admCtx);
             }
+        });
+        if (interruptible) {
+            opCtx->checkForInterrupt();
         }
-    } while (!_tryAcquireTicket());
-    return Ticket{this, admCtx};
+        auto hasTimedOut = waitingResult.hasTimedOut;
+        if (hasTimedOut && Date_t::now() > until) {
+            return boost::none;
+        }
+        // We haven't been interrupted or timed out, so we may have a valid ticket present.
+        rereleaseIfTimedOutOrInterrupted.dismiss();
+        if (waitingResult.hasTicket) {
+            return Ticket{this, admCtx};
+        }
+    }
 }
 
 void PriorityTicketHolder::_releaseToTicketPoolImpl(AdmissionContext* admCtx) noexcept {
@@ -103,37 +134,45 @@ void PriorityTicketHolder::_releaseToTicketPoolImpl(AdmissionContext* admCtx) no
     // tickets, and thus should never be returned to the pool of available tickets.
     invariant(admCtx && admCtx->getPriority() != AdmissionContext::Priority::kImmediate);
 
-    // The idea behind the release mechanism consists of a consistent view of queued elements
-    // waiting for a ticket and many threads releasing tickets simultaneously. The releasers will
-    // proceed to attempt to dequeue an element by seeing if there are threads not woken and waking
-    // one, having increased the number of woken threads for accuracy. Once the thread gets woken it
-    // will then decrease the number of woken threads (as it has been woken) and then attempt to
-    // acquire a ticket. The two possible states are either one or more releasers releasing or a
-    // thread waking up due to the RW mutex.
-    //
-    // Under this lock the queues cannot be modified in terms of someone attempting to enqueue on
-    // them, only waking threads is allowed.
-    ticket_queues::SharedLockGuard sharedQueueLock(_queueMutex);
-    _ticketsAvailable.addAndFetch(1);
-    _dequeueWaitingThread(sharedQueueLock);
+    // We will now proceed to perform dequeueing, we must acquire the growth mutex in order to
+    // prevent new enqueuers.
+    stdx::unique_lock growthLock(_growthMutex);
+
+    auto hasWokenThread = _dequeueWaitingThread(growthLock);
+    if (!hasWokenThread) {
+        // There's no-one in the queue left to wake, so we give the ticket back for general
+        // availability.
+        _ticketsAvailable.addAndFetch(1);
+    }
 }
 
-void PriorityTicketHolder::_resize(int newSize, int oldSize) noexcept {
+void PriorityTicketHolder::_resize(OperationContext* opCtx, int newSize, int oldSize) noexcept {
     auto difference = newSize - oldSize;
-
-    _ticketsAvailable.fetchAndAdd(difference);
 
     if (difference > 0) {
         // As we're adding tickets the waiting threads need to be notified that there are new
         // tickets available.
-        ticket_queues::SharedLockGuard sharedQueueLock(_queueMutex);
+        stdx::unique_lock dequeuerLock(_growthMutex);
         for (int i = 0; i < difference; i++) {
-            _dequeueWaitingThread(sharedQueueLock);
+            auto hasWokenThread = _dequeueWaitingThread(dequeuerLock);
+            if (!hasWokenThread) {
+                // There's no-one in the brokers left to wake, so we give the ticket back for
+                // general availability.
+                _ticketsAvailable.addAndFetch(1);
+            }
+        }
+    } else {
+        AdmissionContext admCtx;
+        for (int i = 0; i < std::abs(difference); i++) {
+            // This operation is uninterruptible as the resize operation is conceptually atomic.
+            // Cancelling the resize and leaving it in-between the old size and the new one is not
+            // allowed.
+            auto ticket = _waitForTicketUntilImpl(
+                opCtx, &admCtx, Date_t::max(), TicketHolder::WaitMode::kUninterruptible);
+            invariant(ticket);
+            ticket->discard();
         }
     }
-
-    // No need to do anything in the other cases as the number of tickets being <= 0 implies they'll
-    // have to wait until the current ticket holders release their tickets.
 }
 
 TicketHolderWithQueueingStats::QueueStats& PriorityTicketHolder::_getQueueStatsToUse(
@@ -176,6 +215,10 @@ void PriorityTicketHolder::_appendImplStats(BSONObjBuilder& b) const {
 }
 
 bool PriorityTicketHolder::_tryAcquireTicket() {
+    // Test, then test and set to avoid invalidating a cache line unncessarily.
+    if (_ticketsAvailable.loadRelaxed() <= 0) {
+        return false;
+    }
     auto remaining = _ticketsAvailable.subtractAndFetch(1);
     if (remaining < 0) {
         _ticketsAvailable.addAndFetch(1);
@@ -184,58 +227,45 @@ bool PriorityTicketHolder::_tryAcquireTicket() {
     return true;
 }
 
-void PriorityTicketHolder::_dequeueWaitingThread(
-    const ticket_queues::SharedLockGuard& sharedQueueLock) {
-    // There are only 2 possible queues to dequeue from - the low priority and normal priority
-    // queues. There will never be anything to dequeue from the immediate priority queue, given
-    // immediate priority operations will never wait for ticket admission.
-    auto& lowPriorityQueue = _getQueue(QueueType::kLowPriority);
-    auto& normalPriorityQueue = _getQueue(QueueType::kNormalPriority);
+bool PriorityTicketHolder::_dequeueWaitingThread(const stdx::unique_lock<stdx::mutex>& growthLock) {
+    // There are only 2 possible brokers to transfer our ticket to - the low priority and normal
+    // priority brokers. There will never be anything to transfer to the immediate priority broker,
+    // given immediate priority operations will never wait for ticket admission.
+    auto& lowPriorityBroker = _getBroker(QueueType::kLowPriority);
+    auto& normalPriorityBroker = _getBroker(QueueType::kNormalPriority);
 
-    // There is a guarantee that the number of queued elements cannot change while holding the
-    // shared queue lock.
-    auto lowQueueCount = lowPriorityQueue.queuedElems();
-    auto normalQueueCount = normalPriorityQueue.queuedElems();
+    // There is a guarantee that the number of waiters will not increase while holding the growth
+    // lock. This check is safe as long as we only compare it against an upper bound.
+    auto lowPrioWaiting = lowPriorityBroker.waitingThreadsRelaxed();
+    auto normalPrioWaiting = normalPriorityBroker.waitingThreadsRelaxed();
 
-    if (lowQueueCount == 0 && normalQueueCount == 0) {
-        return;
+    if (lowPrioWaiting == 0 && normalPrioWaiting == 0) {
+        return false;
     }
-    if (lowQueueCount == 0) {
-        normalPriorityQueue.attemptToDequeue(sharedQueueLock);
-        return;
+    if (lowPrioWaiting == 0) {
+        return normalPriorityBroker.attemptToTransferTicket(growthLock);
     }
-    if (normalQueueCount == 0) {
-        lowPriorityQueue.attemptToDequeue(sharedQueueLock);
-        return;
+    if (normalPrioWaiting == 0) {
+        return lowPriorityBroker.attemptToTransferTicket(growthLock);
     }
 
-    // Both queues are non-empty, and the low priority queue is bypassed for dequeue in favor of the
-    // normal priority queue until the bypass threshold is met.
+    // Both brokers are non-empty, and the low priority broker is bypassed for release in favor of
+    // the normal priority broker until the bypass threshold is met.
     if (_lowPriorityBypassThreshold > 0 &&
         _lowPriorityBypassCount.addAndFetch(1) % _lowPriorityBypassThreshold == 0) {
-        if (lowPriorityQueue.attemptToDequeue(sharedQueueLock)) {
+        if (lowPriorityBroker.attemptToTransferTicket(growthLock)) {
             _expeditedLowPriorityAdmissions.addAndFetch(1);
+            return true;
         } else {
-            normalPriorityQueue.attemptToDequeue(sharedQueueLock);
+            return normalPriorityBroker.attemptToTransferTicket(growthLock);
         }
-        return;
     }
 
-    if (!normalPriorityQueue.attemptToDequeue(sharedQueueLock)) {
-        lowPriorityQueue.attemptToDequeue(sharedQueueLock);
+    if (!normalPriorityBroker.attemptToTransferTicket(growthLock)) {
+        return lowPriorityBroker.attemptToTransferTicket(growthLock);
+    } else {
+        return true;
     }
 }
 
-bool PriorityTicketHolder::_hasToWaitForHigherPriority(const ticket_queues::UniqueLockGuard& lk,
-                                                       QueueType queue) {
-    switch (queue) {
-        case QueueType::kLowPriority: {
-            const auto& normalQueue = _getQueue(QueueType::kNormalPriority);
-            auto pending = normalQueue.getThreadsPendingToWake();
-            return pending != 0 && pending >= _ticketsAvailable.load();
-        }
-        default:
-            return false;
-    }
-}
 }  // namespace mongo

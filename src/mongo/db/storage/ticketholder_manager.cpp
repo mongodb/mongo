@@ -47,7 +47,7 @@ Status TicketHolderManager::updateConcurrentWriteTransactions(const int& newWrit
         auto ticketHolderManager = TicketHolderManager::get(client->getServiceContext());
         auto& writer = ticketHolderManager->_writeTicketHolder;
         if (writer) {
-            writer->resize(newWriteTransactions);
+            writer->resize(client->getOperationContext(), newWriteTransactions);
             return Status::OK();
         }
         LOGV2_WARNING(6754202,
@@ -65,7 +65,7 @@ Status TicketHolderManager::updateConcurrentReadTransactions(const int& newReadT
         auto ticketHolderManager = TicketHolderManager::get(client->getServiceContext());
         auto& reader = ticketHolderManager->_readTicketHolder;
         if (reader) {
-            reader->resize(newReadTransactions);
+            reader->resize(client->getOperationContext(), newReadTransactions);
             return Status::OK();
         }
 
@@ -82,6 +82,9 @@ Status TicketHolderManager::updateConcurrentReadTransactions(const int& newReadT
 Status TicketHolderManager::updateLowPriorityAdmissionBypassThreshold(
     const int& newBypassThreshold) {
     if (auto client = Client::getCurrent()) {
+        // TODO SERVER-72616: Remove the ifdef once TicketBroker is implemented in a cross-platform
+        // manner.
+#ifdef __linux__
         auto ticketHolderManager = TicketHolderManager::get(client->getServiceContext());
         auto reader = dynamic_cast<PriorityTicketHolder*>(
             ticketHolderManager->getTicketHolder(LockMode::MODE_IS));
@@ -101,6 +104,14 @@ Status TicketHolderManager::updateLowPriorityAdmissionBypassThreshold(
         return Status(ErrorCodes::IllegalOperation,
                       "Attempting to update lowPriorityAdmissionBypassThreshold when the "
                       "TicketHolders are not initalized to be PriorityTicketholders");
+#else
+        LOGV2_WARNING(7207204,
+                      "Attempting to update lowPriorityAdmissionBypassThreshold when the feature "
+                      "is only supported on Linux");
+        return Status(ErrorCodes::IllegalOperation,
+                      "Attempting to update lowPriorityAdmissionBypassThreshold when the feature "
+                      "is only supported on Linux");
+#endif
     }
     return Status::OK();
 }

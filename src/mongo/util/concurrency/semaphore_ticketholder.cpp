@@ -140,7 +140,7 @@ int SemaphoreTicketHolder::available() const {
     return val;
 }
 
-void SemaphoreTicketHolder::_resize(int newSize, int oldSize) noexcept {
+void SemaphoreTicketHolder::_resize(OperationContext* opCtx, int newSize, int oldSize) noexcept {
     auto difference = newSize - oldSize;
 
     if (difference > 0) {
@@ -218,7 +218,7 @@ bool SemaphoreTicketHolder::_tryAcquire() {
     return true;
 }
 
-void SemaphoreTicketHolder::_resize(int newSize, int oldSize) noexcept {
+void SemaphoreTicketHolder::_resize(OperationContext* opCtx, int newSize, int oldSize) noexcept {
     auto difference = newSize - oldSize;
 
     stdx::lock_guard<Latch> lk(_mutex);

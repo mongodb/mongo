@@ -40,7 +40,6 @@
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/concurrency/mutex.h"
-#include "mongo/util/concurrency/ticket_queues.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/time_support.h"
@@ -78,7 +77,7 @@ private:
 
     void _appendImplStats(BSONObjBuilder& b) const override final;
 
-    void _resize(int newSize, int oldSize) noexcept override final;
+    void _resize(OperationContext* opCtx, int newSize, int oldSize) noexcept override final;
 
     QueueStats& _getQueueStatsToUse(const AdmissionContext* admCtx) noexcept override final {
         return _semaphoreStats;

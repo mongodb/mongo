@@ -196,6 +196,9 @@ BENCHMARK_TEMPLATE(BM_acquireAndRelease, SemaphoreTicketHolder, AdmissionsPriori
     ->Threads(kTickets)
     ->Threads(kThreadMax);
 
+// TODO SERVER-72616: Remove ifdefs once PriorityTicketHolder is available cross-platform.
+#ifdef __linux__
+
 BENCHMARK_TEMPLATE(BM_acquireAndRelease, PriorityTicketHolder, AdmissionsPriority::kNormal)
     ->Threads(kThreadMin)
     ->Threads(kTickets)
@@ -219,6 +222,7 @@ BENCHMARK_TEMPLATE(BM_acquireAndRelease, PriorityTicketHolder, AdmissionsPriorit
     ->Threads(kTickets)
     ->Threads(kThreadMax);
 
+#endif
 
 }  // namespace
 }  // namespace mongo
