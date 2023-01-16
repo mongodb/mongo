@@ -2,7 +2,7 @@ Building MongoDB
 ================
 
 Please note that prebuilt binaries are available on
-[mongodb.org](http://www.mongodb.org/downloads) and may be the easiest
+[mongodb.com](https://www.mongodb.com/try/download/community) and may be the easiest
 way to get started, rather than building from source.
 
 To build MongoDB, you will need:
@@ -133,7 +133,7 @@ Build requirements:
 * Visual Studio 2022 version 17.0 or newer
 * Python 3.7
 
-Or download a prebuilt binary for Windows at www.mongodb.org.
+Or download a prebuilt binary for Windows at https://www.mongodb.com/try/download/community.
 
 
 Debian/Ubuntu
