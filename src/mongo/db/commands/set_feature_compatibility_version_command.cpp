@@ -84,6 +84,7 @@
 #include "mongo/db/session_catalog.h"
 #include "mongo/db/session_catalog_mongod.h"
 #include "mongo/db/session_txn_record_gen.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/idl/cluster_server_parameter_gen.h"
@@ -750,37 +751,16 @@ private:
                 const auto& dbName = tenantDbName.dbName();
                 Lock::DBLock dbLock(opCtx, dbName, MODE_IX);
                 catalog::forEachCollectionFromDb(
-                    opCtx,
-                    tenantDbName,
-                    MODE_X,
-                    [&](const CollectionPtr& collection) {
-                        invariant(collection->getTimeseriesOptions());
-
+                    opCtx, tenantDbName, MODE_X, [&](const CollectionPtr& collection) {
+                        const auto collNs = collection->getTimeseriesOptions()
+                            ? collection->ns().getTimeseriesViewNamespace()
+                            : collection->ns();
                         auto indexCatalog = collection->getIndexCatalog();
+
                         auto indexIt = indexCatalog->getIndexIterator(
                             opCtx, /*includeUnfinishedIndexes=*/true);
-
                         while (indexIt->more()) {
                             auto indexEntry = indexIt->next();
-                            // Secondary indexes on time-series measurements are only supported
-                            // in 5.2 and up. If the user tries to downgrade the cluster to an
-                            // earlier version, they must first remove all incompatible secondary
-                            // indexes on time-series measurements.
-                            uassert(
-                                ErrorCodes::CannotDowngrade,
-                                str::stream()
-                                    << "Cannot downgrade the cluster when there are secondary "
-                                       "indexes on time-series measurements present, or when there "
-                                       "are partial indexes on a time-series collection. Drop all "
-                                       "secondary indexes on time-series measurements, and all "
-                                       "partial indexes on time-series collections, before "
-                                       "downgrading. First detected incompatible index name: '"
-                                    << indexEntry->descriptor()->indexName() << "' on collection: '"
-                                    << collection->ns().getTimeseriesViewNamespace() << "'",
-                                timeseries::isBucketsIndexSpecCompatibleForDowngrade(
-                                    *collection->getTimeseriesOptions(),
-                                    indexEntry->descriptor()->infoObj()));
-
                             if (auto filter = indexEntry->getFilterExpression()) {
                                 auto status = IndexCatalogImpl::checkValidFilterExpressions(
                                     filter,
@@ -794,10 +774,38 @@ private:
                                                "partial filter elements before downgrading. First "
                                                "detected incompatible index name: '"
                                             << indexEntry->descriptor()->indexName()
-                                            << "' on collection: '"
-                                            << collection->ns().getTimeseriesViewNamespace() << "'",
+                                            << "' on collection: '" << collNs << "'",
                                         status.isOK());
                             }
+                        }
+
+                        if (!collection->getTimeseriesOptions()) {
+                            return true;
+                        }
+
+                        indexIt = indexCatalog->getIndexIterator(opCtx,
+                                                                 /*includeUnfinishedIndexes=*/true);
+                        while (indexIt->more()) {
+                            auto indexEntry = indexIt->next();
+                            // Secondary indexes on time-series measurements are only supported
+                            // in 5.2 and up. If the user tries to downgrade the cluster to an
+                            // earlier version, they must first remove all incompatible secondary
+                            // indexes on time-series measurements.
+                            uassert(
+                                ErrorCodes::CannotDowngrade,
+                                str::stream()
+                                    << "Cannot downgrade the cluster when there are secondary "
+                                       "indexes on time-series measurements present, or when "
+                                       "there are partial indexes on a time-series collection. "
+                                       "Drop "
+                                       "all secondary indexes on time-series measurements, and all "
+                                       "partial indexes on time-series collections, before "
+                                       "downgrading. First detected incompatible index name: '"
+                                    << indexEntry->descriptor()->indexName() << "' on collection: '"
+                                    << collNs << "'",
+                                timeseries::isBucketsIndexSpecCompatibleForDowngrade(
+                                    *collection->getTimeseriesOptions(),
+                                    indexEntry->descriptor()->infoObj()));
                         }
 
                         if (!collection->getTimeseriesBucketsMayHaveMixedSchemaData()) {
@@ -824,9 +832,6 @@ private:
                         }
 
                         return true;
-                    },
-                    [&](const CollectionPtr& collection) {
-                        return collection->getTimeseriesOptions() != boost::none;
                     });
             }
         }
