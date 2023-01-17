@@ -256,19 +256,6 @@ if (typeof _threadInject != "undefined") {
             // TODO (SERVER-63228): Remove this exclusion once the feature flag is enabled by
             // default.
             "timeseries/timeseries_index_ttl_partial.js",
-
-            // TODO SERVER-72447: Avoid this.
-            "columnstore/column_scan_skip_row_store_projection.js",
-            "columnstore/column_store_index_compression.js",
-            "columnstore/columnstore_eligibility.js",
-            "columnstore/columnstore_index.js",
-            "columnstore/columnstore_index_correctness.js",
-            "columnstore/columnstore_index_per_path_filters.js",
-            "columnstore/columnstore_large_array_index_correctness.js",
-            "columnstore/columnstore_validindex.js",
-            "index/hidden_index.js",
-            "query/null_query_semantics.js",
-            "query/project/projection_semantics.js",
         ]);
 
         // Get files, including files in subdirectories.
@@ -410,6 +397,8 @@ if (typeof _threadInject != "undefined") {
                 };
             }
         }
+
+        TestData.isParallelTest = true;
 
         var runners = new Array();
         for (var i in params) {

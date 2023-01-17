@@ -9,6 +9,22 @@ load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParam
 load("jstests/libs/sbe_util.js");                                // For checkSBEEnabled.
 
 /**
+ * Updates server parameters to disable column scan query planning heuristics so that column scan
+ * will always be considered.
+ *
+ * This is intentionally done in all column scan correctness tests because we want to exercise
+ * column scan semantics regardless of whether column scan is performant on the test data. Coverage
+ * for the planning heuristics behavior is included in unit tests, no passthrough tests, and perf
+ * tests.
+ */
+function fullyEnableColumnScan(nodes) {
+    // Since the CSI query planning heuristics are OR-ed together, we can set any one of
+    // [internalQueryColumnScanMinAvgDocSizeBytes, internalQueryColumnScanMinCollectionSizeBytes,
+    // internalQueryColumnScanMinNumColumnFilters] to zero in order to fully enable column scan.
+    setParameterOnAllHosts(nodes, "internalQueryColumnScanMinNumColumnFilters", 0);
+}
+
+/**
  * Checks if the test is eligible to run and sets the appropriate parameters to use column store
  * indexes. Returns true if set up was successful.
  */
@@ -45,9 +61,11 @@ function setUpServerForColumnStoreIndexTest(db) {
         break;
     }
 
-    setParameterOnAllHosts(nodes, "internalQueryColumnScanMinAvgDocSizeBytes", 0);
-    setParameterOnAllHosts(nodes, "internalQueryColumnScanMinCollectionSizeBytes", 0);
-    setParameterOnAllHosts(nodes, "internalQueryColumnScanMinNumColumnFilters", 0);
+    // Parallel tests cannot set these server parameters during execution due to the side effect of
+    // clearing the SBE plan cache, so the parallel test suite overrides this for us up front.
+    if (!(TestData || {}).isParallelTest) {
+        fullyEnableColumnScan(nodes);
+    }
 
     return true;
 }
