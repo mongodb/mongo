@@ -186,6 +186,8 @@ public:
     void onOplogEntriesApplied(int64_t numEntries);
     void onApplyingBegin();
     void onApplyingEnd();
+    void setApplyingBegin(Date_t date);
+    void setApplyingEnd(Date_t date);
     void onLocalInsertDuringOplogFetching(Milliseconds elapsed);
     void onBatchRetrievedDuringOplogApplying(Milliseconds elapsed);
     void onOplogLocalBatchApplied(Milliseconds elapsed);

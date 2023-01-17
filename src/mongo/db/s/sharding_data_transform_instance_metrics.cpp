@@ -236,6 +236,14 @@ Date_t ShardingDataTransformInstanceMetrics::getCopyingEnd() const {
     return _copyingEndTime.load();
 }
 
+void ShardingDataTransformInstanceMetrics::setCopyingBegin(Date_t date) {
+    _copyingStartTime.store(date);
+}
+
+void ShardingDataTransformInstanceMetrics::setCopyingEnd(Date_t date) {
+    _copyingEndTime.store(date);
+}
+
 void ShardingDataTransformInstanceMetrics::onDocumentsProcessed(int64_t documentCount,
                                                                 int64_t totalDocumentsSizeBytes,
                                                                 Milliseconds elapsed) {

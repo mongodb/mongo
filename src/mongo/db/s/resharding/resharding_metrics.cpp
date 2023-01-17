@@ -477,6 +477,14 @@ void ReshardingMetrics::restoreApplyingEnd(Date_t date) {
     _applyingEndTime.store(date);
 }
 
+void ReshardingMetrics::setApplyingBegin(Date_t date) {
+    _applyingStartTime.store(date);
+}
+
+void ReshardingMetrics::setApplyingEnd(Date_t date) {
+    _applyingEndTime.store(date);
+}
+
 Date_t ReshardingMetrics::getApplyingBegin() const {
     return _applyingStartTime.load();
 }

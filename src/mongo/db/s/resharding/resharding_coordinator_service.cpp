@@ -149,38 +149,57 @@ using resharding_metrics::getIntervalStartFieldName;
 using DocT = ReshardingCoordinatorDocument;
 const auto metricsPrefix = resharding_metrics::getMetricsPrefix<DocT>();
 
-void buildStateDocumentCloneMetricsForUpdate(BSONObjBuilder& bob, ReshardingMetrics* metrics) {
+void buildStateDocumentCloneMetricsForUpdate(BSONObjBuilder& bob, Date_t timestamp) {
     bob.append(getIntervalStartFieldName<DocT>(ReshardingRecipientMetrics::kDocumentCopyFieldName),
-               metrics->getCopyingBegin());
+               timestamp);
 }
 
-void buildStateDocumentApplyMetricsForUpdate(BSONObjBuilder& bob, ReshardingMetrics* metrics) {
+void buildStateDocumentApplyMetricsForUpdate(BSONObjBuilder& bob, Date_t timestamp) {
     bob.append(getIntervalEndFieldName<DocT>(ReshardingRecipientMetrics::kDocumentCopyFieldName),
-               metrics->getCopyingEnd());
+               timestamp);
+
     bob.append(
         getIntervalEndFieldName<DocT>(ReshardingRecipientMetrics::kOplogApplicationFieldName),
-        metrics->getApplyingBegin());
+        timestamp);
 }
 
-void buildStateDocumentBlockingWritesMetricsForUpdate(BSONObjBuilder& bob,
-                                                      ReshardingMetrics* metrics) {
+void buildStateDocumentBlockingWritesMetricsForUpdate(BSONObjBuilder& bob, Date_t timestamp) {
     bob.append(
         getIntervalEndFieldName<DocT>(ReshardingRecipientMetrics::kOplogApplicationFieldName),
-        metrics->getApplyingEnd());
+        timestamp);
 }
 
 void buildStateDocumentMetricsForUpdate(BSONObjBuilder& bob,
-                                        ReshardingMetrics* metrics,
-                                        CoordinatorStateEnum newState) {
+                                        CoordinatorStateEnum newState,
+                                        Date_t timestamp) {
     switch (newState) {
         case CoordinatorStateEnum::kCloning:
-            buildStateDocumentCloneMetricsForUpdate(bob, metrics);
+            buildStateDocumentCloneMetricsForUpdate(bob, timestamp);
             return;
         case CoordinatorStateEnum::kApplying:
-            buildStateDocumentApplyMetricsForUpdate(bob, metrics);
+            buildStateDocumentApplyMetricsForUpdate(bob, timestamp);
             return;
         case CoordinatorStateEnum::kBlockingWrites:
-            buildStateDocumentBlockingWritesMetricsForUpdate(bob, metrics);
+            buildStateDocumentBlockingWritesMetricsForUpdate(bob, timestamp);
+            return;
+        default:
+            return;
+    }
+}
+
+void setMeticsAfterWrite(ReshardingMetrics* metrics,
+                         CoordinatorStateEnum newState,
+                         Date_t timestamp) {
+    switch (newState) {
+        case CoordinatorStateEnum::kCloning:
+            metrics->setCopyingBegin(timestamp);
+            return;
+        case CoordinatorStateEnum::kApplying:
+            metrics->setCopyingEnd(timestamp);
+            metrics->setApplyingBegin(timestamp);
+            return;
+        case CoordinatorStateEnum::kBlockingWrites:
+            metrics->setApplyingEnd(timestamp);
             return;
         default:
             return;
@@ -191,8 +210,9 @@ void writeToCoordinatorStateNss(OperationContext* opCtx,
                                 ReshardingMetrics* metrics,
                                 const ReshardingCoordinatorDocument& coordinatorDoc,
                                 TxnNumber txnNumber) {
+    Date_t timestamp = getCurrentTime();
+    auto nextState = coordinatorDoc.getState();
     BatchedCommandRequest request([&] {
-        auto nextState = coordinatorDoc.getState();
         switch (nextState) {
             case CoordinatorStateEnum::kInitializing:
                 // Insert the new coordinator document.
@@ -242,7 +262,7 @@ void writeToCoordinatorStateNss(OperationContext* opCtx,
                             *approxDocumentsToCopy);
                     }
 
-                    buildStateDocumentMetricsForUpdate(setBuilder, metrics, nextState);
+                    buildStateDocumentMetricsForUpdate(setBuilder, nextState, timestamp);
 
                     if (nextState == CoordinatorStateEnum::kPreparingToDonate) {
                         appendShardEntriesToSetBuilder(coordinatorDoc, setBuilder);
@@ -272,6 +292,8 @@ void writeToCoordinatorStateNss(OperationContext* opCtx,
     if (expectedNumModified) {
         assertNumDocsModifiedMatchesExpected(request, res, *expectedNumModified);
     }
+
+    setMeticsAfterWrite(metrics, nextState, timestamp);
 }
 
 /**
@@ -1796,12 +1818,12 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllDonorsReadyToDonate(
 
             auto highestMinFetchTimestamp = resharding::getHighestMinFetchTimestamp(
                 coordinatorDocChangedOnDisk.getDonorShards());
+
             _updateCoordinatorDocStateAndCatalogEntries(
                 CoordinatorStateEnum::kCloning,
                 coordinatorDocChangedOnDisk,
                 highestMinFetchTimestamp,
                 computeApproxCopySize(coordinatorDocChangedOnDisk));
-            _metrics->onCopyingBegin();
         })
         .then([this] { return _waitForMajority(_ctHolder->getAbortToken()); });
 }
@@ -1819,8 +1841,6 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllRecipientsFinishedCloning(
         .then([this](ReshardingCoordinatorDocument coordinatorDocChangedOnDisk) {
             this->_updateCoordinatorDocStateAndCatalogEntries(CoordinatorStateEnum::kApplying,
                                                               coordinatorDocChangedOnDisk);
-            _metrics->onCopyingEnd();
-            _metrics->onApplyingBegin();
         })
         .then([this] { return _waitForMajority(_ctHolder->getAbortToken()); });
 }
@@ -1891,7 +1911,6 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllRecipientsFinishedApplying(
 
             this->_updateCoordinatorDocStateAndCatalogEntries(CoordinatorStateEnum::kBlockingWrites,
                                                               _coordinatorDoc);
-            _metrics->onApplyingEnd();
             _metrics->onCriticalSectionBegin();
         })
         .then([this] { return _waitForMajority(_ctHolder->getAbortToken()); })

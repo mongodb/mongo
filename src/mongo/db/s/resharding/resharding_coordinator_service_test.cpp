@@ -257,6 +257,7 @@ public:
 
     void makeDonorsReadyToDonate(OperationContext* opCtx) {
         auto coordDoc = getCoordinatorDoc(opCtx);
+        ASSERT_NE(coordDoc.getStartTime(), Date_t::min());
 
         auto donorShards = coordDoc.getDonorShards();
         DonorShardContext donorCtx;
@@ -272,6 +273,7 @@ public:
 
     void makeRecipientsFinishedCloning(OperationContext* opCtx) {
         auto coordDoc = getCoordinatorDoc(opCtx);
+        ASSERT_NE(coordDoc.getMetrics()->getDocumentCopy()->getStart(), Date_t::min());
 
         auto shards = coordDoc.getRecipientShards();
         RecipientShardContext ctx;
@@ -286,6 +288,8 @@ public:
 
     void makeRecipientsBeInStrictConsistency(OperationContext* opCtx) {
         auto coordDoc = getCoordinatorDoc(opCtx);
+        ASSERT_LTE(coordDoc.getMetrics()->getOplogApplication()->getStart(),
+                   coordDoc.getMetrics()->getOplogApplication()->getStop());
 
         auto shards = coordDoc.getRecipientShards();
         RecipientShardContext ctx;
@@ -300,6 +304,9 @@ public:
 
     void makeDonorsProceedToDone(OperationContext* opCtx) {
         auto coordDoc = getCoordinatorDoc(opCtx);
+        ASSERT_LTE(coordDoc.getMetrics()->getDocumentCopy()->getStart(),
+                   coordDoc.getMetrics()->getDocumentCopy()->getStop());
+
         auto donorShards = coordDoc.getDonorShards();
         DonorShardContext donorCtx;
         donorCtx.setState(DonorStateEnum::kDone);
@@ -313,6 +320,9 @@ public:
 
     void makeRecipientsProceedToDone(OperationContext* opCtx) {
         auto coordDoc = getCoordinatorDoc(opCtx);
+        ASSERT_LTE(coordDoc.getMetrics()->getDocumentCopy()->getStart(),
+                   coordDoc.getMetrics()->getDocumentCopy()->getStop());
+
         auto shards = coordDoc.getRecipientShards();
         RecipientShardContext ctx;
         ctx.setState(RecipientStateEnum::kDone);

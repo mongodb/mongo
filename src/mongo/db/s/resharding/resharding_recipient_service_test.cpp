@@ -311,6 +311,15 @@ public:
         ASSERT_TRUE(bool(recipientColl->isEmpty(opCtx)));
     }
 
+    ReshardingRecipientDocument getStateDoc(OperationContext* opCtx) {
+        DBDirectClient client(opCtx);
+
+        auto doc =
+            client.findOne(NamespaceString::kRecipientReshardingOperationsNamespace, BSONObj{});
+        IDLParserContext errCtx("reshardingRecipientFromTest");
+        return ReshardingRecipientDocument::parse(errCtx, doc);
+    }
+
 private:
     TypeCollectionRecipientFields _makeRecipientFields(
         const ReshardingRecipientDocument& recipientDoc) {
@@ -355,14 +364,56 @@ TEST_F(ReshardingRecipientServiceTest, CanTransitionThroughEachStateToCompletion
               "Running case",
               "test"_attr = _agent.getTestName(),
               "isAlsoDonor"_attr = isAlsoDonor);
+        auto removeRecipientDocFailpoint =
+            globalFailPointRegistry().find("removeRecipientDocFailpoint");
+        auto timesEnteredFailPoint = removeRecipientDocFailpoint->setMode(FailPoint::alwaysOn);
         auto doc = makeStateDocument(isAlsoDonor);
         auto opCtx = makeOperationContext();
         RecipientStateMachine::insertStateDocument(opCtx.get(), doc);
         auto recipient = RecipientStateMachine::getOrCreate(opCtx.get(), _service, doc.toBSON());
 
         notifyToStartCloning(opCtx.get(), *recipient, doc);
+
         notifyReshardingCommitting(opCtx.get(), *recipient, doc);
 
+        removeRecipientDocFailpoint->waitForTimesEntered(timesEnteredFailPoint + 1);
+
+        // Search metrics in the state document and verify they are valid and the same as the ones
+        // in memory.
+        auto persistedRecipientDocument = getStateDoc(opCtx.get());
+
+        Date_t copyBegin = recipient->getMetrics().getCopyingBegin();
+        Date_t copyEnd = recipient->getMetrics().getCopyingEnd();
+        Date_t applyBegin = recipient->getMetrics().getApplyingBegin();
+        Date_t applyEnd = recipient->getMetrics().getApplyingEnd();
+
+        auto copyBeginDoc = persistedRecipientDocument.getMetrics()->getDocumentCopy()->getStart();
+        auto copyEndDoc = persistedRecipientDocument.getMetrics()->getDocumentCopy()->getStop();
+        auto applyBeginDoc =
+            persistedRecipientDocument.getMetrics()->getOplogApplication()->getStart();
+        auto applyEndDoc =
+            persistedRecipientDocument.getMetrics()->getOplogApplication()->getStop();
+
+        ASSERT_NE(copyBegin, Date_t::min());
+        ASSERT_NE(copyEnd, Date_t::min());
+        ASSERT_NE(applyBegin, Date_t::min());
+        ASSERT_NE(applyEnd, Date_t::min());
+        ASSERT_LTE(copyBegin, copyEnd);
+        ASSERT_LTE(applyBegin, applyEnd);
+
+        ASSERT_TRUE(copyBeginDoc.has_value());
+        ASSERT_EQ(copyBegin, copyBeginDoc.get());
+
+        ASSERT_TRUE(copyEndDoc.has_value());
+        ASSERT_EQ(copyEnd, copyEndDoc.get());
+
+        ASSERT_TRUE(applyBeginDoc.has_value());
+        ASSERT_EQ(applyBegin, applyBeginDoc.get());
+
+        ASSERT_TRUE(applyEndDoc.has_value());
+        ASSERT_EQ(applyEnd, applyEndDoc.get());
+
+        removeRecipientDocFailpoint->setMode(FailPoint::off);
         ASSERT_OK(recipient->getCompletionFuture().getNoThrow());
         checkStateDocumentRemoved(opCtx.get());
     }

@@ -118,42 +118,64 @@ using resharding_metrics::getIntervalStartFieldName;
 using DocT = ReshardingRecipientDocument;
 const auto metricsPrefix = resharding_metrics::getMetricsPrefix<DocT>();
 
-void buildStateDocumentCloneMetricsForUpdate(BSONObjBuilder& bob, ReshardingMetrics* metrics) {
+void buildStateDocumentCloneMetricsForUpdate(BSONObjBuilder& bob, Date_t timestamp) {
     bob.append(getIntervalStartFieldName<DocT>(ReshardingRecipientMetrics::kDocumentCopyFieldName),
-               metrics->getCopyingBegin());
+               timestamp);
 }
 
-void buildStateDocumentApplyMetricsForUpdate(BSONObjBuilder& bob, ReshardingMetrics* metrics) {
+void buildStateDocumentApplyMetricsForUpdate(BSONObjBuilder& bob,
+                                             ReshardingMetrics* metrics,
+                                             Date_t timestamp) {
     bob.append(getIntervalEndFieldName<DocT>(ReshardingRecipientMetrics::kDocumentCopyFieldName),
-               metrics->getCopyingEnd());
+               timestamp);
     bob.append(
         getIntervalStartFieldName<DocT>(ReshardingRecipientMetrics::kOplogApplicationFieldName),
-        metrics->getApplyingBegin());
+        timestamp);
+
     bob.append(metricsPrefix + ReshardingRecipientMetrics::kFinalDocumentsCopiedCountFieldName,
                metrics->getDocumentsProcessedCount());
     bob.append(metricsPrefix + ReshardingRecipientMetrics::kFinalBytesCopiedCountFieldName,
                metrics->getBytesWrittenCount());
 }
 
-void buildStateDocumentStrictConsistencyMetricsForUpdate(BSONObjBuilder& bob,
-                                                         ReshardingMetrics* metrics) {
+void buildStateDocumentStrictConsistencyMetricsForUpdate(BSONObjBuilder& bob, Date_t timestamp) {
     bob.append(
         getIntervalEndFieldName<DocT>(ReshardingRecipientMetrics::kOplogApplicationFieldName),
-        metrics->getApplyingEnd());
+        timestamp);
 }
 
 void buildStateDocumentMetricsForUpdate(BSONObjBuilder& bob,
                                         ReshardingMetrics* metrics,
-                                        RecipientStateEnum newState) {
+                                        RecipientStateEnum newState,
+                                        Date_t timestamp) {
     switch (newState) {
         case RecipientStateEnum::kCloning:
-            buildStateDocumentCloneMetricsForUpdate(bob, metrics);
+            buildStateDocumentCloneMetricsForUpdate(bob, timestamp);
             return;
         case RecipientStateEnum::kApplying:
-            buildStateDocumentApplyMetricsForUpdate(bob, metrics);
+            buildStateDocumentApplyMetricsForUpdate(bob, metrics, timestamp);
             return;
         case RecipientStateEnum::kStrictConsistency:
-            buildStateDocumentStrictConsistencyMetricsForUpdate(bob, metrics);
+            buildStateDocumentStrictConsistencyMetricsForUpdate(bob, timestamp);
+            return;
+        default:
+            return;
+    }
+}
+
+void setMeticsAfterWrite(ReshardingMetrics* metrics,
+                         RecipientStateEnum newState,
+                         Date_t timestamp) {
+    switch (newState) {
+        case RecipientStateEnum::kCloning:
+            metrics->setCopyingBegin(timestamp);
+            return;
+        case RecipientStateEnum::kApplying:
+            metrics->setCopyingEnd(timestamp);
+            metrics->setApplyingBegin(timestamp);
+            return;
+        case RecipientStateEnum::kStrictConsistency:
+            metrics->setApplyingEnd(timestamp);
             return;
         default:
             return;
@@ -884,7 +906,6 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionToCreatingCol
 
 void ReshardingRecipientService::RecipientStateMachine::_transitionToCloning(
     const CancelableOperationContextFactory& factory) {
-    _metrics->onCopyingBegin();
     auto newRecipientCtx = _recipientCtx;
     newRecipientCtx.setState(RecipientStateEnum::kCloning);
     _transitionState(std::move(newRecipientCtx), boost::none, boost::none, factory);
@@ -895,9 +916,6 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionToApplying(
     auto newRecipientCtx = _recipientCtx;
     newRecipientCtx.setState(RecipientStateEnum::kApplying);
     _transitionState(std::move(newRecipientCtx), boost::none, boost::none, factory);
-
-    _metrics->onCopyingEnd();
-    _metrics->onApplyingBegin();
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_transitionToStrictConsistency(
@@ -905,8 +923,6 @@ void ReshardingRecipientService::RecipientStateMachine::_transitionToStrictConsi
     auto newRecipientCtx = _recipientCtx;
     newRecipientCtx.setState(RecipientStateEnum::kStrictConsistency);
     _transitionState(std::move(newRecipientCtx), boost::none, boost::none, factory);
-
-    _metrics->onApplyingEnd();
 }
 
 void ReshardingRecipientService::RecipientStateMachine::_transitionToError(
@@ -1040,6 +1056,7 @@ void ReshardingRecipientService::RecipientStateMachine::_updateRecipientDocument
     auto opCtx = factory.makeOperationContext(&cc());
     PersistentTaskStore<ReshardingRecipientDocument> store(
         NamespaceString::kRecipientReshardingOperationsNamespace);
+    Date_t timestamp = getCurrentTime();
 
     BSONObjBuilder updateBuilder;
     {
@@ -1065,7 +1082,8 @@ void ReshardingRecipientService::RecipientStateMachine::_updateRecipientDocument
                               *configStartTime);
         }
 
-        buildStateDocumentMetricsForUpdate(setBuilder, _metrics.get(), newRecipientCtx.getState());
+        buildStateDocumentMetricsForUpdate(
+            setBuilder, _metrics.get(), newRecipientCtx.getState(), timestamp);
 
         setBuilder.doneFast();
     }
@@ -1080,6 +1098,7 @@ void ReshardingRecipientService::RecipientStateMachine::_updateRecipientDocument
         stdx::lock_guard<Latch> lk(_mutex);
         _recipientCtx = newRecipientCtx;
     }
+    setMeticsAfterWrite(_metrics.get(), newRecipientCtx.getState(), timestamp);
 
     if (cloneDetails) {
         _cloneTimestamp = cloneDetails->cloneTimestamp;
