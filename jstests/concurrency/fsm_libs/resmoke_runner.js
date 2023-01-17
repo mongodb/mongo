@@ -179,7 +179,16 @@ function runWorkloads(workloads,
                 // Wait for the acknowledgement file to be created by the hook thread.
                 assert.soonNoExcept(function() {
                     // The cat() function will throw an exception if the file isn't found.
-                    cat(executionOptions.actionFiles.idleAck);
+                    try {
+                        cat(executionOptions.actionFiles.idleAck);
+                    } catch (ex) {
+                        if (ex.code == 13300 /* CANT_OPEN_FILE */) {
+                            // capture this exception to prevent soonNoExcept polluting the
+                            // logs with errors
+                            return false;
+                        }
+                        throw ex;
+                    }
                     return true;
                 }, "thread action still in progress");
             }
