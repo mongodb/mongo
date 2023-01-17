@@ -325,6 +325,8 @@ const allCommands = {
     mergeChunks: {skip: isPrimaryOnly},
     moveChunk: {skip: isPrimaryOnly},
     moveRange: {skip: isPrimaryOnly},
+    oidcListKeys: {skip: isNotAUserDataRead},
+    oidcRefreshKeys: {skip: isNotAUserDataRead},
     pinHistoryReplicated: {skip: isAnInternalCommand},
     ping: {skip: isNotAUserDataRead},
     planCacheClear: {skip: isNotAUserDataRead},

@@ -46,7 +46,7 @@ public:
      * Upon completion, header and body payloads
      * and parsed structs are available.
      */
-    JWSValidatedToken(const JWKManager& keyMgr, StringData token);
+    JWSValidatedToken(JWKManager* keyMgr, StringData token);
 
     /**
      * Extract just the Issuer name ('iss') from the token.
@@ -58,7 +58,7 @@ public:
      * verifies it has a validator matching its keyId and finally
      * it calls validate from the validator, returning the status.
      */
-    Status validate(const JWKManager& keyMgr) const;
+    Status validate(JWKManager* keyMgr) const;
 
     // General read-only accessors.
     const BSONObj& getHeaderBSON() const {

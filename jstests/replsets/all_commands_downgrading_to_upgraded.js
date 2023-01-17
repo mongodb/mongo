@@ -899,6 +899,12 @@ const allCommands = {
         skip: isNotImplementedYet,
         isShardedOnly: true,
     },
+    oidcListKeys: {
+        skip: isNotImplementedYet,
+    },
+    oidcRefreshKeys: {
+        skip: isNotImplementedYet,
+    },
     pinHistoryReplicated: {
         skip: isNotImplementedYet,
     },

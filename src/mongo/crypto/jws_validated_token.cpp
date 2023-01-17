@@ -64,7 +64,7 @@ ParsedToken parseSignedToken(StringData token) {
 }
 }  // namespace
 
-Status JWSValidatedToken::validate(const JWKManager& keyMgr) const {
+Status JWSValidatedToken::validate(JWKManager* keyMgr) const {
     const auto now = Date_t::now();
 
     // Clock times across the network may differ and `nbf` is likely to be
@@ -86,16 +86,20 @@ Status JWSValidatedToken::validate(const JWKManager& keyMgr) const {
     auto signature = base64url::decode(tokenSplit.token[2]);
     auto payload = tokenSplit.payload;
 
-    auto sValidator = keyMgr.getValidator(_header.getKeyId());
-    if (!sValidator) {
-        return Status{ErrorCodes::BadValue,
-                      str::stream() << "Unknown JWT keyId << '" << _header.getKeyId() << "'"};
+    auto swValidator = keyMgr->getValidator(_header.getKeyId());
+    if (!swValidator.isOK()) {
+        auto status = swValidator.getStatus();
+        if (status.code() == ErrorCodes::NoSuchKey) {
+            return Status{ErrorCodes::BadValue,
+                          str::stream() << "Unknown JWT keyId << '" << _header.getKeyId() << "'"};
+        }
+        return status;
     }
 
-    return sValidator.get()->validate(_header.getAlgorithm(), payload, signature);
+    return swValidator.getValue().get()->validate(_header.getAlgorithm(), payload, signature);
 }
 
-JWSValidatedToken::JWSValidatedToken(const JWKManager& keyMgr, StringData token)
+JWSValidatedToken::JWSValidatedToken(JWKManager* keyMgr, StringData token)
     : _originalToken(token.toString()) {
     auto tokenSplit = parseSignedToken(token);
 

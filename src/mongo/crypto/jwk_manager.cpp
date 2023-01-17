@@ -43,7 +43,7 @@ namespace mongo::crypto {
 namespace {
 constexpr auto kMinKeySizeBytes = 2048 >> 3;
 using SharedValidator = std::shared_ptr<JWSValidator>;
-using SharedMap = std::map<std::string, SharedValidator>;
+using SharedValidatorMap = std::map<std::string, SharedValidator>;
 
 // Strip insignificant leading zeroes to determine the key's true size.
 StringData reduceInt(StringData value) {
@@ -57,51 +57,36 @@ StringData reduceInt(StringData value) {
 }  // namespace
 
 JWKManager::JWKManager(StringData source) : _keyURI(source) {
-    try {
-        auto httpClient = HttpClient::createWithoutConnectionPool();
-        httpClient->setHeaders({"Accept: */*"});
-        httpClient->allowInsecureHTTP(getTestCommandsEnabled());
-
-        auto getJWKs = httpClient->get(source);
-
-        ConstDataRange cdr = getJWKs.getCursor();
-        StringData str;
-        cdr.readInto<StringData>(&str);
-
-        BSONObj data = fromjson(str);
-        _setAndValidateKeys(data);
-    } catch (const DBException& ex) {
-        // throws
-        uassertStatusOK(
-            ex.toStatus().withContext(str::stream() << "Failed loading keys from " << source));
-    }
+    _loadKeysFromUri(true /* isInitialLoad */);
 }
 
 JWKManager::JWKManager(BSONObj keys) {
-    _setAndValidateKeys(keys);
+    _setAndValidateKeys(keys, true /* isInitialLoad */);
 }
 
-StatusWith<BSONObj> JWKManager::getKey(StringData keyId) const {
-    auto it = _keyMaterial.find(keyId.toString());
-    if (it == _keyMaterial.end()) {
-        return {ErrorCodes::NoSuchKey, str::stream() << "Unknown key '" << keyId << "'"};
+StatusWith<SharedValidator> JWKManager::getValidator(StringData keyId) {
+    auto currentValidators = _validators;
+    auto it = currentValidators->find(keyId.toString());
+    if (it == currentValidators->end()) {
+        // If the JWKManager has been initialized with an URI, try refreshing.
+        if (_keyURI) {
+            _loadKeysFromUri(false /* isInitialLoad */);
+            currentValidators = _validators;
+            it = currentValidators->find(keyId.toString());
+        }
+
+        // If it still cannot be found, return an error.
+        if (it == currentValidators->end()) {
+            return {ErrorCodes::NoSuchKey, str::stream() << "Unknown key '" << keyId << "'"};
+        }
     }
     return it->second;
 }
 
-SharedValidator JWKManager::getValidator(StringData keyId) const {
-    auto it = _validators->find(keyId.toString());
+void JWKManager::_setAndValidateKeys(const BSONObj& keys, bool isInitialLoad) {
+    auto newValidators = std::make_shared<SharedValidatorMap>();
+    auto newKeyMaterial = std::make_shared<KeyMap>();
 
-    // TODO: SERVER-71195, refresh keys from the endpoint and try to get the validator again.
-    // If still no key is found throw a uassert.
-    uassert(ErrorCodes::NoSuchKey,
-            str::stream() << "Unknown key '" << keyId << "'",
-            it != _validators->end());
-    return it->second;
-}
-
-void JWKManager::_setAndValidateKeys(const BSONObj& keys) {
-    _validators = std::make_shared<SharedMap>();
     auto keysParsed = JWKSet::parse(IDLParserContext("JWKSet"), keys);
 
     for (const auto& key : keysParsed.getKeys()) {
@@ -130,27 +115,66 @@ void JWKManager::_setAndValidateKeys(const BSONObj& keys) {
         auto keyId = RSAKey.getKeyId().toString();
         uassert(ErrorCodes::DuplicateKeyId,
                 str::stream() << "Key IDs must be unique, duplicate '" << keyId << "'",
-                _keyMaterial.find(keyId) == _keyMaterial.end());
+                newKeyMaterial->find(keyId) == newKeyMaterial->end());
 
-        LOGV2_DEBUG(6766000, 5, "Loaded JWK Key", "kid"_attr = RSAKey.getKeyId());
-        _keyMaterial.insert({keyId, key.copy()});
+        // Does not need to be loaded atomically because isInitialLoad is only true when invoked
+        // from the constructor, so there will not be any concurrent reads.
+        if (isInitialLoad) {
+            _initialKeyMaterial.insert({keyId, key.copy()});
+        }
+
+        newKeyMaterial->insert({keyId, key.copy()});
 
         auto swValidator = JWSValidator::create(JWK.getType(), key);
         uassertStatusOK(swValidator.getStatus());
         SharedValidator shValidator = std::move(swValidator.getValue());
 
-        _validators->insert({keyId, shValidator});
+        newValidators->insert({keyId, shValidator});
         LOGV2_DEBUG(7070202, 3, "Loaded JWK key", "kid"_attr = keyId, "typ"_attr = JWK.getType());
+    }
+
+    // A mutex is not used here because no single thread consumes both _validators and _keyMaterial.
+    // _keyMaterial is used purely for reflection of current key state while _validators is used
+    // for actual signature verification with the keys. Therefore, it's safe to update each
+    // atomically rather than both under a mutex.
+    std::atomic_exchange(&_validators, std::move(newValidators));    // NOLINT
+    std::atomic_exchange(&_keyMaterial, std::move(newKeyMaterial));  // NOLINT
+}
+
+void JWKManager::_loadKeysFromUri(bool isInitialLoad) {
+    try {
+        auto httpClient = HttpClient::createWithoutConnectionPool();
+        httpClient->setHeaders({"Accept: */*"});
+        httpClient->allowInsecureHTTP(getTestCommandsEnabled());
+
+        invariant(_keyURI);
+        auto getJWKs = httpClient->get(_keyURI.value());
+
+        ConstDataRange cdr = getJWKs.getCursor();
+        StringData str;
+        cdr.readInto<StringData>(&str);
+
+        BSONObj data = fromjson(str);
+        _setAndValidateKeys(data, isInitialLoad);
+    } catch (const DBException& ex) {
+        // throws
+        uassertStatusOK(ex.toStatus().withContext(str::stream() << "Failed loading keys from "
+                                                                << _keyURI.value()));
     }
 }
 
-std::vector<std::string> JWKManager::getKeyIds() const {
-    std::vector<std::string> ids;
-    std::transform(_validators->cbegin(),
-                   _validators->cend(),
-                   std::back_inserter(ids),
-                   [](const auto& it) { return it.first; });
-    return ids;
+void JWKManager::serialize(BSONObjBuilder* bob) const {
+    std::vector<BSONObj> keyVector;
+    keyVector.reserve(size());
+
+    auto currentKeys = _keyMaterial;
+    std::transform(currentKeys->begin(),
+                   currentKeys->end(),
+                   std::back_inserter(keyVector),
+                   [](const auto& keyEntry) { return keyEntry.second; });
+
+    JWKSet jwks(keyVector);
+    jwks.serialize(bob);
 }
 
 }  // namespace mongo::crypto

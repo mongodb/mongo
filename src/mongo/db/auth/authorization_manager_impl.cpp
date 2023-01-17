@@ -569,7 +569,13 @@ StatusWith<UserHandle> AuthorizationManagerImpl::reacquireUser(OperationContext*
 
     // Make a good faith effort to acquire an up-to-date user object, since the one
     // we've cached is marked "out-of-date."
-    auto swUserHandle = acquireUser(opCtx, UserRequest(userName, boost::none));
+    // TODO SERVER-72678 avoid this edge case hack when rearchitecting user acquisition. This is
+    // necessary now to preserve the mechanismData from the original UserRequest while eliminating
+    // the roles. If the roles aren't reset to none, it will cause LDAP acquisition to be bypassed
+    // in favor of reusing the ones from before.
+    UserRequest requestWithoutRoles(user->getUserRequest());
+    requestWithoutRoles.roles = boost::none;
+    auto swUserHandle = acquireUser(opCtx, requestWithoutRoles);
     if (!swUserHandle.isOK()) {
         return swUserHandle.getStatus();
     }

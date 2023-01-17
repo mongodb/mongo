@@ -31,6 +31,8 @@ const commandsAddedToMongodSinceLastLTS = [
     "getChangeStreamState",
     "getClusterParameter",
     "listDatabasesForAllTenants",
+    "oidcListKeys",
+    "oidcRefreshKeys",
     "rotateCertificates",
     "setChangeStreamState",
     "setClusterParameter",

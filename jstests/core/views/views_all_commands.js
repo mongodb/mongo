@@ -529,6 +529,8 @@ let viewsCommandTests = {
     moveRange: {skip: isUnrelated},
     multicast: {skip: isUnrelated},
     netstat: {skip: isAnInternalCommand},
+    oidcListKeys: {skip: isUnrelated},
+    oidcRefreshKeys: {skip: isUnrelated},
     pinHistoryReplicated: {skip: isAnInternalCommand},
     ping: {command: {ping: 1}},
     planCacheClear: {command: {planCacheClear: "view"}, expectFailure: true},

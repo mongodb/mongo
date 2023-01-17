@@ -584,6 +584,8 @@ let testCases = {
     },
     multicast: {skip: "does not accept read or write concern"},
     netstat: {skip: "internal command"},
+    oidcListKeys: {skip: "does not accept read or write concern"},
+    oidcRefreshKeys: {skip: "does not accept read or write concern"},
     pinHistoryReplicated: {skip: "internal command"},
     ping: {skip: "does not accept read or write concern"},
     planCacheClear: {skip: "does not accept read or write concern"},

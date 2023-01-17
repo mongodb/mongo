@@ -728,11 +728,11 @@ void AuthorizationSessionImpl::_refreshUserInfoAsNeeded(OperationContext* opCtx)
     auto swUser = getAuthorizationManager().reacquireUser(opCtx, currentUser);
     if (!swUser.isOK()) {
         auto& status = swUser.getStatus();
-        // If an external user is no longer in the cache and cannot be acquired from the cache's
-        // backing external service, it should be cleared from _authenticatedUser. This
-        // guarantees that no operations can be performed until the external authorization
-        // provider comes back up.
-        if (name.getDB() == "$external"_sd) {
+        // If an LDAP user is no longer in the cache and cannot be acquired from the cache's
+        // backing LDAP host, it should be cleared from _authenticatedUser. This
+        // guarantees that no operations can be performed until the LDAP host comes back up.
+        // TODO SERVER-72678 avoid this edge case hack when rearchitecting user acquisition.
+        if (name.getDB() == "$external"_sd && currentUser->getUserRequest().mechanismData.empty()) {
             clearUser();
             LOGV2(5914804,
                   "Removed external user from session cache of user information because of "
@@ -759,6 +759,19 @@ void AuthorizationSessionImpl::_refreshUserInfoAsNeeded(OperationContext* opCtx)
                       "refresh failure",
                       "user"_attr = name,
                       "error"_attr = status);
+                return;
+            }
+            case ErrorCodes::ReauthenticationRequired: {
+                // An auth subsystem has indicated that client reauthentication is required. The
+                // session will exist in an expired state to signal this to drivers.
+                _expiredUserName = _authenticatedUser.value()->getName();
+                clearUser();
+                LOGV2(
+                    7119502,
+                    "Removed user from session cache of user information because reauthentication "
+                    "is required",
+                    "user"_attr = name,
+                    "error"_attr = status);
                 return;
             }
             default:

@@ -347,6 +347,8 @@ let testCases = {
     moveRange: {skip: "primary only"},
     multicast: {skip: "does not return user data"},
     netstat: {skip: "does not return user data"},
+    oidcListKeys: {skip: "does not return user data"},
+    oidcRefreshKeys: {skip: "does not return user data"},
     ping: {skip: "does not return user data"},
     planCacheClear: {skip: "does not return user data"},
     planCacheClearFilters: {skip: "does not return user data"},

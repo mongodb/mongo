@@ -42,6 +42,7 @@ namespace mongo::crypto {
 class JWKManager {
 public:
     using SharedValidator = std::shared_ptr<JWSValidator>;
+    using KeyMap = std::map<std::string, BSONObj>;
 
     /**
      * Fetch a JWKS file from the specified URL, parse them as keys,
@@ -56,36 +57,44 @@ public:
     explicit JWKManager(BSONObj keys);
 
     /**
-     * Given a unique keyId it will return the matching JWK.
-     * If no key is found for the given keyId, a
-     */
-    StatusWith<BSONObj> getKey(StringData keyId) const;
-
-    /**
      * Fetch a specific JWSValidator from the JWKManager by keyId.
-     * If the keyId does not exist,
-     * a rate-limited refresh of the JWK endpoint will be
-     * triggered.
-     * If the keyId still does not exist, return ptr will be empty.
+     * If the keyId does not exist, it will refresh _keyMaterial and _validators and retry.
+     * If it still cannot be found, it will return an error.
      */
-    SharedValidator getValidator(StringData keyId) const;
+    StatusWith<SharedValidator> getValidator(StringData keyId);
 
     std::size_t size() const {
         return _validators->size();
     }
 
     /**
-     * Get the list of keyIds held by this key manager.
+     * Get a snapshot of the keys the key manager was initialized with. It is not
+     * modified after initialization and can be used to determine whether
+     * invalidation is necessary.
+     * TODO SERVER-73165 Generalize this to better handle invalidation.
      */
-    std::vector<std::string> getKeyIds() const;
+    const KeyMap& getInitialKeys() const {
+        return _initialKeyMaterial;
+    }
+
+    /**
+     * Serialize the JWKs stored in this key manager into the BSONObjBuilder.
+     */
+    void serialize(BSONObjBuilder* bob) const;
 
 private:
-    void _setAndValidateKeys(const BSONObj& keys);
+    void _setAndValidateKeys(const BSONObj& keys, bool isInitialLoad);
+
+    void _loadKeysFromUri(bool isInitialLoad);
 
 private:
-    // Map<keyId, JWKRSA>
-    std::map<std::string, BSONObj> _keyMaterial;  // From last load
-    std::string _keyURI;
+    // Stores the key material that the manager was initialized with.
+    KeyMap _initialKeyMaterial;
+
+    // Stores the current key material of the manager, which may have been refreshed.
+    std::shared_ptr<KeyMap> _keyMaterial;
+
+    boost::optional<std::string> _keyURI;
     std::shared_ptr<std::map<std::string, SharedValidator>> _validators;
 };
 

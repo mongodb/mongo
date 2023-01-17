@@ -8,15 +8,21 @@
  * ]
  */
 
-import {authCommandsLib, firstDbName, secondDbName} from "jstests/auth/lib/commands_lib.js";
+import {authCommandsLib} from "jstests/auth/lib/commands_lib.js";
 
 load("jstests/libs/fail_point_util.js");  // Helper to enable/disable failpoints easily.
 
 const tests = authCommandsLib.tests;
 
 // The following commands require additional start up configuration and hence need to be skipped.
-const denylistedTests =
-    ["startRecordingTraffic", "stopRecordingTraffic", "addShardToZone", "removeShardFromZone"];
+const denylistedTests = [
+    "startRecordingTraffic",
+    "stopRecordingTraffic",
+    "addShardToZone",
+    "removeShardFromZone",
+    "oidcListKeys",
+    "oidcRefreshKeys"
+];
 
 function runTests(tests, conn, impls, options) {
     for (const test of tests) {

@@ -53,13 +53,20 @@ TEST(JWKManager, parseJWKSetBasicFromSource) {
     BSONObj data = fromjson(str);
     JWKManager manager(source);
 
+    BSONObjBuilder bob;
+    manager.serialize(&bob);
+    ASSERT_BSONOBJ_EQ(bob.obj(), data);
+
+    const auto& initialKeys = manager.getInitialKeys();
     for (const auto& key : data["keys"_sd].Obj()) {
-        auto keyFromKid = uassertStatusOK(manager.getKey(key["kid"_sd].str()));
-        ASSERT_BSONOBJ_EQ(key.Obj(), keyFromKid);
+        auto initialKey = initialKeys.find(key["kid"_sd].str());
+        ASSERT(initialKey != initialKeys.end());
+        ASSERT_BSONOBJ_EQ(key.Obj(), initialKey->second);
     }
 
     for (const auto& key : data["keys"_sd].Obj()) {
-        ASSERT(manager.getValidator(key["kid"_sd].str()));
+        auto validator = uassertStatusOK(manager.getValidator(key["kid"_sd].str()));
+        ASSERT(validator);
     }
 }
 

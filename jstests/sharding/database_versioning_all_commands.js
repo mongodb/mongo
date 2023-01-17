@@ -583,6 +583,8 @@ let testCases = {
     moveRange: {skip: "does not forward command to primary shard"},
     multicast: {skip: "does not forward command to primary shard"},
     netstat: {skip: "executes locally on mongos (not sent to any remote node)"},
+    oidcListKeys: {skip: "executes locally on mongos (not sent to any remote node)"},
+    oidcRefreshKeys: {skip: "executes locally on mongos (not sent to any remote node)"},
     ping: {skip: "executes locally on mongos (not sent to any remote node)"},
     planCacheClear: {
         run: {

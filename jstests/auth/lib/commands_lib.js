@@ -5288,6 +5288,42 @@ export const authCommandsLib = {
           ]
         },
         {
+          testname: "oidcListKeys",
+          command: {oidcListKeys: 1},
+          // Only enterprise knows of this command.
+          skipTest:
+              (conn) => {
+                return !getBuildInfo().modules.includes("enterprise") 
+                        || !TestData.setParameters.featureFlagOIDC;
+              },
+          testcases: [
+            {
+              runOnDb: adminDbName,
+              roles: roles_hostManager,
+              privileges: [{resource: {cluster: true}, actions: ["oidcListKeys"]}],
+              expectFail: true, // Server isn't configured for MONGODB-OIDC as an auth mechanism.
+            }
+          ]
+        },
+        {
+          testname: "oidcRefreshKeys",
+          command: {oidcRefreshKeys: 1},
+          // Only enterprise knows of this command.
+          skipTest:
+              (conn) => {
+                return !getBuildInfo().modules.includes("enterprise") 
+                    || !TestData.setParameters.featureFlagOIDC;
+              },
+          testcases: [
+            {
+              runOnDb: adminDbName,
+              roles: roles_hostManager,
+              privileges: [{resource: {cluster: true}, actions: ["oidcRefreshKeys"]}],
+              expectFail: true, // Server isn't figured for MONGODB-OIDC as an auth mechanism.
+            }
+          ]
+        },
+        {
           testname: "planCacheIndexFilter",
           command: {planCacheClearFilters: "x"},
           skipSharded: true,

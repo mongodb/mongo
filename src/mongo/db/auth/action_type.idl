@@ -132,6 +132,8 @@ enums:
            logRotate :  "logRotate"
            moveChunk :  "moveChunk"
            netstat :  "netstat"
+           oidcListKeys :  "oidcListKeys"
+           oidcRefreshKeys :  "oidcRefreshKeys"
            oidReset :  "oidReset"    # machine ID reset via the features command
            operationMetrics :  "operationMetrics"
            planCacheIndexFilter :  "planCacheIndexFilter"  # view/update index filters

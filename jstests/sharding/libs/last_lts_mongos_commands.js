@@ -31,6 +31,8 @@ const commandsAddedToMongosSinceLastLTS = [
     "getClusterParameter",
     "mergeAllChunksOnShard",
     "moveRange",
+    "oidcListKeys",
+    "oidcRefreshKeys",
     "reshardCollection",
     "rotateCertificates",
     "setAllowMigrations",
