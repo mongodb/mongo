@@ -856,13 +856,13 @@ def variable_arch_converter(val):
     return val
 
 
-def split_dwarf_converter(val):
+def bool_var_converter(val, var):
     try:
         return to_boolean(val)
     except ValueError as exc:
         if val.lower() != "auto":
             raise ValueError(
-                f'Invalid SPLIT_DWARF value {s}, must be a boolean-like string or "auto"') from exc
+                f'Invalid {var} value {s}, must be a boolean-like string or "auto"') from exc
     return "auto"
 
 
@@ -1390,7 +1390,20 @@ env_vars.Add(
     'SPLIT_DWARF',
     help=
     'Set the boolean (auto, on/off true/false 1/0) to enable gsplit-dwarf (non-Windows). Incompatible with DWARF_VERSION=5',
-    converter=split_dwarf_converter,
+    converter=functools.partial(bool_var_converter, var='SPLIT_DWARF'),
+    default="auto",
+)
+
+env_vars.Add(
+    'GDB',
+    help="Configures the path to the 'gdb' debugger binary.",
+)
+
+env_vars.Add(
+    'GDB_INDEX',
+    help=
+    'Set the boolean (auto, on/off true/false 1/0) to enable creation of a gdb_index in binaries.',
+    converter=functools.partial(bool_var_converter, var='GDB_INDEX'),
     default="auto",
 )
 
@@ -4343,10 +4356,6 @@ def doConfigure(myenv):
         myenv.AddToCCFLAGSIfSupported('-fno-limit-debug-info')
 
     if myenv.ToolchainIs('gcc', 'clang'):
-        # Usually, --gdb-index is too expensive in big static binaries, but for dynamic
-        # builds it works well.
-        if link_model.startswith("dynamic"):
-            myenv.AddToLINKFLAGSIfSupported('-Wl,--gdb-index')
 
         # Pass -gdwarf{32,64} if an explicit value was selected
         # or defaulted. Fail the build if we can't honor the
@@ -5717,13 +5726,18 @@ if get_option('ninja') != 'disabled':
 
     env['NINJA_GENERATED_SOURCE_ALIAS_NAME'] = 'generated-sources'
 
-if get_option('separate-debug') == "on" or env.TargetOSIs("windows"):
+gdb_index = env.get('GDB_INDEX')
+if gdb_index == 'auto' and link_model == 'dynamic':
+    gdb_index = True
 
-    # The current ninja builder can't handle --separate-debug on non-Windows platforms
-    # like linux or macOS, because they depend on adding extra actions to the link step,
-    # which cannot be translated into the ninja bulider.
-    if not env.TargetOSIs("windows") and get_option('ninja') != 'disabled':
-        env.FatalError("Cannot use --separate-debug with Ninja on non-Windows platforms.")
+if gdb_index == True:
+    gdb_index = Tool('gdb_index')
+    if gdb_index.exists(env):
+        gdb_index.generate(env)
+    elif env.get('GDB_INDEX') != 'auto':
+        env.FatalError('Could not enable explicit request for gdb index generation.')
+
+if get_option('separate-debug') == "on" or env.TargetOSIs("windows"):
 
     separate_debug = Tool('separate_debug')
     if not separate_debug.exists(env):
@@ -5750,8 +5764,6 @@ if env['SPLIT_DWARF']:
         env.FatalError(
             'Running split dwarf outside of DWARF4 has shown compilation issues when using DWARF5 and gdb index. Disabling this functionality for now. Use SPLIT_DWARF=0 to disable building with split dwarf or use DWARF_VERSION=4 to pin to DWARF version 4.'
         )
-    if env.ToolchainIs('gcc', 'clang'):
-        env.AddToLINKFLAGSIfSupported('-Wl,--gdb-index')
     env.Tool('split_dwarf')
 
 env["AUTO_ARCHIVE_TARBALL_SUFFIX"] = "tgz"

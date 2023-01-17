@@ -267,6 +267,35 @@ def generate_depfile(env, node, dependencies):
             f.write(depfile_contents)
 
 
+def _extract_cmdstr_for_list_action(ninja_build_list):
+    cmdline = ""
+    for cmd in ninja_build_list:
+
+        # Occasionally a command line will expand to a
+        # whitespace only string (i.e. '  '). Which is not a
+        # valid command but does not trigger the empty command
+        # condition if not cmdstr. So here we trim the whitespace
+        # to make strings like the above become empty strings and
+        # so they will be skipped.
+        cmdstr = cmd["variables"]["cmd"].strip()
+        if not cmdstr:
+            continue
+
+        # Skip duplicate commands
+        if cmdstr in cmdline:
+            continue
+
+        if cmdline:
+            cmdline += " && "
+
+        cmdline += cmdstr
+
+    # Remove all preceding and proceeding whitespace
+    cmdline = cmdline.strip()
+
+    return cmdline
+
+
 class SConsToNinjaTranslator:
     """Translates SCons Actions into Ninja build objects."""
 
@@ -384,31 +413,8 @@ class SConsToNinjaTranslator:
         all_outputs = list({output for build in results for output in build["outputs"]})
         dependencies = list({dep for build in results for dep in build["implicit"]})
 
-        if results[0]["rule"] == "CMD":
-            cmdline = ""
-            for cmd in results:
-
-                # Occasionally a command line will expand to a
-                # whitespace only string (i.e. '  '). Which is not a
-                # valid command but does not trigger the empty command
-                # condition if not cmdstr. So here we strip preceding
-                # and proceeding whitespace to make strings like the
-                # above become empty strings and so will be skipped.
-                cmdstr = cmd["variables"]["cmd"].strip()
-                if not cmdstr:
-                    continue
-
-                # Skip duplicate commands
-                if cmdstr in cmdline:
-                    continue
-
-                if cmdline:
-                    cmdline += " && "
-
-                cmdline += cmdstr
-
-            # Remove all preceding and proceeding whitespace
-            cmdline = cmdline.strip()
+        if all([result['rule'] == 'CMD' for result in results]):
+            cmdline = _extract_cmdstr_for_list_action(results)
 
             # Make sure we didn't generate an empty cmdline
             if cmdline:
@@ -425,6 +431,34 @@ class SConsToNinjaTranslator:
                     },
                     "implicit": dependencies,
                 }
+
+                if node.env and node.env.get("NINJA_POOL", None) is not None:
+                    ninja_build["pool"] = node.env["pool"]
+
+                return ninja_build
+
+        elif results[0]["rule"] == "LINK" and all(
+            [result['rule'] == 'CMD' for result in results[1:]]):
+            cmdline = _extract_cmdstr_for_list_action(results[1:])
+
+            # Make sure we didn't generate an empty cmdline
+            if cmdline:
+
+                env = node.env if node.env else self.env
+                sources = [get_path(src_file(s)) for s in node.sources]
+
+                ninja_build = results[0]
+
+                ninja_build.update({
+                    "outputs": all_outputs,
+                    "rule": "LINK_CHAINED_CMD",
+                    "implicit": dependencies,
+                })
+
+                ninja_build['variables'].update({
+                    "cmd": cmdline,
+                    "env": get_command_env(env, all_outputs, sources),
+                })
 
                 if node.env and node.env.get("NINJA_POOL", None) is not None:
                     ninja_build["pool"] = node.env["pool"]
@@ -530,6 +564,13 @@ class NinjaState:
             },
             "LINK": {
                 "command": "$env$LINK @$out.rsp",
+                "description": "Linked $out",
+                "rspfile": "$out.rsp",
+                "rspfile_content": "$rspc",
+                "pool": "local_pool",
+            },
+            "LINK_CHAINED_CMD": {
+                "command": "$env$LINK @$out.rsp && $cmd",
                 "description": "Linked $out",
                 "rspfile": "$out.rsp",
                 "rspfile_content": "$rspc",

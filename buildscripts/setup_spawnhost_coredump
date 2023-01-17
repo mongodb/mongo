@@ -177,6 +177,89 @@ fi' >> .bash_profile
     # harmless. gdb expects the .debug files to live adjacent to the physical binary.
     find bin -type f -perm -o=x -exec ln -s {} . \;
 
+    # This script checks a bin for the dwarf version and then generates an index if the bin does not already have an index. eu-readelf is used in place of readelf as it is much faster.
+    cat > add_index.sh <<EOF
+#!/bin/bash
+
+set -o pipefail
+
+target_dir="\$(dirname \${1})"
+
+dwarf_version="\$($TOOLCHAIN_ROOT/bin/eu-readelf --debug-dump=info \$1 | grep --line-buffered -E '^\s+Version:' | head -1 | awk -F, '{print(\$1)}' | awk '{print(\$2)}')"
+
+if [[ \$dwarf_version == 5 ]]
+then
+    $TOOLCHAIN_ROOT/bin/gdb --batch-silent --quiet --nx --eval-command "save gdb-index -dwarf-5 \$target_dir" \$1
+    if [ -f \${1}.debug_names ]
+    then
+        $TOOLCHAIN_ROOT/bin/objcopy --dump-section .debug_str=\${1}.debug_str.new \$1
+        cat \${1}.debug_str >>\${1}.debug_str.new
+        $TOOLCHAIN_ROOT/bin/objcopy --add-section .debug_names=\${1}.debug_names --set-section-flags .debug_names=readonly --update-section .debug_str=\${1}.debug_str.new \${1} \${1}
+        rm -f \${1}.debug_names \${1}.debug_str.new \${1}.debug_str
+    fi
+
+elif [[ \$dwarf_version == 4 ]]
+then
+    $TOOLCHAIN_ROOT/bin/gdb --batch-silent --quiet --nx --eval-command "save gdb-index \$target_dir" \$1
+    if [ -f \${1}.gdb-index ]
+    then
+        $TOOLCHAIN_ROOT/bin/objcopy --add-section .gdb_index=\${1}.gdb-index --set-section-flags .gdb_index=readonly \${1} \${1}
+        rm -f \${1}.gdb-index
+    fi
+
+else
+    echo "Can't determine debug info for \$1"
+fi
+EOF
+
+    # After creating the index file in a separate debug file, the debuglink CRC
+    # is no longer value, this will simply recreate the debuglink and therefore
+    # update the CRC to match.
+    cat > recalc_debuglink.sh <<EOF
+#!/bin/bash
+
+set -o pipefail
+
+debuglink="\$($TOOLCHAIN_ROOT/bin/eu-readelf -S \$1 | grep '.gnu_debuglink')"
+
+if [ ! -z "\$debuglink" ]
+then
+    $TOOLCHAIN_ROOT/bin/objcopy --remove-section ".gnu_debuglink" \$1
+	$TOOLCHAIN_ROOT/bin/objcopy --add-gnu-debuglink "$(basename \$1).debug" \$1
+fi
+EOF
+
+# this script creates a symlink in the toolchain lib/debug directory which is in the
+# build-id format. This allows gdb to load the separate debug file and skip CRC
+# checking.
+cat > create_build_id_links.sh <<EOF
+#!/bin/bash
+
+set -o pipefail
+
+build_id="\$($TOOLCHAIN_ROOT/bin/eu-readelf -n \$1 | grep 'Build ID:' | awk -F: '{print \$2}' | sed 's/ *//')"
+gdb_debug_dir="\$(readlink $TOOLCHAIN_ROOT/bin/gdb)"
+gdb_debug_dir="\$(dirname \$gdb_debug_dir)"
+gdb_debug_dir="\$(dirname \$gdb_debug_dir)/lib/debug/.build-id/\${build_id:0:2}"
+gdb_debug_file="\${build_id:2}.debug"
+mkdir -p \$gdb_debug_dir
+ln -s \$PWD/\$1 \$gdb_debug_dir/\$gdb_debug_file
+EOF
+
+    chmod +x ./add_index.sh
+    chmod +x ./recalc_debuglink.sh
+    chmod +x ./create_build_id_links.sh
+    cpus=$(getconf _NPROCESSORS_ONLN)
+
+    # notice we don't search lib directory as we assume dynamic builds build the index during
+    # the build.
+    find bin -type f -perm -o=x | xargs --max-args=1 --max-procs=$cpus ./add_index.sh
+    find bin -type f -perm -o=x | xargs --max-args=1 --max-procs=$cpus ./recalc_debuglink.sh
+
+    # This script constructs symblinks based off the build-id so GDB can skip the crc check
+    # normally performed during .gnu_debuglink loading.
+    find bin lib -name "*.debug" -type f -perm -o=x | xargs --max-args=1 --max-procs=$cpus ./create_build_id_links.sh
+
     # Boost-Pretty-Printer supports auto-detection for the boost version but relies on the system
     # installed version of boost. To avoid this behavior we explicitly specify the boost_version.
     # Moreover, the most recent version of boost that Boost-Pretty-Printer verifies it supports is

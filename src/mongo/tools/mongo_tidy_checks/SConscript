@@ -71,6 +71,7 @@ env['CCFLAGS'] = [
     '-Woverloaded-virtual',
     '-fno-strict-aliasing',
     '-O3',
+    '-g2',
     '-DNDEBUG',
     '-fPIC',
     '-fno-exceptions',
