@@ -30,10 +30,13 @@
 import asyncio
 import dataclasses
 import json
+import math
 import os
 import subprocess
 from pathlib import Path
+import seaborn as sns
 import bson
+import matplotlib.pyplot as plt
 from config import CollectionTemplate, FieldTemplate, DataType
 from data_generator import CollectionInfo, DataGenerator
 from database_instance import DatabaseInstance
@@ -132,6 +135,19 @@ async def main():
                     collections.append(
                         dict(collectionName=name, fields=coll_template.fields,
                              compound_indexes=coll_template.compound_indexes, cardinality=card))
+                    # Generate one histogram per each collection field
+                    coll = database_instance.database[name]
+                    doc_count = await coll.count_documents({})
+                    for field in coll_template.fields:
+                        field_data = []
+                        async for doc in coll.find({field.name: {"$exists": True}},
+                                                   {"_id": 0, field.name: 1}):
+                            field_data.append(doc[field.name])
+                        hist = sns.displot(data=field_data, kind="hist", bins=round(
+                            math.sqrt(doc_count))).figure
+                        hist.savefig(f'{database_config.dump_path}/{name}_{field.name}.png')
+                        plt.close(hist)
+
             json_metadata = json.dumps(collections, indent=4, cls=CollectionTemplateEncoder)
             metadata_file.write("// This is a generated file.\nconst dbMetadata = ")
             metadata_file.write(json_metadata)

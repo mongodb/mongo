@@ -70,21 +70,37 @@ for int_range in int_ranges:
 
 # Mixes of distributions with different NDV and value distances
 
-uniform_int_mix_1 = [
-    int_distributions['uniform_int_1000_1'], int_distributions['uniform_int_100000_100'],
+unf_int_mix_1 = [
+    int_distributions['uniform_int_10000_10'], int_distributions['uniform_int_100000_100'],
     int_distributions['uniform_int_10000000_1000']
 ]
-int_distributions['mixed_int_uniform_1'] = RandomDistribution.mixed(children=uniform_int_mix_1,
+int_distributions['mixed_int_uniform_1'] = RandomDistribution.mixed(children=unf_int_mix_1,
                                                                     weight=[1, 1, 1])
+
+unf_norm_int_mix_1 = [
+    int_distributions['uniform_int_1000_1'], int_distributions['normal_int_100000_100'],
+    int_distributions['normal_int_10000000_1000']
+]
+int_distributions['mixed_int_unf_norm_1'] = RandomDistribution.mixed(children=unf_norm_int_mix_1,
+                                                                     weight=[1, 1, 1])
 
 unf_norm_chi_int_mix_1 = [
     int_distributions['uniform_int_10000_10'], int_distributions['uniform_int_1000000_100'],
     int_distributions['normal_int_10000_10'], int_distributions['normal_int_1000000_100'],
     int_distributions['chi2_int_10000_10'], int_distributions['chi2_int_10000000_1000']
 ]
-
 int_distributions['mixed_int_unf_norm_chi_1'] = RandomDistribution.mixed(
     children=unf_norm_chi_int_mix_1, weight=[1, 1, 1, 1, 1, 1])
+
+unf_norm_chi_int_mix_2 = [
+    int_distributions['uniform_int_10000_10'],
+    int_distributions['normal_int_10000_10'],
+    int_distributions['uniform_int_1000000_100'],
+    int_distributions['normal_int_1000000_100'],
+    int_distributions['chi2_int_1000000_100'],
+]
+int_distributions['mixed_int_unf_norm_chi_2'] = RandomDistribution.mixed(
+    children=unf_norm_chi_int_mix_2, weight=[1, 1, 1, 1, 1])
 
 ################################################################################
 # Collection templates

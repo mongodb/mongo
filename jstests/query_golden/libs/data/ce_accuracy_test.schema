@@ -129,7 +129,17 @@ const dbMetadata = [
                 "indexed": true
             },
             {
+                "fieldName": "mixed_int_unf_norm_1",
+                "dataType": "integer",
+                "indexed": true
+            },
+            {
                 "fieldName": "mixed_int_unf_norm_chi_1",
+                "dataType": "integer",
+                "indexed": true
+            },
+            {
+                "fieldName": "mixed_int_unf_norm_chi_2",
                 "dataType": "integer",
                 "indexed": true
             }
@@ -266,7 +276,17 @@ const dbMetadata = [
                 "indexed": true
             },
             {
+                "fieldName": "mixed_int_unf_norm_1",
+                "dataType": "integer",
+                "indexed": true
+            },
+            {
                 "fieldName": "mixed_int_unf_norm_chi_1",
+                "dataType": "integer",
+                "indexed": true
+            },
+            {
+                "fieldName": "mixed_int_unf_norm_chi_2",
                 "dataType": "integer",
                 "indexed": true
             }
