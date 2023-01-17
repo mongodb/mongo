@@ -188,6 +188,8 @@ private:
     BSONObjIterator _iterator;
 };
 
+struct BSONElementSubIterator;
+
 class BSONElementIterator : public ElementIterator {
 public:
     BSONElementIterator();
@@ -257,18 +259,33 @@ private:
         }
 
         std::string restOfPath;
-        bool hasMore;
         StringData nextPieceOfPath;
+        bool hasMore;
         bool nextPieceOfPathIsNumber;
 
         BSONElement _theArray;
         BSONElement _current;
-        std::unique_ptr<BSONObjIterator> _iterator;
+        boost::optional<BSONObjIterator> _iterator;
     };
 
     ArrayIterationState _arrayIterationState;
 
-    std::unique_ptr<ElementIterator> _subCursor;
-    std::unique_ptr<ElementPath> _subCursorPath;
+    // Pointer to optional. The optional is used for a convenient API to re-use the memory between
+    // instances. Need to wrap with pointer to break cycle when we recursively contain member to
+    // self.
+    std::unique_ptr<boost::optional<BSONElementSubIterator>> _subIterator;
 };
+
+struct BSONElementSubIterator {
+    BSONElementSubIterator(const BSONObj& objectToIterate,
+                           StringData pathToIterate,
+                           ElementPath::LeafArrayBehavior leafArrayBehavior =
+                               ElementPath::LeafArrayBehavior::kTraverse,
+                           ElementPath::NonLeafArrayBehavior nonLeafArrayBehavior =
+                               ElementPath::NonLeafArrayBehavior::kTraverse);
+
+    ElementPath path;
+    BSONElementIterator cursor;
+};
+
 }  // namespace mongo

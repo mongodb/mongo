@@ -100,8 +100,10 @@ void BSONElementIterator::reset(const ElementPath* path,
     _state = BEGIN;
     _next.reset();
 
-    _subCursor.reset();
-    _subCursorPath.reset();
+    // Reset optional, keep memory around in case we need to instantiate a subIterator again.
+    if (_subIterator) {
+        _subIterator->reset();
+    }
 }
 
 void BSONElementIterator::reset(const ElementPath* path, const BSONObj& objectToIterate) {
@@ -112,8 +114,10 @@ void BSONElementIterator::reset(const ElementPath* path, const BSONObj& objectTo
     _state = BEGIN;
     _next.reset();
 
-    _subCursor.reset();
-    _subCursorPath.reset();
+    // Reset optional, keep memory around in case we need to instantiate a subIterator again.
+    if (_subIterator) {
+        _subIterator->reset();
+    }
 }
 
 void BSONElementIterator::_setTraversalStart(size_t suffixIndex, BSONElement elementToIterate) {
@@ -151,7 +155,7 @@ bool BSONElementIterator::ArrayIterationState::isArrayOffsetMatch(StringData fie
 
 void BSONElementIterator::ArrayIterationState::startIterator(BSONElement e) {
     _theArray = e;
-    _iterator.reset(new BSONObjIterator(_theArray.Obj()));
+    _iterator.emplace(_theArray.Obj());
 }
 
 bool BSONElementIterator::ArrayIterationState::more() {
@@ -166,11 +170,12 @@ BSONElement BSONElementIterator::ArrayIterationState::next() {
 
 bool BSONElementIterator::subCursorHasMore() {
     // While we still are still finding arrays along the path, keep traversing deeper.
-    while (_subCursor) {
-        if (_subCursor->more()) {
+    while (_subIterator && _subIterator->has_value()) {
+        if (_subIterator->value().cursor.more()) {
             return true;
         }
-        _subCursor.reset();
+        // Reset optional, keep memory around in case we need to instantiate a subIterator again.
+        _subIterator->reset();
 
         // If the subcursor doesn't have more, see if the current element is an array offset
         // match (see comment in BSONElementIterator::more() for an example).  If it is indeed
@@ -185,18 +190,15 @@ bool BSONElementIterator::subCursorHasMore() {
                 return true;
             }
 
-            _subCursorPath.reset(
-                new ElementPath(_arrayIterationState.restOfPath.substr(
-                                    _arrayIterationState.nextPieceOfPath.size() + 1),
-                                _path->leafArrayBehavior()));
+            _subIterator->emplace(_arrayIterationState._current.Obj(),
+                                  _arrayIterationState.restOfPath.substr(
+                                      _arrayIterationState.nextPieceOfPath.size() + 1),
+                                  _path->leafArrayBehavior());
 
             // If we're here, we must be able to traverse nonleaf arrays.
             dassert(_path->nonLeafArrayBehavior() == ElementPath::NonLeafArrayBehavior::kTraverse);
-            dassert(_subCursorPath->nonLeafArrayBehavior() ==
+            dassert(_subIterator->value().path.nonLeafArrayBehavior() ==
                     ElementPath::NonLeafArrayBehavior::kTraverse);
-
-            _subCursor.reset(
-                new BSONElementIterator(_subCursorPath.get(), _arrayIterationState._current.Obj()));
 
             // Set _arrayIterationState._current to EOO. This is not an implicit array traversal, so
             // we should not override the array offset of the subcursor with the current array
@@ -275,10 +277,12 @@ bool BSONElementIterator::more() {
             if (eltInArray.type() == Object) {
                 // The current array element is a subdocument.  See if the subdocument generates
                 // any elements matching the remaining subpath.
-                _subCursorPath.reset(
-                    new ElementPath(_arrayIterationState.restOfPath, _path->leafArrayBehavior()));
+                if (!_subIterator) {
+                    _subIterator = std::make_unique<boost::optional<BSONElementSubIterator>>();
+                }
+                _subIterator->emplace(
+                    eltInArray.Obj(), _arrayIterationState.restOfPath, _path->leafArrayBehavior());
 
-                _subCursor.reset(new BSONElementIterator(_subCursorPath.get(), eltInArray.Obj()));
                 if (subCursorHasMore()) {
                     return true;
                 }
@@ -300,16 +304,18 @@ bool BSONElementIterator::more() {
                 if (eltInArray.type() == Array) {
                     // The current array element is itself an array.  See if the nested array
                     // has any elements matching the remaining.
-                    _subCursorPath.reset(
-                        new ElementPath(_arrayIterationState.restOfPath.substr(
-                                            _arrayIterationState.nextPieceOfPath.size() + 1),
-                                        _path->leafArrayBehavior()));
-                    BSONElementIterator* real = new BSONElementIterator(
-                        _subCursorPath.get(), _arrayIterationState._current.Obj());
-                    _subCursor.reset(real);
-                    real->_arrayIterationState.reset(_subCursorPath->fieldRef(), 0);
-                    real->_arrayIterationState.startIterator(eltInArray);
-                    real->_state = IN_ARRAY;
+                    if (!_subIterator) {
+                        _subIterator = std::make_unique<boost::optional<BSONElementSubIterator>>();
+                    }
+                    _subIterator->emplace(_arrayIterationState._current.Obj(),
+                                          _arrayIterationState.restOfPath.substr(
+                                              _arrayIterationState.nextPieceOfPath.size() + 1),
+                                          _path->leafArrayBehavior());
+
+                    _subIterator->value().cursor._arrayIterationState.reset(
+                        _subIterator->value().path.fieldRef(), 0);
+                    _subIterator->value().cursor._arrayIterationState.startIterator(eltInArray);
+                    _subIterator->value().cursor._state = IN_ARRAY;
 
                     // Set _arrayIterationState._current to EOO. This is not an implicit array
                     // traversal, so we should not override the array offset of the subcursor with
@@ -344,8 +350,8 @@ bool BSONElementIterator::more() {
 }
 
 ElementIterator::Context BSONElementIterator::next() {
-    if (_subCursor) {
-        Context e = _subCursor->next();
+    if (_subIterator && _subIterator->has_value()) {
+        Context e = _subIterator->value().cursor.next();
         // Use our array offset if we have one, otherwise copy our subcursor's.  This has the
         // effect of preferring the outermost array offset, in the case where we are implicitly
         // traversing nested arrays and have multiple candidate array offsets.  For example,
@@ -360,4 +366,12 @@ ElementIterator::Context BSONElementIterator::next() {
     _next.reset();
     return x;
 }
+
+BSONElementSubIterator::BSONElementSubIterator(
+    const BSONObj& objectToIterate,
+    StringData pathToIterate,
+    ElementPath::LeafArrayBehavior leafArrayBehavior,
+    ElementPath::NonLeafArrayBehavior nonLeafArrayBehavior)
+    : path(pathToIterate, leafArrayBehavior, nonLeafArrayBehavior),
+      cursor(&path, objectToIterate) {}
 }  // namespace mongo
