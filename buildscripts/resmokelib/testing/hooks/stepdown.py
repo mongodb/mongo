@@ -701,6 +701,10 @@ class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-at
                             break
                         except pymongo.errors.NotMasterError:
                             pass
+                        except pymongo.errors.OperationFailure as ex:
+                            if ex.code == 166:  # CommandNotSupportedOnView
+                                # listCollections return also views and collStats is not supported on views
+                                break
                         retarget_time = time.time() - start_time
                         if retarget_time >= 60:
                             raise RuntimeError(
