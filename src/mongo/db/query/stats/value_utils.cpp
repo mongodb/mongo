@@ -57,9 +57,9 @@ SBEValue::~SBEValue() {
 }
 
 SBEValue& SBEValue::operator=(const SBEValue& other) {
+    auto [tag, val] = copyValue(other._tag, other._val);
     value::releaseValue(_tag, _val);
 
-    auto [tag, val] = copyValue(other._tag, other._val);
     _tag = tag;
     _val = val;
     return *this;
