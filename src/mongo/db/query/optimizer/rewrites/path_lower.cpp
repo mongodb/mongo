@@ -238,11 +238,7 @@ void EvalFilterLowering::transport(ABT& n, const PathConstant&, ABT& c) {
 }
 
 void EvalFilterLowering::transport(ABT& n, const PathIdentity&) {
-    n = make<LambdaAbstraction>(_prefixId.getNextId("_"), Constant::boolean(true));
-    _changed = true;
-
-    // TODO - do we need an identity element for the additive composition? i.e. false constant
-    // Or should Identity be left undefined and removed by the PathFuse?
+    uasserted(6893500, "PathIdentity not allowed in EvalFilter (match) context");
 }
 
 void EvalFilterLowering::transport(ABT& n, const PathLambda&, ABT& lam) {
