@@ -78,6 +78,7 @@ ScalarHistogram genMaxDiffHistogram(const DataDistribution& dataDistrib, size_t 
  * data. Histograms will use the supplied number of buckets.
  */
 std::shared_ptr<const ArrayHistogram> createArrayEstimator(const std::vector<SBEValue>& arrayData,
-                                                           size_t nBuckets);
+                                                           size_t nBuckets,
+                                                           double sampleRate = 1.0);
 
 }  // namespace mongo::stats

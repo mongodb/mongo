@@ -103,6 +103,7 @@ runHistogramsTest(function testTypeCounts() {
                 emptyArrayCount: 4,
                 trueCount: 1,
                 falseCount: 2,
+                sampleRate: 1.0,
                 documents: 16,
             }
         }
@@ -345,6 +346,7 @@ runHistogramsTest(function testTypeCounts() {
                 emptyArrayCount: 1,
                 trueCount: 2,
                 falseCount: 1,
+                sampleRate: 1.0,
                 documents: 19,
             }
         }
@@ -561,6 +563,7 @@ runHistogramsTest(function testTypeCounts() {
                 emptyArrayCount: 1,
                 trueCount: 1,
                 falseCount: 1,
+                sampleRate: 1.0,
                 documents: 28,
             }
         }
@@ -829,6 +832,7 @@ runHistogramsTest(function testTypeCounts() {
         emptyArrayCount: 0,
         trueCount: 0,
         falseCount: 0,
+        sampleRate: 1.0,
         documents: 28,
     };
     createAndValidateHistogram({coll, expectedHistogram: {_id: "notAPath", statistics}});

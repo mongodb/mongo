@@ -105,6 +105,7 @@ runHistogramsTest(function verifyArrayHistograms() {
             emptyArrayCount: 1,
             trueCount: 0,
             falseCount: 0,
+            sampleRate: 1.0,
             documents: 6,
         }
     };

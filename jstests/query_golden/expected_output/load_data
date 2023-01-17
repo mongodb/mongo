@@ -518,6 +518,7 @@ Histogram:
 [jsTest] 		"documents" : 100,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -1296,6 +1297,7 @@ Histogram:
 [jsTest] 		"documents" : 100,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -2058,6 +2060,7 @@ Histogram:
 [jsTest] 		"documents" : 100,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -2708,6 +2711,7 @@ Histogram:
 [jsTest] 		"documents" : 100,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -3486,6 +3490,7 @@ Histogram:
 [jsTest] 		"documents" : 100,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -4232,6 +4237,7 @@ Histogram:
 [jsTest] 		"documents" : 100,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -4834,6 +4840,7 @@ Histogram:
 [jsTest] 		"documents" : 100,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -5636,6 +5643,7 @@ Histogram:
 [jsTest] 		"documents" : 100,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -6366,6 +6374,7 @@ Histogram:
 [jsTest] 		"documents" : 100,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -6968,6 +6977,7 @@ Histogram:
 [jsTest] 		"documents" : 100,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -7762,6 +7772,7 @@ Histogram:
 [jsTest] 		"documents" : 100,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -8516,6 +8527,7 @@ Histogram:
 [jsTest] 		"documents" : 100,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -9110,6 +9122,7 @@ Histogram:
 [jsTest] 		"documents" : 100,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -9928,6 +9941,7 @@ Histogram:
 [jsTest] 		"documents" : 100,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -10746,6 +10760,7 @@ Histogram:
 [jsTest] 		"documents" : 100,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -11500,6 +11515,7 @@ Histogram:
 [jsTest] 		"documents" : 100,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -12318,6 +12334,7 @@ Histogram:
 [jsTest] 		"documents" : 100,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -13120,6 +13137,7 @@ Histogram:
 [jsTest] 		"documents" : 100,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -13890,6 +13908,7 @@ Histogram:
 [jsTest] 		"documents" : 100,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -14716,6 +14735,7 @@ Histogram:
 [jsTest] 		"documents" : 100,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -15534,6 +15554,7 @@ Histogram:
 [jsTest] 		"documents" : 100,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -16272,6 +16293,7 @@ Histogram:
 [jsTest] 		"documents" : 100,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -17090,6 +17112,7 @@ Histogram:
 [jsTest] 		"documents" : 100,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -17900,6 +17923,7 @@ Histogram:
 [jsTest] 		"documents" : 100,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -18646,6 +18670,7 @@ Histogram:
 [jsTest] 		"documents" : 100,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -19468,6 +19493,7 @@ Histogram:
 [jsTest] 		"documents" : 100,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -20282,6 +20308,7 @@ Histogram:
 [jsTest] 		"documents" : 100,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -21048,6 +21075,7 @@ Histogram:
 [jsTest] 		"documents" : 100,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -22068,6 +22096,7 @@ Histogram:
 [jsTest] 		"documents" : 1000,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -22894,6 +22923,7 @@ Histogram:
 [jsTest] 		"documents" : 1000,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -23720,6 +23750,7 @@ Histogram:
 [jsTest] 		"documents" : 1000,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -24546,6 +24577,7 @@ Histogram:
 [jsTest] 		"documents" : 1000,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -25372,6 +25404,7 @@ Histogram:
 [jsTest] 		"documents" : 1000,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -26198,6 +26231,7 @@ Histogram:
 [jsTest] 		"documents" : 1000,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -27024,6 +27058,7 @@ Histogram:
 [jsTest] 		"documents" : 1000,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -27850,6 +27885,7 @@ Histogram:
 [jsTest] 		"documents" : 1000,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -28676,6 +28712,7 @@ Histogram:
 [jsTest] 		"documents" : 1000,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -29502,6 +29539,7 @@ Histogram:
 [jsTest] 		"documents" : 1000,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -30328,6 +30366,7 @@ Histogram:
 [jsTest] 		"documents" : 1000,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -31154,6 +31193,7 @@ Histogram:
 [jsTest] 		"documents" : 1000,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -31980,6 +32020,7 @@ Histogram:
 [jsTest] 		"documents" : 1000,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -32806,6 +32847,7 @@ Histogram:
 [jsTest] 		"documents" : 1000,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -33632,6 +33674,7 @@ Histogram:
 [jsTest] 		"documents" : 1000,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -34458,6 +34501,7 @@ Histogram:
 [jsTest] 		"documents" : 1000,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -35284,6 +35328,7 @@ Histogram:
 [jsTest] 		"documents" : 1000,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -36110,6 +36155,7 @@ Histogram:
 [jsTest] 		"documents" : 1000,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -36936,6 +36982,7 @@ Histogram:
 [jsTest] 		"documents" : 1000,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -37762,6 +37809,7 @@ Histogram:
 [jsTest] 		"documents" : 1000,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -38588,6 +38636,7 @@ Histogram:
 [jsTest] 		"documents" : 1000,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -39414,6 +39463,7 @@ Histogram:
 [jsTest] 		"documents" : 1000,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -40240,6 +40290,7 @@ Histogram:
 [jsTest] 		"documents" : 1000,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -41066,6 +41117,7 @@ Histogram:
 [jsTest] 		"documents" : 1000,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -41892,6 +41944,7 @@ Histogram:
 [jsTest] 		"documents" : 1000,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -42722,6 +42775,7 @@ Histogram:
 [jsTest] 		"documents" : 1000,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -43552,6 +43606,7 @@ Histogram:
 [jsTest] 		"documents" : 1000,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -44382,6 +44437,7 @@ Histogram:
 [jsTest] 		"documents" : 1000,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
