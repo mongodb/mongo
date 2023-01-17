@@ -99,6 +99,11 @@ CONFIG configuration_list[] = {{"assert.read_timestamp", "assert read_timestamp"
   {"debug.checkpoint_retention", "adjust log removal to retain the log records", 0x0, 0, 128, 1024,
     V_GLOBAL_DEBUG_CHECKPOINT_RETENTION},
 
+  {"debug.cursor_reposition",
+    "cursor temporarily releases any page requiring forced eviction and then repositions back to "
+    "the page for further operations",
+    C_BOOL, 5, 0, 0, V_GLOBAL_DEBUG_CURSOR_REPOSITION},
+
   {"debug.eviction",
     "modify internal algorithms to force history store eviction to happen more aggressively",
     C_BOOL, 2, 0, 0, V_GLOBAL_DEBUG_EVICTION},
