@@ -748,7 +748,10 @@ void CurOp::reportState(OperationContext* opCtx, BSONObjBuilder* builder, bool t
     }
 
     if (feature_flags::gFeatureFlagDeprioritizeLowPriorityOperations.isEnabledAndIgnoreFCV()) {
-        builder->append("admissionPriority", toString(opCtx->lockState()->getAdmissionPriority()));
+        auto admissionPriority = opCtx->lockState()->getAdmissionPriority();
+        if (admissionPriority < AdmissionContext::Priority::kNormal) {
+            builder->append("admissionPriority", toString(admissionPriority));
+        }
     }
 }
 
@@ -951,7 +954,10 @@ void OpDebug::report(OperationContext* opCtx,
     }
 
     if (feature_flags::gFeatureFlagDeprioritizeLowPriorityOperations.isEnabledAndIgnoreFCV()) {
-        pAttrs->add("admissionPriority", opCtx->lockState()->getAdmissionPriority());
+        auto admissionPriority = opCtx->lockState()->getAdmissionPriority();
+        if (admissionPriority < AdmissionContext::Priority::kNormal) {
+            pAttrs->add("admissionPriority", admissionPriority);
+        }
     }
 
     if (lockStats) {
