@@ -3729,10 +3729,9 @@ tasks:
           <<: *configure_flags_with_builtins
           NONSTANDALONE: -DWT_STANDALONE_BUILD=0
           CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v4_gcc.cmake
-      # FIXME-WT-9767
-      # - func: "format test script"
-      #   vars:
-      #     format_test_script_args: -a -t 30
+      - func: "format test script"
+        vars:
+          format_test_script_args: -a -t 30
 
   - name: many-collection-test
     commands:
