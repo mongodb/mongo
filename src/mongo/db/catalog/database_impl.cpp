@@ -758,8 +758,8 @@ Collection* DatabaseImpl::createVirtualCollection(OperationContext* opCtx,
  * @return true if any modification on the collection data leads to updating the indexes defined on
  * it.
  */
-bool doesCollectionModificationsUpdateIndexes(StringData collName) {
-    // TODO SERVER-72496: investigate whether 'config.transactions' should remain here or not.
+bool doesCollectionModificationsUpdateIndexes(const NamespaceString& nss) {
+    const auto& collName = nss.ns();
     return collName != "config.transactions" &&
         collName !=
         repl::ReplicationConsistencyMarkersImpl::kDefaultOplogTruncateAfterPointNamespace;
@@ -873,7 +873,7 @@ Collection* DatabaseImpl::_createCollection(
                 collection,
                 !idIndex.isEmpty() ? idIndex : ic->getDefaultIdIndexSpec(collection)));
             createColumnIndex = createColumnIndexOnAllCollections.shouldFail() &&
-                doesCollectionModificationsUpdateIndexes(nss.ns());
+                doesCollectionModificationsUpdateIndexes(nss);
         } else {
             // autoIndexId: false is only allowed on unreplicated collections.
             uassert(50001,
