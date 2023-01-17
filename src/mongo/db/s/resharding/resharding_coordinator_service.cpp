@@ -960,12 +960,11 @@ ReshardingCoordinatorExternalStateImpl::calculateParticipantShardsAndChunks(
             }
         }
 
-        auto initialSplitter = ReshardingSplitPolicy::make(opCtx,
-                                                           coordinatorDoc.getSourceNss(),
-                                                           tempNs,
-                                                           shardKey,
-                                                           numInitialChunks,
-                                                           std::move(parsedZones));
+        auto initialSplitter = SamplingBasedSplitPolicy::make(opCtx,
+                                                              coordinatorDoc.getSourceNss(),
+                                                              shardKey,
+                                                              numInitialChunks,
+                                                              std::move(parsedZones));
 
         // Note: The resharding initial split policy doesn't care about what is the real primary
         // shard, so just pass in a random shard.

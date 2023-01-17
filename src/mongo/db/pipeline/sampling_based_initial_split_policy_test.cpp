@@ -41,21 +41,24 @@
 namespace mongo {
 namespace {
 
-using ReshardingSplitPolicyTest = ShardedAggTestFixture;
+using SamplingBasedSplitPolicyTest = ShardedAggTestFixture;
 
 const ShardId primaryShardId = ShardId("0");
 
-TEST_F(ReshardingSplitPolicyTest, ShardKeyWithNonDottedFieldAndIdIsNotProjectedSucceeds) {
+TEST_F(SamplingBasedSplitPolicyTest, ShardKeyWithNonDottedFieldAndIdIsNotProjectedSucceeds) {
+    const int numInitialChunks = 2;
+    const int numSamplesPerChunk = 2;
     auto shardKeyPattern = ShardKeyPattern(BSON("a" << 1));
-    auto pipeline =
-        Pipeline::parse(ReshardingSplitPolicy::createRawPipeline(
-                            shardKeyPattern, 2 /* samplingRatio */, 1 /* numSplitPoints */),
-                        expCtx());
+
+    auto pipeline = Pipeline::parse(SamplingBasedSplitPolicy::createRawPipeline(
+                                        shardKeyPattern, numInitialChunks, numSamplesPerChunk),
+                                    expCtx());
     auto mockSource =
         DocumentSourceMock::createForTest({"{_id: 10, a: 15}", "{_id: 3, a: 5}"}, expCtx());
     pipeline->addInitialSource(mockSource.get());
-    // We sample all of the documents since numSplitPoints(1) * samplingRatio (2) = 2 and the
-    // document source has 2 chunks. So we can assert on the returned values.
+
+    // We sample all of the documents and the document source has 2 chunks. So we can assert on the
+    // returned values.
     auto next = pipeline->getNext();
     ASSERT_EQUALS(next.value().getField("a").getInt(), 5);
     ASSERT(next.value().getField("_id").missing());
@@ -65,19 +68,20 @@ TEST_F(ReshardingSplitPolicyTest, ShardKeyWithNonDottedFieldAndIdIsNotProjectedS
     ASSERT(!pipeline->getNext());
 }
 
-TEST_F(ReshardingSplitPolicyTest, ShardKeyWithIdFieldIsProjectedSucceeds) {
+TEST_F(SamplingBasedSplitPolicyTest, ShardKeyWithIdFieldIsProjectedSucceeds) {
+    const int numInitialChunks = 2;
+    const int numSamplesPerChunk = 2;
     auto shardKeyPattern = ShardKeyPattern(BSON("_id" << 1));
 
-    auto pipeline =
-        Pipeline::parse(ReshardingSplitPolicy::createRawPipeline(
-                            shardKeyPattern, 2 /* samplingRatio */, 1 /* numSplitPoints */),
-                        expCtx());
+    auto pipeline = Pipeline::parse(SamplingBasedSplitPolicy::createRawPipeline(
+                                        shardKeyPattern, numInitialChunks, numSamplesPerChunk),
+                                    expCtx());
     auto mockSource =
         DocumentSourceMock::createForTest({"{_id: 10, a: 15}", "{_id: 3, a: 5}"}, expCtx());
     pipeline->addInitialSource(mockSource.get());
 
-    // We sample all of the documents since numSplitPoints(1) * samplingRatio (2) = 2 and the
-    // document source has 2 chunks. So we can assert on the returned values.
+    // We sample all of the documents and the document source has 2 chunks. So we can assert on the
+    // returned values.
     auto next = pipeline->getNext();
     ASSERT_EQUALS(next.value().getField("_id").getInt(), 3);
     ASSERT(next.value().getField("a").missing());
@@ -87,18 +91,21 @@ TEST_F(ReshardingSplitPolicyTest, ShardKeyWithIdFieldIsProjectedSucceeds) {
     ASSERT(!pipeline->getNext());
 }
 
-TEST_F(ReshardingSplitPolicyTest, CompoundShardKeyWithNonDottedHashedFieldSucceeds) {
+TEST_F(SamplingBasedSplitPolicyTest, CompoundShardKeyWithNonDottedHashedFieldSucceeds) {
+    const int numInitialChunks = 2;
+    const int numSamplesPerChunk = 2;
     auto shardKeyPattern = ShardKeyPattern(BSON("a" << 1 << "b"
                                                     << "hashed"));
-    auto pipeline =
-        Pipeline::parse(ReshardingSplitPolicy::createRawPipeline(
-                            shardKeyPattern, 2 /* samplingRatio */, 1 /* numSplitPoints */),
-                        expCtx());
+
+    auto pipeline = Pipeline::parse(SamplingBasedSplitPolicy::createRawPipeline(
+                                        shardKeyPattern, numInitialChunks, numSamplesPerChunk),
+                                    expCtx());
     auto mockSource = DocumentSourceMock::createForTest(
         {"{x: 1, b: 16, a: 15}", "{x: 2, b: 123, a: 5}"}, expCtx());
     pipeline->addInitialSource(mockSource.get());
-    // We sample all of the documents since numSplitPoints(1) * samplingRatio (2) = 2 and the
-    // document source has 2 chunks. So we can assert on the returned values.
+
+    // We sample all of the documents and the document source has 2 chunks. So we can assert on the
+    // returned values.
     auto next = pipeline->getNext();
     ASSERT_EQUALS(next.value().getField("a").getInt(), 5);
     ASSERT_EQUALS(next.value().getField("b").getLong(), -6548868637522515075LL);
@@ -110,19 +117,20 @@ TEST_F(ReshardingSplitPolicyTest, CompoundShardKeyWithNonDottedHashedFieldSuccee
     ASSERT(!pipeline->getNext());
 }
 
-TEST_F(ReshardingSplitPolicyTest, CompoundShardKeyWithDottedFieldSucceeds) {
+TEST_F(SamplingBasedSplitPolicyTest, CompoundShardKeyWithDottedFieldSucceeds) {
+    const int numInitialChunks = 2;
+    const int numSamplesPerChunk = 2;
     auto shardKeyPattern = ShardKeyPattern(BSON("a.b" << 1 << "c" << 1));
 
-    auto pipeline =
-        Pipeline::parse(ReshardingSplitPolicy::createRawPipeline(
-                            shardKeyPattern, 2 /* samplingRatio */, 1 /* numSplitPoints */),
-                        expCtx());
+    auto pipeline = Pipeline::parse(SamplingBasedSplitPolicy::createRawPipeline(
+                                        shardKeyPattern, numInitialChunks, numSamplesPerChunk),
+                                    expCtx());
     auto mockSource = DocumentSourceMock::createForTest(
         {"{x: 10, a: {b: 20}, c: 1}", "{x: 3, a: {b: 10}, c: 5}"}, expCtx());
     pipeline->addInitialSource(mockSource.get());
 
-    // We sample all of the documents since numSplitPoints(1) * samplingRatio (2) = 2 and the
-    // document source has 2 chunks. So we can assert on the returned values.
+    // We sample all of the documents and the document source has 2 chunks. So we can assert on the
+    // returned values.
     auto next = pipeline->getNext();
     ASSERT_BSONOBJ_EQ(next.value().toBson(), BSON("a.b" << 10 << "c" << 5));
     next = pipeline->getNext();
@@ -130,20 +138,21 @@ TEST_F(ReshardingSplitPolicyTest, CompoundShardKeyWithDottedFieldSucceeds) {
     ASSERT(!pipeline->getNext());
 }
 
-TEST_F(ReshardingSplitPolicyTest, CompoundShardKeyWithDottedHashedFieldSucceeds) {
+TEST_F(SamplingBasedSplitPolicyTest, CompoundShardKeyWithDottedHashedFieldSucceeds) {
+    const int numInitialChunks = 2;
+    const int numSamplesPerChunk = 2;
     auto shardKeyPattern = ShardKeyPattern(BSON("a.b" << 1 << "c" << 1 << "a.c"
                                                       << "hashed"));
 
-    auto pipeline =
-        Pipeline::parse(ReshardingSplitPolicy::createRawPipeline(
-                            shardKeyPattern, 2 /* samplingRatio */, 1 /* numSplitPoints */),
-                        expCtx());
+    auto pipeline = Pipeline::parse(SamplingBasedSplitPolicy::createRawPipeline(
+                                        shardKeyPattern, numInitialChunks, numSamplesPerChunk),
+                                    expCtx());
     auto mockSource = DocumentSourceMock::createForTest(
         {"{x: 10, a: {b: 20, c: 16}, c: 1}", "{x: 3, a: {b: 10, c: 123}, c: 5}"}, expCtx());
     pipeline->addInitialSource(mockSource.get());
 
-    // We sample all of the documents since numSplitPoints(1) * samplingRatio (2) = 2 and the
-    // document source has 2 chunks. So we can assert on the returned values.
+    // We sample all of the documents and the document source has 2 chunks. So we can assert on the
+    // returned values.
     auto next = pipeline->getNext();
     ASSERT_BSONOBJ_EQ(next.value().toBson(),
                       BSON("a.b" << 10 << "c" << 5 << "a.c" << -6548868637522515075LL));
@@ -163,45 +172,97 @@ std::string dumpValues(const std::vector<int>& values) {
     return ss.str();
 }
 
-TEST_F(ReshardingSplitPolicyTest, SamplingSuceeds) {
-    const int kNumSplitPoints = 4;
-    const int kNumSamplesPerChunk = 5;
+TEST_F(SamplingBasedSplitPolicyTest, SamplingSucceedsSufficientSamples) {
+    const int numInitialChunks = 5;
+    const int numSamplesPerChunk = 5;
+    const int numSamples = 30;
     auto shardKeyPattern = ShardKeyPattern(BSON("a" << 1));
 
     std::deque<DocumentSourceMock::GetNextResult> docs;
-    for (int a = 0; a < 30; a++) {
+    for (int a = 0; a < numSamples; a++) {
         docs.emplace_back(Document(BSON("a" << a)));
     }
 
-    auto pipeline = Pipeline::parse(ReshardingSplitPolicy::createRawPipeline(
-                                        shardKeyPattern, kNumSamplesPerChunk, kNumSplitPoints),
+    auto pipeline = Pipeline::parse(SamplingBasedSplitPolicy::createRawPipeline(
+                                        shardKeyPattern, numInitialChunks, numSamplesPerChunk),
                                     expCtx());
     auto mockSource = DocumentSourceMock::createForTest(docs, expCtx());
     pipeline->addInitialSource(mockSource.get());
 
-    ReshardingSplitPolicy::PipelineDocumentSource skippingSource(std::move(pipeline),
-                                                                 kNumSamplesPerChunk - 1);
+    SamplingBasedSplitPolicy::PipelineDocumentSource skippingSource(std::move(pipeline),
+                                                                    numSamplesPerChunk - 1);
 
     std::vector<int> sampledValues;
-    while (auto nextDoc = skippingSource.getNext()) {
+    for (auto i = 0; i < numInitialChunks - 1; i++) {
+        auto nextDoc = skippingSource.getNext();
         sampledValues.push_back((*nextDoc)["a"].numberInt());
     }
 
-    ASSERT_EQ(kNumSplitPoints, sampledValues.size()) << dumpValues(sampledValues);
-
-    int lastVal = -1 * kNumSamplesPerChunk;
+    int lastVal = -1 * numSamplesPerChunk;
     for (const auto& val : sampledValues) {
-        ASSERT_GTE(val - lastVal, kNumSamplesPerChunk) << dumpValues(sampledValues);
+        ASSERT_GTE(val - lastVal, numSamplesPerChunk) << dumpValues(sampledValues);
         lastVal = val;
     }
 }
 
-TEST_F(ReshardingSplitPolicyTest, ShardKeyWithDottedPathAndIdIsNotProjectedSucceeds) {
+TEST_F(SamplingBasedSplitPolicyTest, SamplingSucceedsInsufficientSamplesOneSplitPoint) {
+    const int numInitialChunks = 2;
+    const int numSamplesPerChunk = 5;
+    const int numSamples = 3;
+    auto shardKeyPattern = ShardKeyPattern(BSON("a" << 1));
+
+    std::deque<DocumentSourceMock::GetNextResult> docs;
+    for (int a = 0; a < numSamples; a++) {
+        docs.emplace_back(Document(BSON("a" << a)));
+    }
+
+    auto pipeline = Pipeline::parse(SamplingBasedSplitPolicy::createRawPipeline(
+                                        shardKeyPattern, numInitialChunks, numSamplesPerChunk),
+                                    expCtx());
+    auto mockSource = DocumentSourceMock::createForTest(docs, expCtx());
+    pipeline->addInitialSource(mockSource.get());
+
+    SamplingBasedSplitPolicy::PipelineDocumentSource skippingSource(std::move(pipeline),
+                                                                    numSamplesPerChunk - 1);
+
+    // Verify that the source selected a split point although there are not enough samples.
+    ASSERT(skippingSource.getNext());
+}
+
+TEST_F(SamplingBasedSplitPolicyTest, SamplingSucceedsInsufficientSamplesMultipleSplitPoints) {
+    const int numInitialChunks = 3;
+    const int numSamplesPerChunk = 5;
+    const int numSamples = 8;
+    auto shardKeyPattern = ShardKeyPattern(BSON("a" << 1));
+
+    std::deque<DocumentSourceMock::GetNextResult> docs;
+    for (int a = 0; a < numSamples; a++) {
+        docs.emplace_back(Document(BSON("a" << a)));
+    }
+
+    auto pipeline = Pipeline::parse(SamplingBasedSplitPolicy::createRawPipeline(
+                                        shardKeyPattern, numInitialChunks, numSamplesPerChunk),
+                                    expCtx());
+    auto mockSource = DocumentSourceMock::createForTest(docs, expCtx());
+    pipeline->addInitialSource(mockSource.get());
+
+    SamplingBasedSplitPolicy::PipelineDocumentSource skippingSource(std::move(pipeline),
+                                                                    numSamplesPerChunk - 1);
+
+    // Verify that the source selected two split points although there were not enough samples
+    // for the second chunk.
+    ASSERT(skippingSource.getNext());
+    ASSERT(skippingSource.getNext());
+}
+
+TEST_F(SamplingBasedSplitPolicyTest, ShardKeyWithDottedPathAndIdIsNotProjectedSucceeds) {
+    const int numInitialChunks = 2;
+    const int numSamplesPerChunk = 2;
+
     auto shardKeyPattern = ShardKeyPattern(BSON("b" << 1));
-    auto pipeline =
-        Pipeline::parse(ReshardingSplitPolicy::createRawPipeline(
-                            shardKeyPattern, 2 /* samplingRatio */, 1 /* numSplitPoints */),
-                        expCtx());
+    auto pipeline = Pipeline::parse(SamplingBasedSplitPolicy::createRawPipeline(
+                                        shardKeyPattern, numInitialChunks, numSamplesPerChunk),
+                                    expCtx());
     auto mockSource = DocumentSourceMock::createForTest(
         {"{_id: {a: 15}, b: 10}", "{_id: {a: 5}, b:1}"}, expCtx());
     pipeline->addInitialSource(mockSource.get());
@@ -212,12 +273,14 @@ TEST_F(ReshardingSplitPolicyTest, ShardKeyWithDottedPathAndIdIsNotProjectedSucce
     ASSERT(!pipeline->getNext());
 }
 
-TEST_F(ReshardingSplitPolicyTest, CompoundShardKeyWithDottedPathAndIdIsProjectedSucceeds) {
+TEST_F(SamplingBasedSplitPolicyTest, CompoundShardKeyWithDottedPathAndIdIsProjectedSucceeds) {
+    const int numInitialChunks = 2;
+    const int numSamplesPerChunk = 2;
+
     auto shardKeyPattern = ShardKeyPattern(BSON("_id.a" << 1 << "c" << 1));
-    auto pipeline =
-        Pipeline::parse(ReshardingSplitPolicy::createRawPipeline(
-                            shardKeyPattern, 2 /* samplingRatio */, 1 /* numSplitPoints */),
-                        expCtx());
+    auto pipeline = Pipeline::parse(SamplingBasedSplitPolicy::createRawPipeline(
+                                        shardKeyPattern, numInitialChunks, numSamplesPerChunk),
+                                    expCtx());
     auto mockSource = DocumentSourceMock::createForTest(
         {"{_id: {a: 15}, c: 10}", "{_id: {a: 5}, c: 1}"}, expCtx());
     pipeline->addInitialSource(mockSource.get());
@@ -228,13 +291,15 @@ TEST_F(ReshardingSplitPolicyTest, CompoundShardKeyWithDottedPathAndIdIsProjected
     ASSERT(!pipeline->getNext());
 }
 
-TEST_F(ReshardingSplitPolicyTest, CompoundShardKeyWithDottedHashedPathSucceeds) {
+TEST_F(SamplingBasedSplitPolicyTest, CompoundShardKeyWithDottedHashedPathSucceeds) {
+    const int numInitialChunks = 2;
+    const int numSamplesPerChunk = 2;
+
     auto shardKeyPattern = ShardKeyPattern(BSON("_id.a" << 1 << "b" << 1 << "_id.b"
                                                         << "hashed"));
-    auto pipeline =
-        Pipeline::parse(ReshardingSplitPolicy::createRawPipeline(
-                            shardKeyPattern, 2 /* samplingRatio */, 1 /* numSplitPoints */),
-                        expCtx());
+    auto pipeline = Pipeline::parse(SamplingBasedSplitPolicy::createRawPipeline(
+                                        shardKeyPattern, numInitialChunks, numSamplesPerChunk),
+                                    expCtx());
     auto mockSource = DocumentSourceMock::createForTest(
         {"{x: 10, _id: {a: 20, b: 16}, b: 1}", "{x: 3, _id: {a: 10, b: 123}, b: 5}"}, expCtx());
     pipeline->addInitialSource(mockSource.get());
@@ -248,17 +313,21 @@ TEST_F(ReshardingSplitPolicyTest, CompoundShardKeyWithDottedHashedPathSucceeds) 
     ASSERT(!pipeline->getNext());
 }
 
-TEST_F(ReshardingSplitPolicyTest, ReshardingSucceedsWithLimitedMemoryForSortOperation) {
+TEST_F(SamplingBasedSplitPolicyTest, SamplingSucceedsWithLimitedMemoryForSortOperation) {
     RAIIServerParameterControllerForTest sortMaxMemory{
         "internalQueryMaxBlockingSortMemoryUsageBytes", 100};
+
+    const int numInitialChunks = 3;
+    const int numSamplesPerChunk = 2;
+
     auto shardKeyPattern = ShardKeyPattern(BSON("a" << 1));
-    const NamespaceString ns("reshard", "foo");
+    const NamespaceString ns("foo", "bar");
     auto pipelineDocSource =
-        ReshardingSplitPolicy::makePipelineDocumentSource_forTest(operationContext(),
-                                                                  kTestAggregateNss,
-                                                                  shardKeyPattern,
-                                                                  3 /*numInitialChunks*/,
-                                                                  2 /*samplesPerChunk*/);
+        SamplingBasedSplitPolicy::makePipelineDocumentSource_forTest(operationContext(),
+                                                                     kTestAggregateNss,
+                                                                     shardKeyPattern,
+                                                                     numInitialChunks,
+                                                                     numSamplesPerChunk);
     auto mockSource = DocumentSourceMock::createForTest(
         {"{_id: 20, a: 4}", "{_id: 30, a: 3}", "{_id: 40, a: 2}", "{_id: 50, a: 1}"}, expCtx());
     pipelineDocSource->getPipeline_forTest()->addInitialSource(mockSource.get());

@@ -281,7 +281,7 @@ private:
 /**
  * Split point building strategy for resharding.
  */
-class ReshardingSplitPolicy : public InitialSplitPolicy {
+class SamplingBasedSplitPolicy : public InitialSplitPolicy {
 public:
     using SampleDocumentPipeline = std::unique_ptr<Pipeline, PipelineDeleter>;
 
@@ -309,20 +309,27 @@ public:
     };
 
     /**
-     * Creates a new ReshardingSplitPolicy. Note that it should not outlive the operation
+     * Creates a new SamplingBasedSplitPolicy. Note that it should not outlive the operation
      * context used to create it.
      */
-    static ReshardingSplitPolicy make(OperationContext* opCtx,
-                                      const NamespaceString& origNs,
-                                      const NamespaceString& reshardingTempNs,
-                                      const ShardKeyPattern& shardKey,
-                                      int numInitialChunks,
-                                      boost::optional<std::vector<TagsType>> zones,
-                                      int samplesPerChunk = kDefaultSamplesPerChunk);
+    static SamplingBasedSplitPolicy make(OperationContext* opCtx,
+                                         const NamespaceString& nss,
+                                         const ShardKeyPattern& shardKey,
+                                         int numInitialChunks,
+                                         boost::optional<std::vector<TagsType>> zones,
+                                         int samplesPerChunk = kDefaultSamplesPerChunk);
 
-    ReshardingSplitPolicy(int numInitialChunks,
-                          boost::optional<std::vector<TagsType>> zones,
-                          std::unique_ptr<SampleDocumentSource> samples);
+    SamplingBasedSplitPolicy(int numInitialChunks,
+                             boost::optional<std::vector<TagsType>> zones,
+                             std::unique_ptr<SampleDocumentSource> samples);
+
+    /**
+     * Generates the initial split points and returns them in ascending shard key order. Does not
+     * include MinKey or MaxKey.
+     */
+    BSONObjSet createFirstSplitPoints(OperationContext* opCtx,
+                                      const ShardKeyPattern& shardKeyPattern,
+                                      const SplitPolicyParams& params);
 
     ShardCollectionConfig createFirstChunks(OperationContext* opCtx,
                                             const ShardKeyPattern& shardKeyPattern,
@@ -332,7 +339,7 @@ public:
      * Creates the aggregation pipeline BSON to get documents for sampling from shards.
      */
     static std::vector<BSONObj> createRawPipeline(const ShardKeyPattern& shardKey,
-                                                  int numSplitPoints,
+                                                  int numInitialChunks,
                                                   int samplesPerChunk);
 
     static constexpr int kDefaultSamplesPerChunk = 10;
