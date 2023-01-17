@@ -232,7 +232,9 @@ IndexValidateResults WiredTigerColumnStore::validate(OperationContext* opCtx, bo
     }
 
     WiredTigerIndexUtil::validateStructure(opCtx, _uri, results);
-    results.keysTraversedFromFullValidate = numEntries(opCtx);
+    if (results.valid) {
+        results.keysTraversedFromFullValidate = numEntries(opCtx);
+    }
 
     return results;
 }
