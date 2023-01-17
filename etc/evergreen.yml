@@ -9396,6 +9396,10 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=amzn64 -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: amzn64
     multiversion_edition: enterprise
+    has_packages: true
+    packager_script: packager_enterprise.py
+    packager_arch: x86_64
+    packager_distro: amazon
     repo_edition: enterprise
     scons_cache_scope: shared
     virtualenv: /opt/mongodbtoolchain/v3/bin/virtualenv
@@ -9425,7 +9429,10 @@ buildvariants:
   - name: slow1_gen
   - name: snmp
   - name: .stitch
-  - name: push
+  - name: test_packages
+    distros:
+    - ubuntu1604-packer
+  - name: .publish
     distros:
     - amazon1-2018-small
 
@@ -9441,6 +9448,10 @@ buildvariants:
     compile_flags: --ssl MONGO_DISTMOD=amazon -j$(grep -c ^processor /proc/cpuinfo) --variables-files=etc/scons/mongodbtoolchain_v3_gcc.vars
     multiversion_platform: amazon
     multiversion_edition: targeted
+    has_packages: true
+    packager_script: packager.py
+    packager_arch: x86_64
+    packager_distro: amazon
     repo_edition: org
     scons_cache_scope: shared
     virtualenv: /opt/mongodbtoolchain/v3/bin/virtualenv
@@ -9470,7 +9481,10 @@ buildvariants:
   - name: .sharding .txns
   - name: .ssl
   - name: .stitch
-  - name: push
+  - name: test_packages
+    distros:
+    - ubuntu1604-packer
+  - name: .publish
     distros:
     - amazon1-2018-small
 
