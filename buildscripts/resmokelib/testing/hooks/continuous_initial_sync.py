@@ -507,6 +507,10 @@ class _InitialSyncThread(threading.Thread):
                             break
                         except pymongo.errors.NotPrimaryError:
                             pass
+                        except pymongo.errors.OperationFailure as ex:
+                            if ex.code == 166:  # CommandNotSupportedOnView
+                                # listCollections return also views and collStats is not supported on views
+                                break
                         retarget_time = time.time() - start_time
                         if retarget_time >= 60:
                             raise RuntimeError(
