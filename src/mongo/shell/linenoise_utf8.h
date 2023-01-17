@@ -28,8 +28,8 @@
  */
 
 #include <algorithm>
+#include <cstring>
 #include <memory>
-#include <string.h>
 
 namespace linenoise_utf8 {
 

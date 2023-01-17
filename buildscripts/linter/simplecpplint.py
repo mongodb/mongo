@@ -80,6 +80,16 @@ GENERIC_FCV = [
 _RE_GENERIC_FCV_REF = re.compile(r'(' + '|'.join(GENERIC_FCV) + r')\b')
 _RE_HEADER = re.compile(r'\.(h|hpp)$')
 
+_CXX_COMPAT_HEADERS = [
+    "assert", "ctype", "errno", "fenv", "float", "inttypes", "limits", "locale", "math", "setjmp",
+    "signal", "stdarg", "stddef", "stdint", "stdio", "stdlib", "string", "time", "uchar", "wchar",
+    "wctype"
+]
+
+# Successful matches `m` have a `m["base"]`, the basename of the file that was included.
+_RE_CXX_COMPAT_HEADERS = re.compile(
+    rf'# *include *((<)|("))(?P<base>{"|".join(_CXX_COMPAT_HEADERS)})\.h(?(2)>|")')
+
 
 class Linter:
     """Simple C++ Linter."""
@@ -159,6 +169,7 @@ class Linter:
             self._check_for_collection_sharding_runtime(linenum)
             self._check_for_uninterruptible_lock_guard(linenum)
             self._check_for_rand(linenum)
+            self._check_for_c_stdlib_headers(linenum)
 
             # Relax the rule of commenting generic FCV references for files directly related to FCV
             # implementations.
@@ -374,6 +385,15 @@ class Linter:
                     linenum, 'mongodb/fcv',
                     'Please add a comment containing "(Generic FCV reference):" within 10 lines ' +
                     'before the generic FCV reference.')
+
+    def _check_for_c_stdlib_headers(self, linenum):
+        line = self.clean_lines[linenum]
+
+        if match := _RE_CXX_COMPAT_HEADERS.match(line):
+            self._error(
+                linenum, 'mongodb/headers',
+                f"Prohibited include of C header '<{match['base']}.h>'. " \
+                f"Include C++ header '<c{match['base']}>' instead.")
 
     def _error(self, linenum, category, message):
         if linenum in self.nolint_suppression:

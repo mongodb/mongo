@@ -30,7 +30,7 @@
 #pragma once
 
 #include <boost/intrusive_ptr.hpp>
-#include <stdlib.h>
+#include <cstdlib>
 
 #include "mongo/base/string_data.h"
 #include "mongo/platform/atomic_word.h"

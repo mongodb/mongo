@@ -30,8 +30,8 @@
 #include "mongo/platform/basic.h"
 
 #if !defined(_WIN32)
-#include <errno.h>   // For the E* error codes
-#include <locale.h>  // For setlocale()
+#include <cerrno>   // For the E* error codes
+#include <clocale>  // For setlocale()
 #endif
 
 #include "mongo/unittest/unittest.h"

@@ -32,9 +32,9 @@
 
 #ifdef _WIN32
 #include <crtdbg.h>
+#include <cstdio>
+#include <cstdlib>
 #include <mmsystem.h>
-#include <stdio.h>
-#include <stdlib.h>
 #endif
 
 #include "mongo/base/init.h"

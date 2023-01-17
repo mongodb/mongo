@@ -31,11 +31,11 @@
 #include "mongo/util/exit_code.h"
 
 #include <condition_variable>
+#include <csetjmp>
 #include <exception>
 #include <functional>
 #include <iostream>
 #include <mutex>
-#include <setjmp.h>
 #include <stdexcept>
 
 #ifndef _WIN32

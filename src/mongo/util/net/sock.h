@@ -29,11 +29,11 @@
 
 #pragma once
 
-#include <stdio.h>
+#include <cstdio>
 
 #ifndef _WIN32
 
-#include <errno.h>
+#include <cerrno>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/un.h>

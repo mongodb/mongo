@@ -33,7 +33,7 @@
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/crypto/encryption_fields_util.h"
 #include "mongo/db/field_ref.h"
-#include <math.h>
+#include <cmath>
 
 namespace mongo {
 

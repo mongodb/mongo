@@ -32,8 +32,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstring>  // strlen
 #include <fmt/format.h>
-#include <string.h>  // strlen
 #include <string>
 #include <vector>
 

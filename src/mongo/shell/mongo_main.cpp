@@ -37,11 +37,11 @@
 #include <boost/log/attributes/value_extraction.hpp>
 #include <boost/log/core.hpp>
 #include <boost/log/sinks.hpp>
+#include <csignal>
+#include <cstdio>
+#include <cstring>
 #include <fstream>
 #include <iostream>
-#include <signal.h>
-#include <stdio.h>
-#include <string.h>
 
 #include "mongo/base/init.h"
 #include "mongo/base/initializer.h"

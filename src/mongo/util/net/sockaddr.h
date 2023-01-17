@@ -34,7 +34,7 @@
 
 #ifndef _WIN32
 
-#include <errno.h>
+#include <cerrno>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/un.h>

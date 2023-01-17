@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include <time.h>
+#include <ctime>
 
 #include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/base/status_with.h"

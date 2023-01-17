@@ -42,8 +42,8 @@
 #include <io.h>
 #define SIGKILL 9
 #else
+#include <csignal>
 #include <netinet/in.h>
-#include <signal.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/wait.h>

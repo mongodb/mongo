@@ -30,7 +30,7 @@
 #pragma once
 
 #include <boost/optional/optional.hpp>
-#include <stddef.h>
+#include <cstddef>
 #include <vector>
 
 #include "mongo/db/exec/document_value/document.h"

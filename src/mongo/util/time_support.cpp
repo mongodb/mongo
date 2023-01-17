@@ -51,7 +51,7 @@
 #include "mongo/util/timer.h"
 #include <mmsystem.h>
 #elif defined(__linux__)
-#include <time.h>
+#include <ctime>
 #elif defined(__APPLE__)
 #include <mach/clock.h>
 #include <mach/mach.h>

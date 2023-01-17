@@ -31,8 +31,8 @@
 
 #include "mongo/unittest/death_test.h"
 
+#include <cstdio>
 #include <fmt/format.h>
-#include <stdio.h>
 
 #include "mongo/bson/json.h"
 #include "mongo/unittest/assert.h"

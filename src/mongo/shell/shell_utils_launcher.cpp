@@ -35,6 +35,7 @@
 #include <boost/iostreams/stream.hpp>
 #include <boost/iostreams/stream_buffer.hpp>
 #include <boost/iostreams/tee.hpp>
+#include <csignal>
 #include <fcntl.h>
 #include <fmt/format.h>
 #include <fstream>
@@ -42,15 +43,14 @@
 #include <iterator>
 #include <map>
 #include <memory>
-#include <signal.h>
 #include <vector>
 
 #ifdef _WIN32
 #include <io.h>
 #define SIGKILL 9
 #else
+#include <csignal>
 #include <netinet/in.h>
-#include <signal.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/wait.h>

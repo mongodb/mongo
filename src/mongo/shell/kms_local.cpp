@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include <stdlib.h>
+#include <cstdlib>
 
 #include "mongo/base/init.h"
 #include "mongo/base/secure_allocator.h"

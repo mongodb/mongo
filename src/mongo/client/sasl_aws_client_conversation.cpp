@@ -31,8 +31,8 @@
 
 #include "mongo/client/sasl_aws_client_conversation.h"
 
+#include <ctime>
 #include <string>
-#include <time.h>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"

@@ -30,9 +30,9 @@
 
 #include "mongo/db/storage/durable_catalog_impl.h"
 
+#include <cstdlib>
 #include <fmt/format.h>
 #include <memory>
-#include <stdlib.h>
 
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/bson/util/builder.h"

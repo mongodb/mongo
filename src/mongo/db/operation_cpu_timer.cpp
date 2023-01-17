@@ -32,7 +32,7 @@
 #include <fmt/format.h>
 
 #if defined(__linux__)
-#include <time.h>
+#include <ctime>
 #endif  // defined(__linux__)
 
 #include "mongo/db/operation_cpu_timer.h"

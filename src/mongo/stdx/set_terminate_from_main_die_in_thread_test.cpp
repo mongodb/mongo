@@ -29,7 +29,7 @@
 
 #include "mongo/stdx/exception.h"
 
-#include <stdlib.h>
+#include <cstdlib>
 
 #include <iostream>
 

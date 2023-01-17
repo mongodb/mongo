@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include <string.h>  // strlen
+#include <cstring>  // strlen
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"

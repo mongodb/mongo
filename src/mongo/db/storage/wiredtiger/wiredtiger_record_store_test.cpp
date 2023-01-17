@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
+#include <ctime>
 #include <sstream>
 #include <string>
-#include <time.h>
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/init.h"

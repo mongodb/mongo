@@ -29,8 +29,8 @@
 
 #pragma once
 
+#include <cstddef>
 #include <cstring>
-#include <stddef.h>
 
 #include "mongo/base/data_type.h"
 #include "mongo/base/string_data.h"

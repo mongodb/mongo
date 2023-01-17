@@ -32,8 +32,8 @@
 
 #include "mongo/util/signal_handlers.h"
 
-#include <signal.h>
-#include <time.h>
+#include <csignal>
+#include <ctime>
 
 #if !defined(_WIN32)
 #include <unistd.h>

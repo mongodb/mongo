@@ -37,9 +37,9 @@
 #include <boost/iostreams/stream_buffer.hpp>
 #include <boost/program_options.hpp>
 #include <cerrno>
+#include <cstdio>
 #include <fcntl.h>
 #include <fstream>
-#include <stdio.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <yaml-cpp/yaml.h>

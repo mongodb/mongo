@@ -97,9 +97,9 @@
 
 #else /* _WIN32 */
 
-#include <signal.h>
-#include <stdlib.h>
-#include <string.h>
+#include <csignal>
+#include <cstdlib>
+#include <cstring>
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <termios.h>
@@ -110,12 +110,12 @@
 #include "linenoise.h"
 #include "linenoise_utf8.h"
 #include "mk_wcwidth.h"
+#include <cerrno>
+#include <cstdio>
 #include <cwctype>
-#include <errno.h>
 #include <fcntl.h>
 #include <memory>
 #include <sstream>
-#include <stdio.h>
 #include <string>
 #include <vector>
 

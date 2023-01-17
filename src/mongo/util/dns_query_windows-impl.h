@@ -33,7 +33,7 @@
 
 #include <windns.h>
 
-#include <stdio.h>
+#include <cstdio>
 
 #include <array>
 #include <cassert>

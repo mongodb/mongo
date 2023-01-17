@@ -31,11 +31,11 @@
 #include <boost/filesystem.hpp>
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <cstdio>
 #include <fstream>
 #include <iostream>
 #include <malloc.h>
 #include <procfs.h>
-#include <stdio.h>
 #include <string>
 #include <sys/lgrp_user.h>
 #include <sys/mman.h>

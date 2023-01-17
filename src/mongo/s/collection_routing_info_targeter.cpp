@@ -30,6 +30,8 @@
 
 #include "mongo/s/collection_routing_info_targeter.h"
 
+#include <csignal>
+
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
@@ -54,7 +56,6 @@
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
-#include "signal.h"
 
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
 

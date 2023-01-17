@@ -32,11 +32,11 @@
 
 #include "processinfo.h"
 
+#include <cstdio>
 #include <fstream>
 #include <iostream>
 #include <malloc.h>
 #include <sched.h>
-#include <stdio.h>
 #include <string>
 #include <sys/mman.h>
 #include <sys/resource.h>

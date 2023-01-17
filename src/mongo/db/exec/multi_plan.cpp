@@ -31,7 +31,7 @@
 #include "mongo/db/exec/multi_plan.h"
 
 #include <algorithm>
-#include <math.h>
+#include <cmath>
 #include <memory>
 
 #include "mongo/db/catalog/database.h"

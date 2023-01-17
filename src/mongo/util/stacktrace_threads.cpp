@@ -36,16 +36,16 @@
 #include <atomic>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
+#include <csignal>
 #include <cstdint>
 #include <cstdlib>
+#include <ctime>
 #include <dirent.h>
 #include <fcntl.h>
 #include <fmt/format.h>
-#include <signal.h>
 #include <string>
 #include <sys/stat.h>
 #include <sys/syscall.h>
-#include <time.h>
 #include <unistd.h>
 #include <vector>
 

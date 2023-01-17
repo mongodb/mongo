@@ -34,8 +34,8 @@
 
 #include "mongo/util/md5.h"
 
+#include <cstring>
 #include <sstream>
-#include <string.h>
 #include <string>
 
 namespace mongo {

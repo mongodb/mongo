@@ -42,9 +42,9 @@
 
 #include "mongo/platform/basic.h"
 
-#include <math.h>
-#include <stdio.h>
-#include <string.h>
+#include <cmath>
+#include <cstdio>
+#include <cstring>
 
 #include "md5.h"
 

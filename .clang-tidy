@@ -110,7 +110,7 @@ Checks:          '-*,
                   -readability-uniqueptr-delete-release
                   '
 WarningsAsErrors: '*'
-HeaderFilterRegex: '(mongo/.*|build/.*)'
+HeaderFilterRegex: '^(mongo|build)/'
 CheckOptions:
   - key:             bugprone-assert-side-effect.AssertMacros
     value:           assert

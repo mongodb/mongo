@@ -31,6 +31,7 @@
 #include "mongo/platform/basic.h"
 
 #include <array>
+#include <csignal>
 #include <cstddef>
 #include <cstdio>
 #include <cstdlib>
@@ -39,7 +40,6 @@
 #include <functional>
 #include <map>
 #include <random>
-#include <signal.h>
 #include <sstream>
 #include <utility>
 #include <vector>
@@ -64,8 +64,8 @@
 #endif
 
 #ifdef __linux__
+#include <ctime>
 #include <sys/syscall.h>
-#include <time.h>
 #include <unistd.h>
 #endif  //  __linux__
 

@@ -34,9 +34,9 @@
 
 #include <algorithm>
 #include <boost/filesystem.hpp>
+#include <cstdlib>
 #include <memory>
 #include <set>
-#include <stdlib.h>
 #include <string>
 #include <vector>
 

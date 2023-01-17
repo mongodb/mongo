@@ -31,11 +31,11 @@
 
 #include <boost/filesystem/operations.hpp>
 #include <boost/optional.hpp>
+#include <csignal>
 #include <fstream>
 #include <iostream>
 #include <limits>
 #include <memory>
-#include <signal.h>
 #include <string>
 
 #include "mongo/base/init.h"

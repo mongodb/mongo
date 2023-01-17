@@ -30,7 +30,7 @@
 #pragma once
 
 #include <cstdint>
-#include <stdlib.h>
+#include <cstdlib>
 #include <string>
 
 #include "mongo/base/status.h"

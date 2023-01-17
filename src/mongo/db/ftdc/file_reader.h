@@ -31,8 +31,8 @@
 
 #include <boost/filesystem/path.hpp>
 #include <boost/optional.hpp>
+#include <cstddef>
 #include <fstream>
-#include <stddef.h>
 #include <vector>
 
 #include "mongo/base/status.h"

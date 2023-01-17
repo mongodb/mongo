@@ -29,8 +29,8 @@
 
 #include "mongo/db/clientcursor.h"
 
+#include <ctime>
 #include <string>
-#include <time.h>
 #include <vector>
 
 #include "mongo/db/audit.h"

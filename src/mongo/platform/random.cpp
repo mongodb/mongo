@@ -32,12 +32,12 @@
 
 #include "mongo/platform/random.h"
 
-#include <string.h>
+#include <cstring>
 
 #ifdef _WIN32
 #include <bcrypt.h>
 #else
-#include <errno.h>
+#include <cerrno>
 #include <fcntl.h>
 #endif
 

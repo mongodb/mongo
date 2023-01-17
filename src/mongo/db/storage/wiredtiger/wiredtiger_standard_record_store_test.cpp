@@ -29,10 +29,10 @@
 
 #include "mongo/platform/basic.h"
 
+#include <ctime>
 #include <memory>
 #include <sstream>
 #include <string>
-#include <time.h>
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/init.h"

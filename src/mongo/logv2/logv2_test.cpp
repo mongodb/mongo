@@ -30,8 +30,8 @@
 
 #include "mongo/platform/basic.h"
 
+#include <csignal>
 #include <fstream>
-#include <signal.h>
 #include <sstream>
 #include <string>
 #include <vector>

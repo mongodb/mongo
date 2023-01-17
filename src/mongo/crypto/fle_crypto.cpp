@@ -37,7 +37,6 @@
 #include <iomanip>
 #include <iterator>
 #include <limits>
-#include <math.h>
 #include <memory>
 #include <stack>
 #include <string>

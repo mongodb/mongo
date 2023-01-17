@@ -37,8 +37,8 @@
 #include <processthreadsapi.h>
 #include <synchapi.h>
 #else
+#include <cstdio>
 #include <poll.h>
-#include <stdio.h>
 #endif
 
 #include "mongo/util/errno_util.h"

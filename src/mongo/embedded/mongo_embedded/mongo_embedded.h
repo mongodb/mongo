@@ -29,8 +29,8 @@
 #ifndef HEADERUUID_5E967FCD_63BD_4374_88CC_58C091BA61C0_DEFINED
 #define HEADERUUID_5E967FCD_63BD_4374_88CC_58C091BA61C0_DEFINED
 
-#include <stddef.h>
-#include <stdint.h>
+#include <cstddef>
+#include <cstdint>
 
 #pragma push_macro("MONGO_API_CALL")
 #undef MONGO_API_CALL
