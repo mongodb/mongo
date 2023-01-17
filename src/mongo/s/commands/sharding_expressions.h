@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -157,4 +155,5 @@ private:
     boost::intrusive_ptr<Expression> _doc;
     boost::intrusive_ptr<Expression> _spec;
 };
-};  // namespace mongo
+
+}  // namespace mongo

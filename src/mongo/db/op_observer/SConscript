@@ -5,9 +5,9 @@ Import("env")
 env = env.Clone()
 
 env.Library(
-    target="op_observer",
+    target='op_observer',
     source=[
-        "op_observer.cpp",
+        'op_observer.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
@@ -15,19 +15,16 @@ env.Library(
 )
 
 env.Library(
-    target="op_observer_util",
+    target='op_observer_util',
     source=[
-        "op_observer_util.cpp",
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+        'op_observer_util.cpp',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
         '$BUILD_DIR/mongo/db/catalog/collection',
         '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/index/index_descriptor',
-        '$BUILD_DIR/mongo/db/s/sharding_api_d',
     ],
 )
 
@@ -59,15 +56,17 @@ env.Library(
         'batched_write_context.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/change_stream_pre_images_collection_manager',
+        'op_observer',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/catalog/collection',
         '$BUILD_DIR/mongo/db/catalog/collection_catalog',
         '$BUILD_DIR/mongo/db/catalog/collection_options',
         '$BUILD_DIR/mongo/db/catalog/commit_quorum_options',
         '$BUILD_DIR/mongo/db/catalog/database_holder',
         '$BUILD_DIR/mongo/db/catalog/import_collection_oplog_entry',
+        '$BUILD_DIR/mongo/db/change_stream_pre_images_collection_manager',
         '$BUILD_DIR/mongo/db/commands/txn_cmd_request',
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
         '$BUILD_DIR/mongo/db/dbhelpers',
@@ -78,7 +77,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/repl/image_collection_entry',
         '$BUILD_DIR/mongo/db/repl/repl_server_parameters',
         '$BUILD_DIR/mongo/db/repl/tenant_migration_access_blocker',
-        '$BUILD_DIR/mongo/db/s/sharding_api_d',
         '$BUILD_DIR/mongo/db/server_feature_flags',
         '$BUILD_DIR/mongo/db/session/session_catalog',
         '$BUILD_DIR/mongo/db/session/session_catalog_mongod',
@@ -90,37 +88,39 @@ env.Library(
         '$BUILD_DIR/mongo/db/views/view_catalog_helpers',
         '$BUILD_DIR/mongo/s/coreshard',
         '$BUILD_DIR/mongo/s/grid',
-        'op_observer',
         'op_observer_util',
     ],
 )
 
 env.Library(
-    target="fcv_op_observer",
+    target='fcv_op_observer',
     source=[
-        "fcv_op_observer.cpp",
+        'fcv_op_observer.cpp',
+    ],
+    LIBDEPS=[
+        'op_observer',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/commands/mongod_fcv',
         '$BUILD_DIR/mongo/db/session/kill_sessions_local',
         '$BUILD_DIR/mongo/executor/egress_tag_closer_manager',
-        'op_observer',
         'op_observer_util',
     ],
 )
 
 env.Library(
-    target="user_write_block_mode_op_observer",
+    target='user_write_block_mode_op_observer',
     source=[
-        "user_write_block_mode_op_observer.cpp",
+        'user_write_block_mode_op_observer.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
         'op_observer',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/s/sharding_api_d',
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/catalog/collection',
+        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
         '$BUILD_DIR/mongo/db/s/user_writes_recoverable_critical_section',
     ],
 )
@@ -140,6 +140,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/catalog/collection',
         '$BUILD_DIR/mongo/db/catalog/import_collection_oplog_entry',
         '$BUILD_DIR/mongo/db/catalog/local_oplog_info',
+        '$BUILD_DIR/mongo/db/change_stream_pre_images_collection_manager',
         '$BUILD_DIR/mongo/db/commands/create_command',
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
         '$BUILD_DIR/mongo/db/dbdirectclient',

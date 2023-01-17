@@ -12,9 +12,13 @@ env.Library(
     source=[
         'flush_router_config_cmd.cpp',
         'get_shard_map_cmd.cpp',
+        'sharding_expressions.cpp',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/index_key_validate',
         '$BUILD_DIR/mongo/db/commands',
+        '$BUILD_DIR/mongo/db/index/index_descriptor',
+        '$BUILD_DIR/mongo/db/s/sharding_api_d',
         '$BUILD_DIR/mongo/s/grid',
         '$BUILD_DIR/mongo/s/startup_initialization',
     ],

@@ -128,9 +128,8 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/service_liaison',
-        '$BUILD_DIR/mongo/db/session/kill_sessions',
+        'kill_sessions',
         'logical_session_cache',
-        'logical_session_id',
         'logical_session_id_helpers',
         'sessions_collection',
     ],
@@ -148,15 +147,12 @@ env.Library(
         'session_killer.cpp',
         'kill_sessions.idl',
     ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/api_parameters',
         '$BUILD_DIR/mongo/db/auth/auth',
         '$BUILD_DIR/mongo/db/auth/authprivilege',
         '$BUILD_DIR/mongo/db/auth/user',
-        '$BUILD_DIR/mongo/idl/idl_parser',
+        '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/rpc/client_metadata',
         'logical_session_id_helpers',
     ],

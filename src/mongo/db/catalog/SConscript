@@ -242,8 +242,11 @@ env.Library(
         'collection.cpp',
         'collection_operation_source.cpp',
     ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/s/sharding_api_d',
+    ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/server_base',
     ],
 )
 
