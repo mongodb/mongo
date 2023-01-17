@@ -4866,14 +4866,14 @@ tasks:
 
 - <<: *task_template
   name: change_streams_multitenant_passthrough
-  tags: [] # TODO SERVER-67543 Add 'change_streams' tag.
+  tags: ["change_streams"]
   commands:
   - func: "do setup"
   - func: "run tests"
 
 - <<: *task_template
   name: change_streams_multitenant_sharded_collections_passthrough
-  tags: [] # TODO SERVER-67543 Add 'change_streams' tag.
+  tags: ["change_streams"]
   commands:
   - func: "do setup"
   - func: "run tests"

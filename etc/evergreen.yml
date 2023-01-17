@@ -1569,8 +1569,6 @@ buildvariants:
   - name: .change_stream_fuzzer
   - name: change_streams_multitenant_passthrough
   - name: change_streams_multitenant_sharded_collections_passthrough
-    distros:
-    - rhel80-medium # TODO SERVER-67543 remove the distro.
   - name: .misc_js
   - name: .clustered_collections
   - name: .concurrency !.large !.ubsan !.no_txns !.debug_only
