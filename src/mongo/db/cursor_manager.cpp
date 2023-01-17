@@ -43,7 +43,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/kill_sessions_common.h"
 #include "mongo/db/session/logical_session_cache.h"
@@ -261,8 +260,7 @@ void CursorManager::unpin(OperationContext* opCtx,
     // interesting in proactively cleaning up that cursor's resources. In these cases, we
     // proactively delete the cursor. In other cases we preserve the error code so that the client
     // will see the reason the cursor was killed when asking for the next batch.
-    if (interruptStatus == ErrorCodes::Interrupted || interruptStatus == ErrorCodes::CursorKilled ||
-        (cursor->cameFromRouter() && interruptStatus == ErrorCodes::MaxTimeMSExpired)) {
+    if (interruptStatus == ErrorCodes::Interrupted || cursor->isKillPending()) {
         LOGV2(20530,
               "removing cursor {cursor_cursorid} after completing batch: {error}",
               "Removing cursor after completing batch",
@@ -270,7 +268,7 @@ void CursorManager::unpin(OperationContext* opCtx,
               "error"_attr = interruptStatus);
         return deregisterAndDestroyCursor(std::move(partition), opCtx, std::move(cursor));
     } else if (!interruptStatus.isOK()) {
-        cursor->markAsKilled(interruptStatus);
+        cursor->getExecutor()->markAsKilled(interruptStatus);
     }
 
     // The cursor will stay around in '_cursorMap', so release the unique pointer to avoid deleting
@@ -373,7 +371,6 @@ ClientCursorPin CursorManager::registerCursor(OperationContext* opCtx,
 
     std::unique_ptr<ClientCursor, ClientCursor::Deleter> clientCursor(
         new ClientCursor(std::move(cursorParams), cursorId, opCtx, now));
-    clientCursor->setCameFromRouter(OperationShardingState::isComingFromRouter(opCtx));
 
     // Register this cursor for lookup by transaction.
     if (opCtx->getLogicalSessionId() && opCtx->getTxnNumber()) {
@@ -438,6 +435,10 @@ Status CursorManager::killCursor(OperationContext* opCtx, CursorId id) {
             cursor->_operationUsingCursor->getServiceContext()->killOperation(
                 lk, cursor->_operationUsingCursor, ErrorCodes::CursorKilled);
         }
+
+        // Mark that the cursor has been killed on the cursor object itself as well, as other errors
+        // e.g. MaxTimeMSExpired may override the CursorKilled status.
+        cursor->setKillPending(true);
         return Status::OK();
     }
     std::unique_ptr<ClientCursor, ClientCursor::Deleter> ownedCursor(cursor);

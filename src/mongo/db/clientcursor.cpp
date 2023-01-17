@@ -128,10 +128,6 @@ ClientCursor::~ClientCursor() {
         cursorStatsMoreThanOneBatch.increment();
 }
 
-void ClientCursor::markAsKilled(Status killStatus) {
-    _exec->markAsKilled(killStatus);
-}
-
 void ClientCursor::dispose(OperationContext* opCtx) {
     if (_disposed) {
         return;

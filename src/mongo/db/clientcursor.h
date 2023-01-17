@@ -300,21 +300,19 @@ public:
     }
 
     /**
-     * When properly set, returns true when this client cursor came from router (mongos) in case of
-     * sharding.
+     * Returns true if a client has requested that this cursor can be killed.
      */
-    bool cameFromRouter() const {
-        return _cameFromRouter;
+    bool isKillPending() const {
+        return _killPending;
     }
 
     /**
-     * Sets 'cameFromRouter' flag of this client cursor. This flag comes from 'OperationContext'.
-     *
-     * A cursor needs to store this, because it might be used with several operation contexts, but
-     * only the first operation context has this information.
+     * Sets 'killPending' flag of this client cursor. This indicates to the cursor that a client
+     * has requested that it be killed while it was pinned, and it can proactively clean up its
+     * resources upon unpinning.
      */
-    void setCameFromRouter(bool newValue) {
-        _cameFromRouter = newValue;
+    void setKillPending(bool newValue) {
+        _killPending = newValue;
     }
 
 private:
@@ -348,12 +346,6 @@ private:
      * destroyed.
      */
     ~ClientCursor();
-
-    /**
-     * Marks this cursor as killed, so any future uses will return 'killStatus'. It is an error to
-     * call this method with Status::OK.
-     */
-    void markAsKilled(Status killStatus);
 
     /**
      * Disposes this ClientCursor's PlanExecutor. Must be called before deleting a ClientCursor to
@@ -458,7 +450,8 @@ private:
     // The client OperationKey associated with this cursor.
     boost::optional<OperationKey> _opKey;
 
-    bool _cameFromRouter = false;
+    // Flag indicating that a client has requested to kill the cursor.
+    bool _killPending = false;
 };
 
 /**
