@@ -857,17 +857,22 @@ bool AsyncResultsMerger::_haveOutstandingBatchRequests(WithLock) {
     return false;
 }
 
-void AsyncResultsMerger::_scheduleKillCursors(WithLock, OperationContext* opCtx) {
+void AsyncResultsMerger::_scheduleKillCursors(WithLock lk, OperationContext* opCtx) {
     invariant(_killCompleteInfo);
 
     for (const auto& remote : _remotes) {
-        if ((remote.status.isOK() || remote.status == ErrorCodes::MaxTimeMSExpired) &&
-            remote.cursorId && !remote.exhausted()) {
+        if (_shouldKillRemote(lk, remote)) {
             BSONObj cmdObj =
                 KillCursorsCommandRequest(_params.getNss(), {remote.cursorId}).toBSON(BSONObj{});
 
-            executor::RemoteCommandRequest request(
-                remote.getTargetHost(), _params.getNss().db().toString(), cmdObj, opCtx);
+            executor::RemoteCommandRequest::Options options;
+            options.fireAndForget = true;
+            executor::RemoteCommandRequest request(remote.getTargetHost(),
+                                                   _params.getNss().db().toString(),
+                                                   cmdObj,
+                                                   rpc::makeEmptyMetadata(),
+                                                   opCtx,
+                                                   options);
             // The 'RemoteCommandRequest' takes the remaining time from the 'opCtx' parameter. If
             // the cursor was killed due to a maxTimeMs timeout, the remaining time will be 0, and
             // the remote request will not be sent. To avoid this, we remove the timeout for the
@@ -878,6 +883,12 @@ void AsyncResultsMerger::_scheduleKillCursors(WithLock, OperationContext* opCtx)
             _executor->scheduleRemoteCommand(request, [](auto const&) {}).getStatus().ignore();
         }
     }
+}
+
+bool AsyncResultsMerger::_shouldKillRemote(WithLock, const RemoteCursorData& remote) {
+    return (remote.status.isOK() || remote.status == ErrorCodes::MaxTimeMSExpired ||
+            remote.status == ErrorCodes::Interrupted) &&
+        remote.cursorId && !remote.exhausted();
 }
 
 stdx::shared_future<void> AsyncResultsMerger::kill(OperationContext* opCtx) {

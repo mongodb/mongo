@@ -465,6 +465,11 @@ private:
     void _scheduleKillCursors(WithLock, OperationContext* opCtx);
 
     /**
+     * Checks if we need to schedule a killCursor command for this remote
+     */
+    bool _shouldKillRemote(WithLock, const RemoteCursorData& remote);
+
+    /**
      * Updates the given remote's metadata (e.g. the cursor id) based on information in 'response'.
      */
     void _updateRemoteMetadata(WithLock, size_t remoteIndex, const CursorResponse& response);
