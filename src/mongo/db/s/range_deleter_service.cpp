@@ -353,9 +353,9 @@ void RangeDeleterService::_recoverRangeDeletionsOnStepUp(OperationContext* opCtx
 
                 // The Scoped lock is needed to serialize with concurrent range deletions
                 ScopedRangeDeleterLock rangeDeleterLock(opCtx, MODE_S);
-                // The collection lock is needed to serialize with donors trying to
-                // schedule local range deletions by updating the 'pending' field
-                AutoGetCollection rangeDeletionLock(
+                // The collection lock is needed to serialize with migrations trying to
+                // schedule range deletions by updating the 'pending' field
+                AutoGetCollection collRangeDeletionLock(
                     opCtx, NamespaceString::kRangeDeletionNamespace, MODE_S);
 
                 DBDirectClient client(opCtx);
@@ -420,7 +420,7 @@ void RangeDeleterService::_recoverRangeDeletionsOnStepUp(OperationContext* opCtx
                     this->_state = kUp;
                 }
             })
-            .semi();
+            .share();
 }
 
 void RangeDeleterService::_joinAndResetState() {

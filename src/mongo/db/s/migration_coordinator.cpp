@@ -279,12 +279,15 @@ SharedSemiFuture<void> MigrationCoordinator::_commitMigrationOnDonorAndRecipient
             .semi();
     }();
 
+
     // Register the range deletion task as pending in order to get the completion future
+    const auto rangeDeleterService = RangeDeleterService::get(opCtx);
+    rangeDeleterService->getRangeDeleterServiceInitializationFuture().get(opCtx);
     auto rangeDeletionCompletionFuture =
-        RangeDeleterService::get(opCtx)->registerTask(deletionTask,
-                                                      std::move(waitForActiveQueriesToComplete),
-                                                      false /* fromStepUp*/,
-                                                      true /* pending */);
+        rangeDeleterService->registerTask(deletionTask,
+                                          std::move(waitForActiveQueriesToComplete),
+                                          false /* fromStepUp*/,
+                                          true /* pending */);
 
     LOGV2_DEBUG(6555800,
                 2,

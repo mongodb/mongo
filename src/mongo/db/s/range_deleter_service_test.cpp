@@ -47,7 +47,7 @@ void RangeDeleterServiceTest::setUp() {
     opCtx = operationContext();
     RangeDeleterService::get(opCtx)->onStartup(opCtx);
     RangeDeleterService::get(opCtx)->onStepUpComplete(opCtx, 0L);
-    RangeDeleterService::get(opCtx)->_waitForRangeDeleterServiceUp_FOR_TESTING();
+    RangeDeleterService::get(opCtx)->getRangeDeleterServiceInitializationFuture().get(opCtx);
 
     {
         OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE unsafeCreateCollection(
@@ -665,7 +665,7 @@ TEST_F(RangeDeleterServiceTest, RescheduleRangeDeletionTasksOnStepUp) {
 
     // Trigger step-up
     rds->onStepUpComplete(opCtx, 0L);
-    rds->_waitForRangeDeleterServiceUp_FOR_TESTING();
+    rds->getRangeDeleterServiceInitializationFuture().get(opCtx);
 
     // Check that all non-pending tasks are being rescheduled
     ASSERT_EQ(nNonPending + nNonPendingAndProcessing,

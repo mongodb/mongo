@@ -387,7 +387,7 @@ public:
         auto opCtx = operationContext();
         RangeDeleterService::get(opCtx)->onStartup(opCtx);
         RangeDeleterService::get(opCtx)->onStepUpComplete(opCtx, 0L);
-        RangeDeleterService::get(opCtx)->_waitForRangeDeleterServiceUp_FOR_TESTING();
+        RangeDeleterService::get(opCtx)->getRangeDeleterServiceInitializationFuture().get(opCtx);
     }
 
     void tearDown() override {

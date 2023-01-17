@@ -175,7 +175,7 @@ private:
     State _state{kDown};
 
     // Future markes as ready when the state changes to "up"
-    SemiFuture<void> _stepUpCompletedFuture;
+    SharedSemiFuture<void> _stepUpCompletedFuture;
     // Operation context used for initialization
     ServiceContext::UniqueOperationContext _initOpCtxHolder;
 
@@ -251,9 +251,9 @@ public:
      */
     long long totalNumOfRegisteredTasks();
 
-    /* ONLY FOR TESTING: wait for the state to become "up" */
-    void _waitForRangeDeleterServiceUp_FOR_TESTING() {
-        _stepUpCompletedFuture.get();
+    /* Returns a shared semi-future marked as ready once the service is initialized */
+    SharedSemiFuture<void> getRangeDeleterServiceInitializationFuture() {
+        return _stepUpCompletedFuture;
     }
 
     std::unique_ptr<ReadyRangeDeletionsProcessor> _readyRangeDeletionsProcessorPtr;
