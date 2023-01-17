@@ -83,6 +83,9 @@ public:
     }
 
     void tearDown() override {
+        _executor->shutdown();
+        _executor->join();
+
         TransactionCoordinatorService::get(operationContext())->onStepDown();
         ShardServerTestFixture::tearDown();
     }
