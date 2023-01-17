@@ -146,6 +146,12 @@ def main():
             activate=True,
         )
         variant.add_task_group(create_task_group('linux', tasks['linux_tasks']), ['rhel80-xlarge'])
+        variant = BuildVariant(
+            name="enterprise-rhel-80-aarch64-build-metrics",
+            activate=True,
+        )
+        variant.add_task_group(
+            create_task_group('linux', tasks['linux_tasks']), ['amazon2022-arm64-large'])
 
     project = ShrubProject({variant})
     with open('build_metrics_task_gen.json', 'w') as fout:
