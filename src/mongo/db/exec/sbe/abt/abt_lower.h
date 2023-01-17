@@ -173,7 +173,6 @@ public:
                                          const ABT& pidBind,
                                          const ABT& refs);
 
-    std::unique_ptr<sbe::PlanStage> walk(const ScanNode& n, const ABT& /*binds*/);
     std::unique_ptr<sbe::PlanStage> walk(const PhysicalScanNode& n, const ABT& /*binds*/);
     std::unique_ptr<sbe::PlanStage> walk(const CoScanNode& n);
 
@@ -185,10 +184,6 @@ public:
     std::unique_ptr<sbe::PlanStage> optimize(const ABT& n);
 
 private:
-    std::unique_ptr<sbe::PlanStage> lowerScanNode(const Node& n,
-                                                  const std::string& scanDefName,
-                                                  const FieldProjectionMap& fieldProjectionMap,
-                                                  bool useParallelScan);
     void generateSlots(const FieldProjectionMap& fieldProjectionMap,
                        boost::optional<sbe::value::SlotId>& ridSlot,
                        boost::optional<sbe::value::SlotId>& rootSlot,

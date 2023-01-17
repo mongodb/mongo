@@ -324,6 +324,8 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::optimize(const ABT& n) {
 }
 
 std::unique_ptr<sbe::PlanStage> SBENodeLowering::generateInternal(const ABT& n) {
+    tassert(
+        7239200, "Should not be lowering only logical ABT node", !n.cast<ExclusivelyLogicalNode>());
     return algebra::walk<false>(n, *this);
 }
 
@@ -979,12 +981,10 @@ static NamespaceStringOrUUID parseFromScanDef(const ScanDefinition& def) {
     return {dbName, UUID::parse(uuidStr).getValue()};
 }
 
-std::unique_ptr<sbe::PlanStage> SBENodeLowering::lowerScanNode(
-    const Node& n,
-    const std::string& scanDefName,
-    const FieldProjectionMap& fieldProjectionMap,
-    const bool useParallelScan) {
-    const ScanDefinition& def = _metadata._scanDefs.at(scanDefName);
+
+std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const PhysicalScanNode& n,
+                                                      const ABT& /*binds*/) {
+    const ScanDefinition& def = _metadata._scanDefs.at(n.getScanDefName());
     uassert(6624231, "Collection must exist to lower Scan", def.exists());
     auto& typeSpec = def.getOptionsMap().at("type");
 
@@ -992,7 +992,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::lowerScanNode(
     boost::optional<sbe::value::SlotId> rootSlot;
     std::vector<std::string> fields;
     sbe::value::SlotVector vars;
-    generateSlots(fieldProjectionMap, ridSlot, rootSlot, fields, vars);
+    generateSlots(n.getFieldProjectionMap(), ridSlot, rootSlot, fields, vars);
 
     const PlanNodeId planNodeId = _nodeToGroupPropsMap.at(&n)._planNodeId;
     if (typeSpec == "mongod") {
@@ -1002,7 +1002,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::lowerScanNode(
         boost::optional<sbe::value::SlotId> seekKeySlot;
 
         sbe::ScanCallbacks callbacks({}, {}, {});
-        if (useParallelScan) {
+        if (n.useParallelScan()) {
             return sbe::makeS<sbe::ParallelScanStage>(nss.uuid().value(),
                                                       rootSlot,
                                                       ridSlot,
@@ -1037,17 +1037,6 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::lowerScanNode(
         uasserted(6624355, "Unknown scan type.");
     }
     return nullptr;
-}
-
-std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const ScanNode& n, const ABT& /*binds*/) {
-    FieldProjectionMap fieldProjectionMap;
-    fieldProjectionMap._rootProjection = n.getProjectionName();
-    return lowerScanNode(n, n.getScanDefName(), fieldProjectionMap, false /*useParallelScan*/);
-}
-
-std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const PhysicalScanNode& n,
-                                                      const ABT& /*binds*/) {
-    return lowerScanNode(n, n.getScanDefName(), n.getFieldProjectionMap(), n.useParallelScan());
 }
 
 std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const CoScanNode& n) {

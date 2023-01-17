@@ -40,6 +40,7 @@
 #include "mongo/db/query/optimizer/rewrites/path_lower.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
+#include "mongo/unittest/death_test.h"
 #include "mongo/unittest/golden_test.h"
 #include "mongo/unittest/unittest.h"
 #include <vector>
@@ -864,6 +865,15 @@ TEST_F(ABTPlanGeneration, LowerVarExpression) {
                                    _path(make<EvalPath>(make<PathGet>("a", make<PathIdentity>()),
                                                         make<Variable>(scanLabel))),
                                    _node(scanForTest()))));
+}
+
+DEATH_TEST_F(ABTPlanGeneration,
+             LowerScanLogicalNode,
+             "Should not be lowering only logical ABT node") {
+    GoldenTestContext ctx(&goldenTestConfig);
+    ctx.printTestHeader(GoldenTestContext::HeaderFormat::Text);
+
+    runNodeVariation(ctx, "Do not lower scan node", _node(make<ScanNode>("proj0", "scan0")));
 }
 
 }  // namespace
