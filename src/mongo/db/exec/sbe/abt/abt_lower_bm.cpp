@@ -28,24 +28,29 @@
  */
 
 #include <benchmark/benchmark.h>
+#include <string>
 
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
+#include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/metadata_factory.h"
+#include "mongo/db/query/optimizer/node.h"
 #include "mongo/db/query/optimizer/node_defs.h"
+#include "mongo/db/query/optimizer/rewrites/const_eval.h"
+#include "mongo/db/query/optimizer/rewrites/path_lower.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
+#include "mongo/util/str.h"
 
 namespace mongo::optimizer {
 namespace {
-class ABTLoweringFixture : public benchmark::Fixture {
+class ABTNodeLoweringFixture : public benchmark::Fixture {
+protected:
     ProjectionName scanLabel = ProjectionName{"scan0"_sd};
     NodeToGroupPropsMap _nodeMap;
     // This can be modified by tests that need other labels.
     FieldProjectionMap _fieldProjMap{{}, {scanLabel}, {}};
     int lastNodeGenerated = 0;
-
-protected:
     auto getNextNodeID() {
         return lastNodeGenerated++;
     }
@@ -66,7 +71,7 @@ protected:
         _nodeMap.insert({tree.cast<Node>(), makeNodeProp()});
         return std::move(tree);
     }
-    void benchmarkABTLowering(benchmark::State& state, const ABT& n) {
+    void benchmarkLowering(benchmark::State& state, const ABT& n) {
         for (auto keepRunning : state) {
             auto m = Metadata(
                 {{"collName",
@@ -84,14 +89,161 @@ protected:
             benchmark::ClobberMemory();
         }
     }
+
+    ABT scanNode(std::string scanProj = "scan0") {
+        return make<PhysicalScanNode>(
+            FieldProjectionMap{{}, {ProjectionName{scanProj}}, {}}, "collName", false);
+    }
+
+    void runPathLowering(VariableEnvironment& env, PrefixId& prefixId, ABT& tree) {
+        // Run rewriters while things change
+        bool changed = false;
+        do {
+            changed = false;
+            if (PathLowering{prefixId, env}.optimize(tree)) {
+                changed = true;
+            }
+            if (ConstEval{env}.optimize(tree)) {
+                changed = true;
+            }
+        } while (changed);
+    }
+
+    void runPathLowering(ABT& tree) {
+        auto env = VariableEnvironment::build(tree);
+        auto prefixId = PrefixId::createForTests();
+        runPathLowering(env, prefixId, tree);
+    }
+
+    ABT createBindings(std::vector<std::pair<std::string, std::string>> bindingList,
+                       ABT source,
+                       std::string sourceBinding) {
+        for (auto [fieldName, bindingName] : bindingList) {
+            auto field =
+                make<EvalPath>(make<PathGet>(FieldNameType(fieldName), make<PathIdentity>()),
+                               make<Variable>(ProjectionName(sourceBinding)));
+            runPathLowering(field);
+            ABT evalNode = make<EvaluationNode>(
+                ProjectionName(bindingName), std::move(field), std::move(source));
+            source = std::move(_node(std::move(evalNode)));
+        }
+        return source;
+    }
+
+    // Create bindings (as above) and also create a scan node source.
+    ABT createBindings(std::vector<std::pair<std::string, std::string>> bindingList) {
+        return createBindings(bindingList, _node(scanNode("scan0")), "scan0");
+    }
 };
 
-BENCHMARK_F(ABTLoweringFixture, BM_LowerPhysicalScan)(benchmark::State& state) {
-    benchmarkABTLowering(
+BENCHMARK_F(ABTNodeLoweringFixture, BM_LowerPhysicalScan)(benchmark::State& state) {
+    benchmarkLowering(
         state,
         _node(make<PhysicalScanNode>(
             FieldProjectionMap{{}, {ProjectionName{"root0"}}, {}}, "collName", false)));
 }
+
+BENCHMARK_F(ABTNodeLoweringFixture, BM_LowerIndexScanAndSeek)(benchmark::State& state) {
+    auto indexScan =
+        _node(make<IndexScanNode>(FieldProjectionMap{{ProjectionName{"rid"}}, {}, {}},
+                                  "collName",
+                                  "idx",
+                                  CompoundIntervalRequirement{IntervalRequirement(
+                                      BoundRequirement(false, Constant::fromDouble(23)),
+                                      BoundRequirement(true, Constant::fromDouble(35)))},
+                                  false));
+
+    auto seek = _node(make<LimitSkipNode>(
+        properties::LimitSkipRequirement(1, 0),
+        _node(make<SeekNode>(ProjectionName{"rid"}, _fieldProjMap, "collName"))));
+
+    benchmarkLowering(state,
+                      _node(make<NestedLoopJoinNode>(JoinType::Inner,
+                                                     ProjectionNameSet{"rid"},
+                                                     Constant::boolean(true),
+                                                     std::move(indexScan),
+                                                     std::move(seek))));
+}
+
+BENCHMARK_F(ABTNodeLoweringFixture, BM_LowerGroupByPlan)(benchmark::State& state) {
+    benchmarkLowering(
+        state,
+        _node(make<RootNode>(
+            ProjectionNameOrderPreservingSet({"key1", "outFunc1"}),
+            _node(make<GroupByNode>(
+                ProjectionNameVector{"key1"},
+                ProjectionNameVector{"outFunc1"},
+                makeSeq(make<FunctionCall>("$sum", makeSeq(make<Variable>("aggInput1")))),
+                GroupNodeType::Complete,
+                createBindings({{"a", "key1"}, {"c", "aggInput1"}}))))));
+}
+
+BENCHMARK_DEFINE_F(ABTNodeLoweringFixture, BM_LowerNestedLoopJoins)(benchmark::State& state) {
+    const int64_t nNLJs = state.range(0);
+    ABT n = scanNode();
+    for (int i = 0; i < nNLJs; i++) {
+        ABT leftChild = _node(scanNode(str::stream() << "scan" << std::to_string(i + 1)));
+        n = make<NestedLoopJoinNode>(JoinType::Inner,
+                                     ProjectionNameSet{},
+                                     Constant::boolean(true),
+                                     std::move(leftChild),
+                                     std::move(_node(std::move(n))));
+    }
+    benchmarkLowering(state, _node(std::move(n)));
+}
+
+BENCHMARK_REGISTER_F(ABTNodeLoweringFixture, BM_LowerNestedLoopJoins)
+    ->Arg(1)
+    ->Arg(20)
+    ->Arg(40)
+    ->Arg(100);
+
+BENCHMARK_DEFINE_F(ABTNodeLoweringFixture, BM_LowerEvalNodes)(benchmark::State& state) {
+    const int64_t nEvals = state.range(0);
+    ABT n = scanNode();
+    for (int i = 0; i < nEvals; i++) {
+        n = make<EvaluationNode>(ProjectionName(str::stream() << "proj" << std::to_string(i)),
+                                 Constant::int32(1337),
+                                 _node(std::move(n)));
+    }
+    benchmarkLowering(state, _node(std::move(n)));
+}
+
+BENCHMARK_REGISTER_F(ABTNodeLoweringFixture, BM_LowerEvalNodes)->Arg(1)->Arg(20)->Arg(40)->Arg(100);
+
+BENCHMARK_DEFINE_F(ABTNodeLoweringFixture, BM_LowerEvalNodesUnderNLJs)(benchmark::State& state) {
+    const int64_t nEvals = state.range(0);
+    const int64_t nNLJs = state.range(1);
+
+    ABT n = scanNode();
+    for (int i = 0; i < nNLJs; i++) {
+        ABT leftChild = scanNode(str::stream() << "scan" << std::to_string(i + 1));
+        for (int j = 0; j < nEvals; j++) {
+            leftChild =
+                make<EvaluationNode>(ProjectionName(str::stream() << "proj" << std::to_string(i)
+                                                                  << "-" << std::to_string(j)),
+                                     Constant::int32(1337),
+                                     _node(std::move(leftChild)));
+        }
+        n = make<NestedLoopJoinNode>(JoinType::Inner,
+                                     ProjectionNameSet{},
+                                     Constant::boolean(true),
+                                     std::move(_node(std::move(leftChild))),
+                                     std::move(_node(std::move(n))));
+    }
+
+    benchmarkLowering(state, _node(std::move(n)));
+}
+
+BENCHMARK_REGISTER_F(ABTNodeLoweringFixture, BM_LowerEvalNodesUnderNLJs)
+    ->Args({1, 1})
+    ->Args({2, 1})
+    ->Args({1, 2})
+    ->Args({2, 2})
+    ->Args({4, 2})
+    ->Args({2, 4})
+    ->Args({4, 4})
+    ->Args({5, 5});
 
 }  // namespace
 }  // namespace mongo::optimizer

@@ -5,6 +5,7 @@ selector:
   root: build/benchmarks.txt
   include_files:
   # The trailing asterisk is for handling the .exe extension on Windows.
+  - build/**/system_resource_canary_bm*
   - build/install/bin/abt_lowering_bm*
 
 executor:
