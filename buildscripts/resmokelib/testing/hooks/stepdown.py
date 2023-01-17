@@ -363,7 +363,7 @@ class FileBasedStepdownLifecycle(object):
 
         # We remove the "permitted" file to revoke permission for the stepdown thread to continue
         # performing stepdowns.
-        os.remove(self.__stepdown_files.permitted)
+        fs.remove_if_exists(self.__stepdown_files.permitted)
 
 
 class _StepdownThread(threading.Thread):  # pylint: disable=too-many-instance-attributes
