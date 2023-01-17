@@ -288,6 +288,12 @@ config_bool(
 )
 
 config_bool(
+    ENABLE_GCP
+    "Build the Google Cloud Platform storage extension"
+    DEFAULT OFF
+)
+
+config_bool(
     ENABLE_AZURE
     "Build the Azure storage extension"
     DEFAULT OFF

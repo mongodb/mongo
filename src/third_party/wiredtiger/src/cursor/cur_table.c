@@ -87,6 +87,7 @@ __wt_apply_single_idx(WT_SESSION_IMPL *session, WT_INDEX *idx, WT_CURSOR *cur,
 {
     WT_CURSOR_STATIC_INIT(iface, __wt_cursor_get_key, /* get-key */
       __wt_cursor_get_value,                          /* get-value */
+      __wt_cursor_get_raw_key_value,                  /* get-raw-key-value */
       __wt_cursor_set_key,                            /* set-key */
       __wt_cursor_set_value,                          /* set-value */
       __wt_cursor_compare_notsup,                     /* compare */
@@ -1046,6 +1047,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, 
 {
     WT_CURSOR_STATIC_INIT(iface, __wt_curtable_get_key, /* get-key */
       __wt_curtable_get_value,                          /* get-value */
+      __wt_cursor_get_raw_key_value_notsup,             /* get-raw-key-value */
       __wt_curtable_set_key,                            /* set-key */
       __wt_curtable_set_value,                          /* set-value */
       __curtable_compare,                               /* compare */

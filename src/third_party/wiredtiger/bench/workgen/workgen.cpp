@@ -2553,18 +2553,19 @@ TableInternal::TableInternal(const TableInternal &other)
 }
 
 WorkloadOptions::WorkloadOptions()
-    : max_latency(0), report_file("workload.stat"), report_interval(0), run_time(0),
-      sample_file("monitor.json"), sample_interval_ms(0), max_idle_table_cycle(0), sample_rate(1),
-      warmup(0), oldest_timestamp_lag(0.0), stable_timestamp_lag(0.0), timestamp_advance(0.0),
-      max_idle_table_cycle_fatal(false), create_count(0), create_interval(0), create_prefix(""),
-      create_target(0), create_trigger(0), drop_count(0), drop_interval(0), drop_target(0),
-      drop_trigger(0), _options()
+    : max_latency(0), report_enabled(true), report_file("workload.stat"), report_interval(0),
+      run_time(0), sample_file("monitor.json"), sample_interval_ms(0), max_idle_table_cycle(0),
+      sample_rate(1), warmup(0), oldest_timestamp_lag(0.0), stable_timestamp_lag(0.0),
+      timestamp_advance(0.0), max_idle_table_cycle_fatal(false), create_count(0),
+      create_interval(0), create_prefix(""), create_target(0), create_trigger(0), drop_count(0),
+      drop_interval(0), drop_target(0), drop_trigger(0), _options()
 {
     _options.add_int("max_latency", max_latency,
       "prints warning if any latency measured exceeds this number of "
       "milliseconds. Requires sample_interval to be configured.");
     _options.add_int("report_interval", report_interval,
       "output throughput information every interval seconds, 0 to disable");
+    _options.add_bool("report_enabled", report_enabled, "Enable collecting run output");
     _options.add_string("report_file", report_file,
       "file name for collecting run output, "
       "including output from the report_interval option. "
@@ -2685,7 +2686,7 @@ WorkloadRunner::run(WT_CONNECTION *conn)
         THROW("Workload.options.sample_rate must be positive");
 
     std::ofstream report_out;
-    if (!options->report_file.empty()) {
+    if (options->report_enabled && !options->report_file.empty()) {
         open_report_file(report_out, options->report_file, "Workload.options.report_file");
         _report_out = &report_out;
     }
@@ -2800,10 +2801,12 @@ WorkloadRunner::run_all(WT_CONNECTION *conn)
     for (size_t i = 0; i < _trunners.size(); i++)
         _trunners[i].get_static_counts(counts);
 
-    std::ostream &out = *_report_out;
-    out << "Starting workload: " << _trunners.size() << " threads, ";
-    counts.report(out);
-    out << std::endl;
+    if (_workload->options.report_enabled) {
+        std::ostream &out = *_report_out;
+        out << "Starting workload: " << _trunners.size() << " threads, ";
+        counts.report(out);
+        out << std::endl;
+    }
 
     // Start all threads
     WorkloadOptions *options = &_workload->options;
@@ -3044,13 +3047,16 @@ WorkloadRunner::run_all(WT_CONNECTION *conn)
             monitor_json.close();
     }
 
-    // issue the final report
-    timespec finalsecs = now - _start;
-    final_report(finalsecs);
+    // Issue the final report.
+    if (options->report_enabled) {
+        timespec finalsecs = now - _start;
+        final_report(finalsecs);
+    }
 
     if (ret != 0)
         std::cerr << "run_all failed err=" << ret << std::endl;
-    (*_report_out) << std::endl;
+    if (options->report_enabled)
+        (*_report_out) << std::endl;
     if (exception != nullptr)
         throw *exception;
     return (ret);

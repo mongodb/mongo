@@ -25,6 +25,9 @@ check()
     (sed -e '/^#/d' s_export.list &&
     eval $NM |
     sed 's/.* //' |
+    # Functions beginning with __ut are intentionally exposed to support unit testing when
+    # Wiredtiger is compiled with HAVE_UNITTEST=1.
+    egrep -v '^__ut' |
     egrep -v '^__wt') |
     sort |
     uniq -u |

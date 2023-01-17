@@ -260,6 +260,27 @@ struct __wt_cursor {
 	int __F(get_value)(WT_CURSOR *cursor, ...);
 
 	/*!
+	 * Get the raw key and value for the current record.
+	 *
+	 * @snippet ex_all.c Get the raw key and value for the current record.
+	 *
+	 * @snippet ex_all.c Set the cursor's record number key
+	 *
+	 * @param cursor the cursor handle
+	 * @param key pointer to an item that will contains the current record's raw key
+	 * @param value pointer to an item that will contains the current record's raw value
+	 *
+	 * The caller can optionally pass in NULL for either key or value to retrieve only
+	 * the other of the key or value.
+	 *
+	 * If an error occurs during this operation, a flag will be set in the
+	 * cursor, and the next operation to access the key will fail.  This
+	 * simplifies error handling in applications.
+	 * @errors
+	 */
+        int __F(get_raw_key_value)(WT_CURSOR *cursor, WT_ITEM* key, WT_ITEM* value);
+
+	/*!
 	 * Set the key for the next operation.
 	 *
 	 * @snippet ex_all.c Set the cursor's string key
