@@ -64,7 +64,7 @@ namespace {
 using namespace fmt::literals;
 
 void moveFile(const std::string& src, const std::string& dst) {
-    LOGV2_DEBUG(6114304, 1, "Moving file", "src"_attr = src, "dst"_attr = dst);
+    LOGV2_DEBUG(6114304, 1, "Moving file", "from"_attr = src, "to"_attr = dst);
 
     uassert(6114401,
             "Destination file '{}' already exists"_format(dst),
@@ -122,48 +122,87 @@ std::string _getPathRelativeTo(const std::string& path, const std::string& baseP
 
 void wiredTigerImportFromBackupCursor(OperationContext* opCtx,
                                       const UUID& migrationId,
-                                      const std::vector<CollectionImportMetadata>& metadatas,
-                                      const std::string& importPath) {
+                                      const std::string& importPath,
+                                      std::vector<CollectionImportMetadata>&& metadatas) {
     // Disable replication because this logic is executed on all nodes during a Shard Merge.
     repl::UnreplicatedWritesBlock uwb(opCtx);
 
-    for (auto&& collectionMetadata : metadatas) {
-        /*
-         * Move one collection file and one or more index files from temp dir to dbpath.
-         */
+    for (auto&& metadata : metadatas) {
+        std::vector<std::tuple<std::string, std::string>> revertMoves;
 
-        auto collFileSourcePath =
-            constructSourcePath(importPath, collectionMetadata.importArgs.ident);
-        auto collFileDestPath = constructDestinationPath(collectionMetadata.importArgs.ident);
-
-        moveFile(collFileSourcePath, collFileDestPath);
-
-        ScopeGuard revertCollFileMove([&] { moveFile(collFileDestPath, collFileSourcePath); });
-
-        auto indexPaths = std::vector<std::tuple<std::string, std::string>>();
-        ScopeGuard revertIndexFileMove([&] {
-            for (const auto& pathTuple : indexPaths) {
-                moveFile(std::get<1>(pathTuple), std::get<0>(pathTuple));
+        ScopeGuard revertFileMoves([&] {
+            for (const auto& [srcFilePath, destFilePath] : revertMoves) {
+                try {
+                    moveFile(destFilePath, srcFilePath);
+                } catch (DBException& e) {
+                    LOGV2_WARNING(7199800,
+                                  "Failed to move file",
+                                  "from"_attr = destFilePath,
+                                  "to"_attr = srcFilePath,
+                                  "error"_attr = redact(e));
+                }
             }
         });
-        for (auto&& indexImportArgs : collectionMetadata.indexes) {
-            auto indexFileSourcePath = constructSourcePath(importPath, indexImportArgs.ident);
-            auto indexFileDestPath = constructDestinationPath(indexImportArgs.ident);
-            moveFile(indexFileSourcePath, indexFileDestPath);
-            indexPaths.push_back(std::tuple(indexFileSourcePath, indexFileDestPath));
+
+        auto moveWithNewIdent = [&](const std::string& oldIdent, const char* kind) -> std::string {
+            auto srcFilePath = constructSourcePath(importPath, oldIdent);
+
+            while (true) {
+                try {
+                    auto newIdent =
+                        DurableCatalog::get(opCtx)->generateUniqueIdent(metadata.ns, kind);
+                    auto destFilePath = constructDestinationPath(newIdent);
+
+                    moveFile(srcFilePath, destFilePath);
+                    // Register revert file move in case of failure to import collection and it's
+                    // indexes.
+                    revertMoves.emplace_back(std::move(srcFilePath), std::move(destFilePath));
+
+                    return newIdent;
+                } catch (const DBException& ex) {
+                    // Retry move on "destination file already exists" error. This can happen due to
+                    // ident collision between this import and another parallel import  via
+                    // importCollection command.
+                    if (ex.code() == 6114401) {
+                        LOGV2(7199801,
+                              "Failed to move file from temp to active WT directory. Retrying "
+                              "the move operation using another new unique ident.",
+                              "error"_attr = redact(ex.toStatus()));
+                        continue;
+                    }
+                    throw;
+                }
+            }
+            MONGO_UNREACHABLE;
+        };
+
+        BSONObjBuilder catalogMetaBuilder;
+        BSONObjBuilder storageMetaBuilder;
+
+        // Moves the collection file and it's associated index files from temp dir to dbpath.
+        // And, regenerate metadata info with new unique ident id.
+        auto newCollIdent = moveWithNewIdent(metadata.collection.ident, "collection");
+
+        catalogMetaBuilder.append("ident", newCollIdent);
+        // Update the collection ident id.
+        metadata.collection.ident = std::move(newCollIdent);
+        buildStorageMetadata(metadata.collection, storageMetaBuilder);
+
+        BSONObjBuilder newIndexIdentMap;
+        for (auto&& index : metadata.indexes) {
+            auto newIndexIdent = moveWithNewIdent(index.ident, "index");
+            newIndexIdentMap.append(index.indexName, newIndexIdent);
+            // Update the index ident id.
+            index.ident = std::move(newIndexIdent);
+            buildStorageMetadata(index, storageMetaBuilder);
         }
 
-        /*
-         * Import the collection and index(es).
-         */
-        BSONObjBuilder storageMetadataBuilder;
-        buildStorageMetadata(collectionMetadata.importArgs, storageMetadataBuilder);
-        for (const auto& indexImportArgs : collectionMetadata.indexes) {
-            buildStorageMetadata(indexImportArgs, storageMetadataBuilder);
-        }
-        const auto storageMetadata = storageMetadataBuilder.done();
+        catalogMetaBuilder.append("idxIdent", newIndexIdentMap.obj());
+        metadata.catalogObject = metadata.catalogObject.addFields(catalogMetaBuilder.obj());
+        const auto storageMetaObj = storageMetaBuilder.done();
 
-        const auto nss = collectionMetadata.ns;
+        // Import the collection and it's indexes.
+        const auto nss = metadata.ns;
         writeConflictRetry(opCtx, "importCollection", nss.ns(), [&] {
             LOGV2_DEBUG(6114303, 1, "Importing donor collection", "ns"_attr = nss);
             AutoGetDb autoDb(opCtx, nss.dbName(), MODE_IX);
@@ -184,18 +223,19 @@ void wiredTigerImportFromBackupCursor(OperationContext* opCtx,
                 Top::get(serviceContext).collectionDropped(nss);
             });
 
-            // Create Collection object
+            // Create Collection object.
             auto storageEngine = opCtx->getServiceContext()->getStorageEngine();
             auto durableCatalog = storageEngine->getCatalog();
             ImportOptions importOptions(ImportOptions::ImportCollectionUUIDOption::kKeepOld);
             importOptions.importTimestampRule = ImportOptions::ImportTimestampRule::kStable;
+            // Since we are using the ident id generated by this recipient node, ident collisions in
+            // the future after import is not possible. So, it's ok to skip the ident collision
+            // check. Otherwise, we would unnecessarily generate new rand after each collection
+            // import.
+            importOptions.skipIdentCollisionCheck = true;
 
-            auto importResult = uassertStatusOK(
-                DurableCatalog::get(opCtx)->importCollection(opCtx,
-                                                             collectionMetadata.ns,
-                                                             collectionMetadata.catalogObject,
-                                                             storageMetadata,
-                                                             importOptions));
+            auto importResult = uassertStatusOK(DurableCatalog::get(opCtx)->importCollection(
+                opCtx, nss, metadata.catalogObject, storageMetaObj, importOptions));
 
             const auto md = durableCatalog->getMetaData(opCtx, importResult.catalogId);
             for (const auto& index : md->indexes) {
@@ -209,33 +249,31 @@ void wiredTigerImportFromBackupCursor(OperationContext* opCtx,
 
             // Update the number of records and data size on commit.
             opCtx->recoveryUnit()->registerChange(
-                makeCountsChange(ownedCollection->getRecordStore(), collectionMetadata));
+                makeCountsChange(ownedCollection->getRecordStore(), metadata));
 
             CollectionCatalog::get(opCtx)->onCreateCollection(opCtx, std::move(ownedCollection));
 
             auto importedCatalogEntry =
                 storageEngine->getCatalog()->getCatalogEntry(opCtx, importResult.catalogId);
-            opCtx->getServiceContext()->getOpObserver()->onImportCollection(
-                opCtx,
-                migrationId,
-                nss,
-                collectionMetadata.numRecords,
-                collectionMetadata.dataSize,
-                importedCatalogEntry,
-                storageMetadata,
-                /*dryRun=*/false);
+            opCtx->getServiceContext()->getOpObserver()->onImportCollection(opCtx,
+                                                                            migrationId,
+                                                                            nss,
+                                                                            metadata.numRecords,
+                                                                            metadata.dataSize,
+                                                                            importedCatalogEntry,
+                                                                            storageMetaObj,
+                                                                            /*dryRun=*/false);
 
             wunit.commit();
 
             LOGV2(6114300,
                   "Imported donor collection",
                   "ns"_attr = nss,
-                  "numRecordsApprox"_attr = collectionMetadata.numRecords,
-                  "dataSizeApprox"_attr = collectionMetadata.dataSize);
+                  "numRecordsApprox"_attr = metadata.numRecords,
+                  "dataSizeApprox"_attr = metadata.dataSize);
         });
 
-        revertCollFileMove.dismiss();
-        revertIndexFileMove.dismiss();
+        revertFileMoves.dismiss();
     }
 }
 

@@ -210,7 +210,7 @@ std::string DurableCatalogImpl::getFilesystemPathForDb(const std::string& dbName
     }
 }
 
-std::string DurableCatalogImpl::_newUniqueIdent(NamespaceString nss, const char* kind) {
+std::string DurableCatalogImpl::generateUniqueIdent(NamespaceString nss, const char* kind) {
     // If this changes to not put _rand at the end, _hasEntryCollidingWithRand will need fixing.
     stdx::lock_guard<Latch> lk(_randLock);
     StringBuilder buf;
@@ -302,7 +302,7 @@ StatusWith<DurableCatalog::EntryIdentifier> DurableCatalogImpl::_addEntry(
     OperationContext* opCtx, NamespaceString nss, const CollectionOptions& options) {
     invariant(opCtx->lockState()->isDbLockedForMode(nss.dbName(), MODE_IX));
 
-    auto ident = _newUniqueIdent(nss, "collection");
+    auto ident = generateUniqueIdent(nss, "collection");
 
     BSONObj obj;
     {
@@ -462,7 +462,7 @@ void DurableCatalogImpl::putMetaData(OperationContext* opCtx,
                 continue;
             }
             // missing, create new
-            newIdentMap.append(name, _newUniqueIdent(nss, "index"));
+            newIdentMap.append(name, generateUniqueIdent(nss, "index"));
         }
         b.append("idxIdent", newIdentMap.obj());
 
@@ -751,7 +751,8 @@ StatusWith<DurableCatalog::ImportResult> DurableCatalogImpl::importCollection(
         };
 
         stdx::lock_guard<Latch> lk(_randLock);
-        while (_hasEntryCollidingWithRand(lk) || identsToImportConflict(lk)) {
+        while (!importOptions.skipIdentCollisionCheck &&
+               (_hasEntryCollidingWithRand(lk) || identsToImportConflict(lk))) {
             _rand = _newRand();
         }
     }

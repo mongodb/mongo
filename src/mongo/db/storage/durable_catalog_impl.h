@@ -166,6 +166,8 @@ public:
 
     std::string getRand_forTest() const;
 
+    std::string generateUniqueIdent(NamespaceString nss, const char* kind);
+
 private:
     class AddIdentChange;
 
@@ -189,12 +191,6 @@ private:
     std::shared_ptr<BSONCollectionCatalogEntry::MetaData> _parseMetaData(
         const BSONElement& mdElement) const;
 
-    /**
-     * Generates a new unique identifier for a new "thing".
-     * @param nss - the containing namespace
-     * @param kind - what this "thing" is, likely collection or index
-     */
-    std::string _newUniqueIdent(NamespaceString nss, const char* kind);
 
     std::string _newInternalIdent(StringData identStem);
 

@@ -173,6 +173,16 @@ public:
     virtual std::string newInternalIdent() = 0;
 
     /**
+     * Generates a new unique identifier for a new "thing".
+     * @param nss - the containing namespace
+     * @param kind - what this "thing" is, likely collection or index
+     *
+     * Warning: It's only unique as far as we know without checking every file on disk, but it is
+     * possible that this ident collides with an existing one.
+     */
+    virtual std::string generateUniqueIdent(NamespaceString nss, const char* kind) = 0;
+
+    /**
      * Generate an internal resumable index build ident name.
      */
     virtual std::string newInternalResumableIndexBuildIdent() = 0;

@@ -94,12 +94,11 @@ void importCopiedFiles(OperationContext* opCtx, const UUID& migrationId) {
         boost::filesystem::remove_all(tempWTDirectory, ec);
     });
 
+    auto metadatas = wiredTigerRollbackToStableAndGetMetadata(opCtx, tempWTDirectory.string());
     wiredTigerImportFromBackupCursor(
-        opCtx,
-        migrationId,
-        wiredTigerRollbackToStableAndGetMetadata(opCtx, tempWTDirectory.string()),
-        tempWTDirectory.string());
+        opCtx, migrationId, tempWTDirectory.string(), std::move(metadatas));
 }
+
 }  // namespace
 
 TenantFileImporterService* TenantFileImporterService::get(ServiceContext* serviceContext) {

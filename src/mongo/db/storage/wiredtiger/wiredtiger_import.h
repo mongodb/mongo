@@ -47,14 +47,18 @@ struct WTimportArgs {
     std::string fileMetadata;
 };
 
+struct WTIndexImportArgs final : WTimportArgs {
+    std::string indexName;
+};
+
 struct CollectionImportMetadata {
-    WTimportArgs importArgs;
+    WTimportArgs collection;
     mongo::NamespaceString ns;
     // An _mdb_catalog document.
     mongo::BSONObj catalogObject;
     long long numRecords;
     long long dataSize;
-    std::vector<WTimportArgs> indexes;
+    std::vector<WTIndexImportArgs> indexes;
 };
 
 /**

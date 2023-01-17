@@ -55,5 +55,9 @@ struct ImportOptions {
 
     ImportCollectionUUIDOption importCollectionUUIDOption;
     ImportTimestampRule importTimestampRule = ImportTimestampRule::kOldest;
+
+    // Determines if we need to set new rand for this node to avoid ident collision in future due to
+    // this collection & it's associated index import.
+    bool skipIdentCollisionCheck = false;
 };
 }  // namespace mongo
