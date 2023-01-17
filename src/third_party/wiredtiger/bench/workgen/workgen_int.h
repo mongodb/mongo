@@ -229,7 +229,7 @@ struct ContextInternal {
 
     ContextInternal();
     ~ContextInternal();
-    int create_all();
+    int create_all(WT_CONNECTION *conn);
 };
 
 struct OperationInternal {
@@ -298,6 +298,7 @@ struct TableInternal {
 // Workload::run() method.
 struct WorkloadRunner {
     Workload *_workload;
+    workgen_random_state *_rand_state;
     std::vector<ThreadRunner> _trunners;
     std::ostream *_report_out;
     std::string _wt_home;
@@ -305,7 +306,7 @@ struct WorkloadRunner {
     bool stopping;
 
     WorkloadRunner(Workload *);
-    ~WorkloadRunner() = default;
+    ~WorkloadRunner();
     int run(WT_CONNECTION *conn);
     int increment_timestamp(WT_CONNECTION *conn);
     int start_table_idle_cycle(WT_CONNECTION *conn);
