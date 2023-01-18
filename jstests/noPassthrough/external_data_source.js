@@ -1,5 +1,11 @@
 /**
  * Tests $_externalDataSources aggregate command option.
+ *
+ * @tags: [
+ * # This test file requires multi-threading for writers and tends to fail on small machines due to
+ * # thread resource shortage
+ * requires_external_data_source
+ * ]
  */
 (function() {
 "use strict";

@@ -2231,7 +2231,7 @@ buildvariants:
     exec_timeout_factor: 1.5
     test_flags: >-
       --additionalFeatureFlagsFile all_feature_flags.txt
-      --excludeWithAnyTags=incompatible_with_amazon_linux,incompatible_with_shard_merge
+      --excludeWithAnyTags=incompatible_with_amazon_linux,incompatible_with_shard_merge,requires_external_data_source
   tasks:
   - name: cqf
   - name: cqf_disabled_pipeline_opt
