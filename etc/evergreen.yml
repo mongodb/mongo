@@ -1533,7 +1533,7 @@ buildvariants:
       --additionalFeatureFlagsFile all_feature_flags.txt
       --excludeWithAnyTags=incompatible_with_shard_merge
   depends_on:
-  - name: archive_dist_test
+  - name: archive_dist_test_debug
     variant: *linux_x86_dynamic_compile_variant_name
   - name: version_gen
     variant: generate-tasks-for-version
