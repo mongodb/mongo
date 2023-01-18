@@ -89,9 +89,26 @@ value::Value SBEValue::getValue() const {
     return _val;
 }
 
-std::pair<value::TypeTags, value::Value> makeInt64Value(int v) {
+std::pair<value::TypeTags, value::Value> makeInt64Value(int64_t v) {
     return std::make_pair(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(v));
 };
+
+std::pair<value::TypeTags, value::Value> makeInt32Value(int32_t v) {
+    return std::make_pair(value::TypeTags::NumberInt32, value::bitcastFrom<int32_t>(v));
+};
+
+std::pair<value::TypeTags, value::Value> makeDoubleValue(double v) {
+    return std::make_pair(value::TypeTags::NumberDouble, value::bitcastFrom<double>(v));
+}
+
+std::pair<value::TypeTags, value::Value> makeDateValue(Date_t v) {
+    return std::make_pair(value::TypeTags::Date,
+                          value::bitcastFrom<int64_t>(v.toMillisSinceEpoch()));
+}
+
+std::pair<value::TypeTags, value::Value> makeTimestampValue(Timestamp v) {
+    return std::make_pair(value::TypeTags::Timestamp, value::bitcastFrom<uint64_t>(v.asULL()));
+}
 
 std::pair<value::TypeTags, value::Value> makeNullValue() {
     return std::make_pair(value::TypeTags::Null, 0);
@@ -180,9 +197,13 @@ double valueToDouble(value::TypeTags tag, value::Value val) {
         const StringData sd = value::getStringView(tag, val);
         result = stringToDouble(sd);
 
-    } else if (tag == value::TypeTags::Date || tag == value::TypeTags::Timestamp) {
+    } else if (tag == value::TypeTags::Date) {
         int64_t v = value::bitcastTo<int64_t>(val);
         result = value::numericCast<double>(value::TypeTags::NumberInt64, v);
+
+    } else if (tag == value::TypeTags::Timestamp) {
+        uint64_t v = value::bitcastTo<uint64_t>(val);
+        result = double(v);
 
     } else if (tag == value::TypeTags::ObjectId) {
         const auto oid = sbe::value::getObjectIdView(val);
@@ -215,6 +236,8 @@ bool canEstimateTypeViaHistogram(value::TypeTags tag) {
         case value::TypeTags::Null:
         case value::TypeTags::Nothing:
         case value::TypeTags::Boolean:
+        case value::TypeTags::MinKey:
+        case value::TypeTags::MaxKey:
             return false;
 
         // Trying to estimate any other types should result in an error.

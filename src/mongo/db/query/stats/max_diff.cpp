@@ -32,6 +32,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <fmt/format.h>
 #include <iostream>
 #include <limits>
 #include <map>
@@ -64,9 +65,11 @@ double valueSpread(value::TypeTags tag1,
                    value::Value val2) {
     double doubleVal1 = valueToDouble(tag1, val1);
     double doubleVal2 = valueToDouble(tag2, val2);
-    uassert(6660502,
-            "Data distribution values must be monotonically increasing.",
-            doubleVal2 >= doubleVal1);
+    uassert(
+        6660502,
+        "Data distribution values must be monotonically increasing, however enocuntered {} before {}"_format(
+            doubleVal1, doubleVal2),
+        doubleVal2 >= doubleVal1);
     return doubleVal2 - doubleVal1;
 }
 

@@ -141,3 +141,13 @@ env.CppUnitTest(
         'stats_test_utils',
     ],
 )
+
+env.CppUnitTest(
+    target='array_histogram_test',
+    source=[
+        'array_histogram_test.cpp',
+    ],
+    LIBDEPS=[
+        'stats_test_utils',
+    ],
+)

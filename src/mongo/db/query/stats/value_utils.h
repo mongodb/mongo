@@ -58,14 +58,33 @@ private:
 };
 
 /**
-    Generate an SBE Value pair that represents the supplied int with
-    type Int64
-*/
-std::pair<sbe::value::TypeTags, sbe::value::Value> makeInt64Value(int v);
+ * Generates an SBE Value pair that represents the supplied int with type Int64.
+ */
+std::pair<sbe::value::TypeTags, sbe::value::Value> makeInt64Value(int64_t);
 
 /**
-    Generate an SBE Value pair representing a BSON null value
-*/
+ * Generates an SBE Value pair that represents the supplied int with type Int32.
+ */
+std::pair<sbe::value::TypeTags, sbe::value::Value> makeInt32Value(int32_t);
+
+/**
+ * Generates an SBE Value pair that represents the supplied double.
+ */
+std::pair<sbe::value::TypeTags, sbe::value::Value> makeDoubleValue(double);
+
+/**
+ * Generates an SBE Value pair that represents the supplied date.
+ */
+std::pair<sbe::value::TypeTags, sbe::value::Value> makeDateValue(Date_t);
+
+/**
+ * Generates an SBE Value pair that represents the supplied timestamp.
+ */
+std::pair<sbe::value::TypeTags, sbe::value::Value> makeTimestampValue(Timestamp);
+
+/**
+ * Generates an SBE Value pair representing a BSON null value.
+ */
 std::pair<sbe::value::TypeTags, sbe::value::Value> makeNullValue();
 
 /**
