@@ -305,6 +305,7 @@ let testCases = {
     balancerStop: {skip: "not on a user database"},
     buildInfo: {skip: "executes locally on mongos (not sent to any remote node)"},
     bulkWrite: {skip: "not yet implemented"},
+    checkMetadataConsistency: {skip: "not yet implemented"},
     cleanupReshardCollection: {skip: "always targets the config server"},
     clearJumboFlag: {skip: "does not forward command to primary shard"},
     clearLog: {skip: "executes locally on mongos (not sent to any remote node)"},

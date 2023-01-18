@@ -45,6 +45,7 @@ imports:
     - "mongo/s/sharding_types.idl"
     - "mongo/s/resharding/common_types.idl"
     - "mongo/db/timeseries/timeseries.idl"
+    - "mongo/db/metadata_consistency_types.idl"
 
 types:
     CollectionType:
@@ -519,6 +520,29 @@ commands:
             clusterParameterTime:
                 type: timestamp
                 description: "Time that will be associated with the cluster parameter"
+
+    _shardsvrCheckMetadataConsistency:
+        description: "Internal command sent to the primary shard of a database to check metadata 
+                      consistency."
+        command_name: _shardsvrCheckMetadataConsistency
+        cpp_name: ShardsvrCheckMetadataConsistency
+        namespace: concatenate_with_db
+        allow_global_collection_name: true
+        api_version: ""
+        reply_type: CheckMetadataConsistencyResponse
+
+    _shardsvrCheckMetadataConsistencyParticipant:
+        description: "Internal command sent to participants shards to check metadata consistency."
+        command_name: _shardsvrCheckMetadataConsistencyParticipant
+        cpp_name: ShardsvrCheckMetadataConsistencyParticipant
+        namespace: concatenate_with_db
+        allow_global_collection_name: true
+        api_version: ""
+        reply_type: CheckMetadataConsistencyResponse
+        fields:
+            primaryShardId:
+                description: "The shard id of the db primary shard"
+                type: shard_id
 
     _configsvrSetClusterParameter:
         command_name: _configsvrSetClusterParameter

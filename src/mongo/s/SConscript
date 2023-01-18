@@ -180,6 +180,7 @@ env.Library(
         'catalog/type_namespace_placement.idl',
         'catalog/type_shard.cpp',
         'catalog/type_tags.cpp',
+        'check_metadata_consistency.idl',
         'chunk_version.cpp',
         'chunk_version.idl',
         'configure_query_analyzer_cmd.idl',

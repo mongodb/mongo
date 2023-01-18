@@ -133,6 +133,8 @@ const allCommands = {
     _shardsvrCollMod: {skip: isAnInternalCommand},
     _shardsvrCollModParticipant: {skip: isAnInternalCommand},
     _shardsvrParticipantBlock: {skip: isAnInternalCommand},
+    _shardsvrCheckMetadataConsistency: {skip: isAnInternalCommand},
+    _shardsvrCheckMetadataConsistencyParticipant: {skip: isAnInternalCommand},
     _transferMods: {skip: isAnInternalCommand},
     _vectorClockPersist: {skip: isAnInternalCommand},
     abortReshardCollection: {
@@ -241,6 +243,7 @@ const allCommands = {
         //     assert.commandWorked(conn.getDB(dbName).runCommand({drop: "capped_truncate"}));
         // }
     },
+    checkMetadataConsistency: {skip: isNotImplementedYet},
     checkShardingIndex: {
         // TODO SERVER-69753: Unskip this command when we can test with sharded clusters.
         skip: isNotImplementedYet,

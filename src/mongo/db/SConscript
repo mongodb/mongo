@@ -803,6 +803,17 @@ env.Library(
 )
 
 env.Library(
+    target="metadata_consistency_types_idl",
+    source=[
+        'metadata_consistency_types.idl',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
+        'server_base',
+    ],
+)
+
+env.Library(
     target='commands',
     source=[
         'coll_mod_reply_validation.cpp',

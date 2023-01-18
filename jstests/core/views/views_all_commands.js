@@ -146,6 +146,8 @@ let viewsCommandTests = {
     _recvChunkStatus: {skip: isAnInternalCommand},
     _refreshQueryAnalyzerConfiguration: {skip: isAnInternalCommand},
     _shardsvrAbortReshardCollection: {skip: isAnInternalCommand},
+    _shardsvrCheckMetadataConsistency: {skip: isAnInternalCommand},
+    _shardsvrCheckMetadataConsistencyParticipant: {skip: isAnInternalCommand},
     _shardsvrCloneCatalogData: {skip: isAnInternalCommand},
     _shardsvrCompactStructuredEncryptionData: {skip: isAnInternalCommand},
     _shardsvrDropCollection: {skip: isAnInternalCommand},
@@ -238,6 +240,7 @@ let viewsCommandTests = {
         command: {captrunc: "view", n: 2, inc: false},
         expectFailure: true,
     },
+    checkMetadataConsistency: {skip: isUnrelated},
     checkShardingIndex: {skip: isUnrelated},
     cleanupOrphaned: {
         skip: "Tested in views/views_sharded.js",
