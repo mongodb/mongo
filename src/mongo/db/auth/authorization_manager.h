@@ -368,13 +368,6 @@ public:
     virtual void invalidateUserCache(OperationContext* opCtx) = 0;
 
     /**
-     * Sets the list of users that should be pinned in memory.
-     *
-     * This will start the PinnedUserTracker thread if it hasn't been started already.
-     */
-    virtual void updatePinnedUsersList(std::vector<UserName> names) = 0;
-
-    /**
      * Hook called by replication code to let the AuthorizationManager observe changes
      * to relevant collections.
      */

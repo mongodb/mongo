@@ -159,10 +159,6 @@ public:
         UASSERT_NOT_IMPLEMENTED;
     }
 
-    void updatePinnedUsersList(std::vector<UserName>) override {
-        UASSERT_NOT_IMPLEMENTED;
-    }
-
 private:
     bool _shouldValidate = false;
 };

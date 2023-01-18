@@ -41,22 +41,3 @@ server_parameters:
       - startup
     cpp_varname: authorizationManagerCacheSize
     default: 100
-
-  authorizationManagerPinnedUsers:
-    description: >
-      A comma-separated sequence of user names.
-    set_at:
-      - startup
-      - runtime
-    cpp_class:
-      name: AuthorizationManagerPinnedUsersServerParameter
-      override_set: true
-
-  authorizationManagerPinnedUsersRefreshIntervalMillis:
-    description: The number of milliseconds between refreshing pinned users.
-    set_at:
-      - startup
-      - runtime
-    cpp_vartype: AtomicWord<long long>
-    cpp_varname: authorizationManagerPinnedUsersRefreshIntervalMillis
-    default: 1000

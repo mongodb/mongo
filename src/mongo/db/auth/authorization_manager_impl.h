@@ -129,8 +129,6 @@ public:
      */
     void invalidateUserCache(OperationContext* opCtx) override;
 
-    void updatePinnedUsersList(std::vector<UserName> names) override;
-
     void logOp(OperationContext* opCtx,
                StringData opstr,
                const NamespaceString& nss,
@@ -141,8 +139,6 @@ public:
 
 private:
     void _updateCacheGeneration();
-
-    void _pinnedUsersThreadRoutine() noexcept;
 
     std::unique_ptr<AuthzManagerExternalState> _externalState;
 
@@ -216,11 +212,6 @@ private:
     // Thread pool on which to perform the blocking activities that load the user credentials from
     // storage
     ThreadPool _threadPool;
-
-    Mutex _pinnedUsersMutex = MONGO_MAKE_LATCH("AuthorizationManagerImpl::_pinnedUsersMutex");
-    stdx::condition_variable _pinnedUsersCond;
-    std::once_flag _pinnedThreadTrackerStarted;
-    boost::optional<std::vector<UserName>> _usersToPin;
 };
 
 extern int authorizationManagerCacheSize;

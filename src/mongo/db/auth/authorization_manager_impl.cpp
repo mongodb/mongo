@@ -128,102 +128,6 @@ ServiceContext::ConstructorActionRegisterer setClusterNetworkRestrictionManager{
         ClusterNetworkRestrictionManager::set(service, std::move(manager));
     }};
 
-class PinnedUserSetParameter {
-public:
-    void append(BSONObjBuilder& b, const std::string& name) const {
-        BSONArrayBuilder sub(b.subarrayStart(name));
-        stdx::lock_guard<Latch> lk(_mutex);
-        for (const auto& username : _pinnedUsersList) {
-            BSONObjBuilder nameObj(sub.subobjStart());
-            nameObj << AuthorizationManager::USER_NAME_FIELD_NAME << username.getUser()
-                    << AuthorizationManager::USER_DB_FIELD_NAME << username.getDB();
-        }
-    }
-
-    Status set(const BSONElement& newValueElement) {
-        if (newValueElement.type() == String) {
-            return setFromString(newValueElement.str());
-        } else if (newValueElement.type() == Array) {
-            auto array = static_cast<BSONArray>(newValueElement.embeddedObject());
-            std::vector<UserName> out;
-            auto status = auth::parseUserNamesFromBSONArray(array, "", &out);
-            if (!status.isOK())
-                return status;
-
-            status = _checkForSystemUser(out);
-            if (!status.isOK()) {
-                return status;
-            }
-
-            stdx::lock_guard<Latch> lk(_mutex);
-            _pinnedUsersList = out;
-            auto authzManager = _authzManager;
-            if (!authzManager) {
-                return Status::OK();
-            }
-
-            authzManager->updatePinnedUsersList(std::move(out));
-            return Status::OK();
-        } else {
-            return {ErrorCodes::BadValue,
-                    "authorizationManagerPinnedUsers must be either a string or a BSON array"};
-        }
-    }
-
-    Status setFromString(StringData str) {
-        std::vector<std::string> strList;
-        str::splitStringDelim(str.toString(), &strList, ',');
-
-        std::vector<UserName> out;
-        for (const auto& nameStr : strList) {
-            auto swUserName = UserName::parse(nameStr);
-            if (!swUserName.isOK()) {
-                return swUserName.getStatus();
-            }
-            out.push_back(std::move(swUserName.getValue()));
-        }
-
-        auto status = _checkForSystemUser(out);
-        if (!status.isOK()) {
-            return status;
-        }
-
-        stdx::lock_guard<Latch> lk(_mutex);
-        _pinnedUsersList = out;
-        auto authzManager = _authzManager;
-        if (!authzManager) {
-            return Status::OK();
-        }
-
-        authzManager->updatePinnedUsersList(std::move(out));
-        return Status::OK();
-    }
-
-    void setAuthzManager(AuthorizationManager* authzManager) {
-        stdx::lock_guard<Latch> lk(_mutex);
-        _authzManager = authzManager;
-        _authzManager->updatePinnedUsersList(std::move(_pinnedUsersList));
-    }
-
-private:
-    Status _checkForSystemUser(const std::vector<UserName>& names) {
-        if (std::any_of(names.begin(), names.end(), [&](const UserName& userName) {
-                return (userName == (*internalSecurity.getUser())->getName());
-            })) {
-            return {ErrorCodes::BadValue,
-                    "Cannot set __system as a pinned user, it is always pinned"};
-        }
-        return Status::OK();
-    }
-
-    mutable Mutex _mutex = MONGO_MAKE_LATCH("PinnedUserSetParameter::_mutex");
-
-    AuthorizationManager* _authzManager = nullptr;
-
-    std::vector<UserName> _pinnedUsersList;
-
-} authorizationManagerPinnedUsers;
-
 bool isAuthzNamespace(const NamespaceString& nss) {
     return (nss == AuthorizationManager::rolesCollectionNamespace ||
             nss == AuthorizationManager::usersCollectionNamespace ||
@@ -332,23 +236,6 @@ void handleWaitForUserCacheInvalidation(OperationContext* opCtx, const UserHandl
 }  // namespace
 
 int authorizationManagerCacheSize;
-
-void AuthorizationManagerPinnedUsersServerParameter::append(OperationContext* opCtx,
-                                                            BSONObjBuilder* out,
-                                                            StringData name,
-                                                            const boost::optional<TenantId>&) {
-    return authorizationManagerPinnedUsers.append(*out, name.toString());
-}
-
-Status AuthorizationManagerPinnedUsersServerParameter::set(const BSONElement& newValue,
-                                                           const boost::optional<TenantId>&) {
-    return authorizationManagerPinnedUsers.set(newValue);
-}
-
-Status AuthorizationManagerPinnedUsersServerParameter::setFromString(
-    StringData str, const boost::optional<TenantId>&) {
-    return authorizationManagerPinnedUsers.setFromString(str);
-}
 
 AuthorizationManagerImpl::AuthorizationManagerImpl(
     ServiceContext* service, std::unique_ptr<AuthzManagerExternalState> externalState)
@@ -590,134 +477,9 @@ StatusWith<UserHandle> AuthorizationManagerImpl::reacquireUser(OperationContext*
     return ret;
 }
 
-void AuthorizationManagerImpl::updatePinnedUsersList(std::vector<UserName> names) {
-    stdx::unique_lock<Latch> lk(_pinnedUsersMutex);
-    _usersToPin = std::move(names);
-    bool noUsersToPin = _usersToPin->empty();
-    _pinnedUsersCond.notify_one();
-    if (noUsersToPin) {
-        LOGV2_DEBUG(20227, 1, "There were no users to pin, not starting tracker thread");
-        return;
-    }
-
-    std::call_once(_pinnedThreadTrackerStarted, [this] {
-        stdx::thread thread(&AuthorizationManagerImpl::_pinnedUsersThreadRoutine, this);
-        thread.detach();
-    });
-}
-
 void AuthorizationManagerImpl::_updateCacheGeneration() {
     stdx::lock_guard lg(_cacheGenerationMutex);
     _cacheGeneration = OID::gen();
-}
-
-void AuthorizationManagerImpl::_pinnedUsersThreadRoutine() noexcept try {
-    Client::initThread("PinnedUsersTracker");
-    std::list<UserHandle> pinnedUsers;
-    std::vector<UserName> usersToPin;
-    LOGV2_DEBUG(20228, 1, "Starting pinned users tracking thread");
-    while (true) {
-        auto opCtx = cc().makeOperationContext();
-
-        stdx::unique_lock<Latch> lk(_pinnedUsersMutex);
-        const Milliseconds timeout(authorizationManagerPinnedUsersRefreshIntervalMillis.load());
-        auto waitRes = opCtx->waitForConditionOrInterruptFor(
-            _pinnedUsersCond, lk, timeout, [&] { return _usersToPin.has_value(); });
-
-        if (waitRes) {
-            usersToPin = std::move(_usersToPin.value());
-            _usersToPin = boost::none;
-        }
-        lk.unlock();
-        if (usersToPin.empty()) {
-            pinnedUsers.clear();
-            continue;
-        }
-
-        // Remove any users that shouldn't be pinned anymore or that are invalid.
-        for (auto it = pinnedUsers.begin(); it != pinnedUsers.end();) {
-            const auto& user = *it;
-            const auto shouldPin =
-                std::any_of(usersToPin.begin(), usersToPin.end(), [&](const UserName& userName) {
-                    return (user->getName() == userName);
-                });
-
-            if (!user.isValid() || !shouldPin) {
-                if (!shouldPin) {
-                    LOGV2_DEBUG(20229, 2, "Unpinning user", "user"_attr = user->getName());
-                } else {
-                    LOGV2_DEBUG(20230,
-                                2,
-                                "Pinned user no longer valid, will re-pin",
-                                "user"_attr = user->getName());
-                }
-                it = pinnedUsers.erase(it);
-            } else {
-                LOGV2_DEBUG(20231,
-                            3,
-                            "Pinned user is still valid and pinned",
-                            "user"_attr = user->getName());
-                ++it;
-            }
-        }
-
-        // Find UserRequests for UserNames we need to pin if they exist in the cache.
-        std::map<UserName, UserRequest> pinNow;
-        _userCache.peekLatestCachedIf([&](const UserRequest& request, const User& user) {
-            if (std::any_of(usersToPin.begin(), usersToPin.end(), [&](const auto& userName) {
-                    return user.getName() == userName;
-                })) {
-                pinNow.emplace(request.name, request);
-            }
-            // Don't need any output vector.
-            return false;
-        });
-
-        for (const auto& userName : usersToPin) {
-            if (std::any_of(pinnedUsers.begin(), pinnedUsers.end(), [&](const auto& user) {
-                    return user->getName() == userName;
-                })) {
-                continue;
-            }
-
-            auto request = ([&] {
-                if (auto it = pinNow.find(userName); it != pinNow.end()) {
-                    return it->second;
-                }
-                return UserRequest(userName, boost::none);
-            })();
-
-            if (!request.mechanismData.empty()) {
-                LOGV2_DEBUG(7070000,
-                            2,
-                            "Refusing to pin user with mechanism metadata",
-                            "user"_attr = request.name);
-                continue;
-            }
-
-            auto swUser = acquireUser(opCtx.get(), request);
-
-            if (swUser.isOK()) {
-                LOGV2_DEBUG(20232, 2, "Pinned user", "user"_attr = userName);
-                pinnedUsers.emplace_back(std::move(swUser.getValue()));
-            } else {
-                const auto& status = swUser.getStatus();
-                // If the user is not found, then it might just not exist yet. Skip this user for
-                // now.
-                if (status != ErrorCodes::UserNotFound) {
-                    LOGV2_WARNING(20239,
-                                  "Unable to fetch pinned user",
-                                  "user"_attr = userName,
-                                  "error"_attr = status);
-                } else {
-                    LOGV2_DEBUG(20233, 2, "Pinned user not found", "user"_attr = userName);
-                }
-            }
-        }
-    }
-} catch (const ExceptionFor<ErrorCodes::InterruptedAtShutdown>&) {
-    LOGV2_DEBUG(20234, 1, "Ending pinned users tracking thread");
-    return;
 }
 
 void AuthorizationManagerImpl::invalidateUserByName(OperationContext* opCtx,
@@ -803,11 +565,10 @@ Status AuthorizationManagerImpl::refreshExternalUsers(OperationContext* opCtx) {
 }
 
 Status AuthorizationManagerImpl::initialize(OperationContext* opCtx) {
-    Status status = _externalState->initialize(opCtx);
-    if (!status.isOK())
+    if (auto status = _externalState->initialize(opCtx); !status.isOK()) {
         return status;
+    }
 
-    authorizationManagerPinnedUsers.setAuthzManager(this);
     invalidateUserCache(opCtx);
     return Status::OK();
 }
