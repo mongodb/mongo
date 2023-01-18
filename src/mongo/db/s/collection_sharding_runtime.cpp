@@ -303,7 +303,7 @@ Status CollectionShardingRuntime::waitForClean(OperationContext* opCtx,
         const StatusWith<SharedSemiFuture<void>> swOrphanCleanupFuture =
             [&]() -> StatusWith<SharedSemiFuture<void>> {
             AutoGetCollection autoColl(opCtx, nss, MODE_IX);
-            auto self =
+            const auto self =
                 CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
             stdx::lock_guard lk(self->_metadataManagerLock);
 

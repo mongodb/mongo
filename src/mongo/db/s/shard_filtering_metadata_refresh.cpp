@@ -425,7 +425,7 @@ SharedSemiFuture<void> recoverRefreshCollectionPlacementVersion(
                         Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IS);
                         Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
 
-                        auto scopedCsr =
+                        const auto scopedCsr =
                             CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx,
                                                                                               nss);
 
@@ -638,7 +638,7 @@ ChunkVersion forceShardFilteringMetadataRefresh(OperationContext* opCtx,
         // is in the 'system.views' collection.
         Lock::DBLock dbLock(opCtx, nss.dbName(), MODE_IS);
         Lock::CollectionLock collLock(opCtx, nss, MODE_IS);
-        auto scopedCsr =
+        const auto scopedCsr =
             CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
         if (auto optMetadata = scopedCsr->getCurrentMetadataIfKnown()) {
             const auto& metadata = *optMetadata;

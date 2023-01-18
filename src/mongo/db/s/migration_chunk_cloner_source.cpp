@@ -215,7 +215,7 @@ void LogTransactionOperationsForShardingHandler::commit(OperationContext* opCtx,
 
         // TODO (SERVER-71444): Fix to be interruptible or document exception.
         UninterruptibleLockGuard noInterrupt(opCtx->lockState());  // NOLINT.
-        auto scopedCss =
+        const auto scopedCss =
             CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
 
         auto clonerPtr = MigrationSourceManager::getCurrentCloner(*scopedCss);

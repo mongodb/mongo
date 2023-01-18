@@ -641,7 +641,7 @@ CollectionMetadata MigrationSourceManager::_getCurrentMetadataAndCheckEpoch() {
         // TODO (SERVER-71444): Fix to be interruptible or document exception.
         UninterruptibleLockGuard noInterrupt(_opCtx->lockState());  // NOLINT.
         AutoGetCollection autoColl(_opCtx, _args.getCommandParameter(), MODE_IS);
-        auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(
+        const auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(
             _opCtx, _args.getCommandParameter());
 
         const auto optMetadata = scopedCsr->getCurrentMetadataIfKnown();

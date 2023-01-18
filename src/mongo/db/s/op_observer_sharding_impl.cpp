@@ -95,7 +95,8 @@ OpObserverShardingImpl::OpObserverShardingImpl(std::unique_ptr<OplogWriter> oplo
 bool OpObserverShardingImpl::isMigrating(OperationContext* opCtx,
                                          NamespaceString const& nss,
                                          BSONObj const& docToDelete) {
-    auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
+    const auto scopedCsr =
+        CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
     auto cloner = MigrationSourceManager::getCurrentCloner(*scopedCsr);
 
     return cloner && cloner->isDocumentInMigratingChunk(docToDelete);

@@ -134,7 +134,7 @@ public:
 
         const auto collectionEpoch = [&] {
             AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-            auto scopedCsr =
+            const auto scopedCsr =
                 CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
             auto optMetadata = scopedCsr->getCurrentMetadataIfKnown();
             uassert(StaleConfigInfo(nss,

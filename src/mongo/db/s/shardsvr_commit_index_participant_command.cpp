@@ -96,7 +96,7 @@ public:
                     txnParticipant);
             {
                 AutoGetCollection coll(opCtx, ns(), LockMode::MODE_IS);
-                auto scopedCsr =
+                const auto scopedCsr =
                     CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, ns());
                 uassert(6711902,
                         "The critical section must be taken in order to execute this command",

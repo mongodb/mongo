@@ -42,7 +42,8 @@ CollectionPlacementAndIndexInfo checkCollectionIdentity(
     AutoGetCollection collection(opCtx, nss, MODE_IS);
 
     const auto shardId = ShardingState::get(opCtx)->shardId();
-    auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
+    const auto scopedCsr =
+        CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
     auto optMetadata = scopedCsr->getCurrentMetadataIfKnown();
     auto optGlobalIndexInfo = scopedCsr->getIndexes(opCtx);
 

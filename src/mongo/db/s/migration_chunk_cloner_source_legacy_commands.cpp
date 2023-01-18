@@ -77,7 +77,7 @@ public:
                 _autoColl->getCollection());
 
         {
-            auto scopedCsr =
+            const auto scopedCsr =
                 CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, *nss);
 
             if ((_chunkCloner = MigrationSourceManager::getCurrentCloner(*scopedCsr))) {

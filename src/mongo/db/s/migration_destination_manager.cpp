@@ -300,7 +300,8 @@ void replaceGlobalIndexesInShardIfNeeded(OperationContext* opCtx,
                                          const UUID& uuid) {
     auto currentShardHasAnyChunks = [&]() -> bool {
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-        auto scsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
+        const auto scsr =
+            CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
         const auto optMetadata = scsr->getCurrentMetadataIfKnown();
         return optMetadata && optMetadata->currentShardHasAnyChunks();
     }();
@@ -930,7 +931,7 @@ void MigrationDestinationManager::_dropLocalIndexesIfNecessary(
     const CollectionOptionsAndIndexes& collectionOptionsAndIndexes) {
     bool dropNonDonorIndexes = [&]() -> bool {
         AutoGetCollection autoColl(opCtx, nss, MODE_IS);
-        auto scopedCsr =
+        const auto scopedCsr =
             CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
         // Only attempt to drop a collection's indexes if we have valid metadata and the collection
         // is sharded

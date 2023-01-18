@@ -219,7 +219,8 @@ void incrementChunkOnInsertOrUpdate(OperationContext* opCtx,
  * index operations.
  */
 void abortOngoingMigrationIfNeeded(OperationContext* opCtx, const NamespaceString& nss) {
-    auto scopedCsr = CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
+    const auto scopedCsr =
+        CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
     if (auto msm = MigrationSourceManager::get(*scopedCsr)) {
         // Only interrupt the migration, but don't actually join
         (void)msm->abort();

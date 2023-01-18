@@ -583,7 +583,7 @@ TEST_F(ReshardingDonorRecipientCommonInternalsTest, ClearReshardingFilteringMeta
         // Assert the prestate has no filtering metadata.
         for (auto const& nss : {kOriginalNss, kTemporaryReshardingNss}) {
             AutoGetCollection autoColl(opCtx, nss, LockMode::MODE_IS);
-            auto csr =
+            const auto csr =
                 CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
             ASSERT(csr->getCurrentMetadataIfKnown() == boost::none);
         }
@@ -600,7 +600,7 @@ TEST_F(ReshardingDonorRecipientCommonInternalsTest, ClearReshardingFilteringMeta
 
         for (auto const& nss : {kOriginalNss, kTemporaryReshardingNss}) {
             AutoGetCollection autoColl(opCtx, nss, LockMode::MODE_IS);
-            auto csr =
+            const auto csr =
                 CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
             ASSERT(csr->getCurrentMetadataIfKnown());
         }
@@ -620,7 +620,8 @@ TEST_F(ReshardingDonorRecipientCommonInternalsTest, ClearReshardingFilteringMeta
 
     for (auto const& nss : {kOriginalNss, kTemporaryReshardingNss}) {
         AutoGetCollection autoColl(opCtx, nss, LockMode::MODE_IS);
-        auto csr = CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
+        const auto csr =
+            CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
         ASSERT(csr->getCurrentMetadataIfKnown() == boost::none);
     }
 
@@ -634,7 +635,8 @@ TEST_F(ReshardingDonorRecipientCommonInternalsTest, ClearReshardingFilteringMeta
 
     for (auto const& nss : {kOriginalNss, kTemporaryReshardingNss}) {
         AutoGetCollection autoColl(opCtx, nss, LockMode::MODE_IS);
-        auto csr = CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
+        const auto csr =
+            CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
         ASSERT(csr->getCurrentMetadataIfKnown() == boost::none);
     }
 }
@@ -671,14 +673,16 @@ TEST_F(ReshardingDonorRecipientCommonInternalsTest, ClearReshardingFilteringMeta
 
     for (auto const& nss : {sourceNss1, tempReshardingNss1}) {
         AutoGetCollection autoColl(opCtx, nss, LockMode::MODE_IS);
-        auto csr = CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
+        const auto csr =
+            CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
         ASSERT(csr->getCurrentMetadataIfKnown() == boost::none);
     }
 
     // Assert that the filtering metadata is not cleared for other operation
     for (auto const& nss : {sourceNss2, tempReshardingNss2}) {
         AutoGetCollection autoColl(opCtx, nss, LockMode::MODE_IS);
-        auto csr = CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
+        const auto csr =
+            CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, nss);
         ASSERT(csr->getCurrentMetadataIfKnown() != boost::none);
     }
 }

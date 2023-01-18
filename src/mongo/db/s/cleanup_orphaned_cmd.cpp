@@ -76,7 +76,7 @@ CleanupResult cleanupOrphanedData(OperationContext* opCtx,
         }
         collectionUuid.emplace(autoColl.getCollection()->uuid());
 
-        auto scopedCsr =
+        const auto scopedCsr =
             CollectionShardingRuntime::assertCollectionLockedAndAcquireShared(opCtx, ns);
         auto optCollDescr = scopedCsr->getCurrentMetadataIfKnown();
         if (!optCollDescr || !optCollDescr->isSharded()) {
