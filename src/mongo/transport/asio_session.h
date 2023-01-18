@@ -76,7 +76,7 @@ inline Future<void> futurize(const std::error_code& ec) {
     return Result::makeReady();
 }
 
-class AsioTransportLayer::AsioSession final : public Session {
+class AsioSession final : public Session {
 public:
     using GenericSocket = asio::generic::stream_protocol::socket;
 
@@ -150,7 +150,7 @@ public:
 
 protected:
     friend class AsioTransportLayer;
-    friend class AsioTransportLayer::AsioNetworkingBaton;
+    friend class AsioNetworkingBaton;
 
 #ifdef MONGO_CONFIG_SSL
     // Constructs a SSL socket required to initiate SSL handshake for egress connections.

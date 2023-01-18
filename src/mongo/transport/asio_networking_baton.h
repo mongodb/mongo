@@ -53,7 +53,7 @@ namespace transport {
  *
  * We implement our networking reactor on top of poll + eventfd for wakeups
  */
-class AsioTransportLayer::AsioNetworkingBaton : public NetworkingBaton {
+class AsioNetworkingBaton : public NetworkingBaton {
 public:
     AsioNetworkingBaton(OperationContext* opCtx) : _opCtx(opCtx) {}
 

@@ -204,9 +204,9 @@ public:
  *
  * TODO Maybe use AsioTransportLayer's Reactor?
  */
-class ASIOReactor : public transport::Reactor {
+class AsioReactor : public transport::Reactor {
 public:
-    ASIOReactor() : _ioContext() {}
+    AsioReactor() : _ioContext() {}
 
     void run() noexcept final {
         MONGO_UNREACHABLE;

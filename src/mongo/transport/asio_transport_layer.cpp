@@ -131,13 +131,13 @@ MONGO_FAIL_POINT_DEFINE(asioTransportLayerAsyncConnectReturnsConnectionError);
 SSLConnectionContext::~SSLConnectionContext() = default;
 #endif
 
-class ASIOReactorTimer final : public ReactorTimer {
+class AsioReactorTimer final : public ReactorTimer {
 public:
     using TimerType = synchronized_value<asio::system_timer, RawSynchronizedValueMutexPolicy>;
-    explicit ASIOReactorTimer(asio::io_context& ctx)
+    explicit AsioReactorTimer(asio::io_context& ctx)
         : _timer(std::make_shared<TimerType>(asio::system_timer(ctx))) {}
 
-    ~ASIOReactorTimer() {
+    ~AsioReactorTimer() {
         // The underlying timer won't get destroyed until the last promise from _asyncWait
         // has been filled, so cancel the timer so our promises get fulfilled
         cancel();
@@ -207,9 +207,9 @@ private:
     std::shared_ptr<TimerType> _timer;
 };
 
-class AsioTransportLayer::ASIOReactor final : public Reactor {
+class AsioReactor final : public Reactor {
 public:
-    ASIOReactor() : _clkSource(this), _stats(&_clkSource), _ioContext() {}
+    AsioReactor() : _clkSource(this), _stats(&_clkSource), _ioContext() {}
 
     void run() noexcept override {
         ThreadIdGuard threadIdGuard(this);
@@ -237,7 +237,7 @@ public:
     }
 
     std::unique_ptr<ReactorTimer> makeTimer() override {
-        return std::make_unique<ASIOReactorTimer>(_ioContext);
+        return std::make_unique<AsioReactorTimer>(_ioContext);
     }
 
     Date_t now() override {
@@ -269,7 +269,7 @@ private:
     // Provides `ClockSource` API for the reactor's clock source.
     class ReactorClockSource final : public ClockSource {
     public:
-        explicit ReactorClockSource(ASIOReactor* reactor) : _reactor(reactor) {}
+        explicit ReactorClockSource(AsioReactor* reactor) : _reactor(reactor) {}
         ~ReactorClockSource() = default;
 
         Milliseconds getPrecision() override {
@@ -281,12 +281,12 @@ private:
         }
 
     private:
-        ASIOReactor* const _reactor;
+        AsioReactor* const _reactor;
     };
 
     class ThreadIdGuard {
     public:
-        ThreadIdGuard(AsioTransportLayer::ASIOReactor* reactor) {
+        ThreadIdGuard(AsioReactor* reactor) {
             invariant(!_reactorForThread);
             _reactorForThread = reactor;
         }
@@ -297,7 +297,7 @@ private:
         }
     };
 
-    static thread_local ASIOReactor* _reactorForThread;
+    static thread_local AsioReactor* _reactorForThread;
 
     ReactorClockSource _clkSource;
 
@@ -306,8 +306,7 @@ private:
     asio::io_context _ioContext;
 };
 
-thread_local AsioTransportLayer::ASIOReactor* AsioTransportLayer::ASIOReactor::_reactorForThread =
-    nullptr;
+thread_local AsioReactor* AsioReactor::_reactorForThread = nullptr;
 
 AsioTransportLayer::Options::Options(const ServerGlobalParams* params,
                                      boost::optional<int> loadBalancerPort)
@@ -322,7 +321,7 @@ AsioTransportLayer::Options::Options(const ServerGlobalParams* params,
 }
 
 AsioTransportLayer::TimerService::TimerService(Options opt)
-    : _reactor(std::make_shared<AsioTransportLayer::ASIOReactor>()) {
+    : _reactor(std::make_shared<AsioReactor>()) {
     if (opt.spawn)
         _spawn = std::move(opt.spawn);
 }
@@ -388,9 +387,9 @@ AsioTransportLayer::AsioTransportLayer(const AsioTransportLayer::Options& opts,
                                        ServiceEntryPoint* sep,
                                        const WireSpec& wireSpec)
     : TransportLayer(wireSpec),
-      _ingressReactor(std::make_shared<ASIOReactor>()),
-      _egressReactor(std::make_shared<ASIOReactor>()),
-      _acceptorReactor(std::make_shared<ASIOReactor>()),
+      _ingressReactor(std::make_shared<AsioReactor>()),
+      _egressReactor(std::make_shared<AsioReactor>()),
+      _acceptorReactor(std::make_shared<AsioReactor>()),
       _sep(sep),
       _listenerOptions(opts),
       _timerService(std::make_unique<TimerService>()) {}
@@ -636,7 +635,7 @@ StatusWith<SessionHandle> AsioTransportLayer::connect(
         return {ErrorCodes::InvalidSSLConfiguration, "SSL requested but not supported"};
     }
 #else
-    auto globalSSLMode = _sslMode();
+    auto globalSSLMode = this->sslMode();
     if (sslMode == kEnableSSL ||
         (sslMode == kGlobalSSLMode &&
          ((globalSSLMode == SSLParams::SSLMode_preferSSL) ||
@@ -810,15 +809,15 @@ Future<SessionHandle> AsioTransportLayer::asyncConnect(
 
         Mutex mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "AsyncConnectState::mutex");
         AsioSession::GenericSocket socket;
-        ASIOReactorTimer timeoutTimer;
+        AsioReactorTimer timeoutTimer;
         WrappedResolver resolver;
         WrappedEndpoint resolvedEndpoint;
         const HostAndPort peer;
-        AsioTransportLayer::AsioSessionHandle session;
+        AsioSessionHandle session;
         ReactorHandle reactor;
     };
 
-    auto reactorImpl = checked_cast<ASIOReactor*>(reactor.get());
+    auto reactorImpl = checked_cast<AsioReactor*>(reactor.get());
     auto pf = makePromiseFuture<SessionHandle>();
     auto connector = std::make_shared<AsyncConnectState>(
         std::move(peer), *reactorImpl, std::move(pf.promise), reactor);
@@ -935,7 +934,7 @@ Future<SessionHandle> AsioTransportLayer::asyncConnect(
                 uasserted(ErrorCodes::InvalidSSLConfiguration, "SSL requested but not supported");
             }
 #else
-            auto globalSSLMode = _sslMode();
+            auto globalSSLMode = this->sslMode();
             if (sslMode == kEnableSSL ||
                 (sslMode == kGlobalSSLMode &&
                  ((globalSSLMode == SSLParams::SSLMode_preferSSL) ||
@@ -1370,7 +1369,7 @@ void AsioTransportLayer::_runListener() noexcept {
 
     const char* ssl = "off";
 #ifdef MONGO_CONFIG_SSL
-    if (_sslMode() != SSLParams::SSLMode_disabled) {
+    if (sslMode() != SSLParams::SSLMode_disabled) {
         ssl = "on";
     }
 #endif
@@ -1468,7 +1467,7 @@ ReactorHandle AsioTransportLayer::getReactor(WhichReactor which) {
         case TransportLayer::kEgress:
             return _egressReactor;
         case TransportLayer::kNewReactor:
-            return std::make_shared<ASIOReactor>();
+            return std::make_shared<AsioReactor>();
     }
 
     MONGO_UNREACHABLE;
@@ -1589,7 +1588,7 @@ void AsioTransportLayer::_trySetListenerSocketBacklogQueueDepth(
 }
 
 #ifdef MONGO_CONFIG_SSL
-SSLParams::SSLModes AsioTransportLayer::_sslMode() const {
+SSLParams::SSLModes AsioTransportLayer::sslMode() const {
     return static_cast<SSLParams::SSLModes>(getSSLGlobalParams().sslMode.load());
 }
 
@@ -1599,7 +1598,7 @@ Status AsioTransportLayer::rotateCertificates(std::shared_ptr<SSLManagerInterfac
         return Status(ErrorCodes::InternalError,
                       "Should not rotate transient SSL manager's certificates");
     }
-    auto contextOrStatus = _createSSLContext(manager, _sslMode(), asyncOCSPStaple);
+    auto contextOrStatus = _createSSLContext(manager, sslMode(), asyncOCSPStaple);
     if (!contextOrStatus.isOK()) {
         return contextOrStatus.getStatus();
     }
@@ -1666,7 +1665,7 @@ AsioTransportLayer::createTransientSSLContext(const TransientSSLParams& transien
     auto manager = coordinator->createTransientSSLManager(transientSSLParams);
     invariant(manager);
 
-    return _createSSLContext(manager, _sslMode(), true /* asyncOCSPStaple */);
+    return _createSSLContext(manager, sslMode(), true /* asyncOCSPStaple */);
 }
 
 #endif

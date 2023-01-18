@@ -260,7 +260,7 @@ Status ServiceExecutorFixed::start() {
     _threadPool->schedule([this, reactor](Status) {
         {
             // Check to make sure we haven't been shutdown already. Note that there is still a brief
-            // race that immediately follows this check. ASIOReactor::stop() is not permanent, thus
+            // race that immediately follows this check. AsioReactor::stop() is not permanent, thus
             // our run() could "restart" the reactor.
             auto lk = stdx::lock_guard(_mutex);
             if (_state != State::kRunning) {

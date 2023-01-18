@@ -140,7 +140,7 @@ public:
 
 }  // namespace
 
-void AsioTransportLayer::AsioNetworkingBaton::schedule(Task func) noexcept {
+void AsioNetworkingBaton::schedule(Task func) noexcept {
     auto task = [this, func = std::move(func)](stdx::unique_lock<Mutex> lk) mutable {
         auto status = _opCtx ? Status::OK() : getDetachedError();
         lk.unlock();
@@ -159,12 +159,12 @@ void AsioTransportLayer::AsioNetworkingBaton::schedule(Task func) noexcept {
         notify();
 }
 
-void AsioTransportLayer::AsioNetworkingBaton::notify() noexcept {
+void AsioNetworkingBaton::notify() noexcept {
     efd(_opCtx).notify();
 }
 
-Waitable::TimeoutState AsioTransportLayer::AsioNetworkingBaton::run_until(
-    ClockSource* clkSource, Date_t deadline) noexcept {
+Waitable::TimeoutState AsioNetworkingBaton::run_until(ClockSource* clkSource,
+                                                      Date_t deadline) noexcept {
     // Set up a timer on the baton with the specified deadline. This synthetic timer is used by
     // `_poll()`, which is called through `run()`, to enforce a deadline for the blocking `::poll`.
     DummyTimer timer;
@@ -182,7 +182,7 @@ Waitable::TimeoutState AsioTransportLayer::AsioNetworkingBaton::run_until(
     }
 }
 
-void AsioTransportLayer::AsioNetworkingBaton::run(ClockSource* clkSource) noexcept {
+void AsioNetworkingBaton::run(ClockSource* clkSource) noexcept {
     // On the way out, fulfill promises and run scheduled jobs without holding the lock.
     std::list<Promise<void>> toFulfill;
     const ScopeGuard guard([&] {
@@ -218,7 +218,7 @@ void AsioTransportLayer::AsioNetworkingBaton::run(ClockSource* clkSource) noexce
     }
 }
 
-void AsioTransportLayer::AsioNetworkingBaton::markKillOnClientDisconnect() noexcept {
+void AsioNetworkingBaton::markKillOnClientDisconnect() noexcept {
     auto client = _opCtx->getClient();
     invariant(client);
     if (auto session = client->session()) {
@@ -229,13 +229,12 @@ void AsioTransportLayer::AsioNetworkingBaton::markKillOnClientDisconnect() noexc
     }
 }
 
-Future<void> AsioTransportLayer::AsioNetworkingBaton::addSession(Session& session,
-                                                                 Type type) noexcept {
+Future<void> AsioNetworkingBaton::addSession(Session& session, Type type) noexcept {
     return _addSession(session, type == Type::In ? POLLIN : POLLOUT);
 }
 
-Future<void> AsioTransportLayer::AsioNetworkingBaton::waitUntil(const ReactorTimer& reactorTimer,
-                                                                Date_t expiration) noexcept try {
+Future<void> AsioNetworkingBaton::waitUntil(const ReactorTimer& reactorTimer,
+                                            Date_t expiration) noexcept try {
     auto pf = makePromiseFuture<void>();
     _safeExecute(stdx::unique_lock(_mutex),
                  [this, expiration, timer = Timer{reactorTimer.id(), std::move(pf.promise)}](
@@ -248,8 +247,8 @@ Future<void> AsioTransportLayer::AsioNetworkingBaton::waitUntil(const ReactorTim
     return ex.toStatus();
 }
 
-Future<void> AsioTransportLayer::AsioNetworkingBaton::waitUntil(
-    Date_t expiration, const CancellationToken& token) noexcept try {
+Future<void> AsioNetworkingBaton::waitUntil(Date_t expiration,
+                                            const CancellationToken& token) noexcept try {
     auto pf = makePromiseFuture<void>();
     DummyTimer dummy;
     const size_t timerId = dummy.id();
@@ -270,7 +269,7 @@ Future<void> AsioTransportLayer::AsioNetworkingBaton::waitUntil(
     return ex.toStatus();
 }
 
-bool AsioTransportLayer::AsioNetworkingBaton::cancelSession(Session& session) noexcept {
+bool AsioNetworkingBaton::cancelSession(Session& session) noexcept {
     const auto id = session.id();
 
     stdx::unique_lock lk(_mutex);
@@ -292,12 +291,12 @@ bool AsioTransportLayer::AsioNetworkingBaton::cancelSession(Session& session) no
     return true;
 }
 
-bool AsioTransportLayer::AsioNetworkingBaton::cancelTimer(const ReactorTimer& timer) noexcept {
+bool AsioNetworkingBaton::cancelTimer(const ReactorTimer& timer) noexcept {
     const auto id = timer.id();
     return _cancelTimer(id);
 }
 
-bool AsioTransportLayer::AsioNetworkingBaton::_cancelTimer(size_t id) noexcept {
+bool AsioNetworkingBaton::_cancelTimer(size_t id) noexcept {
     stdx::unique_lock lk(_mutex);
     if (_timersById.find(id) == _timersById.end())
         return false;
@@ -318,13 +317,12 @@ bool AsioTransportLayer::AsioNetworkingBaton::_cancelTimer(size_t id) noexcept {
     return true;
 }
 
-bool AsioTransportLayer::AsioNetworkingBaton::canWait() noexcept {
+bool AsioNetworkingBaton::canWait() noexcept {
     stdx::lock_guard lk(_mutex);
     return _opCtx;
 }
 
-void AsioTransportLayer::AsioNetworkingBaton::_safeExecute(
-    stdx::unique_lock<Mutex> lk, AsioTransportLayer::AsioNetworkingBaton::Job job) {
+void AsioNetworkingBaton::_safeExecute(stdx::unique_lock<Mutex> lk, AsioNetworkingBaton::Job job) {
     if (!_opCtx) {
         // If we're detached, no job can safely execute.
         iasserted(getDetachedError());
@@ -338,8 +336,8 @@ void AsioTransportLayer::AsioNetworkingBaton::_safeExecute(
     }
 }
 
-std::list<Promise<void>> AsioTransportLayer::AsioNetworkingBaton::_poll(
-    stdx::unique_lock<Mutex>& lk, ClockSource* clkSource) {
+std::list<Promise<void>> AsioNetworkingBaton::_poll(stdx::unique_lock<Mutex>& lk,
+                                                    ClockSource* clkSource) {
     const auto now = clkSource->now();
 
     // If we have a timer, then use it to enforce a timeout for polling.
@@ -415,8 +413,7 @@ std::list<Promise<void>> AsioTransportLayer::AsioNetworkingBaton::_poll(
     return promises;
 }
 
-Future<void> AsioTransportLayer::AsioNetworkingBaton::_addSession(Session& session,
-                                                                  short events) try {
+Future<void> AsioNetworkingBaton::_addSession(Session& session, short events) try {
     auto pf = makePromiseFuture<void>();
     TransportSession ts{checked_cast<AsioSession&>(session).getSocket().native_handle(),
                         events,
@@ -431,7 +428,7 @@ Future<void> AsioTransportLayer::AsioNetworkingBaton::_addSession(Session& sessi
     return ex.toStatus();
 }
 
-void AsioTransportLayer::AsioNetworkingBaton::detachImpl() noexcept {
+void AsioNetworkingBaton::detachImpl() noexcept {
     decltype(_scheduled) scheduled;
     decltype(_sessions) sessions;
     decltype(_timers) timers;

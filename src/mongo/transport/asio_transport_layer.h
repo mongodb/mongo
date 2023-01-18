@@ -78,6 +78,9 @@ extern FailPoint asioTransportLayerHangBeforeAcceptCallback;
 
 extern FailPoint asioTransportLayerHangDuringAcceptCallback;
 
+class AsioNetworkingBaton;
+class AsioReactor;
+class AsioSession;
 
 /**
  * A TransportLayer implementation based on ASIO networking primitives.
@@ -220,6 +223,12 @@ public:
 #endif
 
 #ifdef MONGO_CONFIG_SSL
+    SSLParams::SSLModes sslMode() const;
+
+    std::shared_ptr<const SSLConnectionContext> sslContext() const {
+        return _sslContext.get();
+    }
+
     Status rotateCertificates(std::shared_ptr<SSLManagerInterface> manager,
                               bool asyncOCSPStaple) override;
 
@@ -234,10 +243,6 @@ public:
 #endif
 
 private:
-    class AsioNetworkingBaton;
-    class AsioSession;
-    class ASIOReactor;
-
     using AsioSessionHandle = std::shared_ptr<AsioSession>;
     using ConstAsioSessionHandle = std::shared_ptr<const AsioSession>;
     using GenericAcceptor = asio::basic_socket_acceptor<asio::generic::stream_protocol>;
@@ -259,10 +264,6 @@ private:
     void _runListener() noexcept;
 
     void _trySetListenerSocketBacklogQueueDepth(GenericAcceptor& acceptor) noexcept;
-
-#ifdef MONGO_CONFIG_SSL
-    SSLParams::SSLModes _sslMode() const;
-#endif
 
     Mutex _mutex = MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "AsioTransportLayer::_mutex");
 
@@ -288,9 +289,9 @@ private:
     // state that is associated with the reactors), so that we destroy any existing acceptors or
     // other reactor associated state before we drop the refcount on the reactor, which may destroy
     // it.
-    std::shared_ptr<ASIOReactor> _ingressReactor;
-    std::shared_ptr<ASIOReactor> _egressReactor;
-    std::shared_ptr<ASIOReactor> _acceptorReactor;
+    std::shared_ptr<AsioReactor> _ingressReactor;
+    std::shared_ptr<AsioReactor> _egressReactor;
+    std::shared_ptr<AsioReactor> _acceptorReactor;
 
 #ifdef MONGO_CONFIG_SSL
     synchronized_value<std::shared_ptr<const SSLConnectionContext>> _sslContext;
