@@ -218,4 +218,4 @@ class FileBasedThreadLifecycle(object):
 
         # We remove the "permitted" file to revoke permission for the hook thread to continue
         # performing actions.
-        os.remove(self.__action_files.permitted)
+        fs.remove_if_exists(self.__action_files.permitted)
