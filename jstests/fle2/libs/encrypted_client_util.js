@@ -12,8 +12,10 @@ var EncryptedClient = class {
      *
      * @param {Mongo} conn Connection to mongod or mongos
      * @param {string} dbName Name of database to setup key vault in
+     * @param {string} userName user name used for authentication (optional).
+     * @param {string} adminPwd Admin password used for authentication (optional).
      */
-    constructor(conn, dbName) {
+    constructor(conn, dbName, userName = undefined, adminPwd = undefined) {
         // Detect if jstests/libs/override_methods/implicitly_shard_accessed_collections.js is in
         // use
         this.useImplicitSharding = !(typeof (ImplicitlyShardAccessCollSettings) === "undefined");
@@ -33,7 +35,20 @@ var EncryptedClient = class {
         };
 
         let connectionString = conn.host.toString();
-        var shell = Mongo(connectionString, clientSideFLEOptions);
+        var shell = undefined;
+        assert((userName && adminPwd) || (!userName && !adminPwd),
+               `EncryptedClient takes either no credential or both credentials`);
+        if (userName && adminPwd) {
+            // We are using the admin database as a hack for our jstests to avoid having to pass
+            // a tenantId that is required when featureFlagRequireTenantID is set.
+            clientSideFLEOptions.keyVaultNamespace = "admin" +
+                "." + dbName + ".keystore";
+            shell = Mongo(connectionString, clientSideFLEOptions);
+            // auth is needed when using $tenant.
+            assert(shell.getDB('admin').auth(userName, adminPwd));
+        } else {
+            shell = Mongo(connectionString, clientSideFLEOptions);
+        }
         var edb = shell.getDB(dbName);
 
         var keyVault = shell.getKeyVault();
@@ -114,11 +129,17 @@ var EncryptedClient = class {
             `options must contain an encryptedFields document'`);
 
         const res = assert.commandWorked(this._edb.createCollection(name, options));
+        let listCollCmdObj = {listCollections: 1, nameOnly: false, filter: {name: name}};
+        const dollarTenant = options["$tenant"];
+        if (dollarTenant) {
+            Object.extend(listCollCmdObj, {"$tenant": dollarTenant});
+        }
+        const cis = assert.commandWorked(this._edb.runCommand(listCollCmdObj));
 
-        const cis = this._edb.getCollectionInfos({"name": name});
-        assert.eq(cis.length, 1, `Expected to find one collection named '${name}'`);
+        assert.eq(
+            cis.cursor.firstBatch.length, 1, `Expected to find one collection named '${name}'`);
 
-        const ci = cis[0];
+        const ci = cis.cursor.firstBatch[0];
         assert(ci.hasOwnProperty("options"), `Expected collection '${name}' to have 'options'`);
         const storedOptions = ci.options;
         assert(options.hasOwnProperty("encryptedFields"),
@@ -146,11 +167,19 @@ var EncryptedClient = class {
             jsTestLog("Sharding: " + tojson(shardCollCmd));
         }
 
-        assert.commandWorked(this._edb.getCollection(name).createIndex({__safeContent__: 1}));
-
-        assert.commandWorked(this._edb.createCollection(ef.escCollection));
-        assert.commandWorked(this._edb.createCollection(ef.eccCollection));
-        assert.commandWorked(this._edb.createCollection(ef.ecocCollection));
+        const indexOptions = [{"key": {__safeContent__: 1}, name: "__safeContent___1"}];
+        const createIndexCmdObj = {createIndexes: name, indexes: indexOptions};
+        if (dollarTenant) {
+            Object.extend(createIndexCmdObj, {"$tenant": dollarTenant});
+        }
+        assert.commandWorked(this._edb.runCommand(createIndexCmdObj));
+        let tenantOption = {};
+        if (dollarTenant) {
+            Object.extend(tenantOption, {"$tenant": dollarTenant});
+        }
+        assert.commandWorked(this._edb.createCollection(ef.escCollection, tenantOption));
+        assert.commandWorked(this._edb.createCollection(ef.eccCollection, tenantOption));
+        assert.commandWorked(this._edb.createCollection(ef.ecocCollection, tenantOption));
 
         return res;
     }
@@ -165,34 +194,52 @@ var EncryptedClient = class {
      * @param {number} ecoc Number of documents in ECOC
      */
     assertEncryptedCollectionCountsByObject(
-        sessionDB, name, expectedEdc, expectedEsc, expectedEcc, expectedEcoc) {
-        const cis = this._db.getCollectionInfos({"name": name});
-        assert.eq(cis.length, 1, `Expected to find one collection named '${name}'`);
+        sessionDB, name, expectedEdc, expectedEsc, expectedEcc, expectedEcoc, tenantId) {
+        let listCollCmdObj = {listCollections: 1, nameOnly: false, filter: {name: name}};
+        if (tenantId) {
+            Object.extend(listCollCmdObj, {"$tenant": tenantId});
+        }
+        const cis = assert.commandWorked(this._db.runCommand(listCollCmdObj));
+        assert.eq(
+            cis.cursor.firstBatch.length, 1, `Expected to find one collection named '${name}'`);
 
-        const ci = cis[0];
+        const ci = cis.cursor.firstBatch[0];
         assert(ci.hasOwnProperty("options"), `Expected collection '${name}' to have 'options'`);
         const options = ci.options;
         assert(options.hasOwnProperty("encryptedFields"),
                `Expected collection '${name}' to have 'encryptedFields'`);
 
-        const ef = options.encryptedFields;
+        function countDocuments(sessionDB, name, tenantId) {
+            // FLE2 tests are testing transactions and using the count command is not supported.
+            // For the purpose of testing NTDI and `$tenant` we are going to simply use the count
+            // command since we are not testing any transaction. Otherwise fall back to use
+            // aggregation.
+            if (tenantId) {
+                return assert
+                    .commandWorked(sessionDB.runCommand({count: name, "$tenant": tenantId}))
+                    .n;
+            } else {
+                return sessionDB.getCollection(name).countDocuments({});
+            }
+        }
 
-        const actualEdc = sessionDB.getCollection(name).countDocuments({});
+        const actualEdc = countDocuments(sessionDB, name, tenantId);
         assert.eq(actualEdc,
                   expectedEdc,
                   `EDC document count is wrong: Actual ${actualEdc} vs Expected ${expectedEdc}`);
 
-        const actualEsc = sessionDB.getCollection(ef.escCollection).countDocuments({});
+        const ef = options.encryptedFields;
+        const actualEsc = countDocuments(sessionDB, ef.escCollection, tenantId);
         assert.eq(actualEsc,
                   expectedEsc,
                   `ESC document count is wrong: Actual ${actualEsc} vs Expected ${expectedEsc}`);
 
-        const actualEcc = sessionDB.getCollection(ef.eccCollection).countDocuments({});
+        const actualEcc = countDocuments(sessionDB, ef.eccCollection, tenantId);
         assert.eq(actualEcc,
                   expectedEcc,
                   `ECC document count is wrong: Actual ${actualEcc} vs Expected ${expectedEcc}`);
 
-        const actualEcoc = sessionDB.getCollection(ef.ecocCollection).countDocuments({});
+        const actualEcoc = countDocuments(sessionDB, ef.ecocCollection, tenantId);
         assert.eq(actualEcoc,
                   expectedEcoc,
                   `ECOC document count is wrong: Actual ${actualEcoc} vs Expected ${expectedEcoc}`);
@@ -207,9 +254,10 @@ var EncryptedClient = class {
      * @param {number} ecc Number of documents in ECC
      * @param {number} ecoc Number of documents in ECOC
      */
-    assertEncryptedCollectionCounts(name, expectedEdc, expectedEsc, expectedEcc, expectedEcoc) {
+    assertEncryptedCollectionCounts(
+        name, expectedEdc, expectedEsc, expectedEcc, expectedEcoc, tenantId) {
         this.assertEncryptedCollectionCountsByObject(
-            this._db, name, expectedEdc, expectedEsc, expectedEcc, expectedEcoc);
+            this._db, name, expectedEdc, expectedEsc, expectedEcc, expectedEcoc, tenantId);
     }
 
     /**
@@ -220,17 +268,24 @@ var EncryptedClient = class {
      * @param {object} query
      * @param {object} fields
      */
-    assertOneEncryptedDocumentFields(coll, query, fields) {
-        let encryptedDocs = this._db.getCollection(coll).find(query).toArray();
+    assertOneEncryptedDocumentFields(coll, query, fields, tenantId) {
+        let cmd = {find: coll};
+        if (query) {
+            cmd.filter = query;
+        }
+        if (tenantId) {
+            Object.extend(cmd, {"$tenant": tenantId});
+        }
+        const encryptedDocs = assert.commandWorked(this._db.runCommand(cmd)).cursor.firstBatch;
         assert.eq(encryptedDocs.length,
                   1,
                   `Expected query ${tojson(query)} to only return one document. Found ${
                       encryptedDocs.length}`);
-        let unEncryptedDocs = this._edb.getCollection(coll).find(query).toArray();
+        const unEncryptedDocs = assert.commandWorked(this._edb.runCommand(cmd)).cursor.firstBatch;
         assert.eq(unEncryptedDocs.length, 1);
 
-        let encryptedDoc = encryptedDocs[0];
-        let unEncryptedDoc = unEncryptedDocs[0];
+        const encryptedDoc = encryptedDocs[0];
+        const unEncryptedDoc = unEncryptedDocs[0];
 
         assert(encryptedDoc[kSafeContentField] !== undefined);
 

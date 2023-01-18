@@ -202,11 +202,9 @@ protected:
 
     RunCommandReturn processResponseFLE1(RunCommandReturn result, StringData databaseName);
 
-    RunCommandReturn processResponseFLE2(RunCommandReturn result, StringData DatabaseName);
+    RunCommandReturn processResponseFLE2(RunCommandReturn result);
 
-    RunCommandReturn prepareReply(RunCommandReturn result,
-                                  StringData databaseName,
-                                  BSONObj decryptedDoc);
+    RunCommandReturn prepareReply(RunCommandReturn result, BSONObj decryptedDoc);
 
     BSONObj encryptDecryptCommand(const BSONObj& object, bool encrypt, StringData databaseName);
 

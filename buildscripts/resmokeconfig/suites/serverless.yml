@@ -4,6 +4,7 @@ selector:
   roots:
   - jstests/serverless/*.js
   - jstests/serverless/change_streams/**/*.js
+  - src/mongo/db/modules/*/jstests/serverless/**/*.js
 
 executor:
   config:

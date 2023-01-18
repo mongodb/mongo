@@ -188,6 +188,8 @@ boost::intrusive_ptr<ExpressionContext> makeExpCtx(OperationContext* opCtx,
 
 }  // namespace
 
+using VTS = auth::ValidatedTenancyScope;
+
 /**
  * Checks that all encrypted payloads correspond to an encrypted field,
  * and that the encryption keyId used was appropriate for that field.
@@ -362,10 +364,18 @@ write_ops::DeleteCommandReply processDelete(OperationContext* opCtx,
     auto reply = std::make_shared<write_ops::DeleteCommandReply>();
 
     auto ownedRequest = deleteRequest.serialize({});
+    const auto tenantId = deleteRequest.getDbName().tenantId();
+    if (tenantId && gMultitenancySupport) {
+        // `ownedRequest` is OpMsgRequest type which will parse the tenantId from ValidatedTenantId.
+        // Before parsing we should ensure that validatedTenancyScope is set in order not to lose
+        // the tenantId after the parsing.
+        ownedRequest.validatedTenancyScope =
+            VTS(tenantId.get(), VTS::TrustedForInnerOpMsgRequestTag{});
+    }
+
     auto ownedDeleteRequest =
         write_ops::DeleteCommandRequest::parse(IDLParserContext("delete"), ownedRequest);
     auto ownedDeleteOpEntry = ownedDeleteRequest.getDeletes()[0];
-
     auto expCtx = makeExpCtx(opCtx, ownedDeleteRequest, ownedDeleteOpEntry);
     // The function that handles the transaction may outlive this function so we need to use
     // shared_ptrs
@@ -450,6 +460,11 @@ write_ops::UpdateCommandReply processUpdate(OperationContext* opCtx,
     auto reply = std::make_shared<write_ops::UpdateCommandReply>();
 
     auto ownedRequest = updateRequest.serialize({});
+    const auto tenantId = updateRequest.getDbName().tenantId();
+    if (tenantId && gMultitenancySupport) {
+        ownedRequest.validatedTenancyScope =
+            VTS(tenantId.get(), VTS::TrustedForInnerOpMsgRequestTag{});
+    }
     auto ownedUpdateRequest =
         write_ops::UpdateCommandRequest::parse(IDLParserContext("update"), ownedRequest);
     auto ownedUpdateOpEntry = ownedUpdateRequest.getUpdates()[0];
@@ -514,8 +529,7 @@ void processFieldsForInsert(FLEQueryInterface* queryImpl,
                             const EncryptedFieldConfig& efc,
                             int32_t* pStmtId,
                             bool bypassDocumentValidation) {
-
-    NamespaceString nssEsc(edcNss.db(), efc.getEscCollection().value());
+    const NamespaceString nssEsc(edcNss.dbName(), efc.getEscCollection().value());
 
     auto docCount = queryImpl->countDocuments(nssEsc);
 
@@ -577,10 +591,10 @@ void processFieldsForInsert(FLEQueryInterface* queryImpl,
             checkWriteErrors(escInsertReply);
 
 
-            NamespaceString nssEcoc(edcNss.db(), efc.getEcocCollection().value());
+            const NamespaceString nssEcoc(edcNss.dbName(), efc.getEcocCollection().value());
 
             // TODO - should we make this a batch of ECOC updates?
-            auto ecocInsertReply = uassertStatusOK(queryImpl->insertDocument(
+            const auto ecocInsertReply = uassertStatusOK(queryImpl->insertDocument(
                 nssEcoc,
                 ECOCCollection::generateDocument(payload.fieldPathName, encryptedTokens),
                 pStmtId,
@@ -653,7 +667,7 @@ void processRemovedFieldsHelper(FLEQueryInterface* queryImpl,
         true));
     checkWriteErrors(eccInsertReply);
 
-    NamespaceString nssEcoc(edcNss.db(), efc.getEcocCollection().value());
+    const NamespaceString nssEcoc(edcNss.dbName(), efc.getEcocCollection().value());
 
     // TODO - make this a batch of ECOC updates?
     EncryptedStateCollectionTokens tokens(esc, ecc);
@@ -673,7 +687,7 @@ void processRemovedFields(FLEQueryInterface* queryImpl,
                           const std::vector<EDCIndexedFields>& deletedFields,
                           int32_t* pStmtId) {
 
-    NamespaceString eccNss(edcNss.db(), efc.getEccCollection().value());
+    const NamespaceString eccNss(edcNss.dbName(), efc.getEccCollection().value());
 
     auto docCount = queryImpl->countDocuments(eccNss);
 
@@ -813,6 +827,11 @@ StatusWith<std::pair<ReplyType, OpMsgRequest>> processFindAndModifyRequest(
     std::shared_ptr<ReplyType> reply = constructDefaultReply<ReplyType>();
 
     auto ownedRequest = findAndModifyRequest.serialize({});
+    const auto tenantId = findAndModifyRequest.getDbName().tenantId();
+    if (tenantId && gMultitenancySupport) {
+        ownedRequest.validatedTenancyScope =
+            VTS(tenantId.get(), VTS::TrustedForInnerOpMsgRequestTag{});
+    }
     auto ownedFindAndModifyRequest = write_ops::FindAndModifyCommandRequest::parse(
         IDLParserContext("findAndModify"), ownedRequest);
 
@@ -904,7 +923,8 @@ write_ops::DeleteCommandReply processDelete(FLEQueryInterface* queryImpl,
 
     auto newDeleteOp = newDeleteRequest.getDeletes()[0];
     newDeleteOp.setQ(fle::rewriteEncryptedFilterInsideTxn(
-        queryImpl, deleteRequest.getDbName(), efc, expCtx, newDeleteOp.getQ()));
+        queryImpl, edcNss.dbName(), efc, expCtx, newDeleteOp.getQ()));
+
     newDeleteRequest.setDeletes({newDeleteOp});
 
     newDeleteRequest.getWriteCommandRequestBase().setStmtIds(boost::none);
@@ -986,7 +1006,7 @@ write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
         : fle::EncryptedCollScanModeAllowed::kAllow;
 
     newUpdateOpEntry.setQ(fle::rewriteEncryptedFilterInsideTxn(queryImpl,
-                                                               updateRequest.getDbName(),
+                                                               edcNss.dbName(),
                                                                efc,
                                                                expCtx,
                                                                newUpdateOpEntry.getQ(),
@@ -1415,6 +1435,10 @@ BSONObj FLEQueryInterfaceImpl::getById(const NamespaceString& nss, BSONElement e
     FindCommandRequest find(nss);
     find.setFilter(BSON("_id" << element));
     find.setSingleBatch(true);
+    const auto tenantId = nss.tenantId();
+    if (tenantId && gMultitenancySupport) {
+        find.setDollarTenant(tenantId);
+    }
 
     // Throws on error
     auto docs = _txnClient.exhaustiveFind(find).get();
@@ -1441,6 +1465,10 @@ uint64_t FLEQueryInterfaceImpl::countDocuments(const NamespaceString& nss) {
     as->grantInternalAuthorization(opCtx.get());
 
     CountCommandRequest ccr(nss);
+    const auto tenantId = nss.tenantId();
+    if (tenantId && gMultitenancySupport) {
+        ccr.setDollarTenant(*tenantId);
+    }
     auto opMsgRequest = ccr.serialize(BSONObj());
 
     DBDirectClient directClient(opCtx.get());
@@ -1468,6 +1496,10 @@ StatusWith<write_ops::InsertCommandReply> FLEQueryInterfaceImpl::insertDocument(
     write_ops::InsertCommandRequest insertRequest(nss);
     insertRequest.setDocuments({obj});
 
+    const auto tenantId = nss.tenantId();
+    if (tenantId && gMultitenancySupport) {
+        insertRequest.setDollarTenant(tenantId);
+    }
     EncryptionInformation encryptionInformation;
     encryptionInformation.setCrudProcessed(true);
 
@@ -1511,6 +1543,10 @@ std::pair<write_ops::DeleteCommandReply, BSONObj> FLEQueryInterfaceImpl::deleteW
     findAndModifyRequest.setCollation(deleteOpEntry.getCollation());
     findAndModifyRequest.setLet(deleteRequest.getLet());
     findAndModifyRequest.setStmtId(deleteRequest.getStmtId());
+    const auto tenantId = nss.tenantId();
+    if (tenantId && gMultitenancySupport) {
+        findAndModifyRequest.setDollarTenant(tenantId);
+    }
 
     auto ei2 = ei;
     ei2.setCrudProcessed(true);
@@ -1528,7 +1564,6 @@ std::pair<write_ops::DeleteCommandReply, BSONObj> FLEQueryInterfaceImpl::deleteW
     } else {
         auto reply =
             write_ops::FindAndModifyCommandReply::parse(IDLParserContext("reply"), response);
-
         if (reply.getLastErrorObject().getNumDocs() > 0) {
             deleteReply.getWriteCommandReplyBase().setN(1);
         }
@@ -1563,6 +1598,9 @@ std::pair<write_ops::UpdateCommandReply, BSONObj> FLEQueryInterfaceImpl::updateW
     findAndModifyRequest.setStmtId(updateRequest.getStmtId());
     findAndModifyRequest.setBypassDocumentValidation(updateRequest.getBypassDocumentValidation());
 
+    if (nss.tenantId() && gMultitenancySupport) {
+        findAndModifyRequest.setDollarTenant(nss.tenantId());
+    }
     auto ei2 = ei;
     ei2.setCrudProcessed(true);
     findAndModifyRequest.setEncryptionInformation(ei2);
@@ -1647,6 +1685,10 @@ write_ops::FindAndModifyCommandReply FLEQueryInterfaceImpl::findAndModify(
 std::vector<BSONObj> FLEQueryInterfaceImpl::findDocuments(const NamespaceString& nss,
                                                           BSONObj filter) {
     FindCommandRequest find(nss);
+    const auto tenantId = nss.tenantId();
+    if (tenantId && gMultitenancySupport) {
+        find.setDollarTenant(tenantId);
+    }
     find.setFilter(filter);
 
     // Throws on error

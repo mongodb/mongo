@@ -196,21 +196,17 @@ void EncryptedDBClientBase::decryptPayload(ConstDataRange data,
 EncryptedDBClientBase::RunCommandReturn EncryptedDBClientBase::processResponseFLE1(
     EncryptedDBClientBase::RunCommandReturn result, const StringData databaseName) {
     auto rawReply = result.returnReply->getCommandReply();
-    return prepareReply(
-        std::move(result), databaseName, encryptDecryptCommand(rawReply, false, databaseName));
+    return prepareReply(std::move(result), encryptDecryptCommand(rawReply, false, databaseName));
 }
 
 EncryptedDBClientBase::RunCommandReturn EncryptedDBClientBase::processResponseFLE2(
-    EncryptedDBClientBase::RunCommandReturn result, const StringData databaseName) {
+    EncryptedDBClientBase::RunCommandReturn result) {
     auto rawReply = result.returnReply->getCommandReply();
-    return prepareReply(
-        std::move(result), databaseName, FLEClientCrypto::decryptDocument(rawReply, this));
+    return prepareReply(std::move(result), FLEClientCrypto::decryptDocument(rawReply, this));
 }
 
 EncryptedDBClientBase::RunCommandReturn EncryptedDBClientBase::prepareReply(
-    EncryptedDBClientBase::RunCommandReturn result,
-    const StringData databaseName,
-    BSONObj decryptedDoc) {
+    EncryptedDBClientBase::RunCommandReturn result, BSONObj decryptedDoc) {
     rpc::OpMsgReplyBuilder replyBuilder;
     replyBuilder.setCommandReply(StatusWith<BSONObj>(decryptedDoc));
     auto msg = replyBuilder.done();
@@ -243,7 +239,7 @@ EncryptedDBClientBase::RunCommandReturn EncryptedDBClientBase::handleEncryptionR
     }
 
     EncryptedDBClientBase::RunCommandReturn result(doRunCommand(std::move(params)));
-    return processResponseFLE1(processResponseFLE2(std::move(result), databaseName), databaseName);
+    return processResponseFLE1(processResponseFLE2(std::move(result)), databaseName);
 }
 
 std::pair<rpc::UniqueReply, DBClientBase*> EncryptedDBClientBase::runCommandWithTarget(

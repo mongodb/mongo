@@ -257,9 +257,8 @@ OpMsgRequest OpMsgRequest::fromDBAndBody(StringData db, BSONObj body, const BSON
 }
 
 boost::optional<TenantId> parseDollarTenant(const BSONObj body) {
-    auto tenant = body.getField("$tenant");
-    if (tenant) {
-        return TenantId::parseFromBSON(body.getField("$tenant"));
+    if (auto tenant = body.getField("$tenant")) {
+        return TenantId::parseFromBSON(tenant);
     } else {
         return boost::none;
     }

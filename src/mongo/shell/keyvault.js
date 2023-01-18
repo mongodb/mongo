@@ -91,7 +91,14 @@ class KeyVault {
             doc.keyAltNames = keyAltNames;
         }
 
-        this._runCommand(this.keyColl, this.keyColl.insert, [doc, {writeConcern: {w: "majority"}}]);
+        let insertCmdObj = {
+            insert: this.keyColl.getName(),
+            documents: [doc],
+            writeConcern: {w: "majority"}
+        };
+
+        assert.commandWorked(this._runCommand(
+            this.keyColl.getDB(), this.keyColl.getDB().runCommand, [insertCmdObj]));
         return uuid;
     }
 
