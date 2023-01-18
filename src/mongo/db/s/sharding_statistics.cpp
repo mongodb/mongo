@@ -34,6 +34,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 
 namespace mongo {
 namespace {
@@ -69,6 +70,8 @@ void ShardingStatistics::report(BSONObjBuilder* builder) const {
                     countDonorMoveChunkAbortConflictingIndexOperation.load());
     builder->append("unfinishedMigrationFromPreviousPrimary",
                     unfinishedMigrationFromPreviousPrimary.load());
+    if (mongo::feature_flags::gConcurrencyInChunkMigration.isEnabledAndIgnoreFCV())
+        builder->append("chunkMigrationConcurrency", chunkMigrationConcurrencyCnt.load());
 }
 
 }  // namespace mongo
