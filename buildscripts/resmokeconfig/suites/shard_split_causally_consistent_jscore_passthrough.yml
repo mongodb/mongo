@@ -18,7 +18,7 @@ selector:
   exclude_files:
   - jstests/core/txns/**/*.js
   # Skip any tests that run with auth explicitly.
-  - jstests/core/*[aA]uth*.js
+  - jstests/core/administrative/*[aA]uth*.js
 
   #
   # Denylists from causally_consistent_jscore_passthrough.yml

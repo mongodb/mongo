@@ -16,7 +16,7 @@ selector:
   - src/mongo/db/modules/*/jstests/fle2/**/*.js
   exclude_files:
   # Skip any tests that run with auth explicitly.
-  - jstests/core/*[aA]uth*.js
+  - jstests/core/administrative/*[aA]uth*.js
   # Has conditional logic for standalone servers and replica sets, but can't distinguish the two
   # when connected to mongos.
   - jstests/core/**/write_result.js

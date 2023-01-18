@@ -17,7 +17,7 @@ selector:
   - jstests/core/**/*.js
   exclude_files:
   # Skip any tests that run with auth explicitly.
-  - jstests/core/*[aA]uth*.js
+  - jstests/core/administrative/*[aA]uth*.js
 
   # This test runs createIndexes commands without asserting they succeed and depends on a particular
   # index to exist.

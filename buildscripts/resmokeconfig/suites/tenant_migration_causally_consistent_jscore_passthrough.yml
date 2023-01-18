@@ -14,7 +14,7 @@ selector:
   - jstests/core/**/*.js
   exclude_files:
   # Skip any tests that run with auth explicitly.
-  - jstests/core/*[aA]uth*.js
+  - jstests/core/administrative/*[aA]uth*.js
   # This test uses `benchRun` which spawns connections which do not inherit the causal session.
   - jstests/core/**/benchrun_pipeline_updates.js
 
