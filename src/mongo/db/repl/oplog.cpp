@@ -268,13 +268,41 @@ void createIndexForApplyOps(OperationContext* opCtx,
                             << "; original index spec: " << indexSpec);
     const auto constraints = IndexBuildsManager::IndexConstraints::kRelax;
 
-    // Run single-phase builds synchronously with oplog batch application. This enables them to
-    // stop using ghost timestamps. Single phase builds are only used for empty collections, and
-    // to rebuild indexes admin.system collections. See SERVER-47439.
+    // Run single-phase builds synchronously with oplog batch application. For tenant migrations,
+    // the recipient needs to build the index on empty collections to completion within the same
+    // storage transaction. This is in order to eliminate a window of time where we can reload the
+    // catalog through startup or rollback and detect the index in an incomplete state. Before
+    // SERVER-72618 this was possible and would require us to remove the index from the catalog to
+    // allow replication recovery to rebuild it. The result of this was an untimestamped write to
+    // the catalog. This only applies to empty collection index builds during tenant migration and
+    // is resolved by calling `createIndexesOnEmptyCollection` on empty collections.
+    //
+    // Single phase builds are only used for empty collections, and to rebuild indexes admin.system
+    // collections. See SERVER-47439.
     IndexBuildsCoordinator::updateCurOpOpDescription(opCtx, indexNss, {indexSpec});
     auto collUUID = indexCollection->uuid();
     auto fromMigrate = false;
-    indexBuildsCoordinator->createIndex(opCtx, collUUID, indexSpec, constraints, fromMigrate);
+    if (indexCollection->isEmpty(opCtx)) {
+        WriteUnitOfWork wuow(opCtx);
+        CollectionWriter coll(opCtx, indexNss);
+
+        try {
+            indexBuildsCoordinator->createIndexesOnEmptyCollection(
+                opCtx, coll, {indexSpec}, fromMigrate);
+        } catch (const ExceptionFor<ErrorCodes::IndexAlreadyExists>& e) {
+            // Ignore the "IndexAlreadyExists" error during oplog application.
+            LOGV2_DEBUG(7261800,
+                        1,
+                        "Ignoring indexing error",
+                        "error"_attr = redact(e.toStatus()),
+                        logAttrs(indexCollection->ns()),
+                        logAttrs(indexCollection->uuid()),
+                        "spec"_attr = indexSpec);
+        }
+        wuow.commit();
+    } else {
+        indexBuildsCoordinator->createIndex(opCtx, collUUID, indexSpec, constraints, fromMigrate);
+    }
 
     opCtx->recoveryUnit()->abandonSnapshot();
 }

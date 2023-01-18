@@ -40,6 +40,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/global_settings.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/multitenancy.h"
 #include "mongo/db/operation_context.h"
@@ -780,13 +781,17 @@ StatusWith<StorageEngine::ReconcileResult> StorageEngineImpl::reconcileCatalogAn
                 continue;
             }
 
-            // The last anomaly is when the index build did not complete, nor was the index build
-            // a secondary background index build. This implies the index build was on a primary
-            // and the `createIndexes` command never successfully returned, or the index build was
-            // a foreground secondary index build, meaning replication recovery will build the
-            // index when it replays the oplog. In these cases the index entry in the catalog
-            // should be dropped.
-            if (!indexMetaData.ready && !indexMetaData.isBackgroundSecondaryBuild) {
+            // The last anomaly is when the index build did not complete. This implies the index
+            // build was on a standalone and the `createIndexes` command never successfully
+            // returned. In this case the index entry in the catalog should be dropped.
+            if (!indexMetaData.ready) {
+                // Index builds on a secondary node are built using the two-phase protocol on
+                // non-empty collections. On empty collections, the index is built atomically during
+                // oplog application so we should never see an index with {ready: false} in this
+                // case.
+                invariant(!indexMetaData.isBackgroundSecondaryBuild);
+                invariant(!getGlobalReplSettings().usingReplSets());
+
                 LOGV2(22256, "Dropping unfinished index", logAttrs(nss), "index"_attr = indexName);
                 // Ensure the `ident` is dropped while we have the `indexIdent` value.
                 Status status = _engine->dropIdent(opCtx->recoveryUnit(), indexIdent);

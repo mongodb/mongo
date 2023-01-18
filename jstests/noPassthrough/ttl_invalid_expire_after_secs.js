@@ -27,6 +27,10 @@ function test(expireAfterSecondsVal) {
     const db = primary.getDB('test');
     const coll = db.t;
 
+    // Insert a document before creating the index. Index builds on empty collections skip the
+    // collection scan phase, which we look for using checkLog below.
+    assert.commandWorked(coll.insert({_id: 0, t: ISODate()}));
+
     // The test cases here revolve around having a TTL index in the catalog with an invalid
     // 'expireAfterSeconds'. The current createIndexes behavior will reject index creation for
     // invalid values of expireAfterSeconds, so we use a failpoint to disable that checking to
@@ -40,8 +44,6 @@ function test(expireAfterSecondsVal) {
         fp.off();
         fp2.off();
     }
-
-    assert.commandWorked(coll.insert({_id: 0, t: ISODate()}));
 
     // Log the contents of the catalog for debugging purposes in case of failure.
     let catalogContents = coll.aggregate([{$listCatalog: {}}]).toArray();
