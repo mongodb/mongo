@@ -419,6 +419,9 @@ private:
                 if (update.getArrayFilters()) {
                     _updateMetrics->incrementExecutedWithArrayFilters();
                 }
+                if (update.getMulti()) {
+                    updateManyCount.increment(1);
+                }
             }
         }
 
@@ -514,6 +517,12 @@ private:
                            _batch.getDeletes().size(),
                            std::move(reply),
                            &result);
+            // Collect metrics.
+            for (auto&& delOp : _batch.getDeletes()) {
+                if (delOp.getMulti()) {
+                    deleteManyCount.increment(1);
+                }
+            }
         }
 
         void explain(OperationContext* opCtx,

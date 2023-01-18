@@ -38,6 +38,7 @@
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collation_index_key.h"
+#include "mongo/db/stats/counters.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
@@ -62,6 +63,11 @@ using UpdateType = ChunkManagerTargeter::UpdateType;
 Counter64 updateOneOpStyleBroadcastWithExactIDCount;
 ServerStatusMetricField<Counter64> updateOneOpStyleBroadcastWithExactIDStats(
     "query.updateOneOpStyleBroadcastWithExactIDCount", &updateOneOpStyleBroadcastWithExactIDCount);
+
+ServerStatusMetricField<Counter64> displayUpdateManyCount("query.updateManyCount",
+                                                          &updateManyCount);
+ServerStatusMetricField<Counter64> displayDeleteManyCount("query.deleteManyCount",
+                                                          &deleteManyCount);
 
 /**
  * Update expressions are bucketed into one of two types for the purposes of shard targeting:
@@ -437,6 +443,10 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetUpdate(
         return updateType.getStatus();
     }
 
+    if (updateDoc.getMulti()) {
+        updateManyCount.increment(1);
+    }
+
     // If the collection is not sharded, forward the update to the primary shard.
     if (!_routingInfo->cm()) {
         if (!_routingInfo->db().primary()) {
@@ -526,6 +536,10 @@ StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetUpdate(
 StatusWith<std::vector<ShardEndpoint>> ChunkManagerTargeter::targetDelete(
     OperationContext* opCtx, const write_ops::DeleteOpEntry& deleteDoc) const {
     BSONObj shardKey;
+
+    if (deleteDoc.getMulti()) {
+        deleteManyCount.increment(1);
+    }
 
     if (_routingInfo->cm()) {
         //

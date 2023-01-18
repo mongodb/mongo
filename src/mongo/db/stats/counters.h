@@ -315,4 +315,10 @@ private:
 };
 
 extern OperatorCountersMatchExpressions operatorCountersMatchExpressions;
+
+// Track the number of {multi:true} updates.
+extern Counter64 updateManyCount;
+// Track the number of deleteMany calls.
+extern Counter64 deleteManyCount;
+
 }  // namespace mongo

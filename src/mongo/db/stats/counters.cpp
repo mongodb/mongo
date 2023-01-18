@@ -34,6 +34,7 @@
 #include "mongo/db/stats/counters.h"
 
 #include "mongo/client/authenticate.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/logv2/log.h"
 
@@ -297,4 +298,8 @@ AuthCounter authCounter;
 AggStageCounters aggStageCounters;
 OperatorCountersAggExpressions operatorCountersAggExpressions;
 OperatorCountersMatchExpressions operatorCountersMatchExpressions;
+
+Counter64 updateManyCount;
+Counter64 deleteManyCount;
+
 }  // namespace mongo
