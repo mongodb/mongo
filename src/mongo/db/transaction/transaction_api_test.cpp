@@ -1974,7 +1974,8 @@ TEST_F(TxnAPITest, MaxTimeMSIsSetIfOperationContextHasDeadlineAndIgnoresDefaultR
     const std::shared_ptr<ClockSourceMock> mockClock = std::make_shared<ClockSourceMock>();
     mockClock->reset(getServiceContext()->getFastClockSource()->now());
     getServiceContext()->setFastClockSource(std::make_unique<SharedClockSourceAdapter>(mockClock));
-    int maxTimeMS = 2000;
+    int maxTimeMS = 1000 * 60 * 60 * 24;        // 1 day.
+    int advanceTimeByMS = 1000 * 60 * 60 * 23;  // 23 hours.
     opCtx()->setDeadlineByDate(mockClock->now() + Milliseconds(maxTimeMS),
                                ErrorCodes::MaxTimeMSExpired);
 
@@ -2006,7 +2007,7 @@ TEST_F(TxnAPITest, MaxTimeMSIsSetIfOperationContextHasDeadlineAndIgnoresDefaultR
             // is disabled when a deadline is set.
             uassert(ErrorCodes::HostUnreachable, "Host unreachable error", attempt > 3);
 
-            mockClock->advance(Milliseconds(1000));
+            mockClock->advance(Milliseconds(advanceTimeByMS));
 
             // The commit response.
             mockClient()->setNextCommandResponse(kOKCommandResponse);
@@ -2021,7 +2022,7 @@ TEST_F(TxnAPITest, MaxTimeMSIsSetIfOperationContextHasDeadlineAndIgnoresDefaultR
                       boost::none /* startTransaction */,
                       boost::none /* readConcern */,
                       WriteConcernOptions().toBSON() /* writeConcern */,
-                      1000 /* maxTimeMS */);
+                      maxTimeMS - advanceTimeByMS /* maxTimeMS */);
     assertSessionIdMetadata(mockClient()->getLastSentRequest(), LsidAssertion::kStandalone);
     ASSERT_EQ(lastRequest.firstElementFieldNameStringData(), "commitTransaction"_sd);
 }
