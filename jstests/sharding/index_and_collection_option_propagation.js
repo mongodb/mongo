@@ -11,6 +11,7 @@
 // cannot be performed on that node, which causes the consistency checker to fail.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
+TestData.skipCheckShardFilteringMetadata = true;
 
 (function() {
 // Helper function that runs listIndexes against shards to check for the existence of an index.

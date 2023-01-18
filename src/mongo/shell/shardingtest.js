@@ -527,6 +527,7 @@ var ShardingTest = function(params) {
         this.checkIndexesConsistentAcrossCluster();
         this.checkOrphansAreDeleted();
         this.checkRoutingTableConsistency();
+        this.checkShardFilteringMetadata();
 
         if (jsTestOptions().alwaysUseLogFiles) {
             if (opts.noCleanData === false) {
@@ -1918,4 +1919,8 @@ ShardingTest.prototype.checkOrphansAreDeleted = function() {
 
 ShardingTest.prototype.checkRoutingTableConsistency = function() {
     print("Unhooked checkRoutingTableConsistency function");
+};
+
+ShardingTest.prototype.checkShardFilteringMetadata = function() {
+    print("Unhooked checkShardFilteringMetadata function");
 };

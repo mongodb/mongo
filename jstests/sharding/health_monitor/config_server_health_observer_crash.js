@@ -18,6 +18,7 @@ TestData.failIfUnterminatedProcesses = false;
 // the mongos in this test.
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
+TestData.skipCheckShardFilteringMetadata = true;
 
 const mongosParams = {
     setParameter: {

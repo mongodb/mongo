@@ -2,6 +2,10 @@
  * Tests that plan cache entries are deleted after shard key refining, resharding and renaming
  * operations.
  */
+
+// Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
+TestData.skipCheckShardFilteringMetadata = true;
+
 (function() {
 'use strict';
 load("jstests/libs/sbe_util.js");

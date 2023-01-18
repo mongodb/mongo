@@ -256,6 +256,10 @@ def mongo_shell_program(logger, executable=None, connection_string=None, filenam
     # semantically correct before shutting down a ShardingTest.
     eval_sb.append("load('jstests/libs/override_methods/check_routing_table_consistency.js');")
 
+    # Load a callback to check that all shards have correct filtering information before shutting
+    # down a ShardingTest.
+    eval_sb.append("load('jstests/libs/override_methods/check_shard_filtering_metadata.js');")
+
     if config.FUZZ_MONGOD_CONFIGS is not None and config.FUZZ_MONGOD_CONFIGS is not False:
         # Prevent commands from running with the config fuzzer.
         eval_sb.append(

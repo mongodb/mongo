@@ -91,6 +91,12 @@ one argument, the connection object.
 
 */
 
+// Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
+TestData.skipCheckShardFilteringMetadata = true;
+
+// Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
+TestData.skipCheckShardFilteringMetadata = true;
+
 import {
     isShardMergeEnabled,
     makeMigrationCertificatesForTest

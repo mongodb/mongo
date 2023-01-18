@@ -8,6 +8,8 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
 TestData.skipCheckRoutingTableConsistency = true;
+TestData.skipCheckShardFilteringMetadata = true;
+
 (function() {
 "use strict";
 

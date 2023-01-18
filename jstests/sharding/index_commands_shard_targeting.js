@@ -15,6 +15,9 @@ load("jstests/libs/parallelTester.js");  // For Thread.
 // Test deliberately inserts orphans outside of migration.
 TestData.skipCheckOrphans = true;
 
+// This test connects directly to shards and creates collections.
+TestData.skipCheckShardFilteringMetadata = true;
+
 /*
  * Runs the command after performing chunk operations to make the primary shard (shard0) not own
  * any chunks for the collection, and the subset of non-primary shards (shard1 and shard2) that

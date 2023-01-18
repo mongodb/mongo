@@ -12,6 +12,7 @@
 // Skip cross-cluster consistency checks, since this test prematurely shuts down a shard.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
+TestData.skipCheckShardFilteringMetadata = true;
 
 // Create a two-shard cluster so that we can stop one shard to test connection interruptions.
 const st = new ShardingTest({

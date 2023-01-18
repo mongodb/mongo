@@ -20,6 +20,7 @@
 TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
 // Restarts shard nodes with no keyFile.
 TestData.skipCheckOrphans = true;
+TestData.skipCheckShardFilteringMetadata = true;
 
 (function() {
 "use strict";

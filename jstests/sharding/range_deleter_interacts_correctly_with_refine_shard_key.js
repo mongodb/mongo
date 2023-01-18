@@ -1,6 +1,10 @@
 /**
  * Tests the interaction of the refineCollectionShardKey command with the range deleter.
  */
+
+// Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
+TestData.skipCheckShardFilteringMetadata = true;
+
 (function() {
 
 "use strict";

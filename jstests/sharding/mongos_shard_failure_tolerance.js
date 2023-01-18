@@ -10,9 +10,10 @@
 // sequence), idle (connection is connected but not used before a shard change), and new
 // (connection connected after shard change).
 //
-// Checking UUID and index consistency involves talking to shards, but this test shuts down shards.
+// The following checks involve talking to shards, but this test shuts down shards.
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
+TestData.skipCheckShardFilteringMetadata = true;
 
 (function() {
 'use strict';

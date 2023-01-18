@@ -3,6 +3,10 @@
  *
  * @tags: [requires_fcv_61]
  */
+
+// Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
+TestData.skipCheckShardFilteringMetadata = true;
+
 (function() {
 "use strict";
 

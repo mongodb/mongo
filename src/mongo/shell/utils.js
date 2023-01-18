@@ -411,6 +411,7 @@ jsTestOptions = function() {
             alwaysUseLogFiles: TestData.alwaysUseLogFiles || false,
             skipCheckOrphans: TestData.skipCheckOrphans || false,
             skipCheckRoutingTableConsistency: TestData.skipCheckRoutingTableConsistency || false,
+            skipCheckShardFilteringMetadata: TestData.skipCheckShardFilteringMetadata || false,
             inEvergreen: TestData.inEvergreen || false,
             defaultReadPreference: TestData.defaultReadPreference,
 

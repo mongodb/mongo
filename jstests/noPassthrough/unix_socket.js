@@ -23,6 +23,7 @@ if (_isWindows()) {
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
 TestData.skipCheckRoutingTableConsistency = true;
+TestData.skipCheckShardFilteringMetadata = true;
 
 // Do not fail if this test leaves unterminated processes because testSockOptions
 // is expected to throw before it calls stopMongod.

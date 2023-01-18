@@ -7,6 +7,9 @@
 //   uses_transactions,
 // ]
 
+// Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
+TestData.skipCheckShardFilteringMetadata = true;
+
 (function() {
 'use strict';
 

@@ -16,6 +16,7 @@
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
+TestData.skipCheckShardFilteringMetadata = true;
 
 // Replica set nodes started with --shardsvr do not enable key generation until they are added to a
 // sharded cluster and reject commands with gossiped clusterTime from users without the

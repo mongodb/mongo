@@ -17,6 +17,7 @@
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
+TestData.skipCheckShardFilteringMetadata = true;
 
 load('jstests/libs/parallel_shell_helpers.js');
 load('jstests/libs/fail_point_util.js');

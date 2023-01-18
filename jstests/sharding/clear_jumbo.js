@@ -2,6 +2,9 @@
 // hence the balancer is not triggered and the chunk is not marked as jumbo
 // @tags: [requires_fcv_61]
 
+// Cannot run the filtering metadata check on tests that run clearJumboFlag.
+TestData.skipCheckShardFilteringMetadata = true;
+
 (function() {
 "use strict";
 

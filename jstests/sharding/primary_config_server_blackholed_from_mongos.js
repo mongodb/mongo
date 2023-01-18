@@ -9,6 +9,7 @@ load('jstests/replsets/rslib.js');
 // the mongos in this test.
 TestData.skipCheckingIndexesConsistentAcrossCluster = true;
 TestData.skipCheckOrphans = true;
+TestData.skipCheckShardFilteringMetadata = true;
 
 var st = new ShardingTest({shards: 2, mongos: 1, useBridge: true});
 

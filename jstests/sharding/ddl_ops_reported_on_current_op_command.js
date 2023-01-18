@@ -2,6 +2,10 @@
  * Checks that DDL command that use step-down resilient coordinators are shown when calling the
  * currentOp command.
  */
+
+// Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
+TestData.skipCheckShardFilteringMetadata = true;
+
 (function() {
 'use strict';
 

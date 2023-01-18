@@ -229,6 +229,7 @@ executor:
   - class: CheckReplDBHash
   - class: CheckOrphansDeleted
   - class: CheckRoutingTableConsistency
+  - class: CheckShardFilteringMetadata
   - class: CheckClusterIndexConsistency
   - class: ValidateCollections # Validation can interfere with other operations, so this goes last.
     shell_options:

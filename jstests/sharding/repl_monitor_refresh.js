@@ -8,10 +8,10 @@ load("jstests/replsets/rslib.js");
 (function() {
 "use strict";
 
-// Skip db hash check and shard replication since the removed node has wrong config and is still
-// alive.
+// Skip the following checks since the removed node has wrong config and is still alive.
 TestData.skipCheckDBHashes = true;
 TestData.skipAwaitingReplicationOnShardsBeforeCheckingUUIDs = true;
+TestData.skipCheckShardFilteringMetadata = true;
 
 var NODE_COUNT = 3;
 var st = new ShardingTest({shards: {rs0: {nodes: NODE_COUNT, oplogSize: 10}}});
