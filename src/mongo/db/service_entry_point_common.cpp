@@ -58,6 +58,7 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/not_primary_error_tracker.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/ops/write_ops.h"
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/query/find.h"
@@ -1013,6 +1014,8 @@ void CheckoutSessionAndInvokeCommand::_checkOutSession() {
         // transaction on that session.
         while (!beganOrContinuedTxn) {
             try {
+                auto opObserver = opCtx->getServiceContext()->getOpObserver();
+                opObserver->onTransactionStart(opCtx);
                 txnParticipant.beginOrContinue(
                     opCtx,
                     {*sessionOptions.getTxnNumber(), sessionOptions.getTxnRetryCounter()},

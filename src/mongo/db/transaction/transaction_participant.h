@@ -169,7 +169,7 @@ class TransactionParticipant {
 
         // Private because any modifications should go through transitionTo.
         StateFlag _state = kNone;
-    };
+    };  // class TransactionState
 
 public:
     static inline MutableObserverRegistry<int32_t> observeTransactionLifetimeLimitSeconds;
@@ -238,7 +238,7 @@ public:
         APIParameters _apiParameters;
         repl::ReadConcernArgs _readConcernArgs;
         WriteUnitOfWork::RecoveryUnitState _ruState;
-    };
+    };  // class TxnResources
 
     /**
      *  An RAII object that will allow the current transaction to be set aside so that a separate
@@ -258,7 +258,7 @@ public:
         std::unique_ptr<RecoveryUnit> _recoveryUnit;
         WriteUnitOfWork::RecoveryUnitState _ruState;
         OperationContext* _opCtx;
-    };
+    };  // class SideTransactionBlock
 
     using CommittedStatementTimestampMap = stdx::unordered_map<StmtId, repl::OpTime>;
 
@@ -1082,7 +1082,7 @@ private:
         Lock::GlobalLock _globalLock;
         std::unique_ptr<RecoveryUnit> _recoveryUnit;
         std::vector<OplogSlot> _oplogSlots;
-    };
+    };  // class OplogSlotReserver
 
     friend std::ostream& operator<<(std::ostream& s, const TransactionState& txnState) {
         return (s << txnState.toString());
@@ -1178,7 +1178,7 @@ private:
         bool needToWriteAbortEntry{false};
 
     } _p;
-};
+};  // class TransactionParticipant
 
 /**
  * When a client runs a retryable write command with session id {_id: ..., uid: ...}, each write
