@@ -141,7 +141,9 @@ class HistoricTestInfo(NamedTuple):
 
     def total_test_runtime(self) -> float:
         """Get the average runtime of this test and it's non-task level hooks."""
-        return self.avg_duration + self.total_hook_runtime(lambda h: not h.is_task_level_hook())
+        if self.num_pass > 0:
+            return self.avg_duration + self.total_hook_runtime(lambda h: not h.is_task_level_hook())
+        return 0.0
 
     def get_hook_overhead(self) -> float:
         """Get the average runtime of this test and it's non-task level hooks."""
