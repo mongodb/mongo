@@ -93,6 +93,12 @@ const runParallelMoveChunk = (numThreads) => {
     shardKeyIdx--;
     assert.eq(shardKeyIdx, kInitialLoadFinalKey + 1000);
 
+    // server Status on the receiving shard
+    var serverStatus = st.shard1.getDB('admin').runCommand({serverStatus: 1});
+
+    assert.eq(kThreadCount,
+              serverStatus.shardingStatistics.chunkMigrationConcurrency,
+              tojson(serverStatus));
     st.stop();
     MongoRunner.stopMongod(staticMongod);
 };
