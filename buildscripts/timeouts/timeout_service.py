@@ -124,11 +124,16 @@ class TimeoutService:
         :return: Historic test results if they exist.
         """
         try:
+            LOGGER.info(
+                "Getting historic runtime information", evg_project=timeout_params.evg_project,
+                build_variant=timeout_params.build_variant, task_name=timeout_params.task_name)
             evg_stats = HistoricTaskData.from_s3(
                 timeout_params.evg_project, timeout_params.task_name, timeout_params.build_variant)
             if not evg_stats:
                 LOGGER.warning("No historic runtime information available")
                 return None
+            LOGGER.info("Found historic runtime information",
+                        evg_stats=evg_stats.historic_test_results)
             return evg_stats
         except Exception:  # pylint: disable=broad-except
             # If we have any trouble getting the historic runtime information, log the issue, but

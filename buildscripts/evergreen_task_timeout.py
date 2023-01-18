@@ -381,6 +381,7 @@ def main():
         os.path.expanduser(options.timeout_overrides_file))
 
     enable_logging(verbose=False)
+    LOGGER.info("Determining timeouts", cli_args=options)
 
     def dependencies(binder: inject.Binder) -> None:
         binder.bind(
