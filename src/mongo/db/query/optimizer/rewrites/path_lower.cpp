@@ -73,7 +73,7 @@ void EvalPathLowering::transport(ABT& n, const PathDefault&, ABT& c) {
 }
 
 void EvalPathLowering::transport(ABT& n, const PathCompare&, ABT& c) {
-    uasserted(6624132, "cannot lower compare in projection");
+    tasserted(6624132, "cannot lower compare in projection");
 }
 
 void EvalPathLowering::transport(ABT& n, const PathGet& p, ABT& inner) {
@@ -206,7 +206,7 @@ void EvalPathLowering::transport(ABT& n, const PathComposeM&, ABT& p1, ABT& p2) 
 }
 
 void EvalPathLowering::transport(ABT& n, const PathComposeA&, ABT& p1, ABT& p2) {
-    uasserted(6624133, "cannot lower additive composite in projection");
+    tasserted(6624133, "cannot lower additive composite in projection");
 }
 
 void EvalPathLowering::transport(ABT& n, const EvalPath&, ABT& path, ABT& input) {
@@ -238,7 +238,7 @@ void EvalFilterLowering::transport(ABT& n, const PathConstant&, ABT& c) {
 }
 
 void EvalFilterLowering::transport(ABT& n, const PathIdentity&) {
-    uasserted(6893500, "PathIdentity not allowed in EvalFilter (match) context");
+    tasserted(6893500, "PathIdentity not allowed in EvalFilter (match) context");
 }
 
 void EvalFilterLowering::transport(ABT& n, const PathLambda&, ABT& lam) {
@@ -299,11 +299,11 @@ void EvalFilterLowering::transport(ABT& n, const PathGet& p, ABT& inner) {
 }
 
 void EvalFilterLowering::transport(ABT& n, const PathDrop& drop) {
-    uasserted(6624136, "cannot lower drop in filter");
+    tasserted(6624136, "cannot lower drop in filter");
 }
 
 void EvalFilterLowering::transport(ABT& n, const PathKeep& keep) {
-    uasserted(6624137, "cannot lower keep in filter");
+    tasserted(6624137, "cannot lower keep in filter");
 }
 
 void EvalFilterLowering::transport(ABT& n, const PathObj&) {
@@ -352,7 +352,7 @@ void EvalFilterLowering::transport(ABT& n, const PathTraverse& p, ABT& inner) {
 }
 
 void EvalFilterLowering::transport(ABT& n, const PathField& p, ABT& inner) {
-    uasserted(6624140, "cannot lower field in filter");
+    tasserted(6624140, "cannot lower field in filter");
 }
 
 void EvalFilterLowering::transport(ABT& n, const PathComposeM&, ABT& p1, ABT& p2) {
