@@ -8,33 +8,31 @@
 5. Supports validating and updating a set of files to the right coding style.
 """
 
+# pylint: disable=wrong-import-position
+
 import difflib
 import glob
 import logging
 import os
 import re
-import shutil
-import string
+import stat
 import subprocess
 import sys
-import tarfile
-import tempfile
 import threading
 import urllib.error
 import urllib.parse
 import urllib.request
 
 from optparse import OptionParser
+
 import structlog
 
 # Get relative imports to work when the package is not installed on the PYTHONPATH.
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(os.path.realpath(__file__)))))
 
-# pylint: disable=wrong-import-position
-from buildscripts.linter.filediff import gather_changed_files_for_lint
 from buildscripts.linter import git, parallel
-# pylint: enable=wrong-import-position
+from buildscripts.linter.filediff import gather_changed_files_for_lint
 
 ##############################################################################
 #
@@ -43,25 +41,17 @@ from buildscripts.linter import git, parallel
 #
 
 # Expected version of clang-format
-CLANG_FORMAT_VERSION = "7.0.1"
-CLANG_FORMAT_SHORT_VERSION = "7.0"
-CLANG_FORMAT_SHORTER_VERSION = "70"
+CLANG_FORMAT_VERSION = "12.0.1"
+CLANG_FORMAT_SHORT_VERSION = "12.0"
+CLANG_FORMAT_SHORTER_VERSION = "120"
 
 # Name of clang-format as a binary
 CLANG_FORMAT_PROGNAME = "clang-format"
 
-# URL location of the "cached" copy of clang-format to download
-# for users which do not have clang-format installed
-CLANG_FORMAT_HTTP_LINUX_CACHE = "https://s3.amazonaws.com/boxes.10gen.com/build/clang-format-7.0.1-rhel70.tar.gz"
-
-CLANG_FORMAT_HTTP_DARWIN_CACHE = "https://s3.amazonaws.com/boxes.10gen.com/build/clang-format-7.0.1-x86_64-apple-darwin.tar.gz"
+CLANG_FORMAT_HTTP_DARWIN_CACHE = "http://mongodbtoolchain.build.10gen.cc/toolchain/osx/clang-format-12.0.1"
 
 # TODO: Move clang format to the v4 toolchain
-CLANG_FORMAT_TOOLCHAIN_PATH = "/opt/mongodbtoolchain/v3/bin/clang-format"
-
-# Path in the tarball to the clang-format binary
-CLANG_FORMAT_SOURCE_TAR_BASE = string.Template("clang+llvm-$version-$tar_path/bin/" +
-                                               CLANG_FORMAT_PROGNAME)
+CLANG_FORMAT_TOOLCHAIN_PATH = "/opt/mongodbtoolchain/v4/bin/clang-format"
 
 
 ##############################################################################
@@ -70,66 +60,24 @@ def callo(args, **kwargs):
     return subprocess.check_output(args, **kwargs).decode('utf-8')
 
 
-def get_tar_path(version, tar_path):
-    """Return the path to clang-format in the llvm tarball."""
-    return CLANG_FORMAT_SOURCE_TAR_BASE.substitute(version=version, tar_path=tar_path)
-
-
-def extract_clang_format(tar_path):
-    """Extract the clang_format tar file."""
-    # Extract just the clang-format binary
-    # On OSX, we shell out to tar because tarfile doesn't support xz compression
-    if sys.platform == 'darwin':
-        subprocess.call(['tar', '-xzf', tar_path, '*clang-format*'])
-    # Otherwise we use tarfile because some versions of tar don't support wildcards without
-    # a special flag
-    else:
-        tarfp = tarfile.open(tar_path)
-        for name in tarfp.getnames():
-            if name.endswith('clang-format'):
-                tarfp.extract(name)
-        tarfp.close()
-
-
-def get_clang_format_from_cache_and_extract(url, tarball_ext):
-    """Get clang-format from mongodb's cache and extract the tarball."""
-    dest_dir = tempfile.gettempdir()
-    temp_tar_file = os.path.join(dest_dir, "temp.tar" + tarball_ext)
-
+def get_clang_format_from_cache(url, dest_file):
+    """Get clang-format from mongodb's cache."""
     # Download from file
     print("Downloading clang-format %s from %s, saving to %s" % (CLANG_FORMAT_VERSION, url,
-                                                                 temp_tar_file))
+                                                                 dest_file))
 
     # Retry download up to 5 times.
     num_tries = 5
     for attempt in range(num_tries):
         try:
             resp = urllib.request.urlopen(url)
-            with open(temp_tar_file, 'wb') as fh:
+            with open(dest_file, 'wb') as fh:
                 fh.write(resp.read())
             break
         except urllib.error.URLError:
             if attempt == num_tries - 1:
                 raise
             continue
-
-    extract_clang_format(temp_tar_file)
-
-
-def get_clang_format_from_darwin_cache(dest_file):
-    """Download clang-format from llvm.org, unpack the tarball to dest_file."""
-    get_clang_format_from_cache_and_extract(CLANG_FORMAT_HTTP_DARWIN_CACHE, ".xz")
-
-    # Destination Path
-    shutil.move(get_tar_path(CLANG_FORMAT_VERSION, "x86_64-apple-darwin"), dest_file)
-
-
-def get_clang_format_from_linux_cache(dest_file):
-    """Get clang-format from mongodb's cache."""
-    get_clang_format_from_cache_and_extract(CLANG_FORMAT_HTTP_LINUX_CACHE, ".gz")
-
-    # Destination Path
-    shutil.move("build/bin/clang-format", dest_file)
 
 
 class ClangFormat(object):
@@ -207,12 +155,13 @@ class ClangFormat(object):
                 cache_dir,
                 CLANG_FORMAT_PROGNAME + "-" + CLANG_FORMAT_VERSION + clang_format_progname_ext)
 
-            # Download a new version if the cache is empty or stale
+            # Download a new version if the cache is empty or stale and set permissions (0755)
             if not os.path.isfile(self.path) or not self._validate_version():
-                if sys.platform.startswith("linux"):
-                    get_clang_format_from_linux_cache(self.path)
-                elif sys.platform == "darwin":
-                    get_clang_format_from_darwin_cache(self.path)
+                if sys.platform == "darwin":
+                    get_clang_format_from_cache(CLANG_FORMAT_HTTP_DARWIN_CACHE, self.path)
+                    os.chmod(
+                        self.path,
+                        stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH)
                 else:
                     print("ERROR: clang_format.py does not support downloading clang-format " +
                           "on this platform, please install clang-format " + CLANG_FORMAT_VERSION)
