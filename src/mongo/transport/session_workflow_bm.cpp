@@ -247,6 +247,7 @@ public:
     }
 
     void SetUp(benchmark::State& state) override {
+        stdx::lock_guard lk{_setupMutex};
         LOGV2_DEBUG(7015134, 3, "SetUp", "configuredThreads"_attr = _configuredThreads);
         if (_configuredThreads++)
             return;
@@ -281,6 +282,7 @@ public:
     }
 
     void TearDown(benchmark::State& state) override {
+        stdx::lock_guard lk{_setupMutex};
         LOGV2_DEBUG(7015137, 3, "TearDown", "configuredThreads"_attr = _configuredThreads);
         if (--_configuredThreads)
             return;
@@ -308,6 +310,7 @@ public:
     }
 
 private:
+    Mutex _setupMutex;
     int _configuredThreads = 0;
     boost::optional<ScopedValueOverride<size_t>> _savedDefaultReserved;
     boost::optional<ScopedValueOverride<bool>> _savedUseDedicated;

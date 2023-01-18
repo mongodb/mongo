@@ -71,6 +71,29 @@ constexpr auto kWorkerThreadRunTime = Milliseconds{1000};
 // Run time + generous scheduling time slice
 constexpr auto kShutdownTime = Milliseconds{kWorkerThreadRunTime.count() + 50};
 
+// Fibonacci generator for slow integer-valued exponential backoff.
+template <typename T>
+auto fibGenerator() {
+    return [seq = std::array{T{0}, T{1}}]() mutable {
+        auto r = seq[0];
+        seq[0] = seq[1];
+        seq[1] = r + seq[0];
+        return r;
+    };
+}
+
+template <typename Pred>
+auto pollUntil(const Pred& pred, Milliseconds timeout) {
+    auto fib = fibGenerator<Milliseconds>();
+    while (true) {
+        if (auto r = pred(); r || timeout == Milliseconds{0})
+            return r;
+        auto zzz = std::min(fib(), timeout);
+        timeout -= zzz;
+        sleepFor(zzz);
+    }
+}
+
 template <typename M>
 class AtomicWordLoadIs : public m::Matcher {
 public:
@@ -147,41 +170,24 @@ private:
 template <typename M>
 class SoonMatches : public m::Matcher {
 public:
-    explicit SoonMatches(M&& m, int retries = 16) : _m{std::forward<M>(m)}, _retries{retries} {}
+    explicit SoonMatches(M&& m, Milliseconds timeout = Seconds{5})
+        : _m{std::forward<M>(m)}, _timeout{timeout} {}
 
     std::string describe() const {
-        return "SoonMatches({},{})"_format(_m.describe(), _retries);
+        return "SoonMatches({},{})"_format(_m.describe(), _timeout.toString());
     }
 
     template <typename X>
     m::MatchResult match(const X& x) const {
-        // Fibonacci generator for slow integral exponential backoff.
-        auto fib = [seq = std::array<int64_t, 2>{0, 1}]() mutable {
-            auto r = seq[0];
-            seq[0] = seq[1];
-            seq[1] = r + seq[0];
-            return r;
-        };
-        m::MatchResult mr;
-        for (int retries = _retries; retries--;) {
-            if (mr = _m.match(x); mr)
-                return mr;
-            Milliseconds backoff{fib()};
-            LOGV2_DEBUG(1715120,
-                        1,
-                        "Retry",
-                        "matcher"_attr = describe(),
-                        "retries"_attr = retries,
-                        "backoff"_attr = backoff,
-                        "message"_attr = mr.message());
-            sleepFor(backoff);
-        }
-        return {false, "No result matched after {} tries: {}"_format(_retries, mr.message())};
+        auto mr = pollUntil([&] { return _m.match(x); }, _timeout);
+        if (mr)
+            return mr;
+        return {false, "No result matched after {}: {}"_format(_timeout.toString(), mr.message())};
     }
 
 private:
     M _m;
-    int _retries;
+    Milliseconds _timeout;
 };
 
 class JoinThread : public stdx::thread {
@@ -345,6 +351,39 @@ public:
         }
     }
 
+    /**
+     * Verify that a new connection cannot get a lease on a worker while it
+     * is still busy with a task, even if its lease has been destroyed.
+     * Destroys lease from within task, as SessionWorkflow does.
+     *
+     * Exploits the implementation detail that this kind of ServiceExecutor will
+     * reuse the most recently released worker first, and that workers are
+     * lazily created. So the worker held by `lease` is only worker when
+     * `nextLease` is created.
+     */
+    void testDelayedEnd() {
+        auto svcExec = makeExecutor();
+        ASSERT_OK(svcExec.start());
+
+        Notification<bool> pass;
+        Notification<void> destroyedLease;
+        Notification<void> nextLeaseStarted;
+
+        auto lease = svcExec.makeTaskRunner();
+        lease->schedule([&](Status) {
+            lease = {};
+            destroyedLease.set();
+            pass.set(pollUntil([&] { return !!nextLeaseStarted; }, Milliseconds{2000}));
+        });
+
+        destroyedLease.get();
+        auto nextLease = svcExec.makeTaskRunner();
+        nextLease->schedule([&](Status) { nextLeaseStarted.set(); });
+
+        ASSERT(pass.get()) << "worker was reused while running a task";
+        ASSERT_OK(svcExec.shutdown(Seconds{10}));
+    }
+
     decltype(auto) makeExecutor() {
         return _d().makeExecutor();
     }
@@ -418,6 +457,7 @@ protected:
     SERVICE_EXECUTOR_SYNCHRONOUS_COMMON_TEST_CASE(fixture, MakeTaskRunnerMultiple)           \
     SERVICE_EXECUTOR_SYNCHRONOUS_COMMON_TEST_CASE(fixture, ShutdownTimeout)                  \
     SERVICE_EXECUTOR_SYNCHRONOUS_COMMON_TEST_CASE(fixture, ManyLeases)                       \
+    SERVICE_EXECUTOR_SYNCHRONOUS_COMMON_TEST_CASE(fixture, DelayedEnd)                       \
     /**/
 
 SERVICE_EXECUTOR_SYNCHRONOUS_COMMON_TEST_CASES(ServiceExecutorSynchronousTest)

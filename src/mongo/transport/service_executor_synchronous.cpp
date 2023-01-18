@@ -283,14 +283,27 @@ public:
             shutdown();
         }
         auto lk = _sync.acquireLock();
-        while (_state != State::stopped) {
+        while (true) {
             _sync.wait(lk, [&] { return _state != State::idle; });
-            if (_state == State::leased) {
-                _serveLease(lk);
-                _endLeaseLocked();
+            switch (_state) {
+                case State::idle:
+                    break;
+                case State::leased:
+                    _serveLease(lk);
+                    break;
+                case State::released:
+                    _state = State::idle;
+                    try {
+                        _env->onReleasedThread(shared_from_this());
+                    } catch (const ExceptionFor<ErrorCodes::ShutdownInProgress>&) {
+                        _state = State::stopped;
+                    }
+                    break;
+                case State::stopped:
+                    _serveLease(lk, notRunningStatus());
+                    return;
             }
         }
-        _serveLease(lk, notRunningStatus());
     }
 
     uint64_t getId() const {
@@ -301,6 +314,7 @@ private:
     enum class State {
         idle,
         leased,
+        released,
         stopped,
     };
 
@@ -308,25 +322,19 @@ private:
         return std::array{
             "idle"_sd,
             "leased"_sd,
+            "released"_sd,
             "stopped"_sd,
         }[static_cast<int>(s)];
     }
 
-    void _endLeaseLocked() {
-        if (_state != State::leased)
-            return;
-        _state = State::idle;
-        try {
-            _env->onReleasedThread(shared_from_this());
-        } catch (const ExceptionFor<ErrorCodes::ShutdownInProgress>&) {
-            _state = State::stopped;
-        }
-        _sync.notifyAll();
-    }
-
     void _onDestroyLeaseToken() {
         auto lk = _sync.acquireLock();
-        _endLeaseLocked();
+        if (_state != State::leased) {
+            invariant(_state == State::stopped);
+            return;
+        }
+        _state = State::released;
+        _sync.notifyOne();
     }
 
     void _schedule(ServiceExecutor::Task task) {

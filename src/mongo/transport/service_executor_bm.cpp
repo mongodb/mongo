@@ -117,6 +117,23 @@ BENCHMARK_DEFINE_F(ServiceExecutorSynchronousBm, ScheduleAndWait)(benchmark::Sta
 }
 BENCHMARK_REGISTER_F(ServiceExecutorSynchronousBm, ScheduleAndWait)->ThreadRange(1, maxThreads);
 
+/** Like ScheduleAndWait, but kill worker lease from within task like SessionWorkflow does. */
+BENCHMARK_DEFINE_F(ServiceExecutorSynchronousBm, ScheduleAndWaitReleaseInTask)
+(benchmark::State& state) {
+    for (auto _ : state) {
+        auto runner = executor()->makeTaskRunner();
+        Notification done;
+        auto raw = runner.get();
+        raw->schedule([&, trp = std::move(runner)](Status) mutable {
+            trp = {};
+            done.set();
+        });
+        done.get();
+    }
+}
+BENCHMARK_REGISTER_F(ServiceExecutorSynchronousBm, ScheduleAndWaitReleaseInTask)
+    ->ThreadRange(1, maxThreads);
+
 BENCHMARK_DEFINE_F(ServiceExecutorSynchronousBm, ChainedSchedule)(benchmark::State& state) {
     int chainDepth = state.range(0);
     struct LoopState {
