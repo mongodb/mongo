@@ -2050,7 +2050,7 @@ TEST(LogicalRewriter, RemoveTraverseSplitComposeM) {
     phaseManager.optimize(latest);
 
     // We should end up with a Sargable node and no residual Filter.
-    ASSERT_EXPLAIN_V2(
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT (test auto-update)
         "Root []\n"
         "|   |   projections: \n"
         "|   |       scan_0\n"
@@ -2061,7 +2061,8 @@ TEST(LogicalRewriter, RemoveTraverseSplitComposeM) {
         "|   |   |   |   |       refProjection: scan_0, path: 'PathGet [a] PathGet [b] "
         "PathIdentity []', intervals: {{{(Const [3], Const [8])}}}\n"
         "|   |   |   |   candidateIndexes: \n"
-        "|   |   |   |       candidateId: 1, index1, {}, {0}, {{{(Const [3], Const [8])}}}\n"
+        "|   |   |   |       candidateId: 1, index1, {}, {SimpleInequality}, {{{(Const [3], Const"
+        " [8])}}}\n"
         "|   |   |   scanParams: \n"
         "|   |   |       {'a': evalTemp_2}\n"
         "|   |   |           residualReqs: \n"
@@ -2452,7 +2453,7 @@ TEST(LogicalRewriter, EmptyArrayIndexBounds) {
 
     phaseManager.optimize(rootNode);
 
-    ASSERT_EXPLAIN_V2_AUTO(
+    ASSERT_EXPLAIN_V2_AUTO(  // NOLINT (test auto-update)
         "Root []\n"
         "|   |   projections: \n"
         "|   |       root\n"
@@ -2473,8 +2474,8 @@ TEST(LogicalRewriter, EmptyArrayIndexBounds) {
         "|   |   |   |   |       refProjection: root, path: 'PathGet [a] PathIdentity []', interv"
         "als: {{{=Const [undefined]}} U {{=Const [[]]}}}, perfOnly\n"
         "|   |   |   |   candidateIndexes: \n"
-        "|   |   |   |       candidateId: 1, index1, {}, {0}, {{{=Const [undefined]}} U {{=Const "
-        "[[]]}}}\n"
+        "|   |   |   |       candidateId: 1, index1, {}, {Compound}, {{{=Const [undefined]}} U "
+        "{{=Const [[]]}}}\n"
         "|   |   |   scanParams: \n"
         "|   |   |       {}\n"
         "|   |   BindBlock:\n"

@@ -1253,6 +1253,7 @@ static bool computeCandidateIndexEntry(PrefixId& prefixId,
     auto& fieldProjMap = entry._fieldProjectionMap;
     auto& eqPrefixes = entry._eqPrefixes;
     auto& correlatedProjNames = entry._correlatedProjNames;
+    auto& predTypes = entry._predTypes;
 
     // Don't allow more than one Traverse predicate to fuse with the same Traverse in the index. For
     // each field of the index, track whether we are still allowed to fuse a Traverse predicate with
@@ -1310,11 +1311,14 @@ static bool computeCandidateIndexEntry(PrefixId& prefixId,
                     invariant(inserted);
                 }
 
-                if (auto singularInterval = IntervalReqExpr::getSingularDNF(requiredInterval);
-                    !singularInterval || !singularInterval->isEquality()) {
-                    // We only care about collation of for non-equality intervals.
-                    // Equivalently, it is sufficient for singular intervals to be clustered.
-                    entry._fieldsToCollate.insert(indexField);
+                if (auto singularInterval = IntervalReqExpr::getSingularDNF(requiredInterval)) {
+                    if (singularInterval->isEquality()) {
+                        predTypes.push_back(IndexFieldPredType::SimpleEquality);
+                    } else {
+                        predTypes.push_back(IndexFieldPredType::SimpleInequality);
+                    }
+                } else {
+                    predTypes.push_back(IndexFieldPredType::Compound);
                 }
             }
         }
@@ -1322,6 +1326,7 @@ static bool computeCandidateIndexEntry(PrefixId& prefixId,
         if (!foundSuitableField) {
             // We cannot constrain the current index field.
             padCompoundInterval(indexCollationSpec, eqPrefixes.back()._interval, indexField);
+            predTypes.push_back(IndexFieldPredType::Unbound);
         }
     }
 

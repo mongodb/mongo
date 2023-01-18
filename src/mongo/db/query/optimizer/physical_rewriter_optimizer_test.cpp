@@ -741,7 +741,7 @@ TEST(PhysRewriter, FilterIndexing) {
         ABT optimized = rootNode;
         phaseManager.optimize(optimized);
 
-        ASSERT_EXPLAIN_V2(
+        ASSERT_EXPLAIN_V2_AUTO(  // NOLINT (test auto-update)
             "Root []\n"
             "|   |   projections: \n"
             "|   |       root\n"
@@ -757,7 +757,7 @@ TEST(PhysRewriter, FilterIndexing) {
             "|   |   |   |       refProjection: root, path: 'PathGet [a] PathTraverse [1] "
             "PathIdentity []', intervals: {{{=Const [1]}}}\n"
             "|   |   |   candidateIndexes: \n"
-            "|   |   |       candidateId: 1, index1, {}, {}, {{{=Const [1]}}}\n"
+            "|   |   |       candidateId: 1, index1, {}, {SimpleEquality}, {{{=Const [1]}}}\n"
             "|   |   BindBlock:\n"
             "|   RefBlock: \n"
             "|       Variable [root]\n"
@@ -6229,7 +6229,7 @@ TEST(PhysRewriter, EqMemberSargable) {
         ABT optimized = rootNode;
         phaseManager.optimize(optimized);
 
-        ASSERT_EXPLAIN_V2(
+        ASSERT_EXPLAIN_V2_AUTO(  // NOLINT (test auto-update)
             "Root []\n"
             "|   |   projections: \n"
             "|   |       root\n"
@@ -6240,8 +6240,8 @@ TEST(PhysRewriter, EqMemberSargable) {
             "|   |   |   |   |       refProjection: root, path: 'PathGet [a] PathIdentity []', "
             "intervals: {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}\n"
             "|   |   |   |   candidateIndexes: \n"
-            "|   |   |   |       candidateId: 1, index1, {}, {0}, {{{=Const [1]}} U {{=Const [2]}} "
-            "U {{=Const [3]}}}\n"
+            "|   |   |   |       candidateId: 1, index1, {}, {Compound}, {{{=Const [1]}} U "
+            "{{=Const [2]}} U {{=Const [3]}}}\n"
             "|   |   |   scanParams: \n"
             "|   |   |       {'a': evalTemp_0}\n"
             "|   |   |           residualReqs: \n"

@@ -41,7 +41,7 @@ Sargable [Complete]
 |   |   |   |   |   requirementsMap: 
 |   |   |   |   |       refProjection: scan_0, path: 'PathGet [a] PathTraverse [1] PathIdentity []', intervals: {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}
 |   |   |   |   candidateIndexes: 
-|   |   |   |       candidateId: 1, index1, {}, {0}, {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}
+|   |   |   |       candidateId: 1, index1, {}, {Compound}, {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}
 |   |   |   scanParams: 
 |   |   |       {'a': evalTemp_0}
 |   |   |           residualReqs: 
@@ -98,7 +98,7 @@ Sargable [Complete]
 |   |   |   |   |   requirementsMap: 
 |   |   |   |   |       refProjection: scan_0, path: 'PathGet [a] PathTraverse [1] PathIdentity []', intervals: {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}
 |   |   |   |   candidateIndexes: 
-|   |   |   |       candidateId: 1, index1, {}, {0}, {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}
+|   |   |   |       candidateId: 1, index1, {}, {Compound}, {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}
 |   |   |   scanParams: 
 |   |   |       {'a': evalTemp_0}
 |   |   |           residualReqs: 

@@ -209,6 +209,24 @@ struct EqualityPrefixEntry {
 };
 
 /**
+ * Specifies type of query predicate which is being answered using a particular field on a candidate
+ * index. This is used to determine if we can (or should) attempt to satisfy collation requirements
+ * during the implementation phase. For example if we have a query (a = 1) and (b > 2) and (c = 3 or
+ * c > 10) the entries will be SimpleEquality, SimpleInequality, and Compound.
+ */
+#define INDEXFIELD_PREDTYPE_OPNAMES(F) \
+    F(SimpleEquality)                  \
+    F(SimpleInequality)                \
+    F(Compound)                        \
+    F(Unbound)
+
+MAKE_PRINTABLE_ENUM(IndexFieldPredType, INDEXFIELD_PREDTYPE_OPNAMES);
+MAKE_PRINTABLE_ENUM_STRING_ARRAY(IndexFieldPredTypeEnum,
+                                 IndexFieldPredType,
+                                 INDEXFIELD_PREDTYPE_OPNAMES);
+#undef INDEXFIELD_PREDTYPE_OPNAMES
+
+/**
  * Used to pre-compute candidate indexes for SargableNodes.
  * We keep track of the following:
  *  1. Name of index this entry applies to. There may be multiple entries for the same index if we
@@ -230,9 +248,10 @@ struct EqualityPrefixEntry {
  * prefix, we would create compound index bound [{0, MinKey}, {MaxKey, MaxKey}] effectively encoding
  * the interval over the first field into the bound, the binding _field2 to a temporary variable,
  * and applying a filter encoding [1, MaxKey] over the index scan.
- *  5. Fields to collate. We keep track of which fields need collation. This is needed during the
- * physical rewrite phase where we need to match the collation requirements with the collation of
- * the index. Essentially, we may ignore collation requirements for fields which are equalities.
+ *  5. List of the predicate types applied to each field in the candidate index. This is needed
+ * during the physical rewrite phase where we need to match the collation requirements with the
+ * collation of the index. One use is to ignore collation requirements for fields which are
+ * equalities.
  */
 struct CandidateIndexEntry {
     CandidateIndexEntry(std::string indexDefName);
@@ -253,9 +272,9 @@ struct CandidateIndexEntry {
     // sorted in their containing vector from most to least selective.
     ResidualRequirements _residualRequirements;
 
-    // We have equalities on those index fields, and thus do not consider for collation
-    // requirements.
-    opt::unordered_set<size_t> _fieldsToCollate;
+    // Types of the predicates which we will answer using a field at a given position in the
+    // candidate index.
+    std::vector<IndexFieldPredType> _predTypes;
 
     // Length of prefix of fields with applied intervals.
     size_t _intervalPrefixSize;

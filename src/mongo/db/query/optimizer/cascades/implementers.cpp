@@ -1337,13 +1337,12 @@ private:
             const auto& [reqProjName, reqOp] = requiredCollationSpec.at(collationSpecIndex);
 
             if (indexField < indexCollationSpec.size()) {
-                const bool needsCollation =
-                    candidateIndexEntry._fieldsToCollate.count(indexField) > 0;
+                const auto predType = candidateIndexEntry._predTypes.at(indexField);
 
                 auto it = fieldProjections.find(FieldNameType{encodeIndexKeyName(indexField)});
                 if (it == fieldProjections.cend()) {
                     // No bound projection for this index field.
-                    if (needsCollation) {
+                    if (predType != IndexFieldPredType::SimpleEquality) {
                         // We cannot satisfy the rest of the collation requirements.
                         indexSuitable = false;
                         break;
@@ -1352,23 +1351,34 @@ private:
                 }
                 const ProjectionName& projName = it->second;
 
-                if (!needsCollation) {
-                    // We do not need to collate this field because of equality.
-                    if (requiredCollationSpec.at(collationSpecIndex).first == projName) {
-                        // We can satisfy the next collation requirement independent of collation
-                        // op.
-                        if (++collationSpecIndex >= requiredCollationSpec.size()) {
-                            break;
+                switch (predType) {
+                    case IndexFieldPredType::SimpleEquality:
+                        // We do not need to collate this field because of equality.
+                        if (reqProjName == projName) {
+                            // We can satisfy the next collation requirement independent of
+                            // collation op.
+                            if (++collationSpecIndex >= requiredCollationSpec.size()) {
+                                break;
+                            }
                         }
-                    }
-                    continue;
-                }
+                        continue;
 
-                if (reqProjName != projName) {
-                    indexSuitable = false;
+                    case IndexFieldPredType::Compound:
+                        // Cannot satisfy collation if we have a compound predicate on this field.
+                        indexSuitable = false;
+                        break;
+
+                    case IndexFieldPredType::SimpleInequality:
+                    case IndexFieldPredType::Unbound:
+                        if (reqProjName != projName) {
+                            indexSuitable = false;
+                        }
+                        updateDirectionsFn(indexCollationSpec.at(indexField)._op, reqOp);
+                        break;
+                }
+                if (!indexSuitable) {
                     break;
                 }
-                updateDirectionsFn(indexCollationSpec.at(indexField)._op, reqOp);
             } else {
                 // If we fall through here, we are trying to satisfy a trailing collation
                 // requirement on rid.

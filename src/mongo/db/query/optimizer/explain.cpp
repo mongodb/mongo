@@ -1291,29 +1291,24 @@ public:
                 local.separator("}, {");
 
                 {
-                    std::set<size_t> orderedFields;
-                    for (const size_t fieldId : candidateIndexEntry._fieldsToCollate) {
-                        orderedFields.insert(fieldId);
-                    }
-
                     if constexpr (version < ExplainVersion::V3) {
                         bool first = true;
-                        for (const size_t fieldId : orderedFields) {
+                        for (const auto type : candidateIndexEntry._predTypes) {
                             if (first) {
                                 first = false;
                             } else {
                                 local.print(", ");
                             }
-                            local.print(fieldId);
+                            local.print(IndexFieldPredTypeEnum::toString[static_cast<int>(type)]);
                         }
                     } else if constexpr (version == ExplainVersion::V3) {
                         std::vector<ExplainPrinter> printers;
-                        for (const size_t fieldId : orderedFields) {
+                        for (const auto type : candidateIndexEntry._predTypes) {
                             ExplainPrinter local1;
-                            local1.print(fieldId);
+                            local1.print(IndexFieldPredTypeEnum::toString[static_cast<int>(type)]);
                             printers.push_back(std::move(local1));
                         }
-                        local.fieldName("fieldsToCollate").print(printers);
+                        local.fieldName("predType").print(printers);
                     } else {
                         MONGO_UNREACHABLE;
                     }

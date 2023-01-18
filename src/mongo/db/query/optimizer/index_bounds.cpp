@@ -213,15 +213,14 @@ CandidateIndexEntry::CandidateIndexEntry(std::string indexDefName)
       _eqPrefixes(),
       _correlatedProjNames(),
       _residualRequirements(),
-      _fieldsToCollate(),
+      _predTypes(),
       _intervalPrefixSize(0) {}
 
 bool CandidateIndexEntry::operator==(const CandidateIndexEntry& other) const {
     return _indexDefName == other._indexDefName &&
         _fieldProjectionMap == other._fieldProjectionMap && _eqPrefixes == other._eqPrefixes &&
         _correlatedProjNames == other._correlatedProjNames &&
-        _residualRequirements == other._residualRequirements &&
-        _fieldsToCollate == other._fieldsToCollate &&
+        _residualRequirements == other._residualRequirements && _predTypes == other._predTypes &&
         _intervalPrefixSize == other._intervalPrefixSize;
 }
 
