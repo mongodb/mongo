@@ -1,0 +1,7 @@
+test_kind: py_test
+
+selector:
+  roots:
+  - buildscripts/tests/tooling_metrics_e2e/**/test_*.py
+
+executor: {}

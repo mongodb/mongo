@@ -711,6 +711,7 @@ class NinjaState:
         # This version is needed because it is easy to get from pip and it support compile_commands.json
         ninja.variable("ninja_required_version", "1.10")
         ninja.variable("builddir", get_path(self.env['NINJA_BUILDDIR']))
+        ninja.variable("artifact_dir", self.env.Dir('$BUILD_DIR'))
 
         for pool_name, size in self.pools.items():
             ninja.pool(pool_name, min(self.env.get('NINJA_MAX_JOBS', size), size))

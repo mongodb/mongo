@@ -1,6 +1,4 @@
 from datetime import datetime
-import os
-import sys
 import unittest
 from unittest.mock import patch
 from mock import MagicMock
@@ -12,10 +10,6 @@ import buildscripts.resmoke as under_test
 CURRENT_DATE_TIME = datetime(2022, 10, 4)
 
 # pylint: disable=unused-argument
-
-# Metrics collection is not supported for Windows
-if os.name == "nt":
-    sys.exit()
 
 
 @patch("buildscripts.resmokelib.logging.flush._FLUSH_THREAD", None)

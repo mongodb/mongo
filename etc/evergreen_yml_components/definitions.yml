@@ -8050,6 +8050,19 @@ tasks:
       - "src/evergreen/run_python_script.sh"
       - "evergreen/publish_metrics.py"
 
+- name: tooling_metrics_test
+  tags: []
+  depends_on: []
+  commands:
+  - *f_expansions_write
+  - func: "do non-compile setup"
+  - func: "set up remote credentials"
+  - *f_expansions_write
+  - func: "configure evergreen api credentials"
+  - func: "run tests"
+    vars:
+      resmoke_jobs_max: 1
+
 #######################################
 #             Task Groups             #
 #######################################

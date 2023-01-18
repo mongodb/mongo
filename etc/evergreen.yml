@@ -777,6 +777,7 @@ buildvariants:
   - ubuntu1804-small
   stepback: false
   tasks:
+  - name: tooling_metrics_test
   - name: publish_metrics
 
 ###########################################
