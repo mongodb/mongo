@@ -1006,7 +1006,6 @@ Status Balancer::_splitChunksIfNeeded(OperationContext* opCtx) {
                                                   cm.getShardKeyPattern(),
                                                   splitInfo.collectionVersion.epoch(),
                                                   splitInfo.collectionVersion.getTimestamp(),
-                                                  ChunkVersion::IGNORED() /*chunkVersion*/,
                                                   ChunkRange(splitInfo.minKey, splitInfo.maxKey),
                                                   splitInfo.splitKeys);
         if (!splitStatus.isOK()) {

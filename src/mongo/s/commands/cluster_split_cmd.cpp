@@ -59,14 +59,18 @@ BSONObj selectMedianKey(OperationContext* opCtx,
                         const ShardId& shardId,
                         const NamespaceString& nss,
                         const ShardKeyPattern& shardKeyPattern,
-                        const ShardVersion& chunkVersion,
+                        const ChunkVersion& chunkVersion,
                         const ChunkRange& chunkRange) {
+    const auto gii =
+        Grid::get(opCtx)->catalogCache()->getCollectionIndexInfoWithRefresh(opCtx, nss);
+    ShardVersion shardVersion(
+        chunkVersion, gii ? boost::make_optional(gii->getCollectionIndexes()) : boost::none);
     BSONObjBuilder cmd;
     cmd.append("splitVector", nss.ns());
     cmd.append("keyPattern", shardKeyPattern.toBSON());
     chunkRange.append(&cmd);
     cmd.appendBool("force", true);
-    chunkVersion.serialize(ShardVersion::kShardVersionField, &cmd);
+    shardVersion.serialize(ShardVersion::kShardVersionField, &cmd);
 
     auto shard = uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, shardId));
 
@@ -250,16 +254,14 @@ public:
         // specified in the split command through the "middle" parameter, choose "middle" as the
         // splitPoint. Otherwise use the splitVector command with 'force' to ask the shard for the
         // middle of the chunk.
-        const auto placementVersion = cm.getVersion(chunk->getShardId());
         const BSONObj splitPoint = !middle.isEmpty()
             ? middle
-            : selectMedianKey(
-                  opCtx,
-                  chunk->getShardId(),
-                  nss,
-                  cm.getShardKeyPattern(),
-                  ShardVersion(placementVersion, boost::optional<CollectionIndexes>(boost::none)),
-                  ChunkRange(chunk->getMin(), chunk->getMax()));
+            : selectMedianKey(opCtx,
+                              chunk->getShardId(),
+                              nss,
+                              cm.getShardKeyPattern(),
+                              cm.getVersion(chunk->getShardId()),
+                              ChunkRange(chunk->getMin(), chunk->getMax()));
 
         LOGV2(22758,
               "Splitting chunk {chunkRange} in {namespace} on shard {shardId} at key {splitPoint}",
@@ -269,16 +271,15 @@ public:
               "namespace"_attr = nss.ns(),
               "shardId"_attr = chunk->getShardId());
 
-        uassertStatusOK(shardutil::splitChunkAtMultiplePoints(
-            opCtx,
-            chunk->getShardId(),
-            nss,
-            cm.getShardKeyPattern(),
-            cm.getVersion().epoch(),
-            cm.getVersion().getTimestamp(),
-            cm.getVersion(chunk->getShardId()) /* shardVersion */,
-            ChunkRange(chunk->getMin(), chunk->getMax()),
-            {splitPoint}));
+        uassertStatusOK(
+            shardutil::splitChunkAtMultiplePoints(opCtx,
+                                                  chunk->getShardId(),
+                                                  nss,
+                                                  cm.getShardKeyPattern(),
+                                                  cm.getVersion().epoch(),
+                                                  cm.getVersion().getTimestamp(),
+                                                  ChunkRange(chunk->getMin(), chunk->getMax()),
+                                                  {splitPoint}));
 
         Grid::get(opCtx)
             ->catalogCache()

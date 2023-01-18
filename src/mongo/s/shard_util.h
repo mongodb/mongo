@@ -112,7 +112,6 @@ StatusWith<boost::optional<ChunkRange>> splitChunkAtMultiplePoints(
     const ShardKeyPattern& shardKeyPattern,
     const OID& epoch,
     const Timestamp& timestamp,
-    ChunkVersion shardVersion,
     const ChunkRange& chunkRange,
     const std::vector<BSONObj>& splitPoints);
 
