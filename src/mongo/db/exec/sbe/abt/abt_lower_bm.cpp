@@ -245,5 +245,22 @@ BENCHMARK_REGISTER_F(ABTNodeLoweringFixture, BM_LowerEvalNodesUnderNLJs)
     ->Args({4, 4})
     ->Args({5, 5});
 
+void BM_LowerABTLetExpr(benchmark::State& state) {
+    auto nLets = state.range(0);
+    ABT n = Constant::boolean(true);
+    for (int i = 0; i < nLets; i++) {
+        n = make<Let>(ProjectionName{str::stream() << "var" << std::to_string(i)},
+                      Constant::int32(i),
+                      std::move(n));
+    }
+    for (auto keepRunning : state) {
+        auto env = VariableEnvironment::build(n);
+        SlotVarMap map;
+        benchmark::DoNotOptimize(SBEExpressionLowering{env, map}.optimize(n));
+        benchmark::ClobberMemory();
+    }
+}
+
+BENCHMARK(BM_LowerABTLetExpr)->Arg(1)->Arg(10)->Arg(20)->Arg(40)->Arg(100);
 }  // namespace
 }  // namespace mongo::optimizer
