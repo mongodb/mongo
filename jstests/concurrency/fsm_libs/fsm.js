@@ -114,7 +114,29 @@ var fsm = (function() {
                     withTxnAndAutoRetry(args.db.getSession(), () => {
                         data = TransactionsUtil.deepCopyObject({}, args.data);
                         data[kIsRunningInsideTransaction] = true;
-                        fn.call(data, args.db, args.collName, connCache);
+
+                        // The state function is given a Proxy object to the connection cache which
+                        // intercepts property accesses (e.g. `connCacheProxy.rsConns`) and causes
+                        // the state function to fall back to being called outside of
+                        // withTxnAndAutoRetry() as if an operation within the transaction had
+                        // failed with OperationNotSupportedInTransaction or InvalidOptions. Usage
+                        // of the connection cache isn't compatible with
+                        // `TestData.runInsideTransaction === true`. This is because the
+                        // withTxnAndAutoRetry() function isn't aware of transactions started
+                        // directly on replica set shards or the config server replica set to
+                        // automatically commit them and leaked transactions would stall the test
+                        // indefinitely.
+                        let connCacheProxy;
+                        if (connCache !== undefined) {
+                            connCacheProxy = new Proxy(connCache, {
+                                get: function(target, prop, receiver) {
+                                    forceRunningOutsideTransaction(data);
+                                    return target[prop];
+                                }
+                            });
+                        }
+
+                        fn.call(data, args.db, args.collName, connCacheProxy);
                     }, {retryOnKilledSession: args.data.retryOnKilledSession});
                     delete data[kIsRunningInsideTransaction];
                     args.data = data;
