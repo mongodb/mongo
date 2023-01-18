@@ -3411,6 +3411,7 @@ buildvariants:
     target_resmoke_time: 15
     max_sub_suites: 15
   tasks:
+  - name: burn_in_tests_gen
   - name: .audit .patch_build
   - name: .sasl .patch_build
   - name: .encrypt .patch_build
