@@ -739,69 +739,57 @@ void NetworkInterfaceTL::CommandState::fulfillFinalPromise(
 }
 
 NetworkInterfaceTL::RequestManager::RequestManager(CommandStateBase* cmdState_)
-    : cmdState{cmdState_},
-      requests(cmdState->maxConcurrentRequests(), std::weak_ptr<RequestState>()) {}
+    : cmdState{cmdState_}, requests(cmdState->maxConcurrentRequests()) {}
 
 void NetworkInterfaceTL::RequestManager::cancelRequests() {
+    std::vector<std::shared_ptr<RequestState>> requestsToCancel;
     {
         stdx::lock_guard<Latch> lk(mutex);
         isLocked = true;
 
-        if (sentIdx == 0) {
-            // We've canceled before any connections were acquired.
-            return;
+        for (size_t i = 0; i < sentIdx; i++) {
+            requestsToCancel.push_back(requests[i].request.lock());
         }
     }
 
-    for (size_t i = 0; i < requests.size(); i++) {
-        // This may cause the connection to be discarded before it receives the response to an
-        // earlier `_killOperations` command.
-        if (auto requestState = requests[i].lock()) {
+    for (size_t i = 0; i < requestsToCancel.size(); i++) {
+        if (auto& request = requestsToCancel[i]) {
+            // For hedged operations, we send `_killOperations` out-of-band, and the following may
+            // close the connection (used to send the original command) before it receives the
+            // response from the `_killOperations`.
             LOGV2_DEBUG(4646301,
                         2,
                         "Cancelling request",
                         "requestId"_attr = cmdState->requestOnAny.id,
                         "index"_attr = i);
-            requestState->cancel();
+            request->cancel();
+            request.reset();
         }
     }
 }
 
 void NetworkInterfaceTL::RequestManager::killOperationsForPendingRequests() {
+    // Send `_killOperation` out of band to all targets with initialized requests (i.e., those who
+    // acquired a connection), regardless of their state so long as they are not used to fulfill the
+    // operation. The following will hold indices for targets in the initial remote command request.
+    std::vector<size_t> indices;
     {
         stdx::lock_guard<Latch> lk(mutex);
         isLocked = true;
 
-        if (sentIdx == 0) {
-            // We've canceled before any connections were acquired.
-            return;
+        for (size_t i = 0; i < sentIdx; i++) {
+            auto& context = requests[i];
+            invariant(context.initialized);
+            if (auto requestState = context.request.lock();
+                requestState && requestState->fulfilledPromise) {
+                continue;  // This request is used to fulfill the promise.
+            }
+            indices.push_back(context.idx);
         }
     }
 
-    for (size_t i = 0; i < requests.size(); i++) {
-        auto requestState = requests[i].lock();
-        if (!requestState || requestState->fulfilledPromise) {
-            continue;
-        }
-
-        auto conn = requestState->weakConn.lock();
-        if (!conn) {
-            // If there is nothing from weakConn, the networking has already finished.
-            continue;
-        }
-
-        // If the request was sent, send a remote command request to the target host
-        // to kill the operation started by the request.
-
-        LOGV2_DEBUG(4664801,
-                    2,
-                    "Sending remote _killOperations request to cancel command",
-                    "operationKey"_attr = cmdState->operationKey,
-                    "target"_attr = requestState->request->target,
-                    "requestId"_attr = requestState->request->id);
-
-        auto status = requestState->interface()->_killOperation(requestState, this);
-        if (!status.isOK()) {
+    for (auto idx : indices) {
+        if (auto status = cmdState->interface->_killOperation(cmdState, idx); !status.isOK()) {
             LOGV2_DEBUG(4664810, 2, "Failed to send remote _killOperations", "error"_attr = status);
         }
     }
@@ -893,7 +881,7 @@ void NetworkInterfaceTL::RequestManager::trySend(
 
         auto currentSentIdx = sentIdx++;
 
-        requestState = std::make_shared<RequestState>(this, cmdState->shared_from_this(), idx);
+        requestState = std::make_shared<RequestState>(this, cmdState->shared_from_this());
         requestState->isHedge = currentSentIdx > 0;
 
         // Set conn/weakConn+request under the lock so they will always be observed during cancel.
@@ -931,7 +919,10 @@ void NetworkInterfaceTL::RequestManager::trySend(
             request->cmdObj = updatedCmdBuilder.obj();
         }
 
-        requests.at(currentSentIdx) = requestState;
+        auto& context = requests.at(currentSentIdx);
+        context.initialized = true;
+        context.idx = currentSentIdx;
+        context.request = requestState;
     }
 
     LOGV2_DEBUG(4646300,
@@ -1246,16 +1237,19 @@ void NetworkInterfaceTL::cancelCommand(const TaskExecutor::CallbackHandle& cbHan
                        << redact(cmdStateToCancel->requestOnAny.toString())});
 }
 
-Status NetworkInterfaceTL::_killOperation(std::shared_ptr<RequestState> requestStateToKill,
-                                          RequestManager* requestManager) try {
+Status NetworkInterfaceTL::_killOperation(CommandStateBase* cmdStateToKill, size_t idx) try {
     auto [target, sslMode] = [&] {
-        stdx::lock_guard<Latch> lk(requestManager->mutex);
-        invariant(requestStateToKill->request);
-        auto request = requestStateToKill->request.value();
-        return std::make_pair(request.target, request.sslMode);
+        const auto& request = cmdStateToKill->requestOnAny;
+        return std::make_pair(request.target[idx], request.sslMode);
     }();
-    auto cmdStateToKill = requestStateToKill->cmdState;
+
     auto operationKey = cmdStateToKill->operationKey.value();
+    LOGV2_DEBUG(4664801,
+                2,
+                "Sending remote _killOperations request to cancel command",
+                "operationKey"_attr = operationKey,
+                "target"_attr = target,
+                "requestId"_attr = idx);
 
     // Make a request state for _killOperations.
     executor::RemoteCommandRequest killOpRequest(

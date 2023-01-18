@@ -85,7 +85,7 @@ public:
                       StartCommandCB onFinish);
 
     Future<RemoteCommandResponse> runCommand(const TaskExecutor::CallbackHandle& cbHandle,
-                                             RemoteCommandRequest request);
+                                             RemoteCommandRequestOnAny rcroa);
 
     Future<RemoteCommandOnAnyResponse> runCommandOnAny(const TaskExecutor::CallbackHandle& cbHandle,
                                                        RemoteCommandRequestOnAny request);
