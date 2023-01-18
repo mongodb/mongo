@@ -102,6 +102,18 @@ env.Library(
 )
 
 env.Library(
+    target='produce_document_for_upsert',
+    source=[
+        'produce_document_for_upsert.cpp',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/db/catalog/document_validation',
+        '$BUILD_DIR/mongo/db/s/sharding_api_d',
+        '$BUILD_DIR/mongo/db/update/update_driver',
+    ],
+)
+
+env.Library(
     target='update_test_helpers',
     source=[
         'document_diff_test_helpers.cpp',

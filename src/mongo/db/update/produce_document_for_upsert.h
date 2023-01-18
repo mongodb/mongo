@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2019-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,41 +27,27 @@
  *    it in the license file.
  */
 
-#pragma once
+#include "mongo/db/operation_context.h"
+#include "mongo/db/ops/update_request.h"
+#include "mongo/db/update/update_driver.h"
+#include "mongo/util/safe_num.h"
 
-#include "mongo/db/exec/update_stage.h"
 
 namespace mongo {
 
+namespace update {
 /**
- * Execution stage for update requests with {upsert:true}. This is a specialized UpdateStage which,
- * in the event that no documents match the update request's query, generates and inserts a new
- * document into the collection. All logic related to the insertion phase is implemented by this
- * class.
- *
- * If the prior or newly-updated version of the document was requested to be returned, then ADVANCED
- * is returned after updating or inserting a document. Otherwise, NEED_TIME is returned after
- * updating a document if further updates are pending, and IS_EOF is returned if all updates have
- * been performed or if a document has been inserted.
- *
- * Callers of doWork() must be holding a write lock.
- */
-class UpsertStage final : public UpdateStage {
-    UpsertStage(const UpsertStage&) = delete;
-    UpsertStage& operator=(const UpsertStage&) = delete;
+ * Use an UpdateDriver and UpdateRequest to produce the document to insert.
+ **/
+BSONObj produceDocumentForUpsert(OperationContext* opCtx,
+                                 const UpdateRequest* request,
+                                 UpdateDriver* driver,
+                                 const CanonicalQuery* cq,
+                                 bool isUserInitiatedWrite,
+                                 mutablebson::Document& doc);
 
-public:
-    UpsertStage(ExpressionContext* expCtx,
-                const UpdateStageParams& params,
-                WorkingSet* ws,
-                const CollectionPtr& collection,
-                PlanStage* child);
-
-    bool isEOF() final;
-    StageState doWork(WorkingSetID* out) final;
-
-private:
-    void _performInsert(BSONObj newDocument);
-};
+void ensureIdFieldIsFirst(mutablebson::Document* doc, bool generateOIDIfMissing);
+void assertPathsNotArray(const mutablebson::Document& document, const FieldRefSet& paths);
+}  // namespace update
 
 }  // namespace mongo

@@ -125,10 +125,6 @@ protected:
 
     void doRestoreStateRequiresCollection() final;
 
-    void _ensureIdFieldIsFirst(mutablebson::Document* doc, bool generateOIDIfMissing);
-
-    void _assertPathsNotArray(const mutablebson::Document& document, const FieldRefSet& paths);
-
     void _checkRestrictionsOnUpdatingShardKeyAreNotViolated(
         const ScopedCollectionDescription& collDesc, const FieldRefSet& shardKeyPaths);
 
