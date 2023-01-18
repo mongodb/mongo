@@ -45,6 +45,7 @@
 #include "mongo/s/is_mongos.h"
 #include "mongo/s/mongod_and_mongos_server_parameters_gen.h"
 #include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/scopeguard.h"
@@ -449,6 +450,11 @@ boost::optional<GlobalIndexesCache> CatalogCache::_getCollectionIndexInfoAt(
     const NamespaceString& nss,
     boost::optional<Timestamp> atClusterTime,
     bool allowLocks) {
+
+    if (!feature_flags::gGlobalIndexesShardingCatalog.isEnabledAndIgnoreFCV()) {
+        return boost::none;
+    }
+
     if (!allowLocks) {
         invariant(!opCtx->lockState() || !opCtx->lockState()->isLocked(),
                   "Do not hold a lock while refreshing the catalog cache. Doing so would "

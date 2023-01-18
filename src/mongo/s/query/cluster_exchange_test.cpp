@@ -38,6 +38,7 @@
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/query/sharded_agg_test_fixture.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/scopeguard.h"
 
@@ -131,12 +132,14 @@ TEST_F(ClusterExchangeTest, SingleMergeStageNotEligibleForExchangeIfOutputCollec
     expectGetDatabase(kTestTargetNss);
     // Pretend there are no collections in this database.
     expectFindSendBSONObjVector(kConfigHostAndPort, std::vector<BSONObj>());
-    onCommand([&](const executor::RemoteCommandRequest& request) {
-        ASSERT_EQ(request.target, kConfigHostAndPort);
-        ASSERT_EQ(request.dbname, "config");
-        return CursorResponse(CollectionType::ConfigNS, CursorId{0}, {})
-            .toBSON(CursorResponse::ResponseType::InitialResponse);
-    });
+    if (feature_flags::gGlobalIndexesShardingCatalog.isEnabledAndIgnoreFCV()) {
+        onCommand([&](const executor::RemoteCommandRequest& request) {
+            ASSERT_EQ(request.target, kConfigHostAndPort);
+            ASSERT_EQ(request.dbname, "config");
+            return CursorResponse(CollectionType::ConfigNS, CursorId{0}, {})
+                .toBSON(CursorResponse::ResponseType::InitialResponse);
+        });
+    }
 
     future.default_timed_get();
 }

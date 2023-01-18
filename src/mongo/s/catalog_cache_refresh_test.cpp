@@ -29,6 +29,7 @@
 
 #include "mongo/db/concurrency/locker_noop.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database_gen.h"
@@ -99,6 +100,9 @@ protected:
                                             const ShardKeyPattern& shardKeyPattern) {
         return {kNss, epoch, timestamp, Date_t::now(), UUID::gen(), shardKeyPattern.toBSON()};
     }
+
+    RAIIServerParameterControllerForTest featureFlagController{
+        "featureFlagGlobalIndexesShardingCatalog", true};
 };
 
 TEST_F(CatalogCacheRefreshTest, FullLoad) {

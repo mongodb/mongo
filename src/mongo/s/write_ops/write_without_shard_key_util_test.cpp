@@ -30,6 +30,7 @@
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/write_ops/write_without_shard_key_util.h"
 #include "mongo/unittest/unittest.h"
 
@@ -166,12 +167,14 @@ TEST_F(UnshardedCollectionTest, UnshardedCollectionDoesNotUseTwoPhaseProtocol) {
     expectFindSendBSONObjVector(kConfigHostAndPort, {});
 
     // Return no global indexes
-    onCommand([&](const executor::RemoteCommandRequest& request) {
-        ASSERT_EQ(request.target, kConfigHostAndPort);
-        ASSERT_EQ(request.dbname, "config");
-        return CursorResponse(CollectionType::ConfigNS, CursorId{0}, {})
-            .toBSON(CursorResponse::ResponseType::InitialResponse);
-    });
+    if (feature_flags::gGlobalIndexesShardingCatalog.isEnabledAndIgnoreFCV()) {
+        onCommand([&](const executor::RemoteCommandRequest& request) {
+            ASSERT_EQ(request.target, kConfigHostAndPort);
+            ASSERT_EQ(request.dbname, "config");
+            return CursorResponse(CollectionType::ConfigNS, CursorId{0}, {})
+                .toBSON(CursorResponse::ResponseType::InitialResponse);
+        });
+    }
 
     auto cm = *future.default_timed_get();
     ASSERT(!cm.isSharded());

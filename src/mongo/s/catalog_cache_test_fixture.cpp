@@ -40,6 +40,7 @@
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/scopeguard.h"
 
@@ -195,11 +196,13 @@ ChunkManager CatalogCacheTestFixture::makeChunkManager(
                        [](const auto& chunk) { return BSON("chunks" << chunk); });
         return aggResult;
     }());
-    onCommand([&](const executor::RemoteCommandRequest& request) {
-        ASSERT_EQ(request.target, kConfigHostAndPort);
-        ASSERT_EQ(request.dbname, "config");
-        return makeCollectionAndIndexesAggregationResponse(CollectionType(collectionBSON), {});
-    });
+    if (feature_flags::gGlobalIndexesShardingCatalog.isEnabledAndIgnoreFCV()) {
+        onCommand([&](const executor::RemoteCommandRequest& request) {
+            ASSERT_EQ(request.target, kConfigHostAndPort);
+            ASSERT_EQ(request.dbname, "config");
+            return makeCollectionAndIndexesAggregationResponse(CollectionType(collectionBSON), {});
+        });
+    }
 
     return *future.default_timed_get();
 }
@@ -250,13 +253,15 @@ void CatalogCacheTestFixture::expectCollectionAndIndexesAggregation(
     UUID uuid,
     const ShardKeyPattern& shardKeyPattern,
     const std::vector<BSONObj>& globalIndexes) {
-    onCommand([&](const executor::RemoteCommandRequest& request) {
-        ASSERT_EQ(request.target, kConfigHostAndPort);
-        ASSERT_EQ(request.dbname, "config");
-        CollectionType collType(
-            nss, epoch, timestamp, Date_t::now(), uuid, shardKeyPattern.toBSON());
-        return makeCollectionAndIndexesAggregationResponse(collType, {});
-    });
+    if (feature_flags::gGlobalIndexesShardingCatalog.isEnabledAndIgnoreFCV()) {
+        onCommand([&](const executor::RemoteCommandRequest& request) {
+            ASSERT_EQ(request.target, kConfigHostAndPort);
+            ASSERT_EQ(request.dbname, "config");
+            CollectionType collType(
+                nss, epoch, timestamp, Date_t::now(), uuid, shardKeyPattern.toBSON());
+            return makeCollectionAndIndexesAggregationResponse(collType, {});
+        });
+    }
 }
 
 ChunkManager CatalogCacheTestFixture::loadRoutingTableWithTwoChunksAndTwoShards(
@@ -310,11 +315,13 @@ ChunkManager CatalogCacheTestFixture::loadRoutingTableWithTwoChunksAndTwoShardsI
         const auto chunk2Obj = BSON("chunks" << chunk2.toConfigBSON());
         return std::vector<BSONObj>{collType.toBSON(), chunk1Obj, chunk2Obj};
     }());
-    onCommand([&](const executor::RemoteCommandRequest& request) {
-        ASSERT_EQ(request.target, kConfigHostAndPort);
-        ASSERT_EQ(request.dbname, "config");
-        return makeCollectionAndIndexesAggregationResponse(collType, {});
-    });
+    if (feature_flags::gGlobalIndexesShardingCatalog.isEnabledAndIgnoreFCV()) {
+        onCommand([&](const executor::RemoteCommandRequest& request) {
+            ASSERT_EQ(request.target, kConfigHostAndPort);
+            ASSERT_EQ(request.dbname, "config");
+            return makeCollectionAndIndexesAggregationResponse(collType, {});
+        });
+    }
 
     return *future.default_timed_get();
 }

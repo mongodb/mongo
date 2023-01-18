@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/catalog_cache_loader_mock.h"
@@ -197,6 +198,8 @@ protected:
     const int kDummyPort{12345};
     const HostAndPort kConfigHostAndPort{"DummyConfig", kDummyPort};
     const std::vector<ShardId> kShards{{"0"}, {"1"}};
+    RAIIServerParameterControllerForTest featureFlagController{
+        "featureFlagGlobalIndexesShardingCatalog", true};
 
     std::shared_ptr<CatalogCacheLoaderMock> _catalogCacheLoader;
     std::unique_ptr<CatalogCache> _catalogCache;
