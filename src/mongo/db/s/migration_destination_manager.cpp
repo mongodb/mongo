@@ -443,6 +443,9 @@ Status MigrationDestinationManager::start(OperationContext* opCtx,
     _sessionMigration =
         std::make_unique<SessionCatalogMigrationDestination>(_nss, _fromShard, *_sessionId);
     ShardingStatistics::get(opCtx).countRecipientMoveChunkStarted.addAndFetch(1);
+    if (mongo::feature_flags::gConcurrencyInChunkMigration.isEnabledAndIgnoreFCV())
+        ShardingStatistics::get(opCtx).chunkMigrationConcurrencyCnt.store(
+            chunkMigrationConcurrency.load());
 
     _migrateThreadHandle = stdx::thread([this]() { _migrateThread(); });
 
