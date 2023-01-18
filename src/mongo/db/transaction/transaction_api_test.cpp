@@ -149,6 +149,7 @@ public:
     }
 
     virtual SemiFuture<BSONObj> runCommand(StringData dbName, BSONObj cmd) const override {
+        stdx::unique_lock<Latch> ul(_mutex);
         [&]() {
             StringData cmdName = cmd.firstElementFieldNameStringData();
             if (cmdName != AbortTransaction::kCommandName) {
@@ -156,7 +157,11 @@ public:
                 return;
             }
 
-            stdx::unique_lock<Latch> ul(_hangNextAbortCommandMutex);
+            if (_hangNextAbortCommand) {
+                // Tests that expect to hang an abort must use the barrier to synchronize since the
+                // abort runs on a different thread.
+                _hitHungAbort.countDownAndWait();
+            }
             _hangNextAbortCommandCV.wait(ul, [&] { return !_hangNextAbortCommand; });
         }();
 
@@ -199,6 +204,7 @@ public:
     }
 
     BSONObj getLastSentRequest() {
+        stdx::lock_guard<Latch> lg(_mutex);
         if (_sentRequests.empty()) {
             return BSONObj();
         }
@@ -206,19 +212,25 @@ public:
     }
 
     const std::vector<BSONObj>& getSentRequests() {
+        stdx::lock_guard<Latch> lg(_mutex);
         return _sentRequests;
     }
 
     void setNextCommandResponse(StatusWith<BSONObj> res) {
+        stdx::lock_guard<Latch> lg(_mutex);
         _responses.push(res);
     }
 
     void setHangNextAbortCommand(bool enable) {
-        stdx::lock_guard<Latch> lg(_hangNextAbortCommandMutex);
+        stdx::lock_guard<Latch> lg(_mutex);
         _hangNextAbortCommand = enable;
 
         // Wake up any waiting threads.
         _hangNextAbortCommandCV.notify_all();
+    }
+
+    void waitForHungAbortWaiter() {
+        _hitHungAbort.countDownAndWait();
     }
 
 private:
@@ -228,9 +240,10 @@ private:
     mutable std::vector<BSONObj> _sentRequests;
     bool _runningLocalTransaction{false};
 
-    mutable Mutex _hangNextAbortCommandMutex = MONGO_MAKE_LATCH("MockTransactionClient");
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("MockTransactionClient");
     mutable stdx::condition_variable _hangNextAbortCommandCV;
     bool _hangNextAbortCommand{false};
+    mutable unittest::Barrier _hitHungAbort{2};
 };
 
 }  // namespace txn_api::details
@@ -2247,7 +2260,8 @@ TEST_F(TxnAPITest, DoesNotWaitForBestEffortAbortIfCancelled) {
     // it should return a non-ok status.
     ASSERT_FALSE(swResult.getStatus().isOK());
 
-    // The abort should be hung and not have been processed yet.
+    // The abort should get hung and not have been processed yet.
+    mockClient()->waitForHungAbortWaiter();
     auto lastRequest = mockClient()->getLastSentRequest();
     ASSERT_NE(lastRequest.firstElementFieldNameStringData(), "abortTransaction"_sd);
 
@@ -2299,7 +2313,8 @@ TEST_F(TxnAPITest, WaitsForBestEffortAbortOnNonTransientErrorIfNotCancelled) {
     // The future should time out since it's blocked waiting for the best effort abort to finish.
     ASSERT(stdx::future_status::ready != future.wait_for(Milliseconds(10).toSystemDuration()));
 
-    // The abort should be hung and not have been processed yet.
+    // The abort should get hung and not have been processed yet.
+    mockClient()->waitForHungAbortWaiter();
     auto lastRequest = mockClient()->getLastSentRequest();
     ASSERT_NE(lastRequest.firstElementFieldNameStringData(), "abortTransaction"_sd);
 
@@ -2359,7 +2374,8 @@ TEST_F(TxnAPITest, WaitsForBestEffortAbortOnTransientError) {
     // The future should time out since it's blocked waiting for the best effort abort to finish.
     ASSERT(stdx::future_status::ready != future.wait_for(Milliseconds(10).toSystemDuration()));
 
-    // The abort should be hung and not have been processed yet.
+    // The abort should get hung and not have been processed yet.
+    mockClient()->waitForHungAbortWaiter();
     auto lastRequest = mockClient()->getLastSentRequest();
     ASSERT_NE(lastRequest.firstElementFieldNameStringData(), "abortTransaction"_sd);
 
