@@ -515,8 +515,8 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
 
 struct ColumnIndexScanNode : public QuerySolutionNode {
     ColumnIndexScanNode(ColumnIndexEntry,
-                        std::set<std::string> outputFields,
-                        std::set<std::string> matchFields,
+                        OrderedPathSet outputFields,
+                        OrderedPathSet matchFields,
                         StringMap<std::unique_ptr<MatchExpression>> filtersByPath,
                         std::unique_ptr<MatchExpression> postAssemblyFilter);
 
@@ -556,11 +556,11 @@ struct ColumnIndexScanNode : public QuerySolutionNode {
     ColumnIndexEntry indexEntry;
 
     // The fields we need to output. Dot separated path names.
-    std::set<std::string> outputFields;
+    OrderedPathSet outputFields;
 
     // The fields which are referenced by any and all filters - either in 'filtersByPath' or
     // 'postAssemblyFilter'.
-    std::set<std::string> matchFields;
+    OrderedPathSet matchFields;
 
     // A column scan can apply a filter to the columns directly while scanning, or to a document
     // assembled from the scanned columns.
@@ -575,7 +575,7 @@ struct ColumnIndexScanNode : public QuerySolutionNode {
 
     // A cached copy of the union of the above two field sets which we expect to be frequently asked
     // for.
-    std::set<std::string> allFields;
+    OrderedPathSet allFields;
 };
 
 /**

@@ -220,7 +220,7 @@ DocumentSource::GetNextResult DocumentSourceUnwind::doGetNext() {
 }
 
 DocumentSource::GetModPathsReturn DocumentSourceUnwind::getModifiedPaths() const {
-    std::set<std::string> modifiedFields{_unwindPath.fullPath()};
+    OrderedPathSet modifiedFields{_unwindPath.fullPath()};
     if (_indexPath) {
         modifiedFields.insert(_indexPath->fullPath());
     }

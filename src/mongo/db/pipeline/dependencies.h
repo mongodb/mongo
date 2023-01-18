@@ -38,18 +38,20 @@
 
 namespace mongo {
 
-/** Custom comparator that orders fieldpath strings by path prefix first, then by field.
+/**
+ * Custom comparator that orders fieldpath strings by path prefix first, then by field.
  * This ensures that a parent field is ordered directly before its children.
  */
-struct PathPrefixComparator {
+struct PathComparator {
     /* Returns true if the lhs value should sort before the rhs, false otherwise. */
     bool operator()(const std::string& lhs, const std::string& rhs) const;
 };
+
 /**
  * Set of field paths strings.  When iterated over, a parent path is seen directly before its
  * children (or descendants, more generally).  Eg., "a", "a.a", "a.b", "a-plus", "b".
  */
-typedef std::set<std::string, PathPrefixComparator> OrderedPathSet;
+typedef std::set<std::string, PathComparator> OrderedPathSet;
 
 /**
  * This struct allows components in an agg pipeline to report what they need from their input.
@@ -208,11 +210,11 @@ struct DepsTracker {
     }
 
     /**
-     * Return fieldpaths ordered such that a parent is immediately before its children.
+     * Return names of needed fields in dotted notation.  A custom comparator orders the fields
+     * such that a parent is immediately before its children.
      */
-    std::list<std::string> sortedFields() const;
+    OrderedPathSet fields;
 
-    std::set<std::string> fields;    // Names of needed fields in dotted notation.
     std::set<Variables::Id> vars;    // IDs of referenced variables.
     bool needWholeDocument = false;  // If true, ignore 'fields'; the whole document is needed.
 

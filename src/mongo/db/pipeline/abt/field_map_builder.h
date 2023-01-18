@@ -57,7 +57,7 @@ struct FieldMapEntry {
     bool _hasDrop = false;
     std::string _constVarName;
 
-    std::set<std::string> _childPaths;
+    OrderedPathSet _childPaths;
 };
 
 class FieldMapBuilder {

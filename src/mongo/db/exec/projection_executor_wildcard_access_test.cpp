@@ -74,7 +74,7 @@ std::unique_ptr<ProjectionExecutor> makeProjectionWithDefaultIdExclusionAndNeste
     return createProjectionExecutor(projSpec, policies);
 }
 
-std::set<FieldRef> toFieldRefs(const std::set<std::string>& stringPaths) {
+std::set<FieldRef> toFieldRefs(const OrderedPathSet& stringPaths) {
     std::set<FieldRef> fieldRefs;
     std::transform(stringPaths.begin(),
                    stringPaths.end(),

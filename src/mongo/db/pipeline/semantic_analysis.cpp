@@ -79,7 +79,7 @@ boost::optional<std::string> findRename(const StringMap<std::string>& renamedPat
  * maps the path to itself.
  */
 StringMap<std::string> computeNamesAssumingAnyPathsNotRenamedAreUnmodified(
-    const StringMap<std::string>& renamedPaths, const std::set<std::string>& pathsOfInterest) {
+    const StringMap<std::string>& renamedPaths, const OrderedPathSet& pathsOfInterest) {
     StringMap<std::string> renameOut;
     for (auto&& ofInterest : pathsOfInterest) {
         if (auto name = findRename(renamedPaths, ofInterest)) {
@@ -163,7 +163,7 @@ template <class Iterator>
 boost::optional<Iterator> lookForNestUnnestPattern(
     Iterator start,
     Iterator end,
-    std::set<std::string> pathsOfInterest,
+    OrderedPathSet pathsOfInterest,
     const Direction& traversalDir,
     boost::optional<std::function<bool(DocumentSource*)>> additionalStageValidatorCallback) {
     auto replaceRootTransform = isReplaceRoot((*start).get());
@@ -252,7 +252,7 @@ template <class Iterator>
 std::pair<Iterator, StringMap<std::string>> multiStageRenamedPaths(
     Iterator start,
     Iterator end,
-    std::set<std::string> pathsOfInterest,
+    OrderedPathSet pathsOfInterest,
     const Direction& traversalDir,
     boost::optional<std::function<bool(DocumentSource*)>> additionalStageValidatorCallback =
         boost::none) {
@@ -300,7 +300,7 @@ template <class Iterator>
 boost::optional<StringMap<std::string>> renamedPathsFullPipeline(
     Iterator start,
     Iterator end,
-    std::set<std::string> pathsOfInterest,
+    OrderedPathSet pathsOfInterest,
     const Direction& traversalDir,
     boost::optional<std::function<bool(DocumentSource*)>> additionalStageValidatorCallback) {
     auto [itr, renameMap] = multiStageRenamedPaths(
@@ -313,9 +313,9 @@ boost::optional<StringMap<std::string>> renamedPathsFullPipeline(
 
 }  // namespace
 
-std::set<std::string> extractModifiedDependencies(const std::set<std::string>& dependencies,
-                                                  const std::set<std::string>& preservedPaths) {
-    std::set<std::string> modifiedDependencies;
+OrderedPathSet extractModifiedDependencies(const OrderedPathSet& dependencies,
+                                           const OrderedPathSet& preservedPaths) {
+    OrderedPathSet modifiedDependencies;
 
     // The modified dependencies is *almost* the set difference 'dependencies' - 'preservedPaths',
     // except that if p in 'preservedPaths' is a "path prefix" of d in 'dependencies', then 'd'
@@ -342,7 +342,7 @@ std::set<std::string> extractModifiedDependencies(const std::set<std::string>& d
     return modifiedDependencies;
 }
 
-boost::optional<StringMap<std::string>> renamedPaths(const std::set<std::string>& pathsOfInterest,
+boost::optional<StringMap<std::string>> renamedPaths(const OrderedPathSet& pathsOfInterest,
                                                      const DocumentSource& stage,
                                                      const Direction& traversalDir) {
     auto modifiedPathsRet = stage.getModifiedPaths();
@@ -351,19 +351,11 @@ boost::optional<StringMap<std::string>> renamedPaths(const std::set<std::string>
         case DocumentSource::GetModPathsReturn::Type::kAllPaths:
             return boost::none;
         case DocumentSource::GetModPathsReturn::Type::kFiniteSet: {
-            for (auto&& modified : modifiedPathsRet.paths) {
-                for (auto&& ofInterest : pathsOfInterest) {
-                    // Any overlap of the path means the path of interest is not preserved. For
-                    // example, if the path of interest is "a.b", then a modified path of "a",
-                    // "a.b", or "a.b.c" would all signal that "a.b" is not preserved.
-                    if (ofInterest == modified ||
-                        expression::isPathPrefixOf(ofInterest, modified) ||
-                        expression::isPathPrefixOf(modified, ofInterest)) {
-                        // This stage modifies at least one of the fields which the caller is
-                        // interested in, bail out.
-                        return boost::none;
-                    }
-                }
+            // Any overlap of the path means the path of interest is not preserved. For
+            // example, if the path of interest is "a.b", then a modified path of "a",
+            // "a.b", or "a.b.c" would all signal that "a.b" is not preserved.
+            if (!expression::areIndependent(modifiedPathsRet.paths, pathsOfInterest)) {
+                return boost::none;
             }
 
             // None of the paths of interest were modified, construct the result map, mapping
@@ -401,7 +393,7 @@ boost::optional<StringMap<std::string>> renamedPaths(const std::set<std::string>
 boost::optional<StringMap<std::string>> renamedPaths(
     const Pipeline::SourceContainer::const_iterator start,
     const Pipeline::SourceContainer::const_iterator end,
-    const std::set<std::string>& pathsOfInterest,
+    const OrderedPathSet& pathsOfInterest,
     boost::optional<std::function<bool(DocumentSource*)>> additionalStageValidatorCallback) {
     return renamedPathsFullPipeline(
         start, end, pathsOfInterest, Direction::kForward, additionalStageValidatorCallback);
@@ -410,7 +402,7 @@ boost::optional<StringMap<std::string>> renamedPaths(
 boost::optional<StringMap<std::string>> renamedPaths(
     const Pipeline::SourceContainer::const_reverse_iterator start,
     const Pipeline::SourceContainer::const_reverse_iterator end,
-    const std::set<std::string>& pathsOfInterest,
+    const OrderedPathSet& pathsOfInterest,
     boost::optional<std::function<bool(DocumentSource*)>> additionalStageValidatorCallback) {
     return renamedPathsFullPipeline(
         start, end, pathsOfInterest, Direction::kBackward, additionalStageValidatorCallback);
@@ -420,7 +412,7 @@ std::pair<Pipeline::SourceContainer::const_iterator, StringMap<std::string>>
 findLongestViablePrefixPreservingPaths(
     const Pipeline::SourceContainer::const_iterator start,
     const Pipeline::SourceContainer::const_iterator end,
-    const std::set<std::string>& pathsOfInterest,
+    const OrderedPathSet& pathsOfInterest,
     boost::optional<std::function<bool(DocumentSource*)>> additionalStageValidatorCallback) {
     return multiStageRenamedPaths(
         start, end, pathsOfInterest, Direction::kForward, additionalStageValidatorCallback);

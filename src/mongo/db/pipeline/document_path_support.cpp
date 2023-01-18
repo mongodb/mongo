@@ -136,7 +136,7 @@ StatusWith<Value> extractElementAlongNonArrayPath(const Document& doc, const Fie
     return curValue;
 }
 
-BSONObj documentToBsonWithPaths(const Document& input, const std::set<std::string>& paths) {
+BSONObj documentToBsonWithPaths(const Document& input, const OrderedPathSet& paths) {
     BSONObjBuilder outputBuilder;
     for (auto&& path : paths) {
         // getNestedField does not handle dotted paths correctly, so instead of retrieving the

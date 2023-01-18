@@ -140,7 +140,7 @@ public:
 
     GetModPathsReturn getModifiedPaths() const final {
         // This stage does not modify or rename any paths.
-        return {GetModPathsReturn::Type::kFiniteSet, std::set<std::string>{}, {}};
+        return {GetModPathsReturn::Type::kFiniteSet, OrderedPathSet{}, {}};
     }
 
     /**
@@ -199,7 +199,7 @@ public:
      * z: "baz"}} and {$match: {a: "foo"}}.
      */
     std::pair<boost::intrusive_ptr<DocumentSourceMatch>, boost::intrusive_ptr<DocumentSourceMatch>>
-    splitSourceBy(const std::set<std::string>& fields, const StringMap<std::string>& renames) &&;
+    splitSourceBy(const OrderedPathSet& fields, const StringMap<std::string>& renames) &&;
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final {
         return boost::none;
@@ -220,7 +220,7 @@ protected:
 
 private:
     std::pair<boost::intrusive_ptr<DocumentSourceMatch>, boost::intrusive_ptr<DocumentSourceMatch>>
-    splitSourceByFunc(const std::set<std::string>& fields,
+    splitSourceByFunc(const OrderedPathSet& fields,
                       const StringMap<std::string>& renames,
                       expression::ShouldSplitExprFunc func) &&;
 

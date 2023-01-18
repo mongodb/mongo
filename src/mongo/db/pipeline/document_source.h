@@ -601,9 +601,7 @@ public:
             kAllExcept,
         };
 
-        GetModPathsReturn(Type type,
-                          std::set<std::string>&& paths,
-                          StringMap<std::string>&& renames)
+        GetModPathsReturn(Type type, OrderedPathSet&& paths, StringMap<std::string>&& renames)
             : type(type), paths(std::move(paths)), renames(std::move(renames)) {}
 
         std::set<std::string> getNewNames() {
@@ -653,7 +651,7 @@ public:
         }
 
         Type type;
-        std::set<std::string> paths;
+        OrderedPathSet paths;
 
         // Stages may fill out 'renames' to contain information about path renames. Each entry in
         // 'renames' maps from the new name of the path (valid in documents flowing *out* of this
@@ -676,7 +674,7 @@ public:
      * See GetModPathsReturn above for the possible return values and what they mean.
      */
     virtual GetModPathsReturn getModifiedPaths() const {
-        return {GetModPathsReturn::Type::kNotSupported, std::set<std::string>{}, {}};
+        return {GetModPathsReturn::Type::kNotSupported, OrderedPathSet{}, {}};
     }
 
     /**
@@ -714,7 +712,7 @@ public:
      * parallel since it will preserve the shard key.
      */
     virtual bool canRunInParallelBeforeWriteStage(
-        const std::set<std::string>& nameOfShardKeyFieldsUponEntryToStage) const {
+        const OrderedPathSet& nameOfShardKeyFieldsUponEntryToStage) const {
         return false;
     }
 

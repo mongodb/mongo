@@ -31,6 +31,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/checked_cast.h"
+#include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_array.h"
@@ -374,7 +375,7 @@ unique_ptr<MatchExpression> createNorOfNodes(std::vector<unique_ptr<MatchExpress
  */
 std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitMatchExpressionByFunction(
     unique_ptr<MatchExpression> expr,
-    const std::set<std::string>& fields,
+    const OrderedPathSet& fields,
     expression::ShouldSplitExprFunc shouldSplitOut) {
     if (shouldSplitOut(*expr, fields)) {
         // 'expr' satisfies our split condition and can be completely split out.
@@ -440,7 +441,7 @@ std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitMatchEx
 bool pathDependenciesAreExact(StringData key, const MatchExpression* expr) {
     DepsTracker columnDeps;
     expr->addDependencies(&columnDeps);
-    return !columnDeps.needWholeDocument && columnDeps.fields == std::set{key.toString()};
+    return !columnDeps.needWholeDocument && columnDeps.fields == OrderedPathSet{key.toString()};
 }
 
 bool tryAddExprHelper(StringData path,
@@ -786,28 +787,33 @@ bool hasOnlyRenameableMatchExpressionChildren(const MatchExpression& expr) {
     return true;
 }
 
-bool isIndependentOf(const MatchExpression& expr, const std::set<std::string>& pathSet) {
-    // Any expression types that do not have renaming implemented cannot have their independence
-    // evaluated here. See applyRenamesToExpression().
-    if (!hasOnlyRenameableMatchExpressionChildren(expr)) {
+bool containsDependency(const OrderedPathSet& testSet, const OrderedPathSet& prefixCandidates) {
+    if (testSet.empty()) {
         return false;
     }
 
-    auto depsTracker = DepsTracker{};
-    expr.addDependencies(&depsTracker);
-    // Match expressions that generate random numbers can't be safely split out and pushed down.
-    return !depsTracker.needRandomGenerator &&
-        std::none_of(
-            depsTracker.fields.begin(), depsTracker.fields.end(), [&pathSet](auto&& field) {
-                return pathSet.find(field) != pathSet.end() ||
-                    std::any_of(pathSet.begin(), pathSet.end(), [&field](auto&& path) {
-                           return expression::isPathPrefixOf(field, path) ||
-                               expression::isPathPrefixOf(path, field);
-                       });
-            });
+    PathComparator pathComparator;
+    auto i2 = testSet.begin();
+    for (auto p1 : prefixCandidates) {
+        while (pathComparator(*i2, p1)) {
+            ++i2;
+            if (i2 == testSet.end()) {
+                return false;
+            }
+        }
+        // At this point we know that p1 <= *i2, so it may be identical or a path prefix.
+        if (p1 == *i2 || isPathPrefixOf(p1, *i2)) {
+            return true;
+        }
+    }
+    return false;
 }
 
-bool isOnlyDependentOn(const MatchExpression& expr, const std::set<std::string>& pathSet) {
+bool areIndependent(const OrderedPathSet& pathSet1, const OrderedPathSet& pathSet2) {
+    return !containsDependency(pathSet1, pathSet2) && !containsDependency(pathSet2, pathSet1);
+}
+
+bool isIndependentOf(const MatchExpression& expr, const OrderedPathSet& pathSet) {
     // Any expression types that do not have renaming implemented cannot have their independence
     // evaluated here. See applyRenamesToExpression().
     if (!hasOnlyRenameableMatchExpressionChildren(expr)) {
@@ -817,17 +823,42 @@ bool isOnlyDependentOn(const MatchExpression& expr, const std::set<std::string>&
     auto depsTracker = DepsTracker{};
     expr.addDependencies(&depsTracker);
     // Match expressions that generate random numbers can't be safely split out and pushed down.
-    return !depsTracker.needRandomGenerator &&
-        std::all_of(depsTracker.fields.begin(), depsTracker.fields.end(), [&](auto&& field) {
-            return std::any_of(pathSet.begin(), pathSet.end(), [&](auto&& path) {
-                return path == field || isPathPrefixOf(path, field);
-            });
-        });
+    if (depsTracker.needRandomGenerator || depsTracker.needWholeDocument) {
+        return false;
+    }
+    return areIndependent(pathSet, depsTracker.fields);
+}
+
+bool isOnlyDependentOn(const MatchExpression& expr, const OrderedPathSet& pathSet) {
+    // Any expression types that do not have renaming implemented cannot have their independence
+    // evaluated here. See applyRenamesToExpression().
+    if (!hasOnlyRenameableMatchExpressionChildren(expr)) {
+        return false;
+    }
+
+    // The approach below takes only O(n log n) time.
+
+    // Find the unique dependencies of pathSet.
+    auto pathsDeps =
+        DepsTracker::simplifyDependencies(pathSet, DepsTracker::TruncateToRootLevel::no);
+    auto pathsDepsCopy = OrderedPathSet(pathsDeps.begin(), pathsDeps.end());
+
+    // Now add the match expression's paths and see if the dependencies are the same.
+    auto exprDepsTracker = DepsTracker{};
+    expr.addDependencies(&exprDepsTracker);
+    // Match expressions that generate random numbers can't be safely split out and pushed down.
+    if (exprDepsTracker.needRandomGenerator) {
+        return false;
+    }
+    pathsDepsCopy.insert(exprDepsTracker.fields.begin(), exprDepsTracker.fields.end());
+
+    return pathsDeps ==
+        DepsTracker::simplifyDependencies(pathsDepsCopy, DepsTracker::TruncateToRootLevel::no);
 }
 
 std::pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> splitMatchExpressionBy(
     unique_ptr<MatchExpression> expr,
-    const std::set<std::string>& fields,
+    const OrderedPathSet& fields,
     const StringMap<std::string>& renames,
     ShouldSplitExprFunc func /*= isIndependentOf */) {
     auto splitExpr = splitMatchExpressionByFunction(std::move(expr), fields, func);

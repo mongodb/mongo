@@ -410,13 +410,13 @@ void DocumentSourceMatch::joinMatchWith(intrusive_ptr<DocumentSourceMatch> other
 }
 
 pair<intrusive_ptr<DocumentSourceMatch>, intrusive_ptr<DocumentSourceMatch>>
-DocumentSourceMatch::splitSourceBy(const std::set<std::string>& fields,
+DocumentSourceMatch::splitSourceBy(const OrderedPathSet& fields,
                                    const StringMap<std::string>& renames) && {
     return std::move(*this).splitSourceByFunc(fields, renames, expression::isIndependentOf);
 }
 
 pair<intrusive_ptr<DocumentSourceMatch>, intrusive_ptr<DocumentSourceMatch>>
-DocumentSourceMatch::splitSourceByFunc(const std::set<std::string>& fields,
+DocumentSourceMatch::splitSourceByFunc(const OrderedPathSet& fields,
                                        const StringMap<std::string>& renames,
                                        expression::ShouldSplitExprFunc func) && {
     pair<unique_ptr<MatchExpression>, unique_ptr<MatchExpression>> newExpr(
@@ -499,7 +499,7 @@ DocumentSourceMatch::splitMatchByModifiedFields(
     const boost::intrusive_ptr<DocumentSourceMatch>& match,
     const DocumentSource::GetModPathsReturn& modifiedPathsRet) {
     // Attempt to move some or all of this $match before this stage.
-    std::set<std::string> modifiedPaths;
+    OrderedPathSet modifiedPaths;
     switch (modifiedPathsRet.type) {
         case DocumentSource::GetModPathsReturn::Type::kNotSupported:
             // We don't know what paths this stage might modify, so refrain from swapping.

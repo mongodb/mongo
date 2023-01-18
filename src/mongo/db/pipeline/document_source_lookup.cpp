@@ -668,7 +668,7 @@ void DocumentSourceLookUp::addCacheStageAndOptimize(Pipeline& pipeline) {
 }
 
 DocumentSource::GetModPathsReturn DocumentSourceLookUp::getModifiedPaths() const {
-    std::set<std::string> modifiedPaths{_as.fullPath()};
+    OrderedPathSet modifiedPaths{_as.fullPath()};
     if (_unwindSrc) {
         auto pathsModifiedByUnwind = _unwindSrc->getModifiedPaths();
         invariant(pathsModifiedByUnwind.type == GetModPathsReturn::Type::kFiniteSet);

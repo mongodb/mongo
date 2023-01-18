@@ -74,7 +74,7 @@ public:
 
     DocumentSource::GetModPathsReturn getModifiedPaths() const final {
         // Replaces the entire root, so all paths are modified.
-        return {DocumentSource::GetModPathsReturn::Type::kAllPaths, std::set<std::string>{}, {}};
+        return {DocumentSource::GetModPathsReturn::Type::kAllPaths, OrderedPathSet{}, {}};
     }
 
     const boost::intrusive_ptr<Expression>& getExpression() const {

@@ -931,6 +931,15 @@ TEST(IsIndependent, NonRenameableExpressionIsNotIndependent) {
     }
 }
 
+TEST(IsIndependent, EmptyDependencySetsPassIsOnlyDependentOn) {
+    BSONObj matchPredicate = fromjson("{}");
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    auto swMatchExpression = MatchExpressionParser::parse(matchPredicate, std::move(expCtx));
+    ASSERT_OK(swMatchExpression.getStatus());
+    auto matchExpression = std::move(swMatchExpression.getValue());
+    ASSERT_TRUE(expression::isOnlyDependentOn(*matchExpression.get(), {}));
+}
+
 TEST(SplitMatchExpression, AndWithSplittableChildrenIsSplittable) {
     BSONObj matchPredicate = fromjson("{$and: [{a: 1}, {b: 1}]}");
     boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());

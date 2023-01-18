@@ -112,7 +112,7 @@ public:
     }
 
     DocumentSource::GetModPathsReturn getModifiedPaths() const final {
-        std::set<std::string> computedPaths;
+        OrderedPathSet computedPaths;
         StringMap<std::string> renamedPaths;
         _root->reportComputedPaths(&computedPaths, &renamedPaths);
         return {DocumentSource::GetModPathsReturn::Type::kFiniteSet,

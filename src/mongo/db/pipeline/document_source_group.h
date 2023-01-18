@@ -175,7 +175,7 @@ public:
 
     boost::optional<DistributedPlanLogic> distributedPlanLogic() final;
     bool canRunInParallelBeforeWriteStage(
-        const std::set<std::string>& nameOfShardKeyFieldsUponEntryToStage) const final;
+        const OrderedPathSet& nameOfShardKeyFieldsUponEntryToStage) const final;
 
     /**
      * When possible, creates a document transformer that transforms the first document in a group

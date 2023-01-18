@@ -199,7 +199,7 @@ DepsTracker::State DocumentSourceFindAndModifyImageLookup::getDependencies(
 }
 
 DocumentSource::GetModPathsReturn DocumentSourceFindAndModifyImageLookup::getModifiedPaths() const {
-    return {DocumentSource::GetModPathsReturn::Type::kAllPaths, std::set<std::string>{}, {}};
+    return {DocumentSource::GetModPathsReturn::Type::kAllPaths, OrderedPathSet{}, {}};
 }
 
 DocumentSource::GetNextResult DocumentSourceFindAndModifyImageLookup::doGetNext() {

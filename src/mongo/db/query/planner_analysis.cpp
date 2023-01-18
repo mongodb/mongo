@@ -337,7 +337,7 @@ void geoSkipValidationOn(const std::set<StringData>& twoDSphereFields,
 /**
  * If any field is missing from the list of fields the projection wants, we are not covered.
  */
-auto providesAllFields(const std::set<std::string>& fields, const QuerySolutionNode& solnRoot) {
+auto providesAllFields(const OrderedPathSet& fields, const QuerySolutionNode& solnRoot) {
     for (auto&& field : fields) {
         if (!solnRoot.hasField(field))
             return false;

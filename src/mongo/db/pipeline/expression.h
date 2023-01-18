@@ -170,7 +170,7 @@ public:
      */
     struct ComputedPaths {
         // Non-rename computed paths.
-        std::set<std::string> paths;
+        OrderedPathSet paths;
 
         // Mappings from the old name of a path before applying this expression, to the new one
         // after applying this expression.

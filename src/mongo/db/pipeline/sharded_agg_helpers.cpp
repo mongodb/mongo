@@ -414,7 +414,7 @@ void moveEligibleStreamingStagesBeforeSortOnShards(Pipeline* shardPipe,
         // Expected last stage on the shards to be a $sort.
         return;
     }
-    auto sortPaths = sortPattern.getFieldNames<std::set<std::string>>();
+    auto sortPaths = sortPattern.getFieldNames<OrderedPathSet>();
     auto firstMergeStage = mergePipe->getSources().cbegin();
     std::function<bool(DocumentSource*)> distributedPlanLogicCallback = [](DocumentSource* stage) {
         return !static_cast<bool>(stage->distributedPlanLogic());
@@ -561,7 +561,7 @@ void limitFieldsSentFromShardsToMerger(Pipeline* shardPipe, Pipeline* mergePipe)
 }
 
 bool stageCanRunInParallel(const boost::intrusive_ptr<DocumentSource>& stage,
-                           const std::set<std::string>& nameOfShardKeyFieldsUponEntryToStage) {
+                           const OrderedPathSet& nameOfShardKeyFieldsUponEntryToStage) {
     if (stage->distributedPlanLogic()) {
         return stage->canRunInParallelBeforeWriteStage(nameOfShardKeyFieldsUponEntryToStage);
     } else {
@@ -598,7 +598,7 @@ BSONObj buildNewKeyPattern(const ShardKeyPattern& shardKey, StringMap<std::strin
 }
 
 StringMap<std::string> computeShardKeyRenameMap(const Pipeline* mergePipeline,
-                                                std::set<std::string>&& pathsOfShardKey) {
+                                                OrderedPathSet&& pathsOfShardKey) {
     auto traversalStart = mergePipeline->getSources().crbegin();
     auto traversalEnd = mergePipeline->getSources().crend();
     const auto leadingGroup =
@@ -626,7 +626,7 @@ StringMap<std::string> computeShardKeyRenameMap(const Pipeline* mergePipeline,
  *
  * Purposefully takes 'shardKeyPaths' by value so that it can be modified throughout.
  */
-bool anyStageModifiesShardKeyOrNeedsMerge(std::set<std::string> shardKeyPaths,
+bool anyStageModifiesShardKeyOrNeedsMerge(OrderedPathSet shardKeyPaths,
                                           const Pipeline* mergePipeline) {
     const auto& stages = mergePipeline->getSources();
     for (auto it = stages.crbegin(); it != stages.crend(); ++it) {
@@ -653,7 +653,7 @@ boost::optional<ShardedExchangePolicy> walkPipelineBackwardsTrackingShardKey(
     OperationContext* opCtx, const Pipeline* mergePipeline, const ChunkManager& chunkManager) {
 
     const ShardKeyPattern& shardKey = chunkManager.getShardKeyPattern();
-    std::set<std::string> shardKeyPaths;
+    OrderedPathSet shardKeyPaths;
     for (auto&& path : shardKey.getKeyPatternFields()) {
         shardKeyPaths.emplace(path->dottedField().toString());
     }

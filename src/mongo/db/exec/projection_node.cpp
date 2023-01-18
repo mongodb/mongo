@@ -229,7 +229,7 @@ Value ProjectionNode::applyExpressionsToValue(const Document& root, Value inputV
     }
 }
 
-void ProjectionNode::reportProjectedPaths(std::set<std::string>* projectedPaths) const {
+void ProjectionNode::reportProjectedPaths(OrderedPathSet* projectedPaths) const {
     for (auto&& projectedField : _projectedFields) {
         projectedPaths->insert(FieldPath::getFullyQualifiedPath(_pathToNode, projectedField));
     }
@@ -239,7 +239,7 @@ void ProjectionNode::reportProjectedPaths(std::set<std::string>* projectedPaths)
     }
 }
 
-void ProjectionNode::reportComputedPaths(std::set<std::string>* computedPaths,
+void ProjectionNode::reportComputedPaths(OrderedPathSet* computedPaths,
                                          StringMap<std::string>* renamedPaths) const {
     for (auto&& computedPair : _expressions) {
         // The expression's path is the concatenation of the path to this node, plus the field name

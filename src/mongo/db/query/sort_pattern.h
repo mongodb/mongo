@@ -147,6 +147,6 @@ private:
     std::vector<SortPatternPart> _sortPattern;
 
     // The set of paths on which we're sorting.
-    std::set<std::string> _paths;
+    OrderedPathSet _paths;
 };
 }  // namespace mongo

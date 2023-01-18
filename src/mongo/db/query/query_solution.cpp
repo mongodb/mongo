@@ -1083,8 +1083,8 @@ bool IndexScanNode::operator==(const IndexScanNode& other) const {
 // ColumnIndexScanNode
 //
 ColumnIndexScanNode::ColumnIndexScanNode(ColumnIndexEntry indexEntry,
-                                         std::set<std::string> outputFieldsIn,
-                                         std::set<std::string> matchFieldsIn,
+                                         OrderedPathSet outputFieldsIn,
+                                         OrderedPathSet matchFieldsIn,
                                          StringMap<std::unique_ptr<MatchExpression>> filtersByPath,
                                          std::unique_ptr<MatchExpression> postAssemblyFilter)
     : indexEntry(std::move(indexEntry)),
