@@ -48,6 +48,10 @@ function run(pipeline) {
     const explain = coll.explain().aggregate(pipeline);
     print(`Leaf stage: `);
     const {nodeType, indexDefName, interval} = leftmostLeafStage(explain);
+    if (nodeType === undefined) {
+        printjson({message: "nodeType is undefined, which should not be possible.", explain});
+        return;
+    }
     printjson({nodeType, indexDefName, interval: prettyInterval(interval)});
 }
 
