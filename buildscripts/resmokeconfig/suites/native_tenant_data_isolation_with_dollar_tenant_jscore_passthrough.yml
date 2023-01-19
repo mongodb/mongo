@@ -86,8 +86,6 @@ selector:
   - jstests/core/txns/currentop_blocked_operations.js
   - jstests/core/txns/new_transactions_on_session_with_prepared_txn_block_behind_prepare.js
   - jstests/core/txns/write_conflicts_with_non_txns.js
-  # TODO SERVER-72291: rolesInfo commmand is failed when querying relative roles by the tenant.
-  - jstests/core/**/roles_info.js
   # TODO SERVER-72357: cannot get the expected error due to an authorization contract issue.
   - jstests/core/txns/multi_statement_transaction_command_args.js
 

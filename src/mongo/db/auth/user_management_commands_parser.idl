@@ -43,6 +43,7 @@ types:
         cpp_type: "UsersInfoCommandArg"
         deserializer: "mongo::auth::UsersInfoCommandArg::parseFromBSON"
         serializer: "mongo::auth::UsersInfoCommandArg::serializeToBSON"
+        deserialize_with_tenant: true
 
     # Unifies the various invocations of {rolesInfo:...}
     RolesInfoCommandArg:
@@ -51,6 +52,7 @@ types:
         cpp_type: "RolesInfoCommandArg"
         deserializer: "mongo::auth::RolesInfoCommandArg::parseFromBSON"
         serializer: "mongo::auth::RolesInfoCommandArg::serializeToBSON"
+        deserialize_with_tenant: true
 
     # PrivilegeFormat: true | false | "asUserFragment"
     ParsedPrivilegeFormat:
