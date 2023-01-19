@@ -632,6 +632,9 @@ dir_store_file_copy(DIR_STORE *dir_store, WT_SESSION *session, const char *src_p
             goto err;
         }
 
+    if (tmp_path == NULL)
+        return (ENOMEM);
+
     if ((ret = dir_store->wt_api->file_system_get(dir_store->wt_api, session, &wt_fs)) != 0) {
         ret = dir_store_err(
           dir_store, session, ret, "dir_store_file_system: cannot get WiredTiger file system");
