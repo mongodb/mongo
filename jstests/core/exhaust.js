@@ -76,7 +76,8 @@ assert.eq(
 // server will return just a single batch and then close the cursor, even if the limit has not yet
 // been reached. When the batchSize is not specified explicitly, we expect the default initial batch
 // size of 101 to be used.
-assert.eq(101, coll.find().addOption(DBQuery.Option.exhaust).limit(-numDocs).itcount());
+assert.eq(Math.min(101, TestData.batchSize || Infinity),
+          coll.find().addOption(DBQuery.Option.exhaust).limit(-numDocs).itcount());
 assert.eq(50,
           coll.find().addOption(DBQuery.Option.exhaust).limit(-numDocs).batchSize(50).itcount());
 assert.eq(1, coll.find().addOption(DBQuery.Option.exhaust).limit(-1).itcount());

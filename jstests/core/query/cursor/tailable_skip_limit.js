@@ -35,7 +35,7 @@ assert.commandWorked(t.insert({_id: 4}));
 assert(!cursor.hasNext());
 
 // Non-tailable with negative limit
-var cursor = t.find().limit(-100);
+var cursor = t.find().batchSize(100).limit(-100);
 for (var i = 1; i <= 4; i++) {
     assert.eq(i, cursor.next()["_id"]);
 }

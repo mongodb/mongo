@@ -17,7 +17,9 @@
  *   # Part of this test does different checks depending on the engine used.  If an implicit index
  *   # is created, the engine use depends on what index is implicitly created. E.g. if a column
  *   # index is implicitly created, the engine used may be different in that passthrough.
- *   assumes_no_implicit_index_creation
+ *   assumes_no_implicit_index_creation,
+ *   # Plan does not support repeat queries
+ *   does_not_support_repeated_reads,
  * ]
  */
 (function() {

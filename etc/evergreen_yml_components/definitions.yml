@@ -5104,15 +5104,6 @@ tasks:
       suite: core
 
 - <<: *task_template
-  name: jsCore_repeat_queries
-  tags: ["jscore"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      suite: core_repeat_queries
-
-- <<: *task_template
   name: config_fuzzer_jsCore
   tags: []
   commands:
@@ -5182,13 +5173,13 @@ tasks:
       suite: core_ese
 
 - <<: *task_template
-  name: jsCore_ese_gcm
+  name: jsCore_min_batch_repeat_queries_ese_gsm
   tags: ["jscore", "encrypt", "gcm"]
   commands:
   - func: "do setup"
   - func: "run tests"
     vars:
-      suite: core_ese_gcm
+      suite: core_min_batch_repeat_queries_ese_gsm
 
 - <<: *task_template
   name: jsCore_auth
@@ -5198,15 +5189,6 @@ tasks:
   - func: "run tests"
     vars:
       suite: core_auth
-
-- <<: *task_template
-  name: jsCore_minimum_batch_size
-  tags: ["jscore"]
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-    vars:
-      suite: core_minimum_batch_size
 
 - <<: *task_template
   name: jsCore_txns

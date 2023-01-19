@@ -91,7 +91,7 @@ buildvariants:
   - name: initial_sync_fuzzer_gen
   - name: .integration !.standalone !.audit
   - name: .jscore .common
-  - name: jsCore_minimum_batch_size
+  - name: jsCore_min_batch_repeat_queries_ese_gsm
   - name: jsCore_txns_large_txns_format
   - name: json_schema
   - name: .logical_session_cache
@@ -172,7 +172,7 @@ buildvariants:
   - name: initial_sync_fuzzer_gen
   - name: .integration !.audit
   - name: .jscore .common
-  - name: jsCore_minimum_batch_size
+  - name: jsCore_min_batch_repeat_queries_ese_gsm
   - name: jsCore_txns_large_txns_format
   - name: json_schema
   - name: .logical_session_cache .one_sec

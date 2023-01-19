@@ -54,6 +54,10 @@ function checkCursorWithBatchSizeProjection(
     query, projection, sort, batchSize, expectedLeftInBatch) {
     clearQueryPlanCache();
     cursor = makeCursor(query, projection, sort, batchSize);
+    if (TestData.batchSize && batchSize == null) {
+        expectedLeftInBatch = Math.min(TestData.batchSize, expectedLeftInBatch);
+    }
+
     // XXX: this
     assert.eq(expectedLeftInBatch, cursor.objsLeftInBatch());
     assertAllFound(cursor.toArray());

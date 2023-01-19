@@ -460,7 +460,7 @@ buildvariants:
     distros:
     - rhel80-xlarge
   - name: .jscore .common !jsCore !.multiversion
-  - name: jsCore_minimum_batch_size
+  - name: jsCore_min_batch_repeat_queries_ese_gsm
   - name: jsCore_txns_large_txns_format
   - name: json_schema
   - name: libunwind_tests
@@ -688,7 +688,7 @@ buildvariants:
       distros:
       - rhel80-xlarge
     - name: .jscore .common !jsCore !.multiversion
-    - name: jsCore_minimum_batch_size
+    - name: jsCore_min_batch_repeat_queries_ese_gsm
     - name: jsCore_txns_large_txns_format
     - name: json_schema
     - name: libunwind_tests
@@ -1356,7 +1356,7 @@ buildvariants:
     distros:
     - rhel80-xlarge
   - name: .jscore .common !jsCore
-  - name: jsCore_minimum_batch_size
+  - name: jsCore_min_batch_repeat_queries_ese_gsm
   - name: jsCore_txns_large_txns_format
   - name: json_schema
   - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
@@ -1462,7 +1462,7 @@ buildvariants:
     distros:
     - rhel80-xlarge
   - name: .jscore .common !jsCore
-  - name: jsCore_minimum_batch_size
+  - name: jsCore_min_batch_repeat_queries_ese_gsm
   - name: jsCore_txns_large_txns_format
   - name: json_schema
   # TODO(SERVER-69996) reenable after ticket is complete
@@ -1594,8 +1594,7 @@ buildvariants:
   - name: initial_sync_fuzzer_gen
   - name: .jscore .common
   - name: jsCore_column_store_indexes
-  - name: jsCore_minimum_batch_size
-  - name: jsCore_repeat_queries
+  - name: jsCore_min_batch_repeat_queries_ese_gsm
   - name: jsCore_txns_large_txns_format
   - name: json_schema
   - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
@@ -1725,7 +1724,7 @@ buildvariants:
   - name: jsCore
     distros:
     - rhel80-xlarge
-  - name: jsCore_minimum_batch_size
+  - name: jsCore_min_batch_repeat_queries_ese_gsm
   - name: jsCore_txns_large_txns_format
   - name: json_schema
   - name: lint_fuzzer_sanity_patch
@@ -2275,8 +2274,7 @@ buildvariants:
   - name: initial_sync_fuzzer_gen
   - name: .jscore .common
   - name: jsCore_column_store_indexes
-  - name: jsCore_minimum_batch_size
-  - name: jsCore_repeat_queries
+  - name: jsCore_min_batch_repeat_queries_ese_gsm
   - name: jsCore_txns_large_txns_format
   - name: json_schema
   - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
@@ -2390,7 +2388,7 @@ buildvariants:
   - name: .integration !.standalone !.audit
   - name: .jscore .common
   - name: jsCore_column_store_indexes
-  - name: jsCore_minimum_batch_size
+  - name: jsCore_min_batch_repeat_queries_ese_gsm
   - name: jsCore_txns_large_txns_format
   - name: json_schema
   - name: .logical_session_cache
@@ -2473,7 +2471,7 @@ buildvariants:
   - name: initial_sync_fuzzer_gen
   - name: .integration !.standalone !.audit
   - name: .jscore .common !.sbe_only
-  - name: jsCore_minimum_batch_size
+  - name: jsCore_min_batch_repeat_queries_ese_gsm
   - name: jsCore_txns_large_txns_format
   - name: json_schema
   - name: .logical_session_cache
@@ -2563,7 +2561,7 @@ buildvariants:
   - name: .integration !.audit
   - name: .jscore .common
   - name: jsCore_column_store_indexes
-  - name: jsCore_minimum_batch_size
+  - name: jsCore_min_batch_repeat_queries_ese_gsm
   - name: jsCore_txns_large_txns_format
   - name: json_schema
   - name: .logical_session_cache .one_sec
@@ -2642,7 +2640,7 @@ buildvariants:
   - name: initial_sync_fuzzer_gen
   - name: .integration !.audit
   - name: .jscore .common !.sbe_only
-  - name: jsCore_minimum_batch_size
+  - name: jsCore_min_batch_repeat_queries_ese_gsm
   - name: jsCore_txns_large_txns_format
   - name: json_schema
   - name: .logical_session_cache .one_sec
@@ -2798,7 +2796,7 @@ buildvariants:
     distros:
     - rhel80-xlarge
   # - name: .jscore .common !jsCore # Not passing
-  - name: jsCore_minimum_batch_size
+  - name: jsCore_min_batch_repeat_queries_ese_gsm
   - name: jsCore_txns_large_txns_format
   - name: json_schema
   # - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer. # Not passing

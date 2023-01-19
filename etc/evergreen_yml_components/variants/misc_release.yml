@@ -254,7 +254,7 @@ buildvariants:
     distros:
     - amazon2-arm64-large
   - name: .jscore .common !jsCore
-  - name: jsCore_minimum_batch_size
+  - name: jsCore_min_batch_repeat_queries_ese_gsm
   - name: jsCore_txns_large_txns_format
   - name: json_schema
   - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
@@ -427,7 +427,7 @@ buildvariants:
     distros:
     - amazon2022-arm64-large
   - name: .jscore .common !jsCore
-  - name: jsCore_minimum_batch_size
+  - name: jsCore_min_batch_repeat_queries_ese_gsm
   - name: jsCore_txns_large_txns_format
   - name: json_schema
   - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.
@@ -931,7 +931,7 @@ buildvariants:
     distros:
     - rhel80-medium
   - name: .jscore .common
-  - name: jsCore_minimum_batch_size
+  - name: jsCore_min_batch_repeat_queries_ese_gsm
   - name: jsCore_txns_large_txns_format
   - name: json_schema
   - name: .jstestfuzz !.flow_control  # Flow control jstestfuzz take longer.

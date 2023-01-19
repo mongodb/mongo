@@ -279,9 +279,25 @@ class TestRunner(Subcommand):
         self._resmoke_logger.info("resmoke.py invocation for local usage: %s %s",
                                   resmoke_env_options, local_resmoke_invocation)
 
+        suite = self._get_suites()[0]
+        if suite.get_description():
+            self._resmoke_logger.info(suite.get_description())
+
+        if suite.is_matrix_suite():
+            self._resmoke_logger.info(
+                "This suite is a matrix suite. To view the generated matrix suite run python3 ./buildscripts/resmoke.py suiteconfig %s",
+                suite.get_name())
+
         if config.EVERGREEN_TASK_ID:
             with open("local-resmoke-invocation.txt", "w") as fh:
-                fh.write(f"{resmoke_env_options} {local_resmoke_invocation}")
+                lines = [f"{resmoke_env_options} {local_resmoke_invocation}"]
+                if suite.get_description():
+                    lines.append(f"{suite.get_name()}: {suite.get_description()}")
+                if suite.is_matrix_suite():
+                    lines.append(
+                        f"This suite is a matrix suite. To view the generated matrix suite run python3 ./buildscripts/resmoke.py suiteconfig {suite.get_name()}"
+                    )
+                fh.write("\n".join(lines))
 
     def _check_for_mongo_processes(self):
         """Check for existing mongo processes as they could interfere with running the tests."""

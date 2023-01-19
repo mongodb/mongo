@@ -9,7 +9,7 @@ from buildscripts.resmokelib import config as _config
 from buildscripts.resmokelib import errors, utils
 from buildscripts.resmokelib.testing import suite as _suite
 from buildscripts.resmokelib.utils import load_yaml_file
-from buildscripts.resmokelib.utils.dictionary import merge_dicts
+from buildscripts.resmokelib.utils.dictionary import get_dict_value, merge_dicts, set_dict_value
 
 SuiteName = str
 
@@ -226,6 +226,9 @@ class MatrixSuiteConfig(SuiteConfigInterface):
         base_suite_name = suite["base_suite"]
         suite_name = suite["suite_name"]
         override_names = suite.get("overrides", None)
+        excludes_names = suite.get("excludes", None)
+        eval_names = suite.get("eval", None)
+        description = suite.get("description")
 
         base_suite = ExplicitSuiteConfig.get_config_obj(base_suite_name)
 
@@ -233,10 +236,53 @@ class MatrixSuiteConfig(SuiteConfigInterface):
             raise ValueError(f"Unknown base suite {base_suite_name} for matrix suite {suite_name}")
 
         res = base_suite.copy()
+        res['matrix_suite'] = True
+
+        if description:
+            res['description'] = description
 
         if override_names:
             for override_name in override_names:
                 merge_dicts(res, overrides[override_name])
+
+        if excludes_names:
+            for excludes_name in excludes_names:
+                excludes_dict = overrides[excludes_name]
+
+                for key in excludes_dict:
+                    if key not in ["exclude_with_any_tags", "exclude_files"]:
+                        raise ValueError(f"{excludes_name}  is not supported in the 'excludes' tag")
+                    value = excludes_dict[key]
+
+                    if not isinstance(value, list):
+                        raise ValueError(f"the {key} field must be a list")
+
+                    base_value = get_dict_value(res, ["selector", key])
+
+                    if base_value:
+                        base_value.extend(value)
+                        set_dict_value(res, ["selector", key], base_value)
+                    else:
+                        set_dict_value(res, ["selector", key], value)
+
+        if eval_names:
+            for eval_name in eval_names:
+                eval_dict = overrides[eval_name]
+                if len(eval_dict) != 1 or next(iter(eval_dict)) != "eval":
+                    raise ValueError("Root key but be 'eval' for the eval tag.")
+
+                value = eval_dict["eval"]
+
+                if not isinstance(value, str):
+                    raise ValueError("the eval field must be a list")
+
+                path = ["executor", "config", "shell_options", "eval"]
+                base_value = get_dict_value(res, path)
+
+                if base_value:
+                    set_dict_value(res, path, base_value + "; " + value)
+                else:
+                    set_dict_value(res, path, value)
 
         return res
 

@@ -1,0 +1,20 @@
+### Overrides for some suites with encryption ###
+- name: mongodfixture_ese
+  value:
+    executor:
+      fixture:
+        mongod_options:
+          enableEncryption: ''
+          encryptionKeyFile: 'src/mongo/db/modules/enterprise/jstests/encryptdb/libs/ekf2'
+
+- name: mongodfixture_gcm
+  value:
+    executor:
+      fixture:
+        mongod_options:
+          encryptionCipherMode: 'AES256-GCM'
+
+- name: excluded_files
+  value:
+    exclude_with_any_tags:
+    - does_not_support_encrypted_storage_engine

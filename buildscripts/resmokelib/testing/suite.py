@@ -414,3 +414,12 @@ class Suite(object):
             for test_name in self.tests:
                 test_case_names.append(test_name)
         return test_case_names
+
+    def is_matrix_suite(self):
+        return "matrix_suite" in self.get_config()
+
+    def get_description(self):
+        if "description" not in self.get_config():
+            return None
+
+        return self.get_config()["description"]
