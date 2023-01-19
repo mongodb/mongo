@@ -1,0 +1,107 @@
+# Copyright (C) 2023-present MongoDB, Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the Server Side Public License, version 1,
+# as published by MongoDB, Inc.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# Server Side Public License for more details.
+#
+# You should have received a copy of the Server Side Public License
+# along with this program. If not, see
+# <http://www.mongodb.com/licensing/server-side-public-license>.
+#
+# As a special exception, the copyright holders give permission to link the
+# code of portions of this program with the OpenSSL library under certain
+# conditions as described in each individual source file and distribute
+# linked combinations including the program with the OpenSSL library. You
+# must comply with the Server Side Public License in all respects for
+# all of the code used other than as permitted herein. If you modify file(s)
+# with this exception, you may extend this exception to your version of the
+# file(s), but you are not obligated to do so. If you do not wish to do so,
+# delete this exception statement from your version. If you delete this
+# exception statement from all source files in the program, then also delete
+# it in the license file.
+#
+
+global:
+    cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/db/s/move_primary/move_primary_util.h"
+        - "mongo/db/repl/optime.h"
+
+imports:
+    - "mongo/db/basic_types.idl"
+    - "mongo/s/sharding_types.idl"
+    - "mongo/db/repl/replication_types.idl"
+
+structs:
+    MovePrimaryRecipientSyncDataResponse:
+        description: "Response for the 'movePrimaryRecipientSyncData' command"
+        strict: false
+        is_command_reply: true
+        generate_comparison_operators: false
+        fields:
+            majorityAppliedDonorOpTime:
+                type: optime
+                description: "Majority applied donor optime by the recipient"
+    MovePrimaryRecipientMetadata:
+        description: "Common metadata sent as part of every recipient command"
+        strict: false
+        inline_chained_structs: true
+        generate_comparison_operators: false
+        fields:
+            migrationId:
+                description: "Unique identifier for the movePrimary operation."
+                type: uuid
+            databaseName:
+                description: "The name of the database being moved as part of movePrimary."
+                type: string
+            fromShard:
+                description: "The name of the donor shard."
+                type: string
+
+commands:
+    movePrimaryRecipientSyncData:
+        description: "Parser for the 'movePrimaryRecipientSyncData' command."
+        api_version: ""
+        command_name: movePrimaryRecipientSyncData
+        strict: false
+        namespace: ignored
+        reply_type: MovePrimaryRecipientSyncDataResponse
+        inline_chained_structs: true
+        chained_structs:
+            MovePrimaryRecipientMetadata: MovePrimaryRecipientMetadata
+        fields:
+            returnAfterReachingDonorTimestamp:
+                description: >-
+                    If provided, the recipient should return after syncing up to this donor timestamp.
+                    Otherwise, the recipient will return once its copy of the data is consistent.
+                type: timestamp
+                optional: true
+                validator:
+                    callback: "move_primary_util::validateTimestampNotNull"
+
+    movePrimaryRecipientForgetMigration:
+        description: "Parser for the 'movePrimaryRecipientForgetMigration' command."
+        api_version: ""
+        command_name: movePrimaryRecipientForgetMigration
+        reply_type: OkReply
+        strict: false
+        namespace: ignored
+        inline_chained_structs: true
+        chained_structs:
+            MovePrimaryRecipientMetadata: MovePrimaryRecipientMetadata
+
+    movePrimaryRecipientAbortMigration:
+        description: "Parser for the 'movePrimaryRecipientAbortMigration' command."
+        api_version: ""
+        command_name: movePrimaryRecipientAbortMigration
+        reply_type: OkReply
+        strict: false
+        namespace: ignored
+        inline_chained_structs: true
+        chained_structs:
+            MovePrimaryRecipientMetadata: MovePrimaryRecipientMetadata

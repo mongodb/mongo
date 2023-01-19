@@ -128,6 +128,8 @@ env.Library(
         'migration_source_manager.cpp',
         'migration_util.cpp',
         'move_primary_source_manager.cpp',
+        'move_primary/move_primary_recipient_cmds.idl',
+        'move_primary/move_primary_state_machine.idl',
         'move_timing_helper.cpp',
         'namespace_metadata_change_notifications.cpp',
         'op_observer_sharding_impl.cpp',
