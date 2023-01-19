@@ -1348,5 +1348,25 @@ TEST_F(CEHistogramTest, TestHistogramConjTypeCount) {
     // CE = 8/40*sqrt(20/40)*40
     ASSERT_MATCH_CE(t, "{$and: [{i: {$lt: 8}}, {tc: {$eq: false}}]}", 5.65685);
 }
+
+TEST(CEHistogramTest, RoundUpNegativeEstimate) {
+    const auto sh = createHistogram({
+        {Value(3925000), 1, 0, 0},
+        {Value(4432000), 1, 17758, 347},
+    });
+    const auto ah = stats::ArrayHistogram::make(sh, {{sbe::value::TypeTags::NumberDouble, 17760}});
+
+    // Our current estimation would produce a negative estimate for this case. This test verifies we
+    // round a negative result up to 0.0 before returning it.
+    const auto ce = estimateCardRange(*ah,
+                                      false /* lowInclusive */,
+                                      sbe::value::TypeTags::NumberDouble,
+                                      sbe::value::bitcastFrom<double>(4017000.0),
+                                      false /* highInclusive */,
+                                      sbe::value::TypeTags::NumberDouble,
+                                      sbe::value::bitcastFrom<double>(4018000.0),
+                                      true /* includeScalar */);
+    ASSERT_CE_APPROX_EQUAL(ce, 0.0, kMaxCEError);
+}
 }  // namespace
 }  // namespace mongo::optimizer::ce

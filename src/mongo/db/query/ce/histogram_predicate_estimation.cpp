@@ -230,15 +230,21 @@ static EstimationResult estimateRange(const ScalarHistogram& histogram,
                                       bool highInclusive,
                                       value::TypeTags tagHigh,
                                       value::Value valHigh) {
-    const EstimationType highType =
-        highInclusive ? EstimationType::kLessOrEqual : EstimationType::kLess;
-    const EstimationResult highEstimate = estimate(histogram, tagHigh, valHigh, highType);
+    const auto highType = highInclusive ? EstimationType::kLessOrEqual : EstimationType::kLess;
+    const auto highEstimate = estimate(histogram, tagHigh, valHigh, highType);
 
-    const EstimationType lowType =
-        lowInclusive ? EstimationType::kLess : EstimationType::kLessOrEqual;
-    const EstimationResult lowEstimate = estimate(histogram, tagLow, valLow, lowType);
+    const auto lowType = lowInclusive ? EstimationType::kLess : EstimationType::kLessOrEqual;
+    const auto lowEstimate = estimate(histogram, tagLow, valLow, lowType);
 
-    return highEstimate - lowEstimate;
+    const auto est = highEstimate - lowEstimate;
+
+    // There is a case where we estimate an interval (l, u) that falls entirely in a bucket. In this
+    // case, we estimate it as: card(<u) - card(<=l) = card(<=u) - card(=u) - card(<=l)
+    // where our estimate for equality within the bucket, card(=u) = rangeFreq/ndv, is larger than
+    // card(<=high) - card(<=low).
+    // This is problematic, because we will obtain a negative value for 'est'. For now, we solve
+    // this by clamping this result to a minimum of 0.0.
+    return {std::max(0.0, est.card), std::max(0.0, est.ndv)};
 }
 
 /**
