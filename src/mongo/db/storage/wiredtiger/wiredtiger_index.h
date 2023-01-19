@@ -188,6 +188,10 @@ public:
         return false;
     }
 
+    virtual UUID getCollectionUUID() const {
+        return _collectionUUID;
+    }
+
     virtual bool isDup(OperationContext* opCtx,
                        WT_CURSOR* c,
                        const KeyString::Value& keyString) = 0;
