@@ -266,14 +266,19 @@ void CaptureLogs::startCapturingLogMessages() {
             logv2::AllLogsFilter(logv2::LogManager::global().getGlobalDomain()));
         _captureBSONSink->set_formatter(logv2::BSONFormatter());
     }
+    _captureSink->locked_backend()->setEnabled(true);
+    _captureBSONSink->locked_backend()->setEnabled(true);
     boost::log::core::get()->add_sink(_captureSink);
     boost::log::core::get()->add_sink(_captureBSONSink);
-
     _isCapturingLogMessages = true;
 }
 
 void CaptureLogs::stopCapturingLogMessages() {
     invariant(_isCapturingLogMessages);
+    // These sinks can still emit messages after they are detached
+    // from the log core. Disable them first to prevent that race.
+    _captureSink->locked_backend()->setEnabled(false);
+    _captureBSONSink->locked_backend()->setEnabled(false);
     boost::log::core::get()->remove_sink(_captureSink);
     boost::log::core::get()->remove_sink(_captureBSONSink);
 

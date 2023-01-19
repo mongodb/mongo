@@ -52,6 +52,8 @@ public:
     }
 
     void consume(boost::log::record_view const& rec, string_type const& formatted_string) {
+        if (!_enabled)
+            return;
         if (_stripEol && !formatted_string.empty() &&
             formatted_string[formatted_string.size() - 1] == '\n') {
             _logLines.push_back(formatted_string.substr(0, formatted_string.size() - 1));
@@ -60,7 +62,12 @@ public:
         }
     }
 
+    void setEnabled(bool b) {
+        _enabled = b;
+    }
+
 private:
+    bool _enabled{true};
     bool _stripEol;
     std::vector<std::string>& _logLines;
 };
