@@ -1426,12 +1426,32 @@ void TenantMigrationRecipientService::Instance::_processCommittedTransactionEntr
 
     MutableOplogEntry noopEntry;
     noopEntry.setOpType(repl::OpTypeEnum::kNoop);
-    auto tenantNss = NamespaceString(getTenantId() + "_", "");
+
+    auto tenantNss = [&] {
+        if (_protocol == MigrationProtocolEnum::kShardMerge) {
+            // For shard merge, we must set an empty NamespaceString because nss is non-optional in
+            // the oplog entry idl definition.
+            return NamespaceString();
+        }
+
+        return NamespaceString(getTenantId() + "_", "");
+    }();
+
     noopEntry.setNss(tenantNss);
+
     // Write a fake applyOps with the tenantId as the namespace so that this will be picked
     // up by the committed transaction prefetch pipeline in subsequent migrations.
-    noopEntry.setObject(
-        BSON("applyOps" << BSON_ARRAY(BSON(OplogEntry::kNssFieldName << tenantNss.ns()))));
+    //
+    // Unlike MTM, shard merge copies all tenants from the donor. This means that merge does
+    // not need to filter prefetched committed transactions by tenantId. As a result, setting
+    // a nss containing the tenantId for the fake transaction applyOps entry isn't necessary.
+    if (_protocol == MigrationProtocolEnum::kShardMerge) {
+        noopEntry.setObject({});
+    } else {
+        noopEntry.setObject(
+            BSON("applyOps" << BSON_ARRAY(BSON(OplogEntry::kNssFieldName << tenantNss.ns()))));
+    }
+
     noopEntry.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
     noopEntry.setSessionId(sessionId);
     noopEntry.setTxnNumber(txnNumber);

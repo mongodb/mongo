@@ -2,13 +2,15 @@
  * Tests that recipient is able to copy and apply change collection entries from the donor for the
  * shard merge protocol.
  *
+ * TODO SERVER-72828: remove this test from 'exclude_files' in 'replica_sets_large_txns_format.yml'
+ *
  * @tags: [
  *   incompatible_with_macos,
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,
  *   requires_persistence,
  *   serverless,
- *   featureFlagShardMerge,
+ *   featureFlagShardMerge
  * ]
  */
 
@@ -102,6 +104,15 @@ donorTenantConn1.getDB("database")
 assert.soon(() => donorCursor1.hasNext());
 const {_id: resumeToken1} = donorCursor1.next();
 
+// Start a transaction and perform some writes.
+const donorSession1 = donorTenantConn1.getDB("database").getMongo().startSession();
+donorSession1.startTransaction();
+donorSession1.getDatabase("database").collection.insertOne({_id: "tenant1_in_transaction_1"});
+donorSession1.getDatabase("database").collection.updateOne({_id: "tenant1_in_transaction_1"}, {
+    $set: {updated: true}
+});
+donorSession1.commitTransaction_forTesting();
+
 const fpBeforeMarkingCloneSuccess =
     configureFailPoint(recipientPrimary, "fpBeforeMarkingCloneSuccess", {action: "hang"});
 
@@ -134,6 +145,15 @@ const {_id: resumeToken2} = donorCursor2.next();
 // completed.
 donorTenantConn2.getDB("database").collection.insertOne({_id: "tenant2_2"});
 
+// Start a transaction and perform some writes.
+const donorSession2 = donorTenantConn2.getDB("database").getMongo().startSession();
+donorSession2.startTransaction();
+donorSession2.getDatabase("database").collection.insertOne({_id: "tenant2_in_transaction_1"});
+donorSession2.getDatabase("database").collection.updateOne({_id: "tenant2_in_transaction_1"}, {
+    $set: {updated: true}
+});
+donorSession2.commitTransaction_forTesting();
+
 fpBeforeMarkingCloneSuccess.off();
 
 TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));
@@ -163,19 +183,29 @@ const recipientTenantConn2 = ChangeStreamMultitenantReplicaSetTest.getTenantConn
 // Resume the first change stream on the Recipient.
 const recipientCursor1 =
     recipientTenantConn1.getDB("database").collection.watch([], {resumeAfter: resumeToken1});
-[{_id: "tenant1_2"}, {_id: "tenant1_3"}, {_id: "tenant1_4"}].forEach(expectedEvent => {
+[{_id: "tenant1_2", operationType: "insert"},
+ {_id: "tenant1_3", operationType: "insert"},
+ {_id: "tenant1_in_transaction_1", operationType: "insert"},
+ {_id: "tenant1_in_transaction_1", operationType: "update"},
+ {_id: "tenant1_4", operationType: "insert"},
+].forEach(expectedEvent => {
     assert.soon(() => recipientCursor1.hasNext());
     const changeEvent = recipientCursor1.next();
-    assert.eq(changeEvent.fullDocument._id, expectedEvent._id);
+    assert.eq(changeEvent.documentKey._id, expectedEvent._id);
+    assert.eq(changeEvent.operationType, expectedEvent.operationType);
 });
 
 // Resume the second change stream on the Recipient.
 const recipientCursor2 =
     recipientTenantConn2.getDB("database").collection.watch([], {resumeAfter: resumeToken2});
-[{_id: "tenant2_2"}].forEach(expectedEvent => {
+[{_id: "tenant2_2", operationType: "insert"},
+ {_id: "tenant2_in_transaction_1", operationType: "insert"},
+ {_id: "tenant2_in_transaction_1", operationType: "update"},
+].forEach(expectedEvent => {
     assert.soon(() => recipientCursor2.hasNext());
     const changeEvent = recipientCursor2.next();
-    assert.eq(changeEvent.fullDocument._id, expectedEvent._id);
+    assert.eq(changeEvent.documentKey._id, expectedEvent._id);
+    assert.eq(changeEvent.operationType, expectedEvent.operationType);
 });
 
 assert.commandWorked(tenantMigrationTest.forgetMigration(migrationOpts.migrationIdString));

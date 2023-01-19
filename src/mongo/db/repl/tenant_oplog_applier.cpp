@@ -657,9 +657,10 @@ void TenantOplogApplier::_writeSessionNoOpsForRange(
             // Write a fake applyOps with the tenantId as the namespace so that this will be picked
             // up by the committed transaction prefetch pipeline in subsequent migrations.
             //
-            // Unlike MT migration, shard merge protocol fetches all oplog entries, so not setting
-            // the namespace for shard merge, will still ensure that this will be picked up by the
-            // committed transaction prefetch pipeline in subsequent migrations.
+            // Unlike MTM, shard merge copies all tenants from the donor. This means that merge does
+            // not need to filter prefetched committed transactions by tenantId. As a result,
+            // setting a nss containing the tenantId for the fake transaction applyOps entry isn't
+            // necessary.
             if (_protocol != MigrationProtocolEnum::kShardMerge) {
                 noopEntry.setObject(BSON(
                     "applyOps" << BSON_ARRAY(BSON(OplogEntry::kNssFieldName
