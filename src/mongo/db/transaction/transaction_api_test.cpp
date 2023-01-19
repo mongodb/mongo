@@ -270,23 +270,23 @@ void assertSessionIdMetadata(BSONObj obj,
 
     switch (lsidAssert) {
         case LsidAssertion::kStandalone:
-            ASSERT(!getParentSessionId(lsid));
+            ASSERT(!getParentSessionId(lsid)) << obj;
             break;
         case LsidAssertion::kNonRetryableChild:
             invariant(parentLsid);
 
-            ASSERT(getParentSessionId(lsid));
-            ASSERT_EQ(*getParentSessionId(lsid), *parentLsid);
-            ASSERT(isInternalSessionForNonRetryableWrite(lsid));
+            ASSERT(getParentSessionId(lsid)) << obj;
+            ASSERT_EQ(*getParentSessionId(lsid), *parentLsid) << obj;
+            ASSERT(isInternalSessionForNonRetryableWrite(lsid)) << obj;
             break;
         case LsidAssertion::kRetryableChild:
             invariant(parentTxnNumber);
 
-            ASSERT(getParentSessionId(lsid));
-            ASSERT_EQ(*getParentSessionId(lsid), *parentLsid);
-            ASSERT(isInternalSessionForRetryableWrite(lsid));
-            ASSERT(lsid.getTxnNumber());
-            ASSERT_EQ(*lsid.getTxnNumber(), *parentTxnNumber);
+            ASSERT(getParentSessionId(lsid)) << obj;
+            ASSERT_EQ(*getParentSessionId(lsid), *parentLsid) << obj;
+            ASSERT(isInternalSessionForRetryableWrite(lsid)) << obj;
+            ASSERT(lsid.getTxnNumber()) << obj;
+            ASSERT_EQ(*lsid.getTxnNumber(), *parentTxnNumber) << obj;
             break;
     }
 }
@@ -295,15 +295,18 @@ void assertSessionIdMetadata(BSONObj obj,
 void assertAPIParameters(BSONObj obj, boost::optional<APIParameters> expectedParams) {
     if (expectedParams) {
         ASSERT_EQ(obj[APIParametersFromClient::kApiVersionFieldName].String(),
-                  expectedParams->getAPIVersion().value());
+                  expectedParams->getAPIVersion().value())
+            << obj;
         ASSERT_EQ(obj[APIParametersFromClient::kApiStrictFieldName].Bool(),
-                  expectedParams->getAPIStrict().value());
+                  expectedParams->getAPIStrict().value())
+            << obj;
         ASSERT_EQ(obj[APIParametersFromClient::kApiDeprecationErrorsFieldName].Bool(),
-                  expectedParams->getAPIDeprecationErrors().value());
+                  expectedParams->getAPIDeprecationErrors().value())
+            << obj;
     } else {
-        ASSERT(obj[APIParametersFromClient::kApiVersionFieldName].eoo());
-        ASSERT(obj[APIParametersFromClient::kApiStrictFieldName].eoo());
-        ASSERT(obj[APIParametersFromClient::kApiDeprecationErrorsFieldName].eoo());
+        ASSERT(obj[APIParametersFromClient::kApiVersionFieldName].eoo()) << obj;
+        ASSERT(obj[APIParametersFromClient::kApiStrictFieldName].eoo()) << obj;
+        ASSERT(obj[APIParametersFromClient::kApiDeprecationErrorsFieldName].eoo()) << obj;
     }
 }
 
@@ -313,14 +316,14 @@ void assertTxnMetadata(BSONObj obj,
                        boost::optional<BSONObj> readConcern = boost::none,
                        boost::optional<BSONObj> writeConcern = boost::none,
                        boost::optional<int> maxTimeMS = boost::none) {
-    ASSERT_EQ(obj["lsid"].type(), BSONType::Object);
-    ASSERT_EQ(obj["autocommit"].Bool(), false);
-    ASSERT_EQ(obj["txnNumber"].Long(), txnNumber);
+    ASSERT_EQ(obj["lsid"].type(), BSONType::Object) << obj;
+    ASSERT_EQ(obj["autocommit"].Bool(), false) << obj;
+    ASSERT_EQ(obj["txnNumber"].Long(), txnNumber) << obj;
 
     if (startTransaction) {
-        ASSERT_EQ(obj["startTransaction"].Bool(), *startTransaction);
+        ASSERT_EQ(obj["startTransaction"].Bool(), *startTransaction) << obj;
     } else {
-        ASSERT(obj["startTransaction"].eoo());
+        ASSERT(obj["startTransaction"].eoo()) << obj;
     }
 
     if (readConcern) {
@@ -330,19 +333,19 @@ void assertTxnMetadata(BSONObj obj,
         // send the implicit default read concern.
         ASSERT_BSONOBJ_EQ(obj["readConcern"].Obj(), repl::ReadConcernArgs::kImplicitDefault);
     } else {
-        ASSERT(obj["readConcern"].eoo());
+        ASSERT(obj["readConcern"].eoo()) << obj;
     }
 
     if (writeConcern) {
         ASSERT_BSONOBJ_EQ(obj["writeConcern"].Obj(), *writeConcern);
     } else {
-        ASSERT(obj["writeConcern"].eoo());
+        ASSERT(obj["writeConcern"].eoo()) << obj;
     }
 
     if (maxTimeMS) {
-        ASSERT_EQ(obj["maxTimeMS"].numberInt(), *maxTimeMS);
+        ASSERT_EQ(obj["maxTimeMS"].numberInt(), *maxTimeMS) << obj;
     } else {
-        ASSERT(obj["maxTimeMS"].eoo());
+        ASSERT(obj["maxTimeMS"].eoo()) << obj;
     }
 }
 
