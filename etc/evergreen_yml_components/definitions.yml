@@ -96,7 +96,7 @@ variables:
   depends_on:
   - name: version_gen
     variant: generate-tasks-for-version
-  - name: archive_dist_test
+  - name: archive_dist_test_debug
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -109,7 +109,7 @@ variables:
     variant: generate-tasks-for-version
   - name: version_burn_in_gen
     variant: generate-tasks-for-version
-  - name: archive_dist_test
+  - name: archive_dist_test_debug
   commands:
   - func: "generate resmoke tasks"
     vars:

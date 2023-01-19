@@ -82,7 +82,7 @@ variables:
 
 - &amazon_linux2_arm64_compile_variant_dependency
   depends_on:
-  - name: archive_dist_test
+  - name: archive_dist_test_debug
     variant: &amazon_linux2_arm64_compile_variant_name amazon-linux2-arm64-compile
   - name: version_gen
     variant: generate-tasks-for-version
@@ -362,7 +362,7 @@ buildvariants:
   modules:
   - wtdevelop
   depends_on:
-  - name: archive_dist_test
+  - name: archive_dist_test_debug
     variant: &linux_x86_dynamic_debug_wtdevelop_compile_variant_name linux-x86-dynamic-debug-wtdevelop-compile
   - name: version_gen
     variant: generate-tasks-for-version
@@ -1324,7 +1324,7 @@ buildvariants:
     burn_in_tag_compile_task_group_name: compile_and_archive_dist_test_TG
     burn_in_tag_compile_distro: rhel80-xlarge
   depends_on:
-  - name: archive_dist_test
+  - name: archive_dist_test_debug
     variant: *linux_x86_dynamic_compile_variant_name
   - name: version_gen
     variant: generate-tasks-for-version
@@ -1671,7 +1671,7 @@ buildvariants:
     burn_in_tag_compile_task_group_name: compile_and_archive_dist_test_TG
     burn_in_tag_compile_distro: rhel80-xlarge
   depends_on:
-  - name: archive_dist_test
+  - name: archive_dist_test_debug
     variant: *linux_x86_dynamic_compile_variant_name
   - name: version_gen
     variant: generate-tasks-for-version
