@@ -57,6 +57,8 @@ For details on egress networking, see [Egress Networking][egress_networking]. Fo
 details on command dispatch, see [Command Dispatch][command_dispatch]. For details 
 on *NetworkingBaton* and *AsioNetworkingBaton*, see [Baton][baton].
 
+For more detail about `SessionWorkflow`, see the [design][session_workflow_design].
+
 [ServiceExecutor]: service_executor.h
 [SessionWorkflow]: session_workflow.h
 [ServiceEntryPoint]: service_entry_point.h
@@ -66,4 +68,4 @@ on *NetworkingBaton* and *AsioNetworkingBaton*, see [Baton][baton].
 [egress_networking]: ../../../docs/egress_networking.md
 [command_dispatch]: ../../../docs/command_dispatch.md
 [baton]: ../../../docs/baton.md
-
+[session_workflow_design]: https://docs.google.com/document/d/1CKna4BEFyOj_NAM7i2dL7xCDcTs3RQzsu4KN6p5GVuM
