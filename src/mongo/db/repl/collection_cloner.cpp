@@ -29,6 +29,8 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplicationInitialSync
 
+#include "mongo/db/index/index_descriptor_fwd.h"
+#include "mongo/db/service_context.h"
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/string_data.h"
@@ -200,8 +202,20 @@ BaseCloner::AfterStageBehavior CollectionCloner::listIndexesStage() {
                       "source"_attr = getSource());
     }
 
+    const auto storageEngine = getGlobalServiceContext()->getStorageEngine();
     // Parse the index specs into their respective state, ready or unfinished.
     for (auto&& spec : indexSpecs) {
+        // Sanitize storage engine options to remove options which might not apply to this node. See
+        // SERVER-68122.
+        if (auto storageEngineElem = spec.getField(IndexDescriptor::kStorageEngineFieldName)) {
+            auto sanitizedStorageEngineOpts =
+                storageEngine->getSanitizedStorageOptionsForSecondaryReplication(
+                    storageEngineElem.embeddedObject());
+            fassert(6812200, sanitizedStorageEngineOpts);
+            spec = spec.addFields(BSON(IndexDescriptor::kStorageEngineFieldName
+                                       << sanitizedStorageEngineOpts.getValue()));
+        }
+
         if (spec.hasField("buildUUID")) {
             _unfinishedIndexSpecs.push_back(spec.getOwned());
         } else if (spec.hasField("name") && spec.getStringField("name") == "_id_"_sd) {

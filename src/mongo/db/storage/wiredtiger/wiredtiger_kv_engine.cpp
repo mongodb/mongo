@@ -2513,4 +2513,30 @@ std::uint64_t WiredTigerKVEngine::_getCheckpointTimestamp() const {
     return tmp;
 }
 
+StatusWith<BSONObj> WiredTigerKVEngine::getSanitizedStorageOptionsForSecondaryReplication(
+    const BSONObj& options) const {
+
+    if (options.isEmpty()) {
+        return options;
+    }
+
+    auto firstElem = options.firstElement();
+    if (firstElem.fieldName() != kWiredTigerEngineName) {
+        return Status(ErrorCodes::InvalidOptions,
+                      str::stream() << "Expected \"" << kWiredTigerEngineName
+                                    << "\" field, but got: " << firstElem.fieldName());
+    }
+
+    BSONObj wtObj = firstElem.Obj();
+    if (auto configStringElem = wtObj.getField(WiredTigerUtil::kConfigStringField)) {
+        auto configString = configStringElem.String();
+        WiredTigerUtil::removeEncryptionFromConfigString(&configString);
+        // Return a new BSONObj with the configString field sanitized.
+        return options.addFields(BSON(kWiredTigerEngineName << wtObj.addFields(BSON(
+                                          WiredTigerUtil::kConfigStringField << configString))));
+    }
+
+    return options;
+}
+
 }  // namespace mongo
