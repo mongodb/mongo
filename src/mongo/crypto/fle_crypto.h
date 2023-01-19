@@ -68,7 +68,13 @@ public:
     static CollectionsLevel1Token generateCollectionsLevel1Token(FLEIndexKey indexKey);
 
     /**
-     * CollectionsLevel1Token =HMAC(IndexKey, 3) = K_{f,3}
+     * ServerTokenDerivationLevel1Token = HMAC(IndexKey, 2) = K_{f,2}
+     */
+    static ServerTokenDerivationLevel1Token generateServerTokenDerivationLevel1Token(
+        FLEIndexKey indexKey);
+
+    /**
+     * ServerDataEncryptionLevel1Token = HMAC(IndexKey, 3) = K_{f,3}
      */
     static ServerDataEncryptionLevel1Token generateServerDataEncryptionLevel1Token(
         FLEIndexKey indexKey);
@@ -123,6 +129,12 @@ public:
      */
     static ECCDerivedFromDataToken generateECCDerivedFromDataToken(ECCToken token,
                                                                    ConstDataRange value);
+
+    /**
+     * ServerDerivedFromDataToken = HMAC(ServerTokenDerivationLevel1Token, v)
+     */
+    static ServerDerivedFromDataToken generateServerDerivedFromDataToken(
+        ServerTokenDerivationLevel1Token token, ConstDataRange value);
 };
 
 /**
@@ -188,6 +200,23 @@ public:
         ECCDerivedFromDataTokenAndContentionFactorToken token);
 };
 
+/**
+ * Generate tokens for encrypting the metadata in version 2 on-disk payload formats.
+ */
+class FLEServerMetadataEncryptionTokenGenerator {
+public:
+    /**
+     * ServerCountAndContentionFactorEncryptionToken = HMAC(ServerDerivedFromDataToken, 1)
+     */
+    static ServerCountAndContentionFactorEncryptionToken
+    generateServerCountAndContentionFactorEncryptionToken(ServerDerivedFromDataToken token);
+
+    /**
+     * ServerZerosEncryptionToken = HMAC(ServerDerivedFromDataToken, 2)
+     */
+    static ServerZerosEncryptionToken generateServerZerosEncryptionToken(
+        ServerDerivedFromDataToken token);
+};
 
 /**
  * ESC Collection schema

@@ -109,7 +109,7 @@ namespace mongo {
 namespace {
 
 constexpr uint64_t kLevel1Collection = 1;
-constexpr uint64_t kLevel1ClientUserDataEncryption = 2;
+constexpr uint64_t kLevel1ServerTokenDerivation = 2;
 constexpr uint64_t kLevelServerDataEncryption = 3;
 
 
@@ -124,6 +124,9 @@ constexpr uint64_t kTwiceDerivedTokenFromESCTag = 1;
 constexpr uint64_t kTwiceDerivedTokenFromESCValue = 2;
 constexpr uint64_t kTwiceDerivedTokenFromECCTag = 1;
 constexpr uint64_t kTwiceDerivedTokenFromECCValue = 2;
+
+constexpr uint64_t kServerCountAndContentionFactorEncryption = 1;
+constexpr uint64_t kServerZerosEncryption = 2;
 
 constexpr int32_t kEncryptionInformationSchemaVersion = 1;
 
@@ -1975,6 +1978,11 @@ CollectionsLevel1Token FLELevel1TokenGenerator::generateCollectionsLevel1Token(
     return prf(hmacKey(indexKey.data), kLevel1Collection);
 }
 
+ServerTokenDerivationLevel1Token FLELevel1TokenGenerator::generateServerTokenDerivationLevel1Token(
+    FLEIndexKey indexKey) {
+    return prf(hmacKey(indexKey.data), kLevel1ServerTokenDerivation);
+}
+
 ServerDataEncryptionLevel1Token FLELevel1TokenGenerator::generateServerDataEncryptionLevel1Token(
     FLEIndexKey indexKey) {
     return prf(hmacKey(indexKey.data), kLevelServerDataEncryption);
@@ -2013,6 +2021,10 @@ ECCDerivedFromDataToken FLEDerivedFromDataTokenGenerator::generateECCDerivedFrom
     return prf(token.data, value);
 }
 
+ServerDerivedFromDataToken FLEDerivedFromDataTokenGenerator::generateServerDerivedFromDataToken(
+    ServerTokenDerivationLevel1Token token, ConstDataRange value) {
+    return prf(token.data, value);
+}
 
 EDCDerivedFromDataTokenAndContentionFactorToken
 FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
@@ -2059,6 +2071,18 @@ ECCTwiceDerivedTagToken FLETwiceDerivedTokenGenerator::generateECCTwiceDerivedTa
 ECCTwiceDerivedValueToken FLETwiceDerivedTokenGenerator::generateECCTwiceDerivedValueToken(
     ECCDerivedFromDataTokenAndContentionFactorToken token) {
     return prf(token.data, kTwiceDerivedTokenFromECCValue);
+}
+
+ServerCountAndContentionFactorEncryptionToken
+FLEServerMetadataEncryptionTokenGenerator::generateServerCountAndContentionFactorEncryptionToken(
+    ServerDerivedFromDataToken token) {
+    return prf(token.data, kServerCountAndContentionFactorEncryption);
+}
+
+ServerZerosEncryptionToken
+FLEServerMetadataEncryptionTokenGenerator::generateServerZerosEncryptionToken(
+    ServerDerivedFromDataToken token) {
+    return prf(token.data, kServerZerosEncryption);
 }
 
 StatusWith<EncryptedStateCollectionTokens> EncryptedStateCollectionTokens::decryptAndParse(

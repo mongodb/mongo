@@ -232,13 +232,24 @@ BSONObj TestKeyVault::getEncryptedKey(const UUID& uuid) {
 }
 
 TEST(FLETokens, TestVectors) {
+    std::vector<uint8_t> sampleValue = {0xc0, 0x7c, 0x0d, 0xf5, 0x12, 0x57, 0x94, 0x8e,
+                                        0x1a, 0x0f, 0xc7, 0x0d, 0xd4, 0x56, 0x8e, 0x3a,
+                                        0xf9, 0x9b, 0x23, 0xb3, 0x43, 0x4c, 0x98, 0x58,
+                                        0x23, 0x7c, 0xa7, 0xdb, 0x62, 0xdb, 0x97, 0x66};
+    FLECounter counter = 1234567890;
 
     // Level 1
     auto collectionToken = FLELevel1TokenGenerator::generateCollectionsLevel1Token(getIndexKey());
+    auto serverTokenDerivationToken =
+        FLELevel1TokenGenerator::generateServerTokenDerivationLevel1Token(getIndexKey());
 
     ASSERT_EQUALS(CollectionsLevel1Token(decodePrf(
                       "BD53ACAC665EDD01E0CA30CB648B2B8F4967544047FD4E7D12B1A9BF07339928"_sd)),
                   collectionToken);
+
+    ASSERT_EQUALS(ServerTokenDerivationLevel1Token(decodePrf(
+                      "C17FDF249DE234F9AB15CD95137EA7EC82AE4E5B51F6BFB0FC1B8FEB6800F74C"_sd)),
+                  serverTokenDerivationToken);
 
     ASSERT_EQUALS(ServerDataEncryptionLevel1Token(decodePrf(
                       "EB9A73F7912D86A4297E81D2F675AF742874E4057E3A890FEC651A23EEE3F3EC"_sd)),
@@ -261,13 +272,13 @@ TEST(FLETokens, TestVectors) {
         ECOCToken(decodePrf("9E837ED3926CB8ED680E0E7DCB2A481A3E398BE7851FA1CE4D738FA5E67FFCC9"_sd)),
         FLECollectionTokenGenerator::generateECOCToken(collectionToken));
 
+    auto serverDataToken = FLEDerivedFromDataTokenGenerator::generateServerDerivedFromDataToken(
+        serverTokenDerivationToken, sampleValue);
+    ASSERT_EQUALS(ServerDerivedFromDataToken(decodePrf(
+                      "EDBC92F3BFE4CCB3F088FED8D42379A83F26DC37F2B6D513D4F568A6F32C8C80"_sd)),
+                  serverDataToken);
 
     // Level 3
-    std::vector<uint8_t> sampleValue = {0xc0, 0x7c, 0x0d, 0xf5, 0x12, 0x57, 0x94, 0x8e,
-                                        0x1a, 0x0f, 0xc7, 0x0d, 0xd4, 0x56, 0x8e, 0x3a,
-                                        0xf9, 0x9b, 0x23, 0xb3, 0x43, 0x4c, 0x98, 0x58,
-                                        0x23, 0x7c, 0xa7, 0xdb, 0x62, 0xdb, 0x97, 0x66};
-
     auto edcDataToken =
         FLEDerivedFromDataTokenGenerator::generateEDCDerivedFromDataToken(edcToken, sampleValue);
     ASSERT_EQUALS(EDCDerivedFromDataToken(decodePrf(
@@ -286,9 +297,17 @@ TEST(FLETokens, TestVectors) {
                       "9A95D4F44734447E3F0266D1629513A0B7698CCE8C1524F329CE7970627FFD06"_sd)),
                   eccDataToken);
 
-    // Level 4
-    FLECounter counter = 1234567890;
+    ASSERT_EQUALS(ServerCountAndContentionFactorEncryptionToken(decodePrf(
+                      "2F30DBCC06B722B60BC1FF018FC28D5FAEE2F222496BE34A264EF3267E811DA0"_sd)),
+                  FLEServerMetadataEncryptionTokenGenerator::
+                      generateServerCountAndContentionFactorEncryptionToken(serverDataToken));
 
+    ASSERT_EQUALS(ServerZerosEncryptionToken(decodePrf(
+                      "986F23F132FF7F14F748AC69373CFC982AD0AD4BAD25BE92008B83AB43E96029"_sd)),
+                  FLEServerMetadataEncryptionTokenGenerator::generateServerZerosEncryptionToken(
+                      serverDataToken));
+
+    // Level 4
     auto edcDataCounterToken = FLEDerivedFromDataTokenAndContentionFactorTokenGenerator::
         generateEDCDerivedFromDataTokenAndContentionFactorToken(edcDataToken, counter);
     ASSERT_EQUALS(EDCDerivedFromDataTokenAndContentionFactorToken(decodePrf(

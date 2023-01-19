@@ -143,6 +143,11 @@ using FLEUserKeyAndId = FLEKeyAndId<FLEKeyType::User>;
  * ESCTwiceDerivedValueToken = HMAC(ESCDerivedFromDataTokenAndContentionFactorToken, 2) = Fs_esc(2)
  * ECCTwiceDerivedTagToken = HMAC(ECCDerivedFromDataTokenAndContentionFactorToken, 1) = Fs_ecc(1)
  * ECCTwiceDerivedValueToken = HMAC(ECCDerivedFromDataTokenAndContentionFactorToken, 2) = Fs_ecc(2)
+ *
+ * ServerTokenDerivationLevel1Token = HMAC(IndexKey, 2) = K_{f,2}
+ * ServerDerivedFromDataToken = HMAC(ServerTokenDerivationLevel1Token, v) = K_{f,2,v} = Fs[f,2,v]
+ * ServerCountAndContentionFactorEncryptionToken = HMAC(ServerDerivedFromDataToken, 1) = Fs[f,2,v,1]
+ * ServerZerosEncryptionToken = HMAC(ServerDerivedFromDataToken, 2) = Fs[f,2,v,2]
  */
 enum class FLETokenType {
     CollectionsLevel1Token,
@@ -167,6 +172,11 @@ enum class FLETokenType {
     ECCTwiceDerivedTagToken,
     ECCTwiceDerivedValueToken,
 
+    // v2 tokens
+    ServerTokenDerivationLevel1Token,
+    ServerDerivedFromDataToken,
+    ServerCountAndContentionFactorEncryptionToken,
+    ServerZerosEncryptionToken,
 };
 
 /**
@@ -222,5 +232,10 @@ using ESCTwiceDerivedValueToken = FLEToken<FLETokenType::ESCTwiceDerivedValueTok
 using ECCTwiceDerivedTagToken = FLEToken<FLETokenType::ECCTwiceDerivedTagToken>;
 using ECCTwiceDerivedValueToken = FLEToken<FLETokenType::ECCTwiceDerivedValueToken>;
 
+using ServerTokenDerivationLevel1Token = FLEToken<FLETokenType::ServerTokenDerivationLevel1Token>;
+using ServerDerivedFromDataToken = FLEToken<FLETokenType::ServerDerivedFromDataToken>;
+using ServerCountAndContentionFactorEncryptionToken =
+    FLEToken<FLETokenType::ServerCountAndContentionFactorEncryptionToken>;
+using ServerZerosEncryptionToken = FLEToken<FLETokenType::ServerZerosEncryptionToken>;
 
 }  // namespace mongo
