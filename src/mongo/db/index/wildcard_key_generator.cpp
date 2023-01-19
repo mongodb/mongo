@@ -68,8 +68,10 @@ constexpr StringData WildcardKeyGenerator::kSubtreeSuffix;
 
 WildcardProjection WildcardKeyGenerator::createProjectionExecutor(BSONObj keyPattern,
                                                                   BSONObj pathProjection) {
-    // We should never have a key pattern that contains more than a single element.
-    invariant(keyPattern.nFields() == 1);
+    if (!feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabledAndIgnoreFCV()) {
+        // We should never have a key pattern that contains more than a single element.
+        invariant(keyPattern.nFields() == 1);
+    }
 
     // The _keyPattern is either { "$**": ±1 } for all paths or { "path.$**": ±1 } for a single
     // subtree. If we are indexing a single subtree, then we will project just that path.

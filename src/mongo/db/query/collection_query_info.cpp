@@ -144,6 +144,19 @@ void CollectionQueryInfo::computeUpdateIndexData(const IndexCatalogEntry* entry,
             for (const auto& path : *exhaustivePaths) {
                 outData->addPath(path);
             }
+
+            // Handle regular index fields of Compound Wildcard Index.
+            if (isWildcard &&
+                feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabledAndIgnoreFCV()) {
+                BSONObj key = descriptor->keyPattern();
+                BSONObjIterator j(key);
+                while (j.more()) {
+                    StringData fieldName(j.next().fieldName());
+                    if (!fieldName.endsWith("$**"_sd)) {
+                        outData->addPath(FieldRef{fieldName});
+                    }
+                }
+            }
         }
     } else if (descriptor->getAccessMethodName() == IndexNames::TEXT) {
         fts::FTSSpec ftsSpec(descriptor->infoObj());

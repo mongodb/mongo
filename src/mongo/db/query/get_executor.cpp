@@ -2658,6 +2658,7 @@ QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
         if (desc->hidden())
             continue;
         if (desc->keyPattern().hasField(parsedDistinct.getKey())) {
+            // This handles regular fields of Compound Wildcard Indexes as well.
             if (flipDistinctScanDirection && ice->isMultikey(opCtx, collection)) {
                 // This ParsedDistinct was generated as a result of transforming a $group with $last
                 // accumulators using the GroupFromFirstTransformation. We cannot use a

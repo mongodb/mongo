@@ -654,6 +654,15 @@ env.Library(
     ],
 )
 
+env.CppUnitTest(
+    target='db_collection_query_info_test', source=[
+        '$BUILD_DIR/mongo/db/query/collection_query_info_test.cpp',
+    ], LIBDEPS=[
+        '$BUILD_DIR/mongo/db/index/index_access_method',
+        '$BUILD_DIR/mongo/db/storage/devnull/storage_devnull_core',
+        'collection_query_info',
+    ])
+
 if wiredtiger:
     env.CppUnitTest(
         target='db_catalog_test',

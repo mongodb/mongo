@@ -495,6 +495,5 @@ TEST(IndexKeyValidateTest, GeoIndexSpecs) {
         fromjson("{'key':{'loc':'2dsphere'},'name':'loc_2dsphere','finestIndexedLevel':true,'"
                  "coarsestIndexedLevel':5}")));
 }
-
 }  // namespace
 }  // namespace mongo

@@ -52,6 +52,7 @@ iamEnv.Library(
         'sort_key_generator.cpp',
         'wildcard_access_method.cpp',
         'wildcard_key_generator.cpp',
+        "wildcard_validation.cpp",
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
@@ -129,6 +130,7 @@ indexTestEnv.CppUnitTest(
         's2_bucket_key_generator_test.cpp',
         'sort_key_generator_test.cpp',
         'wildcard_key_generator_test.cpp',
+        "wildcard_validation_test.cpp",
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/catalog_test_fixture',

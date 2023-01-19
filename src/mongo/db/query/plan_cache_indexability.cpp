@@ -182,9 +182,12 @@ void PlanCacheIndexabilityState::updateDiscriminators(
             // Instead, we just record some information about the wildcard index so that the
             // discriminators can be constructed on demand at query runtime.
             processWildcardIndex(idx);
-        } else {
-            // If the index is not wildcard, add discriminators for fields mentioned in the key
-            // pattern.
+        }
+
+        if (feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabledAndIgnoreFCV() ||
+            idx.type != IndexType::INDEX_WILDCARD) {
+            // If the index is wildcard compound or not wildcard, add discriminators for
+            // fields mentioned in the key pattern.
             if (idx.sparse) {
                 processSparseIndex(idx.identifier.catalogName, idx.keyPattern);
             }

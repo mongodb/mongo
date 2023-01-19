@@ -44,6 +44,7 @@
 #include "mongo/db/index/columns_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/wildcard_key_generator.h"
+#include "mongo/db/index/wildcard_validation.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_parser.h"
@@ -208,6 +209,14 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
                 // Invalid key names for wildcard or columnstore are not supported.
                 return Status(code,
                               str::stream() << "Invalid key name for " << pluginName << " indexes");
+            }
+        }
+
+        if (pluginName == IndexNames::WILDCARD &&
+            feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabledAndIgnoreFCV()) {
+            auto status = validateWildcardIndex(key);
+            if (!status.isOK()) {
+                return status;
             }
         }
 
@@ -514,8 +523,18 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
                                       << "' field can't be an empty object"};
             }
             try {
-                // We use createProjectionExecutor to parse and validate the path projection spec.
                 if (isWildcard) {
+                    if (key.nFields() > 1 &&
+                        feature_flags::gFeatureFlagCompoundWildcardIndexes
+                            .isEnabledAndIgnoreFCV()) {
+                        auto validationStatus =
+                            validateWildcardProjection(key, indexSpecElem.embeddedObject());
+                        if (!validationStatus.isOK()) {
+                            return validationStatus;
+                        }
+                    }
+                    // We use createProjectionExecutor to parse and validate the path projection
+                    // spec. call here
                     WildcardKeyGenerator::createProjectionExecutor(key,
                                                                    indexSpecElem.embeddedObject());
                 } else {
