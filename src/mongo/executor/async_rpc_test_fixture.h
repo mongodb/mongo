@@ -132,7 +132,7 @@ public:
         invariant(!status.isOK());
         BSONObjBuilder result;
         status.serializeErrorToBSON(&result);
-        result.appendBool("ok", false);
+        result.appendBool("ok", 0);
         return result.obj();
     }
 

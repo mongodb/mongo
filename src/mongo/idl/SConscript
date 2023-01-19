@@ -111,6 +111,24 @@ env.CppUnitTest(
     ],
 )
 
+env.Library(
+    target='generic_args_with_types_idl',
+    source=[
+        'generic_args_with_types.idl',
+    ],
+    LIBDEPS=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/client/read_preference',
+        '$BUILD_DIR/mongo/db/s/forwardable_operation_metadata',
+        '$BUILD_DIR/mongo/db/session/logical_session_id',
+        '$BUILD_DIR/mongo/rpc/client_metadata',
+        '$BUILD_DIR/mongo/s/common_s',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
+    ],
+)
+
 env.CppUnitTest(
     target='idl_test',
     source=[

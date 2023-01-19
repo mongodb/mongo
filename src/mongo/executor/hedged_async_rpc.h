@@ -124,6 +124,7 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
     CancellationToken token,
     std::shared_ptr<RetryPolicy> retryPolicy = std::make_shared<NeverRetryPolicy>(),
     ReadPreferenceSetting readPref = ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+    GenericArgs genericArgs = GenericArgs(),
     BatonHandle baton = nullptr) {
     using SingleResponse = AsyncRPCResponse<typename CommandType::Reply>;
 
@@ -157,8 +158,15 @@ SemiFuture<AsyncRPCResponse<typename CommandType::Reply>> sendHedgedCommand(
 
                 for (size_t i = 0; i < hostsToTarget; i++) {
                     std::unique_ptr<Targeter> t = std::make_unique<FixedTargeter>(targets[i]);
+                    // We explicitly pass "NeverRetryPolicy" here because the retry mechanism
+                    // is implemented at the hedged command runner level and not at the
+                    // 'sendCommand' level.
                     auto options = std::make_shared<AsyncRPCOptions<CommandType>>(
-                        cmd, exec, hedgeCancellationToken.token());
+                        cmd,
+                        exec,
+                        hedgeCancellationToken.token(),
+                        std::make_shared<NeverRetryPolicy>(),
+                        genericArgs);
                     options->baton = baton;
                     requests.push_back(
                         sendCommand(options, opCtx, std::move(t)).thenRunOn(proxyExec));

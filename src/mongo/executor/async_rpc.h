@@ -38,6 +38,7 @@
 #include "mongo/executor/async_rpc_targeter.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/idl/generic_args_with_types_gen.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/async_rpc_shard_targeter.h"
@@ -63,6 +64,19 @@ namespace mongo::async_rpc {
 using executor::TaskExecutor;
 
 /**
+ * Contains generic argument fields that can be part of any command request, separated based on
+ * whether fields are part of the stable API. The generic arguments are generated from
+ * '../idl/generic_args_with_types.idl'.
+ */
+struct GenericArgs {
+    GenericArgs(GenericArgsAPIV1 stable = GenericArgsAPIV1(),
+                GenericArgsAPIV1Unstable unstable = GenericArgsAPIV1Unstable())
+        : stable{stable}, unstable{unstable} {}
+    GenericArgsAPIV1 stable;
+    GenericArgsAPIV1Unstable unstable;
+};
+
+/**
  * The response type used by `sendCommand(...)`  functions, containing the typed response to the
  * command as well as the host it was run on
  */
@@ -70,11 +84,12 @@ template <typename CommandReplyType>
 struct AsyncRPCResponse {
     CommandReplyType response;
     HostAndPort targetUsed;
+    GenericReplyFields genericReplyFields;
 };
 
 /**
- * The response type used by `sendCommand(...)` functions if the return type of the command is
  * 'void'.
+ * The response type used by `sendCommand(...)` functions if the return type of the command is
  */
 template <>
 struct AsyncRPCResponse<void> {
@@ -87,12 +102,19 @@ struct AsyncRPCOptions {
                     std::shared_ptr<executor::TaskExecutor> exec,
                     CancellationToken token,
                     std::shared_ptr<RetryPolicy> retryPolicy = std::make_shared<NeverRetryPolicy>(),
+                    GenericArgs genericArgs = GenericArgs(),
                     BatonHandle baton = nullptr)
-        : cmd{cmd}, exec{exec}, token{token}, retryPolicy{retryPolicy}, baton{std::move(baton)} {}
+        : cmd{cmd},
+          exec{exec},
+          token{token},
+          retryPolicy{retryPolicy},
+          genericArgs{genericArgs},
+          baton{std::move(baton)} {}
     CommandType cmd;
     std::shared_ptr<executor::TaskExecutor> exec;
     CancellationToken token;
     std::shared_ptr<RetryPolicy> retryPolicy;
+    GenericArgs genericArgs;
     BatonHandle baton;
 };
 
@@ -230,7 +252,11 @@ ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendCommandWithRun
         .then([](detail::AsyncRPCInternalResponse r) -> ReplyType {
             auto res = CommandType::Reply::parseSharingOwnership(IDLParserContext("AsyncRPCRunner"),
                                                                  r.response);
-            return {res, r.targetUsed};
+            auto stableReplyFields = GenericReplyFieldsWithTypesV1::parseSharingOwnership(
+                IDLParserContext("AsyncRPCRunner"), r.response);
+            auto unstableReplyFields = GenericReplyFieldsWithTypesUnstableV1::parseSharingOwnership(
+                IDLParserContext("AsyncRPCRunner"), r.response);
+            return {res, r.targetUsed, GenericReplyFields{stableReplyFields, unstableReplyFields}};
         })
         .unsafeToInlineFuture()
         .onError(
@@ -239,6 +265,17 @@ ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendCommandWithRun
             [](Status s) -> StatusWith<ReplyType> {
                 if (s.code() == ErrorCodes::RemoteCommandExecutionError) {
                     return s;
+                }
+                // TODO(SERVER-72974): Replace with named error codes.
+                const auto IDLParserDuplicateFieldError = 40413;
+                const auto IDLParserMissingFieldError = 40414;
+                if (s.code() == IDLParserDuplicateFieldError ||
+                    s.code() == IDLParserMissingFieldError) {
+                    // Failing here indicates that an IDL struct type may be incorrectly defined
+                    // and we were unable to parse a generic reply field from the response.
+                    tasserted(
+                        Status{AsyncRPCErrorInfo(s),
+                               "Failed to parse generic reply fields from async rpc response"});
                 }
                 // The API implementation guarantees that all errors are provided as
                 // RemoteCommandExecutionError, so if we've reached this code, it means that the API
@@ -286,7 +323,9 @@ ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendCommand(
     OperationContext* opCtx,
     std::unique_ptr<Targeter> targeter) {
     auto runner = detail::AsyncRPCRunner::get(opCtx->getServiceContext());
-    auto cmdBSON = options->cmd.toBSON({});
+    auto genericArgs =
+        options->genericArgs.stable.toBSON().addFields(options->genericArgs.unstable.toBSON());
+    auto cmdBSON = options->cmd.toBSON(genericArgs);
     return detail::sendCommandWithRunner(cmdBSON, options, runner, opCtx, std::move(targeter));
 }
 
@@ -304,7 +343,9 @@ ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendCommand(
     // Wrapping this function allows us to separate the CommandType parsing logic from the
     // implementation details of executing the remote command asynchronously.
     auto runner = detail::AsyncRPCRunner::get(svcCtx);
-    auto cmdBSON = options->cmd.toBSON({});
+    auto genericArgs =
+        options->genericArgs.stable.toBSON().addFields(options->genericArgs.unstable.toBSON());
+    auto cmdBSON = options->cmd.toBSON(genericArgs);
     return detail::sendCommandWithRunner(cmdBSON, options, runner, nullptr, std::move(targeter));
 }
 
@@ -327,7 +368,11 @@ ExecutorFuture<AsyncRPCResponse<typename CommandType::Reply>> sendTxnCommand(
     if (auto txnRouter = TransactionRouter::get(opCtx); txnRouter) {
         cmdBSON = txnRouter.attachTxnFieldsIfNeeded(opCtx, targeter->getShardId(), cmdBSON);
     }
-    return detail::sendCommandWithRunner(cmdBSON, options, runner, opCtx, std::move(targeter))
+    auto genericArgs =
+        options->genericArgs.stable.toBSON().addFields(options->genericArgs.unstable.toBSON());
+    auto cmdBsonWithArgs = cmdBSON.addFields(genericArgs);
+    return detail::sendCommandWithRunner(
+               cmdBsonWithArgs, options, runner, opCtx, std::move(targeter))
         .onCompletion([opCtx, shardId](StatusWith<ReplyType> swResponse) -> StatusWith<ReplyType> {
             auto txnRouter = TransactionRouter::get(opCtx);
             if (!txnRouter) {

@@ -32,6 +32,7 @@
 #include "mongo/base/error_extra_info.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/executor/remote_command_response.h"
+#include "mongo/idl/generic_args_with_types_gen.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/stdx/variant.h"
 
@@ -39,6 +40,20 @@ namespace mongo {
 using executor::RemoteCommandOnAnyResponse;
 
 enum class CommandErrorProvenance { kLocal, kRemote };
+
+/**
+ * Contains generic reply fields that can be part of any command response, separated based on
+ * whether fields are part of the stable API. The generic reply fields are generated from
+ * '../idl/generic_args_with_types.idl'.
+ */
+struct GenericReplyFields {
+    GenericReplyFields(
+        GenericReplyFieldsWithTypesV1 stable = GenericReplyFieldsWithTypesV1(),
+        GenericReplyFieldsWithTypesUnstableV1 unstable = GenericReplyFieldsWithTypesUnstableV1())
+        : stable{stable}, unstable{unstable} {}
+    GenericReplyFieldsWithTypesV1 stable;
+    GenericReplyFieldsWithTypesUnstableV1 unstable;
+};
 
 /**
  * Contains information to augment the 'RemoteCommandExecutionError' error code. In particular, this
@@ -65,6 +80,11 @@ public:
             if (BSONElement errLabelsElem = _error["errorLabels"]; !errLabelsElem.eoo()) {
                 _errLabels = errLabelsElem.Array();
             }
+            auto stableReplyFields = GenericReplyFieldsWithTypesV1::parseSharingOwnership(
+                IDLParserContext("AsyncRPCRunner"), _error);
+            auto unstableReplyFields = GenericReplyFieldsWithTypesUnstableV1::parseSharingOwnership(
+                IDLParserContext("AsyncRPCRunner"), _error);
+            _genericReplyFields = GenericReplyFields(stableReplyFields, unstableReplyFields);
         }
 
         Status getRemoteCommandResult() const {
@@ -91,6 +111,10 @@ public:
             return _targetUsed;
         }
 
+        GenericReplyFields getGenericReplyFields() const {
+            return _genericReplyFields;
+        }
+
     private:
         BSONObj _error;
         Status _remoteCommandResult;
@@ -98,6 +122,7 @@ public:
         Status _remoteCommandFirstWriteError;
         std::vector<BSONElement> _errLabels;
         HostAndPort _targetUsed;
+        GenericReplyFields _genericReplyFields;
     };
 
     // Required member of every ErrorExtraInfo.

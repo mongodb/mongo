@@ -1,4 +1,4 @@
-# Copyright (C) 2020-present MongoDB, Inc.
+# Copyright (C) 2023-present MongoDB, Inc.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the Server Side Public License, version 1,
@@ -29,188 +29,256 @@ global:
     cpp_namespace: "mongo"
     cpp_includes:
         - "mongo/db/basic_types.h"
+        - "mongo/s/shard_version.h"
+
 
 imports:
+    - "mongo/client/read_preference_setting.idl"
     - "mongo/db/basic_types.idl"
+    - "mongo/db/repl/read_concern_args.idl"
+    - "mongo/db/repl/replication_types.idl"
+    - "mongo/db/session/logical_session_id.idl"
+    - "mongo/db/s/forwardable_operation_metadata.idl"
+    - "mongo/db/write_concern_options.idl"       
+    - "mongo/rpc/metadata/client_metadata.idl"
+    - "mongo/s/sharding_types.idl"
 
 # This file lists the generic arguments accepted by all commands, and generic
 # reply fields that all commands may return.
 #
-# New fields added to this file should also be added to '..idl/generic_args_with_types.idl'.
+# The structs in this file are meant to mirror the structs defined in '../idl/generic_argument.idl'.
+# This means types added to '../idl/generic_argument.idl' should also be added to this file. The
+# unfortunate duplication of the generic args library is a workaround to avoid passing generic
+# command/reply arguments as BSONObjs through the Async RPC API.
+# TODO (SERVER-72684): Remove the duplicate code in this file.
 
 structs:
-    generic_args_api_v1:
+    GenericArgsAPIV1:
+        # This struct is meant to mirror 'generic_args_api_v1' in '../idl/generic_argument.idl'.
+        strict: false
         description: "Arguments accepted by all commands. These are guaranteed backwards-compatible for as long as the server supports API Version 1."
-        is_generic_cmd_list: "arg" 
+        is_generic_cmd_list: "arg"
         # Note that the _types_ of these fields are not checked for API version compatability! 
         # Historically, these types were parsed and serialized directly from BSON by hand-written  
         # C++ code. The API comapatibility checker does not enforce stability of the types of these fields,
-        # only of their names (i.e. that none are removed or have their name changed). 
+        # only of their names (i.e. that none are removed or have their name changed).
         fields:
             apiVersion:
-                type: IDLAnyType
+                type: string
                 forward_to_shards: false
+                optional: true
             apiStrict:
-                type: IDLAnyType
+                type: bool
                 forward_to_shards: false
+                optional: true
             apiDeprecationErrors:
-                type: IDLAnyType
+                type: bool
                 forward_to_shards: false
+                optional: true
             $db:
-                type: IDLAnyType
+                type: string
                 cpp_name: "dbName"
                 forward_to_shards: false
+                optional: true
             maxTimeMS:
-                type: IDLAnyType
+                type: safeInt64
+                validator: { gte: 0 }
                 forward_to_shards: true
+                optional: true
             readConcern:
-                type: IDLAnyType
+                type: ReadConcern
                 forward_to_shards: true
+                optional: true
             writeConcern:
-                type: IDLAnyType
+                type: WriteConcern
                 forward_to_shards: true
+                optional: true            
             lsid:
-                type: IDLAnyType
+                type: LogicalSessionId
                 forward_to_shards: true
+                optional: true
             clientOperationKey:
-                type: IDLAnyType
+                type: uuid
                 forward_to_shards: true
+                optional: true                
             txnNumber:
-                type: IDLAnyType
+                type: TxnNumber
                 forward_to_shards: true
+                optional: true            
             autocommit:
-                type: IDLAnyType
+                type: bool
                 forward_to_shards: true
+                optional: true
             startTransaction:
-                type: IDLAnyType
+                type: bool
                 forward_to_shards: true
+                optional: true
             stmtId:
-                type: IDLAnyType
+                type: StmtId
                 forward_to_shards: true
+                optional: true
             comment:
-                type: IDLAnyType
+                type: object_owned
                 forward_to_shards: true
+                optional: true
             $readPreference:
-                type: IDLAnyType
-                cpp_name: unwrappedReadPref
+                type: readPreference
+                cpp_name: "dollarReadPreference"
                 forward_to_shards: false
+                optional: true
             $clusterTime:
-                type: IDLAnyType
+                type: logicalTime
                 cpp_name: "dollarClusterTime"
                 forward_to_shards: false
+                optional: true
 
-    generic_args_unstable_v1:
+    GenericArgsAPIV1Unstable:
+        # This struct is meant to mirror 'generic_args_unstable_v1' in '../idl/generic_argument.idl'.
         description: "Arguments accepted by all commands. These are not guaranteed backwards-compatible."
+        strict: false
         is_generic_cmd_list: "arg"
         fields:
             $audit:
-                type: IDLAnyType
+                type: AuthenticationMetadata
                 cpp_name: "dollarAudit"
                 forward_to_shards: false
+                optional: true
             $client:
-                type: IDLAnyType
+                type: ClientMetadata
                 cpp_name: "dollarClient"
                 forward_to_shards: false
+                optional: true
             $configServerState:
-                type: IDLAnyType
+                type: object_owned
                 cpp_name: "dollarConfigServerState"
                 forward_to_shards: false
+                optional: true
             allowImplicitCollectionCreation:
-                type: IDLAnyType
+                type: bool
                 forward_to_shards: false
+                optional: true
             $oplogQueryData:
-                type: IDLAnyType
+                type: object_owned
                 cpp_name: "dollarOplogQueryData"
                 forward_to_shards: false
+                optional: true
             $queryOptions:
-                type: IDLAnyType
-                cpp_name: "dollarQueryOptions"
+                type: object_owned
+                cpp_name: unwrappedReadPref
                 forward_to_shards: true
+                optional: true
             $replData:
-                type: IDLAnyType
+                type: object_owned
                 cpp_name: "dollarReplData"
                 forward_to_shards: false
+                optional: true
             databaseVersion:
-                type: IDLAnyType
+                type: database_version
                 forward_to_shards: false
+                optional: true
             shardVersion:
-                type: IDLAnyType
+                type: shard_version
                 forward_to_shards: false
+                optional: true
             tracking_info:
-                type: IDLAnyType
+                type: object_owned
                 forward_to_shards: false
+                optional: true
             coordinator:
-                type: IDLAnyType
+                type: bool
                 forward_to_shards: true
+                optional: true
             maxTimeMSOpOnly:
-                type: IDLAnyType
+                type: safeInt64
+                validator: { gte: 0 }
                 forward_to_shards: false
+                optional: true
             $configTime:
-                type: IDLAnyType
+                type: timestamp
                 cpp_name: "dollarConfigTime"
                 forward_to_shards: false
+                optional: true
             $topologyTime:
-                type: IDLAnyType
+                type: timestamp
                 cpp_name: "dollarTopologyTime"
                 forward_to_shards: false
+                optional: true
             txnRetryCounter:
-                type: IDLAnyType
+                type: TxnRetryCounter
                 forward_to_shards: true
+                optional: true
             mayBypassWriteBlocking:
-                type: IDLAnyType
+                type: bool
                 forward_to_shards: true
+                optional: true
             $tenant:
-                type: IDLAnyType
+                type: tenant_id
                 cpp_name: "dollarTenant"
                 forward_to_shards: true
+                optional: true
 
-
-    generic_reply_fields_api_v1:
+    
+    GenericReplyFieldsWithTypesV1:
+        # This struct is meant to mirror 'generic_reply_fields_api_v1' in '../idl/generic_argument.idl'.
         description: "Fields that may appear in any command reply. These are guaranteed backwards-compatible for as long as the server supports API Version 1."
+        strict: false
         is_generic_cmd_list: "reply"
         fields:
             $clusterTime:
-                type: IDLAnyType
+                type: logicalTime
                 cpp_name: "dollarClusterTime"
                 forward_from_shards: false
+                optional: true
             operationTime:
-                type: IDLAnyType
+                type: logicalTime
                 forward_from_shards: false
+                optional: true
 
-    generic_reply_fields_unstable_v1:
+    GenericReplyFieldsWithTypesUnstableV1:
+        # This struct is meant to mirror 'generic_reply_fields_unstable_v1' in '../idl/generic_argument.idl'.
         description: "Fields that may appear in any command reply. These are not guaranteed backwards-compatible."
+        strict: false
         is_generic_cmd_list: "reply"
         fields:
             $configServerState:
-                type: IDLAnyType
+                type: object_owned
                 cpp_name: "dollarConfigServerState"
                 forward_from_shards: false
+                optional: true
             $gleStats:
-                type: IDLAnyType
+                type: object_owned
                 cpp_name: "dollarGleStats"
                 forward_from_shards: false
+                optional: true
             lastCommittedOpTime:
-                type: IDLAnyType
+                type: optime
                 forward_from_shards: false
+                optional: true
             readOnly:
-                type: IDLAnyType
+                type: bool
                 forward_from_shards: false
+                optional: true
             $configTime:
-                type: IDLAnyType
+                type: timestamp
                 cpp_name: "dollarConfigTime"
                 forward_from_shards: false
+                optional: true
             $replData:
-                type: IDLAnyType
+                type: object_owned
                 cpp_name: "dollarReplData"
                 forward_from_shards: false
+                optional: true
             $topologyTime:
-                type: IDLAnyType
+                type: timestamp
                 cpp_name: "dollarTopologyTime"
                 forward_from_shards: false
+                optional: true
             $oplogQueryData:
-                type: IDLAnyType
+                type: object_owned
                 cpp_name: "dollarOplogQueryData"
                 forward_from_shards: false
+                optional: true
             ok:
-                type: IDLAnyType
-                forward_from_shards: true 
+                type: safeBool
+                forward_from_shards: true
+                optional: true

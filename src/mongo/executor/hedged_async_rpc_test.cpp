@@ -111,6 +111,7 @@ public:
         CommandType cmd,
         std::vector<HostAndPort> hosts,
         std::shared_ptr<RetryPolicy> retryPolicy = std::make_shared<NeverRetryPolicy>(),
+        GenericArgs genericArgs = GenericArgs(),
         BatonHandle bh = nullptr) {
         // Use a readPreference that's elgible for hedging.
         ReadPreferenceSetting readPref(ReadPreference::Nearest);
@@ -132,6 +133,7 @@ public:
                                  CancellationToken::uncancelable(),
                                  retryPolicy,
                                  readPref,
+                                 genericArgs,
                                  bh);
     }
 
@@ -214,6 +216,94 @@ TEST_F(HedgedAsyncRPCTest, HelloHedgeRequest) {
     auto response = resultFuture.get().response;
 
     ASSERT_BSONOBJ_EQ(response.toBSON(), helloReply.toBSON());
+}
+
+/**
+ * Test that generic args are passed in.
+ */
+TEST_F(HedgedAsyncRPCTest, HelloHedgeRequestWithGenericArgs) {
+    HelloCommandReply helloReply = HelloCommandReply(TopologyVersion(OID::gen(), 0));
+    HelloCommand helloCmd;
+    initializeCommand(helloCmd);
+
+    // Populate structs for generic arguments to be passed along when the command is converted
+    // to BSON.
+    GenericArgsAPIV1 genericArgsApiV1;
+    GenericArgsAPIV1Unstable genericArgsUnstable;
+    const UUID clientOpKey = UUID::gen();
+    genericArgsApiV1.setClientOperationKey(clientOpKey);
+    auto configTime = Timestamp(1, 1);
+    genericArgsUnstable.setDollarConfigTime(configTime);
+
+    auto resultFuture =
+        sendHedgedCommandWithHosts(helloCmd,
+                                   kTwoHosts,
+                                   std::make_shared<NeverRetryPolicy>(),
+                                   GenericArgs(genericArgsApiV1, genericArgsUnstable));
+
+    onCommand([&](const auto& request) {
+        ASSERT(request.cmdObj["hello"]);
+        // Confirm that the generic arguments are present in the BSON command object.
+        ASSERT_EQ(UUID::fromCDR(request.cmdObj["clientOperationKey"].uuid()), clientOpKey);
+        ASSERT_EQ(request.cmdObj["$configTime"].timestamp(), configTime);
+        return helloReply.toBSON();
+    });
+
+    auto counters = getNetworkInterfaceCounters();
+    ASSERT_EQ(counters.succeeded, 1);
+    ASSERT_EQ(counters.canceled, 0);
+
+    auto response = resultFuture.get().response;
+
+    ASSERT_BSONOBJ_EQ(response.toBSON(), helloReply.toBSON());
+}
+
+/*
+ * Test that remote errors with generic reply fields are properly parsed.
+ */
+TEST_F(HedgedAsyncRPCTest, HelloHedgeRemoteErrorWithGenericReplyFields) {
+    auto resultFuture = sendHedgedCommandWithHosts(testFindCmd, kTwoHosts);
+
+    auto network = getNetworkInterfaceMock();
+    auto now = network->now();
+    network->enterNetwork();
+
+    GenericReplyFieldsWithTypesV1 stableFields;
+    stableFields.setDollarClusterTime(LogicalTime(Timestamp(2, 3)));
+    GenericReplyFieldsWithTypesUnstableV1 unstableFields;
+    unstableFields.setDollarConfigTime(Timestamp(1, 1));
+    unstableFields.setOk(false);
+
+    // Send "ignorable" error responses for both requests.
+    performAuthoritativeHedgeBehavior(
+        network,
+        [&](NetworkInterfaceMock::NetworkOperationIterator authoritative,
+            NetworkInterfaceMock::NetworkOperationIterator hedged) {
+            auto remoteErrorBson = createErrorResponse(ignorableMaxTimeMSExpiredStatus);
+            remoteErrorBson = remoteErrorBson.addFields(stableFields.toBSON());
+            remoteErrorBson = remoteErrorBson.addFields(unstableFields.toBSON());
+            const auto rcr = RemoteCommandResponse(remoteErrorBson, Milliseconds(1));
+            network->scheduleResponse(hedged, now, rcr);
+            network->scheduleSuccessfulResponse(authoritative, now + Milliseconds(1000), rcr);
+        });
+
+    network->runUntil(now + Milliseconds(1500));
+    network->exitNetwork();
+
+    auto error = resultFuture.getNoThrow().getStatus();
+    ASSERT_EQ(error.code(), ErrorCodes::RemoteCommandExecutionError);
+
+    auto extraInfo = error.extraInfo<AsyncRPCErrorInfo>();
+    ASSERT(extraInfo);
+
+    ASSERT(extraInfo->isRemote());
+    auto remoteError = extraInfo->asRemote();
+    ASSERT_EQ(remoteError.getRemoteCommandResult(), ignorableMaxTimeMSExpiredStatus);
+
+    // Check generic reply fields.
+    auto replyFields = remoteError.getGenericReplyFields();
+    ASSERT_BSONOBJ_EQ(stableFields.toBSON(), replyFields.stable.toBSON());
+    ASSERT_BSONOBJ_EQ(unstableFields.toBSON(), replyFields.unstable.toBSON());
 }
 
 TEST_F(HedgedAsyncRPCTest, HedgedAsyncRPCWithRetryPolicy) {
@@ -900,8 +990,8 @@ TEST_F(HedgedAsyncRPCTest, RemoteErrorAttemptedTargetsContainActual) {
 
 TEST_F(HedgedAsyncRPCTest, BatonTest) {
     std::shared_ptr<RetryPolicy> retryPolicy = std::make_shared<NeverRetryPolicy>();
-    auto resultFuture =
-        sendHedgedCommandWithHosts(testFindCmd, kTwoHosts, retryPolicy, getOpCtx()->getBaton());
+    auto resultFuture = sendHedgedCommandWithHosts(
+        testFindCmd, kTwoHosts, retryPolicy, GenericArgs(), getOpCtx()->getBaton());
 
     Notification<void> seenNetworkRequests;
     // This thread will respond to the requests we sent via sendHedgedCommandWithHosts above.
@@ -943,7 +1033,8 @@ TEST_F(HedgedAsyncRPCTest, BatonShutdownExecutorAlive) {
     for (int i = 0; i < maxNumRetries; ++i)
         retryPolicy->pushRetryDelay(retryDelay);
     auto subBaton = getOpCtx()->getBaton()->makeSubBaton();
-    auto resultFuture = sendHedgedCommandWithHosts(testFindCmd, kTwoHosts, retryPolicy, *subBaton);
+    auto resultFuture =
+        sendHedgedCommandWithHosts(testFindCmd, kTwoHosts, retryPolicy, GenericArgs(), *subBaton);
 
     subBaton.shutdown();
     auto net = getNetworkInterfaceMock();
