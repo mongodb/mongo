@@ -515,22 +515,11 @@ void Document::toBson(BSONObjBuilder* builder, size_t recursionLevel) const {
     }
 }
 
-BSONObj Document::toBson() const {
-    if (!storage().isModified() && !storage().stripMetadata()) {
-        return storage().bsonObj();
-    }
-
-    BSONObjBuilder bb;
-    toBson(&bb);
-    return bb.obj();
-}
-
 boost::optional<BSONObj> Document::toBsonIfTriviallyConvertible() const {
-    if (!storage().isModified() && !storage().stripMetadata()) {
+    if (isTriviallyConvertible()) {
         return storage().bsonObj();
-    } else {
-        return boost::none;
     }
+    return boost::none;
 }
 
 constexpr StringData Document::metaFieldTextScore;

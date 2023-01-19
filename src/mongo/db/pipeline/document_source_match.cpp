@@ -94,11 +94,12 @@ DocumentSource::GetNextResult DocumentSourceMatch::doGetNext() {
     auto nextInput = pSource->getNext();
     for (; nextInput.isAdvanced(); nextInput = pSource->getNext()) {
         // MatchExpression only takes BSON documents, so we have to make one. As an optimization,
-        // only serialize the fields we need to do the match.
+        // only serialize the fields we need to do the match. Specify BSONObj::LargeSizeTrait so
+        // that matching against a large document mid-pipeline does not throw a BSON max-size error.
         BSONObj toMatch = _dependencies.needWholeDocument
-            ? nextInput.getDocument().toBson()
-            : document_path_support::documentToBsonWithPaths(nextInput.getDocument(),
-                                                             _dependencies.fields);
+            ? nextInput.getDocument().toBson<BSONObj::LargeSizeTrait>()
+            : document_path_support::documentToBsonWithPaths<BSONObj::LargeSizeTrait>(
+                  nextInput.getDocument(), _dependencies.fields);
 
         if (_expression->matchesBSON(toMatch)) {
             return nextInput;

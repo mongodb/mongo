@@ -738,6 +738,21 @@ public:
     BSONArrayBuilder arrBuilder;
 };
 
+TEST(DocumentTest, ToBsonSizeTraits) {
+    constexpr size_t longStringLength = 9 * 1024 * 1024;
+    static_assert(longStringLength <= BSONObjMaxInternalSize &&
+                  2 * longStringLength > BSONObjMaxInternalSize &&
+                  2 * longStringLength <= BufferMaxSize);
+    std::string longString(longStringLength, 'A');
+    MutableDocument md;
+    md.addField("a", Value(longString));
+    ASSERT_DOES_NOT_THROW(md.peek().toBson());
+    md.addField("b", Value(longString));
+    ASSERT_THROWS_CODE(md.peek().toBson(), DBException, ErrorCodes::BSONObjectTooLarge);
+    ASSERT_THROWS_CODE(
+        md.peek().toBson<BSONObj::DefaultSizeTrait>(), DBException, ErrorCodes::BSONObjectTooLarge);
+    ASSERT_DOES_NOT_THROW(md.peek().toBson<BSONObj::LargeSizeTrait>());
+}
 }  // namespace Document
 
 namespace MetaFields {

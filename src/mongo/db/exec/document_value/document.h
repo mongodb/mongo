@@ -258,12 +258,30 @@ public:
     void hash_combine(size_t& seed, const StringData::ComparatorInterface* stringComparator) const;
 
     /**
+     * Returns true, if this document is trivially convertible to BSON, meaning the underlying
+     * storage is already in BSON format and there are no damages.
+     */
+    bool isTriviallyConvertible() const {
+        return !storage().isModified() && !storage().stripMetadata();
+    }
+
+    /**
      * Serializes this document to the BSONObj under construction in 'builder'. Metadata is not
      * included. Throws a AssertionException if 'recursionLevel' exceeds the maximum allowable
      * depth.
      */
     void toBson(BSONObjBuilder* builder, size_t recursionLevel = 1) const;
-    BSONObj toBson() const;
+
+    template <typename BSONTraits = BSONObj::DefaultSizeTrait>
+    BSONObj toBson() const {
+        if (isTriviallyConvertible()) {
+            return storage().bsonObj();
+        }
+
+        BSONObjBuilder bb;
+        toBson(&bb);
+        return bb.obj<BSONTraits>();
+    }
 
     /**
      * Serializes this document iff the conversion is "trivial," meaning that the underlying storage

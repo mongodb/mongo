@@ -136,19 +136,18 @@ StatusWith<Value> extractElementAlongNonArrayPath(const Document& doc, const Fie
     return curValue;
 }
 
-BSONObj documentToBsonWithPaths(const Document& input, const OrderedPathSet& paths) {
-    BSONObjBuilder outputBuilder;
+void documentToBsonWithPaths(const Document& input,
+                             const OrderedPathSet& paths,
+                             BSONObjBuilder* builder) {
     for (auto&& path : paths) {
         // getNestedField does not handle dotted paths correctly, so instead of retrieving the
         // entire path, we just extract the first element of the path.
         const auto prefix = FieldPath::extractFirstFieldFromDottedPath(path);
-        if (!outputBuilder.hasField(prefix)) {
+        if (!builder->hasField(prefix)) {
             // Avoid adding the same prefix twice.
-            input.getField(prefix).addToBsonObj(&outputBuilder, prefix);
+            input.getField(prefix).addToBsonObj(builder, prefix);
         }
     }
-
-    return outputBuilder.obj();
 }
 
 }  // namespace document_path_support
