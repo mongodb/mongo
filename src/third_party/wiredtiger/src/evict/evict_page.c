@@ -41,7 +41,7 @@ __evict_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
     if (__wt_hazard_check(session, ref, NULL) == NULL)
         return (0);
 
-    WT_STAT_CONN_DATA_INCR(session, cache_eviction_hazard);
+    WT_STAT_CONN_DATA_INCR(session, cache_eviction_blocked_hazard);
     return (__wt_set_return(session, EBUSY));
 }
 
