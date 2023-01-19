@@ -1454,6 +1454,11 @@ const DurableCatalog* StorageEngineImpl::getCatalog() const {
     return _catalog.get();
 }
 
+StatusWith<BSONObj> StorageEngineImpl::getSanitizedStorageOptionsForSecondaryReplication(
+    const BSONObj& options) const {
+    return _engine->getSanitizedStorageOptionsForSecondaryReplication(options);
+}
+
 void StorageEngineImpl::dump() const {
     _engine->dump();
 }

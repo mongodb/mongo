@@ -224,6 +224,11 @@ public:
 
     void setPinnedOplogTimestamp(const Timestamp& pinnedTimestamp) final {}
 
+    StatusWith<BSONObj> getSanitizedStorageOptionsForSecondaryReplication(
+        const BSONObj& options) const final {
+        return options;
+    }
+
     void dump() const final {}
 };
 

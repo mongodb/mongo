@@ -420,6 +420,9 @@ public:
 
     size_t getCacheSizeMB() const override;
 
+    StatusWith<BSONObj> getSanitizedStorageOptionsForSecondaryReplication(
+        const BSONObj& options) const override;
+
 private:
     class WiredTigerSessionSweeper;
 
