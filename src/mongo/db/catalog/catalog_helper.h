@@ -45,6 +45,10 @@ namespace mongo::catalog_helper {
  */
 void assertMatchingDbVersion(OperationContext* opCtx, const StringData& dbName);
 
+void assertMatchingDbVersion(OperationContext* opCtx,
+                             const StringData& dbName,
+                             const DatabaseVersion& receivedVersion);
+
 /**
  * Checks that the current shard server is the primary for the given database, throwing
  * `IllegalOperation` if it is not.

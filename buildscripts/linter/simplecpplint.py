@@ -298,7 +298,8 @@ class Linter:
     def _check_for_collection_sharding_runtime(self, linenum):
         line = self.clean_lines[linenum]
         if _RE_COLLECTION_SHARDING_RUNTIME.search(
-                line) and "/src/mongo/db/s/" not in self.file_name:
+                line
+        ) and "/src/mongo/db/s/" not in self.file_name and "_test.cpp" not in self.file_name:
             self._error(
                 linenum, 'mongodb/collection_sharding_runtime', 'Illegal use of '
                 'CollectionShardingRuntime outside of mongo/db/s/; use CollectionShardingState '

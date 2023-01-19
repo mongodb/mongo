@@ -128,6 +128,9 @@ public:
      */
     virtual ScopedCollectionDescription getCollectionDescription(OperationContext* opCtx) const = 0;
 
+    virtual ScopedCollectionDescription getCollectionDescription(
+        OperationContext* opCtx, bool operationIsVersioned) const = 0;
+
     /**
      * This method must be called with an OperationShardingState, which specifies an expected shard
      * version for the collection and it will invariant otherwise.
@@ -171,6 +174,9 @@ public:
      * If the request is not versioned all collections will be treated as UNSHARDED.
      */
     virtual void checkShardVersionOrThrow(OperationContext* opCtx) const = 0;
+
+    virtual void checkShardVersionOrThrow(OperationContext* opCtx,
+                                          const ShardVersion& receivedShardVersion) const = 0;
 
     /**
      * Appends information about the shard version of the collection.

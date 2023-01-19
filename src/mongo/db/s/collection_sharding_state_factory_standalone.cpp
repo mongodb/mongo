@@ -58,6 +58,11 @@ public:
         return {kUnshardedCollection};
     }
 
+    ScopedCollectionDescription getCollectionDescription(OperationContext* opCtx,
+                                                         bool operationIsVersioned) const override {
+        return {kUnshardedCollection};
+    }
+
     ScopedCollectionFilter getOwnershipFilter(OperationContext*,
                                               OrphanCleanupPolicy orphanCleanupPolicy,
                                               bool supportNonVersionedOperations) const override {
@@ -65,6 +70,8 @@ public:
     }
 
     void checkShardVersionOrThrow(OperationContext*) const override {}
+
+    void checkShardVersionOrThrow(OperationContext*, const ShardVersion&) const override {}
 
     void appendShardVersion(BSONObjBuilder* builder) const override {}
 

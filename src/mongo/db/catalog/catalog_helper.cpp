@@ -58,26 +58,32 @@ void assertMatchingDbVersion(OperationContext* opCtx, const StringData& dbName) 
         return;
     }
 
+    assertMatchingDbVersion(opCtx, dbName, *receivedVersion);
+}
+
+void assertMatchingDbVersion(OperationContext* opCtx,
+                             const StringData& dbName,
+                             const DatabaseVersion& receivedVersion) {
     {
         auto scopedDss = DatabaseShardingState::acquire(opCtx, dbName, DSSAcquisitionMode::kShared);
         const auto critSecSignal = scopedDss->getCriticalSectionSignal(
             opCtx->lockState()->isWriteLocked() ? ShardingMigrationCriticalSection::kWrite
                                                 : ShardingMigrationCriticalSection::kRead);
         uassert(
-            StaleDbRoutingVersion(dbName.toString(), *receivedVersion, boost::none, critSecSignal),
+            StaleDbRoutingVersion(dbName.toString(), receivedVersion, boost::none, critSecSignal),
             str::stream() << "The critical section for the database " << dbName
                           << " is acquired with reason: " << scopedDss->getCriticalSectionReason(),
             !critSecSignal);
     }
 
     const auto wantedVersion = DatabaseHolder::get(opCtx)->getDbVersion(opCtx, dbName);
-    uassert(StaleDbRoutingVersion(dbName.toString(), *receivedVersion, boost::none),
+    uassert(StaleDbRoutingVersion(dbName.toString(), receivedVersion, boost::none),
             str::stream() << "No cached info for the database " << dbName,
             wantedVersion);
 
-    uassert(StaleDbRoutingVersion(dbName.toString(), *receivedVersion, *wantedVersion),
+    uassert(StaleDbRoutingVersion(dbName.toString(), receivedVersion, *wantedVersion),
             str::stream() << "Version mismatch for the database " << dbName,
-            *receivedVersion == *wantedVersion);
+            receivedVersion == *wantedVersion);
 }
 
 void assertIsPrimaryShardForDb(OperationContext* opCtx, const StringData& dbName) {

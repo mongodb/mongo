@@ -122,12 +122,17 @@ public:
     }
 
     ScopedCollectionDescription getCollectionDescription(OperationContext* opCtx) const override;
+    ScopedCollectionDescription getCollectionDescription(OperationContext* opCtx,
+                                                         bool operationIsVersioned) const override;
 
     ScopedCollectionFilter getOwnershipFilter(OperationContext* opCtx,
                                               OrphanCleanupPolicy orphanCleanupPolicy,
                                               bool supportNonVersionedOperations) const override;
 
     void checkShardVersionOrThrow(OperationContext* opCtx) const override;
+
+    void checkShardVersionOrThrow(OperationContext* opCtx,
+                                  const ShardVersion& receivedShardVersion) const override;
 
     void appendShardVersion(BSONObjBuilder* builder) const override;
 
@@ -324,6 +329,7 @@ private:
     std::shared_ptr<ScopedCollectionDescription::Impl> _getMetadataWithVersionCheckAt(
         OperationContext* opCtx,
         const boost::optional<mongo::LogicalTime>& atClusterTime,
+        const boost::optional<ShardVersion>& optReceivedShardVersion,
         bool supportNonVersionedOperations = false) const;
 
     /**

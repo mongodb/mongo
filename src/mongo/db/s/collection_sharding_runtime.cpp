@@ -126,6 +126,7 @@ ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(
     auto metadata =
         _getMetadataWithVersionCheckAt(opCtx,
                                        repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime(),
+                                       optReceivedShardVersion,
                                        supportNonVersionedOperations);
 
     if (!supportNonVersionedOperations) {
@@ -141,13 +142,19 @@ ScopedCollectionFilter CollectionShardingRuntime::getOwnershipFilter(
 
 ScopedCollectionDescription CollectionShardingRuntime::getCollectionDescription(
     OperationContext* opCtx) const {
+    const bool operationIsVersioned = OperationShardingState::isComingFromRouter(opCtx);
+    return getCollectionDescription(opCtx, operationIsVersioned);
+}
+
+ScopedCollectionDescription CollectionShardingRuntime::getCollectionDescription(
+    OperationContext* opCtx, bool operationIsVersioned) const {
     // If the server has been started with --shardsvr, but hasn't been added to a cluster we should
     // consider all collections as unsharded
     if (!ShardingState::get(opCtx)->enabled())
         return {kUnshardedCollection};
 
     // Present the collection as unsharded to internal or direct commands against shards
-    if (!OperationShardingState::isComingFromRouter(opCtx))
+    if (!operationIsVersioned)
         return {kUnshardedCollection};
 
     auto& oss = OperationShardingState::get(opCtx);
@@ -175,7 +182,15 @@ boost::optional<CollectionMetadata> CollectionShardingRuntime::getCurrentMetadat
 }
 
 void CollectionShardingRuntime::checkShardVersionOrThrow(OperationContext* opCtx) const {
-    (void)_getMetadataWithVersionCheckAt(opCtx, boost::none);
+    const auto optReceivedShardVersion = getOperationReceivedVersion(opCtx, _nss);
+    if (optReceivedShardVersion) {
+        checkShardVersionOrThrow(opCtx, *optReceivedShardVersion);
+    }
+}
+
+void CollectionShardingRuntime::checkShardVersionOrThrow(
+    OperationContext* opCtx, const ShardVersion& receivedShardVersion) const {
+    (void)_getMetadataWithVersionCheckAt(opCtx, boost::none, receivedShardVersion);
 }
 
 void CollectionShardingRuntime::enterCriticalSectionCatchUpPhase(const BSONObj& reason) {
@@ -399,6 +414,7 @@ std::shared_ptr<ScopedCollectionDescription::Impl>
 CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
     OperationContext* opCtx,
     const boost::optional<mongo::LogicalTime>& atClusterTime,
+    const boost::optional<ShardVersion>& optReceivedShardVersion,
     bool supportNonVersionedOperations) const {
     // If the server has been started with --shardsvr, but hasn't been added to a cluster we should
     // consider all collections as unsharded
@@ -409,7 +425,6 @@ CollectionShardingRuntime::_getMetadataWithVersionCheckAt(
         repl::ReadConcernLevel::kAvailableReadConcern)
         return kUnshardedCollection;
 
-    const auto optReceivedShardVersion = getOperationReceivedVersion(opCtx, _nss);
     if (!optReceivedShardVersion && !supportNonVersionedOperations)
         return kUnshardedCollection;
 
