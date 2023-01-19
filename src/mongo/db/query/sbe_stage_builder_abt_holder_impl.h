@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,46 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/db/query/sbe_stage_builder_eval_frame.h"
+#pragma once
+
 #include "mongo/db/query/optimizer/node.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
-#include "mongo/db/query/sbe_stage_builder_abt_helpers.h"
-#include "mongo/db/query/sbe_stage_builder_abt_holder_impl.h"
-#include "mongo/db/query/sbe_stage_builder_helpers.h"
+#include "mongo/db/query/sbe_stage_builder_abt_holder_def.h"
 
-namespace mongo::stage_builder {
+namespace mongo::stage_builder::abt {
 
-EvalExpr::EvalExpr(const abt::HolderPtr& a) : _storage(abt::wrap(a->_value)) {}
+/**
+ * Implementation of ABT Holder. Only include from *.cpp files.
+ */
+struct Holder {
+    optimizer::ABT _value;
+};
+static_assert(std::is_aggregate_v<Holder>, "Holder must be an aggregate type");
 
-std::unique_ptr<sbe::EExpression> EvalExpr::extractExpr(optimizer::SlotVarMap& varMap) {
-    if (hasSlot()) {
-        return sbe::makeE<sbe::EVariable>(stdx::get<sbe::value::SlotId>(_storage));
-    }
+HolderPtr wrap(optimizer::ABT abt);
+optimizer::ABT unwrap(HolderPtr ptr);
 
-    if (hasABT()) {
-        return abtToExpr(stdx::get<abt::HolderPtr>(_storage)->_value, varMap);
-    }
-
-    if (stdx::holds_alternative<bool>(_storage)) {
-        return std::unique_ptr<sbe::EExpression>{};
-    }
-
-    return std::move(stdx::get<std::unique_ptr<sbe::EExpression>>(_storage));
-}
-
-abt::HolderPtr EvalExpr::extractABT(optimizer::SlotVarMap& varMap) {
-    if (hasSlot()) {
-        auto slotId = stdx::get<sbe::value::SlotId>(_storage);
-        auto varName = makeVariableName(slotId);
-        varMap.emplace(varName, slotId);
-        return abt::wrap(optimizer::make<optimizer::Variable>(varName));
-    }
-
-    tassert(6950800,
-            "Unexpected: extractABT() method invoked on an EExpression object",
-            stdx::holds_alternative<abt::HolderPtr>(_storage));
-
-    return std::move(stdx::get<abt::HolderPtr>(_storage));
-}
-
-}  // namespace mongo::stage_builder
+}  // namespace mongo::stage_builder::abt

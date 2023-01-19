@@ -33,9 +33,9 @@
 
 #include "mongo/db/query/optimizer/algebra/operator.h"
 #include "mongo/db/query/optimizer/algebra/polyvalue.h"
+#include "mongo/db/query/optimizer/comparison_op.h"
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/syntax/syntax_fwd_declare.h"
-#include "mongo/db/query/optimizer/utils/printable_enum.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo::optimizer {
@@ -142,114 +142,6 @@ inline void assertPathSort(const ABT& e) {
 
 inline bool operator!=(const ABT& left, const ABT& right) {
     return !(left == right);
-}
-
-#define PATHSYNTAX_OPNAMES(F)   \
-    /* comparison operations */ \
-    F(Eq)                       \
-    F(EqMember)                 \
-    F(Neq)                      \
-    F(Gt)                       \
-    F(Gte)                      \
-    F(Lt)                       \
-    F(Lte)                      \
-    F(Cmp3w)                    \
-                                \
-    /* binary operations */     \
-    F(Add)                      \
-    F(Sub)                      \
-    F(Mult)                     \
-    F(Div)                      \
-                                \
-    /* unary operations */      \
-    F(Neg)                      \
-                                \
-    /* Nothing-handling */      \
-    F(FillEmpty)                \
-                                \
-    /* logical operations */    \
-    F(And)                      \
-    F(Or)                       \
-    F(Not)
-
-MAKE_PRINTABLE_ENUM(Operations, PATHSYNTAX_OPNAMES);
-MAKE_PRINTABLE_ENUM_STRING_ARRAY(OperationsEnum, Operations, PATHSYNTAX_OPNAMES);
-#undef PATHSYNTAX_OPNAMES
-
-inline constexpr bool isUnaryOp(Operations op) {
-    return op == Operations::Neg || op == Operations::Not;
-}
-
-inline constexpr bool isBinaryOp(Operations op) {
-    return !isUnaryOp(op);
-}
-
-inline constexpr bool isComparisonOp(Operations op) {
-    switch (op) {
-        case Operations::Eq:
-        case Operations::EqMember:
-        case Operations::Neq:
-        case Operations::Gt:
-        case Operations::Gte:
-        case Operations::Lt:
-        case Operations::Lte:
-        case Operations::Cmp3w:
-            return true;
-        default:
-            return false;
-    }
-}
-
-/**
- * Flip the argument order of a comparison op.
- *
- * Not to be confused with boolean negation: see 'negateComparisonOp'.
- */
-inline constexpr Operations flipComparisonOp(Operations op) {
-    switch (op) {
-        case Operations::Eq:
-        case Operations::Neq:
-            return op;
-
-        case Operations::Lt:
-            return Operations::Gt;
-        case Operations::Lte:
-            return Operations::Gte;
-        case Operations::Gt:
-            return Operations::Lt;
-        case Operations::Gte:
-            return Operations::Lte;
-
-        default:
-            MONGO_UNREACHABLE;
-    }
-}
-
-/**
- * Negate a comparison op, such that negate(op)(x, y) == not(op(x, y)).
- *
- * If the op is not a comparison, return none.
- * If the op can't be negated (for example EqMember), return none.
- *
- * Not to be confused with flipping the argument order: see 'flipComparisonOp'.
- */
-inline boost::optional<Operations> negateComparisonOp(Operations op) {
-    switch (op) {
-        case Operations::Lt:
-            return Operations::Gte;
-        case Operations::Lte:
-            return Operations::Gt;
-        case Operations::Eq:
-            return Operations::Neq;
-        case Operations::Gte:
-            return Operations::Lt;
-        case Operations::Gt:
-            return Operations::Lte;
-        case Operations::Neq:
-            return Operations::Eq;
-        default:
-            return {};
-    }
 }
 
 /**

@@ -31,12 +31,11 @@
 
 #include <stack>
 
-#include "mongo/db/exec/sbe/abt/abt_lower.h"
+#include "mongo/db/exec/sbe/abt/abt_lower_defs.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
-#include "mongo/db/query/optimizer/node.h"
-#include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/sbe_stage_builder_abt_holder_def.h"
 #include "mongo/stdx/variant.h"
 
 namespace mongo::stage_builder {
@@ -58,9 +57,9 @@ public:
 
     EvalExpr(sbe::value::SlotId s) : _storage(s) {}
 
-    EvalExpr(const optimizer::ABT& a) : _storage(a) {}
+    EvalExpr(const abt::HolderPtr& a);
 
-    EvalExpr(optimizer::ABT&& a) : _storage(std::move(a)) {}
+    EvalExpr(abt::HolderPtr&& a) : _storage(std::move(a)) {}
 
     EvalExpr& operator=(EvalExpr&& e) {
         if (this == &e) {
@@ -83,7 +82,7 @@ public:
         return *this;
     }
 
-    EvalExpr& operator=(optimizer::ABT&& a) {
+    EvalExpr& operator=(abt::HolderPtr&& a) {
         _storage = std::move(a);
         return *this;
     }
@@ -102,7 +101,7 @@ public:
     }
 
     bool hasABT() const {
-        return stdx::holds_alternative<optimizer::ABT>(_storage);
+        return stdx::holds_alternative<abt::HolderPtr>(_storage);
     }
 
     EvalExpr clone() const {
@@ -111,7 +110,7 @@ public:
         }
 
         if (hasABT()) {
-            return stdx::get<optimizer::ABT>(_storage);
+            return stdx::get<abt::HolderPtr>(_storage);
         }
 
         if (stdx::holds_alternative<bool>(_storage)) {
@@ -154,11 +153,11 @@ public:
      * slot id, the mapping between the generated ABT node and the slot id is recorded in the map.
      * Throws an exception if the expression is stored as an SBE EExpression.
      */
-    optimizer::ABT extractABT(optimizer::SlotVarMap& varMap);
+    abt::HolderPtr extractABT(optimizer::SlotVarMap& varMap);
 
 private:
     // The bool type as the first option is used to represent the empty storage.
-    stdx::variant<bool, std::unique_ptr<sbe::EExpression>, sbe::value::SlotId, optimizer::ABT>
+    stdx::variant<bool, std::unique_ptr<sbe::EExpression>, sbe::value::SlotId, abt::HolderPtr>
         _storage;
 };
 

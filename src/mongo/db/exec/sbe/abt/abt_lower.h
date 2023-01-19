@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/exec/sbe/abt/abt_lower_defs.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/query/optimizer/node_defs.h"
@@ -36,7 +37,6 @@
 #include "mongo/db/query/optimizer/utils/utils.h"
 
 namespace mongo::optimizer {
-using SlotVarMap = stdx::unordered_map<ProjectionName, sbe::value::SlotId, ProjectionName::Hasher>;
 
 class SBEExpressionLowering {
 public:

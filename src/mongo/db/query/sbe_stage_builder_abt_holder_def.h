@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2020-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -29,23 +29,18 @@
 
 #pragma once
 
-#include "mongo/db/exec/sbe/expressions/expression.h"
-#include "mongo/db/exec/sbe/stages/stages.h"
-#include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/expression.h"
-#include "mongo/db/query/sbe_stage_builder_helpers.h"
 
-namespace mongo::stage_builder {
-class PlanStageSlots;
+namespace mongo::stage_builder::abt {
 
 /**
- * Translates an input Expression into an SBE EvalExpr. 'rootExpr' should either be null or it
- * should be an EvalExpr that produces the root document. 'slots' can optionaly be provided as
- * well so that generateExrpession() can make use of kField slots when appropriate.
+ * Forward declaration for ABT Holder. Only include from header files.
  */
-EvalExpr generateExpression(StageBuilderState& state,
-                            const Expression* expr,
-                            EvalExpr rootExpr,
-                            const PlanStageSlots* slots = nullptr);
-}  // namespace mongo::stage_builder
+struct Holder;
+
+struct HolderDeleter {
+    void operator()(Holder* ptr) const;
+};
+
+using HolderPtr = std::unique_ptr<Holder, HolderDeleter>;
+
+}  // namespace mongo::stage_builder::abt

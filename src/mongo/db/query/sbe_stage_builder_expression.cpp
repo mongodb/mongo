@@ -27,19 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <absl/container/flat_hash_set.h>
 
 #include "mongo/db/query/sbe_stage_builder_expression.h"
 #include "mongo/db/query/util/make_data_structure.h"
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/exec/sbe/stages/branch.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
-#include "mongo/db/exec/sbe/stages/filter.h"
-#include "mongo/db/exec/sbe/stages/hash_agg.h"
-#include "mongo/db/exec/sbe/stages/limit_skip.h"
-#include "mongo/db/exec/sbe/stages/loop_join.h"
-#include "mongo/db/exec/sbe/stages/project.h"
 #include "mongo/db/exec/sbe/stages/traverse.h"
 #include "mongo/db/exec/sbe/stages/union.h"
 #include "mongo/db/exec/sbe/values/arith_common.h"
@@ -50,13 +44,12 @@
 #include "mongo/db/pipeline/expression_visitor.h"
 #include "mongo/db/pipeline/expression_walker.h"
 #include "mongo/db/query/expression_walker.h"
-#include "mongo/db/query/projection_parser.h"
 #include "mongo/db/query/sbe_stage_builder.h"
+#include "mongo/db/query/sbe_stage_builder_abt_helpers.h"
+#include "mongo/db/query/sbe_stage_builder_abt_holder_impl.h"
 #include "mongo/db/query/sbe_stage_builder_eval_frame.h"
 #include "mongo/util/str.h"
 
-#include <absl/container/flat_hash_map.h>
-#include <absl/container/flat_hash_set.h>
 
 namespace mongo::stage_builder {
 namespace {
@@ -121,7 +114,7 @@ struct ExpressionVisitorContext {
 
         auto expr = std::move(exprStack.back());
         exprStack.pop_back();
-        return expr.extractABT(state.slotVarMap);
+        return abt::unwrap(expr.extractABT(state.slotVarMap));
     }
 
     EvalExpr done() {
@@ -781,7 +774,7 @@ public:
 
     void visit(const ExpressionConstant* expr) final {
         auto [tag, val] = makeValue(expr->getValue());
-        _context->pushExpr(makeABTConstant(tag, val));
+        pushABT(makeABTConstant(tag, val));
     }
 
     void visit(const ExpressionAbs* expr) final {
@@ -821,7 +814,7 @@ public:
                 makeABTFail(ErrorCodes::Error{7157701}, "can't take $abs of long long min")},
             makeABTFunction("abs", makeVariable(inputName)));
 
-        _context->pushExpr(optimizer::make<optimizer::Let>(
+        pushABT(optimizer::make<optimizer::Let>(
             std::move(inputName), _context->popABTExpr(), std::move(absExpr)));
     }
 
@@ -902,7 +895,7 @@ public:
 
         if (arity == 0) {
             // Return a zero constant if the expression has no operand children.
-            _context->pushExpr(optimizer::Constant::int32(0));
+            pushABT(optimizer::Constant::int32(0));
         } else {
             optimizer::ABTVector binds;
             optimizer::ProjectionNameVector names;
@@ -964,7 +957,7 @@ public:
                     std::move(names[idx]), std::move(binds[idx]), std::move(addExpr));
             }
 
-            _context->pushExpr(std::move(addExpr));
+            pushABT(std::move(addExpr));
         }
     }
 
@@ -1020,7 +1013,7 @@ public:
                             optimizer::Constant::boolean(false)),
             makeABTFail(ErrorCodes::Error{7158300}, "$anyElementTrue's argument must be an array"));
 
-        _context->pushExpr(optimizer::make<optimizer::Let>(
+        pushABT(optimizer::make<optimizer::Let>(
             std::move(argName), std::move(arg), std::move(resultExpr)));
     }
 
@@ -1092,7 +1085,7 @@ public:
                 makeABTFail(ErrorCodes::Error{7158301}, "$bsonSize requires a document input")},
             makeABTFunction("bsonSize", makeVariable(argName)));
 
-        _context->pushExpr(optimizer::make<optimizer::Let>(
+        pushABT(optimizer::make<optimizer::Let>(
             std::move(argName), std::move(arg), std::move(bsonSizeExpr)));
     }
 
@@ -1126,7 +1119,7 @@ public:
                 makeABTFail(ErrorCodes::Error{7157702}, "$ceil only supports numeric types")},
             makeABTFunction("ceil", makeVariable(inputName)));
 
-        _context->pushExpr(optimizer::make<optimizer::Let>(
+        pushABT(optimizer::make<optimizer::Let>(
             std::move(inputName), _context->popABTExpr(), std::move(ceilExpr)));
     }
     void visit(const ExpressionCoerceToBool* expr) final {
@@ -1198,7 +1191,7 @@ public:
             auto cmpWithFallback = optimizer::make<optimizer::BinaryOp>(
                 optimizer::Operations::FillEmpty, std::move(cmp), std::move(nothingFallbackCmp));
 
-            _context->pushExpr(optimizer::make<optimizer::Let>(
+            pushABT(optimizer::make<optimizer::Let>(
                 lhsRef, lhs, optimizer::make<optimizer::Let>(rhsRef, rhs, cmpWithFallback)));
 
             return;
@@ -1389,7 +1382,7 @@ public:
     void visitABT(const ExpressionConcatArrays* expr, size_t numChildren) {
         // If there are no children, return an empty array.
         if (numChildren == 0) {
-            _context->pushExpr(optimizer::Constant::emptyArray());
+            pushABT(optimizer::Constant::emptyArray());
             return;
         }
 
@@ -1433,7 +1426,7 @@ public:
                 std::move(argNames[i]), std::move(args[i]), std::move(resultExpr));
         }
 
-        _context->pushExpr(std::move(resultExpr));
+        pushABT(std::move(resultExpr));
     }
 
     void visit(const ExpressionCond* expr) final {
@@ -1718,7 +1711,7 @@ public:
                 std::move(bindingNames[i]), std::move(bindings[i]), std::move(dateDiffExpression));
         }
 
-        _context->pushExpr(std::move(dateDiffExpression));
+        pushABT(std::move(dateDiffExpression));
     }
     void visit(const ExpressionDateFromString* expr) final {
         unsupportedExpression("$dateFromString");
@@ -2306,7 +2299,7 @@ public:
                                                                 optimizer::Constant::null(),
                                                                 std::move(computeBoundChecks));
 
-        _context->pushExpr(optimizer::make<optimizer::Let>(
+        pushABT(optimizer::make<optimizer::Let>(
             std::move(yearName),
             std::move(operands[0]),
             optimizer::make<optimizer::Let>(
@@ -2463,8 +2456,7 @@ public:
             timezone = _context->popABTExpr();
         }
         if (!children[0]) {
-            _context->pushExpr(
-                makeABTFail(ErrorCodes::Error{7157911}, "$dateToParts must include a date"));
+            pushABT(makeABTFail(ErrorCodes::Error{7157911}, "$dateToParts must include a date"));
             return;
         }
         auto date = _context->popABTExpr();
@@ -2504,7 +2496,7 @@ public:
                                          "$dateToParts date must have the format of a date")},
             std::move(checkIsoflagValue));
 
-        _context->pushExpr(optimizer::make<optimizer::Let>(
+        pushABT(optimizer::make<optimizer::Let>(
             std::move(dateName),
             std::move(date),
             optimizer::make<optimizer::Let>(
@@ -2908,7 +2900,7 @@ public:
             }
         }
 
-        _context->pushExpr(optimizer::make<optimizer::Let>(
+        pushABT(optimizer::make<optimizer::Let>(
             std::move(dateName),
             std::move(dateExpression),
             optimizer::make<optimizer::Let>(
@@ -2982,7 +2974,7 @@ public:
                                                                   makeVariable(rhsName))},
             makeABTFail(ErrorCodes::Error{7157719}, "$divide only supports numeric types"));
 
-        _context->pushExpr(optimizer::make<optimizer::Let>(
+        pushABT(optimizer::make<optimizer::Let>(
             std::move(lhsName),
             std::move(lhs),
             optimizer::make<optimizer::Let>(
@@ -3018,7 +3010,7 @@ public:
                 makeABTFail(ErrorCodes::Error{7157704}, "$exp only supports numeric types")},
             makeABTFunction("exp", makeVariable(inputName)));
 
-        _context->pushExpr(optimizer::make<optimizer::Let>(
+        pushABT(optimizer::make<optimizer::Let>(
             std::move(inputName), _context->popABTExpr(), std::move(expExpr)));
     }
     void visit(const ExpressionFieldPath* expr) final {
@@ -3052,7 +3044,7 @@ public:
             } else if (expr->getVariableId() == Variables::kRemoveId) {
                 // For the field paths that begin with "$$REMOVE", we always produce Nothing,
                 // so no traversal is necessary.
-                _context->pushExpr(optimizer::Constant::nothing());
+                pushABT(optimizer::Constant::nothing());
                 return;
             } else {
                 auto it = Variables::kIdToBuiltinVarName.find(expr->getVariableId());
@@ -3103,13 +3095,13 @@ public:
             auto resultExpr = generateTraverse(
                 _context,
                 inputExpr.isNull() ? boost::optional<optimizer::ABT>{}
-                                   : inputExpr.extractABT(_context->state.slotVarMap),
+                                   : abt::unwrap(inputExpr.extractABT(_context->state.slotVarMap)),
                 expectsDocumentInputOnly,
                 *fp,
                 _context->state.frameIdGenerator,
                 topLevelFieldSlot);
 
-            _context->pushExpr(std::move(resultExpr));
+            pushABT(std::move(resultExpr));
         }
     }
     void visit(const ExpressionFilter* expr) final {
@@ -3216,7 +3208,7 @@ public:
             ABTCaseValuePair{makeABTFunction("isArray", makeVariable(inputName)),
                              std::move(traversePExpr)},
             makeABTFail(ErrorCodes::Error{7158305}, "input to $filter must be an array"));
-        _context->pushExpr(optimizer::make<optimizer::Let>(
+        pushABT(optimizer::make<optimizer::Let>(
             std::move(inputName), std::move(inputExpr), std::move(resultExpr)));
     }
 
@@ -3250,7 +3242,7 @@ public:
                 makeABTFail(ErrorCodes::Error{7157703}, "$floor only supports numeric types")},
             makeABTFunction("floor", makeVariable(inputName)));
 
-        _context->pushExpr(optimizer::make<optimizer::Let>(
+        pushABT(optimizer::make<optimizer::Let>(
             std::move(inputName), _context->popABTExpr(), std::move(floorExpr)));
     }
     void visit(const ExpressionIfNull* expr) final {
@@ -3370,7 +3362,7 @@ public:
                                          "$ln's argument must be a positive number")},
             makeABTFunction("ln", makeVariable(inputName)));
 
-        _context->pushExpr(optimizer::make<optimizer::Let>(
+        pushABT(optimizer::make<optimizer::Let>(
             std::move(inputName), _context->popABTExpr(), std::move(lnExpr)));
     }
     void visit(const ExpressionLog* expr) final {
@@ -3424,7 +3416,7 @@ public:
                                          "$log10's argument must be a positive number")},
             makeABTFunction("log10", makeVariable(inputName)));
 
-        _context->pushExpr(optimizer::make<optimizer::Let>(
+        pushABT(optimizer::make<optimizer::Let>(
             std::move(inputName), _context->popABTExpr(), std::move(log10Expr)));
     }
     void visit(const ExpressionInternalFLEBetween* expr) final {
@@ -3529,7 +3521,7 @@ public:
                 makeABTFail(ErrorCodes::Error{7157718}, "$mod only supports numeric types")},
             makeABTFunction("mod", makeVariable(lhsName), std::move(rhsExpr)));
 
-        _context->pushExpr(optimizer::make<optimizer::Let>(
+        pushABT(optimizer::make<optimizer::Let>(
             std::move(lhsName),
             std::move(lhs),
             optimizer::make<optimizer::Let>(
@@ -3614,7 +3606,7 @@ public:
 
         // Return multiplicative identity if the $multiply expression has no operands.
         if (arity == 0) {
-            _context->pushExpr(optimizer::Constant::int32(1));
+            pushABT(optimizer::Constant::int32(1));
             return;
         }
 
@@ -3666,11 +3658,11 @@ public:
                 std::move(names[i]), std::move(binds[i]), std::move(multiplyExpr));
         }
 
-        _context->pushExpr(std::move(multiplyExpr));
+        pushABT(std::move(multiplyExpr));
     }
     void visit(const ExpressionNot* expr) final {
         if (_context->hasAllAbtEligibleEntries(1)) {
-            _context->pushExpr(makeNot(
+            pushABT(makeNot(
                 makeFillEmptyFalse(makeABTFunction("coerceToBool", _context->popABTExpr()))));
         } else {
             _context->pushExpr(
@@ -3721,7 +3713,7 @@ public:
         // Lastly we need to reverse it to get the correct order of arguments.
         std::reverse(exprs.begin(), exprs.end());
 
-        _context->pushExpr(optimizer::make<optimizer::FunctionCall>("newObj", std::move(exprs)));
+        pushABT(optimizer::make<optimizer::FunctionCall>("newObj", std::move(exprs)));
     }
 
     void visit(const ExpressionOr* expr) final {
@@ -3892,7 +3884,7 @@ public:
                                                         makeVariable(convertedEndName),
                                                         makeVariable(convertedStepName))))))))));
 
-        _context->pushExpr(std::move(rangeExpr));
+        pushABT(std::move(rangeExpr));
     }
 
     void visit(const ExpressionReduce* expr) final {
@@ -4054,7 +4046,7 @@ public:
         replaceOneExpr = optimizer::make<optimizer::Let>(
             std::move(inputArgName), std::move(inputArg), std::move(replaceOneExpr));
 
-        _context->pushExpr(std::move(replaceOneExpr));
+        pushABT(std::move(replaceOneExpr));
     }
 
     void visit(const ExpressionReplaceAll* expr) final {
@@ -4133,7 +4125,7 @@ public:
                 makeABTFail(ErrorCodes::Error{7158002}, "$reverseArray argument must be an array")},
             makeABTFunction("reverseArray", std::move(var)));
 
-        _context->pushExpr(optimizer::make<optimizer::Let>(
+        pushABT(optimizer::make<optimizer::Let>(
             std::move(name), std::move(arg), std::move(exprReverseArr)));
     }
 
@@ -4197,7 +4189,7 @@ public:
                                          "$sortArray input argument must be an array")},
             optimizer::make<optimizer::FunctionCall>("sortArray", std::move(functionArgs)));
 
-        _context->pushExpr(optimizer::make<optimizer::Let>(
+        pushABT(optimizer::make<optimizer::Let>(
             std::move(name), std::move(arg), std::move(exprSortArr)));
     }
 
@@ -4319,7 +4311,7 @@ public:
                                          "$sqrt's argument must be greater than or equal to 0")},
             makeABTFunction("sqrt", makeVariable(inputName)));
 
-        _context->pushExpr(optimizer::make<optimizer::Let>(
+        pushABT(optimizer::make<optimizer::Let>(
             std::move(inputName), _context->popABTExpr(), std::move(sqrtExpr)));
     }
     void visit(const ExpressionStrcasecmp* expr) final {
@@ -4417,7 +4409,7 @@ public:
                             "subtract a number from a date, the date must be the first argument.")},
             std::move(subtractOp));
 
-        _context->pushExpr(optimizer::make<optimizer::Let>(
+        pushABT(optimizer::make<optimizer::Let>(
             std::move(lhsName),
             std::move(lhs),
             optimizer::make<optimizer::Let>(
@@ -4427,7 +4419,7 @@ public:
         visitConditionalExpression(expr);
     }
     void visit(const ExpressionTestApiVersion* expr) final {
-        _context->pushExpr(optimizer::Constant::int32(1));
+        pushABT(optimizer::Constant::int32(1));
     }
     void visit(const ExpressionToLower* expr) final {
         generateStringCaseConversionExpression(_context, "toLower");
@@ -4668,7 +4660,7 @@ public:
                                          str::stream() << expr->getOpName()
                                                        << " expects argument of type timestamp")},
             makeABTFunction("tsSecond", makeVariable(name)));
-        _context->pushExpr(optimizer::make<optimizer::Let>(
+        pushABT(optimizer::make<optimizer::Let>(
             std::move(name), std::move(arg), std::move(tsSecondExpr)));
     }
 
@@ -4714,7 +4706,7 @@ public:
                                          str::stream() << expr->getOpName()
                                                        << " expects argument of type timestamp")},
             makeABTFunction("tsIncrement", makeVariable(name)));
-        _context->pushExpr(optimizer::make<optimizer::Let>(
+        pushABT(optimizer::make<optimizer::Let>(
             std::move(name), std::move(arg), std::move(tsIncrementExpr)));
     }
 
@@ -4741,7 +4733,7 @@ private:
             // Empty $and and $or always evaluate to their logical operator's identity value: true
             // and false, respectively.
             auto logicIdentityVal = (logicOp == sbe::EPrimBinary::logicAnd);
-            _context->pushExpr(optimizer::Constant::boolean(logicIdentityVal));
+            pushABT(optimizer::Constant::boolean(logicIdentityVal));
             return;
         }
 
@@ -4754,10 +4746,10 @@ private:
             }
             std::reverse(exprs.begin(), exprs.end());
 
-            _context->pushExpr(makeBalancedBooleanOpTree(logicOp == sbe::EPrimBinary::logicAnd
-                                                             ? optimizer::Operations::And
-                                                             : optimizer::Operations::Or,
-                                                         std::move(exprs)));
+            pushABT(makeBalancedBooleanOpTree(logicOp == sbe::EPrimBinary::logicAnd
+                                                  ? optimizer::Operations::And
+                                                  : optimizer::Operations::Or,
+                                              std::move(exprs)));
             return;
         }
         // Fallback to generate an SBE EExpression node.
@@ -4833,8 +4825,8 @@ private:
 
         std::reverse(cases.begin(), cases.end());
 
-        _context->pushExpr(buildABTMultiBranchConditionalFromCaseValuePairs(
-            std::move(cases), std::move(defaultExpr)));
+        pushABT(buildABTMultiBranchConditionalFromCaseValuePairs(std::move(cases),
+                                                                 std::move(defaultExpr)));
     }
 
     void generateDayOfExpression(StringData exprName, const Expression* expr) {
@@ -4941,7 +4933,7 @@ private:
                             makeVariable(dateName),
                             makeVariable(timezoneName)));
 
-        _context->pushExpr(optimizer::make<optimizer::Let>(
+        pushABT(optimizer::make<optimizer::Let>(
             std::move(dateName),
             std::move(date),
             optimizer::make<optimizer::Let>(
@@ -5059,7 +5051,7 @@ private:
                         str::stream()
                             << "$" << exprName.toString() << " supports only numeric types"));
 
-        _context->pushExpr(optimizer::make<optimizer::Let>(
+        pushABT(optimizer::make<optimizer::Let>(
             std::move(argName), std::move(arg), std::move(genericTrigonometricExpr)));
     }
 
@@ -5125,7 +5117,7 @@ private:
                         str::stream() << "$" << exprName << " supports only numeric types"));
 
 
-        _context->pushExpr(optimizer::make<optimizer::Let>(
+        pushABT(optimizer::make<optimizer::Let>(
             std::move(lhsName),
             std::move(lhs),
             optimizer::make<optimizer::Let>(
@@ -5223,7 +5215,7 @@ private:
                                       << ", value must be in " << lowerBound.printLowerBound()
                                       << ", " << upperBound.printUpperBound()));
 
-        _context->pushExpr(optimizer::make<optimizer::Let>(
+        pushABT(optimizer::make<optimizer::Let>(
             std::move(argName), std::move(arg), std::move(genericTrigonometricExpr)));
     }
 
@@ -5463,7 +5455,7 @@ private:
         resultExpr = optimizer::make<optimizer::Let>(
             std::move(strName), std::move(operands[operandIdx++]), std::move(resultExpr));
 
-        _context->pushExpr(std::move(resultExpr));
+        pushABT(std::move(resultExpr));
     }
 
     /**
@@ -5598,7 +5590,7 @@ private:
                 std::move(argNames[i]), std::move(args[i]), setExpr);
         }
 
-        _context->pushExpr(std::move(setExpr));
+        pushABT(std::move(setExpr));
     }
 
     std::pair<StringData, StringData> getSetOperatorAndFunctionNames(SetOperation setOp,
@@ -6023,7 +6015,7 @@ private:
                             makeVariable(amountName),
                             makeVariable(tzName)));
 
-        _context->pushExpr(optimizer::make<optimizer::Let>(
+        pushABT(optimizer::make<optimizer::Let>(
             std::move(startDateName),
             std::move(startDateExpr),
             optimizer::make<optimizer::Let>(
@@ -6049,6 +6041,11 @@ private:
     }
 
     ExpressionVisitorContext* _context;
+
+private:
+    void pushABT(optimizer::ABT abt) {
+        _context->pushExpr(abt::wrap(std::move(abt)));
+    }
 };
 }  // namespace
 

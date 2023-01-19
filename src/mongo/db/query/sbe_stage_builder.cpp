@@ -35,19 +35,15 @@
 #include <fmt/format.h>
 
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/exec/sbe/abt/abt_lower.h"
 #include "mongo/db/exec/sbe/match_path.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/stages/column_scan.h"
 #include "mongo/db/exec/sbe/stages/filter.h"
-#include "mongo/db/exec/sbe/stages/hash_agg.h"
 #include "mongo/db/exec/sbe/stages/hash_join.h"
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
-#include "mongo/db/exec/sbe/stages/loop_join.h"
 #include "mongo/db/exec/sbe/stages/makeobj.h"
 #include "mongo/db/exec/sbe/stages/merge_join.h"
 #include "mongo/db/exec/sbe/stages/project.h"
-#include "mongo/db/exec/sbe/stages/scan.h"
 #include "mongo/db/exec/sbe/stages/sort.h"
 #include "mongo/db/exec/sbe/stages/sorted_merge.h"
 #include "mongo/db/exec/sbe/stages/traverse.h"
@@ -57,7 +53,6 @@
 #include "mongo/db/exec/shard_filterer.h"
 #include "mongo/db/fts/fts_index_format.h"
 #include "mongo/db/fts/fts_query_impl.h"
-#include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/index/fts_access_method.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/match_expression_dependencies.h"
@@ -68,8 +63,7 @@
 #include "mongo/db/query/expression_walker.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
-#include "mongo/db/query/optimizer/rewrites/path_lower.h"
-#include "mongo/db/query/query_utils.h"
+#include "mongo/db/query/sbe_stage_builder_abt_helpers.h"
 #include "mongo/db/query/sbe_stage_builder_accumulator.h"
 #include "mongo/db/query/sbe_stage_builder_coll_scan.h"
 #include "mongo/db/query/sbe_stage_builder_expression.h"
@@ -79,9 +73,7 @@
 #include "mongo/db/query/sbe_stage_builder_projection.h"
 #include "mongo/db/query/shard_filterer_factory_impl.h"
 #include "mongo/db/query/util/make_data_structure.h"
-#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/storage/execution_context.h"
-#include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

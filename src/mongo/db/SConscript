@@ -1476,6 +1476,8 @@ env.Library(
         'query/sbe_stage_builder_eval_frame.cpp',
         'query/sbe_stage_builder_expression.cpp',
         'query/sbe_stage_builder_filter.cpp',
+        'query/sbe_stage_builder_abt_helpers.cpp',
+        'query/sbe_stage_builder_abt_holder_impl.cpp',
         'query/sbe_stage_builder_helpers.cpp',
         'query/sbe_stage_builder_index_scan.cpp',
         'query/sbe_stage_builder_lookup.cpp',
