@@ -429,6 +429,16 @@ public:
     }
 
     /**
+     * Returns the input storage engine options, sanitized to remove options that may not apply to
+     * this node, such as encryption. Might be called for both collection and index options. See
+     * SERVER-68122.
+     */
+    virtual StatusWith<BSONObj> getSanitizedStorageOptionsForSecondaryReplication(
+        const BSONObj& options) const {
+        return options;
+    }
+
+    /**
      * The destructor will never be called from mongod, but may be called from tests.
      * Engines may assume that this will only be called in the case of clean shutdown, even if
      * cleanShutdown() hasn't been called.

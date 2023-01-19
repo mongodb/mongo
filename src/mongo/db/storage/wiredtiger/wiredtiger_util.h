@@ -158,6 +158,8 @@ private:
     WiredTigerUtil();
 
 public:
+    static constexpr StringData kConfigStringField = "configString"_sd;
+
     /**
      * Fetch the type and source fields out of the colgroup metadata.  'tableUri' must be a
      * valid table: uri.
@@ -331,6 +333,14 @@ public:
      */
     template <typename T>
     static T castStatisticsValue(uint64_t statisticsValue);
+
+    /**
+     * Removes encryption configuration from a config string. Should only be applied on custom
+     * config strings on secondaries. Fixes an issue where encryption configuration might be
+     * replicated to non-encrypted nodes, or nodes with different encryption options, causing
+     * initial sync or replication to fail. See SERVER-68122.
+     */
+    static void removeEncryptionFromConfigString(std::string* configString);
 
 private:
     /**

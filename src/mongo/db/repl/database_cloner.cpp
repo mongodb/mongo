@@ -29,6 +29,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplicationInitialSync
 
+#include "mongo/db/service_context.h"
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/string_data.h"
@@ -69,6 +70,7 @@ BaseCloner::AfterStageBehavior DatabaseCloner::listCollectionsStage() {
     BSONObj res;
     auto collectionInfos =
         getClient()->getCollectionInfos(_dbName, ListCollectionsFilter::makeTypeCollectionFilter());
+    const auto storageEngine = getGlobalServiceContext()->getStorageEngine();
 
     stdx::unordered_set<std::string> seen;
     for (auto&& info : collectionInfos) {
@@ -103,6 +105,13 @@ BaseCloner::AfterStageBehavior DatabaseCloner::listCollectionsStage() {
                 str::stream() << "collection info contains duplicate collection name "
                               << "'" << result.getName() << "': " << info,
                 isDuplicate);
+
+        // Sanitize storage engine options to remove options which might not apply to this node. See
+        // SERVER-68122.
+        auto sanitizedStorageOptions =
+            uassertStatusOK(storageEngine->getSanitizedStorageOptionsForSecondaryReplication(
+                result.getOptions().storageEngine));
+        result.getOptions().storageEngine = sanitizedStorageOptions;
 
         // While UUID is a member of CollectionOptions, listCollections does not return the
         // collectionUUID there as part of the options, but instead places it in the 'info' field.

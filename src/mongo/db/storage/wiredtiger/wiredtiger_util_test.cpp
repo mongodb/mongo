@@ -452,4 +452,67 @@ TEST(WiredTigerUtilTest, GenerateVerboseConfiguration) {
     }
 }
 
+TEST(WiredTigerUtilTest, RemoveEncryptionFromConfigString) {
+    {  // Found at the middle.
+        std::string input{
+            "debug_mode=(table_logging=true,checkpoint_retention=4),encryption=(name=AES256-CBC,"
+            "keyid="
+            "\".system\"),extensions=[local={entry=mongo_addWiredTigerEncryptors,early_load=true},,"
+            "],"};
+        const std::string expectedOutput{
+            "debug_mode=(table_logging=true,checkpoint_retention=4),extensions=[local={entry=mongo_"
+            "addWiredTigerEncryptors,early_load=true},,],"};
+        WiredTigerUtil::removeEncryptionFromConfigString(&input);
+        ASSERT_EQUALS(input, expectedOutput);
+    }
+    {  // Found at start.
+        std::string input{
+            "encryption=(name=AES256-CBC,keyid=\".system\"),extensions=[local={entry=mongo_"
+            "addWiredTigerEncryptors,early_load=true},,],"};
+        const std::string expectedOutput{
+            "extensions=[local={entry=mongo_addWiredTigerEncryptors,early_load=true},,],"};
+        WiredTigerUtil::removeEncryptionFromConfigString(&input);
+        ASSERT_EQUALS(input, expectedOutput);
+    }
+    {  // Found at the end.
+        std::string input{
+            "debug_mode=(table_logging=true,checkpoint_retention=4),encryption=(name=AES256-CBC,"
+            "keyid=\".system\")"};
+        const std::string expectedOutput{"debug_mode=(table_logging=true,checkpoint_retention=4),"};
+        WiredTigerUtil::removeEncryptionFromConfigString(&input);
+        ASSERT_EQUALS(input, expectedOutput);
+    }
+    {  // Matches full configString.
+        std::string input{"encryption=(name=AES256-CBC,keyid=\".system\")"};
+        const std::string expectedOutput{""};
+        WiredTigerUtil::removeEncryptionFromConfigString(&input);
+        ASSERT_EQUALS(input, expectedOutput);
+    }
+    {  // Matches full configString, trailing comma.
+        std::string input{"encryption=(name=AES256-CBC,keyid=\".system\"),"};
+        const std::string expectedOutput{""};
+        WiredTigerUtil::removeEncryptionFromConfigString(&input);
+        ASSERT_EQUALS(input, expectedOutput);
+    }
+    {  // No match.
+        std::string input{"debug_mode=(table_logging=true,checkpoint_retention=4)"};
+        const std::string expectedOutput{"debug_mode=(table_logging=true,checkpoint_retention=4)"};
+        WiredTigerUtil::removeEncryptionFromConfigString(&input);
+        ASSERT_EQUALS(input, expectedOutput);
+    }
+    {  // No match, empty.
+        std::string input{""};
+        const std::string expectedOutput{""};
+        WiredTigerUtil::removeEncryptionFromConfigString(&input);
+        ASSERT_EQUALS(input, expectedOutput);
+    }
+    {  // Removes multiple instances.
+        std::string input{
+            "encryption=(name=AES256-CBC,keyid=\".system\"),debug_mode=(table_logging=true,"
+            "checkpoint_retention=4),encryption=(name=AES256-CBC,keyid=\".system\")"};
+        const std::string expectedOutput{"debug_mode=(table_logging=true,checkpoint_retention=4),"};
+        WiredTigerUtil::removeEncryptionFromConfigString(&input);
+        ASSERT_EQUALS(input, expectedOutput);
+    }
+}
 }  // namespace mongo

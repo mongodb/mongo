@@ -37,6 +37,7 @@
 
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/path.hpp>
+#include <pcrecpp.h>
 
 #include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -464,7 +465,7 @@ StatusWith<int64_t> WiredTigerUtil::checkApplicationMetadataFormatVersion(Operat
 
 // static
 Status WiredTigerUtil::checkTableCreationOptions(const BSONElement& configElem) {
-    invariant(configElem.fieldNameStringData() == "configString");
+    invariant(configElem.fieldNameStringData() == WiredTigerUtil::kConfigStringField);
 
     if (configElem.type() != String) {
         return {ErrorCodes::TypeMismatch, "'configString' must be a string."};
@@ -1190,5 +1191,9 @@ std::string WiredTigerUtil::generateWTVerboseConfiguration() {
     return cfg;
 }
 
+void WiredTigerUtil::removeEncryptionFromConfigString(std::string* configString) {
+    static const StaticImmortal<pcrecpp::RE> encryptionOptsRegex(R"re(encryption=\([^\)]*\),?)re");
+    encryptionOptsRegex->GlobalReplace("", configString);
+}
 
 }  // namespace mongo

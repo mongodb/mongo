@@ -648,7 +648,7 @@ void WiredTigerRecordStore::OplogStones::adjust(int64_t maxSize) {
 StatusWith<std::string> WiredTigerRecordStore::parseOptionsField(const BSONObj options) {
     StringBuilder ss;
     BSONForEach(elem, options) {
-        if (elem.fieldNameStringData() == "configString") {
+        if (elem.fieldNameStringData() == WiredTigerUtil::kConfigStringField) {
             Status status = WiredTigerUtil::checkTableCreationOptions(elem);
             if (!status.isOK()) {
                 return status;
