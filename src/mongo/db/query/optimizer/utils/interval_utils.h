@@ -36,6 +36,11 @@
 namespace mongo::optimizer {
 
 /**
+ * Constant fold the bounds of a DNF interval.
+ */
+void constFoldInterval(IntervalRequirement& interval, const ConstFoldFn& constFold);
+
+/**
  * Intersects or unions two intervals without simplification which might depend on multi-keyness.
  * Currently assumes intervals are in DNF.
  * TODO: handle generic interval expressions (not necessarily DNF).
@@ -43,6 +48,20 @@ namespace mongo::optimizer {
 void combineIntervalsDNF(bool intersect,
                          IntervalReqExpr::Node& target,
                          const IntervalReqExpr::Node& source);
+
+/**
+ * Simplifies two unioned intervals, variable or constant.
+ */
+std::vector<IntervalRequirement> unionTwoIntervals(const IntervalRequirement& int1,
+                                                   const IntervalRequirement& int2,
+                                                   const ConstFoldFn& constFold);
+
+/**
+ * Union DNF intervals. Analyzes constant intervals, and merges them if possible. Requires interval
+ * to be normalized, as well as intersection simplification to be run before this is called.
+ */
+boost::optional<IntervalReqExpr::Node> unionDNFIntervals(const IntervalReqExpr::Node& interval,
+                                                         const ConstFoldFn& constFold);
 
 /**
  * Intersect all intervals within each conjunction of intervals in a disjunction of intervals.
@@ -54,6 +73,14 @@ void combineIntervalsDNF(bool intersect,
  */
 boost::optional<IntervalReqExpr::Node> intersectDNFIntervals(
     const IntervalReqExpr::Node& intervalDNF, const ConstFoldFn& constFold);
+
+/**
+ * Simplify DNF intervals by analyzing intervals within each conjunction to intersect, and also
+ * combining conjunctions with one child, to simplify unions. Returns boost::none if result is
+ * empty.
+ */
+boost::optional<IntervalReqExpr::Node> simplifyDNFIntervals(const IntervalReqExpr::Node& interval,
+                                                            const ConstFoldFn& constFold);
 
 /**
  * Combines a source interval over a single path with a target multi-component interval. The

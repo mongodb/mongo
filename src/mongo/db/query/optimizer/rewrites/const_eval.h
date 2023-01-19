@@ -59,6 +59,7 @@ public:
     void prepare(ABT&, const LambdaAbstraction&);
     void transport(ABT&, const LambdaAbstraction&, ABT&);
 
+    void transport(ABT& n, const UnaryOp& op, ABT& child);
     // Specific transport for binary operation
     // The const correctness is probably wrong (as const ABT& lhs, const ABT& rhs does not work for
     // some reason but we can fix it later).

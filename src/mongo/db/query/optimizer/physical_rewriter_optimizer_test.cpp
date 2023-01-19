@@ -1704,20 +1704,21 @@ TEST(PhysRewriter, FilterIndexingVariable) {
         "|   |           Source []\n"
         "|   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {[If [] "
         "BinaryOp [And] BinaryOp [And] BinaryOp [Or] BinaryOp [Or] BinaryOp [And] BinaryOp [Lt] "
-        "FunctionCall [getQueryParam] Const [0] FunctionCall [getQueryParam] Const [1] Const "
-        "[true] BinaryOp [And] BinaryOp [Lt] FunctionCall [getQueryParam] Const [0] Const [maxKey] "
-        "Const [true] BinaryOp [Or] BinaryOp [And] BinaryOp [Lt] FunctionCall [getQueryParam] "
-        "Const [1] FunctionCall [getQueryParam] Const [0] BinaryOp [Lt] FunctionCall "
-        "[getQueryParam] Const [0] Const [maxKey] Const [true] BinaryOp [Lt] FunctionCall "
-        "[getQueryParam] Const [0] Const [maxKey] BinaryOp [Gt] FunctionCall [getQueryParam] Const "
-        "[1] FunctionCall [getQueryParam] Const [0] FunctionCall [getQueryParam] Const [1] Const "
-        "[maxKey], FunctionCall [getQueryParam] Const [1]]}]\n"
+        "FunctionCall [getQueryParam] Const [1] FunctionCall [getQueryParam] Const [0] BinaryOp "
+        "[Lt] FunctionCall [getQueryParam] Const [0] Const [maxKey] Const [true] BinaryOp [Or] "
+        "BinaryOp [And] BinaryOp [Lt] FunctionCall [getQueryParam] Const [0] FunctionCall "
+        "[getQueryParam] Const [1] Const [true] BinaryOp [And] BinaryOp [Lt] FunctionCall "
+        "[getQueryParam] Const [0] Const [maxKey] Const [true] BinaryOp [And] BinaryOp [Lt] "
+        "FunctionCall [getQueryParam] Const [0] Const [maxKey] Const [true] BinaryOp [Gt] "
+        "FunctionCall [getQueryParam] Const [1] FunctionCall [getQueryParam] Const [0] "
+        "FunctionCall [getQueryParam] Const [1] Const [maxKey], FunctionCall [getQueryParam] Const "
+        "[1]]}]\n"
         "|       BindBlock:\n"
         "|           [rid_0]\n"
         "|               Source []\n"
         "IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {>If [] "
-        "BinaryOp [Gte] FunctionCall [getQueryParam] Const [1] FunctionCall [getQueryParam] Const "
-        "[0] FunctionCall [getQueryParam] Const [1] FunctionCall [getQueryParam] Const [0]}]\n"
+        "BinaryOp [Gte] FunctionCall [getQueryParam] Const [0] FunctionCall [getQueryParam] Const "
+        "[1] FunctionCall [getQueryParam] Const [0] FunctionCall [getQueryParam] Const [1]}]\n"
         "    BindBlock:\n"
         "        [rid_0]\n"
         "            Source []\n",
@@ -6099,16 +6100,13 @@ TEST(PhysRewriter, ResidualFilterPathIsBalanced) {
         "|   |   Variable [evalTemp_0]\n"
         "|   PathTraverse [1]\n"
         "|   PathComposeA []\n"
-        "|   |   PathComposeA []\n"
-        "|   |   |   PathCompare [Gte]\n"
-        "|   |   |   Const [3]\n"
-        "|   |   PathCompare [Lte]\n"
-        "|   |   Const [0]\n"
+        "|   |   PathCompare [Gt]\n"
+        "|   |   Const [2]\n"
         "|   PathComposeA []\n"
         "|   |   PathCompare [Eq]\n"
         "|   |   Const [1]\n"
-        "|   PathCompare [Gt]\n"
-        "|   Const [2]\n"
+        "|   PathCompare [Lte]\n"
+        "|   Const [0]\n"
         "PhysicalScan [{'<root>': root, 'a': evalTemp_0}, c1]\n"
         "    BindBlock:\n"
         "        [evalTemp_0]\n"
@@ -6145,7 +6143,7 @@ TEST(PhysRewriter, DisjunctiveEqsConsolidatedIntoEqMember) {
                                                         _cmp("Eq", "8"_cint64)),
                                               _composea(_cmp("EqMember", ExprHolder{arrayConst2}),
                                                         _cmp("Eq", "4"_cint64))),
-                                    _composea(_cmp("Gt", "0"_cint64), _cmp("Lt", "20"_cint64))))),
+                                    _composea(_cmp("Lt", "0"_cint64), _cmp("Gt", "20"_cint64))))),
                            "root"_var))
             .finish(_scan("root", "c1"));
 
@@ -6178,13 +6176,65 @@ TEST(PhysRewriter, DisjunctiveEqsConsolidatedIntoEqMember) {
         "|   |   Variable [evalTemp_0]\n"
         "|   PathTraverse [1]\n"
         "|   PathComposeA []\n"
-        "|   |   PathCompare [Lt]\n"
+        "|   |   PathCompare [Gt]\n"
         "|   |   Const [20]\n"
         "|   PathComposeA []\n"
         "|   |   PathCompare [EqMember]\n"
         "|   |   Const [[1, 2, 3, 4, 5, 6, 7, 8]]\n"
-        "|   PathCompare [Gt]\n"
+        "|   PathCompare [Lt]\n"
         "|   Const [0]\n"
+        "PhysicalScan [{'<root>': root, 'a': evalTemp_0}, c1]\n"
+        "    BindBlock:\n"
+        "        [evalTemp_0]\n"
+        "            Source []\n"
+        "        [root]\n"
+        "            Source []\n",
+        optimized);
+}
+
+
+TEST(PhysRewriter, KeepBoundsForNothingCheck) {
+    using namespace properties;
+    using namespace unit_test_abt_literals;
+
+    ABT root =
+        NodeBuilder{}
+            .root("root")
+            .filter(_evalf(
+                _get("a", _traverse1(_composea(_cmp("Gt", "0"_cint64), _cmp("Lt", "20"_cint64)))),
+                "root"_var))
+            .finish(_scan("root", "c1"));
+
+    auto prefixId = PrefixId::createForTests();
+    auto phaseManager = makePhaseManager(
+        {OptPhase::MemoSubstitutionPhase,
+         OptPhase::MemoExplorationPhase,
+         OptPhase::MemoImplementationPhase},
+        prefixId,
+        {{{"c1", createScanDef({}, {})}}},
+        boost::none /*costModel*/,
+        {true /*debugMode*/, 2 /*debugLevel*/, DebugInfo::kIterationLimitForTests});
+
+    ABT optimized = root;
+    phaseManager.optimize(optimized);
+    ASSERT_EQ(2, phaseManager.getMemo().getStats()._physPlanExplorationCount);
+
+    // sbe::nothing will not pass the (Minkey, Maxkey) check. Check that we don't get rid of it.
+    ASSERT_EXPLAIN_V2_AUTO(
+        "Root []\n"
+        "|   |   projections: \n"
+        "|   |       root\n"
+        "|   RefBlock: \n"
+        "|       Variable [root]\n"
+        "Filter []\n"
+        "|   EvalFilter []\n"
+        "|   |   Variable [evalTemp_0]\n"
+        "|   PathTraverse [1]\n"
+        "|   PathComposeM []\n"
+        "|   |   PathCompare [Lt]\n"
+        "|   |   Const [maxKey]\n"
+        "|   PathCompare [Gt]\n"
+        "|   Const [minKey]\n"
         "PhysicalScan [{'<root>': root, 'a': evalTemp_0}, c1]\n"
         "    BindBlock:\n"
         "        [evalTemp_0]\n"

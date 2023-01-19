@@ -107,6 +107,10 @@ void IntervalRequirement::reverse() {
     std::swap(_lowBound, _highBound);
 }
 
+bool IntervalRequirement::isConstant() const {
+    return getLowBound().getBound().is<Constant>() && getHighBound().getBound().is<Constant>();
+}
+
 PartialSchemaKey::PartialSchemaKey(ABT path) : PartialSchemaKey(boost::none, std::move(path)) {}
 
 PartialSchemaKey::PartialSchemaKey(ProjectionName projectionName, ABT path)

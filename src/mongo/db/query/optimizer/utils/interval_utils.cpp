@@ -36,6 +36,310 @@
 
 namespace mongo::optimizer {
 
+// Three way comparison of the two arguments. Returns boost::none if nothing can be determined
+// about the comparison between the two arguments.
+static boost::optional<int> cmpABT(const ABT& a1, const ABT& a2, const ConstFoldFn& constFold) {
+    ABT result = make<BinaryOp>(Operations::Cmp3w, a1, a2);
+    constFold(result);
+    if (const auto resultConst = result.cast<Constant>()) {
+        invariant(resultConst->isValueInt32());
+        return resultConst->getValueInt32();
+    }
+    return boost::none;
+};
+
+ABT minABT(const ABT& v1, const ABT& v2) {
+    return make<If>(make<BinaryOp>(Operations::Lte, v1, v2), v1, v2);
+};
+
+ABT maxABT(const ABT& v1, const ABT& v2) {
+    return make<If>(make<BinaryOp>(Operations::Gte, v1, v2), v1, v2);
+};
+
+void constFoldInterval(IntervalRequirement& interval, const ConstFoldFn& constFold) {
+    ABT low = interval.getLowBound().getBound();
+    ABT high = interval.getHighBound().getBound();
+    constFold(low);
+    constFold(high);
+    interval = IntervalRequirement{
+        BoundRequirement{interval.getLowBound().isInclusive(), std::move(low)},
+        BoundRequirement{interval.getHighBound().isInclusive(), std::move(high)},
+    };
+}
+
+// Returns true if the interval can be proven to be empty. If no conclusion can be made, or the
+// interval is provably not empty, returns false.
+static bool isIntervalEmpty(const IntervalRequirement& interval, const ConstFoldFn& constFold) {
+    if (interval.getLowBound().getBound() == Constant::maxKey() ||
+        interval.getHighBound().getBound() == Constant::minKey()) {
+        return true;
+    }
+    const auto boundsCmp =
+        cmpABT(interval.getLowBound().getBound(), interval.getHighBound().getBound(), constFold);
+    // Can't make any conclusions about the comparison between the bounds. We don't know for sure
+    // that it's empty.
+    if (!boundsCmp) {
+        return false;
+    }
+    const bool hasExclusiveBound =
+        !interval.getLowBound().isInclusive() || !interval.getHighBound().isInclusive();
+    // If lower bound greater than upper bound, or the bounds are equal but the interval is
+    // not completely inclusive, we have an empty interval.
+    return *boundsCmp == 1 || (*boundsCmp == 0 && hasExclusiveBound);
+}
+
+std::vector<IntervalRequirement> unionTwoIntervals(const IntervalRequirement& int1,
+                                                   const IntervalRequirement& int2,
+                                                   const ConstFoldFn& constFold) {
+    /*
+     * If we have two intervals, we can convert [a, b] U [c, d] to:
+     * overlap_indicator = a < d && c < b && int1NonEmpty && int2NonEmpty
+     * [overlap_indicator ? min(a, c) : a, overlap_indicator ? max(b, d) : b]
+     * U [c, overlap_indicator ? -inf : d]
+     * If the intervals overlap, they become [min(a,c), max(b,d)] U [c, -inf]
+     * If they do not overlap, then we have the original intervals [a, b] U [c, d]
+     */
+    const auto& int1Low = int1.getLowBound();
+    const auto& int1High = int1.getHighBound();
+
+    const auto& int2Low = int2.getLowBound();
+    const auto& int2High = int2.getHighBound();
+
+    const auto& a = int1Low.getBound();
+    const bool aInc = int1Low.isInclusive();
+    const auto& b = int1High.getBound();
+    const bool bInc = int1High.isInclusive();
+    const auto& c = int2Low.getBound();
+    const bool cInc = int2Low.isInclusive();
+    const auto& d = int2High.getBound();
+    const bool dInc = int2High.isInclusive();
+
+    /*
+     * We'll be adding auxiliary intervals to deal with open/closed bounds. If we have an
+     * interval [a, b), and add an auxiliary interval to account for the inclusivity of `a`,
+     * we only want this aux interval to simplify to [a, a] if a < b. If a >= b, then we
+     * have something like [2,1) = empty set, or [1, 1) which is also the empty set. If the
+     * original interval is the empty set, we want the aux interval to be empty as well.
+     * Therefore we use have the indicators below to tell us if the intervals are non-empty.
+     * If both bounds are inclusive, we allow equality (since [1, 1] is non-empty).
+     * Otherwise we only use less-than (since (1, 1] is empty).
+     */
+    const ABT int1NonEmpty = make<BinaryOp>(aInc && bInc ? Operations::Lte : Operations::Lt, a, b);
+    const ABT int2NonEmpty = make<BinaryOp>(cInc && dInc ? Operations::Lte : Operations::Lt, c, d);
+
+    /*
+     * Whether or not these intervals overlap is dependent on the inclusivity of
+     * the bounds. For example, [2, 3] U [3, 4] does overlap, while [2, 3) U (3, 4] does
+     * not.
+     * The intervals overlap if a < d && c < b, with the actual comparison instead being LTE if
+     * either bound is inclusive.
+     * For another example, we consider [2, 3) U [3, 4] to "overlap" because they can be
+     * combined into one contiguous interval, even though they have no points in common.
+     */
+    const Operations cmpAD = aInc || dInc ? Operations::Lte : Operations::Lt;
+    const Operations cmpBC = bInc || cInc ? Operations::Lte : Operations::Lt;
+    const ABT overlapCondition =
+        make<BinaryOp>(Operations::And, make<BinaryOp>(cmpAD, a, d), make<BinaryOp>(cmpBC, c, b));
+    ABT overlapAndNonEmptyCond =
+        make<BinaryOp>(Operations::And,
+                       overlapCondition,
+                       make<BinaryOp>(Operations::And, int1NonEmpty, int2NonEmpty));
+
+    // Add the primary intervals.
+    std::vector<IntervalRequirement> result;
+    IntervalRequirement primaryInt1 =
+        IntervalRequirement{{aInc && cInc, make<If>(overlapAndNonEmptyCond, minABT(a, c), a)},
+                            {bInc && dInc, make<If>(overlapAndNonEmptyCond, maxABT(b, d), b)}};
+    IntervalRequirement primaryInt2 = IntervalRequirement{
+        {cInc, c}, {dInc, make<If>(std::move(overlapAndNonEmptyCond), Constant::minKey(), d)}};
+    constFoldInterval(primaryInt1, constFold);
+    constFoldInterval(primaryInt2, constFold);
+    if (!isIntervalEmpty(primaryInt1, constFold)) {
+        result.push_back(std::move(primaryInt1));
+    }
+    if (!isIntervalEmpty(primaryInt2, constFold)) {
+        result.push_back(std::move(primaryInt2));
+    }
+
+    // Take a constant non-empty auxiliary interval, and look for its corresponding primary
+    // interval to merge with.
+    const auto mergeAuxWithPrimary = [&result](const ABT& bound) {
+        for (auto& interval : result) {
+            BoundRequirement& low = interval.getLowBound();
+            if (bound == low.getBound()) {
+                low = {true, bound};
+                return;
+            }
+            BoundRequirement& high = interval.getHighBound();
+            if (bound == high.getBound()) {
+                high = {true, bound};
+                return;
+            }
+        }
+        // We need this case, for when we have something like [1,1] U [2,3). Our primary intervals
+        // would be [1,1) U [2,3). These would be unioned with an aux interval. However the primary
+        // interval corresponding with the aux one would be removed, since [1,1) is empty. Then when
+        // this function is called, we won't find the primary interval it belongs with, so instead
+        // of merging we add it to the primary intervals.
+        result.emplace_back(BoundRequirement{true, bound}, BoundRequirement{true, bound});
+    };
+
+    // Analyze an aux interval for const-ness or emptiness, and add it to our result.
+    const auto addAuxInterval = [&](IntervalRequirement auxInterval) {
+        constFoldInterval(auxInterval, constFold);
+        if (!isIntervalEmpty(auxInterval, constFold)) {
+            if (auxInterval.isConstant()) {
+                invariant(auxInterval.isEquality());
+                // Find the primary interval and merge with it.
+                mergeAuxWithPrimary(auxInterval.getLowBound().getBound());
+            } else {
+                // It's still a variable interval after const folding, so we can't merge it with
+                // a primary. Instead just add it to the result.
+                result.push_back(std::move(auxInterval));
+            }
+        }
+        // If it's empty ignore it.
+    };
+
+    // If `a` and `c` agree on inclusivity, then the primary interval will have the same
+    // inclusivity. If they disagree, we make the primary interval exclusive, and add an aux
+    // interval.
+    if (aInc != cInc) {
+        // Add aux interval.
+        if (aInc) {
+            // The aux interval should be [a,a] if
+            // int1NonEmpty && (!overlap_indicator || a <= c)
+            // We only want the aux interval to be non-empty if the interval it originated from is
+            // non-empty and the bound it corresponds to ("a" in this case) wins, OR the intervals
+            // end up not overlapping. Example for the non-overlapping case might be [1,2] U (3,4]
+            // -> (1,2] U (3,4] U aux so we need 1 to still be inclusive, by making the aux a
+            // non-empty point [1,1].
+            ABT auxCondition =
+                make<BinaryOp>(Operations::And,
+                               int1NonEmpty,
+                               make<BinaryOp>(Operations::Or,
+                                              make<UnaryOp>(Operations::Not, overlapCondition),
+                                              make<BinaryOp>(Operations::Lte, a, c)));
+            addAuxInterval(IntervalRequirement{
+                {true, a}, {true, make<If>(std::move(auxCondition), a, Constant::minKey())}});
+        } else {
+            // The aux interval should be [c,c] if
+            // int2NonEmpty && (!overlap_indicator || c <= a)
+            ABT auxCondition =
+                make<BinaryOp>(Operations::And,
+                               int2NonEmpty,
+                               make<BinaryOp>(Operations::Or,
+                                              make<UnaryOp>(Operations::Not, overlapCondition),
+                                              make<BinaryOp>(Operations::Lte, c, a)));
+            addAuxInterval(IntervalRequirement{
+                {true, c}, {true, make<If>(std::move(auxCondition), c, Constant::minKey())}});
+        }
+    }
+    if (bInc != dInc) {
+        // Add aux interval.
+        if (bInc) {
+            // The interval should be [b,b] if
+            // int1NonEmpty && (!overlap_indicator || b >= d)
+            ABT auxCondition =
+                make<BinaryOp>(Operations::And,
+                               int1NonEmpty,
+                               make<BinaryOp>(Operations::Or,
+                                              make<UnaryOp>(Operations::Not, overlapCondition),
+                                              make<BinaryOp>(Operations::Gte, b, d)));
+            addAuxInterval(IntervalRequirement{
+                {true, b}, {true, make<If>(std::move(auxCondition), b, Constant::minKey())}});
+        } else {
+            // The aux interval should be [d,d] if
+            // int2NonEmpty && (!overlap_indicator || d >= b)
+            ABT auxCondition =
+                make<BinaryOp>(Operations::And,
+                               int2NonEmpty,
+                               make<BinaryOp>(Operations::Or,
+                                              make<UnaryOp>(Operations::Not, overlapCondition),
+                                              make<BinaryOp>(Operations::Gte, d, b)));
+            addAuxInterval(IntervalRequirement{
+                {true, d}, {true, make<If>(std::move(auxCondition), d, Constant::minKey())}});
+        }
+    }
+
+    return result;
+}
+
+static IntervalReqExpr::Node makeSingularDNF(const IntervalRequirement& interval) {
+    return IntervalReqExpr::make<IntervalReqExpr::Disjunction>(
+        IntervalReqExpr::makeSeq(IntervalReqExpr::make<IntervalReqExpr::Conjunction>(
+            IntervalReqExpr::makeSeq(IntervalReqExpr::make<IntervalReqExpr::Atom>(interval)))));
+}
+
+boost::optional<IntervalReqExpr::Node> unionDNFIntervals(const IntervalReqExpr::Node& interval,
+                                                         const ConstFoldFn& constFold) {
+    IntervalReqExpr::NodeVector resultIntervals;
+    // Since our input intervals are sorted, constDisjIntervals will be sorted as well.
+    std::vector<IntervalRequirement> constDisjIntervals;
+    const auto& disjNodes = interval.cast<IntervalReqExpr::Disjunction>()->nodes();
+    for (const auto& disjunct : disjNodes) {
+        const auto& conjNodes = disjunct.cast<IntervalReqExpr::Conjunction>()->nodes();
+        tassert(
+            7117500,
+            "Conjunctions were not simplified before unioning. Found conjunction not of size 1.",
+            conjNodes.size() == 1);
+        const auto& interval = conjNodes.front().cast<IntervalReqExpr::Atom>()->getExpr();
+        if (interval.isConstant()) {
+            // We've found a constant disjunct.
+            constDisjIntervals.push_back(interval);
+        } else {
+            // The bound is not constant, so we won't simplify.
+            resultIntervals.push_back(disjunct);
+        }
+    }
+
+    // Remove empty intervals.
+    for (auto it = constDisjIntervals.begin(); it != constDisjIntervals.end();) {
+        if (isIntervalEmpty(*it, constFold)) {
+            it = constDisjIntervals.erase(it);
+        } else {
+            it++;
+        }
+    }
+
+    // For as long as it can, it1 will eat the interval in front of it. When it can't eat anymore,
+    // advance it1.
+    for (auto it1 = constDisjIntervals.begin(); it1 != constDisjIntervals.end(); it1++) {
+        while (std::next(it1) != constDisjIntervals.end()) {
+            auto it2 = std::next(it1);
+            std::vector<IntervalRequirement> result = unionTwoIntervals(*it1, *it2, constFold);
+            if (result.size() != 1) {
+                // They were not merged.
+                break;
+            }
+            // They were merged, delete the it2 interval.
+            constDisjIntervals.erase(it2);
+            *it1 = std::move(result.front());
+        }
+    }
+
+    // This check happens after simplification in case the simplifying reveals a fully open interval
+    // to us. For example, (-inf, 5) U (3, inf) would become (-inf, inf).
+    for (const auto& interval : constDisjIntervals) {
+        if (interval.isFullyOpen()) {
+            return makeSingularDNF(interval);
+        }
+    }
+
+    // Add our simplified constant disjuncts to the final result.
+    for (auto& interval : constDisjIntervals) {
+        resultIntervals.emplace_back(
+            IntervalReqExpr::make<IntervalReqExpr::Conjunction>(IntervalReqExpr::makeSeq(
+                IntervalReqExpr::make<IntervalReqExpr::Atom>(std::move(interval)))));
+    }
+
+    if (resultIntervals.empty()) {
+        return boost::none;
+    }
+
+    return IntervalReqExpr::make<IntervalReqExpr::Disjunction>(std::move(resultIntervals));
+}
+
 void combineIntervalsDNF(const bool intersect,
                          IntervalReqExpr::Node& target,
                          const IntervalReqExpr::Node& source) {
@@ -100,9 +404,9 @@ void combineIntervalsDNF(const bool intersect,
     target = IntervalReqExpr::make<IntervalReqExpr::Disjunction>(std::move(newDisjunction));
 }
 
-std::vector<IntervalRequirement> intersectIntervals(const IntervalRequirement& i1,
-                                                    const IntervalRequirement& i2,
-                                                    const ConstFoldFn& constFold) {
+static std::vector<IntervalRequirement> intersectIntervals(const IntervalRequirement& i1,
+                                                           const IntervalRequirement& i2,
+                                                           const ConstFoldFn& constFold) {
     // Handle trivial cases of intersection.
     if (i1.isFullyOpen()) {
         return {i2};
@@ -120,17 +424,11 @@ std::vector<IntervalRequirement> intersectIntervals(const IntervalRequirement& i
         constFold(expr);
         return expr;
     };
-    const auto minFn = [](const ABT& v1, const ABT& v2) {
-        return make<If>(make<BinaryOp>(Operations::Lte, v1, v2), v1, v2);
-    };
-    const auto maxFn = [](const ABT& v1, const ABT& v2) {
-        return make<If>(make<BinaryOp>(Operations::Gte, v1, v2), v1, v2);
-    };
 
     // In the simplest case our bound is (max(low1, low2), min(high1, high2)) if none of the bounds
     // are inclusive.
-    const ABT maxLow = foldFn(maxFn(low1, low2));
-    const ABT minHigh = foldFn(minFn(high1, high2));
+    ABT maxLow = foldFn(maxABT(low1, low2));
+    ABT minHigh = foldFn(minABT(high1, high2));
     if (foldFn(make<BinaryOp>(Operations::Gt, maxLow, minHigh)) == Constant::boolean(true)) {
         // Low bound is greater than high bound.
         return {};
@@ -147,7 +445,8 @@ std::vector<IntervalRequirement> intersectIntervals(const IntervalRequirement& i
     BoundRequirement highBoundPrimary(high1Inc && high2Inc, minHigh);
 
     const bool boundsEqual =
-        foldFn(make<BinaryOp>(Operations::Eq, maxLow, minHigh)) == Constant::boolean(true);
+        foldFn(make<BinaryOp>(Operations::Eq, std::move(maxLow), std::move(minHigh))) ==
+        Constant::boolean(true);
     if (boundsEqual) {
         if (low1Inc && high1Inc && low2Inc && high2Inc) {
             // Point interval.
@@ -182,7 +481,8 @@ std::vector<IntervalRequirement> intersectIntervals(const IntervalRequirement& i
     const auto addAuxInterval = [&](ABT low, ABT high, BoundRequirement& bound) {
         IntervalRequirement interval{{true, low}, {true, high}};
 
-        const ABT comparison = foldFn(make<BinaryOp>(Operations::Lte, low, high));
+        const ABT comparison =
+            foldFn(make<BinaryOp>(Operations::Lte, std::move(low), std::move(high)));
         if (comparison == Constant::boolean(true)) {
             if (interval.isEquality()) {
                 // We can determine the two bounds are equal.
@@ -310,8 +610,9 @@ boost::optional<IntervalReqExpr::Node> intersectDNFIntervals(
                 for (const auto& intersectedInterval : intersectedIntervalDisjunction) {
                     auto intersectionResult =
                         intersectIntervals(intersectedInterval, interval, constFold);
-                    newResult.insert(
-                        newResult.end(), intersectionResult.cbegin(), intersectionResult.cend());
+                    newResult.insert(newResult.end(),
+                                     make_move_iterator(intersectionResult.begin()),
+                                     make_move_iterator(intersectionResult.end()));
                 }
                 if (newResult.empty()) {
                     // The intersection is empty, there is no need to process the remaining
@@ -333,7 +634,7 @@ boost::optional<IntervalReqExpr::Node> intersectDNFIntervals(
 
             // Remove redundant conjunctions.
             if (std::find(disjuncts.cbegin(), disjuncts.cend(), conjunction) == disjuncts.cend()) {
-                disjuncts.emplace_back(conjunction);
+                disjuncts.push_back(std::move(conjunction));
             }
         }
     }
@@ -342,6 +643,15 @@ boost::optional<IntervalReqExpr::Node> intersectDNFIntervals(
         return {};
     }
     return IntervalReqExpr::make<IntervalReqExpr::Disjunction>(std::move(disjuncts));
+}
+
+boost::optional<IntervalReqExpr::Node> simplifyDNFIntervals(const IntervalReqExpr::Node& interval,
+                                                            const ConstFoldFn& constFold) {
+    if (const auto simplified = intersectDNFIntervals(interval, constFold)) {
+        return unionDNFIntervals(*simplified, constFold);
+    }
+    // Empty interval.
+    return boost::none;
 }
 
 bool combineCompoundIntervalsDNF(CompoundIntervalReqExpr::Node& targetIntervals,

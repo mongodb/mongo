@@ -193,6 +193,23 @@ void ConstEval::transport(ABT& n, const LambdaApplication& app, ABT& lam, ABT& a
     }
 }
 
+void ConstEval::transport(ABT& n, const UnaryOp& op, ABT& child) {
+    switch (op.op()) {
+        case Operations::Not: {
+            if (const auto childConst = child.cast<Constant>();
+                childConst && childConst->isValueBool()) {
+                swapAndUpdate(n, Constant::boolean(!childConst->getValueBool()));
+            }
+            break;
+        }
+
+            // Could also constant fold arithmetic negation.
+
+        default:
+            break;
+    }
+}
+
 // Specific transport for binary operation
 // The const correctness is probably wrong (as const ABT& lhs, const ABT& rhs does not work for
 // some reason but we can fix it later).

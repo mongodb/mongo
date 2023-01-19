@@ -68,6 +68,7 @@ public:
     bool isFullyOpen() const;
     bool isEquality() const;
     void reverse();
+    bool isConstant() const;
 
     const BoundRequirement& getLowBound() const;
     BoundRequirement& getLowBound();

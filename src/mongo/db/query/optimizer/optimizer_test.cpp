@@ -118,6 +118,14 @@ TEST(Optimizer, ConstEval6) {
     ASSERT_EQ(constEval(tree3)->getValueInt64(), 4294967294);
 }
 
+TEST(Optimizer, ConstEvalNotNegate) {
+    // !true = false
+    ABT tree1 = make<UnaryOp>(Operations::Not, Constant::boolean(true));
+    ASSERT_EQ(constEval(tree1)->getValueBool(), false);
+    // !false = true
+    ABT tree2 = make<UnaryOp>(Operations::Not, Constant::boolean(false));
+    ASSERT_EQ(constEval(tree2)->getValueBool(), true);
+}
 
 TEST(Optimizer, IntegerOverflow) {
     auto int32tree =
@@ -795,11 +803,70 @@ TEST(IntervalNormalize, Basic) {
         "    }\n"
         " U \n"
         "    {\n"
-        "        {(Const [3], Const [4]]}\n"
-        "     U \n"
         "        {[Const [3], Const [2]]}\n"
         "     U \n"
         "        {[Const [3], Const [4]]}\n"
+        "     U \n"
+        "        {(Const [3], Const [4]]}\n"
+        "    }\n"
+        "}\n",
+        intervalExpr);
+}
+
+TEST(IntervalNormalize, IntervalNormalizeConstantsFirst) {
+    auto intervalExpr = _disj(_conj(_interval(_incl("var1"_var), _incl("var2"_var))),
+                              _conj(_interval(_incl("3"_cint64), _incl("var2"_var))),
+                              _conj(_interval(_incl("7"_cint64), _incl("8"_cint64))),
+                              _conj(_interval(_incl("var3"_var), _incl("4"_cint64))),
+                              _conj(_interval(_incl("1"_cint64), _incl("5"_cint64))));
+
+    ASSERT_INTERVAL(
+        "{\n"
+        "    {\n"
+        "        {[Variable [var1], Variable [var2]]}\n"
+        "    }\n"
+        " U \n"
+        "    {\n"
+        "        {[Const [3], Variable [var2]]}\n"
+        "    }\n"
+        " U \n"
+        "    {\n"
+        "        {[Const [7], Const [8]]}\n"
+        "    }\n"
+        " U \n"
+        "    {\n"
+        "        {[Variable [var3], Const [4]]}\n"
+        "    }\n"
+        " U \n"
+        "    {\n"
+        "        {[Const [1], Const [5]]}\n"
+        "    }\n"
+        "}\n",
+        intervalExpr);
+
+    normalizeIntervals(intervalExpr);
+
+    // Demonstrate that constant intervals are sorted first.
+    ASSERT_INTERVAL(
+        "{\n"
+        "    {\n"
+        "        {[Const [1], Const [5]]}\n"
+        "    }\n"
+        " U \n"
+        "    {\n"
+        "        {[Const [7], Const [8]]}\n"
+        "    }\n"
+        " U \n"
+        "    {\n"
+        "        {[Const [3], Variable [var2]]}\n"
+        "    }\n"
+        " U \n"
+        "    {\n"
+        "        {[Variable [var1], Variable [var2]]}\n"
+        "    }\n"
+        " U \n"
+        "    {\n"
+        "        {[Variable [var3], Const [4]]}\n"
         "    }\n"
         "}\n",
         intervalExpr);

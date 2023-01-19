@@ -849,15 +849,13 @@ bool simplifyPartialSchemaReqPaths(const ProjectionName& scanProjName,
     PartialSchemaRequirements result;
     boost::optional<std::pair<PartialSchemaKey, PartialSchemaRequirement>> prevEntry;
 
-    const auto intersectFn = [&constFold](IntervalReqExpr::Node& intervals) {
-        auto intersected = intersectDNFIntervals(intervals, constFold);
-        if (!intersected) {
-            // Empty interval.
-            return false;
+    const auto simplifyFn = [&constFold](IntervalReqExpr::Node& intervals) -> bool {
+        normalizeIntervals(intervals);
+        auto simplified = simplifyDNFIntervals(intervals, constFold);
+        if (simplified) {
+            intervals = std::move(*simplified);
         }
-
-        intervals = std::move(*intersected);
-        return true;
+        return simplified.has_value();
     };
 
     // Simplify paths by eliminating unnecessary Traverse elements.
@@ -884,7 +882,7 @@ bool simplifyPartialSchemaReqPaths(const ProjectionName& scanProjName,
                 }
 
                 combineIntervalsDNF(true /*intersect*/, resultIntervals, req.getIntervals());
-                if (!intersectFn(resultIntervals)) {
+                if (!simplifyFn(resultIntervals)) {
                     return true;
                 }
 
@@ -906,7 +904,7 @@ bool simplifyPartialSchemaReqPaths(const ProjectionName& scanProjName,
     // Intersect and normalize intervals.
     for (auto& [key, req] : result) {
         auto resultIntervals = req.getIntervals();
-        if (!intersectFn(resultIntervals)) {
+        if (!simplifyFn(resultIntervals)) {
             return true;
         }
 

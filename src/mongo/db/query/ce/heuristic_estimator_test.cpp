@@ -702,9 +702,9 @@ TEST_F(CEHeuristicTest, CEAfterMemoSubstitutionPhase_DNF1pathSimple) {
         "{$and: [{a0: {$gt:40}}, {a0: {$lt: 44}}]}"
         "]}";
     HeuristicCETester ht(collName);
-    ASSERT_MATCH_CE_CARD(ht, query, 6.42792, 9.0);
-    ASSERT_MATCH_CE_CARD(ht, query, 37.0586, 99.0);
-    ASSERT_MATCH_CE_CARD(ht, query, 225.232, 1000.0);
+    ASSERT_MATCH_CE_CARD(ht, query, 4.71432, 9.0);
+    ASSERT_MATCH_CE_CARD(ht, query, 22.9249, 99.0);
+    ASSERT_MATCH_CE_CARD(ht, query, 130.089, 1000.0);
 }
 
 
@@ -759,9 +759,9 @@ TEST_F(CEHeuristicTest, CEAfterMemoSubstitutionPhase_CNF1path) {
         "{$or : [ {a0 : {$gt : 77}}, {a0 : {$eq : 51}} ]}"
         "]}";
     HeuristicCETester ht(collName);
-    ASSERT_MATCH_CE_CARD(ht, query, 6.21212, 9.0);
-    ASSERT_MATCH_CE_CARD(ht, query, 36.4418, 99.0);
-    ASSERT_MATCH_CE_CARD(ht, query, 228.935, 1000.0);
+    ASSERT_MATCH_CE_CARD(ht, query, 5.4743, 9.0);
+    ASSERT_MATCH_CE_CARD(ht, query, 30.8127, 99.0);
+    ASSERT_MATCH_CE_CARD(ht, query, 192.613, 1000.0);
 }
 
 TEST_F(CEHeuristicTest, CEAfterMemoSubstitutionPhase_CNF2paths) {
@@ -771,9 +771,9 @@ TEST_F(CEHeuristicTest, CEAfterMemoSubstitutionPhase_CNF2paths) {
         "{$or : [ {b0 : {$gt : 77}}, {b0 : {$eq : 51}} ]}"
         "]}";
     HeuristicCETester ht(collName);
-    ASSERT_MATCH_CE_CARD(ht, query, 6.21212, 9.0);
-    ASSERT_MATCH_CE_CARD(ht, query, 36.4418, 99.0);
-    ASSERT_MATCH_CE_CARD(ht, query, 228.935, 1000.0);
+    ASSERT_MATCH_CE_CARD(ht, query, 5.4743, 9.0);
+    ASSERT_MATCH_CE_CARD(ht, query, 30.8127, 99.0);
+    ASSERT_MATCH_CE_CARD(ht, query, 192.613, 1000.0);
 }
 
 TEST_F(CEHeuristicTest, CEAfterMemoSubstitutionExplorationPhases) {

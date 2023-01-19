@@ -314,28 +314,39 @@ int compareIntervals(const IntervalRequirement& i1, const IntervalRequirement& i
     const auto& low2 = i2.getLowBound();
     const auto& high2 = i2.getHighBound();
 
-    // Sort first by non-inclusive lower bounds.
-    if (low1.isInclusive() < low2.isInclusive()) {
+    // Sort constant intervals first.
+    if (i1.isConstant() && !i2.isConstant()) {
         return -1;
-    } else if (low1.isInclusive() > low2.isInclusive()) {
+    } else if (!i1.isConstant() && i2.isConstant()) {
         return 1;
     }
 
-    // Then by non-inclusive high bounds.
-    if (high1.isInclusive() < high2.isInclusive()) {
+    // By lower bound expression.
+    const int cmpLow = compareExprAndPaths(low1.getBound(), low2.getBound());
+    if (cmpLow != 0) {
+        return cmpLow;
+    }
+
+    // By high bound expression.
+    const int cmpHigh = compareExprAndPaths(high1.getBound(), high2.getBound());
+    if (cmpHigh != 0) {
+        return cmpHigh;
+    }
+
+    // Sort first by inclusive lower bounds.
+    if (low1.isInclusive() && !low2.isInclusive()) {
         return -1;
-    } else if (high1.isInclusive() > high2.isInclusive()) {
+    } else if (!low1.isInclusive() && low2.isInclusive()) {
         return 1;
     }
 
-    // Third, by lower bound expression.
-    const int cmp = compareExprAndPaths(low1.getBound(), low2.getBound());
-    if (cmp != 0) {
-        return cmp;
+    // Then by inclusive high bounds.
+    if (high1.isInclusive() && !high2.isInclusive()) {
+        return -1;
+    } else if (!high1.isInclusive() && high2.isInclusive()) {
+        return 1;
     }
-
-    // Last by high bound expression.
-    return compareExprAndPaths(high1.getBound(), high2.getBound());
+    return 0;
 }
 
 class IntervalExprComparator {

@@ -475,6 +475,186 @@ TEST_F(IntervalIntersection, VariableIntervals4) {
     ASSERT_TRUE(*result == *result1);
 }
 
+void unionTest(IntervalReqExpr::Node interval, const std::string& simplifiedExplain) {
+    normalizeIntervals(interval);
+    auto result = unionDNFIntervals(interval, ConstEval::constFold);
+    ASSERT_TRUE(result);
+
+    ASSERT_INTERVAL(simplifiedExplain, *result);
+}
+
+TEST(IntervalIntersection, EliminateEmptyIntervals) {
+    unionTest(_disj(_conj(_interval(_incl("1"_cint32), _incl("3"_cint32))),
+                    _conj(_interval(_incl("6"_cint32), _incl("5"_cint32))),
+                    _conj(_interval(_excl("7"_cint32), _incl("7"_cint32))),
+                    _conj(_interval(_excl("8"_cint32), _excl("8"_cint32)))),
+              "{\n"
+              "    {\n"
+              "        {[Const [1], Const [3]]}\n"
+              "    }\n"
+              "}\n");
+}
+
+TEST(IntervalIntersection, FullyOpenInterval) {
+    unionTest(_disj(_conj(_interval(_incl("1"_cint32), _incl("3"_cint32))),
+                    _conj(_interval(_minusInf(), _plusInf()))),
+              "{\n"
+              "    {\n"
+              "        {<fully open>}\n"
+              "    }\n"
+              "}\n");
+}
+
+TEST(IntervalIntersection, FullyOpenIntervalAfterSimplification) {
+    unionTest(_disj(_conj(_interval(_minusInf(), _incl("10"_cint32))),
+                    _conj(_interval(_incl("5"_cint32), _plusInf())),
+                    _conj(_interval(_incl("v1"_var), _incl("v2"_var)))),
+              "{\n"
+              "    {\n"
+              "        {<fully open>}\n"
+              "    }\n"
+              "}\n");
+}
+
+TEST(IntervalIntersection, UnionConstConst1) {
+    unionTest(_disj(_conj(_interval(_incl("2"_cint32), _excl("4"_cint32))),
+                    _conj(_interval(_incl("1"_cint32), _incl("3"_cint32)))),
+              "{\n"
+              "    {\n"
+              "        {[Const [1], Const [4])}\n"
+              "    }\n"
+              "}\n");
+}
+
+TEST(IntervalIntersection, UnionConstConst2) {
+    unionTest(_disj(_conj(_interval(_incl("1"_cint32), _excl("4"_cint32))),
+                    _conj(_interval(_incl("2"_cint32), _incl("3"_cint32)))),
+              "{\n"
+              "    {\n"
+              "        {[Const [1], Const [4])}\n"
+              "    }\n"
+              "}\n");
+}
+
+TEST(IntervalIntersection, UnionConstConst3) {
+    unionTest(_disj(_conj(_interval(_incl("2"_cint32), _incl("3"_cint32))),
+                    _conj(_interval(_incl("1"_cint32), _excl("4"_cint32)))),
+              "{\n"
+              "    {\n"
+              "        {[Const [1], Const [4])}\n"
+              "    }\n"
+              "}\n");
+}
+
+TEST(IntervalIntersection, UnionConstSameIntervalExclusive) {
+    unionTest(_disj(_conj(_interval(_excl("1"_cint32), _excl("4"_cint32))),
+                    _conj(_interval(_excl("1"_cint32), _excl("4"_cint32)))),
+              "{\n"
+              "    {\n"
+              "        {(Const [1], Const [4])}\n"
+              "    }\n"
+              "}\n");
+}
+
+TEST(IntervalIntersection, UnionConstConstNoOverlap) {
+    unionTest(_disj(_conj(_interval(_incl("1"_cint32), _incl("2"_cint32))),
+                    _conj(_interval(_incl("3"_cint32), _incl("5"_cint32)))),
+              "{\n"
+              "    {\n"
+              "        {[Const [1], Const [2]]}\n"
+              "    }\n"
+              " U \n"
+              "    {\n"
+              "        {[Const [3], Const [5]]}\n"
+              "    }\n"
+              "}\n");
+}
+
+TEST(IntervalIntersection, UnionConstConstSameBoundExcl) {
+    unionTest(_disj(_conj(_interval(_incl("1"_cint32), _excl("3"_cint32))),
+                    _conj(_interval(_excl("3"_cint32), _incl("5"_cint32)))),
+              "{\n"
+              "    {\n"
+              "        {[Const [1], Const [3])}\n"
+              "    }\n"
+              " U \n"
+              "    {\n"
+              "        {(Const [3], Const [5]]}\n"
+              "    }\n"
+              "}\n");
+}
+
+TEST(IntervalIntersection, UnionConstConstSameBoundOneIncl) {
+    unionTest(_disj(_conj(_interval(_incl("1"_cint32), _incl("3"_cint32))),
+                    _conj(_interval(_excl("3"_cint32), _incl("5"_cint32)))),
+              "{\n"
+              "    {\n"
+              "        {[Const [1], Const [5]]}\n"
+              "    }\n"
+              "}\n");
+}
+
+TEST(IntervalIntersection, UnionConstConstSameBoundIncl) {
+    unionTest(_disj(_conj(_interval(_incl("1"_cint32), _incl("3"_cint32))),
+                    _conj(_interval(_incl("3"_cint32), _incl("5"_cint32)))),
+              "{\n"
+              "    {\n"
+              "        {[Const [1], Const [5]]}\n"
+              "    }\n"
+              "}\n");
+}
+
+TEST(IntervalIntersection, UnionManyConst) {
+    unionTest(
+        // Purposely put out of order so they'll get sorted during normalization.
+        _disj(_conj(_interval(_incl("4"_cint32), _incl("7"_cint32))),
+              _conj(_interval(_incl("3"_cint32), _incl("5"_cint32))),
+              _conj(_interval(_incl("9"_cint32), _incl("12"_cint32))),
+              _conj(_interval(_incl("8"_cint32), _incl("10"_cint32))),
+              _conj(_interval(_incl("12"_cint32), _incl("13"_cint32))),
+              _conj(_interval(_incl("1"_cint32), _incl("2"_cint32)))),
+        "{\n"
+        "    {\n"
+        "        {[Const [1], Const [2]]}\n"
+        "    }\n"
+        " U \n"
+        "    {\n"
+        "        {[Const [3], Const [7]]}\n"
+        "    }\n"
+        " U \n"
+        "    {\n"
+        "        {[Const [8], Const [13]]}\n"
+        "    }\n"
+        "}\n");
+}
+
+TEST(IntervalIntersection, UnionManyConst2) {
+    unionTest(
+        // Purposely put out of order so they'll get sorted during normalization.
+        _disj(_conj(_interval(_incl("1"_cint32), _excl("3"_cint32))),
+              _conj(_interval(_excl("3"_cint32), _incl("4"_cint32))),
+              _conj(_interval(_incl("3"_cint32), _incl("4"_cint32)))),
+        "{\n"
+        "    {\n"
+        "        {[Const [1], Const [4]]}\n"
+        "    }\n"
+        "}\n");
+}
+
+TEST(IntervalIntersection, UnionConstVariable) {
+    unionTest(_disj(_conj(_interval(_incl("v1"_var), _incl("v3"_var))),
+                    _conj(_interval(_incl("1"_cint32), _incl("3"_cint32)))),
+              "{\n"
+              "    {\n"
+              "        {[Variable [v1], Variable [v3]]}\n"
+              "    }\n"
+              " U \n"
+              "    {\n"
+              "        {[Const [1], Const [3]]}\n"
+              "    }\n"
+              "}\n");
+}
+
 /*
  * Bitset with extra flags to indicate whether MinKey and MaxKey are included.
  * The first two bits are MinKey and MaxKey, the rest represent integers [0, N).
@@ -485,7 +665,7 @@ public:
     ExtendedBitset() {}
 
     void set(const int i, const bool b) {
-        invariant(i >= 0 && i < N);
+        invariant(i >= 0 && i < N - 2);
         _b.set(i + 2, b);
     }
 
@@ -520,7 +700,7 @@ public:
     }
 
 private:
-    std::bitset<N + 2> _b;
+    std::bitset<N> _b;
 };
 
 /*
@@ -548,7 +728,7 @@ public:
             lbInt = lb.getBound().cast<Constant>()->getValueInt32() + (lb.isInclusive() ? 0 : 1);
         }
 
-        int hbInt = N;
+        int hbInt = N - 2;
         if (hb.getBound() == Constant::maxKey()) {
             result |= ExtendedBitset<N>::maxKey();
         } else {
@@ -645,15 +825,8 @@ bool compareIntervals(const IntervalReqExpr::Node& original,
 void constFoldBounds(IntervalReqExpr::Node& node) {
     for (auto& disjunct : node.cast<IntervalReqExpr::Disjunction>()->nodes()) {
         for (auto& conjunct : disjunct.cast<IntervalReqExpr::Conjunction>()->nodes()) {
-            auto& interval = conjunct.cast<IntervalReqExpr::Atom>()->getExpr();
-            ABT lowABT = interval.getLowBound().getBound();
-            ABT highABT = interval.getHighBound().getBound();
-            ConstEval::constFold(lowABT);
-            ConstEval::constFold(highABT);
-            interval = IntervalRequirement{
-                BoundRequirement{interval.getLowBound().isInclusive(), std::move(lowABT)},
-                BoundRequirement{interval.getHighBound().isInclusive(), std::move(highABT)},
-            };
+            constFoldInterval(conjunct.cast<IntervalReqExpr::Atom>()->getExpr(),
+                              ConstEval::constFold);
         }
     }
 }
@@ -673,6 +846,15 @@ void testIntervalPermutation(int permutation) {
     const int high2 = decode<N>(permutation);
     const bool useRealConstFold = decode<2>(permutation);
 
+    const auto randBoundToABT = [](const int bound) {
+        if (bound == N - 2) {
+            return Constant::minKey();
+        } else if (bound == N - 1) {
+            return Constant::maxKey();
+        }
+        return Constant::int32(bound);
+    };
+
     // This function can be passed as a substitute for the real constant folding function, to test
     // that our simplification methods work when we cannot constant fold anything.
     const auto noOpConstFold = [](ABT& n) {
@@ -682,8 +864,9 @@ void testIntervalPermutation(int permutation) {
     // Test intersection.
     {
         auto original = _disj(
-            _conj(_interval({low1Inc, Constant::int32(low1)}, {high1Inc, Constant::int32(high1)}),
-                  _interval({low2Inc, Constant::int32(low2)}, {high2Inc, Constant::int32(high2)})));
+            _conj(_interval({low1Inc, randBoundToABT(low1)}, {high1Inc, randBoundToABT(high1)}),
+                  _interval({low2Inc, randBoundToABT(low2)}, {high2Inc, randBoundToABT(high2)})));
+        normalizeIntervals(original);
         auto simplified = intersectDNFIntervals(
             original, useRealConstFold ? ConstEval::constFold : noOpConstFold);
 
@@ -699,8 +882,29 @@ void testIntervalPermutation(int permutation) {
             }
             ASSERT(compareIntervals<N>(original, *simplified));
         } else {
-            IntervalInclusionTransport<N> transport;
-            ASSERT(transport.computeInclusion(original) == ExtendedBitset<N>());
+            ASSERT(IntervalInclusionTransport<N>().computeInclusion(original) ==
+                   ExtendedBitset<N>());
+        }
+    }
+
+    // Test union.
+    {
+        auto original = _disj(
+            _conj(_interval({low1Inc, randBoundToABT(low1)}, {high1Inc, randBoundToABT(high1)})),
+            _conj(_interval({low2Inc, randBoundToABT(low2)}, {high2Inc, randBoundToABT(high2)})));
+        normalizeIntervals(original);
+        auto simplified =
+            unionDNFIntervals(original, useRealConstFold ? ConstEval::constFold : noOpConstFold);
+        if (simplified) {
+            if (!useRealConstFold) {
+                // If we didn't use the real constant folding function, we have to constant fold
+                // now, because our bounds will have If's.
+                constFoldBounds(*simplified);
+            }
+            ASSERT(compareIntervals<N>(original, *simplified));
+        } else {
+            ASSERT(IntervalInclusionTransport<N>().computeInclusion(original) ==
+                   ExtendedBitset<N>());
         }
     }
 }
@@ -723,18 +927,22 @@ template <int N, bool isLow>
 BoundRequirement makeRandomBound(PseudoRandom& threadLocalRNG,
                                  const std::vector<ProjectionName>& vars) {
     const bool isInclusive = threadLocalRNG.nextInt32(2);
-    // We can return one of: N+2 constants (+2 because of minkey and maxkey), or 8 variables.
-    const int r = threadLocalRNG.nextInt32(N + 10);
+    // We can return one of: N constants, or 8 variables.
+    const int r = threadLocalRNG.nextInt32(N + 8);
     if (r == 0) {
         return {isInclusive, Constant::minKey()};
     } else if (r == 1) {
         return {isInclusive, Constant::maxKey()};
-    } else if (r < N + 2) {
-        return {isInclusive, makeRandomIntBound<N, isLow>(threadLocalRNG)};
+    } else if (r < N) {
+        return {isInclusive, makeRandomIntBound<N - 2, isLow>(threadLocalRNG)};
     } else {
-        return {isInclusive, make<Variable>(vars.at(r - (N + 2)))};
+        return {isInclusive, make<Variable>(vars.at(r - N))};
     }
 };
+
+IntervalReqExpr::Node makeEmptyInterval() {
+    return _disj(_conj(_interval(_excl("0"_cint32), _excl("0"_cint32))));
+}
 
 template <int N>
 void testIntervalFuzz(const uint64_t seed, PseudoRandom& threadLocalRNG) {
@@ -744,7 +952,7 @@ void testIntervalFuzz(const uint64_t seed, PseudoRandom& threadLocalRNG) {
     std::vector<ProjectionName> vars;
     for (size_t i = 0; i < 8; i++) {
         // minkey=0, maxkey=1, anything else is a constant
-        const int type = threadLocalRNG.nextInt32(N + 2);
+        const int type = threadLocalRNG.nextInt32(N);
         ABT val = Constant::int32(type - 2);
         if (type == 0) {
             val = Constant::minKey();
@@ -764,36 +972,110 @@ void testIntervalFuzz(const uint64_t seed, PseudoRandom& threadLocalRNG) {
     {
         IntervalReqExpr::NodeVector intervalVec;
         for (size_t i = 0; i < numIntervals; i++) {
-            intervalVec.push_back(IntervalReqExpr::make<IntervalReqExpr::Atom>(
-                IntervalRequirement{makeRandomBound<N, true>(threadLocalRNG, vars),
-                                    makeRandomBound<N, false>(threadLocalRNG, vars)}));
+            intervalVec.push_back(_interval(makeRandomBound<N, true>(threadLocalRNG, vars),
+                                            makeRandomBound<N, false>(threadLocalRNG, vars)));
         }
 
-        auto original =
-            IntervalReqExpr::make<IntervalReqExpr::Disjunction>(IntervalReqExpr::NodeVector{
-                IntervalReqExpr::make<IntervalReqExpr::Conjunction>(std::move(intervalVec))});
+        auto original = _disj(_conj(std::move(intervalVec)));
+        normalizeIntervals(original);
         auto simplified = intersectDNFIntervals(original, ConstEval::constFold);
 
         varEval.replaceVarsInInterval(original);
         if (simplified) {
             varEval.replaceVarsInInterval(*simplified);
-            ASSERT(compareIntervals<N>(original, *simplified));
         } else {
-            // 'simplified' false means the simplified interval is empty (always-false) and can't be
-            // represented as a BoolExpr, so check that 'original' returns false on every example.
-            IntervalInclusionTransport<N> transport;
-            ASSERT(transport.computeInclusion(original) == ExtendedBitset<N>());
+            simplified = makeEmptyInterval();
+        }
+        if (!compareIntervals<N>(original, *simplified)) {
+            std::cout << "Failed with random seed: " << seed << "\n";
+            ASSERT(false);
         }
     }
 
-    // TODO SERVER-71175 should include a union test here
+    // Union two intervals of any kind. It is necessary to specifically test unionTwoIntervals,
+    // because it is intended to work with variables and constants. Testing with unionDNFIntervals
+    // only tests constants.
+    {
+        const auto int1 = IntervalRequirement(makeRandomBound<N, true>(threadLocalRNG, vars),
+                                              makeRandomBound<N, false>(threadLocalRNG, vars));
+        const auto int2 = IntervalRequirement(makeRandomBound<N, true>(threadLocalRNG, vars),
+                                              makeRandomBound<N, false>(threadLocalRNG, vars));
+        auto original = _disj(_conj(_interval(int1)), _conj(_interval(int2)));
+        std::vector<IntervalRequirement> unionResult =
+            unionTwoIntervals(int1, int2, ConstEval::constFold);
 
-    // TODO SERVER-71175 should extend this to have DNF intervals that are not purely disjunctions
-    // or purely conjunctions. A mix of ORs and ANDs seems necessary, to test that the two
-    // simplification methods (intersecting and unioning) don't interfere with each other.
+        IntervalReqExpr::NodeVector simplifiedDisj;
+        for (IntervalRequirement& interval : unionResult) {
+            simplifiedDisj.push_back(_conj(_interval(std::move(interval))));
+        }
+        IntervalReqExpr::Node simplified =
+            simplifiedDisj.empty() ? makeEmptyInterval() : _disj(std::move(simplifiedDisj));
+
+        varEval.replaceVarsInInterval(original);
+        varEval.replaceVarsInInterval(simplified);
+        if (!compareIntervals<N>(original, simplified)) {
+            std::cout << "Failed with random seed: " << seed << "\n";
+            ASSERT(false);
+        }
+    }
+
+    // Union with multiple intervals.
+    {
+        IntervalReqExpr::NodeVector intervalVec;
+        for (size_t i = 0; i < numIntervals; i++) {
+            intervalVec.push_back(
+                _conj(_interval(makeRandomBound<N, true>(threadLocalRNG, vars),
+                                makeRandomBound<N, false>(threadLocalRNG, vars))));
+        }
+
+        auto original = _disj(std::move(intervalVec));
+        normalizeIntervals(original);
+        auto simplified = unionDNFIntervals(original, ConstEval::constFold);
+
+        varEval.replaceVarsInInterval(original);
+        if (simplified) {
+            varEval.replaceVarsInInterval(*simplified);
+        } else {
+            simplified = makeEmptyInterval();
+        }
+        if (!compareIntervals<N>(original, *simplified)) {
+            std::cout << "Failed with random seed: " << seed << "\n";
+            ASSERT(false);
+        }
+    }
+
+    // Test a mix of unions and intersections.
+    {
+        IntervalReqExpr::NodeVector disjVec;
+        for (size_t i = 0; i < numIntervals; i++) {
+            const size_t numConjuncts = 1 + threadLocalRNG.nextInt32(3);
+            IntervalReqExpr::NodeVector conjVec;
+            for (size_t j = 0; j < numConjuncts; j++) {
+                conjVec.push_back(_interval(makeRandomBound<N, true>(threadLocalRNG, vars),
+                                            makeRandomBound<N, false>(threadLocalRNG, vars)));
+            }
+            disjVec.push_back(_conj(std::move(conjVec)));
+        }
+
+        auto original = _disj(std::move(disjVec));
+        normalizeIntervals(original);
+        auto simplified = simplifyDNFIntervals(original, ConstEval::constFold);
+
+        varEval.replaceVarsInInterval(original);
+        if (simplified) {
+            varEval.replaceVarsInInterval(*simplified);
+        } else {
+            simplified = makeEmptyInterval();
+        }
+        if (!compareIntervals<N>(original, *simplified)) {
+            std::cout << "Failed with random seed: " << seed << "\n";
+            ASSERT(false);
+        }
+    }
 }
 
-static constexpr int bitsetSize = 10;
+// Number of bits held in the bitset. This include MinKey and MaxKey, so it must be at least two.
+static constexpr int bitsetSize = 11;
 static const size_t numThreads = ProcessInfo::getNumCores();
 
 TEST_F(IntervalIntersection, IntervalPermutations) {
@@ -835,7 +1117,7 @@ TEST_F(IntervalIntersection, IntervalPermutations) {
 }
 
 TEST_F(IntervalIntersection, IntervalFuzz) {
-    static constexpr int numFuzzTests = 5000;
+    static constexpr int numFuzzTests = 500;
     /**
      * Generate random intervals with a mix of variables and constants, and test that they intersect
      * and union correctly.
@@ -865,12 +1147,8 @@ TEST_F(IntervalIntersection, IntervalFuzz) {
 }
 
 TEST(IntervalIntersection, IntersectionSpecialCase) {
-    auto original = IntervalReqExpr::make<IntervalReqExpr::Disjunction>(IntervalReqExpr::NodeVector{
-        IntervalReqExpr::make<IntervalReqExpr::Conjunction>(IntervalReqExpr::NodeVector{
-            IntervalReqExpr::make<IntervalReqExpr::Atom>(IntervalRequirement{
-                {true, make<Variable>("var1")}, {true, make<Variable>("var1")}}),
-            IntervalReqExpr::make<IntervalReqExpr::Atom>(IntervalRequirement{
-                {false, make<Variable>("var2")}, {false, make<Variable>("var3")}})})});
+    auto original = _disj(_conj(_interval(_incl("var1"_var), _incl("var1"_var)),
+                                _interval(_incl("var1"_var), _incl("var1"_var))));
 
     auto simplified = intersectDNFIntervals(original, ConstEval::constFold);
     ASSERT(simplified);
