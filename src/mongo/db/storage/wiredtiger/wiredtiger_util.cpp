@@ -37,6 +37,7 @@
 
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/path.hpp>
+#include <pcrecpp.h>
 
 #include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -51,6 +52,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/static_immortal.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -336,7 +338,7 @@ StatusWith<int64_t> WiredTigerUtil::checkApplicationMetadataFormatVersion(Operat
 
 // static
 Status WiredTigerUtil::checkTableCreationOptions(const BSONElement& configElem) {
-    invariant(configElem.fieldNameStringData() == "configString");
+    invariant(configElem.fieldNameStringData() == WiredTigerUtil::kConfigStringField);
 
     if (configElem.type() != String) {
         return {ErrorCodes::TypeMismatch, "'configString' must be a string."};
@@ -793,6 +795,11 @@ void WiredTigerUtil::appendSnapshotWindowSettings(WiredTigerKVEngine* engine,
                     stableTimestamp.toStringPretty());
     settings.append("oldest majority snapshot timestamp available",
                     oldestTimestamp.toStringPretty());
+}
+
+void WiredTigerUtil::removeEncryptionFromConfigString(std::string* configString) {
+    static const StaticImmortal<pcrecpp::RE> encryptionOptsRegex(R"re(encryption=\([^\)]*\),?)re");
+    encryptionOptsRegex->GlobalReplace("", configString);
 }
 
 }  // namespace mongo

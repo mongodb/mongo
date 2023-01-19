@@ -361,6 +361,9 @@ public:
 
     void setPinnedOplogTimestamp(const Timestamp& pinnedTimestamp) override;
 
+    StatusWith<BSONObj> getSanitizedStorageOptionsForSecondaryReplication(
+        const BSONObj& options) const override;
+
 private:
     using CollIter = std::list<std::string>::iterator;
 
