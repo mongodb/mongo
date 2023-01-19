@@ -56,53 +56,84 @@ function extractTs(message) {
     return Date.parse(msgJson.t["$date"]);
 }
 
+function printLog(connection) {
+    const log = cat(connection.fullOptions.logFile);
+    jsTestLog(`Printing log for ${connection}`);
+    for (let line of log.split("\n")) {
+        print(`d${connection.port} | ${line}`);
+    }
+
+    return log;
+}
+
+function extractTimingsForSplitSteps(connection) {
+    const log = printLog(connection);
+    const logLines = {
+        enterBlockingState: "Entering 'blocking' state.",
+        waitingForCatchup: "Waiting for recipient nodes to reach block timestamp.",
+        applyingSplitConfig: "Applying the split config.",
+        triggeringRecipientElection:
+            "Triggering an election after recipient has accepted the split.",
+        waitForMajorityWrite: "Waiting for majority commit on recipient primary",
+        committed: "Entering 'committed' state.",
+        decisionReached: "Shard split decision reached",
+    };
+
+    const result = {};
+
+    for (let line of log.split("\n")) {
+        for (let key in logLines) {
+            if (line.includes(logLines[key])) {
+                result[key] = extractTs(line);
+                break;
+            }
+        }
+    }
+
+    return result;
+}
+
 function runOneSplit() {
     "use strict";
 
-    const test = new ShardSplitTest({quickGarbageCollection: true});
+    const test = new ShardSplitTest({
+        quickGarbageCollection: true,
+        nodeOptions: {
+            useLogFiles: true,
+            setParameter: {logComponentVerbosity: tojson({replication: 4, command: 4})}
+        }
+    });
     test.addAndAwaitRecipientNodes();
-
-    const primary = test.donor.getPrimary();
 
     const tenantIds = [ObjectId(), ObjectId()];
     const operation = test.createSplitOperation(tenantIds);
     assert.commandWorked(operation.commit());
-
     test.removeRecipientNodesFromDonor();
-    assertMigrationState(test.donor.getPrimary(), operation.migrationId, "committed");
 
-    const kEnterBlockingState = "Entering 'blocking' state.";
-    const kWaitingForCatchup = "Waiting for recipient nodes to reach block timestamp.";
-    const kApplyingSplitConfig = "Applying the split config.";
-    const kTriggeringRecipientElection =
-        "Triggering an election after recipient has accepted the split.";
-    const kWaitForMajorityWrite = "Waiting for majority commit on recipient primary";
-    const kCommitted = "Entering 'committed' state.";
-    const kDecisionReached = "Shard split decision reached";
+    const donorPrimary = test.donor.getPrimary();
+
+    assertMigrationState(donorPrimary, operation.migrationId, "committed");
+
+    const result = extractTimingsForSplitSteps(donorPrimary);
+    test.donor.getSecondaries().forEach(node => {
+        printLog(node);
+    });
 
     const report = {
         // shard split critical section:
         //  - wait to abort index builds
-        waitToAbortIndexBuilds: extractTs(checkLog.getLogMessage(primary, kWaitingForCatchup)) -
-            extractTs(checkLog.getLogMessage(primary, kEnterBlockingState)),
+        waitToAbortIndexBuilds: result.waitingForCatchup - result.enterBlockingState,
         //  - wait for recipient nodes to catch up with blockTimestamp
-        waitForRecipientCatchup: extractTs(checkLog.getLogMessage(primary, kApplyingSplitConfig)) -
-            extractTs(checkLog.getLogMessage(primary, kWaitingForCatchup)),
+        waitForRecipientCatchup: result.applyingSplitConfig - result.waitingForCatchup,
         //  - wait for split acceptance
-        waitForSplitAcceptance:
-            extractTs(checkLog.getLogMessage(primary, kTriggeringRecipientElection)) -
-            extractTs(checkLog.getLogMessage(primary, kApplyingSplitConfig)),
+        waitForSplitAcceptance: result.triggeringRecipientElection - result.applyingSplitConfig,
         //  - wait for recipient primary to step up
-        waitForRecipientStepUp: extractTs(checkLog.getLogMessage(primary, kWaitForMajorityWrite)) -
-            extractTs(checkLog.getLogMessage(primary, kTriggeringRecipientElection)),
+        waitForRecipientStepUp: result.waitForMajorityWrite - result.triggeringRecipientElection,
         //  - wait for recipient to majority commit write
-        waitForRecipientMajorityWrite: extractTs(checkLog.getLogMessage(primary, kCommitted)) -
-            extractTs(checkLog.getLogMessage(primary, kWaitForMajorityWrite)),
+        waitForRecipientMajorityWrite: result.committed - result.waitForMajorityWrite,
         //  - total duration
-        totalDuration: extractTs(checkLog.getLogMessage(primary, kDecisionReached)) -
-            extractTs(checkLog.getLogMessage(primary, kEnterBlockingState)),
-        totalDurationWithoutCatchup: extractTs(checkLog.getLogMessage(primary, kDecisionReached)) -
-            extractTs(checkLog.getLogMessage(primary, kApplyingSplitConfig)),
+        totalDuration: result.decisionReached - result.enterBlockingState,
+        totalDurationWithoutCatchup: result.decisionReached - result.applyingSplitConfig,
     };
 
     jsTestLog(`Shard split performance report: ${tojson(report)}`);
@@ -115,7 +146,6 @@ function runOneSplit() {
                   maxCriticalSectionDurationWithoutCatchup}ms`);
 
     // Validate using reported values in serverStatus
-    const donorPrimary = test.donor.getPrimary();
     const serverStatus = assert.commandWorked(donorPrimary.adminCommand({serverStatus: 1}));
     const splitStats = serverStatus.shardSplits;
     assert.eq(splitStats.totalCommitted, 1);
