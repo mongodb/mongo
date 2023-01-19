@@ -458,6 +458,47 @@ void checkInvariantsForReadOptions(const NamespaceString& nss,
                     "collection"_attr = nss);
     }
 }
+
+/**
+ * Returns a collection reference compatible with the specified 'readTimestamp'. Creates and places
+ * a compatible PIT collection reference in the 'catalog' if needed and the collection exists at
+ * that PIT.
+ */
+CollectionPtr fetchOrCreatePITCollection(OperationContext* opCtx,
+                                         const CollectionCatalog* catalog,
+                                         const NamespaceString nss,
+                                         boost::optional<Timestamp> readTimestamp,
+                                         bool isPrimaryNs) {
+    CollectionPtr coll = catalog->lookupCollectionByNamespace(opCtx, nss);
+
+    // Return the latest collection information if there's no readTimestamp set.
+    if (!readTimestamp) {
+        return coll;
+    }
+
+    if (coll && *readTimestamp >= coll->getMinimumValidSnapshot()) {
+        return coll;
+    }
+
+    // Getting this far means that either the collection is not present in the catalog (it may have
+    // been dropped) or the read timestamp is earlier than the last DDL operation
+    // (minValidSnapshot). So try to create a valid past Collection instance for the
+    // readTimestamp.
+
+    [[maybe_unused]] auto collPtr = catalog->openCollection(opCtx, nss, readTimestamp);
+
+    // TODO SERVER-70846: openCollection does not set a yield handler on the CollectionPtr returned.
+    // Therefore, it is necessary to lookup the collection again via a different lookup fn to fetch
+    // a yielding-aware CollectionPtr from the catalog. Only the primary namespace must be yield
+    // aware.
+
+    if (!isPrimaryNs) {
+        return collPtr;
+    }
+
+    return catalog->lookupCollectionByNamespace(opCtx, nss);
+}
+
 }  // namespace
 
 AutoStatsTracker::AutoStatsTracker(
@@ -733,39 +774,42 @@ AutoGetCollectionForReadPITCatalog::AutoGetCollectionForReadPITCatalog(
         SnapshotHelper::changeReadSourceIfNeeded(opCtx, _resolvedNss);
     // Update readSource in case it was updated.
     const auto readSource = opCtx->recoveryUnit()->getTimestampReadSource();
+    const auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
 
     // Check that the collections are all safe to use. First acquire collection from our catalog.
-    _coll = catalog->lookupCollectionByNamespace(opCtx, _resolvedNss);
+    _coll = fetchOrCreatePITCollection(
+        opCtx, catalog.get(), _resolvedNss, readTimestamp, true /* isPrimaryNs */);
 
-    // If we are reading with a PIT timestamp validate the collection's minValid snapshot. If it
-    // doesn't match we need to instantiate a collection instance from the storage snapshot. Also,
-    // if we are reading with a timestamp but not finding any collection in the catalog try to
-    // instantiate from the snapshot as it may have existed at that timestamp.
-    // TODO SERVER-68271: Use common logic to determine if we need to call openCollection.
-    const auto readTimestamp = opCtx->recoveryUnit()->getPointInTimeReadTimestamp(opCtx);
-    if (readTimestamp && (!_coll || *readTimestamp < _coll->getMinimumValidSnapshot())) {
-        // TODO SERVER-70846: openCollection does not set a yield handler. Perform the lookup again
-        // to get a proper CollectionPtr from the catalog.
-        [[maybe_unused]] auto collPtr = catalog->openCollection(opCtx, _resolvedNss, readTimestamp);
-        _coll = catalog->lookupCollectionByNamespace(opCtx, _resolvedNss);
-    }
-
-    // Validate collection instance
+    // Validate primary collection.
     checkCollectionUUIDMismatch(opCtx, _resolvedNss, _coll, options._expectedUUID);
     verifyDbAndCollectionReadIntent(
         opCtx, modeColl, nsOrUUID, _resolvedNss, _coll, _autoDb.getDb());
-    for (auto& secondaryNssOrUUID : secondaryNssOrUUIDs) {
-        auto secondaryResolvedNss =
-            catalog->resolveNamespaceStringOrUUID(opCtx, secondaryNssOrUUID);
-        auto secondaryColl = catalog->lookupCollectionByNamespace(opCtx, secondaryResolvedNss);
-        auto secondaryDbName = secondaryNssOrUUID.dbName() ? secondaryNssOrUUID.dbName()
-                                                           : secondaryNssOrUUID.nss()->dbName();
-        verifyDbAndCollectionReadIntent(opCtx,
-                                        MODE_IS,
-                                        secondaryNssOrUUID,
-                                        secondaryResolvedNss,
-                                        secondaryColl,
-                                        databaseHolder->getDb(opCtx, *secondaryDbName));
+
+    // Check secondary collections and verify they are valid for use.
+    if (!secondaryNssOrUUIDs.empty()) {
+        // Check that none of the namespaces are views or sharded collections, which are not
+        // supported for secondary namespaces.
+        auto resolvedSecondaryNamespaces =
+            resolveSecondaryNamespacesOrUUIDs(opCtx, catalog.get(), secondaryNssOrUUIDs);
+        _secondaryNssIsAViewOrSharded = !resolvedSecondaryNamespaces.has_value();
+
+        if (!_secondaryNssIsAViewOrSharded) {
+            // Ensure that the readTimestamp is compatible with the latest Collection instances or
+            // create PIT instances in the 'catalog' (if the collections existed at that PIT).
+            for (const auto& secondaryNss : *resolvedSecondaryNamespaces) {
+                auto secondaryCollection = fetchOrCreatePITCollection(
+                    opCtx, catalog.get(), secondaryNss, readTimestamp, false /* isPrimaryNs */);
+                invariant(secondaryCollection);
+                invariant(secondaryCollection->ns().dbName() == _resolvedNss.dbName());
+                verifyDbAndCollectionReadIntent(
+                    opCtx,
+                    MODE_IS,
+                    secondaryNss,
+                    secondaryNss,
+                    secondaryCollection,
+                    databaseHolder->getDb(opCtx, secondaryNss.dbName()));
+            }
+        }
     }
 
     if (_coll) {
@@ -793,22 +837,6 @@ AutoGetCollectionForReadPITCatalog::AutoGetCollectionForReadPITCatalog(
                                       readTimestamp,
                                       _callerWasConflicting,
                                       shouldReadAtLastApplied);
-
-        // Check secondary collections and verify they are valid for use.
-        if (!secondaryNssOrUUIDs.empty()) {
-            auto resolvedNamespaces =
-                resolveSecondaryNamespacesOrUUIDs(opCtx, catalog.get(), secondaryNssOrUUIDs);
-
-            _secondaryNssIsAViewOrSharded = !resolvedNamespaces.has_value();
-
-            // If no secondary namespace is a view or is sharded, resolve namespaces and check their
-            // that their minVisible timestamps are compatible with the read timestamp.
-            // TODO SERVER-72608: We should not throw SnapshotUnavailable
-            if (resolvedNamespaces) {
-                assertAllNamespacesAreCompatibleForReadTimestamp(
-                    opCtx, catalog.get(), *resolvedNamespaces);
-            }
-        }
 
         return;
     }

@@ -202,10 +202,8 @@ private:
  * some command. This will ensure your reads obey any requested readConcern, but will not update the
  * status of CurrentOp, or add a Top entry.
  *
- * Any collections specified in 'secondaryNssOrUUIDs' will be checked that their minimum visible
- * timestamp supports read concern, throwing a SnapshotUnavailable on error. Additional collection
- * and/or database locks will be acquired for 'secondaryNssOrUUIDs' namespaces.
- * TODO SERVER-72608: This class should never throw SnapshotUnavailable.
+ * Additional collection and/or database locks will be acquired for 'secondaryNssOrUUIDs'
+ * namespaces.
  */
 class AutoGetCollectionForReadPITCatalog {
 public:
