@@ -98,7 +98,11 @@ public:
                 "BulkWrite may not be run without featureFlagBulkWriteCommand enabled",
                 gFeatureFlagBulkWriteCommand.isEnabled(serverGlobalParams.featureCompatibility));
 
-            return Reply();
+            auto reply = Reply();
+            auto replies = std::vector<BulkWriteReplyItem>();
+            replies.emplace_back(1, 0);
+            reply.setCursor(BulkWriteCommandResponseCursor(0, replies));
+            return reply;
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const final {}
