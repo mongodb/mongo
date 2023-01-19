@@ -943,7 +943,7 @@ tasks:
           test_control: "initialsync-logkeeper"
           mongodb_setup: "initialsync-logkeeper-short"
           # Logkeeper dataset with FCV set to 6.0
-          mongodb_dataset: "https://dsi-donot-remove.s3-us-west-2.amazonaws.com/InitialSyncLogKeeper/logkeeper-slice-data-mongodb-6.1.tgz"
+          mongodb_dataset: "https://dsi-donot-remove.s3-us-west-2.amazonaws.com/InitialSyncLogKeeper/logkeeper-slice-data-mongodb-6.2.tgz"
 
   - name: initialsync-logkeeper-short-fcbis
     priority: 5
@@ -953,7 +953,7 @@ tasks:
           test_control: "initialsync-logkeeper"
           mongodb_setup: "initialsync-logkeeper-short-fcbis"
           # Logkeeper dataset with FCV set to 6.0
-          mongodb_dataset: "https://dsi-donot-remove.s3-us-west-2.amazonaws.com/InitialSyncLogKeeper/logkeeper-slice-data-mongodb-6.1.tgz"
+          mongodb_dataset: "https://dsi-donot-remove.s3-us-west-2.amazonaws.com/InitialSyncLogKeeper/logkeeper-slice-data-mongodb-6.2.tgz"
 
   - name: initialsync-logkeeper
     priority: 5
@@ -985,7 +985,7 @@ tasks:
           test_control: "initialsync-logkeeper-short-s3-update"
           mongodb_setup: "initialsync-logkeeper-short-s3-update"
           # Update this to Logkeeper dataset with FCV set to latest after each LTS release.
-          mongodb_dataset: "https://dsi-donot-remove.s3-us-west-2.amazonaws.com/InitialSyncLogKeeper/logkeeper-slice-data-mongodb-6.1.tgz"
+          mongodb_dataset: "https://dsi-donot-remove.s3-us-west-2.amazonaws.com/InitialSyncLogKeeper/logkeeper-slice-data-mongodb-6.2.tgz"
 
   - name: initialsync-logkeeper-snapshot-update
     priority: 5
@@ -1903,7 +1903,7 @@ buildvariants:
       mongodb_setup: initialsync-logkeeper
       infrastructure_provisioning: initialsync-logkeeper
       # EBS logkeeper snapshot with FCV set to 6.0
-      snapshotId: snap-0716ed59d18225693
+      snapshotId: snap-0a7bca6322ef8b844
       platform: linux
       authentication: disabled
       storageEngine: wiredTiger
@@ -2873,7 +2873,7 @@ buildvariants:
       infrastructure_provisioning: initialsync-logkeeper
       workload_setup: 2022-11
       # EBS logkeeper snapshot with FCV set to 6.0
-      snapshotId: snap-0716ed59d18225693
+      snapshotId: snap-0a7bca6322ef8b844
       platform: linux
       authentication: disabled
       storageEngine: wiredTiger
@@ -2887,6 +2887,30 @@ buildvariants:
       - name: schedule_variant_auto_tasks
       - name: initialsync-logkeeper
       - name: initialsync-logkeeper-fcbis
+
+  # Uncomment this to run logkeeper FCV updates automatically. This is only intended to be run in
+  # patch builds.
+  #- name: linux-replSet-initialsync-logkeeper-snapshot-update
+  #  display_name: Linux ReplSet Initial Sync LogKeeper Snapshot Update
+  #  cron: "0 0 * * 4"  # 00:00 on Thursday
+  #  modules: *modules
+  #  expansions:
+  #    mongodb_setup: initialsync-logkeeper-snapshot-update
+  #    infrastructure_provisioning: initialsync-logkeeper-snapshot-update
+  #    # Update this to latest snapshot after each LTS release.
+  #    snapshotId: snap-0a7bca6322ef8b844
+  #    platform: linux
+  #    authentication: disabled
+  #    storageEngine: wiredTiger
+  #    project_dir: *project_dir
+  #  run_on:
+  #    - "rhel70-perf-initialsync-logkeeper"
+  #  depends_on: *_compile_amazon2
+  #  tasks:
+  #    - name: schedule_patch_auto_tasks
+  #    - name: schedule_variant_auto_tasks
+  #    - name: initialsync-logkeeper-snapshot-update
+  #    - name: initialsync-logkeeper-short-s3-update
 
   - name: linux-replSet-audit.2022-11
     display_name: Linux 3-Node ReplSet Audit 2022-11
