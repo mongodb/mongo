@@ -1010,6 +1010,14 @@ tasks:
           test_control_params: |
             {scale: 10}
 
+# TODO PERF-3094: Remove this task.
+  - name: bestbuy_4_inserts
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "bestbuy_4_inserts"
+
   - name: non_sharded_workloads
     priority: 5
     commands:
@@ -1340,9 +1348,10 @@ buildvariants:
       - name: bestbuy_agg_merge_wordcount
       - name: bestbuy_4_analytics
       - name: bestbuy_4_analytics_columnstore
+      - name: bestbuy_4_inserts
+      - name: bestbuy_query
       - name: external_data_source_1
       - name: external_data_source_4
-      - name: bestbuy_query
       - name: cursor_manager
       - name: map_reduce_workloads
       - name: tpcc
@@ -1519,6 +1528,7 @@ buildvariants:
       - name: schedule_variant_auto_tasks
       - name: bestbuy_4_analytics
       - name: bestbuy_4_analytics_columnstore
+      - name: bestbuy_4_inserts
       - name: column_store_index_charts_events_1G
       - name: column_store_index_charts_events_10G
       - name: column_store_tpch_10_denormalized
@@ -2548,6 +2558,7 @@ buildvariants:
       - name: bestbuy_agg_merge_wordcount
       - name: bestbuy_4_analytics
       - name: bestbuy_4_analytics_columnstore
+      - name: bestbuy_4_inserts
       - name: bestbuy_query
       - name: cursor_manager
       - name: map_reduce_workloads
