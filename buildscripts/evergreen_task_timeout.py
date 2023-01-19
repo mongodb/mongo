@@ -276,11 +276,12 @@ class TaskTimeoutOrchestrator:
 
         return determined_timeout
 
-    def determine_historic_timeout(self, task: str, variant: str, suite_name: str,
+    def determine_historic_timeout(self, project: str, task: str, variant: str, suite_name: str,
                                    exec_timeout_factor: Optional[float]) -> TimeoutOverride:
         """
         Calculate the timeout based on historic test results.
 
+        :param project: Name of project to query.
         :param task: Name of task to query.
         :param variant: Name of build variant to query.
         :param suite_name: Name of test suite being run.
@@ -290,7 +291,7 @@ class TaskTimeoutOrchestrator:
             return TimeoutOverride(task=task, exec_timeout=None, idle_timeout=None)
 
         timeout_params = TimeoutParams(
-            evg_project="mongodb-mongo-master",
+            evg_project=project,
             build_variant=variant,
             task_name=task,
             suite_name=suite_name,
@@ -318,8 +319,8 @@ class TaskTimeoutOrchestrator:
         return bv.is_asan_build()
 
     def determine_timeouts(self, cli_idle_timeout: Optional[timedelta],
-                           cli_exec_timeout: Optional[timedelta], outfile: Optional[str], task: str,
-                           variant: str, evg_alias: str, suite_name: str,
+                           cli_exec_timeout: Optional[timedelta], outfile: Optional[str],
+                           project: str, task: str, variant: str, evg_alias: str, suite_name: str,
                            exec_timeout_factor: Optional[float]) -> None:
         """
         Determine the timeouts to use for the given task and write timeouts to expansion file.
@@ -327,12 +328,14 @@ class TaskTimeoutOrchestrator:
         :param cli_idle_timeout: Idle timeout specified by the CLI.
         :param cli_exec_timeout: Exec timeout specified by the CLI.
         :param outfile: File to write timeout expansions to.
+        :param project: Evergreen project task is being run on.
+        :param task: Name of task.
         :param variant: Build variant task is being run on.
         :param evg_alias: Evergreen alias that triggered task.
         :param suite_name: Name of evergreen suite being run.
         :param exec_timeout_factor: Scaling factor to use when determining timeout.
         """
-        historic_timeout = self.determine_historic_timeout(task, variant, suite_name,
+        historic_timeout = self.determine_historic_timeout(project, task, variant, suite_name,
                                                            exec_timeout_factor)
 
         idle_timeout = self.determine_idle_timeout(task, variant, cli_idle_timeout,
@@ -354,6 +357,8 @@ def main():
                         help="Resmoke suite being run against.")
     parser.add_argument("--build-variant", dest="variant", required=True,
                         help="Build variant task is being executed on.")
+    parser.add_argument("--project", dest="project", required=True,
+                        help="Evergreen project task is being executed on.")
     parser.add_argument("--evg-alias", dest="evg_alias", required=True,
                         help="Evergreen alias used to trigger build.")
     parser.add_argument("--timeout", dest="timeout", type=int, help="Timeout to use (in sec).")
@@ -398,8 +403,8 @@ def main():
 
     task_timeout_orchestrator = inject.instance(TaskTimeoutOrchestrator)
     task_timeout_orchestrator.determine_timeouts(
-        timeout_override, exec_timeout_override, options.outfile, task_name, options.variant,
-        options.evg_alias, options.suite_name, options.exec_timeout_factor)
+        timeout_override, exec_timeout_override, options.outfile, options.project, task_name,
+        options.variant, options.evg_alias, options.suite_name, options.exec_timeout_factor)
 
 
 if __name__ == "__main__":

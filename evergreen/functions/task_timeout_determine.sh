@@ -30,6 +30,7 @@ PATH=$PATH:$HOME:/ $python buildscripts/evergreen_task_timeout.py $timeout_facto
   --install-dir "${install_dir}" \
   --task-name ${task_name} \
   --suite-name ${suite_name} \
+  --project ${project} \
   --build-variant $build_variant_for_timeout \
   --evg-alias '${alias}' \
   --timeout ${timeout_secs} \
