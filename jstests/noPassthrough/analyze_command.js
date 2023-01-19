@@ -20,13 +20,16 @@ assert.commandWorked(
 const coll = db.cqf_analyze;
 const syscoll = db.system.statistics.cqf_analyze;
 
-const setup = () => {
+function cleanup() {
     coll.drop();
     syscoll.drop();
+}
 
+function setup() {
+    cleanup();
     assert.commandWorked(coll.insert({a: [1, 2, 4, 4, 5, 6, {b: 10}, {b: 7}, {b: 1}]}));
     assert.commandWorked(coll.insert({a: [1, 2, 4, 4, 5, 6, {b: 5}]}));
-};
+}
 
 let res = null;
 
@@ -143,6 +146,40 @@ assert.commandFailedWithCode(res, ErrorCodes.APIStrictError);
 // Test write concern
 res = db.runCommand({analyze: coll.getName(), writeConcern: {w: 1}});
 assert.commandWorked(res);
+
+cleanup();
+
+assert.commandWorked(coll.insert([
+    {a: 1},
+    {a: 1.5},
+    {a: NumberDecimal("2.1")},
+    {a: "string"},
+    {a: ISODate("2023-01-18T20:09:36.325Z")},
+]));
+
+(function validateBuckets() {
+    for (let i = 0; i <= 2; i++) {
+        res = db.runCommand({analyze: coll.getName(), key: "a", numberBuckets: i});
+        assert.commandFailed(res);
+    }
+    // TODO SERVER-72997: Fix and enable tests
+    // Verify that we can bucket into numberic, string, and date buckets
+    // res = db.runCommand({analyze: coll.getName(), key: "a", numberBuckets: 3});
+    // assert.commandWorked(res);
+    res = db.runCommand({analyze: coll.getName(), key: "a", numberBuckets: 5});
+    assert.commandWorked(res);
+    assert.eq(5, syscoll.find({_id: "a"})[0].statistics.scalarHistogram.buckets.length);
+})();
+
+cleanup();
+
+assert.commandWorked(coll.insert(Array.from(Array(10000), (_, i) => Object.create({a: i}))));
+res = db.runCommand({analyze: coll.getName(), key: "a"});
+assert.commandWorked(res);
+// Assert on default number of buckets
+assert.eq(100, syscoll.find({_id: "a"})[0].statistics.scalarHistogram.buckets.length);
+
+cleanup();
 
 MongoRunner.stopMongod(conn);
 }());

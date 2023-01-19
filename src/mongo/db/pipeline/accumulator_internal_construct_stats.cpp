@@ -60,27 +60,26 @@ AccumulationExpression parseInternalConstructStats(ExpressionContext* const expC
 
     auto initializer = ExpressionConstant::create(expCtx, Value(BSONNULL));
     auto argument = Expression::parseOperand(expCtx, elem, vps);
-    return {initializer,
-            argument,
-            [expCtx, params]() {
-                return AccumulatorInternalConstructStats::create(expCtx, params.getSampleRate());
-            },
-            "_internalConstructStats"};
+    return {
+        initializer,
+        argument,
+        [expCtx, params]() { return AccumulatorInternalConstructStats::create(expCtx, params); },
+        "_internalConstructStats"};
 }
 
 REGISTER_ACCUMULATOR(_internalConstructStats, parseInternalConstructStats);
 
 AccumulatorInternalConstructStats::AccumulatorInternalConstructStats(
-    ExpressionContext* const expCtx, double sampleRate)
-    : AccumulatorState(expCtx), _count(0.0), _sampleRate(sampleRate) {
+    ExpressionContext* const expCtx, InternalConstructStatsAccumulatorParams params)
+    : AccumulatorState(expCtx), _count(0.0), _params(params) {
     assertAllowedInternalIfRequired(
         expCtx->opCtx, "_internalConstructStats", AllowedWithClientType::kInternal);
     _memUsageBytes = sizeof(*this);
 }
 
 intrusive_ptr<AccumulatorState> AccumulatorInternalConstructStats::create(
-    ExpressionContext* const expCtx, double sampleRate) {
-    return new AccumulatorInternalConstructStats(expCtx, sampleRate);
+    ExpressionContext* const expCtx, InternalConstructStatsAccumulatorParams params) {
+    return new AccumulatorInternalConstructStats(expCtx, params);
 }
 
 void AccumulatorInternalConstructStats::processInternal(const Value& input, bool merging) {
@@ -107,7 +106,7 @@ Value AccumulatorInternalConstructStats::getValue(bool toBeMerged) {
 
     // Generate and serialize maxdiff histogram for scalar and array values.
     auto arrayHistogram =
-        stats::createArrayEstimator(_values, stats::ScalarHistogram::kMaxBuckets, _sampleRate);
+        stats::createArrayEstimator(_values, _params.getNumberBuckets(), _params.getSampleRate());
     auto stats = stats::makeStatistics(_count, arrayHistogram);
 
     return Value(stats);

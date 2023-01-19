@@ -112,3 +112,5 @@ structs:
             sampleRate:
                 type: double
                 default: 1.0
+            numberBuckets:
+                type: int

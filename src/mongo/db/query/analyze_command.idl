@@ -66,3 +66,8 @@ commands:
                 type: safeInt
                 validator: { gt: 0 }
                 optional: true
+            numberBuckets:
+                description: "The number of buckets used for creating the histogram."
+                type: safeInt
+                validator: { gt: 0 }
+                optional: true

@@ -50,7 +50,8 @@ StatusWith<BSONObj> analyzeCommandAsAggregationCommand(OperationContext* opCtx,
                                                        StringData db,
                                                        StringData collection,
                                                        StringData keyPath,
-                                                       boost::optional<double> sampleRate) {
+                                                       boost::optional<double> sampleRate,
+                                                       boost::optional<int> numBuckets) {
     // Build a pipeline that accomplishes the analyze request. The building code constructs a
     // pipeline that looks like this, assuming the analyze is on the key "a.b.c"
     //
@@ -62,7 +63,8 @@ StatusWith<BSONObj> analyzeCommandAsAggregationCommand(OperationContext* opCtx,
     //              _id: "a.b.c",
     //              statistics: { $_internalConstructStats: {
     //                              val: "$$ROOT",
-    //                              sampleRate: sampleRate }
+    //                              sampleRate: sampleRate,
+    //                              numberBuckets: numberBuckets }
     //              }
     //          },
     //          { $merge: {
@@ -87,6 +89,8 @@ StatusWith<BSONObj> analyzeCommandAsAggregationCommand(OperationContext* opCtx,
     InternalConstructStatsAccumulatorParams statsAccumParams;
     statsAccumParams.setVal("$$ROOT");
     statsAccumParams.setSampleRate(sampleRate ? *sampleRate : 1.0);
+    statsAccumParams.setNumberBuckets(numBuckets ? *numBuckets
+                                                 : mongo::stats::ScalarHistogram::kMaxBuckets);
 
     pipelineBuilder << BSON("$project" << BSON("val" << fieldPath.fullPathWithPrefix()))
                     << BSON("$group" << BSON("_id" << keyPath << "statistics"
@@ -211,8 +215,12 @@ public:
                 // Run Aggregate
                 BSONObj analyzeResult;
                 client.runCommand(nss.db().toString(),
-                                  analyzeCommandAsAggregationCommand(
-                                      opCtx, nss.db(), nss.coll(), key->toString(), sampleRate)
+                                  analyzeCommandAsAggregationCommand(opCtx,
+                                                                     nss.db(),
+                                                                     nss.coll(),
+                                                                     key->toString(),
+                                                                     sampleRate,
+                                                                     cmd.getNumberBuckets())
                                       .getValue(),
                                   analyzeResult);
 
