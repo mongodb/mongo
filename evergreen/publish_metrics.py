@@ -9,13 +9,21 @@ from pydantic import ValidationError
 if __name__ == "__main__" and __package__ is None:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from mongo_tooling_metrics.client import get_mongo_metrics_client
+import mongo_tooling_metrics.client as metrics_client
 from mongo_tooling_metrics.lib.top_level_metrics import NinjaToolingMetrics, ResmokeToolingMetrics, SConsToolingMetrics
 from evergreen.api import RetryingEvergreenApi
 
+
+def return_true():
+    return True
+
+
+# This script will run in Evergreen on a non-vw. Setting this allows us to successfully get the client.
+metrics_client.should_collect_internal_metrics = return_true
+
 # Check cluster connectivity
 try:
-    client = get_mongo_metrics_client().mongo_client
+    client = metrics_client.get_mongo_metrics_client().mongo_client
     print(client.server_info())
 except Exception as exc:
     print("Could not connect to Atlas cluster")
