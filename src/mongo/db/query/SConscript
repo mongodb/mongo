@@ -426,6 +426,7 @@ env.CppUnitTest(
         "sbe_and_hash_test.cpp",
         "sbe_and_sorted_test.cpp",
         "sbe_stage_builder_accumulator_test.cpp",
+        "sbe_stage_builder_const_eval_test.cpp",
         "sbe_stage_builder_lookup_test.cpp",
         "sbe_stage_builder_test.cpp",
         "sbe_stage_builder_test_fixture.cpp",

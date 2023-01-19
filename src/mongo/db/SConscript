@@ -1470,6 +1470,7 @@ env.Library(
         'query/sbe_stage_builder.cpp',
         'query/sbe_stage_builder_accumulator.cpp',
         'query/sbe_stage_builder_coll_scan.cpp',
+        'query/sbe_stage_builder_const_eval.cpp',
         'query/sbe_stage_builder_eval_frame.cpp',
         'query/sbe_stage_builder_expression.cpp',
         'query/sbe_stage_builder_filter.cpp',

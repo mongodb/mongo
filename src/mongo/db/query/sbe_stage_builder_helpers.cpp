@@ -49,9 +49,9 @@
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/matcher/matcher_type_set.h"
-#include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/rewrites/path_lower.h"
 #include "mongo/db/query/sbe_stage_builder.h"
+#include "mongo/db/query/sbe_stage_builder_const_eval.h"
 #include "mongo/db/storage/execution_context.h"
 #include "mongo/logv2/log.h"
 
@@ -1364,7 +1364,7 @@ std::unique_ptr<sbe::EExpression> abtToExpr(optimizer::ABT& abt, optimizer::Slot
 
     // Run the constant folding to eliminate lambda applications as they are not directly
     // supported by the SBE VM.
-    optimizer::ConstEval constEval{env};
+    ExpressionConstEval constEval{env, nullptr /*collator*/};  // TODO Add collator support
     constEval.optimize(abt);
 
     // And finally convert to the SBE expression.
