@@ -300,11 +300,11 @@ boost::optional<std::shared_ptr<const Collection>> OpenedCollections::lookupByUU
 void OpenedCollections::store(std::shared_ptr<const Collection> coll,
                               NamespaceString nss,
                               boost::optional<UUID> uuid) {
+    if (coll) {
+        invariant(nss == coll->ns());
+        invariant(uuid == coll->uuid());
+    }
     _collections.push_back({std::move(coll), std::move(nss), uuid});
-}
-
-void OpenedCollections::store(std::shared_ptr<const Collection> coll) {
-    _collections.push_back({coll, coll->ns(), coll->uuid()});
 }
 
 }  // namespace mongo

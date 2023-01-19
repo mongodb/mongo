@@ -111,8 +111,7 @@ public:
         bool found;
 
         // Storage for the actual collection.
-        // Set for actions kWritableCollection, kCreatedCollection, kRecreatedCollection,
-        // kOpenedCollection (nullptr otherwise).
+        // Set for actions kWritableCollection, kCreatedCollection, and kRecreatedCollection.
         std::shared_ptr<Collection> collection;
 
         // True if the collection was created during this transaction for the first time.
@@ -309,14 +308,6 @@ public:
     void store(std::shared_ptr<const Collection> coll,
                NamespaceString nss,
                boost::optional<UUID> uuid);
-
-    /**
-     * Stores a Collection instance. Lifetime of instance will be tied to lifetime of opened storage
-     * snapshot.
-     *
-     * TODO SERVER-72133: Remove this function
-     */
-    void store(std::shared_ptr<const Collection> coll);
 
 private:
     struct Entry {
