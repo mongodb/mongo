@@ -36,6 +36,7 @@ global:
         - "mongo/db/tenant_id.h"
         - "mongo/util/database_name_util.h"
         - "mongo/util/namespace_string_util.h"
+        - "mongo/bson/bson_duration.h"
         - "mongo/bson/bson_time_support.h"
         - "mongo/util/uuid.h"
 
@@ -223,6 +224,20 @@ types:
         cpp_type: "mongo::Date_t"
         deserializer: "mongo::parseDateFromDurationSinceEpoch<Seconds>"
         serializer: "::mongo::serializeDateToDurationSinceEpoch<Seconds>"
+
+    milliseconds:
+        bson_serialization_type: any
+        description: "A period of time measured in seconds"
+        cpp_type: "mongo::Milliseconds"
+        deserializer: "mongo::parseDurationFromCount<Milliseconds>"
+        serializer: "::mongo::serializeDurationToCount<Milliseconds>"
+
+    seconds:
+        bson_serialization_type: any
+        description: "A period of time measured in seconds"
+        cpp_type: "mongo::Seconds"
+        deserializer: "mongo::parseDurationFromCount<Seconds>"
+        serializer: "::mongo::serializeDurationToCount<Seconds>"
 
     logicalTime:
         bson_serialization_type: any

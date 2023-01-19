@@ -33,34 +33,32 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/time_support.h"
 
 namespace mongo {
 
 /**
  * BSON deserialization support.
  * Parses from a BSON int32/int64 assuming the duration type.
- * e.g. parseDateFromDurationSinceEpoch<Seconds> will parse a Unix Epoch value.
- *      parseDateFromDurationSinceEpoch<Milliseconds> will parse an ECMAScript epoch value.
+ * e.g. parseDurationFromCount<Seconds> will parse a number of seconds as a Duration.
  */
 template <typename Duration>
-Date_t parseDateFromDurationSinceEpoch(const BSONElement& elem) {
+Duration parseDurationFromCount(const BSONElement& elem) {
     uassert(ErrorCodes::BadValue,
-            str::stream() << "Epoch value must be numeric, got: " << typeName(elem.type()),
+            str::stream() << "Duration value must be numeric, got: " << typeName(elem.type()),
             elem.isNumber());
 
-    return Date_t::fromDurationSinceEpoch(Duration{elem.exactNumberLong()});
+    return Duration{elem.exactNumberLong()};
 }
 
 /**
  * BSON serialization support.
- * Serializes a Date_t to a BSON int32/int64 since the unix epoch.
+ * Serializes a Duration to a BSON int32/int64 for the specified units.
  */
-template <typename Duration>
-void serializeDateToDurationSinceEpoch(const Date_t& date,
-                                       StringData fieldName,
-                                       BSONObjBuilder* builder) {
-    builder->append(fieldName, durationCount<Duration>(date.toDurationSinceEpoch()));
+template <typename ToDuration, typename Period>
+void serializeDurationToCount(const Duration<Period>& duration,
+                              StringData fieldName,
+                              BSONObjBuilder* builder) {
+    builder->append(fieldName, durationCount<ToDuration>(duration));
 }
 
 }  // namespace mongo

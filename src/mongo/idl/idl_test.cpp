@@ -443,6 +443,56 @@ TEST(IDLOneTypeTests, TestBase64StringNegative) {
     }
 }
 
+TEST(IDLStructTests, DurationParse) {
+    IDLParserContext ctxt("duration");
+
+    auto justAMinuteDoc = BSON("secs" << 60);
+    auto justAMinute = Struct_with_durations::parse(ctxt, justAMinuteDoc);
+    ASSERT_EQ(justAMinute.getSecs().get(), Seconds{60});
+    ASSERT_EQ(justAMinute.getSecs().get(), Minutes{1});
+
+    auto floatDurationDoc = BSON("secs" << 123.0);
+    auto floatDuration = Struct_with_durations::parse(ctxt, floatDurationDoc);
+    ASSERT_EQ(floatDuration.getSecs().get(), Seconds{123});
+
+    auto halfSecondDoc = BSON("secs" << 234.5);
+    ASSERT_THROWS_CODE_AND_WHAT(Struct_with_durations::parse(ctxt, halfSecondDoc),
+                                AssertionException,
+                                ErrorCodes::FailedToParse,
+                                "Expected an integer: secs: 234.5");
+
+    auto invalidDurationDoc = BSON("secs"
+                                   << "bob");
+    ASSERT_THROWS_CODE_AND_WHAT(Struct_with_durations::parse(ctxt, invalidDurationDoc),
+                                AssertionException,
+                                ErrorCodes::BadValue,
+                                "Duration value must be numeric, got: string");
+
+    auto notADurationDoc = BSON("secs" << NAN);
+    ASSERT_THROWS_CODE_AND_WHAT(Struct_with_durations::parse(ctxt, notADurationDoc),
+                                AssertionException,
+                                ErrorCodes::FailedToParse,
+                                "Expected an integer, but found NaN in: secs: nan.0");
+
+    auto endOfTimeDoc = BSON("secs" << std::numeric_limits<double>::infinity());
+    ASSERT_THROWS_CODE_AND_WHAT(Struct_with_durations::parse(ctxt, endOfTimeDoc),
+                                AssertionException,
+                                ErrorCodes::FailedToParse,
+                                "Cannot represent as a 64-bit integer: secs: inf.0");
+}
+
+TEST(IDLStructTests, DurationSerialize) {
+    Struct_with_durations allDay;
+    allDay.setSecs(boost::make_optional(duration_cast<Seconds>(Days{1})));
+
+    BSONObjBuilder builder;
+    allDay.serialize(&builder);
+    auto obj = builder.obj();
+
+    auto intervalElem = obj["secs"_sd];
+    ASSERT_EQ(intervalElem.numberLong(), 86400);
+}
+
 TEST(IDLStructTests, EpochsParse) {
     IDLParserContext ctxt("epoch");
 
@@ -451,6 +501,17 @@ TEST(IDLStructTests, EpochsParse) {
     ASSERT_EQ(sameTime.getUnix(), sameTime.getEcma());
     ASSERT_EQ(sameTime.getUnix().toDurationSinceEpoch(), Seconds{1234567890});
     ASSERT_EQ(sameTime.getEcma().toDurationSinceEpoch(), Seconds{1234567890});
+
+    auto floatTimeDoc = BSON("unix" << 123.0 << "ecma" << 234000.0);
+    auto floatTime = Struct_with_epochs::parse(ctxt, floatTimeDoc);
+    ASSERT_EQ(floatTime.getUnix().toDurationSinceEpoch(), Seconds{123});
+    ASSERT_EQ(floatTime.getEcma().toDurationSinceEpoch(), Seconds{234});
+
+    auto halfTimeDoc = BSON("unix" << 345.6 << "ecma" << 0);
+    ASSERT_THROWS_CODE_AND_WHAT(Struct_with_epochs::parse(ctxt, halfTimeDoc),
+                                AssertionException,
+                                ErrorCodes::FailedToParse,
+                                "Expected an integer: unix: 345.6");
 
     auto invalidTimeDoc = BSON("unix"
                                << "bob"
@@ -463,16 +524,14 @@ TEST(IDLStructTests, EpochsParse) {
     auto notATimeDoc = BSON("unix" << 0 << "ecma" << NAN);
     ASSERT_THROWS_CODE_AND_WHAT(Struct_with_epochs::parse(ctxt, notATimeDoc),
                                 AssertionException,
-                                ErrorCodes::BadValue,
-                                "Unable to coerce value to an epoch :: caused by :: "
-                                "Unable to coerce NaN/Inf to integral type");
+                                ErrorCodes::FailedToParse,
+                                "Expected an integer, but found NaN in: ecma: nan.0");
 
     auto endOfTimeDoc = BSON("unix" << std::numeric_limits<double>::infinity() << "ecma" << 0);
     ASSERT_THROWS_CODE_AND_WHAT(Struct_with_epochs::parse(ctxt, endOfTimeDoc),
                                 AssertionException,
-                                ErrorCodes::BadValue,
-                                "Unable to coerce value to an epoch :: caused by :: "
-                                "Unable to coerce NaN/Inf to integral type");
+                                ErrorCodes::FailedToParse,
+                                "Cannot represent as a 64-bit integer: unix: inf.0");
 }
 
 TEST(IDLStructTests, EpochSerialize) {
