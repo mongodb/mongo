@@ -11,6 +11,7 @@ Adler's
 Atomicity
 BLOBs
 BLRrVv
+BLmRrSVv
 CAS
 CFLAGS
 CMake
@@ -247,6 +248,7 @@ crashless
 crc
 cryptographic
 cryptographically
+cstu
 csuite
 ctest
 curfile

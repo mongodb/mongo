@@ -32,10 +32,11 @@ usage(void)
       "ignore record number keys in the input and assign new record number keys", "-f input",
       "read from the specified file (by default records are read from stdin)", "-j",
       "read in JSON format", "-n", "fail at any attempt to overwrite existing data", "-r name",
-      "use the argument as the table name, ignoring any name in the source", NULL, NULL};
+      "use the argument as the table name, ignoring any name in the source", "-?",
+      "show this message", NULL, NULL};
 
     util_usage(
-      "load [-as] [-f input-file] [-r name] [object configuration ...]", "options:", options);
+      "load [-ajn] [-f input-file] [-r name] [object configuration ...]", "options:", options);
     return (1);
 }
 
@@ -53,7 +54,7 @@ util_load(WT_SESSION *session, int argc, char *argv[])
     flags = 0;
 
     filename = "<stdin>";
-    while ((ch = __wt_getopt(progname, argc, argv, "af:jnr:")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "af:jnr:?")) != EOF)
         switch (ch) {
         case 'a': /* append (ignore record number keys) */
             append = true;
@@ -74,6 +75,8 @@ util_load(WT_SESSION *session, int argc, char *argv[])
             cmdname = __wt_optarg;
             break;
         case '?':
+            usage();
+            return (0);
         default:
             return (usage());
         }

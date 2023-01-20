@@ -15,8 +15,8 @@
 static int
 usage(void)
 {
-    static const char *options[] = {
-      "-f", "include only \"fast\" statistics in the output", NULL, NULL};
+    static const char *options[] = {"-f", "include only \"fast\" statistics in the output", "-?",
+      "show this message", NULL, NULL};
 
     util_usage("stat [-f] [uri]", "options:", options);
     return (1);
@@ -40,7 +40,7 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
     objname_free = false;
     objname = uri = NULL;
     config = NULL;
-    while ((ch = __wt_getopt(progname, argc, argv, "af")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "af?")) != EOF)
         switch (ch) {
         case 'a':
             /*
@@ -54,6 +54,8 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
             config = "statistics=(fast)";
             break;
         case '?':
+            usage();
+            return (0);
         default:
             return (usage());
         }

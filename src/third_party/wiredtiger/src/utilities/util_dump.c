@@ -47,7 +47,7 @@ usage(void)
       "encoded). The -x flag can be combined with -p. In this case, the dump will be formatted "
       "similar to -p except for raw data elements, which will look like -x with hexadecimal "
       "encoding.",
-      NULL, NULL};
+      "-?", "show this message", NULL, NULL};
 
     util_usage(
       "dump [-jprx] [-c checkpoint] [-f output-file] [-t timestamp] uri", "options:", options);
@@ -78,7 +78,7 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
     hs_dump_cursor = NULL;
     checkpoint = ofile = simpleuri = uri = timestamp = NULL;
     hex = json = pretty = reverse = false;
-    while ((ch = __wt_getopt(progname, argc, argv, "c:f:t:jprx")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "c:f:t:jprx?")) != EOF)
         switch (ch) {
         case 'c':
             checkpoint = __wt_optarg;
@@ -102,6 +102,8 @@ util_dump(WT_SESSION *session, int argc, char *argv[])
             hex = true;
             break;
         case '?':
+            usage();
+            return (0);
         default:
             return (usage());
         }

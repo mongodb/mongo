@@ -15,16 +15,16 @@
 static int
 usage(void)
 {
-    static const char *options[] = {"-d config",
-      "display underlying information during verification", "-c",
-      "continue to the next page after encountering error during verification", "-s",
+    static const char *options[] = {"-c",
+      "continue to the next page after encountering error during verification", "-d config",
+      "display underlying information during verification", "-s",
       "verify against the specified timestamp", "-t", "do not clear txn ids during verification",
       "-u",
       "display the application data when dumping with configuration dump_blocks or dump_pages",
-      NULL, NULL};
+      "-?", "show this message", NULL, NULL};
 
     util_usage(
-      "verify [-s] [-t] [-c] [-u] [-d dump_address | dump_blocks | dump_layout | dump_offsets=#,# "
+      "verify [-cstu] [-d dump_address | dump_blocks | dump_layout | dump_offsets=#,# "
       "| dump_pages] [uri]",
       "options:", options);
 
@@ -48,7 +48,7 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
     do_not_clear_txn_id = dump_address = dump_app_data = dump_blocks = dump_layout = dump_pages =
       read_corrupt = stable_timestamp = false;
     config = dump_offsets = uri = NULL;
-    while ((ch = __wt_getopt(progname, argc, argv, "cd:stu")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "cd:stu?")) != EOF)
         switch (ch) {
         case 'c':
             read_corrupt = true;
@@ -82,6 +82,8 @@ util_verify(WT_SESSION *session, int argc, char *argv[])
             do_not_clear_txn_id = true;
             break;
         case '?':
+            usage();
+            return (0);
         default:
             return (usage());
         }

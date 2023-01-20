@@ -16,9 +16,10 @@ static int
 usage(void)
 {
     static const char *options[] = {"-a", "append each value as a new record in the data source",
-      "-o", "allow overwrite of previously existing records", NULL, NULL};
+      "-o", "allow overwrite of previously existing records", "-?", "show this message", NULL,
+      NULL};
 
-    util_usage("write [-ao] uri key ...", "options:", options);
+    util_usage("write [-ao] uri key value ...", "options:", options);
     return (1);
 }
 
@@ -38,7 +39,7 @@ util_write(WT_SESSION *session, int argc, char *argv[])
 
     append = overwrite = false;
     uri = NULL;
-    while ((ch = __wt_getopt(progname, argc, argv, "ao")) != EOF)
+    while ((ch = __wt_getopt(progname, argc, argv, "ao?")) != EOF)
         switch (ch) {
         case 'a':
             append = true;
@@ -47,6 +48,8 @@ util_write(WT_SESSION *session, int argc, char *argv[])
             overwrite = true;
             break;
         case '?':
+            usage();
+            return (0);
         default:
             return (usage());
         }

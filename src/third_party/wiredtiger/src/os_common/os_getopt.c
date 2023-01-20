@@ -59,15 +59,21 @@
 
 #include "wt_internal.h"
 
+/* WT-specific return codes for __wt_getopt(); use __wt_optwt to enable */
+#define WT_GETOPT_BAD_OPTION 1
+#define WT_GETOPT_BAD_ARGUMENT 2
+
 extern int __wt_opterr WT_ATTRIBUTE_LIBRARY_VISIBLE;
 extern int __wt_optind WT_ATTRIBUTE_LIBRARY_VISIBLE;
 extern int __wt_optopt WT_ATTRIBUTE_LIBRARY_VISIBLE;
 extern int __wt_optreset WT_ATTRIBUTE_LIBRARY_VISIBLE;
+extern int __wt_optwt WT_ATTRIBUTE_LIBRARY_VISIBLE;
 
 int __wt_opterr = 1, /* if error message should be printed */
   __wt_optind = 1,   /* index into parent argv vector */
   __wt_optopt,       /* character checked for validity */
-  __wt_optreset;     /* reset getopt */
+  __wt_optreset,     /* reset getopt */
+  __wt_optwt = 0;    /* enable WT-specific behavior, e.g., using WT_* return codes */
 
 extern char *__wt_optarg WT_ATTRIBUTE_LIBRARY_VISIBLE;
 char *__wt_optarg; /* argument associated with option */
@@ -119,7 +125,7 @@ __wt_getopt(const char *progname, int nargc, char *const *nargv, const char *ost
             ++__wt_optind;
         if (__wt_opterr && *ostr != ':')
             (void)fprintf(stderr, "%s: illegal option -- %c\n", progname, __wt_optopt);
-        return (BADCH);
+        return (__wt_optwt ? WT_GETOPT_BAD_OPTION : BADCH);
     }
 
     /* Does this option need an argument? */
@@ -139,11 +145,11 @@ __wt_getopt(const char *progname, int nargc, char *const *nargv, const char *ost
             /* option-argument absent */
             place = EMSG;
             if (*ostr == ':')
-                return (BADARG);
+                return (__wt_optwt ? WT_GETOPT_BAD_ARGUMENT : BADARG);
             if (__wt_opterr)
                 (void)fprintf(
                   stderr, "%s: option requires an argument -- %c\n", progname, __wt_optopt);
-            return (BADCH);
+            return (__wt_optwt ? WT_GETOPT_BAD_OPTION : BADCH);
         }
         place = EMSG;
         ++__wt_optind;

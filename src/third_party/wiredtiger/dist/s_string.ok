@@ -43,6 +43,7 @@ BDB's
 BDmpvXx
 BIGENDIAN
 BLKCACHE
+BLmRrSVv
 BOOL
 BSR
 BTREE
@@ -568,6 +569,7 @@ addr
 addrs
 addtw
 agc
+ajn
 alfred
 alloc
 allocator
@@ -745,6 +747,7 @@ cryptobad
 cryptographic
 cryptographically
 cstring
+cstu
 csuite
 csv
 ctime
@@ -1283,6 +1286,7 @@ oplist
 oplog
 optimizations
 optrack
+optwt
 optype
 ori
 origstartrecno
