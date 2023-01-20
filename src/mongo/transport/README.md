@@ -28,7 +28,7 @@ by the sending of a response message, and destroyed.
 
 That's the basic case. A few more exotic message transfer styles exist, and
 these are also managed by the `SessionWorkflow`. See the section on message
-[flag bits][[wire_protocol_flag_bits] for details.
+[flag bits][wire_protocol_flag_bits] for details.
 
 A request that can produce multiple responses is an "exhaust" command.
 Internally, after each response is sent out, the `SessionWorkflow` synthesizes
