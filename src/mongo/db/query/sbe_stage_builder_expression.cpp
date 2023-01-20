@@ -315,9 +315,6 @@ optimizer::ABT generateTraverse(
  */
 void generateStringCaseConversionExpression(ExpressionVisitorContext* _context,
                                             const std::string& caseConversionFunction) {
-    auto frameId = _context->state.frameId();
-    auto str = sbe::makeEs(_context->popExpr());
-    sbe::EVariable inputRef(frameId, 0);
     uint32_t typeMask = (getBSONTypeMask(sbe::value::TypeTags::StringSmall) |
                          getBSONTypeMask(sbe::value::TypeTags::StringBig) |
                          getBSONTypeMask(sbe::value::TypeTags::bsonString) |
@@ -328,6 +325,31 @@ void generateStringCaseConversionExpression(ExpressionVisitorContext* _context,
                          getBSONTypeMask(sbe::value::TypeTags::NumberDecimal) |
                          getBSONTypeMask(sbe::value::TypeTags::Date) |
                          getBSONTypeMask(sbe::value::TypeTags::Timestamp));
+
+    if (_context->hasAllAbtEligibleEntries(1)) {
+        auto str = _context->popABTExpr();
+        auto varStr = makeLocalVariableName(_context->state.frameId(), 0);
+
+        auto totalCaseConversionExpr = optimizer::make<optimizer::If>(
+            generateABTNullOrMissing(varStr),
+            makeABTConstant(""_sd),
+            optimizer::make<optimizer::If>(
+                makeABTFunction(
+                    "typeMatch"_sd, makeVariable(varStr), optimizer::Constant::int32(typeMask)),
+                makeABTFunction(caseConversionFunction,
+                                makeABTFunction("coerceToString"_sd, makeVariable(varStr))),
+                makeABTFail(ErrorCodes::Error{7158200},
+                            str::stream() << "$" << caseConversionFunction
+                                          << " input type is not supported")));
+
+        _context->pushExpr(abt::wrap(optimizer::make<optimizer::Let>(
+            varStr, std::move(str), std::move(totalCaseConversionExpr))));
+        return;
+    }
+
+    auto frameId = _context->state.frameId();
+    auto str = sbe::makeEs(_context->popExpr());
+    sbe::EVariable inputRef(frameId, 0);
     auto checkValidTypeExpr =
         makeFunction("typeMatch",
                      inputRef.clone(),
@@ -1266,11 +1288,53 @@ public:
         auto arity = expr->getChildren().size();
         _context->ensureArity(arity);
 
-        // Concatination of no strings is an empty string.
+        // Concatenation of no strings is an empty string.
         if (arity == 0) {
-            _context->pushExpr(makeConstant(""_sd));
+            pushABT(makeABTConstant(""_sd));
             return;
         }
+
+        if (_context->hasAllAbtEligibleEntries(arity)) {
+            std::vector<std::pair<optimizer::ProjectionName, optimizer::ABT>> binds;
+            for (size_t idx = 0; idx < arity; ++idx) {
+                // ABT can bind a single variable at a time, so create a new frame for each
+                // argument.
+                binds.emplace_back(makeLocalVariableName(_context->state.frameId(), 0),
+                                   _context->popABTExpr());
+            }
+            std::reverse(std::begin(binds), std::end(binds));
+
+            optimizer::ABTVector checkNullArg;
+            optimizer::ABTVector checkStringArg;
+            optimizer::ABTVector argVars;
+            for (auto& bind : binds) {
+                checkNullArg.push_back(generateABTNullOrMissing(bind.first));
+                checkStringArg.push_back(makeABTFunction("isString"_sd, makeVariable(bind.first)));
+                argVars.push_back(makeVariable(bind.first));
+            }
+
+            auto checkNullAnyArgument =
+                makeBalancedBooleanOpTree(optimizer::Operations::Or, std::move(checkNullArg));
+
+            auto checkStringAllArguments =
+                makeBalancedBooleanOpTree(optimizer::Operations::And, std::move(checkStringArg));
+
+            auto concatExpr = buildABTMultiBranchConditional(
+                ABTCaseValuePair{std::move(checkNullAnyArgument), optimizer::Constant::null()},
+                ABTCaseValuePair{
+                    std::move(checkStringAllArguments),
+                    optimizer::make<optimizer::FunctionCall>("concat", std::move(argVars))},
+                makeABTFail(ErrorCodes::Error{7158201}, "$concat supports only strings"));
+
+            for (auto it = binds.begin(); it != binds.end(); it++) {
+                concatExpr = optimizer::make<optimizer::Let>(
+                    it->first, std::move(it->second), std::move(concatExpr));
+            }
+
+            pushABT(std::move(concatExpr));
+            return;
+        }
+        // Fallback to generate an SBE EExpression node.
 
         auto frameId = _context->state.frameId();
         sbe::EExpression::Vector binds;
@@ -3246,6 +3310,21 @@ public:
         auto numChildren = expr->getChildren().size();
         invariant(numChildren >= 2);
 
+        if (_context->hasAllAbtEligibleEntries(numChildren)) {
+            std::vector<optimizer::ABT> values;
+            values.reserve(numChildren);
+            for (size_t i = 0; i < numChildren; ++i) {
+                values.emplace_back(_context->popABTExpr());
+            }
+            std::reverse(values.begin(), values.end());
+
+            auto resultExpr = makeIfNullExpr(std::move(values), _context->state.frameIdGenerator);
+
+            pushABT(std::move(resultExpr));
+            return;
+        }
+        // Fallback to generate an SBE EExpression node.
+
         std::vector<std::unique_ptr<sbe::EExpression>> values;
         values.reserve(numChildren);
         for (size_t i = 0; i < numChildren; ++i) {
@@ -3272,6 +3351,19 @@ public:
         visitIndexOfFunction(expr, _context, "indexOfCP");
     }
     void visit(const ExpressionIsNumber* expr) final {
+        if (_context->hasAllAbtEligibleEntries(1)) {
+            auto arg = _context->popABTExpr();
+            auto varName = makeLocalVariableName(_context->state.frameId(), 0);
+            auto exprIsNum =
+                optimizer::make<optimizer::If>(makeABTFunction("exists", makeVariable(varName)),
+                                               makeABTFunction("isNumber", makeVariable(varName)),
+                                               optimizer::Constant::boolean(false));
+
+            pushABT(optimizer::make<optimizer::Let>(varName, std::move(arg), std::move(exprIsNum)));
+            return;
+        }
+        // Fallback to generate an SBE EExpression node.
+
         auto frameId = _context->state.frameId();
         auto binds = sbe::makeEs(_context->popExpr());
         sbe::EVariable inputRef(frameId, 0);
@@ -4203,14 +4295,66 @@ public:
         unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionSplit* expr) final {
+        invariant(expr->getChildren().size() == 2);
+        _context->ensureArity(2);
+
+        auto [arrayWithEmptyStringTag, arrayWithEmptyStringVal] = sbe::value::makeNewArray();
+        sbe::value::ValueGuard arrayWithEmptyStringGuard{arrayWithEmptyStringTag,
+                                                         arrayWithEmptyStringVal};
+        auto [emptyStrTag, emptyStrVal] = sbe::value::makeNewString("");
+        sbe::value::getArrayView(arrayWithEmptyStringVal)->push_back(emptyStrTag, emptyStrVal);
+
+        if (_context->hasAllAbtEligibleEntries(2)) {
+            auto delimiter = _context->popABTExpr();
+            auto stringExpression = _context->popABTExpr();
+
+            auto varString = makeLocalVariableName(_context->state.frameId(), 0);
+            auto varDelimiter = makeLocalVariableName(_context->state.frameId(), 0);
+            auto emptyResult = makeABTConstant(arrayWithEmptyStringTag, arrayWithEmptyStringVal);
+            arrayWithEmptyStringGuard.reset();
+
+            // In order to maintain MQL semantics, first check both the string expression
+            // (first agument), and delimiter string (second argument) for null, undefined, or
+            // missing, and if either is nullish make the entire expression return null. Only
+            // then make further validity checks against the input. Fail if the delimiter is an
+            // empty string. Return [""] if the string expression is an empty string.
+            auto totalSplitFunc = buildABTMultiBranchConditional(
+                ABTCaseValuePair{
+                    optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Or,
+                                                         generateABTNullOrMissing(varString),
+                                                         generateABTNullOrMissing(varDelimiter)),
+                    optimizer::Constant::null()},
+                ABTCaseValuePair{makeNot(makeABTFunction("isString"_sd, makeVariable(varString))),
+                                 makeABTFail(ErrorCodes::Error{7158202},
+                                             "$split string expression must be a string")},
+                ABTCaseValuePair{
+                    makeNot(makeABTFunction("isString"_sd, makeVariable(varDelimiter))),
+                    makeABTFail(ErrorCodes::Error{7158203}, "$split delimiter must be a string")},
+                ABTCaseValuePair{optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Eq,
+                                                                      makeVariable(varDelimiter),
+                                                                      makeABTConstant(""_sd)),
+                                 makeABTFail(ErrorCodes::Error{7158204},
+                                             "$split delimiter must not be an empty string")},
+                ABTCaseValuePair{optimizer::make<optimizer::BinaryOp>(optimizer::Operations::Eq,
+                                                                      makeVariable(varString),
+                                                                      makeABTConstant(""_sd)),
+                                 std::move(emptyResult)},
+                makeABTFunction("split"_sd, makeVariable(varString), makeVariable(varDelimiter)));
+
+            pushABT(optimizer::make<optimizer::Let>(
+                varString,
+                std::move(stringExpression),
+                optimizer::make<optimizer::Let>(
+                    varDelimiter, std::move(delimiter), std::move(totalSplitFunc))));
+            return;
+        }
+        // Fallback to generate an SBE EExpression node.
+
         auto frameId = _context->state.frameId();
         sbe::EExpression::Vector args;
         sbe::EExpression::Vector binds;
         sbe::EVariable stringExpressionRef(frameId, 0);
         sbe::EVariable delimiterRef(frameId, 1);
-
-        invariant(expr->getChildren().size() == 2);
-        _context->ensureArity(2);
 
         auto delimiter = _context->popExpr();
         auto stringExpression = _context->popExpr();
@@ -4223,14 +4367,6 @@ public:
         binds.push_back(std::move(delimiter));
         args.push_back(delimiterRef.clone());
 
-        auto [emptyStrTag, emptyStrVal] = sbe::value::makeNewString("");
-        auto [arrayWithEmptyStringTag, arrayWithEmptyStringVal] = sbe::value::makeNewArray();
-        sbe::value::ValueGuard arrayWithEmptyStringGuard{arrayWithEmptyStringTag,
-                                                         arrayWithEmptyStringVal};
-        auto arrayWithEmptyStringView = sbe::value::getArrayView(arrayWithEmptyStringVal);
-        arrayWithEmptyStringView->push_back(emptyStrTag, emptyStrVal);
-        arrayWithEmptyStringGuard.reset();
-
         auto generateIsEmptyString = [this, emptyStrTag = emptyStrTag, emptyStrVal = emptyStrVal](
                                          const sbe::EVariable& var) {
             return makeBinaryOp(sbe::EPrimBinary::eq,
@@ -4242,6 +4378,9 @@ public:
         auto checkIsNullOrMissing = makeBinaryOp(sbe::EPrimBinary::logicOr,
                                                  generateNullOrMissing(stringExpressionRef),
                                                  generateNullOrMissing(delimiterRef));
+        auto emptyResult =
+            sbe::makeE<sbe::EConstant>(arrayWithEmptyStringTag, arrayWithEmptyStringVal);
+        arrayWithEmptyStringGuard.reset();
 
         // In order to maintain MQL semantics, first check both the string expression
         // (first agument), and delimiter string (second argument) for null, undefined, or
@@ -4263,10 +4402,8 @@ public:
                           sbe::makeE<sbe::EFail>(
                               ErrorCodes::Error{5155401},
                               str::stream() << "$split delimiter must not be an empty string")},
-            sbe::makeE<sbe::EIf>(
-                generateIsEmptyString(stringExpressionRef),
-                sbe::makeE<sbe::EConstant>(arrayWithEmptyStringTag, arrayWithEmptyStringVal),
-                sbe::makeE<sbe::EFunction>("split", std::move(args))));
+            CaseValuePair{generateIsEmptyString(stringExpressionRef), std::move(emptyResult)},
+            sbe::makeE<sbe::EFunction>("split", std::move(args)));
 
         _context->pushExpr(
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(totalSplitFunc)));
@@ -5616,6 +5753,211 @@ private:
     void generateRegexExpression(const ExpressionRegex* expr, StringData exprName) {
         size_t arity = expr->hasOptions() ? 3 : 2;
         _context->ensureArity(arity);
+
+        if (_context->hasAllAbtEligibleEntries(arity)) {
+            boost::optional<optimizer::ABT> options;
+            if (expr->hasOptions()) {
+                options = _context->popABTExpr();
+            }
+            auto pattern = _context->popABTExpr();
+            auto input = _context->popABTExpr();
+
+            auto inputVar = makeLocalVariableName(_context->state.frameId(), 0);
+            auto patternVar = makeLocalVariableName(_context->state.frameId(), 0);
+
+            auto generateRegexNullResponse = [exprName]() {
+                if (exprName == "regexMatch"_sd) {
+                    return optimizer::Constant::boolean(false);
+                } else if (exprName == "regexFindAll"_sd) {
+                    return optimizer::Constant::emptyArray();
+                } else {
+                    return optimizer::Constant::null();
+                }
+            };
+
+            auto makeError = [exprName](int errorCode, StringData message) {
+                return makeABTFail(ErrorCodes::Error{errorCode},
+                                   str::stream() << "$" << exprName.toString() << ": " << message);
+            };
+
+            auto makeRegexFunctionCall = [&](optimizer::ABT compiledRegex) {
+                auto resultVar = makeLocalVariableName(_context->state.frameId(), 0);
+                return optimizer::make<optimizer::Let>(
+                    resultVar,
+                    makeABTFunction(exprName, std::move(compiledRegex), makeVariable(inputVar)),
+                    optimizer::make<optimizer::If>(
+                        makeABTFunction("exists"_sd, makeVariable(resultVar)),
+                        makeVariable(resultVar),
+                        makeError(5073403,
+                                  "error occurred while executing the regular expression")));
+            };
+
+            auto regexFunctionResult = [&]() {
+                if (auto patternAndOptions = expr->getConstantPatternAndOptions();
+                    patternAndOptions) {
+                    auto [pattern, options] = *patternAndOptions;
+                    if (!pattern) {
+                        // Pattern is null, just generate null result.
+                        return generateRegexNullResponse();
+                    }
+
+                    // Create the compiled Regex from constant pattern and options.
+                    auto [regexTag, regexVal] = sbe::value::makeNewPcreRegex(*pattern, options);
+                    auto compiledRegex = makeABTConstant(regexTag, regexVal);
+                    return makeRegexFunctionCall(std::move(compiledRegex));
+                }
+
+                // 'patternArgument' contains the following expression:
+                //
+                // if isString(pattern) {
+                //     if hasNullBytes(pattern) {
+                //         fail('pattern cannot have null bytes in it')
+                //     } else {
+                //         pattern
+                //     }
+                // } else if isBsonRegex(pattern) {
+                //     getRegexPattern(pattern)
+                // } else {
+                //     fail('pattern must be either string or BSON RegEx')
+                // }
+                auto patternArgument = optimizer::make<optimizer::If>(
+                    makeABTFunction("isString"_sd, makeVariable(patternVar)),
+                    optimizer::make<optimizer::If>(
+                        makeABTFunction("hasNullBytes"_sd, makeVariable(patternVar)),
+                        makeError(5126602, "regex pattern must not have embedded null bytes"),
+                        makeVariable(patternVar)),
+                    optimizer::make<optimizer::If>(
+                        makeABTFunction(
+                            "typeMatch"_sd,
+                            makeVariable(patternVar),
+                            optimizer::Constant::int32(getBSONTypeMask(BSONType::RegEx))),
+                        makeABTFunction("getRegexPattern"_sd, makeVariable(patternVar)),
+                        makeError(5126601,
+                                  "regex pattern must have either string or BSON RegEx type")));
+
+                if (!options) {
+                    // If no options are passed to the expression, try to extract them from the
+                    // pattern.
+                    auto optionsArgument = optimizer::make<optimizer::If>(
+                        makeABTFunction(
+                            "typeMatch"_sd,
+                            makeVariable(patternVar),
+                            optimizer::Constant::int32(getBSONTypeMask(BSONType::RegEx))),
+                        makeABTFunction("getRegexFlags"_sd, makeVariable(patternVar)),
+                        makeABTConstant(""_sd));
+                    auto compiledRegex = makeABTFunction(
+                        "regexCompile"_sd, std::move(patternArgument), std::move(optionsArgument));
+                    return optimizer::make<optimizer::If>(
+                        makeABTFunction("isNull"_sd, makeVariable(patternVar)),
+                        generateRegexNullResponse(),
+                        makeRegexFunctionCall(std::move(compiledRegex)));
+                }
+
+                // If there are options passed to the expression, we construct local bind with
+                // options argument because it needs to be validated even when pattern is null.
+                auto userOptionsVar = makeLocalVariableName(_context->state.frameId(), 0);
+                auto optionsArgument = [&]() {
+                    // The code below generates the following expression:
+                    //
+                    // let stringOptions =
+                    //     if isString(options) {
+                    //         if hasNullBytes(options) {
+                    //             fail('options cannot have null bytes in it')
+                    //         } else {
+                    //             options
+                    //         }
+                    //     } else if isNull(options) {
+                    //         ''
+                    //     } else {
+                    //         fail('options must be either string or null')
+                    //     }
+                    // in
+                    //     if isBsonRegex(pattern) {
+                    //         let bsonOptions = getRegexFlags(pattern)
+                    //         in
+                    //             if stringOptions == "" {
+                    //                 bsonOptions
+                    //             } else if bsonOptions == "" {
+                    //                 stringOptions
+                    //             } else {
+                    //                 fail('multiple options specified')
+                    //             }
+                    //     } else {
+                    //         stringOptions
+                    //     }
+                    auto stringOptions = optimizer::make<optimizer::If>(
+                        makeABTFunction("isString"_sd, makeVariable(userOptionsVar)),
+                        optimizer::make<optimizer::If>(
+                            makeABTFunction("hasNullBytes"_sd, makeVariable(userOptionsVar)),
+                            makeError(5126604, "regex flags must not have embedded null bytes"),
+                            makeVariable(userOptionsVar)),
+                        optimizer::make<optimizer::If>(
+                            makeABTFunction("isNull"_sd, makeVariable(userOptionsVar)),
+                            makeABTConstant(""_sd),
+                            makeError(5126603,
+                                      "regex flags must have either string or null type")));
+
+                    auto generateIsEmptyString = [](const optimizer::ProjectionName& var) {
+                        return optimizer::make<optimizer::BinaryOp>(
+                            optimizer::Operations::Eq, makeVariable(var), makeABTConstant(""_sd));
+                    };
+
+                    auto stringVar = makeLocalVariableName(_context->state.frameId(), 0);
+                    auto bsonPatternVar = makeLocalVariableName(_context->state.frameId(), 0);
+                    return optimizer::make<optimizer::Let>(
+                        stringVar,
+                        std::move(stringOptions),
+                        optimizer::make<optimizer::If>(
+                            makeABTFunction(
+                                "typeMatch"_sd,
+                                makeVariable(patternVar),
+                                optimizer::Constant::int32(getBSONTypeMask(BSONType::RegEx))),
+                            optimizer::make<optimizer::Let>(
+                                bsonPatternVar,
+                                makeABTFunction("getRegexFlags", makeVariable(patternVar)),
+                                optimizer::make<optimizer::If>(
+                                    generateIsEmptyString(stringVar),
+                                    makeVariable(bsonPatternVar),
+                                    optimizer::make<optimizer::If>(
+                                        generateIsEmptyString(bsonPatternVar),
+                                        makeVariable(stringVar),
+                                        makeError(5126605,
+                                                  "regex options cannot be specified in both BSON "
+                                                  "RegEx and 'options' field")))),
+                            makeVariable(stringVar)));
+                }();
+
+                auto optionsVar = makeLocalVariableName(_context->state.frameId(), 0);
+                return optimizer::make<optimizer::Let>(
+                    userOptionsVar,
+                    std::move(*options),
+                    optimizer::make<optimizer::Let>(
+                        optionsVar,
+                        std::move(optionsArgument),
+                        optimizer::make<optimizer::If>(
+                            makeABTFunction("isNull"_sd, makeVariable(patternVar)),
+                            generateRegexNullResponse(),
+                            makeRegexFunctionCall(makeABTFunction("regexCompile"_sd,
+                                                                  makeVariable(patternVar),
+                                                                  makeVariable(optionsVar))))));
+            }();
+
+            auto regexCall = optimizer::make<optimizer::If>(
+                generateABTNullOrMissing(inputVar),
+                generateRegexNullResponse(),
+                optimizer::make<optimizer::If>(
+                    makeNot(makeABTFunction("isString"_sd, makeVariable(inputVar))),
+                    makeError(5073401, "input must be of type string"),
+                    regexFunctionResult));
+
+            pushABT(optimizer::make<optimizer::Let>(
+                inputVar,
+                std::move(input),
+                optimizer::make<optimizer::Let>(
+                    patternVar, std::move(pattern), std::move(regexCall))));
+            return;
+        }
+        // Fallback to generate an SBE EExpression node.
 
         std::unique_ptr<sbe::EExpression> options =
             expr->hasOptions() ? _context->popExpr() : nullptr;
