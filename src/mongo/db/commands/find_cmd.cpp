@@ -574,8 +574,11 @@ public:
             cq->setUseCqfIfEligible(true);
 
             if (collection) {
-                telemetry::registerFindRequest(
-                    cq->getFindCommandRequest(), collection.get()->ns(), opCtx);
+                // Collect telemetry. Exclude queries against collections with encrypted fields.
+                if (!collection.get()->getCollectionOptions().encryptedFieldConfig) {
+                    telemetry::registerFindRequest(
+                        cq->getFindCommandRequest(), collection.get()->ns(), opCtx);
+                }
             }
 
             // Get the execution plan for the query.

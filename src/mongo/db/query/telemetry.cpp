@@ -370,10 +370,6 @@ void registerAggRequest(const AggregateCommandRequest& request, OperationContext
         return;
     }
 
-    if (request.getEncryptionInformation()) {
-        return;
-    }
-
     // Queries against metadata collections should never appear in telemetry data.
     if (request.getNamespace().isFLE2StateCollection()) {
         return;
@@ -424,9 +420,6 @@ void registerFindRequest(const FindCommandRequest& request,
                          const NamespaceString& collection,
                          OperationContext* opCtx) {
     if (!isTelemetryEnabled()) {
-        return;
-    }
-    if (request.getEncryptionInformation()) {
         return;
     }
 

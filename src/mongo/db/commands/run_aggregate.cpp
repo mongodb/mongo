@@ -727,15 +727,22 @@ Status runAggregate(OperationContext* opCtx,
         collections.clear();
     };
 
+    auto collectTelemetry = [&]() -> void {
+        // Collect telemetry. Exclude queries against collections with encrypted fields.
+        // We still collect telemetry on collection-less aggregations.
+        if (!(ctx && ctx->getCollection() &&
+              ctx->getCollection()->getCollectionOptions().encryptedFieldConfig)) {
+            telemetry::registerAggRequest(request, opCtx);
+        }
+    };
+
     std::vector<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> execs;
     boost::intrusive_ptr<ExpressionContext> expCtx;
     auto curOp = CurOp::get(opCtx);
     auto catalog = CollectionCatalog::get(opCtx);
 
-    telemetry::registerAggRequest(request, opCtx);
-
     // Since we remove encryptionInformation after rewriting a FLE2 query, this boolean keeps track
-    // of whether the input query did originally have enryption information.
+    // of whether the input query did originally have encryption information.
     bool didDoFLERewrite = false;
 
     {
@@ -812,6 +819,7 @@ Status runAggregate(OperationContext* opCtx,
 
             // Obtain collection locks on the execution namespace; that is, the oplog.
             initContext(auto_get_collection::ViewMode::kViewsForbidden);
+            collectTelemetry();
         } else if (nss.isCollectionlessAggregateNS() && pipelineInvolvedNamespaces.empty()) {
             uassert(4928901,
                     str::stream() << AggregateCommandRequest::kCollectionUUIDFieldName
@@ -831,9 +839,11 @@ Status runAggregate(OperationContext* opCtx,
             tassert(6235101,
                     "A collection-less aggregate should not take any locks",
                     ctx == boost::none);
+            collectTelemetry();
         } else {
             // This is a regular aggregation. Lock the collection or view.
             initContext(auto_get_collection::ViewMode::kViewsPermitted);
+            collectTelemetry();
             auto [collator, match] =
                 PipelineD::resolveCollator(opCtx,
                                            request.getCollation().get_value_or(BSONObj()),
