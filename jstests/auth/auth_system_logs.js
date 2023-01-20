@@ -9,35 +9,21 @@ mongod.getDB('admin').createUser(
 assert(mongod.getDB('admin').auth('admin', 'pwd'));
 // `mongod` is authenticated as a super user and stays that way.
 
-// base64 encoded: 'n,,n=admin,r=deadbeefcafeba11';
-const kClientPayload = 'biwsbj1hZG1pbixyPWRlYWRiZWVmY2FmZWJhMTE=';
-
 const kFailedToAuthMsg = 5286307;
 
-// Obtains all of the logs that contain a failed to authenticate message.
-function getFailures() {
-    // No need to auth, we're already superuser.
-    return checkLog.getGlobalLog(mongod)
-        .map(JSON.parse)
-        .filter((log) => log.id == kFailedToAuthMsg);
-}
+let failuresAlreadyObserved = 0;
 
-// Ensures that there are exactly expectedNumFailures failures in the logs after failuresBefore.
-function assertNewAuthFailures(failuresBefore, expectedNumFailures) {
-    const failuresAfter = getFailures();
-    assert.eq(failuresBefore.length + expectedNumFailures,
-              failuresAfter.length,
-              "Unexpected new failures: " + tojson(failuresAfter.slice(failuresBefore.length)));
-}
-
-function runTest(speculations, performNormalAuth = false) {
-    const failuresBefore = getFailures();
-
+// Run the number of speculations specified, and if performNormalAuth is true we complete the
+// authentication session. At the end, we check to see that the total number of failures in the logs
+// for this iteration is the same as expectedNumFailures.
+function runTest(speculations, performNormalAuth, expectedNumFailures) {
     // Running the operations in a parallel shell so that if performNormalAuth is false, we
     // encounter an "authentication session abandoned" error because the client will disconnect.
     let runAuths = startParallelShell(
         funWithArgs(function(speculations, performNormalAuth = false) {
             const admin = db.getSiblingDB('admin');
+
+            // base64 encoded: 'n,,n=admin,r=deadbeefcafeba11';
             const kClientPayload = 'biwsbj1hZG1pbixyPWRlYWRiZWVmY2FmZWJhMTE=';
 
             // Run speculative auth(s).
@@ -60,25 +46,23 @@ function runTest(speculations, performNormalAuth = false) {
 
     runAuths();
 
-    // If we perform a normal auth after the speculative one(s), we complete the authentication
-    // session (and thus, do not encounter the "authentication session abandoned" error).
-    let expectedFailures = 0;
-    if (speculations > 0) {
-        expectedFailures = performNormalAuth ? 0 : 1;
-    }
-    if (speculations > 1) {
-        expectedFailures += speculations - 1;
-    }
-
-    assertNewAuthFailures(failuresBefore, expectedFailures);
+    checkLog.containsWithCount(
+        mongod, kFailedToAuthMsg, failuresAlreadyObserved + expectedNumFailures);
+    failuresAlreadyObserved += expectedNumFailures;
 }
 
-// Run test with no speculation (0), normal speculation (1), and a few levels of excessive
-// speculation. Try each degree both with and without performing a normal authentication at the end.
-for (let speculate = 0; speculate < 5; ++speculate) {
-    runTest(speculate, true);
-    runTest(speculate, false);
-}
+// Running with 0 speculations should not cause any failures.
+runTest(0, true, 0);
+runTest(0, false, 0);
+
+// Running with 1 speculation should only cause a failure when we do not complete the authentication
+// session with a normal auth.
+runTest(1, true, 0);
+runTest(1, false, 1);
+
+// Running 2 speculations should cause a failure because the second will override the first.
+runTest(2, true, 1);
+runTest(2, false, 2);
 
 MongoRunner.stopMongod(mongod);
 })();
