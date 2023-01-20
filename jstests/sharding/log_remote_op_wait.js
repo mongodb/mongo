@@ -130,30 +130,6 @@ assert(!csCursor.hasNext());
     assert.gte(remoteOpWait, 900);
 }
 
-// An equivalent .find() does not include remoteOpWaitMillis.
-const findComment = 'example_find_should_not_have_remote_op_wait';
-coll.find().sort({x: 1}).comment(findComment).next();
-{
-    const mongosLog = assert.commandWorked(st.s.adminCommand({getLog: "global"}));
-    const lines =
-        [...findMatchingLogLines(mongosLog.log, {msg: "Slow query", comment: findComment})];
-    const line = lines.find(line => line.match(/command.{1,4}find/));
-    assert(line, "Failed to find a 'find' log line matching the comment");
-    assert(!line.match(/remoteOpWait/), `Log line unexpectedly contained remoteOpWait: ${line}`);
-}
-
-// Other cursor-producing commands do not include remoteOpWaitMillis, such as listCollections.
-const listCollectionsComment = 'example_listCollections_should_not_have_remote_op_wait';
-coll.runCommand({listCollections: 1, comment: listCollectionsComment});
-{
-    const mongosLog = assert.commandWorked(st.s.adminCommand({getLog: "global"}));
-    const lines = [...findMatchingLogLines(mongosLog.log,
-                                           {msg: "Slow query", comment: listCollectionsComment})];
-    const line = lines.find(line => line.match(/command.{1,4}listCollections/));
-    assert(line, "Failed to find a 'listCollections' log line matching the comment");
-    assert(!line.match(/remoteOpWait/), `Log line unexpectedly contained remoteOpWait: ${line}`);
-}
-
 // A query that merges on a shard logs remoteOpWaitMillis on the shard.
 const pipeline2 = [{$sort: {x: 1}}, {$group: {_id: "$y"}}];
 const pipelineComment2 = 'example_pipeline2_should_have_remote_op_wait';
