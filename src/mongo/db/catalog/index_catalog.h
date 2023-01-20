@@ -284,6 +284,17 @@ public:
         InclusionPolicy inclusionPolicy = InclusionPolicy::kReady) const = 0;
 
     /**
+     * Finds the index with the given ident. The ident uniquely identifies an index.
+     *
+     * Returns nullptr if the index is not found.
+     */
+    virtual const IndexDescriptor* findIndexByIdent(
+        OperationContext* opCtx,
+        const Collection* collection,
+        StringData ident,
+        InclusionPolicy inclusionPolicy = InclusionPolicy::kReady) const = 0;
+
+    /**
      * Reload the index definition for 'oldDesc' from the CollectionCatalogEntry.  'oldDesc'
      * must be a ready index that is already registered with the index catalog.  Returns an
      * unowned pointer to the descriptor for the new index definition.

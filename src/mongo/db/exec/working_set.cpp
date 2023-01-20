@@ -315,15 +315,14 @@ void SortableWorkingSetMember::makeOwned() {
     _holder->makeObjOwnedIfNeeded();
 }
 
-WorkingSetRegisteredIndexId WorkingSet::registerIndexAccessMethod(
-    const IndexAccessMethod* indexAccess) {
+WorkingSetRegisteredIndexId WorkingSet::registerIndexIdent(const std::string& ident) {
     for (WorkingSetRegisteredIndexId i = 0; i < _registeredIndexes.size(); ++i) {
-        if (_registeredIndexes[i] == indexAccess) {
+        if (_registeredIndexes[i] == ident) {
             return i;
         }
     }
 
-    _registeredIndexes.push_back(indexAccess);
+    _registeredIndexes.push_back(ident);
     return _registeredIndexes.size() - 1;
 }
 

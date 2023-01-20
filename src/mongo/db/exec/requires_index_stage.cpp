@@ -39,40 +39,31 @@ RequiresIndexStage::RequiresIndexStage(const char* stageType,
                                        const IndexDescriptor* indexDescriptor,
                                        WorkingSet* workingSet)
     : RequiresCollectionStage(stageType, expCtx, collection),
-      _weakIndexCatalogEntry(indexDescriptor->getEntry()->shared_from_this()) {
-    auto indexCatalogEntry = _weakIndexCatalogEntry.lock();
-    _indexDescriptor = indexCatalogEntry->descriptor();
-    _indexAccessMethod = indexCatalogEntry->accessMethod()->asSortedData();
-    invariant(_indexDescriptor);
-    invariant(_indexAccessMethod);
-    _indexName = _indexDescriptor->indexName();
-    _workingSetIndexId = workingSet->registerIndexAccessMethod(_indexAccessMethod);
-}
+      _indexIdent(indexDescriptor->getEntry()->getIdent()),
+      _indexName(indexDescriptor->indexName()),
+      _entry(indexDescriptor->getEntry()),
+      _workingSetIndexId(workingSet->registerIndexIdent(_indexIdent)) {}
 
 void RequiresIndexStage::doSaveStateRequiresCollection() {
     doSaveStateRequiresIndex();
 
-    // Set catalog pointers to null, since accessing these pointers is illegal during yield.
-    _indexDescriptor = nullptr;
-    _indexAccessMethod = nullptr;
+    // Set the index entry to null, since accessing this pointer is illegal during yield.
+    _entry = nullptr;
 }
 
 void RequiresIndexStage::doRestoreStateRequiresCollection() {
-    // Attempt to lock the weak_ptr. If the resulting shared_ptr is null, then our index is no
-    // longer valid and the query should die. We must also check the `isDropped()` flag on the index
-    // catalog entry if we are able lock the weak_ptr.
-    auto indexCatalogEntry = _weakIndexCatalogEntry.lock();
+    auto desc = collection()->getIndexCatalog()->findIndexByIdent(
+        expCtx()->opCtx, collection().get(), _indexIdent);
     uassert(ErrorCodes::QueryPlanKilled,
             str::stream() << "query plan killed :: index '" << _indexName << "' dropped",
-            indexCatalogEntry && !indexCatalogEntry->isDropped());
+            desc && !desc->getEntry()->isDropped());
 
-    // Re-obtain catalog pointers that were set to null during yield preparation. It is safe to
-    // access the catalog entry by raw pointer when the query is active, as its validity is
-    // protected by at least MODE_IS collection locks.
-    _indexDescriptor = indexCatalogEntry->descriptor();
-    _indexAccessMethod = indexCatalogEntry->accessMethod()->asSortedData();
-    invariant(_indexDescriptor);
-    invariant(_indexAccessMethod);
+    // Re-obtain the index entry pointer that was set to null during yield preparation. It is safe
+    // to access the index entry when the query is active, as its validity is protected by at least
+    // MODE_IS collection locks; or, in the case of lock-free reads, its lifetime is managed by the
+    // CollectionCatalog stashed on the RecoveryUnit snapshot, which is kept alive until the query
+    // yields.
+    _entry = desc->getEntry();
 
     doRestoreStateRequiresIndex();
 }

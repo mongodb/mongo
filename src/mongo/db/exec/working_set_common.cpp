@@ -147,7 +147,13 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
             // index to be multikey when ensuring the keyData is still valid.
             KeyStringSet* multikeyMetadataKeys = nullptr;
             MultikeyPaths* multikeyPaths = nullptr;
-            auto* iam = workingSet->retrieveIndexAccessMethod(memberKey.indexId)->asSortedData();
+            const StringData indexIdent = workingSet->retrieveIndexIdent(memberKey.indexId);
+            auto desc = collection->getIndexCatalog()->findIndexByIdent(
+                opCtx, collection.get(), indexIdent);
+            invariant(desc,
+                      str::stream() << "Index entry not found for index with ident " << indexIdent
+                                    << " on collection " << collection->ns());
+            auto* iam = desc->getEntry()->accessMethod()->asSortedData();
             iam->getKeys(opCtx,
                          collection,
                          pool,

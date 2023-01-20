@@ -133,6 +133,17 @@ public:
                          std::vector<const IndexDescriptor*>& matches,
                          InclusionPolicy inclusionPolicy = InclusionPolicy::kReady) const override;
 
+    /**
+     * Finds the index with the given ident. The ident uniquely identifies an index.
+     *
+     * Returns nullptr if the index is not found.
+     */
+    const IndexDescriptor* findIndexByIdent(
+        OperationContext* opCtx,
+        const Collection* collection,
+        StringData ident,
+        InclusionPolicy inclusionPolicy = InclusionPolicy::kReady) const override;
+
 
     /**
      * Reload the index definition for 'oldDesc' from the CollectionCatalogEntry.  'oldDesc'

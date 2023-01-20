@@ -1597,6 +1597,20 @@ void IndexCatalogImpl::findIndexByType(OperationContext* opCtx,
     }
 }
 
+const IndexDescriptor* IndexCatalogImpl::findIndexByIdent(OperationContext* opCtx,
+                                                          const Collection* collection,
+                                                          StringData ident,
+                                                          InclusionPolicy inclusionPolicy) const {
+    auto ii = getIndexIterator(opCtx, inclusionPolicy);
+    while (ii->more()) {
+        const IndexCatalogEntry* entry = ii->next();
+        if (ident == entry->getIdent()) {
+            return entry->descriptor();
+        }
+    }
+    return nullptr;
+}
+
 const IndexCatalogEntry* IndexCatalogImpl::getEntry(const IndexDescriptor* desc) const {
     const IndexCatalogEntry* entry = desc->getEntry();
     massert(17357, "cannot find index entry", entry);
