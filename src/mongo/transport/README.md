@@ -1,40 +1,47 @@
+
 # Transport Internals
 ## Ingress Networking
 
-Ingress networking refers to when a MongoDB process receives incoming requests 
-from a client.
+Ingress networking refers to a server accepting incoming connections
+from MongoDB protocol clients. A client establishes a connection to a
+server, issues commands, and receives responses. A server can be
+configured to accept connections on several network endpoints.
 
-When a client wants to interact with a server, they must first establish a 
-connection. The server listens on a single port for incoming client connections. 
-Once a client connection is received, a client session is created out of this
-connection and commands begin to be processed on a dedicated thread, which
-can be either new or reused from a previous ingress connection. Each ingress
-connection will be granted temporary but exclusive lease of a worker thread.
+### Session and ServiceEntryPoint
+Once a client connection is accepted, a `Session` object is created to manage
+it. This in turn is given to the `ServiceEntryPoint` singleton for the server.
+The `ServiceEntryPoint` creates a `SessionWorkflow` for each `Session`, and
+maintains a collection of these. The `Session` represents the client side of
+that conversation, and the `ServiceEntryPoint` represents the server side.
 
-The session accepts commands from the client and hands them off to a 
-[ServiceEntryPointImpl]. This entry point will spawn threads to perform specific 
-tasks via a [ServiceExecutor], which is then used to initialize a 
-[SessionWorkflow]. The `SessionWorkflow` manages the life cycle of the client
-connection, organizing its traffic to simple request and response sequences
-represented internally as `WorkItem` objects. Only one `WorkItem` can be in
+### SessionWorkflow
+While `Session` manages only the transfer of `Messages`, the `SessionWorkflow`
+organizes these into a higher layer: the MongoDB protocol. It organizes Session
+messages into simple request and response sequences represented internally as
+`WorkItem` objects. A `SessionWorkflow` can only have one `WorkItem` in
 progress at a time.
 
-A `WorkItem` starts with a request message, and may be associated with 0 or
-more response messages.
+In the most straightforward case, a `WorkItem` is created by an incoming
+message from the `Session`, which is parsed by `SessionWorkflow` and sent to
+the `ServiceEntryPoint::handleRequest` function. The `WorkItem` is resolved
+by the sending of a response message, and destroyed.
 
-Normally, a `WorkItem` is created by an incoming request
-and is resolved by the sending of a response.
+That's the basic case. A few more exotic message transfer styles exist, and
+these are also managed by the `SessionWorkflow`. See the section on message
+[flag bits][[wire_protocol_flag_bits] for details.
 
-A request that produces multiple responses is an "exhaust" command, and
-after each response is sent, a new `WorkItem` is synthesized from the
-completed one.
+A request that can produce multiple responses is an "exhaust" command.
+Internally, after each response is sent out, the `SessionWorkflow` synthesizes
+a new `WorkItem` from the completed one, and submits this synthetic request to
+`ServiceEntryPoint::handleRequest` as it would with a client-initiated request.
+In this way, the `SessionWorkflow` keeps the exhaust command going until one
+of the responses indicates that it is the last one.
 
-A "more to come" request is similar to an exhaust command but requires the user to
-issue `getMore` commands to pull responses, as opposed to "exhaust" which generates
-responses spontaneously.
+A request may also have the "more to come" flag set, so that it
+produces no responses. This is known as a "fire and forget" command. This
+behavior is also managed by the `SessionWorkflow`.
 
-A request that produces no responses is a "fire and forget" command.
-
+### Builders
 In order to return the results to the user whether it be a document or a response 
 code, MongoDB uses the [ReplyBuilderInterface]. This interface helps to build 
 message bodies for replying to commands or even returning documents.
@@ -57,7 +64,7 @@ For details on egress networking, see [Egress Networking][egress_networking]. Fo
 details on command dispatch, see [Command Dispatch][command_dispatch]. For details 
 on *NetworkingBaton* and *AsioNetworkingBaton*, see [Baton][baton].
 
-For more detail about `SessionWorkflow`, see the [design][session_workflow_design].
+For more detail about `SessionWorkflow`, see WRITING-10398 (internal).
 
 [ServiceExecutor]: service_executor.h
 [SessionWorkflow]: session_workflow.h
@@ -68,4 +75,4 @@ For more detail about `SessionWorkflow`, see the [design][session_workflow_desig
 [egress_networking]: ../../../docs/egress_networking.md
 [command_dispatch]: ../../../docs/command_dispatch.md
 [baton]: ../../../docs/baton.md
-[session_workflow_design]: https://docs.google.com/document/d/1CKna4BEFyOj_NAM7i2dL7xCDcTs3RQzsu4KN6p5GVuM
+[wire_protocol_flag_bits]: https://www.mongodb.com/docs/manual/reference/mongodb-wire-protocol/#flag-bits
