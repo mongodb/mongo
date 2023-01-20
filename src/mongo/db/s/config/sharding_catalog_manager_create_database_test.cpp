@@ -312,5 +312,59 @@ TEST_F(CreateDatabaseTest, createDatabaseNoShards) {
                        ErrorCodes::ShardNotFound);
 }
 
+TEST_F(CreateDatabaseTest, CreateDatabaseAdminFails) {
+    ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
+                           ->createDatabase(operationContext(), "admin"_sd, ShardId()),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+
+    // Alternative capitalizations are also invalid
+    ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
+                           ->createDatabase(operationContext(), "Admin"_sd, ShardId()),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+
+    ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
+                           ->createDatabase(operationContext(), "aDmIn"_sd, ShardId()),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+}
+
+TEST_F(CreateDatabaseTest, CreateDatabaseLocalFails) {
+    ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
+                           ->createDatabase(operationContext(), "local"_sd, ShardId()),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+
+    // Alternative capitalizations are also invalid
+    ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
+                           ->createDatabase(operationContext(), "Local"_sd, ShardId()),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+
+    ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
+                           ->createDatabase(operationContext(), "lOcAl"_sd, ShardId()),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+}
+
+TEST_F(CreateDatabaseTest, CreateDatabaseConfigFails) {
+    ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
+                           ->createDatabase(operationContext(), "config"_sd, ShardId()),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+
+    // Alternative capitalizations are also invalid
+    ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
+                           ->createDatabase(operationContext(), "Config"_sd, ShardId()),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+
+    ASSERT_THROWS_CODE(ShardingCatalogManager::get(operationContext())
+                           ->createDatabase(operationContext(), "cOnFiG"_sd, ShardId()),
+                       DBException,
+                       ErrorCodes::InvalidOptions);
+}
+
 }  // namespace
 }  // namespace mongo

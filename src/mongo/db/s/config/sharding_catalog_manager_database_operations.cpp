@@ -91,12 +91,13 @@ DatabaseType ShardingCatalogManager::createDatabase(OperationContext* opCtx,
                                                     const ShardId& primaryShard) {
     invariant(nsIsDbOnly(dbName));
 
-    // The admin and config databases should never be explicitly created. They "just exist",
-    // i.e. getDatabase will always return an entry for them.
-    if (dbName == NamespaceString::kAdminDb || dbName == NamespaceString::kConfigDb) {
-        uasserted(ErrorCodes::InvalidOptions,
-                  str::stream() << "cannot manually create database '" << dbName << "'");
-    }
+    // The admin, local and config databases should never be explicitly created, in any casing. They
+    // "just exist", i.e. getDatabase will always return an entry for them.
+    uassert(ErrorCodes::InvalidOptions,
+            str::stream() << "cannot manually create database '" << dbName << "'",
+            !dbName.equalCaseInsensitive(NamespaceString::kAdminDb) &&
+                !dbName.equalCaseInsensitive(NamespaceString::kLocalDb) &&
+                !dbName.equalCaseInsensitive(NamespaceString::kConfigDb));
 
     const auto catalogClient = Grid::get(opCtx)->catalogClient();
     const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
