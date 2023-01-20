@@ -82,9 +82,9 @@ function closeRoutingConnection(conn) {
 }
 
 /**
- * @returns Whether we are currently running a shard split passthrough.
+ * @returns Whether we are currently running an operation with multiple tenants.
  */
-function isShardSplitPassthrough() {
+function usingMultipleTenants() {
     return !!TestData.tenantIds;
 }
 
@@ -108,7 +108,7 @@ function prependTenantIdToDbNameIfApplicable(dbName) {
 
     let prefix;
     // If running shard split passthroughs, then assign a database to a randomly selected tenant
-    if (isShardSplitPassthrough()) {
+    if (usingMultipleTenants()) {
         if (!kTenantPrefixMap[dbName]) {
             const tenantId =
                 TestData.tenantIds[Math.floor(Math.random() * TestData.tenantIds.length)];
@@ -142,7 +142,7 @@ function prependTenantIdToNsIfApplicable(ns) {
  * Remove a tenant prefix from the provided database name, if applicable.
  */
 function extractOriginalDbName(dbName) {
-    if (isShardSplitPassthrough()) {
+    if (usingMultipleTenants()) {
         const anyTenantPrefixOnceRegex = new RegExp(Object.values(kTenantPrefixMap).join('|'), '');
         return dbName.replace(anyTenantPrefixOnceRegex, "");
     }
@@ -163,13 +163,19 @@ function extractOriginalNs(ns) {
  * Removes all occurrences of a tenant prefix in the provided string.
  */
 function removeTenantIdFromString(string) {
-    if (isShardSplitPassthrough()) {
+    if (usingMultipleTenants()) {
         const anyTenantPrefixGlobalRegex =
             new RegExp(Object.values(kTenantPrefixMap).join('|'), 'g');
         return string.replace(anyTenantPrefixGlobalRegex, "");
     }
 
     return string.replace(new RegExp(`${TestData.tenantId}_`, 'g'), "");
+}
+
+function isShardSplitPassthrough(conn) {
+    const doc =
+        originalRunCommand.apply(conn, ["admin", {getParameter: 1, shardSplitGarbageCollectionDelayMS: 1}, 0]);
+    return doc.shardSplitGarbageCollectionDelayMS && doc.shardSplitGarbageCollectionDelayMS === 1;
 }
 
 /**
@@ -453,16 +459,12 @@ function convertServerConnectionStringToURI(input) {
  * that there is only one such operation.
  */
 function getOperationStateDocument(conn) {
-    const collection = isShardSplitPassthrough() ? "shardSplitDonors" : "tenantMigrationDonors";
+    const collection = isShardSplitPassthrough(conn) ? "shardSplitDonors" : "tenantMigrationDonors";
     let filter = {tenantId: TestData.tenantId};
-    if (isShardSplitPassthrough()) {
+    if (usingMultipleTenants()) {
         let tenantIds = [];
         TestData.tenantIds.forEach(tenantId => tenantIds.push(ObjectId(tenantId)));
         filter = {tenantIds: tenantIds};
-    } else if (isShardMergePassthrough(conn)) {
-        // TODO (SERVER-68643) No longer require to check for shard merge since shard merge will be
-        // the only protocol left.
-        filter = {};
     }
 
     const findRes = assert.commandWorked(
@@ -473,7 +475,7 @@ function getOperationStateDocument(conn) {
     assert.eq(docs.length, 1, tojson(docs));
 
     const result = docs[0];
-    if (isShardSplitPassthrough()) {
+    if (isShardSplitPassthrough(conn)) {
         result.recipientConnectionString =
             convertServerConnectionStringToURI(result.recipientConnectionString);
     }
@@ -685,7 +687,7 @@ function runCommandRetryOnTenantMigrationErrors(
 
                 recordRerouteDueToTenantMigration(donorConnection, migrationStateDoc);
 
-                if (isShardSplitPassthrough()) {
+                if (isShardSplitPassthrough(donorConnection)) {
                     closeRoutingConnection(donorConnection);
                 }
             } else if (migrationAbortedErr) {

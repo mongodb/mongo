@@ -190,12 +190,12 @@ def get_primary(rs, logger, max_tries=5):  # noqa: D205,D400
 
 class _ShardMergeOptions:  # pylint:disable=too-many-instance-attributes
     def __init__(  # pylint: disable=too-many-arguments
-            self, donor_rs, recipient_rs, tenant_id, read_preference, logger, donor_rs_index,
+            self, donor_rs, recipient_rs, tenant_ids, read_preference, logger, donor_rs_index,
             recipient_rs_index):
         self.donor_rs = donor_rs
         self.recipient_rs = recipient_rs
         self.migration_id = uuid.uuid4()
-        self.tenant_id = tenant_id
+        self.tenant_ids = tenant_ids
         self.read_preference = read_preference
         self.logger = logger
         self.donor_rs_index = donor_rs_index
@@ -228,7 +228,7 @@ class _ShardMergeOptions:  # pylint:disable=too-many-instance-attributes
     def __str__(self):
         opts = {
             "donor": self.get_donor_name(), "recipient": self.get_recipient_name(),
-            "migration_id": self.migration_id, "tenant_id": self.tenant_id,
+            "migration_id": self.migration_id, "tenant_ids": self.tenant_ids,
             "read_preference": self.read_preference
         }
         return str(opts)
@@ -253,8 +253,9 @@ class _ShardMergeThread(threading.Thread):  # pylint: disable=too-many-instance-
         self.daemon = True
         self.logger = logger
         self._shard_merge_fixture = shard_merge_fixture
-        # TODO SERVER-69034 : replace tenantId with tenantIds
-        self._tenant_id = shell_options["global_vars"]["TestData"]["tenantId"]
+        self._tenant_ids = []
+        for tenant_id in shell_options["global_vars"]["TestData"]["tenantIds"]:
+            self._tenant_ids.append(ObjectId(tenant_id))
         self._auth_options = shell_options["global_vars"]["TestData"]["authOptions"]
         self._test = None
         self._test_report = test_report
@@ -375,7 +376,7 @@ class _ShardMergeThread(threading.Thread):  # pylint: disable=too-many-instance-
         donor_rs = self._shard_merge_fixture.get_replset(donor_rs_index)
         recipient_rs = self._shard_merge_fixture.get_replset(recipient_rs_index)
         read_preference = {"mode": "primary"}
-        return _ShardMergeOptions(donor_rs, recipient_rs, self._tenant_id, read_preference,
+        return _ShardMergeOptions(donor_rs, recipient_rs, self._tenant_ids, read_preference,
                                   self.logger, donor_rs_index, recipient_rs_index)
 
     def _create_client(self, node):
@@ -472,6 +473,7 @@ class _ShardMergeThread(threading.Thread):  # pylint: disable=too-many-instance-
         """Run donorStartMigration to start a shard merge based on 'migration_opts', wait for
         the migration decision and return the last response for donorStartMigration.
         """
+
         cmd_obj = {
             "donorStartMigration":
                 1,
@@ -487,8 +489,9 @@ class _ShardMergeThread(threading.Thread):  # pylint: disable=too-many-instance-
                 get_certificate_and_private_key("jstests/libs/tenant_migration_recipient.pem"),
             "protocol":
                 "shard merge",
-            "tenantIds": [ObjectId(migration_opts.tenant_id)],
+            "tenantIds": migration_opts.tenant_ids
         }
+
         donor_primary = migration_opts.get_donor_primary()
         # TODO(SERVER-68643) We no longer need to override the failpoint once milestone 3 is done
         # for shard merge.
@@ -602,7 +605,8 @@ class _ShardMergeThread(threading.Thread):  # pylint: disable=too-many-instance-
                         donor_node_client = self._create_client(donor_node)
                         res = donor_node_client.config.command({
                             "count": "tenantMigrationDonors",
-                            "query": {"_id": bson.Binary(migration_opts.migration_id.bytes, 4)}
+                            "query": {"tenantIds": migration_opts.tenant_ids}
+                            # "query": {"_id": bson.Binary(migration_opts.migration_id.bytes, 4)}
                         })
                         if res["n"] == 0:
                             break
@@ -630,7 +634,8 @@ class _ShardMergeThread(threading.Thread):  # pylint: disable=too-many-instance-
                         recipient_node_client = self._create_client(recipient_node)
                         res = recipient_node_client.config.command({
                             "count": "tenantMigrationRecipients",
-                            "query": {"_id": bson.Binary(migration_opts.migration_id.bytes, 4)}
+                            "query": {"tenantIds": migration_opts.tenant_ids}
+                            # "query": {"_id": bson.Binary(migration_opts.migration_id.bytes, 4)}
                         })
                         if res["n"] == 0:
                             break
@@ -699,8 +704,9 @@ class _ShardMergeThread(threading.Thread):  # pylint: disable=too-many-instance-
                 res = primary_client.admin.command({"listDatabases": 1})
                 for database in res["databases"]:
                     db_name = database["name"]
-                    if db_name.startswith(self._tenant_id + "_"):
-                        primary_client.drop_database(db_name)
+                    for tenant_id in self._tenant_ids:
+                        if db_name.startswith(f"{str(tenant_id)}_"):
+                            primary_client.drop_database(db_name)
                 return
             # We retry on all write concern errors because we assume the only reason waiting for
             # write concern should fail is because of a failover.
@@ -713,8 +719,8 @@ class _ShardMergeThread(threading.Thread):  # pylint: disable=too-many-instance-
                 continue
             except pymongo.errors.PyMongoError:
                 self.logger.exception(
-                    "Error dropping databases for tenant id '%s' on primary on" +
-                    " port %d of replica set '%s' to be garbage collection.", self._tenant_id,
+                    "Error dropping databases for tenants %s on primary on" +
+                    " port %d of replica set '%s' to be garbage collection.", str(self._tenant_ids),
                     primary.port, rs.replset_name)
                 raise
 

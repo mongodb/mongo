@@ -1,10 +1,7 @@
 """Fixture with multiple replica sets for executing JSTests against."""
 
 import os.path
-
 import buildscripts.resmokelib.testing.fixtures.interface as interface
-from buildscripts.resmokelib.testing.fixtures.fixturelib import FixtureLib
-
 
 class ShardMergeFixture(interface.MultiClusterFixture):  # pylint: disable=too-many-instance-attributes
     """Fixture which provides JSTests with a set of replica sets to run tenant migration against."""
