@@ -35,13 +35,16 @@
 #include "mongo/db/query/optimizer/node_defs.h"
 #include "mongo/db/query/optimizer/reference_tracker.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
+#include "mongo/stdx/unordered_map.h"
 
 namespace mongo::optimizer {
 
 class SBEExpressionLowering {
 public:
-    SBEExpressionLowering(const VariableEnvironment& env, SlotVarMap& slotMap)
-        : _env(env), _slotMap(slotMap) {}
+    SBEExpressionLowering(const VariableEnvironment& env,
+                          SlotVarMap& slotMap,
+                          const NamedSlotsProvider& namedSlots)
+        : _env(env), _slotMap(slotMap), _namedSlots(namedSlots) {}
 
     // The default noop transport.
     template <typename T, typename... Ts>
@@ -83,6 +86,7 @@ public:
 private:
     const VariableEnvironment& _env;
     SlotVarMap& _slotMap;
+    const NamedSlotsProvider& _namedSlots;
 
     sbe::FrameId _frameCounter{100};
     stdx::unordered_map<const Let*, sbe::FrameId> _letMap;
@@ -94,6 +98,7 @@ public:
     // TODO: SERVER-69540. Consider avoiding a mutable slotMap argument here.
     SBENodeLowering(const VariableEnvironment& env,
                     SlotVarMap& slotMap,
+                    const NamedSlotsProvider& namedSlots,
                     boost::optional<sbe::value::SlotId>& ridSlot,
                     sbe::value::SlotIdGenerator& ids,
                     const Metadata& metadata,
@@ -101,6 +106,7 @@ public:
                     const bool randomScan)
         : _env(env),
           _slotMap(slotMap),
+          _namedSlots(namedSlots),
           _ridSlot(ridSlot),
           _slotIdGenerator(ids),
           _metadata(metadata),
@@ -214,6 +220,7 @@ private:
 
     const VariableEnvironment& _env;
     SlotVarMap& _slotMap;
+    const NamedSlotsProvider& _namedSlots;
     boost::optional<sbe::value::SlotId>& _ridSlot;
     sbe::value::SlotIdGenerator& _slotIdGenerator;
 

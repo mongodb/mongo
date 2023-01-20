@@ -38,7 +38,13 @@
 #include "mongo/db/query/sbe_stage_builder_abt_holder_def.h"
 #include "mongo/stdx/variant.h"
 
+namespace mongo::sbe {
+class RuntimeEnvironment;
+}
+
 namespace mongo::stage_builder {
+
+struct StageBuilderState;
 
 /**
  * EvalExpr is a wrapper around an EExpression that can also carry a SlotId. It is used to eliminate
@@ -137,8 +143,9 @@ public:
         _storage = false;
     }
 
-    std::unique_ptr<sbe::EExpression> getExpr(optimizer::SlotVarMap& varMap) const {
-        return clone().extractExpr(varMap);
+    std::unique_ptr<sbe::EExpression> getExpr(optimizer::SlotVarMap& varMap,
+                                              const sbe::RuntimeEnvironment& runtimeEnv) const {
+        return clone().extractExpr(varMap, runtimeEnv);
     }
 
     /**
@@ -146,7 +153,13 @@ public:
      * stored as an ABT node, it is lowered into an SBE expression, using the provided map to
      * convert variable names into slot ids.
      */
-    std::unique_ptr<sbe::EExpression> extractExpr(optimizer::SlotVarMap& varMap);
+    std::unique_ptr<sbe::EExpression> extractExpr(optimizer::SlotVarMap& varMap,
+                                                  const sbe::RuntimeEnvironment& runtimeEnv);
+
+    /**
+     * Helper function that obtains data needed for EvalExpr::extractExpr from StageBuilderState
+     */
+    std::unique_ptr<sbe::EExpression> extractExpr(StageBuilderState& state);
 
     /**
      * Extract the expression on top of the stack as an ABT node. If the expression is stored as a

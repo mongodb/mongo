@@ -28,6 +28,8 @@
  */
 
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
+#include "mongo/db/exec/sbe/abt/named_slots.h"
+#include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/stages/exchange.h"
 #include "mongo/db/exec/sbe/stages/filter.h"
@@ -46,7 +48,6 @@
 #include "mongo/db/exec/sbe/stages/unique.h"
 #include "mongo/db/exec/sbe/stages/unwind.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
-
 
 namespace mongo::optimizer {
 
@@ -143,6 +144,15 @@ std::unique_ptr<sbe::EExpression> SBEExpressionLowering::transport(
                 MONGO_UNREACHABLE;
         }
     }(op.op());
+
+    if (sbe::EPrimBinary::isComparisonOp(sbeOp)) {
+        boost::optional<sbe::value::SlotId> collatorSlot =
+            _namedSlots.getSlotIfExists("collator"_sd);
+        if (collatorSlot) {
+            return sbe::makeE<sbe::EPrimBinary>(
+                sbeOp, std::move(lhs), std::move(rhs), sbe::makeE<sbe::EVariable>(*collatorSlot));
+        }
+    }
 
     return sbe::makeE<sbe::EPrimBinary>(sbeOp, std::move(lhs), std::move(rhs));
 }
@@ -394,7 +404,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const EvaluationNode& n,
     sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projects;
 
     for (size_t idx = 0; idx < exprs.size(); ++idx) {
-        auto expr = SBEExpressionLowering{_env, _slotMap}.optimize(exprs[idx]);
+        auto expr = SBEExpressionLowering{_env, _slotMap, _namedSlots}.optimize(exprs[idx]);
         auto slot = _slotIdGenerator.generate();
 
         mapProjToSlot(names[idx], slot);
@@ -409,7 +419,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const FilterNode& n,
                                                       const ABT& child,
                                                       const ABT& filter) {
     auto input = generateInternal(child);
-    auto expr = SBEExpressionLowering{_env, _slotMap}.optimize(filter);
+    auto expr = SBEExpressionLowering{_env, _slotMap, _namedSlots}.optimize(filter);
     const PlanNodeId planNodeId = _nodeToGroupPropsMap.at(&n)._planNodeId;
 
     // Check if the filter expression is 'constant' (i.e., does not depend on any variables); then
@@ -607,7 +617,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const SpoolProducerNode& n
                 std::move(input), n.getSpoolId(), std::move(vals), planNodeId);
 
         case SpoolProducerType::Lazy: {
-            auto expr = SBEExpressionLowering{_env, _slotMap}.optimize(filter);
+            auto expr = SBEExpressionLowering{_env, _slotMap, _namedSlots}.optimize(filter);
             return sbe::makeS<sbe::SpoolLazyProducerStage>(
                 std::move(input), n.getSpoolId(), std::move(vals), std::move(expr), planNodeId);
         }
@@ -675,15 +685,14 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const GroupByNode& n,
     sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> aggs;
 
     for (size_t idx = 0; idx < exprs.size(); ++idx) {
-        auto expr = SBEExpressionLowering{_env, _slotMap}.optimize(exprs[idx]);
+        auto expr = SBEExpressionLowering{_env, _slotMap, _namedSlots}.optimize(exprs[idx]);
         auto slot = _slotIdGenerator.generate();
 
         mapProjToSlot(names[idx], slot);
         aggs.emplace(slot, std::move(expr));
     }
 
-    // TODO: use collator slot.
-    boost::optional<sbe::value::SlotId> collatorSlot;
+    boost::optional<sbe::value::SlotId> collatorSlot = _namedSlots.getSlotIfExists("collator"_sd);
     // Unused
     sbe::value::SlotVector seekKeysSlots;
 
@@ -711,7 +720,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const NestedLoopJoinNode& 
         correlatedSlots.push_back(_slotMap.at(projectionName));
     }
 
-    auto expr = SBEExpressionLowering{_env, _slotMap}.optimize(filter);
+    auto expr = SBEExpressionLowering{_env, _slotMap, _namedSlots}.optimize(filter);
 
     const auto& leftChildProps = _nodeToGroupPropsMap.at(n.getLeftChild().cast<Node>());
     auto outerProjects = convertRequiredProjectionsToSlots(leftChildProps);
@@ -762,8 +771,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const HashJoinNode& n,
     auto outerKeys = convertProjectionsToSlots(n.getRightKeys());
     auto outerProjects = convertRequiredProjectionsToSlots(rightProps, outerKeys);
 
-    // TODO: use collator slot.
-    boost::optional<sbe::value::SlotId> collatorSlot;
+    boost::optional<sbe::value::SlotId> collatorSlot = _namedSlots.getSlotIfExists("collator"_sd);
     const PlanNodeId planNodeId = _nodeToGroupPropsMap.at(&n)._planNodeId;
     return sbe::makeS<sbe::HashJoinStage>(std::move(outerStage),
                                           std::move(innerStage),
@@ -833,6 +841,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const SortedMergeNode& n,
         boost::optional<sbe::value::SlotId> localRIDSlot;
         SBENodeLowering localLowering(_env,
                                       localMap,
+                                      _namedSlots,
                                       localRIDSlot,
                                       _slotIdGenerator,
                                       _metadata,
@@ -893,6 +902,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const UnionNode& n,
         boost::optional<sbe::value::SlotId> localRIDSlot;
         SBENodeLowering localLowering(_env,
                                       localMap,
+                                      _namedSlots,
                                       localRIDSlot,
                                       _slotIdGenerator,
                                       _metadata,
@@ -1058,7 +1068,7 @@ std::unique_ptr<sbe::EExpression> SBENodeLowering::convertBoundsToExpr(
         sbe::makeE<sbe::EConstant>(sbe::value::TypeTags::NumberInt32,
                                    sbe::value::bitcastFrom<uint32_t>(indexDef.getOrdering())));
 
-    auto exprLower = SBEExpressionLowering{_env, _slotMap};
+    auto exprLower = SBEExpressionLowering{_env, _slotMap, _namedSlots};
     bool inclusive = true;
     bool fullyInfinite = true;
     for (const auto& entry : interval) {

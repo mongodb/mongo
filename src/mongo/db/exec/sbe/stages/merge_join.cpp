@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/sbe/stages/merge_join.h"
 
+#include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/util/str.h"

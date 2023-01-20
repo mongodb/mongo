@@ -30,6 +30,8 @@
 #include "mongo/db/query/ce/sampling_estimator.h"
 
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
+#include "mongo/db/exec/sbe/expressions/compile_ctx.h"
+#include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/query/cqf_command_utils.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/index_bounds.h"
@@ -256,10 +258,12 @@ private:
 
         auto env = VariableEnvironment::build(abtTree);
         SlotVarMap slotMap;
+        auto runtimeEnvironment = std::make_unique<sbe::RuntimeEnvironment>();  // TODO Use factory
         boost::optional<sbe::value::SlotId> ridSlot;
         sbe::value::SlotIdGenerator ids;
         SBENodeLowering g{env,
                           slotMap,
+                          *runtimeEnvironment,
                           ridSlot,
                           ids,
                           _phaseManager.getMetadata(),
@@ -273,7 +277,7 @@ private:
         uassert(6624245, "Invalid slot map size", slotMap.size() == 1);
 
         sbePlan->attachToOperationContext(_opCtx);
-        sbe::CompileCtx ctx(std::make_unique<sbe::RuntimeEnvironment>());
+        sbe::CompileCtx ctx(std::move(runtimeEnvironment));
         sbePlan->prepare(ctx);
 
         std::vector<sbe::value::SlotAccessor*> accessors;

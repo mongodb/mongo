@@ -29,13 +29,15 @@
 
 #pragma once
 
-#include "mongo/db/exec/sbe/values/slot.h"
-#include "mongo/db/query/optimizer/defs.h"
-
+#include "mongo/db/exec/sbe/abt/named_slots.h"
 
 namespace mongo::optimizer {
 
-class NamedSlotsProvider;
-using SlotVarMap = stdx::unordered_map<ProjectionName, sbe::value::SlotId, ProjectionName::Hasher>;
+class MockEmptyNamedSlotsProvider final : public NamedSlotsProvider {
+public:
+    boost::optional<sbe::value::SlotId> getSlotIfExists(StringData name) const final {
+        return boost::none;
+    }
+};
 
 }  // namespace mongo::optimizer

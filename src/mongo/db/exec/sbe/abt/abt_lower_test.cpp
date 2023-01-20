@@ -30,6 +30,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
+#include "mongo/db/exec/sbe/abt/named_slots_mock.h"
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/metadata.h"
@@ -69,7 +70,8 @@ protected:
         stream << "-- OUTPUT:" << std::endl;
         auto env = VariableEnvironment::build(n);
         SlotVarMap map;
-        auto expr = SBEExpressionLowering{env, map}.optimize(n);
+        MockEmptyNamedSlotsProvider namedSlots;
+        auto expr = SBEExpressionLowering{env, map, namedSlots}.optimize(n);
         stream << expr->toString() << std::endl;
     }
 
@@ -106,6 +108,7 @@ protected:
         stream << "-- OUTPUT:" << std::endl;
         auto env = VariableEnvironment::build(n);
         SlotVarMap map;
+        MockEmptyNamedSlotsProvider namedSlots;
         boost::optional<sbe::value::SlotId> ridSlot;
         sbe::value::SlotIdGenerator ids;
         opt::unordered_map<std::string, ScanDefinition> scanDefs;
@@ -116,7 +119,8 @@ protected:
         scanDefs.insert({"otherColl", buildScanDefinition()});
 
         Metadata md(scanDefs);
-        auto planStage = SBENodeLowering{env, map, ridSlot, ids, md, _nodeMap, false}.optimize(n);
+        auto planStage =
+            SBENodeLowering{env, map, namedSlots, ridSlot, ids, md, _nodeMap, false}.optimize(n);
         sbe::DebugPrinter printer;
         stream << stripUUIDs(printer.print(*planStage)) << std::endl;
 

@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/sbe/stages/project.h"
 
+#include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
 
 namespace mongo {

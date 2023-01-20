@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 
+#include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 
 namespace mongo::sbe {

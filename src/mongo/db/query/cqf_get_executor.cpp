@@ -306,10 +306,12 @@ static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> optimizeAndCreateExe
 
     auto env = VariableEnvironment::build(abt);
     SlotVarMap slotMap;
+    auto runtimeEnvironment = std::make_unique<sbe::RuntimeEnvironment>();  // TODO use factory
     sbe::value::SlotIdGenerator ids;
     boost::optional<sbe::value::SlotId> ridSlot;
     SBENodeLowering g{env,
                       slotMap,
+                      *runtimeEnvironment,
                       ridSlot,
                       ids,
                       phaseManager.getMetadata(),
@@ -326,7 +328,7 @@ static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> optimizeAndCreateExe
         OPTIMIZER_DEBUG_LOG(6264802, 5, "Lowered SBE plan", "plan"_attr = p.print(*sbePlan.get()));
     }
 
-    stage_builder::PlanStageData data{std::make_unique<sbe::RuntimeEnvironment>()};
+    stage_builder::PlanStageData data{std::move(runtimeEnvironment)};
     data.outputs.set(stage_builder::PlanStageSlots::kResult, slotMap.begin()->second);
     if (requireRID) {
         data.outputs.set(stage_builder::PlanStageSlots::kRecordId, *ridSlot);

@@ -36,6 +36,7 @@
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/util/str.h"
 
+#include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
 
 namespace mongo {

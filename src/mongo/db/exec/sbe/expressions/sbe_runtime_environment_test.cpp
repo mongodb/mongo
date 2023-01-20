@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo::sbe {

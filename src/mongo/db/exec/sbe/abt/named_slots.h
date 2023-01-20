@@ -30,12 +30,12 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/values/slot.h"
-#include "mongo/db/query/optimizer/defs.h"
-
 
 namespace mongo::optimizer {
 
-class NamedSlotsProvider;
-using SlotVarMap = stdx::unordered_map<ProjectionName, sbe::value::SlotId, ProjectionName::Hasher>;
+class NamedSlotsProvider {
+public:
+    virtual boost::optional<sbe::value::SlotId> getSlotIfExists(StringData name) const = 0;
+};
 
 }  // namespace mongo::optimizer

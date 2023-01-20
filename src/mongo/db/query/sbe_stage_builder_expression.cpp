@@ -102,7 +102,7 @@ struct ExpressionVisitorContext {
 
         auto expr = std::move(exprStack.back());
         exprStack.pop_back();
-        return expr.extractExpr(state.slotVarMap);
+        return expr.extractExpr(state.slotVarMap, *state.data->env);
     }
 
     void pushExpr(EvalExpr expr) {
@@ -1129,11 +1129,7 @@ public:
     }
     void visit(const ExpressionCompare* expr) final {
         _context->ensureArity(2);
-        // Build an ABT node if both operands are stored as either a slot or an ABT expression, and
-        // the comparison doesn't involve a collation, because binary operations in ABT don't
-        // support it yet.
-        if (!_context->state.data->env->getSlotIfExists("collator"_sd) &&
-            _context->hasAllAbtEligibleEntries(2)) {
+        if (_context->hasAllAbtEligibleEntries(2)) {
             auto rhs = _context->popABTExpr();
             auto lhs = _context->popABTExpr();
             auto lhsRef = makeLocalVariableName(_context->state.frameIdGenerator->generate(), 0);
@@ -3084,11 +3080,12 @@ public:
 
         // Dereference a dotted path, which may contain arrays requiring implicit traversal.
         if (inputExpr.hasExpr()) {
-            auto resultExpr = generateTraverse(inputExpr.extractExpr(_context->state.slotVarMap),
-                                               expectsDocumentInputOnly,
-                                               *fp,
-                                               _context->state.frameIdGenerator,
-                                               topLevelFieldSlot);
+            auto resultExpr = generateTraverse(
+                inputExpr.extractExpr(_context->state.slotVarMap, *_context->state.data->env),
+                expectsDocumentInputOnly,
+                *fp,
+                _context->state.frameIdGenerator,
+                topLevelFieldSlot);
 
             _context->pushExpr(std::move(resultExpr));
         } else {

@@ -38,7 +38,9 @@ sbeEnv.InjectThirdParty(libraries=['snappy'])
 sbeEnv.Library(
     target='query_sbe',
     source=[
+        'expressions/compile_ctx.cpp',
         'expressions/expression.cpp',
+        'expressions/runtime_environment.cpp',
         'size_estimator.cpp',
         'util/debug_print.cpp',
         'util/spilling.cpp',
@@ -50,8 +52,8 @@ sbeEnv.Library(
         'values/slot_printer.cpp',
         'vm/arith.cpp',
         'vm/datetime.cpp',
-        'vm/vm_printer.cpp',
         'vm/vm.cpp',
+        'vm/vm_printer.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

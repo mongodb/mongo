@@ -30,21 +30,22 @@
 #include "mongo/db/query/sbe_stage_builder_eval_frame.h"
 #include "mongo/db/query/optimizer/node.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/query/sbe_stage_builder_abt_helpers.h"
 #include "mongo/db/query/sbe_stage_builder_abt_holder_impl.h"
-#include "mongo/db/query/sbe_stage_builder_helpers.h"
 
 namespace mongo::stage_builder {
 
 EvalExpr::EvalExpr(const abt::HolderPtr& a) : _storage(abt::wrap(a->_value)) {}
 
-std::unique_ptr<sbe::EExpression> EvalExpr::extractExpr(optimizer::SlotVarMap& varMap) {
+std::unique_ptr<sbe::EExpression> EvalExpr::extractExpr(optimizer::SlotVarMap& varMap,
+                                                        const sbe::RuntimeEnvironment& runtimeEnv) {
     if (hasSlot()) {
         return sbe::makeE<sbe::EVariable>(stdx::get<sbe::value::SlotId>(_storage));
     }
 
     if (hasABT()) {
-        return abtToExpr(stdx::get<abt::HolderPtr>(_storage)->_value, varMap);
+        return abtToExpr(stdx::get<abt::HolderPtr>(_storage)->_value, varMap, runtimeEnv);
     }
 
     if (stdx::holds_alternative<bool>(_storage)) {
@@ -52,6 +53,10 @@ std::unique_ptr<sbe::EExpression> EvalExpr::extractExpr(optimizer::SlotVarMap& v
     }
 
     return std::move(stdx::get<std::unique_ptr<sbe::EExpression>>(_storage));
+}
+
+std::unique_ptr<sbe::EExpression> EvalExpr::extractExpr(StageBuilderState& state) {
+    return extractExpr(state.slotVarMap, *state.data->env);
 }
 
 abt::HolderPtr EvalExpr::extractABT(optimizer::SlotVarMap& varMap) {

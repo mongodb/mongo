@@ -30,6 +30,7 @@
 
 #include "mongo/unittest/unittest.h"
 
+#include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/sbe_unittest.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
@@ -59,15 +60,30 @@ namespace mongo::sbe {
  */
 class EExpressionTestFixture : public virtual SBETestFixture {
 protected:
-    EExpressionTestFixture() : _ctx{std::make_unique<sbe::RuntimeEnvironment>()} {
+    EExpressionTestFixture(std::unique_ptr<sbe::RuntimeEnvironment> runtimeEnv)
+        : _runtimeEnv(runtimeEnv.get()), _ctx(std::move(runtimeEnv)) {
         _ctx.root = &_emptyStage;
     }
+
+    EExpressionTestFixture()
+        : EExpressionTestFixture(std::make_unique<sbe::RuntimeEnvironment>()) {}
 
     value::SlotId bindAccessor(value::SlotAccessor* accessor) {
         auto slot = _slotIdGenerator.generate();
         _ctx.pushCorrelated(slot, accessor);
         boundAccessors.push_back(std::make_pair(slot, accessor));
         return slot;
+    }
+
+    const RuntimeEnvironment* runtimeEnv() const {
+        return _runtimeEnv;
+    }
+
+    sbe::value::SlotId registerSlot(StringData name,
+                                    value::TypeTags tag,
+                                    value::Value val,
+                                    bool owned) {
+        return _runtimeEnv->registerSlot(name, tag, val, owned, &_slotIdGenerator);
     }
 
     std::unique_ptr<vm::CodeFragment> compileExpression(const EExpression& expr) {
@@ -283,6 +299,7 @@ protected:
 protected:
     value::SlotIdGenerator _slotIdGenerator;
     CoScanStage _emptyStage{kEmptyPlanNodeId};
+    RuntimeEnvironment* _runtimeEnv;
     CompileCtx _ctx;
     vm::ByteCode _vm;
     std::vector<std::pair<value::SlotId, value::SlotAccessor*>> boundAccessors;

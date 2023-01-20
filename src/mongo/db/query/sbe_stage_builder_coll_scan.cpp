@@ -476,7 +476,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateOptimizedOplo
         auto filterExpr = generateFilter(state, csn->filter.get(), resultSlot, nullptr);
         if (!filterExpr.isNull()) {
             stage = sbe::makeS<sbe::FilterStage<false>>(
-                std::move(stage), filterExpr.extractExpr(state.slotVarMap), csn->nodeId());
+                std::move(stage), filterExpr.extractExpr(state), csn->nodeId());
         }
 
         // We may be requested to stop applying the filter after the first match. This can happen
@@ -652,7 +652,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateGenericCollSc
         auto filterExpr = generateFilter(state, csn->filter.get(), resultSlot, &outputs);
         if (!filterExpr.isNull()) {
             stage = sbe::makeS<sbe::FilterStage<false>>(
-                std::move(stage), filterExpr.extractExpr(state.slotVarMap), csn->nodeId());
+                std::move(stage), filterExpr.extractExpr(state), csn->nodeId());
         }
     }
 

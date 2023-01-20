@@ -30,6 +30,7 @@
 #include "mongo/db/exec/sbe/abt/abt_lower.h"
 #include "mongo/db/exec/sbe/abt/sbe_abt_test_util.h"
 #include "mongo/db/pipeline/abt/document_source_visitor.h"
+#include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/metadata_factory.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
@@ -50,7 +51,7 @@ TEST_F(ABTSBE, Lower1) {
     auto env = VariableEnvironment::build(tree);
     SlotVarMap map;
 
-    auto expr = SBEExpressionLowering{env, map}.optimize(tree);
+    auto expr = SBEExpressionLowering{env, map, *runtimeEnv()}.optimize(tree);
 
     ASSERT(expr);
 
@@ -70,7 +71,7 @@ TEST_F(ABTSBE, Lower2) {
     auto env = VariableEnvironment::build(tree);
     SlotVarMap map;
 
-    auto expr = SBEExpressionLowering{env, map}.optimize(tree);
+    auto expr = SBEExpressionLowering{env, map, *runtimeEnv()}.optimize(tree);
 
     ASSERT(expr);
 
@@ -86,7 +87,7 @@ TEST_F(ABTSBE, Lower3) {
     auto env = VariableEnvironment::build(tree);
     SlotVarMap map;
 
-    auto expr = SBEExpressionLowering{env, map}.optimize(tree);
+    auto expr = SBEExpressionLowering{env, map, *runtimeEnv()}.optimize(tree);
 
     ASSERT(expr);
 
@@ -117,7 +118,7 @@ TEST_F(ABTSBE, Lower4) {
     auto env = VariableEnvironment::build(tree);
     SlotVarMap map;
 
-    auto expr = SBEExpressionLowering{env, map}.optimize(tree);
+    auto expr = SBEExpressionLowering{env, map, *runtimeEnv()}.optimize(tree);
 
     ASSERT(expr);
 
@@ -135,7 +136,7 @@ TEST_F(ABTSBE, Lower5) {
     auto env = VariableEnvironment::build(tree);
     SlotVarMap map;
 
-    auto expr = SBEExpressionLowering{env, map}.optimize(tree);
+    auto expr = SBEExpressionLowering{env, map, *runtimeEnv()}.optimize(tree);
 
     ASSERT(expr);
 
@@ -185,7 +186,7 @@ TEST_F(ABTSBE, Lower6) {
         }
     } while (changed);
 
-    auto expr = SBEExpressionLowering{env, map}.optimize(tree);
+    auto expr = SBEExpressionLowering{env, map, *runtimeEnv()}.optimize(tree);
 
     ASSERT(expr);
 
@@ -235,7 +236,7 @@ TEST_F(ABTSBE, Lower7) {
         }
     } while (changed);
 
-    auto expr = SBEExpressionLowering{env, map}.optimize(tree);
+    auto expr = SBEExpressionLowering{env, map, *runtimeEnv()}.optimize(tree);
 
     ASSERT(expr);
     auto compiledExpr = compileExpression(*expr);
@@ -254,7 +255,7 @@ TEST_F(ABTSBE, LowerFunctionCallFail) {
     auto env = VariableEnvironment::build(tree);
     SlotVarMap map;
 
-    auto expr = SBEExpressionLowering{env, map}.optimize(tree);
+    auto expr = SBEExpressionLowering{env, map, *runtimeEnv()}.optimize(tree);
     ASSERT(expr);
 
     auto compiledExpr = compileExpression(*expr);
@@ -284,7 +285,7 @@ TEST_F(ABTSBE, LowerFunctionCallConvert) {
                 Constant::int32(static_cast<int32_t>(sbe::value::TypeTags::NumberInt64))));
     auto env = VariableEnvironment::build(tree);
 
-    auto expr = SBEExpressionLowering{env, map}.optimize(tree);
+    auto expr = SBEExpressionLowering{env, map, *runtimeEnv()}.optimize(tree);
     ASSERT(expr);
 
     auto compiledExpr = compileExpression(*expr);
@@ -323,7 +324,7 @@ TEST_F(ABTSBE, LowerFunctionCallTypeMatch) {
                                 getBSONTypeMask(sbe::value::TypeTags::NumberDecimal))));
     auto env = VariableEnvironment::build(tree);
 
-    auto expr = SBEExpressionLowering{env, map}.optimize(tree);
+    auto expr = SBEExpressionLowering{env, map, *runtimeEnv()}.optimize(tree);
     ASSERT(expr);
 
     auto compiledExpr = compileExpression(*expr);
@@ -341,6 +342,47 @@ TEST_F(ABTSBE, LowerFunctionCallTypeMatch) {
         auto result = runCompiledExpressionPredicate(compiledExpr.get());
         ASSERT(!result);
     }
+}
+
+TEST_F(ABTSBE, LowerComparisonCollation) {
+    sbe::value::OwnedValueAccessor lhsAccessor;
+    sbe::value::OwnedValueAccessor rhsAccessor;
+    auto lhsSlotId = bindAccessor(&lhsAccessor);
+    auto rhsSlotId = bindAccessor(&rhsAccessor);
+    SlotVarMap map;
+    map["lhs"] = lhsSlotId;
+    map["rhs"] = rhsSlotId;
+
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kToLowerString);
+    registerSlot("collator"_sd,
+                 sbe::value::TypeTags::collator,
+                 sbe::value::bitcastFrom<const CollatorInterface*>(&collator),
+                 false);
+
+    auto tree = make<BinaryOp>(Operations::Cmp3w, make<Variable>("lhs"), make<Variable>("rhs"));
+
+    auto env = VariableEnvironment::build(tree);
+    auto expr = SBEExpressionLowering{env, map, *runtimeEnv()}.optimize(tree);
+    ASSERT(expr);
+    auto compiledExpr = compileExpression(*expr);
+
+    auto checkCmp3w = [&](StringData lhs, StringData rhs, int result) {
+        auto [lhsTag, lhsValue] = sbe::value::makeNewString(lhs);
+        lhsAccessor.reset(true, lhsTag, lhsValue);
+        auto [rhsTag, rhsValue] = sbe::value::makeNewString(rhs);
+        rhsAccessor.reset(true, rhsTag, rhsValue);
+
+        auto [tag, value] = runCompiledExpression(compiledExpr.get());
+        sbe::value::ValueGuard guard(tag, value);
+
+        ASSERT_EQ(sbe::value::TypeTags::NumberInt32, tag);
+        ASSERT_EQ(result, sbe::value::bitcastTo<int32_t>(value))
+            << "comparing string '" << lhs << "' and '" << rhs << "'";
+    };
+
+    checkCmp3w("ABC", "abc", 0);
+    checkCmp3w("aCC", "abb", 1);
+    checkCmp3w("AbX", "aBy", -1);
 }
 
 TEST_F(NodeSBE, Lower1) {
@@ -388,11 +430,13 @@ TEST_F(NodeSBE, Lower1) {
     phaseManager.optimize(tree);
     auto env = VariableEnvironment::build(tree);
     SlotVarMap map;
+    auto runtimeEnv = std::make_unique<sbe::RuntimeEnvironment>();
     boost::optional<sbe::value::SlotId> ridSlot;
     sbe::value::SlotIdGenerator ids;
 
     SBENodeLowering g{env,
                       map,
+                      *runtimeEnv,
                       ridSlot,
                       ids,
                       phaseManager.getMetadata(),
@@ -402,7 +446,7 @@ TEST_F(NodeSBE, Lower1) {
     ASSERT_EQ(1, map.size());
     ASSERT_FALSE(ridSlot);
 
-    sbe::CompileCtx ctx(std::make_unique<sbe::RuntimeEnvironment>());
+    sbe::CompileCtx ctx(std::move(runtimeEnv));
     sbePlan->prepare(ctx);
 
     std::vector<sbe::value::SlotAccessor*> accessors;
@@ -635,11 +679,13 @@ TEST_F(NodeSBE, RequireRID) {
     auto env = VariableEnvironment::build(tree);
 
     SlotVarMap map;
+    auto runtimeEnv = std::make_unique<sbe::RuntimeEnvironment>();
     boost::optional<sbe::value::SlotId> ridSlot;
     sbe::value::SlotIdGenerator ids;
 
     SBENodeLowering g{env,
                       map,
+                      *runtimeEnv,
                       ridSlot,
                       ids,
                       phaseManager.getMetadata(),
@@ -649,7 +695,7 @@ TEST_F(NodeSBE, RequireRID) {
     ASSERT_EQ(1, map.size());
     ASSERT_TRUE(ridSlot);
 
-    sbe::CompileCtx ctx(std::make_unique<sbe::RuntimeEnvironment>());
+    sbe::CompileCtx ctx(std::move(runtimeEnv));
     sbePlan->prepare(ctx);
 
     std::vector<sbe::value::SlotAccessor*> accessors;
@@ -816,14 +862,15 @@ TEST_F(NodeSBE, SpoolFibonacci) {
 
     auto env = VariableEnvironment::build(tree);
     SlotVarMap map;
+    auto runtimeEnv = std::make_unique<sbe::RuntimeEnvironment>();
     boost::optional<sbe::value::SlotId> ridSlot;
     sbe::value::SlotIdGenerator ids;
-    SBENodeLowering g{env, map, ridSlot, ids, metadata, props, false /*randomScan*/};
+    SBENodeLowering g{env, map, *runtimeEnv, ridSlot, ids, metadata, props, false /*randomScan*/};
     auto sbePlan = g.optimize(tree);
     ASSERT_EQ(1, map.size());
 
     auto opCtx = makeOperationContext();
-    sbe::CompileCtx ctx(std::make_unique<sbe::RuntimeEnvironment>());
+    sbe::CompileCtx ctx(std::move(runtimeEnv));
     sbePlan->prepare(ctx);
 
     std::vector<sbe::value::SlotAccessor*> accessors;

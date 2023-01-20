@@ -28,6 +28,7 @@
  */
 #include "mongo/db/exec/sbe/stages/column_scan.h"
 
+#include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/index/columns_access_method.h"

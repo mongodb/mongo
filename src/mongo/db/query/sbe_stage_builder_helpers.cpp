@@ -141,9 +141,8 @@ std::unique_ptr<sbe::EExpression> generateNullOrMissing(std::unique_ptr<sbe::EEx
     return generateNullOrMissingExpr(*arg);
 }
 
-std::unique_ptr<sbe::EExpression> generateNullOrMissing(EvalExpr arg,
-                                                        optimizer::SlotVarMap& slotVarMap) {
-    auto expr = arg.extractExpr(slotVarMap);
+std::unique_ptr<sbe::EExpression> generateNullOrMissing(EvalExpr arg, StageBuilderState& state) {
+    auto expr = arg.extractExpr(state.slotVarMap, *state.data->env);
     return generateNullOrMissingExpr(*expr);
 }
 
@@ -151,9 +150,8 @@ std::unique_ptr<sbe::EExpression> generateNonNumericCheck(const sbe::EVariable& 
     return makeNot(makeFunction("isNumber", var.clone()));
 }
 
-std::unique_ptr<sbe::EExpression> generateNonNumericCheck(EvalExpr expr,
-                                                          optimizer::SlotVarMap& slotVarMap) {
-    return makeNot(makeFunction("isNumber", expr.extractExpr(slotVarMap)));
+std::unique_ptr<sbe::EExpression> generateNonNumericCheck(EvalExpr expr, StageBuilderState& state) {
+    return makeNot(makeFunction("isNumber", expr.extractExpr(state.slotVarMap, *state.data->env)));
 }
 
 std::unique_ptr<sbe::EExpression> generateLongLongMinCheck(const sbe::EVariable& var) {
@@ -175,18 +173,16 @@ std::unique_ptr<sbe::EExpression> generateNaNCheck(const sbe::EVariable& var) {
     return makeFunction("isNaN", var.clone());
 }
 
-std::unique_ptr<sbe::EExpression> generateNaNCheck(EvalExpr expr,
-                                                   optimizer::SlotVarMap& slotVarMap) {
-    return makeFunction("isNaN", expr.extractExpr(slotVarMap));
+std::unique_ptr<sbe::EExpression> generateNaNCheck(EvalExpr expr, StageBuilderState& state) {
+    return makeFunction("isNaN", expr.extractExpr(state.slotVarMap, *state.data->env));
 }
 
 std::unique_ptr<sbe::EExpression> generateInfinityCheck(const sbe::EVariable& var) {
     return makeFunction("isInfinity"_sd, var.clone());
 }
 
-std::unique_ptr<sbe::EExpression> generateInfinityCheck(EvalExpr expr,
-                                                        optimizer::SlotVarMap& slotVarMap) {
-    return makeFunction("isInfinity"_sd, expr.extractExpr(slotVarMap));
+std::unique_ptr<sbe::EExpression> generateInfinityCheck(EvalExpr expr, StageBuilderState& state) {
+    return makeFunction("isInfinity"_sd, expr.extractExpr(state.slotVarMap, *state.data->env));
 }
 
 std::unique_ptr<sbe::EExpression> generateNonPositiveCheck(const sbe::EVariable& var) {
@@ -343,7 +339,7 @@ std::pair<sbe::value::SlotId, EvalStage> projectEvalExpr(
     EvalStage stage,
     PlanNodeId planNodeId,
     sbe::value::SlotIdGenerator* slotIdGenerator,
-    optimizer::SlotVarMap& slotVarMap) {
+    StageBuilderState& state) {
     // If expr's value is already in a slot, return the slot.
     if (expr.hasSlot()) {
         return {*expr.getSlot(), std::move(stage)};
@@ -352,7 +348,8 @@ std::pair<sbe::value::SlotId, EvalStage> projectEvalExpr(
     // If expr's value is an expression, create a ProjectStage to evaluate the expression
     // into a slot.
     auto slot = slotIdGenerator->generate();
-    stage = makeProject(std::move(stage), planNodeId, slot, expr.extractExpr(slotVarMap));
+    stage = makeProject(
+        std::move(stage), planNodeId, slot, expr.extractExpr(state.slotVarMap, *state.data->env));
     return {slot, std::move(stage)};
 }
 
@@ -555,41 +552,6 @@ std::unique_ptr<sbe::EExpression> makeIfNullExpr(
     }
 
     return expr;
-}
-
-EvalExprStagePair generateUnion(std::vector<std::pair<EvalExpr, EvalStage>> branches,
-                                BranchFn branchFn,
-                                PlanNodeId planNodeId,
-                                sbe::value::SlotIdGenerator* slotIdGenerator,
-                                optimizer::SlotVarMap& slotVarMap) {
-    sbe::PlanStage::Vector stages;
-    std::vector<sbe::value::SlotVector> inputs;
-    stages.reserve(branches.size());
-    inputs.reserve(branches.size());
-
-    for (size_t i = 0; i < branches.size(); i++) {
-        auto [slot, stage] = [&]() {
-            auto& [expr, stage] = branches[i];
-
-            if (!branchFn || i + 1 == branches.size()) {
-                return projectEvalExpr(
-                    std::move(expr), std::move(stage), planNodeId, slotIdGenerator, slotVarMap);
-            }
-
-            return branchFn(
-                std::move(expr), std::move(stage), planNodeId, slotIdGenerator, slotVarMap);
-        }();
-
-        stages.emplace_back(stage.extractStage(planNodeId));
-        inputs.emplace_back(sbe::makeSV(slot));
-    }
-
-    auto outputSlot = slotIdGenerator->generate();
-    auto unionStage = sbe::makeS<sbe::UnionStage>(
-        std::move(stages), std::move(inputs), sbe::makeSV(outputSlot), planNodeId);
-    EvalStage outputStage{std::move(unionStage), sbe::makeSV(outputSlot)};
-
-    return {outputSlot, std::move(outputStage)};
 }
 
 std::pair<sbe::value::SlotId, std::unique_ptr<sbe::PlanStage>> generateVirtualScan(
@@ -1129,7 +1091,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, sbe::value::SlotVector> projectFields
     sbe::value::SlotId resultSlot,
     PlanNodeId nodeId,
     sbe::value::SlotIdGenerator* slotIdGenerator,
-    optimizer::SlotVarMap& slotVarMap,
+    StageBuilderState& state,
     const PlanStageSlots* slots) {
     // 'outputSlots' will match the order of 'fields'. Bail out early if 'fields' is empty.
     auto outputSlots = sbe::makeSV();
@@ -1226,11 +1188,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, sbe::value::SlotVector> projectFields
                 tassert(7182002, "Expected DfsState to have at least 2 entries", dfs.size() >= 2);
 
                 auto parent = dfs[dfs.size() - 2].first;
-                auto getFieldExpr =
-                    makeFunction("getField"_sd,
-                                 parent->value.hasSlot() ? makeVariable(*parent->value.getSlot())
-                                                         : parent->value.extractExpr(slotVarMap),
-                                 makeConstant(node->name));
+                auto getFieldExpr = makeFunction(
+                    "getField"_sd,
+                    parent->value.hasSlot()
+                        ? makeVariable(*parent->value.getSlot())
+                        : parent->value.extractExpr(state.slotVarMap, *state.data->env),
+                    makeConstant(node->name));
 
                 auto hasOneChildToVisit = [&] {
                     size_t count = 0;

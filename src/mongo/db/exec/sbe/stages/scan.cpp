@@ -32,6 +32,7 @@
 #include "mongo/db/exec/sbe/stages/scan.h"
 
 #include "mongo/config.h"
+#include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
 #include "mongo/db/exec/trial_run_tracker.h"

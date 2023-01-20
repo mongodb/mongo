@@ -88,16 +88,14 @@ std::unique_ptr<sbe::EExpression> generateNullOrMissing(sbe::FrameId frameId,
                                                         sbe::value::SlotId slotId);
 
 std::unique_ptr<sbe::EExpression> generateNullOrMissing(std::unique_ptr<sbe::EExpression> arg);
-std::unique_ptr<sbe::EExpression> generateNullOrMissing(EvalExpr arg,
-                                                        optimizer::SlotVarMap& slotVarMap);
+std::unique_ptr<sbe::EExpression> generateNullOrMissing(EvalExpr arg, StageBuilderState& state);
 
 /**
  * Generates an EExpression that checks if the input expression is a non-numeric type _assuming
  * that_ it has already been verified to be neither null nor missing.
  */
 std::unique_ptr<sbe::EExpression> generateNonNumericCheck(const sbe::EVariable& var);
-std::unique_ptr<sbe::EExpression> generateNonNumericCheck(EvalExpr expr,
-                                                          optimizer::SlotVarMap& slotVarMap);
+std::unique_ptr<sbe::EExpression> generateNonNumericCheck(EvalExpr expr, StageBuilderState& state);
 
 /**
  * Generates an EExpression that checks if the input expression is the value NumberLong(-2^64).
@@ -109,15 +107,13 @@ std::unique_ptr<sbe::EExpression> generateLongLongMinCheck(const sbe::EVariable&
  * already been verified to be numeric.
  */
 std::unique_ptr<sbe::EExpression> generateNaNCheck(const sbe::EVariable& var);
-std::unique_ptr<sbe::EExpression> generateNaNCheck(EvalExpr expr,
-                                                   optimizer::SlotVarMap& slotVarMap);
+std::unique_ptr<sbe::EExpression> generateNaNCheck(EvalExpr expr, StageBuilderState& state);
 
 /**
  * Generates an EExpression that checks if the input expression is a numeric Infinity.
  */
 std::unique_ptr<sbe::EExpression> generateInfinityCheck(const sbe::EVariable& var);
-std::unique_ptr<sbe::EExpression> generateInfinityCheck(EvalExpr expr,
-                                                        optimizer::SlotVarMap& slotVarMap);
+std::unique_ptr<sbe::EExpression> generateInfinityCheck(EvalExpr expr, StageBuilderState& state);
 
 /**
  * Generates an EExpression that checks if the input expression is a non-positive number (i.e. <= 0)
@@ -348,7 +344,7 @@ std::pair<sbe::value::SlotId, EvalStage> projectEvalExpr(
     EvalStage stage,
     PlanNodeId planNodeId,
     sbe::value::SlotIdGenerator* slotIdGenerator,
-    optimizer::SlotVarMap& slotVarMap);
+    StageBuilderState& state);
 
 template <bool IsConst, bool IsEof = false>
 EvalStage makeFilter(EvalStage stage,
@@ -444,13 +440,6 @@ EvalStage makeMkBsonObj(EvalStage stage,
                         bool returnOldObject,
                         PlanNodeId planNodeId);
 
-using BranchFn = std::function<std::pair<sbe::value::SlotId, EvalStage>(
-    EvalExpr expr,
-    EvalStage stage,
-    PlanNodeId planNodeId,
-    sbe::value::SlotIdGenerator* slotIdGenerator,
-    optimizer::SlotVarMap& slotVarMap)>;
-
 /**
  * Creates a chain of EIf expressions that will inspect each arg in order and return the first
  * arg that is not null or missing.
@@ -458,16 +447,6 @@ using BranchFn = std::function<std::pair<sbe::value::SlotId, EvalStage>(
 std::unique_ptr<sbe::EExpression> makeIfNullExpr(
     std::vector<std::unique_ptr<sbe::EExpression>> values,
     sbe::value::FrameIdGenerator* frameIdGenerator);
-
-/**
- * Creates a union stage with specified branches. Each branch is passed to 'branchFn' first. If
- * 'branchFn' is not set, expression from branch is simply projected to a slot.
- */
-EvalExprStagePair generateUnion(std::vector<std::pair<EvalExpr, EvalStage>> branches,
-                                BranchFn branchFn,
-                                PlanNodeId planNodeId,
-                                sbe::value::SlotIdGenerator* slotIdGenerator,
-                                optimizer::SlotVarMap& slotVarMap);
 
 /** This helper takes an SBE SlotIdGenerator and an SBE Array and returns an output slot and a
  * unwind/project/limit/coscan subtree that streams out the elements of the array one at a time via
@@ -1127,7 +1106,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, sbe::value::SlotVector> projectFields
     sbe::value::SlotId resultSlot,
     PlanNodeId nodeId,
     sbe::value::SlotIdGenerator* slotIdGenerator,
-    optimizer::SlotVarMap& slotVarMap,
+    StageBuilderState& state,
     const PlanStageSlots* slots = nullptr);
 
 template <typename T>

@@ -31,10 +31,10 @@
 
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
 #include "mongo/db/query/optimizer/rewrites/path_lower.h"
+#include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/query/sbe_stage_builder_abt_holder_impl.h"
 #include "mongo/db/query/sbe_stage_builder_const_eval.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
-
 
 namespace mongo::stage_builder {
 
@@ -81,13 +81,13 @@ optimizer::ABT makeBalancedBooleanOpTree(optimizer::Operations logicOp,
 
 EvalExpr makeBalancedBooleanOpTree(sbe::EPrimBinary::Op logicOp,
                                    std::vector<EvalExpr> leaves,
-                                   optimizer::SlotVarMap& slotVarMap) {
+                                   StageBuilderState& state) {
     if (std::all_of(
             leaves.begin(), leaves.end(), [](auto&& e) { return e.hasABT() || e.hasSlot(); })) {
         std::vector<optimizer::ABT> abtExprs;
         abtExprs.reserve(leaves.size());
         for (auto&& e : leaves) {
-            abtExprs.push_back(abt::unwrap(e.extractABT(slotVarMap)));
+            abtExprs.push_back(abt::unwrap(e.extractABT(state.slotVarMap)));
         }
         return abt::wrap(makeBalancedBooleanOpTree(logicOp == sbe::EPrimBinary::logicAnd
                                                        ? optimizer::Operations::And
@@ -98,12 +98,14 @@ EvalExpr makeBalancedBooleanOpTree(sbe::EPrimBinary::Op logicOp,
     std::vector<std::unique_ptr<sbe::EExpression>> exprs;
     exprs.reserve(leaves.size());
     for (auto&& e : leaves) {
-        exprs.emplace_back(e.extractExpr(slotVarMap));
+        exprs.emplace_back(e.extractExpr(state.slotVarMap, *state.data->env));
     }
     return EvalExpr{makeBalancedBooleanOpTree(logicOp, std::move(exprs))};
 }
 
-std::unique_ptr<sbe::EExpression> abtToExpr(optimizer::ABT& abt, optimizer::SlotVarMap& slotMap) {
+std::unique_ptr<sbe::EExpression> abtToExpr(optimizer::ABT& abt,
+                                            optimizer::SlotVarMap& slotMap,
+                                            const sbe::RuntimeEnvironment& runtimeEnv) {
     auto env = optimizer::VariableEnvironment::build(abt);
 
     // Do not use descriptive names here.
@@ -112,13 +114,24 @@ std::unique_ptr<sbe::EExpression> abtToExpr(optimizer::ABT& abt, optimizer::Slot
     optimizer::EvalPathLowering pathLower{prefixId, env};
     pathLower.optimize(abt);
 
+    const CollatorInterface* collator = nullptr;
+    boost::optional<sbe::value::SlotId> collatorSlot = runtimeEnv.getSlotIfExists("collator");
+    if (collatorSlot) {
+        auto [collatorTag, collatorValue] = runtimeEnv.getAccessor(*collatorSlot)->getViewOfValue();
+        tassert(7158700,
+                "Not a collator in collatorSlot",
+                collatorTag == sbe::value::TypeTags::collator);
+        collator = sbe::value::bitcastTo<const CollatorInterface*>(collatorValue);
+    }
+
     // Run the constant folding to eliminate lambda applications as they are not directly
     // supported by the SBE VM.
-    ExpressionConstEval constEval{env, nullptr /*collator*/};  // TODO Add collator support
+    ExpressionConstEval constEval{env, collator};
+
     constEval.optimize(abt);
 
     // And finally convert to the SBE expression.
-    optimizer::SBEExpressionLowering exprLower{env, slotMap};
+    optimizer::SBEExpressionLowering exprLower{env, slotMap, runtimeEnv};
     return exprLower.optimize(abt);
 }
 
