@@ -343,6 +343,9 @@ private:
  * It applies a filter over its input.
  *
  * This node is both logical and physical.
+ *
+ * The Filter node evaluates its Expression child. If the expression evaluates to false or is not a
+ * boolean, the value is filtered out, otherwise it's retained.
  */
 class FilterNode final : public ABTOpFixedArity<2>, public Node {
     using Base = ABTOpFixedArity<2>;

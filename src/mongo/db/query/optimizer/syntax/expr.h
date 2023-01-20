@@ -399,8 +399,9 @@ public:
  * EvalFilter defines a context for path behavior used to evaluate boolean conditions for the
  * purposes of filtering. Some path elements have special behavior under this context.
  *
- * EvalFilter evaluates its path child over the result of its expression child. If the result of
- * the path application is false, the value is filtered out, otherwise it's returned up the tree.
+ * The intermediate result of all path operators in the path child of an EvalFilter should evaluate
+ * to true, false, or Nothing. It is assumed that that Nothing is equivalent to false within an
+ * EvalFilter context.
  */
 class EvalFilter final : public ABTOpFixedArity<2>, public ExpressionSyntaxSort {
     using Base = ABTOpFixedArity<2>;
