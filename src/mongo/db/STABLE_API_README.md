@@ -69,7 +69,23 @@ that the implementation uses the IDL spec.
 The compatibility checker script compares IDL files from the new commit against both the base
 commit and all [releases](https://github.com/mongodb/mongo/blob/10439de079b03a981ead7f5566e6f539a6f9becd/buildscripts/idl/checkout_idl_files_from_past_releases.py)
 from 5.0.0 onwards. This compatibility checker script will run in evergreen patch builds
-and in the commit queue.
+and in the commit queue. The script that evergreen runs is [here](https://github.com/mongodb/mongo/blob/4594ea6598ce28d01c5c5d76164b1cfeeba1494f/evergreen/check_idl_compat.sh).
+
+### Running the Compatibility Checker Locally
+To run the compatibility checker locally, first run
+```
+python buildscripts/idl/checkout_idl_files_from_past_releases.py -v idls
+```
+This creates subfolders of past releases in the `idls` folder. Then, for the old release you want to
+check against, run
+```
+python buildscripts/idl/idl_check_compatibility.py -v --old-include idls/<old_release_dir>/src --old-include idls/<old_release_dir>/src/mongo/db/modules/enterprise/src --new-include src --new-include src/mongo/db/modules/enterprise/src idls/<old_release_dir>/src src
+```
+
+For example:
+```
+python buildscripts/idl/idl_check_compatibility.py -v --old-include idls/r6.0.3/src --old-include idls/r6.0.3/src/mongo/db/modules/enterprise/src --new-include src --new-include src/mongo/db/modules/enterprise/src idls/r6.0.3/src src
+```
 
 ## Adding new commands and fields
 ***Any additions to the Stable API must be approved by the Stable API PM and code reviewed by the 
