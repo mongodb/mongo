@@ -57,10 +57,14 @@ enums:
 
 feature_flags:
     featureFlagFLE2Range:
-      description: "Enable support for range indexes in Queryable Encryption"
-      version: 6.2
-      cpp_varname: gFeatureFlagFLE2Range
-      default: true
+        description: "Enable support for range indexes in Queryable Encryption"
+        version: 6.2
+        cpp_varname: gFeatureFlagFLE2Range
+        default: true
+    featureFlagFLE2ProtocolVersion2:
+        description: "Enable support for version 2 of Queryable Encryption wire protocol"
+        cpp_varname: gFeatureFlagFLE2ProtocolVersion2
+        default: false
 
 structs:
 
