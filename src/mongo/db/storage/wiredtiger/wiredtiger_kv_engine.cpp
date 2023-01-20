@@ -1703,19 +1703,35 @@ std::unique_ptr<SortedDataInterface> WiredTigerKVEngine::getSortedDataInterface(
     const CollectionOptions& collOptions,
     StringData ident,
     const IndexDescriptor* desc) {
+    invariant(collOptions.uuid);
+
     if (desc->isIdIndex()) {
         invariant(!collOptions.clusteredIndex);
-        return std::make_unique<WiredTigerIdIndex>(
-            opCtx, _uri(ident), ident, desc, WiredTigerUtil::useTableLogging(nss));
+        return std::make_unique<WiredTigerIdIndex>(opCtx,
+                                                   _uri(ident),
+                                                   *collOptions.uuid,
+                                                   ident,
+                                                   desc,
+                                                   WiredTigerUtil::useTableLogging(nss));
     }
     auto keyFormat = (collOptions.clusteredIndex) ? KeyFormat::String : KeyFormat::Long;
     if (desc->unique()) {
-        return std::make_unique<WiredTigerIndexUnique>(
-            opCtx, _uri(ident), ident, keyFormat, desc, WiredTigerUtil::useTableLogging(nss));
+        return std::make_unique<WiredTigerIndexUnique>(opCtx,
+                                                       _uri(ident),
+                                                       *collOptions.uuid,
+                                                       ident,
+                                                       keyFormat,
+                                                       desc,
+                                                       WiredTigerUtil::useTableLogging(nss));
     }
 
-    return std::make_unique<WiredTigerIndexStandard>(
-        opCtx, _uri(ident), ident, keyFormat, desc, WiredTigerUtil::useTableLogging(nss));
+    return std::make_unique<WiredTigerIndexStandard>(opCtx,
+                                                     _uri(ident),
+                                                     *collOptions.uuid,
+                                                     ident,
+                                                     keyFormat,
+                                                     desc,
+                                                     WiredTigerUtil::useTableLogging(nss));
 }
 
 Status WiredTigerKVEngine::createColumnStore(OperationContext* opCtx,

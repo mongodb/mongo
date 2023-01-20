@@ -123,6 +123,7 @@ public:
      */
     WiredTigerIndex(OperationContext* ctx,
                     const std::string& uri,
+                    const UUID& collectionUUID,
                     StringData ident,
                     KeyFormat rsKeyFormat,
                     const IndexDescriptor* desc,
@@ -284,7 +285,7 @@ protected:
     int _dataFormatVersion;
     std::string _uri;
     uint64_t _tableId;
-    const IndexDescriptor* _desc;
+    const UUID _collectionUUID;
     const std::string _indexName;
     const BSONObj _keyPattern;
     const BSONObj _collation;
@@ -295,6 +296,7 @@ class WiredTigerIndexUnique : public WiredTigerIndex {
 public:
     WiredTigerIndexUnique(OperationContext* ctx,
                           const std::string& uri,
+                          const UUID& collectionUUID,
                           StringData ident,
                           KeyFormat rsKeyFormat,
                           const IndexDescriptor* desc,
@@ -339,6 +341,7 @@ class WiredTigerIdIndex : public WiredTigerIndex {
 public:
     WiredTigerIdIndex(OperationContext* ctx,
                       const std::string& uri,
+                      const UUID& collectionUUID,
                       StringData ident,
                       const IndexDescriptor* desc,
                       bool isLogged);
@@ -392,6 +395,7 @@ class WiredTigerIndexStandard : public WiredTigerIndex {
 public:
     WiredTigerIndexStandard(OperationContext* ctx,
                             const std::string& uri,
+                            const UUID& collectionUUID,
                             StringData ident,
                             KeyFormat rsKeyFormat,
                             const IndexDescriptor* desc,

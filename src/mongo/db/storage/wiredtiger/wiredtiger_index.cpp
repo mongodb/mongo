@@ -204,6 +204,7 @@ Status WiredTigerIndex::Drop(OperationContext* opCtx, const std::string& uri) {
 
 WiredTigerIndex::WiredTigerIndex(OperationContext* ctx,
                                  const std::string& uri,
+                                 const UUID& collectionUUID,
                                  StringData ident,
                                  KeyFormat rsKeyFormat,
                                  const IndexDescriptor* desc,
@@ -214,14 +215,20 @@ WiredTigerIndex::WiredTigerIndex(OperationContext* ctx,
                           rsKeyFormat),
       _uri(uri),
       _tableId(WiredTigerSession::genTableId()),
-      _desc(desc),
+      _collectionUUID(collectionUUID),
       _indexName(desc->indexName()),
       _keyPattern(desc->keyPattern()),
       _collation(desc->collation()),
       _isLogged(isLogged) {}
 
 NamespaceString WiredTigerIndex::getCollectionNamespace(OperationContext* opCtx) const {
-    return _desc->getEntry()->getNSSFromCatalog(opCtx);
+    // TODO SERVER-73111: Remove CollectionCatalog usage.
+    auto nss = CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, _collectionUUID);
+
+    // In testing this may be boost::none.
+    if (!nss)
+        return NamespaceString();
+    return *nss;
 }
 
 namespace {
@@ -356,9 +363,8 @@ Status WiredTigerIndex::dupKeyCheck(OperationContext* opCtx, const KeyString::Va
     WT_CURSOR* c = curwrap.get();
 
     if (isDup(opCtx, c, key)) {
-        auto entry = _desc->getEntry();
-        auto nss = entry ? entry->getNSSFromCatalog(opCtx) : NamespaceString();
-        return buildDupKeyErrorStatus(key, nss, _indexName, _keyPattern, _collation, _ordering);
+        return buildDupKeyErrorStatus(
+            key, getCollectionNamespace(opCtx), _indexName, _keyPattern, _collation, _ordering);
     }
     return Status::OK();
 }
@@ -600,7 +606,7 @@ StatusWith<bool> WiredTigerIndex::_checkDups(OperationContext* opCtx,
         auto key = KeyString::toBson(
             keyString.getBuffer(), sizeWithoutRecordId, _ordering, keyString.getTypeBits());
         return buildDupKeyErrorStatus(
-            key, _desc->getEntry()->getNSSFromCatalog(opCtx), _indexName, _keyPattern, _collation);
+            key, getCollectionNamespace(opCtx), _indexName, _keyPattern, _collation);
     }
     invariantWTOK(ret,
                   c->session,
@@ -633,7 +639,7 @@ StatusWith<bool> WiredTigerIndex::_checkDups(OperationContext* opCtx,
     return buildDupKeyErrorStatus(
         KeyString::toBson(
             keyString.getBuffer(), sizeWithoutRecordId, _ordering, keyString.getTypeBits()),
-        _desc->getEntry() ? _desc->getEntry()->getNSSFromCatalog(opCtx) : NamespaceString(),
+        getCollectionNamespace(opCtx),
         _indexName,
         _keyPattern,
         _collation,
@@ -817,10 +823,8 @@ public:
             if (cmp == 0) {
                 // Duplicate found!
                 auto newKey = KeyString::toBson(newKeyString, _idx->_ordering);
-                auto entry = _idx->_desc->getEntry();
                 return buildDupKeyErrorStatus(newKey,
-                                              entry ? entry->getNSSFromCatalog(_opCtx)
-                                                    : NamespaceString(),
+                                              _idx->getCollectionNamespace(_opCtx),
                                               _idx->indexName(),
                                               _idx->keyPattern(),
                                               _idx->_collation);
@@ -1439,7 +1443,7 @@ private:
                         "key"_attr = redact(curr(kWantKey)->key),
                         "index"_attr = _idx.indexName(),
                         "uri"_attr = _idx.uri(),
-                        "collection"_attr = _idx.getCollectionNamespace(_opCtx));
+                        logAttrs(_idx.getCollectionNamespace(_opCtx)));
         }
     }
 };
@@ -1472,7 +1476,7 @@ public:
                         "key"_attr = redact(curr(kWantKey)->key),
                         "index"_attr = _idx.indexName(),
                         "uri"_attr = _idx.uri(),
-                        "collection"_attr = _idx.getCollectionNamespace(_opCtx));
+                        logAttrs(_idx.getCollectionNamespace(_opCtx)));
         }
     }
 };
@@ -1480,11 +1484,13 @@ public:
 
 WiredTigerIndexUnique::WiredTigerIndexUnique(OperationContext* ctx,
                                              const std::string& uri,
+                                             const UUID& collectionUUID,
                                              StringData ident,
                                              KeyFormat rsKeyFormat,
                                              const IndexDescriptor* desc,
                                              bool isLogged)
-    : WiredTigerIndex(ctx, uri, ident, rsKeyFormat, desc, isLogged), _partial(desc->isPartial()) {
+    : WiredTigerIndex(ctx, uri, collectionUUID, ident, rsKeyFormat, desc, isLogged),
+      _partial(desc->isPartial()) {
     // _id indexes must use WiredTigerIdIndex
     invariant(!isIdIndex());
     // All unique indexes should be in the timestamp-safe format version as of version 4.2.
@@ -1567,10 +1573,11 @@ void WiredTigerIndexUnique::insertWithRecordIdInValue_forTest(OperationContext* 
 
 WiredTigerIdIndex::WiredTigerIdIndex(OperationContext* ctx,
                                      const std::string& uri,
+                                     const UUID& collectionUUID,
                                      StringData ident,
                                      const IndexDescriptor* desc,
                                      bool isLogged)
-    : WiredTigerIndex(ctx, uri, ident, KeyFormat::Long, desc, isLogged) {
+    : WiredTigerIndex(ctx, uri, collectionUUID, ident, KeyFormat::Long, desc, isLogged) {
     invariant(isIdIndex());
 }
 
@@ -1627,7 +1634,7 @@ Status WiredTigerIdIndex::_insert(OperationContext* opCtx,
 
     auto key = KeyString::toBson(keyString, _ordering);
     return buildDupKeyErrorStatus(key,
-                                  _desc->getEntry()->getNSSFromCatalog(opCtx),
+                                  getCollectionNamespace(opCtx),
                                   _indexName,
                                   _keyPattern,
                                   _collation,
@@ -1736,9 +1743,9 @@ void WiredTigerIdIndex::_unindex(OperationContext* opCtx,
         LOGV2_FATAL(5176201,
                     "Un-index seeing multiple records for key",
                     "key"_attr = bsonKey,
-                    "index"_attr = _desc->indexName(),
+                    "index"_attr = _indexName,
                     "uri"_attr = _uri,
-                    "collection"_attr = getCollectionNamespace(opCtx));
+                    logAttrs(getCollectionNamespace(opCtx)));
     }
 
     // The RecordId matches, so remove the entry.
@@ -1751,7 +1758,7 @@ void WiredTigerIdIndex::_unindex(OperationContext* opCtx,
     auto key = KeyString::toBson(keyString, _ordering);
     LOGV2_WARNING(51797,
                   "Associated record not found in collection while removing index entry",
-                  "collection"_attr = getCollectionNamespace(opCtx),
+                  logAttrs(getCollectionNamespace(opCtx)),
                   "index"_attr = _indexName,
                   "key"_attr = redact(key),
                   "recordId"_attr = id);
@@ -1803,11 +1810,12 @@ void WiredTigerIndexUnique::_unindex(OperationContext* opCtx,
 
 WiredTigerIndexStandard::WiredTigerIndexStandard(OperationContext* ctx,
                                                  const std::string& uri,
+                                                 const UUID& collectionUUID,
                                                  StringData ident,
                                                  KeyFormat rsKeyFormat,
                                                  const IndexDescriptor* desc,
                                                  bool isLogged)
-    : WiredTigerIndex(ctx, uri, ident, rsKeyFormat, desc, isLogged) {}
+    : WiredTigerIndex(ctx, uri, collectionUUID, ident, rsKeyFormat, desc, isLogged) {}
 
 std::unique_ptr<SortedDataInterface::Cursor> WiredTigerIndexStandard::newCursor(
     OperationContext* opCtx, bool forward) const {

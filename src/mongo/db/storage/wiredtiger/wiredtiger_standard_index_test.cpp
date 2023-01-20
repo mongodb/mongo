@@ -95,7 +95,8 @@ public:
         string uri = "table:" + ns;
         invariant(Status::OK() == WiredTigerIndex::create(&opCtx, uri, result.getValue()));
 
-        return std::make_unique<WiredTigerIdIndex>(&opCtx, uri, "" /* ident */, &desc, isLogged);
+        return std::make_unique<WiredTigerIdIndex>(
+            &opCtx, uri, UUID::gen(), "" /* ident */, &desc, isLogged);
     }
 
     std::unique_ptr<mongo::SortedDataInterface> newSortedDataInterface(bool unique,
@@ -131,13 +132,19 @@ public:
         if (unique) {
             return std::make_unique<WiredTigerIndexUnique>(&opCtx,
                                                            uri,
+                                                           UUID::gen(),
                                                            "" /* ident */,
                                                            keyFormat,
                                                            &desc,
                                                            WiredTigerUtil::useTableLogging(nss));
         }
-        return std::make_unique<WiredTigerIndexStandard>(
-            &opCtx, uri, "" /* ident */, keyFormat, &desc, WiredTigerUtil::useTableLogging(nss));
+        return std::make_unique<WiredTigerIndexStandard>(&opCtx,
+                                                         uri,
+                                                         UUID::gen(),
+                                                         "" /* ident */,
+                                                         keyFormat,
+                                                         &desc,
+                                                         WiredTigerUtil::useTableLogging(nss));
     }
 
     std::unique_ptr<RecoveryUnit> newRecoveryUnit() final {
