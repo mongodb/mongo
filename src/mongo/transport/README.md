@@ -60,11 +60,10 @@ This interface acts as a cursor to build a response message to be sent out back
 to the client.
 
 ## See Also
-For details on egress networking, see [Egress Networking][egress_networking]. For 
-details on command dispatch, see [Command Dispatch][command_dispatch]. For details 
-on *NetworkingBaton* and *AsioNetworkingBaton*, see [Baton][baton].
-
-For more detail about `SessionWorkflow`, see WRITING-10398 (internal).
+- For details on egress networking, see [Egress Networking][egress_networking].
+- For details on command dispatch, see [Command Dispatch][command_dispatch].
+- For details on *NetworkingBaton* and *AsioNetworkingBaton*, see [Baton][baton].
+- For more detail about `SessionWorkflow`, see WRITING-10398 (internal).
 
 [ServiceExecutor]: service_executor.h
 [SessionWorkflow]: session_workflow.h
