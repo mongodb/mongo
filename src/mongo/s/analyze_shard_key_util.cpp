@@ -29,43 +29,311 @@
 
 #include "mongo/s/analyze_shard_key_util.h"
 
-#include "mongo/s/analyze_shard_key_feature_flag_gen.h"
-#include "mongo/s/is_mongos.h"
+#include "mongo/client/connpool.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/logv2/log.h"
+#include "mongo/s/async_requests_sender.h"
+#include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/query/cluster_aggregate.h"
+#include "mongo/s/stale_shard_version_helpers.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
 namespace analyze_shard_key {
 
-bool isFeatureFlagEnabled() {
-    return serverGlobalParams.featureCompatibility.isVersionInitialized() &&
-        analyze_shard_key::gFeatureFlagAnalyzeShardKey.isEnabled(
-            serverGlobalParams.featureCompatibility);
+namespace {
+
+/**
+ * Runs the aggregate command 'aggRequest' locally and applies 'callbackFn' to each returned
+ * document.
+ */
+void runAggregateTargetLocal(OperationContext* opCtx,
+                             AggregateCommandRequest aggRequest,
+                             std::function<void(const BSONObj&)> callbackFn) {
+    DBDirectClient client(opCtx);
+    auto cursor = uassertStatusOK(DBClientCursor::fromAggregationRequest(
+        &client, aggRequest, true /* secondaryOk */, false /* useExhaust*/));
+
+    while (cursor->more()) {
+        auto doc = cursor->next();
+        callbackFn(doc);
+    }
 }
 
-bool isFeatureFlagEnabledIgnoreFCV() {
-    return analyze_shard_key::gFeatureFlagAnalyzeShardKey.isEnabledAndIgnoreFCV();
+/**
+ * Runs the aggregate command 'aggRequest' and applies 'callbackFn' to each returned document.
+ * Targets the shards that the query targets and automatically retries on shard versioning errors.
+ * Does not support runnning getMore commands for the aggregation.
+ */
+void runAggregateTargetByQuery(OperationContext* opCtx,
+                               AggregateCommandRequest aggRequest,
+                               std::function<void(const BSONObj&)> callbackFn) {
+    invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+
+    auto nss = aggRequest.getNamespace();
+    bool succeeded = false;
+
+    while (true) {
+        try {
+            shardVersionRetry(
+                opCtx, Grid::get(opCtx)->catalogCache(), nss, "AnalyzeShardKey"_sd, [&] {
+                    BSONObjBuilder responseBuilder;
+                    uassertStatusOK(
+                        ClusterAggregate::runAggregate(opCtx,
+                                                       ClusterAggregate::Namespaces{nss, nss},
+                                                       aggRequest,
+                                                       LiteParsedPipeline{aggRequest},
+                                                       PrivilegeVector(),
+                                                       &responseBuilder));
+                    succeeded = true;
+                    auto response = responseBuilder.obj();
+                    auto firstBatch = response.firstElement()["firstBatch"].Obj();
+                    BSONObjIterator it(firstBatch);
+
+                    while (it.more()) {
+                        auto doc = it.next().Obj();
+                        callbackFn(doc);
+                    }
+                });
+            return;
+        } catch (const DBException& ex) {
+            if (ex.toStatus() == ErrorCodes::ShardNotFound) {
+                // 'callbackFn' should never trigger a ShardNotFound error. It is also incorrect
+                // to retry the aggregate command after some documents have already been
+                // processed.
+                invariant(!succeeded);
+
+                LOGV2(6875200,
+                      "Failed to run aggregate command to analyze shard key",
+                      "error"_attr = ex.toStatus());
+                continue;
+            }
+            throw;
+        }
+    }
 }
 
-bool supportsCoordinatingQueryAnalysis() {
-    return isFeatureFlagEnabled() && serverGlobalParams.clusterRole == ClusterRole::ConfigServer;
+/**
+ * Runs the aggregate command 'aggRequest' and applies 'callbackFn' to each returned document.
+ * Targets all shards that own data for the collection 'nss'. Does not support runnning getMore
+ * commands for the aggregation.
+ */
+void runAggregateTargetByNs(OperationContext* opCtx,
+                            const NamespaceString& nss,
+                            AggregateCommandRequest aggRequest,
+                            std::function<void(const BSONObj&)> callbackFn) {
+    invariant(serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+
+    std::set<ShardId> shardIds;
+    auto cm =
+        uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionPlacementInfo(opCtx, nss));
+    if (cm.isSharded()) {
+        cm.getAllShardIds(&shardIds);
+    } else {
+        shardIds.insert(cm.dbPrimary());
+    }
+
+    std::vector<AsyncRequestsSender::Request> requests;
+    auto cmdObj = applyReadWriteConcern(
+        opCtx, true /* appendRC */, true /* appendWC */, aggRequest.toBSON({}));
+    for (const auto& shardId : shardIds) {
+        requests.emplace_back(shardId, cmdObj);
+    }
+
+    auto shardResults = gatherResponses(opCtx,
+                                        aggRequest.getNamespace().db(),
+                                        ReadPreferenceSetting(ReadPreference::SecondaryPreferred),
+                                        Shard::RetryPolicy::kIdempotent,
+                                        requests);
+
+    for (const auto& shardResult : shardResults) {
+        const auto shardResponse = uassertStatusOK(std::move(shardResult.swResponse));
+        uassertStatusOK(shardResponse.status);
+        const auto cmdResult = shardResponse.data;
+        uassertStatusOK(getStatusFromCommandResult(cmdResult));
+
+        auto firstBatch = cmdResult.firstElement()["firstBatch"].Obj();
+        BSONObjIterator it(firstBatch);
+
+        if (!it.more()) {
+            continue;
+        }
+
+        auto doc = it.next().Obj();
+        callbackFn(doc);
+    }
 }
 
-bool supportsPersistingSampledQueries() {
-    return isFeatureFlagEnabled() && serverGlobalParams.clusterRole == ClusterRole::ShardServer;
+MONGO_FAIL_POINT_DEFINE(analyzeShardKeyHangBeforeWritingLocally);
+MONGO_FAIL_POINT_DEFINE(analyzeShardKeyHangBeforeWritingRemotely);
+
+const int kMaxRetriesOnRetryableErrors = 5;
+const WriteConcernOptions kMajorityWriteConcern{WriteConcernOptions::kMajority,
+                                                WriteConcernOptions::SyncMode::UNSET,
+                                                WriteConcernOptions::kWriteConcernTimeoutSystem};
+
+/*
+ * Returns true if this mongod can accept writes to the collection 'nss'. Unless the collection is
+ * in the "local" database, this will only return true if this mongod is a primary (or a
+ * standalone).
+ */
+bool canAcceptWrites(OperationContext* opCtx, const NamespaceString& nss) {
+    ShouldNotConflictWithSecondaryBatchApplicationBlock noPBWMBlock(opCtx->lockState());
+    Lock::DBLock lk(opCtx, nss.dbName(), MODE_IS);
+    Lock::CollectionLock lock(opCtx, nss, MODE_IS);
+    return mongo::repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(opCtx,
+                                                                                       nss.db());
 }
 
-bool supportsPersistingSampledQueriesIgnoreFCV() {
-    return isFeatureFlagEnabledIgnoreFCV() &&
-        serverGlobalParams.clusterRole == ClusterRole::ShardServer;
+/*
+ * Runs the write command 'cmdObj' against the database 'dbName' locally, asserts that the
+ * top-level command is OK, then asserts the write status using the 'uassertWriteStatusFn' callback.
+ * Returns the command response.
+ */
+BSONObj executeWriteCommandLocal(OperationContext* opCtx,
+                                 const std::string dbName,
+                                 const BSONObj& cmdObj,
+                                 const std::function<void(const BSONObj&)>& uassertWriteStatusFn) {
+    DBDirectClient client(opCtx);
+    BSONObj resObj;
+
+    if (!client.runCommand(dbName, cmdObj, resObj)) {
+        uassertStatusOK(getStatusFromCommandResult(resObj));
+    }
+    uassertWriteStatusFn(resObj);
+
+    return resObj;
 }
 
-bool supportsSamplingQueries() {
-    return isFeatureFlagEnabled() &&
-        (isMongos() || serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+/*
+ * Runs the write command 'cmdObj' against the database 'dbName' on the (remote) primary, asserts
+ * that the top-level command is OK, then asserts the write status using the given
+ * 'uassertWriteStatusFn' callback. Throws a PrimarySteppedDown error if no primary is found.
+ * Returns the command response.
+ */
+BSONObj executeWriteCommandRemote(OperationContext* opCtx,
+                                  const std::string dbName,
+                                  const BSONObj& cmdObj,
+                                  const std::function<void(const BSONObj&)>& uassertWriteStatusFn) {
+    auto hostAndPort = repl::ReplicationCoordinator::get(opCtx)->getCurrentPrimaryHostAndPort();
+
+    if (hostAndPort.empty()) {
+        uasserted(ErrorCodes::PrimarySteppedDown, "No primary exists currently");
+    }
+
+    auto conn = std::make_unique<ScopedDbConnection>(hostAndPort.toString());
+
+    if (auth::isInternalAuthSet()) {
+        uassertStatusOK(conn->get()->authenticateInternalUser());
+    }
+
+    DBClientBase* client = conn->get();
+    ScopeGuard guard([&] { conn->done(); });
+    try {
+        BSONObj resObj;
+
+        if (!client->runCommand(dbName, cmdObj, resObj)) {
+            uassertStatusOK(getStatusFromCommandResult(resObj));
+        }
+        uassertWriteStatusFn(resObj);
+
+        return resObj;
+    } catch (...) {
+        guard.dismiss();
+        conn->kill();
+        throw;
+    }
 }
 
-bool supportsSamplingQueriesIgnoreFCV() {
-    return isFeatureFlagEnabledIgnoreFCV() &&
-        (isMongos() || serverGlobalParams.clusterRole == ClusterRole::ShardServer);
+/*
+ * Runs the write command 'cmdObj' against the collection 'nss'. If this mongod is currently the
+ * primary, runs the write command locally. Otherwise, runs the command on the remote primary.
+ * Internally asserts that the top-level command is OK, then asserts the write status using the
+ * given 'uassertWriteStatusFn' callback. Internally retries the write command on retryable
+ * errors (for kMaxRetriesOnRetryableErrors times) so the writes must be idempotent. Returns the
+ * command response.
+ */
+BSONObj executeWriteCommand(OperationContext* opCtx,
+                            const NamespaceString& nss,
+                            const BSONObj& cmdObj,
+                            const std::function<void(const BSONObj&)>& uassertWriteStatusFn) {
+    const auto dbName = nss.db().toString();
+    auto numRetries = 0;
+
+    while (true) {
+        try {
+            if (canAcceptWrites(opCtx, nss)) {
+                // There is a window here where this mongod may step down after check above. In this
+                // case, a NotWritablePrimary error would be thrown. However, this is preferable to
+                // running the command while holding locks.
+                analyzeShardKeyHangBeforeWritingLocally.pauseWhileSet(opCtx);
+                return executeWriteCommandLocal(opCtx, dbName, cmdObj, uassertWriteStatusFn);
+            }
+
+            analyzeShardKeyHangBeforeWritingRemotely.pauseWhileSet(opCtx);
+            return executeWriteCommandRemote(opCtx, dbName, cmdObj, uassertWriteStatusFn);
+        } catch (DBException& ex) {
+            if (ErrorCodes::isRetriableError(ex) && numRetries < kMaxRetriesOnRetryableErrors) {
+                numRetries++;
+                continue;
+            }
+            throw;
+        }
+    }
+
+    return {};
+}
+
+}  // namespace
+
+void runAggregate(OperationContext* opCtx,
+                  AggregateCommandRequest aggRequest,
+                  std::function<void(const BSONObj&)> callbackFn) {
+    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+        return runAggregateTargetByQuery(opCtx, aggRequest, callbackFn);
+    }
+    return runAggregateTargetLocal(opCtx, aggRequest, callbackFn);
+}
+
+void runAggregate(OperationContext* opCtx,
+                  const NamespaceString& nss,
+                  AggregateCommandRequest aggRequest,
+                  std::function<void(const BSONObj&)> callbackFn) {
+    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
+        return runAggregateTargetByNs(opCtx, nss, aggRequest, callbackFn);
+    }
+    return runAggregateTargetLocal(opCtx, aggRequest, callbackFn);
+}
+
+void insertDocuments(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const std::vector<BSONObj>& docs,
+    const std::function<void(const BatchedCommandResponse&)>& uassertWriteStatusFn) {
+    write_ops::InsertCommandRequest insertCmd(nss);
+    insertCmd.setDocuments(docs);
+    insertCmd.setWriteCommandRequestBase([&] {
+        write_ops::WriteCommandRequestBase wcb;
+        wcb.setOrdered(false);
+        wcb.setBypassDocumentValidation(false);
+        return wcb;
+    }());
+    auto insertCmdObj = insertCmd.toBSON(
+        {BSON(WriteConcernOptions::kWriteConcernField << kMajorityWriteConcern.toBSON())});
+
+    executeWriteCommand(opCtx, nss, std::move(insertCmdObj), [&](const BSONObj& resObj) {
+        BatchedCommandResponse res;
+        std::string errMsg;
+
+        if (!res.parseBSON(resObj, &errMsg)) {
+            uasserted(ErrorCodes::FailedToParse, errMsg);
+        }
+        uassertWriteStatusFn(res);
+    });
 }
 
 }  // namespace analyze_shard_key

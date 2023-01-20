@@ -83,7 +83,8 @@ env.Library(
         '$BUILD_DIR/mongo/db/service_context',
         '$BUILD_DIR/mongo/db/shard_role',
         '$BUILD_DIR/mongo/idl/idl_parser',
-        '$BUILD_DIR/mongo/s/analyze_shard_key_common',
+        '$BUILD_DIR/mongo/s/analyze_shard_key_idl',
+        '$BUILD_DIR/mongo/s/analyze_shard_key_util',
     ],
 )
 
@@ -588,6 +589,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
         '$BUILD_DIR/mongo/db/transaction/transaction_api',
         '$BUILD_DIR/mongo/idl/cluster_server_parameter',
+        '$BUILD_DIR/mongo/s/analyze_shard_key_util',
         '$BUILD_DIR/mongo/s/commands/cluster_commands_common',
         '$BUILD_DIR/mongo/s/commands/sharded_cluster_sharding_commands',
         '$BUILD_DIR/mongo/s/common_s',

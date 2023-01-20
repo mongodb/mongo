@@ -33,7 +33,6 @@
 #include "mongo/db/s/query_analysis_op_observer.h"
 #include "mongo/db/s/query_analysis_writer.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/analyze_shard_key_util.h"
 #include "mongo/s/catalog/type_mongos.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault

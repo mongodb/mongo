@@ -65,8 +65,7 @@ QueryAnalysisCoordinator* QueryAnalysisCoordinator::get(ServiceContext* serviceC
 bool QueryAnalysisCoordinator::shouldRegisterReplicaSetAwareService() const {
     // This is invoked when the Register above is constructed which is before FCV is set so we need
     // to ignore FCV when checking if the feature flag is enabled.
-    return analyze_shard_key::isFeatureFlagEnabledIgnoreFCV() &&
-        serverGlobalParams.clusterRole == ClusterRole::ConfigServer;
+    return supportsCoordinatingQueryAnalysisIgnoreFCV();
 }
 
 void QueryAnalysisCoordinator::onConfigurationInsert(const BSONObj& doc) {

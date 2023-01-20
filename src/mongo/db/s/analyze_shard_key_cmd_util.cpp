@@ -42,14 +42,11 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/s/analyze_shard_key_server_parameters_gen.h"
-#include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/analyze_shard_key_util.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/query/cluster_aggregate.h"
 #include "mongo/s/service_entry_point_mongos.h"
-#include "mongo/s/stale_shard_version_helpers.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
-
 
 namespace mongo {
 namespace analyze_shard_key {
@@ -147,69 +144,6 @@ AggregateCommandRequest makeAggregateRequestForCardinalityAndFrequency(
     return aggRequest;
 }
 
-/**
- * Runs the given aggregate command request and applies 'callbackFn' to each returned document. On a
- * sharded cluster, automatically retries on shard versioning errors. Does not support runnning
- * getMore commands for the aggregation.
- */
-void runAggregate(OperationContext* opCtx,
-                  const NamespaceString& nss,
-                  AggregateCommandRequest aggRequest,
-                  std::function<void(const BSONObj&)> callbackFn) {
-    if (serverGlobalParams.clusterRole == ClusterRole::ShardServer) {
-        const auto& catalogCache = Grid::get(opCtx)->catalogCache();
-        bool succeeded = false;
-
-        while (true) {
-            try {
-                shardVersionRetry(opCtx, catalogCache, nss, "AnalyzeShardKeyAggregation"_sd, [&] {
-                    BSONObjBuilder responseBuilder;
-                    uassertStatusOK(
-                        ClusterAggregate::runAggregate(opCtx,
-                                                       ClusterAggregate::Namespaces{nss, nss},
-                                                       aggRequest,
-                                                       LiteParsedPipeline{aggRequest},
-                                                       PrivilegeVector(),
-                                                       &responseBuilder));
-                    succeeded = true;
-                    auto response = responseBuilder.obj();
-                    auto firstBatch = response.firstElement()["firstBatch"].Obj();
-                    BSONObjIterator it(firstBatch);
-
-                    while (it.more()) {
-                        auto doc = it.next().Obj();
-                        callbackFn(doc);
-                    }
-                });
-                return;
-            } catch (const DBException& ex) {
-                if (ex.toStatus() == ErrorCodes::ShardNotFound) {
-                    // 'callbackFn' should never trigger a ShardNotFound error. It is also incorrect
-                    // to retry the aggregate command after some documents have already been
-                    // processed.
-                    invariant(!succeeded);
-
-                    LOGV2(6875200,
-                          "Failed to run aggregate command to analyze shard key",
-                          "error"_attr = ex.toStatus());
-                    continue;
-                }
-                throw;
-            }
-        }
-
-    } else {
-        DBDirectClient client(opCtx);
-        auto cursor = uassertStatusOK(DBClientCursor::fromAggregationRequest(
-            &client, aggRequest, true /* secondaryOk */, false /* useExhaust*/));
-
-        while (cursor->more()) {
-            auto doc = cursor->next();
-            callbackFn(doc);
-        }
-    }
-}
-
 struct IndexSpec {
     BSONObj keyPattern;
     bool isUnique;
@@ -290,7 +224,7 @@ CardinalityFrequencyMetricsBundle calculateCardinalityAndFrequency(OperationCont
     }
 
     auto aggRequest = makeAggregateRequestForCardinalityAndFrequency(nss, shardKey, hintIndexKey);
-    runAggregate(opCtx, nss, aggRequest, [&](const BSONObj& doc) {
+    runAggregate(opCtx, aggRequest, [&](const BSONObj& doc) {
         auto numDocs = doc.getField(kNumDocsFieldName).exactNumberLong();
         auto cardinality = doc.getField(kCardinalityFieldName).exactNumberLong();
         auto frequency = doc.getField(kFrequencyFieldName).exactNumberLong();
@@ -435,39 +369,11 @@ boost::optional<int64_t> getNumOrphanDocuments(OperationContext* opCtx,
                                     << BSON("$sum"
                                             << "$" + RangeDeletionTask::kNumOrphanDocsFieldName))));
     AggregateCommandRequest aggRequest(NamespaceString::kRangeDeletionNamespace, pipeline);
-    auto cmdObj = applyReadWriteConcern(
-        opCtx, true /* appendRC */, true /* appendWC */, aggRequest.toBSON({}));
-
-    std::set<ShardId> shardIds;
-    cm.getAllShardIds(&shardIds);
-    std::vector<AsyncRequestsSender::Request> requests;
-    for (const auto& shardId : shardIds) {
-        requests.emplace_back(shardId, cmdObj);
-    }
-    auto shardResults = gatherResponses(opCtx,
-                                        NamespaceString::kConfigDb,
-                                        ReadPreferenceSetting(ReadPreference::SecondaryPreferred),
-                                        Shard::RetryPolicy::kIdempotent,
-                                        requests);
 
     long long numOrphanDocs = 0;
-    for (const auto& shardResult : shardResults) {
-        const auto shardResponse = uassertStatusOK(std::move(shardResult.swResponse));
-        uassertStatusOK(shardResponse.status);
-        const auto cmdResult = shardResponse.data;
-        uassertStatusOK(getStatusFromCommandResult(cmdResult));
-
-        auto firstBatch = cmdResult.firstElement()["firstBatch"].Obj();
-        BSONObjIterator it(firstBatch);
-
-        if (!it.more()) {
-            continue;
-        }
-
-        auto doc = it.next().Obj();
-        invariant(!it.more());
+    runAggregate(opCtx, nss, aggRequest, [&](const BSONObj& doc) {
         numOrphanDocs += doc.getField(kNumOrphanDocsFieldName).exactNumberLong();
-    }
+    });
 
     return numOrphanDocs;
 }

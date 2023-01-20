@@ -31,22 +31,47 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/s/write_ops/batched_command_response.h"
+
 namespace mongo {
 namespace analyze_shard_key {
 
-bool isFeatureFlagEnabled();
+// The size limit for the documents to an insert in a single batch. Leave some padding for other
+// fields in the insert command.
+constexpr int kMaxBSONObjSizePerInsertBatch = BSONObjMaxUserSize - 100 * 1024;
 
-bool isFeatureFlagEnabledIgnoreFCV();
+/**
+ * Runs the aggregate command 'aggRequest' and applies 'callbackFn' to each returned document. On a
+ * sharded cluster, automatically retries on shard versioning errors. Does not support runnning
+ * getMore commands for the aggregation.
+ */
+void runAggregate(OperationContext* opCtx,
+                  AggregateCommandRequest aggRequest,
+                  std::function<void(const BSONObj&)> callbackFn);
 
-bool supportsCoordinatingQueryAnalysis();
+/**
+ * Same as above, but on a sharded cluster, targets all the shards that owns the collection 'nss'
+ * instead.
+ */
+void runAggregate(OperationContext* opCtx,
+                  const NamespaceString& nss,
+                  AggregateCommandRequest aggRequest,
+                  std::function<void(const BSONObj&)> callbackFn);
 
-bool supportsPersistingSampledQueries();
-
-bool supportsPersistingSampledQueriesIgnoreFCV();
-
-bool supportsSamplingQueries();
-
-bool supportsSamplingQueriesIgnoreFCV();
+/*
+ * Inserts the documents 'docs' into the collection 'nss'. If this mongod is currently the primary,
+ * runs the insert command locally. Otherwise, runs the command on the remote primary. Internally
+ * asserts that the top-level command is OK, then asserts the write status using the
+ * 'uassertWriteStatusFn' callback. Internally retries the write command on retryable errors.
+ */
+void insertDocuments(
+    OperationContext* opCtx,
+    const NamespaceString& nss,
+    const std::vector<BSONObj>& docs,
+    const std::function<void(const BatchedCommandResponse&)>& uassertWriteStatusFn);
 
 }  // namespace analyze_shard_key
 }  // namespace mongo
