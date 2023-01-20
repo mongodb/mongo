@@ -32,6 +32,7 @@ import dataclasses
 import json
 import math
 import os
+import re
 import subprocess
 from pathlib import Path
 import seaborn as sns
@@ -97,6 +98,27 @@ async def dump_collection_to_json(db, dump_path, database_name, collections):
         data_file.write("]\n")
 
 
+async def generate_histograms(coll_template, coll, dump_path):
+    """
+    Generate one histogram per each collection field.
+
+    This is slow - enable only when needed to review the generated histograms visually.
+    """
+    doc_count = await coll.count_documents({})
+    for field in coll_template.fields:
+        field_data = []
+        async for doc in coll.find({field.name: {"$exists": True}}, {"_id": 0, field.name: 1}):
+            field_val = doc[field.name]
+            if isinstance(field_val, str):
+                field_val = re.escape(field_val)
+            field_data.append(field_val)
+        fig_file_name = f'{dump_path}/{coll.name}_{field.name}.png'
+        print(f'Generating histogram {fig_file_name}')
+        hist = sns.displot(data=field_data, kind="hist", bins=round(math.sqrt(doc_count))).figure
+        hist.savefig(fig_file_name)
+        plt.close(hist)
+
+
 async def main():
     """Entry point function."""
     script_directory = os.path.abspath(os.path.dirname(__file__))
@@ -117,6 +139,9 @@ async def main():
 
         # 3. Export all collections in the database into json files.
         db_collections = await database_instance.database.list_collection_names()
+        # TODO: This is an alternative way to export the data. It is better than what is implemented,
+        # but cannot be used until we find a way to call 'mongoimport' from the corresponding JS test.
+        #
         #for coll_name in db_collections:
         # subprocess.run([
         #     'mongoexport', f'--db={database_config.database_name}', f'--collection={coll_name}',
@@ -135,19 +160,8 @@ async def main():
                     collections.append(
                         dict(collectionName=name, fields=coll_template.fields,
                              compound_indexes=coll_template.compound_indexes, cardinality=card))
-                    # Generate one histogram per each collection field
-                    coll = database_instance.database[name]
-                    doc_count = await coll.count_documents({})
-                    for field in coll_template.fields:
-                        field_data = []
-                        async for doc in coll.find({field.name: {"$exists": True}},
-                                                   {"_id": 0, field.name: 1}):
-                            field_data.append(doc[field.name])
-                        hist = sns.displot(data=field_data, kind="hist", bins=round(
-                            math.sqrt(doc_count))).figure
-                        hist.savefig(f'{database_config.dump_path}/{name}_{field.name}.png')
-                        plt.close(hist)
-
+                    # Uncomment this to generate histograms in PNG format
+                    # await generate_histograms(coll_template, database_instance.database[name], database_config.dump_path)
             json_metadata = json.dumps(collections, indent=4, cls=CollectionTemplateEncoder)
             metadata_file.write("// This is a generated file.\nconst dbMetadata = ")
             metadata_file.write(json_metadata)

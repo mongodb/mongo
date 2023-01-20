@@ -29,6 +29,7 @@
 
 from pathlib import Path
 import random
+from typing import Sequence
 import config
 from random_generator import RangeGenerator, DataType, RandomDistribution, ArrayRandomDistribution
 
@@ -55,7 +56,7 @@ int_ranges = [
     range_int_10000_10, range_int_10000_100, range_int_10000_1000
 ]
 
-# Various integer distributions
+# Integer distributions
 int_distributions = {}
 for int_range in int_ranges:
     int_distributions[
@@ -102,6 +103,115 @@ unf_norm_chi_int_mix_2 = [
 int_distributions['mixed_int_unf_norm_chi_2'] = RandomDistribution.mixed(
     children=unf_norm_chi_int_mix_2, weight=[1, 1, 1, 1, 1])
 
+# String distributions
+
+PRINTED_CHAR_MIN_CODE = 32
+PRINTED_CHAR_MAX_CODE = 126
+
+ascii_printable_chars = [
+    chr(code) for code in range(PRINTED_CHAR_MIN_CODE, PRINTED_CHAR_MAX_CODE + 1)
+]
+
+
+def next_char(char: str, distance: int, min_char_code: int, max_char_code: int):
+    char_code = ord(char)
+    assert (min_char_code <= char_code <= max_char_code), "char is out of range"
+    number_of_chars = max_char_code - min_char_code + 1
+    new_char_code = ((char_code - min_char_code + distance) % number_of_chars) + min_char_code
+    assert (min_char_code <= new_char_code <= max_char_code), "new char is out of range"
+    return chr(new_char_code)
+
+
+def generate_str_by_distance(num_strings: int, seed_str: str, distance_distr_0: RandomDistribution,
+                             distance_distr_1: RandomDistribution,
+                             distance_distr_2: RandomDistribution,
+                             distance_distr_3: RandomDistribution):
+    """
+    Generate a set of unique strings with different string distances.
+
+    The generation starts with a seed string 'seed_str', and each subsequent string is generated
+    by producing the next character at each string position according to the distance generator
+    'distance_distr_i' for the corresponding position.
+
+    Given that the current histogram and CE implementation takes into account only the first 4
+    characters, the length of the strings is limited to 4.
+    """
+    str_set = set()
+    distances_0 = distance_distr_0.generate(num_strings)
+    distances_1 = distance_distr_1.generate(num_strings)
+    distances_2 = distance_distr_2.generate(num_strings)
+    distances_3 = distance_distr_3.generate(num_strings)
+    cur_str = seed_str
+    str_set.add(cur_str)
+    for i in range(1, num_strings):
+        new_str = next_char(cur_str[0], distances_0[i], PRINTED_CHAR_MIN_CODE,
+                            PRINTED_CHAR_MAX_CODE)
+        new_str += next_char(cur_str[1], distances_1[i], PRINTED_CHAR_MIN_CODE,
+                             PRINTED_CHAR_MAX_CODE)
+        new_str += next_char(cur_str[2], distances_2[i], PRINTED_CHAR_MIN_CODE,
+                             PRINTED_CHAR_MAX_CODE)
+        new_str += next_char(cur_str[3], distances_3[i], PRINTED_CHAR_MIN_CODE,
+                             PRINTED_CHAR_MAX_CODE)
+        str_set.add(new_str)
+        cur_str = new_str
+    return list(str_set)
+
+
+# Ranges of distances between string characters
+range_int_1_1 = RangeGenerator(DataType.INTEGER, 1, 2, 1)
+range_int_1_7 = RangeGenerator(DataType.INTEGER, 1, 8, 3)
+range_int_6_12 = RangeGenerator(DataType.INTEGER, 6, 13, 3)
+range_int_1_16 = RangeGenerator(DataType.INTEGER, 1, 20, 5)
+range_int_20_30 = RangeGenerator(DataType.INTEGER, 20, 31, 3)
+# Data distributions of ranges between string characters
+d1 = RandomDistribution.uniform(range_int_1_1)
+d2 = RandomDistribution.uniform(range_int_1_7)
+d3 = RandomDistribution.uniform(range_int_6_12)
+d4 = RandomDistribution.uniform(range_int_20_30)
+
+# Sets of strings where characters at different positions have different distances
+string_sets = {}
+# 33 unique strings
+string_sets['set_1112_33'] = generate_str_by_distance(33, 'xxxx', d1, d1, d1, d2)
+string_sets['set_2221_33'] = generate_str_by_distance(33, 'aZa3', d2, d2, d3, d1)
+string_sets['set_5555_33'] = generate_str_by_distance(33, 'axbz', d4, d4, d4, d4)
+# 1000 unique strings
+string_sets['set_1112_1000'] = generate_str_by_distance(1000, 'xxxx', d1, d1, d1, d2)
+string_sets['set_2221_1000'] = generate_str_by_distance(1000, 'aZa3', d2, d2, d3, d1)
+string_sets['set_5555_1000'] = generate_str_by_distance(1000, 'axbz', d4, d4, d4, d4)
+
+# Weights with different variance. For instance if the smallest weight is 1, and the biggest weight is 5
+# then some values in a choice distribution will be picked with at most 5 times higher probability.
+
+# 5% variance in choice probability - all strings are chosen with almost the same probability.
+weight_range_s = RangeGenerator(DataType.INTEGER, 95, 101, 1)
+# 30% variance in choice probability
+# weight_range_m = RangeGenerator(DataType.INTEGER, 65, 101, 2)
+# 70% variance in choice probability
+weight_range_l = RangeGenerator(DataType.INTEGER, 25, 101, 2)
+
+weights = {}
+weights['norm_s'] = RandomDistribution.normal(weight_range_s)
+#weights['norm_m'] = RandomDistribution.normal(weight_range_m)
+weights['norm_l'] = RandomDistribution.normal(weight_range_l)
+weights['chi2_s'] = RandomDistribution.noncentral_chisquare(weight_range_s)
+#weights['chi2_m'] = RandomDistribution.noncentral_chisquare(weight_range_m)
+weights['chi2_l'] = RandomDistribution.noncentral_chisquare(weight_range_l)
+
+
+def make_choice_distr(str_set: Sequence[str], weight_distr: RandomDistribution):
+    return RandomDistribution.choice(str_set, weight_distr.generate(len(str_set)))
+
+
+# String data distributions to be used for string generation
+
+str_distributions = {}
+
+for set_name, cur_set in string_sets.items():
+    for weight_name, weight in weights.items():
+        str_distributions[f'choice_str_{set_name}_{weight_name}'] = make_choice_distr(
+            cur_set, weight)
+
 ################################################################################
 # Collection templates
 ################################################################################
@@ -114,9 +224,12 @@ int_distributions['mixed_int_unf_norm_chi_2'] = RandomDistribution.mixed(
 collection_cardinalities = [100, 1000]
 
 field_templates = [
-    config.FieldTemplate(name=f'{dist}', data_type=config.DataType.INTEGER,
-                         distribution=int_distributions[dist], indexed=True)
-    for dist in int_distributions
+    config.FieldTemplate(name=f'{dist_name}', data_type=config.DataType.INTEGER, distribution=dist,
+                         indexed=False) for dist_name, dist in int_distributions.items()
+]
+field_templates += [
+    config.FieldTemplate(name=f'{dist_name}', data_type=config.DataType.STRING, distribution=dist,
+                         indexed=False) for dist_name, dist in str_distributions.items()
 ]
 
 ce_data = config.CollectionTemplate(name="ce_data", fields=field_templates, compound_indexes=[],

@@ -6,142 +6,262 @@ const dbMetadata = [
             {
                 "fieldName": "uniform_int_1000_1",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "normal_int_1000_1",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "chi2_int_1000_1",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "uniform_int_10000_10",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "normal_int_10000_10",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "chi2_int_10000_10",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "uniform_int_100000_100",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "normal_int_100000_100",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "chi2_int_100000_100",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "uniform_int_1000000_1000",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "normal_int_1000000_1000",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "chi2_int_1000000_1000",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "uniform_int_10000_1",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "normal_int_10000_1",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "chi2_int_10000_1",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "uniform_int_100000_10",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "normal_int_100000_10",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "chi2_int_100000_10",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "uniform_int_1000000_100",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "normal_int_1000000_100",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "chi2_int_1000000_100",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "uniform_int_10000000_1000",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "normal_int_10000000_1000",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "chi2_int_10000000_1000",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "mixed_int_uniform_1",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "mixed_int_unf_norm_1",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "mixed_int_unf_norm_chi_1",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "mixed_int_unf_norm_chi_2",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_1112_33_norm_s",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_1112_33_norm_l",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_1112_33_chi2_s",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_1112_33_chi2_l",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_2221_33_norm_s",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_2221_33_norm_l",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_2221_33_chi2_s",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_2221_33_chi2_l",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_5555_33_norm_s",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_5555_33_norm_l",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_5555_33_chi2_s",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_5555_33_chi2_l",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_1112_1000_norm_s",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_1112_1000_norm_l",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_1112_1000_chi2_s",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_1112_1000_chi2_l",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_2221_1000_norm_s",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_2221_1000_norm_l",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_2221_1000_chi2_s",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_2221_1000_chi2_l",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_5555_1000_norm_s",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_5555_1000_norm_l",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_5555_1000_chi2_s",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_5555_1000_chi2_l",
+                "dataType": "string",
+                "indexed": false
             }
         ],
         "compound_indexes": [],
@@ -153,142 +273,262 @@ const dbMetadata = [
             {
                 "fieldName": "uniform_int_1000_1",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "normal_int_1000_1",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "chi2_int_1000_1",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "uniform_int_10000_10",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "normal_int_10000_10",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "chi2_int_10000_10",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "uniform_int_100000_100",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "normal_int_100000_100",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "chi2_int_100000_100",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "uniform_int_1000000_1000",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "normal_int_1000000_1000",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "chi2_int_1000000_1000",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "uniform_int_10000_1",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "normal_int_10000_1",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "chi2_int_10000_1",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "uniform_int_100000_10",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "normal_int_100000_10",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "chi2_int_100000_10",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "uniform_int_1000000_100",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "normal_int_1000000_100",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "chi2_int_1000000_100",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "uniform_int_10000000_1000",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "normal_int_10000000_1000",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "chi2_int_10000000_1000",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "mixed_int_uniform_1",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "mixed_int_unf_norm_1",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "mixed_int_unf_norm_chi_1",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
             },
             {
                 "fieldName": "mixed_int_unf_norm_chi_2",
                 "dataType": "integer",
-                "indexed": true
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_1112_33_norm_s",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_1112_33_norm_l",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_1112_33_chi2_s",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_1112_33_chi2_l",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_2221_33_norm_s",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_2221_33_norm_l",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_2221_33_chi2_s",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_2221_33_chi2_l",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_5555_33_norm_s",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_5555_33_norm_l",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_5555_33_chi2_s",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_5555_33_chi2_l",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_1112_1000_norm_s",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_1112_1000_norm_l",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_1112_1000_chi2_s",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_1112_1000_chi2_l",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_2221_1000_norm_s",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_2221_1000_norm_l",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_2221_1000_chi2_s",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_2221_1000_chi2_l",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_5555_1000_norm_s",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_5555_1000_norm_l",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_5555_1000_chi2_s",
+                "dataType": "string",
+                "indexed": false
+            },
+            {
+                "fieldName": "choice_str_set_5555_1000_chi2_l",
+                "dataType": "string",
+                "indexed": false
             }
         ],
         "compound_indexes": [],
