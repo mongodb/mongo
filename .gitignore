@@ -175,9 +175,6 @@ CMakeLists.txt
 .vs/
 /x64/
 
-# VSCode JavaScript config files
-**/jsconfig.json
-
 # Windows MSI builder artifacts
 *.msi
 *.wixobj
