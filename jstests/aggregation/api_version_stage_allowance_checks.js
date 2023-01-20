@@ -43,7 +43,6 @@ let result = curDB.runCommand({
             remotes: [],
             nss: "test.mergeCursors",
             allowPartialResults: false,
-            recordRemoteOpWaitTime: false
         }
     }],
     cursor: {},
@@ -64,7 +63,6 @@ result = testDB.runCommand({
             remotes: [],
             nss: "test.mergeCursors",
             allowPartialResults: false,
-            recordRemoteOpWaitTime: false
         }
     }],
     cursor: {},
@@ -85,7 +83,6 @@ result = testDB.runCommand({
             remotes: [],
             nss: "test.mergeCursors",
             allowPartialResults: false,
-            recordRemoteOpWaitTime: false
         }
     }],
     cursor: {},

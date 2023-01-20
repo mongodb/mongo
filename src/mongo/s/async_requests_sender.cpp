@@ -36,6 +36,7 @@
 #include <memory>
 
 #include "mongo/client/remote_command_targeter.h"
+#include "mongo/db/curop.h"
 #include "mongo/executor/hedge_options_util.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/logv2/log.h"
@@ -89,6 +90,8 @@ AsyncRequestsSender::AsyncRequestsSender(OperationContext* opCtx,
         // Kick off requests immediately.
         _remotes.emplace_back(this, request.shardId, request.cmdObj).executeRequest();
     }
+
+    CurOp::get(_opCtx)->ensureRecordRemoteOpWait();
 }
 
 AsyncRequestsSender::Response AsyncRequestsSender::next() noexcept {
@@ -119,9 +122,22 @@ AsyncRequestsSender::Response AsyncRequestsSender::next() noexcept {
             _resourceYielder->yield(_opCtx);
         }
 
+        auto curOp = CurOp::get(_opCtx);
+        // Calculating the total wait time for remote operations relies on the CurOp's timing
+        // measurement facility and we can't use such facility when the current operation is marked
+        // as done. Some commands such as 'analyzeShardKey' command may send remote operations using
+        // AsyncRequestsSender even after marking the current operation done and so we need to check
+        // whether the current operation is still in progress.
+        auto curOpInProgress = !curOp->isDone();
+        if (curOpInProgress) {
+            curOp->startRemoteOpWaitTimer();
+        }
         // Only wait for the next result without popping it, so an error unyielding doesn't
         // discard an already popped response.
         auto waitStatus = _responseQueue.waitForNonEmptyNoThrow(_opCtx);
+        if (curOpInProgress) {
+            curOp->stopRemoteOpWaitTimer();
+        }
 
         auto unyieldStatus =
             _resourceYielder ? _resourceYielder->unyieldNoThrow(_opCtx) : Status::OK();

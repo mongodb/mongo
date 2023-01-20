@@ -96,4 +96,7 @@ structs:
             recordRemoteOpWaitTime:
                 type: bool
                 default: false
-                description: If set, records the total time spent waiting for remote operations to complete.
+                description: >-
+                    This parameter is not used anymore but should stay for a while for backward
+                    compatibility.
+                    TODO SERVER-73120 Remove this parameter when releasing 8.0.

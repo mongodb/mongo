@@ -59,7 +59,6 @@ assert.eq(mergeCursors.nss,
           "test.agg_explain_fmt",
           mergeCursors);  // This test manually sets collection and db at the top.
 assert.eq(mergeCursors.allowPartialResults, false, mergeCursors);
-assert.eq(mergeCursors.recordRemoteOpWaitTime, false, mergeCursors);
 
 // Do a sharded explain from a mongod, not mongos, to ensure that it does not have a
 // SHARDING_FILTER stage.");

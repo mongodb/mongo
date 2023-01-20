@@ -42,7 +42,6 @@ BlockingResultsMerger::BlockingResultsMerger(OperationContext* opCtx,
                                              std::shared_ptr<executor::TaskExecutor> executor,
                                              std::unique_ptr<ResourceYielder> resourceYielder)
     : _tailableMode(armParams.getTailableMode().value_or(TailableModeEnum::kNormal)),
-      _recordRemoteOpWaitTime(armParams.getRecordRemoteOpWaitTime()),
       _executor(executor),
       _arm(opCtx, std::move(executor), std::move(armParams)),
       _resourceYielder(std::move(resourceYielder)) {}
@@ -146,9 +145,7 @@ StatusWith<ClusterQueryResult> BlockingResultsMerger::blockUntilNext(OperationCo
     return _arm.nextReady();
 }
 StatusWith<ClusterQueryResult> BlockingResultsMerger::next(OperationContext* opCtx) {
-    if (_recordRemoteOpWaitTime) {
-        CurOp::get(opCtx)->enableRecordRemoteOpWait();
-    }
+    CurOp::get(opCtx)->ensureRecordRemoteOpWait();
 
     // Non-tailable and tailable non-awaitData cursors always block until ready(). AwaitData
     // cursors wait for ready() only until a specified time limit is exceeded.

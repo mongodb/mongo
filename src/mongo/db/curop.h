@@ -612,12 +612,12 @@ public:
      * This method is separate from startRemoteOpWait because operation types that do record
      * remoteOpWait, such as a getMore of a sharded aggregation, should always include the
      * remoteOpWait field even if its value is zero. An operation should call
-     * enableRecordRemoteOpWait() to declare that it wants to report remoteOpWait, and call
+     * ensureRecordRemoteOpWait() to declare that it wants to report remoteOpWait, and call
      * startRemoteOpWaitTimer()/stopRemoteOpWaitTimer() to measure the time.
      *
      * This timer uses the same clock source as elapsedTimeTotal().
      */
-    void enableRecordRemoteOpWait() {
+    void ensureRecordRemoteOpWait() {
         if (!_debug.remoteOpWaitTime) {
             _debug.remoteOpWaitTime.emplace(0);
         }
@@ -626,10 +626,15 @@ public:
     /**
      * Starts the remoteOpWait timer.
      *
-     * Does nothing if enableRecordRemoteOpWait() was not called.
+     * Does nothing if ensureRecordRemoteOpWait() was not called or the current operation was not
+     * marked as started.
      */
     void startRemoteOpWaitTimer() {
-        invariant(isStarted());
+        // There are some commands that send remote operations but do not mark the current operation
+        // as started. We do not record remote op wait time for those commands.
+        if (!isStarted()) {
+            return;
+        }
         invariant(!isDone());
         invariant(!isPaused());
         invariant(!_remoteOpStartTime);
@@ -641,10 +646,15 @@ public:
     /**
      * Stops the remoteOpWait timer.
      *
-     * Does nothing if enableRecordRemoteOpWait() was not called.
+     * Does nothing if ensureRecordRemoteOpWait() was not called or the current operation was not
+     * marked as started.
      */
     void stopRemoteOpWaitTimer() {
-        invariant(isStarted());
+        // There are some commands that send remote operations but do not mark the current operation
+        // as started. We do not record remote op wait time for those commands.
+        if (!isStarted()) {
+            return;
+        }
         invariant(!isDone());
         invariant(!isPaused());
         if (_debug.remoteOpWaitTime) {

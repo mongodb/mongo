@@ -52,7 +52,6 @@ DocumentSourceMergeCursors::DocumentSourceMergeCursors(
     : DocumentSource(kStageName, expCtx),
       _armParamsObj(std::move(ownedParamsSpec)),
       _armParams(std::move(armParams)) {
-    _armParams->setRecordRemoteOpWaitTime(true);
 
     // Populate the shard ids from the 'RemoteCursor'.
     recordRemoteCursorShardIds(_armParams->getRemotes());
@@ -83,7 +82,6 @@ bool DocumentSourceMergeCursors::remotesExhausted() const {
 void DocumentSourceMergeCursors::populateMerger() {
     invariant(!_blockingResultsMerger);
     invariant(_armParams);
-    invariant(_armParams->getRecordRemoteOpWaitTime());
 
     _blockingResultsMerger.emplace(
         pExpCtx->opCtx,
