@@ -43,6 +43,11 @@ namespace analyze_shard_key {
 // fields in the insert command.
 constexpr int kMaxBSONObjSizePerInsertBatch = BSONObjMaxUserSize - 100 * 1024;
 
+/*
+ * Returns the percentage between 'part' and 'whole' (between 0 and 100).
+ */
+double calculatePercentage(double part, double whole);
+
 /**
  * Runs the aggregate command 'aggRequest' and applies 'callbackFn' to each returned document. On a
  * sharded cluster, automatically retries on shard versioning errors. Does not support runnning

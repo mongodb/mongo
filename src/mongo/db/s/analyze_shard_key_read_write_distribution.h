@@ -34,6 +34,7 @@
 #include "mongo/s/analyze_shard_key_cmd_gen.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
+#include "mongo/s/analyze_shard_key_util.h"
 #include "mongo/s/collection_routing_info_targeter.h"
 
 namespace mongo {
@@ -196,6 +197,153 @@ private:
     int64_t _numSingleWritesWithoutShardKey = 0;
     int64_t _numMultiWritesWithoutShardKey = 0;
 };
+
+// Override the + operator and == operator for ReadSampleSize, WriteSampleSize,
+// ReadDistributionMetrics and WriteDistributionMetrics.
+
+inline ReadSampleSize operator+(const ReadSampleSize& l, const ReadSampleSize& r) {
+    ReadSampleSize sampleSize;
+    sampleSize.setTotal(l.getTotal() + r.getTotal());
+    sampleSize.setFind(l.getFind() + r.getFind());
+    sampleSize.setAggregate(l.getAggregate() + r.getAggregate());
+    sampleSize.setCount(l.getCount() + r.getCount());
+    sampleSize.setDistinct(l.getDistinct() + r.getDistinct());
+    return sampleSize;
+}
+
+inline bool operator==(const ReadSampleSize& l, const ReadSampleSize& r) {
+    return l.getTotal() == r.getTotal() && l.getFind() == r.getFind() &&
+        l.getAggregate() == r.getAggregate() && l.getCount() == r.getCount() &&
+        l.getDistinct() == r.getDistinct();
+}
+
+inline WriteSampleSize operator+(const WriteSampleSize& l, const WriteSampleSize& r) {
+    WriteSampleSize sampleSize;
+    sampleSize.setTotal(l.getTotal() + r.getTotal());
+    sampleSize.setUpdate(l.getUpdate() + r.getUpdate());
+    sampleSize.setDelete(l.getDelete() + r.getDelete());
+    sampleSize.setFindAndModify(l.getFindAndModify() + r.getFindAndModify());
+    return sampleSize;
+}
+
+inline bool operator==(const WriteSampleSize& l, const WriteSampleSize& r) {
+    return l.getTotal() == r.getTotal() && l.getUpdate() == r.getUpdate() &&
+        l.getDelete() == r.getDelete() && l.getFindAndModify() == r.getFindAndModify();
+}
+
+template <typename T>
+std::vector<T> addElements(const std::vector<T>& l, const std::vector<T>& r) {
+    invariant(!l.empty());
+    invariant(!r.empty());
+    invariant(l.size() == r.size());
+
+    std::vector<T> result;
+    result.reserve(l.size());
+
+    std::transform(l.begin(), l.end(), r.begin(), std::back_inserter(result), std::plus<T>());
+    return result;
+}
+
+template <typename DistributionMetricsType>
+DistributionMetricsType addDistributionMetricsBase(DistributionMetricsType l,
+                                                   DistributionMetricsType r) {
+    DistributionMetricsType metrics;
+    metrics.setSampleSize(l.getSampleSize() + r.getSampleSize());
+    if (auto numTotal = metrics.getSampleSize().getTotal(); numTotal > 0) {
+        auto numTargetedOneShard =
+            l.getNumTargetedOneShard().value_or(0) + r.getNumTargetedOneShard().value_or(0);
+        metrics.setNumTargetedOneShard(numTargetedOneShard);
+        metrics.setPercentageOfTargetedOneShard(calculatePercentage(numTargetedOneShard, numTotal));
+
+        auto numTargetedMultipleShards = l.getNumTargetedMultipleShards().value_or(0) +
+            r.getNumTargetedMultipleShards().value_or(0);
+        metrics.setNumTargetedMultipleShards(numTargetedMultipleShards);
+        metrics.setPercentageOfTargetedMultipleShards(
+            calculatePercentage(numTargetedMultipleShards, numTotal));
+
+        auto numTargetedAllShards =
+            l.getNumTargetedAllShards().value_or(0) + r.getNumTargetedAllShards().value_or(0);
+        metrics.setNumTargetedAllShards(numTargetedAllShards);
+        metrics.setPercentageOfTargetedAllShards(
+            calculatePercentage(numTargetedAllShards, numTotal));
+
+        if (l.getNumDispatchedByRange() && r.getNumDispatchedByRange()) {
+            metrics.setNumDispatchedByRange(
+                addElements(*l.getNumDispatchedByRange(), *r.getNumDispatchedByRange()));
+        } else if (l.getNumDispatchedByRange()) {
+            metrics.setNumDispatchedByRange(*l.getNumDispatchedByRange());
+        } else if (r.getNumDispatchedByRange()) {
+            metrics.setNumDispatchedByRange(*r.getNumDispatchedByRange());
+        }
+    }
+    return metrics;
+}
+
+template <typename DistributionMetricsType>
+inline bool areEqualDistributionMetricsBase(const DistributionMetricsType& l,
+                                            const DistributionMetricsType& r) {
+    return l.getSampleSize() == r.getSampleSize() &&
+        l.getNumTargetedOneShard() == r.getNumTargetedOneShard() &&
+        l.getPercentageOfTargetedOneShard() == r.getPercentageOfTargetedOneShard() &&
+        l.getNumTargetedMultipleShards() == r.getNumTargetedMultipleShards() &&
+        l.getPercentageOfTargetedMultipleShards() == r.getPercentageOfTargetedMultipleShards() &&
+        l.getNumTargetedAllShards() == r.getNumTargetedAllShards() &&
+        l.getPercentageOfTargetedAllShards() == r.getPercentageOfTargetedAllShards();
+}
+
+inline ReadDistributionMetrics operator+(const ReadDistributionMetrics& l,
+                                         const ReadDistributionMetrics& r) {
+    auto metrics = addDistributionMetricsBase(l, r);
+    return metrics;
+}
+
+inline bool operator==(const ReadDistributionMetrics& l, const ReadDistributionMetrics& r) {
+    return areEqualDistributionMetricsBase(l, r);
+}
+
+inline bool operator!=(const ReadDistributionMetrics& l, const ReadDistributionMetrics& r) {
+    return !(l == r);
+}
+
+inline WriteDistributionMetrics operator+(const WriteDistributionMetrics& l,
+                                          const WriteDistributionMetrics& r) {
+    auto metrics = addDistributionMetricsBase(l, r);
+    if (auto numTotal = metrics.getSampleSize().getTotal(); numTotal > 0) {
+        auto numShardKeyUpdates =
+            l.getNumShardKeyUpdates().value_or(0) + r.getNumShardKeyUpdates().value_or(0);
+        metrics.setNumShardKeyUpdates(numShardKeyUpdates);
+        metrics.setPercentageOfShardKeyUpdates(calculatePercentage(numShardKeyUpdates, numTotal));
+
+        auto numSingleWritesWithoutShardKey = l.getNumSingleWritesWithoutShardKey().value_or(0) +
+            r.getNumSingleWritesWithoutShardKey().value_or(0);
+        metrics.setNumSingleWritesWithoutShardKey(numSingleWritesWithoutShardKey);
+        metrics.setPercentageOfSingleWritesWithoutShardKey(
+            calculatePercentage(numSingleWritesWithoutShardKey, numTotal));
+
+        auto numMultiWritesWithoutShardKey = l.getNumMultiWritesWithoutShardKey().value_or(0) +
+            r.getNumMultiWritesWithoutShardKey().value_or(0);
+        metrics.setNumMultiWritesWithoutShardKey(numMultiWritesWithoutShardKey);
+        metrics.setPercentageOfMultiWritesWithoutShardKey(
+            calculatePercentage(numMultiWritesWithoutShardKey, numTotal));
+    }
+    return metrics;
+}
+
+inline bool operator==(const WriteDistributionMetrics& l, const WriteDistributionMetrics& r) {
+    return areEqualDistributionMetricsBase(l, r) &&
+        l.getNumShardKeyUpdates() == r.getNumShardKeyUpdates() &&
+        l.getPercentageOfShardKeyUpdates() == r.getPercentageOfShardKeyUpdates() &&
+        l.getNumSingleWritesWithoutShardKey() == r.getNumSingleWritesWithoutShardKey() &&
+        l.getPercentageOfSingleWritesWithoutShardKey() ==
+        r.getPercentageOfSingleWritesWithoutShardKey() &&
+        l.getNumMultiWritesWithoutShardKey() == r.getNumMultiWritesWithoutShardKey() &&
+        l.getPercentageOfMultiWritesWithoutShardKey() ==
+        r.getPercentageOfMultiWritesWithoutShardKey();
+}
+
+inline bool operator!=(const WriteDistributionMetrics& l, const WriteDistributionMetrics& r) {
+    return !(l == r);
+}
 
 }  // namespace analyze_shard_key
 }  // namespace mongo

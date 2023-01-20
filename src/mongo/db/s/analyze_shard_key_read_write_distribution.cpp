@@ -38,6 +38,7 @@
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/s/shard_key_index_util.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/analyze_shard_key_util.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 
@@ -113,10 +114,18 @@ template <typename DistributionMetricsType, typename SampleSizeType>
 DistributionMetricsType
 DistributionMetricsCalculator<DistributionMetricsType, SampleSizeType>::_getMetrics() const {
     DistributionMetricsType metrics(_getSampleSize());
-    if (metrics.getSampleSize().getTotal() > 0) {
+    if (auto numTotal = metrics.getSampleSize().getTotal(); numTotal > 0) {
         metrics.setNumTargetedOneShard(_numTargetedOneShard);
+        metrics.setPercentageOfTargetedOneShard(
+            calculatePercentage(_numTargetedOneShard, numTotal));
+
         metrics.setNumTargetedMultipleShards(_numTargetedMultipleShards);
+        metrics.setPercentageOfTargetedMultipleShards(
+            calculatePercentage(_numTargetedMultipleShards, numTotal));
+
         metrics.setNumTargetedAllShards(_numTargetedAllShards);
+        metrics.setPercentageOfTargetedAllShards(
+            calculatePercentage(_numTargetedAllShards, numTotal));
 
         std::vector<int64_t> numDispatchedByRange;
         for (auto& [_, numDispatched] : _numDispatchedByRange) {
@@ -240,10 +249,17 @@ WriteSampleSize WriteDistributionMetricsCalculator::_getSampleSize() const {
 
 WriteDistributionMetrics WriteDistributionMetricsCalculator::getMetrics() const {
     auto metrics = DistributionMetricsCalculator::_getMetrics();
-    if (metrics.getSampleSize().getTotal() > 0) {
+    if (auto numTotal = metrics.getSampleSize().getTotal(); numTotal > 0) {
         metrics.setNumShardKeyUpdates(_numShardKeyUpdates);
+        metrics.setPercentageOfShardKeyUpdates(calculatePercentage(_numShardKeyUpdates, numTotal));
+
         metrics.setNumSingleWritesWithoutShardKey(_numSingleWritesWithoutShardKey);
+        metrics.setPercentageOfSingleWritesWithoutShardKey(
+            calculatePercentage(_numSingleWritesWithoutShardKey, numTotal));
+
         metrics.setNumMultiWritesWithoutShardKey(_numMultiWritesWithoutShardKey);
+        metrics.setPercentageOfMultiWritesWithoutShardKey(
+            calculatePercentage(_numMultiWritesWithoutShardKey, numTotal));
     }
     return metrics;
 }

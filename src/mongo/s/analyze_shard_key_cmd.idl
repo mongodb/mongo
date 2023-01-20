@@ -144,15 +144,36 @@ structs:
         cpp_name: numTargetedOneShard
         validator: { gte: 0 }
         optional: true
+      percentageOfReadsTargetedOneShard:
+        type: double
+        cpp_name: percentageOfTargetedOneShard
+        validator:
+          gte: 0
+          lte: 100
+        optional: true
       numReadsTargetedMultipleShards:
         type: long
         cpp_name: numTargetedMultipleShards
         validator: { gte: 0 }
         optional: true
+      percentageOfReadsTargetedMultipleShards:
+        type: double
+        cpp_name: percentageOfTargetedMultipleShards
+        validator:
+          gte: 0
+          lte: 100
+        optional: true
       numReadsTargetedAllShards:
         type: long
         cpp_name: numTargetedAllShards
         validator: { gte: 0 }
+        optional: true
+      percentageOfReadsTargetedAllShards:
+        type: double
+        cpp_name: percentageOfTargetedAllShards
+        validator:
+          gte: 0
+          lte: 100
         optional: true
       numDispatchedReadsByRange:
         type: array<long>
@@ -172,15 +193,36 @@ structs:
         cpp_name: numTargetedOneShard
         validator: { gte: 0 }
         optional: true
+      percentageOfWritesTargetedOneShard:
+        type: double
+        cpp_name: percentageOfTargetedOneShard
+        validator:
+          gte: 0
+          lte: 100
+        optional: true
       numWritesTargetedMultipleShards:
         type: long
         cpp_name: numTargetedMultipleShards
         validator: { gte: 0 }
         optional: true
+      percentageOfWritesTargetedMultipleShards:
+        type: double
+        cpp_name: percentageOfTargetedMultipleShards
+        validator:
+          gte: 0
+          lte: 100
+        optional: true
       numWritesTargetedAllShards:
         type: long
         cpp_name: numTargetedAllShards
         validator: { gte: 0 }
+        optional: true
+      percentageOfWritesTargetedAllShards:
+        type: double
+        cpp_name: percentageOfTargetedAllShards
+        validator:
+          gte: 0
+          lte: 100
         optional: true
       numDispatchedWritesByRange:
         type: array<long>
@@ -192,13 +234,31 @@ structs:
         type: long
         validator: { gte: 0 }
         optional: true
+      percentageOfShardKeyUpdates:
+        type: long
+        validator:
+          gte: 0
+          lte: 100
+        optional: true
       numSingleWritesWithoutShardKey:
         type: long
         validator: { gte: 0 }
         optional: true
+      percentageOfSingleWritesWithoutShardKey:
+        type: double
+        validator:
+          gte: 0
+          lte: 100
+        optional: true
       numMultiWritesWithoutShardKey:
         type: long
         validator: { gte: 0 }
+        optional: true
+      percentageOfMultiWritesWithoutShardKey:
+        type: double
+        validator:
+          gte: 0
+          lte: 100
         optional: true
 
   analyzeShardKeyResponse:

@@ -37,6 +37,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
+#include "mongo/s/analyze_shard_key_util.h"
 #include "mongo/unittest/death_test.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -63,9 +64,9 @@ struct WriteTargetMetricsBundle {
     int64_t numTargetedMultipleShards = 0;
     int64_t numTargetedAllShards = 0;
     std::vector<int64_t> numDispatchedByRange;
+    int64_t numShardKeyUpdates = 0;
     int64_t numSingleWritesWithoutShardKey = 0;
     int64_t numMultiWritesWithoutShardKey = 0;
-    int64_t numShardKeyUpdates = 0;
 };
 
 struct ChunkSplitInfo {
@@ -196,10 +197,22 @@ protected:
         readDistributionCalculator.addQuery(operationContext(), queryDoc);
 
         auto metrics = readDistributionCalculator.getMetrics();
+        auto expectedNumTotal = expectedMetrics.numTargetedOneShard +
+            expectedMetrics.numTargetedMultipleShards + expectedMetrics.numTargetedAllShards;
+
         ASSERT_EQ(*metrics.getNumTargetedOneShard(), expectedMetrics.numTargetedOneShard);
+        ASSERT_EQ(*metrics.getPercentageOfTargetedOneShard(),
+                  calculatePercentage(expectedMetrics.numTargetedOneShard, expectedNumTotal));
+
         ASSERT_EQ(*metrics.getNumTargetedMultipleShards(),
                   expectedMetrics.numTargetedMultipleShards);
+        ASSERT_EQ(*metrics.getPercentageOfTargetedMultipleShards(),
+                  calculatePercentage(expectedMetrics.numTargetedMultipleShards, expectedNumTotal));
+
         ASSERT_EQ(*metrics.getNumTargetedAllShards(), expectedMetrics.numTargetedAllShards);
+        ASSERT_EQ(*metrics.getPercentageOfTargetedAllShards(),
+                  calculatePercentage(expectedMetrics.numTargetedAllShards, expectedNumTotal));
+
         ASSERT_EQ(*metrics.getNumDispatchedByRange(), expectedMetrics.numDispatchedByRange);
     }
 
@@ -210,16 +223,39 @@ protected:
         writeDistributionCalculator.addQuery(operationContext(), queryDoc);
 
         auto metrics = writeDistributionCalculator.getMetrics();
+        auto expectedNumTotal = expectedMetrics.numTargetedOneShard +
+            expectedMetrics.numTargetedMultipleShards + expectedMetrics.numTargetedAllShards;
+
         ASSERT_EQ(*metrics.getNumTargetedOneShard(), expectedMetrics.numTargetedOneShard);
+        ASSERT_EQ(*metrics.getPercentageOfTargetedOneShard(),
+                  calculatePercentage(expectedMetrics.numTargetedOneShard, expectedNumTotal));
+
         ASSERT_EQ(*metrics.getNumTargetedMultipleShards(),
                   expectedMetrics.numTargetedMultipleShards);
+        ASSERT_EQ(*metrics.getPercentageOfTargetedMultipleShards(),
+                  calculatePercentage(expectedMetrics.numTargetedMultipleShards, expectedNumTotal));
+
         ASSERT_EQ(*metrics.getNumTargetedAllShards(), expectedMetrics.numTargetedAllShards);
+        ASSERT_EQ(*metrics.getPercentageOfTargetedAllShards(),
+                  calculatePercentage(expectedMetrics.numTargetedAllShards, expectedNumTotal));
+
         ASSERT_EQ(*metrics.getNumDispatchedByRange(), expectedMetrics.numDispatchedByRange);
+
+        ASSERT_EQ(*metrics.getNumShardKeyUpdates(), expectedMetrics.numShardKeyUpdates);
+        ASSERT_EQ(*metrics.getPercentageOfShardKeyUpdates(),
+                  calculatePercentage(expectedMetrics.numShardKeyUpdates, expectedNumTotal));
+
         ASSERT_EQ(*metrics.getNumSingleWritesWithoutShardKey(),
                   expectedMetrics.numSingleWritesWithoutShardKey);
+        ASSERT_EQ(
+            *metrics.getPercentageOfSingleWritesWithoutShardKey(),
+            calculatePercentage(expectedMetrics.numSingleWritesWithoutShardKey, expectedNumTotal));
+
         ASSERT_EQ(*metrics.getNumMultiWritesWithoutShardKey(),
                   expectedMetrics.numMultiWritesWithoutShardKey);
-        ASSERT_EQ(*metrics.getNumShardKeyUpdates(), expectedMetrics.numShardKeyUpdates);
+        ASSERT_EQ(
+            *metrics.getPercentageOfMultiWritesWithoutShardKey(),
+            calculatePercentage(expectedMetrics.numMultiWritesWithoutShardKey, expectedNumTotal));
     }
 
     const NamespaceString nss{"testDb", "testColl"};
@@ -1497,6 +1533,138 @@ TEST_F(WriteDistributionNotFilterByShardKeyReplacementUpdateTest, Upsert) {
                                 << "c" << 0);
     assertTargetMetrics(targeter,
                         makeSampledUpdateQueryDocument(filter, updateMod, true /* upsert */));
+}
+
+TEST(ReadDistributionMetricsTest, AddOperator) {
+    ReadDistributionMetrics metrics0;
+
+    ReadSampleSize sampleSize0;
+    sampleSize0.setFind(1);
+    sampleSize0.setAggregate(2);
+    sampleSize0.setCount(3);
+    sampleSize0.setDistinct(4);
+    auto numTotal0 = 1 + 2 + 3 + 4;
+    sampleSize0.setTotal(numTotal0);
+
+    metrics0.setSampleSize(sampleSize0);
+    metrics0.setNumTargetedOneShard(1);
+    metrics0.setNumTargetedMultipleShards(2);
+    metrics0.setNumTargetedAllShards(3);
+    metrics0.setNumDispatchedByRange(std::vector<int64_t>{1, 2, 3});
+
+    ReadDistributionMetrics metrics1;
+
+    ReadSampleSize sampleSize1;
+    sampleSize1.setFind(10);
+    sampleSize1.setAggregate(20);
+    sampleSize1.setCount(30);
+    sampleSize1.setDistinct(40);
+    auto numTotal1 = 10 + 20 + 30 + 40;
+    sampleSize1.setTotal(numTotal1);
+
+    metrics1.setSampleSize(sampleSize1);
+    metrics1.setNumTargetedOneShard(10);
+    metrics1.setNumTargetedMultipleShards(20);
+    metrics1.setNumTargetedAllShards(30);
+    metrics1.setNumDispatchedByRange(std::vector<int64_t>{10, 20, 30});
+
+    ReadDistributionMetrics expectedMetrics;
+
+    ReadSampleSize expectedSampleSize;
+    expectedSampleSize.setFind(11);
+    expectedSampleSize.setAggregate(22);
+    expectedSampleSize.setCount(33);
+    expectedSampleSize.setDistinct(44);
+    auto expectedNumtotal = 11 + 22 + 33 + 44;
+    expectedSampleSize.setTotal(expectedNumtotal);
+    expectedMetrics.setSampleSize(expectedSampleSize);
+
+    expectedMetrics.setNumTargetedOneShard(11);
+    expectedMetrics.setPercentageOfTargetedOneShard(calculatePercentage(11, expectedNumtotal));
+
+    expectedMetrics.setNumTargetedMultipleShards(22);
+    expectedMetrics.setPercentageOfTargetedMultipleShards(
+        calculatePercentage(22, expectedNumtotal));
+
+    expectedMetrics.setNumTargetedAllShards(33);
+    expectedMetrics.setPercentageOfTargetedAllShards(calculatePercentage(33, expectedNumtotal));
+
+    expectedMetrics.setNumDispatchedByRange(std::vector<int64_t>{11, 22, 33});
+
+    ASSERT((metrics0 + metrics1) == expectedMetrics);
+}
+
+TEST(WriteDistributionMetricsTest, AddOperator) {
+    WriteDistributionMetrics metrics0;
+
+    WriteSampleSize sampleSize0;
+    sampleSize0.setUpdate(1);
+    sampleSize0.setDelete(2);
+    sampleSize0.setFindAndModify(3);
+    auto numTotal0 = 1 + 2 + 3;
+    sampleSize0.setTotal(numTotal0);
+    metrics0.setSampleSize(sampleSize0);
+
+    metrics0.setNumTargetedOneShard(1);
+    metrics0.setNumTargetedMultipleShards(2);
+    metrics0.setNumTargetedAllShards(3);
+    metrics0.setNumDispatchedByRange(std::vector<int64_t>{1, 2, 3});
+    metrics0.setNumShardKeyUpdates(1);
+    metrics0.setNumSingleWritesWithoutShardKey(2);
+    metrics0.setNumMultiWritesWithoutShardKey(3);
+
+    WriteDistributionMetrics metrics1;
+
+    WriteSampleSize sampleSize1;
+    sampleSize1.setUpdate(10);
+    sampleSize1.setDelete(20);
+    sampleSize1.setFindAndModify(30);
+    auto numTotal1 = 10 + 20 + 30;
+    sampleSize1.setTotal(numTotal1);
+    metrics1.setSampleSize(sampleSize1);
+
+    metrics1.setNumTargetedOneShard(10);
+    metrics1.setNumTargetedMultipleShards(20);
+    metrics1.setNumTargetedAllShards(30);
+    metrics1.setNumDispatchedByRange(std::vector<int64_t>{10, 20, 30});
+    metrics1.setNumShardKeyUpdates(10);
+    metrics1.setNumSingleWritesWithoutShardKey(20);
+    metrics1.setNumMultiWritesWithoutShardKey(30);
+
+    WriteDistributionMetrics expectedMetrics;
+
+    WriteSampleSize expectedSampleSize;
+    expectedSampleSize.setUpdate(11);
+    expectedSampleSize.setDelete(22);
+    expectedSampleSize.setFindAndModify(33);
+    auto expectedNumtotal = 11 + 22 + 33;
+    expectedSampleSize.setTotal(expectedNumtotal);
+    expectedMetrics.setSampleSize(expectedSampleSize);
+
+    expectedMetrics.setNumTargetedOneShard(11);
+    expectedMetrics.setPercentageOfTargetedOneShard(calculatePercentage(11, expectedNumtotal));
+
+    expectedMetrics.setNumTargetedMultipleShards(22);
+    expectedMetrics.setPercentageOfTargetedMultipleShards(
+        calculatePercentage(22, expectedNumtotal));
+
+    expectedMetrics.setNumTargetedAllShards(33);
+    expectedMetrics.setPercentageOfTargetedAllShards(calculatePercentage(33, expectedNumtotal));
+
+    expectedMetrics.setNumDispatchedByRange(std::vector<int64_t>{11, 22, 33});
+
+    expectedMetrics.setNumShardKeyUpdates(11);
+    expectedMetrics.setPercentageOfShardKeyUpdates(calculatePercentage(11, expectedNumtotal));
+
+    expectedMetrics.setNumSingleWritesWithoutShardKey(22);
+    expectedMetrics.setPercentageOfSingleWritesWithoutShardKey(
+        calculatePercentage(22, expectedNumtotal));
+
+    expectedMetrics.setNumMultiWritesWithoutShardKey(33);
+    expectedMetrics.setPercentageOfMultiWritesWithoutShardKey(
+        calculatePercentage(33, expectedNumtotal));
+
+    ASSERT((metrics0 + metrics1) == expectedMetrics);
 }
 
 }  // namespace
