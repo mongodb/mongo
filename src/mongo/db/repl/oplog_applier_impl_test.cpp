@@ -58,6 +58,7 @@
 #include "mongo/db/repl/idempotency_test_fixture.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_applier.h"
+#include "mongo/db/repl/oplog_batcher.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
@@ -1954,6 +1955,43 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyAbortPreparedTransactio
     getStorageInterface()->oplogDiskLocRegister(
         _opCtx.get(), _abortPrepareWithPrevOp->getTimestamp(), true);
     ASSERT_OK(oplogApplier.applyOplogBatch(_opCtx.get(), {*_abortPrepareWithPrevOp}));
+    ASSERT_BSONOBJ_EQ(_abortPrepareWithPrevOp->getEntry().toBSON(), oplogDocs().back());
+    ASSERT_EQ(1U, _insertedDocs[_nss1].size());
+    ASSERT_EQ(2U, _insertedDocs[_nss2].size());
+    checkTxnTable(_lsid,
+                  _txnNum,
+                  _abortPrepareWithPrevOp->getOpTime(),
+                  _abortPrepareWithPrevOp->getWallClockTime(),
+                  boost::none,
+                  DurableTxnStateEnum::kAborted);
+}
+
+TEST_F(MultiOplogEntryPreparedTransactionTest,
+       MultiApplyAbortPreparedTransactionCheckTxnTableSingleBatch) {
+    NoopOplogApplierObserver observer;
+    OplogApplierImpl oplogApplier(
+        nullptr,  // executor
+        nullptr,  // oplogBuffer
+        &observer,
+        ReplicationCoordinator::get(_opCtx.get()),
+        getConsistencyMarkers(),
+        getStorageInterface(),
+        repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+        _writerPool.get());
+
+    // Apply a batch with the entire lifecyle of the prepared transaction - this includes the
+    // insert operations with the subsequent commands to prepare and abort the transaction.
+    // Note that this combination of operations (applyOps, commitTransaction, and abortTransaction)
+    // in the same batch is not permissible under current oplog batching rules.
+    // See OplogBatcher::mustProcessIndividually().
+    ASSERT_FALSE(OplogBatcher::mustProcessIndividually(*_insertOp1));
+    ASSERT_FALSE(OplogBatcher::mustProcessIndividually(*_insertOp2));
+    ASSERT(OplogBatcher::mustProcessIndividually(*_prepareWithPrevOp));
+    ASSERT(OplogBatcher::mustProcessIndividually(*_abortPrepareWithPrevOp));
+    getStorageInterface()->oplogDiskLocRegister(
+        _opCtx.get(), _abortPrepareWithPrevOp->getTimestamp(), true);
+    ASSERT_OK(oplogApplier.applyOplogBatch(
+        _opCtx.get(), {*_insertOp1, *_insertOp2, *_prepareWithPrevOp, *_abortPrepareWithPrevOp}));
     ASSERT_BSONOBJ_EQ(_abortPrepareWithPrevOp->getEntry().toBSON(), oplogDocs().back());
     ASSERT_EQ(1U, _insertedDocs[_nss1].size());
     ASSERT_EQ(2U, _insertedDocs[_nss2].size());
