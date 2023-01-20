@@ -34,6 +34,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/repl/change_stream_oplog_notification.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/shard_metadata_util.h"
 #include "mongo/db/s/sharding_logging.h"
@@ -341,6 +342,8 @@ Status MovePrimarySourceManager::_commitOnConfig(OperationContext* opCtx,
                 "toShard"_attr = _toShard,
                 "expectedDbVersion"_attr = expectedDbVersion);
 
+    notifyChangeStreamsOnMovePrimary(opCtx, getNss().dbName(), _fromShard, _toShard);
+
     const auto commitStatus = [&] {
         ConfigsvrCommitMovePrimary commitRequest(_dbname, expectedDbVersion, _toShard);
         commitRequest.setDbName(NamespaceString::kAdminDb);
@@ -373,6 +376,9 @@ Status MovePrimarySourceManager::_commitOnConfig(OperationContext* opCtx,
               "Error committing movePrimary",
               "db"_attr = _dbname,
               "error"_attr = redact(commitStatus));
+        // Try to emit a second notification to reverse the effect of the one notified before the
+        // commit attempt.
+        notifyChangeStreamsOnMovePrimary(opCtx, getNss().dbName(), _toShard, _fromShard);
         return commitStatus;
     }
 

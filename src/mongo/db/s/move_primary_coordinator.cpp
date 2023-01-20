@@ -36,6 +36,7 @@
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands/list_collections_filter.h"
+#include "mongo/db/repl/change_stream_oplog_notification.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
@@ -212,6 +213,9 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                         _dbName.toString()));
 
                 assertChangedMetadataOnConfig(opCtx, preCommitDbVersion);
+
+                notifyChangeStreamsOnMovePrimary(
+                    opCtx, _dbName, ShardingState::get(opCtx)->shardId(), _doc.getToShardId());
 
                 // Checkpoint the vector clock to ensure causality in the event of a crash or
                 // shutdown.
