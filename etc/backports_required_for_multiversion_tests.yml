@@ -88,6 +88,8 @@ last-continuous:
     ticket: SERVER-68628
   - test_file: jstests/sharding/move_chunk_interrupt_postimage.js
     ticket: SERVER-68728
+  - test_file: jstests/sharding/move_chunk_concurrent_cloning.js
+    ticket: SERVER-68648
   suites:
     change_streams_multiversion_passthrough: null
     change_streams_sharded_collections_multiversion_passthrough: null
@@ -273,6 +275,8 @@ last-lts:
     ticket: SERVER-68628
   - test_file: jstests/sharding/move_chunk_interrupt_postimage.js
     ticket: SERVER-68728
+  - test_file: jstests/sharding/move_chunk_concurrent_cloning.js
+    ticket: SERVER-68648
   suites:
     change_streams_multiversion_passthrough: null
     change_streams_sharded_collections_multiversion_passthrough: null

@@ -1,5 +1,8 @@
 /**
- * @tags: [featureFlagConcurrencyInChunkMigration]
+ * @tags: [
+ *   featureFlagConcurrencyInChunkMigration,
+ *   requires_fcv_50,
+ * ]
  */
 (function() {
 "use strict";
@@ -10,7 +13,7 @@ const runParallelMoveChunk = (numThreads) => {
     // For startParallelOps to write its state
     let staticMongod = MongoRunner.runMongod({});
 
-    let st = new ShardingTest({shards: 2});
+    let st = new ShardingTest({shards: 2, other: {chunkSize: 512}});
     st.stopBalancer();
 
     const kThreadCount = numThreads;
