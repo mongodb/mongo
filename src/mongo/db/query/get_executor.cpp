@@ -805,6 +805,13 @@ public:
         return buildMultiPlan(std::move(solutions));
     }
 
+    /**
+     * Returns the planner params if initialized, otherwise returns nullptr.
+     */
+    const QueryPlannerParams* plannerParams() const {
+        return _plannerParamsInitialized ? &_plannerParams : nullptr;
+    }
+
 protected:
     static constexpr bool ShouldDeferExecutionTreeGeneration = DeferExecutionTreeGeneration;
 
@@ -1470,11 +1477,22 @@ bool shouldPlanningResultUseSbe(bool sbeFull,
 }
 
 /**
- * Checks the index catalog for the main collection and returns true if a non-hidden column store
- * index is found.
+ * Returns true if the query *may* be eligible for column scan. This requires two conditions:
+ *
+ * 1) query has a column scan-eligible projection, i.e. an inclusion projection or is count-like
+ * 2) there is a column store index present on the main collection
+ *
+ * These checks are an optimization in cases where we can determine without query planning that a
+ * query doesn't meet other SBE requirements, and definitely can't use column scan.
  */
-bool isColumnStoreIndexPresent(OperationContext* opCtx,
-                               const MultipleCollectionAccessor& collections) {
+bool maybeQueryIsColumnScanEligible(OperationContext* opCtx,
+                                    const MultipleCollectionAccessor& collections,
+                                    const CanonicalQuery* cq) {
+    if (!cq->isCountLike() && (!cq->getProj() || cq->getProj()->isExclusionOnly())) {
+        // The query's projection makes it automatically ineligible for column scan.
+        return false;
+    }
+
     if (const auto& mainColl = collections.getMainCollection()) {
         std::vector<const IndexDescriptor*> csiIndexes;
         mainColl->getIndexCatalog()->findIndexByType(opCtx, IndexNames::COLUMN, csiIndexes);
@@ -1511,25 +1529,26 @@ attemptToGetSlotBasedExecutor(
         extractAndAttachPipelineStages(canonicalQuery.get(), true /* attachOnly */);
     }
 
-    // Create the SBE prepare execution helper and initialize the params for the planner. Our
-    // decision about using SBE will depend on whether there is a column index present.
-    auto sbeYieldPolicy = makeSbeYieldPolicy(
-        opCtx, yieldPolicy, &collections.getMainCollection(), canonicalQuery->nss());
-    SlotBasedPrepareExecutionHelper helper{
-        opCtx, collections, canonicalQuery.get(), sbeYieldPolicy.get(), plannerParams.options};
-
-    const bool csiPresent = isColumnStoreIndexPresent(opCtx, collections);
     const bool sbeFull = feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV();
     const bool aggSpecificStagesPushedDown = !canonicalQuery->pipeline().empty();
 
-    // Attempt to use SBE if we find any $group/$lookup stages eligible for execution in SBE, if a
-    // column index is present or if SBE is fully enabled. Otherwise, fallback to the classic
-    // engine right away.
-    if (aggSpecificStagesPushedDown || csiPresent || sbeFull) {
+    // Attempt to use SBE if we find any $group/$lookup stages eligible for execution in SBE, if the
+    // query may be eligible for column scan, or if SBE is fully enabled. Otherwise, fallback to the
+    // classic engine right away.
+    if (aggSpecificStagesPushedDown || sbeFull ||
+        maybeQueryIsColumnScanEligible(opCtx, collections, canonicalQuery.get())) {
+        auto sbeYieldPolicy = makeSbeYieldPolicy(
+            opCtx, yieldPolicy, &collections.getMainCollection(), canonicalQuery->nss());
+        SlotBasedPrepareExecutionHelper helper{
+            opCtx, collections, canonicalQuery.get(), sbeYieldPolicy.get(), plannerParams.options};
+
         auto planningResultWithStatus = helper.prepare();
         if (!planningResultWithStatus.isOK()) {
             return planningResultWithStatus.getStatus();
         }
+
+        const bool csiPresent =
+            helper.plannerParams() && !helper.plannerParams()->columnStoreIndexes.empty();
 
         if (shouldPlanningResultUseSbe(sbeFull,
                                        csiPresent,
