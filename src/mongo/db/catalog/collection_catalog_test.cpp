@@ -954,14 +954,16 @@ public:
                                                  expectedNumIndexes);
     }
 
-    void concurrentRenameCollectionAndOpenCollection(OperationContext* opCtx,
-                                                     const NamespaceString& from,
-                                                     const NamespaceString& to,
-                                                     const NamespaceString& lookupNss,
-                                                     Timestamp timestamp,
-                                                     bool openSnapshotBeforeCommit,
-                                                     bool expectedExistence,
-                                                     int expectedNumIndexes) {
+    void concurrentRenameCollectionAndOpenCollection(
+        OperationContext* opCtx,
+        const NamespaceString& from,
+        const NamespaceString& to,
+        const NamespaceString& lookupNss,
+        Timestamp timestamp,
+        bool openSnapshotBeforeCommit,
+        bool expectedExistence,
+        int expectedNumIndexes,
+        std::function<void()> verifyStateCallback = {}) {
         _concurrentDDLOperationAndOpenCollection(
             opCtx,
             lookupNss,
@@ -971,7 +973,8 @@ public:
             },
             openSnapshotBeforeCommit,
             expectedExistence,
-            expectedNumIndexes);
+            expectedNumIndexes,
+            std::move(verifyStateCallback));
     }
 
     void concurrentCreateIndexAndOpenCollection(OperationContext* opCtx,
@@ -1143,7 +1146,8 @@ private:
                                                   Callable&& ddlOperation,
                                                   bool openSnapshotBeforeCommit,
                                                   bool expectedExistence,
-                                                  int expectedNumIndexes) {
+                                                  int expectedNumIndexes,
+                                                  std::function<void()> verifyStateCallback = {}) {
         mongo::Mutex mutex;
         stdx::condition_variable cv;
         int numCalls = 0;
@@ -1196,6 +1200,9 @@ private:
         // Perform the openCollection lookup.
         OneOffRead oor(opCtx, Timestamp());
         Lock::GlobalLock globalLock(opCtx, MODE_IS);
+        // Stash the catalog so we may perform multiple lookups that will be in sync with our
+        // snapshot
+        CollectionCatalog::stash(opCtx, CollectionCatalog::get(opCtx));
         CollectionPtr coll = CollectionCatalog::get(opCtx)->openCollection(opCtx, nss, boost::none);
 
         // Notify the thread that our openCollection lookup is done.
@@ -1211,6 +1218,14 @@ private:
             ASSERT(coll);
 
             ASSERT_EQ(coll->ns(), nss);
+            // Check that lookup returns the same instance as openCollection above
+            ASSERT_EQ(
+                CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, coll->ns()).get(),
+                coll.get());
+            ASSERT_EQ(
+                CollectionCatalog::get(opCtx)->lookupCollectionByUUID(opCtx, coll->uuid()).get(),
+                coll.get());
+            ASSERT_EQ(CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, coll->uuid()), nss);
             ASSERT_EQ(coll->getIndexCatalog()->numIndexesTotal(), expectedNumIndexes);
 
             auto catalogEntry =
@@ -1238,6 +1253,10 @@ private:
             ASSERT_EQ(
                 CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(opCtx, nss).get(),
                 coll.get());
+        }
+
+        if (verifyStateCallback) {
+            verifyStateCallback();
         }
     }
 };
@@ -2978,11 +2997,25 @@ TEST_F(CollectionCatalogTimestampTest,
     const Timestamp renameCollectionTs = Timestamp(20, 20);
 
     createCollection(opCtx.get(), originalNss, createCollectionTs);
+    UUID uuid = CollectionCatalog::get(opCtx.get())
+                    ->lookupCollectionByNamespace(opCtx.get(), originalNss)
+                    ->uuid();
 
     // When the snapshot is opened right after the rename is committed to the durable catalog, and
     // the openCollection looks for the originalNss, no collection instance should be returned.
     concurrentRenameCollectionAndOpenCollection(
-        opCtx.get(), originalNss, newNss, originalNss, renameCollectionTs, false, false, 0);
+        opCtx.get(), originalNss, newNss, originalNss, renameCollectionTs, false, false, 0, [&]() {
+            // Verify that we can find the Collection when we search by UUID when the setup occured
+            // during concurrent rename (rename is not affecting UUID), even if we can't find it by
+            // namespace.
+            auto coll =
+                CollectionCatalog::get(opCtx.get())->lookupCollectionByUUID(opCtx.get(), uuid);
+            ASSERT(coll);
+            ASSERT_EQ(coll->ns(), newNss);
+
+            ASSERT_EQ(CollectionCatalog::get(opCtx.get())->lookupNSSByUUID(opCtx.get(), uuid),
+                      newNss);
+        });
 }
 
 TEST_F(CollectionCatalogTimestampTest,
@@ -2996,11 +3029,25 @@ TEST_F(CollectionCatalogTimestampTest,
     const Timestamp renameCollectionTs = Timestamp(20, 20);
 
     createCollection(opCtx.get(), originalNss, createCollectionTs);
+    UUID uuid = CollectionCatalog::get(opCtx.get())
+                    ->lookupCollectionByNamespace(opCtx.get(), originalNss)
+                    ->uuid();
 
     // When the snapshot is opened right before the rename is committed to the durable catalog, and
     // the openCollection looks for the newNss, no collection instance should be returned.
     concurrentRenameCollectionAndOpenCollection(
-        opCtx.get(), originalNss, newNss, newNss, renameCollectionTs, true, false, 0);
+        opCtx.get(), originalNss, newNss, newNss, renameCollectionTs, true, false, 0, [&]() {
+            // Verify that we can find the Collection when we search by UUID when the setup occured
+            // during concurrent rename (rename is not affecting UUID), even if we can't find it by
+            // namespace.
+            auto coll =
+                CollectionCatalog::get(opCtx.get())->lookupCollectionByUUID(opCtx.get(), uuid);
+            ASSERT(coll);
+            ASSERT_EQ(coll->ns(), originalNss);
+
+            ASSERT_EQ(CollectionCatalog::get(opCtx.get())->lookupNSSByUUID(opCtx.get(), uuid),
+                      originalNss);
+        });
 }
 
 TEST_F(CollectionCatalogTimestampTest,

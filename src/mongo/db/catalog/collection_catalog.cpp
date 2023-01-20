@@ -803,9 +803,41 @@ CollectionPtr CollectionCatalog::openCollection(OperationContext* opCtx,
         // must be non-nullptr and must contain a uuid.
         auto uuid = pendingCollection ? pendingCollection->uuid() : latestCollection->uuid();
 
-        if (catalogEntry.isEmpty() ||
-            nss != DurableCatalog::getNamespaceFromCatalogEntry(catalogEntry)) {
+        // If the catalog entry is not found in our snapshot then the collection is being dropped
+        // and we can observe the drop. Lookups by this namespace or uuid should not find a
+        // collection.
+        if (catalogEntry.isEmpty()) {
             openedCollections.store(nullptr, nss, uuid);
+            return CollectionPtr();
+        }
+
+        // If the catalog entry has a different namespace in our snapshot, then there is a rename
+        // operation concurrent with this call. We need to store entries under uncommitted catalog
+        // changes for two namespaces (rename 'from' and 'to') so we can make sure lookups by UUID
+        // is supported and will return a Collection with its namespace in sync with the storage
+        // snapshot.
+        NamespaceString nsInDurableCatalog =
+            DurableCatalog::getNamespaceFromCatalogEntry(catalogEntry);
+        if (nss != nsInDurableCatalog) {
+            // Like above, the correct instance is either in the catalog or under pending. First
+            // lookup in pending by UUID to determine if it contains the right namespace.
+            auto itUUID = _pendingCommitUUIDs.find(uuid);
+            invariant(itUUID != _pendingCommitUUIDs.end());
+            const auto& pendingCollectionByUUID = itUUID->second;
+            if (pendingCollectionByUUID->ns() == nsInDurableCatalog) {
+                openedCollections.store(
+                    pendingCollectionByUUID, pendingCollectionByUUID->ns(), uuid);
+            } else {
+                // If pending by UUID does not contain the right namespace, a regular lookup in the
+                // catalog by UUID should have it.
+                auto latestCollectionByUUID = lookupCollectionByUUIDForRead(opCtx, uuid);
+                invariant(latestCollectionByUUID &&
+                          latestCollectionByUUID->ns() == nsInDurableCatalog);
+                openedCollections.store(latestCollectionByUUID, latestCollectionByUUID->ns(), uuid);
+            }
+
+            // Last, mark 'nss' as not existing
+            openedCollections.store(nullptr, nss, boost::none);
             return CollectionPtr();
         }
 
