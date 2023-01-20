@@ -94,6 +94,7 @@ let testCases = {
     _configsvrCommitChunkMigration: {skip: "internal command"},
     _configsvrCommitChunkSplit: {skip: "internal command"},
     _configsvrCommitIndex: {skip: "internal command"},
+    _configsvrCommitMergeAllChunksOnShard: {skip: "internal command"},
     _configsvrCommitMovePrimary: {skip: "internal command"},  // Can be removed once 6.0 is last LTS
     _configsvrCommitReshardCollection: {skip: "internal command"},
     _configsvrConfigureCollectionBalancing: {skip: "internal command"},
@@ -162,6 +163,7 @@ let testCases = {
     _shardsvrDeleteGlobalIndexKey: {skip: "internal command"},
     _shardsvrWriteGlobalIndexKeys: {skip: "internal command"},
     _shardsvrJoinMigrations: {skip: "internal command"},
+    _shardsvrMergeAllChunksOnShard: {skip: "internal command"},
     _shardsvrMovePrimary: {skip: "internal command"},
     _shardsvrMoveRange: {
         skip:
@@ -569,6 +571,7 @@ let testCases = {
     logout: {skip: "does not accept read or write concern"},
     makeSnapshot: {skip: "does not accept read or write concern"},
     mapReduce: {skip: "does not accept read or write concern"},
+    mergeAllChunksOnShard: {skip: "does not accept read or write concern"},
     mergeChunks: {skip: "does not accept read or write concern"},
     moveChunk: {
         skip:

@@ -54,6 +54,7 @@ const allCommands = {
     _configsvrCommitChunkMigration: {skip: isAnInternalCommand},
     _configsvrCommitChunkSplit: {skip: isAnInternalCommand},
     _configsvrCommitIndex: {skip: isAnInternalCommand},
+    _configsvrCommitMergeAllChunksOnShard: {skip: isAnInternalCommand},
     _configsvrCommitMovePrimary: {skip: isAnInternalCommand},
     _configsvrCommitReshardCollection: {skip: isAnInternalCommand},
     _configsvrConfigureCollectionBalancing: {skip: isAnInternalCommand},
@@ -115,6 +116,7 @@ const allCommands = {
     _shardsvrDeleteGlobalIndexKey: {skip: isAnInternalCommand},
     _shardsvrWriteGlobalIndexKeys: {skip: isAnInternalCommand},
     _shardsvrJoinMigrations: {skip: isAnInternalCommand},
+    _shardsvrMergeAllChunksOnShard: {skip: isAnInternalCommand},
     _shardsvrMovePrimary: {skip: isAnInternalCommand},
     _shardsvrMoveRange: {skip: isAnInternalCommand},
     _shardsvrRenameCollection: {skip: isAnInternalCommand},
@@ -867,6 +869,10 @@ const allCommands = {
             assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
         },
     },
+    mergeAllChunksOnShard: {
+        skip: isNotImplementedYet,
+        isShardedOnly: true,
+    },
     mergeChunks: {
         // TODO SERVER-69753: Unskip this command when we can test with sharded clusters.
         skip: isNotImplementedYet,
@@ -1230,10 +1236,10 @@ let runAllCommandsTest = function(test, conn) {
     if (typeof (test.setUp) === "function") {
         let setUpRes = test.setUp(conn);
 
-        // For some commands (such as killSessions) the command requires information that is created
-        // during the setUp portion (such as a session ID), so we need to create the command in
-        // setUp. We set the command to an empty object in order to indicate that the command
-        // created in setUp should be used instead.
+        // For some commands (such as killSessions) the command requires information that is
+        // created during the setUp portion (such as a session ID), so we need to create the
+        // command in setUp. We set the command to an empty object in order to indicate that
+        // the command created in setUp should be used instead.
         if (Object.keys(test.command).length === 0) {
             cmdObj = setUpRes;
         }

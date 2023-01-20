@@ -53,6 +53,7 @@ let testCases = {
     _configsvrCommitChunkMigration: {skip: "primary only"},
     _configsvrCommitChunkSplit: {skip: "primary only"},
     _configsvrCommitIndex: {skip: "primary only"},
+    _configsvrCommitMergeAllChunksOnShard: {skip: "primary only"},
     _configsvrConfigureCollectionBalancing: {skip: "primary only"},
     _configsvrDropIndexCatalogEntry: {skip: "primary only"},
     _configsvrMoveChunk: {skip: "primary only"},
@@ -78,6 +79,7 @@ let testCases = {
     _shardsvrCheckMetadataConsistency: {skip: "internal command"},
     _shardsvrCheckMetadataConsistencyParticipant: {skip: "internal command"},
     _shardsvrCompactStructuredEncryptionData: {skip: "primary only"},
+    _shardsvrMergeAllChunksOnShard: {skip: "primary only"},
     _shardsvrMovePrimary: {skip: "primary only"},
     _shardsvrMoveRange: {skip: "primary only"},
     _recvChunkAbort: {skip: "primary only"},
@@ -274,6 +276,7 @@ let testCases = {
         },
         behavior: "versioned"
     },
+    mergeAllChunksOnShard: {skip: "primary only"},
     mergeChunks: {skip: "primary only"},
     moveChunk: {skip: "primary only"},
     movePrimary: {skip: "primary only"},

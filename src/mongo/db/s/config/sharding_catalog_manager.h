@@ -295,10 +295,7 @@ public:
      * TODO SERVER-72283 add definition of "mergeable" related to `onCurrentShardSince`
      */
     StatusWith<ShardingCatalogManager::ShardAndCollectionVersion> commitMergeAllChunksOnShard(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        const UUID& collectionUUID,
-        const ShardId& shardId);
+        OperationContext* opCtx, const NamespaceString& nss, const ShardId& shardId);
 
 
     /**

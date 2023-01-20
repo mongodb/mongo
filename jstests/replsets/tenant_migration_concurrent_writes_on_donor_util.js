@@ -263,6 +263,7 @@ export const TenantMigrationConcurrentWriteUtil = {
         _configsvrCommitChunkMigration: {skip: isNotRunOnUserDatabase},
         _configsvrCommitChunkSplit: {skip: isNotRunOnUserDatabase},
         _configsvrCommitIndex: {skip: isNotRunOnUserDatabase},
+        _configsvrCommitMergeAllChunksOnShard: {skip: isNotRunOnUserDatabase},
         _configsvrCommitMovePrimary:
             {skip: isNotRunOnUserDatabase},  // Can be removed once 6.0 is last LTS
         _configsvrCreateDatabase: {skip: isNotRunOnUserDatabase},
@@ -587,6 +588,7 @@ export const TenantMigrationConcurrentWriteUtil = {
                 assert(!collectionExists(db, collName + "MrOut"));
             }
         },
+        mergeAllChunksOnShard: {skip: isNotRunOnUserDatabase},
         mergeChunks: {skip: isNotRunOnUserDatabase},
         moveChunk: {skip: isNotRunOnUserDatabase},
         ping: {skip: isNotRunOnUserDatabase},

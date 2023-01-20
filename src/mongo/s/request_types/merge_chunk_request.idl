@@ -26,8 +26,6 @@
 # it in the license file.
 #
 
-# _configsvrCommitChunksMerge IDL File
-
 global:
     cpp_namespace: "mongo"
     cpp_includes:
@@ -51,7 +49,7 @@ types:
 
 structs:
     ConfigSvrMergeResponse:
-        description: "Response of the _configsvrCommitChunksMerge command."
+        description: "Response of the _configsvrCommitChunksMerge and _configsvrCommitMergeAllChunksOnShard commands."
         strict: false
         is_command_reply: true
         fields:
@@ -89,3 +87,49 @@ commands:
                 description: "The expected timestamp of the collection that is being committed"
                 type: timestamp
                 optional: true
+    
+    clusterMergeAllChunksOnShard:
+        command_name: mergeAllChunksOnShard
+        cpp_name: ClusterMergeAllChunksOnShard
+        description: "Definition of the mergeAllChunksOnShard command called on routers."
+        namespace: type
+        type: namespacestring
+        api_version: ""
+        strict: false
+        fields:
+            shard:
+                description: "The id of the shard."
+                type: shard_id
+                validator:
+                    callback: "ShardId::validate"
+
+    _shardsvrMergeAllChunksOnShard:
+        command_name: _shardsvrMergeAllChunksOnShard
+        cpp_name: ShardSvrMergeAllChunksOnShard
+        description: "Definition of the mergeAllChunksOnShard command called on the shards."
+        namespace: type
+        type: namespacestring
+        api_version: ""
+        strict: false
+        fields:
+            shard:
+                description: "The id of the shard."
+                type: shard_id
+                validator:
+                    callback: "ShardId::validate"
+
+    _configsvrCommitMergeAllChunksOnShard:
+        command_name: _configsvrCommitMergeAllChunksOnShard
+        cpp_name: ConfigSvrCommitMergeAllChunksOnShard
+        description: "Definition of the mergeAllChunksOnShard command called on the config server."
+        namespace: type
+        type: namespacestring
+        api_version: ""
+        strict: false
+        reply_type: ConfigSvrMergeResponse
+        fields:
+            shard:
+                description: "The id of the shard."
+                type: shard_id
+                validator:
+                    callback: "ShardId::validate"

@@ -214,6 +214,7 @@ env.Library(
         'cluster_configure_query_analyzer_cmd.cpp',
         'cluster_control_balancer_cmd.cpp',
         'cluster_list_shards_cmd.cpp',
+        'cluster_merge_all_chunks_on_shard_cmd.cpp',
         'cluster_merge_chunks_cmd.cpp',
         'cluster_move_chunk_cmd.cpp',
         'cluster_move_range_cmd.cpp',

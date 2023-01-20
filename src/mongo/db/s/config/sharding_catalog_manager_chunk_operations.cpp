@@ -991,7 +991,6 @@ ShardingCatalogManager::commitChunksMerge(OperationContext* opCtx,
 StatusWith<ShardingCatalogManager::ShardAndCollectionVersion>
 ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
                                                     const NamespaceString& nss,
-                                                    const UUID& collectionUUID,
                                                     const ShardId& shardId) {
     // Mark opCtx as interruptible to ensure that all reads and writes to the metadata collections
     // under the exclusive _kChunkOpLock happen on the same term.
@@ -1070,7 +1069,7 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
     }
 
     // 4. Commit the new routing table changes to the sharding catalog.
-    mergeAllChunksOnShardInTransaction(opCtx, collectionUUID, shardId, newChunks);
+    mergeAllChunksOnShardInTransaction(opCtx, collUuid, shardId, newChunks);
 
     // TODO SERVER-71924 log merge operations in the changelog
 

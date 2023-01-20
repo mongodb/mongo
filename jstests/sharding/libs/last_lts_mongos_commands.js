@@ -29,6 +29,7 @@ const commandsAddedToMongosSinceLastLTS = [
     "configureQueryAnalyzer",  // TODO (SERVER-68977): Remove upgrade/downgrade for PM-1858.
     "coordinateCommitTransaction",
     "getClusterParameter",
+    "mergeAllChunksOnShard",
     "moveRange",
     "reshardCollection",
     "rotateCertificates",

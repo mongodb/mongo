@@ -878,9 +878,9 @@ TEST_F(MergeAllChunksOnShardTest, MergeAllChunksOnShard) {
     const auto chunksBeforeMerges = getChunks();
 
     for (const auto& shard : _shards) {
-        uassertStatusOK(ShardingCatalogManager::get(operationContext())
-                            ->commitMergeAllChunksOnShard(
-                                operationContext(), _nss, _collUuid, shard.getName()));
+        uassertStatusOK(
+            ShardingCatalogManager::get(operationContext())
+                ->commitMergeAllChunksOnShard(operationContext(), _nss, shard.getName()));
     }
 
     const auto chunksAfterMerges = getChunks();
