@@ -9,8 +9,6 @@
 (function() {
 'use strict';
 
-load("jstests/libs/feature_flag_util.js");  // for FeatureFlagUtil.isEnabled
-
 const testName = jsTestName();
 let dbName1 = testName + '1-1';
 let dbName2 = testName + '1-2';
@@ -48,11 +46,7 @@ let opEntries =
         .sort({$natural: -1})
         .toArray();
 
-if (!FeatureFlagUtil.isEnabled(db, "InternalWritesAreReplicatedTransactionally")) {
-    assert.eq(collCount, opEntries.length, "Should be one oplog entry per inserted document.");
-} else {
-    assert.eq(0, opEntries.length, "Should be no insert oplog entries.");
-}
+assert.eq(0, opEntries.length, "Should be no insert oplog entries.");
 
 opEntries = db.getSiblingDB('local')
                 .oplog.rs
@@ -60,17 +54,12 @@ opEntries = db.getSiblingDB('local')
                 .sort({$natural: -1})
                 .toArray();
 
-if (!FeatureFlagUtil.isEnabled(db, "InternalWritesAreReplicatedTransactionally")) {
-    jsTestLog(
-        "Skipping a few checks because the InternalWritesAreReplicatedTransactionally feature flag is not enabled.");
-} else {
-    let applyOpsOpEntries = opEntries[0].o.applyOps;
-    for (const op of applyOpsOpEntries) {
-        assert.eq(op.op, "i", "Each applyOps operation should be an insert");
-    }
-    assert.eq(
-        collCount, applyOpsOpEntries.length, "Should have " + collCount + " applyOps insert ops.");
+let applyOpsOpEntries = opEntries[0].o.applyOps;
+for (const op of applyOpsOpEntries) {
+    assert.eq(op.op, "i", "Each applyOps operation should be an insert");
 }
+assert.eq(
+    collCount, applyOpsOpEntries.length, "Should have " + collCount + " applyOps insert ops.");
 
 // Check prior collection gone
 assert(!db.getCollectionNames().includes(collName));
@@ -137,45 +126,40 @@ for (let i = 0; i < largeNumberOfDocsToExceedBatchCountLimit + 1; i++) {
 
 assert.commandWorked(db.adminCommand({renameCollection: srcNs, to: dstNs}));
 
-if (!FeatureFlagUtil.isEnabled(db, "InternalWritesAreReplicatedTransactionally")) {
-    jsTestLog(
-        "Skipping a few checks because the InternalWritesAreReplicatedTransactionally feature flag is not enabled.");
-} else {
-    // ns: rename_collection_across_dbs3-2-too-many-documents.tmp1h5Aj.renameCollection
-    opEntries =
-        db.getSiblingDB('local')
-            .oplog.rs.find({op: 'i', ns: {$regex: '^' + dbName2 + '\.tmp.{5}\.renameCollection$'}})
-            .sort({$natural: -1})
-            .toArray();
+// ns: rename_collection_across_dbs3-2-too-many-documents.tmp1h5Aj.renameCollection
+opEntries =
+    db.getSiblingDB('local')
+        .oplog.rs.find({op: 'i', ns: {$regex: '^' + dbName2 + '\.tmp.{5}\.renameCollection$'}})
+        .sort({$natural: -1})
+        .toArray();
 
-    assert.eq(opEntries.length, 1, "Spillover insert should have its own insert entry.");
+assert.eq(opEntries.length, 1, "Spillover insert should have its own insert entry.");
 
-    opEntries = db.getSiblingDB('local')
-                    .oplog.rs
-                    .find({
-                        op: 'c',
-                        ns: 'admin.$cmd',
-                        "o.applyOps": {$exists: true},
-                        "o.applyOps.ns": {$regex: '^' + dbName2 + '\.tmp.{5}\.renameCollection$'}
-                    })
-                    .sort({$natural: -1})
-                    .toArray();
+opEntries = db.getSiblingDB('local')
+                .oplog.rs
+                .find({
+                    op: 'c',
+                    ns: 'admin.$cmd',
+                    "o.applyOps": {$exists: true},
+                    "o.applyOps.ns": {$regex: '^' + dbName2 + '\.tmp.{5}\.renameCollection$'}
+                })
+                .sort({$natural: -1})
+                .toArray();
 
-    for (let i = 0; i < opEntries.length; i++) {
-        for (const op of opEntries[i]["o"]["applyOps"]) {
-            assert.eq(op.op, "i", "Each applyOps operation should be an insert.");
-        }
-        // Keep in mind there is also a limit on the total size of the documents not just
-        // the number of documents.
-        assert.eq(opEntries[i]['o']["applyOps"].length,
-                  maxInsertsCount,
-                  "Each batch should contain the maximum size of " + maxInsertsCount + "entries.");
+for (let i = 0; i < opEntries.length; i++) {
+    for (const op of opEntries[i]["o"]["applyOps"]) {
+        assert.eq(op.op, "i", "Each applyOps operation should be an insert.");
     }
-    assert.eq(largeNumberOfDocsToExceedBatchCountLimit / maxInsertsCount,
-              opEntries.length,
-              "Should be " + largeNumberOfDocsToExceedBatchCountLimit + "/" + maxInsertsCount +
-                  " insert oplog entries, in applyOps format.");
+    // Keep in mind there is also a limit on the total size of the documents not just
+    // the number of documents.
+    assert.eq(opEntries[i]['o']["applyOps"].length,
+              maxInsertsCount,
+              "Each batch should contain the maximum size of " + maxInsertsCount + "entries.");
 }
+assert.eq(largeNumberOfDocsToExceedBatchCountLimit / maxInsertsCount,
+          opEntries.length,
+          "Should be " + largeNumberOfDocsToExceedBatchCountLimit + "/" + maxInsertsCount +
+              " insert oplog entries, in applyOps format.");
 
 rst.stopSet();
 })();
