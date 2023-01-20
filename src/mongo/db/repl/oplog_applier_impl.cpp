@@ -43,6 +43,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/oplog_applier_utils.h"
+#include "mongo/db/repl/oplog_batcher.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/session/logical_session_id.h"
@@ -734,8 +735,9 @@ void OplogApplierImpl::_deriveOpsAndFillWriterVectors(
         }
 
         if (op.getCommandType() == OplogEntry::CommandType::kAbortTransaction) {
-            auto& partialTxnList = partialTxnOps[*op.getSessionId()];
-            partialTxnList.clear();
+            // Under current oplog batching rules, it is not possible for abortTransaction to
+            // be in the same batch as a preceding partial transaction applyOps oplog entry.
+            invariant(partialTxnOps.empty(), op.toStringForLogging());
         }
 
         // Extract applyOps operations and fill writers with extracted operations using this

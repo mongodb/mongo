@@ -1966,8 +1966,9 @@ TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyAbortPreparedTransactio
                   DurableTxnStateEnum::kAborted);
 }
 
-TEST_F(MultiOplogEntryPreparedTransactionTest,
-       MultiApplyAbortPreparedTransactionCheckTxnTableSingleBatch) {
+DEATH_TEST_REGEX_F(MultiOplogEntryPreparedTransactionTest,
+                   MultiApplyAbortPreparedTransactionCheckTxnTableSingleBatch,
+                   "Invariant.*partialTxnOps.*abortTransaction") {
     NoopOplogApplierObserver observer;
     OplogApplierImpl oplogApplier(
         nullptr,  // executor
@@ -1990,17 +1991,8 @@ TEST_F(MultiOplogEntryPreparedTransactionTest,
     ASSERT(OplogBatcher::mustProcessIndividually(*_abortPrepareWithPrevOp));
     getStorageInterface()->oplogDiskLocRegister(
         _opCtx.get(), _abortPrepareWithPrevOp->getTimestamp(), true);
-    ASSERT_OK(oplogApplier.applyOplogBatch(
-        _opCtx.get(), {*_insertOp1, *_insertOp2, *_prepareWithPrevOp, *_abortPrepareWithPrevOp}));
-    ASSERT_BSONOBJ_EQ(_abortPrepareWithPrevOp->getEntry().toBSON(), oplogDocs().back());
-    ASSERT_EQ(1U, _insertedDocs[_nss1].size());
-    ASSERT_EQ(2U, _insertedDocs[_nss2].size());
-    checkTxnTable(_lsid,
-                  _txnNum,
-                  _abortPrepareWithPrevOp->getOpTime(),
-                  _abortPrepareWithPrevOp->getWallClockTime(),
-                  boost::none,
-                  DurableTxnStateEnum::kAborted);
+    (void)oplogApplier.applyOplogBatch(
+        _opCtx.get(), {*_insertOp1, *_insertOp2, *_prepareWithPrevOp, *_abortPrepareWithPrevOp});
 }
 
 TEST_F(MultiOplogEntryPreparedTransactionTest, MultiApplyPreparedTransactionInitialSync) {
