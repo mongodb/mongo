@@ -363,7 +363,7 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
             }
 
             indexType = IndexNames::findPluginName(keyPattern);
-            if (apiStrict && indexType == IndexNames::TEXT) {
+            if (apiStrict && (indexType == IndexNames::TEXT || indexType == IndexNames::COLUMN)) {
                 return {ErrorCodes::APIStrictError,
                         str::stream()
                             << indexType << " indexes cannot be created with apiStrict: true"};

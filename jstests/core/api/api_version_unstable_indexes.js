@@ -1,19 +1,25 @@
 /**
  * Ensure the indexes excluded from API version 1 cannot be used for query planning with
- * "APIStrict: true". Currently, "geoHaystack", "text" and sparse indexes are excluded from API
- * version 1. Note "geoHaystack" index has been deprecated after 4.9.
+ * "APIStrict: true". Currently, "geoHaystack", "text", "columnstore", and sparse indexes are
+ * excluded from API version 1. Note "geoHaystack" index has been deprecated after 4.9.
  *
  * @tags: [
  *   uses_api_parameters,
  *   assumes_read_concern_local,
+ *   # the following tags are needed for the columnstore tests
+ *   requires_fcv_63,
+ *   tenant_migration_incompatible,
+ *   does_not_support_stepdowns,
+ *   not_allowed_with_security_token
  * ]
  */
 
 (function() {
 "use strict";
 
-load("jstests/libs/analyze_plan.js");     // For 'getWinningPlan'.
-load("jstests/libs/fixture_helpers.js");  // For 'isMongos'.
+load("jstests/libs/analyze_plan.js");      // For 'getWinningPlan'.
+load("jstests/libs/fixture_helpers.js");   // For 'isMongos'.
+load("jstests/libs/columnstore_util.js");  // For 'setUpServerForColumnStoreIndexTest'.
 
 const collName = "api_verision_unstable_indexes";
 const coll = db[collName];
@@ -58,5 +64,27 @@ if (!FixtureHelpers.isMongos(db)) {
     const explainRes = assert.commandWorked(
         db.runCommand({explain: {"find": collName, "filter": {views: 50}, "hint": {views: 1}}}));
     assert.eq(getWinningPlan(explainRes.queryPlanner).inputStage.indexName, "views_1", explainRes);
+}
+
+if (setUpServerForColumnStoreIndexTest(db)) {
+    // Column store indexes cannot be created with apiStrict: true.
+    assert.commandFailedWithCode(db.runCommand({
+        createIndexes: coll.getName(),
+        indexes: [{key: {"$**": "columnstore"}, name: "$**_columnstore"}],
+        apiVersion: "1",
+        apiStrict: true
+    }),
+                                 ErrorCodes.APIStrictError);
+
+    // Column store indexes cannot be used for query planning with apiStrict: true.
+    coll.createIndex({"$**": "columnstore"});
+    assert.commandFailedWithCode(db.runCommand({
+        "find": coll.getName(),
+        "projection": {_id: 0, x: 1},
+        "hint": {"$**": "columnstore"},
+        apiVersion: "1",
+        apiStrict: true
+    }),
+                                 ErrorCodes.BadValue);
 }
 })();

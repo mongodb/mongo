@@ -314,7 +314,7 @@ void fillOutIndexEntries(OperationContext* opCtx,
         auto indexType = ice->descriptor()->getIndexType();
         if (apiStrict &&
             (indexType == IndexType::INDEX_HAYSTACK || indexType == IndexType::INDEX_TEXT ||
-             ice->descriptor()->isSparse()))
+             indexType == IndexType::INDEX_COLUMN || ice->descriptor()->isSparse()))
             continue;
 
         // Skip the addition of hidden indexes to prevent use in query planning.
