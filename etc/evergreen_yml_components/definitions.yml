@@ -1624,6 +1624,8 @@ functions:
       - "./src/evergreen/do_watchdog_setup.sh"
 
   "run package test":
+  - *get_version_expansions
+  - *apply_version_expansions
   - *f_expansions_write
   - command: subprocess.exec
     type: test
@@ -1633,13 +1635,17 @@ functions:
       args:
       - "src/evergreen/run_python_script.sh"
       - "buildscripts/package_test.py"
-      - "--os=none"
       - "--arch=${packager_arch}"
-      - "--extra-test"
+      - "branch"
+      - "--test"
       - "${packager_distro}"
       - "https://s3.amazonaws.com/mciuploads/${project}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz"
+      - "--edition"
+      - "${repo_edition}"
+      - "--server-version"
+      - "${version}"
 
-  "run complete package test":
+  "run release package test":
   - *f_expansions_write
   - command: subprocess.exec
     type: test
@@ -1649,6 +1655,7 @@ functions:
       args:
       - "src/evergreen/run_python_script.sh"
       - "buildscripts/package_test.py"
+      - "release"
 
   "set up EC2 instance": &set_up_ec2_instance
 
@@ -6992,10 +6999,11 @@ tasks:
       docker_username: ${dockerhub_username}
       docker_password: ${dockerhub_password}
 
-- name: test_packages_complete
+- name: test_packages_release
   tags: []
   depends_on:
-  - name: package
+  - name: version_expansions_gen
+    variant: generate-tasks-for-version
   commands:
   - command: manifest.load
   - func: "git get project and add git tag"
@@ -7003,7 +7011,7 @@ tasks:
   - *kill_processes
   - *cleanup_environment
   - *set_up_venv
-  - func: "run complete package test"
+  - func: "run release package test"
     vars:
       docker_username: ${dockerhub_username}
       docker_password: ${dockerhub_password}

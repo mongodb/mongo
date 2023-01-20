@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import platform
+import re
 import sys
 import time
 import traceback
@@ -138,11 +139,9 @@ OS_DOCKER_LOOKUP = {
     'windows_x86_64-2012plus': None,
 }
 
-VERSIONS_TO_SKIP = set(['3.0.15', '3.2.22', '3.4.24', '3.6.23', '4.0.28'])
-
-# TODO(SERVER-70016) These can be deleted once these versions are no longer is current.json
-DISABLED_TESTS = [("amazon2", "4.4.16"), ("amazon2", "4.4.17-rc2"), ("amazon2", "4.2.23-rc0"),
-                  ("amazon2", "4.2.23-rc1"), ("amazon2", "4.2.22")]
+# TODO: Remove 6.1.1 from VERSIONS_TO_SKIP when 6.2.0 is released
+VERSIONS_TO_SKIP: Set[str] = set(['3.0.15', '3.2.22', '3.4.24', '3.6.23', '4.0.28', '6.1.1'])
+DISABLED_TESTS: Set[Tuple[str, str]] = set()
 
 
 @dataclasses.dataclass
@@ -151,6 +150,7 @@ class Test:
 
     os_name: str
     version: str
+    edition: str
     base_image: str = dataclasses.field(default="", repr=False)
     package_manager: str = dataclasses.field(default="", repr=False)
     update_command: str = dataclasses.field(default="", repr=False)
@@ -180,7 +180,7 @@ class Test:
         return ret
 
     def name(self) -> str:
-        return self.os_name + "-" + self.version
+        return self.os_name + "-" + self.edition + "-" + self.version
 
 
 def get_image(test: Test, client: DockerClient) -> Image:
@@ -208,7 +208,7 @@ def join_commands(commands: List[str], sep: str = ' && ') -> str:
 def run_test(test: Test, client: DockerClient) -> Result:
     result = Result(status="pass", test_file=test.name(), start=time.time(), log_raw="")
 
-    log_name = f"logs/{test.os_name}_{test.version}_{uuid.uuid4().hex}.log"
+    log_name = f"logs/{test.name()}_{test.version}_{uuid.uuid4().hex}.log"
     test_docker_root = Path("/mnt/package_test").resolve()
     log_docker_path = Path.joinpath(test_docker_root, log_name)
     test_external_root = Path(__file__).parent.resolve()
@@ -338,13 +338,19 @@ def get_arch_aliases(arch_name: str) -> List[str]:
     return [arch_name]
 
 
+def get_edition_alias(edition_name: str) -> str:
+    if edition_name in ("base", "targeted"):
+        return "org"
+    return edition_name
+
+
 arches: Set[str] = set()
 oses: Set[str] = set()
 editions: Set[str] = set()
 versions: Set[str] = set()
 
 for dl in iterate_over_downloads():
-    editions.add(dl["edition"])
+    editions.add(get_edition_alias(dl["edition"]))
     arches.add(dl["arch"])
     oses.add(dl["target"])
     versions.add(dl["version"])
@@ -352,60 +358,82 @@ for dl in iterate_over_downloads():
 parser = argparse.ArgumentParser(
     description=
     'Test packages on various hosts. This will spin up docker containers and test the installs.')
-
-parser.add_argument("--arch", type=str, help="Arch of host machine to use",
+parser.add_argument("--arch", type=str, help="Arch of packages to test",
                     choices=["auto"] + list(arches), default="auto")
-parser.add_argument(
+subparsers = parser.add_subparsers(dest="command")
+release_test_parser = subparsers.add_parser("release")
+release_test_parser.add_argument(
     "--os", type=str, help=
     "OS of docker image to run test(s) on. All means run all os tests on this arch. None means run no os test on this arch (except for one specified in extra-packages.",
-    choices=["all", "none"] + list(oses), default="all")
-parser.add_argument(
-    "-e", "--extra-test", type=str, help=
-    "Space-separated tuple of (test_os, package_archive_path). For example ubuntu2004,https://s3.amazonaws.com/mciuploads/${project}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz.",
+    choices=["all"] + list(oses), default="all")
+release_test_parser.add_argument("-e", "--edition", help="Server edition to run tests for",
+                                 choices=["all"] + list(editions), default="all")
+release_test_parser.add_argument("-v", "--server-version", type=str,
+                                 help="Version of MongoDB to run tests for",
+                                 choices=["all"] + list(versions), default="all")
+branch_test_parser = subparsers.add_parser("branch")
+branch_test_parser.add_argument(
+    "-t", "--test", type=str, help=
+    "Space-separated tuple of (test_os, package_archive_path). For example: ubuntu2004 https://s3.amazonaws.com/mciuploads/${project}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz.",
     action='append', nargs=2, default=[])
+branch_test_parser.add_argument("-e", "--edition", type=str, help="Server edition being tested",
+                                required=True)
+branch_test_parser.add_argument("-v", "--server-version", type=str,
+                                help="Server version being tested", required=True)
 args = parser.parse_args()
 
-mongo_os: str = args.os
-extra_tests: List[Tuple[str, str]] = args.extra_test
 arch: str = args.arch
 if arch == "auto":
     arch = platform.machine()
 
 tests: List[Test] = []
-for extra_test in extra_tests:
-    test_os = extra_test[0]
-    logging.info(extra_test[1])
-    urls: List[str] = [extra_test[1]]
-    if test_os not in OS_DOCKER_LOOKUP:
-        logging.error("We have not seen this OS %s before, please add it to OS_DOCKER_LOOKUP",
-                      test_os)
-        sys.exit(1)
+urls: List[str] = []
 
-    if not OS_DOCKER_LOOKUP[test_os]:
-        logging.info("Skipping test on target because the OS has no associated container %s->???",
-                     test_os)
-        continue
+if args.command == "branch":
+    for test_pair in args.test:
+        test_os = test_pair[0]
+        urls = [test_pair[1]]
+        if test_os not in OS_DOCKER_LOOKUP:
+            logging.error("We have not seen this OS %s before, please add it to OS_DOCKER_LOOKUP",
+                          test_os)
+            sys.exit(1)
 
-    tools_package = get_tools_package(arch, test_os)
-    mongosh_package = get_mongosh_package(arch, test_os)
-    if tools_package:
-        urls.append(tools_package)
-    else:
-        logging.error("Could not find tools package for %s and %s", arch, test_os)
-        sys.exit(1)
+        if not OS_DOCKER_LOOKUP[test_os]:
+            logging.info(
+                "Skipping test on target because the OS has no associated container %s->???",
+                test_os)
+            continue
 
-    if mongosh_package:
-        urls.append(mongosh_package)
-    else:
-        logging.error("Could not find mongosh package for %s and %s", arch, test_os)
-        sys.exit(1)
+        tools_package = get_tools_package(arch, test_os)
+        mongosh_package = get_mongosh_package(arch, test_os)
+        if tools_package:
+            urls.append(tools_package)
+        else:
+            logging.error("Could not find tools package for %s and %s", arch, test_os)
+            sys.exit(1)
 
-    tests.append(Test(os_name=test_os, version="custom", packages_urls=urls))
+        if mongosh_package:
+            urls.append(mongosh_package)
+        else:
+            logging.error("Could not find mongosh package for %s and %s", arch, test_os)
+            sys.exit(1)
+
+        tests.append(
+            Test(os_name=test_os, edition=args.edition, version=args.server_version,
+                 packages_urls=urls))
 
 # If os is None we only want to do the tests specified in the arguments
-if mongo_os != "none":
+if args.command == "release":
+
     for dl in iterate_over_downloads():
-        if mongo_os not in ["all", dl["target"]]:
+        if args.os not in ["all", dl["target"]]:
+            continue
+
+        if args.server_version not in ("all", dl["version"]):
+            continue
+
+        # "base" and "targeted" should both match "org"
+        if args.edition not in ("all", get_edition_alias(dl["edition"])):
             continue
 
         # amd64 and x86_64 should be treated as aliases of each other
@@ -427,8 +455,66 @@ if mongo_os != "none":
         if (dl["target"], dl["version"]) in DISABLED_TESTS:
             continue
 
+        test_os: str = dl["target"]
+        urls: List[str] = dl["packages"]
+        server_version: str = dl["version"]
+        edition: str
+
+        version_major, version_minor, _ = server_version.split(".", 2)
+        version_major = int(version_major)
+        version_minor = int(version_minor)
+
+        # The feeds don't include metapackages, so we need to add them to our
+        # URL list for a complete installation.
+        repo_uri: str
+        package: str
+        repo_uri, package = urls[0].rsplit("/", 1)
+        match = re.match(r'(\w+-(\w+(?:-unstable)?))-[^-_]+((?:-|_).*)', package)
+        if match:
+            urls.insert(0, f"{repo_uri}/{match.group(1)}{match.group(3)}")
+            # The actual "edition" may be an unstable package release, so we
+            # need to capture that.
+            package_type = match.group(0).split(".")[-1]
+            edition = match.group(2)
+
+            if version_major > 4:
+                urls.append(f"{repo_uri}/{match.group(1)}-database{match.group(3)}")
+
+            if version_major > 4 or (version_major == 4 and version_minor >= 3):
+                urls.append(f"{repo_uri}/{match.group(1)}-database-tools-extra{match.group(3)}")
+
+            urls.append(f"{repo_uri}/{match.group(1)}-tools{match.group(3)}")
+            urls.append(f"{repo_uri}/{match.group(1)}-mongos{match.group(3)}")
+
+            if package_type == "deb":
+                # We removed the built-in shell package for RPM, but for some reason
+                # we never removed it from the DEB packages. It's just an empty package
+                # we require users to install now...
+                urls.append(f"{repo_uri}/{match.group(1)}-shell{match.group(3)}")
+        else:
+            logging.error("Failed to match package name: %s", package)
+            sys.exit(1)
+
+        if version_major > 4 or (version_major == 4 and version_minor >= 3):
+            # The external `tools' package is only compatible with server
+            # versions 4.3 and above. Before that, we used the `tools`
+            # package built in the server repo.
+            tools_package = get_tools_package(arch, test_os)
+            if tools_package:
+                urls.append(tools_package)
+            else:
+                logging.error("Could not find tools package for %s and %s", arch, test_os)
+                sys.exit(1)
+
+        mongosh_package = get_mongosh_package(arch, test_os)
+        if mongosh_package:
+            urls.append(mongosh_package)
+        else:
+            logging.error("Could not find mongosh package for %s and %s", arch, test_os)
+            sys.exit(1)
+
         tests.append(
-            Test(os_name=dl["target"], packages_urls=dl["packages"], version=dl["version"]))
+            Test(os_name=test_os, packages_urls=urls, edition=edition, version=server_version))
 
 docker_client = docker.client.from_env()
 docker_username = os.environ.get('docker_username')
@@ -460,6 +546,12 @@ if report["failures"] == 0:
     logging.info("All %s tests passed :)", len(report['results']))
     sys.exit(0)
 else:
-    success_count = sum([1 for test_result in report["results"] if test_result["exit_code"] == 0])
+    failed_tests = [
+        test_result["test_file"] for test_result in report["results"]
+        if test_result["exit_code"] != 0
+    ]
+    success_count = len(report['results']) - len(failed_tests)
     logging.info("%s/%s tests passed", success_count, len(report['results']))
+    if len(failed_tests) > 0:
+        logging.info("Failed tests:\n\t%s", "\n\t".join(failed_tests))
     sys.exit(1)

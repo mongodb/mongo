@@ -429,7 +429,7 @@ def test_uninstall(test_args: TestArgs):
 
 
 def test_uninstall_is_complete(test_args: TestArgs):
-    logging.info("Checking that the installation is complete.")
+    logging.info("Checking that the uninstallation is complete.")
 
     leftover_files = [
         pathlib.Path('/usr/bin/mongod'),

@@ -2083,7 +2083,7 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu2204-large
-  - name: test_packages_complete
+  - name: test_packages_release
     distros:
     - ubuntu2204-large
   - name: .publish
@@ -2239,7 +2239,7 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu2204-arm64-large
-  - name: test_packages_complete
+  - name: test_packages_release
     distros:
     - ubuntu2204-arm64-large
   - name: .publish
