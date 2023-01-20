@@ -9,16 +9,11 @@ Exchange []
 |   |               proj0
 |   RefBlock: 
 |       Variable [proj0]
-Evaluation []
-|   BindBlock:
-|       [proj0]
-|           FunctionCall [getField]
-|           |   Const ["a"]
-|           Variable [scan0]
+Evaluation [{proj0}]
+|   FunctionCall [getField]
+|   |   Const ["a"]
+|   Variable [scan0]
 PhysicalScan [{'<root>': scan0}, collName]
-    BindBlock:
-        [scan0]
-            Source []
 
 -- OUTPUT:
 [0] exchange [s2] 1 hash 
@@ -34,16 +29,11 @@ Exchange []
 |   |               proj0
 |   RefBlock: 
 |       Variable [proj0]
-Evaluation []
-|   BindBlock:
-|       [proj0]
-|           FunctionCall [getField]
-|           |   Const ["a"]
-|           Variable [scan0]
+Evaluation [{proj0}]
+|   FunctionCall [getField]
+|   |   Const ["a"]
+|   Variable [scan0]
 PhysicalScan [{'<root>': scan0}, collName]
-    BindBlock:
-        [scan0]
-            Source []
 
 -- OUTPUT:
 [0] exchange [s2] 1 bcast 
@@ -59,16 +49,11 @@ Exchange []
 |   |               proj0
 |   RefBlock: 
 |       Variable [proj0]
-Evaluation []
-|   BindBlock:
-|       [proj0]
-|           FunctionCall [getField]
-|           |   Const ["a"]
-|           Variable [scan0]
+Evaluation [{proj0}]
+|   FunctionCall [getField]
+|   |   Const ["a"]
+|   Variable [scan0]
 PhysicalScan [{'<root>': scan0}, collName]
-    BindBlock:
-        [scan0]
-            Source []
 
 -- OUTPUT:
 [0] exchange [s2] 1 round 
@@ -84,16 +69,11 @@ Exchange []
 |   |               proj0
 |   RefBlock: 
 |       Variable [proj0]
-Evaluation []
-|   BindBlock:
-|       [proj0]
-|           FunctionCall [getField]
-|           |   Const ["a"]
-|           Variable [scan0]
+Evaluation [{proj0}]
+|   FunctionCall [getField]
+|   |   Const ["a"]
+|   Variable [scan0]
 PhysicalScan [{'<root>': scan0}, collName]
-    BindBlock:
-        [scan0]
-            Source []
 
 -- OUTPUT:
 [0] exchange [s2] 1 bcast 

@@ -2,29 +2,15 @@
 
 ==== VARIATION: Spool in union with Eager producer and Regular consumer ====
 -- INPUT:
-Union []
-|   |   BindBlock:
-|   |       [proj0]
-|   |           Source []
-|   SpoolConsumer [Regular, id: 1]
-|       BindBlock:
-|           [proj0]
-|               Source []
-SpoolProducer [Eager, id: 1]
+Union [{proj0}]
+|   SpoolConsumer [Regular, id: 1, {proj0}]
+SpoolProducer [Eager, id: 1, {proj0}]
 |   |   Const [true]
-|   BindBlock:
-|       [proj0]
-|           Source []
-Evaluation []
-|   BindBlock:
-|       [proj0]
-|           FunctionCall [getField]
-|           |   Const ["a"]
-|           Variable [scan0]
+Evaluation [{proj0}]
+|   FunctionCall [getField]
+|   |   Const ["a"]
+|   Variable [scan0]
 PhysicalScan [{'<root>': scan0}, collName]
-    BindBlock:
-        [scan0]
-            Source []
 
 -- OUTPUT:
 [4] union [s4] 
@@ -38,29 +24,15 @@ PhysicalScan [{'<root>': scan0}, collName]
 
 ==== VARIATION: Spool in union with Eager producer and Stack consumer ====
 -- INPUT:
-Union []
-|   |   BindBlock:
-|   |       [proj0]
-|   |           Source []
-|   SpoolConsumer [Stack, id: 1]
-|       BindBlock:
-|           [proj0]
-|               Source []
-SpoolProducer [Eager, id: 1]
+Union [{proj0}]
+|   SpoolConsumer [Stack, id: 1, {proj0}]
+SpoolProducer [Eager, id: 1, {proj0}]
 |   |   Const [true]
-|   BindBlock:
-|       [proj0]
-|           Source []
-Evaluation []
-|   BindBlock:
-|       [proj0]
-|           FunctionCall [getField]
-|           |   Const ["a"]
-|           Variable [scan0]
+Evaluation [{proj0}]
+|   FunctionCall [getField]
+|   |   Const ["a"]
+|   Variable [scan0]
 PhysicalScan [{'<root>': scan0}, collName]
-    BindBlock:
-        [scan0]
-            Source []
 
 -- OUTPUT:
 [4] union [s4] 
@@ -74,29 +46,15 @@ PhysicalScan [{'<root>': scan0}, collName]
 
 ==== VARIATION: Spool in union with Lazy producer and Regular consumer ====
 -- INPUT:
-Union []
-|   |   BindBlock:
-|   |       [proj0]
-|   |           Source []
-|   SpoolConsumer [Regular, id: 1]
-|       BindBlock:
-|           [proj0]
-|               Source []
-SpoolProducer [Lazy, id: 1]
+Union [{proj0}]
+|   SpoolConsumer [Regular, id: 1, {proj0}]
+SpoolProducer [Lazy, id: 1, {proj0}]
 |   |   Const [true]
-|   BindBlock:
-|       [proj0]
-|           Source []
-Evaluation []
-|   BindBlock:
-|       [proj0]
-|           FunctionCall [getField]
-|           |   Const ["a"]
-|           Variable [scan0]
+Evaluation [{proj0}]
+|   FunctionCall [getField]
+|   |   Const ["a"]
+|   Variable [scan0]
 PhysicalScan [{'<root>': scan0}, collName]
-    BindBlock:
-        [scan0]
-            Source []
 
 -- OUTPUT:
 [4] union [s4] 
@@ -110,29 +68,15 @@ PhysicalScan [{'<root>': scan0}, collName]
 
 ==== VARIATION: Spool in union with Lazy producer and Stack consumer ====
 -- INPUT:
-Union []
-|   |   BindBlock:
-|   |       [proj0]
-|   |           Source []
-|   SpoolConsumer [Stack, id: 1]
-|       BindBlock:
-|           [proj0]
-|               Source []
-SpoolProducer [Lazy, id: 1]
+Union [{proj0}]
+|   SpoolConsumer [Stack, id: 1, {proj0}]
+SpoolProducer [Lazy, id: 1, {proj0}]
 |   |   Const [true]
-|   BindBlock:
-|       [proj0]
-|           Source []
-Evaluation []
-|   BindBlock:
-|       [proj0]
-|           FunctionCall [getField]
-|           |   Const ["a"]
-|           Variable [scan0]
+Evaluation [{proj0}]
+|   FunctionCall [getField]
+|   |   Const ["a"]
+|   Variable [scan0]
 PhysicalScan [{'<root>': scan0}, collName]
-    BindBlock:
-        [scan0]
-            Source []
 
 -- OUTPUT:
 [4] union [s4] 
@@ -146,15 +90,9 @@ PhysicalScan [{'<root>': scan0}, collName]
 
 ==== VARIATION: Spool in union with filter expression ====
 -- INPUT:
-Union []
-|   |   BindBlock:
-|   |       [proj0]
-|   |           Source []
-|   SpoolConsumer [Stack, id: 1]
-|       BindBlock:
-|           [proj0]
-|               Source []
-SpoolProducer [Lazy, id: 1]
+Union [{proj0}]
+|   SpoolConsumer [Stack, id: 1, {proj0}]
+SpoolProducer [Lazy, id: 1, {proj0}]
 |   |   BinaryOp [FillEmpty]
 |   |   |   Const [false]
 |   |   BinaryOp [Gte]
@@ -164,19 +102,11 @@ SpoolProducer [Lazy, id: 1]
 |   |   FunctionCall [getField]
 |   |   |   Const ["b"]
 |   |   Variable [scan0]
-|   BindBlock:
-|       [proj0]
-|           Source []
-Evaluation []
-|   BindBlock:
-|       [proj0]
-|           FunctionCall [getField]
-|           |   Const ["a"]
-|           Variable [scan0]
+Evaluation [{proj0}]
+|   FunctionCall [getField]
+|   |   Const ["a"]
+|   Variable [scan0]
 PhysicalScan [{'<root>': scan0}, collName]
-    BindBlock:
-        [scan0]
-            Source []
 
 -- OUTPUT:
 [4] union [s4] 

@@ -5,16 +5,11 @@
 Unique []
 |   projections: 
 |       proj0
-Evaluation []
-|   BindBlock:
-|       [proj0]
-|           FunctionCall [getField]
-|           |   Const ["a"]
-|           Variable [scan0]
+Evaluation [{proj0}]
+|   FunctionCall [getField]
+|   |   Const ["a"]
+|   Variable [scan0]
 PhysicalScan [{'<root>': scan0}, collName]
-    BindBlock:
-        [scan0]
-            Source []
 
 -- OUTPUT:
 [2] unique [s2] 
@@ -28,28 +23,19 @@ Unique []
 |       proj0
 |       proj1
 |       proj2
-Evaluation []
-|   BindBlock:
-|       [proj2]
-|           FunctionCall [getField]
-|           |   Const ["c"]
-|           Variable [scan0]
-Evaluation []
-|   BindBlock:
-|       [proj1]
-|           FunctionCall [getField]
-|           |   Const ["b"]
-|           Variable [scan0]
-Evaluation []
-|   BindBlock:
-|       [proj0]
-|           FunctionCall [getField]
-|           |   Const ["a"]
-|           Variable [scan0]
+Evaluation [{proj2}]
+|   FunctionCall [getField]
+|   |   Const ["c"]
+|   Variable [scan0]
+Evaluation [{proj1}]
+|   FunctionCall [getField]
+|   |   Const ["b"]
+|   Variable [scan0]
+Evaluation [{proj0}]
+|   FunctionCall [getField]
+|   |   Const ["a"]
+|   Variable [scan0]
 PhysicalScan [{'<root>': scan0}, collName]
-    BindBlock:
-        [scan0]
-            Source []
 
 -- OUTPUT:
 [4] unique [s2, s3, s4] 

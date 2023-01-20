@@ -34,23 +34,12 @@ Filter []
 |   PathTraverse [1]
 |   PathCompare [Eq]
 |   Const [1]
-Union []
-|   |   BindBlock:
-|   |       [scan_0]
-|   |           Source []
-|   Evaluation []
-|   |   BindBlock:
-|   |       [scan_0]
-|   |           EvalPath []
-|   |           |   Variable [scan_1]
-|   |           PathIdentity []
-|   Scan [collB]
-|       BindBlock:
-|           [scan_1]
-|               Source []
-Scan [collA]
-    BindBlock:
-        [scan_0]
-            Source []
+Union [{scan_0}]
+|   Evaluation [{scan_0}]
+|   |   EvalPath []
+|   |   |   Variable [scan_1]
+|   |   PathIdentity []
+|   Scan [collB, {scan_1}]
+Scan [collA, {scan_0}]
 
 

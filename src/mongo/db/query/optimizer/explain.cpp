@@ -711,6 +711,45 @@ public:
         }
     }
 
+    static void printProjections(ExplainPrinter& printer,
+                                 const ProjectionNameOrderedSet& projections) {
+        if constexpr (version < ExplainVersion::V3) {
+            if (!projections.empty()) {
+                printer.separator("{");
+                bool first = true;
+                for (const ProjectionName& projectionName : projections) {
+                    if (first) {
+                        first = false;
+                    } else {
+                        printer.separator(", ");
+                    }
+                    printer.print(projectionName);
+                }
+                printer.separator("}");
+            }
+        } else if constexpr (version == ExplainVersion::V3) {
+            std::vector<ExplainPrinter> printers;
+            for (const ProjectionName& projectionName : projections) {
+                ExplainPrinter local;
+                local.print(projectionName);
+                printers.push_back(std::move(local));
+            }
+            printer.print(printers);
+        } else {
+            MONGO_UNREACHABLE;
+        }
+    }
+
+    static void printProjections(ExplainPrinter& printer, const ProjectionNameVector& projections) {
+        ProjectionNameOrderedSet projectionSet(projections.begin(), projections.end());
+        printProjections(printer, projectionSet);
+    }
+
+    static void printProjection(ExplainPrinter& printer, const ProjectionName& projection) {
+        ProjectionNameOrderedSet projectionSet = {projection};
+        printProjections(printer, projectionSet);
+    }
+
     static void printCorrelatedProjections(
         ExplainPrinter& printer, const mongo::optimizer::ProjectionNameSet& correlatedProjections) {
         ProjectionNameOrderedSet ordered;
@@ -718,32 +757,10 @@ public:
             ordered.insert(projName);
         }
 
-        if constexpr (version < ExplainVersion::V3) {
-            if (!correlatedProjections.empty()) {
-                printer.print(", {");
-                bool first = true;
-                for (const ProjectionName& projectionName : ordered) {
-                    if (first) {
-                        first = false;
-                    } else {
-                        printer.print(", ");
-                    }
-                    printer.print(projectionName);
-                }
-                printer.print("}");
-            }
-        } else if constexpr (version == ExplainVersion::V3) {
-            std::vector<ExplainPrinter> printers;
-            for (const ProjectionName& projectionName : ordered) {
-                ExplainPrinter local;
-                local.print(projectionName);
-                printers.push_back(std::move(local));
-            }
-            printer.fieldName("correlatedProjections").print(printers);
-        } else {
-            MONGO_UNREACHABLE;
-        }
+        printer.fieldName("correlatedProjections", ExplainVersion::V3);
+        printProjections(printer, ordered);
     }
+
 
     /**
      * Nodes
@@ -759,26 +776,23 @@ public:
     ExplainPrinter transport(const ABT& /*n*/,
                              const ExpressionBinder& binders,
                              std::vector<ExplainPrinter> inResults) {
-        std::map<ProjectionName, ExplainPrinter> ordered;
-        for (size_t idx = 0; idx < inResults.size(); ++idx) {
-            ordered.emplace(binders.names()[idx], std::move(inResults[idx]));
-        }
-
         ExplainPrinter printer;
-        printer.separator("BindBlock:");
-
-        for (auto& [name, child] : ordered) {
-            if constexpr (version < ExplainVersion::V3) {
-                ExplainPrinter local;
-                local.print("[").print(name).print("]").print(child);
-                printer.print(local);
-            } else if constexpr (version == ExplainVersion::V3) {
-                printer.separator(" ").fieldName(name).print(child);
-            } else {
-                MONGO_UNREACHABLE;
+        if constexpr (version < ExplainVersion::V3) {
+            // The bind block is redundant for V1-V2 type explains, as the bound projections can be
+            // inferred from the field projection map; so here we print nothing.
+            return printer;
+        } else if constexpr (version == ExplainVersion::V3) {
+            std::map<ProjectionName, ExplainPrinter> ordered;
+            for (size_t idx = 0; idx < inResults.size(); ++idx) {
+                ordered.emplace(binders.names()[idx], std::move(inResults[idx]));
             }
+            printer.separator("BindBlock:");
+            for (auto& [name, child] : ordered) {
+                printer.separator(" ").fieldName(name).print(child);
+            }
+        } else {
+            MONGO_UNREACHABLE;
         }
-
         return printer;
     }
 
@@ -820,8 +834,13 @@ public:
         maybePrintProps(printer, node);
         printer.separator(" [")
             .fieldName("scanDefName", ExplainVersion::V3)
-            .print(node.getScanDefName())
-            .separator("]");
+            .print(node.getScanDefName());
+
+        if constexpr (version < ExplainVersion::V3) {
+            printer.separator(", ");
+            printProjection(printer, node.getProjectionName());
+        }
+        printer.separator("]");
         nodeCEPropsPrint(printer, n, node);
         printer.fieldName("bindings", ExplainVersion::V3).print(bindResult);
         return printer;
@@ -1178,13 +1197,29 @@ public:
                              ExplainPrinter projectionResult) {
         ExplainPrinter printer("Evaluation");
         maybePrintProps(printer, node);
-        printer.separator(" []");
+        printer.separator(" [");
+
+        // The bind block (projectionResult) is empty in V1-V2 explains. In the case of the
+        // Evaluation node, the bind block may have useful information about the embedded
+        // expression, so we make sure to print the projected expression.
+        if constexpr (version < ExplainVersion::V3) {
+            printProjection(printer, node.getProjectionName());
+        }
+
+        printer.separator("]");
         nodeCEPropsPrint(printer, n, node);
-        printer.setChildCount(2)
-            .fieldName("projection", ExplainVersion::V3)
-            .print(projectionResult)
-            .fieldName("child", ExplainVersion::V3)
-            .print(childResult);
+        printer.setChildCount(2);
+
+        if constexpr (version < ExplainVersion::V3) {
+            auto pathPrinter = generate(node.getProjection());
+            printer.print(pathPrinter);
+        } else if constexpr (version == ExplainVersion::V3) {
+            printer.fieldName("projection").print(projectionResult);
+        } else {
+            MONGO_UNREACHABLE;
+        }
+
+        printer.fieldName("child", ExplainVersion::V3).print(childResult);
         return printer;
     }
 
@@ -1260,7 +1295,13 @@ public:
             .print(IndexReqTargetEnum::toString[static_cast<int>(node.getTarget())])
             .separator("]");
         nodeCEPropsPrint(printer, n, node);
-        printer.setChildCount(scanParams ? 6 : 5);
+        size_t childCount = scanParams ? 5 : 4;
+        // In V3 only we include the ref block (see at the end of this function), so V3 has one
+        // more child.
+        if constexpr (version == ExplainVersion::V3) {
+            childCount++;
+        }
+        printer.setChildCount(childCount);
 
         if constexpr (version < ExplainVersion::V3) {
             ExplainPrinter local;
@@ -1388,12 +1429,11 @@ public:
             printer.printAppend(scanParamsPrinter);
         }
 
-        printer.fieldName("bindings", ExplainVersion::V3)
-            .print(bindResult)
-            .fieldName("references", ExplainVersion::V3)
-            .print(refsResult)
-            .fieldName("child", ExplainVersion::V3)
-            .print(childResult);
+        printer.fieldName("bindings", ExplainVersion::V3).print(bindResult);
+        if constexpr (version == ExplainVersion::V3) {
+            printer.fieldName("references", ExplainVersion::V3).print(refsResult);
+        }
+        printer.fieldName("child", ExplainVersion::V3).print(childResult);
         return printer;
     }
 
@@ -1448,7 +1488,8 @@ public:
         maybePrintProps(printer, node);
         printer.separator(" [")
             .fieldName("joinType")
-            .print(JoinTypeEnum::toString[static_cast<int>(node.getJoinType())]);
+            .print(JoinTypeEnum::toString[static_cast<int>(node.getJoinType())])
+            .separator(", ");
 
         printCorrelatedProjections(printer, node.getCorrelatedProjectionNames());
 
@@ -1589,7 +1630,8 @@ public:
         maybePrintProps(printer, node);
         printer.separator(" [")
             .fieldName("joinType")
-            .print(JoinTypeEnum::toString[static_cast<int>(node.getJoinType())]);
+            .print(JoinTypeEnum::toString[static_cast<int>(node.getJoinType())])
+            .separator(", ");
 
         printCorrelatedProjections(printer, node.getCorrelatedProjectionNames());
 
@@ -1613,7 +1655,13 @@ public:
                              ExplainPrinter /*refsResult*/) {
         ExplainPrinter printer("Union");
         maybePrintProps(printer, node);
-        printer.separator(" []");
+        if (version < ExplainVersion::V3) {
+            printer.separator(" [");
+            printProjections(printer, node.binder().names());
+            printer.separator("]");
+        } else {
+            printer.separator(" []");
+        }
         nodeCEPropsPrint(printer, n, node);
         printer.setChildCount(childResults.size() + 1)
             .fieldName("bindings", ExplainVersion::V3)
@@ -1742,8 +1790,12 @@ public:
             .print(SpoolProducerTypeEnum::toString[static_cast<int>(node.getType())])
             .separator(", ")
             .fieldName("id")
-            .print(node.getSpoolId())
-            .separator("]");
+            .print(node.getSpoolId());
+        if (version < ExplainVersion::V3) {
+            printer.separator(", ");
+            printProjections(printer, node.binder().names());
+        }
+        printer.separator("]");
 
         nodeCEPropsPrint(printer, n, node);
         printer.setChildCount(3);
@@ -1765,8 +1817,12 @@ public:
             .print(SpoolConsumerTypeEnum::toString[static_cast<int>(node.getType())])
             .separator(", ")
             .fieldName("id")
-            .print(node.getSpoolId())
-            .separator("]");
+            .print(node.getSpoolId());
+        if (version < ExplainVersion::V3) {
+            printer.separator(", ");
+            printProjections(printer, node.binder().names());
+        }
+        printer.separator("]");
 
         nodeCEPropsPrint(printer, n, node);
         printer.fieldName("bindings", ExplainVersion::V3).print(bindResult);

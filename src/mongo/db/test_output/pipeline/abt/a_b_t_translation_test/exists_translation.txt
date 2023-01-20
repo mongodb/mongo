@@ -25,10 +25,7 @@ Filter []
 |   PathGet [a]
 |   PathDefault []
 |   Const [false]
-Scan [collection]
-    BindBlock:
-        [scan_0]
-            Source []
+Scan [collection, {scan_0}]
 
 
 ==== VARIATION: $match exists ====
@@ -62,10 +59,7 @@ Filter []
 |   PathGet [a]
 |   PathDefault []
 |   Const [false]
-Scan [collection]
-    BindBlock:
-        [scan_0]
-            Source []
+Scan [collection, {scan_0}]
 
 
 ==== VARIATION: $match exists ====
@@ -97,9 +91,6 @@ Filter []
 |   PathGet [b]
 |   PathDefault []
 |   Const [false]
-Scan [collection]
-    BindBlock:
-        [scan_0]
-            Source []
+Scan [collection, {scan_0}]
 
 

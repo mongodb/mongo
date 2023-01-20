@@ -26,20 +26,16 @@ Collation []
 |   RefBlock: 
 |       Variable [sort_0]
 |       Variable [sort_1]
-Evaluation []
-|   BindBlock:
-|       [sort_1]
-|           EvalPath []
-|           |   Variable [scan_0]
-|           PathGet [b]
-|           PathIdentity []
-Evaluation []
-|   BindBlock:
-|       [sort_0]
-|           EvalPath []
-|           |   Variable [scan_0]
-|           PathGet [a]
-|           PathIdentity []
+Evaluation [{sort_1}]
+|   EvalPath []
+|   |   Variable [scan_0]
+|   PathGet [b]
+|   PathIdentity []
+Evaluation [{sort_0}]
+|   EvalPath []
+|   |   Variable [scan_0]
+|   PathGet [a]
+|   PathIdentity []
 LimitSkip []
 |   limitSkip:
 |       limit: (none)
@@ -48,10 +44,7 @@ LimitSkip []
 |   limitSkip:
 |       limit: 5
 |       skip: 0
-Scan [collection]
-    BindBlock:
-        [scan_0]
-            Source []
+Scan [collection, {scan_0}]
 
 
 ==== VARIATION: $match sort ====
@@ -80,13 +73,11 @@ Collation []
 |   |       sort_0: Ascending
 |   RefBlock: 
 |       Variable [sort_0]
-Evaluation []
-|   BindBlock:
-|       [sort_0]
-|           EvalPath []
-|           |   Variable [scan_0]
-|           PathGet [a]
-|           PathIdentity []
+Evaluation [{sort_0}]
+|   EvalPath []
+|   |   Variable [scan_0]
+|   PathGet [a]
+|   PathIdentity []
 Filter []
 |   EvalFilter []
 |   |   Variable [scan_0]
@@ -94,9 +85,6 @@ Filter []
 |   PathTraverse [1]
 |   PathCompare [Eq]
 |   Const [10]
-Scan [collection]
-    BindBlock:
-        [scan_0]
-            Source []
+Scan [collection, {scan_0}]
 
 

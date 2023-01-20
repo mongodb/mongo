@@ -88,17 +88,15 @@ bool handleAutoUpdate(const std::string& expected,
     maybePrintABT(abt);               \
     ASSERT_EQ(expected, ExplainGenerator::explain(abt))
 
-// Do not remove macro even if unused: used to update tests before committing code.
 #define ASSERT_EXPLAIN_AUTO(expected, abt) \
     maybePrintABT(abt);                    \
-    ASSERT_STR_EQ(expected, ExplainGenerator::explain(abt))
+    ASSERT_STR_EQ_AUTO(expected, ExplainGenerator::explain(abt))
 
 
 #define ASSERT_EXPLAIN_V2(expected, abt) \
     maybePrintABT(abt);                  \
     ASSERT_EQ(expected, ExplainGenerator::explainV2(abt))
 
-// Do not remove macro even if unused: used to update tests before committing code.
 #define ASSERT_EXPLAIN_V2_AUTO(expected, abt) \
     maybePrintABT(abt);                       \
     ASSERT_STR_EQ_AUTO(expected, ExplainGenerator::explainV2(abt))
@@ -108,7 +106,6 @@ bool handleAutoUpdate(const std::string& expected,
     maybePrintABT(abt);                         \
     ASSERT_EQ(expected, ExplainGenerator::explainV2Compact(abt))
 
-// Do not remove macro even if unused: used to update tests before committing code.
 #define ASSERT_EXPLAIN_V2Compact_AUTO(expected, abt) \
     maybePrintABT(abt);                              \
     ASSERT_STR_EQ_AUTO(expected, ExplainGenerator::explainV2Compact(abt))
@@ -127,14 +124,12 @@ bool handleAutoUpdate(const std::string& expected,
 #define ASSERT_EXPLAIN_PROPS_V2(expected, phaseManager) \
     ASSERT_EQ(expected, getPropsStrForExplain(phaseManager))
 
-// Do not remove macro even if unused: used to update tests before committing code.
 #define ASSERT_EXPLAIN_PROPS_V2_AUTO(expected, phaseManager) \
     ASSERT_STR_EQ_AUTO(expected, getPropsStrForExplain(phaseManager))
 
 
 #define ASSERT_EXPLAIN_MEMO(expected, memo) ASSERT_EQ(expected, ExplainGenerator::explainMemo(memo))
 
-// Do not remove macro even if unused: used to update tests before committing code.
 #define ASSERT_EXPLAIN_MEMO_AUTO(expected, memo) \
     ASSERT_STR_EQ_AUTO(expected, ExplainGenerator::explainMemo(memo))
 
@@ -142,7 +137,6 @@ bool handleAutoUpdate(const std::string& expected,
 #define ASSERT_INTERVAL(expected, interval) \
     ASSERT_EQ(expected, ExplainGenerator::explainIntervalExpr(interval))
 
-// Do not remove macro even if unused: used to update tests before committing code.
 #define ASSERT_INTERVAL_AUTO(expected, interval) \
     ASSERT_STR_EQ_AUTO(expected, ExplainGenerator::explainIntervalExpr(interval))
 

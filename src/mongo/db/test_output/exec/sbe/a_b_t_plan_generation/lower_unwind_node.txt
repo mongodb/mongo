@@ -3,21 +3,11 @@
 ==== VARIATION: Lower UnwindNode discard non-arrays ====
 -- INPUT:
 Unwind []
-|   BindBlock:
-|       [proj0]
-|           Source []
-|       [proj0_pid]
-|           Source []
-Evaluation []
-|   BindBlock:
-|       [proj0]
-|           FunctionCall [getField]
-|           |   Const ["a"]
-|           Variable [scan0]
+Evaluation [{proj0}]
+|   FunctionCall [getField]
+|   |   Const ["a"]
+|   Variable [scan0]
 PhysicalScan [{'<root>': scan0}, collName]
-    BindBlock:
-        [scan0]
-            Source []
 
 -- OUTPUT:
 [2] unwind s3 s4 s2 false 
@@ -27,21 +17,11 @@ PhysicalScan [{'<root>': scan0}, collName]
 ==== VARIATION: Lower UnwindNode keep non-arrays ====
 -- INPUT:
 Unwind [retainNonArrays]
-|   BindBlock:
-|       [proj0]
-|           Source []
-|       [proj0_pid]
-|           Source []
-Evaluation []
-|   BindBlock:
-|       [proj0]
-|           FunctionCall [getField]
-|           |   Const ["a"]
-|           Variable [scan0]
+Evaluation [{proj0}]
+|   FunctionCall [getField]
+|   |   Const ["a"]
+|   Variable [scan0]
 PhysicalScan [{'<root>': scan0}, collName]
-    BindBlock:
-        [scan0]
-            Source []
 
 -- OUTPUT:
 [2] unwind s3 s4 s2 true 

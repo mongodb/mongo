@@ -32,10 +32,7 @@ Filter []
 |   |   PathObj []
 |   PathConstant []
 |   Const [true]
-Scan [collection]
-    BindBlock:
-        [scan_0]
-            Source []
+Scan [collection, {scan_0}]
 
 
 ==== VARIATION: ensure the PathGet and PathTraverse operators interact correctly when $in is under $elemMatch ====
@@ -70,10 +67,7 @@ Filter []
 |   PathTraverse [1]
 |   PathCompare [EqMember]
 |   Const [[1, 2, 3]]
-Scan [collection]
-    BindBlock:
-        [scan_0]
-            Source []
+Scan [collection, {scan_0}]
 
 
 ==== VARIATION: $match with value $elemMatch: observe type bracketing in the filter. ====
@@ -115,27 +109,20 @@ Filter []
 |   |   Const [nan]
 |   PathCompare [Lte]
 |   Const [3]
-Evaluation []
-|   BindBlock:
-|       [combinedProjection_0]
-|           EvalPath []
-|           |   Variable [scan_0]
-|           PathComposeM []
-|           |   PathDefault []
-|           |   Const [{}]
-|           PathComposeM []
-|           |   PathField [a]
-|           |   PathConstant []
-|           |   Variable [projGetPath_0]
-|           PathKeep [_id, a]
-Evaluation []
-|   BindBlock:
-|       [projGetPath_0]
-|           Const [[1, 2, 3, 4]]
-Scan [collection]
-    BindBlock:
-        [scan_0]
-            Source []
+Evaluation [{combinedProjection_0}]
+|   EvalPath []
+|   |   Variable [scan_0]
+|   PathComposeM []
+|   |   PathDefault []
+|   |   Const [{}]
+|   PathComposeM []
+|   |   PathField [a]
+|   |   PathConstant []
+|   |   Variable [projGetPath_0]
+|   PathKeep [_id, a]
+Evaluation [{projGetPath_0}]
+|   Const [[1, 2, 3, 4]]
+Scan [collection, {scan_0}]
 
 
 ==== VARIATION: $match object $elemMatch ====
@@ -174,9 +161,6 @@ Filter []
 |   PathTraverse [1]
 |   PathCompare [Eq]
 |   Const [5]
-Scan [collection]
-    BindBlock:
-        [scan_0]
-            Source []
+Scan [collection, {scan_0}]
 
 

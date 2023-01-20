@@ -7,26 +7,16 @@ MergeJoin []
 |   |   |       proj0 = proj1
 |   |   Collation
 |   |       Ascending
-|   Evaluation []
-|   |   BindBlock:
-|   |       [proj1]
-|   |           FunctionCall [getField]
-|   |           |   Const ["id"]
-|   |           Variable [scan1]
+|   Evaluation [{proj1}]
+|   |   FunctionCall [getField]
+|   |   |   Const ["id"]
+|   |   Variable [scan1]
 |   PhysicalScan [{'<root>': scan1}, otherColl]
-|       BindBlock:
-|           [scan1]
-|               Source []
-Evaluation []
-|   BindBlock:
-|       [proj0]
-|           FunctionCall [getField]
-|           |   Const ["other_id"]
-|           Variable [scan0]
+Evaluation [{proj0}]
+|   FunctionCall [getField]
+|   |   Const ["other_id"]
+|   Variable [scan0]
 PhysicalScan [{'<root>': scan0}, collName]
-    BindBlock:
-        [scan0]
-            Source []
 
 -- OUTPUT:
 [4] mj 
@@ -45,26 +35,16 @@ MergeJoin []
 |   |   |       proj0 = proj1
 |   |   Collation
 |   |       Descending
-|   Evaluation []
-|   |   BindBlock:
-|   |       [proj1]
-|   |           FunctionCall [getField]
-|   |           |   Const ["id"]
-|   |           Variable [scan1]
+|   Evaluation [{proj1}]
+|   |   FunctionCall [getField]
+|   |   |   Const ["id"]
+|   |   Variable [scan1]
 |   PhysicalScan [{'<root>': scan1}, otherColl]
-|       BindBlock:
-|           [scan1]
-|               Source []
-Evaluation []
-|   BindBlock:
-|       [proj0]
-|           FunctionCall [getField]
-|           |   Const ["other_id"]
-|           Variable [scan0]
+Evaluation [{proj0}]
+|   FunctionCall [getField]
+|   |   Const ["other_id"]
+|   Variable [scan0]
 PhysicalScan [{'<root>': scan0}, collName]
-    BindBlock:
-        [scan0]
-            Source []
 
 -- OUTPUT:
 [4] mj 
@@ -85,38 +65,24 @@ MergeJoin []
 |   |   Collation
 |   |       Ascending
 |   |       Ascending
-|   Evaluation []
-|   |   BindBlock:
-|   |       [proj3]
-|   |           FunctionCall [getField]
-|   |           |   Const ["city"]
-|   |           Variable [scan1]
-|   Evaluation []
-|   |   BindBlock:
-|   |       [proj1]
-|   |           FunctionCall [getField]
-|   |           |   Const ["id"]
-|   |           Variable [scan1]
+|   Evaluation [{proj3}]
+|   |   FunctionCall [getField]
+|   |   |   Const ["city"]
+|   |   Variable [scan1]
+|   Evaluation [{proj1}]
+|   |   FunctionCall [getField]
+|   |   |   Const ["id"]
+|   |   Variable [scan1]
 |   PhysicalScan [{'<root>': scan1}, otherColl]
-|       BindBlock:
-|           [scan1]
-|               Source []
-Evaluation []
-|   BindBlock:
-|       [proj2]
-|           FunctionCall [getField]
-|           |   Const ["city"]
-|           Variable [scan0]
-Evaluation []
-|   BindBlock:
-|       [proj0]
-|           FunctionCall [getField]
-|           |   Const ["other_id"]
-|           Variable [scan0]
+Evaluation [{proj2}]
+|   FunctionCall [getField]
+|   |   Const ["city"]
+|   Variable [scan0]
+Evaluation [{proj0}]
+|   FunctionCall [getField]
+|   |   Const ["other_id"]
+|   Variable [scan0]
 PhysicalScan [{'<root>': scan0}, collName]
-    BindBlock:
-        [scan0]
-            Source []
 
 -- OUTPUT:
 [6] mj 
@@ -139,38 +105,24 @@ MergeJoin []
 |   |   Collation
 |   |       Ascending
 |   |       Descending
-|   Evaluation []
-|   |   BindBlock:
-|   |       [proj3]
-|   |           FunctionCall [getField]
-|   |           |   Const ["city"]
-|   |           Variable [scan1]
-|   Evaluation []
-|   |   BindBlock:
-|   |       [proj1]
-|   |           FunctionCall [getField]
-|   |           |   Const ["id"]
-|   |           Variable [scan1]
+|   Evaluation [{proj3}]
+|   |   FunctionCall [getField]
+|   |   |   Const ["city"]
+|   |   Variable [scan1]
+|   Evaluation [{proj1}]
+|   |   FunctionCall [getField]
+|   |   |   Const ["id"]
+|   |   Variable [scan1]
 |   PhysicalScan [{'<root>': scan1}, otherColl]
-|       BindBlock:
-|           [scan1]
-|               Source []
-Evaluation []
-|   BindBlock:
-|       [proj2]
-|           FunctionCall [getField]
-|           |   Const ["city"]
-|           Variable [scan0]
-Evaluation []
-|   BindBlock:
-|       [proj0]
-|           FunctionCall [getField]
-|           |   Const ["other_id"]
-|           Variable [scan0]
+Evaluation [{proj2}]
+|   FunctionCall [getField]
+|   |   Const ["city"]
+|   Variable [scan0]
+Evaluation [{proj0}]
+|   FunctionCall [getField]
+|   |   Const ["other_id"]
+|   Variable [scan0]
 PhysicalScan [{'<root>': scan0}, collName]
-    BindBlock:
-        [scan0]
-            Source []
 
 -- OUTPUT:
 [6] mj 
@@ -193,38 +145,24 @@ MergeJoin []
 |   |   Collation
 |   |       Descending
 |   |       Ascending
-|   Evaluation []
-|   |   BindBlock:
-|   |       [proj3]
-|   |           FunctionCall [getField]
-|   |           |   Const ["city"]
-|   |           Variable [scan1]
-|   Evaluation []
-|   |   BindBlock:
-|   |       [proj1]
-|   |           FunctionCall [getField]
-|   |           |   Const ["id"]
-|   |           Variable [scan1]
+|   Evaluation [{proj3}]
+|   |   FunctionCall [getField]
+|   |   |   Const ["city"]
+|   |   Variable [scan1]
+|   Evaluation [{proj1}]
+|   |   FunctionCall [getField]
+|   |   |   Const ["id"]
+|   |   Variable [scan1]
 |   PhysicalScan [{'<root>': scan1}, otherColl]
-|       BindBlock:
-|           [scan1]
-|               Source []
-Evaluation []
-|   BindBlock:
-|       [proj2]
-|           FunctionCall [getField]
-|           |   Const ["city"]
-|           Variable [scan0]
-Evaluation []
-|   BindBlock:
-|       [proj0]
-|           FunctionCall [getField]
-|           |   Const ["other_id"]
-|           Variable [scan0]
+Evaluation [{proj2}]
+|   FunctionCall [getField]
+|   |   Const ["city"]
+|   Variable [scan0]
+Evaluation [{proj0}]
+|   FunctionCall [getField]
+|   |   Const ["other_id"]
+|   Variable [scan0]
 PhysicalScan [{'<root>': scan0}, collName]
-    BindBlock:
-        [scan0]
-            Source []
 
 -- OUTPUT:
 [6] mj 
@@ -247,38 +185,24 @@ MergeJoin []
 |   |   Collation
 |   |       Descending
 |   |       Descending
-|   Evaluation []
-|   |   BindBlock:
-|   |       [proj3]
-|   |           FunctionCall [getField]
-|   |           |   Const ["city"]
-|   |           Variable [scan1]
-|   Evaluation []
-|   |   BindBlock:
-|   |       [proj1]
-|   |           FunctionCall [getField]
-|   |           |   Const ["id"]
-|   |           Variable [scan1]
+|   Evaluation [{proj3}]
+|   |   FunctionCall [getField]
+|   |   |   Const ["city"]
+|   |   Variable [scan1]
+|   Evaluation [{proj1}]
+|   |   FunctionCall [getField]
+|   |   |   Const ["id"]
+|   |   Variable [scan1]
 |   PhysicalScan [{'<root>': scan1}, otherColl]
-|       BindBlock:
-|           [scan1]
-|               Source []
-Evaluation []
-|   BindBlock:
-|       [proj2]
-|           FunctionCall [getField]
-|           |   Const ["city"]
-|           Variable [scan0]
-Evaluation []
-|   BindBlock:
-|       [proj0]
-|           FunctionCall [getField]
-|           |   Const ["other_id"]
-|           Variable [scan0]
+Evaluation [{proj2}]
+|   FunctionCall [getField]
+|   |   Const ["city"]
+|   Variable [scan0]
+Evaluation [{proj0}]
+|   FunctionCall [getField]
+|   |   Const ["other_id"]
+|   Variable [scan0]
 PhysicalScan [{'<root>': scan0}, collName]
-    BindBlock:
-        [scan0]
-            Source []
 
 -- OUTPUT:
 [6] mj 

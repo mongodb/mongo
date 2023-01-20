@@ -61,17 +61,9 @@ NestedLoopJoin [joinType: Inner, {rid_0}]
 |   |       limit: 1
 |   |       skip: 0
 |   Seek [ridProjection: rid_0, {'<root>': scan_0, 'b': evalTemp_4}, collection]
-|   |   BindBlock:
-|   |       [evalTemp_4]
-|   |           Source []
-|   |       [scan_0]
-|   |           Source []
 |   RefBlock: 
 |       Variable [rid_0]
 IndexScan [{'<rid>': rid_0}, scanDefName: collection, indexDefName: index1, interval: {=Const [3]}]
-    BindBlock:
-        [rid_0]
-            Source []
 
 
 ==== VARIATION: optimized partial index negative: the expression does not match the pipeline ====
@@ -141,12 +133,5 @@ Filter []
 |   |   Variable [valCmp_0]
 |   Variable [evalTemp_2]
 PhysicalScan [{'<root>': scan_0, 'a': evalTemp_2, 'b': evalTemp_3}, collection]
-    BindBlock:
-        [evalTemp_2]
-            Source []
-        [evalTemp_3]
-            Source []
-        [scan_0]
-            Source []
 
 

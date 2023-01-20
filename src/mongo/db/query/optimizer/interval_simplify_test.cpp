@@ -75,7 +75,7 @@ TEST_F(IntervalIntersection, SingleFieldIntersection) {
         {"index1", makeIndexDefinition("a0", CollationOp::Ascending, /*Not multikey*/ false)}};
 
     const std::string q1Text = "{a0: {$gt:14, $lt:21}}";
-    ASSERT_EXPLAIN_V2(
+    ASSERT_EXPLAIN_V2_AUTO(
         "Root []\n"
         "|   |   projections: \n"
         "|   |       scan_0\n"
@@ -88,20 +88,14 @@ TEST_F(IntervalIntersection, SingleFieldIntersection) {
         "|   |       limit: 1\n"
         "|   |       skip: 0\n"
         "|   Seek [ridProjection: rid_0, {'<root>': scan_0}, coll]\n"
-        "|   |   BindBlock:\n"
-        "|   |       [scan_0]\n"
-        "|   |           Source []\n"
         "|   RefBlock: \n"
         "|       Variable [rid_0]\n"
-        "IndexScan [{'<rid>': rid_0}, scanDefName: coll, indexDefName: index1, interval: "
-        "{(Const [14], Const [21])}]\n"
-        "    BindBlock:\n"
-        "        [rid_0]\n"
-        "            Source []\n",
+        "IndexScan [{'<rid>': rid_0}, scanDefName: coll, indexDefName: index1, interval: {(Const "
+        "[14], Const [21])}]\n",
         optimizedQueryPlan(q1Text, testIndex));
 
     const std::string q2Text = "{$and: [{a0: {$gt:14}}, {a0: {$lt: 21}}]}";
-    ASSERT_EXPLAIN_V2(
+    ASSERT_EXPLAIN_V2_AUTO(
         "Root []\n"
         "|   |   projections: \n"
         "|   |       scan_0\n"
@@ -114,22 +108,16 @@ TEST_F(IntervalIntersection, SingleFieldIntersection) {
         "|   |       limit: 1\n"
         "|   |       skip: 0\n"
         "|   Seek [ridProjection: rid_0, {'<root>': scan_0}, coll]\n"
-        "|   |   BindBlock:\n"
-        "|   |       [scan_0]\n"
-        "|   |           Source []\n"
         "|   RefBlock: \n"
         "|       Variable [rid_0]\n"
-        "IndexScan [{'<rid>': rid_0}, scanDefName: coll, indexDefName: index1, interval: "
-        "{(Const [14], Const [21])}]\n"
-        "    BindBlock:\n"
-        "        [rid_0]\n"
-        "            Source []\n",
+        "IndexScan [{'<rid>': rid_0}, scanDefName: coll, indexDefName: index1, interval: {(Const "
+        "[14], Const [21])}]\n",
         optimizedQueryPlan(q2Text, testIndex));
 
     const std::string q3Text =
         "{$or: [{$and: [{a0: {$gt:9, $lt:999}}, {a0: {$gt: 0, $lt: 12}}]}, {$and: [{a0: {$gt:40, "
         "$lt:997}}, {a0: {$gt:0, $lt: 44}}]}]}";
-    ASSERT_EXPLAIN_V2(
+    ASSERT_EXPLAIN_V2_AUTO(
         "Root []\n"
         "|   |   projections: \n"
         "|   |       scan_0\n"
@@ -142,9 +130,6 @@ TEST_F(IntervalIntersection, SingleFieldIntersection) {
         "|   |       limit: 1\n"
         "|   |       skip: 0\n"
         "|   Seek [ridProjection: rid_0, {'<root>': scan_0}, coll]\n"
-        "|   |   BindBlock:\n"
-        "|   |       [scan_0]\n"
-        "|   |           Source []\n"
         "|   RefBlock: \n"
         "|       Variable [rid_0]\n"
         "GroupBy []\n"
@@ -152,34 +137,23 @@ TEST_F(IntervalIntersection, SingleFieldIntersection) {
         "|   |       RefBlock: \n"
         "|   |           Variable [rid_0]\n"
         "|   aggregations: \n"
-        "Union []\n"
-        "|   |   BindBlock:\n"
-        "|   |       [rid_0]\n"
-        "|   |           Source []\n"
+        "Union [{rid_0}]\n"
         "|   IndexScan [{'<rid>': rid_0}, scanDefName: coll, indexDefName: index1, interval: {(Co"
         "nst [40], Const [44])}]\n"
-        "|       BindBlock:\n"
-        "|           [rid_0]\n"
-        "|               Source []\n"
         "IndexScan [{'<rid>': rid_0}, scanDefName: coll, indexDefName: index1, interval: {(Const "
-        "[9], Const [12])}]\n"
-        "    BindBlock:\n"
-        "        [rid_0]\n"
-        "            Source []\n",
+        "[9], Const [12])}]\n",
         optimizedQueryPlan(q3Text, testIndex));
 
     // Contradiction: empty interval.
     const std::string q4Text = "{$and: [{a0: {$gt:20}}, {a0: {$lt: 20}}]}";
-    ASSERT_EXPLAIN_V2(
+    ASSERT_EXPLAIN_V2_AUTO(
         "Root []\n"
         "|   |   projections: \n"
         "|   |       scan_0\n"
         "|   RefBlock: \n"
         "|       Variable [scan_0]\n"
-        "Evaluation []\n"
-        "|   BindBlock:\n"
-        "|       [scan_0]\n"
-        "|           Const [Nothing]\n"
+        "Evaluation [{scan_0}]\n"
+        "|   Const [Nothing]\n"
         "LimitSkip []\n"
         "|   limitSkip:\n"
         "|       limit: 0\n"
@@ -191,7 +165,7 @@ TEST_F(IntervalIntersection, SingleFieldIntersection) {
     const std::string q5Text =
         "{$or: [{$and: [{a0: {$gt:9}}, {a0: {$lt: 12}}]}, {$and: [{a0: {$gt:44}}, {a0: {$lt: "
         "40}}]}]}";
-    ASSERT_EXPLAIN_V2(
+    ASSERT_EXPLAIN_V2_AUTO(
         "Root []\n"
         "|   |   projections: \n"
         "|   |       scan_0\n"
@@ -204,32 +178,24 @@ TEST_F(IntervalIntersection, SingleFieldIntersection) {
         "|   |       limit: 1\n"
         "|   |       skip: 0\n"
         "|   Seek [ridProjection: rid_0, {'<root>': scan_0}, coll]\n"
-        "|   |   BindBlock:\n"
-        "|   |       [scan_0]\n"
-        "|   |           Source []\n"
         "|   RefBlock: \n"
         "|       Variable [rid_0]\n"
-        "IndexScan [{'<rid>': rid_0}, scanDefName: coll, indexDefName: index1, interval: "
-        "{(Const [9], Const [12])}]\n"
-        "    BindBlock:\n"
-        "        [rid_0]\n"
-        "            Source []\n",
+        "IndexScan [{'<rid>': rid_0}, scanDefName: coll, indexDefName: index1, interval: {(Const "
+        "[9], Const [12])}]\n",
         optimizedQueryPlan(q5Text, testIndex));
 
     // Contradiction: both conjuncts empty, whole disjunct empty.
     const std::string q6Text =
         "{$or: [{$and: [{a0: {$gt:15}}, {a0: {$lt: 10}}]}, {$and: [{a0: {$gt:44}}, {a0: {$lt: "
         "40}}]}]}";
-    ASSERT_EXPLAIN_V2(
+    ASSERT_EXPLAIN_V2_AUTO(
         "Root []\n"
         "|   |   projections: \n"
         "|   |       scan_0\n"
         "|   RefBlock: \n"
         "|       Variable [scan_0]\n"
-        "Evaluation []\n"
-        "|   BindBlock:\n"
-        "|       [scan_0]\n"
-        "|           Const [Nothing]\n"
+        "Evaluation [{scan_0}]\n"
+        "|   Const [Nothing]\n"
         "LimitSkip []\n"
         "|   limitSkip:\n"
         "|       limit: 0\n"
@@ -241,16 +207,14 @@ TEST_F(IntervalIntersection, SingleFieldIntersection) {
     const std::string q7Text =
         "{$or: [{$and: [{a0: {$gt:12}}, {a0: {$lt: 12}}]}, {$and: [{a0: {$gte:42}}, {a0: {$lt: "
         "42}}]}]}";
-    ASSERT_EXPLAIN_V2(
+    ASSERT_EXPLAIN_V2_AUTO(
         "Root []\n"
         "|   |   projections: \n"
         "|   |       scan_0\n"
         "|   RefBlock: \n"
         "|       Variable [scan_0]\n"
-        "Evaluation []\n"
-        "|   BindBlock:\n"
-        "|       [scan_0]\n"
-        "|           Const [Nothing]\n"
+        "Evaluation [{scan_0}]\n"
+        "|   Const [Nothing]\n"
         "LimitSkip []\n"
         "|   limitSkip:\n"
         "|       limit: 0\n"
@@ -270,16 +234,14 @@ TEST_F(IntervalIntersection, MultiFieldIntersection) {
 
     const std::string q1Text =
         "{$and: [{a0: {$gt: 11}}, {a0: {$lt: 14}}, {b0: {$gt: 21}}, {b0: {$lt: 12}}]}";
-    ASSERT_EXPLAIN_V2(
+    ASSERT_EXPLAIN_V2_AUTO(
         "Root []\n"
         "|   |   projections: \n"
         "|   |       scan_0\n"
         "|   RefBlock: \n"
         "|       Variable [scan_0]\n"
-        "Evaluation []\n"
-        "|   BindBlock:\n"
-        "|       [scan_0]\n"
-        "|           Const [Nothing]\n"
+        "Evaluation [{scan_0}]\n"
+        "|   Const [Nothing]\n"
         "LimitSkip []\n"
         "|   limitSkip:\n"
         "|       limit: 0\n"
@@ -289,16 +251,14 @@ TEST_F(IntervalIntersection, MultiFieldIntersection) {
 
     const std::string q2Text =
         "{$and: [{a0: {$gt: 14}}, {a0: {$lt: 11}}, {b0: {$gt: 12}}, {b0: {$lt: 21}}]}";
-    ASSERT_EXPLAIN_V2(
+    ASSERT_EXPLAIN_V2_AUTO(
         "Root []\n"
         "|   |   projections: \n"
         "|   |       scan_0\n"
         "|   RefBlock: \n"
         "|       Variable [scan_0]\n"
-        "Evaluation []\n"
-        "|   BindBlock:\n"
-        "|       [scan_0]\n"
-        "|           Const [Nothing]\n"
+        "Evaluation [{scan_0}]\n"
+        "|   Const [Nothing]\n"
         "LimitSkip []\n"
         "|   limitSkip:\n"
         "|       limit: 0\n"
@@ -308,16 +268,14 @@ TEST_F(IntervalIntersection, MultiFieldIntersection) {
 
     const std::string q3Text =
         "{$and: [{a0: {$gt: 14}}, {a0: {$lt: 11}}, {b0: {$gt: 21}}, {b0: {$lt: 12}}]}";
-    ASSERT_EXPLAIN_V2(
+    ASSERT_EXPLAIN_V2_AUTO(
         "Root []\n"
         "|   |   projections: \n"
         "|   |       scan_0\n"
         "|   RefBlock: \n"
         "|       Variable [scan_0]\n"
-        "Evaluation []\n"
-        "|   BindBlock:\n"
-        "|       [scan_0]\n"
-        "|           Const [Nothing]\n"
+        "Evaluation [{scan_0}]\n"
+        "|   Const [Nothing]\n"
         "LimitSkip []\n"
         "|   limitSkip:\n"
         "|       limit: 0\n"
@@ -326,16 +284,14 @@ TEST_F(IntervalIntersection, MultiFieldIntersection) {
         optimizedQueryPlan(q3Text, testIndex));
 
     const std::string q4Text = "{$and: [{a0: 42}, {b0: {$gt: 21}}, {b0: {$lt: 12}}]}";
-    ASSERT_EXPLAIN_V2(
+    ASSERT_EXPLAIN_V2_AUTO(
         "Root []\n"
         "|   |   projections: \n"
         "|   |       scan_0\n"
         "|   RefBlock: \n"
         "|       Variable [scan_0]\n"
-        "Evaluation []\n"
-        "|   BindBlock:\n"
-        "|       [scan_0]\n"
-        "|           Const [Nothing]\n"
+        "Evaluation [{scan_0}]\n"
+        "|   Const [Nothing]\n"
         "LimitSkip []\n"
         "|   limitSkip:\n"
         "|       limit: 0\n"

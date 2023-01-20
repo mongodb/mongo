@@ -5,26 +5,16 @@
 HashJoin [joinType: Inner]
 |   |   Condition
 |   |       otherID = ID
-|   Evaluation []
-|   |   BindBlock:
-|   |       [ID]
-|   |           FunctionCall [getField]
-|   |           |   Const ["id"]
-|   |           Variable [scan1]
+|   Evaluation [{ID}]
+|   |   FunctionCall [getField]
+|   |   |   Const ["id"]
+|   |   Variable [scan1]
 |   PhysicalScan [{'<root>': scan1}, otherColl]
-|       BindBlock:
-|           [scan1]
-|               Source []
-Evaluation []
-|   BindBlock:
-|       [otherID]
-|           FunctionCall [getField]
-|           |   Const ["other_id"]
-|           Variable [scan0]
+Evaluation [{otherID}]
+|   FunctionCall [getField]
+|   |   Const ["other_id"]
+|   Variable [scan0]
 PhysicalScan [{'<root>': scan0}, collName]
-    BindBlock:
-        [scan0]
-            Source []
 
 -- OUTPUT:
 [4] hj 
@@ -42,38 +32,24 @@ HashJoin [joinType: Inner]
 |   |   Condition
 |   |       proj0 = proj2
 |   |       proj1 = proj3
-|   Evaluation []
-|   |   BindBlock:
-|   |       [proj3]
-|   |           FunctionCall [getField]
-|   |           |   Const ["state_id"]
-|   |           Variable [scan1]
-|   Evaluation []
-|   |   BindBlock:
-|   |       [proj2]
-|   |           FunctionCall [getField]
-|   |           |   Const ["cityField"]
-|   |           Variable [scan1]
+|   Evaluation [{proj3}]
+|   |   FunctionCall [getField]
+|   |   |   Const ["state_id"]
+|   |   Variable [scan1]
+|   Evaluation [{proj2}]
+|   |   FunctionCall [getField]
+|   |   |   Const ["cityField"]
+|   |   Variable [scan1]
 |   PhysicalScan [{'<root>': scan1}, otherColl]
-|       BindBlock:
-|           [scan1]
-|               Source []
-Evaluation []
-|   BindBlock:
-|       [proj1]
-|           FunctionCall [getField]
-|           |   Const ["state"]
-|           Variable [scan0]
-Evaluation []
-|   BindBlock:
-|       [proj0]
-|           FunctionCall [getField]
-|           |   Const ["city"]
-|           Variable [scan0]
+Evaluation [{proj1}]
+|   FunctionCall [getField]
+|   |   Const ["state"]
+|   Variable [scan0]
+Evaluation [{proj0}]
+|   FunctionCall [getField]
+|   |   Const ["city"]
+|   Variable [scan0]
 PhysicalScan [{'<root>': scan0}, collName]
-    BindBlock:
-        [scan0]
-            Source []
 
 -- OUTPUT:
 [6] hj 

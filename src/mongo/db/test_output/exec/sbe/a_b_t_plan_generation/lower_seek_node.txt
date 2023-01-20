@@ -9,15 +9,9 @@ NestedLoopJoin [joinType: Inner, {rid}]
 |   |       limit: 1
 |   |       skip: 0
 |   Seek [ridProjection: rid, {'<root>': scan0}, collName]
-|   |   BindBlock:
-|   |       [scan0]
-|   |           Source []
 |   RefBlock: 
 |       Variable [rid]
 IndexScan [{'<rid>': rid}, scanDefName: collName, indexDefName: index0, interval: {(Const [23], Const [35]]}]
-    BindBlock:
-        [rid]
-            Source []
 
 -- OUTPUT:
 [3] nlj inner [] [s1] {true} 

@@ -38,21 +38,15 @@ Root []
 |   RefBlock: 
 |       Variable [scan_0]
 Sargable [Complete]
-|   |   |   |   |   requirementsMap: 
-|   |   |   |   |       refProjection: scan_0, path: 'PathGet [a] PathTraverse [1] PathIdentity []', intervals: {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}
-|   |   |   |   candidateIndexes: 
-|   |   |   |       candidateId: 1, index1, {}, {Compound}, {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}
-|   |   |   scanParams: 
-|   |   |       {'a': evalTemp_0}
-|   |   |           residualReqs: 
-|   |   |               refProjection: evalTemp_0, path: 'PathTraverse [1] PathIdentity []', intervals: {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}, entryIndex: 0
-|   |   BindBlock:
-|   RefBlock: 
-|       Variable [scan_0]
-Scan [collection]
-    BindBlock:
-        [scan_0]
-            Source []
+|   |   |   |   requirementsMap: 
+|   |   |   |       refProjection: scan_0, path: 'PathGet [a] PathTraverse [1] PathIdentity []', intervals: {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}
+|   |   |   candidateIndexes: 
+|   |   |       candidateId: 1, index1, {}, {Compound}, {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}
+|   |   scanParams: 
+|   |       {'a': evalTemp_0}
+|   |           residualReqs: 
+|   |               refProjection: evalTemp_0, path: 'PathTraverse [1] PathIdentity []', intervals: {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}, entryIndex: 0
+Scan [collection, {scan_0}]
 
 
 ==== VARIATION: optimized $match with $in and a list of equalities becomes a comparison to an EqMember list. ====
@@ -95,21 +89,15 @@ Root []
 |   RefBlock: 
 |       Variable [scan_0]
 Sargable [Complete]
-|   |   |   |   |   requirementsMap: 
-|   |   |   |   |       refProjection: scan_0, path: 'PathGet [a] PathTraverse [1] PathIdentity []', intervals: {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}
-|   |   |   |   candidateIndexes: 
-|   |   |   |       candidateId: 1, index1, {}, {Compound}, {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}
-|   |   |   scanParams: 
-|   |   |       {'a': evalTemp_0}
-|   |   |           residualReqs: 
-|   |   |               refProjection: evalTemp_0, path: 'PathTraverse [1] PathIdentity []', intervals: {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}, entryIndex: 0
-|   |   BindBlock:
-|   RefBlock: 
-|       Variable [scan_0]
-Scan [collection]
-    BindBlock:
-        [scan_0]
-            Source []
+|   |   |   |   requirementsMap: 
+|   |   |   |       refProjection: scan_0, path: 'PathGet [a] PathTraverse [1] PathIdentity []', intervals: {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}
+|   |   |   candidateIndexes: 
+|   |   |       candidateId: 1, index1, {}, {Compound}, {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}
+|   |   scanParams: 
+|   |       {'a': evalTemp_0}
+|   |           residualReqs: 
+|   |               refProjection: evalTemp_0, path: 'PathTraverse [1] PathIdentity []', intervals: {{{=Const [1]}} U {{=Const [2]}} U {{=Const [3]}}}, entryIndex: 0
+Scan [collection, {scan_0}]
 
 
 ==== VARIATION: optimized $project inclusion then $match: observe the Filter can be reordered against the Eval node ====
@@ -139,22 +127,20 @@ Root []
 |   |       combinedProjection_0
 |   RefBlock: 
 |       Variable [combinedProjection_0]
-Evaluation []
-|   BindBlock:
-|       [combinedProjection_0]
-|           EvalPath []
-|           |   Const [{}]
-|           PathComposeM []
-|           |   PathField [b]
-|           |   PathConstant []
-|           |   Variable [fieldProj_2]
-|           PathComposeM []
-|           |   PathField [a]
-|           |   PathConstant []
-|           |   Variable [fieldProj_1]
-|           PathField [_id]
-|           PathConstant []
-|           Variable [fieldProj_0]
+Evaluation [{combinedProjection_0}]
+|   EvalPath []
+|   |   Const [{}]
+|   PathComposeM []
+|   |   PathField [b]
+|   |   PathConstant []
+|   |   Variable [fieldProj_2]
+|   PathComposeM []
+|   |   PathField [a]
+|   |   PathConstant []
+|   |   Variable [fieldProj_1]
+|   PathField [_id]
+|   PathConstant []
+|   Variable [fieldProj_0]
 Filter []
 |   EvalFilter []
 |   |   Variable [fieldProj_1]
@@ -162,13 +148,6 @@ Filter []
 |   PathCompare [Eq]
 |   Const [2]
 PhysicalScan [{'_id': fieldProj_0, 'a': fieldProj_1, 'b': fieldProj_2}, collection]
-    BindBlock:
-        [fieldProj_0]
-            Source []
-        [fieldProj_1]
-            Source []
-        [fieldProj_2]
-            Source []
 
 
 ==== VARIATION: optimized $match basic ====
@@ -209,13 +188,6 @@ Filter []
 |   PathCompare [Eq]
 |   Const [1]
 PhysicalScan [{'<root>': scan_0, 'a': evalTemp_2, 'b': evalTemp_3}, collection]
-    BindBlock:
-        [evalTemp_2]
-            Source []
-        [evalTemp_3]
-            Source []
-        [scan_0]
-            Source []
 
 
 ==== VARIATION: optimized $expr filter: make sure we have a single array constant for (1, 2, 'str', ...) ====
@@ -241,37 +213,32 @@ Root []
 |   |       combinedProjection_0
 |   RefBlock: 
 |       Variable [combinedProjection_0]
-Evaluation []
-|   BindBlock:
-|       [combinedProjection_0]
-|           EvalPath []
-|           |   Variable [scan_0]
-|           PathComposeM []
-|           |   PathDefault []
-|           |   Const [{}]
-|           PathComposeM []
-|           |   PathField [a]
-|           |   PathConstant []
-|           |   EvalPath []
-|           |   |   Const [[1, 2, "str", {"a" : 2, "b" : "s"}, 3, 4]]
-|           |   PathTraverse [inf]
-|           |   PathLambda []
-|           |   LambdaAbstraction [var_1]
-|           |   If []
-|           |   |   |   Const [Nothing]
-|           |   |   Variable [var_1]
-|           |   BinaryOp [And]
-|           |   |   BinaryOp [Gte]
-|           |   |   |   Const [2]
-|           |   |   Variable [var_1]
-|           |   BinaryOp [Lte]
-|           |   |   Const [3]
-|           |   Variable [var_1]
-|           PathKeep [_id, a]
-Scan [collection]
-    BindBlock:
-        [scan_0]
-            Source []
+Evaluation [{combinedProjection_0}]
+|   EvalPath []
+|   |   Variable [scan_0]
+|   PathComposeM []
+|   |   PathDefault []
+|   |   Const [{}]
+|   PathComposeM []
+|   |   PathField [a]
+|   |   PathConstant []
+|   |   EvalPath []
+|   |   |   Const [[1, 2, "str", {"a" : 2, "b" : "s"}, 3, 4]]
+|   |   PathTraverse [inf]
+|   |   PathLambda []
+|   |   LambdaAbstraction [var_1]
+|   |   If []
+|   |   |   |   Const [Nothing]
+|   |   |   Variable [var_1]
+|   |   BinaryOp [And]
+|   |   |   BinaryOp [Gte]
+|   |   |   |   Const [2]
+|   |   |   Variable [var_1]
+|   |   BinaryOp [Lte]
+|   |   |   Const [3]
+|   |   Variable [var_1]
+|   PathKeep [_id, a]
+Scan [collection, {scan_0}]
 
 
 ==== VARIATION: optimized $group local global ====
@@ -303,18 +270,16 @@ Exchange []
 |   |   distribution: 
 |   |       type: Centralized
 |   RefBlock: 
-Evaluation []
-|   BindBlock:
-|       [agg_project_0]
-|           EvalPath []
-|           |   Const [{}]
-|           PathComposeM []
-|           |   PathField [c]
-|           |   PathConstant []
-|           |   Variable [field_agg_0]
-|           PathField [_id]
-|           PathConstant []
-|           Variable [groupByProj_0]
+Evaluation [{agg_project_0}]
+|   EvalPath []
+|   |   Const [{}]
+|   PathComposeM []
+|   |   PathField [c]
+|   |   PathConstant []
+|   |   Variable [field_agg_0]
+|   PathField [_id]
+|   PathConstant []
+|   Variable [groupByProj_0]
 GroupBy [Global]
 |   |   groupings: 
 |   |       RefBlock: 
@@ -339,11 +304,6 @@ GroupBy [Local]
 |           FunctionCall [$sum]
 |           Variable [groupByInputProj_0]
 PhysicalScan [{'a': groupByProj_0, 'b': groupByInputProj_0}, collection, parallel]
-    BindBlock:
-        [groupByInputProj_0]
-            Source []
-        [groupByProj_0]
-            Source []
 
 
 ==== VARIATION: optimized $unwind then $sort ====
@@ -380,36 +340,22 @@ Collation []
 |   |       sort_0: Ascending
 |   RefBlock: 
 |       Variable [sort_0]
-Evaluation []
-|   BindBlock:
-|       [sort_0]
-|           Variable [unwoundProj_0]
-Evaluation []
-|   BindBlock:
-|       [embedProj_0]
-|           If []
-|           |   |   Variable [scan_0]
-|           |   FunctionCall [setField]
-|           |   |   |   Variable [unwoundProj_0]
-|           |   |   Const ["x"]
-|           |   Variable [scan_0]
-|           BinaryOp [Or]
-|           |   FunctionCall [isObject]
-|           |   Variable [scan_0]
-|           FunctionCall [exists]
-|           Variable [unwoundProj_0]
+Evaluation [{sort_0}]
+|   Variable [unwoundProj_0]
+Evaluation [{embedProj_0}]
+|   If []
+|   |   |   Variable [scan_0]
+|   |   FunctionCall [setField]
+|   |   |   |   Variable [unwoundProj_0]
+|   |   |   Const ["x"]
+|   |   Variable [scan_0]
+|   BinaryOp [Or]
+|   |   FunctionCall [isObject]
+|   |   Variable [scan_0]
+|   FunctionCall [exists]
+|   Variable [unwoundProj_0]
 Unwind []
-|   BindBlock:
-|       [unwoundPid_0]
-|           Source []
-|       [unwoundProj_0]
-|           Source []
 PhysicalScan [{'<root>': scan_0, 'x': unwoundProj_0}, collection]
-    BindBlock:
-        [scan_0]
-            Source []
-        [unwoundProj_0]
-            Source []
 
 
 ==== VARIATION: optimized $match with index ====
@@ -460,15 +406,9 @@ NestedLoopJoin [joinType: Inner, {rid_0}]
 |   |       limit: 1
 |   |       skip: 0
 |   Seek [ridProjection: rid_0, {'<root>': scan_0}, collection]
-|   |   BindBlock:
-|   |       [scan_0]
-|   |           Source []
 |   RefBlock: 
 |       Variable [rid_0]
 IndexScan [{'<rid>': rid_0}, scanDefName: collection, indexDefName: index1, interval: {=Const [10]}]
-    BindBlock:
-        [rid_0]
-            Source []
 
 
 ==== VARIATION: optimized $match index covered ====
@@ -513,18 +453,13 @@ Root []
 |   |       combinedProjection_0
 |   RefBlock: 
 |       Variable [combinedProjection_0]
-Evaluation []
-|   BindBlock:
-|       [combinedProjection_0]
-|           EvalPath []
-|           |   Const [{}]
-|           PathField [a]
-|           PathConstant []
-|           Variable [fieldProj_0]
+Evaluation [{combinedProjection_0}]
+|   EvalPath []
+|   |   Const [{}]
+|   PathField [a]
+|   PathConstant []
+|   Variable [fieldProj_0]
 IndexScan [{'<indexKey> 0': fieldProj_0}, scanDefName: collection, indexDefName: index1, interval: {=Const [10]}]
-    BindBlock:
-        [fieldProj_0]
-            Source []
 
 
 ==== VARIATION: optimized $match index covered, match then project ====
@@ -569,18 +504,13 @@ Root []
 |   |       combinedProjection_0
 |   RefBlock: 
 |       Variable [combinedProjection_0]
-Evaluation []
-|   BindBlock:
-|       [combinedProjection_0]
-|           EvalPath []
-|           |   Const [{}]
-|           PathField [a]
-|           PathConstant []
-|           Variable [fieldProj_0]
+Evaluation [{combinedProjection_0}]
+|   EvalPath []
+|   |   Const [{}]
+|   PathField [a]
+|   PathConstant []
+|   Variable [fieldProj_0]
 IndexScan [{'<indexKey> 0': fieldProj_0}, scanDefName: collection, indexDefName: index1, interval: {=Const [10]}]
-    BindBlock:
-        [fieldProj_0]
-            Source []
 
 
 ==== VARIATION: optimized $match index covered, match on two indexed keys then project ====
@@ -630,18 +560,13 @@ Root []
 |   |       combinedProjection_0
 |   RefBlock: 
 |       Variable [combinedProjection_0]
-Evaluation []
-|   BindBlock:
-|       [combinedProjection_0]
-|           EvalPath []
-|           |   Const [{}]
-|           PathField [a]
-|           PathConstant []
-|           Variable [fieldProj_0]
+Evaluation [{combinedProjection_0}]
+|   EvalPath []
+|   |   Const [{}]
+|   PathField [a]
+|   PathConstant []
+|   Variable [fieldProj_0]
 IndexScan [{'<indexKey> 0': fieldProj_0}, scanDefName: collection, indexDefName: index1, interval: {=Const [10], =Const [20]}]
-    BindBlock:
-        [fieldProj_0]
-            Source []
 
 
 ==== VARIATION: optimized $match index covered, match on three indexed keys then project ====
@@ -696,30 +621,21 @@ Root []
 |   |       combinedProjection_0
 |   RefBlock: 
 |       Variable [combinedProjection_0]
-Evaluation []
-|   BindBlock:
-|       [combinedProjection_0]
-|           EvalPath []
-|           |   Const [{}]
-|           PathComposeM []
-|           |   PathField [c]
-|           |   PathConstant []
-|           |   Variable [fieldProj_2]
-|           PathComposeM []
-|           |   PathField [b]
-|           |   PathConstant []
-|           |   Variable [fieldProj_1]
-|           PathField [a]
-|           PathConstant []
-|           Variable [fieldProj_0]
+Evaluation [{combinedProjection_0}]
+|   EvalPath []
+|   |   Const [{}]
+|   PathComposeM []
+|   |   PathField [c]
+|   |   PathConstant []
+|   |   Variable [fieldProj_2]
+|   PathComposeM []
+|   |   PathField [b]
+|   |   PathConstant []
+|   |   Variable [fieldProj_1]
+|   PathField [a]
+|   PathConstant []
+|   Variable [fieldProj_0]
 IndexScan [{'<indexKey> 0': fieldProj_0, '<indexKey> 1': fieldProj_1, '<indexKey> 2': fieldProj_2}, scanDefName: collection, indexDefName: index1, interval: {=Const [10], =Const [20], =Const [30]}]
-    BindBlock:
-        [fieldProj_0]
-            Source []
-        [fieldProj_1]
-            Source []
-        [fieldProj_2]
-            Source []
 
 
 ==== VARIATION: optimized $match index covered, inclusion project then match on three indexed keys ====
@@ -774,30 +690,21 @@ Root []
 |   |       combinedProjection_0
 |   RefBlock: 
 |       Variable [combinedProjection_0]
-Evaluation []
-|   BindBlock:
-|       [combinedProjection_0]
-|           EvalPath []
-|           |   Const [{}]
-|           PathComposeM []
-|           |   PathField [c]
-|           |   PathConstant []
-|           |   Variable [fieldProj_2]
-|           PathComposeM []
-|           |   PathField [b]
-|           |   PathConstant []
-|           |   Variable [fieldProj_1]
-|           PathField [a]
-|           PathConstant []
-|           Variable [fieldProj_0]
+Evaluation [{combinedProjection_0}]
+|   EvalPath []
+|   |   Const [{}]
+|   PathComposeM []
+|   |   PathField [c]
+|   |   PathConstant []
+|   |   Variable [fieldProj_2]
+|   PathComposeM []
+|   |   PathField [b]
+|   |   PathConstant []
+|   |   Variable [fieldProj_1]
+|   PathField [a]
+|   PathConstant []
+|   Variable [fieldProj_0]
 IndexScan [{'<indexKey> 0': fieldProj_0, '<indexKey> 1': fieldProj_1, '<indexKey> 2': fieldProj_2}, scanDefName: collection, indexDefName: index1, interval: {=Const [10], =Const [20], =Const [30]}]
-    BindBlock:
-        [fieldProj_0]
-            Source []
-        [fieldProj_1]
-            Source []
-        [fieldProj_2]
-            Source []
 
 
 ==== VARIATION: optimized $match sort index ====
@@ -853,17 +760,9 @@ NestedLoopJoin [joinType: Inner, {rid_0}]
 |   |       limit: 1
 |   |       skip: 0
 |   Seek [ridProjection: rid_0, {'<root>': scan_0, 'a': sort_0}, collection]
-|   |   BindBlock:
-|   |       [scan_0]
-|   |           Source []
-|   |       [sort_0]
-|   |           Source []
 |   RefBlock: 
 |       Variable [rid_0]
 IndexScan [{'<rid>': rid_0}, scanDefName: collection, indexDefName: index1, interval: {=Const [10]}]
-    BindBlock:
-        [rid_0]
-            Source []
 
 
 ==== VARIATION: optimized range index ====
@@ -914,9 +813,6 @@ NestedLoopJoin [joinType: Inner, {rid_0}]
 |   |       limit: 1
 |   |       skip: 0
 |   Seek [ridProjection: rid_0, {'<root>': scan_0}, collection]
-|   |   BindBlock:
-|   |       [scan_0]
-|   |           Source []
 |   RefBlock: 
 |       Variable [rid_0]
 Filter []
@@ -933,28 +829,13 @@ GroupBy []
 |       [sides_0]
 |           FunctionCall [$addToSet]
 |           Variable [sideId_0]
-Union []
-|   |   BindBlock:
-|   |       [rid_0]
-|   |           Source []
-|   |       [sideId_0]
-|   |           Source []
-|   Evaluation []
-|   |   BindBlock:
-|   |       [sideId_0]
-|   |           Const [1]
+Union [{rid_0, sideId_0}]
+|   Evaluation [{sideId_0}]
+|   |   Const [1]
 |   IndexScan [{'<rid>': rid_0}, scanDefName: collection, indexDefName: index1, interval: {(Const [70], Const [""])}]
-|       BindBlock:
-|           [rid_0]
-|               Source []
-Evaluation []
-|   BindBlock:
-|       [sideId_0]
-|           Const [0]
+Evaluation [{sideId_0}]
+|   Const [0]
 IndexScan [{'<rid>': rid_0}, scanDefName: collection, indexDefName: index1, interval: {[Const [nan], Const [90])}]
-    BindBlock:
-        [rid_0]
-            Source []
 
 
 ==== VARIATION: optimized index on two keys ====
@@ -1011,15 +892,9 @@ NestedLoopJoin [joinType: Inner, {rid_0}]
 |   |       limit: 1
 |   |       skip: 0
 |   Seek [ridProjection: rid_0, {'<root>': scan_0}, collection]
-|   |   BindBlock:
-|   |       [scan_0]
-|   |           Source []
 |   RefBlock: 
 |       Variable [rid_0]
 IndexScan [{'<rid>': rid_0}, scanDefName: collection, indexDefName: index1, interval: {=Const [2], =Const [2]}]
-    BindBlock:
-        [rid_0]
-            Source []
 
 
 ==== VARIATION: optimized index on one key ====
@@ -1077,17 +952,9 @@ NestedLoopJoin [joinType: Inner, {rid_0}]
 |   |       limit: 1
 |   |       skip: 0
 |   Seek [ridProjection: rid_0, {'<root>': scan_0, 'b': evalTemp_4}, collection]
-|   |   BindBlock:
-|   |       [evalTemp_4]
-|   |           Source []
-|   |       [scan_0]
-|   |           Source []
 |   RefBlock: 
 |       Variable [rid_0]
 IndexScan [{'<rid>': rid_0}, scanDefName: collection, indexDefName: index1, interval: {=Const [2]}]
-    BindBlock:
-        [rid_0]
-            Source []
 
 
 ==== VARIATION: optimized $group eval no inline: verify that "b" is not inlined in the group expression, but is coming from the physical scan ====
@@ -1119,32 +986,30 @@ Root []
 |   |       agg_project_0
 |   RefBlock: 
 |       Variable [agg_project_0]
-Evaluation []
-|   BindBlock:
-|       [agg_project_0]
-|           Let [inputField_1]
-|           |   If []
-|           |   |   |   Variable [inputField_1]
-|           |   |   FunctionCall [setField]
-|           |   |   |   |   Variable [field_agg_0]
-|           |   |   |   Const ["a"]
-|           |   |   Variable [inputField_1]
-|           |   BinaryOp [Or]
-|           |   |   FunctionCall [isObject]
-|           |   |   Variable [inputField_1]
-|           |   FunctionCall [exists]
-|           |   Variable [field_agg_0]
-|           If []
-|           |   |   Const [{}]
-|           |   FunctionCall [setField]
-|           |   |   |   Variable [groupByProj_0]
-|           |   |   Const ["_id"]
-|           |   Const [{}]
-|           BinaryOp [Or]
-|           |   FunctionCall [isObject]
-|           |   Const [{}]
-|           FunctionCall [exists]
-|           Variable [groupByProj_0]
+Evaluation [{agg_project_0}]
+|   Let [inputField_1]
+|   |   If []
+|   |   |   |   Variable [inputField_1]
+|   |   |   FunctionCall [setField]
+|   |   |   |   |   Variable [field_agg_0]
+|   |   |   |   Const ["a"]
+|   |   |   Variable [inputField_1]
+|   |   BinaryOp [Or]
+|   |   |   FunctionCall [isObject]
+|   |   |   Variable [inputField_1]
+|   |   FunctionCall [exists]
+|   |   Variable [field_agg_0]
+|   If []
+|   |   |   Const [{}]
+|   |   FunctionCall [setField]
+|   |   |   |   Variable [groupByProj_0]
+|   |   |   Const ["_id"]
+|   |   Const [{}]
+|   BinaryOp [Or]
+|   |   FunctionCall [isObject]
+|   |   Const [{}]
+|   FunctionCall [exists]
+|   Variable [groupByProj_0]
 GroupBy []
 |   |   groupings: 
 |   |       RefBlock: 
@@ -1153,14 +1018,9 @@ GroupBy []
 |       [field_agg_0]
 |           FunctionCall [$first]
 |           Variable [groupByInputProj_0]
-Evaluation []
-|   BindBlock:
-|       [groupByProj_0]
-|           Const [null]
+Evaluation [{groupByProj_0}]
+|   Const [null]
 PhysicalScan [{'b': groupByInputProj_0}, collection]
-    BindBlock:
-        [groupByInputProj_0]
-            Source []
 
 
 ==== VARIATION: optimized union ====
@@ -1196,10 +1056,7 @@ Root []
 |   |       scan_0
 |   RefBlock: 
 |       Variable [scan_0]
-Union []
-|   |   BindBlock:
-|   |       [scan_0]
-|   |           Source []
+Union [{scan_0}]
 |   Filter []
 |   |   EvalFilter []
 |   |   |   Variable [scan_0]
@@ -1207,16 +1064,11 @@ Union []
 |   |   PathTraverse [1]
 |   |   PathCompare [Eq]
 |   |   Const [1]
-|   Evaluation []
-|   |   BindBlock:
-|   |       [scan_0]
-|   |           EvalPath []
-|   |           |   Variable [scan_1]
-|   |           PathIdentity []
+|   Evaluation [{scan_0}]
+|   |   EvalPath []
+|   |   |   Variable [scan_1]
+|   |   PathIdentity []
 |   PhysicalScan [{'<root>': scan_1}, collB]
-|       BindBlock:
-|           [scan_1]
-|               Source []
 Filter []
 |   EvalFilter []
 |   |   Variable [evalTemp_0]
@@ -1224,11 +1076,6 @@ Filter []
 |   PathCompare [Eq]
 |   Const [1]
 PhysicalScan [{'<root>': scan_0, '_id': evalTemp_0}, collA]
-    BindBlock:
-        [evalTemp_0]
-            Source []
-        [scan_0]
-            Source []
 
 
 ==== VARIATION: optimized common expression elimination ====
@@ -1254,36 +1101,29 @@ Root []
 |   |       combinedProjection_0
 |   RefBlock: 
 |       Variable [combinedProjection_0]
-Evaluation []
-|   BindBlock:
-|       [combinedProjection_0]
-|           EvalPath []
-|           |   Variable [scan_0]
-|           PathComposeM []
-|           |   PathDefault []
-|           |   Const [{}]
-|           PathComposeM []
-|           |   PathField [foo]
-|           |   PathConstant []
-|           |   Variable [projGetPath_0]
-|           PathComposeM []
-|           |   PathField [bar]
-|           |   PathConstant []
-|           |   Variable [projGetPath_0]
-|           PathKeep [_id, bar, foo]
-Evaluation []
-|   BindBlock:
-|       [projGetPath_0]
-|           BinaryOp [Add]
-|           |   Const [1]
-|           EvalPath []
-|           |   Variable [scan_0]
-|           PathGet [b]
-|           PathIdentity []
-Scan [test]
-    BindBlock:
-        [scan_0]
-            Source []
+Evaluation [{combinedProjection_0}]
+|   EvalPath []
+|   |   Variable [scan_0]
+|   PathComposeM []
+|   |   PathDefault []
+|   |   Const [{}]
+|   PathComposeM []
+|   |   PathField [foo]
+|   |   PathConstant []
+|   |   Variable [projGetPath_0]
+|   PathComposeM []
+|   |   PathField [bar]
+|   |   PathConstant []
+|   |   Variable [projGetPath_0]
+|   PathKeep [_id, bar, foo]
+Evaluation [{projGetPath_0}]
+|   BinaryOp [Add]
+|   |   Const [1]
+|   EvalPath []
+|   |   Variable [scan_0]
+|   PathGet [b]
+|   PathIdentity []
+Scan [test, {scan_0}]
 
 
 ==== VARIATION: optimized group by dependency: demonstrate that "c" is set to the array size (not the array itself coming from the group) ====
@@ -1313,17 +1153,15 @@ Root []
 |   |       combinedProjection_1
 |   RefBlock: 
 |       Variable [combinedProjection_1]
-Evaluation []
-|   BindBlock:
-|       [combinedProjection_1]
-|           EvalPath []
-|           |   Const [{}]
-|           PathComposeM []
-|           |   PathField [c]
-|           |   PathConstant []
-|           |   FunctionCall [getArraySize]
-|           |   Variable [field_agg_0]
-|           PathKeep []
+Evaluation [{combinedProjection_1}]
+|   EvalPath []
+|   |   Const [{}]
+|   PathComposeM []
+|   |   PathField [c]
+|   |   PathConstant []
+|   |   FunctionCall [getArraySize]
+|   |   Variable [field_agg_0]
+|   PathKeep []
 GroupBy []
 |   |   groupings: 
 |   |       RefBlock: 
@@ -1332,14 +1170,9 @@ GroupBy []
 |       [field_agg_0]
 |           FunctionCall [$addToSet]
 |           Variable [groupByInputProj_0]
-Evaluation []
-|   BindBlock:
-|       [groupByProj_0]
-|           Const [{}]
+Evaluation [{groupByProj_0}]
+|   Const [{}]
 PhysicalScan [{'a': groupByInputProj_0}, test]
-    BindBlock:
-        [groupByInputProj_0]
-            Source []
 
 
 ==== VARIATION: optimized double $elemMatch ====
@@ -1366,25 +1199,19 @@ Root []
 |   RefBlock: 
 |       Variable [scan_0]
 Sargable [Complete]
-|   |   |   |   |   requirementsMap: 
-|   |   |   |   |       refProjection: scan_0, path: 'PathGet [a] PathIdentity []', intervals: {{{[Const [[]], Const [BinData(0, )])}}}
-|   |   |   |   |       refProjection: scan_0, path: 'PathGet [a] PathTraverse [1] PathIdentity []', intervals: {{{[Const [5], Const [6]]}}}
-|   |   |   |   |       refProjection: scan_0, path: 'PathGet [b] PathIdentity []', intervals: {{{[Const [[]], Const [BinData(0, )])}}}
-|   |   |   |   |       refProjection: scan_0, path: 'PathGet [b] PathTraverse [1] PathIdentity []', intervals: {{{[Const [1], Const [3]]}}}
-|   |   |   |   candidateIndexes: 
-|   |   |   scanParams: 
-|   |   |       {'a': evalTemp_7, 'b': evalTemp_8}
-|   |   |           residualReqs: 
-|   |   |               refProjection: evalTemp_7, path: 'PathIdentity []', intervals: {{{[Const [[]], Const [BinData(0, )])}}}, entryIndex: 0
-|   |   |               refProjection: evalTemp_7, path: 'PathTraverse [1] PathIdentity []', intervals: {{{[Const [5], Const [6]]}}}, entryIndex: 1
-|   |   |               refProjection: evalTemp_8, path: 'PathIdentity []', intervals: {{{[Const [[]], Const [BinData(0, )])}}}, entryIndex: 2
-|   |   |               refProjection: evalTemp_8, path: 'PathTraverse [1] PathIdentity []', intervals: {{{[Const [1], Const [3]]}}}, entryIndex: 3
-|   |   BindBlock:
-|   RefBlock: 
-|       Variable [scan_0]
-Scan [test]
-    BindBlock:
-        [scan_0]
-            Source []
+|   |   |   |   requirementsMap: 
+|   |   |   |       refProjection: scan_0, path: 'PathGet [a] PathIdentity []', intervals: {{{[Const [[]], Const [BinData(0, )])}}}
+|   |   |   |       refProjection: scan_0, path: 'PathGet [a] PathTraverse [1] PathIdentity []', intervals: {{{[Const [5], Const [6]]}}}
+|   |   |   |       refProjection: scan_0, path: 'PathGet [b] PathIdentity []', intervals: {{{[Const [[]], Const [BinData(0, )])}}}
+|   |   |   |       refProjection: scan_0, path: 'PathGet [b] PathTraverse [1] PathIdentity []', intervals: {{{[Const [1], Const [3]]}}}
+|   |   |   candidateIndexes: 
+|   |   scanParams: 
+|   |       {'a': evalTemp_7, 'b': evalTemp_8}
+|   |           residualReqs: 
+|   |               refProjection: evalTemp_7, path: 'PathIdentity []', intervals: {{{[Const [[]], Const [BinData(0, )])}}}, entryIndex: 0
+|   |               refProjection: evalTemp_7, path: 'PathTraverse [1] PathIdentity []', intervals: {{{[Const [5], Const [6]]}}}, entryIndex: 1
+|   |               refProjection: evalTemp_8, path: 'PathIdentity []', intervals: {{{[Const [[]], Const [BinData(0, )])}}}, entryIndex: 2
+|   |               refProjection: evalTemp_8, path: 'PathTraverse [1] PathIdentity []', intervals: {{{[Const [1], Const [3]]}}}, entryIndex: 3
+Scan [test, {scan_0}]
 
 

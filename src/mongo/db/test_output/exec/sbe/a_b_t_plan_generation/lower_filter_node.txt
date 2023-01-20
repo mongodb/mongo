@@ -13,9 +13,6 @@ Filter []
 |   |   Const ["a"]
 |   Variable [scan0]
 PhysicalScan [{'<root>': scan0}, collName]
-    BindBlock:
-        [scan0]
-            Source []
 
 -- OUTPUT:
 [1] filter {(((getField(s1, "a") <=> 23) >= 0ll) ?: false)} 
@@ -28,9 +25,6 @@ Filter []
 |   |   Const [false]
 |   Const [true]
 PhysicalScan [{'<root>': scan0}, collName]
-    BindBlock:
-        [scan0]
-            Source []
 
 -- OUTPUT:
 [1] cfilter {(true ?: false)} 

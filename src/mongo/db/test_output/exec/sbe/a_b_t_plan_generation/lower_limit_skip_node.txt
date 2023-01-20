@@ -7,9 +7,6 @@ LimitSkip []
 |       limit: 5
 |       skip: 0
 PhysicalScan [{'<root>': scan0}, collName]
-    BindBlock:
-        [scan0]
-            Source []
 
 -- OUTPUT:
 [1] limitskip 5 0 
@@ -22,9 +19,6 @@ LimitSkip []
 |       limit: 0
 |       skip: 4
 PhysicalScan [{'<root>': scan0}, collName]
-    BindBlock:
-        [scan0]
-            Source []
 
 -- OUTPUT:
 [1] limitskip 0 4 
@@ -37,9 +31,6 @@ LimitSkip []
 |       limit: 4
 |       skip: 2
 PhysicalScan [{'<root>': scan0}, collName]
-    BindBlock:
-        [scan0]
-            Source []
 
 -- OUTPUT:
 [1] limitskip 4 2 

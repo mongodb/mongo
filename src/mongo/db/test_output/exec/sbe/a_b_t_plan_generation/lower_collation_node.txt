@@ -7,16 +7,11 @@ Collation []
 |   |       sortA: Ascending
 |   RefBlock: 
 |       Variable [sortA]
-Evaluation []
-|   BindBlock:
-|       [sortA]
-|           FunctionCall [getField]
-|           |   Const ["a"]
-|           Variable [scan0]
+Evaluation [{sortA}]
+|   FunctionCall [getField]
+|   |   Const ["a"]
+|   Variable [scan0]
 PhysicalScan [{'<root>': scan0}, collName]
-    BindBlock:
-        [scan0]
-            Source []
 
 -- OUTPUT:
 [0] sort [s2] [asc] [] 
@@ -32,22 +27,15 @@ Collation []
 |   RefBlock: 
 |       Variable [sortA]
 |       Variable [sortB]
-Evaluation []
-|   BindBlock:
-|       [sortB]
-|           FunctionCall [getField]
-|           |   Const ["b"]
-|           Variable [scan0]
-Evaluation []
-|   BindBlock:
-|       [sortA]
-|           FunctionCall [getField]
-|           |   Const ["a"]
-|           Variable [scan0]
+Evaluation [{sortB}]
+|   FunctionCall [getField]
+|   |   Const ["b"]
+|   Variable [scan0]
+Evaluation [{sortA}]
+|   FunctionCall [getField]
+|   |   Const ["a"]
+|   Variable [scan0]
 PhysicalScan [{'<root>': scan0}, collName]
-    BindBlock:
-        [scan0]
-            Source []
 
 -- OUTPUT:
 [0] sort [s2, s3] [asc, desc] [] 

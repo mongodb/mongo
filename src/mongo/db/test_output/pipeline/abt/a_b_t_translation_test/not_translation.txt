@@ -29,10 +29,7 @@ Filter []
 |   PathGet [a]
 |   PathDefault []
 |   Const [false]
-Scan [collection]
-    BindBlock:
-        [scan_0]
-            Source []
+Scan [collection, {scan_0}]
 
 
 ==== VARIATION: $match not ====
@@ -67,10 +64,7 @@ Filter []
 |   PathTraverse [1]
 |   PathCompare [Eq]
 |   Const [5]
-Scan [collection]
-    BindBlock:
-        [scan_0]
-            Source []
+Scan [collection, {scan_0}]
 
 
 ==== VARIATION: $match with $ne ====
@@ -105,9 +99,6 @@ Filter []
 |   PathTraverse [1]
 |   PathCompare [Eq]
 |   Const [2]
-Scan [collection]
-    BindBlock:
-        [scan_0]
-            Source []
+Scan [collection, {scan_0}]
 
 

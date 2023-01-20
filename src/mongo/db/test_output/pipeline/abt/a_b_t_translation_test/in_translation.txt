@@ -24,10 +24,7 @@ Filter []
 |   |   Variable [scan_0]
 |   PathConstant []
 |   Const [false]
-Scan [collection]
-    BindBlock:
-        [scan_0]
-            Source []
+Scan [collection, {scan_0}]
 
 
 ==== VARIATION: match with $in, singleton list ====
@@ -58,10 +55,7 @@ Filter []
 |   PathTraverse [1]
 |   PathCompare [Eq]
 |   Const [1]
-Scan [collection]
-    BindBlock:
-        [scan_0]
-            Source []
+Scan [collection, {scan_0}]
 
 
 ==== VARIATION: $match with $in and a list of equalities becomes a comparison to an EqMember list. ====
@@ -92,10 +86,7 @@ Filter []
 |   PathTraverse [1]
 |   PathCompare [EqMember]
 |   Const [[1, 2, 3]]
-Scan [collection]
-    BindBlock:
-        [scan_0]
-            Source []
+Scan [collection, {scan_0}]
 
 
 ==== VARIATION: match with $in over an array, duplicated equalities removed ====
@@ -126,9 +117,6 @@ Filter []
 |   PathTraverse [1]
 |   PathCompare [EqMember]
 |   Const [["abc", "def", "ghi"]]
-Scan [collection]
-    BindBlock:
-        [scan_0]
-            Source []
+Scan [collection, {scan_0}]
 
 

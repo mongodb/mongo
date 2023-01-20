@@ -220,7 +220,7 @@ TEST_F(ServiceContextTest, CanonicalQueryTranslation) {
                                                     ProjectionName{"test"},
                                                     make<ScanNode>("test", "test"),
                                                     prefixId);
-    ASSERT_EXPLAIN_V2(
+    ASSERT_EXPLAIN_V2_AUTO(
         "Root []\n"
         "|   |   projections: \n"
         "|   |       test\n"
@@ -247,10 +247,7 @@ TEST_F(ServiceContextTest, CanonicalQueryTranslation) {
         "|   PathTraverse [1]\n"
         "|   PathCompare [Eq]\n"
         "|   Const [30]\n"
-        "Scan [test]\n"
-        "    BindBlock:\n"
-        "        [test]\n"
-        "            Source []\n",
+        "Scan [test, {test}]\n",
         translation);
 }
 
@@ -265,24 +262,22 @@ TEST_F(ServiceContextTest, NonDescriptiveNames) {
         translatePipeline(metadata, pipeline, scanProjName, "collection", prefixId, {});
 
     // Observe projection names are not descriptive. They are of the form "pXXXX".
-    ASSERT_EXPLAIN_V2(
+    ASSERT_EXPLAIN_V2_AUTO(
         "Root []\n"
         "|   |   projections: \n"
         "|   |       p4\n"
         "|   RefBlock: \n"
         "|       Variable [p4]\n"
-        "Evaluation []\n"
-        "|   BindBlock:\n"
-        "|       [p4]\n"
-        "|           EvalPath []\n"
-        "|           |   Const [{}]\n"
-        "|           PathComposeM []\n"
-        "|           |   PathField [s]\n"
-        "|           |   PathConstant []\n"
-        "|           |   Variable [p2]\n"
-        "|           PathField [_id]\n"
-        "|           PathConstant []\n"
-        "|           Variable [p1]\n"
+        "Evaluation [{p4}]\n"
+        "|   EvalPath []\n"
+        "|   |   Const [{}]\n"
+        "|   PathComposeM []\n"
+        "|   |   PathField [s]\n"
+        "|   |   PathConstant []\n"
+        "|   |   Variable [p2]\n"
+        "|   PathField [_id]\n"
+        "|   PathConstant []\n"
+        "|   Variable [p1]\n"
         "GroupBy []\n"
         "|   |   groupings: \n"
         "|   |       RefBlock: \n"
@@ -291,31 +286,24 @@ TEST_F(ServiceContextTest, NonDescriptiveNames) {
         "|       [p2]\n"
         "|           FunctionCall [$sum]\n"
         "|           Variable [p3]\n"
-        "Evaluation []\n"
-        "|   BindBlock:\n"
-        "|       [p3]\n"
-        "|           BinaryOp [Mult]\n"
-        "|           |   EvalPath []\n"
-        "|           |   |   Variable [p0]\n"
-        "|           |   PathGet [c]\n"
-        "|           |   PathIdentity []\n"
-        "|           EvalPath []\n"
-        "|           |   Variable [p0]\n"
-        "|           PathGet [b]\n"
-        "|           PathIdentity []\n"
-        "Evaluation []\n"
-        "|   BindBlock:\n"
-        "|       [p1]\n"
-        "|           EvalPath []\n"
-        "|           |   Variable [p0]\n"
-        "|           PathGet [a]\n"
-        "|           PathTraverse [inf]\n"
-        "|           PathGet [b]\n"
-        "|           PathIdentity []\n"
-        "Scan [collection]\n"
-        "    BindBlock:\n"
-        "        [p0]\n"
-        "            Source []\n",
+        "Evaluation [{p3}]\n"
+        "|   BinaryOp [Mult]\n"
+        "|   |   EvalPath []\n"
+        "|   |   |   Variable [p0]\n"
+        "|   |   PathGet [c]\n"
+        "|   |   PathIdentity []\n"
+        "|   EvalPath []\n"
+        "|   |   Variable [p0]\n"
+        "|   PathGet [b]\n"
+        "|   PathIdentity []\n"
+        "Evaluation [{p1}]\n"
+        "|   EvalPath []\n"
+        "|   |   Variable [p0]\n"
+        "|   PathGet [a]\n"
+        "|   PathTraverse [inf]\n"
+        "|   PathGet [b]\n"
+        "|   PathIdentity []\n"
+        "Scan [collection, {p0}]\n",
         translated);
 }
 

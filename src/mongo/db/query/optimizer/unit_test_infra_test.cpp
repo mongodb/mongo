@@ -159,7 +159,7 @@ TEST(TestInfra, ABTLiterals) {
     auto groupByNode = _gb(_varnames("pa"), _varnames("pc"), {"pb"_var}, std::move(filterBNode));
     auto rootNode = _root("pc")(std::move(groupByNode));
 
-    ASSERT_EXPLAIN_V2(
+    ASSERT_EXPLAIN_V2_AUTO(
         "Root []\n"
         "|   |   projections: \n"
         "|   |       pc\n"
@@ -177,29 +177,22 @@ TEST(TestInfra, ABTLiterals) {
         "|   |   Variable [pb]\n"
         "|   PathCompare [Gt]\n"
         "|   Const [1]\n"
-        "Evaluation []\n"
-        "|   BindBlock:\n"
-        "|       [pb]\n"
-        "|           EvalPath []\n"
-        "|           |   Variable [root]\n"
-        "|           PathGet [b]\n"
-        "|           PathIdentity []\n"
+        "Evaluation [{pb}]\n"
+        "|   EvalPath []\n"
+        "|   |   Variable [root]\n"
+        "|   PathGet [b]\n"
+        "|   PathIdentity []\n"
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [pa]\n"
         "|   PathCompare [Gt]\n"
         "|   Const [0]\n"
-        "Evaluation []\n"
-        "|   BindBlock:\n"
-        "|       [pa]\n"
-        "|           EvalPath []\n"
-        "|           |   Variable [root]\n"
-        "|           PathGet [a]\n"
-        "|           PathIdentity []\n"
-        "Scan [c1]\n"
-        "    BindBlock:\n"
-        "        [root]\n"
-        "            Source []\n",
+        "Evaluation [{pa}]\n"
+        "|   EvalPath []\n"
+        "|   |   Variable [root]\n"
+        "|   PathGet [a]\n"
+        "|   PathIdentity []\n"
+        "Scan [c1, {root}]\n",
         rootNode);
 
     // Construct using a builder. Note we construct the tree in a top-to-bottom fashion.
@@ -212,7 +205,7 @@ TEST(TestInfra, ABTLiterals) {
                          .eval("pa", _evalp(_get("a", _id()), "root"_var))
                          .finish(_scan("root", "c1"));
 
-    ASSERT_EXPLAIN_V2(
+    ASSERT_EXPLAIN_V2_AUTO(
         "Root []\n"
         "|   |   projections: \n"
         "|   |       pc\n"
@@ -230,29 +223,22 @@ TEST(TestInfra, ABTLiterals) {
         "|   |   Variable [pb]\n"
         "|   PathCompare [Gt]\n"
         "|   Const [1]\n"
-        "Evaluation []\n"
-        "|   BindBlock:\n"
-        "|       [pb]\n"
-        "|           EvalPath []\n"
-        "|           |   Variable [root]\n"
-        "|           PathGet [b]\n"
-        "|           PathIdentity []\n"
+        "Evaluation [{pb}]\n"
+        "|   EvalPath []\n"
+        "|   |   Variable [root]\n"
+        "|   PathGet [b]\n"
+        "|   PathIdentity []\n"
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [pa]\n"
         "|   PathCompare [Gt]\n"
         "|   Const [0]\n"
-        "Evaluation []\n"
-        "|   BindBlock:\n"
-        "|       [pa]\n"
-        "|           EvalPath []\n"
-        "|           |   Variable [root]\n"
-        "|           PathGet [a]\n"
-        "|           PathIdentity []\n"
-        "Scan [c1]\n"
-        "    BindBlock:\n"
-        "        [root]\n"
-        "            Source []\n",
+        "Evaluation [{pa}]\n"
+        "|   EvalPath []\n"
+        "|   |   Variable [root]\n"
+        "|   PathGet [a]\n"
+        "|   PathIdentity []\n"
+        "Scan [c1, {root}]\n",
         rootNode1);
 }
 

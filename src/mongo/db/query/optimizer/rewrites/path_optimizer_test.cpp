@@ -191,40 +191,31 @@ TEST(Path, Fuse3) {
 
     auto tree = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"y"}},
                                std::move(project2));
-    ASSERT_EXPLAIN(
+    ASSERT_EXPLAIN_AUTO(
         "Root []\n"
         "  projections: \n"
         "    y\n"
         "  RefBlock: \n"
         "    Variable [y]\n"
-        "  Evaluation []\n"
-        "    BindBlock:\n"
-        "      [y]\n"
+        "  Evaluation [{y}]\n"
+        "    EvalPath []\n"
+        "      PathGet [a]\n"
+        "        PathTraverse [inf]\n"
+        "          PathConstant []\n"
+        "            Const [2]\n"
+        "      Variable [x]\n"
+        "    Evaluation [{x}]\n"
+        "      EvalPath []\n"
+        "        PathField [a]\n"
+        "          PathConstant []\n"
+        "            Variable [z]\n"
+        "        Variable [root]\n"
+        "      Evaluation [{z}]\n"
         "        EvalPath []\n"
-        "          PathGet [a]\n"
-        "            PathTraverse [inf]\n"
-        "              PathConstant []\n"
-        "                Const [2]\n"
-        "          Variable [x]\n"
-        "    Evaluation []\n"
-        "      BindBlock:\n"
-        "        [x]\n"
-        "          EvalPath []\n"
-        "            PathField [a]\n"
-        "              PathConstant []\n"
-        "                Variable [z]\n"
-        "            Variable [root]\n"
-        "      Evaluation []\n"
-        "        BindBlock:\n"
-        "          [z]\n"
-        "            EvalPath []\n"
-        "              PathGet [z]\n"
-        "                PathIdentity []\n"
-        "              Variable [root]\n"
-        "        Scan [test]\n"
-        "          BindBlock:\n"
-        "            [root]\n"
-        "              Source []\n",
+        "          PathGet [z]\n"
+        "            PathIdentity []\n"
+        "          Variable [root]\n"
+        "        Scan [test, {root}]\n",
         tree);
 
     auto env = VariableEnvironment::build(tree);
@@ -239,25 +230,20 @@ TEST(Path, Fuse3) {
         }
     } while (changed);
 
-    ASSERT_EXPLAIN(
+    ASSERT_EXPLAIN_AUTO(
         "Root []\n"
         "  projections: \n"
         "    y\n"
         "  RefBlock: \n"
         "    Variable [y]\n"
-        "  Evaluation []\n"
-        "    BindBlock:\n"
-        "      [y]\n"
-        "        EvalPath []\n"
-        "          PathGet [z]\n"
-        "            PathTraverse [inf]\n"
-        "              PathConstant []\n"
-        "                Const [2]\n"
-        "          Variable [root]\n"
-        "    Scan [test]\n"
-        "      BindBlock:\n"
-        "        [root]\n"
-        "          Source []\n",
+        "  Evaluation [{y}]\n"
+        "    EvalPath []\n"
+        "      PathGet [z]\n"
+        "        PathTraverse [inf]\n"
+        "          PathConstant []\n"
+        "            Const [2]\n"
+        "      Variable [root]\n"
+        "    Scan [test, {root}]\n",
         tree);
 }
 
@@ -299,7 +285,7 @@ TEST(Path, Fuse4) {
     auto tree = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"x", "y"}},
                                std::move(project2));
 
-    ASSERT_EXPLAIN(
+    ASSERT_EXPLAIN_AUTO(
         "Root []\n"
         "  projections: \n"
         "    x\n"
@@ -307,56 +293,43 @@ TEST(Path, Fuse4) {
         "  RefBlock: \n"
         "    Variable [x]\n"
         "    Variable [y]\n"
-        "  Evaluation []\n"
-        "    BindBlock:\n"
-        "      [y]\n"
-        "        EvalPath []\n"
-        "          PathGet [a]\n"
-        "            PathTraverse [inf]\n"
+        "  Evaluation [{y}]\n"
+        "    EvalPath []\n"
+        "      PathGet [a]\n"
+        "        PathTraverse [inf]\n"
+        "          PathConstant []\n"
+        "            Const [2]\n"
+        "      Variable [x]\n"
+        "    Evaluation [{x}]\n"
+        "      EvalPath []\n"
+        "        PathComposeM []\n"
+        "          PathField [c]\n"
+        "            PathConstant []\n"
+        "              Variable [z2]\n"
+        "          PathComposeM []\n"
+        "            PathField [a]\n"
         "              PathConstant []\n"
-        "                Const [2]\n"
-        "          Variable [x]\n"
-        "    Evaluation []\n"
-        "      BindBlock:\n"
-        "        [x]\n"
+        "                Variable [z]\n"
+        "            PathField [b]\n"
+        "              PathConstant []\n"
+        "                Variable [z1]\n"
+        "        Variable [root]\n"
+        "      Evaluation [{z2}]\n"
+        "        EvalPath []\n"
+        "          PathGet [z2]\n"
+        "            PathIdentity []\n"
+        "          Variable [root]\n"
+        "        Evaluation [{z1}]\n"
         "          EvalPath []\n"
-        "            PathComposeM []\n"
-        "              PathField [c]\n"
-        "                PathConstant []\n"
-        "                  Variable [z2]\n"
-        "              PathComposeM []\n"
-        "                PathField [a]\n"
-        "                  PathConstant []\n"
-        "                    Variable [z]\n"
-        "                PathField [b]\n"
-        "                  PathConstant []\n"
-        "                    Variable [z1]\n"
+        "            PathGet [z1]\n"
+        "              PathIdentity []\n"
         "            Variable [root]\n"
-        "      Evaluation []\n"
-        "        BindBlock:\n"
-        "          [z2]\n"
+        "          Evaluation [{z}]\n"
         "            EvalPath []\n"
-        "              PathGet [z2]\n"
+        "              PathGet [z]\n"
         "                PathIdentity []\n"
         "              Variable [root]\n"
-        "        Evaluation []\n"
-        "          BindBlock:\n"
-        "            [z1]\n"
-        "              EvalPath []\n"
-        "                PathGet [z1]\n"
-        "                  PathIdentity []\n"
-        "                Variable [root]\n"
-        "          Evaluation []\n"
-        "            BindBlock:\n"
-        "              [z]\n"
-        "                EvalPath []\n"
-        "                  PathGet [z]\n"
-        "                    PathIdentity []\n"
-        "                  Variable [root]\n"
-        "            Scan [test]\n"
-        "              BindBlock:\n"
-        "                [root]\n"
-        "                  Source []\n",
+        "            Scan [test, {root}]\n",
         tree);
 
     auto env = VariableEnvironment::build(tree);
@@ -371,7 +344,7 @@ TEST(Path, Fuse4) {
         }
     } while (changed);
 
-    ASSERT_EXPLAIN(
+    ASSERT_EXPLAIN_AUTO(
         "Root []\n"
         "  projections: \n"
         "    x\n"
@@ -379,47 +352,38 @@ TEST(Path, Fuse4) {
         "  RefBlock: \n"
         "    Variable [x]\n"
         "    Variable [y]\n"
-        "  Evaluation []\n"
-        "    BindBlock:\n"
-        "      [y]\n"
-        "        EvalPath []\n"
-        "          PathTraverse [inf]\n"
+        "  Evaluation [{y}]\n"
+        "    EvalPath []\n"
+        "      PathTraverse [inf]\n"
+        "        PathConstant []\n"
+        "          Const [2]\n"
+        "      Variable [z]\n"
+        "    Evaluation [{x}]\n"
+        "      EvalPath []\n"
+        "        PathComposeM []\n"
+        "          PathField [c]\n"
         "            PathConstant []\n"
-        "              Const [2]\n"
-        "          Variable [z]\n"
-        "    Evaluation []\n"
-        "      BindBlock:\n"
-        "        [x]\n"
-        "          EvalPath []\n"
-        "            PathComposeM []\n"
-        "              PathField [c]\n"
-        "                PathConstant []\n"
-        "                  EvalPath []\n"
-        "                    PathGet [z2]\n"
-        "                      PathIdentity []\n"
-        "                    Variable [root]\n"
-        "              PathComposeM []\n"
-        "                PathField [a]\n"
-        "                  PathConstant []\n"
-        "                    Variable [z]\n"
-        "                PathField [b]\n"
-        "                  PathConstant []\n"
-        "                    EvalPath []\n"
-        "                      PathGet [z1]\n"
-        "                        PathIdentity []\n"
-        "                      Variable [root]\n"
-        "            Variable [root]\n"
-        "      Evaluation []\n"
-        "        BindBlock:\n"
-        "          [z]\n"
-        "            EvalPath []\n"
-        "              PathGet [z]\n"
-        "                PathIdentity []\n"
-        "              Variable [root]\n"
-        "        Scan [test]\n"
-        "          BindBlock:\n"
-        "            [root]\n"
-        "              Source []\n",
+        "              EvalPath []\n"
+        "                PathGet [z2]\n"
+        "                  PathIdentity []\n"
+        "                Variable [root]\n"
+        "          PathComposeM []\n"
+        "            PathField [a]\n"
+        "              PathConstant []\n"
+        "                Variable [z]\n"
+        "            PathField [b]\n"
+        "              PathConstant []\n"
+        "                EvalPath []\n"
+        "                  PathGet [z1]\n"
+        "                    PathIdentity []\n"
+        "                  Variable [root]\n"
+        "        Variable [root]\n"
+        "      Evaluation [{z}]\n"
+        "        EvalPath []\n"
+        "          PathGet [z]\n"
+        "            PathIdentity []\n"
+        "          Variable [root]\n"
+        "        Scan [test, {root}]\n",
         tree);
 }
 
@@ -443,7 +407,7 @@ TEST(Path, Fuse5) {
     auto tree = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"x"}},
                                std::move(filter));
 
-    ASSERT_EXPLAIN(
+    ASSERT_EXPLAIN_AUTO(
         "Root []\n"
         "  projections: \n"
         "    x\n"
@@ -456,16 +420,11 @@ TEST(Path, Fuse5) {
         "          PathCompare [Eq]\n"
         "            Const [2]\n"
         "      Variable [x]\n"
-        "    Evaluation []\n"
-        "      BindBlock:\n"
-        "        [x]\n"
-        "          EvalPath []\n"
-        "            PathKeep [a, b, c]\n"
-        "            Variable [root]\n"
-        "      Scan [test]\n"
-        "        BindBlock:\n"
-        "          [root]\n"
-        "            Source []\n",
+        "    Evaluation [{x}]\n"
+        "      EvalPath []\n"
+        "        PathKeep [a, b, c]\n"
+        "        Variable [root]\n"
+        "      Scan [test, {root}]\n",
         tree);
 
     auto env = VariableEnvironment::build(tree);
@@ -481,7 +440,7 @@ TEST(Path, Fuse5) {
     } while (changed);
 
     // The filter now refers directly to the root projection.
-    ASSERT_EXPLAIN(
+    ASSERT_EXPLAIN_AUTO(
         "Root []\n"
         "  projections: \n"
         "    x\n"
@@ -494,16 +453,11 @@ TEST(Path, Fuse5) {
         "          PathCompare [Eq]\n"
         "            Const [2]\n"
         "      Variable [root]\n"
-        "    Evaluation []\n"
-        "      BindBlock:\n"
-        "        [x]\n"
-        "          EvalPath []\n"
-        "            PathKeep [a, b, c]\n"
-        "            Variable [root]\n"
-        "      Scan [test]\n"
-        "        BindBlock:\n"
-        "          [root]\n"
-        "            Source []\n",
+        "    Evaluation [{x}]\n"
+        "      EvalPath []\n"
+        "        PathKeep [a, b, c]\n"
+        "        Variable [root]\n"
+        "      Scan [test, {root}]\n",
         tree);
 }
 
@@ -522,28 +476,23 @@ TEST(Path, Fuse6) {
     auto tree = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"x"}},
                                std::move(project));
 
-    ASSERT_EXPLAIN(
+    ASSERT_EXPLAIN_AUTO(
         "Root []\n"
         "  projections: \n"
         "    x\n"
         "  RefBlock: \n"
         "    Variable [x]\n"
-        "  Evaluation []\n"
-        "    BindBlock:\n"
-        "      [x]\n"
-        "        EvalPath []\n"
-        "          PathComposeM []\n"
-        "            PathComposeM []\n"
-        "              PathObj []\n"
-        "              PathKeep [a, b, c]\n"
-        "            PathField [a]\n"
-        "              PathConstant []\n"
-        "                Const [{}]\n"
-        "          Variable [root]\n"
-        "    Scan [test]\n"
-        "      BindBlock:\n"
-        "        [root]\n"
-        "          Source []\n",
+        "  Evaluation [{x}]\n"
+        "    EvalPath []\n"
+        "      PathComposeM []\n"
+        "        PathComposeM []\n"
+        "          PathObj []\n"
+        "          PathKeep [a, b, c]\n"
+        "        PathField [a]\n"
+        "          PathConstant []\n"
+        "            Const [{}]\n"
+        "      Variable [root]\n"
+        "    Scan [test, {root}]\n",
         tree);
 
     auto env = VariableEnvironment::build(tree);
@@ -559,26 +508,21 @@ TEST(Path, Fuse6) {
     } while (changed);
 
     // PathObj is removed.
-    ASSERT_EXPLAIN(
+    ASSERT_EXPLAIN_AUTO(
         "Root []\n"
         "  projections: \n"
         "    x\n"
         "  RefBlock: \n"
         "    Variable [x]\n"
-        "  Evaluation []\n"
-        "    BindBlock:\n"
-        "      [x]\n"
-        "        EvalPath []\n"
-        "          PathComposeM []\n"
-        "            PathKeep [a, b, c]\n"
-        "            PathField [a]\n"
-        "              PathConstant []\n"
-        "                Const [{}]\n"
-        "          Variable [root]\n"
-        "    Scan [test]\n"
-        "      BindBlock:\n"
-        "        [root]\n"
-        "          Source []\n",
+        "  Evaluation [{x}]\n"
+        "    EvalPath []\n"
+        "      PathComposeM []\n"
+        "        PathKeep [a, b, c]\n"
+        "        PathField [a]\n"
+        "          PathConstant []\n"
+        "            Const [{}]\n"
+        "      Variable [root]\n"
+        "    Scan [test, {root}]\n",
         tree);
 }
 
@@ -603,36 +547,29 @@ TEST(Path, Fuse7) {
     auto tree = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"py"}},
                                std::move(project2));
 
-    ASSERT_EXPLAIN(
+    ASSERT_EXPLAIN_AUTO(
         "Root []\n"
         "  projections: \n"
         "    py\n"
         "  RefBlock: \n"
         "    Variable [py]\n"
-        "  Evaluation []\n"
-        "    BindBlock:\n"
-        "      [py]\n"
-        "        EvalPath []\n"
-        "          PathComposeM []\n"
-        "            PathComposeM []\n"
-        "              PathKeep [a]\n"
-        "              PathField [a]\n"
-        "                PathConstant []\n"
-        "                  Variable [px]\n"
-        "            PathDefault []\n"
-        "              Const [{}]\n"
-        "          Variable [root]\n"
-        "    Evaluation []\n"
-        "      BindBlock:\n"
-        "        [px]\n"
-        "          EvalPath []\n"
-        "            PathGet [x]\n"
-        "              PathIdentity []\n"
-        "            Variable [root]\n"
-        "      Scan [test]\n"
-        "        BindBlock:\n"
-        "          [root]\n"
-        "            Source []\n",
+        "  Evaluation [{py}]\n"
+        "    EvalPath []\n"
+        "      PathComposeM []\n"
+        "        PathComposeM []\n"
+        "          PathKeep [a]\n"
+        "          PathField [a]\n"
+        "            PathConstant []\n"
+        "              Variable [px]\n"
+        "        PathDefault []\n"
+        "          Const [{}]\n"
+        "      Variable [root]\n"
+        "    Evaluation [{px}]\n"
+        "      EvalPath []\n"
+        "        PathGet [x]\n"
+        "          PathIdentity []\n"
+        "        Variable [root]\n"
+        "      Scan [test, {root}]\n",
         tree);
 
     auto env = VariableEnvironment::build(tree);
@@ -648,27 +585,22 @@ TEST(Path, Fuse7) {
     } while (changed);
 
     // Obtain "x" and directly assign at "a".
-    ASSERT_EXPLAIN(
+    ASSERT_EXPLAIN_AUTO(
         "Root []\n"
         "  projections: \n"
         "    py\n"
         "  RefBlock: \n"
         "    Variable [py]\n"
-        "  Evaluation []\n"
-        "    BindBlock:\n"
-        "      [py]\n"
-        "        EvalPath []\n"
-        "          PathField [a]\n"
-        "            PathConstant []\n"
-        "              EvalPath []\n"
-        "                PathGet [x]\n"
-        "                  PathIdentity []\n"
-        "                Variable [root]\n"
-        "          Const [{}]\n"
-        "    Scan [test]\n"
-        "      BindBlock:\n"
-        "        [root]\n"
-        "          Source []\n",
+        "  Evaluation [{py}]\n"
+        "    EvalPath []\n"
+        "      PathField [a]\n"
+        "        PathConstant []\n"
+        "          EvalPath []\n"
+        "            PathGet [x]\n"
+        "              PathIdentity []\n"
+        "            Variable [root]\n"
+        "      Const [{}]\n"
+        "    Scan [test, {root}]\n",
         tree);
 }
 
@@ -757,7 +689,7 @@ TEST(Path, LowerPathGetPathLambda) {
 
     runPathLowering(env, prefixId, tree);
 
-    ASSERT_EXPLAIN(
+    ASSERT_EXPLAIN_AUTO(
         "BinaryOp [Add]\n"
         "  FunctionCall [getField]\n"
         "    FunctionCall [getField]\n"
@@ -786,21 +718,16 @@ TEST(Path, ProjElim1) {
 
     runPathLowering(env, prefixId, tree);
 
-    ASSERT_EXPLAIN(
+    ASSERT_EXPLAIN_AUTO(
         "Root []\n"
         "  projections: \n"
         "    y\n"
         "  RefBlock: \n"
         "    Variable [y]\n"
-        "  Evaluation []\n"
-        "    BindBlock:\n"
-        "      [y]\n"
-        "        FunctionCall [anyFunctionWillDo]\n"
-        "          Variable [root]\n"
-        "    Scan [test]\n"
-        "      BindBlock:\n"
-        "        [root]\n"
-        "          Source []\n",
+        "  Evaluation [{y}]\n"
+        "    FunctionCall [anyFunctionWillDo]\n"
+        "      Variable [root]\n"
+        "    Scan [test, {root}]\n",
         tree);
 }
 
@@ -821,14 +748,11 @@ TEST(Path, ProjElim2) {
 
     runPathLowering(env, prefixId, tree);
 
-    ASSERT_EXPLAIN(
+    ASSERT_EXPLAIN_AUTO(
         "Root []\n"
         "  projections: \n"
         "  RefBlock: \n"
-        "  Scan [test]\n"
-        "    BindBlock:\n"
-        "      [root]\n"
-        "        Source []\n",
+        "  Scan [test, {root}]\n",
         tree);
 }
 
@@ -859,20 +783,15 @@ TEST(Path, ProjElim3) {
         }
     } while (changed);
 
-    ASSERT_EXPLAIN(
+    ASSERT_EXPLAIN_AUTO(
         "Root []\n"
         "  projections: \n"
         "    p99\n"
         "  RefBlock: \n"
         "    Variable [p99]\n"
-        "  Evaluation []\n"
-        "    BindBlock:\n"
-        "      [p99]\n"
-        "        Variable [root]\n"
-        "    Scan [test]\n"
-        "      BindBlock:\n"
-        "        [root]\n"
-        "          Source []\n",
+        "  Evaluation [{p99}]\n"
+        "    Variable [root]\n"
+        "    Scan [test, {root}]\n",
         tree);
 }
 

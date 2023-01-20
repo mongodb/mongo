@@ -2,22 +2,15 @@
 
 ==== VARIATION: Lower two chained evaluation nodes ====
 -- INPUT:
-Evaluation []
-|   BindBlock:
-|       [proj1]
-|           FunctionCall [getField]
-|           |   Const ["b"]
-|           Variable [scan0]
-Evaluation []
-|   BindBlock:
-|       [proj0]
-|           FunctionCall [getField]
-|           |   Const ["a"]
-|           Variable [scan0]
+Evaluation [{proj1}]
+|   FunctionCall [getField]
+|   |   Const ["b"]
+|   Variable [scan0]
+Evaluation [{proj0}]
+|   FunctionCall [getField]
+|   |   Const ["a"]
+|   Variable [scan0]
 PhysicalScan [{'<root>': scan0}, collName]
-    BindBlock:
-        [scan0]
-            Source []
 
 -- OUTPUT:
 [2] project [s3 = getField(s1, "b")] 

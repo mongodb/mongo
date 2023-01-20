@@ -26,10 +26,7 @@ Filter []
 |   PathTraverse [1]
 |   PathCompare [Eq]
 |   Const [1]
-Scan [collection]
-    BindBlock:
-        [scan_0]
-            Source []
+Scan [collection, {scan_0}]
 
 
 ==== VARIATION: $match with $expr $eq with dotted path ====
@@ -65,10 +62,7 @@ Filter []
 |   PathTraverse [inf]
 |   PathGet [b]
 |   PathIdentity []
-Scan [collection]
-    BindBlock:
-        [scan_0]
-            Source []
+Scan [collection, {scan_0}]
 
 
 ==== VARIATION: $match with $expr $eq ====
@@ -98,9 +92,6 @@ Filter []
 |   PathGet [a]
 |   PathCompare [Eq]
 |   Const [1]
-Scan [collection]
-    BindBlock:
-        [scan_0]
-            Source []
+Scan [collection, {scan_0}]
 
 

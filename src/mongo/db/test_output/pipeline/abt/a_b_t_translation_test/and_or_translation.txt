@@ -33,10 +33,7 @@ Filter []
 |   PathTraverse [1]
 |   PathCompare [Eq]
 |   Const [2]
-Scan [collection]
-    BindBlock:
-        [scan_0]
-            Source []
+Scan [collection, {scan_0}]
 
 
 ==== VARIATION: $match disjunction ====
@@ -72,10 +69,7 @@ Filter []
 |   PathTraverse [1]
 |   PathCompare [Eq]
 |   Const [2]
-Scan [collection]
-    BindBlock:
-        [scan_0]
-            Source []
+Scan [collection, {scan_0}]
 
 
 ==== VARIATION: $match nested conjunction ====
@@ -120,9 +114,6 @@ Filter []
 |   PathTraverse [1]
 |   PathCompare [Eq]
 |   Const [3]
-Scan [collection]
-    BindBlock:
-        [scan_0]
-            Source []
+Scan [collection, {scan_0}]
 
 

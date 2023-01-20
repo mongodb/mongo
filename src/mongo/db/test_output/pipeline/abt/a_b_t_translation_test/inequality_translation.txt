@@ -29,10 +29,7 @@ Filter []
 |   |   Const [""]
 |   PathCompare [Gt]
 |   Const [70]
-Scan [collection]
-    BindBlock:
-        [scan_0]
-            Source []
+Scan [collection, {scan_0}]
 
 
 ==== VARIATION: $match with range conjunction ====
@@ -76,9 +73,6 @@ Filter []
 |   |   Const [nan]
 |   PathCompare [Lt]
 |   Const [90]
-Scan [collection]
-    BindBlock:
-        [scan_0]
-            Source []
+Scan [collection, {scan_0}]
 
 

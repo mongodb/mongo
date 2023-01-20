@@ -231,20 +231,14 @@ TEST(Optimizer, Tracker4) {
 
 TEST(Optimizer, RefExplain) {
     ABT scanNode = make<ScanNode>("ptest", "test");
-    ASSERT_EXPLAIN(
-        "Scan [test]\n"
-        "  BindBlock:\n"
-        "    [ptest]\n"
-        "      Source []\n",
+    ASSERT_EXPLAIN_AUTO(           // NOLINT (test auto-update)
+        "Scan [test, {ptest}]\n",  // NOLINT (test auto-update)
         scanNode);
 
     // Now repeat for the reference type.
     auto ref = scanNode.ref();
-    ASSERT_EXPLAIN(
-        "Scan [test]\n"
-        "  BindBlock:\n"
-        "    [ptest]\n"
-        "      Source []\n",
+    ASSERT_EXPLAIN_AUTO(           // NOLINT (test auto-update)
+        "Scan [test, {ptest}]\n",  // NOLINT (test auto-update)
         ref);
 
     ASSERT_EQ(scanNode.tagOf(), ref.tagOf());
@@ -269,11 +263,8 @@ TEST(Optimizer, CoScan) {
 
 TEST(Optimizer, Basic) {
     ABT scanNode = make<ScanNode>("ptest", "test");
-    ASSERT_EXPLAIN(
-        "Scan [test]\n"
-        "  BindBlock:\n"
-        "    [ptest]\n"
-        "      Source []\n",
+    ASSERT_EXPLAIN_AUTO(           // NOLINT (test auto-update)
+        "Scan [test, {ptest}]\n",  // NOLINT (test auto-update)
         scanNode);
 
     ABT filterNode = make<FilterNode>(
@@ -289,7 +280,7 @@ TEST(Optimizer, Basic) {
         make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"P1", "ptest"}},
                        std::move(evalNode));
 
-    ASSERT_EXPLAIN(
+    ASSERT_EXPLAIN_AUTO(
         "Root []\n"
         "  projections: \n"
         "    P1\n"
@@ -297,28 +288,23 @@ TEST(Optimizer, Basic) {
         "  RefBlock: \n"
         "    Variable [P1]\n"
         "    Variable [ptest]\n"
-        "  Evaluation []\n"
-        "    BindBlock:\n"
-        "      [P1]\n"
-        "        EvalPath []\n"
-        "          PathConstant []\n"
-        "            Const [2]\n"
-        "          Variable [ptest]\n"
+        "  Evaluation [{P1}]\n"
+        "    EvalPath []\n"
+        "      PathConstant []\n"
+        "        Const [2]\n"
+        "      Variable [ptest]\n"
         "    Filter []\n"
         "      EvalFilter []\n"
         "        PathConstant []\n"
         "          UnaryOp [Neg]\n"
         "            Const [1]\n"
         "        Variable [ptest]\n"
-        "      Scan [test]\n"
-        "        BindBlock:\n"
-        "          [ptest]\n"
-        "            Source []\n",
+        "      Scan [test, {ptest}]\n",
         rootNode);
 
 
     ABT clonedNode = rootNode;
-    ASSERT_EXPLAIN(
+    ASSERT_EXPLAIN_AUTO(
         "Root []\n"
         "  projections: \n"
         "    P1\n"
@@ -326,23 +312,18 @@ TEST(Optimizer, Basic) {
         "  RefBlock: \n"
         "    Variable [P1]\n"
         "    Variable [ptest]\n"
-        "  Evaluation []\n"
-        "    BindBlock:\n"
-        "      [P1]\n"
-        "        EvalPath []\n"
-        "          PathConstant []\n"
-        "            Const [2]\n"
-        "          Variable [ptest]\n"
+        "  Evaluation [{P1}]\n"
+        "    EvalPath []\n"
+        "      PathConstant []\n"
+        "        Const [2]\n"
+        "      Variable [ptest]\n"
         "    Filter []\n"
         "      EvalFilter []\n"
         "        PathConstant []\n"
         "          UnaryOp [Neg]\n"
         "            Const [1]\n"
         "        Variable [ptest]\n"
-        "      Scan [test]\n"
-        "        BindBlock:\n"
-        "          [ptest]\n"
-        "            Source []\n",
+        "      Scan [test, {ptest}]\n",
         clonedNode);
 
     auto env = VariableEnvironment::build(rootNode);
@@ -377,7 +358,7 @@ TEST(Optimizer, GroupBy) {
         properties::ProjectionRequirement{ProjectionNameVector{"p1", "p2", "a1", "a2"}},
         std::move(groupByNode));
 
-    ASSERT_EXPLAIN(
+    ASSERT_EXPLAIN_AUTO(
         "Root []\n"
         "  projections: \n"
         "    p1\n"
@@ -399,22 +380,13 @@ TEST(Optimizer, GroupBy) {
         "        Const [10]\n"
         "      [a2]\n"
         "        Const [11]\n"
-        "    Evaluation []\n"
-        "      BindBlock:\n"
-        "        [p3]\n"
-        "          Const [3]\n"
-        "      Evaluation []\n"
-        "        BindBlock:\n"
-        "          [p2]\n"
-        "            Const [2]\n"
-        "        Evaluation []\n"
-        "          BindBlock:\n"
-        "            [p1]\n"
-        "              Const [1]\n"
-        "          Scan [test]\n"
-        "            BindBlock:\n"
-        "              [ptest]\n"
-        "                Source []\n",
+        "    Evaluation [{p3}]\n"
+        "      Const [3]\n"
+        "      Evaluation [{p2}]\n"
+        "        Const [2]\n"
+        "        Evaluation [{p1}]\n"
+        "          Const [1]\n"
+        "          Scan [test, {ptest}]\n",
         rootNode);
 
     {
@@ -454,7 +426,7 @@ TEST(Optimizer, Union) {
         ASSERT(!env.hasFreeVariables());
     }
 
-    ASSERT_EXPLAIN(
+    ASSERT_EXPLAIN_AUTO(
         "Root []\n"
         "  projections: \n"
         "    ptest\n"
@@ -462,43 +434,21 @@ TEST(Optimizer, Union) {
         "  RefBlock: \n"
         "    Variable [B]\n"
         "    Variable [ptest]\n"
-        "  Union []\n"
-        "    BindBlock:\n"
-        "      [B]\n"
-        "        Source []\n"
-        "      [ptest]\n"
-        "        Source []\n"
-        "    Evaluation []\n"
-        "      BindBlock:\n"
-        "        [B]\n"
-        "          Const [3]\n"
-        "      Scan [test]\n"
-        "        BindBlock:\n"
-        "          [ptest]\n"
-        "            Source []\n"
-        "    Evaluation []\n"
-        "      BindBlock:\n"
-        "        [B]\n"
-        "          Const [4]\n"
-        "      Scan [test]\n"
-        "        BindBlock:\n"
-        "          [ptest]\n"
-        "            Source []\n"
-        "    Evaluation []\n"
-        "      BindBlock:\n"
-        "        [B]\n"
-        "          Const [5]\n"
-        "      Evaluation []\n"
-        "        BindBlock:\n"
-        "          [ptest]\n"
-        "            EvalPath []\n"
-        "              PathConstant []\n"
-        "                Const [2]\n"
-        "              Variable [ptest1]\n"
-        "        Scan [test]\n"
-        "          BindBlock:\n"
-        "            [ptest1]\n"
-        "              Source []\n",
+        "  Union [{B, ptest}]\n"
+        "    Evaluation [{B}]\n"
+        "      Const [3]\n"
+        "      Scan [test, {ptest}]\n"
+        "    Evaluation [{B}]\n"
+        "      Const [4]\n"
+        "      Scan [test, {ptest}]\n"
+        "    Evaluation [{B}]\n"
+        "      Const [5]\n"
+        "      Evaluation [{ptest}]\n"
+        "        EvalPath []\n"
+        "          PathConstant []\n"
+        "            Const [2]\n"
+        "          Variable [ptest1]\n"
+        "        Scan [test, {ptest1}]\n",
         rootNode);
 }
 
@@ -539,7 +489,7 @@ TEST(Optimizer, Unwind) {
         ASSERT(!env.hasFreeVariables());
     }
 
-    ASSERT_EXPLAIN(
+    ASSERT_EXPLAIN_AUTO(
         "Root []\n"
         "  projections: \n"
         "    p1\n"
@@ -550,22 +500,12 @@ TEST(Optimizer, Unwind) {
         "    Variable [p2]\n"
         "    Variable [p2pid]\n"
         "  Unwind [retainNonArrays]\n"
-        "    BindBlock:\n"
-        "      [p2]\n"
-        "        Source []\n"
-        "      [p2pid]\n"
-        "        Source []\n"
-        "    Evaluation []\n"
-        "      BindBlock:\n"
-        "        [p2]\n"
-        "          EvalPath []\n"
-        "            PathConstant []\n"
-        "              Const [2]\n"
-        "            Variable [p1]\n"
-        "      Scan [test]\n"
-        "        BindBlock:\n"
-        "          [p1]\n"
-        "            Source []\n",
+        "    Evaluation [{p2}]\n"
+        "      EvalPath []\n"
+        "        PathConstant []\n"
+        "          Const [2]\n"
+        "        Variable [p1]\n"
+        "      Scan [test, {p1}]\n",
         rootNode);
 }
 
@@ -588,7 +528,7 @@ TEST(Optimizer, Collation) {
         ASSERT(!env.hasFreeVariables());
     }
 
-    ASSERT_EXPLAIN(
+    ASSERT_EXPLAIN_AUTO(
         "Collation []\n"
         "  collation: \n"
         "    a: Ascending\n"
@@ -596,17 +536,12 @@ TEST(Optimizer, Collation) {
         "  RefBlock: \n"
         "    Variable [a]\n"
         "    Variable [b]\n"
-        "  Evaluation []\n"
-        "    BindBlock:\n"
-        "      [b]\n"
-        "        EvalPath []\n"
-        "          PathConstant []\n"
-        "            Const [2]\n"
-        "          Variable [a]\n"
-        "    Scan [test]\n"
-        "      BindBlock:\n"
-        "        [a]\n"
-        "          Source []\n",
+        "  Evaluation [{b}]\n"
+        "    EvalPath []\n"
+        "      PathConstant []\n"
+        "        Const [2]\n"
+        "      Variable [a]\n"
+        "    Scan [test, {a}]\n",
         collationNode);
 }
 
@@ -627,22 +562,17 @@ TEST(Optimizer, LimitSkip) {
         ASSERT(!env.hasFreeVariables());
     }
 
-    ASSERT_EXPLAIN(
+    ASSERT_EXPLAIN_AUTO(
         "LimitSkip []\n"
         "  limitSkip:\n"
         "    limit: 10\n"
         "    skip: 20\n"
-        "  Evaluation []\n"
-        "    BindBlock:\n"
-        "      [b]\n"
-        "        EvalPath []\n"
-        "          PathConstant []\n"
-        "            Const [2]\n"
-        "          Variable [a]\n"
-        "    Scan [test]\n"
-        "      BindBlock:\n"
-        "        [a]\n"
-        "          Source []\n",
+        "  Evaluation [{b}]\n"
+        "    EvalPath []\n"
+        "      PathConstant []\n"
+        "        Const [2]\n"
+        "      Variable [a]\n"
+        "    Scan [test, {a}]\n",
         limitSkipNode);
 }
 
@@ -657,7 +587,7 @@ TEST(Optimizer, Distribution) {
         properties::DistributionRequirement({DistributionType::HashPartitioning, {"b"}}),
         std::move(evalNode));
 
-    ASSERT_EXPLAIN(
+    ASSERT_EXPLAIN_AUTO(
         "Exchange []\n"
         "  distribution: \n"
         "    type: HashPartitioning\n"
@@ -665,17 +595,12 @@ TEST(Optimizer, Distribution) {
         "        b\n"
         "  RefBlock: \n"
         "    Variable [b]\n"
-        "  Evaluation []\n"
-        "    BindBlock:\n"
-        "      [b]\n"
-        "        EvalPath []\n"
-        "          PathConstant []\n"
-        "            Const [2]\n"
-        "          Variable [a]\n"
-        "    Scan [test]\n"
-        "      BindBlock:\n"
-        "        [a]\n"
-        "          Source []\n",
+        "  Evaluation [{b}]\n"
+        "    EvalPath []\n"
+        "      PathConstant []\n"
+        "        Const [2]\n"
+        "      Variable [a]\n"
+        "    Scan [test, {a}]\n",
         exchangeNode);
 }
 
@@ -732,19 +657,14 @@ TEST(Explain, ExplainV2Compact) {
     ABT evalNode = make<EvaluationNode>(
         "x2", make<EvalPath>(pathNode, make<Variable>("a")), std::move(scanNode));
 
-    ASSERT_EXPLAIN_V2Compact(
-        "Evaluation []\n"
-        "|   BindBlock:\n"
-        "|       [x2]\n"
-        "|           EvalPath []\n"
-        "|           |   Variable [a]\n"
-        "|           PathGet [a] PathTraverse [1] PathComposeM []\n"
-        "|           |   PathCompare [Lt] Const [7]\n"
-        "|           PathCompare [Gte] UnaryOp [Neg] Const [2]\n"
-        "Scan [test]\n"
-        "    BindBlock:\n"
-        "        [x1]\n"
-        "            Source []\n",
+    ASSERT_EXPLAIN_V2Compact_AUTO(
+        "Evaluation [{x2}]\n"
+        "|   EvalPath []\n"
+        "|   |   Variable [a]\n"
+        "|   PathGet [a] PathTraverse [1] PathComposeM []\n"
+        "|   |   PathCompare [Lt] Const [7]\n"
+        "|   PathCompare [Gte] UnaryOp [Neg] Const [2]\n"
+        "Scan [test, {x1}]\n",
         evalNode);
 }
 
@@ -886,17 +806,14 @@ TEST(Optimizer, ExplainRIDUnion) {
     ABT rootNode = make<RootNode>(properties::ProjectionRequirement{ProjectionNameVector{"root"}},
                                   std::move(unionNode));
 
-    ASSERT_EXPLAIN_V2(
+    ASSERT_EXPLAIN_V2_AUTO(
         "Root []\n"
         "|   |   projections: \n"
         "|   |       root\n"
         "|   RefBlock: \n"
         "|       Variable [root]\n"
         "RIDUnion [root]\n"
-        "|   Scan [c1]\n"
-        "|       BindBlock:\n"
-        "|           [root]\n"
-        "|               Source []\n"
+        "|   Scan [c1, {root}]\n"
         "Filter []\n"
         "|   EvalFilter []\n"
         "|   |   Variable [root]\n"
@@ -904,10 +821,7 @@ TEST(Optimizer, ExplainRIDUnion) {
         "|   PathTraverse [1]\n"
         "|   PathCompare [Eq]\n"
         "|   Const [1]\n"
-        "Scan [c1]\n"
-        "    BindBlock:\n"
-        "        [root]\n"
-        "            Source []\n",
+        "Scan [c1, {root}]\n",
         rootNode);
 }
 
