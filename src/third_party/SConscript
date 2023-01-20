@@ -15,7 +15,6 @@ Import([
 
 snappySuffix = '-1.1.7'
 icuSuffix = '-57.1'
-timelibSuffix = '-2022.02'
 tomcryptSuffix = '-1.18.2'
 variantSuffix = '-1.4.0'
 
@@ -28,7 +27,7 @@ thirdPartyEnvironmentModifications = {
         # SAFEINT_USE_INTRINSICS=0 for overflow-safe constexpr multiply. See comment in SafeInt.hpp.
         'CPPDEFINES': [('SAFEINT_USE_INTRINSICS', 0)],
     },
-    'timelib': {'CPPPATH': ['#/src/third_party/timelib' + timelibSuffix], },
+    'timelib': {'CPPPATH': ['#/src/third_party/timelib'], },
     'unwind': {},
     'variant': {'CPPPATH': ['#src/third_party/variant' + variantSuffix + '/include'], },
     'mozjs': {
@@ -553,9 +552,9 @@ yamlEnv.ShimLibrary(name="yaml")
 
 timelibEnv = env.Clone()
 timelibEnv.InjectThirdParty(libraries=['timelib'])
-timelibEnv.SConscript('timelib' + timelibSuffix + '/SConscript', exports={'env': timelibEnv})
+timelibEnv.SConscript('timelib' + '/SConscript', exports={'env': timelibEnv})
 timelibEnv = timelibEnv.Clone(LIBDEPS_INTERFACE=[
-    'timelib' + timelibSuffix + '/timelib',
+    'timelib' + '/timelib',
 ])
 
 timelibEnv.ShimLibrary(name='timelib', )
