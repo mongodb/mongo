@@ -513,10 +513,10 @@ __tiered_update_metadata(WT_SESSION_IMPL *session, WT_TIERED *tiered, const char
     WT_DECL_ITEM(tmp);
     WT_DECL_RET;
     const char *cfg[4] = {NULL, NULL, NULL, NULL};
-    const char *newconfig;
+    const char *newconfig, *strip;
 
     dhandle = &tiered->iface;
-    newconfig = NULL;
+    newconfig = strip = NULL;
     WT_RET(__wt_scr_alloc(session, 0, &tmp));
 
     WT_ERR(__wt_tiered_set_metadata(session, tiered, tmp));
@@ -524,7 +524,8 @@ __tiered_update_metadata(WT_SESSION_IMPL *session, WT_TIERED *tiered, const char
     cfg[0] = WT_CONFIG_BASE(session, tiered_meta);
     cfg[1] = orig_config;
     cfg[2] = tmp->data;
-    WT_ERR(__wt_config_merge(session, cfg, NULL, &newconfig));
+    strip = "tiered_storage=(shared=),";
+    WT_ERR(__wt_config_merge(session, cfg, strip, &newconfig));
     __wt_verbose(
       session, WT_VERB_TIERED, "TIER_UPDATE_META: Update TIERED: %s %s", dhandle->name, newconfig);
     WT_ERR(__wt_metadata_update(session, dhandle->name, newconfig));

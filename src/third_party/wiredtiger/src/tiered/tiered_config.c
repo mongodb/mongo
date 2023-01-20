@@ -103,6 +103,14 @@ __wt_tiered_bucket_config(
     WT_ERR(__wt_config_gets(session, cfg, "tiered_storage.cache_directory", &cachedir));
     WT_ERR_NOTFOUND_OK(__wt_config_gets(session, cfg, "tiered_storage.shared", &shared), false);
 
+    /*
+     * Check if tiered storage shared is set on the connection. If someone wants tiered storage on a
+     * table, it needs to be configured on the database as well.
+     */
+    if (conn->bstorage != NULL && conn->bstorage->tiered_shared == false && shared.val)
+        WT_ERR_MSG(session, EINVAL,
+          "table tiered storage shared requires connection tiered storage shared to be set");
+
     hash = __wt_hash_city64(bucket.str, bucket.len);
     hash_bucket = hash & (conn->hash_size - 1);
     TAILQ_FOREACH (bstorage, &nstorage->buckethashqh[hash_bucket], q) {

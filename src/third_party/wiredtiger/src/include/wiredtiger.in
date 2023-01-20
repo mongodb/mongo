@@ -1397,6 +1397,8 @@ struct __wt_session {
 	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;name, permitted values are \c "none" or a custom storage
 	 * source name created with WT_CONNECTION::add_storage_source.  See @ref
 	 * custom_storage_sources for more information., a string; default \c none.}
+	 * @config{&nbsp;&nbsp;&nbsp;&nbsp;shared, enable sharing tiered tables across other
+	 * WiredTiger instances., a boolean flag; default \c false.}
 	 * @config{ ),,}
 	 * @config{type, set the type of data source used to store a column group\, index or simple
 	 * table.  By default\, a \c "file:" URI is derived from the object name.  The \c type

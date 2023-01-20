@@ -205,6 +205,9 @@ tiered_config = [
         Config('object_target_size', '0', r'''
             this option is no longer supported, retained for backward compatibility''',
             min='0', undoc=True),
+        Config('shared', 'false', r'''
+            enable sharing tiered tables across other WiredTiger instances.''',
+            type='boolean'),
         ]),
 ]
 
