@@ -39,7 +39,7 @@
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/s/balancer_stats_registry.h"
-#include "mongo/db/timeseries/bucket_catalog.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/timeseries_stats.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
@@ -101,7 +101,8 @@ void _appendRecordStats(OperationContext* opCtx,
         if (numRecords) {
             bob.append("avgBucketSize", collection->averageObjectSize(opCtx));
         }
-        BucketCatalog::get(opCtx).appendExecutionStats(collNss.getTimeseriesViewNamespace(), &bob);
+        timeseries::bucket_catalog::BucketCatalog::get(opCtx).appendExecutionStats(
+            collNss.getTimeseriesViewNamespace(), &bob);
         TimeseriesStats::get(collection.get()).append(&bob);
     } else {
         result->appendNumber("count", numRecords);

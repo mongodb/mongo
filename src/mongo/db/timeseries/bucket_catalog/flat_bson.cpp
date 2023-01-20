@@ -27,13 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/db/timeseries/flat_bson.h"
+#include "mongo/db/timeseries/bucket_catalog/flat_bson.h"
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/update/document_diff_serialization.h"
 
-namespace mongo::timeseries {
+namespace mongo::timeseries::bucket_catalog {
 namespace {
 constexpr int32_t kMaxLinearSearchLength = 12;
 constexpr StringData kArrayFieldName =
@@ -967,4 +967,4 @@ template class FlatBSON<MinMax, MinMaxElement, BSONElementValueBuffer>;
 template class FlatBSONStore<SchemaElement, BSONTypeValue>;
 template class FlatBSON<Schema, SchemaElement, BSONTypeValue>;
 
-}  // namespace mongo::timeseries
+}  // namespace mongo::timeseries::bucket_catalog

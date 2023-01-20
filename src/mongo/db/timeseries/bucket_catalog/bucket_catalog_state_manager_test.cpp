@@ -28,11 +28,11 @@
  */
 
 #include "mongo/db/storage/storage_parameters_gen.h"
-#include "mongo/db/timeseries/bucket_catalog.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/bson_test_util.h"
 
-namespace mongo {
+namespace mongo::timeseries::bucket_catalog {
 namespace {
 
 class BucketCatalogStateManagerTest : public BucketCatalog, public unittest::Test {
@@ -614,4 +614,4 @@ TEST_F(BucketCatalogStateManagerTest, DirectWriteFinishRemovesBucketState) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace mongo::timeseries::bucket_catalog

@@ -48,7 +48,7 @@
 #include "mongo/db/s/sharding_state_recovery.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/s/type_shard_collection.h"
-#include "mongo/db/timeseries/bucket_catalog.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/logv2/log.h"
@@ -553,7 +553,7 @@ void MigrationSourceManager::commitChunkMetadataOnConfig() {
     // If the migration has succeeded, clear the BucketCatalog so that the buckets that got migrated
     // out are no longer updatable.
     if (nss().isTimeseriesBucketsCollection()) {
-        auto& bucketCatalog = BucketCatalog::get(_opCtx);
+        auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(_opCtx);
         bucketCatalog.clear(nss().getTimeseriesViewNamespace());
     }
 

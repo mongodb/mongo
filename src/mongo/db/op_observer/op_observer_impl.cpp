@@ -70,8 +70,8 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
-#include "mongo/db/timeseries/bucket_catalog.h"
-#include "mongo/db/timeseries/bucket_catalog_helpers.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_catalog_helpers.h"
 #include "mongo/db/timeseries/timeseries_extended_range.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction/transaction_participant_gen.h"
@@ -945,7 +945,7 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
     } else if (args.coll->ns().isTimeseriesBucketsCollection()) {
         if (args.updateArgs->source != OperationSource::kTimeseriesInsert) {
             OID bucketId = args.updateArgs->updatedDoc["_id"].OID();
-            timeseries::handleDirectWrite(opCtx, args.coll->ns(), bucketId);
+            timeseries::bucket_catalog::handleDirectWrite(opCtx, args.coll->ns(), bucketId);
         }
     }
 }
@@ -965,7 +965,7 @@ void OpObserverImpl::aboutToDelete(OperationContext* opCtx,
 
     if (coll->ns().isTimeseriesBucketsCollection()) {
         OID bucketId = doc["_id"].OID();
-        timeseries::handleDirectWrite(opCtx, coll->ns(), bucketId);
+        timeseries::bucket_catalog::handleDirectWrite(opCtx, coll->ns(), bucketId);
     }
 }
 
@@ -1254,7 +1254,7 @@ void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const DatabaseName&
         mongoDSessionCatalog->invalidateAllSessions(opCtx);
     }
 
-    BucketCatalog::get(opCtx).clear(dbName.db());
+    timeseries::bucket_catalog::BucketCatalog::get(opCtx).clear(dbName.db());
 }
 
 repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
@@ -1314,7 +1314,8 @@ repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,
     } else if (collectionName == NamespaceString::kConfigSettingsNamespace) {
         ReadWriteConcernDefaults::get(opCtx).invalidate();
     } else if (collectionName.isTimeseriesBucketsCollection()) {
-        BucketCatalog::get(opCtx).clear(collectionName.getTimeseriesViewNamespace());
+        timeseries::bucket_catalog::BucketCatalog::get(opCtx).clear(
+            collectionName.getTimeseriesViewNamespace());
     } else if (collectionName.isSystemDotJavascript()) {
         // Inform the JavaScript engine of the change to system.js.
         Scope::storedFuncMod(opCtx);
@@ -2172,7 +2173,7 @@ void OpObserverImpl::_onReplicationRollback(OperationContext* opCtx,
             timeseriesNamespaces.insert(ns.getTimeseriesViewNamespace());
         }
     }
-    BucketCatalog::get(opCtx).clear(
+    timeseries::bucket_catalog::BucketCatalog::get(opCtx).clear(
         [timeseriesNamespaces = std::move(timeseriesNamespaces)](const NamespaceString& bucketNs) {
             return timeseriesNamespaces.contains(bucketNs);
         });

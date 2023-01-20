@@ -57,7 +57,6 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
-#include "mongo/db/timeseries/bucket_catalog.h"
 #include "mongo/db/ttl_collection_cache.h"
 #include "mongo/db/ttl_gen.h"
 #include "mongo/logv2/log.h"

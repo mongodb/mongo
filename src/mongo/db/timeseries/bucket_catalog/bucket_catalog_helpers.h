@@ -33,10 +33,10 @@
 #include "mongo/base/string_data_comparator_interface.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/timeseries/flat_bson.h"
+#include "mongo/db/timeseries/bucket_catalog/flat_bson.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 
-namespace mongo::timeseries {
+namespace mongo::timeseries::bucket_catalog {
 
 /**
  * Generates and returns a MinMax object from an existing bucket document. Avoids unpacking the
@@ -121,4 +121,4 @@ BSONObj generateReopeningFilters(const Date_t& time,
  */
 void handleDirectWrite(OperationContext* opCtx, const NamespaceString& ns, const OID& bucketId);
 
-}  // namespace mongo::timeseries
+}  // namespace mongo::timeseries::bucket_catalog

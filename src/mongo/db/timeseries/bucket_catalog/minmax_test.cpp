@@ -30,12 +30,12 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/simple_string_data_comparator.h"
-#include "mongo/db/timeseries/flat_bson.h"
+#include "mongo/db/timeseries/bucket_catalog/flat_bson.h"
 #include "mongo/unittest/unittest.h"
 
 #include <numeric>
 
-namespace mongo::timeseries {
+namespace mongo::timeseries::bucket_catalog {
 namespace {
 
 std::string concatFieldNames(const MinMaxStore::Obj& obj) {
@@ -263,4 +263,4 @@ TEST(MinMax, SearchLookupMap) {
 
 
 }  // namespace
-}  // namespace mongo::timeseries
+}  // namespace mongo::timeseries::bucket_catalog

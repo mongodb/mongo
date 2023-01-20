@@ -31,7 +31,7 @@
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/timeseries/bucket_catalog.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/stdx/future.h"
@@ -42,7 +42,7 @@
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 
-namespace mongo {
+namespace mongo::timeseries::bucket_catalog {
 namespace {
 constexpr StringData kNumSchemaChanges = "numBucketsClosedDueToSchemaChange"_sd;
 constexpr StringData kNumBucketsReopened = "numBucketsReopened"_sd;
@@ -73,7 +73,7 @@ protected:
     TimeseriesOptions _getTimeseriesOptions(const NamespaceString& ns) const;
     const CollatorInterface* _getCollator(const NamespaceString& ns) const;
 
-    void _commit(const std::shared_ptr<BucketCatalog::WriteBatch>& batch,
+    void _commit(const std::shared_ptr<WriteBatch>& batch,
                  uint16_t numPreviouslyCommittedMeasurements,
                  size_t expectedBatchSize = 1);
     void _insertOneAndCommit(const NamespaceString& ns,
@@ -158,7 +158,7 @@ const CollatorInterface* BucketCatalogTest::_getCollator(const NamespaceString& 
     return autoColl->getDefaultCollator();
 }
 
-void BucketCatalogTest::_commit(const std::shared_ptr<BucketCatalog::WriteBatch>& batch,
+void BucketCatalogTest::_commit(const std::shared_ptr<WriteBatch>& batch,
                                 uint16_t numPreviouslyCommittedMeasurements,
                                 size_t expectedBatchSize) {
     ASSERT(batch->claimCommitRights());
@@ -1366,12 +1366,11 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertCompatibleMeasurement) 
                     "a":{"0":1,"1":2,"2":3},
                     "b":{"0":1,"1":2,"2":3}}})");
 
-    timeseries::CompressionResult compressionResult =
-        timeseries::compressBucket(bucketDoc,
-                                   _timeField,
-                                   _ns1,
-                                   /*eligibleForReopening*/ true,
-                                   /*validateDecompression*/ true);
+    CompressionResult compressionResult = compressBucket(bucketDoc,
+                                                         _timeField,
+                                                         _ns1,
+                                                         /*eligibleForReopening*/ true,
+                                                         /*validateDecompression*/ true);
     const BSONObj& compressedBucketDoc = compressionResult.compressedBucket.value();
 
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
@@ -1429,12 +1428,11 @@ TEST_F(BucketCatalogTest, ReopenCompressedBucketAndInsertIncompatibleMeasurement
                     "a":{"0":1,"1":2,"2":3},
                     "b":{"0":1,"1":2,"2":3}}})");
 
-    timeseries::CompressionResult compressionResult =
-        timeseries::compressBucket(bucketDoc,
-                                   _timeField,
-                                   _ns1,
-                                   /*eligibleForReopening*/ true,
-                                   /*validateDecompression*/ true);
+    CompressionResult compressionResult = compressBucket(bucketDoc,
+                                                         _timeField,
+                                                         _ns1,
+                                                         /*eligibleForReopening*/ true,
+                                                         /*validateDecompression*/ true);
     const BSONObj& compressedBucketDoc = compressionResult.compressedBucket.value();
 
     AutoGetCollection autoColl(_opCtx, _ns1.makeTimeseriesBucketsNamespace(), MODE_IX);
@@ -1480,7 +1478,7 @@ TEST_F(BucketCatalogTest, ArchivingUnderMemoryPressure) {
     // Insert a measurement with a unique meta value, guaranteeing we will open a new bucket but not
     // close an old one except under memory pressure.
     long long meta = 0;
-    auto insertDocument = [&meta, this]() -> BucketCatalog::ClosedBuckets {
+    auto insertDocument = [&meta, this]() -> ClosedBuckets {
         auto result =
             _bucketCatalog->insert(_opCtx,
                                    _ns1,
@@ -1720,8 +1718,8 @@ TEST_F(BucketCatalogTest, InsertIntoReopenedBucket) {
         return autoColl->checkValidation(opCtx, bucketDoc);
     };
 
-    BucketCatalog::BucketFindResult findResult;
-    findResult.bucketToReopen = BucketCatalog::BucketToReopen{bucketDoc, validator};
+    BucketFindResult findResult;
+    findResult.bucketToReopen = BucketToReopen{bucketDoc, validator};
 
     // We should be able to pass in a valid bucket and insert into it.
     result = _bucketCatalog->insert(
@@ -1801,9 +1799,8 @@ TEST_F(BucketCatalogTest, CannotInsertIntoOutdatedBucket) {
     _bucketCatalog->directWriteStart(fakeNs, fakeId);
     _bucketCatalog->directWriteFinish(fakeNs, fakeId);
 
-    BucketCatalog::BucketFindResult findResult;
-    findResult.bucketToReopen =
-        BucketCatalog::BucketToReopen{bucketDoc, validator, result.getValue().catalogEra};
+    BucketFindResult findResult;
+    findResult.bucketToReopen = BucketToReopen{bucketDoc, validator, result.getValue().catalogEra};
 
     // We should get an WriteConflict back if we pass in an outdated bucket.
     result = _bucketCatalog->insert(
@@ -1819,4 +1816,4 @@ TEST_F(BucketCatalogTest, CannotInsertIntoOutdatedBucket) {
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace mongo::timeseries::bucket_catalog

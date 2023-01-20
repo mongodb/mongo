@@ -70,8 +70,8 @@
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
-#include "mongo/db/timeseries/bucket_catalog.h"
-#include "mongo/db/timeseries/bucket_catalog_helpers.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_catalog_helpers.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_extended_range.h"
@@ -159,7 +159,7 @@ NamespaceString makeTimeseriesBucketsNamespace(const NamespaceString& nss) {
  */
 write_ops::UpdateOpEntry makeTimeseriesUpdateOpEntry(
     OperationContext* opCtx,
-    std::shared_ptr<BucketCatalog::WriteBatch> batch,
+    std::shared_ptr<timeseries::bucket_catalog::WriteBatch> batch,
     const BSONObj& metadata) {
     BSONObjBuilder updateBuilder;
     {
@@ -245,7 +245,7 @@ write_ops::UpdateOpEntry makeTimeseriesTransformationOpEntry(
 /**
  * Returns the document for inserting a new bucket.
  */
-BSONObj makeTimeseriesInsertDocument(std::shared_ptr<BucketCatalog::WriteBatch> batch,
+BSONObj makeTimeseriesInsertDocument(std::shared_ptr<timeseries::bucket_catalog::WriteBatch> batch,
                                      const BSONObj& metadata) {
     using namespace timeseries;
 
@@ -586,7 +586,7 @@ public:
 
     private:
         using TimeseriesBatches =
-            std::vector<std::pair<std::shared_ptr<BucketCatalog::WriteBatch>, size_t>>;
+            std::vector<std::pair<std::shared_ptr<timeseries::bucket_catalog::WriteBatch>, size_t>>;
         using TimeseriesStmtIds = stdx::unordered_map<OID, std::vector<StmtId>, OID::Hasher>;
         struct TimeseriesSingleWriteResult {
             StatusWith<SingleWriteResult> result;
@@ -602,11 +602,13 @@ public:
             throw;
         }
 
-        BucketCatalog::CombineWithInsertsFromOtherClients
+        timeseries::bucket_catalog::BucketCatalog::CombineWithInsertsFromOtherClients
         _canCombineTimeseriesInsertWithOtherClients(OperationContext* opCtx) const {
             return isTimeseriesWriteRetryable(opCtx) || request().getOrdered()
-                ? BucketCatalog::CombineWithInsertsFromOtherClients::kDisallow
-                : BucketCatalog::CombineWithInsertsFromOtherClients::kAllow;
+                ? timeseries::bucket_catalog::BucketCatalog::CombineWithInsertsFromOtherClients::
+                      kDisallow
+                : timeseries::bucket_catalog::BucketCatalog::CombineWithInsertsFromOtherClients::
+                      kAllow;
         }
 
         TimeseriesSingleWriteResult _getTimeseriesSingleWriteResult(
@@ -634,7 +636,7 @@ public:
         }
 
         write_ops::InsertCommandRequest _makeTimeseriesInsertOp(
-            std::shared_ptr<BucketCatalog::WriteBatch> batch,
+            std::shared_ptr<timeseries::bucket_catalog::WriteBatch> batch,
             const BSONObj& metadata,
             std::vector<StmtId>&& stmtIds) const {
             write_ops::InsertCommandRequest op{makeTimeseriesBucketsNamespace(ns()),
@@ -645,7 +647,7 @@ public:
 
         write_ops::UpdateCommandRequest _makeTimeseriesUpdateOp(
             OperationContext* opCtx,
-            std::shared_ptr<BucketCatalog::WriteBatch> batch,
+            std::shared_ptr<timeseries::bucket_catalog::WriteBatch> batch,
             const BSONObj& metadata,
             std::vector<StmtId>&& stmtIds) const {
             write_ops::UpdateCommandRequest op(
@@ -682,7 +684,7 @@ public:
          */
         TimeseriesSingleWriteResult _performTimeseriesInsert(
             OperationContext* opCtx,
-            std::shared_ptr<BucketCatalog::WriteBatch> batch,
+            std::shared_ptr<timeseries::bucket_catalog::WriteBatch> batch,
             const BSONObj& metadata,
             std::vector<StmtId>&& stmtIds) const {
             if (auto status = checkFailUnorderedTimeseriesInsertFailPoint(metadata)) {
@@ -699,7 +701,7 @@ public:
          */
         TimeseriesSingleWriteResult _performTimeseriesUpdate(
             OperationContext* opCtx,
-            std::shared_ptr<BucketCatalog::WriteBatch> batch,
+            std::shared_ptr<timeseries::bucket_catalog::WriteBatch> batch,
             const BSONObj& metadata,
             const write_ops::UpdateCommandRequest& op) const {
             if (auto status = checkFailUnorderedTimeseriesInsertFailPoint(metadata)) {
@@ -711,7 +713,8 @@ public:
         }
 
         TimeseriesSingleWriteResult _performTimeseriesBucketCompression(
-            OperationContext* opCtx, const BucketCatalog::ClosedBucket& closedBucket) const {
+            OperationContext* opCtx,
+            const timeseries::bucket_catalog::ClosedBucket& closedBucket) const {
             // Buckets with just a single measurement is not worth compressing.
             if (closedBucket.numMeasurements.has_value() &&
                 closedBucket.numMeasurements.value() <= 1) {
@@ -778,7 +781,7 @@ public:
 
         write_ops::UpdateCommandRequest _makeTimeseriesDecompressAndUpdateOp(
             OperationContext* opCtx,
-            std::shared_ptr<BucketCatalog::WriteBatch> batch,
+            std::shared_ptr<timeseries::bucket_catalog::WriteBatch> batch,
             const BSONObj& metadata,
             std::vector<StmtId>&& stmtIds) const {
             // Generate the diff and apply it against the previously decrompressed bucket document.
@@ -816,7 +819,7 @@ public:
          * Returns whether the request can continue.
          */
         bool _commitTimeseriesBucket(OperationContext* opCtx,
-                                     std::shared_ptr<BucketCatalog::WriteBatch> batch,
+                                     std::shared_ptr<timeseries::bucket_catalog::WriteBatch> batch,
                                      size_t start,
                                      size_t index,
                                      std::vector<StmtId>&& stmtIds,
@@ -824,7 +827,7 @@ public:
                                      boost::optional<repl::OpTime>* opTime,
                                      boost::optional<OID>* electionId,
                                      std::vector<size_t>* docsToRetry) const try {
-            auto& bucketCatalog = BucketCatalog::get(opCtx);
+            auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
 
             auto metadata = bucketCatalog.getMetadata(batch->bucket());
             auto status = bucketCatalog.prepareCommit(batch);
@@ -879,8 +882,8 @@ public:
 
             getOpTimeAndElectionId(opCtx, opTime, electionId);
 
-            auto closedBucket =
-                bucketCatalog.finish(batch, BucketCatalog::CommitInfo{*opTime, *electionId});
+            auto closedBucket = bucketCatalog.finish(
+                batch, timeseries::bucket_catalog::CommitInfo{*opTime, *electionId});
 
             if (closedBucket) {
                 // If this write closed a bucket, compress the bucket
@@ -893,7 +896,7 @@ public:
             }
             return true;
         } catch (const DBException& ex) {
-            BucketCatalog::get(opCtx).abort(batch, ex.toStatus());
+            timeseries::bucket_catalog::BucketCatalog::get(opCtx).abort(batch, ex.toStatus());
             throw;
         }
 
@@ -910,9 +913,10 @@ public:
             std::vector<write_ops::WriteError>* errors,
             boost::optional<repl::OpTime>* opTime,
             boost::optional<OID>* electionId) const {
-            auto& bucketCatalog = BucketCatalog::get(opCtx);
+            auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
 
-            std::vector<std::reference_wrapper<std::shared_ptr<BucketCatalog::WriteBatch>>>
+            std::vector<
+                std::reference_wrapper<std::shared_ptr<timeseries::bucket_catalog::WriteBatch>>>
                 batchesToCommit;
 
             for (auto& [batch, _] : *batches) {
@@ -987,7 +991,7 @@ public:
                 bool compressClosedBuckets = true;
                 for (auto batch : batchesToCommit) {
                     auto closedBucket = bucketCatalog.finish(
-                        batch, BucketCatalog::CommitInfo{*opTime, *electionId});
+                        batch, timeseries::bucket_catalog::CommitInfo{*opTime, *electionId});
                     batch.get().reset();
 
                     if (!closedBucket || !compressClosedBuckets) {
@@ -1080,7 +1084,7 @@ public:
                                  const std::vector<size_t>& indices,
                                  std::vector<write_ops::WriteError>* errors,
                                  bool* containsRetry) const {
-            auto& bucketCatalog = BucketCatalog::get(opCtx);
+            auto& bucketCatalog = timeseries::bucket_catalog::BucketCatalog::get(opCtx);
 
             auto bucketsNs = makeTimeseriesBucketsNamespace(ns());
             // Holding this shared pointer to the collection guarantees that the collator is not
@@ -1141,7 +1145,7 @@ public:
                     ns().isTimeseriesBucketsCollection() ? ns().getTimeseriesViewNamespace() : ns();
                 auto& measurementDoc = request().getDocuments()[start + index];
 
-                StatusWith<BucketCatalog::InsertResult> swResult =
+                StatusWith<timeseries::bucket_catalog::BucketCatalog::InsertResult> swResult =
                     Status{ErrorCodes::BadValue, "Uninitialized InsertResult"};
                 do {
                     if (feature_flags::gTimeseriesScalabilityImprovements.isEnabled(
@@ -1160,7 +1164,7 @@ public:
                             // If the InsertResult doesn't contain a batch, we failed to insert the
                             // measurement into an open bucket and need to create/reopen a bucket.
                             if (!insertResult.batch) {
-                                BucketCatalog::BucketFindResult bucketFindResult;
+                                timeseries::bucket_catalog::BucketFindResult bucketFindResult;
                                 BSONObj suitableBucket;
 
                                 if (auto* bucketId = stdx::get_if<OID>(&insertResult.candidate)) {
@@ -1190,15 +1194,16 @@ public:
                                     }
                                 }
 
-                                boost::optional<BucketCatalog::BucketToReopen> bucketToReopen =
-                                    boost::none;
+                                boost::optional<timeseries::bucket_catalog::BucketToReopen>
+                                    bucketToReopen = boost::none;
                                 if (!suitableBucket.isEmpty()) {
                                     auto validator = [&](OperationContext * opCtx,
                                                          const BSONObj& bucketDoc) -> auto {
                                         return bucketsColl->checkValidation(opCtx, bucketDoc);
                                     };
-                                    auto bucketToReopen = BucketCatalog::BucketToReopen{
-                                        suitableBucket, validator, insertResult.catalogEra};
+                                    auto bucketToReopen =
+                                        timeseries::bucket_catalog::BucketToReopen{
+                                            suitableBucket, validator, insertResult.catalogEra};
                                     bucketFindResult.bucketToReopen = std::move(bucketToReopen);
                                 }
 
@@ -1213,7 +1218,7 @@ public:
                             }
                         }
                     } else {
-                        BucketCatalog::BucketFindResult bucketFindResult;
+                        timeseries::bucket_catalog::BucketFindResult bucketFindResult;
                         swResult =
                             bucketCatalog.insert(opCtx,
                                                  viewNs,
@@ -1306,7 +1311,8 @@ public:
                 // If there are any unprocessed batches, we mark them as error with the last known
                 // error.
                 if (itr > indexOfLastProcessedBatch && batch->claimCommitRights()) {
-                    BucketCatalog::get(opCtx).abort(batch, lastError->getStatus());
+                    timeseries::bucket_catalog::BucketCatalog::get(opCtx).abort(
+                        batch, lastError->getStatus());
                     errors->emplace_back(start + index, lastError->getStatus());
                     continue;
                 }

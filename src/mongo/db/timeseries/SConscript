@@ -4,6 +4,15 @@ Import("env")
 
 env = env.Clone()
 
+env.SConscript(
+    dirs=[
+        'bucket_catalog',
+    ],
+    exports=[
+        'env',
+    ],
+)
+
 env.Library(
     target='timeseries_options',
     source=[
@@ -16,29 +25,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/db/storage/storage_options',
         '$BUILD_DIR/mongo/util/processinfo',
-    ],
-)
-
-env.Library(
-    target='bucket_catalog',
-    source=[
-        'bucket_catalog.cpp',
-        'bucket_catalog_helpers.cpp',
-        'flat_bson.cpp',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/bson/util/bson_column',
-        '$BUILD_DIR/mongo/db/catalog/database_holder',
-        '$BUILD_DIR/mongo/db/commands/server_status_core',
-        '$BUILD_DIR/mongo/db/dbdirectclient',
-        '$BUILD_DIR/mongo/db/record_id_helpers',
-        '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/db/server_options_core',
-        '$BUILD_DIR/mongo/db/storage/storage_options',
-        '$BUILD_DIR/mongo/db/views/views',
-        '$BUILD_DIR/mongo/util/fail_point',
-        'bucket_compression',
-        'timeseries_options',
     ],
 )
 
@@ -133,11 +119,7 @@ env.Library(
 env.CppUnitTest(
     target='db_timeseries_test',
     source=[
-        'bucket_catalog_helpers_test.cpp',
-        'bucket_catalog_state_manager_test.cpp',
-        'bucket_catalog_test.cpp',
         'bucket_compression_test.cpp',
-        'minmax_test.cpp',
         'timeseries_dotted_path_support_test.cpp',
         'timeseries_extended_range_test.cpp',
         'timeseries_index_schema_conversion_functions_test.cpp',
@@ -147,9 +129,7 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/catalog_test_fixture',
         '$BUILD_DIR/mongo/db/catalog/collection_crud',
-        '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/shard_role',
-        'bucket_catalog',
         'bucket_compression',
         'timeseries_conversion_util',
         'timeseries_extended_range',

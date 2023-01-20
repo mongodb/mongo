@@ -27,19 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/db/timeseries/bucket_catalog_helpers.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_catalog_helpers.h"
 
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
-#include "mongo/db/timeseries/bucket_catalog.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/redaction.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
-namespace mongo::timeseries {
+namespace mongo::timeseries::bucket_catalog {
 
 namespace {
 
@@ -290,4 +290,4 @@ void handleDirectWrite(OperationContext* opCtx, const NamespaceString& ns, const
         });
 }
 
-}  // namespace mongo::timeseries
+}  // namespace mongo::timeseries::bucket_catalog

@@ -58,7 +58,7 @@
 #include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
-#include "mongo/db/timeseries/flat_bson.h"
+#include "mongo/db/timeseries/bucket_catalog/flat_bson.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/logv2/log.h"
@@ -229,7 +229,7 @@ Status _validateTimeseriesDataFieldTypes(const BSONElement& dataField, int bucke
  * granularity into account.
  */
 Status _validateTimeSeriesMinMax(const CollectionPtr& coll,
-                                 timeseries::MinMax& minmax,
+                                 timeseries::bucket_catalog::MinMax& minmax,
                                  const BSONElement& controlMin,
                                  const BSONElement& controlMax,
                                  StringData fieldName) {
@@ -285,7 +285,7 @@ Status _validateTimeSeriesDataTimeField(const CollectionPtr& coll,
                                         StringData fieldName,
                                         int version,
                                         int* bucketCount) {
-    timeseries::MinMax minmax;
+    timeseries::bucket_catalog::MinMax minmax;
     if (version == 1) {
         for (const auto& metric : timeField.Obj()) {
             if (metric.type() != BSONType::Date) {
@@ -350,7 +350,7 @@ Status _validateTimeSeriesDataField(const CollectionPtr& coll,
                                     StringData fieldName,
                                     int version,
                                     int bucketCount) {
-    timeseries::MinMax minmax;
+    timeseries::bucket_catalog::MinMax minmax;
     if (version == 1) {
         // Checks that indices are in increasing order and within the correct range.
         int prevIdx = INT_MIN;

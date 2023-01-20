@@ -33,12 +33,12 @@
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/timeseries/bucket_catalog_helpers.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_catalog_helpers.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/unittest.h"
 
-namespace mongo {
+namespace mongo::timeseries::bucket_catalog {
 namespace {
 
 const NamespaceString kNss = NamespaceString("test.ts");
@@ -79,33 +79,32 @@ BSONObj BucketCatalogHelpersTest::_findSuitableBucket(OperationContext* opCtx,
     Date_t time;
     BSONElement metadata;
     if (!options.getMetaField().has_value()) {
-        auto swTime = timeseries::extractTime(measurementDoc, options.getTimeField());
+        auto swTime = extractTime(measurementDoc, options.getTimeField());
         ASSERT_OK(swTime);
         time = swTime.getValue();
     } else {
-        auto swDocTimeAndMeta = timeseries::extractTimeAndMeta(
+        auto swDocTimeAndMeta = extractTimeAndMeta(
             measurementDoc, options.getTimeField(), options.getMetaField().value());
         ASSERT_OK(swDocTimeAndMeta);
         time = swDocTimeAndMeta.getValue().first;
         metadata = swDocTimeAndMeta.getValue().second;
     }
 
-    auto controlMinTimePath =
-        timeseries::kControlMinFieldNamePrefix.toString() + options.getTimeField();
+    auto controlMinTimePath = kControlMinFieldNamePrefix.toString() + options.getTimeField();
 
     boost::optional<BSONObj> normalizedMetadata;
     if (metadata.ok()) {
         BSONObjBuilder builder;
-        timeseries::normalizeMetadata(&builder, metadata, timeseries::kBucketMetaFieldName);
+        normalizeMetadata(&builder, metadata, kBucketMetaFieldName);
         normalizedMetadata = builder.obj();
     }
 
     // Generate all the filters we need to add to our 'find' query for a suitable bucket.
-    auto fullFilterExpression = timeseries::generateReopeningFilters(
-        time,
-        normalizedMetadata ? normalizedMetadata->firstElement() : metadata,
-        controlMinTimePath,
-        *options.getBucketMaxSpanSeconds());
+    auto fullFilterExpression =
+        generateReopeningFilters(time,
+                                 normalizedMetadata ? normalizedMetadata->firstElement() : metadata,
+                                 controlMinTimePath,
+                                 *options.getBucketMaxSpanSeconds());
 
     DBDirectClient client(opCtx);
     return client.findOne(bucketNss, fullFilterExpression);
@@ -130,8 +129,7 @@ TEST_F(BucketCatalogHelpersTest, GenerateMinMaxBadBucketDocumentsTest) {
                                  ::mongo::fromjson(R"({control: {min: {a: 1}, max: {}}})")};
 
     for (const BSONObj& doc : docs) {
-        StatusWith<timeseries::MinMax> swMinMax =
-            timeseries::generateMinMaxFromBucketDoc(doc, collator);
+        StatusWith<MinMax> swMinMax = generateMinMaxFromBucketDoc(doc, collator);
         ASSERT_NOT_OK(swMinMax.getStatus());
     }
 }
@@ -157,11 +155,10 @@ TEST_F(BucketCatalogHelpersTest, GenerateMinMaxTest) {
                                         max:{a: 2, b: {c: 2, d: [4, 5, 6]}, e: [4, 5, 6]}}})")};
 
     for (const BSONObj& doc : docs) {
-        StatusWith<timeseries::MinMax> swMinMax =
-            timeseries::generateMinMaxFromBucketDoc(doc, collator);
+        StatusWith<MinMax> swMinMax = generateMinMaxFromBucketDoc(doc, collator);
         ASSERT_OK(swMinMax.getStatus());
 
-        timeseries::MinMax minmax = std::move(swMinMax.getValue());
+        MinMax minmax = std::move(swMinMax.getValue());
 
         ASSERT_BSONOBJ_BINARY_EQ(doc.getObjectField("control").getObjectField("min"), minmax.min());
         ASSERT_BSONOBJ_BINARY_EQ(doc.getObjectField("control").getObjectField("max"), minmax.max());
@@ -184,11 +181,10 @@ TEST_F(BucketCatalogHelpersTest, GenerateMinMaxWithLowerCaseFirstCollationTest) 
     // Lowercase compares less than uppercase with a {caseFirst: "lower"} collator.
     BSONObj doc = ::mongo::fromjson(R"({control: {min: {field: "a"}, max: {field: "A"}}})");
 
-    StatusWith<timeseries::MinMax> swMinMax =
-        timeseries::generateMinMaxFromBucketDoc(doc, collator);
+    StatusWith<MinMax> swMinMax = generateMinMaxFromBucketDoc(doc, collator);
     ASSERT_OK(swMinMax.getStatus());
 
-    timeseries::MinMax minmax = std::move(swMinMax.getValue());
+    MinMax minmax = std::move(swMinMax.getValue());
 
     ASSERT_BSONOBJ_BINARY_EQ(doc.getObjectField("control").getObjectField("min"), minmax.min());
     ASSERT_BSONOBJ_BINARY_EQ(doc.getObjectField("control").getObjectField("max"), minmax.max());
@@ -210,11 +206,10 @@ TEST_F(BucketCatalogHelpersTest, GenerateMinMaxWithUpperCaseFirstCollationTest) 
     // Uppercase compares less than lowercase with a {caseFirst: "upper"} collator.
     BSONObj doc = ::mongo::fromjson(R"({control: {min: {field: "A"}, max: {field: "a"}}})");
 
-    StatusWith<timeseries::MinMax> swMinMax =
-        timeseries::generateMinMaxFromBucketDoc(doc, collator);
+    StatusWith<MinMax> swMinMax = generateMinMaxFromBucketDoc(doc, collator);
     ASSERT_OK(swMinMax.getStatus());
 
-    timeseries::MinMax minmax = std::move(swMinMax.getValue());
+    MinMax minmax = std::move(swMinMax.getValue());
 
     ASSERT_BSONOBJ_BINARY_EQ(doc.getObjectField("control").getObjectField("min"), minmax.min());
     ASSERT_BSONOBJ_BINARY_EQ(doc.getObjectField("control").getObjectField("max"), minmax.max());
@@ -235,8 +230,7 @@ TEST_F(BucketCatalogHelpersTest, GenerateMinMaxSucceedsWithMixedSchemaBucketDocu
                                  ::mongo::fromjson(R"({control:{min: {a: 1}, max: {a: "foo"}}})")};
 
     for (const BSONObj& doc : docs) {
-        StatusWith<timeseries::MinMax> swMinMax =
-            timeseries::generateMinMaxFromBucketDoc(doc, collator);
+        StatusWith<MinMax> swMinMax = generateMinMaxFromBucketDoc(doc, collator);
         ASSERT_OK(swMinMax.getStatus());
     }
 }
@@ -256,8 +250,7 @@ TEST_F(BucketCatalogHelpersTest, GenerateSchemaFailsWithMixedSchemaBucketDocumen
                                  ::mongo::fromjson(R"({control:{min: {a: 1}, max: {a: "foo"}}})")};
 
     for (const BSONObj& doc : docs) {
-        StatusWith<timeseries::Schema> swSchema =
-            timeseries::generateSchemaFromBucketDoc(doc, collator);
+        StatusWith<Schema> swSchema = generateSchemaFromBucketDoc(doc, collator);
         ASSERT_NOT_OK(swSchema.getStatus());
     }
 }
@@ -296,14 +289,13 @@ TEST_F(BucketCatalogHelpersTest, GenerateSchemaWithInvalidMeasurementsTest) {
          ::mongo::fromjson(R"({a: {b: []}})")}};
 
     for (const auto& [minMaxDoc, measurementDoc] : docs) {
-        StatusWith<timeseries::Schema> swSchema =
-            timeseries::generateSchemaFromBucketDoc(minMaxDoc, collator);
+        StatusWith<Schema> swSchema = generateSchemaFromBucketDoc(minMaxDoc, collator);
         ASSERT_OK(swSchema.getStatus());
 
-        timeseries::Schema schema = std::move(swSchema.getValue());
+        Schema schema = std::move(swSchema.getValue());
 
         auto result = schema.update(measurementDoc, /*metaField=*/boost::none, collator);
-        ASSERT(result == timeseries::Schema::UpdateStatus::Failed);
+        ASSERT(result == Schema::UpdateStatus::Failed);
     }
 }
 
@@ -331,14 +323,13 @@ TEST_F(BucketCatalogHelpersTest, GenerateSchemaWithValidMeasurementsTest) {
          ::mongo::fromjson(R"({a: {b: 3}})")}};
 
     for (const auto& [minMaxDoc, measurementDoc] : docs) {
-        StatusWith<timeseries::Schema> swSchema =
-            timeseries::generateSchemaFromBucketDoc(minMaxDoc, collator);
+        StatusWith<Schema> swSchema = generateSchemaFromBucketDoc(minMaxDoc, collator);
         ASSERT_OK(swSchema.getStatus());
 
-        timeseries::Schema schema = std::move(swSchema.getValue());
+        Schema schema = std::move(swSchema.getValue());
 
         auto result = schema.update(measurementDoc, /*metaField=*/boost::none, collator);
-        ASSERT(result == timeseries::Schema::UpdateStatus::Updated);
+        ASSERT(result == Schema::UpdateStatus::Updated);
     }
 }
 
@@ -586,8 +577,7 @@ TEST_F(BucketCatalogHelpersTest, FindDocumentFromOID) {
     // document.
     for (const auto& doc : bucketDocs) {
         const auto bucketId = doc["_id"].OID();
-        auto retrievedBucket =
-            timeseries::findDocFromOID(operationContext(), (*autoColl).get(), bucketId);
+        auto retrievedBucket = findDocFromOID(operationContext(), (*autoColl).get(), bucketId);
         ASSERT(!retrievedBucket.isEmpty());
         ASSERT_BSONOBJ_EQ(retrievedBucket, doc);
     }
@@ -597,11 +587,10 @@ TEST_F(BucketCatalogHelpersTest, FindDocumentFromOID) {
                                         OID("90e7e6ec27c28d338ab29200"),
                                         OID("00e7e6ec27c28d338ab29200")};
     for (const auto& oid : nonExistentOIDs) {
-        auto retrievedBucket =
-            timeseries::findDocFromOID(operationContext(), (*autoColl).get(), oid);
+        auto retrievedBucket = findDocFromOID(operationContext(), (*autoColl).get(), oid);
         ASSERT(retrievedBucket.isEmpty());
     }
 }
 
 }  // namespace
-}  // namespace mongo
+}  // namespace mongo::timeseries::bucket_catalog

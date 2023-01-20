@@ -31,7 +31,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/platform/basic.h"
 
-#include "mongo/db/timeseries/bucket_catalog.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 
 #include <algorithm>
 #include <boost/iterator/transform_iterator.hpp>
@@ -44,7 +44,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
-#include "mongo/db/timeseries/bucket_catalog_helpers.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_catalog_helpers.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_options.h"
@@ -55,7 +55,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
-namespace mongo {
+namespace mongo::timeseries::bucket_catalog {
 namespace {
 const auto getBucketCatalog = ServiceContext::declareDecoration<BucketCatalog>();
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesDirectModificationBeforeWriteConflict);
@@ -64,16 +64,6 @@ MONGO_FAIL_POINT_DEFINE(alwaysUseSameBucketCatalogStripe);
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesDirectModificationAfterStart);
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesDirectModificationBeforeFinish);
 MONGO_FAIL_POINT_DEFINE(hangWaitingForConflictingPreparedBatch);
-
-
-uint8_t numDigits(uint32_t num) {
-    uint8_t numDigits = 0;
-    while (num) {
-        num /= 10;
-        ++numDigits;
-    }
-    return numDigits;
-}
 
 OperationId getOpId(OperationContext* opCtx,
                     BucketCatalog::CombineWithInsertsFromOtherClients combine) {
@@ -102,7 +92,7 @@ std::pair<OID, Date_t> generateBucketOID(const Date_t& time, const TimeseriesOpt
     // time. The second, and more important reason, is so that we reliably group measurements
     // together into predictable chunks for sharding. This way we know from a measurement timestamp
     // what the bucket timestamp will be, so we can route measurements to the right shard chunk.
-    auto roundedTime = timeseries::roundTimestampToGranularity(time, options);
+    auto roundedTime = roundTimestampToGranularity(time, options);
     int64_t const roundedSeconds = durationCount<Seconds>(roundedTime.toDurationSinceEpoch());
     oid.setTimestamp(roundedSeconds);
 
@@ -159,734 +149,6 @@ int32_t getCacheDerivedBucketMaxSize(StorageEngine* storageEngine, uint32_t work
 }
 
 }  // namespace
-
-void BucketCatalog::ExecutionStatsController::incNumBucketInserts(long long increment) {
-    _collectionStats->numBucketInserts.fetchAndAddRelaxed(increment);
-    _globalStats->numBucketInserts.fetchAndAddRelaxed(increment);
-}
-
-void BucketCatalog::ExecutionStatsController::incNumBucketUpdates(long long increment) {
-    _collectionStats->numBucketUpdates.fetchAndAddRelaxed(increment);
-    _globalStats->numBucketUpdates.fetchAndAddRelaxed(increment);
-}
-
-void BucketCatalog::ExecutionStatsController::incNumBucketsOpenedDueToMetadata(
-    long long increment) {
-    _collectionStats->numBucketsOpenedDueToMetadata.fetchAndAddRelaxed(increment);
-    _globalStats->numBucketsOpenedDueToMetadata.fetchAndAddRelaxed(increment);
-}
-
-void BucketCatalog::ExecutionStatsController::incNumBucketsClosedDueToCount(long long increment) {
-    _collectionStats->numBucketsClosedDueToCount.fetchAndAddRelaxed(increment);
-    _globalStats->numBucketsClosedDueToCount.fetchAndAddRelaxed(increment);
-}
-
-void BucketCatalog::ExecutionStatsController::incNumBucketsClosedDueToSchemaChange(
-    long long increment) {
-    _collectionStats->numBucketsClosedDueToSchemaChange.fetchAndAddRelaxed(increment);
-    _globalStats->numBucketsClosedDueToSchemaChange.fetchAndAddRelaxed(increment);
-}
-
-void BucketCatalog::ExecutionStatsController::incNumBucketsClosedDueToSize(long long increment) {
-    _collectionStats->numBucketsClosedDueToSize.fetchAndAddRelaxed(increment);
-    _globalStats->numBucketsClosedDueToSize.fetchAndAddRelaxed(increment);
-}
-
-void BucketCatalog::ExecutionStatsController::incNumBucketsClosedDueToCachePressure(
-    long long increment) {
-    _collectionStats->numBucketsClosedDueToCachePressure.fetchAndAddRelaxed(increment);
-    _globalStats->numBucketsClosedDueToCachePressure.fetchAndAddRelaxed(increment);
-}
-
-void BucketCatalog::ExecutionStatsController::incNumBucketsClosedDueToTimeForward(
-    long long increment) {
-    _collectionStats->numBucketsClosedDueToTimeForward.fetchAndAddRelaxed(increment);
-    _globalStats->numBucketsClosedDueToTimeForward.fetchAndAddRelaxed(increment);
-}
-
-void BucketCatalog::ExecutionStatsController::incNumBucketsClosedDueToTimeBackward(
-    long long increment) {
-    _collectionStats->numBucketsClosedDueToTimeBackward.fetchAndAddRelaxed(increment);
-    _globalStats->numBucketsClosedDueToTimeBackward.fetchAndAddRelaxed(increment);
-}
-
-void BucketCatalog::ExecutionStatsController::incNumBucketsClosedDueToMemoryThreshold(
-    long long increment) {
-    _collectionStats->numBucketsClosedDueToMemoryThreshold.fetchAndAddRelaxed(increment);
-    _globalStats->numBucketsClosedDueToMemoryThreshold.fetchAndAddRelaxed(increment);
-}
-
-void BucketCatalog::ExecutionStatsController::incNumBucketsClosedDueToReopening(
-    long long increment) {
-    _collectionStats->numBucketsClosedDueToReopening.fetchAndAddRelaxed(increment);
-    _globalStats->numBucketsClosedDueToReopening.fetchAndAddRelaxed(increment);
-}
-
-void BucketCatalog::ExecutionStatsController::incNumBucketsArchivedDueToMemoryThreshold(
-    long long increment) {
-    _collectionStats->numBucketsArchivedDueToMemoryThreshold.fetchAndAddRelaxed(increment);
-    _globalStats->numBucketsArchivedDueToMemoryThreshold.fetchAndAddRelaxed(increment);
-}
-
-void BucketCatalog::ExecutionStatsController::incNumBucketsArchivedDueToTimeBackward(
-    long long increment) {
-    _collectionStats->numBucketsArchivedDueToTimeBackward.fetchAndAddRelaxed(increment);
-    _globalStats->numBucketsArchivedDueToTimeBackward.fetchAndAddRelaxed(increment);
-}
-
-void BucketCatalog::ExecutionStatsController::incNumCommits(long long increment) {
-    _collectionStats->numCommits.fetchAndAddRelaxed(increment);
-    _globalStats->numCommits.fetchAndAddRelaxed(increment);
-}
-
-void BucketCatalog::ExecutionStatsController::incNumWaits(long long increment) {
-    _collectionStats->numWaits.fetchAndAddRelaxed(increment);
-    _globalStats->numWaits.fetchAndAddRelaxed(increment);
-}
-
-void BucketCatalog::ExecutionStatsController::incNumMeasurementsCommitted(long long increment) {
-    _collectionStats->numMeasurementsCommitted.fetchAndAddRelaxed(increment);
-    _globalStats->numMeasurementsCommitted.fetchAndAddRelaxed(increment);
-}
-
-void BucketCatalog::ExecutionStatsController::incNumBucketsReopened(long long increment) {
-    _collectionStats->numBucketsReopened.fetchAndAddRelaxed(increment);
-    _globalStats->numBucketsReopened.fetchAndAddRelaxed(increment);
-}
-
-void BucketCatalog::ExecutionStatsController::incNumBucketsKeptOpenDueToLargeMeasurements(
-    long long increment) {
-    _collectionStats->numBucketsKeptOpenDueToLargeMeasurements.fetchAndAddRelaxed(increment);
-    _globalStats->numBucketsKeptOpenDueToLargeMeasurements.fetchAndAddRelaxed(increment);
-}
-
-void BucketCatalog::ExecutionStatsController::incNumBucketFetchesFailed(long long increment) {
-    _collectionStats->numBucketFetchesFailed.fetchAndAddRelaxed(increment);
-    _globalStats->numBucketFetchesFailed.fetchAndAddRelaxed(increment);
-}
-
-void BucketCatalog::ExecutionStatsController::incNumBucketQueriesFailed(long long increment) {
-    _collectionStats->numBucketQueriesFailed.fetchAndAddRelaxed(increment);
-    _globalStats->numBucketQueriesFailed.fetchAndAddRelaxed(increment);
-}
-
-void BucketCatalog::ExecutionStatsController::incNumBucketsFetched(long long increment) {
-    _collectionStats->numBucketsFetched.fetchAndAddRelaxed(increment);
-    _globalStats->numBucketsFetched.fetchAndAddRelaxed(increment);
-}
-
-void BucketCatalog::ExecutionStatsController::incNumBucketsQueried(long long increment) {
-    _collectionStats->numBucketsQueried.fetchAndAddRelaxed(increment);
-    _globalStats->numBucketsQueried.fetchAndAddRelaxed(increment);
-}
-
-void BucketCatalog::ExecutionStatsController::incNumBucketReopeningsFailed(long long increment) {
-    _collectionStats->numBucketReopeningsFailed.fetchAndAddRelaxed(increment);
-    _globalStats->numBucketReopeningsFailed.fetchAndAddRelaxed(increment);
-}
-
-void BucketCatalog::ExecutionStatsController::incNumDuplicateBucketsReopened(long long increment) {
-    _collectionStats->numDuplicateBucketsReopened.fetchAndAddRelaxed(increment);
-    _globalStats->numDuplicateBucketsReopened.fetchAndAddRelaxed(increment);
-}
-
-BucketCatalog::BucketState& BucketCatalog::BucketState::setFlag(BucketStateFlag flag) {
-    _state |= static_cast<decltype(_state)>(flag);
-    return *this;
-}
-
-BucketCatalog::BucketState& BucketCatalog::BucketState::unsetFlag(BucketStateFlag flag) {
-    _state &= ~static_cast<decltype(_state)>(flag);
-    return *this;
-}
-
-BucketCatalog::BucketState& BucketCatalog::BucketState::reset() {
-    _state = 0;
-    return *this;
-}
-
-bool BucketCatalog::BucketState::isSet(BucketStateFlag flag) const {
-    return _state & static_cast<decltype(_state)>(flag);
-}
-
-
-bool BucketCatalog::BucketState::isPrepared() const {
-    constexpr decltype(_state) mask = static_cast<decltype(_state)>(BucketStateFlag::kPrepared);
-    return _state & mask;
-}
-
-bool BucketCatalog::BucketState::conflictsWithReopening() const {
-    constexpr decltype(_state) mask =
-        static_cast<decltype(_state)>(BucketStateFlag::kPendingCompression) |
-        static_cast<decltype(_state)>(BucketStateFlag::kPendingDirectWrite);
-    return _state & mask;
-}
-
-bool BucketCatalog::BucketState::conflictsWithInsertion() const {
-    constexpr decltype(_state) mask = static_cast<decltype(_state)>(BucketStateFlag::kCleared) |
-        static_cast<decltype(_state)>(BucketStateFlag::kPendingCompression) |
-        static_cast<decltype(_state)>(BucketStateFlag::kPendingDirectWrite);
-    return _state & mask;
-}
-
-bool BucketCatalog::BucketState::operator==(const BucketState& other) const {
-    return _state == other._state;
-}
-
-std::string BucketCatalog::BucketState::toString() const {
-    str::stream str;
-    str << "[";
-
-    bool first = true;
-    auto output = [&first, &str](std::string name) {
-        if (first) {
-            first = false;
-        } else {
-            str << ", ";
-        }
-        str << name;
-    };
-
-    if (isSet(BucketStateFlag::kPrepared)) {
-        output("prepared");
-    }
-
-    if (isSet(BucketStateFlag::kCleared)) {
-        output("cleared");
-    }
-
-    if (isSet(BucketStateFlag::kPendingCompression)) {
-        output("pendingCompression");
-    }
-
-    if (isSet(BucketStateFlag::kPendingDirectWrite)) {
-        output("pendingDirectWrite");
-    }
-
-    if (isSet(BucketStateFlag::kUntracked)) {
-        output("untracked");
-    }
-
-    str << "]";
-    return str;
-}
-
-BucketCatalog::BucketStateManager::BucketStateManager(Mutex* m) : _mutex(m), _era(0) {}
-
-uint64_t BucketCatalog::BucketStateManager::getEra() {
-    stdx::lock_guard lk{*_mutex};
-    return _era;
-}
-
-uint64_t BucketCatalog::BucketStateManager::getEraAndIncrementCount() {
-    stdx::lock_guard lk{*_mutex};
-    _incrementEraCountHelper(_era);
-    return _era;
-}
-
-void BucketCatalog::BucketStateManager::decrementCountForEra(uint64_t value) {
-    stdx::lock_guard lk{*_mutex};
-    _decrementEraCountHelper(value);
-}
-
-uint64_t BucketCatalog::BucketStateManager::getCountForEra(uint64_t value) {
-    stdx::lock_guard lk{*_mutex};
-    auto it = _countMap.find(value);
-    if (it == _countMap.end()) {
-        return 0;
-    } else {
-        return it->second;
-    }
-}
-
-void BucketCatalog::BucketStateManager::clearSetOfBuckets(ShouldClearFn&& shouldClear) {
-    stdx::lock_guard lk{*_mutex};
-    _clearRegistry[++_era] = std::move(shouldClear);
-}
-
-uint64_t BucketCatalog::BucketStateManager::getClearOperationsCount() {
-    return _clearRegistry.size();
-}
-
-void BucketCatalog::BucketStateManager::_decrementEraCountHelper(uint64_t era) {
-    auto it = _countMap.find(era);
-    invariant(it != _countMap.end());
-    if (it->second == 1) {
-        _countMap.erase(it);
-        _cleanClearRegistry();
-    } else {
-        --it->second;
-    }
-}
-
-void BucketCatalog::BucketStateManager::_incrementEraCountHelper(uint64_t era) {
-    auto it = _countMap.find(era);
-    if (it == _countMap.end()) {
-        (_countMap)[era] = 1;
-    } else {
-        ++it->second;
-    }
-}
-
-bool BucketCatalog::BucketStateManager::_isMemberOfClearedSet(WithLock catalogLock,
-                                                              Bucket* bucket) {
-    for (auto it = _clearRegistry.lower_bound(bucket->getEra() + 1); it != _clearRegistry.end();
-         ++it) {
-        if (it->second(bucket->ns())) {
-            return true;
-        }
-    }
-    if (bucket->getEra() != _era) {
-        _decrementEraCountHelper(bucket->getEra());
-        _incrementEraCountHelper(_era);
-        bucket->setEra(_era);
-    }
-
-    return false;
-}
-
-boost::optional<BucketCatalog::BucketState>
-BucketCatalog::BucketStateManager::_markIndividualBucketCleared(WithLock catalogLock,
-                                                                const BucketId& bucketId) {
-    return _changeBucketStateHelper(
-        catalogLock,
-        bucketId,
-        [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
-            if (!input.has_value()) {
-                return boost::none;
-            }
-            return input.value().setFlag(BucketStateFlag::kCleared);
-        });
-}
-
-boost::optional<BucketCatalog::BucketState> BucketCatalog::BucketStateManager::getBucketState(
-    Bucket* bucket) {
-    stdx::lock_guard catalogLock{*_mutex};
-    // If the bucket has been cleared, we will set the bucket state accordingly to reflect that.
-    if (_isMemberOfClearedSet(catalogLock, bucket)) {
-        return _markIndividualBucketCleared(catalogLock, bucket->bucketId());
-    }
-    auto it = _bucketStates.find(bucket->bucketId());
-    return it != _bucketStates.end() ? boost::make_optional(it->second) : boost::none;
-}
-
-boost::optional<BucketCatalog::BucketState> BucketCatalog::BucketStateManager::getBucketState(
-    const BucketId& bucketId) const {
-    stdx::lock_guard catalogLock{*_mutex};
-    auto it = _bucketStates.find(bucketId);
-    return it != _bucketStates.end() ? boost::make_optional(it->second) : boost::none;
-}
-
-boost::optional<BucketCatalog::BucketState> BucketCatalog::BucketStateManager::changeBucketState(
-    Bucket* bucket, const StateChangeFn& change) {
-    stdx::lock_guard catalogLock{*_mutex};
-    if (_isMemberOfClearedSet(catalogLock, bucket)) {
-        return _markIndividualBucketCleared(catalogLock, bucket->bucketId());
-    }
-
-    return _changeBucketStateHelper(catalogLock, bucket->bucketId(), change);
-}
-
-boost::optional<BucketCatalog::BucketState> BucketCatalog::BucketStateManager::changeBucketState(
-    const BucketId& bucketId, const StateChangeFn& change) {
-    stdx::lock_guard catalogLock{*_mutex};
-    return _changeBucketStateHelper(catalogLock, bucketId, change);
-}
-
-void BucketCatalog::BucketStateManager::appendStats(BSONObjBuilder* base) const {
-    stdx::lock_guard catalogLock{*_mutex};
-
-    BSONObjBuilder builder{base->subobjStart("stateManagement")};
-
-    builder.appendNumber("bucketsManaged", static_cast<long long>(_bucketStates.size()));
-    builder.appendNumber("currentEra", static_cast<long long>(_era));
-    builder.appendNumber("erasWithRemainingBuckets", static_cast<long long>(_countMap.size()));
-    builder.appendNumber("trackedClearOperations", static_cast<long long>(_clearRegistry.size()));
-}
-
-boost::optional<BucketCatalog::BucketState>
-BucketCatalog::BucketStateManager::_changeBucketStateHelper(WithLock catalogLock,
-                                                            const BucketId& bucketId,
-                                                            const StateChangeFn& change) {
-    auto it = _bucketStates.find(bucketId);
-    const boost::optional<BucketState> initial =
-        (it == _bucketStates.end()) ? boost::none : boost::make_optional(it->second);
-    const boost::optional<BucketState> target = change(initial, _era);
-
-    // If we are initiating or finishing a direct write, we need to advance the era. This allows us
-    // to synchronize with reopening attempts that do not directly observe a state with the
-    // kPendingDirectWrite flag set, but which nevertheless may be trying to reopen a stale bucket.
-    if ((target.has_value() && target.value().isSet(BucketStateFlag::kPendingDirectWrite) &&
-         (!initial.has_value() || !initial.value().isSet(BucketStateFlag::kPendingDirectWrite))) ||
-        (initial.has_value() && initial.value().isSet(BucketStateFlag::kPendingDirectWrite) &&
-         (!target.has_value() || !target.value().isSet(BucketStateFlag::kPendingDirectWrite)))) {
-        ++_era;
-    }
-
-    // If initial and target are not both set, then we are either initializing or erasing the state.
-    if (!target.has_value()) {
-        if (initial.has_value()) {
-            _bucketStates.erase(it);
-        }
-        return boost::none;
-    } else if (!initial.has_value()) {
-        _bucketStates.emplace(bucketId, target.value());
-        return target;
-    }
-
-    // At this point we can now assume that both initial and target are set.
-
-    // We cannot prepare a bucket that isn't eligible for insertions. We expect to attempt this when
-    // we try to prepare a batch on a bucket that's been recently cleared.
-    if (!initial.value().isPrepared() && target.value().isPrepared() &&
-        initial.value().conflictsWithInsertion()) {
-        return initial;
-    }
-
-    // We cannot transition from a prepared state to pending compression, as that would indicate a
-    // programmer error.
-    invariant(!initial.value().isPrepared() ||
-              !target.value().isSet(BucketStateFlag::kPendingCompression));
-
-    it->second = target.value();
-
-    return target;
-}
-
-void BucketCatalog::BucketStateManager::_cleanClearRegistry() {
-    // An edge case occurs when the count map is empty. In this case, we can clean the whole clear
-    // registry.
-    if (_countMap.begin() == _countMap.end()) {
-        _clearRegistry.erase(_clearRegistry.begin(), _clearRegistry.end());
-        return;
-    }
-
-    uint64_t smallestEra = _countMap.begin()->first;
-    auto endIt = upper_bound(_clearRegistry.begin(),
-                             _clearRegistry.end(),
-                             smallestEra,
-                             [](uint64_t val, auto kv) { return val < kv.first; });
-
-    _clearRegistry.erase(_clearRegistry.begin(), endIt);
-}
-
-BucketCatalog::Bucket::Bucket(const BucketId& bucketId,
-                              StripeNumber stripe,
-                              BucketKey::Hash keyHash,
-                              BucketStateManager* bucketStateManager)
-    : _lastCheckedEra(bucketStateManager->getEraAndIncrementCount()),
-      _bucketStateManager(bucketStateManager),
-      _bucketId(bucketId),
-      _stripe(stripe),
-      _keyHash(keyHash) {}
-
-BucketCatalog::Bucket::~Bucket() {
-    _bucketStateManager->decrementCountForEra(getEra());
-}
-
-uint64_t BucketCatalog::Bucket::getEra() const {
-    return _lastCheckedEra;
-}
-
-void BucketCatalog::Bucket::setEra(uint64_t era) {
-    _lastCheckedEra = era;
-}
-
-const BucketCatalog::BucketId& BucketCatalog::Bucket::bucketId() const {
-    return _bucketId;
-}
-
-const OID& BucketCatalog::Bucket::oid() const {
-    return _bucketId.oid;
-}
-
-const NamespaceString& BucketCatalog::Bucket::ns() const {
-    return _bucketId.ns;
-}
-
-BucketCatalog::StripeNumber BucketCatalog::Bucket::stripe() const {
-    return _stripe;
-}
-
-BucketCatalog::BucketKey::Hash BucketCatalog::Bucket::keyHash() const {
-    return _keyHash;
-}
-
-Date_t BucketCatalog::Bucket::getTime() const {
-    return _minTime;
-}
-
-StringData BucketCatalog::Bucket::getTimeField() {
-    return _timeField;
-}
-
-bool BucketCatalog::Bucket::allCommitted() const {
-    return _batches.empty() && !_preparedBatch;
-}
-
-uint32_t BucketCatalog::Bucket::numMeasurements() const {
-    return _numMeasurements;
-}
-
-void BucketCatalog::Bucket::setRolloverAction(RolloverAction action) {
-    _rolloverAction = action;
-}
-
-bool BucketCatalog::Bucket::schemaIncompatible(const BSONObj& input,
-                                               boost::optional<StringData> metaField,
-                                               const StringData::ComparatorInterface* comparator) {
-    auto result = _schema.update(input, metaField, comparator);
-    return (result == timeseries::Schema::UpdateStatus::Failed);
-}
-
-void BucketCatalog::Bucket::_calculateBucketFieldsAndSizeChange(
-    const BSONObj& doc,
-    boost::optional<StringData> metaField,
-    NewFieldNames* newFieldNamesToBeInserted,
-    int32_t* sizeToBeAdded) const {
-    // BSON size for an object with an empty object field where field name is empty string.
-    // We can use this as an offset to know the size when we have real field names.
-    static constexpr int emptyObjSize = 12;
-    // Validate in debug builds that this size is correct
-    dassert(emptyObjSize == BSON("" << BSONObj()).objsize());
-
-    newFieldNamesToBeInserted->clear();
-    *sizeToBeAdded = 0;
-    auto numMeasurementsFieldLength = numDigits(_numMeasurements);
-    for (const auto& elem : doc) {
-        auto fieldName = elem.fieldNameStringData();
-        if (fieldName == metaField) {
-            // Ignore the metadata field since it will not be inserted.
-            continue;
-        }
-
-        auto hashedKey = StringSet::hasher().hashed_key(fieldName);
-        if (!_fieldNames.contains(hashedKey)) {
-            // Record the new field name only if it hasn't been committed yet. There could
-            // be concurrent batches writing to this bucket with the same new field name,
-            // but they're not guaranteed to commit successfully.
-            newFieldNamesToBeInserted->push_back(hashedKey);
-
-            // Only update the bucket size once to account for the new field name if it
-            // isn't already pending a commit from another batch.
-            if (!_uncommittedFieldNames.contains(hashedKey)) {
-                // Add the size of an empty object with that field name.
-                *sizeToBeAdded += emptyObjSize + fieldName.size();
-
-                // The control.min and control.max summaries don't have any information for
-                // this new field name yet. Add two measurements worth of data to account
-                // for this. As this is the first measurement for this field, min == max.
-                *sizeToBeAdded += elem.size() * 2;
-            }
-        }
-
-        // Add the element size, taking into account that the name will be changed to its
-        // positional number. Add 1 to the calculation since the element's field name size
-        // accounts for a null terminator whereas the stringified position does not.
-        *sizeToBeAdded += elem.size() - elem.fieldNameSize() + numMeasurementsFieldLength + 1;
-    }
-}
-
-bool BucketCatalog::Bucket::_hasBeenCommitted() const {
-    return _numCommittedMeasurements != 0 || _preparedBatch;
-}
-
-std::shared_ptr<BucketCatalog::WriteBatch> BucketCatalog::Bucket::_activeBatch(
-    OperationId opId, ExecutionStatsController& stats) {
-    auto it = _batches.find(opId);
-    if (it == _batches.end()) {
-        it = _batches
-                 .try_emplace(
-                     opId,
-                     std::make_shared<WriteBatch>(BucketHandle{_bucketId, _stripe}, opId, stats))
-                 .first;
-    }
-    return it->second;
-}
-
-BucketCatalog::ClosedBucket::~ClosedBucket() {
-    if (_bucketStateManager) {
-        _bucketStateManager->changeBucketState(
-            bucketId,
-            [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
-                return boost::none;
-            });
-    }
-}
-
-BucketCatalog::ClosedBucket::ClosedBucket(BucketStateManager* bsm,
-                                          const BucketId& bucketId,
-                                          const std::string& tf,
-                                          boost::optional<uint32_t> nm,
-                                          bool efr)
-    : bucketId{bucketId},
-      timeField{tf},
-      numMeasurements{nm},
-      eligibleForReopening{efr},
-      _bucketStateManager{bsm} {
-    invariant(_bucketStateManager);
-    _bucketStateManager->changeBucketState(
-        bucketId,
-        [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
-            invariant(input.has_value());
-            return input.value().setFlag(BucketStateFlag::kPendingCompression);
-        });
-}
-
-BucketCatalog::ClosedBucket::ClosedBucket(ClosedBucket&& other)
-    : bucketId{std::move(other.bucketId)},
-      timeField{std::move(other.timeField)},
-      numMeasurements{other.numMeasurements},
-      eligibleForReopening{other.eligibleForReopening},
-      _bucketStateManager{other._bucketStateManager} {
-    other._bucketStateManager = nullptr;
-}
-
-BucketCatalog::ClosedBucket& BucketCatalog::ClosedBucket::operator=(ClosedBucket&& other) {
-    if (this != &other) {
-        bucketId = std::move(other.bucketId);
-        timeField = std::move(other.timeField);
-        numMeasurements = other.numMeasurements;
-        eligibleForReopening = other.eligibleForReopening;
-        _bucketStateManager = other._bucketStateManager;
-        other._bucketStateManager = nullptr;
-    }
-    return *this;
-}
-
-BucketCatalog::WriteBatch::WriteBatch(const BucketHandle& bucket,
-                                      OperationId opId,
-                                      ExecutionStatsController& stats)
-    : _bucket{bucket}, _opId(opId), _stats(stats) {}
-
-bool BucketCatalog::WriteBatch::claimCommitRights() {
-    return !_commitRights.swap(true);
-}
-
-StatusWith<BucketCatalog::CommitInfo> BucketCatalog::WriteBatch::getResult() {
-    if (!_promise.getFuture().isReady()) {
-        _stats.incNumWaits();
-    }
-    return _promise.getFuture().getNoThrow();
-}
-
-const BucketCatalog::BucketHandle& BucketCatalog::WriteBatch::bucket() const {
-    return _bucket;
-}
-
-const BucketCatalog::BatchMeasurements& BucketCatalog::WriteBatch::measurements() const {
-    return _measurements;
-}
-
-const BSONObj& BucketCatalog::WriteBatch::min() const {
-    return _min;
-}
-
-const BSONObj& BucketCatalog::WriteBatch::max() const {
-    return _max;
-}
-
-const StringMap<std::size_t>& BucketCatalog::WriteBatch::newFieldNamesToBeInserted() const {
-    return _newFieldNamesToBeInserted;
-}
-
-uint32_t BucketCatalog::WriteBatch::numPreviouslyCommittedMeasurements() const {
-    return _numPreviouslyCommittedMeasurements;
-}
-
-bool BucketCatalog::WriteBatch::needToDecompressBucketBeforeInserting() const {
-    return _decompressed.has_value();
-}
-
-const BucketCatalog::DecompressionResult& BucketCatalog::WriteBatch::decompressed() const {
-    invariant(_decompressed.has_value());
-    return _decompressed.value();
-}
-
-bool BucketCatalog::WriteBatch::finished() const {
-    return _promise.getFuture().isReady();
-}
-
-BSONObj BucketCatalog::WriteBatch::toBSON() const {
-    auto toFieldName = [](const auto& nameHashPair) { return nameHashPair.first; };
-    return BSON("docs" << std::vector<BSONObj>(_measurements.begin(), _measurements.end())
-                       << "bucketMin" << _min << "bucketMax" << _max << "numCommittedMeasurements"
-                       << int(_numPreviouslyCommittedMeasurements) << "newFieldNamesToBeInserted"
-                       << std::set<std::string>(
-                              boost::make_transform_iterator(_newFieldNamesToBeInserted.begin(),
-                                                             toFieldName),
-                              boost::make_transform_iterator(_newFieldNamesToBeInserted.end(),
-                                                             toFieldName)));
-}
-
-void BucketCatalog::WriteBatch::_addMeasurement(const BSONObj& doc) {
-    _measurements.push_back(doc);
-}
-
-void BucketCatalog::WriteBatch::_recordNewFields(Bucket* bucket, NewFieldNames&& fields) {
-    for (auto&& field : fields) {
-        _newFieldNamesToBeInserted[field] = field.hash();
-        bucket->_uncommittedFieldNames.emplace(field);
-    }
-}
-
-void BucketCatalog::WriteBatch::_prepareCommit(Bucket* bucket) {
-    invariant(_commitRights.load());
-    _numPreviouslyCommittedMeasurements = bucket->_numCommittedMeasurements;
-
-    // Filter out field names that were new at the time of insertion, but have since been committed
-    // by someone else.
-    for (auto it = _newFieldNamesToBeInserted.begin(); it != _newFieldNamesToBeInserted.end();) {
-        StringMapHashedKey fieldName(it->first, it->second);
-        bucket->_uncommittedFieldNames.erase(fieldName);
-        if (bucket->_fieldNames.contains(fieldName)) {
-            _newFieldNamesToBeInserted.erase(it++);
-            continue;
-        }
-
-        bucket->_fieldNames.emplace(fieldName);
-        ++it;
-    }
-
-    for (const auto& doc : _measurements) {
-        bucket->_minmax.update(
-            doc, bucket->_metadata.getMetaField(), bucket->_metadata.getComparator());
-    }
-
-    const bool isUpdate = _numPreviouslyCommittedMeasurements > 0;
-    if (isUpdate) {
-        _min = bucket->_minmax.minUpdates();
-        _max = bucket->_minmax.maxUpdates();
-    } else {
-        _min = bucket->_minmax.min();
-        _max = bucket->_minmax.max();
-
-        // Approximate minmax memory usage by taking sizes of initial commit. Subsequent updates may
-        // add fields but are most likely just to update values.
-        bucket->_memoryUsage += _min.objsize();
-        bucket->_memoryUsage += _max.objsize();
-    }
-
-    if (bucket->_decompressed.has_value()) {
-        _decompressed = std::move(bucket->_decompressed);
-        bucket->_decompressed.reset();
-        bucket->_memoryUsage -=
-            (_decompressed.value().before.objsize() + _decompressed.value().after.objsize());
-    }
-}
-
-void BucketCatalog::WriteBatch::_finish(const CommitInfo& info) {
-    invariant(_commitRights.load());
-    _promise.emplaceValue(info);
-}
-
-void BucketCatalog::WriteBatch::_abort(const Status& status) {
-    if (finished()) {
-        return;
-    }
-
-    _promise.setError(status);
-}
 
 BucketCatalog& BucketCatalog::get(ServiceContext* svcCtx) {
     return getBucketCatalog(svcCtx);
@@ -1025,8 +287,8 @@ Status BucketCatalog::prepareCommit(std::shared_ptr<WriteBatch> batch) {
     return Status::OK();
 }
 
-boost::optional<BucketCatalog::ClosedBucket> BucketCatalog::finish(
-    std::shared_ptr<WriteBatch> batch, const CommitInfo& info) {
+boost::optional<ClosedBucket> BucketCatalog::finish(std::shared_ptr<WriteBatch> batch,
+                                                    const CommitInfo& info) {
     invariant(!batch->finished());
 
     boost::optional<ClosedBucket> closedBucket;
@@ -1272,64 +534,7 @@ long long BucketCatalog::memoryUsage() const {
     return _memoryUsage.load();
 }
 
-BucketCatalog::BucketMetadata::BucketMetadata(BSONElement elem,
-                                              const StringData::ComparatorInterface* comparator)
-    : _metadataElement(elem), _comparator(comparator) {
-    if (_metadataElement) {
-        BSONObjBuilder objBuilder;
-        // We will get an object of equal size, just with reordered fields.
-        objBuilder.bb().reserveBytes(_metadataElement.size());
-        timeseries::normalizeMetadata(&objBuilder, _metadataElement, boost::none);
-        _metadata = objBuilder.obj();
-    }
-    // Updates the BSONElement to refer to the copied BSONObj.
-    _metadataElement = _metadata.firstElement();
-}
-
-bool BucketCatalog::BucketMetadata::operator==(const BucketMetadata& other) const {
-    return _metadataElement.binaryEqualValues(other._metadataElement);
-}
-
-const BSONObj& BucketCatalog::BucketMetadata::toBSON() const {
-    return _metadata;
-}
-
-const BSONElement& BucketCatalog::BucketMetadata::element() const {
-    return _metadataElement;
-}
-
-StringData BucketCatalog::BucketMetadata::getMetaField() const {
-    return StringData(_metadataElement.fieldName());
-}
-
-const StringData::ComparatorInterface* BucketCatalog::BucketMetadata::getComparator() const {
-    return _comparator;
-}
-
-BucketCatalog::BucketKey::BucketKey(const NamespaceString& n, const BucketMetadata& m)
-    : ns(n), metadata(m), hash(absl::Hash<BucketKey>{}(*this)) {}
-
-BucketCatalog::BucketId::BucketId(const NamespaceString& n, const OID& o)
-    : ns{n}, oid{o}, hash{absl::Hash<BucketId>{}(*this)} {}
-
-std::size_t BucketCatalog::BucketHasher::operator()(const BucketKey& key) const {
-    // Use the default absl hasher.
-    return key.hash;
-}
-
-std::size_t BucketCatalog::BucketHasher::operator()(const BucketId& bucketId) const {
-    // Use the default absl hasher.
-    return bucketId.hash;
-}
-
-std::size_t BucketCatalog::BucketHasher::operator()(const BucketKey::Hash& key) const {
-    return key;
-}
-
-BucketCatalog::ArchivedBucket::ArchivedBucket(const BucketId& b, const std::string& t)
-    : bucketId{b}, timeField{t} {}
-
-StatusWith<std::pair<BucketCatalog::BucketKey, Date_t>> BucketCatalog::_extractBucketingParameters(
+StatusWith<std::pair<BucketKey, Date_t>> BucketCatalog::_extractBucketingParameters(
     const NamespaceString& ns,
     const StringData::ComparatorInterface* comparator,
     const TimeseriesOptions& options,
@@ -1338,14 +543,14 @@ StatusWith<std::pair<BucketCatalog::BucketKey, Date_t>> BucketCatalog::_extractB
     BSONElement metadata;
 
     if (!options.getMetaField().has_value()) {
-        auto swTime = timeseries::extractTime(doc, options.getTimeField());
+        auto swTime = extractTime(doc, options.getTimeField());
         if (!swTime.isOK()) {
             return swTime.getStatus();
         }
         time = swTime.getValue();
     } else {
-        auto swDocTimeAndMeta = timeseries::extractTimeAndMeta(
-            doc, options.getTimeField(), options.getMetaField().value());
+        auto swDocTimeAndMeta =
+            extractTimeAndMeta(doc, options.getTimeField(), options.getMetaField().value());
         if (!swDocTimeAndMeta.isOK()) {
             return swDocTimeAndMeta.getStatus();
         }
@@ -1367,10 +572,10 @@ BucketCatalog::StripeNumber BucketCatalog::_getStripeNumber(const BucketKey& key
     return key.hash % kNumberOfStripes;
 }
 
-const BucketCatalog::Bucket* BucketCatalog::_findBucket(const Stripe& stripe,
-                                                        WithLock,
-                                                        const BucketId& bucketId,
-                                                        IgnoreBucketState mode) {
+const Bucket* BucketCatalog::_findBucket(const Stripe& stripe,
+                                         WithLock,
+                                         const BucketId& bucketId,
+                                         IgnoreBucketState mode) {
     auto it = stripe.allBuckets.find(bucketId);
     if (it != stripe.allBuckets.end()) {
         if (mode == IgnoreBucketState::kYes) {
@@ -1385,18 +590,17 @@ const BucketCatalog::Bucket* BucketCatalog::_findBucket(const Stripe& stripe,
     return nullptr;
 }
 
-BucketCatalog::Bucket* BucketCatalog::_useBucket(Stripe* stripe,
-                                                 WithLock stripeLock,
-                                                 const BucketId& bucketId,
-                                                 IgnoreBucketState mode) {
+Bucket* BucketCatalog::_useBucket(Stripe* stripe,
+                                  WithLock stripeLock,
+                                  const BucketId& bucketId,
+                                  IgnoreBucketState mode) {
     return const_cast<Bucket*>(_findBucket(*stripe, stripeLock, bucketId, mode));
 }
 
-BucketCatalog::Bucket* BucketCatalog::_useBucketAndChangeState(
-    Stripe* stripe,
-    WithLock stripeLock,
-    const BucketId& bucketId,
-    const BucketStateManager::StateChangeFn& change) {
+Bucket* BucketCatalog::_useBucketAndChangeState(Stripe* stripe,
+                                                WithLock stripeLock,
+                                                const BucketId& bucketId,
+                                                const BucketStateManager::StateChangeFn& change) {
     auto it = stripe->allBuckets.find(bucketId);
     if (it != stripe->allBuckets.end()) {
         if (auto state = _bucketStateManager.changeBucketState(it->second.get(), change);
@@ -1407,10 +611,10 @@ BucketCatalog::Bucket* BucketCatalog::_useBucketAndChangeState(
     return nullptr;
 }
 
-BucketCatalog::Bucket* BucketCatalog::_useBucket(Stripe* stripe,
-                                                 WithLock stripeLock,
-                                                 const CreationInfo& info,
-                                                 AllowBucketCreation mode) {
+Bucket* BucketCatalog::_useBucket(Stripe* stripe,
+                                  WithLock stripeLock,
+                                  const CreationInfo& info,
+                                  AllowBucketCreation mode) {
     auto it = stripe->openBuckets.find(info.key);
     if (it == stripe->openBuckets.end()) {
         // No open bucket for this metadata.
@@ -1446,9 +650,9 @@ BucketCatalog::Bucket* BucketCatalog::_useBucket(Stripe* stripe,
     return mode == AllowBucketCreation::kYes ? _allocateBucket(stripe, stripeLock, info) : nullptr;
 }
 
-BucketCatalog::Bucket* BucketCatalog::_useAlternateBucket(Stripe* stripe,
-                                                          WithLock stripeLock,
-                                                          const CreationInfo& info) {
+Bucket* BucketCatalog::_useAlternateBucket(Stripe* stripe,
+                                           WithLock stripeLock,
+                                           const CreationInfo& info) {
     auto it = stripe->openBuckets.find(info.key);
     if (it == stripe->openBuckets.end()) {
         // No open bucket for this metadata.
@@ -1494,7 +698,7 @@ BucketCatalog::Bucket* BucketCatalog::_useAlternateBucket(Stripe* stripe,
     return nullptr;
 }
 
-StatusWith<std::unique_ptr<BucketCatalog::Bucket>> BucketCatalog::_rehydrateBucket(
+StatusWith<std::unique_ptr<Bucket>> BucketCatalog::_rehydrateBucket(
     OperationContext* opCtx,
     const NamespaceString& ns,
     const StringData::ComparatorInterface* comparator,
@@ -1508,11 +712,10 @@ StatusWith<std::unique_ptr<BucketCatalog::Bucket>> BucketCatalog::_rehydrateBuck
         return {ErrorCodes::WriteConflict, "Bucket is from an earlier era, may be outdated"};
     }
 
-    BSONElement bucketIdElem = bucketDoc.getField(timeseries::kBucketIdFieldName);
+    BSONElement bucketIdElem = bucketDoc.getField(kBucketIdFieldName);
     if (bucketIdElem.eoo() || bucketIdElem.type() != BSONType::jstOID) {
         return {ErrorCodes::BadValue,
-                str::stream() << timeseries::kBucketIdFieldName
-                              << " is missing or not an ObjectId"};
+                str::stream() << kBucketIdFieldName << " is missing or not an ObjectId"};
     }
 
     // Validate the bucket document against the schema.
@@ -1521,8 +724,8 @@ StatusWith<std::unique_ptr<BucketCatalog::Bucket>> BucketCatalog::_rehydrateBuck
         return result.second;
     }
 
-    auto controlField = bucketDoc.getObjectField(timeseries::kBucketControlFieldName);
-    auto closedElem = controlField.getField(timeseries::kBucketControlClosedFieldName);
+    auto controlField = bucketDoc.getObjectField(kBucketControlFieldName);
+    auto closedElem = controlField.getField(kBucketControlClosedFieldName);
     if (closedElem.booleanSafe()) {
         return {ErrorCodes::BadValue,
                 "Bucket has been marked closed and is not eligible for reopening"};
@@ -1531,7 +734,7 @@ StatusWith<std::unique_ptr<BucketCatalog::Bucket>> BucketCatalog::_rehydrateBuck
     BSONElement metadata;
     auto metaFieldName = options.getMetaField();
     if (metaFieldName) {
-        metadata = bucketDoc.getField(timeseries::kBucketMetaFieldName);
+        metadata = bucketDoc.getField(kBucketMetaFieldName);
     }
 
     // Buckets are spread across independently-lockable stripes to improve parallelism. We map a
@@ -1546,13 +749,13 @@ StatusWith<std::unique_ptr<BucketCatalog::Bucket>> BucketCatalog::_rehydrateBuck
     std::unique_ptr<Bucket> bucket =
         std::make_unique<Bucket>(bucketId, stripeNumber, key.hash, &_bucketStateManager);
 
-    const bool isCompressed = timeseries::isCompressedBucket(bucketDoc);
+    const bool isCompressed = isCompressedBucket(bucketDoc);
 
     // Initialize the remaining member variables from the bucket document.
     bucket->_metadata = key.metadata;
     bucket->_timeField = options.getTimeField().toString();
     if (isCompressed) {
-        auto decompressed = timeseries::decompressBucket(bucketDoc);
+        auto decompressed = decompressBucket(bucketDoc);
         if (!decompressed.has_value()) {
             return Status{ErrorCodes::BadValue, "Bucket could not be decompressed"};
         }
@@ -1562,24 +765,24 @@ StatusWith<std::unique_ptr<BucketCatalog::Bucket>> BucketCatalog::_rehydrateBuck
     } else {
         bucket->_size = bucketDoc.objsize();
     }
-    bucket->_minTime = controlField.getObjectField(timeseries::kBucketControlMinFieldName)
+    bucket->_minTime = controlField.getObjectField(kBucketControlMinFieldName)
                            .getField(options.getTimeField())
                            .Date();
 
     // Populate the top-level data field names.
-    const BSONObj& dataObj = bucketDoc.getObjectField(timeseries::kBucketDataFieldName);
+    const BSONObj& dataObj = bucketDoc.getObjectField(kBucketDataFieldName);
     for (const BSONElement& dataElem : dataObj) {
         auto hashedKey = StringSet::hasher().hashed_key(dataElem.fieldName());
         bucket->_fieldNames.emplace(hashedKey);
     }
 
-    auto swMinMax = timeseries::generateMinMaxFromBucketDoc(bucketDoc, comparator);
+    auto swMinMax = generateMinMaxFromBucketDoc(bucketDoc, comparator);
     if (!swMinMax.isOK()) {
         return swMinMax.getStatus();
     }
     bucket->_minmax = std::move(swMinMax.getValue());
 
-    auto swSchema = timeseries::generateSchemaFromBucketDoc(bucketDoc, comparator);
+    auto swSchema = generateSchemaFromBucketDoc(bucketDoc, comparator);
     if (!swSchema.isOK()) {
         return swSchema.getStatus();
     }
@@ -1614,13 +817,13 @@ StatusWith<std::unique_ptr<BucketCatalog::Bucket>> BucketCatalog::_rehydrateBuck
     return {std::move(bucket)};
 }
 
-StatusWith<BucketCatalog::Bucket*> BucketCatalog::_reopenBucket(Stripe* stripe,
-                                                                WithLock stripeLock,
-                                                                ExecutionStatsController stats,
-                                                                const BucketKey& key,
-                                                                std::unique_ptr<Bucket>&& bucket,
-                                                                std::uint64_t targetEra,
-                                                                ClosedBuckets* closedBuckets) {
+StatusWith<Bucket*> BucketCatalog::_reopenBucket(Stripe* stripe,
+                                                 WithLock stripeLock,
+                                                 ExecutionStatsController stats,
+                                                 const BucketKey& key,
+                                                 std::unique_ptr<Bucket>&& bucket,
+                                                 std::uint64_t targetEra,
+                                                 ClosedBuckets* closedBuckets) {
     invariant(bucket);
 
     _expireIdleBuckets(stripe, stripeLock, stats, closedBuckets);
@@ -1702,13 +905,12 @@ StatusWith<BucketCatalog::Bucket*> BucketCatalog::_reopenBucket(Stripe* stripe,
     return unownedBucket;
 }
 
-StatusWith<BucketCatalog::Bucket*> BucketCatalog::_reuseExistingBucket(
-    Stripe* stripe,
-    WithLock stripeLock,
-    ExecutionStatsController* stats,
-    const BucketKey& key,
-    Bucket* existingBucket,
-    std::uint64_t targetEra) {
+StatusWith<Bucket*> BucketCatalog::_reuseExistingBucket(Stripe* stripe,
+                                                        WithLock stripeLock,
+                                                        ExecutionStatsController* stats,
+                                                        const BucketKey& key,
+                                                        Bucket* existingBucket,
+                                                        std::uint64_t targetEra) {
     invariant(existingBucket);
 
     // If we have an existing bucket, passing the Bucket* will let us check if the bucket was
@@ -1893,16 +1095,16 @@ StatusWith<BucketCatalog::InsertResult> BucketCatalog::_insert(
     return std::move(result);
 }
 
-stdx::variant<std::shared_ptr<BucketCatalog::WriteBatch>, BucketCatalog::RolloverReason>
-BucketCatalog::_insertIntoBucket(OperationContext* opCtx,
-                                 Stripe* stripe,
-                                 WithLock stripeLock,
-                                 const BSONObj& doc,
-                                 CombineWithInsertsFromOtherClients combine,
-                                 AllowBucketCreation mode,
-                                 CreationInfo* info,
-                                 Bucket* bucket,
-                                 ClosedBuckets* closedBuckets) {
+stdx::variant<std::shared_ptr<WriteBatch>, RolloverReason> BucketCatalog::_insertIntoBucket(
+    OperationContext* opCtx,
+    Stripe* stripe,
+    WithLock stripeLock,
+    const BSONObj& doc,
+    CombineWithInsertsFromOtherClients combine,
+    AllowBucketCreation mode,
+    CreationInfo* info,
+    Bucket* bucket,
+    ClosedBuckets* closedBuckets) {
     NewFieldNames newFieldNamesToBeInserted;
     int32_t sizeToBeAdded = 0;
     const auto previousMemoryUsage = bucket->_memoryUsage;
@@ -1947,7 +1149,7 @@ BucketCatalog::_insertIntoBucket(OperationContext* opCtx,
 
         auto updateStatus = bucket->_schema.update(
             doc, info->options.getMetaField(), info->key.metadata.getComparator());
-        invariant(updateStatus == timeseries::Schema::UpdateStatus::Updated);
+        invariant(updateStatus == Schema::UpdateStatus::Updated);
     } else {
         _memoryUsage.fetchAndSubtract(previousMemoryUsage);
     }
@@ -2152,10 +1354,9 @@ stdx::variant<std::monostate, OID, BSONObj> BucketCatalog::_getReopeningCandidat
         metaElement = info.key.metadata.element();
     }
 
-    auto controlMinTimePath =
-        timeseries::kControlMinFieldNamePrefix.toString() + info.options.getTimeField();
+    auto controlMinTimePath = kControlMinFieldNamePrefix.toString() + info.options.getTimeField();
 
-    return timeseries::generateReopeningFilters(
+    return generateReopeningFilters(
         info.time, metaElement, controlMinTimePath, *info.options.getBucketMaxSpanSeconds());
 }
 
@@ -2241,7 +1442,7 @@ void BucketCatalog::_markBucketNotIdle(Stripe* stripe, WithLock stripeLock, Buck
 void BucketCatalog::_expireIdleBuckets(Stripe* stripe,
                                        WithLock stripeLock,
                                        ExecutionStatsController& stats,
-                                       std::vector<BucketCatalog::ClosedBucket>* closedBuckets) {
+                                       ClosedBuckets* closedBuckets) {
     // As long as we still need space and have entries and remaining attempts, close idle buckets.
     int32_t numExpired = 0;
 
@@ -2305,9 +1506,9 @@ void BucketCatalog::_expireIdleBuckets(Stripe* stripe,
     }
 }
 
-BucketCatalog::Bucket* BucketCatalog::_allocateBucket(Stripe* stripe,
-                                                      WithLock stripeLock,
-                                                      const CreationInfo& info) {
+Bucket* BucketCatalog::_allocateBucket(Stripe* stripe,
+                                       WithLock stripeLock,
+                                       const CreationInfo& info) {
     _expireIdleBuckets(stripe, stripeLock, info.stats, info.closedBuckets);
 
     auto [oid, roundedTime] = generateBucketOID(info.time, info.options);
@@ -2343,14 +1544,14 @@ BucketCatalog::Bucket* BucketCatalog::_allocateBucket(Stripe* stripe,
     return bucket;
 }
 
-std::pair<BucketCatalog::RolloverAction, BucketCatalog::RolloverReason>
-BucketCatalog::_determineRolloverAction(OperationContext* opCtx,
-                                        const BSONObj& doc,
-                                        CreationInfo* info,
-                                        Bucket* bucket,
-                                        NewFieldNames* newFieldNamesToBeInserted,
-                                        int32_t* sizeToBeAdded,
-                                        AllowBucketCreation mode) {
+std::pair<RolloverAction, RolloverReason> BucketCatalog::_determineRolloverAction(
+    OperationContext* opCtx,
+    const BSONObj& doc,
+    CreationInfo* info,
+    Bucket* bucket,
+    NewFieldNames* newFieldNamesToBeInserted,
+    int32_t* sizeToBeAdded,
+    AllowBucketCreation mode) {
     // If the mode is enabled to create new buckets, then we should update stats for soft closures
     // accordingly. If we specify the mode to not allow bucket creation, it means we are not sure if
     // we want to soft close the bucket yet and should wait to update closure stats.
@@ -2440,11 +1641,11 @@ BucketCatalog::_determineRolloverAction(OperationContext* opCtx,
     return {RolloverAction::kNone, RolloverReason::kNone};
 }
 
-BucketCatalog::Bucket* BucketCatalog::_rollover(Stripe* stripe,
-                                                WithLock stripeLock,
-                                                Bucket* bucket,
-                                                const CreationInfo& info,
-                                                RolloverAction action) {
+Bucket* BucketCatalog::_rollover(Stripe* stripe,
+                                 WithLock stripeLock,
+                                 Bucket* bucket,
+                                 const CreationInfo& info,
+                                 RolloverAction action) {
     invariant(action != RolloverAction::kNone);
     if (bucket->allCommitted()) {
         // The bucket does not contain any measurements that are yet to be committed, so we can take
@@ -2470,20 +1671,18 @@ BucketCatalog::Bucket* BucketCatalog::_rollover(Stripe* stripe,
     return _allocateBucket(stripe, stripeLock, info);
 }
 
-BucketCatalog::ExecutionStatsController BucketCatalog::_getExecutionStats(
-    const NamespaceString& ns) {
+ExecutionStatsController BucketCatalog::_getExecutionStats(const NamespaceString& ns) {
     stdx::lock_guard catalogLock{_mutex};
     auto it = _executionStats.find(ns);
     if (it != _executionStats.end()) {
-        return {it->second, &_globalExecutionStats};
+        return {it->second, _globalExecutionStats};
     }
 
     auto res = _executionStats.emplace(ns, std::make_shared<ExecutionStats>());
-    return {res.first->second, &_globalExecutionStats};
+    return {res.first->second, _globalExecutionStats};
 }
 
-std::shared_ptr<BucketCatalog::ExecutionStats> BucketCatalog::_getExecutionStats(
-    const NamespaceString& ns) const {
+std::shared_ptr<ExecutionStats> BucketCatalog::_getExecutionStats(const NamespaceString& ns) const {
     static const auto kEmptyStats{std::make_shared<ExecutionStats>()};
 
     stdx::lock_guard catalogLock{_mutex};
@@ -2584,4 +1783,4 @@ public:
         return builder.obj();
     }
 } bucketCatalogServerStatus;
-}  // namespace mongo
+}  // namespace mongo::timeseries::bucket_catalog

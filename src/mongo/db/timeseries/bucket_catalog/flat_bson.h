@@ -37,7 +37,7 @@
 #include <string>
 #include <vector>
 
-namespace mongo::timeseries {
+namespace mongo::timeseries::bucket_catalog {
 
 /**
  * Stores a BSON hierarchy in a flat contigous memory structure. Optimized for fast traversal
@@ -543,4 +543,4 @@ private:
     };
 };
 
-}  // namespace mongo::timeseries
+}  // namespace mongo::timeseries::bucket_catalog
