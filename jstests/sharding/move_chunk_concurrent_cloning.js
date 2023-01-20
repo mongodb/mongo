@@ -1,5 +1,8 @@
 /**
- * @tags: [featureFlagConcurrencyInChunkMigration]
+ * @tags: [
+ *   featureFlagConcurrencyInChunkMigration,
+ *   requires_fcv_63,
+ * ]
  */
 (function() {
 "use strict";
