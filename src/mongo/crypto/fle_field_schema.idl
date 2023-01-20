@@ -60,6 +60,15 @@ enums:
           kFLE2RangeIndexedValue : 9      # see FLE2IndexedRangeEncryptedValue
           kFLE2FindRangePayload : 10      # see FLE2FindRangePayload
 
+          # QE protocol version 2 - client-side payloads
+          kFLE2InsertUpdatePayloadV2: 11
+          kFLE2FindEqualityPayloadV2: 12
+          kFLE2FindRangePayloadV2: 13
+
+          # QE protocol version 2 - server-side payloads
+          kFLE2EqualityIndexedValueV2: 14
+          kFLE2RangeIndexedValueV2: 15
+
     FleVersion:
         description: "The version / type of field-level encryption in use."
         type: int
@@ -140,7 +149,7 @@ structs:
             cpp_name: value
 
     FLE2EncryptionPlaceholder:
-        description: "Implements Encryption BinData (subtype 6) sub-subtype 0, the intent-to-encrypt
+        description: "Implements Encryption BinData (subtype 6) sub-subtype 3, the intent-to-encrypt
             mapping. Contains a value to encrypt and a description of how it should be encrypted."
         strict: true
         cpp_validator_func: "validateIDLFLE2EncryptionPlaceholder"
@@ -198,6 +207,27 @@ structs:
             type: bindata_generic
             cpp_name: encryptedTokens
 
+    EdgeTokenSetV2:
+        description: "Payload of an indexed field to insert or update. Version 2"
+        strict: true
+        fields:
+          d:
+            description: "EDCDerivedFromDataTokenAndCounter"
+            type: bindata_generic
+            cpp_name: edcDerivedToken
+          s:
+            description: "ESCDerivedFromDataTokenAndCounter"
+            type: bindata_generic
+            cpp_name: escDerivedToken
+          l:
+            description: "ServerDerivedFromDataToken"
+            type: bindata_generic
+            cpp_name: serverDerivedFromDataToken
+          p:
+            description: "Encrypted tokens"
+            type: bindata_generic
+            cpp_name: encryptedTokens
+
     FLE2InsertUpdatePayload:
         description: "Payload of an indexed field to insert or update"
         strict: true
@@ -237,6 +267,52 @@ structs:
           g:
             description: "Array of Edges"
             type: array<EdgeTokenSet>
+            cpp_name: edgeTokenSet
+            optional: true
+
+    FLE2InsertUpdatePayloadV2:
+        description: "Payload of an indexed field to insert or update. Version 2"
+        strict: true
+        fields:
+          d:
+            description: "EDCDerivedFromDataAndContentionToken"
+            type: bindata_generic
+            cpp_name: edcDerivedToken
+          s:
+            description: "ESCDerivedFromDataAndContentionToken"
+            type: bindata_generic
+            cpp_name: escDerivedToken
+          p:
+            description: "Encrypted tokens"
+            type: bindata_generic
+            cpp_name: encryptedTokens
+          u:
+            description: "Index KeyId"
+            type: uuid
+            cpp_name: indexKeyId
+          t:
+            description: "Encrypted type"
+            type: safeInt
+            cpp_name: type
+          v:
+            description: "Encrypted value"
+            type: bindata_generic
+            cpp_name: value
+          e:
+            description: "ServerDataEncryptionLevel1Token"
+            type: bindata_generic
+            cpp_name: serverEncryptionToken
+          l:
+            description: "ServerDerivedFromDataToken"
+            type: bindata_generic
+            cpp_name: serverDerivedFromDataToken
+          k:
+            description: "Randomly sampled contention factor value"
+            type: long
+            cpp_name: contentionFactor
+          g:
+            description: "Array of Edges"
+            type: array<EdgeTokenSetV2>
             cpp_name: edgeTokenSet
             optional: true
 
@@ -280,6 +356,27 @@ structs:
             cpp_name: maxCounter
             optional: true
 
+    FLE2FindEqualityPayloadV2:
+        description: "Payload for an equality find. Version 2"
+        strict: true
+        fields:
+          d:
+            description: "EDCDerivedFromDataToken"
+            type: bindata_generic
+            cpp_name: edcDerivedToken
+          s:
+            description: "ESCDerivedFromDataToken"
+            type: bindata_generic
+            cpp_name: escDerivedToken
+          l:
+            description: "ServerDerivedFromDataToken"
+            type: bindata_generic
+            cpp_name: serverDerivedFromDataToken
+          cm:
+            description: "Queryable Encryption max counter"
+            type: long
+            cpp_name: maxCounter
+
     EdgeFindTokenSet:
         description: "Payload of an edge to query for"
         strict: true
@@ -297,8 +394,25 @@ structs:
             type: bindata_generic
             cpp_name: eccDerivedToken
 
+    EdgeFindTokenSetV2:
+        description: "Payload of an edge to query for. Version 2"
+        strict: true
+        fields:
+          d:
+            description: "EDCDerivedFromDataToken"
+            type: bindata_generic
+            cpp_name: edcDerivedToken
+          s:
+            description: "ESCDerivedFromDataToken"
+            type: bindata_generic
+            cpp_name: escDerivedToken
+          l:
+            description: "ServerDerivedFromDataToken"
+            type: bindata_generic
+            cpp_name: serverDerivedFromDataToken
+
     FLE2FindRangePayloadEdgesInfo:
-        description: "Tokken information for find range payload."
+        description: "Token information for find range payload."
         strict: true
         fields:
           g:
@@ -314,6 +428,19 @@ structs:
             type: long
             cpp_name: maxCounter
 
+    FLE2FindRangePayloadEdgesInfoV2:
+        description: "Token information for find range payload."
+        strict: true
+        fields:
+          g:
+            description: "Array of Edges"
+            type: array<EdgeFindTokenSetV2>
+            cpp_name: edges
+          cm:
+            description: "Queryable Encryption max counter"
+            type: long
+            cpp_name: maxCounter
+
     FLE2FindRangePayload:
         description: "Payload for a range find"
         strict: true
@@ -321,6 +448,27 @@ structs:
           payload:
             description: "Token information for a find range payload"
             type: FLE2FindRangePayloadEdgesInfo
+            optional: true
+          payloadId:
+            description: "Id of payload - must be paired with another payload"
+            type: safeInt
+            optional: false
+          firstOperator:
+            description: "First query operator for which this payload was generated."
+            type: Fle2RangeOperator
+            optional: false
+          secondOperator:
+            description: "Second query operator for which this payload was generated. Only populated for two-sided ranges."
+            type: Fle2RangeOperator
+            optional: true
+
+    FLE2FindRangePayloadV2:
+        description: "Payload for a range find. Version 2"
+        strict: true
+        fields:
+          payload:
+            description: "Token information for a find range payload"
+            type: FLE2FindRangePayloadEdgesInfoV2
             optional: true
           payloadId:
             description: "Id of payload - must be paired with another payload"
