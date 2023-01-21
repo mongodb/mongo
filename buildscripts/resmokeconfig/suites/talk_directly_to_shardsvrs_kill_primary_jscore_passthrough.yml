@@ -34,6 +34,7 @@ selector:
   - jstests/core/**/find_and_modify.js
   - jstests/core/**/find_and_modify2.js
   - jstests/core/**/find_and_modify_server6865.js
+  - jstests/core/**/project_with_collation.js
 
   - jstests/core/**/bench_test*.js # benchRun() used for writes
   - jstests/core/**/benchrun_pipeline_updates.js # benchRun() used for writes
