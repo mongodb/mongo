@@ -1,0 +1,11 @@
+{
+    "compilerOptions": {
+        "baseUrl": ".",
+        "disableSizeLimit": true,
+        "target": "ES6"
+    },
+    "exclude": [
+        "node_modules",
+        "src/third_party"
+    ]
+}
