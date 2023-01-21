@@ -634,7 +634,7 @@ DB.prototype.dbEval = DB.prototype.eval;
 DB.prototype.groupeval = function(parmsObj) {
     var groupFunction = function() {
         var parms = args[0];
-        var c = db[parms.ns].find(parms.cond || {});
+        var c = globalThis.db[parms.ns].find(parms.cond || {});
         var map = new Map();
         var pks = parms.key ? Object.keySet(parms.key) : null;
         var pkl = pks ? pks.length : 0;
@@ -1775,7 +1775,7 @@ DB.prototype.createEncryptedCollection = function(name, opts) {
 };
 
 DB.prototype.dropEncryptedCollection = function(name) {
-    const ci = db.getCollectionInfos({name: name})[0];
+    const ci = globalThis.db.getCollectionInfos({name: name})[0];
     if (ci == undefined) {
         throw `Encrypted Collection '${name}' not found`;
     }

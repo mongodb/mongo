@@ -517,12 +517,12 @@ jsTest.isMongos = function(conn) {
 };
 
 defaultPrompt = function() {
-    var status = db.getMongo().authStatus;
-    var prefix = db.getMongo().promptPrefix;
+    var status = globalThis.db.getMongo().authStatus;
+    var prefix = globalThis.db.getMongo().promptPrefix;
 
     if (typeof prefix == 'undefined') {
         prefix = "";
-        var buildInfo = db._runCommandWithoutApiStrict({buildInfo: 1});
+        var buildInfo = globalThis.db._runCommandWithoutApiStrict({buildInfo: 1});
         try {
             if (buildInfo.modules.indexOf("enterprise") > -1) {
                 prefix += "MongoDB Enterprise ";
@@ -530,7 +530,7 @@ defaultPrompt = function() {
         } catch (e) {
             // Don't do anything here. Just throw the error away.
         }
-        var hello = db._helloOrLegacyHello({forShell: 1});
+        var hello = globalThis.db._helloOrLegacyHello({forShell: 1});
         try {
             if (hello.hasOwnProperty("automationServiceDescriptor")) {
                 prefix += "[automated] ";
@@ -538,7 +538,7 @@ defaultPrompt = function() {
         } catch (e) {
             // Don't do anything here. Just throw the error away.
         }
-        db.getMongo().promptPrefix = prefix;
+        globalThis.db.getMongo().promptPrefix = prefix;
     }
 
     try {
@@ -547,7 +547,7 @@ defaultPrompt = function() {
             try {
                 var prompt = replSetMemberStatePrompt();
                 // set our status that it was good
-                db.getMongo().authStatus = {replSetGetStatus: true, hello: true};
+                globalThis.db.getMongo().authStatus = {replSetGetStatus: true, hello: true};
                 return prefix + prompt;
             } catch (e) {
                 // don't have permission to run that, or requires auth
@@ -563,7 +563,7 @@ defaultPrompt = function() {
                 var prompt = replSetMemberStatePrompt();
                 // set our status that it was good
                 status.replSetGetStatus = true;
-                db.getMongo().authStatus = status;
+                globalThis.db.getMongo().authStatus = status;
                 return prefix + prompt;
             } catch (e) {
                 // don't have permission to run that, or requires auth
@@ -578,7 +578,7 @@ defaultPrompt = function() {
             try {
                 var prompt = helloStatePrompt(hello);
                 status.hello = true;
-                db.getMongo().authStatus = status;
+                globalThis.db.getMongo().authStatus = status;
                 return prefix + prompt;
             } catch (e) {
                 status.authRequired = true;
@@ -591,14 +591,14 @@ defaultPrompt = function() {
         status = {hello: true};
     }
 
-    db.getMongo().authStatus = status;
+    globalThis.db.getMongo().authStatus = status;
     return prefix + "> ";
 };
 
 replSetMemberStatePrompt = function() {
     var state = '';
-    var stateInfo =
-        db.getSiblingDB('admin')._runCommandWithoutApiStrict({replSetGetStatus: 1, forShell: 1});
+    var stateInfo = globalThis.db.getSiblingDB('admin')._runCommandWithoutApiStrict(
+        {replSetGetStatus: 1, forShell: 1});
     if (stateInfo.ok) {
         // Report the self member's stateStr if it's present.
         stateInfo.members.forEach(function(member) {
@@ -624,7 +624,7 @@ replSetMemberStatePrompt = function() {
 
 helloStatePrompt = function(helloReply) {
     var state = '';
-    var hello = helloReply || db._helloOrLegacyHello({forShell: 1});
+    var hello = helloReply || globalThis.db._helloOrLegacyHello({forShell: 1});
     if (hello.ok) {
         var role = "";
 
@@ -863,8 +863,8 @@ shellHelper.use = function(dbname) {
         print("bad use parameter");
         return;
     }
-    db = db.getSiblingDB(dbname);
-    print("switched to db " + db.getName());
+    globalThis.db = globalThis.db.getSiblingDB(dbname);
+    print("switched to db " + globalThis.db.getName());
 };
 
 shellHelper.set = function(str) {
@@ -908,13 +908,13 @@ shellHelper.show = function(what) {
     var messageIndent = "        ";
 
     if (what == "profile") {
-        if (db.system.profile.count() == 0) {
+        if (globalThis.db.system.profile.count() == 0) {
             print("db.system.profile is empty");
             print("Use db.setProfilingLevel(2) will enable profiling");
             print("Use db.system.profile.find() to show raw profile entries");
         } else {
             print();
-            db.system.profile.find({millis: {$gt: 0}})
+            globalThis.db.system.profile.find({millis: {$gt: 0}})
                 .sort({$natural: -1})
                 .limit(5)
                 .forEach(function(x) {
@@ -945,30 +945,30 @@ shellHelper.show = function(what) {
     }
 
     if (what == "users") {
-        db.getUsers().forEach(printjson);
+        globalThis.db.getUsers().forEach(printjson);
         return "";
     }
 
     if (what == "roles") {
-        db.getRoles({showBuiltinRoles: true}).forEach(printjson);
+        globalThis.db.getRoles({showBuiltinRoles: true}).forEach(printjson);
         return "";
     }
 
     if (what == "collections" || what == "tables") {
-        db.getCollectionInfos({}, true, true).forEach(function(infoObj) {
+        globalThis.db.getCollectionInfos({}, true, true).forEach(function(infoObj) {
             print(infoObj.name);
         });
         return "";
     }
 
     if (what == "dbs" || what == "databases") {
-        var mongo = db.getMongo();
+        var mongo = globalThis.db.getMongo();
         var dbs;
         try {
-            dbs = mongo.getDBs(db.getSession(), undefined, false);
+            dbs = mongo.getDBs(globalThis.db.getSession(), undefined, false);
         } catch (ex) {
             // Unable to get detailed information, retry name-only.
-            mongo.getDBs(db.getSession(), undefined, true).forEach(function(x) {
+            mongo.getDBs(globalThis.db.getSession(), undefined, true).forEach(function(x) {
                 print(x);
             });
             return "";
@@ -1020,7 +1020,7 @@ shellHelper.show = function(what) {
         if (args.length > 0)
             n = args[0];
 
-        var res = db.adminCommand({getLog: n});
+        var res = globalThis.db.adminCommand({getLog: n});
         if (!res.ok) {
             print("Error while trying to show " + n + " log: " + res.errmsg);
             return "";
@@ -1032,7 +1032,7 @@ shellHelper.show = function(what) {
     }
 
     if (what == "logs") {
-        var res = db.adminCommand({getLog: "*"});
+        var res = globalThis.db.adminCommand({getLog: "*"});
         if (!res.ok) {
             print("Error while trying to show logs: " + res.errmsg);
             return "";
@@ -1048,13 +1048,13 @@ shellHelper.show = function(what) {
         try {
             // !!db essentially casts db to a boolean
             // Will throw a reference exception if db hasn't been declared.
-            dbDeclared = !!db;
+            dbDeclared = !!globalThis.db;
         } catch (ex) {
             dbDeclared = false;
         }
         if (dbDeclared) {
-            var res =
-                db.getSiblingDB("admin")._runCommandWithoutApiStrict({getLog: "startupWarnings"});
+            var res = globalThis.db.getSiblingDB("admin")._runCommandWithoutApiStrict(
+                {getLog: "startupWarnings"});
             if (res.ok) {
                 if (res.log.length == 0) {
                     return "";
@@ -1103,13 +1103,13 @@ shellHelper.show = function(what) {
         try {
             // !!db essentially casts db to a boolean
             // Will throw a reference exception if db hasn't been declared.
-            dbDeclared = !!db;
+            dbDeclared = !!globalThis.db;
         } catch (ex) {
             dbDeclared = false;
         }
 
         if (dbDeclared) {
-            var res = db._helloOrLegacyHello({forShell: 1});
+            var res = globalThis.db._helloOrLegacyHello({forShell: 1});
             if (!res.ok) {
                 print("Note: Cannot determine if automation is active");
                 return "";
@@ -1136,13 +1136,13 @@ shellHelper.show = function(what) {
         try {
             // !!db essentially casts db to a boolean
             // Will throw a reference exception if db hasn't been declared.
-            dbDeclared = !!db;
+            dbDeclared = !!globalThis.db;
         } catch (ex) {
             dbDeclared = false;
         }
 
         if (dbDeclared) {
-            const freemonStatus = db.adminCommand({getFreeMonitoringStatus: 1});
+            const freemonStatus = globalThis.db.adminCommand({getFreeMonitoringStatus: 1});
 
             if (freemonStatus.ok) {
                 if (freemonStatus.state == 'enabled' &&
@@ -1183,7 +1183,7 @@ shellHelper.show = function(what) {
         // A MongoDB emulation service offered by a company
         // responsible for a certain disk operating system.
         try {
-            const buildInfo = db._runCommandWithoutApiStrict({buildInfo: 1});
+            const buildInfo = globalThis.db._runCommandWithoutApiStrict({buildInfo: 1});
             if (buildInfo.hasOwnProperty('_t')) {
                 matchesKnownImposterSignature = true;
             }
@@ -1195,7 +1195,7 @@ shellHelper.show = function(what) {
         // after some sort of minor river or something.
         if (!matchesKnownImposterSignature) {
             try {
-                const cmdLineOpts = db.adminCommand({getCmdLineOpts: 1});
+                const cmdLineOpts = globalThis.db.adminCommand({getCmdLineOpts: 1});
                 if (cmdLineOpts.hasOwnProperty('errmsg') &&
                     cmdLineOpts.errmsg.indexOf('not supported') !== -1) {
                     matchesKnownImposterSignature = true;
@@ -1228,24 +1228,24 @@ shellHelper.show = function(what) {
 
 __promptWrapper__ = function(promptFunction) {
     // Call promptFunction directly if the global "db" is not defined, e.g. --nodb.
-    if (typeof db === 'undefined' || !(db instanceof DB)) {
+    if (typeof globalThis.db === 'undefined' || !(globalThis.db instanceof DB)) {
         __prompt__ = promptFunction();
         return;
     }
 
     // Stash the global "db" for the prompt function to make sure the session
     // of the global "db" isn't accessed by the prompt function.
-    let originalDB = db;
+    let originalDB = globalThis.db;
     try {
-        db = originalDB.getMongo().getDB(originalDB.getName());
+        globalThis.db = originalDB.getMongo().getDB(originalDB.getName());
         // Setting db._session to be a _DummyDriverSession instance makes it so that
         // a logical session id isn't included in the hello and replSetGetStatus
         // commands and therefore won't interfere with the session associated with the
         // global "db" object.
-        db._session = new _DummyDriverSession(db.getMongo());
+        globalThis.db._session = new _DummyDriverSession(globalThis.db.getMongo());
         __prompt__ = promptFunction();
     } finally {
-        db = originalDB;
+        globalThis.db = originalDB;
     }
 };
 
@@ -1529,41 +1529,41 @@ rs.help = function() {
 rs.slaveOk = function(value) {
     print(
         "WARNING: slaveOk() is deprecated and may be removed in the next major release. Please use secondaryOk() instead.");
-    return db.getMongo().setSecondaryOk(value);
+    return globalThis.db.getMongo().setSecondaryOk(value);
 };
 
 rs.secondaryOk = function(value) {
-    return db.getMongo().setSecondaryOk(value);
+    return globalThis.db.getMongo().setSecondaryOk(value);
 };
 
 rs.status = function() {
-    return db._adminCommand("replSetGetStatus");
+    return globalThis.db._adminCommand("replSetGetStatus");
 };
 rs.isMaster = function() {
-    return db.isMaster();
+    return globalThis.db.isMaster();
 };
 rs.hello = function() {
-    return db.hello();
+    return globalThis.db.hello();
 };
 rs.initiate = function(c) {
-    return db._adminCommand({replSetInitiate: c});
+    return globalThis.db._adminCommand({replSetInitiate: c});
 };
 rs.printSlaveReplicationInfo = function() {
     print(
         "WARNING: printSlaveReplicationInfo is deprecated and may be removed in the next major release. Please use printSecondaryReplicationInfo instead.");
-    return db.printSecondaryReplicationInfo();
+    return globalThis.db.printSecondaryReplicationInfo();
 };
 rs.printSecondaryReplicationInfo = function() {
-    return db.printSecondaryReplicationInfo();
+    return globalThis.db.printSecondaryReplicationInfo();
 };
 rs.printReplicationInfo = function() {
-    return db.printReplicationInfo();
+    return globalThis.db.printReplicationInfo();
 };
 rs._runCmd = function(c) {
     // after the command, catch the disconnect and reconnect if necessary
     var res = null;
     try {
-        res = db.adminCommand(c);
+        res = globalThis.db.adminCommand(c);
     } catch (e) {
         if (isNetworkError(e)) {
             if (reconnect(db)) {
@@ -1644,7 +1644,7 @@ rs.add = function(hostport, arb) {
     assert.soon(function() {
         var cfg = hostport;
 
-        var local = db.getSiblingDB("local");
+        var local = globalThis.db.getSiblingDB("local");
         assert(local.system.replset.count() <= 1,
                "error: local.system.replset has unexpected contents");
         var c = local.system.replset.findOne();
@@ -1700,34 +1700,34 @@ rs.add = function(hostport, arb) {
     return res;
 };
 rs.syncFrom = function(host) {
-    return db._adminCommand({replSetSyncFrom: host});
+    return globalThis.db._adminCommand({replSetSyncFrom: host});
 };
 rs.stepDown = function(stepdownSecs, catchUpSecs) {
     var cmdObj = {replSetStepDown: stepdownSecs === undefined ? 60 : stepdownSecs};
     if (catchUpSecs !== undefined) {
         cmdObj['secondaryCatchUpPeriodSecs'] = catchUpSecs;
     }
-    return db._adminCommand(cmdObj);
+    return globalThis.db._adminCommand(cmdObj);
 };
 rs.freeze = function(secs) {
-    return db._adminCommand({replSetFreeze: secs});
+    return globalThis.db._adminCommand({replSetFreeze: secs});
 };
 rs.addArb = function(hn) {
     return this.add(hn, true);
 };
 
 rs.conf = function() {
-    var resp = db._adminCommand({replSetGetConfig: 1});
+    var resp = globalThis.db._adminCommand({replSetGetConfig: 1});
     if (resp.ok && !(resp.errmsg) && resp.config)
         return resp.config;
     else if (resp.errmsg && resp.errmsg.startsWith("no such cmd"))
-        return db.getSiblingDB("local").system.replset.findOne();
+        return globalThis.db.getSiblingDB("local").system.replset.findOne();
     throw new Error("Could not retrieve replica set config: " + tojson(resp));
 };
 rs.config = rs.conf;
 
 rs.remove = function(hn) {
-    var local = db.getSiblingDB("local");
+    var local = globalThis.db.getSiblingDB("local");
     assert(local.system.replset.count() <= 1,
            "error: local.system.replset has unexpected contents");
     var c = local.system.replset.findOne();
@@ -1737,7 +1737,7 @@ rs.remove = function(hn) {
     for (var i in c.members) {
         if (c.members[i].host == hn) {
             c.members.splice(i, 1);
-            return db._adminCommand({replSetReconfig: c});
+            return globalThis.db._adminCommand({replSetReconfig: c});
         }
     }
 
@@ -1770,7 +1770,7 @@ rs.debug.nullLastOpWritten = function(primary, secondary) {
 };
 
 rs.debug.getLastOpWritten = function(server) {
-    var s = db.getSiblingDB("local");
+    var s = globalThis.db.getSiblingDB("local");
     if (server) {
         s = connect(server + "/local");
     }
@@ -1791,7 +1791,7 @@ rs.isValidOpTime = function(opTime) {
  * Returns -1 if ot1 is 'earlier' than ot2, 1 if 'later' and 0 if equal.
  */
 rs.compareOpTimes = function(ot1, ot2) {
-    if (!rs.isValidOpTime(ot1) || !rs.isValidOpTime(ot2)) {
+    if (!globalThis.rs.isValidOpTime(ot1) || !globalThis.rs.isValidOpTime(ot2)) {
         throw Error("invalid optimes, received: " + tojson(ot1) + " and " + tojson(ot2));
     }
 

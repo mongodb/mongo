@@ -469,7 +469,7 @@ if (typeof (DBPointer) != "undefined") {
     DBPointer.prototype.fetch = function() {
         assert(this.ns, "need a ns");
         assert(this.id, "need an id");
-        return db[this.ns].findOne({_id: this.id});
+        return globalThis.db[this.ns].findOne({_id: this.id});
     };
 
     DBPointer.prototype.tojson = function(indent) {
@@ -496,7 +496,8 @@ if (typeof (DBRef) != "undefined") {
     DBRef.prototype.fetch = function() {
         assert(this.$ref, "need a ns");
         assert(this.$id, "need an id");
-        var coll = this.$db ? db.getSiblingDB(this.$db).getCollection(this.$ref) : db[this.$ref];
+        var coll = this.$db ? globalThis.db.getSiblingDB(this.$db).getCollection(this.$ref)
+                            : globalThis.db[this.$ref];
         return coll.findOne({_id: this.$id});
     };
 
