@@ -616,20 +616,22 @@ public:
     /**
      * Finds the shard IDs for a given filter and collation. If collation is empty, we use the
      * collection default collation for targeting.
-     * If output parameter `chunkRanges` is non-null, the set is populated with ChunkRanges that
-     * would be targeted by the query; if nullptr, no processing of chunk ranges occurs.
+     * If 'chunkRanges' is not null, populates it with ChunkRanges that would be targeted by the
+     * query. If 'targetMinKeyToMaxKey' is not null, sets it to true if the query targets the entire
+     * shard key space.
      */
     void getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> expCtx,
                              const BSONObj& query,
                              const BSONObj& collation,
                              std::set<ShardId>* shardIds,
-                             std::set<ChunkRange>* chunkRanges = nullptr) const;
+                             std::set<ChunkRange>* chunkRanges = nullptr,
+                             bool* targetMinKeyToMaxKey = nullptr) const;
 
     /**
      * Returns all shard ids which contain chunks overlapping the range [min, max]. Please note the
      * inclusive bounds on both sides (SERVER-20768).
-     * If output parameter `chunkRanges` is non-null, the set is populated with ChunkRanges that
-     * would be targeted by the query.
+     * If 'chunkRanges' is not null, populates it with ChunkRanges that would be targeted by the
+     * query.
      */
     void getShardIdsForRange(const BSONObj& min,
                              const BSONObj& max,

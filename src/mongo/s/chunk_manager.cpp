@@ -414,7 +414,8 @@ void ChunkManager::getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> e
                                        const BSONObj& query,
                                        const BSONObj& collation,
                                        std::set<ShardId>* shardIds,
-                                       std::set<ChunkRange>* chunkRanges) const {
+                                       std::set<ChunkRange>* chunkRanges,
+                                       bool* targetMinKeyToMaxKey) const {
     if (chunkRanges) {
         invariant(chunkRanges->empty());
     }
@@ -449,6 +450,9 @@ void ChunkManager::getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> e
             if (chunkRanges) {
                 chunkRanges->insert(chunk.getRange());
             }
+            if (targetMinKeyToMaxKey) {
+                *targetMinKeyToMaxKey = false;
+            }
             return;
         } catch (const DBException&) {
             // The query uses multiple shards
@@ -471,7 +475,14 @@ void ChunkManager::getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> e
     BoundList ranges = _rt->optRt->getShardKeyPattern().flattenBounds(bounds);
 
     for (BoundList::const_iterator it = ranges.begin(); it != ranges.end(); ++it) {
-        getShardIdsForRange(it->first /*min*/, it->second /*max*/, shardIds, chunkRanges);
+        const auto& min = it->first;
+        const auto& max = it->second;
+
+        getShardIdsForRange(min, max, shardIds, chunkRanges);
+        if (targetMinKeyToMaxKey && allElementsAreOfType(MinKey, min) &&
+            allElementsAreOfType(MaxKey, max)) {
+            *targetMinKeyToMaxKey = true;
+        }
 
         // Once we know we need to visit all shards no need to keep looping.
         // However, this optimization does not apply when we are reading from a snapshot
@@ -492,6 +503,9 @@ void ChunkManager::getShardIdsForQuery(boost::intrusive_ptr<ExpressionContext> e
             if (chunkRanges) {
                 chunkRanges->insert(chunkInfo->getRange());
             }
+            if (targetMinKeyToMaxKey) {
+                *targetMinKeyToMaxKey = false;
+            }
             return false;
         });
     }
@@ -511,7 +525,6 @@ void ChunkManager::getShardIdsForRange(const BSONObj& min,
         if (chunkRanges) {
             getAllChunkRanges(chunkRanges);
         }
-        return;
     }
 
     _rt->optRt->forEachOverlappingChunk(min, max, true, [&](auto& chunkInfo) {

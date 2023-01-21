@@ -75,8 +75,8 @@ public:
     /**
      * Returns a ShardEndpoint for a single document write or throws ShardKeyNotFound if 'doc' is
      * malformed with respect to the shard key pattern of the collection.
-     * If output parameter chunkRanges is not nullptr, also returns the set of ChunkRange that
-     * the query is targeting; otherwise no other processing on chunk ranges is performed.
+     * If 'chunkRanges' is not null, populates it with ChunkRanges that would be targeted by the
+     * insert.
      */
     virtual ShardEndpoint targetInsert(OperationContext* opCtx,
                                        const BSONObj& doc,
@@ -85,8 +85,8 @@ public:
     /**
      * Returns a vector of ShardEndpoints for a potentially multi-shard update or throws
      * ShardKeyNotFound if 'updateOp' misses a shard key, but the type of update requires it.
-     * If output parameter chunkRanges is not nullptr, also returns the set of ChunkRange that
-     * the query is targeting; otherwise no other processing on chunk ranges is performed.
+     * If 'chunkRanges' is not null, populates it with ChunkRanges that would be targeted by the
+     * update.
      */
     virtual std::vector<ShardEndpoint> targetUpdate(
         OperationContext* opCtx,
@@ -96,8 +96,8 @@ public:
     /**
      * Returns a vector of ShardEndpoints for a potentially multi-shard delete or throws
      * ShardKeyNotFound if 'deleteOp' misses a shard key, but the type of delete requires it.
-     * If output parameter chunkRanges is not nullptr, also returns the set of ChunkRange that
-     * the query is targeting; otherwise no other processing on chunk ranges is performed.
+     * If 'chunkRanges' is not null, populates it with ChunkRanges that would be targeted by the
+     * delete.
      */
     virtual std::vector<ShardEndpoint> targetDelete(
         OperationContext* opCtx,

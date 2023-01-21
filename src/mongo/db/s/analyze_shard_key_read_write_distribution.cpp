@@ -50,35 +50,6 @@ namespace analyze_shard_key {
 namespace {
 
 /**
- * Returns true if the given object contains any of the given fields.
- */
-bool hasAnyFieldName(const BSONObj& obj, const std::set<StringData>& fieldNames) {
-    BSONObjIterator it(obj);
-    while (it.more()) {
-        auto e = it.next();
-        auto fieldName = e.fieldNameStringData();
-        if (fieldNames.find(fieldName) != fieldNames.end()) {
-            return true;
-        }
-        if (e.type() == Object) {
-            if (hasAnyFieldName(e.embeddedObject(), fieldNames)) {
-                return true;
-            }
-        }
-        if (e.type() == Array) {
-            for (const auto& innerE : e.Array()) {
-                if (innerE.type() == Object) {
-                    if (hasAnyFieldName(innerE.embeddedObject(), fieldNames)) {
-                        return true;
-                    }
-                }
-            }
-        }
-    }
-    return false;
-}
-
-/**
  * Returns true if the query that specifies the given collation against the collection with the
  * given default collator has simple collation.
  */
@@ -166,16 +137,19 @@ DistributionMetricsCalculator<DistributionMetricsType, SampleSizeType>::_increme
 
     std::set<ShardId> shardIds;  // This is not used.
     std::set<ChunkRange> chunkRanges;
-    _getChunkManager().getShardIdsForQuery(expCtx, filter, collation, &shardIds, &chunkRanges);
+    bool targetMinkeyToMaxKey = false;
+    _getChunkManager().getShardIdsForQuery(
+        expCtx, filter, collation, &shardIds, &chunkRanges, &targetMinkeyToMaxKey);
     _incrementTargetedRanges(chunkRanges);
 
     // Increment metrics about sharding targeting.
     if (!shardKey.isEmpty()) {
         // This query filters by shard key equality. If the query has a simple collation or the
-        // shard key doesn't contain a collatable field, then it is guaranteed to target only one
-        // shard. Otherwise, the number of shards that it targets depend on how the shard key range
-        // is distributed among shards. Given this, pessimistically classify it as targeting to
-        // multiple shards.
+        // shard key doesn't contain a collatable field, then there is only one matching shard key
+        // value so the query is guaranteed to target only one shard. Otherwise, the number of
+        // shards that it targets depend on how the matching shard key values are distributed among
+        // shards. Given this, pessimistically classify it as targeting to multiple shards.
+        invariant(!targetMinkeyToMaxKey);
         if (hasSimpleCollation(_getDefaultCollator(), collation) ||
             !shardKeyHasCollatableType(_getShardKeyPattern(), shardKey)) {
             _incrementTargetedOneShard();
@@ -183,18 +157,16 @@ DistributionMetricsCalculator<DistributionMetricsType, SampleSizeType>::_increme
         } else {
             _incrementTargetedMultipleShards();
         }
+    } else if (targetMinkeyToMaxKey) {
+        // This query targets the entire shard key space. Therefore, it always targets all
+        // shards and chunks.
+        _incrementTargetedAllShards();
+        invariant((int)chunkRanges.size() == _getChunkManager().numChunks());
     } else {
-        if (hasAnyFieldName(filter, {_firstShardKeyFieldName})) {
-            // This query filters by shard key range. Again, the number of shards that it targets
-            // depends on how the shard key range is distributed among shards. Given this,
-            // pessimistically classify it as targeting to multiple shards.
-            _incrementTargetedMultipleShards();
-        } else {
-            // This query doesn't filter by shard key at all. Therefore, it always targets all
-            // shards.
-            _incrementTargetedAllShards();
-            invariant((int)chunkRanges.size() == _getChunkManager().numChunks());
-        }
+        // This query targets a subset of the shard key space. Therefore, the number of shards
+        // that it targets depends on how the matching shard key ranges are distributed among
+        // shards. Given this, pessimistically classify it as targeting to multiple shards.
+        _incrementTargetedMultipleShards();
     }
 
     return shardKey;

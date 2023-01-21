@@ -263,49 +263,56 @@ protected:
 
     // Define two set of ChunkSplintInfo's for testing.
 
-    // 'chunkSplitInfoRangeSharding0' and 'chunkSplitInfoHashedSharding0' make the collection have
-    // chunks for the following shard key ranges:
+    // 'chunkSplitInfoRangeSharding0' makes the collection have the following chunks:
     // {a.x: MinKey, b.y: Minkey} -> {a.x: -100, b.y: "A"}
     // {a.x: -100, b.y: "A"} -> {a.x: 100, b.y: "A"}
     // {a.x: 100, b.y: "A"} -> {a.x: MaxKey, b.y: MaxKey}
-    const std::vector<BSONObj> splitPoints0 = {BSON("a.x" << -100 << "b.y"
-                                                          << "A"),
-                                               BSON("a.x" << 100 << "b.y"
-                                                          << "A")};
     const ChunkSplitInfo chunkSplitInfoRangeSharding0{
-        ShardKeyPattern{BSON("a.x" << 1 << "b.y" << 1)}, splitPoints0};
+        ShardKeyPattern{BSON("a.x" << 1 << "b.y" << 1)},
+        std::vector<BSONObj>{{BSON("a.x" << -100 << "b.y"
+                                         << "A"),
+                              BSON("a.x" << 100 << "b.y"
+                                         << "A")}}};
+
+    // 'chunkSplitInfoHashedSharding0' makes the collection have the following chunks:
+    // {a.x: MinKey, b.y: Minkey} -> {a.x: -100, b.y: hash("A")}
+    // {a.x: -100, b.y: hash("A")} -> {a.x: 100, b.y: hash("A")}
+    // {a.x: 100, b.y: hash("A")} -> {a.x: MaxKey, b.y: MaxKey}
     const ChunkSplitInfo chunkSplitInfoHashedSharding0{
         ShardKeyPattern{BSON("a.x" << 1 << "b.y"
                                    << "hashed")},
         std::vector<BSONObj>{
-            BSON("a.x" << splitPoints0[0]["a.x"].Int() << "b.y"
-                       << BSONElementHasher::hash64(splitPoints0[0]["b.y"],
+            BSON("a.x" << -100 << "b.y"
+                       << BSONElementHasher::hash64(BSON(""
+                                                         << "A")
+                                                        .firstElement(),
                                                     BSONElementHasher::DEFAULT_HASH_SEED)),
-            BSON("a.x" << splitPoints0[1]["a.x"].Int() << "b.y"
-                       << BSONElementHasher::hash64(splitPoints0[1]["b.y"],
+            BSON("a.x" << 100 << "b.y"
+                       << BSONElementHasher::hash64(BSON(""
+                                                         << "A")
+                                                        .firstElement(),
                                                     BSONElementHasher::DEFAULT_HASH_SEED))}};
 
-    // 'chunkSplitInfoRangeSharding1' and 'chunkSplitInfoHashedSharding1' make the collection
-    // have chunks for the following shard key ranges:
+    // 'chunkSplitInfoRangeSharding1' makes the collection have the following chunks:
     // {a: MinKey, b.y: Minkey} -> {a: {x: -100}, b.y: "A"}
     // {a: {x: -100}, b.y: "A"} -> {a: {x: 100}, b.y: "A"}
     // {a: {x: 100}, b.y: "A"} -> {a: MaxKey, b.y: MaxKey}
-    const std::vector<BSONObj> splitPoints1 = {BSON("a" << BSON("x" << -100) << "b.y"
-                                                        << "A"),
-                                               BSON("a" << BSON("x" << 100) << "b.y"
-                                                        << "A")};
-    const ChunkSplitInfo chunkSplitInfoRangeSharding1{ShardKeyPattern{BSON("a" << 1 << "b.y" << 1)},
-                                                      splitPoints1};
-    const ChunkSplitInfo chunkSplitInfoHashedSharding1{
-        ShardKeyPattern{BSON("a" << 1 << "b.y"
-                                 << "hashed")},
-        std::vector<BSONObj>{
-            BSON("a" << splitPoints1[0]["a"].wrap() << "b.y"
-                     << BSONElementHasher::hash64(splitPoints1[0]["b.y"],
-                                                  BSONElementHasher::DEFAULT_HASH_SEED)),
-            BSON("a" << splitPoints1[1]["a"].wrap() << "b.y"
-                     << BSONElementHasher::hash64(splitPoints1[1]["b.y"],
-                                                  BSONElementHasher::DEFAULT_HASH_SEED))}};
+    const ChunkSplitInfo chunkSplitInfoRangeSharding1{
+        ShardKeyPattern{BSON("a" << 1 << "b.y" << 1)},
+        std::vector<BSONObj>{BSON("a" << BSON("x" << -100) << "b.y"
+                                      << "A"),
+                             BSON("a" << BSON("x" << 100) << "b.y"
+                                      << "A")}};
+
+    // 'chunkSplitInfoHashedSharding2' makes the collection have the following chunks:
+    // {a: MinKey} -> {a: -4611686018427387902LL}
+    // {a: -4611686018427387902LL} -> {a: 4611686018427387902LL}
+    // {a: -4611686018427387902LL} -> {a: MaxKey}
+    const ChunkSplitInfo chunkSplitInfoHashedSharding2{ShardKeyPattern{BSON("a"
+                                                                            << "hashed")},
+                                                       std::vector<BSONObj>{
+                                                           BSON("a" << -4611686018427387902LL),
+                                                           BSON("a" << 4611686018427387902LL)}};
 
     const BSONObj emptyCollation = {};
     const BSONObj simpleCollation = CollationSpec::kSimpleSpec;
@@ -735,6 +742,20 @@ TEST_F(ReadDistributionFilterByShardKeyEqualityTest, ShardKeyEqualitySimpleColla
         hasCollatableType);
 }
 
+TEST_F(ReadDistributionFilterByShardKeyEqualityTest, ShardKeyEqualityHashed) {
+    auto targeter = makeCollectionRoutingInfoTargeter(chunkSplitInfoHashedSharding2);
+    auto filter = BSON("a" << -100);  // The hash of -100 is -1979677326953392702LL.
+    auto numDispatchedByRange = std::vector<int64_t>({0, 1, 0});
+    auto hasSimpleCollation = true;
+    auto hasCollatableType = false;
+
+    assertTargetMetrics(targeter,
+                        makeSampledReadQueryDocument(getRandomSampledReadCommandName(), filter),
+                        numDispatchedByRange,
+                        hasSimpleCollation,
+                        hasCollatableType);
+}
+
 class ReadDistributionFilterByShardKeyRangeTest : public ReadWriteDistributionTest {
 protected:
     void assertTargetMetrics(const CollectionRoutingInfoTargeter& targeter,
@@ -743,6 +764,14 @@ protected:
         ReadTargetMetricsBundle metrics;
         metrics.numTargetedMultipleShards = 1;
         metrics.numDispatchedByRange = numDispatchedByRange;
+        assertTargetMetricsForReadQuery(targeter, queryDoc, metrics);
+    }
+
+    void assertTargetMetrics(const CollectionRoutingInfoTargeter& targeter,
+                             const SampledQueryDocument& queryDoc) const {
+        ReadTargetMetricsBundle metrics;
+        metrics.numTargetedAllShards = 1;
+        metrics.numDispatchedByRange = std::vector<int64_t>({1, 1, 1});
         assertTargetMetricsForReadQuery(targeter, queryDoc, metrics);
     }
 };
@@ -812,6 +841,14 @@ TEST_F(ReadDistributionFilterByShardKeyRangeTest, ShardKeyNonEquality) {
     assertTargetMetrics(targeter,
                         makeSampledReadQueryDocument(getRandomSampledReadCommandName(), filter),
                         numDispatchedByRange);
+}
+
+TEST_F(ReadDistributionFilterByShardKeyRangeTest, ShardKeyRangeHashed) {
+    auto targeter = makeCollectionRoutingInfoTargeter(chunkSplitInfoHashedSharding2);
+    // For hashed sharding, range queries always target all shards and chunks.
+    auto filter = BSON("a" << BSON("$gte" << -100));
+    assertTargetMetrics(targeter,
+                        makeSampledReadQueryDocument(getRandomSampledReadCommandName(), filter));
 }
 
 class ReadDistributionNotFilterByShardKeyTest : public ReadWriteDistributionTest {
@@ -1145,6 +1182,31 @@ TEST_F(WriteDistributionFilterByShardKeyEqualityTest, ShardKeyEqualitySimpleColl
                         hasCollatableType);
 }
 
+TEST_F(WriteDistributionFilterByShardKeyEqualityTest, ShardKeyEqualityHashed) {
+    auto targeter = makeCollectionRoutingInfoTargeter(chunkSplitInfoHashedSharding2);
+    auto filter = BSON("a" << -100);  // The hash of -100 is -1979677326953392702LL.
+    auto updateMod = BSON("$set" << BSON("c" << 100));
+    auto numDispatchedByRange = std::vector<int64_t>({0, 1, 0});
+    auto hasSimpleCollation = true;
+    auto hasCollatableType = false;
+
+    assertTargetMetrics(targeter,
+                        makeSampledUpdateQueryDocument(filter, updateMod),
+                        numDispatchedByRange,
+                        hasSimpleCollation,
+                        hasCollatableType);
+    assertTargetMetrics(targeter,
+                        makeSampledDeleteQueryDocument(filter),
+                        numDispatchedByRange,
+                        hasSimpleCollation,
+                        hasCollatableType);
+    assertTargetMetrics(targeter,
+                        makeSampledFindAndModifyQueryDocument(filter, updateMod),
+                        numDispatchedByRange,
+                        hasSimpleCollation,
+                        hasCollatableType);
+}
+
 class WriteDistributionFilterByShardKeyRangeTest : public ReadWriteDistributionTest {
 protected:
     void assertTargetMetrics(const CollectionRoutingInfoTargeter& targeter,
@@ -1154,6 +1216,20 @@ protected:
         WriteTargetMetricsBundle metrics;
         metrics.numTargetedMultipleShards = 1;
         metrics.numDispatchedByRange = numDispatchedByRange;
+        if (multi) {
+            metrics.numMultiWritesWithoutShardKey = 1;
+        } else {
+            metrics.numSingleWritesWithoutShardKey = 1;
+        }
+        assertTargetMetricsForWriteQuery(targeter, queryDoc, metrics);
+    }
+
+    void assertTargetMetrics(const CollectionRoutingInfoTargeter& targeter,
+                             const SampledQueryDocument& queryDoc,
+                             bool multi) const {
+        WriteTargetMetricsBundle metrics;
+        metrics.numTargetedAllShards = 1;
+        metrics.numDispatchedByRange = std::vector<int64_t>({1, 1, 1});
         if (multi) {
             metrics.numMultiWritesWithoutShardKey = 1;
         } else {
@@ -1321,6 +1397,21 @@ TEST_F(WriteDistributionFilterByShardKeyRangeTest, ShardKeyNonEquality) {
                         makeSampledFindAndModifyQueryDocument(filter, updateMod),
                         false /* multi */,
                         numDispatchedByRange);
+}
+
+TEST_F(WriteDistributionFilterByShardKeyRangeTest, ShardKeyRangeHashed) {
+    auto targeter = makeCollectionRoutingInfoTargeter(chunkSplitInfoHashedSharding2);
+    // For hashed sharding, range queries always target all shards and chunks.
+    auto filter = BSON("a" << BSON("$gte" << -100));
+    auto updateMod = BSON("$set" << BSON("c" << 5));
+    auto numDispatchedByRange = std::vector<int64_t>({1, 1, 1});
+    for (auto& multi : {true, false}) {
+        assertTargetMetrics(
+            targeter, makeSampledUpdateQueryDocument(filter, updateMod, multi), multi);
+        assertTargetMetrics(targeter, makeSampledDeleteQueryDocument(filter, multi), multi);
+    }
+    assertTargetMetrics(
+        targeter, makeSampledFindAndModifyQueryDocument(filter, updateMod), false /* multi */);
 }
 
 class WriteDistributionFilterByShardKeyRangeReplacementUpdateTest
