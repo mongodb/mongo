@@ -408,7 +408,54 @@ same shape runs and exhibits similar or better trial period performance, as meas
 situations where a plan cache entry is created with an unreasonably high works value. When this
 happens, the plan can get stuck in the cache since replanning will never kick in.
 
-# Column Store Indexes
+# Column Store Indexes (CSI)
+
+Column store index (CSI) is a single WT B-tree index where the _index key_ is `Dotted.Path\0RowId`
+and the _index value_ contains the value(s) at that path in the source document with the matching
+`RowId` plus metadata that describes the arrays and nested objects pertinent to the path. This
+organization of the index colocates same-path document values from all source documents and makes it
+efficient to scan a given document path, similar to how a single column can be scanned in column
+stores for relational data. Including `RowId` into the _index key_ allows synchronizing scans across
+multiple paths and fetching the full document from the rowstore, if necessary. Note, that CSI doesn't
+support lookup by document values.
+
+From the point of view of management, maintenance and replication, CSI is treated the same as other
+types of indexes in MongoDB.
+
+## Query side
+
+CSI can be created for all collections except timeseries and clustered but it is only used with
+queries that project a known limited subset of fields, run in SBE and aren't eligible for any other
+indexes. For other heuristics limiting use of CSI see
+[`querySatisfiesCsiPlanningHeuristics()`](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/query/query_planner.cpp#L250).
+
+Scanning of CSI is implemented by the 
+[`columnscan`](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/exec/sbe/stages/column_scan.h)
+SBE stage. Unlike `ixscan` the plans that use `columnscan` don't include a separate fetch stage as
+the columnstore indexes are optimistically assumed to be covering for the scenarios when they are
+eligible, and if reading data from the rowstore is required during execution, the fetch is
+implemented inside the `columnscan` stage itself. In some situations `columnscan` can degenerate
+into scanning of the row store but it would still show as `columnscan` in the `explain` output. To
+observe how the rowstore is accessed, see `numRowStoreFetches` and `numRowStoreScans` in
+`explain("executionStats")`.
+
+Some filters might be pushed into the `columnscan` stage and evaluated against the values stored in
+the index (see `traverseCsiCellValues` and `traverseCsiCellTypes` primitives in the
+[VM](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/exec/sbe/vm/vm.h#L306)).
+The filters that cannot be pushed down would require a downstream `filter` stage. For details on
+which filters can be pushed down see
+[`splitMatchExpressionForColumns()`](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/matcher/expression_algo.cpp#L514).
+
+### Tests
+
+*JS Tests:* Most CSI related tests can be found in `jstests/core/columnstore` folder or by searching
+for tests that create an index with the "columnstore" tag. There are also
+[`core_column_store_indexes`](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/buildscripts/resmokeconfig/suites/core_column_store_indexes.yml)
+and [`aggregation_column_store_index_passthrough`](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/buildscripts/resmokeconfig/suites/aggregation_column_store_index_passthrough.yml)
+suites that run many tests with a CSI created implicitly via a failpoint
+`createColumnIndexOnAllCollections`.
+
+## Storage side
 
 There is now a `ColumnStore` interface, akin to the `RecordStore` and `SortedDataInterface` base
 classes.
@@ -460,7 +507,16 @@ High-level view of the column store data format:
 (\xFF2, {flags: [HAS_SUBPATHS]})
 ```
 
-## Code Structure
+Columnstore indexes benefit significantly from compression because of their structure. In long runs
+of entries with the same path that are within a tight range of record ids, the 'dotted.path\0rid'
+B-tree keys differ only in the last one or two bytes. All CSIs enable WiredTiger's prefix compression
+for index keys to remove the redundant bytes. By default, CSIs also use Zstandard compression for the
+B-tree, which is well suited to compressing blocks of data from the same column, because columns tend
+to contain data from a limited domain of values and to contain many duplicate values. The internal
+`columnstoreCompressor` index option is available for testing the performance and disk usage of other
+compression methods.
+
+### Code Structure
 
 The `ColumnStore` base class is the storage access point for columnar data. It supports reads and
 writes to the column store storage table. The `ColumnStore` component is not involved in generating
@@ -476,11 +532,24 @@ that the storage engine will receive.
 
 _Code spelunking entry points:_
 
-* The [IndexAccessMethod](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/index_access_method.h) is invoked by the [IndexCatalogImpl](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/catalog/index_catalog_impl.cpp#L1714-L1715).
-  * The [ColumnStoreAccessMethod](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/columns_access_method.h#L39), note the [write paths](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/columns_access_method.cpp#L269-L286) that use the ColumnKeyGenerator.
+* The [IndexAccessMethod](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/index_access_method.h)
+is invoked by the [IndexCatalogImpl](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/catalog/index_catalog_impl.cpp#L1714-L1715).
 
-* The [ColumnKeyGenerator](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/column_key_generator.h#L146) produces many [UnencodedCellView](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/column_key_generator.h#L111) via the [ColumnShredder](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/column_key_generator.cpp#L163-L176) with the [ColumnProjectionTree & ColumnProjectionNode](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/column_key_generator.h#L46-L101) classes defining the desired path projections.
+* The [ColumnStoreAccessMethod](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/columns_access_method.h#L39),
+note the [write paths](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/columns_access_method.cpp#L269-L286)
+that use the ColumnKeyGenerator.
 
-* The [column_cell.h/cpp](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/column_cell.h#L44-L50) helpers are leveraged throughout [ColumnStoreAccessMethod write methods](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/columns_access_method.cpp#L281) to encode ColumnKeyGenerator UnencodedCellView cells into final buffers for storage write.
+* The [ColumnKeyGenerator](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/column_key_generator.h#L146)
+produces many [UnencodedCellView](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/column_key_generator.h#L111)
+via the [ColumnShredder](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/column_key_generator.cpp#L163-L176)
+with the [ColumnProjectionTree & ColumnProjectionNode](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/column_key_generator.h#L46-L101)
+classes defining the desired path projections.
 
-* The ColumnStoreAccessMethod [invokes the WiredTigerColumnStore](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/columns_access_method.cpp#L318) with the final encoded path-cell (key-value) entries for storage.
+* The [column_cell.h/cpp](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/column_cell.h#L44-L50)
+helpers are leveraged throughout
+[ColumnStoreAccessMethod write methods](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/columns_access_method.cpp#L281)
+to encode ColumnKeyGenerator UnencodedCellView cells into final buffers for storage write.
+
+* The ColumnStoreAccessMethod
+[invokes the WiredTigerColumnStore](https://github.com/mongodb/mongo/blob/r6.3.0-alpha/src/mongo/db/index/columns_access_method.cpp#L318)
+with the final encoded path-cell (key-value) entries for storage.
