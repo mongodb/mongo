@@ -897,18 +897,20 @@ TEST(ColKeyGen, DuplicateFieldTests) {
                    {"", {"", "", kHasDuplicateFields}},
                },
                expectedProjPairs({{{}, {""}}}));
-    // This behaves the same as {a:[{b:[1,3]}, {b:2}]} as far as a.b can tell.
+    // Although no object has "b" as a duplicate field, at least one a.b path goes through a
+    // duplicate "a" field.
     basicTests(__LINE__,
                R"({a: [{b:[1, 3]}], a: [null, {b:[2]}]})",
                {
                    {"a", {"", "", kHasDuplicateFields}},
-                   {"a.b", {"1,3,2", "[{[|1]{[", kIsSparse}},
+                   {"a.b", {"", "", kHasDuplicateFields}},
                },
                expectedProjPairs({{{}, {"a", "a.b"}},
                                   {BSON("c" << false), {"a", "a.b"}},
                                   {BSON("a.b" << true), {"a", "a.b"}},
                                   {BSON("a.b" << false), {"a"}}}));
-    // These tests only have one a.b path.
+    // The a.b path does not marked as duplicate here, because all paths a.b go through only the
+    // first "a" object.
     basicTests(__LINE__,
                R"({a: [{b:1}], a: 2})",
                {
@@ -923,7 +925,7 @@ TEST(ColKeyGen, DuplicateFieldTests) {
                R"({a: 1, a: [{b:2}]})",
                {
                    {"a", {"", "", kHasDuplicateFields}},
-                   {"a.b", {"2", "[", kIsSparse}},
+                   {"a.b", {"", "", kHasDuplicateFields}},
                },
                expectedProjPairs({{{}, {"a", "a.b"}},
                                   {BSON("c" << false), {"a", "a.b"}},
@@ -943,12 +945,25 @@ TEST(ColKeyGen, DuplicateFieldTests) {
                R"({a: [1], a: [{b:2}]})",
                {
                    {"a", {"", "", kHasDuplicateFields}},
-                   {"a.b", {"2", "[", kIsSparse}},
+                   {"a.b", {"", "", kHasDuplicateFields}},
                },
                expectedProjPairs({{{}, {"a", "a.b"}},
                                   {BSON("c" << false), {"a", "a.b"}},
                                   {BSON("a.b" << true), {"a", "a.b"}},
                                   {BSON("a.b" << false), {"a"}}}));
+    basicTests(__LINE__,
+               R"({a: [1], b: [{b: 2}], a: [{b:3}]})",
+               {
+                   {"a", {"", "", kHasDuplicateFields}},
+                   {"a.b", {"", "", kHasDuplicateFields}},
+                   {"a.b", {"", "", kHasDuplicateFields}},
+                   {"b", {"", "[o", kHasSubPath}},
+                   {"b.b", {"2", "["}},
+               },
+               expectedProjPairs({{{}, {"a", "a.b", "b", "b.b"}},
+                                  {BSON("c" << false), {"a", "a.b", "b", "b.b"}},
+                                  {BSON("a.b" << true), {"a", "a.b"}},
+                                  {BSON("b.b" << true), {"b", "b.b"}}}));
     basicTests(__LINE__,
                R"({a: { b: { c: 42 }, b: [ 42 ] } })",
                {{"a", {"", "", kHasSubPath}},
