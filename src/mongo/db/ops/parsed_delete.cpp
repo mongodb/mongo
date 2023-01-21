@@ -146,12 +146,4 @@ std::unique_ptr<CanonicalQuery> ParsedDelete::releaseParsedQuery() {
     return std::move(_canonicalQuery);
 }
 
-void ParsedDelete::setCollator(std::unique_ptr<CollatorInterface> collator) {
-    if (_canonicalQuery) {
-        _canonicalQuery->setCollator(std::move(collator));
-    } else {
-        _expCtx->setCollator(std::move(collator));
-    }
-}
-
 }  // namespace mongo

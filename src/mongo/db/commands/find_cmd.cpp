@@ -83,17 +83,11 @@ std::unique_ptr<FindCommandRequest> parseCmdObjectToFindCommandRequest(Operation
 boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     OperationContext* opCtx,
     const FindCommandRequest& findCommand,
-    const CollectionPtr& collPtr,
     boost::optional<ExplainOptions::Verbosity> verbosity) {
     std::unique_ptr<CollatorInterface> collator;
     if (!findCommand.getCollation().isEmpty()) {
         collator = uassertStatusOK(CollatorFactoryInterface::get(opCtx->getServiceContext())
                                        ->makeFromBSON(findCommand.getCollation()));
-    } else if (collPtr && collPtr->getDefaultCollator()) {
-        // The 'collPtr' will be null for views, but we don't need to worry about views here. The
-        // views will get rewritten into aggregate command and will regenerate the
-        // ExpressionContext.
-        collator = collPtr->getDefaultCollator()->clone();
     }
 
     // Although both 'find' and 'aggregate' commands have an ExpressionContext, some of the data
@@ -262,11 +256,7 @@ public:
 
             // Finish the parsing step by using the FindCommandRequest to create a CanonicalQuery.
             const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
-
-            // The collection may be NULL. If so, getExecutor() should handle it by returning an
-            // execution tree with an EOFStage.
-            const auto& collection = ctx->getCollection();
-            auto expCtx = makeExpressionContext(opCtx, *findCommand, collection, verbosity);
+            auto expCtx = makeExpressionContext(opCtx, *findCommand, verbosity);
             const bool isExplain = true;
             auto cq = uassertStatusOK(
                 CanonicalQuery::canonicalize(opCtx,
@@ -310,6 +300,10 @@ public:
                 }
                 return;
             }
+
+            // The collection may be NULL. If so, getExecutor() should handle it by returning an
+            // execution tree with an EOFStage.
+            const auto& collection = ctx->getCollection();
 
             // Get the execution plan for the query.
             bool permitYield = true;
@@ -444,10 +438,7 @@ public:
 
             // Finish the parsing step by using the FindCommandRequest to create a CanonicalQuery.
             const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
-
-            const auto& collection = ctx->getCollection();
-            auto expCtx =
-                makeExpressionContext(opCtx, *findCommand, collection, boost::none /* verbosity */);
+            auto expCtx = makeExpressionContext(opCtx, *findCommand, boost::none /* verbosity */);
             auto cq = uassertStatusOK(
                 CanonicalQuery::canonicalize(opCtx,
                                              std::move(findCommand),
@@ -477,6 +468,8 @@ public:
                 result->getBodyBuilder().appendElements(aggResult);
                 return;
             }
+
+            const auto& collection = ctx->getCollection();
 
             if (cq->getFindCommandRequest().getReadOnce()) {
                 // The readOnce option causes any storage-layer cursors created during plan

@@ -25,7 +25,6 @@ selector:
   - jstests/core/find_and_modify2.js
   - jstests/core/find_and_modify_server6865.js
   - jstests/core/fts_find_and_modify.js
-  - jstests/core/project_with_collation.js
 
   # Stepdown commands during fsync lock will fail.
   - jstests/core/currentop.js

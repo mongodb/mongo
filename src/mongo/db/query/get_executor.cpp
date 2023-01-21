@@ -1331,13 +1331,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
         expCtx->setIsCappedDelete();
     }
 
-    // If the parsed delete does not have a user-specified collation, set it from the collection
-    // default.
-    if (collection && parsedDelete->getRequest()->getCollation().isEmpty() &&
-        collection->getDefaultCollator()) {
-        parsedDelete->setCollator(collection->getDefaultCollator()->clone());
-    }
-
     if (collection && collection->isCapped()) {
         // This check is duplicated from CollectionImpl::deleteDocument() for two reasons:
         // - Performing a remove on an empty capped collection would not call

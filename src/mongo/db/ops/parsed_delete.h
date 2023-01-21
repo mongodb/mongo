@@ -115,8 +115,6 @@ public:
         return _expCtx;
     }
 
-    void setCollator(std::unique_ptr<CollatorInterface> collator);
-
 private:
     // Transactional context.  Not owned by us.
     OperationContext* _opCtx;
