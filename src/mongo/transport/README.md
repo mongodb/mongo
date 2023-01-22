@@ -52,7 +52,7 @@ messages in serialized-BSON format.
 A Document body builder ([DocSequenceBuilder]) is also defined to help build a 
 reply that can be used to build a response centered around a document.
 
-The various builders supplied in the ReplyBuilderInterface can be appended 
+The various builders supplied in the `ReplyBuilderInterface` can be appended 
 together to generate responses containing document bodies, error codes, and 
 other appropriate response types.
 
