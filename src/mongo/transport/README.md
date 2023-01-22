@@ -16,7 +16,7 @@ that conversation, and the `ServiceEntryPoint` represents the server side.
 
 ### SessionWorkflow
 While `Session` manages only the transfer of `Messages`, the `SessionWorkflow`
-organizes these into a higher layer: the MongoDB protocol. It organizes Session
+organizes these into a higher layer: the MongoDB protocol. It organizes `Session`
 messages into simple request and response sequences represented internally as
 `WorkItem` objects. A `SessionWorkflow` can only have one `WorkItem` in
 progress at a time.
