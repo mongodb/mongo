@@ -1,4 +1,3 @@
-
 # Transport Internals
 ## Ingress Networking
 
