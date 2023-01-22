@@ -1,58 +1,47 @@
 # Transport Internals
 ## Ingress Networking
 
-Ingress networking refers to when a MongoDB process receives incoming requests 
-from a client.
+Ingress networking refers to a server accepting incoming connections
+from MongoDB protocol clients. A client establishes a connection to a
+server, issues commands, and receives responses. A server can be
+configured to accept connections on several network endpoints.
 
-When a client wants to interact with a server, they must first establish a 
-connection. The server listens on a single port for incoming client connections. 
-Once a client connection is received over an ephermeral port, a client session 
-is created out of this connection and commands begin to be processed on a new 
-dedicated thread.
+### Session and ServiceEntryPoint
+Once a client connection is accepted, a `Session` object is created to manage
+it. This in turn is given to the `ServiceEntryPoint` singleton for the server.
+The `ServiceEntryPoint` creates a `SessionWorkflow` for each `Session`, and
+maintains a collection of these. The `Session` represents the client side of
+that conversation, and the `ServiceEntryPoint` represents the server side.
 
-The session takes in commands received from the client and hands them off to a 
-[ServiceEntryPointImpl]. This entry point will spawn threads to perform specific 
-tasks via a [ServiceExecutor], which is then used to initialize a 
-[ServiceStateMachine]. The ServiceStateMachine is a state machine that manages 
-the life cycle of the client connection.
+### SessionWorkflow
+While `Session` manages only the transfer of `Messages`, the `SessionWorkflow`
+organizes these into a higher layer: the MongoDB protocol. It organizes `Session`
+messages into simple request and response sequences represented internally as
+`WorkItem` objects. A `SessionWorkflow` can only have one `WorkItem` in
+progress at a time.
 
-These are the valid state transitions:
-* *Source -> SourceWait -> {ProcessStandard,ProcessExhaust,ProcessMoreToCome}*
-* *ProcessStandard -> SinkStandard -> SinkWait -> Source (standard RPC)*
-* *ProcessExhaust -> SinkMoreToCome-> SinkWait -> ProcessExhaust*
-* *ProcessExhaust -> SinkFinal -> SinkWait -> Source*
-* *ProcessMoreToCome -> Source*
+In the most straightforward case, a `WorkItem` is created by an incoming
+message from the `Session`, which is parsed by `SessionWorkflow` and sent to
+the `ServiceEntryPoint::handleRequest` function. The `WorkItem` is resolved
+by the sending of a response message, and destroyed.
 
-*Source* - When the server is in the state it requests a new message from the 
-network to handle.
+That's the basic case. A few more exotic message transfer styles exist, and
+these are also managed by the `SessionWorkflow`. See the section on message
+[flag bits][wire_protocol_flag_bits] for details.
 
-*SourceWait* - This simply the waiting state for that requested message to arrive. 
-The message that is received will also dictate which mode the *Process* state will 
-be transitioned into.
+A request that can produce multiple responses is an "exhaust" command.
+Internally, after each response is sent out, the `SessionWorkflow` synthesizes
+a new `WorkItem` from the completed one, and submits this synthetic request to
+`ServiceEntryPoint::handleRequest` as it would with a client-initiated request.
+In this way, the `SessionWorkflow` keeps the exhaust command going until one
+of the responses indicates that it is the last one, or the operation is
+interrupted (e.g., due to an error).
 
-*Process* - The message enters through the [ServiceEntryPoint] and will be run 
-through the database in this state. This state may operate in different modes 
-(*Standard*, *Exhaust*, or *MoreToCome*) which dictate the next state transition. The 
-*MoreToCome* mode denotes that another message should be received before any other 
-action, and so the server returns to the *Source* state when *MoreToCome* mode is 
-seen by the *Process* state on the request message. Meanwhile the *Exhaust* mode 
-indicates that multiple messages must be sent back, and so it will continue to 
-send more response messages until this state stops setting *MoreToCome* mode.
+A request may also have the "more to come" flag set, so that it
+produces no responses. This is known as a "fire and forget" command. This
+behavior is also managed by the `SessionWorkflow`.
 
-*SinkWait* - Marks the period when the server waits for the database result to be 
-sent over the network This state is usually preceded by a *Sink* state that 
-follows three modes similar to *Process* (*Standard*, *MoreToCome*, *Final*). *Standard* 
-and *Final* will simply proceed to the *SinkWait* stage to await the database result 
-and then return to *Source*. If the *MoreToCome* mode is enabled, however, the 
-server will go on to *ProcessExhaust* following the standard *SinkWait* state. When 
-this happens the server will not transition back to *Source* until a message is 
-received with *MoreToCome* disabled.
-
-*EndSession* - Denotes the end of a session.
-
-Should an error occur throughout the lifecycle, the state will transition to the 
-*EndSession* state.
-
+### Builders
 In order to return the results to the user whether it be a document or a response 
 code, MongoDB uses the [ReplyBuilderInterface]. This interface helps to build 
 message bodies for replying to commands or even returning documents.
@@ -63,7 +52,7 @@ messages in serialized-BSON format.
 A Document body builder ([DocSequenceBuilder]) is also defined to help build a 
 reply that can be used to build a response centered around a document.
 
-The various builders supplied in the ReplyBuilderInterface can be appended 
+The various builders supplied in the `ReplyBuilderInterface` can be appended 
 together to generate responses containing document bodies, error codes, and 
 other appropriate response types.
 
@@ -71,12 +60,13 @@ This interface acts as a cursor to build a response message to be sent out back
 to the client.
 
 ## See Also
-For details on egress networking, see [this document][egress_networking]. For 
-details on command dispatch, see [this document][command_dispatch]. For details 
-on *NetworkingBaton* and *AsioNetworkingBaton*, see [this document][baton].
+- For details on egress networking, see [Egress Networking][egress_networking].
+- For details on command dispatch, see [Command Dispatch][command_dispatch].
+- For details on *NetworkingBaton* and *AsioNetworkingBaton*, see [Baton][baton].
+- For more detail about `SessionWorkflow`, see WRITING-10398 (internal).
 
 [ServiceExecutor]: service_executor.h
-[ServiceStateMachine]: service_state_machine.h
+[SessionWorkflow]: session_workflow.h
 [ServiceEntryPoint]: service_entry_point.h
 [ServiceEntryPointImpl]: service_entry_point_impl.h
 [ReplyBuilderInterface]: ../rpc/reply_builder_interface.h
@@ -84,4 +74,4 @@ on *NetworkingBaton* and *AsioNetworkingBaton*, see [this document][baton].
 [egress_networking]: ../../../docs/egress_networking.md
 [command_dispatch]: ../../../docs/command_dispatch.md
 [baton]: ../../../docs/baton.md
-
+[wire_protocol_flag_bits]: https://www.mongodb.com/docs/manual/reference/mongodb-wire-protocol/#flag-bits
