@@ -35,7 +35,7 @@ Internally, after each response is sent out, the `SessionWorkflow` synthesizes
 a new `WorkItem` from the completed one, and submits this synthetic request to
 `ServiceEntryPoint::handleRequest` as it would with a client-initiated request.
 In this way, the `SessionWorkflow` keeps the exhaust command going until one
-of the responses indicates that it is the last one.
+of the responses indicates that it is the last one, or the operation is interrupted (e.g., due to an error).
 
 A request may also have the "more to come" flag set, so that it
 produces no responses. This is known as a "fire and forget" command. This
