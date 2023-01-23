@@ -203,59 +203,51 @@ vm::CodeFragment EPrimBinary::compileDirect(CompileCtx& ctx) const {
          *
          * @true1:    lhs1
          *            jumpNothing @end
-         *            jumpTrue @true2
-         *            jump @false
+         *            jumpFalse @false
          * ...
          * @trueN-1:  lhsN-1
          *            jumpNothing @end
-         *            jumpTrue @trueN
-         *            jump @false // this is elided
-         * @false:    push false
-         *            jmp @end
+         *            jumpFalse @false
          * @trueN:    rhs
+         *            jmp @end
+         * @false:    push false
          * @end:
          */
         auto clauses = collectAndClauses();
         invariant(clauses.size() >= 2);
 
-        auto it = clauses.rbegin();
-        auto rhs = (*it)->compileDirect(ctx);
-
+        // Build code fragment for @false
         vm::CodeFragment codeFalseBranch;
         codeFalseBranch.appendConstVal(value::TypeTags::Boolean, value::bitcastFrom<bool>(false));
-        codeFalseBranch.appendJump(rhs.instrs().size());
 
-        int32_t falseBranchOffset = 0;
-        int32_t trueBranchOffset = codeFalseBranch.instrs().size();
+        // Build code fragment for @trueN
+        auto it = clauses.rbegin();
+        auto rhs = (*it)->compileDirect(ctx);
+        rhs.appendJump(codeFalseBranch.instrs().size());
 
-        code.append(std::move(codeFalseBranch), std::move(rhs));
+        int32_t falseBranchOffset = rhs.instrs().size();
+
+        code.append(std::move(rhs), std::move(codeFalseBranch));
 
         ++it;
         invariant(it != clauses.rend());
 
+        // Build code fragment for @trueN-1 to @true1
         for (; it != clauses.rend(); ++it) {
             auto lhs = (*it)->compileDirect(ctx);
 
-            vm::CodeFragment jumpCode;
-            if (falseBranchOffset != 0) {
-                jumpCode.appendJump(falseBranchOffset);
-            }
-
-            vm::CodeFragment jumpTrueCode;
-            jumpTrueCode.appendJumpTrue(jumpCode.instrs().size() + trueBranchOffset);
+            vm::CodeFragment jumpFalseCode;
+            jumpFalseCode.appendJumpFalse(falseBranchOffset);
 
             vm::CodeFragment jumpNothingCode;
-            jumpNothingCode.appendJumpNothing(jumpTrueCode.instrs().size() +
-                                              jumpCode.instrs().size() + code.instrs().size());
+            jumpNothingCode.appendJumpNothing(jumpFalseCode.instrs().size() + code.instrs().size());
 
             vm::CodeFragment tmpCode;
             tmpCode.append(std::move(lhs));
             tmpCode.append(std::move(jumpNothingCode));
-            tmpCode.append(std::move(jumpTrueCode));
-            tmpCode.append(std::move(jumpCode));
+            tmpCode.append(std::move(jumpFalseCode));
 
             falseBranchOffset += tmpCode.instrs().size();
-            trueBranchOffset = 0;
 
             tmpCode.append(std::move(code));
             code = std::move(tmpCode);

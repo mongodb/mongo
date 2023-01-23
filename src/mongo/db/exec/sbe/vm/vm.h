@@ -341,6 +341,7 @@ struct Instruction {
 
         jmp,  // offset is calculated from the end of instruction
         jmpTrue,
+        jmpFalse,
         jmpNothing,
         ret,  // used only by simple local lambdas
         allocStack,
@@ -563,6 +564,8 @@ struct Instruction {
                 return "jmp";
             case jmpTrue:
                 return "jmpTrue";
+            case jmpFalse:
+                return "jmpFalse";
             case jmpNothing:
                 return "jmpNothing";
             case ret:
@@ -876,6 +879,7 @@ public:
     void appendFunction(Builtin f, ArityType arity);
     void appendJump(int jumpOffset);
     void appendJumpTrue(int jumpOffset);
+    void appendJumpFalse(int jumpOffset);
     void appendJumpNothing(int jumpOffset);
     void appendRet();
     void appendAllocStack(uint32_t size);

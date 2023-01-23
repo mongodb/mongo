@@ -157,6 +157,7 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
 
     0,   // jmp
     -1,  // jmpTrue
+    -1,  // jmpFalse
     0,   // jmpNothing
     0,   // ret
     0,   // allocStack does not affect the top of stack
@@ -774,6 +775,17 @@ void CodeFragment::appendJump(int jumpOffset) {
 void CodeFragment::appendJumpTrue(int jumpOffset) {
     Instruction i;
     i.tag = Instruction::jmpTrue;
+    adjustStackSimple(i);
+
+    auto offset = allocateSpace(sizeof(Instruction) + sizeof(jumpOffset));
+
+    offset += writeToMemory(offset, i);
+    offset += writeToMemory(offset, jumpOffset);
+}
+
+void CodeFragment::appendJumpFalse(int jumpOffset) {
+    Instruction i;
+    i.tag = Instruction::jmpFalse;
     adjustStackSimple(i);
 
     auto offset = allocateSpace(sizeof(Instruction) + sizeof(jumpOffset));
@@ -6537,6 +6549,22 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
                 popStack();
 
                 if (tag == value::TypeTags::Boolean && value::bitcastTo<bool>(val)) {
+                    pcPointer += jumpOffset;
+                }
+
+                if (owned) {
+                    value::releaseValue(tag, val);
+                }
+                break;
+            }
+            case Instruction::jmpFalse: {
+                auto jumpOffset = readFromMemory<int>(pcPointer);
+                pcPointer += sizeof(jumpOffset);
+
+                auto [owned, tag, val] = getFromStack(0);
+                popStack();
+
+                if (tag == value::TypeTags::Boolean && !value::bitcastTo<bool>(val)) {
                     pcPointer += jumpOffset;
                 }
 

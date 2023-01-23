@@ -267,6 +267,7 @@ public:
                 }
                 case Instruction::jmp:
                 case Instruction::jmpTrue:
+                case Instruction::jmpFalse:
                 case Instruction::jmpNothing: {
                     auto offset = readFromMemory<int>(pcPointer);
                     pcPointer += sizeof(offset);

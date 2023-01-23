@@ -3,36 +3,30 @@
 (((s1 && s2) && (s3 && s4)) && ((s5 && s6) && (s7 && s8))) 
 
 -- COMPILED EXPRESSION:
-[0x0000-0x00bb]
+[0x0000-0x009d]
 0x0000: pushAccessVal(accessor: <accessor>);
-0x0009: jmpNothing(target: 0x00bb);
-0x000e: jmpTrue(target: 0x0018);
-0x0013: jmp(target: 0x00a3);
-0x0018: pushAccessVal(accessor: <accessor>);
-0x0021: jmpNothing(target: 0x00bb);
-0x0026: jmpTrue(target: 0x0030);
-0x002b: jmp(target: 0x00a3);
-0x0030: pushAccessVal(accessor: <accessor>);
-0x0039: jmpNothing(target: 0x00bb);
-0x003e: jmpTrue(target: 0x0048);
-0x0043: jmp(target: 0x00a3);
-0x0048: pushAccessVal(accessor: <accessor>);
-0x0051: jmpNothing(target: 0x00bb);
-0x0056: jmpTrue(target: 0x0060);
-0x005b: jmp(target: 0x00a3);
-0x0060: pushAccessVal(accessor: <accessor>);
-0x0069: jmpNothing(target: 0x00bb);
-0x006e: jmpTrue(target: 0x0078);
-0x0073: jmp(target: 0x00a3);
-0x0078: pushAccessVal(accessor: <accessor>);
-0x0081: jmpNothing(target: 0x00bb);
-0x0086: jmpTrue(target: 0x0090);
-0x008b: jmp(target: 0x00a3);
-0x0090: pushAccessVal(accessor: <accessor>);
-0x0099: jmpNothing(target: 0x00bb);
-0x009e: jmpTrue(target: 0x00b2);
-0x00a3: pushConstVal(value: false);
-0x00ad: jmp(target: 0x00bb);
-0x00b2: pushAccessVal(accessor: <accessor>);
+0x0009: jmpNothing(target: 0x009d);
+0x000e: jmpFalse(target: 0x0093);
+0x0013: pushAccessVal(accessor: <accessor>);
+0x001c: jmpNothing(target: 0x009d);
+0x0021: jmpFalse(target: 0x0093);
+0x0026: pushAccessVal(accessor: <accessor>);
+0x002f: jmpNothing(target: 0x009d);
+0x0034: jmpFalse(target: 0x0093);
+0x0039: pushAccessVal(accessor: <accessor>);
+0x0042: jmpNothing(target: 0x009d);
+0x0047: jmpFalse(target: 0x0093);
+0x004c: pushAccessVal(accessor: <accessor>);
+0x0055: jmpNothing(target: 0x009d);
+0x005a: jmpFalse(target: 0x0093);
+0x005f: pushAccessVal(accessor: <accessor>);
+0x0068: jmpNothing(target: 0x009d);
+0x006d: jmpFalse(target: 0x0093);
+0x0072: pushAccessVal(accessor: <accessor>);
+0x007b: jmpNothing(target: 0x009d);
+0x0080: jmpFalse(target: 0x0093);
+0x0085: pushAccessVal(accessor: <accessor>);
+0x008e: jmp(target: 0x009d);
+0x0093: pushConstVal(value: false);
 
 
