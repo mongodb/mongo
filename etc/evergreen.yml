@@ -2765,7 +2765,7 @@ buildvariants:
   # - name: unittest_shell_hang_analyzer_gen # Not passing
   - name: cqf
   - name: cqf_disabled_pipeline_opt
-  # - name: cqf_passthrough # Not passing
+  - name: cqf_passthrough
   - name: cqf_parallel
   # - name: .causally_consistent !.sharding # Not passing
   # - name: .change_streams # Not passing
@@ -2833,8 +2833,8 @@ buildvariants:
   # - name: .read_only # Not passing, see above
   # - name: .rollbackfuzzer # Not passing
   - name: sasl
-  # - name: search # Not passing
-  # - name: search_auth # Not passing
+  - name: search
+  - name: search_auth
   - name: search_ssl
   - name: session_jscore_passthrough
   # - name: .sharding .jscore !.wo_snapshot !.multi_stmt # Not passing
@@ -2876,7 +2876,6 @@ buildvariants:
   - name: .auth
   - name: resmoke_end2end_tests
   - name: unittest_shell_hang_analyzer_gen
-  - name: cqf_passthrough
   - name: .causally_consistent !.sharding
   - name: .change_streams
   - name: .change_stream_fuzzer
@@ -2926,8 +2925,6 @@ buildvariants:
     - rhel80-medium
   - name: .read_only
   - name: .rollbackfuzzer
-  - name: search
-  - name: search_auth
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: sharding_api_version_jscore_passthrough_gen
   - name: .sharding .txns
