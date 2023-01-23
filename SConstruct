@@ -3618,6 +3618,9 @@ def doConfigure(myenv):
         if get_option('cxx-std') == "20":
             myenv.AddToCXXFLAGSIfSupported('-Wno-deprecated')
 
+        # TODO SERVER-58675 - Remove this suppression after abseil is upgraded
+        myenv.AddToCXXFLAGSIfSupported("-Wno-deprecated-builtins")
+
         # Check if we can set "-Wnon-virtual-dtor" when "-Werror" is set. The only time we can't set it is on
         # clang 3.4, where a class with virtual function(s) and a non-virtual destructor throws a warning when
         # it shouldn't.

@@ -230,7 +230,7 @@ std::pair<SlotId /* keyValueSlot */, std::unique_ptr<sbe::PlanStage>> buildForei
 
         SlotId getFieldSlot = slotIdGenerator.generate();
         currentStage = makeProjectStage(
-            move(currentStage), nodeId, getFieldSlot, std::move(getFieldFromObject));
+            std::move(currentStage), nodeId, getFieldSlot, std::move(getFieldFromObject));
         keyValueSlot = getFieldSlot;
 
         // For the terminal array we will do the extra work of adding the array itself to the stream
