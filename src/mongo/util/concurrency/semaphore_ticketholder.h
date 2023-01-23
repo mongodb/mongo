@@ -53,10 +53,10 @@ public:
 
     int available() const override final;
 
-    int queued() const override final {
+    int64_t queued() const override final {
         auto removed = _semaphoreStats.totalRemovedQueue.loadRelaxed();
         auto added = _semaphoreStats.totalAddedQueue.loadRelaxed();
-        return std::max(static_cast<int>(added - removed), 0);
+        return std::max(added - removed, (int64_t)0);
     };
 
 private:

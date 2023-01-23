@@ -63,8 +63,8 @@ public:
         return _ticketsAvailable.load();
     };
 
-    int queued() const override final {
-        int result = 0;
+    int64_t queued() const override final {
+        int64_t result = 0;
         for (const auto& queue : _brokers) {
             result += queue.waitingThreadsRelaxed();
         }
@@ -75,15 +75,20 @@ public:
      * Number of times low priority operations are expedited for ticket admission over normal
      * priority operations.
      */
-    std::int64_t expedited() const {
+    int64_t expedited() const {
         return _expeditedLowPriorityAdmissions.loadRelaxed();
     }
 
     /**
      * Returns the number of times the low priority queue is bypassed in favor of dequeuing from the
      * normal priority queue when a ticket becomes available.
+     *
+     * Note: This method implicitly casts a uint64_t to an int64_t. In the case where the
+     * '_lowPriorityBypassCount' is > int64_t::Max(), it may return misleading numbers due to
+     * overflow. Since this method is strictly used for FTDC data reports, but not used for internal
+     * computations, this behavior is acceptable.
      */
-    std::int64_t bypassed() const {
+    int64_t bypassed() const {
         return _lowPriorityBypassCount.loadRelaxed();
     };
 
@@ -139,7 +144,6 @@ private:
         return _brokers[_enumToInt(queueType)];
     }
 
-
     static QueueType _getQueueType(const AdmissionContext* admCtx) {
         auto priority = admCtx->getPriority();
         switch (priority) {
@@ -168,19 +172,19 @@ private:
      *
      * Updates must be done under the _growthMutex.
      */
-    int _lowPriorityBypassThreshold;
+    int64_t _lowPriorityBypassThreshold;
 
     /**
      * Counts the number of times normal operations are dequeued over operations queued in the low
      * priority queue. We explicitly use an unsigned type here because rollover is desired.
      */
-    AtomicWord<std::uint64_t> _lowPriorityBypassCount{0};
+    AtomicWord<uint64_t> _lowPriorityBypassCount{0};
 
     /**
      * Number of times ticket admission is expedited for low priority operations.
      */
-    AtomicWord<std::int64_t> _expeditedLowPriorityAdmissions{0};
-    AtomicWord<int> _ticketsAvailable;
+    AtomicWord<int64_t> _expeditedLowPriorityAdmissions{0};
+    AtomicWord<int64_t> _ticketsAvailable;
     ServiceContext* _serviceContext;
 };
 }  // namespace mongo

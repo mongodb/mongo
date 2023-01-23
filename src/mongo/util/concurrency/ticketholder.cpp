@@ -154,12 +154,12 @@ void TicketHolderWithQueueingStats::_appendCommonQueueImplStats(BSONObjBuilder& 
 
     b.append("addedToQueue", added);
     b.append("removedFromQueue", removed);
-    b.append("queueLength", std::max(static_cast<int>(added - removed), 0));
+    b.append("queueLength", std::max(added - removed, (int64_t)0));
 
     auto finished = stats.totalFinishedProcessing.loadRelaxed();
     auto started = stats.totalStartedProcessing.loadRelaxed();
     b.append("startedProcessing", started);
-    b.append("processing", std::max(static_cast<int>(started - finished), 0));
+    b.append("processing", std::max(started - finished, (int64_t)0));
     b.append("finishedProcessing", finished);
     b.append("totalTimeProcessingMicros", stats.totalTimeProcessingMicros.loadRelaxed());
     b.append("canceled", stats.totalCanceled.loadRelaxed());
