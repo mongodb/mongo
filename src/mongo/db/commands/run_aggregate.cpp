@@ -1119,7 +1119,7 @@ Status runAggregate(OperationContext* opCtx,
         curOp->debug().setPlanSummaryMetrics(stats);
         curOp->debug().nreturned = stats.nReturned;
 
-        telemetry::recordExecution(opCtx, curOp->debug(), didDoFLERewrite);
+        telemetry::recordExecution(opCtx, didDoFLERewrite);
 
         // For an optimized away pipeline, signal the cache that a query operation has completed.
         // For normal pipelines this is done in DocumentSourceCursor.

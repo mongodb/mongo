@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include <boost/optional.hpp>
 #include <functional>
 
@@ -446,7 +447,8 @@ private:
     // requests.
     boost::optional<uint32_t> _planCacheKey;
     boost::optional<uint32_t> _queryHash;
-
+    // The shape of the original query serialized with readConcern, application name, and namespace.
+    BSONObj _telemetryStoreKey;
     // The client OperationKey associated with this cursor.
     boost::optional<OperationKey> _opKey;
 

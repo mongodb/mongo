@@ -46,7 +46,7 @@ PlanExecutorPipeline::PlanExecutorPipeline(boost::intrusive_ptr<ExpressionContex
                                            ResumableScanType resumableScanType)
     : _expCtx(std::move(expCtx)),
       _pipeline(std::move(pipeline)),
-      _planExplainer{_pipeline.get(), _expCtx->opCtx->getTelemetryKey()},
+      _planExplainer{_pipeline.get()},
       _resumableScanType{resumableScanType} {
     // Pipeline plan executors must always have an ExpressionContext.
     invariant(_expCtx);

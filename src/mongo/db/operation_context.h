@@ -391,17 +391,6 @@ public:
         return _elapsedTime.elapsed();
     }
 
-    BSONObj getTelemetryKey() const {
-        return _originalQueryBSON;
-    }
-
-    void storeQueryBSON(BSONObj originalBSON) {
-        if (_originalQueryBSON.isEmpty()) {
-            _originalQueryBSON = originalBSON.copy();
-        }
-    }
-
-
     /**
      * Sets the deadline for this operation to the given point in time.
      *
@@ -807,7 +796,6 @@ private:
     // Timer counting the elapsed time since the construction of this OperationContext.
     Timer _elapsedTime;
 
-    BSONObj _originalQueryBSON;
     bool _writesAreReplicated = true;
     bool _shouldIncrementLatencyStats = true;
     bool _inMultiDocumentTransaction = false;

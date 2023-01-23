@@ -94,6 +94,7 @@ ClientCursor::ClientCursor(ClientCursorParams params,
       _planSummary(_exec->getPlanExplainer().getPlanSummary()),
       _planCacheKey(CurOp::get(operationUsingCursor)->debug().planCacheKey),
       _queryHash(CurOp::get(operationUsingCursor)->debug().queryHash),
+      _telemetryStoreKey(CurOp::get(operationUsingCursor)->debug().telemetryStoreKey),
       _opKey(operationUsingCursor->getOperationKey()) {
     invariant(_exec);
     invariant(_operationUsingCursor);

@@ -134,7 +134,6 @@ CandidatePlans CachedSolutionPlanner::plan(
         {},    /* rejectedCandidates */
         false, /* isMultiPlan */
         true,  /* isFromPlanCache */
-        _opCtx->getTelemetryKey(),
         candidate.data.debugInfo
             ? std::make_unique<plan_cache_debug_info::DebugInfoSBE>(*candidate.data.debugInfo)
             : nullptr);

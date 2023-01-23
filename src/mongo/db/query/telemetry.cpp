@@ -364,6 +364,20 @@ const BSONObj& TelemetryMetrics::redactKey(const BSONObj& key, bool redactFieldN
     return *_redactedKey;
 }
 
+// The originating command/query does not persist through the end of query execution. In order to
+// pair the telemetry metrics that are collected at the end of execution with the original query, it
+// is necessary to register the original query during planning and persist it after
+// execution.
+
+// During planning, registerAggRequest or registerFindRequest are called to serialize the query
+// shape and context (together, the telemetry context) and save it to OpDebug. Moreover, as query
+// execution may span more than one request/operation and OpDebug does not persist through cursor
+// iteration, it is necessary to communicate the telemetry context across operations. In this way,
+// the telemetry context is registered to the cursor, so upon getMore() calls, the cursor manager
+// passes the telemetry key from the pinned cursor to the new OpDebug.
+
+// Once query execution is complete, the telemetry context is grabbed from OpDebug, a telemetry key
+// is generated from this and metrics are paired to this key in the telemetry store.
 void registerAggRequest(const AggregateCommandRequest& request, OperationContext* opCtx) {
 
     if (!isTelemetryEnabled()) {
@@ -397,23 +411,10 @@ void registerAggRequest(const AggregateCommandRequest& request, OperationContext
     } catch (ExceptionFor<ErrorCodes::EncounteredFLEPayloadWhileRedacting>&) {
         return;
     }
-    opCtx->storeQueryBSON(telemetryKey.obj());
-    // Management of the telemetry key works as follows.
-    //
-    // Query execution potentially spans more than one request/operation. For this reason, we need a
-    // mechanism to communicate the context (the telemetry key) across operations on the same query.
-    // In order to accomplish this, we store the telemetry key in the plan explainer which exists
-    // for the entire life of the query.
-    //
-    // - Telemetry key must be stored in the OperationContext before the PlanExecutor is created.
-    //   This is accomplished by calling registerXXXRequest() in run_aggregate.cpp and
-    //   find_cmd.cpp before the PlanExecutor is created.
-    //
-    // - During collectTelemetry(), the telemetry key is retrieved from the OperationContext to
-    //   write metrics into the telemetry store. This is done at the end of the operation.
-    //
-    // - Upon getMore() calls, registerGetMoreRequest() copy the telemetry key from the
-    //   PlanExplainer to the OperationContext.
+
+    CurOp::get(opCtx)->debug().telemetryStoreKey = telemetryKey.obj();
+    // Mark this request as one that telemetry machinery has decided to collect metrics from.
+    CurOp::get(opCtx)->debug().shouldRecordTelemetry = true;
 }
 
 void registerFindRequest(const FindCommandRequest& request,
@@ -451,18 +452,24 @@ void registerFindRequest(const FindCommandRequest& request,
     } catch (ExceptionFor<ErrorCodes::EncounteredFLEPayloadWhileRedacting>&) {
         return;
     }
-    opCtx->storeQueryBSON(telemetryKey.obj());
+    CurOp::get(opCtx)->debug().telemetryStoreKey = telemetryKey.obj();
+    CurOp::get(opCtx)->debug().shouldRecordTelemetry = true;
 }
 
-void registerGetMoreRequest(OperationContext* opCtx, const PlanExplainer& planExplainer) {
+void registerGetMoreRequest(OperationContext* opCtx) {
     if (!isTelemetryEnabled()) {
         return;
     }
-    auto&& telemetryKey = planExplainer.getTelemetryKey();
-    if (telemetryKey.isEmpty() || !shouldCollect(opCtx->getServiceContext())) {
+
+    // Rate limiting is important in all cases as it limits the amount of CPU telemetry uses to
+    // prevent degrading query throughput. This is essential in the case of a large find
+    // query with a batchsize of 1, where collecting metrics on every getMore would quickly impact
+    // the number of queries the system can process per second (query throughput). This is why not
+    // only are originating queries rate limited but also their subsequent getMore operations.
+    if (!shouldCollect(opCtx->getServiceContext())) {
         return;
     }
-    opCtx->storeQueryBSON(telemetryKey);
+    CurOp::get(opCtx)->debug().shouldRecordTelemetry = true;
 }
 
 TelemetryStore& getTelemetryStore(OperationContext* opCtx) {
@@ -470,7 +477,7 @@ TelemetryStore& getTelemetryStore(OperationContext* opCtx) {
     return telemetryStoreDecoration(opCtx->getServiceContext())->getTelemetryStore();
 }
 
-void recordExecution(OperationContext* opCtx, const OpDebug& opDebug, bool isFle) {
+void recordExecution(OperationContext* opCtx, bool isFle) {
 
     if (!isTelemetryEnabled()) {
         return;
@@ -478,21 +485,24 @@ void recordExecution(OperationContext* opCtx, const OpDebug& opDebug, bool isFle
     if (isFle) {
         return;
     }
-    auto&& telemetryKey = opCtx->getTelemetryKey();
-    if (telemetryKey.isEmpty()) {
+    // Confirms that this is an operation the telemetry machinery has decided to collect metrics
+    // from.
+    auto&& opDebug = CurOp::get(opCtx)->debug();
+    if (!opDebug.shouldRecordTelemetry) {
         return;
     }
-    auto&& metrics = LockedMetrics::get(opCtx, telemetryKey);
+    auto&& metrics = LockedMetrics::get(opCtx, opDebug.telemetryStoreKey);
     metrics->execCount++;
     metrics->queryOptMicros.aggregate(opDebug.planningTime.count());
 }
 
 void collectTelemetry(OperationContext* opCtx, const OpDebug& opDebug) {
-    auto&& telemetryKey = opCtx->getTelemetryKey();
-    if (telemetryKey.isEmpty()) {
+    // Confirms that this is an operation the telemetry machinery has decided to collect metrics
+    // from.
+    if (!opDebug.shouldRecordTelemetry) {
         return;
     }
-    auto&& metrics = LockedMetrics::get(opCtx, telemetryKey);
+    auto&& metrics = LockedMetrics::get(opCtx, opDebug.telemetryStoreKey);
     metrics->docsReturned.aggregate(opDebug.nreturned);
     metrics->docsScanned.aggregate(opDebug.additiveMetrics.docsExamined.value_or(0));
     metrics->keysScanned.aggregate(opDebug.additiveMetrics.keysExamined.value_or(0));

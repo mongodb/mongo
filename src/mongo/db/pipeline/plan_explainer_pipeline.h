@@ -39,8 +39,7 @@ namespace mongo {
  */
 class PlanExplainerPipeline final : public PlanExplainer {
 public:
-    PlanExplainerPipeline(const Pipeline* pipeline, BSONObj telemetryKey)
-        : PlanExplainer{telemetryKey}, _pipeline{pipeline} {}
+    PlanExplainerPipeline(const Pipeline* pipeline) : _pipeline{pipeline} {}
 
     bool isMultiPlan() const final {
         return false;

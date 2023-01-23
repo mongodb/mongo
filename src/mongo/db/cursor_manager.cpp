@@ -42,6 +42,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/kill_sessions_common.h"
@@ -223,6 +224,9 @@ StatusWith<ClientCursorPin> CursorManager::pinCursor(
     // Pass along the original queryHash and planCacheKey for slow query logging.
     CurOp::get(opCtx)->debug().queryHash = cursor->_queryHash;
     CurOp::get(opCtx)->debug().planCacheKey = cursor->_planCacheKey;
+
+    // Pass along telemetry context so it is retrievable after query execution for storing metrics.
+    CurOp::get(opCtx)->debug().telemetryStoreKey = cursor->_telemetryStoreKey;
 
     cursor->_operationUsingCursor = opCtx;
 

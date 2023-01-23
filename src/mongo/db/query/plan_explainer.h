@@ -59,14 +59,10 @@ public:
     using PlanStatsDetails = std::pair<BSONObj, boost::optional<PlanSummaryStats>>;
 
     PlanExplainer() {}
-    PlanExplainer(const QuerySolution* solution, BSONObj telemetryKey)
+    PlanExplainer(const QuerySolution* solution)
         : _enumeratorExplainInfo{solution ? solution->_enumeratorExplainInfo
-                                          : PlanEnumeratorExplainInfo{}},
-          _telemetryKey{telemetryKey} {}
-    PlanExplainer(BSONObj telemetryKey) : _telemetryKey{telemetryKey} {}
+                                          : PlanEnumeratorExplainInfo{}} {}
     PlanExplainer(const PlanEnumeratorExplainInfo& info) : _enumeratorExplainInfo{info} {}
-    PlanExplainer(const PlanEnumeratorExplainInfo& info, BSONObj telemetryKey)
-        : _enumeratorExplainInfo{info}, _telemetryKey{telemetryKey} {}
 
     virtual ~PlanExplainer() = default;
 
@@ -146,12 +142,7 @@ public:
         _enumeratorExplainInfo.merge(other);
     }
 
-    BSONObj getTelemetryKey() const {
-        return _telemetryKey;
-    }
-
 protected:
     PlanEnumeratorExplainInfo _enumeratorExplainInfo;
-    BSONObj _telemetryKey;
 };
 }  // namespace mongo

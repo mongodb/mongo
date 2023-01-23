@@ -181,7 +181,6 @@ void CommandHelpers::runCommandInvocation(OperationContext* opCtx,
                                           CommandInvocation* invocation,
                                           rpc::ReplyBuilderInterface* response) {
     auto&& hooks = getCommandInvocationHooks(opCtx->getServiceContext());
-
     if (hooks) {
         hooks->onBeforeRun(opCtx, request, invocation);
     }

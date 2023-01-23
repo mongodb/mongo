@@ -50,9 +50,8 @@ public:
                      std::vector<sbe::plan_ranker::CandidatePlan> rejectedCandidates,
                      bool isMultiPlan,
                      bool isCachedPlan,
-                     BSONObj telemetryKey,
                      std::shared_ptr<const plan_cache_debug_info::DebugInfoSBE> debugInfo)
-        : PlanExplainer{solution, telemetryKey},
+        : PlanExplainer{solution},
           _root{root},
           _rootData{data},
           _solution{solution},

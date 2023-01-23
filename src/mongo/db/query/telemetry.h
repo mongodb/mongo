@@ -191,9 +191,13 @@ void registerFindRequest(const FindCommandRequest& request,
                          const NamespaceString& collection,
                          OperationContext* opCtx);
 
-void registerGetMoreRequest(OperationContext* opCtx, const PlanExplainer& planExplainer);
+void registerGetMoreRequest(OperationContext* opCtx);
 
-void recordExecution(OperationContext* opCtx, const OpDebug& opDebug, bool isFle);
+// recordExecution is called between registering the query and collecting metrics post execution.
+// Its purpose is to track the number of times a given query shape has been ran. The execution count
+// is incremented outside of registering the command because the originating command could be an
+// explain request and therefore the query is not actually executed.
+void recordExecution(OperationContext* opCtx, bool isFle);
 
 /**
  * Collect telemetry for the operation identified by `key`. The `isExec` flag should be set if it's

@@ -125,7 +125,6 @@ PlanExecutorSBE::PlanExecutorSBE(OperationContext* opCtx,
                                                   std::move(candidates.plans),
                                                   isMultiPlan,
                                                   isCachedCandidate,
-                                                  opCtx->getTelemetryKey(),
                                                   _rootData.debugInfo);
 }
 

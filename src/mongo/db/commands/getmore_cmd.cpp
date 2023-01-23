@@ -565,7 +565,7 @@ public:
             exec->reattachToOperationContext(opCtx);
             exec->restoreState(readLock ? &readLock->getCollection() : nullptr);
 
-            telemetry::registerGetMoreRequest(opCtx, exec->getPlanExplainer());
+            telemetry::registerGetMoreRequest(opCtx);
 
             auto planSummary = exec->getPlanExplainer().getPlanSummary();
             {

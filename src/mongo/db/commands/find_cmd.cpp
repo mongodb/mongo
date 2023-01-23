@@ -738,7 +738,7 @@ public:
             query_request_helper::validateCursorResponse(result->getBodyBuilder().asTempObj(),
                                                          nss.tenantId());
 
-            telemetry::recordExecution(opCtx, CurOp::get(opCtx)->debug(), _didDoFLERewrite);
+            telemetry::recordExecution(opCtx, _didDoFLERewrite);
         }
 
         void appendMirrorableRequest(BSONObjBuilder* bob) const override {

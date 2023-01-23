@@ -124,7 +124,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/clustered_collection_options',
         '$BUILD_DIR/mongo/db/catalog/collection_crud',
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
-        '$BUILD_DIR/mongo/db/curop',
+        '$BUILD_DIR/mongo/db/query/op_metrics',
         '$BUILD_DIR/mongo/db/session/logical_session_id_helpers',
         '$BUILD_DIR/mongo/db/storage/key_string',
         '$BUILD_DIR/mongo/db/transaction/transaction',
@@ -195,48 +195,13 @@ env.Library(
 )
 
 env.Library(
-    target='curop',
-    source=[
-        'curop.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
-        '$BUILD_DIR/mongo/db/commands',
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-        '$BUILD_DIR/mongo/db/query/command_request_response',
-        '$BUILD_DIR/mongo/db/query/telemetry',
-        '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/db/stats/timer_stats',
-        '$BUILD_DIR/mongo/db/storage/storage_engine_parameters',
-        '$BUILD_DIR/mongo/rpc/client_metadata',
-        '$BUILD_DIR/mongo/transport/service_executor',
-        '$BUILD_DIR/mongo/util/diagnostic_info'
-        if get_option('use-diagnostic-latches') == 'on' else [],
-        '$BUILD_DIR/mongo/util/fail_point',
-        '$BUILD_DIR/mongo/util/net/network',
-        '$BUILD_DIR/mongo/util/progress_meter',
-        'generic_cursor',
-        'profile_filter',
-        'server_options',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/util/concurrency/admission_context',
-        '$BUILD_DIR/mongo/util/namespace_string_database_name_util',
-        'auth/auth',
-        'auth/user_acquisition_stats',
-        'prepare_conflict_tracker',
-        'stats/resource_consumption_metrics',
-    ],
-)
-
-env.Library(
     target='curop_failpoint_helpers',
     source=[
         'curop_failpoint_helpers.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/query/op_metrics',
         '$BUILD_DIR/mongo/util/fail_point',
-        'curop',
     ],
 )
 
@@ -616,10 +581,10 @@ env.Library(
         '$BUILD_DIR/mongo/db/catalog/clustered_collection_options',
         '$BUILD_DIR/mongo/db/catalog/collection_crud',
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
+        '$BUILD_DIR/mongo/db/query/op_metrics',
         '$BUILD_DIR/mongo/db/repl/storage_interface',
         'change_stream_options_manager',
         'change_stream_serverless_helpers',
-        'curop',
         'query_exec',
         'record_id_helpers',
         'server_base',
@@ -888,7 +853,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_uuid_mismatch_info',
         '$BUILD_DIR/mongo/db/catalog/local_oplog_info',
-        'curop',
+        '$BUILD_DIR/mongo/db/query/op_metrics',
         'multitenancy',
         'server_base',
         'storage/capped_snapshots',
@@ -996,7 +961,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/clientdriver_minimal',
-        'curop',
+        '$BUILD_DIR/mongo/db/query/op_metrics',
         'not_primary_error_tracker',
         'ops/write_ops_parsers',
     ],
@@ -1043,8 +1008,8 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/query/op_metrics',
         '$BUILD_DIR/mongo/transport/service_entry_point',
-        'curop',
         'curop_metrics',
         'rw_concern_d',
         'storage/storage_engine_common',
@@ -1134,11 +1099,11 @@ env.Library(
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/catalog/collection_catalog',
         '$BUILD_DIR/mongo/db/catalog/index_build_entry_idl',
+        '$BUILD_DIR/mongo/db/query/op_metrics',
         '$BUILD_DIR/mongo/db/repl/tenant_migration_access_blocker',
         '$BUILD_DIR/mongo/db/s/forwardable_operation_metadata',
         '$BUILD_DIR/mongo/db/storage/two_phase_index_build_knobs_idl',
         '$BUILD_DIR/mongo/executor/task_executor_interface',
-        'curop',
         'index_build_entry_helpers',
         'resumable_index_builds_idl',
         'shard_role',
@@ -1232,8 +1197,8 @@ env.Library(
         "curop_metrics.cpp",
     ],
     LIBDEPS_PRIVATE=[
+        "$BUILD_DIR/mongo/db/query/op_metrics",
         "commands/server_status_core",
-        "curop",
     ],
 )
 
@@ -1258,7 +1223,7 @@ env.Library(
         'write_concern.cpp',
     ],
     LIBDEPS=[
-        'curop',
+        '$BUILD_DIR/mongo/db/query/op_metrics',
         'read_write_concern_defaults',
         'repl/read_concern_args',
         'repl/speculative_majority_read_info',
@@ -1283,9 +1248,9 @@ env.Library(
         'read_concern_mongod.idl',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/query/op_metrics',
         '$BUILD_DIR/mongo/s/grid',
         'concurrency/exception_util',
-        'curop',
         'repl/repl_coordinator_interface',
         'repl/speculative_majority_read_info',
         'repl/tenant_migration_access_blocker',
@@ -1491,6 +1456,7 @@ env.Library(
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/db/auth/auth_checks',
+        '$BUILD_DIR/mongo/db/query/op_metrics',
         '$BUILD_DIR/mongo/scripting/scripting',
         '$BUILD_DIR/mongo/util/background_job',
         '$BUILD_DIR/mongo/util/elapsed_tracker',
@@ -1502,7 +1468,6 @@ env.Library(
         'catalog/index_catalog',
         'catalog/index_catalog_entry',
         'commands',
-        'curop',
         'curop_failpoint_helpers',
         'cursor_server_params',
         'dbdirectclient',
@@ -1764,9 +1729,9 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/pipeline/lite_parsed_document_source',
+        '$BUILD_DIR/mongo/db/query/op_metrics',
         '$BUILD_DIR/mongo/db/session/logical_session_id',
         'commands',
-        'curop',
     ],
 )
 
@@ -2225,6 +2190,7 @@ env.Library(
     LIBDEPS_PRIVATE=[
         # NOTE: If you need to add a static or mongo initializer to mongod startup,
         # please add that library here, as a private library dependency.
+        '$BUILD_DIR/mongo/db/query/op_metrics',
         '$BUILD_DIR/mongo/executor/async_rpc_error_info',
         '$BUILD_DIR/mongo/executor/network_interface_factory',
         '$BUILD_DIR/mongo/rpc/rpc',
@@ -2262,7 +2228,6 @@ env.Library(
         'common',
         'concurrency/flow_control_ticketholder',
         'concurrency/lock_manager',
-        'curop',
         'curop_metrics',
         'dbdirectclient',
         'dbhelpers',
@@ -2615,6 +2580,7 @@ if wiredtiger:
             '$BUILD_DIR/mongo/db/ops/write_ops',
             '$BUILD_DIR/mongo/db/pipeline/change_stream_expired_pre_image_remover',
             '$BUILD_DIR/mongo/db/query/common_query_enums_and_helpers',
+            '$BUILD_DIR/mongo/db/query/op_metrics',
             '$BUILD_DIR/mongo/db/query/query_test_service_context',
             '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
             '$BUILD_DIR/mongo/db/repl/repl_server_parameters',
@@ -2643,7 +2609,6 @@ if wiredtiger:
             'collection_index_usage_tracker',
             'commands',
             'common',
-            'curop',
             'dbmessage',
             'fle_crud',
             'fle_mocks',

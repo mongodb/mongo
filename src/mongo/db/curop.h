@@ -266,6 +266,12 @@ public:
     boost::optional<uint32_t> planCacheKey;
     // The hash of the query's "stable" key. This represents the query's shape.
     boost::optional<uint32_t> queryHash;
+    // The shape of the original query serialized with readConcern, application name, and namespace.
+    BSONObj telemetryStoreKey;
+    // Tracks if an operation has been rate limited, or has been selected to be tracked for
+    // telemetry metrics. collectTelemetry checks this boolean before including the metrics
+    // associated with this operation (eg a getMore) in the overall metrics for the original query.
+    bool shouldRecordTelemetry{false};
 
     // The query framework that this operation used. Will be unknown for non query operations.
     PlanExecutor::QueryFramework queryFramework{PlanExecutor::QueryFramework::kUnknown};
