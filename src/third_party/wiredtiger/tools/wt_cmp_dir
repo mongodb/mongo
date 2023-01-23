@@ -1,0 +1,152 @@
+#!/bin/bash
+#
+# Public Domain 2014-present MongoDB, Inc.
+# Public Domain 2008-2014 WiredTiger, Inc.
+#
+# This is free and unencumbered software released into the public domain.
+#
+# Anyone is free to copy, modify, publish, use, compile, sell, or
+# distribute this software, either in source code form or as a compiled
+# binary, for any purpose, commercial or non-commercial, and by any
+# means.
+#
+# In jurisdictions that recognize copyright laws, the author or authors
+# of this software dedicate any and all copyright interest in the
+# software to the public domain. We make this dedication for the benefit
+# of the public at large and to the detriment of our heirs and
+# successors. We intend this dedication to be an overt act of
+# relinquishment in perpetuity of all present and future rights to this
+# software under copyright law.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+# OTHER DEALINGS IN THE SOFTWARE.
+
+# Compare content in WT home directories.
+
+usage_exit() {
+    echo "Usage: wt_cmp_dir [ -t timestamp ] dir1 [ -t timestamp  ] dir2"
+    exit 1
+}
+
+# Find the 'wt' utility, and set the global wt variable.
+wt=
+init_wt_utility() {
+    dir=$(pwd)
+    lastdir=
+    while [ "$dir" != "$lastdir" -a ! \( -x "$dir/wt" -a -f "$dir/wt" \) ]; do
+        lastdir="$dir"
+        dir=$(dirname $dir)
+    done
+    wt="$dir/wt"
+    if [ ! -x "$wt" ]; then
+        echo "wt_cmp_dir: cannot find working wt utility, must run within build directory" >&2
+        exit 1
+    fi
+}
+
+wtfiles() {
+    local tmpa=/tmp/wcd$$a
+    local tmpb=/tmp/wcd$$b
+
+    #TODO: check for corruption
+    $wt -h "$1" list >$tmpa 2>$tmpb
+    if [ "$?" != 0 -o -s $tmpb ]; then
+        echo failed command: $wt -h "$1" list >&2
+        cat $tmpb
+        rm -f $tmpa $tmpb
+        exit 1
+    fi
+    # The uris are a simple list, for example: "colgroup:table1 file:table1.wt table:table1"
+    uris=$(cat $tmpa)
+    rm -f $tmpa $tmpb
+    #echo INITIAL URIS $uris >&2
+    results=""
+    for uri in $uris; do
+        case "$uri" in
+            file:* )
+                # When a table is created in WT, both a table: and file: are
+                # created.  If there is is matching table: entry for this file,
+                # skip this entry. But if there's no matching table, then it is
+                # not refererenced elsewhere, and we want it in our list to compare.
+                base=$(echo "$uri" | sed -e 's/file://' -e 's/.wt//')
+                if ! echo "$uris" | grep "table:$base" > /dev/null; then
+                    results="$results $uri"
+                fi
+            ;;
+            table:* )
+                results="$results $uri"
+                ;;
+        esac
+    done
+    #echo EDITED URIS $results >&2
+    echo $results
+}
+
+timestamp_opt1=
+timestamp_opt2=
+
+while [ "$#" -gt 2 ]; do
+    if [ "$1" = '-t' ]; then
+        # By default, the first -t argument, if given
+        # applies to both directories
+        timestamp_opt1="-t $2"
+        timestamp_opt2="-t $2"
+        shift; shift
+    else
+        break  # done with flags
+    fi
+done
+if [ "$#" -lt 2 ]; then
+    usage_exit
+fi
+
+init_wt_utility
+
+# The next argument is the first directory
+dir1="$1"
+files1=$(wtfiles "$dir1")
+shift
+
+# We can still have another -t argument to apply to the
+# second directory.
+
+if [ "$#" -gt 2 -a "$1" = '-t' ]; then
+    timestamp_opt2="-t $2"
+    shift; shift
+fi
+
+if [ "$#" != 1 ]; then
+    usage_exit
+fi
+
+# The next argument is the second directory
+dir2="$1"
+files2=$(wtfiles "$dir2")
+
+# If the home directories have different files, give up.
+# In the future we might consider relaxing this, reporting missing files,
+# and doing the compare for common files, in the spirit of diff -r.
+
+if [ "$files1" != "$files2" ]; then
+    echo "Directories have different files to compare, stopping."
+    echo "  $dir1: $files1"
+    echo "  $dir2: $files2"
+    exit 1
+fi
+
+# Get the script to run
+cmp_uri_script=$(dirname "$0")/wt_cmp_uri
+
+ecode=0
+for f in $files1; do
+    echo $f
+    if ! python $cmp_uri_script $timestamp_opt1 "$dir1"/$f $timestamp_opt2 "$dir2"/$f; then
+        ecode=1
+    fi
+done
+exit $ecode
