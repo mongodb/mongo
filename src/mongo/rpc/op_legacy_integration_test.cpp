@@ -129,7 +129,7 @@ TEST(OpLegacy, GetLastError) {
 
     static const auto getLastErrorCommand = fromjson(R"({"getlasterror": 1})");
     BSONObj replyObj;
-    conn->runCommand("admin", getLastErrorCommand, replyObj);
+    conn->runCommand({boost::none, "admin"}, getLastErrorCommand, replyObj);
 
     // 'getLastError' command is no longer supported and will always fail.
     auto status = getStatusFromCommandResult(replyObj);
@@ -181,7 +181,7 @@ TEST(OpLegacy, UnsupportedReadOps) {
         documents: [ {a: 1},{a: 2},{a: 3},{a: 4},{a: 5},{a: 6},{a: 7} ]
     })");
     BSONObj ignoreResponse;
-    ASSERT(conn->runCommand("testOpLegacy", insert, ignoreResponse));
+    ASSERT(conn->runCommand({boost::none, "testOpLegacy"}, insert, ignoreResponse));
 
     // Issue the unsupported requests. They all should fail one way or another.
     Message opQueryRequest = makeUnsupportedOpQueryMessage(ns,
@@ -241,7 +241,7 @@ void testAllowedCommand(const char* command,
 
     auto serverStatusCmd = fromjson("{serverStatus: 1}");
     BSONObj serverStatus;
-    ASSERT(conn->runCommand("admin", serverStatusCmd, serverStatus));
+    ASSERT(conn->runCommand({boost::none, "admin"}, serverStatusCmd, serverStatus));
     auto opCountersPrior = serverStatus["opcounters"]["deprecated"];
     const auto queryCountPrior = opCountersPrior ? opCountersPrior["query"].Long() : 0;
 
@@ -253,7 +253,7 @@ void testAllowedCommand(const char* command,
     auto status = getStatusFromCommandResult(obj);
     ASSERT_EQ(status.code(), code);
 
-    ASSERT(conn->runCommand("admin", serverStatusCmd, serverStatus));
+    ASSERT(conn->runCommand({boost::none, "admin"}, serverStatusCmd, serverStatus));
     auto opCounters = serverStatus["opcounters"]["deprecated"];
     const auto queryCount = opCounters ? opCounters["query"].Long() : 0;
 

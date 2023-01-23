@@ -699,8 +699,8 @@ TEST(AggregationRequestTest, ParseFromBSONOverloadsShouldProduceIdenticalRequest
         "'a'}");
     NamespaceString nss("a.collection");
 
-    auto aggReqDBName =
-        unittest::assertGet(aggregation_request_helper::parseFromBSONForTests("a", inputBSON));
+    auto aggReqDBName = unittest::assertGet(
+        aggregation_request_helper::parseFromBSONForTests(nss.dbName(), inputBSON));
     auto aggReqNSS =
         unittest::assertGet(aggregation_request_helper::parseFromBSONForTests(nss, inputBSON));
 

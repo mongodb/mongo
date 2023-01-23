@@ -569,7 +569,7 @@ SemiFuture<BSONObj> Transaction::_commitOrAbort(StringData dbName, StringData cm
     }
 
     return ExecutorFuture<void>(_executor)
-        .then([this, dbNameCopy = dbName.toString(), cmdObj = cmdBuilder.obj()] {
+        .then([this, dbNameCopy = dbName, cmdObj = cmdBuilder.obj()] {
             return _txnClient->runCommand(dbNameCopy, cmdObj);
         })
         // Safe to inline because the continuation only holds state.

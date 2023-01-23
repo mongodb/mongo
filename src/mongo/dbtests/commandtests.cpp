@@ -88,8 +88,8 @@ public:
     NamespaceString nss() {
         return NamespaceString("test.testCollection");
     }
-    const char* nsDb() {
-        return "test";
+    DatabaseName nsDb() {
+        return {boost::none, "test"};
     }
     const char* nsColl() {
         return "testCollection";
@@ -136,7 +136,7 @@ struct Type0 : Base {
         }
 
         BSONObj result;
-        ASSERT(db.runCommand("test", BSON("filemd5" << 0), result));
+        ASSERT(db.runCommand({boost::none, "test"}, BSON("filemd5" << 0), result));
         ASSERT_EQUALS(string("5eb63bbbe01eeed093cb22bb8f5acdc3"), result.getStringField("md5"));
     }
 };
@@ -160,7 +160,7 @@ struct Type2 : Base {
         }
 
         BSONObj result;
-        ASSERT(db.runCommand("test", BSON("filemd5" << 0), result));
+        ASSERT(db.runCommand({boost::none, "test"}, BSON("filemd5" << 0), result));
         ASSERT_EQUALS(string("5eb63bbbe01eeed093cb22bb8f5acdc3"), result.getStringField("md5"));
     }
 };

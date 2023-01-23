@@ -498,7 +498,7 @@ TEST_F(TransactionParticipantRetryableWritesTest, SessionTransactionsCollectionN
     BSONObj dropResult;
     DBDirectClient client(opCtx());
     const auto& nss = NamespaceString::kSessionTransactionsTableNamespace;
-    ASSERT(client.runCommand(nss.db().toString(), BSON("drop" << nss.coll()), dropResult));
+    ASSERT(client.runCommand(nss.dbName(), BSON("drop" << nss.coll()), dropResult));
 
     const TxnNumber txnNum = 21;
     txnParticipant.beginOrContinue(

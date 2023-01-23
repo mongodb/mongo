@@ -163,8 +163,7 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::countStage() {
     }
 
     BSONObj res;
-    getClient()->runCommand(
-        _sourceNss.db().toString(), BSON("collStats" << _sourceNss.coll()), res);
+    getClient()->runCommand(_sourceNss.dbName(), BSON("collStats" << _sourceNss.coll()), res);
     auto status = getStatusFromCommandResult(res);
     if (!status.isOK()) {
         LOGV2_WARNING(5426601,
@@ -245,7 +244,8 @@ BaseCloner::AfterStageBehavior TenantCollectionCloner::listIndexesStage() {
 
     BSONObj readResult;
     BSONObj cmd = ClonerUtils::buildMajorityWaitRequest(_operationTime);
-    getClient()->runCommand("admin", cmd, readResult, QueryOption_SecondaryOk);
+    getClient()->runCommand(
+        DatabaseName(boost::none, "admin"), cmd, readResult, QueryOption_SecondaryOk);
     uassertStatusOKWithContext(
         getStatusFromCommandResult(readResult),
         "TenantCollectionCloner failed to get listIndexes result majority-committed");

@@ -239,7 +239,7 @@ TEST(OpMsg, CloseConnectionOnFireAndForgetNotWritablePrimaryError) {
         // Disable eager checking of primary to simulate a stepdown occurring after the check. This
         // should respect w:0.
         BSONObj output;
-        ASSERT(conn.runCommand("admin",
+        ASSERT(conn.runCommand({boost::none, "admin"},
                                fromjson(R"({
                                    configureFailPoint: 'skipCheckingForNotPrimaryInCommandDispatch',
                                    mode: 'alwaysOn'
@@ -248,7 +248,7 @@ TEST(OpMsg, CloseConnectionOnFireAndForgetNotWritablePrimaryError) {
             << output;
         ON_BLOCK_EXIT([&] {
             uassertStatusOK(conn.connect(host, "integration_test-cleanup", boost::none));
-            ASSERT(conn.runCommand("admin",
+            ASSERT(conn.runCommand({boost::none, "admin"},
                                    fromjson(R"({
                                           configureFailPoint:
                                               'skipCheckingForNotPrimaryInCommandDispatch',
@@ -779,7 +779,7 @@ void serverStatusCorrectlyShowsExhaustMetrics(std::string commandName) {
     ASSERT(waitForCondition([&] {
         auto serverStatusCmd = BSON("serverStatus" << 1);
         BSONObj serverStatusReply;
-        ASSERT(conn->runCommand("admin", serverStatusCmd, serverStatusReply));
+        ASSERT(conn->runCommand({boost::none, "admin"}, serverStatusCmd, serverStatusReply));
         return serverStatusReply["connections"]["exhaustIsMaster"].numberInt() == 0 &&
             serverStatusReply["connections"]["exhaustHello"].numberInt() == 0;
     }));
@@ -814,7 +814,7 @@ void serverStatusCorrectlyShowsExhaustMetrics(std::string commandName) {
 
     auto serverStatusCmd = BSON("serverStatus" << 1);
     BSONObj serverStatusReply;
-    ASSERT(conn2->runCommand("admin", serverStatusCmd, serverStatusReply));
+    ASSERT(conn2->runCommand({boost::none, "admin"}, serverStatusCmd, serverStatusReply));
     if (useLegacyCommandName) {
         ASSERT_EQUALS(1, serverStatusReply["connections"]["exhaustIsMaster"].numberInt());
         ASSERT_EQUALS(0, serverStatusReply["connections"]["exhaustHello"].numberInt());
@@ -853,7 +853,7 @@ void exhaustMetricSwitchingCommandNames(bool useLegacyCommandNameAtStart) {
     ASSERT(waitForCondition([&] {
         auto serverStatusCmd = BSON("serverStatus" << 1);
         BSONObj serverStatusReply;
-        ASSERT(conn1->runCommand("admin", serverStatusCmd, serverStatusReply));
+        ASSERT(conn1->runCommand({boost::none, "admin"}, serverStatusCmd, serverStatusReply));
         return serverStatusReply["connections"]["exhaustIsMaster"].numberInt() == 0 &&
             serverStatusReply["connections"]["exhaustHello"].numberInt() == 0;
     }));
@@ -900,7 +900,7 @@ void exhaustMetricSwitchingCommandNames(bool useLegacyCommandNameAtStart) {
 
     auto serverStatusCmd = BSON("serverStatus" << 1);
     BSONObj serverStatusReply;
-    ASSERT(conn2->runCommand("admin", serverStatusCmd, serverStatusReply));
+    ASSERT(conn2->runCommand({boost::none, "admin"}, serverStatusCmd, serverStatusReply));
     if (useLegacyCommandNameAtStart) {
         ASSERT_EQUALS(1, serverStatusReply["connections"]["exhaustIsMaster"].numberInt());
         ASSERT_EQUALS(0, serverStatusReply["connections"]["exhaustHello"].numberInt());
@@ -927,7 +927,7 @@ void exhaustMetricSwitchingCommandNames(bool useLegacyCommandNameAtStart) {
     }));
 
     // Terminating the exhaust stream should not decrement the number of exhaust connections.
-    ASSERT(conn2->runCommand("admin", serverStatusCmd, serverStatusReply));
+    ASSERT(conn2->runCommand({boost::none, "admin"}, serverStatusCmd, serverStatusReply));
     if (useLegacyCommandNameAtStart) {
         ASSERT_EQUALS(1, serverStatusReply["connections"]["exhaustIsMaster"].numberInt());
         ASSERT_EQUALS(0, serverStatusReply["connections"]["exhaustHello"].numberInt());
@@ -955,7 +955,7 @@ void exhaustMetricSwitchingCommandNames(bool useLegacyCommandNameAtStart) {
 
     // exhaust metric should decrease for the exhaust type that was closed, and increase for the
     // exhaust type that was just opened.
-    ASSERT(conn2->runCommand("admin", serverStatusCmd, serverStatusReply));
+    ASSERT(conn2->runCommand({boost::none, "admin"}, serverStatusCmd, serverStatusReply));
     if (useLegacyCommandNameAtStart) {
         ASSERT_EQUALS(0, serverStatusReply["connections"]["exhaustIsMaster"].numberInt());
         ASSERT_EQUALS(1, serverStatusReply["connections"]["exhaustHello"].numberInt());
@@ -990,7 +990,7 @@ void exhaustMetricDecrementsOnNewOpAfterTerminatingExhaustStream(bool useLegacyC
     ASSERT(waitForCondition([&] {
         auto serverStatusCmd = BSON("serverStatus" << 1);
         BSONObj serverStatusReply;
-        ASSERT(conn1->runCommand("admin", serverStatusCmd, serverStatusReply));
+        ASSERT(conn1->runCommand({boost::none, "admin"}, serverStatusCmd, serverStatusReply));
         return serverStatusReply["connections"]["exhaustIsMaster"].numberInt() == 0 &&
             serverStatusReply["connections"]["exhaustHello"].numberInt() == 0;
     }));
@@ -1036,7 +1036,7 @@ void exhaustMetricDecrementsOnNewOpAfterTerminatingExhaustStream(bool useLegacyC
 
     auto serverStatusCmd = BSON("serverStatus" << 1);
     BSONObj serverStatusReply;
-    ASSERT(conn2->runCommand("admin", serverStatusCmd, serverStatusReply));
+    ASSERT(conn2->runCommand({boost::none, "admin"}, serverStatusCmd, serverStatusReply));
     if (useLegacyCommandName) {
         ASSERT_EQUALS(1, serverStatusReply["connections"]["exhaustIsMaster"].numberInt());
         ASSERT_EQUALS(0, serverStatusReply["connections"]["exhaustHello"].numberInt());
@@ -1063,7 +1063,7 @@ void exhaustMetricDecrementsOnNewOpAfterTerminatingExhaustStream(bool useLegacyC
     }));
 
     // Terminating the exhaust stream should not decrement the number of exhaust connections.
-    ASSERT(conn2->runCommand("admin", serverStatusCmd, serverStatusReply));
+    ASSERT(conn2->runCommand({boost::none, "admin"}, serverStatusCmd, serverStatusReply));
     if (useLegacyCommandName) {
         ASSERT_EQUALS(1, serverStatusReply["connections"]["exhaustIsMaster"].numberInt());
         ASSERT_EQUALS(0, serverStatusReply["connections"]["exhaustHello"].numberInt());
@@ -1074,7 +1074,7 @@ void exhaustMetricDecrementsOnNewOpAfterTerminatingExhaustStream(bool useLegacyC
 
     // exhaust metric should now decrement after calling serverStatus on the connection that used
     // to have the exhaust stream.
-    ASSERT(conn1->runCommand("admin", serverStatusCmd, serverStatusReply));
+    ASSERT(conn1->runCommand({boost::none, "admin"}, serverStatusCmd, serverStatusReply));
     ASSERT_EQUALS(0, serverStatusReply["connections"]["exhaustIsMaster"].numberInt());
     ASSERT_EQUALS(0, serverStatusReply["connections"]["exhaustHello"].numberInt());
 }
@@ -1103,7 +1103,7 @@ void exhaustMetricOnNewExhaustAfterTerminatingExhaustStream(bool useLegacyComman
     ASSERT(waitForCondition([&] {
         auto serverStatusCmd = BSON("serverStatus" << 1);
         BSONObj serverStatusReply;
-        ASSERT(conn1->runCommand("admin", serverStatusCmd, serverStatusReply));
+        ASSERT(conn1->runCommand({boost::none, "admin"}, serverStatusCmd, serverStatusReply));
         return serverStatusReply["connections"]["exhaustIsMaster"].numberInt() == 0 &&
             serverStatusReply["connections"]["exhaustHello"].numberInt() == 0;
     }));
@@ -1149,7 +1149,7 @@ void exhaustMetricOnNewExhaustAfterTerminatingExhaustStream(bool useLegacyComman
 
     auto serverStatusCmd = BSON("serverStatus" << 1);
     BSONObj serverStatusReply;
-    ASSERT(conn2->runCommand("admin", serverStatusCmd, serverStatusReply));
+    ASSERT(conn2->runCommand({boost::none, "admin"}, serverStatusCmd, serverStatusReply));
     if (useLegacyCommandName) {
         ASSERT_EQUALS(1, serverStatusReply["connections"]["exhaustIsMaster"].numberInt());
         ASSERT_EQUALS(0, serverStatusReply["connections"]["exhaustHello"].numberInt());
@@ -1176,7 +1176,7 @@ void exhaustMetricOnNewExhaustAfterTerminatingExhaustStream(bool useLegacyComman
     }));
 
     // Terminating the exhaust stream should not decrement the number of exhaust connections.
-    ASSERT(conn2->runCommand("admin", serverStatusCmd, serverStatusReply));
+    ASSERT(conn2->runCommand({boost::none, "admin"}, serverStatusCmd, serverStatusReply));
     if (useLegacyCommandName) {
         ASSERT_EQUALS(1, serverStatusReply["connections"]["exhaustIsMaster"].numberInt());
         ASSERT_EQUALS(0, serverStatusReply["connections"]["exhaustHello"].numberInt());
@@ -1196,7 +1196,7 @@ void exhaustMetricOnNewExhaustAfterTerminatingExhaustStream(bool useLegacyComman
     ASSERT_OK(getStatusFromCommandResult(res));
 
     // exhaust metric should not increment or decrement after initiating a new exhaust stream.
-    ASSERT(conn2->runCommand("admin", serverStatusCmd, serverStatusReply));
+    ASSERT(conn2->runCommand({boost::none, "admin"}, serverStatusCmd, serverStatusReply));
     if (useLegacyCommandName) {
         ASSERT_EQUALS(1, serverStatusReply["connections"]["exhaustIsMaster"].numberInt());
         ASSERT_EQUALS(0, serverStatusReply["connections"]["exhaustHello"].numberInt());

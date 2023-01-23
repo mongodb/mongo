@@ -289,7 +289,7 @@ private:
         auto opCtx = opCtxHolder.get();
         DBDirectClient client(opCtx);
         BSONObj result;
-        client.runCommand(nss.db().toString(),
+        client.runCommand(nss.dbName(),
                           BSON("createIndexes"
                                << nss.coll().toString() << "indexes"
                                << BSON_ARRAY(BSON("key" << BSON("x" << 1) << "name"

@@ -156,7 +156,7 @@ SessionsCollection::SendBatchFn SessionsCollection::makeSendFnForBatchWrite(
     const NamespaceString& ns, DBClientBase* client) {
     auto send = [client, ns](BSONObj batch) {
         BSONObj res;
-        if (!client->runCommand(ns.db().toString(), batch, res)) {
+        if (!client->runCommand(ns.dbName(), batch, res)) {
             uassertStatusOK(getStatusFromCommandResult(res));
         }
     };
@@ -168,7 +168,7 @@ SessionsCollection::SendBatchFn SessionsCollection::makeSendFnForCommand(const N
                                                                          DBClientBase* client) {
     auto send = [client, ns](BSONObj cmd) {
         BSONObj res;
-        if (!client->runCommand(ns.db().toString(), cmd, res)) {
+        if (!client->runCommand(ns.dbName(), cmd, res)) {
             uassertStatusOK(getStatusFromCommandResult(res));
         }
     };
@@ -180,7 +180,7 @@ SessionsCollection::FindBatchFn SessionsCollection::makeFindFnForCommand(const N
                                                                          DBClientBase* client) {
     auto send = [client, ns](BSONObj cmd) -> BSONObj {
         BSONObj res;
-        if (!client->runCommand(ns.db().toString(), cmd, res)) {
+        if (!client->runCommand(ns.dbName(), cmd, res)) {
             uassertStatusOK(getStatusFromCommandResult(res));
         }
 

@@ -214,7 +214,7 @@ public:
 
                 // Run Aggregate
                 BSONObj analyzeResult;
-                client.runCommand(nss.db().toString(),
+                client.runCommand(nss.dbName(),
                                   analyzeCommandAsAggregationCommand(opCtx,
                                                                      nss.db(),
                                                                      nss.coll(),

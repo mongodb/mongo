@@ -58,7 +58,7 @@ public:
         auto conn = makeConn(kAppName + "-cleanup");
 
         BSONObj currOp;
-        if (!conn->runCommand("admin", BSON("currentOp" << 1), currOp))
+        if (!conn->runCommand({boost::none, "admin"}, BSON("currentOp" << 1), currOp))
             uassertStatusOK(getStatusFromCommandResult(currOp));
 
         for (auto&& op : currOp["inprog"].Obj()) {
@@ -74,7 +74,8 @@ public:
 
             // Ignore failures to clean up.
             BSONObj ignored;
-            (void)conn->runCommand("admin", BSON("killOp" << 1 << "op" << op["opid"]), ignored);
+            (void)conn->runCommand(
+                {boost::none, "admin"}, BSON("killOp" << 1 << "op" << op["opid"]), ignored);
         }
     }
 };
@@ -85,7 +86,7 @@ TEST_F(DBClientConnectionFixture, shutdownWorksIfCalledFirst) {
     conn->shutdownAndDisallowReconnect();
 
     BSONObj reply;
-    ASSERT_THROWS(conn->runCommand("admin", sleepCmd, reply),
+    ASSERT_THROWS(conn->runCommand({boost::none, "admin"}, sleepCmd, reply),
                   ExceptionForCat<ErrorCategory::NetworkError>);  // Currently SocketException.
 }
 
@@ -100,7 +101,7 @@ TEST_F(DBClientConnectionFixture, shutdownWorksIfRunCommandInProgress) {
     ON_BLOCK_EXIT([&] { shutdownThread.join(); });
 
     BSONObj reply;
-    ASSERT_THROWS(conn->runCommand("admin", sleepCmd, reply),
+    ASSERT_THROWS(conn->runCommand({boost::none, "admin"}, sleepCmd, reply),
                   ExceptionForCat<ErrorCategory::NetworkError>);  // Currently HostUnreachable.
 }
 

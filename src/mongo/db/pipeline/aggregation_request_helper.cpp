@@ -75,17 +75,13 @@ StatusWith<AggregateCommandRequest> parseFromBSONForTests(
 }
 
 StatusWith<AggregateCommandRequest> parseFromBSONForTests(
-    const std::string& dbName,
+    const DatabaseName& dbName,
     const BSONObj& cmdObj,
     boost::optional<ExplainOptions::Verbosity> explainVerbosity,
     bool apiStrict) {
     try {
         return parseFromBSON(
-            /*opCtx=*/nullptr,
-            DatabaseName(boost::none, dbName),
-            cmdObj,
-            explainVerbosity,
-            apiStrict);
+            /*opCtx=*/nullptr, dbName, cmdObj, explainVerbosity, apiStrict);
     } catch (const AssertionException&) {
         return exceptionToStatus();
     }

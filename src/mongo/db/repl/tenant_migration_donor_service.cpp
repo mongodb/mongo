@@ -263,7 +263,7 @@ ExecutorFuture<void> TenantMigrationDonorService::createStateDocumentTTLIndex(
 
                BSONObj result;
                client.runCommand(
-                   nss.db().toString(),
+                   nss.dbName(),
                    BSON("createIndexes"
                         << nss.coll().toString() << "indexes"
                         << BSON_ARRAY(BSON("key" << BSON("expireAt" << 1) << "name" << kTTLIndexName
@@ -290,7 +290,7 @@ ExecutorFuture<void> TenantMigrationDonorService::createExternalKeysTTLIndex(
 
                BSONObj result;
                client.runCommand(
-                   nss.db().toString(),
+                   nss.dbName(),
                    BSON("createIndexes"
                         << nss.coll().toString() << "indexes"
                         << BSON_ARRAY(BSON("key" << BSON("ttlExpiresAt" << 1) << "name"

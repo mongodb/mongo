@@ -252,7 +252,7 @@ void runUpdateCommand(OperationContext* opCtx, const FeatureCompatibilityVersion
     // Update the featureCompatibilityVersion document stored in the server configuration
     // collection.
     BSONObj updateResult;
-    client.runCommand(nss.db().toString(), updateCmd.obj(), updateResult);
+    client.runCommand(nss.dbName(), updateCmd.obj(), updateResult);
     uassertStatusOK(getStatusFromWriteCommandReply(updateResult));
 }
 

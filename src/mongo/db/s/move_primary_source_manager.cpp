@@ -465,7 +465,7 @@ Status MovePrimarySourceManager::cleanStaleData(OperationContext* opCtx) {
     DBDirectClient client(opCtx);
     for (auto& coll : _clonedColls) {
         BSONObj dropCollResult;
-        client.runCommand(_dbname.toString(), BSON("drop" << coll.coll()), dropCollResult);
+        client.runCommand(_dbname, BSON("drop" << coll.coll()), dropCollResult);
         Status dropStatus = getStatusFromCommandResult(dropCollResult);
         if (!dropStatus.isOK()) {
             LOGV2(22045,

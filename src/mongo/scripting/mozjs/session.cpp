@@ -128,14 +128,16 @@ void endSession(SessionHolder* holder) {
         BSONObj abortObj = BSON("abortTransaction" << 1 << "lsid" << holder->lsid << "txnNumber"
                                                    << holder->txnNumber << "autocommit" << false);
 
-        [[maybe_unused]] auto ignored = holder->client->runCommand("admin", abortObj, out);
+        [[maybe_unused]] auto ignored =
+            holder->client->runCommand(DatabaseName(boost::none, "admin"), abortObj, out);
     }
 
     EndSessions es;
 
     es.setEndSessions({holder->lsid});
 
-    [[maybe_unused]] auto ignored = holder->client->runCommand("admin", es.toBSON(), out);
+    [[maybe_unused]] auto ignored =
+        holder->client->runCommand(DatabaseName(boost::none, "admin"), es.toBSON(), out);
 
     holder->client.reset();
 }

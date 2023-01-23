@@ -77,7 +77,8 @@ public:
             DBDirectClient localClient(opCtx);
             BSONObj res;
 
-            localClient.runCommand(NamespaceString::kAdminDb.toString(), shardIdUpsertCmd, res);
+            localClient.runCommand(
+                DatabaseName(boost::none, NamespaceString::kAdminDb), shardIdUpsertCmd, res);
 
             uassertStatusOK(getStatusFromCommandResult(res));
 

@@ -219,7 +219,7 @@ public:
 
         DBDirectClient cl(&_opCtx);
         BSONObj info;
-        bool ok = cl.runCommand("unittests",
+        bool ok = cl.runCommand({boost::none, "unittests"},
                                 BSON("godinsert"
                                      << "querytests"
                                      << "obj" << BSONObj()),
@@ -635,7 +635,7 @@ public:
 
         const char* ns = "unittests.querytests.TailableQueryOnId";
         BSONObj info;
-        _client.runCommand("unittests",
+        _client.runCommand({boost::none, "unittests"},
                            BSON("create"
                                 << "querytests.TailableQueryOnId"
                                 << "capped" << true << "size" << 8192 << "autoIndexId" << true),
@@ -690,7 +690,7 @@ public:
         // to truncating the oplog instead.
         if (_opCtx.getServiceContext()->getStorageEngine()->supportsRecoveryTimestamp()) {
             BSONObj info;
-            _client.runCommand("local",
+            _client.runCommand({boost::none, "local"},
                                BSON("emptycapped"
                                     << "oplog.querytests.OplogScanWithGtTimstampPred"),
                                info);
@@ -742,7 +742,7 @@ public:
         // to truncating the oplog instead.
         if (_opCtx.getServiceContext()->getStorageEngine()->supportsRecoveryTimestamp()) {
             BSONObj info;
-            _client.runCommand("local",
+            _client.runCommand({boost::none, "local"},
                                BSON("emptycapped"
                                     << "oplog.querytests.OplogScanGtTsExplain"),
                                info);
@@ -1481,7 +1481,7 @@ public:
 
         BSONObj info;
         // Must use local db so that the collection is not replicated, to allow autoIndexId:false.
-        _client.runCommand("local",
+        _client.runCommand({boost::none, "local"},
                            BSON("create"
                                 << "oplog.querytests.findingstart"
                                 << "capped" << true << "size" << 4096 << "autoIndexId" << false),
@@ -1493,7 +1493,7 @@ public:
         // To ensure we are working with a clean oplog (an oplog without entries), we resort
         // to truncating the oplog instead.
         if (_opCtx.getServiceContext()->getStorageEngine()->supportsRecoveryTimestamp()) {
-            _client.runCommand("local",
+            _client.runCommand({boost::none, "local"},
                                BSON("emptycapped"
                                     << "oplog.querytests.findingstart"),
                                info);
@@ -1550,7 +1550,7 @@ public:
 
         BSONObj info;
         // Must use local db so that the collection is not replicated, to allow autoIndexId:false.
-        _client.runCommand("local",
+        _client.runCommand({boost::none, "local"},
                            BSON("create"
                                 << "oplog.querytests.findingstart"
                                 << "capped" << true << "size" << 4096 << "autoIndexId" << false),
@@ -1562,7 +1562,7 @@ public:
         // To ensure we are working with a clean oplog (an oplog without entries), we resort
         // to truncating the oplog instead.
         if (_opCtx.getServiceContext()->getStorageEngine()->supportsRecoveryTimestamp()) {
-            _client.runCommand("local",
+            _client.runCommand({boost::none, "local"},
                                BSON("emptycapped"
                                     << "oplog.querytests.findingstart"),
                                info);
@@ -1621,7 +1621,7 @@ public:
 
         BSONObj info;
         // Must use local db so that the collection is not replicated, to allow autoIndexId:false.
-        _client.runCommand("local",
+        _client.runCommand({boost::none, "local"},
                            BSON("create"
                                 << "oplog.querytests.findingstart"
                                 << "capped" << true << "size" << 4096 << "autoIndexId" << false),
@@ -1633,7 +1633,7 @@ public:
         // To ensure we are working with a clean oplog (an oplog without entries), we resort
         // to truncating the oplog instead.
         if (_opCtx.getServiceContext()->getStorageEngine()->supportsRecoveryTimestamp()) {
-            _client.runCommand("local",
+            _client.runCommand({boost::none, "local"},
                                BSON("emptycapped"
                                     << "oplog.querytests.findingstart"),
                                info);
@@ -1664,7 +1664,7 @@ public:
     WhatsMyUri() : CollectionBase("whatsmyuri") {}
     void run() {
         BSONObj result;
-        _client.runCommand("admin", BSON("whatsmyuri" << 1), result);
+        _client.runCommand({boost::none, "admin"}, BSON("whatsmyuri" << 1), result);
         ASSERT_EQUALS("", result["you"].str());
     }
 };
@@ -1674,7 +1674,7 @@ public:
     WhatsMySni() : CollectionBase("whatsmysni") {}
     void run() {
         BSONObj result;
-        _client.runCommand("admin", BSON("whatsmysni" << 1), result);
+        _client.runCommand({boost::none, "admin"}, BSON("whatsmysni" << 1), result);
         ASSERT_EQUALS("", result["sni"].str());
     }
 };

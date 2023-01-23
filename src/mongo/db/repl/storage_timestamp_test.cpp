@@ -2073,7 +2073,7 @@ TEST_F(StorageTimestampTest, TimestampMultiIndexBuilds) {
             BSON("createIndexes" << nss.coll() << "indexes" << BSON_ARRAY(index1 << index2)
                                  << "commitQuorum" << 0);
         BSONObj result;
-        ASSERT(client.runCommand(nss.db().toString(), createIndexesCmdObj, result)) << result;
+        ASSERT(client.runCommand(nss.dbName(), createIndexesCmdObj, result)) << result;
     }
 
     auto indexCreateInitTs = queryOplog(BSON("op"
@@ -2172,7 +2172,7 @@ TEST_F(StorageTimestampTest, TimestampMultiIndexBuildsDuringRename) {
             BSON("createIndexes" << nss.coll() << "indexes" << BSON_ARRAY(index1 << index2)
                                  << "commitQuorum" << 0);
         BSONObj result;
-        ASSERT(client.runCommand(nss.db().toString(), createIndexesCmdObj, result)) << result;
+        ASSERT(client.runCommand(nss.dbName(), createIndexesCmdObj, result)) << result;
     }
 
     AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
@@ -2187,7 +2187,7 @@ TEST_F(StorageTimestampTest, TimestampMultiIndexBuildsDuringRename) {
     // Rename collection.
     BSONObj renameResult;
     ASSERT(client.runCommand(
-        "admin",
+        DatabaseName(boost::none, "admin"),
         BSON("renameCollection" << nss.ns() << "to" << renamedNss.ns() << "dropTarget" << true),
         renameResult))
         << renameResult;
@@ -2298,7 +2298,7 @@ TEST_F(StorageTimestampTest, TimestampAbortIndexBuild) {
 
         DBDirectClient client(_opCtx);
         BSONObj result;
-        ASSERT_FALSE(client.runCommand(nss.db().toString(), createIndexesCmdObj, result));
+        ASSERT_FALSE(client.runCommand(nss.dbName(), createIndexesCmdObj, result));
         ASSERT_EQUALS(ErrorCodes::DuplicateKey, getStatusFromCommandResult(result));
     }
 
@@ -3076,7 +3076,7 @@ TEST_F(StorageTimestampTest, MultipleTimestampsForMultikeyWrites) {
             BSON("createIndexes" << nss.coll() << "indexes" << BSON_ARRAY(index1 << index2)
                                  << "commitQuorum" << 0);
         BSONObj result;
-        ASSERT(client.runCommand(nss.db().toString(), createIndexesCmdObj, result)) << result;
+        ASSERT(client.runCommand(nss.dbName(), createIndexesCmdObj, result)) << result;
     }
 
     AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_IX);

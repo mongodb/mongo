@@ -234,7 +234,7 @@ public:
      * commands have prebuilt helper functions -- see below. If a helper is not available you can
      * directly call runCommand.
      *
-     *  'dbname': Database name. Use "admin" for global administrative commands.
+     *  'dbName': Database name. Use "admin" for global administrative commands.
      *  'cmd': The command object to execute. For example, { hello : 1 }.
      *  'info': The result object the database returns. Typically has { ok : ..., errmsg : ... }
      *          fields set.
@@ -242,7 +242,7 @@ public:
      *
      *  Returns true if the command returned "ok".
      */
-    bool runCommand(const std::string& dbname, BSONObj cmd, BSONObj& info, int options = 0);
+    bool runCommand(const DatabaseName& dbName, BSONObj cmd, BSONObj& info, int options = 0);
 
     /*
      * Wraps up the runCommand function avove, but returns the DBClient that actually ran the
@@ -363,8 +363,10 @@ public:
             info = &temp;
         }
 
-        bool res = runCommand(
-            db.c_str(), BSON("drop" << coll << "writeConcern" << writeConcern.toBSON()), *info);
+        // TODO SERVER-72942: Use ns.dbName() which is DatabaseName object already.
+        bool res = runCommand(DatabaseName(boost::none, db),
+                              BSON("drop" << coll << "writeConcern" << writeConcern.toBSON()),
+                              *info);
         return res;
     }
 
@@ -375,7 +377,8 @@ public:
     bool validate(const std::string& ns) {
         BSONObj cmd = BSON("validate" << nsGetCollection(ns));
         BSONObj info;
-        return runCommand(nsGetDB(ns).c_str(), cmd, info);
+        // TODO SERVER-72943: Use ns.dbName() which is DatabaseName object already.
+        return runCommand(DatabaseName(boost::none, nsGetDB(ns)), cmd, info);
     }
 
     /**
@@ -406,8 +409,10 @@ public:
         BSONObj o;
         if (info == nullptr)
             info = &o;
-        return runCommand(
-            dbname, BSON("dropDatabase" << 1 << "writeConcern" << writeConcern.toBSON()), *info);
+        // TODO SERVER-72944: Use dbname which is DatabaseName object already.
+        return runCommand(DatabaseName(boost::none, dbname),
+                          BSON("dropDatabase" << 1 << "writeConcern" << writeConcern.toBSON()),
+                          *info);
     }
 
     /**

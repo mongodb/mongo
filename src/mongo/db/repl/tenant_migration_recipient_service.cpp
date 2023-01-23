@@ -320,7 +320,7 @@ ExecutorFuture<void> TenantMigrationRecipientService::_rebuildService(
 
                BSONObj result;
                client.runCommand(
-                   nss.db().toString(),
+                   nss.dbName(),
                    BSON("createIndexes"
                         << nss.coll().toString() << "indexes"
                         << BSON_ARRAY(BSON("key" << BSON("expireAt" << 1) << "name" << kTTLIndexName
@@ -1762,7 +1762,8 @@ TenantMigrationRecipientService::Instance::_fetchRetryableWritesOplogBeforeStart
 
     BSONObj readResult;
     BSONObj cmd = ClonerUtils::buildMajorityWaitRequest(*operationTime);
-    _client.get()->runCommand("admin", cmd, readResult, QueryOption_SecondaryOk);
+    _client.get()->runCommand(
+        DatabaseName(boost::none, "admin"), cmd, readResult, QueryOption_SecondaryOk);
     uassertStatusOKWithContext(
         getStatusFromCommandResult(readResult),
         "Failed to wait for retryable writes pre-fetch result majority committed");

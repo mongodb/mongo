@@ -1094,7 +1094,7 @@ void CreateCollectionCoordinator::_createCollectionAndIndexes(
 
         BSONObj createRes;
         DBDirectClient localClient(opCtx);
-        localClient.runCommand(nss().db().toString(), createCmd, createRes);
+        localClient.runCommand(nss().dbName(), createCmd, createRes);
         auto createStatus = getStatusFromCommandResult(createRes);
 
         if (!createStatus.isOK() && createStatus.code() == ErrorCodes::NamespaceExists) {

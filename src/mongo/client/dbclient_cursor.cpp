@@ -371,7 +371,7 @@ StatusWith<std::unique_ptr<DBClientCursor>> DBClientCursor::fromAggregationReque
     DBClientBase* client, AggregateCommandRequest aggRequest, bool secondaryOk, bool useExhaust) {
     BSONObj ret;
     try {
-        if (!client->runCommand(aggRequest.getNamespace().db().toString(),
+        if (!client->runCommand(aggRequest.getNamespace().dbName(),
                                 aggregation_request_helper::serializeToCommandObj(aggRequest),
                                 ret,
                                 secondaryOk ? QueryOption_SecondaryOk : 0)) {

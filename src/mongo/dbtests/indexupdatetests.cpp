@@ -657,7 +657,7 @@ public:
         DBDirectClient client(opCtx.get());
         client.dropCollection(_ns);
         BSONObj cmdResult;
-        ASSERT_TRUE(client.runCommand("unittests",
+        ASSERT_TRUE(client.runCommand({boost::none, "unittests"},
                                       BSON("create"
                                            << "indexupdate"
                                            << "collation"

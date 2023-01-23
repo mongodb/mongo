@@ -740,7 +740,7 @@ void updateTagsDocsForTempNss(OperationContext* opCtx,
     // currently have 'ns' as the temporary collection namespace.
     DBDirectClient client(opCtx);
     BSONObj tagsRes;
-    client.runCommand(tagsRequest.getNS().db().toString(), tagsRequest.toBSON(), tagsRes);
+    client.runCommand(tagsRequest.getNS().dbName(), tagsRequest.toBSON(), tagsRes);
     uassertStatusOK(getStatusFromWriteCommandReply(tagsRes));
 }
 
@@ -1071,7 +1071,7 @@ ExecutorFuture<void> ReshardingCoordinatorService::_rebuildService(
                DBDirectClient client(opCtx);
                BSONObj result;
                client.runCommand(
-                   nss.db().toString(),
+                   nss.dbName(),
                    BSON("createIndexes"
                         << nss.coll().toString() << "indexes"
                         << BSON_ARRAY(BSON("key" << BSON("active" << 1) << "name"

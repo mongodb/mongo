@@ -289,7 +289,7 @@ void ValidationBehaviorsShardCollection::verifyUsefulNonMultiKeyIndex(
     const NamespaceString& nss, const BSONObj& proposedKey) const {
     BSONObj res;
     auto success = _localClient->runCommand(
-        "admin",
+        DatabaseName(boost::none, "admin"),
         BSON(kCheckShardingIndexCmdName << nss.ns() << kKeyPatternField << proposedKey),
         res);
     uassert(ErrorCodes::InvalidOptions, res["errmsg"].str(), success);
@@ -313,7 +313,7 @@ void ValidationBehaviorsShardCollection::createShardKeyIndex(
         defaultCollation && !defaultCollation->isEmpty() ? CollationSpec::kSimpleSpec : BSONObj();
     auto createIndexesCmd = makeCreateIndexesCmd(nss, proposedKey, collation, unique);
     BSONObj res;
-    _localClient->runCommand(nss.db().toString(), createIndexesCmd, res);
+    _localClient->runCommand(nss.dbName(), createIndexesCmd, res);
     uassertStatusOK(getStatusFromCommandResult(res));
 }
 

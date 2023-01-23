@@ -31,6 +31,7 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/dbclient_cursor.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/query/query_knobs_gen.h"
@@ -132,8 +133,11 @@ protected:
     ServiceContext::UniqueOperationContext _uniqueOpCtx{makeOperationContext()};
     OperationContext* _opCtx{_uniqueOpCtx.get()};
 
-    static constexpr auto kDatabaseName = "external_data_source";
+    static const DatabaseName kDatabaseName;
 };
+
+const DatabaseName ExternalDataSourceCommandsTest::kDatabaseName =
+    DatabaseName(boost::none, "external_data_source");
 
 TEST_F(ExternalDataSourceCommandsTest, SimpleScanAggRequest) {
     const auto nDocs = _random.nextInt32(100) + 1;

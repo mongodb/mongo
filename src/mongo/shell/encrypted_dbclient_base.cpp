@@ -575,7 +575,7 @@ void EncryptedDBClientBase::compact(JSContext* cx, JS::CallArgs args) {
                    efc ? FLEClientCrypto::generateCompactionTokens(*efc, this) : BSONObj());
 
     BSONObj reply;
-    runCommand(nss.db().toString(), builder.obj(), reply, 0);
+    runCommand(nss.dbName(), builder.obj(), reply, 0);
     reply = reply.getOwned();
     mozjs::ValueReader(cx, args.rval()).fromBSON(reply, nullptr, false);
 }

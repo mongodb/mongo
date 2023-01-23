@@ -114,7 +114,7 @@ BSONObj executeConfigRequest(OperationContext* opCtx,
     invariant(nss.db() == NamespaceString::kConfigDb);
     DBDirectClient client(opCtx);
     BSONObj result;
-    client.runCommand(nss.db().toString(), request.toBSON(), result);
+    client.runCommand(nss.dbName(), request.toBSON(), result);
     return result;
 }
 
@@ -489,7 +489,7 @@ Status ShardingCatalogManager::_initConfigCollections(OperationContext* opCtx) {
 
     BSONObj cmd = BSON("create" << CollectionType::ConfigNS.coll());
     BSONObj result;
-    const bool ok = client.runCommand(CollectionType::ConfigNS.db().toString(), cmd, result);
+    const bool ok = client.runCommand(CollectionType::ConfigNS.dbName(), cmd, result);
     if (!ok) {  // create returns error NamespaceExists if collection already exists
         Status status = getStatusFromCommandResult(result);
         if (status != ErrorCodes::NamespaceExists) {
@@ -536,7 +536,7 @@ Status ShardingCatalogManager::_initConfigSettings(OperationContext* opCtx) {
     BSONObj cmd = BSON("create" << NamespaceString::kConfigSettingsNamespace.coll());
     BSONObj result;
     const bool ok =
-        client.runCommand(NamespaceString::kConfigSettingsNamespace.db().toString(), cmd, result);
+        client.runCommand(NamespaceString::kConfigSettingsNamespace.dbName(), cmd, result);
     if (!ok) {  // create returns error NamespaceExists if collection already exists
         Status status = getStatusFromCommandResult(result);
         if (status != ErrorCodes::NamespaceExists) {

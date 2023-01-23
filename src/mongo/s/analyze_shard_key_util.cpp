@@ -203,7 +203,7 @@ bool canAcceptWrites(OperationContext* opCtx, const NamespaceString& nss) {
  * Returns the command response.
  */
 BSONObj executeWriteCommandLocal(OperationContext* opCtx,
-                                 const std::string dbName,
+                                 const DatabaseName& dbName,
                                  const BSONObj& cmdObj,
                                  const std::function<void(const BSONObj&)>& uassertWriteStatusFn) {
     DBDirectClient client(opCtx);
@@ -224,7 +224,7 @@ BSONObj executeWriteCommandLocal(OperationContext* opCtx,
  * Returns the command response.
  */
 BSONObj executeWriteCommandRemote(OperationContext* opCtx,
-                                  const std::string dbName,
+                                  const DatabaseName& dbName,
                                   const BSONObj& cmdObj,
                                   const std::function<void(const BSONObj&)>& uassertWriteStatusFn) {
     auto hostAndPort = repl::ReplicationCoordinator::get(opCtx)->getCurrentPrimaryHostAndPort();
@@ -269,7 +269,7 @@ BSONObj executeWriteCommand(OperationContext* opCtx,
                             const NamespaceString& nss,
                             const BSONObj& cmdObj,
                             const std::function<void(const BSONObj&)>& uassertWriteStatusFn) {
-    const auto dbName = nss.db().toString();
+    const auto dbName = nss.dbName();
     auto numRetries = 0;
 
     while (true) {

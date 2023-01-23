@@ -90,7 +90,7 @@ AggregateCommandRequest parseFromBSON(OperationContext* opCtx,
                                       bool apiStrict);
 
 StatusWith<AggregateCommandRequest> parseFromBSONForTests(
-    const std::string& dbName,
+    const DatabaseName& dbName,
     const BSONObj& cmdObj,
     boost::optional<ExplainOptions::Verbosity> explainVerbosity = boost::none,
     bool apiStrict = false);

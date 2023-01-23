@@ -115,7 +115,8 @@ BaseCloner::AfterStageBehavior TenantDatabaseCloner::listCollectionsStage() {
 
     BSONObj readResult;
     BSONObj cmd = ClonerUtils::buildMajorityWaitRequest(_operationTime);
-    getClient()->runCommand("admin", cmd, readResult, QueryOption_SecondaryOk);
+    getClient()->runCommand(
+        DatabaseName(boost::none, "admin"), cmd, readResult, QueryOption_SecondaryOk);
     uassertStatusOKWithContext(
         getStatusFromCommandResult(readResult),
         "TenantDatabaseCloner failed to get listCollections result majority-committed");
@@ -224,7 +225,9 @@ BaseCloner::AfterStageBehavior TenantDatabaseCloner::listExistingCollectionsStag
         clonedCollectionUUIDs.emplace_back(result.getInfo().getUuid());
 
         BSONObj res;
-        client.runCommand(_dbName, BSON("collStats" << result.getName()), res);
+        // TODO SERVER-72945: Use the _dbName which is DatabaseName object already.
+        client.runCommand(
+            DatabaseName(boost::none, _dbName), BSON("collStats" << result.getName()), res);
         if (auto status = getStatusFromCommandResult(res); !status.isOK()) {
             LOGV2_WARNING(5522901,
                           "Skipping recording of data size metrics for database due to failure "

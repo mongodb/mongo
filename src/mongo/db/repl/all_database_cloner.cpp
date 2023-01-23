@@ -227,8 +227,6 @@ void AllDatabaseCloner::postStage() {
             _stats.databaseStats.emplace_back();
             _stats.databaseStats.back().dbname = dbName;
 
-            auto db = DatabaseNameUtil::serialize(dbName);
-
             BSONObj cmdObj = BSON("dbStats" << 1);
             BSONObjBuilder b(cmdObj);
             if (gMultitenancySupport &&
@@ -239,7 +237,7 @@ void AllDatabaseCloner::postStage() {
             }
 
             BSONObj res;
-            getClient()->runCommand(db, b.obj(), res);
+            getClient()->runCommand(dbName, b.obj(), res);
 
             // It is possible for the call to 'dbStats' to fail if the sync source contains invalid
             // views. We should not fail initial sync in this case due to the situation where the

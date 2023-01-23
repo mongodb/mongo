@@ -138,7 +138,7 @@ void CollectionCloner::preStage() {
     }
 
     BSONObj res;
-    getClient()->runCommand(DatabaseNameUtil::serialize(_sourceNss.dbName()), b.obj(), res);
+    getClient()->runCommand(_sourceNss.dbName(), b.obj(), res);
     if (auto status = getStatusFromCommandResult(res); status.isOK()) {
         _stats.bytesToCopy = res.getField("size").safeNumberLong();
         if (_stats.bytesToCopy > 0) {

@@ -93,7 +93,7 @@ protected:
 
         DBDirectClient client(opCtx);
         BSONObj result;
-        client.runCommand(nss.db().toString(), cmdObj, result);
+        client.runCommand(nss.dbName(), cmdObj, result);
         ASSERT_OK(getStatusFromWriteCommandReply(result));
     }
 
@@ -114,7 +114,7 @@ protected:
 
         DBDirectClient client(opCtx);
         BSONObj result;
-        client.runCommand(nss.db().toString(), cmdObj, result);
+        client.runCommand(nss.dbName(), cmdObj, result);
         ASSERT_OK(getStatusFromWriteCommandReply(result));
     }
 

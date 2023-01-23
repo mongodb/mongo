@@ -226,7 +226,7 @@ public:
 
         db.createCollection("unittests.clienttests.create");
         BSONObj info;
-        ASSERT(db.runCommand("unittests",
+        ASSERT(db.runCommand({boost::none, "unittests"},
                              BSON("collstats"
                                   << "clienttests.create"),
                              info));

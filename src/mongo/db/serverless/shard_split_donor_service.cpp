@@ -728,7 +728,7 @@ ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_applySplitConfi
                DBDirectClient client(opCtxHolder.get());
                BSONObj result;
                const bool returnValue =
-                   client.runCommand(NamespaceString::kAdminDb.toString(),
+                   client.runCommand(DatabaseName(boost::none, NamespaceString::kAdminDb),
                                      BSON("replSetReconfig" << splitConfig.toBSON()),
                                      result);
                uassert(ErrorCodes::BadValue,
@@ -1219,7 +1219,7 @@ ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_removeSplitConf
 
                BSONObj result;
                const bool returnValue =
-                   client.runCommand(NamespaceString::kAdminDb.toString(),
+                   client.runCommand(DatabaseName(boost::none, NamespaceString::kAdminDb),
                                      BSON("replSetReconfig" << newConfigBob.obj()),
                                      result);
                uassert(

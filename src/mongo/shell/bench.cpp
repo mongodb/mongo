@@ -126,7 +126,8 @@ bool runCommandWithSession(DBClientBase* conn,
                            BSONObj* result) {
     if (!lsid) {
         invariant(!txnNumber);
-        return conn->runCommand(dbname, cmdObj, *result);
+        // Shell is not tenant aware, so use boost::none here.
+        return conn->runCommand(DatabaseName(boost::none, dbname), cmdObj, *result);
     }
 
     BSONObjBuilder cmdObjWithLsidBuilder;
@@ -161,7 +162,9 @@ bool runCommandWithSession(DBClientBase* conn,
         cmdObjWithLsidBuilder.append("startTransaction", true);
     }
 
-    return conn->runCommand(dbname, cmdObjWithLsidBuilder.done(), *result);
+    // Shell is not tenant aware, so use boost::none here.
+    return conn->runCommand(
+        DatabaseName(boost::none, dbname), cmdObjWithLsidBuilder.done(), *result);
 }
 
 bool runCommandWithSession(DBClientBase* conn,
@@ -929,7 +932,8 @@ void BenchRunWorker::generateLoadOnConnection(DBClientBase* conn) {
         BSONObj result;
         uassert(40640,
                 str::stream() << "Unable to create session due to error " << result,
-                conn->runCommand("admin", BSON("startSession" << 1), result));
+                conn->runCommand(
+                    DatabaseName(boost::none, "admin"), BSON("startSession" << 1), result));
 
         lsid.emplace(LogicalSessionIdToClient::parse(IDLParserContext("lsid"), result["id"].Obj()));
     }

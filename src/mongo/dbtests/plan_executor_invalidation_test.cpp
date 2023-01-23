@@ -146,7 +146,7 @@ public:
     void renameCollection(const std::string& to) {
         BSONObj info;
         ASSERT_TRUE(_client.runCommand(
-            "admin",
+            DatabaseName(boost::none, "admin"),
             BSON("renameCollection" << nss.ns() << "to" << to << "dropTarget" << true),
             info));
         _refreshCollection();

@@ -59,8 +59,7 @@ void SessionsCollectionStandalone::setupSessionsCollection(OperationContext* opC
         }
 
         BSONObj info;
-        if (!client.runCommand(
-                NamespaceString::kLogicalSessionsNamespace.db().toString(), cmd, info)) {
+        if (!client.runCommand(NamespaceString::kLogicalSessionsNamespace.dbName(), cmd, info)) {
             uassertStatusOKWithContext(getStatusFromCommandResult(info),
                                        str::stream() << "Failed to create "
                                                      << NamespaceString::kLogicalSessionsNamespace);

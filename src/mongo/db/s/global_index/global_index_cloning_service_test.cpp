@@ -309,7 +309,8 @@ public:
         CreateGlobalIndex createGlobalIndex(_indexCollectionUUID);
         createGlobalIndex.setDbName({boost::none, "admin"});
         BSONObj cmdResult;
-        auto success = client.runCommand("admin", createGlobalIndex.toBSON({}), cmdResult);
+        auto success =
+            client.runCommand({boost::none, "admin"}, createGlobalIndex.toBSON({}), cmdResult);
         ASSERT(success) << "createGlobalIndex cmd failed with result: " << cmdResult;
     }
 

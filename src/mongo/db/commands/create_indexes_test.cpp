@@ -68,7 +68,7 @@ TEST_F(CreateIndexesTest, CreateIndexesFailsWhenIndexBuildsCollectionIsMissing) 
             "createIndexes" << nss.coll() << "indexes" << BSON_ARRAY(index) << "commitQuorum" << 0);
         BSONObj result;
         // This should fail since config.system.indexBuilds does not exist.
-        ASSERT_FALSE(client.runCommand(nss.db().toString(), createIndexesCmdObj, result)) << result;
+        ASSERT_FALSE(client.runCommand(nss.dbName(), createIndexesCmdObj, result)) << result;
         ASSERT(result.hasField("code"));
         ASSERT_EQ(result.getIntField("code"), 6325700);
     }

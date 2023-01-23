@@ -463,7 +463,7 @@ void MovePrimaryCoordinator::dropStaleDataOnDonor(OperationContext* opCtx) const
     for (const auto& nss : *_doc.getCollectionsToClone()) {
         const auto dropStatus = [&] {
             BSONObj dropResult;
-            dbClient.runCommand(_dbName.toString(), BSON("drop" << nss.coll()), dropResult);
+            dbClient.runCommand(_dbName, BSON("drop" << nss.coll()), dropResult);
             return getStatusFromCommandResult(dropResult);
         }();
 

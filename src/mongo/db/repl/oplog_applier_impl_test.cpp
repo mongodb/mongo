@@ -3423,7 +3423,7 @@ public:
 
         DBDirectClient client(_opCtx.get());
         BSONObj result;
-        ASSERT(client.runCommand(kNs.db().toString(), BSON("create" << kNs.coll()), result));
+        ASSERT(client.runCommand(kNs.dbName(), BSON("create" << kNs.coll()), result));
     }
 
     /**
@@ -3833,10 +3833,10 @@ TEST_F(OplogApplierImplTxnTableTest, MultiApplyUpdatesTheTransactionTable) {
 
     DBDirectClient client(_opCtx.get());
     BSONObj result;
-    ASSERT(client.runCommand(ns0.db().toString(), BSON("create" << ns0.coll()), result));
-    ASSERT(client.runCommand(ns1.db().toString(), BSON("create" << ns1.coll()), result));
-    ASSERT(client.runCommand(ns2.db().toString(), BSON("create" << ns2.coll()), result));
-    ASSERT(client.runCommand(ns3.db().toString(), BSON("create" << ns3.coll()), result));
+    ASSERT(client.runCommand(ns0.dbName(), BSON("create" << ns0.coll()), result));
+    ASSERT(client.runCommand(ns1.dbName(), BSON("create" << ns1.coll()), result));
+    ASSERT(client.runCommand(ns2.dbName(), BSON("create" << ns2.coll()), result));
+    ASSERT(client.runCommand(ns3.dbName(), BSON("create" << ns3.coll()), result));
     auto uuid0 = [&] {
         return AutoGetCollectionForRead(_opCtx.get(), ns0).getCollection()->uuid();
     }();

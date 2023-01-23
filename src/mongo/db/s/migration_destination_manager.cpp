@@ -972,7 +972,7 @@ void MigrationDestinationManager::_dropLocalIndexesIfNecessary(
                     recipientIndex[IndexDescriptor::kKeyPatternFieldName].Obj())) {
                 BSONObj info;
                 if (!client.runCommand(
-                        nss.db().toString(),
+                        nss.dbName(),
                         BSON("dropIndexes" << nss.coll() << "index" << indexNameElem),
                         info))
                     uassertStatusOK(getStatusFromCommandResult(info));

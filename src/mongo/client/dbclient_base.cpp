@@ -275,8 +275,9 @@ std::tuple<bool, std::shared_ptr<DBClientBase>> DBClientBase::runCommandWithTarg
     return std::make_tuple(isOk(info), result.second);
 }
 
-bool DBClientBase::runCommand(const string& dbname, BSONObj cmd, BSONObj& info, int options) {
-    auto res = runCommandWithTarget(dbname, std::move(cmd), info, options);
+bool DBClientBase::runCommand(const DatabaseName& dbName, BSONObj cmd, BSONObj& info, int options) {
+    auto res =
+        runCommandWithTarget(DatabaseNameUtil::serialize(dbName), std::move(cmd), info, options);
     return std::get<0>(res);
 }
 
@@ -296,7 +297,7 @@ long long DBClientBase::count(const NamespaceStringOrUUID nsOrUuid,
 
     BSONObj cmd = _countCmd(nsOrUuid, query, options, limit, skip, readConcernObj, dollarTenant);
     BSONObj res;
-    if (!runCommand(DatabaseNameUtil::serialize(*dbName), cmd, res, options)) {
+    if (!runCommand(*dbName, cmd, res, options)) {
         auto status = getStatusFromCommandResult(res);
         uassertStatusOK(status.withContext("count fails:"));
     }
@@ -460,7 +461,8 @@ bool DBClientBase::auth(const string& dbname,
 }
 
 void DBClientBase::logout(const string& dbname, BSONObj& info) {
-    runCommand(dbname, BSON("logout" << 1), info);
+    // TODO SERVER-72977: Use dbname which is DatabaseName object already.
+    runCommand(DatabaseName(boost::none, dbname), BSON("logout" << 1), info);
 }
 
 bool DBClientBase::isPrimary(bool& isPrimary, BSONObj* info) {
@@ -473,7 +475,7 @@ bool DBClientBase::isPrimary(bool& isPrimary, BSONObj* info) {
     BSONObj o;
     if (info == nullptr)
         info = &o;
-    bool ok = runCommand("admin", bob.obj(), *info);
+    bool ok = runCommand(DatabaseName(boost::none, "admin"), bob.obj(), *info);
     isPrimary =
         info->getField(_apiParameters.getVersion() ? "isWritablePrimary" : "ismaster").trueValue();
     return ok;
@@ -501,7 +503,8 @@ bool DBClientBase::createCollection(const string& ns,
     if (writeConcernObj) {
         b.append(WriteConcernOptions::kWriteConcernField, *writeConcernObj);
     }
-    return runCommand(db.c_str(), b.done(), *info);
+    // TODO SERVER-72942: Use ns.dbName() which is DatabaseName object already.
+    return runCommand(DatabaseName(boost::none, db), b.done(), *info);
 }
 
 list<BSONObj> DBClientBase::getCollectionInfos(const std::string& db, const BSONObj& filter) {
@@ -525,7 +528,7 @@ list<BSONObj> DBClientBase::getCollectionInfos(const DatabaseName& dbName,
     }
 
     BSONObj res;
-    if (runCommand(DatabaseNameUtil::serialize(dbName), b.obj(), res, QueryOption_SecondaryOk)) {
+    if (runCommand(dbName, b.obj(), res, QueryOption_SecondaryOk)) {
         BSONObj cursorObj = res["cursor"].Obj();
         BSONObj collections = cursorObj["firstBatch"].Obj();
         BSONObjIterator it(collections);
@@ -582,7 +585,7 @@ vector<BSONObj> DBClientBase::getDatabaseInfos(const BSONObj& filter,
     BSONObj cmd = bob.done();
 
     BSONObj res;
-    if (runCommand("admin", cmd, res, QueryOption_SecondaryOk)) {
+    if (runCommand(DatabaseName(boost::none, "admin"), cmd, res, QueryOption_SecondaryOk)) {
         BSONObj dbs = res["databases"].Obj();
         BSONObjIterator it(dbs);
         while (it.more()) {
@@ -836,7 +839,7 @@ std::list<BSONObj> DBClientBase::_getIndexSpecs(const NamespaceStringOrUUID& nsO
             (dbName->tenantId() && dollarTenant) ? (dbName->tenantId() == dollarTenant) : true);
 
     BSONObj res;
-    if (runCommand(DatabaseNameUtil::serialize(*dbName), cmd, res, options)) {
+    if (runCommand(*dbName, cmd, res, options)) {
         BSONObj cursorObj = res["cursor"].Obj();
         BSONObjIterator i(cursorObj["firstBatch"].Obj());
         while (i.more()) {
@@ -901,7 +904,8 @@ void DBClientBase::dropIndex(const string& ns,
     }
 
     BSONObj info;
-    if (!runCommand(nsToDatabase(ns), cmdBuilder.obj(), info)) {
+    // TODO SERVER-72946: Use ns.dbName() which is DatabaseName object already.
+    if (!runCommand(DatabaseName(boost::none, nsToDatabase(ns)), cmdBuilder.obj(), info)) {
         LOGV2_DEBUG(20118,
                     _logLevel.toInt(),
                     "dropIndex failed: {info}",
@@ -919,14 +923,20 @@ void DBClientBase::dropIndexes(const string& ns, boost::optional<BSONObj> writeC
         cmdBuilder.append(WriteConcernOptions::kWriteConcernField, *writeConcernObj);
     }
     BSONObj info;
-    uassert(10008, "dropIndexes failed", runCommand(nsToDatabase(ns), cmdBuilder.obj(), info));
+    // TODO SERVER-72946: Use ns.dbName() which is DatabaseName object already.
+    uassert(10008,
+            "dropIndexes failed",
+            runCommand(DatabaseName(boost::none, nsToDatabase(ns)), cmdBuilder.obj(), info));
 }
 
 void DBClientBase::reIndex(const string& ns) {
     BSONObj info;
+    // TODO SERVER-72946: Use ns.dbName() which is DatabaseName object already.
     uassert(18908,
             str::stream() << "reIndex failed: " << info,
-            runCommand(nsToDatabase(ns), BSON("reIndex" << nsToCollectionSubstring(ns)), info));
+            runCommand(DatabaseName(boost::none, nsToDatabase(ns)),
+                       BSON("reIndex" << nsToCollectionSubstring(ns)),
+                       info));
 }
 
 
@@ -973,7 +983,8 @@ void DBClientBase::createIndexes(StringData ns,
     const BSONObj commandObj = command.done();
 
     BSONObj infoObj;
-    if (!runCommand(nsToDatabase(ns), commandObj, infoObj)) {
+    // TODO SERVER-72946: Use the ns.dbName() which is DatabaseName object already.
+    if (!runCommand(DatabaseName(boost::none, nsToDatabase(ns)), commandObj, infoObj)) {
         Status runCommandStatus = getStatusFromCommandResult(infoObj);
         invariant(!runCommandStatus.isOK());
         uassertStatusOK(runCommandStatus);
@@ -1002,7 +1013,8 @@ void DBClientBase::createIndexes(StringData ns,
     const BSONObj commandObj = command.done();
 
     BSONObj infoObj;
-    if (!runCommand(nsToDatabase(ns), commandObj, infoObj)) {
+    // TODO SERVER-72946: Use the ns.dbName() which is DatabaseName object already.
+    if (!runCommand(DatabaseName(boost::none, nsToDatabase(ns)), commandObj, infoObj)) {
         Status runCommandStatus = getStatusFromCommandResult(infoObj);
         invariant(!runCommandStatus.isOK());
         uassertStatusOK(runCommandStatus);

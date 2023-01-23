@@ -435,7 +435,7 @@ Status DBClientConnection::connectSocketOnly(
 void DBClientConnection::logout(const string& dbname, BSONObj& info) {
     authCache.erase(dbname);
     _internalAuthOnReconnect = false;
-    runCommand(dbname, BSON("logout" << 1), info);
+    runCommand(DatabaseName(boost::none, dbname), BSON("logout" << 1), info);
 }
 
 std::pair<rpc::UniqueReply, DBClientBase*> DBClientConnection::runCommandWithTarget(
