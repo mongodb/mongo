@@ -33,6 +33,7 @@
 #include "mongo/db/metadata_consistency_types_gen.h"
 #include "mongo/db/s/ddl_lock_manager.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/s/sharding_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
@@ -87,27 +88,15 @@ public:
                     opCtx, nss.db(), lockReason, DDLLockManager::kDefaultLockTimeout);
 
                 // Send command to all shards
-                auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-                std::vector<AsyncRequestsSender::Request> requests;
-                std::set<ShardId> initializedShards;
-
-                for (const auto& shardId : participants) {
-                    ShardsvrCheckMetadataConsistencyParticipant
-                        checkMetadataConsistencyParticipantRequest(nss);
-                    checkMetadataConsistencyParticipantRequest.setDbName(nss.db());
-                    checkMetadataConsistencyParticipantRequest.setPrimaryShardId(primaryShardId);
-
-                    requests.emplace_back(shardId,
-                                          checkMetadataConsistencyParticipantRequest.toBSON({}));
-
-                    initializedShards.emplace(shardId);
-                }
-
-                responses = gatherResponses(opCtx,
-                                            nss.db(),
-                                            ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                                            Shard::RetryPolicy::kIdempotent,
-                                            requests);
+                ShardsvrCheckMetadataConsistencyParticipant participantRequest{nss};
+                participantRequest.setPrimaryShardId(primaryShardId);
+                const auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+                responses = sharding_util::sendCommandToShards(
+                    opCtx,
+                    nss.db(),
+                    participantRequest.toBSON({}),
+                    participants,
+                    Grid::get(opCtx)->getExecutorPool()->getFixedExecutor());
             }
 
             // Merge responses from shards
