@@ -37,7 +37,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/static_immortal.h"
-#include "mongo/util/system_clock_source.h"
+#include "mongo/util/system_tick_source.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -53,14 +53,14 @@ public:
 
     class BasicSpan final : public Tracer::Span {
     public:
-        BasicSpan(BSONObjBuilder bob, std::shared_ptr<Tracer> tracer)
-            : _bob(std::move(bob)), _tracer(std::move(tracer)) {
-            _bob.append("started"_sd, _tracer->getClockSource()->now());
+        BasicSpan(BSONObjBuilder bob, TickSource::Tick tracerStart, std::shared_ptr<Tracer> tracer)
+            : _bob(std::move(bob)), _tracerStart(tracerStart), _tracer(std::move(tracer)) {
+            _bob.append("startedMicros"_sd, durationCount<Microseconds>(_now()));
         }
 
         ~BasicSpan() {
             _spans = boost::none;
-            _bob.append("stopped"_sd, _tracer->getClockSource()->now());
+            _bob.append("stoppedMicros"_sd, durationCount<Microseconds>(_now()));
         }
 
         BSONObjBuilder makeSubSpan(std::string name) {
@@ -70,9 +70,15 @@ public:
             return _spans->subobjStart(name);
         }
 
+        Microseconds _now() const {
+            auto ts = _tracer->getTickSource();
+            return ts->ticksTo<Microseconds>(ts->getTicks() - _tracerStart);
+        }
+
     private:
         BSONObjBuilder _bob;
         boost::optional<BSONObjBuilder> _spans;
+        TickSource::Tick _tracerStart;
         const std::shared_ptr<Tracer> _tracer;
     };
 
@@ -80,10 +86,13 @@ public:
         if (_spans.empty()) {
             // We're starting a new root span, so erase the most recent trace.
             _trace = boost::none;
+            _tracerStart = _tracer->getTickSource()->getTicks();
         }
-        auto span = std::make_unique<BasicSpan>(_makeObjBuilder(std::move(name)),
-                                                _tracer->shared_from_this());
+
+        auto span = std::make_unique<BasicSpan>(
+            _makeObjBuilder(std::move(name)), _tracerStart, _tracer->shared_from_this());
         _spans.push_back(span.get());
+
         return Tracer::ScopedSpan(span.release(), [this](Tracer::Span* span) {
             invariant(span == _spans.back(), "Spans must go out of scope in the order of creation");
             _spans.pop_back();
@@ -114,8 +123,10 @@ private:
         }
     }
 
+
     const std::string _name;
     Tracer* const _tracer;
+    TickSource::Tick _tracerStart;
 
     std::deque<BasicSpan*> _spans;
     boost::optional<BSONObjBuilder> _builder;
@@ -138,19 +149,19 @@ MONGO_INITIALIZER(InitializeTraceProvider)(InitializerContext*) {
     LOGV2_OPTIONS(5970001,
                   {logv2::LogTag::kStartupWarnings},
                   "Operation tracing is enabled. This may have performance implications.");
-    TracerProvider::initialize(std::make_unique<SystemClockSource>());  // NOLINT
+    TracerProvider::initialize(makeSystemTickSource());  // NOLINT
 }
 
 }  // namespace
 
-Tracer::Tracer(std::string name, ClockSource* clkSource) : _clkSource(clkSource) {
+Tracer::Tracer(std::string name, TickSource* tickSource) : _tickSource(tickSource) {
     _factory = std::make_unique<BasicTracerFactory>(std::move(name), this);
 }
 
-void TracerProvider::initialize(std::unique_ptr<ClockSource> clkSource) {  // NOLINT
+void TracerProvider::initialize(std::unique_ptr<TickSource> tickSource) {  // NOLINT
     auto& provider = getTraceProvider();
     invariant(!provider.has_value(), "already initialized");
-    provider.emplace(TracerProvider(std::move(clkSource)));
+    provider.emplace(TracerProvider(std::move(tickSource)));
 }
 
 TracerProvider& TracerProvider::get() {  // NOLINT
@@ -160,7 +171,7 @@ TracerProvider& TracerProvider::get() {  // NOLINT
 }
 
 std::shared_ptr<Tracer> TracerProvider::getTracer(std::string name) {
-    return std::make_shared<Tracer>(name, _clkSource.get());
+    return std::make_shared<Tracer>(name, _tickSource.get());
 }
 
 }  // namespace mongo

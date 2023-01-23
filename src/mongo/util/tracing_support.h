@@ -35,7 +35,7 @@
 #include <boost/optional.hpp>
 
 #include "mongo/bson/bsonobj.h"
-#include "mongo/util/clock_source.h"
+#include "mongo/util/tick_source.h"
 
 namespace mongo {
 
@@ -75,21 +75,21 @@ namespace mongo {
  * {
  *     "tracer": "myTracer",
  *     "root": {
- *         "started": 2021-11-04T00:00:00.000,
+ *         "startedMicros": 0,
  *         "spans": {
  *             "child": {
- *                 "started": 2021-11-04T00:00:00.001,
- *                 "stopped": 2021-11-04T00:00:00.003,
+ *                 "startedMicros": 1,
+ *                 "stoppedMicros": 3,
  *             },
  *         },
- *         "stopped": 2021-11-04T00:00:00.003,
+ *         "stoppedMicros": 3,
  *     },
  * }
  * ```
  */
 class Tracer : public std::enable_shared_from_this<Tracer> {
 public:
-    Tracer(std::string name, ClockSource* clkSource);
+    Tracer(std::string name, TickSource* tickSource);
 
     class Span {
     public:
@@ -115,12 +115,12 @@ public:
         return _factory->getLatestTrace();
     }
 
-    ClockSource* getClockSource() {
-        return _clkSource;
+    TickSource* getTickSource() {
+        return _tickSource;
     }
 
 private:
-    ClockSource* const _clkSource;
+    TickSource* const _tickSource;
     std::unique_ptr<Factory> _factory;
 };
 
@@ -132,17 +132,17 @@ private:
  */
 class TracerProvider {
 public:
-    explicit TracerProvider(std::unique_ptr<ClockSource> clkSource)
-        : _clkSource(std::move(clkSource)) {}
+    explicit TracerProvider(std::unique_ptr<TickSource> tickSource)
+        : _tickSource(std::move(tickSource)) {}
 
-    static void initialize(std::unique_ptr<ClockSource> clkSource);
+    static void initialize(std::unique_ptr<TickSource> tickSource);
 
     static TracerProvider& get();
 
     std::shared_ptr<Tracer> getTracer(std::string name);
 
 private:
-    std::unique_ptr<ClockSource> _clkSource;
+    std::unique_ptr<TickSource> _tickSource;
 };
 
 }  // namespace mongo
