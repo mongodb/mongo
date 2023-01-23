@@ -42,6 +42,8 @@ public:
     CollectionIndexes(UUID collectionUUID, Timestamp index)
         : _uuid(collectionUUID), _indexVersion(index) {}
 
+    CollectionIndexes() : CollectionIndexes(UUID::gen(), Timestamp()) {}
+
     Timestamp indexVersion() const {
         return _indexVersion;
     }
@@ -57,6 +59,9 @@ public:
     bool operator!=(const CollectionIndexes& otherVersion) const {
         return !(otherVersion == *this);
     }
+
+    static CollectionIndexes parse(const BSONElement& element);
+    void serialize(StringData field, BSONObjBuilder* builder) const;
 
     std::string toString() const;
 

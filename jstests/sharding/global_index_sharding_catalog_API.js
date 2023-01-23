@@ -11,9 +11,15 @@ const st = new ShardingTest({mongos: 1, shards: {rs0: {nodes: 3}, rs1: {nodes: 3
 
 const shard0 = st.shard0.shardName;
 const shard1 = st.shard1.shardName;
-const cbName = 'foo';
+const dbName = 'foo';
 const collectionName = 'test';
-const nss = cbName + '.' + collectionName;
+const collection2Name = 'test2';
+const collection3Name = 'test3';
+const collection4Name = 'test4';
+const nss = dbName + '.' + collectionName;
+const nss2 = dbName + '.' + collection2Name;
+const nss3 = dbName + '.' + collection3Name;
+const nss4 = dbName + '.' + collection4Name;
 const index1Pattern = {
     x: 1
 };
@@ -35,7 +41,7 @@ const configsvrCollectionCatalog = 'config.collections';
 const shardIndexCatalog = 'config.shard.indexes';
 const shardCollectionCatalog = 'config.shard.collections';
 
-st.s.adminCommand({enableSharding: cbName, primaryShard: shard0});
+st.s.adminCommand({enableSharding: dbName, primaryShard: shard0});
 st.s.adminCommand({shardCollection: nss, key: {_id: 1}});
 
 const collectionUUID = st.s.getCollection('config.collections').findOne({_id: nss}).uuid;
@@ -51,8 +57,8 @@ st.rs0.getPrimary().adminCommand({
     writeConcern: {w: 'majority'}
 });
 
-// Check that we created the index on the config server and on shard0, which is the only shard with
-// data.
+jsTestLog(
+    "Check that we created the index on the config server and on shard0, which is the only shard with data.");
 assert.eq(1, st.configRS.getPrimary().getCollection(configsvrIndexCatalog).countDocuments({
     collectionUUID: collectionUUID,
     name: index1Name
@@ -82,7 +88,7 @@ assert.eq(0, st.rs1.getPrimary().getCollection(shardIndexCatalog).countDocuments
     name: index1Name
 }));
 
-// Ensure we committed in the right collection
+jsTestLog("Ensure we committed in the right collection.");
 assert.eq(0, st.configRS.getPrimary().getCollection(shardIndexCatalog).countDocuments({
     collectionUUID: collectionUUID,
     name: index1Name
@@ -99,7 +105,7 @@ assert.eq(0, st.rs1.getPrimary().getCollection(configsvrIndexCatalog).countDocum
 st.s.adminCommand({split: nss, middle: {_id: 0}});
 st.s.adminCommand({moveChunk: nss, find: {_id: 0}, to: shard1});
 
-// Verify indexes are copied to the new shard after a migration.
+jsTestLog("Verify indexes are copied to the new shard after a migration.");
 assert.eq(1, st.rs1.getPrimary().getCollection(shardIndexCatalog).countDocuments({
     collectionUUID: collectionUUID,
     name: index1Name
@@ -109,7 +115,7 @@ assert.eq(1, st.rs1.getSecondary().getCollection(shardIndexCatalog).countDocumen
     name: index1Name
 }));
 
-// AND the index version.
+jsTestLog("AND the index version.");
 const indexVersionRS0 = st.rs0.getPrimary()
                             .getDB('config')
                             .shard.collections.findOne({uuid: collectionUUID})
@@ -131,8 +137,8 @@ st.rs0.getPrimary().adminCommand({
     writeConcern: {w: 'majority'}
 });
 
-// Check that we created the index on the config server and on both shards because there is data
-// everywhere.
+jsTestLog(
+    "Check that we created the index on the config server and on both shards because there is data everywhere.");
 assert.eq(1, st.configRS.getPrimary().getCollection(configsvrIndexCatalog).countDocuments({
     collectionUUID: collectionUUID,
     name: index2Name
@@ -158,7 +164,7 @@ assert.eq(1, st.rs1.getSecondary().getCollection(shardIndexCatalog).countDocumen
     name: index2Name
 }));
 
-// Check we didn't commit in a wrong collection.
+jsTestLog("Check we didn't commit in a wrong collection.");
 assert.eq(0, st.configRS.getPrimary().getCollection(shardIndexCatalog).countDocuments({
     collectionUUID: collectionUUID,
     name: index2Name
@@ -172,7 +178,7 @@ assert.eq(0, st.rs1.getPrimary().getCollection(configsvrIndexCatalog).countDocum
     name: index2Name
 }));
 
-// Drop index test.
+jsTestLog("Drop index test.");
 st.rs0.getPrimary().adminCommand({
     _shardsvrUnregisterIndex: 'foo.test',
     name: index2Name,
@@ -202,9 +208,8 @@ assert.eq(0, st.rs1.getSecondary().getCollection(shardIndexCatalog).countDocumen
     name: index2Name
 }));
 
-// Check global index consolidation.
-// Case 1: 1 leftover index dropped.
-// Initial state: there must be only one index in the shards.
+jsTestLog(
+    "Check global index consolidation. Case 1: 1 leftover index dropped. Initial state: there must be only one index in the shards.");
 assert.eq(1, st.rs0.getPrimary().getCollection(shardIndexCatalog).countDocuments({
     collectionUUID: collectionUUID
 }));
@@ -229,7 +234,7 @@ st.rs0.getPrimary().adminCommand({
     writeConcern: {w: 'majority'}
 });
 
-// Check that there is leftover data.
+jsTestLog("Check that there is leftover data.");
 assert.eq(0, st.rs0.getPrimary().getCollection(shardIndexCatalog).countDocuments({
     collectionUUID: collectionUUID
 }));
@@ -241,7 +246,7 @@ assert.eq(1, st.rs1.getPrimary().getCollection(shardIndexCatalog).countDocuments
     name: index1Name
 }));
 
-// Consolidation of indexes for case 1.
+jsTestLog("Consolidation of indexes for case 1.");
 st.s.adminCommand({moveChunk: nss, find: {_id: 0}, to: shard1});
 assert.eq(0, st.rs0.getPrimary().getCollection(shardIndexCatalog).countDocuments({
     collectionUUID: collectionUUID
@@ -250,8 +255,7 @@ assert.eq(0, st.rs1.getPrimary().getCollection(shardIndexCatalog).countDocuments
     collectionUUID: collectionUUID
 }));
 
-// Case 2: 1 leftover index dropped, and another index created.
-// Add one index.
+jsTestLog("Case 2: 1 leftover index dropped, and another index created. Add one index.");
 st.rs0.getPrimary().adminCommand({
     _shardsvrRegisterIndex: nss,
     keyPattern: index1Pattern,
@@ -263,14 +267,14 @@ st.rs0.getPrimary().adminCommand({
     writeConcern: {w: 'majority'}
 });
 
-// Move only chunk to shard0, leaving "garbage".
+jsTestLog("Move only chunk to shard0, leaving 'garbage'.");
 st.s.adminCommand({moveChunk: nss, find: {_id: 0}, to: shard0});
 assert.eq(1, st.rs1.getPrimary().getCollection(shardIndexCatalog).countDocuments({
     collectionUUID: collectionUUID,
     name: index1Name
 }));
 
-// Drop and create another index.
+jsTestLog("Drop and create another index.");
 st.rs0.getPrimary().adminCommand({
     _shardsvrUnregisterIndex: 'foo.test',
     name: index1Name,
@@ -289,7 +293,7 @@ st.rs0.getPrimary().adminCommand({
     writeConcern: {w: 'majority'}
 });
 
-// We'll find leftover index info.
+jsTestLog("We'll find leftover index info.");
 assert.eq(1, st.rs0.getPrimary().getCollection(shardIndexCatalog).countDocuments({
     collectionUUID: collectionUUID,
     name: index2Name
@@ -307,7 +311,7 @@ assert.eq(0, st.rs1.getPrimary().getCollection(shardIndexCatalog).countDocuments
     name: index2Name
 }));
 
-// Moving the chunk back, this will consolidate the indexes.
+jsTestLog("Moving the chunk back, this will consolidate the indexes.");
 st.s.adminCommand({moveChunk: nss, find: {_id: 0}, to: shard1});
 assert.eq(1, st.rs0.getPrimary().getCollection(shardIndexCatalog).countDocuments({
     collectionUUID: collectionUUID,
@@ -326,7 +330,7 @@ assert.eq(0, st.rs1.getPrimary().getCollection(shardIndexCatalog).countDocuments
     name: index1Name
 }));
 
-// Case 3: Multi-index consolidation test. Create index1 again.
+jsTestLog("Case 3: Multi-index consolidation test. Create index1 again.");
 st.rs0.getPrimary().adminCommand({
     _shardsvrRegisterIndex: nss,
     keyPattern: index1Pattern,
@@ -338,7 +342,7 @@ st.rs0.getPrimary().adminCommand({
     writeConcern: {w: 'majority'}
 });
 
-// Move the chunk back and clear the indexes.
+jsTestLog("Move the chunk back and clear the indexes.");
 st.s.adminCommand({moveChunk: nss, find: {_id: 0}, to: shard0});
 st.rs0.getPrimary().adminCommand({
     _shardsvrUnregisterIndex: 'foo.test',
@@ -355,7 +359,7 @@ st.rs0.getPrimary().adminCommand({
     writeConcern: {w: 'majority'}
 });
 
-// Check for leftover data.
+jsTestLog("Check for leftover data.");
 assert.eq(0, st.rs0.getPrimary().getCollection(shardIndexCatalog).countDocuments({
     collectionUUID: collectionUUID
 }));
@@ -363,7 +367,7 @@ assert.eq(2, st.rs1.getPrimary().getCollection(shardIndexCatalog).countDocuments
     collectionUUID: collectionUUID
 }));
 
-// Create the new indexes.
+jsTestLog("Create the new indexes.");
 st.rs0.getPrimary().adminCommand({
     _shardsvrRegisterIndex: nss,
     keyPattern: index3Pattern,
@@ -385,7 +389,7 @@ st.rs0.getPrimary().adminCommand({
     writeConcern: {w: 'majority'}
 });
 
-// Move chunk, it should consolidate the indexes.
+jsTestLog("Move chunk, it should consolidate the indexes.");
 st.s.adminCommand({moveChunk: nss, find: {_id: 0}, to: shard1});
 assert.eq(2, st.rs0.getPrimary().getCollection(shardIndexCatalog).countDocuments({
     collectionUUID: collectionUUID
@@ -409,6 +413,157 @@ assert.eq(1, st.rs1.getPrimary().getCollection(shardIndexCatalog).countDocuments
     collectionUUID: collectionUUID,
     name: index4Name
 }));
+
+jsTestLog(
+    "Rename test. Have one sharded collection with indexVersion 1. Have a second collection with indexVersion 2. Rename A to B, indexVersion should be bumped.");
+st.s.adminCommand({shardCollection: nss2, key: {_id: 1}});
+const collection2UUID = st.s.getCollection('config.collections').findOne({_id: nss2}).uuid;
+
+st.rs0.getPrimary().adminCommand({
+    _shardsvrRegisterIndex: nss2,
+    keyPattern: index1Pattern,
+    options: {global: true},
+    name: index1Name,
+    collectionUUID: collection2UUID,
+    indexCollectionUUID: UUID(),
+    lastmod: Timestamp(0, 0),
+    writeConcern: {w: 'majority'}
+});
+st.rs0.getPrimary().adminCommand({
+    _shardsvrRegisterIndex: nss2,
+    keyPattern: index2Pattern,
+    options: {global: true},
+    name: index2Name,
+    collectionUUID: collection2UUID,
+    indexCollectionUUID: UUID(),
+    lastmod: Timestamp(0, 0),
+    writeConcern: {w: 'majority'}
+});
+
+assert.eq(2, st.rs0.getPrimary().getCollection(shardIndexCatalog).countDocuments({
+    collectionUUID: collection2UUID
+}));
+assert.eq(1, st.rs0.getPrimary().getCollection(shardIndexCatalog).countDocuments({
+    collectionUUID: collection2UUID,
+    name: index1Name
+}));
+assert.eq(1, st.rs0.getPrimary().getCollection(shardIndexCatalog).countDocuments({
+    collectionUUID: collection2UUID,
+    name: index2Name
+}));
+
+jsTestLog(
+    "Check correct index metadata after rename. Case 1: rename existing sharded collection with destination sharded collection. Snapshot indexVersions for future checks.");
+const indexVersionNss = st.configRS.getPrimary()
+                            .getCollection(configsvrCollectionCatalog)
+                            .findOne({_id: nss})
+                            .indexVersion;
+const indexVersionNss2 = st.configRS.getPrimary()
+                             .getCollection(configsvrCollectionCatalog)
+                             .findOne({_id: nss2})
+                             .indexVersion;
+jsTestLog(
+    "This is the case where the bump makes sense, nss has different indexes than nss2, so, after the rename, we should keep the original indexes of nss.");
+assert(timestampCmp(indexVersionNss, indexVersionNss2));
+
+assert.commandWorked(
+    st.s.getDB(dbName).adminCommand({renameCollection: nss, to: nss2, dropTarget: true}));
+
+jsTestLog("Check CSRS metadata.");
+assert.eq(2, st.configRS.getPrimary().getCollection(configsvrIndexCatalog).countDocuments({
+    collectionUUID: collectionUUID,
+}));
+assert.eq(0, st.configRS.getPrimary().getCollection(configsvrIndexCatalog).countDocuments({
+    collectionUUID: collection2UUID,
+}));
+assert.eq(1, st.configRS.getPrimary().getCollection(configsvrIndexCatalog).countDocuments({
+    collectionUUID: collectionUUID,
+    name: index3Name
+}));
+assert.eq(1, st.configRS.getPrimary().getCollection(configsvrIndexCatalog).countDocuments({
+    collectionUUID: collectionUUID,
+    name: index4Name
+}));
+jsTestLog("Check RS0 metadata.");
+assert.eq(2, st.rs0.getPrimary().getCollection(shardIndexCatalog).countDocuments({
+    collectionUUID: collectionUUID
+}));
+assert.eq(0, st.rs0.getPrimary().getCollection(shardIndexCatalog).countDocuments({
+    collectionUUID: collection2UUID
+}));
+assert.eq(1, st.rs0.getPrimary().getCollection(shardIndexCatalog).countDocuments({
+    collectionUUID: collectionUUID,
+    name: index3Name
+}));
+assert.eq(1, st.rs0.getPrimary().getCollection(shardIndexCatalog).countDocuments({
+    collectionUUID: collectionUUID,
+    name: index4Name
+}));
+jsTestLog("Check RS1 metadata.");
+assert.eq(2, st.rs1.getPrimary().getCollection(shardIndexCatalog).countDocuments({
+    collectionUUID: collectionUUID
+}));
+assert.eq(0, st.rs1.getPrimary().getCollection(shardIndexCatalog).countDocuments({
+    collectionUUID: collection2UUID
+}));
+assert.eq(1, st.rs1.getPrimary().getCollection(shardIndexCatalog).countDocuments({
+    collectionUUID: collectionUUID,
+    name: index3Name
+}));
+assert.eq(1, st.rs1.getPrimary().getCollection(shardIndexCatalog).countDocuments({
+    collectionUUID: collectionUUID,
+    name: index4Name
+}));
+const indexVersionAfterFirstRename = st.configRS.getPrimary()
+                                         .getCollection(configsvrCollectionCatalog)
+                                         .findOne({_id: nss2})
+                                         .indexVersion;
+assert(timestampCmp(indexVersionNss, indexVersionAfterFirstRename) < 0);
+assert(timestampCmp(indexVersionNss2, indexVersionAfterFirstRename) < 0);
+
+st.s.getCollection(nss3).insert({x: 1});
+
+jsTestLog("Case 2: Rename from unsharded collection to sharded collection clears the indexes");
+
+assert.commandWorked(
+    st.s.getDB(dbName).adminCommand({renameCollection: nss3, to: nss2, dropTarget: true}));
+
+assert.eq(0, st.rs0.getPrimary().getCollection(shardIndexCatalog).countDocuments({
+    collectionUUID: collectionUUID
+}));
+assert.eq(0, st.rs1.getPrimary().getCollection(shardIndexCatalog).countDocuments({
+    collectionUUID: collectionUUID
+}));
+assert.eq(0, st.configRS.getPrimary().getCollection(configsvrIndexCatalog).countDocuments({
+    collectionUUID: collectionUUID,
+}));
+
+assert.commandWorked(st.s.getDB(dbName).runCommand({drop: collection2Name}));
+
+jsTestLog(
+    "Case 3: Rename from sharded collection without indexes to sharded collection with indexes clears the indexVersion");
+
+st.s.adminCommand({shardCollection: nss2, key: {_id: 1}});
+st.s.adminCommand({shardCollection: nss3, key: {_id: 1}});
+let collection3UUID = st.s.getCollection('config.collections').findOne({_id: nss3}).uuid;
+
+st.rs0.getPrimary().adminCommand({
+    _shardsvrRegisterIndex: nss3,
+    keyPattern: index1Pattern,
+    options: {global: true},
+    name: index1Name,
+    collectionUUID: collection3UUID,
+    indexCollectionUUID: UUID(),
+    lastmod: Timestamp(0, 0),
+    writeConcern: {w: 'majority'}
+});
+
+assert.commandWorked(
+    st.s.getDB(dbName).adminCommand({renameCollection: nss2, to: nss3, dropTarget: true}));
+
+let nss3Metadata =
+    st.configRS.getPrimary().getCollection(configsvrCollectionCatalog).findOne({_id: nss3});
+assert(!nss3Metadata.indexVersion);
 
 st.stop();
 })();

@@ -605,6 +605,50 @@ void ShardServerOpObserver::onModifyShardedCollectionGlobalIndexCatalogEntry(
             });
 
             break;
+        case 'm': {
+            auto indexVersion = indexDoc["entry"][IndexCatalogType::kLastmodFieldName].timestamp();
+            auto fromNss = NamespaceString(indexDoc["entry"]["fromNss"].String());
+            auto toNss = NamespaceString(indexDoc["entry"]["toNss"].String());
+            opCtx->recoveryUnit()->onCommit([opCtx, fromNss, toNss, indexVersion](auto _) {
+                AutoGetCollection autoCollFrom(
+                    opCtx,
+                    fromNss,
+                    MODE_IX,
+                    AutoGetCollection::Options{}.secondaryNssOrUUIDs({toNss}));
+                std::vector<IndexCatalogType> fromIndexes;
+                boost::optional<UUID> uuid;
+                {
+                    auto fromCSR =
+                        CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
+                            opCtx, fromNss);
+                    uassert(
+                        7079504,
+                        format(FMT_STRING("The critical section for collection {} must be taken in "
+                                          "order to execute this command"),
+                               fromNss.toString()),
+                        fromCSR->getCriticalSectionSignal(
+                            opCtx, ShardingMigrationCriticalSection::kWrite));
+                    auto indexCache = fromCSR->getIndexes(opCtx, true);
+                    indexCache->forEachGlobalIndex([&](const auto& index) {
+                        fromIndexes.push_back(index);
+                        return true;
+                    });
+                    uuid.emplace(indexCache->getCollectionIndexes().uuid());
+
+                    fromCSR->clearIndexes(opCtx);
+                }
+                auto toCSR = CollectionShardingRuntime::assertCollectionLockedAndAcquireExclusive(
+                    opCtx, toNss);
+                uassert(7079505,
+                        format(FMT_STRING("The critical section for collection {} must be taken in "
+                                          "order to execute this command"),
+                               toNss.toString()),
+                        toCSR->getCriticalSectionSignal(opCtx,
+                                                        ShardingMigrationCriticalSection::kWrite));
+                toCSR->replaceIndexes(opCtx, fromIndexes, {*uuid, indexVersion});
+            });
+            break;
+        }
         default:
             MONGO_UNREACHABLE;
     }

@@ -31,6 +31,17 @@
 #include "mongo/s/index_version_gen.h"
 namespace mongo {
 
+CollectionIndexes CollectionIndexes::parse(const BSONElement& element) {
+    auto parsedVersion =
+        CollectionIndexesFormat::parse(IDLParserContext("CollectionIndexes"), element.Obj());
+    return CollectionIndexes({parsedVersion.getUuid(), parsedVersion.getVersion()});
+}
+
+void CollectionIndexes::serialize(StringData field, BSONObjBuilder* builder) const {
+    CollectionIndexesFormat version({_uuid, _indexVersion});
+    builder->append(field, version.toBSON());
+}
+
 std::string CollectionIndexes::toString() const {
     return _uuid.toString() + "|" + _indexVersion.toString();
 }

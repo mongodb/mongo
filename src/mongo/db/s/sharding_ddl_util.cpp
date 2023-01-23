@@ -51,6 +51,7 @@
 #include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog/type_index_catalog_gen.h"
 #include "mongo/s/catalog/type_namespace_placement_gen.h"
 #include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/grid.h"
@@ -58,6 +59,7 @@
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/util/uuid.h"
+
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -214,6 +216,29 @@ void deleteCollection(OperationContext* opCtx,
     };
 
     runTransactionOnShardingCatalog(opCtx, std::move(transactionChain), writeConcern);
+}
+
+void deleteGlobalIndexesMetadata(OperationContext* opCtx,
+                                 const UUID& uuid,
+                                 const WriteConcernOptions& writeConcern) {
+    BatchedCommandRequest request([&] {
+        write_ops::DeleteCommandRequest deleteOp(NamespaceString::kConfigsvrIndexCatalogNamespace);
+        deleteOp.setDeletes({[&] {
+            write_ops::DeleteOpEntry entry;
+            entry.setQ(BSON(IndexCatalogType::kCollectionUUIDFieldName << uuid));
+            entry.setMulti(true);
+            return entry;
+        }()});
+        return deleteOp;
+    }());
+
+    request.setWriteConcern(writeConcern.toBSON());
+
+    auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
+    auto response = configShard->runBatchWriteCommand(
+        opCtx, Milliseconds::max(), request, Shard::RetryPolicy::kIdempotentOrCursorInvalidated);
+
+    uassertStatusOK(response.toStatus());
 }
 
 write_ops::UpdateCommandRequest buildNoopWriteRequestCommand() {
@@ -475,6 +500,8 @@ void removeCollAndChunksMetadataFromConfig(OperationContext* opCtx,
     deleteCollection(opCtx, nss, uuid, writeConcern);
 
     deleteChunks(opCtx, uuid, writeConcern);
+
+    deleteGlobalIndexesMetadata(opCtx, uuid, writeConcern);
 }
 
 bool removeCollAndChunksMetadataFromConfig_notIdempotent(OperationContext* opCtx,

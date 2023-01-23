@@ -538,12 +538,17 @@ void CollectionShardingRuntime::resetShardVersionRecoverRefreshFuture() {
 
 boost::optional<CollectionIndexes> CollectionShardingRuntime::getCollectionIndexes(
     OperationContext* opCtx) const {
+    _checkCritSecForIndexMetadata(opCtx);
+
     return _globalIndexesInfo ? boost::make_optional(_globalIndexesInfo->getCollectionIndexes())
                               : boost::none;
 }
 
-const boost::optional<GlobalIndexesCache>& CollectionShardingRuntime::getIndexes(
-    OperationContext* opCtx) const {
+boost::optional<GlobalIndexesCache> CollectionShardingRuntime::getIndexes(OperationContext* opCtx,
+                                                                          bool withCritSec) const {
+    if (!withCritSec)
+        _checkCritSecForIndexMetadata(opCtx);
+
     return _globalIndexesInfo;
 }
 
@@ -681,6 +686,37 @@ void CollectionShardingRuntime::_cleanupBeforeInstallingNewCollectionMetadata(
             })
             .getAsync([](auto) {});
     }
+}
+
+void CollectionShardingRuntime::_checkCritSecForIndexMetadata(OperationContext* opCtx) const {
+    if (!ShardingState::get(opCtx)->enabled())
+        return;
+
+    if (repl::ReadConcernArgs::get(opCtx).getLevel() ==
+        repl::ReadConcernLevel::kAvailableReadConcern)
+        return;
+
+    const auto optReceivedShardVersion = getOperationReceivedVersion(opCtx, _nss);
+
+    // Assume that the received shard version was IGNORED if the current operation wasn't
+    // versioned
+    const auto& receivedShardVersion =
+        optReceivedShardVersion ? *optReceivedShardVersion : ShardVersion::IGNORED();
+    auto criticalSectionSignal = _critSec.getSignal(opCtx->lockState()->isWriteLocked()
+                                                        ? ShardingMigrationCriticalSection::kWrite
+                                                        : ShardingMigrationCriticalSection::kRead);
+    std::string reason = _critSec.getReason() ? _critSec.getReason()->toString() : "unknown";
+    uassert(StaleConfigInfo(_nss,
+                            receivedShardVersion,
+                            boost::none /* wantedVersion */,
+                            ShardingState::get(opCtx)->shardId(),
+                            std::move(criticalSectionSignal),
+                            opCtx->lockState()->isWriteLocked()
+                                ? StaleConfigInfo::OperationType::kWrite
+                                : StaleConfigInfo::OperationType::kRead),
+            str::stream() << "The critical section for " << _nss.ns()
+                          << " is acquired with reason: " << reason,
+            !criticalSectionSignal);
 }
 
 }  // namespace mongo

@@ -85,7 +85,8 @@ void removeCollAndChunksMetadataFromConfig(OperationContext* opCtx,
 
 /**
  * Erase collection metadata from config server and invalidate the locally cached one.
- * In particular remove the collection and chunks metadata associated with the given namespace.
+ * In particular remove the collection, chunks and index metadata associated with the given
+ * namespace.
  *
  * Returns true if the collection existed before being removed.
  */
@@ -224,6 +225,5 @@ BSONObj getCriticalSectionReasonForRename(const NamespaceString& from, const Nam
 void ensureCollectionDroppedNoChangeEvent(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           const boost::optional<UUID>& uuid = boost::none);
-
 }  // namespace sharding_ddl_util
 }  // namespace mongo

@@ -39,15 +39,19 @@
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/s/global_index_ddl_util.h"
+#include "mongo/db/s/sharded_index_catalog_commands_gen.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/index_version.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -84,6 +88,43 @@ boost::optional<UUID> getCollectionUUID(OperationContext* opCtx,
             collPtr);
 
     return collPtr->uuid();
+}
+
+void renameIndexMetadataInShards(OperationContext* opCtx,
+                                 const NamespaceString& nss,
+                                 const RenameCollectionRequest& request,
+                                 const OperationSessionInfo& osi,
+                                 const std::shared_ptr<executor::TaskExecutor>& executor,
+                                 RenameCollectionCoordinatorDocument* doc) {
+    const auto [configTime, newIndexVersion] = [opCtx]() -> std::pair<LogicalTime, Timestamp> {
+        VectorClock::VectorTime vt = VectorClock::get(opCtx)->getTime();
+        return {vt.configTime(), vt.clusterTime().asTimestamp()};
+    }();
+
+    // Bump the index version only if there are indexes in the source
+    // collection.
+    auto optShardedCollInfo = doc->getOptShardedCollInfo();
+    if (optShardedCollInfo && optShardedCollInfo->getIndexVersion()) {
+        // Bump sharding catalog's index version on the config server if the source
+        // collection is sharded. It will be updated later on.
+        optShardedCollInfo->setIndexVersion(newIndexVersion);
+        doc->setOptShardedCollInfo(optShardedCollInfo);
+    }
+
+    // Update global index metadata in shards.
+    auto& toNss = request.getTo();
+
+    auto participants = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+    ShardsvrRenameIndexMetadata renameIndexCatalogReq(
+        nss, toNss, {doc->getSourceUUID().value(), newIndexVersion});
+    const auto renameIndexCatalogCmdObj =
+        CommandHelpers::appendMajorityWriteConcern(renameIndexCatalogReq.toBSON({}));
+    sharding_ddl_util::sendAuthenticatedCommandToShards(
+        opCtx,
+        toNss.db(),
+        renameIndexCatalogCmdObj.addFields(osi.toBSON()),
+        participants,
+        executor);
 }
 }  // namespace
 
@@ -338,6 +379,12 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 if (!_firstExecution) {
                     _performNoopRetryableWriteOnAllShardsAndConfigsvr(
                         opCtx, getCurrentSession(), **executor);
+                }
+
+                if (!_isPre63Compatible() &&
+                    (_doc.getTargetIsSharded() || _doc.getOptShardedCollInfo())) {
+                    renameIndexMetadataInShards(
+                        opCtx, nss(), _request, getCurrentSession(), **executor, &_doc);
                 }
 
                 ConfigsvrRenameCollectionMetadata req(nss(), _request.getTo());

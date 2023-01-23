@@ -43,3 +43,23 @@ structs:
                 description: "Collection index version"
                 cpp_name: IndexVersion
                 optional: true
+    CollectionIndexesFormat:
+        description: Class that provides the serialization/deserialization for CollectionIndexes
+                      and the network/persistence format.
+        strict: false
+        fields:
+            uuid:
+                type: uuid
+                description: "Collection uuid"
+            version:
+                type: timestamp
+                description: "Cluster time representing the wall time of the latest index change."
+
+types:
+    # The canonical serialisation format for IndexVersions
+    CollectionIndexes:
+        bson_serialization_type: any
+        description: "An object representing an index version for a collection."
+        cpp_type: CollectionIndexes
+        serializer: CollectionIndexes::serialize
+        deserializer: CollectionIndexes::parse

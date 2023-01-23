@@ -59,6 +59,94 @@ void deleteGlobalIndexes(OperationContext* opCtx,
 }
 }  // namespace
 
+void renameGlobalIndexesMetadata(OperationContext* opCtx,
+                                 const NamespaceString& fromNss,
+                                 const NamespaceString& toNss,
+                                 const Timestamp& indexVersion) {
+    writeConflictRetry(
+        opCtx,
+        "RenameGlobalIndexesMetadata",
+        NamespaceString::kShardIndexCatalogNamespace.ns(),
+        [&]() {
+            boost::optional<UUID> toUuid;
+            WriteUnitOfWork wunit(opCtx);
+            AutoGetCollection collsColl(
+                opCtx, NamespaceString::kShardCollectionCatalogNamespace, MODE_IX);
+            {
+                // First get the document to check the index version if the document already exists
+                const auto queryTo = BSON(CollectionType::kNssFieldName << toNss.ns());
+                BSONObj collectionDoc;
+                bool docExists =
+                    Helpers::findOne(opCtx, collsColl.getCollection(), queryTo, collectionDoc);
+                if (docExists &&
+                    indexVersion <=
+                        collectionDoc[CollectionType::kIndexVersionFieldName].timestamp()) {
+                    LOGV2_DEBUG(
+                        7079500,
+                        1,
+                        "renameGlobalIndexesMetadata has index version older than current "
+                        "collection index version",
+                        "collectionIndexVersion"_attr =
+                            collectionDoc[CollectionType::kIndexVersionFieldName].timestamp(),
+                        "expectedIndexVersion"_attr = indexVersion);
+                    return;
+                }
+                // Update the document (or create it) with the new index version
+                repl::UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
+                // Save uuid to remove the 'to' indexes later on.
+                if (docExists) {
+                    toUuid =
+                        uassertStatusOK(UUID::parse(collectionDoc[CollectionType::kUuidFieldName]));
+                    // Remove the 'to' entry.
+                    mongo::deleteObjects(opCtx,
+                                         collsColl.getCollection(),
+                                         NamespaceString::kShardCollectionCatalogNamespace,
+                                         queryTo,
+                                         true);
+                }
+                // Replace the _id in the 'From' entry.
+                BSONObj collectionFromDoc;
+                auto queryFrom = BSON(CollectionType::kNssFieldName << fromNss.ns());
+                Helpers::findOne(opCtx, collsColl.getCollection(), queryFrom, collectionFromDoc);
+                auto finalDoc = collectionFromDoc.addField(
+                    BSON(CollectionType::kNssFieldName << toNss.ns()).firstElement());
+
+                mongo::deleteObjects(opCtx,
+                                     collsColl.getCollection(),
+                                     NamespaceString::kShardCollectionCatalogNamespace,
+                                     queryFrom,
+                                     true);
+                uassertStatusOK(collection_internal::insertDocument(
+                    opCtx, collsColl.getCollection(), InsertStatement(finalDoc), nullptr));
+            }
+            AutoGetCollection idxColl(opCtx, NamespaceString::kShardIndexCatalogNamespace, MODE_IX);
+
+            if (toUuid) {
+                // Remove the 'to' indexes.
+                repl::UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
+                mongo::deleteObjects(
+                    opCtx,
+                    idxColl.getCollection(),
+                    NamespaceString::kShardIndexCatalogNamespace,
+                    BSON(IndexCatalogType::kCollectionUUIDFieldName << toUuid.value()),
+                    false);
+            }
+
+            auto entryObj = BSON("op"
+                                 << "m"
+                                 << "entry"
+                                 << BSON(IndexCatalogType::kLastmodFieldName
+                                         << indexVersion << "fromNss" << fromNss.ns() << "toNss"
+                                         << toNss.ns()));
+
+            opCtx->getServiceContext()
+                ->getOpObserver()
+                ->onModifyShardedCollectionGlobalIndexCatalogEntry(
+                    opCtx, fromNss, idxColl->uuid(), entryObj);
+            wunit.commit();
+        });
+}
+
 void addGlobalIndexCatalogEntryToCollection(OperationContext* opCtx,
                                             const NamespaceString& userCollectionNss,
                                             const std::string& name,
@@ -98,7 +186,7 @@ void addGlobalIndexCatalogEntryToCollection(OperationContext* opCtx,
                     return;
                 }
                 // Update the document (or create it) with the new index version
-                repl::UnreplicatedWritesBlock uneplicatedWritesBlock(opCtx);
+                repl::UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
                 auto request = UpdateRequest();
                 request.setNamespaceString(NamespaceString::kShardCollectionCatalogNamespace);
                 request.setQuery(query);
@@ -114,7 +202,7 @@ void addGlobalIndexCatalogEntryToCollection(OperationContext* opCtx,
             AutoGetCollection idxColl(opCtx, NamespaceString::kShardIndexCatalogNamespace, MODE_IX);
 
             {
-                repl::UnreplicatedWritesBlock uneplicatedWritesBlock(opCtx);
+                repl::UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
                 BSONObjBuilder builder(indexCatalogEntry.toBSON());
                 auto idStr = format(FMT_STRING("{}_{}"), collectionUUID.toString(), name);
                 builder.append("_id", idStr);
@@ -168,7 +256,7 @@ void removeGlobalIndexCatalogEntryFromCollection(OperationContext* opCtx,
                     return;
                 }
                 // Update the document (or create it) with the new index version
-                repl::UnreplicatedWritesBlock uneplicatedWritesBlock(opCtx);
+                repl::UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
                 auto request = UpdateRequest();
                 request.setNamespaceString(NamespaceString::kShardCollectionCatalogNamespace);
                 request.setQuery(query);
@@ -184,7 +272,7 @@ void removeGlobalIndexCatalogEntryFromCollection(OperationContext* opCtx,
             AutoGetCollection idxColl(opCtx, NamespaceString::kShardIndexCatalogNamespace, MODE_IX);
 
             {
-                repl::UnreplicatedWritesBlock uneplicatedWritesBlock(opCtx);
+                repl::UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
                 mongo::deleteObjects(opCtx,
                                      idxColl.getCollection(),
                                      NamespaceString::kShardIndexCatalogNamespace,
@@ -226,7 +314,7 @@ void replaceGlobalIndexes(OperationContext* opCtx,
                                         << nss.ns() << CollectionType::kUuidFieldName << uuid);
 
                 // Update the document (or create it) with the new index version
-                repl::UnreplicatedWritesBlock uneplicatedWritesBlock(opCtx);
+                repl::UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
                 auto request = UpdateRequest();
                 request.setNamespaceString(NamespaceString::kShardCollectionCatalogNamespace);
                 request.setQuery(query);
@@ -243,7 +331,7 @@ void replaceGlobalIndexes(OperationContext* opCtx,
             BSONArrayBuilder indexesBSON;
             {
                 // Clear old indexes.
-                repl::UnreplicatedWritesBlock uneplicatedWritesBlock(opCtx);
+                repl::UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
                 deleteGlobalIndexes(opCtx, idxColl.getCollection(), uuid);
 
                 // Add new indexes.
@@ -299,23 +387,22 @@ void clearGlobalIndexes(OperationContext* opCtx,
                 if (!docExists || collectionDoc[CollectionType::kIndexVersionFieldName].eoo()) {
                     return;
                 }
-                // Update the document (or create it) with the new index version
-                repl::UnreplicatedWritesBlock uneplicatedWritesBlock(opCtx);
-                auto request = UpdateRequest();
-                request.setNamespaceString(NamespaceString::kShardCollectionCatalogNamespace);
-                request.setQuery(query);
-                request.setUpdateModification(write_ops::UpdateModification::parseFromClassicUpdate(
-                    BSON("$unset" << BSON(CollectionType::kIndexVersionFieldName << 1))));
-                request.setUpsert(true);
-                request.setFromOplogApplication(true);
-                mongo::update(opCtx, collsColl.getDb(), request);
+                repl::UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
+                mongo::deleteObjects(opCtx,
+                                     collsColl.getCollection(),
+                                     NamespaceString::kShardCollectionCatalogNamespace,
+                                     query,
+                                     true);
+                auto finalDoc = collectionDoc.filterFieldsUndotted(
+                    BSON(CollectionType::kIndexVersionFieldName << 1), false);
+                uassertStatusOK(collection_internal::insertDocument(
+                    opCtx, collsColl.getCollection(), InsertStatement(finalDoc), nullptr));
             }
 
             AutoGetCollection idxColl(opCtx, NamespaceString::kShardIndexCatalogNamespace, MODE_IX);
 
-            BSONArrayBuilder queryIds;
             {
-                repl::UnreplicatedWritesBlock uneplicatedWritesBlock(opCtx);
+                repl::UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
                 deleteGlobalIndexes(opCtx, idxColl.getCollection(), collectionUUID);
             }
             auto entryObj = BSON("op"

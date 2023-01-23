@@ -47,11 +47,14 @@
 
 global:
     cpp_namespace: "mongo"
+    cpp_includes:
+        - "mongo/s/index_version.h"
 
 imports:
     - "mongo/db/basic_types.idl"
     - "mongo/s/sharding_types.idl"
     - "mongo/s/catalog/type_index_catalog.idl"
+    - "mongo/s/index_version.idl"
 
 structs:
     UnregisterIndexCatalogRequest:
@@ -90,6 +93,22 @@ commands:
         strict: false
         chained_structs:
             IndexCatalogType: IndexCatalogType
+
+    _shardsvrRenameIndexMetadata:
+        command_name: _shardsvrRenameIndexMetadata
+        cpp_name: ShardsvrRenameIndexMetadata
+        description: "Internal command to rename the sharding index catalog metadata in a shard."
+        api_version: ""
+        namespace: type
+        type: namespacestring
+        strict: false
+        fields:
+            toNss:
+                type: namespacestring
+                description: "Destination collection name."
+            indexVersion:
+                type: CollectionIndexes
+                description: "Collection index version with uuid"
 
     _configsvrCommitIndex:
         command_name: _configsvrCommitIndex

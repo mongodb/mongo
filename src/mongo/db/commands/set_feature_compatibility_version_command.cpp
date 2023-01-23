@@ -316,6 +316,15 @@ public:
             // Set the client's last opTime to the system last opTime so no-ops wait for
             // writeConcern.
             repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
+
+            // TODO SERVER-72796: Remove once gGlobalIndexesShardingCatalog is enabled.
+            if (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
+                feature_flags::gGlobalIndexesShardingCatalog.isEnabledOnVersion(requestedVersion)) {
+                ShardingDDLCoordinatorService::getService(opCtx)
+                    ->waitForCoordinatorsOfGivenTypeToComplete(
+                        opCtx, DDLCoordinatorTypeEnum::kRenameCollectionPre63Compatible);
+            }
+
             return true;
         }
 
@@ -420,6 +429,15 @@ public:
                 false /* setTargetVersion */);
         }
 
+        // TODO SERVER-72796: Remove once gGlobalIndexesShardingCatalog is enabled.
+        if (serverGlobalParams.clusterRole == ClusterRole::ShardServer &&
+            requestedVersion > actualVersion &&
+            feature_flags::gGlobalIndexesShardingCatalog.isEnabledOnVersion(requestedVersion)) {
+            ShardingDDLCoordinatorService::getService(opCtx)
+                ->waitForCoordinatorsOfGivenTypeToComplete(
+                    opCtx, DDLCoordinatorTypeEnum::kRenameCollectionPre63Compatible);
+        }
+
         LOGV2(6744302,
               "setFeatureCompatibilityVersion succeeded",
               "upgradeOrDowngrade"_attr = upgradeOrDowngrade,
@@ -459,6 +477,14 @@ private:
             // incompatible on disk metadata
             ShardingDDLCoordinatorService::getService(opCtx)
                 ->waitForCoordinatorsOfGivenTypeToComplete(opCtx, DDLCoordinatorTypeEnum::kCollMod);
+        }
+
+        // TODO SERVER-72796: Remove once gGlobalIndexesShardingCatalog is enabled.
+        if (actualVersion > requestedVersion &&
+            !feature_flags::gGlobalIndexesShardingCatalog.isEnabledOnVersion(requestedVersion)) {
+            ShardingDDLCoordinatorService::getService(opCtx)
+                ->waitForCoordinatorsOfGivenTypeToComplete(
+                    opCtx, DDLCoordinatorTypeEnum::kRenameCollection);
         }
 
         // TODO SERVER-68373 remove once 7.0 becomes last LTS

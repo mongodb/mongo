@@ -31,6 +31,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/catalog/rename_collection.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/s/rename_collection_coordinator.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/s/sharding_ddl_util.h"
@@ -38,6 +39,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -91,19 +93,26 @@ public:
             if (fromNss.db() != toNss.db()) {
                 sharding_ddl_util::checkDbPrimariesOnTheSameShard(opCtx, fromNss, toNss);
             }
-
             validateNamespacesForRenameCollection(opCtx, fromNss, toNss);
 
-            auto coordinatorDoc = RenameCollectionCoordinatorDocument();
-            coordinatorDoc.setRenameCollectionRequest(req.getRenameCollectionRequest());
-            coordinatorDoc.setShardingDDLCoordinatorMetadata(
-                {{fromNss, DDLCoordinatorTypeEnum::kRenameCollection}});
-            coordinatorDoc.setAllowEncryptedCollectionRename(
-                req.getAllowEncryptedCollectionRename().value_or(false));
+            auto renameCollectionCoordinator = [&]() {
+                FixedFCVRegion fixedFcvRegion{opCtx};
+                auto coordinatorDoc = RenameCollectionCoordinatorDocument();
+                coordinatorDoc.setRenameCollectionRequest(req.getRenameCollectionRequest());
+                // TODO SERVER-72796: Remove once gGlobalIndexesShardingCatalog is enabled.
+                coordinatorDoc.setShardingDDLCoordinatorMetadata(
+                    {{fromNss,
+                      feature_flags::gGlobalIndexesShardingCatalog.isEnabled(*fixedFcvRegion)
+                          ? DDLCoordinatorTypeEnum::kRenameCollection
+                          : DDLCoordinatorTypeEnum::kRenameCollectionPre63Compatible}});
+                coordinatorDoc.setAllowEncryptedCollectionRename(
+                    req.getAllowEncryptedCollectionRename().value_or(false));
+                auto service = ShardingDDLCoordinatorService::getService(opCtx);
+                auto coordinator = checked_pointer_cast<RenameCollectionCoordinator>(
+                    service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
+                return coordinator;
+            }();
 
-            auto service = ShardingDDLCoordinatorService::getService(opCtx);
-            auto renameCollectionCoordinator = checked_pointer_cast<RenameCollectionCoordinator>(
-                service->getOrCreateInstance(opCtx, coordinatorDoc.toBSON()));
             return renameCollectionCoordinator->getResponse(opCtx);
         }
 

@@ -35,6 +35,14 @@
 namespace mongo {
 
 /**
+ * Renames the global indexes metadata.
+ */
+void renameGlobalIndexesMetadata(OperationContext* opCtx,
+                                 const NamespaceString& fromNss,
+                                 const NamespaceString& toNss,
+                                 const Timestamp& indexVersion);
+
+/**
  * Adds a new index entry into the in-memory catalog and persist it to disk. It effectively executes
  * two writes, so it should only be called after stopping migrations and holding the critical
  * section in all shards with data for userCollectionNss. This function is not currently compatible

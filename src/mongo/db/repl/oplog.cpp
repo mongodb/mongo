@@ -1190,7 +1190,8 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                                                             indexEntry.getCollectionUUID(),
                                                             indexEntry.getLastmod(),
                                                             indexEntry.getIndexCollectionUUID());
-                 } break;
+                     break;
+                 }
                  case 'd':
                      removeGlobalIndexCatalogEntryFromCollection(
                          opCtx,
@@ -1214,7 +1215,8 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                              entryObj["entry"][IndexCatalogType::kCollectionUUIDFieldName])),
                          indexVersion,
                          indexes);
-                 } break;
+                     break;
+                 }
                  case 'c':
                      clearGlobalIndexes(
                          opCtx,
@@ -1222,6 +1224,16 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
                          uassertStatusOK(UUID::parse(
                              entryObj["entry"][IndexCatalogType::kCollectionUUIDFieldName])));
                      break;
+                 case 'm': {
+                     auto fromNss = NamespaceString(entryObj["entry"]["fromNss"].String());
+                     auto toNss = NamespaceString(entryObj["entry"]["toNss"].String());
+                     renameGlobalIndexesMetadata(
+                         opCtx,
+                         fromNss,
+                         toNss,
+                         entryObj["entry"][IndexCatalogType::kLastmodFieldName].timestamp());
+                     break;
+                 }
                  default:
                      MONGO_UNREACHABLE;
              }

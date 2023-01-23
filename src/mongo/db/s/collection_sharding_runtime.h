@@ -265,14 +265,17 @@ public:
     void resetShardVersionRecoverRefreshFuture();
 
     /**
-     * Gets an index version under a lock.
+     * Gets the shard's index version.
      */
     boost::optional<CollectionIndexes> getCollectionIndexes(OperationContext* opCtx) const;
 
     /**
-     * Gets the index list under a lock.
+     * Gets the shard's index cache.
+     *
+     * If withCritSec is true, then this function is being called under a critical section.
      */
-    const boost::optional<GlobalIndexesCache>& getIndexes(OperationContext* opCtx) const;
+    boost::optional<GlobalIndexesCache> getIndexes(OperationContext* opCtx,
+                                                   bool withCritSec = false) const;
 
     /**
      * Add a new index to the shard-role index info under a lock.
@@ -342,6 +345,11 @@ private:
      * replaced by the new metadata.
      */
     void _cleanupBeforeInstallingNewCollectionMetadata(WithLock, OperationContext* opCtx);
+
+    /**
+     * This function throws an StaleConfigInfo exception if the critical section is held.
+     */
+    void _checkCritSecForIndexMetadata(OperationContext* opCtx) const;
 
     // The service context under which this instance runs
     ServiceContext* const _serviceContext;

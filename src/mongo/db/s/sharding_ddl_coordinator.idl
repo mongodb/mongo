@@ -48,7 +48,9 @@ enums:
             kMovePrimary: "movePrimary"
             kDropDatabase: "dropDatabase"
             kDropCollection: "dropCollection"
-            kRenameCollection: "renameCollection"
+            kRenameCollection: "renameCollection_V2"
+            # TODO SERVER-72796: Remove once gGlobalIndexesShardingCatalog is enabled.
+            kRenameCollectionPre63Compatible: "renameCollection"
             kCreateCollection: "createCollection_V3"
             # TODO SERVER-68008: Remove once 7.0 becomes last LTS
             kCreateCollectionPre61Compatible: "createCollection_V2"
