@@ -846,7 +846,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const SortedMergeNode& n,
                                       _slotIdGenerator,
                                       _metadata,
                                       _nodeToGroupPropsMap,
-                                      _randomScan);
+                                      _scanOrder);
         auto loweredChild = localLowering.optimize(child);
         tassert(7063700, "Unexpected rid slot", !localRIDSlot);
 
@@ -907,7 +907,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const UnionNode& n,
                                       _slotIdGenerator,
                                       _metadata,
                                       _nodeToGroupPropsMap,
-                                      _randomScan);
+                                      _scanOrder);
         auto loweredChild = localLowering.optimize(child);
         tassert(6624258, "Unexpected rid slot", !localRIDSlot);
 
@@ -1025,24 +1025,34 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const PhysicalScanNode& n,
                                                       nullptr /*yieldPolicy*/,
                                                       planNodeId,
                                                       callbacks);
-        } else {
-            return sbe::makeS<sbe::ScanStage>(nss.uuid().value(),
-                                              rootSlot,
-                                              ridSlot,
-                                              boost::none,
-                                              boost::none,
-                                              boost::none,
-                                              boost::none,
-                                              boost::none,
-                                              fields,
-                                              vars,
-                                              seekKeySlot,
-                                              true /*forward*/,
-                                              nullptr /*yieldPolicy*/,
-                                              planNodeId,
-                                              callbacks,
-                                              _randomScan);
         }
+
+        bool forwardScan = [&]() {
+            switch (_scanOrder) {
+                case ScanOrder::Forward:
+                case ScanOrder::Random:
+                    return true;
+                case ScanOrder::Reverse:
+                    return false;
+            }
+            MONGO_UNREACHABLE;
+        }();
+        return sbe::makeS<sbe::ScanStage>(nss.uuid().value(),
+                                          rootSlot,
+                                          ridSlot,
+                                          boost::none,
+                                          boost::none,
+                                          boost::none,
+                                          boost::none,
+                                          boost::none,
+                                          fields,
+                                          vars,
+                                          seekKeySlot,
+                                          forwardScan,
+                                          nullptr /*yieldPolicy*/,
+                                          planNodeId,
+                                          callbacks,
+                                          _scanOrder == ScanOrder::Random);
     } else {
         uasserted(6624355, "Unknown scan type.");
     }

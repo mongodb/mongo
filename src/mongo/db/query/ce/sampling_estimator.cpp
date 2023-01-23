@@ -268,7 +268,7 @@ private:
                           ids,
                           _phaseManager.getMetadata(),
                           _phaseManager.getNodeToGroupPropsMap(),
-                          true /*randomScan*/};
+                          ScanOrder::Random};
         auto sbePlan = g.optimize(abtTree);
         tassert(6624261, "Unexpected rid slot", !ridSlot);
 

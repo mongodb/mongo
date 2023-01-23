@@ -441,7 +441,7 @@ TEST_F(NodeSBE, Lower1) {
                       ids,
                       phaseManager.getMetadata(),
                       phaseManager.getNodeToGroupPropsMap(),
-                      false /*randomScan*/};
+                      ScanOrder::Forward};
     auto sbePlan = g.optimize(tree);
     ASSERT_EQ(1, map.size());
     ASSERT_FALSE(ridSlot);
@@ -666,7 +666,7 @@ TEST_F(NodeSBE, RequireRID) {
                       ids,
                       phaseManager.getMetadata(),
                       phaseManager.getNodeToGroupPropsMap(),
-                      false /*randomScan*/};
+                      ScanOrder::Forward};
     auto sbePlan = g.optimize(tree);
     ASSERT_EQ(1, map.size());
     ASSERT_TRUE(ridSlot);
@@ -808,7 +808,7 @@ TEST_F(NodeSBE, SpoolFibonacci) {
     auto runtimeEnv = std::make_unique<sbe::RuntimeEnvironment>();
     boost::optional<sbe::value::SlotId> ridSlot;
     sbe::value::SlotIdGenerator ids;
-    SBENodeLowering g{env, map, *runtimeEnv, ridSlot, ids, metadata, props, false /*randomScan*/};
+    SBENodeLowering g{env, map, *runtimeEnv, ridSlot, ids, metadata, props, ScanOrder::Forward};
     auto sbePlan = g.optimize(tree);
     ASSERT_EQ(1, map.size());
 

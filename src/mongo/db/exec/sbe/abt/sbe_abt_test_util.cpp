@@ -139,7 +139,7 @@ std::vector<BSONObj> runSBEAST(OperationContext* opCtx,
                       ids,
                       phaseManager.getMetadata(),
                       phaseManager.getNodeToGroupPropsMap(),
-                      false /*randomScan*/};
+                      ScanOrder::Forward};
     auto sbePlan = g.optimize(tree);
     ASSERT_EQ(1, map.size());
     tassert(6624260, "Unexpected rid slot", !ridSlot);

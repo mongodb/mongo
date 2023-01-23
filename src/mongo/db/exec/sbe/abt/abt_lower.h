@@ -93,6 +93,12 @@ private:
     stdx::unordered_map<const LambdaAbstraction*, sbe::FrameId> _lambdaMap;
 };
 
+enum class ScanOrder {
+    Forward,
+    Reverse,
+    Random  // Uses a random cursor.
+};
+
 class SBENodeLowering {
 public:
     // TODO: SERVER-69540. Consider avoiding a mutable slotMap argument here.
@@ -103,7 +109,7 @@ public:
                     sbe::value::SlotIdGenerator& ids,
                     const Metadata& metadata,
                     const NodeToGroupPropsMap& nodeToGroupPropsMap,
-                    const bool randomScan)
+                    const ScanOrder scanOrder)
         : _env(env),
           _slotMap(slotMap),
           _namedSlots(namedSlots),
@@ -111,7 +117,7 @@ public:
           _slotIdGenerator(ids),
           _metadata(metadata),
           _nodeToGroupPropsMap(nodeToGroupPropsMap),
-          _randomScan(randomScan) {}
+          _scanOrder(scanOrder) {}
 
     // The default noop transport.
     template <typename T, typename... Ts>
@@ -227,10 +233,10 @@ private:
     const Metadata& _metadata;
     const NodeToGroupPropsMap& _nodeToGroupPropsMap;
 
-    // If true, will create scan nodes using a random cursor to support sampling.
-    // Currently only supported for single-threaded (non parallel-scanned) mongod collections.
-    // TODO: handle cases where we have more than one collection scan.
-    const bool _randomScan;
+    // Specifies the order for any ScanStages. Currently only supported for single-threaded
+    // (non parallel-scanned) mongod collections.
+    // TODO SERVER-73010: handle cases where we have more than one collection scan.
+    const ScanOrder _scanOrder;
 };
 
 }  // namespace mongo::optimizer
