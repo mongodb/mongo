@@ -166,33 +166,6 @@ function testFour() {
     assert(arrayEq(resultArray, testExpected), buildErrorString(resultArray, testExpected));
 }
 
-// One partition doesn't need densifying.
-function testFive() {
-    coll.drop();
-
-    const testDocs = [
-        {val: 0, partition: 0},
-        {val: 2, partition: 0},
-        {val: 123, partition: 1},
-    ];
-    assert.commandWorked(coll.insert(testDocs));
-
-    let result = coll.aggregate([
-        {$project: {_id: 0}},
-        {
-            $densify: {
-                field: "val",
-                partitionByFields: ["partition"],
-                range: {step: 1, bounds: "partition"}
-            }
-        }
-    ]);
-    const resultArray = result.toArray();
-    const testExpected = testDocs.concat([{val: 1, partition: 0}]);
-    assert(arrayEq(resultArray, testExpected), buildErrorString(resultArray, testExpected));
-    coll.drop();
-}
-
 // Verify the following test works in the full case without partitions.
 function fullTestOne(stepVal = 1) {
     coll.drop();
@@ -254,6 +227,33 @@ function testFive(stepVal = 1) {
     ]);
     const resultArray = result.toArray();
     assert(arrayEq(resultArray, testExpected), buildErrorString(resultArray, testExpected));
+}
+
+// One partition doesn't need densifying.
+function testSix() {
+    coll.drop();
+
+    const testDocs = [
+        {val: 0, partition: 0},
+        {val: 2, partition: 0},
+        {val: 123, partition: 1},
+    ];
+    assert.commandWorked(coll.insert(testDocs));
+
+    let result = coll.aggregate([
+        {$project: {_id: 0}},
+        {
+            $densify: {
+                field: "val",
+                partitionByFields: ["partition"],
+                range: {step: 1, bounds: "partition"}
+            }
+        }
+    ]);
+    const resultArray = result.toArray();
+    const testExpected = testDocs.concat([{val: 1, partition: 0}]);
+    assert(arrayEq(resultArray, testExpected), buildErrorString(resultArray, testExpected));
+    coll.drop();
 }
 
 // Test partitioning with full where partitions need to be densified at the end.
@@ -645,6 +645,7 @@ testTwo();
 testThree();
 testFour();
 testFive();
+testSix();
 fullTestOne();
 testFive();
 fullTestOne(3);
