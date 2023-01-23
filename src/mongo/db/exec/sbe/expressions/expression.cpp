@@ -1188,6 +1188,9 @@ std::unique_ptr<EExpression> ELocalBind::clone() const {
 vm::CodeFragment ELocalBind::compileDirect(CompileCtx& ctx) const {
     vm::CodeFragment code;
 
+    // Declare the frame at the top of the stack, where the local variable values will reside.
+    code.declareFrame(_frameId);
+
     // Generate bytecode for local variables and the 'in' expression. The 'in' expression is in the
     // last position of _nodes.
     for (size_t idx = 0; idx < _nodes.size(); ++idx) {
@@ -1202,8 +1205,8 @@ vm::CodeFragment ELocalBind::compileDirect(CompileCtx& ctx) const {
         code.appendPop();
     }
 
-    // Local variables are no longer accessible after this point so remove any fixup information.
-    code.removeFixup(_frameId);
+    // Local variables are no longer accessible after this point so remove the frame.
+    code.removeFrame(_frameId);
     return code;
 }
 
@@ -1249,14 +1252,33 @@ vm::CodeFragment ELocalLambda::compileBodyDirect(CompileCtx& ctx) const {
     // Compile the body first so we know its size.
     auto inner = _nodes.back()->compileDirect(ctx);
     vm::CodeFragment body;
+
+    // Declare the frame containing lambda variable.
+    // The variable is expected to be already on the stack so declare the frame just below the
+    // current top of the stack.
+    body.declareFrame(_frameId, -1);
+
     // Make sure the stack is sufficiently large.
     body.appendAllocStack(inner.maxStackSize());
     body.append(std::move(inner));
     body.appendRet();
     invariant(body.stackSize() == 1);
-    body.fixup(1);
-    // Lambda parameter is no longer accessible after this point so remove any fixup information.
-    body.removeFixup(_frameId);
+
+    // Lambda parameter is no longer accessible after this point so remove the frame.
+    body.removeFrame(_frameId);
+
+    // TODO SERVER-72843 Remove the adjustment below when the issue if fixed.
+    // Adjust the stack offsets by 1 to account to maintain the bug compatibility that
+    // allows traverse lambdas to access clousre variables under special conditions.
+    // Lambda captures are not supported, and adjustment below is only meant to keep
+    // existing stage builder code from falling apart.
+    body.fixupStackOffsets(1);
+
+    // TODO SERVER-72843: Add assert that verifies that lambda uses no closure variables.
+    // Possibly by ensuring that there are no outstanding frames in the lambda code fragment, like:
+    // tassert(7284301,
+    //         !body.hasFrames(),
+    //         "Accessing closure variables from lambda body in not supported.");
 
     return body;
 }

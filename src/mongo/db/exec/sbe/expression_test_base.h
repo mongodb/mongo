@@ -130,7 +130,6 @@ protected:
         return _vm.runPredicate(compiledExpr);
     }
 
-
     void printInputExpression(std::ostream& os, const EExpression& expr) {
         os << "-- INPUT EXPRESSION:" << std::endl;
         os << DebugPrinter().print(expr.debugPrint()) << std::endl << std::endl;

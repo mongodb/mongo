@@ -56,6 +56,7 @@
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/str.h"
@@ -201,32 +202,117 @@ void CodeFragment::adjustStackSimple(const Instruction& i, Ts&&... params) {
     }
 }
 
-void CodeFragment::fixup(int offset) {
-    for (auto fixUp : _fixUps) {
-        auto ptr = instrs().data() + fixUp.offset;
-        int newOffset = readFromMemory<int>(ptr) + offset;
-        writeToMemory(ptr, newOffset);
+void CodeFragment::declareFrame(FrameId frameId) {
+    declareFrame(frameId, 0);
+}
+
+void CodeFragment::declareFrame(FrameId frameId, int stackOffset) {
+    FrameInfo& frame = getOrDefineFrame(frameId);
+    tassert(7239101,
+            str::stream() << "Frame stackPosition is already defined. frameId: " << frameId,
+            frame.stackPosition == FrameInfo::kPositionNotSet);
+    frame.stackPosition = _stackSize + stackOffset;
+    if (!frame.fixupOffsets.empty()) {
+        fixupFrame(frame);
     }
 }
 
-void CodeFragment::removeFixup(FrameId frameId) {
-    _fixUps.erase(std::remove_if(_fixUps.begin(),
-                                 _fixUps.end(),
-                                 [frameId](const auto& f) { return f.frameId == frameId; }),
-                  _fixUps.end());
+void CodeFragment::removeFrame(FrameId frameId) {
+    auto p = _frames.find(frameId);
+    tassert(7239102, str::stream() << "Frame not found. frameId: " << frameId, p != _frames.end());
+    tassert(7239103,
+            str::stream() << "Can't remove frame that has outstanding fixups. frameId:" << frameId,
+            p->second.fixupOffsets.empty());
+
+    _frames.erase(frameId);
+}
+
+bool CodeFragment::hasFrames() const {
+    return !_frames.empty();
+}
+
+CodeFragment::FrameInfo& CodeFragment::getOrDefineFrame(FrameId frameId) {
+    auto [it, r] = _frames.try_emplace(frameId);
+    return it->second;
+}
+
+void CodeFragment::fixupFrame(FrameInfo& frame) {
+    tassert(7239105,
+            "Frame must have defined stackPosition",
+            frame.stackPosition != FrameInfo::kPositionNotSet);
+
+    for (auto fixupOffset : frame.fixupOffsets) {
+        int stackOffset = readFromMemory<int>(_instrs.data() + fixupOffset);
+        writeToMemory(_instrs.data() + fixupOffset,
+                      stackOffset - static_cast<int>(frame.stackPosition));
+    }
+
+    frame.fixupOffsets.clear();
+}
+
+
+void CodeFragment::fixupStackOffsets(int stackOffsetDelta) {
+    if (stackOffsetDelta == 0) {
+        return;
+    }
+
+    for (auto& p : _frames) {
+        auto& frame = p.second;
+        if (frame.stackPosition != FrameInfo::kPositionNotSet) {
+            frame.stackPosition = frame.stackPosition + stackOffsetDelta;
+        }
+
+        for (auto& fixupOffset : frame.fixupOffsets) {
+            int stackOffset = readFromMemory<int>(_instrs.data() + fixupOffset);
+            writeToMemory<int>(_instrs.data() + fixupOffset, stackOffset + stackOffsetDelta);
+        }
+    }
 }
 
 void CodeFragment::copyCodeAndFixup(CodeFragment&& from) {
-    for (auto fixUp : from._fixUps) {
-        fixUp.offset += _instrs.size();
-        _fixUps.push_back(fixUp);
-    }
+    auto instrsSize = _instrs.size();
 
     if (_instrs.empty()) {
         _instrs = std::move(from._instrs);
     } else {
         _instrs.insert(_instrs.end(), from._instrs.begin(), from._instrs.end());
     }
+
+    for (auto& p : from._frames) {
+        auto& fromFrame = p.second;
+        for (auto& fixupOffset : fromFrame.fixupOffsets) {
+            fixupOffset += instrsSize;
+        }
+        auto it = _frames.find(p.first);
+        if (it != _frames.end()) {
+            auto& frame = it->second;
+            tassert(7239104,
+                    "Duplicate frame stackPosition",
+                    frame.stackPosition == FrameInfo::kPositionNotSet ||
+                        fromFrame.stackPosition == FrameInfo::kPositionNotSet);
+            if (fromFrame.stackPosition != FrameInfo::kPositionNotSet) {
+                frame.stackPosition = fromFrame.stackPosition;
+            }
+            frame.fixupOffsets.insert(frame.fixupOffsets.end(),
+                                      fromFrame.fixupOffsets.begin(),
+                                      fromFrame.fixupOffsets.end());
+            if (frame.stackPosition != FrameInfo::kPositionNotSet) {
+                fixupFrame(frame);
+            }
+        } else {
+            _frames.emplace(p.first, std::move(fromFrame));
+        }
+    }
+}
+
+template <typename... Ts>
+size_t CodeFragment::appendParameters(uint8_t* ptr, Ts&&... params) {
+    int popCompensation = 0;
+    ((popCompensation += params.frameId ? 0 : -1), ...);
+
+    size_t size = 0;
+    ((size += appendParameter(ptr + size, params, popCompensation)), ...);
+    return size;
 }
 
 size_t CodeFragment::appendParameter(uint8_t* ptr,
@@ -236,11 +322,22 @@ size_t CodeFragment::appendParameter(uint8_t* ptr,
     // instruction is done.
     ptr += writeToMemory(ptr, !param.frameId);
 
-    int stackOffset = 0;
     if (param.frameId) {
-        stackOffset = varToOffset(param.variable) + popCompensation;
-        size_t fixUpOffset = ptr - _instrs.data();
-        _fixUps.push_back(FixUp{*param.frameId, fixUpOffset});
+        auto& frame = getOrDefineFrame(*param.frameId);
+
+        // Compute the absolute variable stack offset based on the current stack depth and pop
+        // compensation.
+        int stackOffset = varToOffset(param.variable) + popCompensation + _stackSize;
+
+        // If frame has stackPositiion defined, then compute the final relative stack offset.
+        // Otherwise, register a fixup to compute the relative stack offset later.
+        if (frame.stackPosition != FrameInfo::kPositionNotSet) {
+            stackOffset -= frame.stackPosition;
+        } else {
+            size_t fixUpOffset = ptr - _instrs.data();
+            frame.fixupOffsets.push_back(fixUpOffset);
+        }
+
         ptr += writeToMemory(ptr, stackOffset);
     } else {
         ++popCompensation;
@@ -249,9 +346,10 @@ size_t CodeFragment::appendParameter(uint8_t* ptr,
 
     return param.size();
 }
+
 void CodeFragment::append(CodeFragment&& code) {
-    // Fixup before copying.
-    code.fixup(_stackSize);
+    // Fixup all stack offsets before copying.
+    code.fixupStackOffsets(_stackSize);
 
     _maxStackSize = std::max(_maxStackSize, _stackSize + code._maxStackSize);
     _stackSize += code._stackSize;
@@ -266,9 +364,9 @@ void CodeFragment::appendNoStack(CodeFragment&& code) {
 void CodeFragment::append(CodeFragment&& lhs, CodeFragment&& rhs) {
     invariant(lhs.stackSize() == rhs.stackSize());
 
-    // Fixup before copying.
-    lhs.fixup(_stackSize);
-    rhs.fixup(_stackSize);
+    // Fixup all stack offsets before copying.
+    lhs.fixupStackOffsets(_stackSize);
+    rhs.fixupStackOffsets(_stackSize);
 
     _maxStackSize = std::max(_maxStackSize, _stackSize + lhs._maxStackSize);
     _maxStackSize = std::max(_maxStackSize, _stackSize + rhs._maxStackSize);
@@ -281,56 +379,69 @@ void CodeFragment::append(CodeFragment&& lhs, CodeFragment&& rhs) {
 void CodeFragment::appendConstVal(value::TypeTags tag, value::Value val) {
     Instruction i;
     i.tag = Instruction::pushConstVal;
-    adjustStackSimple(i);
 
     auto offset = allocateSpace(sizeof(Instruction) + sizeof(tag) + sizeof(val));
 
     offset += writeToMemory(offset, i);
     offset += writeToMemory(offset, tag);
     offset += writeToMemory(offset, val);
+
+    adjustStackSimple(i);
 }
 
 void CodeFragment::appendAccessVal(value::SlotAccessor* accessor) {
     Instruction i;
     i.tag = Instruction::pushAccessVal;
-    adjustStackSimple(i);
 
     auto offset = allocateSpace(sizeof(Instruction) + sizeof(accessor));
 
     offset += writeToMemory(offset, i);
     offset += writeToMemory(offset, accessor);
+
+    adjustStackSimple(i);
 }
 
 void CodeFragment::appendMoveVal(value::SlotAccessor* accessor) {
     Instruction i;
     i.tag = Instruction::pushMoveVal;
-    adjustStackSimple(i);
 
     auto offset = allocateSpace(sizeof(Instruction) + sizeof(accessor));
 
     offset += writeToMemory(offset, i);
     offset += writeToMemory(offset, accessor);
+
+    adjustStackSimple(i);
 }
 
 void CodeFragment::appendLocalVal(FrameId frameId, int variable, bool moveFrom) {
     Instruction i;
     i.tag = moveFrom ? Instruction::pushMoveLocalVal : Instruction::pushLocalVal;
-    adjustStackSimple(i);
 
-    auto fixUpOffset = _instrs.size() + sizeof(Instruction);
-    _fixUps.push_back(FixUp{frameId, fixUpOffset});
+    auto& frame = getOrDefineFrame(frameId);
 
-    auto stackOffset = varToOffset(variable);
+    // Compute the absolute variable stack offset based on the current stack depth
+    int stackOffset = varToOffset(variable) + _stackSize;
+
+    // If frame has stackPositiion defined, then compute the final relative stack offset.
+    // Otherwise, register a fixup to compute the relative stack offset later.
+    if (frame.stackPosition != FrameInfo::kPositionNotSet) {
+        stackOffset -= frame.stackPosition;
+    } else {
+        auto fixUpOffset = _instrs.size() + sizeof(Instruction);
+        frame.fixupOffsets.push_back(fixUpOffset);
+    }
+
     auto offset = allocateSpace(sizeof(Instruction) + sizeof(stackOffset));
 
     offset += writeToMemory(offset, i);
     offset += writeToMemory(offset, stackOffset);
+
+    adjustStackSimple(i);
 }
 
 void CodeFragment::appendLocalLambda(int codePosition) {
     Instruction i;
     i.tag = Instruction::pushLocalLambda;
-    adjustStackSimple(i);
 
     auto size = sizeof(Instruction) + sizeof(codePosition);
     auto offset = allocateSpace(size);
@@ -339,6 +450,8 @@ void CodeFragment::appendLocalLambda(int codePosition) {
 
     offset += writeToMemory(offset, i);
     offset += writeToMemory(offset, codeOffset);
+
+    adjustStackSimple(i);
 }
 
 void CodeFragment::appendPop() {
@@ -360,23 +473,24 @@ void CodeFragment::appendAdd(Instruction::Parameter lhs, Instruction::Parameter 
 void CodeFragment::appendNumericConvert(value::TypeTags targetTag) {
     Instruction i;
     i.tag = Instruction::numConvert;
-    adjustStackSimple(i);
 
     auto offset = allocateSpace(sizeof(Instruction) + sizeof(targetTag));
 
     offset += writeToMemory(offset, i);
     offset += writeToMemory(offset, targetTag);
+    adjustStackSimple(i);
 }
 
 void CodeFragment::appendApplyClassicMatcher(const MatchExpression* matcher) {
     Instruction i;
     i.tag = Instruction::applyClassicMatcher;
-    adjustStackSimple(i);
 
     auto offset = allocateSpace(sizeof(Instruction) + sizeof(matcher));
 
     offset += writeToMemory(offset, i);
     offset += writeToMemory(offset, matcher);
+
+    adjustStackSimple(i);
 }
 
 void CodeFragment::appendSub(Instruction::Parameter lhs, Instruction::Parameter rhs) {
@@ -435,11 +549,9 @@ template <typename... Ts>
 void CodeFragment::appendSimpleInstruction(Instruction::Tags tag, Ts&&... params) {
     Instruction i;
     i.tag = tag;
-    adjustStackSimple(i, params...);
 
     // For every parameter that is popped (i.e. not coming from a frame) we have to compensate frame
     // offsets.
-    int popCompensation = 0;
     size_t paramSize = 0;
 
     ((paramSize += params.size()), ...);
@@ -447,7 +559,9 @@ void CodeFragment::appendSimpleInstruction(Instruction::Tags tag, Ts&&... params
     auto offset = allocateSpace(sizeof(Instruction) + paramSize);
 
     offset += writeToMemory(offset, i);
-    ((offset += appendParameter(offset, params, popCompensation)), ...);
+    offset += appendParameters(offset, params...);
+
+    adjustStackSimple(i, params...);
 }
 
 void CodeFragment::appendCollLess(Instruction::Parameter lhs,
@@ -499,12 +613,13 @@ void CodeFragment::appendFillEmpty() {
 void CodeFragment::appendFillEmpty(Instruction::Constants k) {
     Instruction i;
     i.tag = Instruction::fillEmptyImm;
-    adjustStackSimple(i);
 
     auto offset = allocateSpace(sizeof(Instruction) + sizeof(k));
 
     offset += writeToMemory(offset, i);
     offset += writeToMemory(offset, k);
+
+    adjustStackSimple(i);
 }
 
 void CodeFragment::appendGetField(Instruction::Parameter lhs, Instruction::Parameter rhs) {
@@ -517,17 +632,17 @@ void CodeFragment::appendGetField(Instruction::Parameter input, StringData field
 
     Instruction i;
     i.tag = Instruction::getFieldImm;
-    adjustStackSimple(i, input);
 
-    int popCompensation = 0;
     auto offset = allocateSpace(sizeof(Instruction) + input.size() + sizeof(uint8_t) + size);
 
     offset += writeToMemory(offset, i);
-    offset += appendParameter(offset, input, popCompensation);
+    offset += appendParameters(offset, input);
     offset += writeToMemory(offset, static_cast<uint8_t>(size));
     for (auto ch : fieldName) {
         offset += writeToMemory(offset, ch);
     }
+
+    adjustStackSimple(i, input);
 }
 
 void CodeFragment::appendGetElement(Instruction::Parameter lhs, Instruction::Parameter rhs) {
@@ -641,7 +756,6 @@ void CodeFragment::appendTraverseP() {
 void CodeFragment::appendTraverseP(int codePosition, Instruction::Constants k) {
     Instruction i;
     i.tag = Instruction::traversePImm;
-    adjustStackSimple(i);
 
     auto size = sizeof(Instruction) + sizeof(codePosition) + sizeof(k);
     auto offset = allocateSpace(size);
@@ -651,6 +765,8 @@ void CodeFragment::appendTraverseP(int codePosition, Instruction::Constants k) {
     offset += writeToMemory(offset, i);
     offset += writeToMemory(offset, k);
     offset += writeToMemory(offset, codeOffset);
+
+    adjustStackSimple(i);
 }
 
 void CodeFragment::appendTraverseF() {
@@ -660,7 +776,6 @@ void CodeFragment::appendTraverseF() {
 void CodeFragment::appendTraverseF(int codePosition, Instruction::Constants k) {
     Instruction i;
     i.tag = Instruction::traverseFImm;
-    adjustStackSimple(i);
 
     auto size = sizeof(Instruction) + sizeof(codePosition) + sizeof(k);
     auto offset = allocateSpace(size);
@@ -670,6 +785,8 @@ void CodeFragment::appendTraverseF(int codePosition, Instruction::Constants k) {
     offset += writeToMemory(offset, i);
     offset += writeToMemory(offset, k);
     offset += writeToMemory(offset, codeOffset);
+
+    adjustStackSimple(i);
 }
 
 void CodeFragment::appendTraverseCellValues() {
@@ -679,7 +796,6 @@ void CodeFragment::appendTraverseCellValues() {
 void CodeFragment::appendTraverseCellValues(int codePosition) {
     Instruction i;
     i.tag = Instruction::traverseCsiCellValues;
-    adjustStackSimple(i);
 
     auto size = sizeof(Instruction) + sizeof(codePosition);
     auto offset = allocateSpace(size);
@@ -688,6 +804,8 @@ void CodeFragment::appendTraverseCellValues(int codePosition) {
 
     offset += writeToMemory(offset, i);
     offset += writeToMemory(offset, codeOffset);
+
+    adjustStackSimple(i);
 }
 
 void CodeFragment::appendTraverseCellTypes() {
@@ -697,7 +815,6 @@ void CodeFragment::appendTraverseCellTypes() {
 void CodeFragment::appendTraverseCellTypes(int codePosition) {
     Instruction i;
     i.tag = Instruction::traverseCsiCellTypes;
-    adjustStackSimple(i);
 
     auto size = sizeof(Instruction) + sizeof(codePosition);
     auto offset = allocateSpace(size);
@@ -706,21 +823,22 @@ void CodeFragment::appendTraverseCellTypes(int codePosition) {
 
     offset += writeToMemory(offset, i);
     offset += writeToMemory(offset, codeOffset);
+
+    adjustStackSimple(i);
 }
 
 void CodeFragment::appendTypeMatch(Instruction::Parameter input, uint32_t mask) {
     Instruction i;
     i.tag = Instruction::typeMatchImm;
-    adjustStackSimple(i, input);
-
-    int popCompensation = 0;
 
     auto size = sizeof(Instruction) + input.size() + sizeof(mask);
     auto offset = allocateSpace(size);
 
     offset += writeToMemory(offset, i);
-    offset += appendParameter(offset, input, popCompensation);
+    offset += appendParameters(offset, input);
     offset += writeToMemory(offset, mask);
+
+    adjustStackSimple(i, input);
 }
 
 void CodeFragment::appendDateTrunc(TimeUnit unit,
@@ -729,7 +847,6 @@ void CodeFragment::appendDateTrunc(TimeUnit unit,
                                    DayOfWeek startOfWeek) {
     Instruction i;
     i.tag = Instruction::dateTruncImm;
-    adjustStackSimple(i);
 
     auto offset = allocateSpace(sizeof(Instruction) + sizeof(unit) + sizeof(binSize) +
                                 sizeof(timezone) + sizeof(startOfWeek));
@@ -739,6 +856,8 @@ void CodeFragment::appendDateTrunc(TimeUnit unit,
     offset += writeToMemory(offset, binSize);
     offset += writeToMemory(offset, timezone);
     offset += writeToMemory(offset, startOfWeek);
+
+    adjustStackSimple(i);
 }
 
 void CodeFragment::appendFunction(Builtin f, ArityType arity) {
@@ -764,23 +883,25 @@ void CodeFragment::appendFunction(Builtin f, ArityType arity) {
 void CodeFragment::appendJump(int jumpOffset) {
     Instruction i;
     i.tag = Instruction::jmp;
-    adjustStackSimple(i);
 
     auto offset = allocateSpace(sizeof(Instruction) + sizeof(jumpOffset));
 
     offset += writeToMemory(offset, i);
     offset += writeToMemory(offset, jumpOffset);
+
+    adjustStackSimple(i);
 }
 
 void CodeFragment::appendJumpTrue(int jumpOffset) {
     Instruction i;
     i.tag = Instruction::jmpTrue;
-    adjustStackSimple(i);
 
     auto offset = allocateSpace(sizeof(Instruction) + sizeof(jumpOffset));
 
     offset += writeToMemory(offset, i);
     offset += writeToMemory(offset, jumpOffset);
+
+    adjustStackSimple(i);
 }
 
 void CodeFragment::appendJumpFalse(int jumpOffset) {
@@ -797,12 +918,13 @@ void CodeFragment::appendJumpFalse(int jumpOffset) {
 void CodeFragment::appendJumpNothing(int jumpOffset) {
     Instruction i;
     i.tag = Instruction::jmpNothing;
-    adjustStackSimple(i);
 
     auto offset = allocateSpace(sizeof(Instruction) + sizeof(jumpOffset));
 
     offset += writeToMemory(offset, i);
     offset += writeToMemory(offset, jumpOffset);
+
+    adjustStackSimple(i);
 }
 
 void CodeFragment::appendRet() {
@@ -812,12 +934,13 @@ void CodeFragment::appendRet() {
 void CodeFragment::appendAllocStack(uint32_t size) {
     Instruction i;
     i.tag = Instruction::allocStack;
-    adjustStackSimple(i);
 
     auto offset = allocateSpace(sizeof(Instruction) + sizeof(size));
 
     offset += writeToMemory(offset, i);
     offset += writeToMemory(offset, size);
+
+    adjustStackSimple(i);
 }
 
 void CodeFragment::appendFail() {

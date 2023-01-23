@@ -69,5 +69,5 @@ void GoldenSBETestFixture::printVariation(const std::string& name) {
         os << _variationCount;
     }
     os << std::endl;
-}  // namespace mongo::sbe
+}
 }  // namespace mongo::sbe

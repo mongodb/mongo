@@ -101,13 +101,32 @@ TEST_F(SBECodeFragmentTest, AppendSimpleInstruction_Binary_LhsOnFrame) {
     auto rhsValue = makeInt32(20);
     FrameId frameId = 10;
 
-    // There is currently no way to declare a frame and parameters assume that their frame
-    // is at the top of the stack, so we have to use vm::CodeFragment::append()
+    {
+        printVariation("append instr");
+
+        vm::CodeFragment code;
+        code.declareFrame(frameId);
+        // Create frame with 2 variables to make variable resolution less trivial.
+        code.appendConstVal(lhsValue.first, lhsValue.second);
+        code.appendConstVal(value::TypeTags::Nothing, 0);
+
+        code.appendConstVal(rhsValue.first, rhsValue.second);
+        code.appendSub({0, frameId}, {});
+        code.removeFrame(frameId);
+
+        for (int i = 0; i < 2; i++) {
+            code.appendSwap();
+            code.appendPop();
+        }
+
+        runTest(code);
+    }
 
     {
         printVariation("append code 1");
 
         vm::CodeFragment code;
+        code.declareFrame(frameId);
         // Create frame with 2 variables to make variable resolution less trivial.
         code.appendConstVal(lhsValue.first, lhsValue.second);
         code.appendConstVal(value::TypeTags::Nothing, 0);
@@ -117,7 +136,7 @@ TEST_F(SBECodeFragmentTest, AppendSimpleInstruction_Binary_LhsOnFrame) {
         code2.appendSub({0, frameId}, {});
 
         code.append(std::move(code2));
-        code.removeFixup(frameId);
+        code.removeFrame(frameId);
 
         for (int i = 0; i < 2; i++) {
             code.appendSwap();
@@ -126,12 +145,12 @@ TEST_F(SBECodeFragmentTest, AppendSimpleInstruction_Binary_LhsOnFrame) {
 
         runTest(code);
     }
-// TODO SERVER-72391 - Enable this test after fixing the issue.
-#if FALSE
+
     {
         printVariation("append code 2");
 
         vm::CodeFragment frame;
+        frame.declareFrame(frameId);
         // Create frame with 2 variables to make variable resolution less trivial.
         frame.appendConstVal(lhsValue.first, lhsValue.second);
         frame.appendConstVal(value::TypeTags::Nothing, 0);
@@ -147,7 +166,7 @@ TEST_F(SBECodeFragmentTest, AppendSimpleInstruction_Binary_LhsOnFrame) {
         code.append(std::move(rhs));
         code.append(std::move(instr));
 
-        code.removeFixup(frameId);
+        code.removeFrame(frameId);
 
         for (int i = 0; i < 2; i++) {
             code.appendSwap();
@@ -156,12 +175,12 @@ TEST_F(SBECodeFragmentTest, AppendSimpleInstruction_Binary_LhsOnFrame) {
 
         runTest(code);
     }
-#endif
 
     {
         printVariation("append code 3");
 
         vm::CodeFragment frame;
+        frame.declareFrame(frameId);
         // Create frame with 2 variables to make variable resolution less trivial.
         frame.appendConstVal(lhsValue.first, lhsValue.second);
         frame.appendConstVal(value::TypeTags::Nothing, 0);
@@ -177,7 +196,7 @@ TEST_F(SBECodeFragmentTest, AppendSimpleInstruction_Binary_LhsOnFrame) {
         code.append(std::move(frame));
         code.append(std::move(instr));
 
-        code.removeFixup(frameId);
+        code.removeFrame(frameId);
 
         for (int i = 0; i < 2; i++) {
             code.appendSwap();
@@ -193,23 +212,18 @@ TEST_F(SBECodeFragmentTest, AppendSimpleInstruction_Binary_RhsOnFrame) {
     auto rhsValue = makeInt32(20);
     FrameId frameId = 10;
 
-    // There is currently no way to declare a frame and parameters assume that their frame
-    // is at the top of the stack, so we have to use vm::CodeFragment::append()
-
     {
-        printVariation("append code 1");
+        printVariation("append instr");
 
         vm::CodeFragment code;
+        code.declareFrame(frameId);
         // Create frame with 2 variables to make variable resolution less trivial.
         code.appendConstVal(rhsValue.first, rhsValue.second);
         code.appendConstVal(value::TypeTags::Nothing, 0);
 
-        vm::CodeFragment code2;
-        code2.appendConstVal(lhsValue.first, lhsValue.second);
-        code2.appendSub({}, {0, frameId});
-
-        code.append(std::move(code2));
-        code.removeFixup(frameId);
+        code.appendConstVal(lhsValue.first, lhsValue.second);
+        code.appendSub({}, {0, frameId});
+        code.removeFrame(frameId);
 
         for (int i = 0; i < 2; i++) {
             code.appendSwap();
@@ -219,12 +233,35 @@ TEST_F(SBECodeFragmentTest, AppendSimpleInstruction_Binary_RhsOnFrame) {
         runTest(code);
     }
 
-// TODO SERVER-72391 - Enable this test after fixing the issue.
-#if FALSE
+    {
+        printVariation("append code 1");
+
+        vm::CodeFragment code;
+        code.declareFrame(frameId);
+        // Create frame with 2 variables to make variable resolution less trivial.
+        code.appendConstVal(rhsValue.first, rhsValue.second);
+        code.appendConstVal(value::TypeTags::Nothing, 0);
+
+        vm::CodeFragment code2;
+        code2.appendConstVal(lhsValue.first, lhsValue.second);
+        code2.appendSub({}, {0, frameId});
+
+        code.append(std::move(code2));
+        code.removeFrame(frameId);
+
+        for (int i = 0; i < 2; i++) {
+            code.appendSwap();
+            code.appendPop();
+        }
+
+        runTest(code);
+    }
+
     {
         printVariation("append code 2");
 
         vm::CodeFragment frame;
+        frame.declareFrame(frameId);
         // Create frame with 2 variables to make variable resolution less trivial.
         frame.appendConstVal(rhsValue.first, rhsValue.second);
         frame.appendConstVal(value::TypeTags::Nothing, 0);
@@ -240,7 +277,7 @@ TEST_F(SBECodeFragmentTest, AppendSimpleInstruction_Binary_RhsOnFrame) {
         code.append(std::move(lhs));
         code.append(std::move(instr));
 
-        code.removeFixup(frameId);
+        code.removeFrame(frameId);
 
         for (int i = 0; i < 2; i++) {
             code.appendSwap();
@@ -249,12 +286,12 @@ TEST_F(SBECodeFragmentTest, AppendSimpleInstruction_Binary_RhsOnFrame) {
 
         runTest(code);
     }
-#endif
 
     {
         printVariation("append code 3");
 
         vm::CodeFragment frame;
+        frame.declareFrame(frameId);
         // Create frame with 2 variables to make variable resolution less trivial.
         frame.appendConstVal(rhsValue.first, rhsValue.second);
         frame.appendConstVal(value::TypeTags::Nothing, 0);
@@ -270,7 +307,7 @@ TEST_F(SBECodeFragmentTest, AppendSimpleInstruction_Binary_RhsOnFrame) {
         code.append(std::move(frame));
         code.append(std::move(instr));
 
-        code.removeFixup(frameId);
+        code.removeFrame(frameId);
 
         for (int i = 0; i < 2; i++) {
             code.appendSwap();
@@ -287,13 +324,32 @@ TEST_F(SBECodeFragmentTest, AppendSimpleInstruction_Binary_BothOnFrame) {
     auto rhsValue = makeInt32(20);
     FrameId frameId = 10;
 
-    // There is currently no way to declare a frame and parameters assume that their frame
-    // is at the top of the stack, so we have to use vm::CodeFragment::append()
+    {
+        printVariation("append instr");
+
+        vm::CodeFragment code;
+        code.declareFrame(frameId);
+        // Create frame with 3 variables to make variable resolution less trivial.
+        code.appendConstVal(lhsValue.first, lhsValue.second);
+        code.appendConstVal(rhsValue.first, rhsValue.second);
+        code.appendConstVal(value::TypeTags::Nothing, 0);
+
+        code.appendSub({0, frameId}, {1, frameId});
+        code.removeFrame(frameId);
+
+        for (int i = 0; i < 3; i++) {
+            code.appendSwap();
+            code.appendPop();
+        }
+
+        runTest(code);
+    }
 
     {
         printVariation("append code 1");
 
         vm::CodeFragment code;
+        code.declareFrame(frameId);
         // Create frame with 3 variables to make variable resolution less trivial.
         code.appendConstVal(lhsValue.first, lhsValue.second);
         code.appendConstVal(rhsValue.first, rhsValue.second);
@@ -303,7 +359,7 @@ TEST_F(SBECodeFragmentTest, AppendSimpleInstruction_Binary_BothOnFrame) {
         code2.appendSub({0, frameId}, {1, frameId});
 
         code.append(std::move(code2));
-        code.removeFixup(frameId);
+        code.removeFrame(frameId);
 
         for (int i = 0; i < 3; i++) {
             code.appendSwap();
@@ -317,6 +373,7 @@ TEST_F(SBECodeFragmentTest, AppendSimpleInstruction_Binary_BothOnFrame) {
         printVariation("append code 2");
 
         vm::CodeFragment frame;
+        frame.declareFrame(frameId);
         // Create frame with 3 variables to make variable resolution less trivial.
         frame.appendConstVal(lhsValue.first, lhsValue.second);
         frame.appendConstVal(rhsValue.first, rhsValue.second);
@@ -329,7 +386,7 @@ TEST_F(SBECodeFragmentTest, AppendSimpleInstruction_Binary_BothOnFrame) {
         code.append(std::move(frame));
         code.append(std::move(instr));
 
-        code.removeFixup(frameId);
+        code.removeFrame(frameId);
 
         for (int i = 0; i < 3; i++) {
             code.appendSwap();
@@ -348,6 +405,7 @@ TEST_F(SBECodeFragmentTest, AppendLocalVal) {
         printVariation("append code");
 
         vm::CodeFragment code;
+        code.declareFrame(frameId);
         // Create frame with 2 variables to make variable resolution less trivial.
         code.appendConstVal(value.first, value.second);
         code.appendConstVal(value::TypeTags::Nothing, 0);
@@ -356,7 +414,7 @@ TEST_F(SBECodeFragmentTest, AppendLocalVal) {
         code2.appendLocalVal(frameId, 0, false);
 
         code.append(std::move(code2));
-        code.removeFixup(frameId);
+        code.removeFrame(frameId);
 
         for (int i = 0; i < 2; i++) {
             code.appendSwap();
@@ -366,17 +424,17 @@ TEST_F(SBECodeFragmentTest, AppendLocalVal) {
         runTest(code);
     }
 
-// TODO SERVER-72391 - Enable this test after fixing the issue.
-#if FALSE
     {
         printVariation("append instr");
 
         vm::CodeFragment code;
+        code.declareFrame(frameId);
         // Create frame with 2 variables to make variable resolution less trivial.
         code.appendConstVal(value.first, value.second);
         code.appendConstVal(value::TypeTags::Nothing, 0);
+
         code.appendLocalVal(frameId, 0, false);
-        code.removeFixup(frameId);
+        code.removeFrame(frameId);
 
         for (int i = 0; i < 2; i++) {
             code.appendSwap();
@@ -386,7 +444,6 @@ TEST_F(SBECodeFragmentTest, AppendLocalVal) {
 
         runTest(code);
     }
-#endif
 }
 
 
@@ -395,12 +452,11 @@ TEST_F(SBECodeFragmentTest, AppendLocalVal2) {
     auto rhsValue = makeInt32(20);
     FrameId frameId = 10;
 
-// TODO SERVER-72391 - Enable this test after fixing the issue.
-#if FALSE
     {
         printVariation("append code 1");
 
         vm::CodeFragment code;
+        code.declareFrame(frameId);
         // Create frame with 3 variables to make variable resolution less trivial.
         code.appendConstVal(lhsValue.first, lhsValue.second);
         code.appendConstVal(rhsValue.first, rhsValue.second);
@@ -412,7 +468,7 @@ TEST_F(SBECodeFragmentTest, AppendLocalVal2) {
         code2.appendSub({}, {});
 
         code.append(std::move(code2));
-        code.removeFixup(frameId);
+        code.removeFrame(frameId);
 
         for (int i = 0; i < 3; i++) {
             code.appendSwap();
@@ -426,6 +482,7 @@ TEST_F(SBECodeFragmentTest, AppendLocalVal2) {
         printVariation("append code 2");
 
         vm::CodeFragment frame;
+        frame.declareFrame(frameId);
         // Create frame with 3 variables to make variable resolution less trivial.
         frame.appendConstVal(lhsValue.first, lhsValue.second);
         frame.appendConstVal(rhsValue.first, rhsValue.second);
@@ -439,7 +496,7 @@ TEST_F(SBECodeFragmentTest, AppendLocalVal2) {
         vm::CodeFragment code;
         code.append(std::move(frame));
         code.append(std::move(code2));
-        code.removeFixup(frameId);
+        code.removeFrame(frameId);
 
         for (int i = 0; i < 3; i++) {
             code.appendSwap();
@@ -453,6 +510,7 @@ TEST_F(SBECodeFragmentTest, AppendLocalVal2) {
         printVariation("append code 3");
 
         vm::CodeFragment frame;
+        frame.declareFrame(frameId);
         // Create frame with 3 variables to make variable resolution less trivial.
         frame.appendConstVal(lhsValue.first, lhsValue.second);
         frame.appendConstVal(rhsValue.first, rhsValue.second);
@@ -468,11 +526,11 @@ TEST_F(SBECodeFragmentTest, AppendLocalVal2) {
         instr.appendSub({}, {});
 
         vm::CodeFragment code;
+        code.append(std::move(frame));
         code.append(std::move(lhs));
         code.append(std::move(rhs));
-        code.append(std::move(frame));
         code.append(std::move(instr));
-        code.removeFixup(frameId);
+        code.removeFrame(frameId);
 
         for (int i = 0; i < 3; i++) {
             code.appendSwap();
@@ -481,12 +539,12 @@ TEST_F(SBECodeFragmentTest, AppendLocalVal2) {
 
         runTest(code);
     }
-#endif
 
     {
         printVariation("append code 4");
 
         vm::CodeFragment frame;
+        frame.declareFrame(frameId);
         // Create frame with 3 variables to make variable resolution less trivial.
         frame.appendConstVal(lhsValue.first, lhsValue.second);
         frame.appendConstVal(rhsValue.first, rhsValue.second);
@@ -506,7 +564,7 @@ TEST_F(SBECodeFragmentTest, AppendLocalVal2) {
         vm::CodeFragment code;
         code.append(std::move(frame));
         code.append(std::move(code2));
-        code.removeFixup(frameId);
+        code.removeFrame(frameId);
 
         for (int i = 0; i < 3; i++) {
             code.appendSwap();
@@ -520,6 +578,7 @@ TEST_F(SBECodeFragmentTest, AppendLocalVal2) {
         printVariation("append code 5");
 
         vm::CodeFragment frame;
+        frame.declareFrame(frameId);
         // Create frame with 3 variables to make variable resolution less trivial.
         frame.appendConstVal(lhsValue.first, lhsValue.second);
         frame.appendConstVal(rhsValue.first, rhsValue.second);
@@ -542,7 +601,7 @@ TEST_F(SBECodeFragmentTest, AppendLocalVal2) {
         vm::CodeFragment code;
         code.append(std::move(frame));
         code.append(std::move(code2));
-        code.removeFixup(frameId);
+        code.removeFrame(frameId);
 
         for (int i = 0; i < 3; i++) {
             code.appendSwap();
@@ -552,12 +611,11 @@ TEST_F(SBECodeFragmentTest, AppendLocalVal2) {
         runTest(code);
     }
 
-// TODO SERVER-72391 - Enable this test after fixing the issue.
-#if FALSE
     {
         printVariation("append instr");
 
         vm::CodeFragment code;
+        code.declareFrame(frameId);
         // Create frame with 3 variables to make variable resolution less trivial.
         code.appendConstVal(lhsValue.first, lhsValue.second);
         code.appendConstVal(rhsValue.first, rhsValue.second);
@@ -566,7 +624,7 @@ TEST_F(SBECodeFragmentTest, AppendLocalVal2) {
         code.appendLocalVal(frameId, 0, false);
         code.appendLocalVal(frameId, 1, false);
         code.appendSub({}, {});
-        code.removeFixup(frameId);
+        code.removeFrame(frameId);
 
         for (int i = 0; i < 3; i++) {
             code.appendSwap();
@@ -575,6 +633,66 @@ TEST_F(SBECodeFragmentTest, AppendLocalVal2) {
 
         runTest(code);
     }
-#endif
 }
+
+
+TEST_F(SBECodeFragmentTest, DeclareFrameNotEmptyStack) {
+    auto value = makeInt32(10);
+    FrameId frameId = 10;
+
+    {
+        printVariation("append code");
+
+        vm::CodeFragment code;
+        // Pad the stack with 3 values
+        code.appendConstVal(value::TypeTags::Nothing, 0);
+        code.appendConstVal(value::TypeTags::Nothing, 0);
+        code.appendConstVal(value::TypeTags::Nothing, 0);
+
+        code.declareFrame(frameId);
+        // Create frame with 2 variables to make variable resolution less trivial.
+        code.appendConstVal(value.first, value.second);
+        code.appendConstVal(value::TypeTags::Nothing, 0);
+
+        vm::CodeFragment code2;
+        code2.appendLocalVal(frameId, 0, false);
+
+        code.append(std::move(code2));
+        code.removeFrame(frameId);
+
+        for (int i = 0; i < 5; i++) {
+            code.appendSwap();
+            code.appendPop();
+        }
+
+        runTest(code);
+    }
+
+    {
+        printVariation("append instr");
+
+        vm::CodeFragment code;
+        // Pad the stack with 3 values
+        code.appendConstVal(value::TypeTags::Nothing, 0);
+        code.appendConstVal(value::TypeTags::Nothing, 0);
+        code.appendConstVal(value::TypeTags::Nothing, 0);
+
+        code.declareFrame(frameId);
+        // Create frame with 2 variables to make variable resolution less trivial.
+        code.appendConstVal(value.first, value.second);
+        code.appendConstVal(value::TypeTags::Nothing, 0);
+
+        code.appendLocalVal(frameId, 0, false);
+        code.removeFrame(frameId);
+
+        for (int i = 0; i < 5; i++) {
+            code.appendSwap();
+            code.appendPop();
+        }
+
+
+        runTest(code);
+    }
+}
+
 }  // namespace mongo::sbe

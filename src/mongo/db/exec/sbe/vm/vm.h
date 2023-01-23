@@ -779,7 +779,6 @@ public:
     auto maxStackSize() const {
         return _maxStackSize;
     }
-    void removeFixup(FrameId frameId);
 
     void append(CodeFragment&& code);
     void appendNoStack(CodeFragment&& code);
@@ -887,9 +886,44 @@ public:
     void appendNumericConvert(value::TypeTags targetTag);
     void appendApplyClassicMatcher(const MatchExpression*);
 
-    void fixup(int offset);
     // For printing from an interactive debugger.
     std::string toString() const;
+
+    // Declares and defines a local variable frame at the current depth.
+    // Local frame declaration is used to resolve the stack offsets of local variable access.
+    // All references local variables must have matching frame declaration. The
+    // variable reference and frame declaration is allowed to happen in any order.
+    void declareFrame(FrameId frameId);
+
+    // Declares and defines a local variable frame at the current stack depth modifies by the gives
+    // offset.
+    void declareFrame(FrameId frameId, int stackOffset);
+
+    // Removes the frame from scope. The frame must exist and must have no outstanding fixups.
+    // That is: have been declared or have never been referenced.
+    void removeFrame(FrameId frameId);
+
+    // Returns whether the are any frames currently in scope.
+    bool hasFrames() const;
+
+    // Adjusts all the stack offsets in the outstanding fixups by the provided delta.
+    // TODO SERVER-72843: Make fixupStackOffsets private after fixing the issue.
+    // ELocalLambda needs access to fixupStackOffsets as the bug workaround, and should be
+    // treated as private otherwise.
+    void fixupStackOffsets(int stackOffsetDelta);
+
+private:
+    // Stores the fixup information for stack frames.
+    // stackPosition - stack depth of where the frame was declared, or kPositionNotSet if not known
+    // yet.
+    // fixupOffsets - offsets in the code where the stack depth of the frame was used and need
+    // fixup.
+    struct FrameInfo {
+        static constexpr int64_t kPositionNotSet = std::numeric_limits<int64_t>::min();
+
+        absl::InlinedVector<size_t, 2> fixupOffsets;
+        int64_t stackPosition{kPositionNotSet};
+    };
 
 private:
     template <typename... Ts>
@@ -904,6 +938,8 @@ private:
     void adjustStackSimple(const Instruction& i, Ts&&... params);
     void copyCodeAndFixup(CodeFragment&& from);
 
+    template <typename... Ts>
+    size_t appendParameters(uint8_t* ptr, Ts&&... params);
     size_t appendParameter(uint8_t* ptr, Instruction::Parameter param, int& popCompensation);
 
     // Convert a variable index to a stack offset.
@@ -911,21 +947,19 @@ private:
         return -var - 1;
     }
 
+    FrameInfo& getOrDefineFrame(FrameId frameId);
+    void fixupFrame(FrameInfo& frame);
+
 private:
     absl::InlinedVector<uint8_t, 16> _instrs;
 
-    /**
-     * Local variables bound by the let expressions live on the stack and are accessed by knowing an
-     * offset from the top of the stack. As CodeFragments are appened together the offsets must be
-     * fixed up to account for movement of the top of the stack.
-     * The FixUp structure holds a "pointer" to the bytecode where we have to adjust the stack
-     * offset.
-     */
-    struct FixUp {
-        FrameId frameId;
-        size_t offset;
-    };
-    std::vector<FixUp> _fixUps;
+    // A collection of frame information for local variables.
+    // Variables can be declared or referenced out of order and at the time of variable reference
+    // it may not be known the relative stack offset of variable daclaration w.r.t to the its use.
+    // This tracks both declaration info (stack depth) and use info (code offset).
+    // When code is concatenated the offsets are adjusted if needed and when declaration stack depth
+    // becomes known all fixups are resolved.
+    absl::flat_hash_map<FrameId, FrameInfo> _frames;
 
     size_t _stackSize{0};
     size_t _maxStackSize{0};
