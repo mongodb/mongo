@@ -51,10 +51,9 @@ public:
     static void start(ServiceContext* serviceCtx, OperationContext* opCtx);
 
     /**
-     * Refreshes all cluster server parameters that have been updated on the config servers since
-     * _latestClusterParameterTime. Called periodically in the run method, which executes in a
-     * background thread. Also called in-line during getClusterParameter on mongos to ensure that
-     * cached values returned are up-to-date.
+     * Refreshes all cluster server parameters from the config servers. Called periodically in the
+     * run method, which executes in a background thread. Also called in-line during
+     * getClusterParameter on mongos to ensure that cached values returned are up-to-date.
      */
     Status refreshParameters(OperationContext* opCtx);
 
@@ -68,7 +67,6 @@ private:
     void run();
 
     std::unique_ptr<PeriodicJobAnchor> _job;
-    LogicalTime _latestClusterParameterTime = LogicalTime::kUninitialized;
 };
 
 Status clusterServerParameterRefreshIntervalSecsNotify(const int& newValue);

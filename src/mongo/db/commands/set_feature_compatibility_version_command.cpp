@@ -840,15 +840,6 @@ private:
     // requestedVersion.
     void _cleanUpClusterParameters(
         OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
-        std::set<TenantId> tenantIds;
-        if (gMultitenancySupport) {
-            auto catalog = CollectionCatalog::get(opCtx);
-            {
-                Lock::GlobalLock lk(opCtx, MODE_IS);
-                tenantIds = catalog->getAllTenants();
-            }
-        }
-
         invariant(serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
         const auto& [fromVersion, _] =
             getTransitionFCVFromAndTo(serverGlobalParams.featureCompatibility.getVersion());
@@ -863,13 +854,7 @@ private:
         }
         if (deletes.size() > 0) {
             DBDirectClient client(opCtx);
-            // Delete disabled parameters' values from all cluster parameter collections.
-            for (const auto& tenantId : tenantIds) {
-                write_ops::DeleteCommandRequest deleteOp(
-                    NamespaceString::makeClusterParametersNSS(tenantId));
-                deleteOp.setDeletes(deletes);
-                write_ops::checkWriteErrors(client.remove(deleteOp));
-            }
+            // We never downgrade with multitenancy enabled, so assume we have just the none tenant.
             write_ops::DeleteCommandRequest deleteOp(NamespaceString::kClusterParametersNamespace);
             deleteOp.setDeletes(deletes);
             write_ops::checkWriteErrors(client.remove(deleteOp));

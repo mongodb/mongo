@@ -239,7 +239,8 @@ function runGetClusterParameterReplicaSet(
 // the config server replica set.
 function runGetClusterParameterSharded(
     st, getClusterParameterArgs, expectedClusterParameters, tenantId) {
-    runGetClusterParameterNode(st.s0, getClusterParameterArgs, expectedClusterParameters, tenantId);
+    assert(runGetClusterParameterNode(
+        st.s0, getClusterParameterArgs, expectedClusterParameters, tenantId));
 
     runGetClusterParameterReplicaSet(
         st.configRS, getClusterParameterArgs, expectedClusterParameters, tenantId);
