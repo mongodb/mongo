@@ -36,7 +36,7 @@ import itertools
 # compilation database can access the complete list, and also so that the writer has easy
 # access to write all of the files. But it seems clunky. How can the emitter and the scanner
 # communicate more gracefully?
-__COMPILATION_DB_ENTRIES = []
+__COMPILATION_DB_ENTRIES = {}
 
 # Cribbed from Tool/cc.py and Tool/c++.py. It would be better if
 # we could obtain this from SCons.
@@ -100,7 +100,12 @@ def makeEmitCompilationDbEntry(comstr):
         env.AlwaysBuild(entry)
         env.NoCache(entry)
 
-        __COMPILATION_DB_ENTRIES.append(dbtarget)
+        compiledb_target = env.get('COMPILEDB_TARGET')
+
+        if compiledb_target not in __COMPILATION_DB_ENTRIES:
+            __COMPILATION_DB_ENTRIES[compiledb_target] = []
+
+        __COMPILATION_DB_ENTRIES[compiledb_target].append(dbtarget)
 
         return target, source
 
@@ -137,7 +142,7 @@ def CompilationDbEntryAction(target, source, env, **kw):
 def WriteCompilationDb(target, source, env):
     entries = []
 
-    for s in __COMPILATION_DB_ENTRIES:
+    for s in __COMPILATION_DB_ENTRIES[target[0].abspath]:
         entries.append(s.read())
 
     with open(str(target[0]), "w") as target_file:
@@ -151,7 +156,10 @@ def WriteCompilationDb(target, source, env):
 
 
 def ScanCompilationDb(node, env, path):
-    return __COMPILATION_DB_ENTRIES
+    all_entries = []
+    for compiledb_target in __COMPILATION_DB_ENTRIES:
+        all_entries.extend(__COMPILATION_DB_ENTRIES[compiledb_target])
+    return all_entries
 
 
 def generate(env, **kwargs):
@@ -203,7 +211,9 @@ def generate(env, **kwargs):
     )
 
     def CompilationDatabase(env, target):
+
         result = env.__COMPILATIONDB_Database(target=target, source=[])
+        env['COMPILEDB_TARGET'] = result[0].abspath
 
         env.AlwaysBuild(result)
         env.NoCache(result)

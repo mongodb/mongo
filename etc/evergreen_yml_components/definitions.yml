@@ -2764,7 +2764,7 @@ tasks:
     vars:
       task_compile_flags: >-
         --build-profile=compiledb
-      targets: compiledb
+      targets: compiledb +mongo-tidy-tests
       compiling_for_test: true
       compile_flags: >-
         --link-model=dynamic

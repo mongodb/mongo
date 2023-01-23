@@ -404,6 +404,13 @@ class Linter:
             if "enterprise" in self.file_name:
                 return
 
+            norm_file_name = self.file_name.replace('\\', '/')
+
+            # Custom clang-tidy check tests purposefully produce errors for
+            # tests to find, they should be ignored.
+            if "mongo_tidy_checks/tests/" in norm_file_name:
+                return
+
             # The following files are in the src/mongo/ directory but technically belong
             # in src/third_party/ because their copyright does not belong to MongoDB.
             files_to_ignore = set([
@@ -419,7 +426,6 @@ class Linter:
                 'src/mongo/util/scopeguard.h',
             ])
 
-            norm_file_name = self.file_name.replace('\\', '/')
             for file_to_ignore in files_to_ignore:
                 if file_to_ignore in norm_file_name:
                     return

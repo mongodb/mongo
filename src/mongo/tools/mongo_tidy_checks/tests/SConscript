@@ -1,0 +1,61 @@
+Import('env')
+Import('mongo_tidy_module')
+Import('base_toolchain_bin')
+
+import sys
+import os
+import SCons
+
+# multiple compilation databases is not supported by ninja
+if env.GetOption('ninja') == 'disabled':
+
+    # This list represents the test source files, which should contain a single issue which will be flagged
+    # by a clang tidy check. The issue should be isolated in as minimal way as possible.
+    tests = [
+        'test_MongoTestCheck.cpp',
+    ]
+
+    # So that we can do fast runs, we will generate a separate compilation database file for each
+    # unittest. To keep things simple we will name the compilation database file after the test.
+    # We need to create separate environments here because compilation database acts on the current
+    # environment.
+    test_objs = []
+    compilation_dbs = []
+    for test in tests:
+        test_env = env.Clone()
+        compilation_dbs += test_env.CompilationDatabase(
+            os.path.splitext(os.path.basename(test))[0] + ".json")
+        test_objs += test_env.Object(test)
+
+    # Building a program binary may not be necessary but it does validate the code and tie it together.
+    test_prog = env.Program(
+        target='MongoTidyCheck_test',
+        source=['MongoTidyCheckTestMain.cpp'] + test_objs,
+        LIBDEPS_NO_INHERIT=[
+            '$BUILD_DIR/third_party/shim_allocator',
+        ],
+    )
+
+    # Here we setup the test execution. The test will pythons built in unittest framework
+    # to execute clang tidy for each test source file from the list above.
+    test = env.Command(
+        target='run_MongoTidyCheck_test',
+        source=[
+            'MongoTidyCheck_unittest.py',
+            str(base_toolchain_bin / 'clang-tidy'), mongo_tidy_module.abspath
+        ] + compilation_dbs,
+        action=SCons.Action.Action(
+            ' '.join([
+                sys.executable,
+                '${SOURCES[0]}',
+                '--clang-tidy-path=${SOURCES[1]}',
+                '--mongo-tidy-module=${SOURCES[2]}',
+                '${["--test-compiledbs=%s" % src for src in SOURCES[3:]]}',
+                f"{'' if env.Verbose() else '2> /dev/null'}",
+            ]),
+            "" if env.Verbose() else "Runnning mongo tidy checks unittests.",
+        ),
+    )
+
+    env.Alias('+mongo-tidy-tests', test)
+    env.Depends(test, test_prog)

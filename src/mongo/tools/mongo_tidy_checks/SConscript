@@ -4,13 +4,12 @@ from buildscripts.toolchains import DEFAULT_DATA_FILE, ToolchainConfig, Toolchai
 
 toolchain_clang_tidy_dev_found = False
 toolchain_found = False
-
+base_toolchain_bin = None
 try:
     toolchain_config = ToolchainConfig(DEFAULT_DATA_FILE, ToolchainPlatform('default'))
     toolchain_found = toolchain_config.base_path.exists()
-
-    base_revision_path = (toolchain_config.base_path / toolchain_config.aliases['stable'] / 'bin' /
-                          'clang-tidy').resolve().parent.parent
+    base_toolchain_bin = (toolchain_config.base_path / toolchain_config.aliases['stable'] / 'bin')
+    base_revision_path = (base_toolchain_bin / 'clang-tidy').resolve().parent.parent
 
     tidy_include = base_revision_path / 'include'
     tidy_lib = base_revision_path / 'lib'
@@ -123,6 +122,7 @@ mongo_custom_check = env.SharedLibrary(
     target="mongo_tidy_checks",
     source=[
         "MongoTestCheck.cpp",
+        "MongoTidyModule.cpp",
     ],
     LIBDEPS_NO_INHERIT=[
         '$BUILD_DIR/third_party/shim_allocator',
@@ -130,9 +130,16 @@ mongo_custom_check = env.SharedLibrary(
     AIB_COMPONENT='mongo-tidy-checks',
 )
 
-pretty_printer_test_installed = env.AutoInstall(
+env.AutoInstall(
     target='$PREFIX_LIBDIR',
     source=mongo_custom_check,
     AIB_ROLE='runtime',
     AIB_COMPONENT='mongo-tidy-checks',
 )
+mongo_tidy_module = env.GetAutoInstalledFiles(mongo_custom_check[0])[0]
+
+# because compiledb is required for use with clang-tidy and potentially clang-tidy is
+# loading the module, we add the module to the compiledb alias.
+env.Alias("compiledb", mongo_tidy_module)
+
+env.SConscript('tests/SConscript', exports=['env', 'mongo_tidy_module', 'base_toolchain_bin'])

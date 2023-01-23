@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -26,7 +26,7 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "MongoTestCheck.h"
+#pragma once
 
 #include "clang-tidy/ClangTidy.h"
 #include "clang-tidy/ClangTidyCheck.h"
@@ -37,25 +37,20 @@ using namespace clang;
 using namespace clang::tidy;
 using namespace clang::ast_matchers;
 
-// TODO SERVER-72150
-// This is a dummy reference check to give example for writing new checks.
-// This check should be removed (the file here and any references to it) once we have
-// some real checks.
 namespace mongo {
 namespace tidy {
 
-MongoTestCheck::MongoTestCheck(StringRef Name, ClangTidyContext* Context)
-    : ClangTidyCheck(Name, Context) {}
+class MongoTestCheck : public ClangTidyCheck {
 
-void MongoTestCheck::registerMatchers(ast_matchers::MatchFinder* Finder) {
-    Finder->addMatcher(translationUnitDecl().bind("tu"), this);
-}
+public:
+    MongoTestCheck(StringRef Name, ClangTidyContext* Context);
 
-void MongoTestCheck::check(const ast_matchers::MatchFinder::MatchResult& Result) {
-    auto S = Result.Nodes.getNodeAs<TranslationUnitDecl>("tu");
-    if (S)
-        diag("ran mongo-test-check!");
-}
+    void registerMatchers(ast_matchers::MatchFinder* Finder) override;
+
+    void check(const ast_matchers::MatchFinder::MatchResult& Result) override;
+
+private:
+};
 
 }  // namespace tidy
 }  // namespace mongo
