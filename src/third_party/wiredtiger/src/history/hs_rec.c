@@ -9,8 +9,8 @@
 #include "wt_internal.h"
 
 static int __hs_delete_reinsert_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor,
-  uint32_t btree_id, const WT_ITEM *key, wt_timestamp_t ts, bool reinsert, bool ooo_tombstone,
-  bool error_on_ooo_ts, uint64_t *hs_counter);
+  uint32_t btree_id, const WT_ITEM *key, wt_timestamp_t ts, bool reinsert, bool no_ts_tombstone,
+  bool error_on_ts_ordering, uint64_t *hs_counter, WT_TIME_WINDOW *upd_tw);
 
 /*
  * __hs_verbose_cache_stats --
@@ -209,7 +209,7 @@ __hs_insert_record(WT_SESSION_IMPL *session, WT_CURSOR *cursor, WT_BTREE *btree,
 
     if (ret == 0)
         WT_ERR(__hs_delete_reinsert_from_pos(session, cursor, btree->id, key, tw->start_ts + 1,
-          true, false, error_on_ooo_ts, &counter));
+          true, false, error_on_ooo_ts, &counter, tw));
 
 #ifdef HAVE_DIAGNOSTIC
     /*
@@ -816,7 +816,7 @@ __wt_hs_delete_key_from_ts(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, uint3
     }
 
     WT_ERR(__hs_delete_reinsert_from_pos(session, hs_cursor, btree_id, key, ts, reinsert,
-      ooo_tombstone, error_on_ooo_ts, &hs_counter));
+      ooo_tombstone, error_on_ooo_ts, &hs_counter, NULL));
 
 done:
 err:
@@ -834,8 +834,8 @@ err:
  */
 static int
 __hs_delete_reinsert_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, uint32_t btree_id,
-  const WT_ITEM *key, wt_timestamp_t ts, bool reinsert, bool ooo_tombstone, bool error_on_ooo_ts,
-  uint64_t *counter)
+  const WT_ITEM *key, wt_timestamp_t ts, bool reinsert, bool no_ts_tombstone,
+  bool error_on_ts_ordering, uint64_t *counter, WT_TIME_WINDOW *upd_tw)
 {
     WT_CURSOR *hs_insert_cursor;
     WT_CURSOR_BTREE *hs_cbt;
@@ -863,12 +863,57 @@ __hs_delete_reinsert_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, ui
      * If we delete all the updates of the key from the history store, we should not reinsert any
      * update except when an out-of-order tombstone is not globally visible yet.
      */
-    WT_ASSERT(session, ooo_tombstone || ts > WT_TS_NONE || !reinsert);
+    WT_ASSERT(session, no_ts_tombstone || ts > WT_TS_NONE || !reinsert);
 
     for (; ret == 0; ret = hs_cursor->next(hs_cursor)) {
         /* Ignore records that are obsolete. */
         __wt_hs_upd_time_window(hs_cursor, &twp);
         if (__wt_txn_tw_stop_visible_all(session, twp))
+            continue;
+
+        /*
+         * The below example illustrates a case that the data store and the history
+         * store may contain the same value. In this case, skip inserting the same
+         * value to the history store again.
+         *
+         * Suppose there is one table table1 and the below operations are performed.
+         *
+         * 1. Insert a=1 in table1 at timestamp 10
+         * 2. Delete a from table1 at timestamp 20
+         * 3. Set stable timestamp = 20, oldest timestamp=1
+         * 4. Checkpoint table1
+         * 5. Insert a=2 in table1 at timestamp 30
+         * 6. Evict a=2 from table1 and move the content to history store.
+         * 7. Checkpoint is still running and before it finishes checkpointing the history store the
+         * above steps 5 and 6 will happen.
+         *
+         * After all this operations the checkpoint content will be
+         * Data store --
+         * table1 --> a=1 at start_ts=10, stop_ts=20
+         *
+         * History store --
+         * table1 --> a=1 at start_ts=10, stop_ts=20
+         *
+         * WiredTiger takes a backup of the checkpoint and use this backup to restore.
+         * Note: In table1 of both data store and history store has the same content.
+         *
+         * Now the backup is used to restore.
+         *
+         * 1. Insert a=3 in table1
+         * 2. Checkpoint started, eviction started and sees the same content in data store and
+         * history store while reconciling.
+         *
+         * The start timestamp and transaction ids are checked to ensure for the global
+         * visibility because globally visible timestamps and transaction ids may be cleared to 0.
+         * The time window of the inserting record and the history store record are
+         * compared to make sure that the same record are not being inserted again.
+         */
+
+        if (upd_tw != NULL &&
+          (__wt_txn_tw_start_visible_all(session, upd_tw) &&
+                __wt_txn_tw_start_visible_all(session, twp) ?
+              WT_TIME_WINDOWS_STOP_EQUAL(upd_tw, twp) :
+              WT_TIME_WINDOWS_EQUAL(upd_tw, twp)))
             continue;
 
         /* We shouldn't have crossed the btree and user key search space. */
@@ -891,7 +936,7 @@ __hs_delete_reinsert_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, ui
      * flag. We cannot modify the history store to fix the out of order timestamp updates as it may
      * make the history store checkpoint inconsistent.
      */
-    if (error_on_ooo_ts) {
+    if (error_on_ts_ordering) {
         ret = EBUSY;
         WT_STAT_CONN_INCR(session, cache_eviction_fail_checkpoint_out_of_order_ts);
         goto err;
@@ -979,7 +1024,8 @@ __hs_delete_reinsert_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, ui
              * to the new update.
              */
             if (hs_cbt->upd_value->tw.start_ts >= ts)
-                hs_insert_tw.start_ts = hs_insert_tw.durable_start_ts = ooo_tombstone ? ts : ts - 1;
+                hs_insert_tw.start_ts = hs_insert_tw.durable_start_ts =
+                  no_ts_tombstone ? ts : ts - 1;
             else {
                 hs_insert_tw.start_ts = hs_cbt->upd_value->tw.start_ts;
                 hs_insert_tw.durable_start_ts = hs_cbt->upd_value->tw.durable_start_ts;
@@ -991,7 +1037,7 @@ __hs_delete_reinsert_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, ui
              * another moved update OR the update itself triggered the correction. In either case,
              * we should preserve the stop transaction id.
              */
-            hs_insert_tw.stop_ts = hs_insert_tw.durable_stop_ts = ooo_tombstone ? ts : ts - 1;
+            hs_insert_tw.stop_ts = hs_insert_tw.durable_stop_ts = no_ts_tombstone ? ts : ts - 1;
             hs_insert_tw.stop_txn = hs_cbt->upd_value->tw.stop_txn;
 
             /* Extract the underlying value for reinsertion. */
@@ -999,7 +1045,7 @@ __hs_delete_reinsert_from_pos(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, ui
               hs_cursor, &tw.durable_stop_ts, &tw.durable_start_ts, &hs_upd_type, &hs_value));
 
             /* Reinsert the update with corrected timestamps. */
-            if (ooo_tombstone && hs_ts == ts)
+            if (no_ts_tombstone && hs_ts == ts)
                 *counter = hs_counter;
 
             /* Insert the value back with different timestamps. */
