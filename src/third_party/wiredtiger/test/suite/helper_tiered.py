@@ -45,6 +45,10 @@ def get_auth_token(storage_source):
         secret_key = os.getenv('aws_sdk_s3_ext_secret_key')
         if access_key and secret_key:
             auth_token = access_key + ";" + secret_key
+    if storage_source == 'azure_store': 
+        auth_token = os.getenv('AZURE_STORAGE_CONNECTION_STRING')
+    if storage_source == 'gcp_store':
+        auth_token = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
     return auth_token
 
 # Get buckets configured for the storage source
