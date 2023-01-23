@@ -92,12 +92,12 @@ void IndexScanStageBase::prepareImpl(CompileCtx& ctx) {
             str::stream() << "could not find index named '" << _indexName << "' in collection '"
                           << _collName << "'",
             indexDesc);
-    _weakIndexCatalogEntry = indexCatalog->getEntryShared(indexDesc);
-    auto entry = _weakIndexCatalogEntry.lock();
+    _entry = indexCatalog->getEntry(indexDesc);
     tassert(4938503,
             str::stream() << "expected IndexCatalogEntry for index named: " << _indexName,
-            static_cast<bool>(entry));
-    _ordering = entry->ordering();
+            static_cast<bool>(_entry));
+    _indexIdent = _entry->getIdent();
+    _ordering = _entry->ordering();
 
     if (_snapshotIdAccessor) {
         _snapshotIdAccessor->reset(
@@ -147,6 +147,9 @@ void IndexScanStageBase::doSaveState(bool relinquishCursor) {
         _cursor->setSaveStorageCursorOnDetachFromOperationContext(!relinquishCursor);
     }
 
+    // Set the index entry to null, since accessing this pointer is illegal during yield.
+    _entry = nullptr;
+
     _coll.reset();
 }
 
@@ -154,10 +157,17 @@ void IndexScanStageBase::restoreCollectionAndIndex() {
     tassert(5777406, "Collection name should be initialized", _collName);
     tassert(5777407, "Catalog epoch should be initialized", _catalogEpoch);
     _coll = restoreCollection(_opCtx, *_collName, _collUuid, *_catalogEpoch);
-    auto indexCatalogEntry = _weakIndexCatalogEntry.lock();
+    auto desc = _coll->getIndexCatalog()->findIndexByIdent(_opCtx, _coll.get(), _indexIdent);
     uassert(ErrorCodes::QueryPlanKilled,
             str::stream() << "query plan killed :: index '" << _indexName << "' dropped",
-            indexCatalogEntry && !indexCatalogEntry->isDropped());
+            desc && !desc->getEntry()->isDropped());
+
+    // Re-obtain the index entry pointer that was set to null during yield preparation. It is safe
+    // to access the index entry when the query is active, as its validity is protected by at least
+    // MODE_IS collection locks; or, in the case of lock-free reads, its lifetime is managed by the
+    // CollectionCatalog stashed on the RecoveryUnit snapshot, which is kept alive until the query
+    // yields.
+    _entry = desc->getEntry();
 }
 
 void IndexScanStageBase::doRestoreState(bool relinquishCursor) {
@@ -226,12 +236,8 @@ void IndexScanStageBase::openImpl(bool reOpen) {
     _open = true;
     _scanState = ScanState::kNeedSeek;
 
-    auto entry = _weakIndexCatalogEntry.lock();
-    tassert(4938502,
-            str::stream() << "expected IndexCatalogEntry for index named: " << _indexName,
-            static_cast<bool>(entry));
     if (!_cursor) {
-        _cursor = entry->accessMethod()->asSortedData()->newCursor(_opCtx, _forward);
+        _cursor = _entry->accessMethod()->asSortedData()->newCursor(_opCtx, _forward);
     }
 }
 
@@ -500,8 +506,7 @@ void SimpleIndexScanStage::open(bool reOpen) {
                 tagLow == value::TypeTags::ksValue);
         _seekKeyLowHolder->reset(ownedLow, tagLow, valLow);
     } else {
-        auto entry = _weakIndexCatalogEntry.lock();
-        auto sdi = entry->accessMethod()->asSortedData()->getSortedDataInterface();
+        auto sdi = _entry->accessMethod()->asSortedData()->getSortedDataInterface();
         KeyString::Builder kb(sdi->getKeyStringVersion(),
                               sdi->getOrdering(),
                               KeyString::Discriminator::kExclusiveBefore);
