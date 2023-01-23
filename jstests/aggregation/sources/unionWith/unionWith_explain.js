@@ -37,7 +37,11 @@ function getUnionWithStage(explain) {
             }
         }
     } else {
-        return getAggPlanStage(explain, "$unionWith");
+        const stages = getAggPlanStages(explain, "$unionWith");
+        assert.gt(stages.length, 0, 'Expected a $unionWith stage: ' + tojson(explain));
+        // getAggPlanStage includes stages in sub-pipelines. But we're only interested in the
+        // top-level $unionWith stage.
+        return stages[0];
     }
 }
 

@@ -210,6 +210,13 @@ function getAggPlanStages(root, stage, useQueryPlannerSection = false) {
             if (properties[0] === stage) {
                 results.push(docSourceArray[i]);
             }
+
+            if (properties[0] === "$unionWith") {
+                jsTestLog(tojson(docSourceArray));
+                // $unionWith contains a whole sub-explain.
+                results = results.concat(getAggPlanStages(
+                    docSourceArray[i].$unionWith.pipeline, stage, useQueryPlannerSection));
+            }
         }
         return results;
     }

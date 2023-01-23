@@ -1255,7 +1255,8 @@ void BoundedSorter<Key, Value, Comparator, BoundMaker>::add(Key key, Value value
     invariant(!_done);
     // If a new value violates what we thought was our min bound, something has gone wrong.
     uassert(6369910,
-            "BoundedSorter input is too out-of-order.",
+            str::stream() << "BoundedSorter input is too out-of-order: with bound "
+                          << _min->toString() << ", did not expect input " << key.toString(),
             !_checkInput || !_min || compare(*_min, key) <= 0);
 
     // Each new item can potentially give us a tighter bound (a higher min).

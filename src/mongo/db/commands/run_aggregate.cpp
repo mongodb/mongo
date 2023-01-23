@@ -453,17 +453,39 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
     boost::optional<UUID> uuid,
     ExpressionContext::CollationMatchesDefault collationMatchesDefault) {
     setIgnoredShardVersionForMergeCursors(opCtx, request);
+    auto resolvedNamespaces = uassertStatusOK(resolveInvolvedNamespaces(opCtx, request));
+
     boost::intrusive_ptr<ExpressionContext> expCtx =
         new ExpressionContext(opCtx,
                               request,
                               std::move(collator),
                               MongoProcessInterface::create(opCtx),
-                              uassertStatusOK(resolveInvolvedNamespaces(opCtx, request)),
+                              resolvedNamespaces,
                               uuid,
                               CurOp::get(opCtx)->dbProfileLevel() > 0);
     expCtx->tempDir = storageGlobalParams.dbpath + "/_tmp";
     expCtx->collationMatchesDefault = collationMatchesDefault;
     expCtx->forPerShardCursor = request.getPassthroughToShard().has_value();
+
+    // If any involved collection contains extended-range data, set a flag which individual
+    // DocumentSource parsers can check.
+    {
+        auto catalog = CollectionCatalog::get(opCtx);
+        if (CollectionPtr coll =
+                catalog->lookupCollectionByNamespace(opCtx, request.getNamespace())) {
+            if (coll->getRequiresTimeseriesExtendedRangeSupport()) {
+                expCtx->setRequiresTimeseriesExtendedRangeSupport(true);
+            }
+        }
+
+        for (auto&& [orig, resolved] : resolvedNamespaces) {
+            if (CollectionPtr coll = catalog->lookupCollectionByNamespace(opCtx, resolved.ns)) {
+                if (coll->getRequiresTimeseriesExtendedRangeSupport()) {
+                    expCtx->setRequiresTimeseriesExtendedRangeSupport(true);
+                }
+            }
+        }
+    }
 
     return expCtx;
 }
