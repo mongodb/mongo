@@ -593,6 +593,9 @@ void ShardingCatalogManager::updateTimeSeriesBucketingParameters(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const CollModTimeseries& timeseriesParameters) {
+    // Take _kChunkOpLock in exclusive mode to prevent concurrent updates of the collection version.
+    Lock::ExclusiveLock lk(opCtx, _kChunkOpLock);
+
     const auto cm = uassertStatusOK(
         Grid::get(opCtx)->catalogCache()->getShardedCollectionPlacementInfoWithRefresh(opCtx, nss));
     std::set<ShardId> shardIds;
