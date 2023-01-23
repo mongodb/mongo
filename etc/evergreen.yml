@@ -390,7 +390,7 @@ buildvariants:
     compile_variant: *linux_x86_dynamic_debug_wtdevelop_compile_variant_name
 
 - name: &tla-plus tla-plus
-  display_name: TLA+
+  display_name: "TLA+"
   run_on:
   - rhel80-build
   cron: "0 4 * * 0" # From the ${project_weekly_cron} parameter
@@ -745,7 +745,7 @@ buildvariants:
 - name: &stm-daily-cron stm-daily-cron
   modules:
   - enterprise
-  display_name: "~ STM Daily Cron"
+  display_name: "* STM Daily Cron"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - rhel80-small
@@ -771,7 +771,7 @@ buildvariants:
   - name: blackduck_scanner
 
 - name: tooling-metrics
-  display_name: "Tooling Metrics"
+  display_name: "* Tooling Metrics"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   run_on:
   - ubuntu1804-small
@@ -1054,7 +1054,7 @@ buildvariants:
   - name: .updatefuzzer !.multiversion
 
 - name: &enterprise-windows-debug-unoptimized enterprise-windows-debug-unoptimized
-  display_name: Enterprise Windows DEBUG (Unoptimized)
+  display_name: "Enterprise Windows DEBUG (Unoptimized)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
@@ -2121,7 +2121,7 @@ buildvariants:
   - name: replica_sets_gen
 
 - name: &enterprise-rhel-72-s390x-compile enterprise-rhel-72-s390x-compile
-  display_name: Enterprise RHEL 7.2 s390x Compile
+  display_name: "Enterprise RHEL 7.2 s390x Compile"
   modules:
   - enterprise
   run_on:
@@ -2162,31 +2162,12 @@ buildvariants:
     - rhel72-zseries-build
   - name: generate_buildid_to_debug_symbols_mapping
 
-- <<: *linux_x86_dynamic_debug_compile_variant_dependency
-  name: &linux-debug-suggested linux-debug-suggested
-  display_name: "* Linux x86 Shared Library DEBUG"
-  cron: "0 */4 * * *" # From the ${project_required_suggested_cron} parameter
-  run_on:
-  - rhel80-small
-  expansions:
-    large_distro_name: rhel80-large
-    resmoke_jobs_factor: 0.5  # Avoid starting too many mongod's
-    compile_variant: *linux_x86_dynamic_debug_compile_variant_name
-  tasks:
-  - name: jsCore
-  - name: .read_write_concern !.write !.aggregation
-  - name: replica_sets_jscore_passthrough_gen
-  - name: replica_sets_large_txns_format_jscore_passthrough
-  - name: sharded_collections_jscore_passthrough
-  - name: sharding_gen
-  - name: sharding_auth_gen
-
 ################################
 # storage engine buildvariants #
 ################################
 
 - name: &enterprise-rhel-80-benchmarks enterprise-rhel-80-benchmarks
-  display_name: Enterprise RHEL 8.0 (Benchmarks)
+  display_name: "* Enterprise RHEL 8.0 (Benchmarks)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
@@ -2325,7 +2306,7 @@ buildvariants:
 
 - &rhel80-debug-asan-all-feature-flags-template
   name: &rhel80-debug-asan-all-feature-flags rhel80-debug-asan-all-feature-flags
-  display_name: "~ Shared Library ASAN Enterprise RHEL 8.0 DEBUG (all feature flags)"
+  display_name: "* Shared Library ASAN Enterprise RHEL 8.0 DEBUG (all feature flags)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
@@ -2419,7 +2400,7 @@ buildvariants:
 #  - name: server_selection_json_test_TG
 
 - name: &rhel80-debug-asan-classic-engine rhel80-debug-asan-classic-engine
-  display_name: ~ ASAN Enterprise RHEL 8.0 DEBUG (Classic Engine)
+  display_name: "* ASAN Enterprise RHEL 8.0 DEBUG (Classic Engine)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
@@ -2501,7 +2482,7 @@ buildvariants:
 
 - &rhel80-debug-ubsan-all-feature-flags-template
   name: &rhel80-debug-ubsan-all-feature-flags rhel80-debug-ubsan-all-feature-flags
-  display_name: "~ Shared Library UBSAN Enterprise RHEL 8.0 DEBUG (all feature flags)"
+  display_name: "* Shared Library UBSAN Enterprise RHEL 8.0 DEBUG (all feature flags)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
@@ -2592,7 +2573,7 @@ buildvariants:
 #  - name: server_selection_json_test_TG
 
 - name: &rhel80-debug-ubsan-classic-engine rhel80-debug-ubsan-classic-engine
-  display_name: "~ UBSAN Enterprise RHEL 8.0 DEBUG (Classic Engine)"
+  display_name: "* UBSAN Enterprise RHEL 8.0 DEBUG (Classic Engine)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   modules:
   - enterprise
@@ -3416,7 +3397,7 @@ buildvariants:
   - name: lint_fuzzer_sanity_patch
 
 - name: &enterprise-ubuntu1804-64-libvoidstar enterprise-ubuntu1804-64-libvoidstar
-  display_name: ~ Enterprise Ubuntu 18.04 w/ libvoidstar
+  display_name: "~ Enterprise Ubuntu 18.04 w/ libvoidstar"
   modules:
   - enterprise
   run_on:
@@ -3445,7 +3426,7 @@ buildvariants:
 
 - <<: *enterprise-windows-nopush-template
   name: &enterprise-windows-benchmarks enterprise-windows-benchmarks
-  display_name: "~ Enterprise Windows (Benchmarks)"
+  display_name: "* Enterprise Windows (Benchmarks)"
   cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
   expansions:
     <<: *enterprise-windows-nopush-expansions-template
