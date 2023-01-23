@@ -50,7 +50,7 @@ namespace {
 const std::string kActionLogCollectionName("actionlog");
 const int kActionLogCollectionSizeMB = 20 * 1024 * 1024;
 
-const std::string kChangeLogCollectionName(ChangeLogType::ConfigNS.coll());
+const std::string kChangeLogCollectionName("changelog");
 const int kChangeLogCollectionSizeMB = 200 * 1024 * 1024;
 
 // Global ShardingLogging instance

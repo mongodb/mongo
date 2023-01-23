@@ -359,24 +359,6 @@ void bumpCollectionMinorVersion(OperationContext* opCtx,
             numDocsExpectedModified == numDocsModified);
 }
 
-void logMergeToChangelog(OperationContext* opCtx,
-                         const NamespaceString& nss,
-                         const ChunkVersion& prevShardVersion,
-                         const ChunkVersion& mergedVersion,
-                         const ShardId& owningShard,
-                         const ChunkRange& chunkRange,
-                         const size_t numChunks) {
-    BSONObjBuilder logDetail;
-    prevShardVersion.serialize("prevShardVersion", &logDetail);
-    mergedVersion.serialize("mergedVersion", &logDetail);
-    logDetail.append("owningShard", owningShard);
-    chunkRange.append(&logDetail);
-    logDetail.append("numChunks", static_cast<int>(numChunks));
-
-    ShardingLogging::get(opCtx)->logChange(
-        opCtx, "merge", nss.ns(), logDetail.obj(), WriteConcernOptions());
-}
-
 void mergeAllChunksOnShardInTransaction(OperationContext* opCtx,
                                         const UUID& collectionUUID,
                                         const ShardId& shardId,
@@ -993,8 +975,15 @@ ShardingCatalogManager::commitChunksMerge(OperationContext* opCtx,
         opCtx, nss, coll.getUuid(), mergeVersion, validAfter, chunkRange, shardId, chunksToMerge);
 
     // 5. log changes
-    logMergeToChangelog(
-        opCtx, nss, initialVersion, mergeVersion, shardId, chunkRange, chunksToMerge->size());
+    BSONObjBuilder logDetail;
+    initialVersion.serialize("prevShardVersion", &logDetail);
+    mergeVersion.serialize("mergedVersion", &logDetail);
+    logDetail.append("owningShard", shardId);
+    chunkRange.append(&logDetail);
+    logDetail.append("numChunks", static_cast<int>(chunksToMerge->size()));
+
+    ShardingLogging::get(opCtx)->logChange(
+        opCtx, "merge", nss.ns(), logDetail.obj(), WriteConcernOptions());
 
     return ShardAndCollectionVersion{mergeVersion /*shardVersion*/, mergeVersion /*collVersion*/};
 }
@@ -1031,10 +1020,6 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
             .docs;
 
     // 3. Prepare the data for the merge.
-
-    // Track the number of merged chunks for each new chunk
-    std::vector<size_t> numMergedChunks;
-
     const auto newChunks = [&]() -> std::shared_ptr<std::vector<ChunkType>> {
         auto newChunks = std::make_shared<std::vector<ChunkType>>();
 
@@ -1046,7 +1031,6 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
             if (nChunksInRange > 1) {
                 newVersion.incMinor();
                 ChunkType newChunk(collUuid, {rangeMin, rangeMax}, newVersion, shardId);
-                numMergedChunks.push_back(nChunksInRange);
                 newChunks->push_back(std::move(newChunk));
             }
             nChunksInRange = 0;
@@ -1087,22 +1071,7 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
     // 4. Commit the new routing table changes to the sharding catalog.
     mergeAllChunksOnShardInTransaction(opCtx, collUuid, shardId, newChunks);
 
-    // 5. Log changes
-    auto prevVersion = originalVersion;
-    invariant(numMergedChunks.size() == newChunks->size());
-    for (auto i = 0U; i < newChunks->size(); ++i) {
-        const auto& newChunk = newChunks->at(i);
-        logMergeToChangelog(opCtx,
-                            nss,
-                            prevVersion,
-                            newChunk.getVersion(),
-                            shardId,
-                            newChunk.getRange(),
-                            numMergedChunks.at(i));
-
-        // we can know the prevVersion since newChunks vector is sorted by version
-        prevVersion = newChunk.getVersion();
-    }
+    // TODO SERVER-71924 log merge operations in the changelog
 
     return ShardAndCollectionVersion{newVersion /*shardVersion*/, newVersion /*collVersion*/};
 }

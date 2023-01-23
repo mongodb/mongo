@@ -49,8 +49,6 @@ const BSONField<std::string> ChangeLogType::what("what");
 const BSONField<std::string> ChangeLogType::ns("ns");
 const BSONField<BSONObj> ChangeLogType::details("details");
 
-const NamespaceString ChangeLogType::ConfigNS("config.changelog");
-
 StatusWith<ChangeLogType> ChangeLogType::fromBSON(const BSONObj& source) {
     ChangeLogType changeLog;
 
