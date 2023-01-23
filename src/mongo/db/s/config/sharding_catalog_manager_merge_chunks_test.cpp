@@ -41,6 +41,7 @@
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/s/catalog/type_changelog.h"
 #include "mongo/s/catalog/type_chunk.h"
 
 namespace mongo {
@@ -846,6 +847,60 @@ protected:
         }
     }
 
+    void assertChangesWereLoggedAfterMerges(const NamespaceString& nss,
+                                            const std::vector<ChunkType>& originalRoutingTable,
+                                            const std::vector<ChunkType>& mergedRoutingTable) {
+
+        const std::vector<ChunkType> chunksDiff = [&] {
+            // Calculate chunks that are in the merged routing table but aren't in the original one
+            std::vector<ChunkType> chunksDiff;
+            std::set_difference(mergedRoutingTable.begin(),
+                                mergedRoutingTable.end(),
+                                originalRoutingTable.begin(),
+                                originalRoutingTable.end(),
+                                std::back_inserter(chunksDiff),
+                                [](const ChunkType& l, const ChunkType& r) {
+                                    return l.getRange().toBSON().woCompare(r.getRange().toBSON()) <
+                                        0;
+                                });
+            return chunksDiff;
+        }();
+
+        size_t numMergedChunks = 0;
+        size_t numMerges = 0;
+        for (const auto& chunkDiff : chunksDiff) {
+            BSONObjBuilder query;
+            query << ChangeLogType::what("merge") << ChangeLogType::ns(nss.ns());
+            chunkDiff.getVersion().serialize("details.mergedVersion", &query);
+
+            auto response = assertGet(getConfigShard()->exhaustiveFindOnConfig(
+                operationContext(),
+                ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+                repl::ReadConcernLevel::kLocalReadConcern,
+                ChangeLogType::ConfigNS,
+                query.obj(),
+                BSONObj(),
+                1));
+
+            ASSERT_EQ(1U, response.docs.size());
+            auto logEntryBSON = response.docs.front();
+            auto logEntry = assertGet(ChangeLogType::fromBSON(logEntryBSON));
+            const auto& logEntryDetails = logEntry.getDetails();
+
+            ASSERT_EQUALS(chunkDiff.getVersion(),
+                          ChunkVersion::parse(logEntryDetails["mergedVersion"]));
+            ASSERT_EQUALS(chunkDiff.getShard(), logEntryDetails["owningShard"].String());
+            ASSERT_EQUALS(0,
+                          chunkDiff.getRange().toBSON().woCompare(
+                              ChunkRange(logEntryDetails["min"].Obj(), logEntryDetails["max"].Obj())
+                                  .toBSON()));
+            numMergedChunks += logEntryDetails["numChunks"].Int();
+            numMerges++;
+        }
+        ASSERT_EQUALS(numMergedChunks,
+                      originalRoutingTable.size() - mergedRoutingTable.size() + numMerges);
+    }
+
     inline const static auto _shards =
         std::vector<ShardType>{ShardType{"shard0", "host0:123"}, ShardType{"shard1", "host1:123"}};
 
@@ -889,6 +944,7 @@ TEST_F(MergeAllChunksOnShardTest, MergeAllChunksOnShard) {
         assertConsistentRoutingTableWithNoContiguousChunksOnTheSameShard(chunksAfterMerges);
         assertConsistentRoutingTableAfterMerges(chunksBeforeMerges, chunksAfterMerges);
         assertConsistentChunkVersionsAfterMerges(chunksBeforeMerges, chunksAfterMerges);
+        assertChangesWereLoggedAfterMerges(_nss, chunksBeforeMerges, chunksAfterMerges);
     } catch (...) {
         // Log original and merged routing tables only in case of error
         LOGV2_INFO(7161200,
