@@ -69,11 +69,11 @@ struct ExpressionVisitorContext {
         sbe::EExpression::Vector exprStack;
 
         // The FrameId assigned to this VarsFrame.
-        sbe::FrameId frameId;
+        sbe::FrameId frameId = sbe::kInvalidId;
 
         // 'nextSlotId' is used to keep track of what the next available local variable ID is within
         // this VarsFrame.
-        sbe::value::SlotId nextSlotId;
+        sbe::value::SlotId nextSlotId = sbe::kInvalidId;
     };
 
     ExpressionVisitorContext(StageBuilderState& state,

@@ -90,6 +90,8 @@ struct FastTuple<A, B, C> {
 using FrameId = int64_t;
 using SpoolId = int64_t;
 
+static constexpr int64_t kInvalidId = LLONG_MIN;
+
 using IndexKeysInclusionSet = std::bitset<Ordering::kMaxCompoundIndexKeys>;
 
 namespace value {
