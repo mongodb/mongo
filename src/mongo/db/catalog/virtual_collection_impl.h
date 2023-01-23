@@ -242,7 +242,8 @@ public:
     }
 
     bool getRequiresTimeseriesExtendedRangeSupport() const final {
-        unimplementedTasserted();
+        // A virtual collection is never a time-series collection, so it never requires
+        // extended-range support.
         return false;
     }
 

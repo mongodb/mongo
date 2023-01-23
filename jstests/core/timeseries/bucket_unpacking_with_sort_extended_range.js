@@ -3,8 +3,6 @@
  *  [1970-01-01 00:00:00 UTC - 2038-01-29 03:13:07 UTC], when a collection scan is used.
  *
  * @tags: [
- *     # TODO (SERVER-73110): remove
- *     assumes_against_mongod_not_mongos,
  *     # Explain of a resolved view must be executed by mongos.
  *     directly_against_shardsvrs_incompatible,
  *     # This complicates aggregation extraction.
@@ -14,8 +12,6 @@
  *     does_not_support_stepdowns,
  *     # We need a timeseries collection.
  *     requires_timeseries,
- *     # Patched in 6.2
- *     requires_fcv_62
  * ]
  */
 
@@ -49,6 +45,33 @@ assert.commandWorked(collIndexed.createIndex({'t': 1}));
 jsTestLog(collIndexed.getIndexes());
 jsTestLog(bucketsIndexed.getIndexes());
 
+function numShards() {
+    return db.getSiblingDB('config').shards.count();
+}
+for (const collection of [buckets, bucketsIndexed]) {
+    if (FixtureHelpers.isSharded(collection) && numShards() >= 2) {
+        // Split and move data to create an interesting scenario: we have some data on each shard,
+        // but all the extended-range data is on a non-primary shard. This means view resolution is
+        // unaware of the extended-range data, because that happens on the primary shard.
+
+        const shards = db.getSiblingDB('config').shards.find().toArray();
+        const [shardName0, shardName1] = shards.map(doc => doc._id);
+
+        assert.commandWorked(db.adminCommand({movePrimary: db.getName(), to: shardName0}));
+        const collName = collection.getFullName();
+        // Our example data has documents between 2000-2003, and these dates are non-wrapping.
+        // So this goes on the primary shard, and everything else goes on the non-primary.
+        assert.commandWorked(sh.splitAt(collName, {'control.min.t': ISODate('2000-01-01')}));
+        assert.commandWorked(sh.splitAt(collName, {'control.min.t': ISODate('2003-01-01')}));
+        assert.commandWorked(
+            sh.moveChunk(collName, {'control.min.t': ISODate('1969-01-01')}, shardName1));
+        assert.commandWorked(
+            sh.moveChunk(collName, {'control.min.t': ISODate('2000-01-01')}, shardName0));
+        assert.commandWorked(
+            sh.moveChunk(collName, {'control.min.t': ISODate('2003-01-01')}, shardName1));
+    }
+}
+
 const intervalMillis = 60000;
 function insertBucket(start) {
     jsTestLog("Inserting bucket starting with " + Date(start).toString());
@@ -69,7 +92,7 @@ function insertBucket(start) {
 function insertDocuments() {
     // We want to choose the underflow and overflow lower bits in such a way that we
     // encourage wrong results when the upper bytes are removed.
-    const underflowMin = new Date("1969-01-01").getTime();  // Day before the 32 bit epoch
+    const underflowMin = new Date("1969-01-01").getTime();  // Year before the 32 bit epoch
     const normalMin = new Date("2002-01-01").getTime();     // Middle of the 32 bit epoch
 
     insertBucket(underflowMin);
@@ -109,6 +132,25 @@ function checkAgainstReferenceBoundedSortUnexpected(
     collection, reference, pipeline, hint, sortOrder) {
     const options = hint ? {hint: hint} : {};
 
+    const bucket = db['system.buckets.' + coll.getName()];
+
+    const plan = collection.explain().aggregate(pipeline, options);
+    if (FixtureHelpers.isSharded(buckets) && numShards() >= 2) {
+        // With a sharded collection, some shards might not have any extended-range data,
+        // so they might still use $_internalBoundedSort. But we know at least one
+        // shard has extended-range data, so we know at least one shard has to
+        // use a blocking sort.
+        const bounded = getAggPlanStages(plan, "$_internalBoundedSort");
+        const blocking = getAggPlanStages(plan, "$sort");
+        assert.gt(blocking.length, 0, {bounded, blocking, plan});
+        assert.lt(bounded.length,
+                  FixtureHelpers.numberOfShardsForCollection(buckets),
+                  {bounded, blocking, plan});
+    } else {
+        const stages = getAggPlanStages(plan, "$_internalBoundedSort");
+        assert.eq([], stages, plan);
+    }
+
     const opt = collection.aggregate(pipeline, options).toArray();
     assertSorted(opt, sortOrder);
 
@@ -116,16 +158,16 @@ function checkAgainstReferenceBoundedSortUnexpected(
     for (var i = 0; i < opt.length; ++i) {
         assert.docEq(reference[i], opt[i]);
     }
-
-    const plan = collection.explain({}).aggregate(pipeline, options);
-    const stages = getAggPlanStages(plan, "$_internalBoundedSort");
-    assert.eq([], stages, plan);
 }
 
 function checkAgainstReferenceBoundedSortExpected(
     collection, reference, pipeline, hint, sortOrder) {
     const options = hint ? {hint: hint} : {};
 
+    const plan = collection.explain().aggregate(pipeline, options);
+    const stages = getAggPlanStages(plan, "$_internalBoundedSort");
+    assert.neq([], stages, plan);
+
     const opt = collection.aggregate(pipeline, options).toArray();
     assertSorted(opt, sortOrder);
 
@@ -133,10 +175,6 @@ function checkAgainstReferenceBoundedSortExpected(
     for (var i = 0; i < opt.length; ++i) {
         assert.docEq(reference[i], opt[i]);
     }
-
-    const plan = collection.explain({}).aggregate(pipeline, options);
-    const stages = getAggPlanStages(plan, "$_internalBoundedSort");
-    assert.neq([], stages, plan);
 }
 
 function runTest(ascending) {
@@ -176,10 +214,10 @@ function runTest(ascending) {
                                  .toArray();
     assertSorted(referenceIndexed, ascending);
 
-    // Check plan using index scan. If we've inserted a date before 1-1-1970, we round the min up
-    // towards 1970, rather then down, which has the effect of increasing the control.min.t. This
-    // means the minimum time in the bucket is likely to be lower than indicated and thus, actual
-    // dates may be out of order relative to what's indicated by the bucket bounds.
+    // Check plan using index scan. If we've inserted a date before 1-1-1970, we round the min
+    // up towards 1970, rather then down, which has the effect of increasing the control.min.t.
+    // This means the minimum time in the bucket is likely to be lower than indicated and thus,
+    // actual dates may be out of order relative to what's indicated by the bucket bounds.
     checkAgainstReferenceBoundedSortUnexpected(collIndexed,
                                                referenceIndexed,
                                                [

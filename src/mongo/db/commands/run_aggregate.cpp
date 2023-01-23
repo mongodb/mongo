@@ -974,6 +974,13 @@ Status runAggregate(OperationContext* opCtx,
                                            ? collections.getMainCollection()->getCollectionOptions()
                                            : boost::optional<CollectionOptions>(boost::none));
 
+        // If any involved collection contains extended-range data, set a flag which individual
+        // DocumentSource parsers can check.
+        collections.forEach([&](const CollectionPtr& coll) {
+            if (coll->getRequiresTimeseriesExtendedRangeSupport())
+                expCtx->setRequiresTimeseriesExtendedRangeSupport(true);
+        });
+
         expCtx->startExpressionCounters();
         auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
         curOp->beginQueryPlanningTimer();
