@@ -554,8 +554,7 @@ class BlackDuckConfig:
             rc = json.loads(rfh.read())
 
         self.url = rc["baseurl"]
-        self.username = rc["username"]
-        self.password = rc["password"]
+        self.token = rc["token"]
 
 
 def _run_scan():
@@ -564,7 +563,7 @@ def _run_scan():
 
     with tempfile.NamedTemporaryFile() as fp:
         fp.write(f"""#/!bin/sh
-curl --retry 5 -s -L https://detect.synopsys.com/detect.sh  | bash -s -- --blackduck.url={bdc.url} --blackduck.username={bdc.username} --blackduck.password={bdc.password} --detect.report.timeout={BLACKDUCK_TIMEOUT_SECS} --snippet-matching --upload-source --detect.wait.for.results=true
+curl --retry 5 -s -L https://detect.synopsys.com/detect8.sh | bash -s -- --blackduck.url={bdc.url} --blackduck.api.token={bdc.token} --detect.report.timeout={BLACKDUCK_TIMEOUT_SECS} --snippet-matching --upload-source --detect.wait.for.results=true --logging.level.detect=TRACE --detect.diagnostic=true --detect.cleanup=false
 """.encode())
         fp.flush()
 

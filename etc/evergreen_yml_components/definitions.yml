@@ -1890,6 +1890,24 @@ functions:
   - *archive_jepsen_results
   - *upload_jepsen_log
 
+  "save blackduck artifacts":
+  - command: archive.targz_pack
+    params:
+      target: blackduck.tgz
+      source_dir: /home/ec2-user/blackduck/runs/
+      include:
+      - "**"
+  - command: s3.put
+    params:
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: blackduck.tgz
+      remote_file: ${project}/${build_variant}/${version_id}/blackduck-${task_id}-${execution}.tgz
+      bucket: mciuploads
+      permissions: public-read
+      content_type: ${content_type|application/gzip}
+      display_name: BlackDuck logs
+
   ### Process & archive mongo coredumps ###
   "gather mongo coredumps": &gather_mongo_coredumps
     command: subprocess.exec
@@ -2308,6 +2326,7 @@ post:
 - func: "save local client logs"
 - func: "save code coverage data"
 - func: "save jepsen artifacts"
+- func: "save blackduck artifacts"
 - func: "save mongo coredumps"
 - func: "save failed unittests"
 - func: "save hang analyzer debugger files"
