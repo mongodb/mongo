@@ -489,6 +489,15 @@ public:
     // expression counting.
     bool enabledCounters = true;
 
+    // Sets or clears a flag which tells DocumentSource parsers whether any involved Collection
+    // may contain extended-range dates.
+    void setRequiresTimeseriesExtendedRangeSupport(bool v) {
+        _requiresTimeseriesExtendedRangeSupport = v;
+    }
+    bool getRequiresTimeseriesExtendedRangeSupport() const {
+        return _requiresTimeseriesExtendedRangeSupport;
+    }
+
 protected:
     static const int kInterruptCheckPeriod = 128;
 
@@ -512,6 +521,8 @@ protected:
     int _interruptCounter = kInterruptCheckPeriod;
 
     bool _isCappedDelete = false;
+
+    bool _requiresTimeseriesExtendedRangeSupport = false;
 
 private:
     boost::optional<ExpressionCounters> _expressionCounters = boost::none;

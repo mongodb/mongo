@@ -259,6 +259,11 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceInternalUnpackBucket::createF
     // if that's the case, no field will be added to 'bucketSpec.fieldSet' in the for-loop below.
     BucketUnpacker::Behavior unpackerBehavior = BucketUnpacker::Behavior::kExclude;
     BucketSpec bucketSpec;
+    // Use extended-range support if any individual collection requires it, even if 'specElem'
+    // doesn't mention this flag.
+    if (expCtx->getRequiresTimeseriesExtendedRangeSupport()) {
+        bucketSpec.setUsesExtendedRange(true);
+    }
     auto hasIncludeExclude = false;
     auto hasTimeField = false;
     auto hasBucketMaxSpanSeconds = false;
@@ -455,6 +460,14 @@ void DocumentSourceInternalUnpackBucket::serializeToArray(
     out.addField(kBucketMaxSpanSeconds, Value{_bucketMaxSpanSeconds});
     if (_assumeNoMixedSchemaData)
         out.addField(kAssumeNoMixedSchemaData, Value(_assumeNoMixedSchemaData));
+
+    if (spec.usesExtendedRange()) {
+        // Include this flag so that 'explain' is more helpful.
+        // But this is not so useful for communicating from one process to another,
+        // because mongos and/or the primary shard don't know whether any other shard
+        // has extended-range data.
+        out.addField(kUsesExtendedRange, Value{true});
+    }
 
     if (!spec.computedMetaProjFields().empty())
         out.addField("computedMetaProjFields", Value{[&] {

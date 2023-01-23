@@ -101,6 +101,17 @@ public:
         _secondaryColls.clear();
     }
 
+    void forEach(std::function<void(const CollectionPtr&)> func) const {
+        if (hasMainCollection()) {
+            func(getMainCollection());
+        }
+        for (const auto& [name, coll] : getSecondaryCollections()) {
+            if (coll) {
+                func(coll);
+            }
+        }
+    }
+
 private:
     const CollectionPtr* _mainColl{&CollectionPtr::null};
 

@@ -914,6 +914,13 @@ Status runAggregate(OperationContext* opCtx,
         expCtx = makeExpressionContext(
             opCtx, request, std::move(*collatorToUse), uuid, collatorToUseMatchesDefault);
 
+        // If any involved collection contains extended-range data, set a flag which individual
+        // DocumentSource parsers can check.
+        collections.forEach([&](const CollectionPtr& coll) {
+            if (coll->getRequiresTimeseriesExtendedRangeSupport())
+                expCtx->setRequiresTimeseriesExtendedRangeSupport(true);
+        });
+
         expCtx->startExpressionCounters();
         auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
         expCtx->stopExpressionCounters();
