@@ -192,7 +192,7 @@ structs:
         description: "This reply contains a field that exists in the old command but is
                       missing in the new command."
         is_command_reply: true
-        
+
     RequiredNewField:
         description: "This struct contains a field that is optional in the old command but is
                       required in the new command."
@@ -2668,6 +2668,35 @@ commands:
                 - check: checkThree
                 - check: checkOne
                 - check: checkTwo
+
+    complexChecksSupersetNoneAllowed:
+        description: "new command fails when the the complex checks are a superset of the old
+                      checks and none of the additional checks are explicitly allowed."
+        command_name: complexChecksSupersetNoneAllowed
+        namespace: ignored
+        cpp_name: complexChecksSupersetNoneAllowed
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        access_check:
+            complex:
+                - check: checkOne
+                - check: checkTwo
+
+    complexChecksSupersetSomeAllowed:
+        description: "new command fails when the the complex checks are a superset of the old
+                      checks and not all of the additional checks are explicitly allowed."
+        command_name: complexChecksSupersetSomeAllowed
+        namespace: ignored
+        cpp_name: complexChecksSupersetSomeAllowed
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        access_check:
+            complex:
+                - check: checkOne
+                - check: checkTwo
+                - check: checkThree
 
     complexResourcePatternChange:
         description: "new command fails because there is a change in the complex resource patterns"

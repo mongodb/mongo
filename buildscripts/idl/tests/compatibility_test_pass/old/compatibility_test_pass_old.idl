@@ -1069,7 +1069,7 @@ commands:
         reply_type: AddedNewFieldReply
 
     oldReplyFieldUnstable:
-        description: "old reply field is unstable so new commmand passes even if its new reply
+        description: "old reply field is unstable so new command passes even if its new reply
                       field is unstable"
         command_name: oldReplyFieldUnstable
         namespace: ignored
@@ -1079,7 +1079,7 @@ commands:
         reply_type: UnstableOldFieldReply
 
     newReplyFieldUnstableOptionalIgnoreList:
-        description: "old reply field is stable but is included in the ignore list so new commmand 
+        description: "old reply field is stable but is included in the ignore list so new command
                       passes even if its new reply field is unstable and optional"
         command_name: newReplyFieldUnstableOptionalIgnoreList
         namespace: ignored
@@ -1814,6 +1814,19 @@ commands:
                 - check: checkOne
                 - check: checkTwo
                 - check: checkThree
+
+    complexChecksSupersetAllowed:
+        description: "new command passes when the the complex checks are a superset of the old
+                      checks but all the additional checks are explicitly allowed."
+        command_name: complexChecksSupersetAllowed
+        namespace: ignored
+        cpp_name: complexChecksSupersetAllowed
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        access_check:
+            complex:
+                - check: checkOne
 
     addedAggStage:
         description: "new command passes when a agg stage is added"

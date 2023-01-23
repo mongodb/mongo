@@ -817,7 +817,7 @@ structs:
     NewAddedChainedTypeReply:
         description: "This reply contains an added chained type in the new version"
         is_command_reply: true
-        
+
     NewRemovedChainedTypeStruct:
         description: "This reply contains an added chained type in the new version"
         chained_types:
@@ -2716,6 +2716,32 @@ commands:
                     action_type: [actionTypeOne, actionTypeTwo]
                 - check: checkOne
                 - check: checkTwo
+
+    complexChecksSupersetNoneAllowed:
+        description: "new command fails when the the complex checks are a superset of the old
+                      checks and none of the additional checks are explicitly allowed."
+        command_name: complexChecksSupersetNoneAllowed
+        namespace: ignored
+        cpp_name: complexChecksSupersetNoneAllowed
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        access_check:
+            complex:
+                - check: checkOne
+
+    complexChecksSupersetSomeAllowed:
+        description: "new command fails when the the complex checks are a superset of the old
+                      checks and not all of the additional checks are explicitly allowed."
+        command_name: complexChecksSupersetSomeAllowed
+        namespace: ignored
+        cpp_name: complexChecksSupersetSomeAllowed
+        strict: true
+        api_version: "1"
+        reply_type: OkReply
+        access_check:
+            complex:
+                - check: checkOne
 
     complexResourcePatternChange:
         description: "new command fails because there is a change in the complex resource patterns"

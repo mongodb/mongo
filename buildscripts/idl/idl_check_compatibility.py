@@ -342,6 +342,15 @@ RENAMED_COMPLEX_ACCESS_CHECKS = dict(
     get_impersonated_usernames='get_impersonated_username',
 )
 
+ALLOWED_NEW_COMPLEX_ACCESS_CHECKS = dict(
+    # Do not add any command other the aggregate command or any access check that is not required
+    # only by an aggregation stage not present in previously released versions.
+    aggregate={},
+
+    # This list is only used in unit-tests.
+    complexChecksSupersetAllowed={'checkTwo', 'checkThree'},
+    complexChecksSupersetSomeAllowed={'checkTwo'})
+
 
 class FieldCompatibility:
     """Information about a Field to check compatibility."""
@@ -1278,24 +1287,12 @@ def split_complex_checks(
     return checks, sorted(privileges, key=lambda x: len(x.action_type), reverse=True)
 
 
-def compare_complex_access_checks(new_checks: List[str], old_checks: List[str]) -> bool:
-    """Compare two sets of access check names for equivalence."""
-    # Quick path, common case where access checks match exactly.
-    if set(new_checks).issubset(old_checks):
-        return True
-
-    def map_complex_access_check_name(name: str) -> str:
-        """Returns normalized name if it exists in the map, otherwise returns self."""
-        if name in RENAMED_COMPLEX_ACCESS_CHECKS:
-            return RENAMED_COMPLEX_ACCESS_CHECKS[name]
-        else:
-            return name
-
-    # Slow path allowing for access check renames.
-    old_normalized = [map_complex_access_check_name(name) for name in old_checks]
-    new_normalized = [map_complex_access_check_name(name) for name in new_checks]
-
-    return set(new_normalized).issubset(old_normalized)
+def map_complex_access_check_name(name: str) -> str:
+    """Return the normalized name for the given access check name if there is one, otherwise returns self."""
+    if name in RENAMED_COMPLEX_ACCESS_CHECKS:
+        return RENAMED_COMPLEX_ACCESS_CHECKS[name]
+    else:
+        return name
 
 
 def check_complex_checks(ctxt: IDLCompatibilityContext,
@@ -1304,14 +1301,22 @@ def check_complex_checks(ctxt: IDLCompatibilityContext,
                          new_idl_file_path: str) -> None:
     """Check the compatibility between complex access checks of the old and new command."""
     cmd_name = cmd.command_name
-    if len(new_complex_checks) > len(old_complex_checks):
+    old_checks, old_privileges = split_complex_checks(old_complex_checks)
+    new_checks, new_privileges = split_complex_checks(new_complex_checks)
+    old_checks_normalized = {map_complex_access_check_name(name) for name in old_checks}
+    new_checks_normalized = {map_complex_access_check_name(name) for name in new_checks}
+
+    if cmd_name in ALLOWED_NEW_COMPLEX_ACCESS_CHECKS:
+        for check in ALLOWED_NEW_COMPLEX_ACCESS_CHECKS[cmd_name]:
+            if check in new_checks_normalized:
+                new_checks_normalized.remove(check)
+
+    if (len(new_checks_normalized) + len(new_privileges)) > (
+            len(old_checks_normalized) + len(old_privileges)):
         ctxt.add_new_additional_complex_access_check_error(cmd_name, new_idl_file_path)
     else:
-        old_checks, old_privileges = split_complex_checks(old_complex_checks)
-        new_checks, new_privileges = split_complex_checks(new_complex_checks)
-        if not compare_complex_access_checks(new_checks, old_checks):
+        if not new_checks_normalized.issubset(old_checks_normalized):
             ctxt.add_new_complex_checks_not_subset_error(cmd_name, new_idl_file_path)
-
         if len(new_privileges) > len(old_privileges):
             ctxt.add_new_complex_privileges_not_subset_error(cmd_name, new_idl_file_path)
         else:

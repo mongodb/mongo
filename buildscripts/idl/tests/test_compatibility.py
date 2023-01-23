@@ -1254,6 +1254,20 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
                         idl_compatibility_errors.ERROR_ID_NEW_ADDITIONAL_COMPLEX_ACCESS_CHECK)
         self.assertRegex(str(complex_checks_not_subset_two_error), "complexChecksNotSubsetTwo")
 
+        complex_checks_superset_none_allowed_error = error_collection.get_error_by_command_name(
+            "complexChecksSupersetNoneAllowed")
+        self.assertTrue(complex_checks_superset_none_allowed_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_ADDITIONAL_COMPLEX_ACCESS_CHECK)
+        self.assertRegex(
+            str(complex_checks_superset_none_allowed_error), "complexChecksSupersetNoneAllowed")
+
+        complex_checks_superset_some_allowed_error = error_collection.get_error_by_command_name(
+            "complexChecksSupersetSomeAllowed")
+        self.assertTrue(complex_checks_superset_some_allowed_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_ADDITIONAL_COMPLEX_ACCESS_CHECK)
+        self.assertRegex(
+            str(complex_checks_superset_some_allowed_error), "complexChecksSupersetSomeAllowed")
+
         complex_resource_pattern_change_error = error_collection.get_error_by_command_name(
             "complexResourcePatternChange")
         self.assertTrue(complex_resource_pattern_change_error.error_id ==
@@ -1278,6 +1292,14 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
         self.assertTrue(additional_complex_access_check_error.error_id ==
                         idl_compatibility_errors.ERROR_ID_NEW_ADDITIONAL_COMPLEX_ACCESS_CHECK)
         self.assertRegex(str(additional_complex_access_check_error), "additionalComplexAccessCheck")
+
+        additional_complex_access_check_agg_stage_error = error_collection.get_error_by_command_name(
+            "additionalComplexAccessCheckAggStage")
+        self.assertTrue(additional_complex_access_check_agg_stage_error.error_id ==
+                        idl_compatibility_errors.ERROR_ID_NEW_ADDITIONAL_COMPLEX_ACCESS_CHECK)
+        self.assertRegex(
+            str(additional_complex_access_check_agg_stage_error),
+            "additionalComplexAccessCheckAggStage")
 
         removed_access_check_field_error = error_collection.get_error_by_command_name(
             "removedAccessCheckField")
@@ -1455,7 +1477,7 @@ class TestIDLCompatibilityChecker(unittest.TestCase):
         self.assertRegex(
             str(new_command_type_field_added_as_stable_error), "newStableTypeFieldAdded")
 
-        self.assertEqual(error_collection.count(), 207)
+        self.assertEqual(error_collection.count(), 209)
 
     def test_generic_argument_compatibility_pass(self):
         """Tests that compatible old and new generic_argument.idl files should pass."""
