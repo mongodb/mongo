@@ -100,6 +100,12 @@
 #define WT_ENCRYPT_LEN_SIZE sizeof(uint32_t)
 
 /*
+ * WT-specific return codes for __wt_getopt(); use __wt_optwt to enable.
+ */
+#define WT_GETOPT_BAD_ARGUMENT 1
+#define WT_GETOPT_BAD_OPTION 2
+
+/*
  * __wt_calloc_def, __wt_calloc_one --
  *     Most calloc calls don't need separate count or sizeof arguments.
  */

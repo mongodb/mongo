@@ -65,7 +65,7 @@ util_backup(WT_SESSION *session, int argc, char *argv[])
 
     if (argc != 1) {
         (void)usage();
-        ret = 1;
+        ret = EXIT_FAILURE;
         goto err;
     }
     directory = *argv;
@@ -94,8 +94,8 @@ util_backup(WT_SESSION *session, int argc, char *argv[])
         goto err;
     }
 
-err:
 done:
+err:
     __wt_scr_free(session_impl, &tmp);
     return (ret);
 }

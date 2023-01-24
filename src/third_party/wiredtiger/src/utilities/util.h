@@ -20,10 +20,6 @@ extern bool verbose;             /* Verbose flag */
 
 extern WT_EVENT_HANDLER *verbose_handler;
 
-/* WT-specific return codes for __wt_getopt(); use __wt_optwt to enable */
-#define WT_GETOPT_BAD_OPTION 1
-#define WT_GETOPT_BAD_ARGUMENT 2
-
 extern int __wt_opterr;   /* if error message should be printed */
 extern int __wt_optind;   /* index into parent argv vector */
 extern int __wt_optopt;   /* character checked for validity */

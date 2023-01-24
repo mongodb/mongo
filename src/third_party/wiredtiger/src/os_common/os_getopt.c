@@ -59,10 +59,6 @@
 
 #include "wt_internal.h"
 
-/* WT-specific return codes for __wt_getopt(); use __wt_optwt to enable */
-#define WT_GETOPT_BAD_OPTION 1
-#define WT_GETOPT_BAD_ARGUMENT 2
-
 extern int __wt_opterr WT_ATTRIBUTE_LIBRARY_VISIBLE;
 extern int __wt_optind WT_ATTRIBUTE_LIBRARY_VISIBLE;
 extern int __wt_optopt WT_ATTRIBUTE_LIBRARY_VISIBLE;

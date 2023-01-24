@@ -91,7 +91,6 @@ LLVM
 LLVMFuzzerTestOneInput
 LOGREC
 LRU
-LRrVv
 LSB
 LSM
 LSNs
@@ -125,7 +124,6 @@ RepMgr
 Riak
 RocksDB
 Roelofs
-RrVv
 Rrx
 SDK
 SDK's
@@ -568,7 +566,6 @@ px
 py
 qnx
 qqq
-rVv
 rankdir
 rdbms
 rdlock
