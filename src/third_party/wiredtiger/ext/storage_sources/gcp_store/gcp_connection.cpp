@@ -37,6 +37,14 @@ gcp_connection::gcp_connection(const std::string &bucket_name, const std::string
     : _gcp_client(google::cloud::storage::Client()), _bucket_name(bucket_name),
       _object_prefix(prefix)
 {
+    // StatusOr either contains a usable BucketMetadata value or a Status object explaining why the
+    // value is not present. The value's validity is checked by StatusOr::ok().
+    google::cloud::StatusOr<gcs::BucketMetadata> metadata =
+      _gcp_client.GetBucketMetadata(_bucket_name);
+
+    // Check if bucket exists and is accessible.
+    if (!metadata.ok())
+        throw std::invalid_argument(_bucket_name + ": " + metadata.status().message());
 }
 
 // Builds a list of object names from the bucket.
@@ -102,15 +110,28 @@ gcp_connection::get_object(const std::string &object_key, const std::string &pat
 // Checks whether an object with the given key exists in the google cloud bucket and also retrieves
 // size of the object.
 int
-gcp_connection::object_exists(
-  const std::string &object_key, bool &exists, size_t &object_size) const
+gcp_connection::object_exists(const std::string &object_key, bool &exists, size_t &object_size)
 {
-    return 0;
-}
+    object_size = 0;
 
-// Checks whether the google cloud bucket is accessible to us or not.
-int
-gcp_connection::bucket_exists(bool &exists) const
-{
-    return 0;
+    google::cloud::StatusOr<gcs::ObjectMetadata> metadata =
+      _gcp_client.GetObjectMetadata(_bucket_name, _object_prefix + object_key);
+
+    // Check if object exists and is accessible.
+    if (metadata.ok()) {
+        exists = true;
+        object_size = metadata.value().size();
+        return 0;
+    }
+
+    // Check if object doesn't exist.
+    if (metadata.status().code() == google::cloud::StatusCode::kNotFound) {
+        exists = false;
+        // This is an expected response so do not fail.
+        return 0;
+    }
+
+    std::cerr << object_key + ": " + metadata.status().message() << std::endl;
+
+    return -1;
 }
