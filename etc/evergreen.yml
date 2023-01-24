@@ -963,6 +963,10 @@ buildvariants:
       --additionalFeatureFlagsFile all_feature_flags.txt
       --excludeWithAnyTags=incompatible_with_windows_tls
       --excludeWithAnyTags=incompatible_with_shard_merge
+    # Uncomment expansion and `burn_in_tasks_gen` task below and add resmoke task name to burn-in.
+    # WARNING! Task splitting is not supported for burn-in tasks. Large unsplitted `_gen` tasks may
+    # run too long and hit execution timeouts.
+    # burn_in_task_name: jsCore
   tasks:
   - name: cqf
   - name: cqf_parallel
@@ -973,6 +977,7 @@ buildvariants:
     distros:
     - windows-vsCurrent-xlarge
   - name: burn_in_tests_gen
+  # - name: burn_in_tasks_gen
   - name: audit
   - name: auth_audit_gen
   - name: causally_consistent_jscore_txns_passthrough
@@ -1452,6 +1457,10 @@ buildvariants:
     test_flags: >-
       --additionalFeatureFlagsFile all_feature_flags.txt
       --excludeWithAnyTags=incompatible_with_shard_merge
+    # Uncomment expansion and `burn_in_tasks_gen` task below and add resmoke task name to burn-in.
+    # WARNING! Task splitting is not supported for burn-in tasks. Large unsplitted `_gen` tasks may
+    # run too long and hit execution timeouts.
+    # burn_in_task_name: jsCore
   tasks: &enterprise-rhel-80-64-bit-dynamic-all-feature-flags-tasks
   - name: cqf
   - name: cqf_parallel
@@ -1469,6 +1478,7 @@ buildvariants:
     distros:
     - rhel80-large
   - name: burn_in_tests_gen
+  # - name: burn_in_tasks_gen
   - name: .aggfuzzer
   - name: .aggregation
   - name: audit

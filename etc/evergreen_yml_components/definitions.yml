@@ -3329,6 +3329,21 @@ tasks:
 - <<: *gen_burn_in_task_template
   name: burn_in_tests_gen
   tags: []
+  patch_only: true
+  commands:
+  - func: "generate resmoke tasks"
+
+- <<: *gen_burn_in_task_template
+  name: burn_in_tags_gen
+  tags: []
+  patch_only: true
+  commands:
+  - func: "generate resmoke tasks"
+
+- <<: *gen_burn_in_task_template
+  name: burn_in_tasks_gen
+  tags: []
+  patch_only: true
   commands:
   - func: "generate resmoke tasks"
 
@@ -4350,12 +4365,6 @@ tasks:
 - <<: *gen_task_template
   name: auth_gen
   tags: ["auth"]
-  commands:
-  - func: "generate resmoke tasks"
-
-- <<: *gen_burn_in_task_template
-  name: burn_in_tags_gen
-  tags: []
   commands:
   - func: "generate resmoke tasks"
 
