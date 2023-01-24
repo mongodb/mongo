@@ -48,7 +48,7 @@ mongo_crypt_v1_status_get_code@@MONGO_CRYPT_1.0
 mongo_crypt_v1_status_get_error@@MONGO_CRYPT_1.0
 mongo_crypt_v1_status_get_explanation@@MONGO_CRYPT_1.0'
 
-actual="$(readelf -W --dyn-syms "$SOPATH" | awk '$5 == "GLOBAL" && $7 != "UND" && $7 != "ABS" {print $(NF)}' | sort)"
+actual="$(readelf -W --dyn-syms "$SOPATH" | awk '$5 == "GLOBAL" && $7 != "UND" && $7 != "ABS" {print $8}' | sort)"
 
 if [ "$actual" != "$expect" ]; then
   echo "Error: symbols are not as expected in: $SOPATH"
