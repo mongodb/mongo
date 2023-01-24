@@ -107,8 +107,9 @@ auto rehydrateIndexKey(const BSONObj& keyPattern, const BSONObj& dehydratedKey) 
         md.setNestedField(fieldName, Value{value});
     }
 
-    invariant(!keyIter.more());
-    invariant(!valueIter.more());
+    tassert(
+        7241729, "must iterate through all field names specified in keyPattern", !keyIter.more());
+    tassert(7241730, "must iterate through all index keys with no field names", !valueIter.more());
 
     return md.freeze();
 }
@@ -184,11 +185,15 @@ void ProjectionStageDefault::transform(WorkingSetMember* member) const {
         input = std::move(member->doc.value());
     } else {
         // We have a covered projection, which is only supported in inclusion mode.
-        invariant(_projectType == projection_ast::ProjectType::kInclusion);
+        tassert(7241731,
+                "covered projections are only supported in inclusion mode",
+                _projectType == projection_ast::ProjectType::kInclusion);
         // We're pulling data from an index key, so there must be exactly one key entry in the WSM
         // as the planner guarantees that it will never generate a covered plan in the case of index
         // intersection.
-        invariant(member->keyData.size() == 1);
+        tassert(7241732,
+                "covered plan cannot be generated if there is an index intersection",
+                member->keyData.size() == 1);
 
         // For covered projection we will rehydrate in index key into a Document and then pass it
         // through the projection executor to include only required fields, including metadata
@@ -220,7 +225,9 @@ ProjectionStageCovered::ProjectionStageCovered(ExpressionContext* expCtx,
                                                const BSONObj& coveredKeyObj)
     : ProjectionStage{expCtx, projObj, ws, std::move(child), "PROJECTION_COVERED"},
       _coveredKeyObj{coveredKeyObj} {
-    invariant(projection->isSimple() && projection->isInclusionOnly());
+    tassert(7241733,
+            "covered projections must be simple and only consist of inclusions",
+            projection->isSimple() && projection->isInclusionOnly());
 
     // If we're pulling data out of one index we can pre-compute the indices of the fields
     // in the key that we pull data from and avoid looking up the field name each time.
@@ -251,7 +258,8 @@ void ProjectionStageCovered::transform(WorkingSetMember* member) const {
     BSONObjBuilder bob;
 
     // We're pulling data out of the key.
-    invariant(1 == member->keyData.size());
+    tassert(
+        7241734, "covered projections must be covered by one index", 1 == member->keyData.size());
     size_t keyIndex = 0;
 
     // Look at every key element...
@@ -275,7 +283,9 @@ ProjectionStageSimple::ProjectionStageSimple(ExpressionContext* expCtx,
                                              std::unique_ptr<PlanStage> child)
     : ProjectionStage{expCtx, projObj, ws, std::move(child), "PROJECTION_SIMPLE"},
       _projectType(projection->type()) {
-    invariant(projection->isSimple());
+    tassert(7241735,
+            "the projection must be simple to create a simple projection stage",
+            projection->isSimple());
     if (_projectType == projection_ast::ProjectType::kInclusion) {
         _fields = {projection->getRequiredFields().begin(), projection->getRequiredFields().end()};
     } else {
@@ -287,7 +297,7 @@ void ProjectionStageSimple::transform(WorkingSetMember* member) const {
     BSONObjBuilder bob;
     // SIMPLE_DOC implies that we expect an object so it's kind of redundant.
     // If we got here because of SIMPLE_DOC the planner shouldn't have messed up.
-    invariant(member->hasObj());
+    tassert(7241736, "simple projections must have an object", member->hasObj());
 
     // Apply the SIMPLE_DOC projection: look at every top level field in the source document and
     // see if we should keep it.

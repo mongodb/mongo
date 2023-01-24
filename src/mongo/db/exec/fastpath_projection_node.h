@@ -61,7 +61,9 @@ template <typename ProjectionNode, typename BaseProjectionNode>
 boost::optional<Document>
 FastPathProjectionNode<ProjectionNode, BaseProjectionNode>::tryApplyFastPathProjection(
     const Document& inputDoc) const {
-    invariant(!this->_subtreeContainsComputedFields);
+    tassert(7241741,
+            "fast-path projections cannot contain computed fields",
+            !this->_subtreeContainsComputedFields);
 
     // If we can get the backing BSON object off the input document without allocating an owned
     // copy, then we can apply a fast-path BSON-to-BSON exclusion projection.

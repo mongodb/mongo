@@ -53,7 +53,7 @@ namespace {
  *
  * The 'AllowFallBackToDefault' parameter should be set to 'true', if the executor is allowed to
  * fall back to the default inclusion projection implementation if the fast-path projection cannot
- * be used for a specific test. If set to 'false', an invariant will be triggered if fast-path
+ * be used for a specific test. If set to 'false', a tassert will be triggered if fast-path
  * projection was expected to be chosen, but the default one has been picked instead.
  */
 template <bool AllowFallBackToDefault>

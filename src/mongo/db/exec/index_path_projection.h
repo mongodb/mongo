@@ -37,7 +37,7 @@ class IndexPathProjection {
 public:
     IndexPathProjection(std::unique_ptr<projection_executor::ProjectionExecutor> projExec)
         : _exec(std::move(projExec)), _exhaustivePaths(_exec->extractExhaustivePaths()) {
-        invariant(_exec);
+        tassert(7241740, "index path projection requires a Projection Executor", _exec);
     }
 
     projection_executor::ProjectionExecutor* exec() const {

@@ -57,7 +57,7 @@ struct SliceParams {
  */
 Value extractArrayElement(const Value& arr, const std::string& elemIndex) {
     auto index = str::parseUnsignedBase10Integer(elemIndex);
-    invariant(index);
+    tassert(7241700, "the element's index could not be converted to an unsigned integer", index);
     return arr[*index];
 }
 
@@ -88,7 +88,7 @@ Value sliceArray(const std::vector<Value>& array, boost::optional<int> skip, int
         }
     } else {
         // We explicitly disallow a negative limit when skip is specified.
-        invariant(limit >= 0);
+        tassert(7241701, "limit cannot be negative when skip is specified", limit >= 0);
 
         if (*skip < 0) {
             start = std::max(0ll, len + *skip);
@@ -99,8 +99,10 @@ Value sliceArray(const std::vector<Value>& array, boost::optional<int> skip, int
         }
     }
 
-    invariant(start + forward >= 0);
-    invariant(start + forward <= len);
+    tassert(
+        7241702, "the size of the slice must be greater than or equal to 0.", start + forward >= 0);
+    tassert(
+        7241703, "the size of the slice cannot be larger than the array", start + forward <= len);
     return Value{std::vector<Value>(array.cbegin() + start, array.cbegin() + start + forward)};
 }
 
@@ -144,7 +146,10 @@ Value applyFindSliceProjectionToArray(const std::vector<Value>& array,
 Value applyFindSliceProjectionHelper(const Document& input,
                                      const SliceParams& params,
                                      size_t fieldPathIndex) {
-    invariant(fieldPathIndex < params.path.getPathLength());
+    tassert(7241704,
+            "$slice operator cannot slice field that is beyond the last component in the requested "
+            "path",
+            fieldPathIndex < params.path.getPathLength());
 
     auto fieldName = params.path.getFieldName(fieldPathIndex++);
     Value val{input[fieldName]};
@@ -178,13 +183,18 @@ Document applyFindPositionalProjection(const Document& preImage,
 
     // Try to find the first matching array element from the 'input' document based on the condition
     // specified as 'matchExpr'. If such an element is found, its position within an array will be
-    // recorded in the 'details' object. Since 'matchExpr' used with the positional projection is
-    // the very same selection filter expression in the find command, the input document passed to
-    // this function should have already been matched against this expression, so we'll use an
-    // invariant to make sure this is the case indeed.
+    // recorded in the 'details' object.
     MatchDetails details;
     details.requestElemMatchKey();
-    invariant(matchExpr.matchesBSON(preImage.toBson(), &details));
+    auto stillMatchesExpression = matchExpr.matchesBSON(preImage.toBson(), &details);
+
+    // Since 'matchExpr' used with the positional projection is the very same selection filter
+    // expression in the find command, the input document passed to this function should have
+    // already been matched against this expression, so we'll use a tassert to make sure this is the
+    // case indeed.
+    tassert(7241705,
+            "input does not match the same filter that matched in the find command",
+            stillMatchesExpression);
 
     // At this stage we know that the 'input' document matches against the specified condition,
     // but the matching array element may not be found. This can happen if the field, specified
@@ -232,7 +242,9 @@ Document applyFindPositionalProjection(const Document& preImage,
 Value applyFindElemMatchProjection(const Document& input,
                                    const MatchExpression& matchExpr,
                                    const FieldPath& path) {
-    invariant(path.getPathLength() == 1);
+    tassert(7241706,
+            "$elemMatch projection operator field path cannot have more than one path element.",
+            path.getPathLength() == 1);
 
     // Try to find the first matching array element from the 'input' document based on the condition
     // specified as 'matchExpr'. If such an element is found, its position within an array will be
@@ -244,11 +256,17 @@ Value applyFindElemMatchProjection(const Document& input,
     }
 
     auto val = input[path.fullPath()];
-    invariant(val.getType() == BSONType::Array);
+    tassert(7241707,
+            str::stream()
+                << "$elemMatch projection operator requires an array field, found field of type:"
+                << typeName(val.getType()),
+            val.getType() == BSONType::Array);
     auto elemMatchKey = details.elemMatchKey();
-    invariant(details.hasElemMatchKey());
+    tassert(7241708,
+            "$elemMatch projection operator couldn't find a matching element in the array",
+            details.hasElemMatchKey());
     auto matchingElem = extractArrayElement(val, elemMatchKey);
-    invariant(!matchingElem.missing());
+    tassert(7241709, "$elemMatch projection operator element mismatch", !matchingElem.missing());
 
     return Value{std::vector<Value>{matchingElem}};
 }
@@ -259,7 +277,9 @@ Document applyFindSliceProjection(const Document& input,
                                   int limit) {
     auto params = SliceParams{path, skip, limit};
     auto val = applyFindSliceProjectionHelper(input, params, 0);
-    invariant(val.getType() == BSONType::Object);
+    tassert(7241710,
+            "output of the slice projection must be an Object",
+            val.getType() == BSONType::Object);
     return val.getDocument();
 }
 }  // namespace mongo::projection_executor_utils

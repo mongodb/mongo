@@ -66,7 +66,7 @@ BSONObj wrapInLiteral(const T& arg) {
  *
  * The 'AllowFallBackToDefault' parameter should be set to 'true', if the executor is allowed to
  * fall back to the default inclusion projection implementation if the fast-path projection cannot
- * be used for a specific test. If set to 'false', an invariant will be triggered if fast-path
+ * be used for a specific test. If set to 'false', a tassert will be triggered if fast-path
  * projection was expected to be chosen, but the default one has been picked instead.
  */
 template <bool AllowFallBackToDefault>
@@ -115,8 +115,9 @@ protected:
         }
 
         auto executor = buildProjectionExecutor(expCtx, &projection, policies, builderParams);
-        invariant(executor->getType() ==
-                  TransformerInterface::TransformerType::kInclusionProjection);
+        tassert(7241743,
+                "projection executor must be inclusion projections",
+                executor->getType() == TransformerInterface::TransformerType::kInclusionProjection);
         auto inclusionExecutor = static_cast<InclusionProjectionExecutor*>(executor.get());
         auto fastPathRootNode =
             exact_pointer_cast<FastPathEligibleInclusionNode*>(inclusionExecutor->getRoot());

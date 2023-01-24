@@ -98,7 +98,7 @@ Document applyFindPositionalProjection(const Document& preImage,
  * If the 'matchExpr' does not match the input document, the function returns a missing value.
  *
  * Since the $elemMatch projection cannot be used with a nested field, the 'path' value must not
- * be a dotted path, otherwise an invariant will be triggered.
+ * be a dotted path, otherwise a tassert will be triggered.
  */
 Value applyFindElemMatchProjection(const Document& input,
                                    const MatchExpression& matchExpr,

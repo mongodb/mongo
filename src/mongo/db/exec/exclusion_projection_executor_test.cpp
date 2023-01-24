@@ -59,7 +59,9 @@ auto createProjectionExecutor(const BSONObj& spec, const ProjectionPolicies& pol
     auto projection = projection_ast::parseAndAnalyze(expCtx, spec, policies);
     auto builderParams = BuilderParamsBitSet{kDefaultBuilderParams};
     auto executor = buildProjectionExecutor(expCtx, &projection, policies, builderParams);
-    invariant(executor->getType() == TransformerInterface::TransformerType::kExclusionProjection);
+    tassert(7241742,
+            "projection executor must be exclusion projections",
+            executor->getType() == TransformerInterface::TransformerType::kExclusionProjection);
     return executor;
 }
 

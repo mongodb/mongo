@@ -41,7 +41,7 @@ ProjectionNode::ProjectionNode(ProjectionPolicies policies, std::string pathToNo
 
 void ProjectionNode::addProjectionForPath(const FieldPath& path) {
     // Enforce that this method can only be called on the root node.
-    invariant(_pathToNode.empty());
+    tassert(7241722, "can only add projection to path from the root node", _pathToNode.empty());
     _addProjectionForPath(path);
 }
 
@@ -59,7 +59,7 @@ void ProjectionNode::_addProjectionForPath(const FieldPath& path) {
 void ProjectionNode::addExpressionForPath(const FieldPath& path,
                                           boost::intrusive_ptr<Expression> expr) {
     // Enforce that this method can only be called on the root node.
-    invariant(_pathToNode.empty());
+    tassert(7241723, "can only add expression to path from the root node", _pathToNode.empty());
     _addExpressionForPath(path, std::move(expr));
 }
 
@@ -67,7 +67,9 @@ void ProjectionNode::_addExpressionForPath(const FieldPath& path,
                                            boost::intrusive_ptr<Expression> expr) {
     makeOptimizationsStale();
     // If the computed fields policy is 'kBanComputedFields', we should never reach here.
-    invariant(_policies.computedFieldsPolicy == ComputedFieldsPolicy::kAllowComputedFields);
+    tassert(7241724,
+            "computed fields must be allowed in inclusion projections",
+            _policies.computedFieldsPolicy == ComputedFieldsPolicy::kAllowComputedFields);
 
     // We're going to add an expression either to this node, or to some child of this node.
     // In any case, the entire subtree will contain at least one computed field.
@@ -107,7 +109,9 @@ ProjectionNode* ProjectionNode::addOrGetChild(const std::string& field) {
 
 ProjectionNode* ProjectionNode::addChild(const std::string& field) {
     makeOptimizationsStale();
-    invariant(!str::contains(field, "."));
+    tassert(7241725,
+            "field for child in projection cannot contain a path or '.'",
+            !str::contains(field, "."));
     _orderToProcessAdditionsAndChildren.push_back(field);
     auto insertedPair = _children.emplace(std::make_pair(field, makeChild(field)));
     return insertedPair.first->second.get();
@@ -196,7 +200,9 @@ void ProjectionNode::applyExpressions(const Document& root, MutableDocument* out
                 field, childIt->second->applyExpressionsToValue(root, outputDoc->peek()[field]));
         } else {
             auto expressionIt = _expressions.find(field);
-            invariant(expressionIt != _expressions.end());
+            tassert(7241726,
+                    "reached end of expression iterator, but trying to evaluate the expression",
+                    expressionIt != _expressions.end());
             outputDoc->setField(
                 field,
                 expressionIt->second->evaluate(
@@ -298,9 +304,13 @@ void ProjectionNode::serialize(boost::optional<ExplainOptions::Verbosity> explai
             childIt->second->serialize(explain, &subDoc);
             output->addField(field, subDoc.freezeToValue());
         } else {
-            invariant(_policies.computedFieldsPolicy == ComputedFieldsPolicy::kAllowComputedFields);
+            tassert(7241727,
+                    "computed fields must be allowed in inclusion projections.",
+                    _policies.computedFieldsPolicy == ComputedFieldsPolicy::kAllowComputedFields);
             auto expressionIt = _expressions.find(field);
-            invariant(expressionIt != _expressions.end());
+            tassert(7241728,
+                    "reached end of the expression iterator",
+                    expressionIt != _expressions.end());
             output->addField(field, expressionIt->second->serialize(static_cast<bool>(explain)));
         }
     }

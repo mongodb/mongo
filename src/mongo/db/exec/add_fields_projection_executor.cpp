@@ -233,7 +233,9 @@ bool AddFieldsProjectionExecutor::parseObjectAsExpression(
     const VariablesParseState& variablesParseState) {
     if (objSpec.firstElementFieldName()[0] == '$') {
         // This is an expression like {$add: [...]}. We already verified that it has only one field.
-        invariant(objSpec.nFields() == 1);
+        tassert(7241737,
+                "expression in Projection Executor should only have one field",
+                objSpec.nFields() == 1);
         _root->addExpressionForPath(
             pathToObject, Expression::parseExpression(_expCtx.get(), objSpec, variablesParseState));
         return true;
@@ -248,10 +250,14 @@ void AddFieldsProjectionExecutor::parseSubObject(const BSONObj& subObj,
     for (auto&& elem : subObj) {
         elemInSubObj = true;
         auto fieldName = elem.fieldNameStringData();
-        invariant(fieldName[0] != '$');
+        tassert(7241738,
+                "the field name in the Projection Executor cannot be an operator",
+                fieldName[0] != '$');
         // Dotted paths in a sub-object have already been detected and disallowed by the function
         // ProjectionSpecValidator::validate().
-        invariant(fieldName.find('.') == std::string::npos);
+        tassert(7241739,
+                "dotted paths in Projection Executor are not allowed",
+                fieldName.find('.') == std::string::npos);
 
         auto currentPath = pathToObj.concat(fieldName);
         if (elem.type() == BSONType::Object) {
