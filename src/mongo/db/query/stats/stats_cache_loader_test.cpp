@@ -83,13 +83,14 @@ TEST_F(StatsCacheLoaderTest, VerifyStatsLoadsScalar) {
         {sbe::value::TypeTags::NumberDouble, doubleCount},
         {sbe::value::TypeTags::Boolean, trueCount + falseCount},
     };
-    auto ah =
-        ArrayHistogram::make(ScalarHistogram::make(*bounds, buckets), tc, trueCount, falseCount);
+    auto ah = ArrayHistogram::make(
+        ScalarHistogram::make(*bounds, buckets), tc, numDocs, trueCount, falseCount);
     auto expectedSerialized = ah->serialize();
 
     // Serialize histogram into a stats path.
     std::string path = "somePath";
-    auto serialized = stats::makeStatsPath(path, numDocs, ah);
+    constexpr double sampleRate = 1.0;
+    auto serialized = stats::makeStatsPath(path, numDocs, sampleRate, ah);
 
     // Initalize stats collection.
     NamespaceString nss("test", "stats");
@@ -115,7 +116,7 @@ TEST_F(StatsCacheLoaderTest, VerifyStatsLoadsScalar) {
 }
 
 TEST_F(StatsCacheLoaderTest, VerifyStatsLoadsArray) {
-    constexpr double numDocs = 12.0;
+    constexpr double numDocs = 13.0;
 
     auto nonEmptyArrayVal = sbe::value::makeNewArray().second;
     auto nonEmptyArray = sbe::value::getArrayView(nonEmptyArrayVal);
@@ -157,7 +158,8 @@ TEST_F(StatsCacheLoaderTest, VerifyStatsLoadsArray) {
 
     // Serialize histogram into a stats path.
     std::string path = "somePath";
-    auto serialized = stats::makeStatsPath(path, numDocs, ah);
+    constexpr double sampleRate = 1.0;
+    auto serialized = stats::makeStatsPath(path, numDocs, sampleRate, ah);
 
     // Initalize stats collection.
     NamespaceString nss("test", "stats");

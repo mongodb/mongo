@@ -79,13 +79,13 @@ structs:
         fields:
             documents:
                 type: double
+            sampleRate:
+                type: double
+                validator: { gte: 0.0, lte: 1.0 }
             trueCount:
                 type: double
             falseCount:
                 type: double
-            sampleRate:
-                type: double
-                validator: { gte: 0.0, lte: 1.0 }
             emptyArrayCount:
                 type: double
             typeCount:

@@ -83,10 +83,11 @@ TEST(StatsPath, BasicValidStatsPath) {
         {sbe::value::TypeTags::Boolean, trueCount + falseCount},
     };
     const auto sh = ScalarHistogram::make(*bounds, buckets);
-    auto ah = ArrayHistogram::make(std::move(sh), tc, trueCount, falseCount);
+    auto ah = ArrayHistogram::make(std::move(sh), tc, numDocs, trueCount, falseCount);
 
     // Serialize to BSON.
-    auto serializedPath = stats::makeStatsPath("somePath", numDocs, ah);
+    constexpr double sampleRate = 1.0;
+    auto serializedPath = stats::makeStatsPath("somePath", numDocs, sampleRate, ah);
 
     // Parse StatsPath via IDL & serialize to BSON.
     auto parsedPath = StatsPath::parse(ctx, serializedPath);
@@ -105,10 +106,11 @@ TEST(StatsPath, BasicValidEmptyStatsPath) {
     std::vector<Bucket> buckets;
 
     // Create an empty scalar histogram.
-    auto ah = ArrayHistogram::make(ScalarHistogram::make(), TypeCounts{});
+    auto ah = ArrayHistogram::make(ScalarHistogram::make(), TypeCounts{}, 0.0 /* sampleSize */);
 
     // Serialize to BSON.
-    auto serializedPath = stats::makeStatsPath("someEmptyPath", numDocs, ah);
+    constexpr double sampleRate = 1.0;
+    auto serializedPath = stats::makeStatsPath("someEmptyPath", numDocs, sampleRate, ah);
 
     // Parse StatsPath via IDL & serialize to BSON.
     auto parsedPath = StatsPath::parse(ctx, serializedPath);

@@ -241,6 +241,7 @@ struct ArrayFields {
 void validate(const ScalarHistogram& scalar,
               const TypeCounts& typeCounts,
               boost::optional<ArrayFields> arrayFields,
+              double sampleSize,
               double trueCount,
               double falseCount) {
     const double numArrays = getTagTypeCount(typeCounts, sbe::value::TypeTags::Array);
@@ -293,6 +294,14 @@ void validate(const ScalarHistogram& scalar,
 
     // Validate scalar type counts.
     validateHistogramTypeCounts(typeCounts, scalar);
+
+    // Validate total count.
+    const auto totalCard = getTotalCount(typeCounts);
+    if (totalCard != sampleSize) {
+        uasserted(7261500,
+                  str::stream() << "Expected sum of type counts " << totalCard
+                                << " to equal sample size " << sampleSize);
+    }
 }
 
 }  // namespace
@@ -308,10 +317,7 @@ double getTotalCount(const TypeCounts& tc, boost::optional<bool> isHistogrammabl
 }
 
 ArrayHistogram::ArrayHistogram()
-    : ArrayHistogram(ScalarHistogram::make(),
-                     {} /* Type counts. */,
-                     0.0 /* True count. */,
-                     0.0 /* False count. */) {}
+    : ArrayHistogram(ScalarHistogram::make(), {} /* Type counts. */, 0.0 /* Sample size. */) {}
 
 ArrayHistogram::ArrayHistogram(ScalarHistogram scalar,
                                TypeCounts typeCounts,
@@ -319,16 +325,16 @@ ArrayHistogram::ArrayHistogram(ScalarHistogram scalar,
                                ScalarHistogram arrayMin,
                                ScalarHistogram arrayMax,
                                TypeCounts arrayTypeCounts,
+                               double sampleSize,
                                double emptyArrayCount,
                                double trueCount,
-                               double falseCount,
-                               double sampleRate)
+                               double falseCount)
     : _scalar(std::move(scalar)),
       _typeCounts(std::move(typeCounts)),
       _emptyArrayCount(emptyArrayCount),
       _trueCount(trueCount),
       _falseCount(falseCount),
-      _sampleRate(sampleRate),
+      _sampleSize(sampleSize),
       _arrayUnique(std::move(arrayUnique)),
       _arrayMin(std::move(arrayMin)),
       _arrayMax(std::move(arrayMax)),
@@ -336,15 +342,15 @@ ArrayHistogram::ArrayHistogram(ScalarHistogram scalar,
 
 ArrayHistogram::ArrayHistogram(ScalarHistogram scalar,
                                TypeCounts typeCounts,
+                               double sampleSize,
                                double trueCount,
-                               double falseCount,
-                               double sampleRate)
+                               double falseCount)
     : _scalar(std::move(scalar)),
       _typeCounts(std::move(typeCounts)),
       _emptyArrayCount(0.0),
       _trueCount(trueCount),
       _falseCount(falseCount),
-      _sampleRate(sampleRate),
+      _sampleSize(sampleSize),
       _arrayUnique(boost::none),
       _arrayMin(boost::none),
       _arrayMax(boost::none),
@@ -357,15 +363,15 @@ std::shared_ptr<const ArrayHistogram> ArrayHistogram::make() {
 
 std::shared_ptr<const ArrayHistogram> ArrayHistogram::make(ScalarHistogram scalar,
                                                            TypeCounts typeCounts,
+                                                           double sampleSize,
                                                            double trueCount,
                                                            double falseCount,
-                                                           double sampleRate,
                                                            bool doValidation) {
     if (doValidation) {
-        validate(scalar, typeCounts, boost::none, trueCount, falseCount);
+        validate(scalar, typeCounts, boost::none, sampleSize, trueCount, falseCount);
     }
     return std::shared_ptr<const ArrayHistogram>(new ArrayHistogram(
-        std::move(scalar), std::move(typeCounts), trueCount, falseCount, sampleRate));
+        std::move(scalar), std::move(typeCounts), sampleSize, trueCount, falseCount));
 }
 
 std::shared_ptr<const ArrayHistogram> ArrayHistogram::make(ScalarHistogram scalar,
@@ -374,15 +380,16 @@ std::shared_ptr<const ArrayHistogram> ArrayHistogram::make(ScalarHistogram scala
                                                            ScalarHistogram arrayMin,
                                                            ScalarHistogram arrayMax,
                                                            TypeCounts arrayTypeCounts,
+                                                           double sampleSize,
                                                            double emptyArrayCount,
                                                            double trueCount,
                                                            double falseCount,
-                                                           double sampleRate,
                                                            bool doValidation) {
     if (doValidation) {
         validate(scalar,
                  typeCounts,
                  ArrayFields{arrayUnique, arrayMin, arrayMax, arrayTypeCounts, emptyArrayCount},
+                 sampleSize,
                  trueCount,
                  falseCount);
     }
@@ -392,10 +399,10 @@ std::shared_ptr<const ArrayHistogram> ArrayHistogram::make(ScalarHistogram scala
                                                                     std::move(arrayMin),
                                                                     std::move(arrayMax),
                                                                     std::move(arrayTypeCounts),
+                                                                    sampleSize,
                                                                     emptyArrayCount,
                                                                     trueCount,
-                                                                    falseCount,
-                                                                    sampleRate));
+                                                                    falseCount));
 }
 
 std::shared_ptr<const ArrayHistogram> ArrayHistogram::make(Statistics stats) {
@@ -403,9 +410,9 @@ std::shared_ptr<const ArrayHistogram> ArrayHistogram::make(Statistics stats) {
     // because we already validated this histogram before inserting it.
     const auto scalar = ScalarHistogram::make(stats.getScalarHistogram());
     const auto typeCounts = mapStatsTypeCountToTypeCounts(stats.getTypeCount());
-    double trueCount = stats.getTrueCount();
-    double falseCount = stats.getFalseCount();
-    double sampleRate = stats.getSampleRate();
+    const double trueCount = stats.getTrueCount();
+    const double falseCount = stats.getFalseCount();
+    const double sampleSize = stats.getDocuments();
 
     // If we have ArrayStatistics, we will need to initialize the array-only fields.
     if (auto maybeArrayStats = stats.getArrayStatistics(); maybeArrayStats) {
@@ -416,16 +423,16 @@ std::shared_ptr<const ArrayHistogram> ArrayHistogram::make(Statistics stats) {
                                ScalarHistogram::make(maybeArrayStats->getMinHistogram()),
                                ScalarHistogram::make(maybeArrayStats->getMaxHistogram()),
                                mapStatsTypeCountToTypeCounts(maybeArrayStats->getTypeCount()),
+                               sampleSize,
                                stats.getEmptyArrayCount(),
                                trueCount,
-                               falseCount,
-                               sampleRate));
+                               falseCount));
     }
 
     // If we don't have ArrayStatistics available, we should construct a histogram with only scalar
     // fields.
     return std::shared_ptr<const ArrayHistogram>(new ArrayHistogram(
-        std::move(scalar), std::move(typeCounts), trueCount, falseCount, sampleRate));
+        std::move(scalar), std::move(typeCounts), sampleSize, trueCount, falseCount));
 }
 
 bool ArrayHistogram::isArray() const {
@@ -522,8 +529,6 @@ BSONObj ArrayHistogram::serialize() const {
     histogramBuilder.append("trueCount", getTrueCount());
     histogramBuilder.append("falseCount", getFalseCount());
 
-    histogramBuilder.append("sampleRate", _sampleRate);
-
     // Serialize empty array counts.
     histogramBuilder.appendNumber("emptyArrayCount", getEmptyArrayCount());
 
@@ -548,9 +553,11 @@ BSONObj ArrayHistogram::serialize() const {
 }
 
 BSONObj makeStatistics(double documents,
+                       double sampleRate,
                        const std::shared_ptr<const ArrayHistogram> arrayHistogram) {
     BSONObjBuilder builder;
     builder.appendNumber("documents", documents);
+    builder.appendNumber("sampleRate", sampleRate);
     builder.appendElements(arrayHistogram->serialize());
     builder.doneFast();
     return builder.obj();
@@ -558,10 +565,11 @@ BSONObj makeStatistics(double documents,
 
 BSONObj makeStatsPath(StringData path,
                       double documents,
+                      double sampleRate,
                       const std::shared_ptr<const ArrayHistogram> arrayHistogram) {
     BSONObjBuilder builder;
     builder.append("_id", path);
-    builder.append("statistics", makeStatistics(documents, arrayHistogram));
+    builder.append("statistics", makeStatistics(documents, sampleRate, arrayHistogram));
     builder.doneFast();
     return builder.obj();
 }

@@ -107,7 +107,7 @@ public:
     const sbe::value::Array& getBounds() const;
     const std::vector<Bucket>& getBuckets() const;
     // Return the total number of histogrammed values.
-    size_t getCardinality() const {
+    double getCardinality() const {
         if (_buckets.empty()) {
             return 0.0;
         }

@@ -552,9 +552,9 @@ Histogram:
 [jsTest] 	"_id" : "uniform_int_1000_1",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -1339,9 +1339,9 @@ Histogram:
 [jsTest] 	"_id" : "normal_int_1000_1",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -2070,9 +2070,9 @@ Histogram:
 [jsTest] 	"_id" : "chi2_int_1000_1",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -2665,9 +2665,9 @@ Histogram:
 [jsTest] 	"_id" : "uniform_int_10000_10",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -3436,9 +3436,9 @@ Histogram:
 [jsTest] 	"_id" : "normal_int_10000_10",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -4199,9 +4199,9 @@ Histogram:
 [jsTest] 	"_id" : "chi2_int_10000_10",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -4770,9 +4770,9 @@ Histogram:
 [jsTest] 	"_id" : "uniform_int_100000_100",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -5573,9 +5573,9 @@ Histogram:
 [jsTest] 	"_id" : "normal_int_100000_100",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -6328,9 +6328,9 @@ Histogram:
 [jsTest] 	"_id" : "chi2_int_100000_100",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -6891,9 +6891,9 @@ Histogram:
 [jsTest] 	"_id" : "uniform_int_1000000_1000",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -7654,9 +7654,9 @@ Histogram:
 [jsTest] 	"_id" : "normal_int_1000000_1000",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -8393,9 +8393,9 @@ Histogram:
 [jsTest] 	"_id" : "chi2_int_1000000_1000",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -8988,9 +8988,9 @@ Histogram:
 [jsTest] 	"_id" : "uniform_int_10000_1",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -9815,9 +9815,9 @@ Histogram:
 [jsTest] 	"_id" : "normal_int_10000_1",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -10642,9 +10642,9 @@ Histogram:
 [jsTest] 	"_id" : "chi2_int_10000_1",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -11381,9 +11381,9 @@ Histogram:
 [jsTest] 	"_id" : "uniform_int_100000_10",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -12208,9 +12208,9 @@ Histogram:
 [jsTest] 	"_id" : "normal_int_100000_10",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -13027,9 +13027,9 @@ Histogram:
 [jsTest] 	"_id" : "chi2_int_100000_10",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -13742,9 +13742,9 @@ Histogram:
 [jsTest] 	"_id" : "uniform_int_1000000_100",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -14569,9 +14569,9 @@ Histogram:
 [jsTest] 	"_id" : "normal_int_1000000_100",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -15372,9 +15372,9 @@ Histogram:
 [jsTest] 	"_id" : "chi2_int_1000000_100",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -16143,9 +16143,9 @@ Histogram:
 [jsTest] 	"_id" : "uniform_int_10000000_1000",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -16962,9 +16962,9 @@ Histogram:
 [jsTest] 	"_id" : "normal_int_10000000_1000",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -17789,9 +17789,9 @@ Histogram:
 [jsTest] 	"_id" : "chi2_int_10000000_1000",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -18512,9 +18512,9 @@ Histogram:
 [jsTest] 	"_id" : "mixed_int_uniform_1",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -19335,9 +19335,9 @@ Histogram:
 [jsTest] 	"_id" : "mixed_int_unf_norm_1",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -20142,9 +20142,9 @@ Histogram:
 [jsTest] 	"_id" : "mixed_int_unf_norm_chi_1",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -20933,9 +20933,9 @@ Histogram:
 [jsTest] 	"_id" : "mixed_int_unf_norm_chi_2",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -21752,9 +21752,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_1112_33_norm_s",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -22019,9 +22019,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_1112_33_norm_l",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -22310,9 +22310,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_1112_33_chi2_s",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -22585,9 +22585,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_1112_33_chi2_l",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -22868,9 +22868,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_2221_33_norm_s",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -23143,9 +23143,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_2221_33_norm_l",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -23410,9 +23410,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_2221_33_chi2_s",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -23693,9 +23693,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_2221_33_chi2_l",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -23960,9 +23960,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_5555_33_norm_s",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -24251,9 +24251,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_5555_33_norm_l",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -24534,9 +24534,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_5555_33_chi2_s",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -24817,9 +24817,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_5555_33_chi2_l",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -25092,9 +25092,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_1112_1000_norm_s",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -25879,9 +25879,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_1112_1000_norm_l",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -26690,9 +26690,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_1112_1000_chi2_s",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -27477,9 +27477,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_1112_1000_chi2_l",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -28272,9 +28272,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_2221_1000_norm_s",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -29083,9 +29083,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_2221_1000_norm_l",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -29854,9 +29854,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_2221_1000_chi2_s",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -30625,9 +30625,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_2221_1000_chi2_l",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -31412,9 +31412,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_5555_1000_norm_s",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -32159,9 +32159,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_5555_1000_norm_l",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -32962,9 +32962,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_5555_1000_chi2_s",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -33709,9 +33709,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_5555_1000_chi2_l",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 100,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -34502,9 +34502,9 @@ Histogram:
 [jsTest] 	"_id" : "uniform_int_1000_1",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -35329,9 +35329,9 @@ Histogram:
 [jsTest] 	"_id" : "normal_int_1000_1",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -36156,9 +36156,9 @@ Histogram:
 [jsTest] 	"_id" : "chi2_int_1000_1",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -36983,9 +36983,9 @@ Histogram:
 [jsTest] 	"_id" : "uniform_int_10000_10",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -37810,9 +37810,9 @@ Histogram:
 [jsTest] 	"_id" : "normal_int_10000_10",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -38637,9 +38637,9 @@ Histogram:
 [jsTest] 	"_id" : "chi2_int_10000_10",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -39464,9 +39464,9 @@ Histogram:
 [jsTest] 	"_id" : "uniform_int_100000_100",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -40291,9 +40291,9 @@ Histogram:
 [jsTest] 	"_id" : "normal_int_100000_100",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -41118,9 +41118,9 @@ Histogram:
 [jsTest] 	"_id" : "chi2_int_100000_100",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -41945,9 +41945,9 @@ Histogram:
 [jsTest] 	"_id" : "uniform_int_1000000_1000",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -42772,9 +42772,9 @@ Histogram:
 [jsTest] 	"_id" : "normal_int_1000000_1000",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -43599,9 +43599,9 @@ Histogram:
 [jsTest] 	"_id" : "chi2_int_1000000_1000",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -44426,9 +44426,9 @@ Histogram:
 [jsTest] 	"_id" : "uniform_int_10000_1",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -45253,9 +45253,9 @@ Histogram:
 [jsTest] 	"_id" : "normal_int_10000_1",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -46080,9 +46080,9 @@ Histogram:
 [jsTest] 	"_id" : "chi2_int_10000_1",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -46907,9 +46907,9 @@ Histogram:
 [jsTest] 	"_id" : "uniform_int_100000_10",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -47734,9 +47734,9 @@ Histogram:
 [jsTest] 	"_id" : "normal_int_100000_10",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -48561,9 +48561,9 @@ Histogram:
 [jsTest] 	"_id" : "chi2_int_100000_10",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -49388,9 +49388,9 @@ Histogram:
 [jsTest] 	"_id" : "uniform_int_1000000_100",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -50215,9 +50215,9 @@ Histogram:
 [jsTest] 	"_id" : "normal_int_1000000_100",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -51042,9 +51042,9 @@ Histogram:
 [jsTest] 	"_id" : "chi2_int_1000000_100",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -51869,9 +51869,9 @@ Histogram:
 [jsTest] 	"_id" : "uniform_int_10000000_1000",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -52696,9 +52696,9 @@ Histogram:
 [jsTest] 	"_id" : "normal_int_10000000_1000",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -53523,9 +53523,9 @@ Histogram:
 [jsTest] 	"_id" : "chi2_int_10000000_1000",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -54350,9 +54350,9 @@ Histogram:
 [jsTest] 	"_id" : "mixed_int_uniform_1",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -55181,9 +55181,9 @@ Histogram:
 [jsTest] 	"_id" : "mixed_int_unf_norm_1",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -56012,9 +56012,9 @@ Histogram:
 [jsTest] 	"_id" : "mixed_int_unf_norm_chi_1",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -56843,9 +56843,9 @@ Histogram:
 [jsTest] 	"_id" : "mixed_int_unf_norm_chi_2",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -57670,9 +57670,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_1112_33_norm_s",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -57961,9 +57961,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_1112_33_norm_l",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -58252,9 +58252,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_1112_33_chi2_s",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -58543,9 +58543,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_1112_33_chi2_l",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -58834,9 +58834,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_2221_33_norm_s",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -59125,9 +59125,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_2221_33_norm_l",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -59416,9 +59416,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_2221_33_chi2_s",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -59707,9 +59707,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_2221_33_chi2_l",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -59998,9 +59998,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_5555_33_norm_s",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -60289,9 +60289,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_5555_33_norm_l",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -60580,9 +60580,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_5555_33_chi2_s",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -60871,9 +60871,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_5555_33_chi2_l",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -61162,9 +61162,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_1112_1000_norm_s",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -61989,9 +61989,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_1112_1000_norm_l",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -62816,9 +62816,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_1112_1000_chi2_s",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -63643,9 +63643,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_1112_1000_chi2_l",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -64470,9 +64470,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_2221_1000_norm_s",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -65297,9 +65297,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_2221_1000_norm_l",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -66124,9 +66124,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_2221_1000_chi2_s",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -66951,9 +66951,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_2221_1000_chi2_l",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -67778,9 +67778,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_5555_1000_norm_s",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -68605,9 +68605,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_5555_1000_norm_l",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -69432,9 +69432,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_5555_1000_chi2_s",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{
@@ -70259,9 +70259,9 @@ Histogram:
 [jsTest] 	"_id" : "choice_str_set_5555_1000_chi2_l",
 [jsTest] 	"statistics" : {
 [jsTest] 		"documents" : 1000,
+[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"trueCount" : 0,
 [jsTest] 		"falseCount" : 0,
-[jsTest] 		"sampleRate" : 1,
 [jsTest] 		"emptyArrayCount" : 0,
 [jsTest] 		"typeCount" : [
 [jsTest] 			{

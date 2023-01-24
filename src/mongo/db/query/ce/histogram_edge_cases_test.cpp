@@ -533,10 +533,15 @@ TEST(EstimatorTest, TwoBucketsObjectIdHistogram) {
 
 TEST(EstimatorTest, TwoExclusiveBucketsMixedHistogram) {
     // Data set of mixed data types: 3 integers and 5 strings.
-    std::vector<BucketData> data{{1, 3.0, 0.0, 0.0}, {"abc", 5.0, 0.0, 0.0}};
+    constexpr double numInts = 3.0;
+    constexpr double numStrs = 5.0;
+    constexpr double collCard = numInts + numStrs;
+    std::vector<BucketData> data{{1, numInts, 0.0, 0.0}, {"abc", numStrs, 0.0, 0.0}};
     const ScalarHistogram hist = createHistogram(data);
-    const auto arrHist = ArrayHistogram::make(
-        hist, TypeCounts{{value::TypeTags::NumberInt64, 3}, {value::TypeTags::StringSmall, 5}});
+    const auto arrHist = ArrayHistogram::make(hist,
+                                              TypeCounts{{value::TypeTags::NumberInt64, numInts},
+                                                         {value::TypeTags::StringSmall, numStrs}},
+                                              collCard);
 
     const auto [tagLowDbl, valLowDbl] =
         std::make_pair(value::TypeTags::NumberDouble,
@@ -578,7 +583,7 @@ TEST(EstimatorTest, TwoExclusiveBucketsMixedHistogram) {
                                      tagLowStr,
                                      valLowStr,
                                      true /* includeScalar */);
-    ASSERT_CE_APPROX_EQUAL(3.0, expectedCard, kErrorBound);
+    ASSERT_CE_APPROX_EQUAL(numInts, expectedCard, kErrorBound);
 
     // ["", "a"].
     expectedCard = estimateCardRange(*arrHist,
@@ -603,7 +608,7 @@ TEST(EstimatorTest, TwoExclusiveBucketsMixedHistogram) {
                                      value,
                                      true /* includeScalar */);
 
-    ASSERT_CE_APPROX_EQUAL(5.0, expectedCard, kErrorBound);
+    ASSERT_CE_APPROX_EQUAL(numStrs, expectedCard, kErrorBound);
 }
 
 TEST(EstimatorTest, TwoBucketsMixedHistogram) {
@@ -612,7 +617,9 @@ TEST(EstimatorTest, TwoBucketsMixedHistogram) {
     std::vector<BucketData> data{{100, 3.0, 17.0, 9.0}, {"pqr", 5.0, 75.0, 25.0}};
     const ScalarHistogram hist = createHistogram(data);
     const auto arrHist = ArrayHistogram::make(
-        hist, TypeCounts{{value::TypeTags::NumberInt64, 20}, {value::TypeTags::StringSmall, 80}});
+        hist,
+        TypeCounts{{value::TypeTags::NumberInt64, 20}, {value::TypeTags::StringSmall, 80}},
+        100.0 /* sampleSize */);
 
     ASSERT_EQ(100.0, getTotals(hist).card);
 
@@ -916,7 +923,8 @@ TEST(EstimatorTest, MinValueMixedHistogramFromData) {
                                                   {value::TypeTags::ObjectId, 2},
                                                   {value::TypeTags::Date, 3},
                                                   {value::TypeTags::Timestamp, 3},
-                                              });
+                                              },
+                                              13.0 /* sampleSize */);
     // [minDate, startInstant], estimated by the half of the date bucket.
     expectedCard = estimateCardRange(*arrHist,
                                      true /* lowInclusive */,
@@ -1032,7 +1040,8 @@ TEST(EstimatorTest, MinValueMixedHistogramFromBuckets) {
                                                   {value::TypeTags::ObjectId, 100},
                                                   {value::TypeTags::Date, 100},
                                                   {value::TypeTags::Timestamp, 100},
-                                              });
+                                              },
+                                              500.0 /* sampleSize */);
     // [minDate, innerDate], estimated by the half of the date bucket.
     const int64_t innerDate = 1516864323000LL;
     expectedCard = estimateCardRange(*arrHist,

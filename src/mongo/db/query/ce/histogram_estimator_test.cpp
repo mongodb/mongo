@@ -103,21 +103,32 @@ ScalarHistogram getHistogramFromData(TestBuckets testBuckets) {
     return ScalarHistogram::make(std::move(bounds), std::move(buckets));
 }
 
-TypeCounts getTypeCountsFromData(TestBuckets testBuckets) {
+std::pair<TypeCounts, double> getTypeCountsFromData(TestBuckets testBuckets,
+                                                    TypeCounts additionalData = {}) {
     TypeCounts typeCounts;
+    double total = 0.0;
     for (const auto& b : testBuckets) {
         // Add bucket boundary value to bounds.
         auto sbeVal = stage_builder::makeValue(b.val);
         auto [tag, val] = sbeVal;
 
+        const auto num = b.equalFreq + b.rangeFreq;
+        total += num;
+
         // Increment count of values for each type tag.
         if (auto it = typeCounts.find(tag); it != typeCounts.end()) {
-            it->second += b.equalFreq + b.rangeFreq;
+            it->second += num;
         } else {
-            typeCounts[tag] = b.equalFreq + b.rangeFreq;
+            typeCounts[tag] = num;
         }
     }
-    return typeCounts;
+
+    for (const auto& [t, c] : additionalData) {
+        total += c;
+    }
+    typeCounts.merge(additionalData);
+
+    return {typeCounts, total};
 }
 
 std::shared_ptr<const ArrayHistogram> getArrayHistogramFromData(
@@ -125,10 +136,12 @@ std::shared_ptr<const ArrayHistogram> getArrayHistogramFromData(
     TypeCounts additionalScalarData = {},
     double trueCount = 0,
     double falseCount = 0) {
-    TypeCounts dataTypeCounts = getTypeCountsFromData(testBuckets);
-    dataTypeCounts.merge(additionalScalarData);
-    return ArrayHistogram::make(
-        getHistogramFromData(testBuckets), std::move(dataTypeCounts), trueCount, falseCount);
+    auto [dataTypeCounts, sampleSize] = getTypeCountsFromData(testBuckets, additionalScalarData);
+    return ArrayHistogram::make(getHistogramFromData(testBuckets),
+                                std::move(dataTypeCounts),
+                                sampleSize,
+                                trueCount,
+                                falseCount);
 }
 
 std::shared_ptr<const ArrayHistogram> getArrayHistogramFromData(
@@ -144,9 +157,8 @@ std::shared_ptr<const ArrayHistogram> getArrayHistogramFromData(
     double falseCount = 0) {
 
     // Set up scalar type counts.
-    TypeCounts dataTypeCounts = getTypeCountsFromData(scalarBuckets);
-    dataTypeCounts[value::TypeTags::Array] = totalArrayCount;
-    dataTypeCounts.merge(additionalScalarData);
+    additionalScalarData.merge(TypeCounts{{value::TypeTags::Array, totalArrayCount}});
+    auto [dataTypeCounts, sampleSize] = getTypeCountsFromData(scalarBuckets, additionalScalarData);
 
     // Set up histograms.
     auto arrayMinHist = getHistogramFromData(arrayMinBuckets);
@@ -157,6 +169,7 @@ std::shared_ptr<const ArrayHistogram> getArrayHistogramFromData(
                                 std::move(arrayMinHist),
                                 std::move(arrayMaxHist),
                                 std::move(arrayTypeCounts),
+                                sampleSize,
                                 emptyArrayCount,
                                 trueCount,
                                 falseCount);
@@ -1246,12 +1259,13 @@ TEST_F(CEHistogramTest, TestFallbackForNonConstIntervals) {
 }
 
 TEST_F(CEHistogramTest, TestHistogramNeq) {
-    constexpr double kCollCard = 10.0;
+    constexpr double kCollCard = 20.0;
+    constexpr double kTypeCard = 10.0;
 
     CEHistogramTester t("test", {kCollCard});
     {
         std::vector<stats::SBEValue> values;
-        for (double v = 0; v < kCollCard; v++) {
+        for (double v = 0; v < kTypeCard; v++) {
             values.push_back(stage_builder::makeValue(Value(v)));
             values.push_back(stage_builder::makeValue(Value(BSON_ARRAY(v))));
         }
@@ -1261,7 +1275,7 @@ TEST_F(CEHistogramTest, TestHistogramNeq) {
     {
         std::vector<stats::SBEValue> values;
         std::string s = "charA";
-        for (double v = 0; v < kCollCard; v++) {
+        for (double v = 0; v < kTypeCard; v++) {
             s[4] += (char)v;
             values.push_back(stage_builder::makeValue(Value(s)));
             values.push_back(stage_builder::makeValue(Value(BSON_ARRAY(s))));
@@ -1276,34 +1290,37 @@ TEST_F(CEHistogramTest, TestHistogramNeq) {
 
     CEType eqCE{2.0};
     CEType eqElemCE{1.0};
-    CEType eqHeu{6.83772};
-    CEType eqHeuNotNe{3.16228};
+    CEType eqHeu{15.5279};
+    CEType eqHeuElem{6.83772};
+    CEType eqHeuNotNe{4.47214};
     ASSERT_EQ_ELEMMATCH_CE(t, eqCE, eqElemCE, "a", "{$eq: 5}");
-    ASSERT_EQ_ELEMMATCH_CE(t, eqHeu, eqHeu, "a", "{$not: {$eq: 5}}");
+    ASSERT_EQ_ELEMMATCH_CE(t, eqHeu, eqHeuElem, "a", "{$not: {$eq: 5}}");
     ASSERT_EQ_ELEMMATCH_CE(t, eqHeuNotNe, eqElemCE, "a", "{$not: {$ne: 5}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, eqHeu, eqHeu, "a", "{$ne: 5}");
+    ASSERT_EQ_ELEMMATCH_CE(t, eqHeu, eqHeuElem, "a", "{$ne: 5}");
 
     ASSERT_EQ_ELEMMATCH_CE(t, eqCE, eqElemCE, "b", "{$eq: 'charB'}");
-    ASSERT_EQ_ELEMMATCH_CE(t, eqHeu, eqHeu, "b", "{$not: {$eq: 'charB'}}");
+    ASSERT_EQ_ELEMMATCH_CE(t, eqHeu, eqHeuElem, "b", "{$not: {$eq: 'charB'}}");
     ASSERT_EQ_ELEMMATCH_CE(t, eqHeuNotNe, eqElemCE, "b", "{$not: {$ne: 'charB'}}");
-    ASSERT_EQ_ELEMMATCH_CE(t, eqHeu, eqHeu, "b", "{$ne: 'charB'}");
+    ASSERT_EQ_ELEMMATCH_CE(t, eqHeu, eqHeuElem, "b", "{$ne: 'charB'}");
 
     // Test conjunctions where both fields have histograms. Note that when both ops are $ne, we
     // never use histogram estimation because the optimizer only generates filetr nodes (no sargable
     // nodes).
-    CEType neNeCE{4.22282};
+    CEType neNeCE{11.5873};
     CEType neEqCE{0.585786};
+    CEType eqEqCE{0.632456};
     ASSERT_MATCH_CE(t, "{$and: [{a: {$ne: 7}}, {b: {$ne: 'charB'}}]}", neNeCE);
     ASSERT_MATCH_CE(t, "{$and: [{a: {$ne: 7}}, {b: {$eq: 'charB'}}]}", neEqCE);
-    ASSERT_MATCH_CE(t, "{$and: [{a: {$ne: 7}}, {b: {$ne: 'charB'}}]}", neNeCE);
-    ASSERT_MATCH_CE(t, "{$and: [{a: {$ne: 7}}, {b: {$eq: 'charB'}}]}", neEqCE);
+    ASSERT_MATCH_CE(t, "{$and: [{a: {$eq: 7}}, {b: {$ne: 'charB'}}]}", neEqCE);
+    ASSERT_MATCH_CE(t, "{$and: [{a: {$eq: 7}}, {b: {$eq: 'charB'}}]}", eqEqCE);
 
     // Test conjunctions where only one field has a histogram (fallback to heuristics).
-    neEqCE = {1.384};
     ASSERT_MATCH_CE(t, "{$and: [{a: {$ne: 7}}, {noHist: {$ne: 'charB'}}]}", neNeCE);
+    ASSERT_MATCH_CE(t, "{$and: [{a: {$eq: 7}}, {noHist: {$ne: 'charB'}}]}", neEqCE);
+    neEqCE = {2.35739};
+    eqEqCE = {2.11474};
     ASSERT_MATCH_CE(t, "{$and: [{a: {$ne: 7}}, {noHist: {$eq: 'charB'}}]}", neEqCE);
-    ASSERT_MATCH_CE(t, "{$and: [{a: {$ne: 7}}, {noHist: {$ne: 'charB'}}]}", neNeCE);
-    ASSERT_MATCH_CE(t, "{$and: [{a: {$ne: 7}}, {noHist: {$eq: 'charB'}}]}", neEqCE);
+    ASSERT_MATCH_CE(t, "{$and: [{a: {$eq: 7}}, {noHist: {$eq: 'charB'}}]}", eqEqCE);
 }
 
 TEST_F(CEHistogramTest, TestHistogramConjTypeCount) {
@@ -1354,7 +1371,8 @@ TEST(CEHistogramTest, RoundUpNegativeEstimate) {
         {Value(3925000), 1, 0, 0},
         {Value(4432000), 1, 17758, 347},
     });
-    const auto ah = stats::ArrayHistogram::make(sh, {{sbe::value::TypeTags::NumberDouble, 17760}});
+    const auto ah =
+        stats::ArrayHistogram::make(sh, {{sbe::value::TypeTags::NumberDouble, 17760}}, 17760.0);
 
     // Our current estimation would produce a negative estimate for this case. This test verifies we
     // round a negative result up to 0.0 before returning it.

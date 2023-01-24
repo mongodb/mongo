@@ -50,15 +50,15 @@ namespace mongo::optimizer::ce {
 
 namespace {
 /**
- * Returns how many values of the given type are known by the array histogram, and may apply
- * heuristics to adjust the count estimate for the case where the counters don't have enough
+ * Returns the selectivity of the given type according to the array histogram type counts, and may
+ * apply heuristics to adjust the count estimate for the case where the counters don't have enough
  * information for us to accurately estimate the given interval.
  */
-CEType estimateIntervalByTypeCount(const stats::ArrayHistogram& ah,
-                                   const IntervalRequirement& interval,
-                                   const BoundRequirement& bound,
-                                   CEType childResult,
-                                   bool includeScalar) {
+SelectivityType estimateIntervalByTypeSel(const stats::ArrayHistogram& ah,
+                                          const IntervalRequirement& interval,
+                                          const BoundRequirement& bound,
+                                          CEType childResult,
+                                          bool includeScalar) {
     const auto [tag, val] = *getBound(bound);
     CEType count{0.0};
 
@@ -126,7 +126,7 @@ CEType estimateIntervalByTypeCount(const stats::ArrayHistogram& ah,
         }
     }
 
-    return count;
+    return getSelectivity(ah, count);
 }
 
 /**
@@ -298,13 +298,12 @@ public:
 
         std::vector<SelectivityType> topLevelSelectivities;
         for (const auto& [serializedPath, conjunctReq] : conjunctRequirements) {
-            const CEType totalCard{_stats->getCardinality()};
+            const auto& histogram = conjunctReq.histogram;
 
             if (conjunctReq.intervals.empty() && !conjunctReq.includeScalar) {
                 // In this case there is a single 'PathArr' interval for this field.
-                // The selectivity of this interval is: (count of all arrays) / totalCard
-                SelectivityType pathArrSel =
-                    CEType{conjunctReq.histogram.getArrayCount()} / totalCard;
+                // The selectivity of this interval is: (count of all arrays) / sampleCard
+                const auto pathArrSel = getSelectivity(histogram, {histogram.getArrayCount()});
                 topLevelSelectivities.push_back(pathArrSel);
             }
 
@@ -320,10 +319,10 @@ public:
                     for (const auto& conjunct : conjuncts) {
                         const auto& interval = conjunct.cast<IntervalReqExpr::Atom>()->getExpr();
 
-                        CEType cardinality;
+                        SelectivityType selectivity;
                         if (interval.isFullyOpen()) {
                             // No need to estimate, as we're just going to return all inputs.
-                            cardinality = childResult;
+                            selectivity = {1.0};
                         } else {
                             // Determine how this interval will be estimated.
                             const auto [mode, lowBound, highBound] =
@@ -332,32 +331,30 @@ public:
                                 case IntervalEstimationMode::kUseHistogram: {
                                     const auto [lowTag, lowVal] = *getBound(lowBound->get());
                                     if (interval.isEquality()) {
-                                        cardinality = estimateCardEq(conjunctReq.histogram,
-                                                                     lowTag,
-                                                                     lowVal,
-                                                                     conjunctReq.includeScalar);
+                                        selectivity = estimateSelEq(
+                                            histogram, lowTag, lowVal, conjunctReq.includeScalar);
                                     } else {
                                         const auto [highTag, highVal] = *getBound(highBound->get());
-                                        cardinality =
-                                            estimateCardRange(conjunctReq.histogram,
-                                                              lowBound->get().isInclusive(),
-                                                              lowTag,
-                                                              lowVal,
-                                                              highBound->get().isInclusive(),
-                                                              highTag,
-                                                              highVal,
-                                                              conjunctReq.includeScalar);
+                                        selectivity =
+                                            estimateSelRange(histogram,
+                                                             lowBound->get().isInclusive(),
+                                                             lowTag,
+                                                             lowVal,
+                                                             highBound->get().isInclusive(),
+                                                             highTag,
+                                                             highVal,
+                                                             conjunctReq.includeScalar);
                                     }
                                     break;
                                 }
                                 case IntervalEstimationMode::kUseTypeCounts: {
                                     const auto bound = lowBound ? *lowBound : *highBound;
-                                    cardinality =
-                                        estimateIntervalByTypeCount(conjunctReq.histogram,
-                                                                    interval,
-                                                                    bound,
-                                                                    childResult,
-                                                                    conjunctReq.includeScalar);
+                                    selectivity =
+                                        estimateIntervalByTypeSel(histogram,
+                                                                  interval,
+                                                                  bound,
+                                                                  childResult,
+                                                                  conjunctReq.includeScalar);
                                     break;
                                 }
                                 case IntervalEstimationMode::kFallback: {
@@ -373,12 +370,12 @@ public:
                                             "path"_attr = serializedPath,
                                             "interval"_attr =
                                                 ExplainGenerator::explainInterval(interval),
-                                            "ce"_attr = cardinality._value);
+                                            "selectivity"_attr = selectivity._value);
 
                         // We have to convert the cardinality to a selectivity. The histogram
                         // returns the cardinality for the entire collection; however, fewer records
                         // may be expected at the SargableNode.
-                        conjSelectivities.push_back(cardinality / totalCard);
+                        conjSelectivities.push_back(selectivity);
                     }
 
                     const auto backoff = conjExponentialBackoff(std::move(conjSelectivities));

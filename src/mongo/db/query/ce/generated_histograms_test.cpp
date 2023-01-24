@@ -77,9 +77,12 @@ TEST(EstimatorTest, UniformIntStrEstimate) {
         {"3vL", 6, 30, 11}, {"9WUk", 1, 59, 24}, {"HraK", 4, 56, 26}, {"Zujbu", 1, 130, 64},
         {"kEr", 5, 80, 40}, {"rupc", 6, 44, 21}, {"up1O", 5, 16, 7},  {"ztf", 5, 37, 17}};
 
+    constexpr double collCard = 1000.0;
     const ScalarHistogram hist = createHistogram(data);
     const auto arrHist = ArrayHistogram::make(
-        hist, TypeCounts{{value::TypeTags::NumberInt64, 515}, {value::TypeTags::StringSmall, 485}});
+        hist,
+        TypeCounts{{value::TypeTags::NumberInt64, 515}, {value::TypeTags::StringSmall, 485}},
+        collCard);
 
     const auto [tagLowStr, valLowStr] = value::makeNewString(""_sd);
     value::ValueGuard vgLowStr(tagLowStr, valLowStr);
@@ -219,20 +222,14 @@ TEST(EstimatorTest, IntStrArrayEstimate) {
 
     const ScalarHistogram uniqueHist = createHistogram(uniqueData);
 
+    constexpr double collCard = 1000.0;
     TypeCounts typeCounts{{value::TypeTags::NumberInt64, 388},
                           {value::TypeTags::StringSmall, 319},
                           {value::TypeTags::Array, 293}};
     TypeCounts arrayTypeCounts{{value::TypeTags::NumberInt64, 282},
                                {value::TypeTags::StringSmall, 222}};
-    const auto arrHist = ArrayHistogram::make(scalarHist,
-                                              typeCounts,
-                                              uniqueHist,
-                                              minHist,
-                                              maxHist,
-                                              arrayTypeCounts,
-                                              0.0 /* No empty arrays. */,
-                                              0.0 /* No trues. */,
-                                              0.0 /* No falses. */);
+    const auto arrHist = ArrayHistogram::make(
+        scalarHist, typeCounts, uniqueHist, minHist, maxHist, arrayTypeCounts, collCard);
 
     const auto [tagLowDbl, valLowDbl] =
         std::make_pair(value::TypeTags::NumberDouble,

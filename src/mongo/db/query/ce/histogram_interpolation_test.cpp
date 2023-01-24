@@ -241,6 +241,9 @@ TEST(EstimatorTest, UniformIntStrEstimate) {
     // two types occurring with equal probability:
     // - 100 distinct ints between 0 and 1000, and
     // - 100 distinct strings of length between 2 and 5.
+    constexpr double numInt = 254;
+    constexpr double numStr = 246;
+    constexpr double collCard = numInt + numStr;
     std::vector<BucketData> data{{
         {2, 3, 0, 0},       {19, 4, 1, 1},      {226, 2, 49, 20},  {301, 5, 12, 4},
         {317, 3, 0, 0},     {344, 2, 3, 1},     {423, 5, 18, 6},   {445, 3, 0, 0},
@@ -250,7 +253,9 @@ TEST(EstimatorTest, UniformIntStrEstimate) {
     }};
     const ScalarHistogram hist = createHistogram(data);
     const auto arrHist = ArrayHistogram::make(
-        hist, TypeCounts{{value::TypeTags::NumberInt64, 254}, {value::TypeTags::StringSmall, 246}});
+        hist,
+        TypeCounts{{value::TypeTags::NumberInt64, numInt}, {value::TypeTags::StringSmall, numStr}},
+        collCard);
 
     // Predicates over value inside of the last numeric bucket.
 
@@ -371,7 +376,7 @@ TEST(EstimatorTest, UniformIntArrayOnlyEstimate) {
                                               maxHist,
                                               // There are 100 non-empty int-only arrays.
                                               TypeCounts{{value::TypeTags::NumberInt64, 100}},
-                                              0);
+                                              100.0 /* sampleSize */);
 
     // Query in the middle of the domain: estimate from ArrayUnique histogram.
     value::TypeTags lowTag = value::TypeTags::NumberInt64;
@@ -476,7 +481,7 @@ TEST(EstimatorTest, UniformIntMixedArrayEstimate) {
                                               maxHist,
                                               // There are 94 non-empty int-only arrays.
                                               TypeCounts{{value::TypeTags::NumberInt64, 94}},
-                                              0);
+                                              200.0 /* sampleSize */);
 
     value::TypeTags lowTag = value::TypeTags::NumberInt64;
     value::Value lowVal = 500;

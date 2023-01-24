@@ -283,8 +283,7 @@ ScalarHistogram genMaxDiffHistogram(const DataDistribution& dataDistrib, size_t 
 }
 
 std::shared_ptr<const ArrayHistogram> createArrayEstimator(const std::vector<SBEValue>& arrayData,
-                                                           size_t nBuckets,
-                                                           double sampleRate) {
+                                                           size_t nBuckets) {
     uassert(7120500, "A histogram must have at least one bucket.", nBuckets > 0);
 
     // Values that will be used as inputs to histogram generation code.
@@ -384,8 +383,11 @@ std::shared_ptr<const ArrayHistogram> createArrayEstimator(const std::vector<SBE
 
     if (isScalar) {
         // If we don't have array elements, we don't include array fields in the final histogram.
-        return ArrayHistogram::make(
-            makeHistogram(scalarData), std::move(typeCounts), trueCount, falseCount, sampleRate);
+        return ArrayHistogram::make(makeHistogram(scalarData),
+                                    std::move(typeCounts),
+                                    arrayData.size(),
+                                    trueCount,
+                                    falseCount);
     }
 
     return ArrayHistogram::make(makeHistogram(scalarData),
@@ -394,10 +396,10 @@ std::shared_ptr<const ArrayHistogram> createArrayEstimator(const std::vector<SBE
                                 makeHistogram(arrayMinData),
                                 makeHistogram(arrayMaxData),
                                 std::move(arrayTypeCounts),
+                                arrayData.size(),
                                 emptyArrayCount,
                                 trueCount,
-                                falseCount,
-                                sampleRate);
+                                falseCount);
 }
 
 }  // namespace mongo::stats

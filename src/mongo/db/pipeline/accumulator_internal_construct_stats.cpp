@@ -105,9 +105,8 @@ Value AccumulatorInternalConstructStats::getValue(bool toBeMerged) {
     uassert(8423374, "Can not merge analyze pipelines", !toBeMerged);
 
     // Generate and serialize maxdiff histogram for scalar and array values.
-    auto arrayHistogram =
-        stats::createArrayEstimator(_values, _params.getNumberBuckets(), _params.getSampleRate());
-    auto stats = stats::makeStatistics(_count, arrayHistogram);
+    auto arrayHistogram = stats::createArrayEstimator(_values, _params.getNumberBuckets());
+    auto stats = stats::makeStatistics(_count, _params.getSampleRate(), arrayHistogram);
 
     return Value(stats);
 }

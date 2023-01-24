@@ -47,6 +47,14 @@ using stats::sameTypeBracket;
 using stats::ScalarHistogram;
 using stats::valueToDouble;
 
+SelectivityType getSelectivity(const ArrayHistogram& ah, CEType cardinality) {
+    const CEType sampleSize = {ah.getSampleSize()};
+    if (sampleSize == 0.0) {
+        return {0.0};
+    }
+    return cardinality / sampleSize;
+}
+
 EstimationResult getTotals(const ScalarHistogram& h) {
     if (h.empty()) {
         return {0.0, 0.0};
@@ -354,6 +362,28 @@ CEType estimateCardRange(const ArrayHistogram& ah,
     }
 
     return {result};
+}
+
+SelectivityType estimateSelEq(const stats::ArrayHistogram& ah,
+                              sbe::value::TypeTags tag,
+                              sbe::value::Value val,
+                              bool includeScalar) {
+    const auto ce = estimateCardEq(ah, tag, val, includeScalar);
+    return getSelectivity(ah, ce);
+}
+
+SelectivityType estimateSelRange(const stats::ArrayHistogram& ah,
+                                 bool lowInclusive,
+                                 sbe::value::TypeTags tagLow,
+                                 sbe::value::Value valLow,
+                                 bool highInclusive,
+                                 sbe::value::TypeTags tagHigh,
+                                 sbe::value::Value valHigh,
+                                 bool includeScalar,
+                                 EstimationAlgo estAlgo) {
+    const auto ce = estimateCardRange(
+        ah, lowInclusive, tagLow, valLow, highInclusive, tagHigh, valHigh, includeScalar, estAlgo);
+    return getSelectivity(ah, ce);
 }
 
 }  // namespace mongo::optimizer::ce

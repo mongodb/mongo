@@ -74,20 +74,27 @@ function verifyCEForMatchNodes({coll, predicate, expected, getNodeCEs, CEs, hint
 }
 
 /**
- * Validates that the generated histogram for the given "coll" has the expected type counters.
+ * Creates a histogram for the given 'coll' along the input field 'key'.
  */
-function createAndValidateHistogram({coll, expectedHistogram, empty = false}) {
-    const field = expectedHistogram._id;
-    const stats = db.system.statistics[coll.getName()];
-
+function createHistogram(coll, key, options = {}) {
     // We can't use forceBonsai here because the new optimizer doesn't know how to handle the
     // analyze command.
     assert.commandWorked(
-        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
+        coll.getDB().adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
 
     // Set up histogram for test collection.
-    const res = db.runCommand({analyze: coll.getName(), key: field});
+    const res = coll.getDB().runCommand(Object.assign({analyze: coll.getName(), key}, options));
     assert.commandWorked(res);
+}
+
+/**
+ * Validates that the generated histogram for the given "coll" has the expected type counters.
+ */
+function createAndValidateHistogram({coll, expectedHistogram, empty = false, options = {}}) {
+    const field = expectedHistogram._id;
+    createHistogram(coll, field, options);
+
+    const stats = db.system.statistics[coll.getName()];
 
     // Validate histograms.
     const expected = empty ? [] : [expectedHistogram];

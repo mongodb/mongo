@@ -5,7 +5,6 @@
  * Returns : {"absError": 2.47, "relError": 1.23, "selError": 12.35}
  */
 function computeStrategyErrors(testcase, strategy, collSize) {
-    let errorDoc = {};
     const absError = testcase[strategy] - testcase.nReturned;
     let relError = 0.0;
     if (testcase.nReturned > 0) {
