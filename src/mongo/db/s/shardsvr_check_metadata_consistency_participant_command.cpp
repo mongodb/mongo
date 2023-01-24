@@ -46,7 +46,7 @@ class ShardsvrCheckMetadataConsistencyParticipantCommand final
     : public TypedCommand<ShardsvrCheckMetadataConsistencyParticipantCommand> {
 public:
     using Request = ShardsvrCheckMetadataConsistencyParticipant;
-    using Response = CheckMetadataConsistencyResponse;
+    using Response = MetadataInconsistencies;
 
     bool adminOnly() const override {
         return false;

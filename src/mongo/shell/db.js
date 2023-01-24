@@ -470,6 +470,7 @@ DB.prototype.help = function() {
     print("\tdb.eval() - deprecated");
     print("\tdb.fsyncLock() flush data to disk and lock server for backups");
     print("\tdb.fsyncUnlock() unlocks server following a db.fsyncLock()");
+    print("\tdb.checkMetadataConsistency() checks the consistency of the metadata in the db");
     print("\tdb.getCollection(cname) same as db['cname'] or db.cname");
     print("\tdb.getCollectionInfos([filter]) - returns a list that contains the names and options" +
           " of the db's collections");
@@ -1788,5 +1789,10 @@ DB.prototype.dropEncryptedCollection = function(name) {
     this.getCollection(ef.eccCollection).drop();
     this.getCollection(ef.ecocCollection).drop();
     return this.getCollection(name).drop();
+};
+
+DB.prototype.checkMetadataConsistency = function() {
+    const res = assert.commandWorked(this.runCommand({checkMetadataConsistency: 1}));
+    return new DBCommandCursor(this, res);
 };
 }());

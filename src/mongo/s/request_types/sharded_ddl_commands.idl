@@ -530,6 +530,11 @@ commands:
         allow_global_collection_name: true
         api_version: ""
         reply_type: CheckMetadataConsistencyResponse
+        strict: false
+        fields:
+            cursor:
+                type: SimpleCursorOptions
+                optional: true
 
     _shardsvrCheckMetadataConsistencyParticipant:
         description: "Internal command sent to participants shards to check metadata consistency."
@@ -538,7 +543,8 @@ commands:
         namespace: concatenate_with_db
         allow_global_collection_name: true
         api_version: ""
-        reply_type: CheckMetadataConsistencyResponse
+        reply_type: MetadataInconsistencies
+        strict: false
         fields:
             primaryShardId:
                 description: "The shard id of the db primary shard"

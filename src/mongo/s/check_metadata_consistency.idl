@@ -42,3 +42,7 @@ commands:
         allow_global_collection_name: true
         api_version: ""
         reply_type: CheckMetadataConsistencyResponse
+        fields:
+            cursor:
+                type: SimpleCursorOptions
+                optional: true

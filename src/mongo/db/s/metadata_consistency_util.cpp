@@ -41,8 +41,8 @@ void _appendHiddenUnshardedCollectionInconsistency(
     const ShardId& shardId,
     const NamespaceString& localNss,
     const UUID& localUUID,
-    std::vector<MetadataInconsistency>& inconsistencies) {
-    MetadataInconsistency val;
+    std::vector<MetadataInconsistencyItem>& inconsistencies) {
+    MetadataInconsistencyItem val;
     val.setNs(localNss);
     val.setType(MetadataInconsistencyTypeEnum::kHiddenUnshardedCollection);
     val.setShard(shardId);
@@ -57,8 +57,8 @@ void _appendUUIDMismatchInconsistency(const ShardId& shardId,
                                       const UUID& localUUID,
                                       const UUID& UUID,
                                       bool isLocalCollectionSharded,
-                                      std::vector<MetadataInconsistency>& inconsistencies) {
-    MetadataInconsistency val;
+                                      std::vector<MetadataInconsistencyItem>& inconsistencies) {
+    MetadataInconsistencyItem val;
     val.setNs(localNss);
     val.setType(MetadataInconsistencyTypeEnum::kUUIDMismatch);
     val.setShard(shardId);
@@ -70,13 +70,13 @@ void _appendUUIDMismatchInconsistency(const ShardId& shardId,
 }
 }  // namespace
 
-std::vector<MetadataInconsistency> checkCollectionMetadataInconsistencies(
+std::vector<MetadataInconsistencyItem> checkCollectionMetadataInconsistencies(
     OperationContext* opCtx,
     const ShardId& shardId,
     const ShardId& primaryShardId,
     const std::vector<CollectionType>& catalogClientCollections,
     const std::vector<CollectionPtr>& localCollections) {
-    std::vector<MetadataInconsistency> inconsistencies;
+    std::vector<MetadataInconsistencyItem> inconsistencies;
     auto itLocalCollections = localCollections.begin();
     auto itCatalogCollections = catalogClientCollections.begin();
     while (itLocalCollections != localCollections.end() &&

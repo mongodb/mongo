@@ -33,6 +33,7 @@
 #include "mongo/s/check_metadata_consistency_gen.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/query/store_possible_cursor.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 
@@ -66,6 +67,8 @@ public:
         using InvocationBase::InvocationBase;
 
         Response typedRun(OperationContext* opCtx) {
+            CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
+
             const auto& nss = ns();
 
             // Cluster and Collection level mode command is not implemented
@@ -77,9 +80,11 @@ public:
 
             ShardsvrCheckMetadataConsistency shardsvrRequest(nss);
             shardsvrRequest.setDbName(nss.db());
+            shardsvrRequest.setCursor(request().getCursor());
 
             auto catalogCache = Grid::get(opCtx)->catalogCache();
             const auto dbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, nss.db()));
+
             auto cmdResponse = executeCommandAgainstDatabasePrimary(
                 opCtx,
                 nss.db(),
@@ -88,12 +93,23 @@ public:
                 ReadPreferenceSetting(ReadPreference::PrimaryOnly),
                 Shard::RetryPolicy::kIdempotent);
 
-            auto remoteResponse = uassertStatusOK(std::move(cmdResponse.swResponse));
-            uassertStatusOK(getStatusFromCommandResult(remoteResponse.data));
+            auto response = uassertStatusOK(std::move(cmdResponse.swResponse));
+            uassertStatusOK(getStatusFromCommandResult(response.data));
+
+            // TODO: SERVER-72667: Add privileges for getMore()
+            auto transformedResponse = uassertStatusOK(
+                storePossibleCursor(opCtx,
+                                    cmdResponse.shardId,
+                                    *cmdResponse.shardHostAndPort,
+                                    response.data,
+                                    nss,
+                                    Grid::get(opCtx)->getExecutorPool()->getArbitraryExecutor(),
+                                    Grid::get(opCtx)->getCursorManager(),
+                                    {}));
 
             return CheckMetadataConsistencyResponse::parseOwned(
                 IDLParserContext("checkMetadataConsistencyResponse"),
-                std::move(remoteResponse.data));
+                std::move(transformedResponse));
         }
 
     private:

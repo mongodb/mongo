@@ -30,7 +30,12 @@
 
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/cursor_manager.h"
+#include "mongo/db/exec/queued_data_stage.h"
+#include "mongo/db/exec/working_set.h"
 #include "mongo/db/metadata_consistency_types_gen.h"
+#include "mongo/db/query/find_common.h"
+#include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/s/ddl_lock_manager.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_util.h"
@@ -100,13 +105,13 @@ public:
             }
 
             // Merge responses from shards
-            std::vector<MetadataInconsistency> inconsistenciesMerged;
+            std::vector<MetadataInconsistencyItem> inconsistenciesMerged;
             for (auto&& asyncResponse : responses) {
                 auto response = uassertStatusOK(std::move(asyncResponse.swResponse));
                 uassertStatusOK(getStatusFromCommandResult(response.data));
 
-                auto data = CheckMetadataConsistencyResponse::parseOwned(
-                    IDLParserContext("checkMetadataConsistencyResponse"), std::move(response.data));
+                auto data = MetadataInconsistencies::parseOwned(
+                    IDLParserContext("MetadataInconsistencies"), std::move(response.data));
 
                 auto& shardInconsistencies = data.getInconsistencies();
                 inconsistenciesMerged.insert(inconsistenciesMerged.end(),
@@ -114,10 +119,100 @@ public:
                                              std::make_move_iterator(shardInconsistencies.end()));
             }
 
-            return Response{std::move(inconsistenciesMerged)};
+            return Response{_makeCursor(opCtx, inconsistenciesMerged, nss)};
         }
 
     private:
+        CheckMetadataConsistencyResponseCursor _makeCursor(
+            OperationContext* opCtx,
+            const std::vector<MetadataInconsistencyItem>& inconsistencies,
+            const NamespaceString& nss) {
+            auto& cmd = request();
+
+            const auto batchSize = [&] {
+                if (cmd.getCursor() && cmd.getCursor()->getBatchSize()) {
+                    return (long long)*cmd.getCursor()->getBatchSize();
+                } else {
+                    return std::numeric_limits<long long>::max();
+                }
+            }();
+
+            auto expCtx = make_intrusive<ExpressionContext>(
+                opCtx, std::unique_ptr<CollatorInterface>(nullptr), nss);
+            auto ws = std::make_unique<WorkingSet>();
+            auto root = std::make_unique<QueuedDataStage>(expCtx.get(), ws.get());
+
+            for (auto&& inconsistency : inconsistencies) {
+                WorkingSetID id = ws->allocate();
+                WorkingSetMember* member = ws->get(id);
+                member->keyData.clear();
+                member->recordId = RecordId();
+                member->resetDocument(SnapshotId(), inconsistency.toBSON().getOwned());
+                member->transitionToOwnedObj();
+                root->pushBack(id);
+            }
+
+            auto exec = uassertStatusOK(
+                plan_executor_factory::make(expCtx,
+                                            std::move(ws),
+                                            std::move(root),
+                                            &CollectionPtr::null,
+                                            PlanYieldPolicy::YieldPolicy::NO_YIELD,
+                                            false, /* whether returned BSON must be owned */
+                                            nss));
+
+            std::vector<MetadataInconsistencyItem> firstBatch;
+            size_t bytesBuffered = 0;
+            for (long long objCount = 0; objCount < batchSize; objCount++) {
+                BSONObj nextDoc;
+                PlanExecutor::ExecState state = exec->getNext(&nextDoc, nullptr);
+                if (state == PlanExecutor::IS_EOF) {
+                    break;
+                }
+                invariant(state == PlanExecutor::ADVANCED);
+
+                // If we can't fit this result inside the current batch, then we stash it for
+                // later.
+                if (!FindCommon::haveSpaceForNext(nextDoc, objCount, bytesBuffered)) {
+                    exec->stashResult(nextDoc);
+                    break;
+                }
+
+                int objsize = nextDoc.objsize();
+                firstBatch.push_back(MetadataInconsistencyItem::parseOwned(
+                    IDLParserContext("MetadataInconsistencyItem"), std::move(nextDoc)));
+                bytesBuffered += objsize;
+            }
+
+            if (exec->isEOF()) {
+                return CheckMetadataConsistencyResponseCursor(
+                    0 /* cursorId */, nss, std::move(firstBatch));
+            }
+
+            exec->saveState();
+            exec->detachFromOperationContext();
+
+            // TODO: SERVER-72667: Add privileges for getMore()
+            // Global cursor registration must be done without holding any locks.
+            auto pinnedCursor = CursorManager::get(opCtx)->registerCursor(
+                opCtx,
+                {std::move(exec),
+                 nss,
+                 AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserName(),
+                 APIParameters::get(opCtx),
+                 opCtx->getWriteConcern(),
+                 repl::ReadConcernArgs::get(opCtx),
+                 ReadPreferenceSetting::get(opCtx),
+                 cmd.toBSON({}),
+                 {}});
+
+            pinnedCursor->incNBatches();
+            pinnedCursor->incNReturnedSoFar(firstBatch.size());
+
+            return CheckMetadataConsistencyResponseCursor(
+                pinnedCursor.getCursor()->cursorid(), nss, std::move(firstBatch));
+        }
+
         NamespaceString ns() const override {
             return request().getNamespace();
         }

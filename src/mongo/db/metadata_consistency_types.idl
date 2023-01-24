@@ -41,35 +41,7 @@ enums:
             kHiddenUnshardedCollection: "HiddenUnshardedCollection"
 
 structs:
-    MetadataInconsistencyInfoUUIDMismatch:
-        description: "Info for a UUID mismatch"
-        strict: false
-        fields:
-            description: 
-                type: string
-                description: "Description of the inconsistency."
-            localUUID:
-                type: uuid
-                description: "Local UUID of the collection."
-            primaryUUID:
-                type: uuid
-                description: "UUID of the collection."
-            shardThinkCollectionIsSharded:
-                type: bool
-                description: "Whether the shard thinks the collection is sharded."
-
-    MetadataInconsistencyInfoHiddenUnshardedCollection:
-        description: "Info for a hidden unsharded collection"
-        strict: false
-        fields:
-            description: 
-                type: string
-                description: "Description of the inconsistency."
-            UUID:
-                type: uuid
-                description: "UUID of the collection."
-
-    MetadataInconsistency:
+    MetadataInconsistencyItem:
         description: "Object representing a single metadata inconsistency found in a specific shard"
         strict: false
         fields:
@@ -86,11 +58,31 @@ structs:
                 type: object_owned
                 description: "Info about the inconsistency."
 
-    CheckMetadataConsistencyResponse:
-        description: "Response of the check metadata consistency command"
-        strict: false
+    MetadataInconsistencies:
+        description: "Object representing a list of metadata inconsistencies"
         is_command_reply: true
+        strict: false
         fields:
             inconsistencies:
-                type: array<MetadataInconsistency>
+                type: array<MetadataInconsistencyItem>
                 description: "Array of inconsistencies found."
+
+    CheckMetadataConsistencyResponseCursor:
+        description: "Cursor object of the checkMetadataConsistency command"
+        strict: false
+        fields:
+            id:
+                type: long
+            ns:
+                type: namespacestring
+            firstBatch:
+                type: array<MetadataInconsistencyItem>
+                description: "Array of inconsistencies found."
+
+    CheckMetadataConsistencyResponse:
+        description: "Response of the check metadata consistency command"
+        is_command_reply: true
+        strict: false
+        fields:
+            cursor:
+                type: CheckMetadataConsistencyResponseCursor
