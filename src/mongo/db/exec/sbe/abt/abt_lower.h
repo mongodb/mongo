@@ -202,7 +202,18 @@ private:
                        std::vector<std::string>& fields,
                        sbe::value::SlotVector& vars);
 
+    /**
+     * Convert a vector of ProjectionNames to slot IDs from the projections that have already been
+     * bound to slots.
+     */
     sbe::value::SlotVector convertProjectionsToSlots(const ProjectionNameVector& projectionNames);
+
+    /**
+     * During Cascades, projections that a node is required to propagate up the tree are added to
+     * the RequiredProjections node property. This function pulls out those projection names and
+     * looks up the relevant slot IDs they are bound to. The optional toExclude vector can prevent
+     * some slots from being added to the output vector.
+     */
     sbe::value::SlotVector convertRequiredProjectionsToSlots(
         const NodeProps& props, const sbe::value::SlotVector& toExclude = {});
 
@@ -224,6 +235,16 @@ private:
                        sbe::value::SlotId slot,
                        bool canOverwrite = false);
 
+    /**
+     * Instantiate an expression lowering transporter for use in node lowering.
+     */
+    SBEExpressionLowering getExpressionLowering() {
+        return SBEExpressionLowering{_env, _slotMap, _namedSlots};
+    }
+
+    std::unique_ptr<sbe::EExpression> lowerExpression(const ABT& e) {
+        return getExpressionLowering().optimize(e);
+    }
     const VariableEnvironment& _env;
     SlotVarMap& _slotMap;
     const NamedSlotsProvider& _namedSlots;
