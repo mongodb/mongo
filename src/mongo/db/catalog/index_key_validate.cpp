@@ -50,6 +50,7 @@
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
@@ -151,6 +152,15 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
             return Status(code, str::stream() << "Unknown index plugin '" << pluginName << '\'');
     }
 
+    if (pluginName == IndexNames::WILDCARD &&
+        feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        auto status = validateWildcardIndex(key);
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+
     BSONObjIterator it(key);
     while (it.more()) {
         BSONElement keyElement = it.next();
@@ -173,7 +183,9 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
                         return {code, "Values in the index key pattern cannot be NaN."};
                     } else if (value == 0.0) {
                         return {code, "Values in the index key pattern cannot be 0."};
-                    } else if (value < 0.0 && pluginName == IndexNames::WILDCARD) {
+                    } else if (value < 0.0 && pluginName == IndexNames::WILDCARD &&
+                               !feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabled(
+                                   serverGlobalParams.featureCompatibility)) {
                         return {code,
                                 "A numeric value in a $** index key pattern must be positive."};
                     }
@@ -199,24 +211,21 @@ Status validateKeyPattern(const BSONObj& key, IndexDescriptor::IndexVersion inde
                                         << "' index must be a non-zero number, not a string.");
         }
 
-        if (pluginName == IndexNames::WILDCARD || pluginName == IndexNames::COLUMN) {
-            StringData fieldName(keyElement.fieldNameStringData());
+        StringData fieldName(keyElement.fieldNameStringData());
+
+        // TODO SERVER-68303: Remove the CompoundWildcardIndexes feature flag.
+        if ((pluginName == IndexNames::WILDCARD &&
+             !feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabled(
+                 serverGlobalParams.featureCompatibility)) ||
+            pluginName == IndexNames::COLUMN) {
             if (key.nFields() != 1) {
-                // Some special index types do not support compound indexes.
+                // Columnstore indexes do not support compound indexes.
                 return Status(code,
                               str::stream() << pluginName << " indexes do not allow compounding");
             } else if ((fieldName != "$**") && !fieldName.endsWith(".$**")) {
-                // Invalid key names for wildcard or columnstore are not supported.
+                // Invalid key names for columnstore are not supported.
                 return Status(code,
                               str::stream() << "Invalid key name for " << pluginName << " indexes");
-            }
-        }
-
-        if (pluginName == IndexNames::WILDCARD &&
-            feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabledAndIgnoreFCV()) {
-            auto status = validateWildcardIndex(key);
-            if (!status.isOK()) {
-                return status;
             }
         }
 
@@ -382,6 +391,13 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx, const BSONObj& in
                     return {ErrorCodes::CannotCreateIndex,
                             str::stream()
                                 << "Values in the index key pattern cannot be empty strings"};
+                }
+                if (indexType == IndexNames::WILDCARD &&
+                    keyElement.fieldNameStringData() == "$**" && keyPattern.nFields() > 1 &&
+                    !indexSpec.hasField(IndexDescriptor::kWildcardProjectionFieldName)) {
+                    return {ErrorCodes::CannotCreateIndex,
+                            "Compound wildcard indexes on all fields must also specify "
+                            "'wildcardProjection' option"};
                 }
             }
 

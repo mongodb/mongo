@@ -63,23 +63,26 @@ const StringMap<IndexType> kIndexNameToType = {
 // static
 string IndexNames::findPluginName(const BSONObj& keyPattern) {
     BSONObjIterator i(keyPattern);
+    string indexTypeStr = "";
     while (i.more()) {
         BSONElement e = i.next();
         StringData fieldName(e.fieldNameStringData());
         if (String == e.type()) {
-            return e.String();
+            indexTypeStr = e.String();
         } else if ((fieldName == "$**") || fieldName.endsWith(".$**")) {
             if (keyPattern.firstElement().type() == String &&
                 keyPattern.firstElement().fieldNameStringData() == "columnstore"_sd) {
                 return IndexNames::COLUMN;
             } else {
+                // Returns IndexNames::WILDCARD directly here because we rely on the caller to
+                // validate that wildcard indexes cannot compound with other special index type.
                 return IndexNames::WILDCARD;
             }
         } else
             continue;
     }
 
-    return IndexNames::BTREE;
+    return indexTypeStr.empty() ? IndexNames::BTREE : indexTypeStr;
 }
 
 // static

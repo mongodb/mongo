@@ -264,6 +264,12 @@ selector:
   - jstests/core/**/find_and_modify_server7660.js
   - jstests/core/**/upsert_shell.js
 
+  # Does not support feature flag check.
+  # TODO SERVER-68303: Unban the following jstests when the feature flag is removed.
+  - jstests/core/compound_wildcard_index_validation.js
+  - jstests/core/index/wildcard/wildcard_index_validindex.js
+  - jstests/core/query/index_key_expression.js
+
   exclude_with_any_tags:
   ##
   # The next four tags correspond to the special errors thrown by the auto_retry_on_network_error.js

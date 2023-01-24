@@ -38,7 +38,6 @@ TEST(WildcardValidation, GoodCase) {
 }
 
 TEST(WildcardValidation, Overlapping) {
-    ASSERT_NOT_OK(validateWildcardIndex(BSON("a" << 1 << "$**" << 1)));
     ASSERT_NOT_OK(validateWildcardIndex(BSON("a" << 1 << "b.c" << 1 << "b.$**" << 1)));
 }
 

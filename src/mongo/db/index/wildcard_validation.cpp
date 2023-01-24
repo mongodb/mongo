@@ -92,17 +92,6 @@ Status validateWildcardIndex(const BSONObj& keyPattern) {
 
     wildcardRef.removeLastPart();  // remove wildcard part
 
-    // If wildcard index path is "$**" then is cannot be compound.
-    if (wildcardRef.empty() && !indexFields.empty()) {
-        return Status(
-            ErrorCodes::Error{7246203},
-            str::stream()
-                << "A wildcard index field should not overlap with and index key fields if "
-                   "wildcard projection is empty, however '"
-                << indexFields.front().dottedField()
-                << "' is overlapping with the wildcard index field.");
-    }
-
     // wildcard should not overlap with index key fields if wildcard projection is empty.
     for (const auto& field : indexFields) {
         if (wildcardRef.isPrefixOfOrEqualTo(field)) {
@@ -114,7 +103,6 @@ Status validateWildcardIndex(const BSONObj& keyPattern) {
                     << field.dottedField() << "' is overlapping with the wildcard index field.");
         }
     }
-
 
     return Status::OK();
 }

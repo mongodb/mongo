@@ -312,6 +312,18 @@ void fillOutIndexEntries(OperationContext* opCtx,
              indexType == IndexType::INDEX_COLUMN || ice->descriptor()->isSparse()))
             continue;
 
+        // TODO SERVER-72465: Allow the planner to utilize compound wildcard indexes.
+        if (indexType == IndexType::INDEX_WILDCARD &&
+            feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabled(
+                serverGlobalParams.featureCompatibility) &&
+            ice->descriptor()->getNumFields() > 1) {
+            LOGV2_DEBUG(7246104,
+                        2,
+                        "Skipping compound wildcard indexes",
+                        "index"_attr = redact(ice->descriptor()->toString()));
+            continue;
+        }
+
         // Skip the addition of hidden indexes to prevent use in query planning.
         if (ice->descriptor()->hidden())
             continue;

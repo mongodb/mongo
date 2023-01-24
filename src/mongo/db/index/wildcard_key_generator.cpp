@@ -68,22 +68,33 @@ constexpr StringData WildcardKeyGenerator::kSubtreeSuffix;
 
 WildcardProjection WildcardKeyGenerator::createProjectionExecutor(BSONObj keyPattern,
                                                                   BSONObj pathProjection) {
-    if (!feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabledAndIgnoreFCV()) {
+    // TODO SERVER-68303: Remove the invariant after we remove the compound wilcard indexes feature
+    // flag.
+    if (!feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
         // We should never have a key pattern that contains more than a single element.
         invariant(keyPattern.nFields() == 1);
     }
 
-    // The _keyPattern is either { "$**": ±1 } for all paths or { "path.$**": ±1 } for a single
-    // subtree. If we are indexing a single subtree, then we will project just that path.
-    auto indexRoot = keyPattern.firstElement().fieldNameStringData();
-    auto suffixPos = indexRoot.find(kSubtreeSuffix);
+    StringData indexRoot = "";
+    size_t suffixPos = std::string::npos;
+    for (auto elem : keyPattern) {
+        StringData fieldName(elem.fieldNameStringData());
+        if (fieldName == "$**" || fieldName.endsWith(".$**")) {
+            // The _keyPattern is either {..., "$**": 1, ..} for all paths or
+            // {.., "path.$**": 1, ...} for a single subtree. If we are indexing a single subtree
+            // then we will project just that path.
+            indexRoot = elem.fieldNameStringData();
+            suffixPos = indexRoot.find(kSubtreeSuffix);
+            break;
+        }
+    }
 
     // If we're indexing a single subtree, we can't also specify a path projection.
-    invariant(suffixPos == std::string::npos || pathProjection.isEmpty());
+    uassert(7246102,
+            str::stream() << "the wildcard keyPattern " << keyPattern.toString() << " is invalid",
+            !indexRoot.empty() && (suffixPos == std::string::npos || pathProjection.isEmpty()));
 
-    // If this is a subtree projection, the projection spec is { "path.to.subtree": 1 }. Otherwise,
-    // we use the path projection from the original command object. If the path projection is empty
-    // we default to {_id: 0}, since empty projections are illegal and will be rejected when parsed.
     auto projSpec = (suffixPos != std::string::npos
                          ? BSON(indexRoot.substr(0, suffixPos) << 1)
                          : pathProjection.isEmpty() ? kDefaultProjection : pathProjection);

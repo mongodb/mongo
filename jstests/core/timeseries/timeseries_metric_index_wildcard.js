@@ -38,7 +38,8 @@ TimeseriesTest.run((insert) => {
 
         // Insert data on the time-series collection and index it.
         assert.commandWorked(insert(coll, doc), "failed to insert doc: " + tojson(doc));
-        assert.commandFailedWithCode(coll.createIndex(keysForCreate), ErrorCodes.CannotCreateIndex);
+        assert.commandFailedWithCode(coll.createIndex(keysForCreate),
+                                     [7246201, ErrorCodes.CannotCreateIndex]);
     };
 
     testIndex({"_id.$**": 1});
