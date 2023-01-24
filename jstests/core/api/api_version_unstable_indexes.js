@@ -78,10 +78,21 @@ if (setUpServerForColumnStoreIndexTest(db)) {
 
     // Column store indexes cannot be used for query planning with apiStrict: true.
     coll.createIndex({"$**": "columnstore"});
+
+    const projection = {_id: 0, x: 1};
+
+    // Sanity check that this query can use column scan.
+    assert(planHasStage(db, coll.find({}, projection).explain(), "COLUMN_SCAN"));
+
+    // No hint should work (but redirect to coll scan).
+    assert.commandWorked(db.runCommand(
+        {find: coll.getName(), projection: {_id: 0, x: 1}, apiVersion: "1", apiStrict: true}));
+
+    // Hint should fail.
     assert.commandFailedWithCode(db.runCommand({
-        "find": coll.getName(),
-        "projection": {_id: 0, x: 1},
-        "hint": {"$**": "columnstore"},
+        find: coll.getName(),
+        projection: projection,
+        hint: {"$**": "columnstore"},
         apiVersion: "1",
         apiStrict: true
     }),

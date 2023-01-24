@@ -1483,10 +1483,11 @@ bool shouldPlanningResultUseSbe(bool sbeFull,
 }
 
 /**
- * Returns true if the query *may* be eligible for column scan. This requires two conditions:
+ * Returns true if the query *may* be eligible for column scan. This requires three conditions:
  *
- * 1) query has a column scan-eligible projection, i.e. an inclusion projection or is count-like
- * 2) there is a column store index present on the main collection
+ * 1) apiStrict is false
+ * 2) query has a column scan-eligible projection, i.e. an inclusion projection or is count-like
+ * 3) there is a column store index present on the main collection
  *
  * These checks are an optimization in cases where we can determine without query planning that a
  * query doesn't meet other SBE requirements, and definitely can't use column scan.
@@ -1494,6 +1495,11 @@ bool shouldPlanningResultUseSbe(bool sbeFull,
 bool maybeQueryIsColumnScanEligible(OperationContext* opCtx,
                                     const MultipleCollectionAccessor& collections,
                                     const CanonicalQuery* cq) {
+    if (APIParameters::get(opCtx).getAPIStrict().value_or(false)) {
+        // Column scan is not allowed with apiStrict: true.
+        return false;
+    }
+
     if (!cq->isCountLike() && (!cq->getProj() || cq->getProj()->isExclusionOnly())) {
         // The query's projection makes it automatically ineligible for column scan.
         return false;
