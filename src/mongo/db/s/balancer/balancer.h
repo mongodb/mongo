@@ -311,6 +311,8 @@ private:
 
     // TODO  SERVER-65332 remove logic bound to this policy object When kLastLTS is 6.0
     std::unique_ptr<ClusterChunksResizePolicy> _clusterChunksResizePolicy;
+
+    std::unique_ptr<stdx::unordered_set<NamespaceString>> _imbalancedCollectionsCache;
 };
 
 }  // namespace mongo

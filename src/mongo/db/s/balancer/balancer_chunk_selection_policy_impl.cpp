@@ -405,31 +405,50 @@ StatusWith<SplitInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToSpli
 StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMove(
     OperationContext* opCtx,
     const std::vector<ClusterStatistics::ShardStatistics>& shardStats,
-    stdx::unordered_set<ShardId>* availableShards) {
+    stdx::unordered_set<ShardId>* availableShards,
+    stdx::unordered_set<NamespaceString>* imbalancedCollectionsCachePtr) {
+    invariant(availableShards);
+    invariant(imbalancedCollectionsCachePtr);
 
     if (availableShards->size() < 2) {
         return MigrateInfoVector{};
     }
 
-    auto collections = Grid::get(opCtx)->catalogClient()->getCollections(opCtx, {});
+    auto collections = Grid::get(opCtx)->catalogClient()->getCollections(
+        opCtx,
+        {},
+        repl::ReadConcernLevel::kMajorityReadConcern,
+        BSON(CollectionType::kNssFieldName << 1));
+
     if (collections.empty()) {
         return MigrateInfoVector{};
     }
 
     MigrateInfoVector candidateChunks;
+    static constexpr auto kStatsForBalancingBatchSize = 50;
+    static constexpr auto kMaxCachedCollectionsSize = int(0.75 * kStatsForBalancingBatchSize);
 
-    std::shuffle(collections.begin(), collections.end(), _random);
+    // Lambda function used to get a CollectionType leveraging the `collections` vector
+    // The `collections` vector must be sorted by nss when it is called
+    auto getCollectionTypeByNss = [&collections](const NamespaceString& nss)
+        -> std::pair<boost::optional<CollectionType>, std::vector<CollectionType>::iterator> {
+        // Using a lower_bound to perform a binary search on the `collections` vector
+        const auto collIt =
+            std::lower_bound(collections.begin(),
+                             collections.end(),
+                             nss,
+                             [](const CollectionType& coll, const NamespaceString& ns) {
+                                 return coll.getNss() < ns;
+                             });
 
-    static constexpr auto kStatsForBalancingBatchSize = 20;
-
-    std::vector<CollectionType> collBatch;
-    for (auto collIt = collections.begin(); collIt != collections.end();) {
-
-        if (availableShards->size() < 2) {
-            break;
+        if (collIt == collections.end() || collIt->getNss() != nss) {
+            return std::make_pair(boost::none, collections.end());
         }
+        return std::make_pair(*collIt, collIt);
+    };
 
-        const auto& coll = *(collIt++);
+    // Lambda function to check if a collection is explicitly disabled for balancing
+    const auto canBalanceCollection = [](const CollectionType& coll) -> bool {
         if (!coll.getAllowBalance() || !coll.getAllowMigrations() || !coll.getPermitMigrations() ||
             coll.getDefragmentCollection()) {
             LOGV2_DEBUG(5966401,
@@ -440,15 +459,13 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
                         "allowMigrations"_attr = coll.getAllowMigrations(),
                         "permitMigrations"_attr = coll.getPermitMigrations(),
                         "defragmentCollection"_attr = coll.getDefragmentCollection());
-        } else {
-            collBatch.push_back(coll);
+            return false;
         }
+        return true;
+    };
 
-        if (collBatch.size() < kStatsForBalancingBatchSize && collIt != collections.end()) {
-            // keep Accumulating in the batch
-            continue;
-        }
-
+    // Lambda function to select migrate candidates from a batch of collections
+    const auto processBatch = [&](std::vector<CollectionType>& collBatch) {
         boost::optional<stdx::unordered_map<NamespaceString, CollectionDataSizeInfoForBalancing>>
             collsDataSizeInfo;
         if (feature_flags::gBalanceAccordingToDataSize.isEnabled(
@@ -456,39 +473,91 @@ StatusWith<MigrateInfoVector> BalancerChunkSelectionPolicyImpl::selectChunksToMo
             collsDataSizeInfo.emplace(getDataSizeInfoForCollections(opCtx, collBatch));
         }
 
-        for (const auto& collFromBatch : collBatch) {
+        std::shuffle(collBatch.begin(), collBatch.end(), _random);
+        for (const auto& coll : collBatch) {
 
             if (availableShards->size() < 2) {
                 break;
             }
 
-            const auto& nss = collFromBatch.getNss();
+            const auto& nss = coll.getNss();
 
             boost::optional<CollectionDataSizeInfoForBalancing> optDataSizeInfo;
             if (collsDataSizeInfo.has_value()) {
                 optDataSizeInfo.emplace(std::move(collsDataSizeInfo->at(nss)));
             }
 
-            auto candidatesStatus = _getMigrateCandidatesForCollection(
+            auto swMigrateCandidates = _getMigrateCandidatesForCollection(
                 opCtx, nss, shardStats, optDataSizeInfo, availableShards);
-            if (candidatesStatus == ErrorCodes::NamespaceNotFound) {
+            if (swMigrateCandidates == ErrorCodes::NamespaceNotFound) {
                 // Namespace got dropped before we managed to get to it, so just skip it
+                imbalancedCollectionsCachePtr->erase(nss);
                 continue;
-            } else if (!candidatesStatus.isOK()) {
+            } else if (!swMigrateCandidates.isOK()) {
                 LOGV2_WARNING(21853,
                               "Unable to balance collection",
                               "namespace"_attr = nss.ns(),
-                              "error"_attr = candidatesStatus.getStatus());
+                              "error"_attr = swMigrateCandidates.getStatus());
                 continue;
             }
 
             candidateChunks.insert(
                 candidateChunks.end(),
-                std::make_move_iterator(candidatesStatus.getValue().first.begin()),
-                std::make_move_iterator(candidatesStatus.getValue().first.end()));
+                std::make_move_iterator(swMigrateCandidates.getValue().first.begin()),
+                std::make_move_iterator(swMigrateCandidates.getValue().first.end()));
+
+            const auto& migrateCandidates = swMigrateCandidates.getValue().first;
+            if (migrateCandidates.empty()) {
+                imbalancedCollectionsCachePtr->erase(nss);
+            } else if (imbalancedCollectionsCachePtr->size() < kMaxCachedCollectionsSize) {
+                imbalancedCollectionsCachePtr->insert(nss);
+            }
+        }
+    };
+
+    // To assess if a collection has chunks to migrate, we need to ask shards the size of that
+    // collection. For efficiency, we ask for a batch of collections per every shard request instead
+    // of a single request per collection
+    std::vector<CollectionType> collBatch;
+
+    // The first batch is partially filled by the imbalanced cached collections
+    for (auto imbalancedNssIt = imbalancedCollectionsCachePtr->begin();
+         imbalancedNssIt != imbalancedCollectionsCachePtr->end();) {
+
+        const auto& [imbalancedColl, collIt] = getCollectionTypeByNss(*imbalancedNssIt);
+
+        if (!imbalancedColl.has_value() || !canBalanceCollection(imbalancedColl.value())) {
+            // The collection was dropped or is no longer enabled for balancing.
+            imbalancedCollectionsCachePtr->erase(imbalancedNssIt++);
+            continue;
         }
 
-        collBatch.clear();
+        collBatch.push_back(imbalancedColl.value());
+        ++imbalancedNssIt;
+
+        // Remove the collection from the whole list of collections to avoid processing it twice
+        collections.erase(collIt);
+    }
+
+    // Iterate all the remaining collections randomly
+    std::shuffle(collections.begin(), collections.end(), _random);
+    for (const auto& coll : collections) {
+
+        if (canBalanceCollection(coll)) {
+            collBatch.push_back(coll);
+        }
+
+        if (collBatch.size() == kStatsForBalancingBatchSize) {
+            processBatch(collBatch);
+            if (availableShards->size() < 2) {
+                return candidateChunks;
+            }
+            collBatch.clear();
+        }
+    }
+
+    if (collBatch.size() > 0) {
+        processBatch(collBatch);
     }
 
     return candidateChunks;

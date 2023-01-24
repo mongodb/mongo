@@ -131,11 +131,14 @@ public:
     /**
      * Retrieves all collections under a specified database (or in the system). If the dbName
      * parameter is empty, returns all collections.
+     *
+     * @param sort Fields to use for sorting the results. If empty, no sorting is performed.
      */
     virtual std::vector<CollectionType> getCollections(
         OperationContext* opCtx,
         StringData db,
-        repl::ReadConcernLevel readConcernLevel = repl::ReadConcernLevel::kMajorityReadConcern) = 0;
+        repl::ReadConcernLevel readConcernLevel = repl::ReadConcernLevel::kMajorityReadConcern,
+        const BSONObj& sort = BSONObj()) = 0;
 
     /**
      * Returns the set of collections for the specified database, which have been marked as sharded.

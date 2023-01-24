@@ -82,7 +82,8 @@ public:
 
     std::vector<CollectionType> getCollections(OperationContext* opCtx,
                                                StringData db,
-                                               repl::ReadConcernLevel readConcernLevel) override;
+                                               repl::ReadConcernLevel readConcernLevel,
+                                               const BSONObj& sort) override;
 
     std::vector<NamespaceString> getAllShardedCollectionsForDb(
         OperationContext* opCtx, StringData dbName, repl::ReadConcernLevel readConcern) override;
