@@ -133,8 +133,10 @@
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_params.h"
+#include "mongo/logv2/log.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
 
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 namespace mongo {
 
 using namespace optimizer;
@@ -1097,11 +1099,25 @@ boost::optional<bool> shouldForceEligibility() {
     if (!serverGlobalParams.featureCompatibility.isVersionInitialized() ||
         !feature_flags::gFeatureFlagCommonQueryFramework.isEnabled(
             serverGlobalParams.featureCompatibility)) {
+        LOGV2_DEBUG(7325100,
+                    4,
+                    "Bonsai will not be forced because FCV initialized={fcv} and CQF flag={cqf}",
+                    "Bonsai will not be forced because FCV isn't initialized or CQF isn't enabled.",
+                    "fcv"_attr = serverGlobalParams.featureCompatibility.isVersionInitialized(),
+                    "cqf"_attr = !serverGlobalParams.featureCompatibility.isVersionInitialized() ||
+                        feature_flags::gFeatureFlagCommonQueryFramework.isEnabled(
+                            serverGlobalParams.featureCompatibility));
         return false;
     }
 
     auto queryControl = ServerParameterSet::getNodeParameterSet()->get<QueryFrameworkControl>(
         "internalQueryFrameworkControl");
+
+    LOGV2_DEBUG(7325101,
+                4,
+                "internalQueryFrameworkControl={knob}",
+                "logging internalQueryFrameworkControl",
+                "knob"_attr = QueryFrameworkControl_serializer(queryControl->_data.get()));
 
     switch (queryControl->_data.get()) {
         case QueryFrameworkControlEnum::kForceClassicEngine:

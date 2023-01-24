@@ -12,6 +12,8 @@
 
 load("jstests/libs/optimizer_utils.js");  // For leftmostLeafStage
 
+db.setLogLevel(4, "query");
+
 const coll = db.cqf_non_multikey_paths;
 coll.drop();
 assert.commandWorked(coll.createIndex({'one.one.one.one': 1}));

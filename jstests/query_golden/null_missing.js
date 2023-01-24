@@ -12,6 +12,8 @@
 
 load("jstests/libs/optimizer_utils.js");  // For getPlanSkeleton.
 
+db.setLogLevel(4, "query");
+
 const coll = db.cqf_null_missing;
 coll.drop();
 

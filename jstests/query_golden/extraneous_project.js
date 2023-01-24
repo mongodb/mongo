@@ -11,6 +11,8 @@
 
 load("jstests/libs/optimizer_utils.js");  // For getPlanSkeleton.
 
+db.setLogLevel(4, "query");
+
 const coll = db.cqf_extraneous_project;
 coll.drop();
 assert.commandWorked(coll.insert([
