@@ -761,6 +761,26 @@ void resumeMigrations(OperationContext* opCtx,
     setAllowMigrations(opCtx, nss, expectedCollectionUUID, true);
 }
 
+bool checkAllowMigrations(OperationContext* opCtx, const NamespaceString& nss) {
+    auto collDoc =
+        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+                            opCtx,
+                            ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet{}),
+                            repl::ReadConcernLevel::kMajorityReadConcern,
+                            CollectionType::ConfigNS,
+                            BSON(CollectionType::kNssFieldName << nss.ns()),
+                            BSONObj(),
+                            1))
+            .docs;
+
+    uassert(ErrorCodes::NamespaceNotFound,
+            str::stream() << "collection " << nss.ns() << " not found",
+            !collDoc.empty());
+
+    auto coll = CollectionType(collDoc[0]);
+    return coll.getAllowMigrations();
+}
+
 boost::optional<UUID> getCollectionUUID(OperationContext* opCtx,
                                         const NamespaceString& nss,
                                         bool allowViews) {

@@ -137,6 +137,11 @@ protected:
         return false;
     };
 
+    /*
+     * Specify if the given error will be retried by the ddl coordinator infrastructure.
+     */
+    bool _isRetriableErrorForDDLCoordinator(const Status& status);
+
     ShardingDDLCoordinatorService* _service;
     const ShardingDDLCoordinatorId _coordId;
 
@@ -295,12 +300,17 @@ protected:
                     "newPhase"_attr = serializePhase(newDoc.getPhase()),
                     "oldPhase"_attr = serializePhase(_doc.getPhase()));
 
-        auto opCtx = cc().makeOperationContext();
+        ServiceContext::UniqueOperationContext uniqueOpCtx;
+        auto opCtx = cc().getOperationContext();
+        if (!opCtx) {
+            uniqueOpCtx = cc().makeOperationContext();
+            opCtx = uniqueOpCtx.get();
+        }
 
         if (_doc.getPhase() == Phase::kUnset) {
-            _insertStateDocument(opCtx.get(), std::move(newDoc));
+            _insertStateDocument(opCtx, std::move(newDoc));
         } else {
-            _updateStateDocument(opCtx.get(), std::move(newDoc));
+            _updateStateDocument(opCtx, std::move(newDoc));
         }
     }
 

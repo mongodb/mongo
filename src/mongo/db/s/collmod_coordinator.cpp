@@ -285,74 +285,101 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 _saveShardingInfoOnCoordinatorIfNecessary(opCtx);
 
                 if (_collInfo->isSharded) {
-                    ShardsvrCollModParticipant request(originalNss(), _request);
-                    bool needsUnblock =
-                        _collInfo->timeSeriesOptions && hasTimeSeriesBucketingUpdate(_request);
-                    request.setNeedsUnblock(needsUnblock);
+                    try {
+                        if (!_firstExecution) {
+                            bool allowMigrations = sharding_ddl_util::checkAllowMigrations(
+                                opCtx, _collInfo->nsForTargeting);
+                            if (_result.is_initialized() && allowMigrations) {
+                                // The command finished and we have the response. Return it.
+                                return;
+                            } else if (allowMigrations) {
+                                // Previous run on a different node completed, but we lost the
+                                // result in the stepdown. Restart from stage in which we disallow
+                                // migrations.
+                                auto newPhase = _isPre61Compatible() ? Phase::kBlockShards
+                                                                     : Phase::kFreezeMigrations;
+                                _enterPhase(newPhase);
+                                uasserted(ErrorCodes::Interrupted,
+                                          "Retriable error to move to previous stage");
+                            }
+                        }
 
-                    std::vector<AsyncRequestsSender::Response> responses;
-                    auto shardsOwningChunks = _shardingInfo->shardsOwningChunks;
-                    auto primaryShardOwningChunk = std::find(shardsOwningChunks.begin(),
-                                                             shardsOwningChunks.end(),
-                                                             _shardingInfo->primaryShard);
+                        ShardsvrCollModParticipant request(originalNss(), _request);
+                        bool needsUnblock =
+                            _collInfo->timeSeriesOptions && hasTimeSeriesBucketingUpdate(_request);
+                        request.setNeedsUnblock(needsUnblock);
 
-                    // If trying to convert an index to unique, executes a dryRun first to find any
-                    // duplicates without actually changing the indexes to avoid inconsistent index
-                    // specs on different shards.
-                    // Example:
-                    //   Shard0: {_id: 0, a: 1}
-                    //   Shard1: {_id: 1, a: 2}, {_id: 2, a: 2}
-                    //   When trying to convert index {a: 1} to unique, the dry run will return the
-                    //   duplicate errors to the user without converting the indexes.
-                    if (isCollModIndexUniqueConversion(_request)) {
-                        // The 'dryRun' option only works with 'unique' index option. We need to
-                        // strip out other incompatible options.
-                        auto dryRunRequest = ShardsvrCollModParticipant{
-                            originalNss(), makeCollModDryRunRequest(_request)};
-                        sharding_ddl_util::sendAuthenticatedCommandToShards(
-                            opCtx,
-                            nss().db(),
-                            CommandHelpers::appendMajorityWriteConcern(dryRunRequest.toBSON({})),
-                            shardsOwningChunks,
-                            **executor);
-                    }
+                        std::vector<AsyncRequestsSender::Response> responses;
+                        auto shardsOwningChunks = _shardingInfo->shardsOwningChunks;
+                        auto primaryShardOwningChunk = std::find(shardsOwningChunks.begin(),
+                                                                 shardsOwningChunks.end(),
+                                                                 _shardingInfo->primaryShard);
 
-                    // A view definition will only be present on the primary shard. So we pass an
-                    // addition 'performViewChange' flag only to the primary shard.
-                    if (primaryShardOwningChunk != shardsOwningChunks.end()) {
-                        request.setPerformViewChange(true);
-                        const auto& primaryResponse =
+                        // If trying to convert an index to unique, executes a dryRun first to find
+                        // any duplicates without actually changing the indexes to avoid
+                        // inconsistent index specs on different shards. Example:
+                        //   Shard0: {_id: 0, a: 1}
+                        //   Shard1: {_id: 1, a: 2}, {_id: 2, a: 2}
+                        //   When trying to convert index {a: 1} to unique, the dry run will return
+                        //   the duplicate errors to the user without converting the indexes.
+                        if (isCollModIndexUniqueConversion(_request)) {
+                            // The 'dryRun' option only works with 'unique' index option. We need to
+                            // strip out other incompatible options.
+                            auto dryRunRequest = ShardsvrCollModParticipant{
+                                originalNss(), makeCollModDryRunRequest(_request)};
+                            sharding_ddl_util::sendAuthenticatedCommandToShards(
+                                opCtx,
+                                nss().db(),
+                                CommandHelpers::appendMajorityWriteConcern(
+                                    dryRunRequest.toBSON({})),
+                                shardsOwningChunks,
+                                **executor);
+                        }
+
+                        // A view definition will only be present on the primary shard. So we pass
+                        // an addition 'performViewChange' flag only to the primary shard.
+                        if (primaryShardOwningChunk != shardsOwningChunks.end()) {
+                            request.setPerformViewChange(true);
+                            const auto& primaryResponse =
+                                sharding_ddl_util::sendAuthenticatedCommandToShards(
+                                    opCtx,
+                                    nss().db(),
+                                    CommandHelpers::appendMajorityWriteConcern(request.toBSON({})),
+                                    {_shardingInfo->primaryShard},
+                                    **executor);
+                            responses.insert(
+                                responses.end(), primaryResponse.begin(), primaryResponse.end());
+                            shardsOwningChunks.erase(primaryShardOwningChunk);
+                        }
+
+                        request.setPerformViewChange(false);
+                        const auto& secondaryResponses =
                             sharding_ddl_util::sendAuthenticatedCommandToShards(
                                 opCtx,
                                 nss().db(),
                                 CommandHelpers::appendMajorityWriteConcern(request.toBSON({})),
-                                {_shardingInfo->primaryShard},
+                                shardsOwningChunks,
                                 **executor);
                         responses.insert(
-                            responses.end(), primaryResponse.begin(), primaryResponse.end());
-                        shardsOwningChunks.erase(primaryShardOwningChunk);
-                    }
+                            responses.end(), secondaryResponses.begin(), secondaryResponses.end());
 
-                    request.setPerformViewChange(false);
-                    const auto& secondaryResponses =
-                        sharding_ddl_util::sendAuthenticatedCommandToShards(
-                            opCtx,
-                            nss().db(),
-                            CommandHelpers::appendMajorityWriteConcern(request.toBSON({})),
-                            shardsOwningChunks,
-                            **executor);
-                    responses.insert(
-                        responses.end(), secondaryResponses.begin(), secondaryResponses.end());
-
-                    BSONObjBuilder builder;
-                    std::string errmsg;
-                    auto ok = appendRawResponses(opCtx, &errmsg, &builder, responses).responseOK;
-                    if (!errmsg.empty()) {
-                        CommandHelpers::appendSimpleCommandStatus(builder, ok, errmsg);
+                        BSONObjBuilder builder;
+                        std::string errmsg;
+                        auto ok =
+                            appendRawResponses(opCtx, &errmsg, &builder, responses).responseOK;
+                        if (!errmsg.empty()) {
+                            CommandHelpers::appendSimpleCommandStatus(builder, ok, errmsg);
+                        }
+                        _result = builder.obj();
+                        sharding_ddl_util::resumeMigrations(
+                            opCtx, _collInfo->nsForTargeting, _doc.getCollUUID());
+                    } catch (DBException& ex) {
+                        if (!_isRetriableErrorForDDLCoordinator(ex.toStatus())) {
+                            sharding_ddl_util::resumeMigrations(
+                                opCtx, _collInfo->nsForTargeting, _doc.getCollUUID());
+                        }
+                        throw;
                     }
-                    _result = builder.obj();
-                    sharding_ddl_util::resumeMigrations(
-                        opCtx, _collInfo->nsForTargeting, _doc.getCollUUID());
                 } else {
                     CollMod cmd(originalNss());
                     cmd.setCollModRequest(_request);
@@ -380,16 +407,6 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                             "Error running collMod",
                             "namespace"_attr = nss(),
                             "error"_attr = redact(status));
-                // If we have the collection UUID set, this error happened in a sharded collection,
-                // we should restore the migrations.
-                if (_doc.getCollUUID() && _collInfo) {
-                    auto opCtxHolder = cc().makeOperationContext();
-                    auto* opCtx = opCtxHolder.get();
-                    getForwardableOpMetadata().setOn(opCtx);
-
-                    sharding_ddl_util::resumeMigrations(
-                        opCtx, _collInfo->nsForTargeting, _doc.getCollUUID());
-                }
             }
             return status;
         });
