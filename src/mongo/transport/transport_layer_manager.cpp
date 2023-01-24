@@ -41,7 +41,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/transport/asio_transport_layer.h"
+#include "mongo/transport/asio/asio_transport_layer.h"
 #include "mongo/transport/service_executor_synchronous.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/net/ssl_types.h"

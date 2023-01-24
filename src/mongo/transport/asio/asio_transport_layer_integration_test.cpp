@@ -40,7 +40,7 @@
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/transport/asio_transport_layer.h"
+#include "mongo/transport/asio/asio_transport_layer.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/unittest/integration_test.h"

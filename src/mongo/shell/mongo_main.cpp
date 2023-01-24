@@ -71,7 +71,7 @@
 #include "mongo/shell/shell_utils.h"
 #include "mongo/shell/shell_utils_launcher.h"
 #include "mongo/stdx/utility.h"
-#include "mongo/transport/asio_transport_layer.h"
+#include "mongo/transport/asio/asio_transport_layer.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/exit.h"

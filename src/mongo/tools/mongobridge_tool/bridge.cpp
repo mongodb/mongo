@@ -50,7 +50,7 @@
 #include "mongo/stdx/thread.h"
 #include "mongo/tools/mongobridge_tool/bridge_commands.h"
 #include "mongo/tools/mongobridge_tool/mongobridge_options.h"
-#include "mongo/transport/asio_transport_layer.h"
+#include "mongo/transport/asio/asio_transport_layer.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/service_entry_point_impl.h"
 #include "mongo/transport/service_executor_synchronous.h"

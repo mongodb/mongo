@@ -30,7 +30,7 @@
 
 #include "mongo/platform/basic.h"
 
-#include "mongo/transport/asio_transport_layer.h"
+#include "mongo/transport/asio/asio_transport_layer.h"
 
 #include <fmt/format.h>
 #include <fstream>
@@ -52,7 +52,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/logv2/log.h"
-#include "mongo/transport/asio_utils.h"
+#include "mongo/transport/asio/asio_utils.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/transport_options_gen.h"
 #include "mongo/util/clock_source.h"
@@ -73,10 +73,10 @@
 // asio_session.h has some header dependencies that require it to be the last header.
 
 #ifdef __linux__
-#include "mongo/transport/asio_networking_baton.h"
+#include "mongo/transport/asio/asio_networking_baton.h"
 #endif
 
-#include "mongo/transport/asio_session.h"
+#include "mongo/transport/asio/asio_session.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 

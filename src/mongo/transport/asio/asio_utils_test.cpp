@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/transport/asio_utils.h"
+#include "mongo/transport/asio/asio_utils.h"
 
 #include <asio.hpp>
 

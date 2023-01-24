@@ -28,13 +28,13 @@
  */
 
 
-#include "mongo/transport/asio_session.h"
+#include "mongo/transport/asio/asio_session.h"
 
 #include "mongo/config.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/logv2/log.h"
-#include "mongo/transport/asio_utils.h"
+#include "mongo/transport/asio/asio_utils.h"
 #include "mongo/transport/proxy_protocol_header_parser.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future_util.h"

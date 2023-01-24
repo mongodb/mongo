@@ -69,10 +69,10 @@ tlEnv.Library(
 tlEnv.Library(
     target='transport_layer',
     source=[
-        'asio_networking_baton.cpp' if env.TargetOSIs('linux') else [],
-        'asio_session.cpp',
-        'asio_transport_layer.cpp',
-        'asio_utils.cpp',
+        'asio/asio_networking_baton.cpp' if env.TargetOSIs('linux') else [],
+        'asio/asio_session.cpp',
+        'asio/asio_transport_layer.cpp',
+        'asio/asio_utils.cpp',
         'proxy_protocol_header_parser.cpp',
         'transport_options.idl',
     ],
@@ -205,8 +205,8 @@ env.Library(
 tlEnv.CppUnitTest(
     target='transport_test',
     source=[
-        'asio_transport_layer_test.cpp',
-        'asio_utils_test.cpp',
+        'asio/asio_transport_layer_test.cpp',
+        'asio/asio_utils_test.cpp',
         'message_compressor_manager_test.cpp',
         'message_compressor_registry_test.cpp',
         'service_executor_test.cpp',
@@ -251,7 +251,7 @@ tlEnvTest.Append(
 tlEnvTest.CppIntegrationTest(
     target='transport_integration_test',
     source=[
-        'asio_transport_layer_integration_test.cpp',
+        'asio/asio_transport_layer_integration_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

@@ -30,7 +30,7 @@
 
 #include <sys/eventfd.h>
 
-#include "mongo/transport/asio_networking_baton.h"
+#include "mongo/transport/asio/asio_networking_baton.h"
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"

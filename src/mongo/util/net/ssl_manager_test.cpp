@@ -33,7 +33,7 @@
 #include "mongo/config.h"
 #include "mongo/platform/basic.h"
 
-#include "mongo/transport/asio_transport_layer.h"
+#include "mongo/transport/asio/asio_transport_layer.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/transport_layer_manager.h"
 #include "mongo/util/net/ssl/context.hpp"

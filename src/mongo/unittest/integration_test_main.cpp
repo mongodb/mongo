@@ -44,7 +44,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/logv2/log.h"
-#include "mongo/transport/asio_transport_layer.h"
+#include "mongo/transport/asio/asio_transport_layer.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/options_parser/environment.h"

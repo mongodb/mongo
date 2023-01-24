@@ -45,7 +45,7 @@
 #include "mongo/db/commands/server_status.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/overflow_arithmetic.h"
-#include "mongo/transport/asio_transport_layer.h"
+#include "mongo/transport/asio/asio_transport_layer.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/hex.h"

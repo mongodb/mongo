@@ -27,7 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/transport/asio_transport_layer.h"
+#include "mongo/transport/asio/asio_transport_layer.h"
 
 #include <fstream>
 #include <queue>
@@ -49,7 +49,7 @@
 #include "mongo/platform/basic.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/transport/asio_session.h"
+#include "mongo/transport/asio/asio_session.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/transport_options_gen.h"
 #include "mongo/unittest/assert_that.h"
