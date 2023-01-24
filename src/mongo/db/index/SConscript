@@ -31,7 +31,7 @@ env.Library(
 iamEnv = env.Clone()
 iamEnv.InjectThirdParty(libraries=['snappy'])
 iamEnv.Library(
-    target="index_access_method",
+    target='index_access_method',
     source=[
         '2d_access_method.cpp',
         'btree_access_method.cpp',
@@ -52,11 +52,10 @@ iamEnv.Library(
         'sort_key_generator.cpp',
         'wildcard_access_method.cpp',
         'wildcard_key_generator.cpp',
-        "wildcard_validation.cpp",
+        'wildcard_validation.cpp',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/bson/dotted_path_support',
-        '$BUILD_DIR/mongo/db/catalog/collection',
         '$BUILD_DIR/mongo/db/catalog/index_catalog',
         '$BUILD_DIR/mongo/db/catalog/index_catalog_entry',
         '$BUILD_DIR/mongo/db/concurrency/exception_util',
