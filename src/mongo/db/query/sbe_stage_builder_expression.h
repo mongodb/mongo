@@ -29,15 +29,13 @@
 
 #pragma once
 
-#include "mongo/db/exec/sbe/expressions/expression.h"
-#include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression.h"
-#include "mongo/db/query/sbe_stage_builder_abt_holder_def.h"
-#include "mongo/db/query/sbe_stage_builder_helpers.h"
+#include "mongo/db/query/sbe_stage_builder_eval_frame.h"
 
 namespace mongo::stage_builder {
+
+struct StageBuilderState;
 class PlanStageSlots;
 
 /**
