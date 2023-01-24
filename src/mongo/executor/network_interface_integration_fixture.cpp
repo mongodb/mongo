@@ -116,7 +116,8 @@ void NetworkInterfaceIntegrationFixture::startCommand(const TaskExecutor::Callba
 }
 
 Future<RemoteCommandResponse> NetworkInterfaceIntegrationFixture::runCommand(
-    const TaskExecutor::CallbackHandle& cbHandle, RemoteCommandRequestOnAny rcroa) {
+    const TaskExecutor::CallbackHandle& cbHandle, RemoteCommandRequest request) {
+    RemoteCommandRequestOnAny rcroa{request};
 
     _onSchedulingCommand();
 
