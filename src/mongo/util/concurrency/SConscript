@@ -63,9 +63,13 @@ env.Library(
 env.CppUnitTest(
     target='util_concurrency_test',
     source=[
-        'priority_ticketholder_test.cpp' if env.TargetOSIs('linux') else [], 'spin_lock_test.cpp',
-        'thread_pool_test.cpp', 'ticketholder_test.cpp',
-        'ticket_broker_test.cpp' if env.TargetOSIs('linux') else [], 'with_lock_test.cpp'
+        'priority_ticketholder_test.cpp' if env.TargetOSIs('linux') else [],
+        'semaphore_ticketholder_test.cpp',
+        'spin_lock_test.cpp',
+        'thread_pool_test.cpp',
+        'ticketholder_test_fixture.cpp',
+        'ticket_broker_test.cpp' if env.TargetOSIs('linux') else [],
+        'with_lock_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
