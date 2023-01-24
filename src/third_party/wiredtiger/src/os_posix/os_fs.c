@@ -86,7 +86,12 @@ __posix_sync(WT_SESSION_IMPL *session, int fd, const char *name, const char *fun
         WT_RET_PANIC(session, ret, "%s: %s: fcntl(F_FULLFSYNC)", name, func);
     }
 #endif
-#if defined(HAVE_FDATASYNC)
+/*
+ * Use fsync in case we run on BSD systems that don't flush file size changes as part of fdatasync.
+ * This is for extra safety and is not a guarantee that we are providing full support for these
+ * systems and/or other non POSIX 1003.1 Unix systems.
+ */
+#if defined(HAVE_FDATASYNC) && !defined(BSD)
     /* See comment in __posix_sync(): sync cannot be retried or fail. */
     WT_SYSCALL(fdatasync(fd), ret);
     if (ret == 0)
