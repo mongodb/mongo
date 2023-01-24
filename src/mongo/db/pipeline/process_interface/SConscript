@@ -67,7 +67,7 @@ env.Library(
 )
 
 env.Library(
-    target="shardsvr_process_interface",
+    target='shardsvr_process_interface',
     source=[
         'shardsvr_process_interface.cpp',
     ],
@@ -75,8 +75,8 @@ env.Library(
         'mongod_process_interfaces',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/collection',
         '$BUILD_DIR/mongo/db/query_exec',
-        '$BUILD_DIR/mongo/db/s/sharding_api_d',
         '$BUILD_DIR/mongo/s/sharding_api',
     ],
 )
@@ -97,8 +97,8 @@ env.Library(
         'mongod_process_interface_factory.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/s/sharding_api_d',
-        '$BUILD_DIR/mongo/s/sharding_router_api',
+        '$BUILD_DIR/mongo/db/catalog/collection',
+        '$BUILD_DIR/mongo/s/sharding_api',
         'mongod_process_interfaces',
         'shardsvr_process_interface',
     ],

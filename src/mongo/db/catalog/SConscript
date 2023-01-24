@@ -233,7 +233,7 @@ env.Library(
     ],
 )
 
-# TODO (SERVER-72735): DO NOT ADD TO OR CHANGE THE LINKING DEPENDENCIES OF THIS LIBRARY WITHOUT
+# TODO (SERVER-73238): DO NOT ADD TO OR CHANGE THE LINKING DEPENDENCIES OF THIS LIBRARY WITHOUT
 # CONSULTING WITH A MEMBER OF THE PM-2144 PROJECT
 env.Library(
     target='collection',
@@ -242,7 +242,7 @@ env.Library(
         'collection_operation_source.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/s/sharding_api_d',
+        '$BUILD_DIR/mongo/db/s/sharding_api_d_DO_NOT_ADD_MORE_USAGES',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/db/server_base',
@@ -605,7 +605,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/fts/base_fts',
         '$BUILD_DIR/mongo/db/query/op_metrics',
         '$BUILD_DIR/mongo/db/query/query_planner',
-        '$BUILD_DIR/mongo/db/s/sharding_api_d',
         '$BUILD_DIR/mongo/db/service_context',
         'collection',
         'index_catalog',

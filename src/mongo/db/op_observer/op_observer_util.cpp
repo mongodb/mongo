@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/op_observer/op_observer_util.h"
 
 #include "mongo/db/bson/dotted_path_support.h"
@@ -104,9 +102,9 @@ DocumentKey getDocumentKey(OperationContext* opCtx, const CollectionPtr& coll, B
     boost::optional<BSONObj> shardKey;
 
     if (coll.isSharded()) {
-        shardKey =
-            dotted_path_support::extractElementsBasedOnTemplate(doc, coll.getShardKeyPattern())
-                .getOwned();
+        shardKey = dotted_path_support::extractElementsBasedOnTemplate(
+                       doc, coll.getShardKeyPattern().toBSON())
+                       .getOwned();
     }
 
     return {std::move(id), std::move(shardKey)};

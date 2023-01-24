@@ -4,12 +4,9 @@ Import("env")
 
 env = env.Clone()
 
-# This is the main library to use for consumers of sharding on a mongod shard. It will pull the
-# version checking and document filtering functionality.
-#
-# This is the only library, which should be referenced directly outside of mongo/s/ and mongo/db/s/
+# TODO (SERVER-73238): This library is about to be decommissioned, use `catalog/collection` in the meantime
 env.Library(
-    target='sharding_api_d',
+    target='sharding_api_d_DO_NOT_ADD_MORE_USAGES',
     source=[
         'collection_metadata.cpp',
         'collection_sharding_state_factory_standalone.cpp',
@@ -213,6 +210,7 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/client/remote_command_targeter',
+        '$BUILD_DIR/mongo/db/catalog/index_key_validate',
         '$BUILD_DIR/mongo/db/catalog/multi_index_block',
         '$BUILD_DIR/mongo/db/client_metadata_propagation_egress_hook',
         '$BUILD_DIR/mongo/db/commands/mongod_fcv',
@@ -233,7 +231,6 @@ env.Library(
         '$BUILD_DIR/mongo/s/sharding_api',
         '$BUILD_DIR/mongo/s/sharding_initialization',
         'forwardable_operation_metadata',
-        'sharding_api_d',
         'sharding_catalog_manager',
         'transaction_coordinator',
     ],
@@ -275,10 +272,10 @@ env.Library(
         'user_writes_recoverable_critical_section_service.cpp',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/collection',
         '$BUILD_DIR/mongo/db/dbdirectclient',
         '$BUILD_DIR/mongo/db/repl/replica_set_aware_service',
         '$BUILD_DIR/mongo/db/rw_concern_d',
-        'sharding_api_d',
     ],
 )
 
@@ -302,6 +299,7 @@ env.Library(
         'transaction_coordinators_stats.idl',
     ],
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/catalog/collection',
         '$BUILD_DIR/mongo/db/commands/server_status_core',
         '$BUILD_DIR/mongo/db/commands/txn_cmd_request',
         '$BUILD_DIR/mongo/db/dbdirectclient',
@@ -313,7 +311,6 @@ env.Library(
         '$BUILD_DIR/mongo/db/vector_clock_mongod',
         '$BUILD_DIR/mongo/executor/task_executor_pool',
         '$BUILD_DIR/mongo/s/grid',
-        'sharding_api_d',
     ],
 )
 
@@ -625,8 +622,8 @@ env.Library(
         'sharding_logging.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/catalog/collection',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_impl',
-        'sharding_api_d',
     ],
 )
 
@@ -867,7 +864,7 @@ env.Benchmark(
         'chunk_manager_refresh_bm.cpp',
     ],
     LIBDEPS=[
-        'sharding_api_d',
+        '$BUILD_DIR/mongo/db/catalog/collection',
     ],
 )
 
@@ -891,7 +888,6 @@ env.Benchmark(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
-        '$BUILD_DIR/mongo/s/grid',
         '$BUILD_DIR/mongo/s/sharding_test_fixture_common',
         'sharding_runtime_d',
     ],

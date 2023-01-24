@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include <ctime>
 
 #include "mongo/base/simple_string_data_comparator.h"
@@ -104,7 +101,6 @@
 #include "mongo/util/version.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
-
 
 namespace mongo {
 namespace {
@@ -298,7 +294,7 @@ public:
             }
 
             if (collection.isSharded()) {
-                const ShardKeyPattern shardKeyPattern(collection.getShardKeyPattern());
+                const auto& shardKeyPattern = collection.getShardKeyPattern();
                 uassert(ErrorCodes::BadValue,
                         "keyPattern must be empty or must be an object that equals the shard key",
                         keyPattern.isEmpty() ||

@@ -27,21 +27,15 @@
  *    it in the license file.
  */
 
-
-#include "mongo/db/curop.h"
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/query/get_executor.h"
 
-#include "mongo/util/duration.h"
-#include "mongo/util/tick_source.h"
 #include <boost/optional.hpp>
 #include <limits>
-#include <memory>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/parse_number.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/curop.h"
 #include "mongo/db/exec/cached_plan.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/count.h"
@@ -110,12 +104,13 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/str.h"
+#include "mongo/util/tick_source.h"
 #include "mongo/util/timer.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
-
 
 namespace mongo {
 
@@ -376,8 +371,7 @@ void fillOutPlannerParams(OperationContext* opCtx,
     // If the caller wants a shard filter, make sure we're actually sharded.
     if (plannerParams->options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
         if (collection.isSharded()) {
-            const auto& keyPattern = collection.getShardKeyPattern();
-            ShardKeyPattern shardKeyPattern(keyPattern);
+            const auto& shardKeyPattern = collection.getShardKeyPattern();
 
             // If the shard key is specified exactly, the query is guaranteed to only target one
             // shard. Shards cannot own orphans for the key ranges they own, so there is no need
@@ -387,7 +381,7 @@ void fillOutPlannerParams(OperationContext* opCtx,
             const BSONObj extractedKey = shardKeyPattern.extractShardKeyFromQuery(*canonicalQuery);
 
             if (extractedKey.isEmpty()) {
-                plannerParams->shardKey = keyPattern;
+                plannerParams->shardKey = shardKeyPattern.toBSON();
             } else {
                 plannerParams->options &= ~QueryPlannerParams::INCLUDE_SHARD_FILTER;
             }

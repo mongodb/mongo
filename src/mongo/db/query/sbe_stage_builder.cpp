@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/query/sbe_stage_builder.h"
 
 #include <fmt/format.h>
@@ -2741,7 +2738,7 @@ SlotBasedStageBuilder::buildShardFilterCovered(const QuerySolutionNode* root,
     // there are orphaned documents from aborted migrations. To check if the document is owned by
     // the shard, we need to own a 'ShardFilterer', and extract the document's shard key as a
     // BSONObj.
-    auto shardKeyPattern = _collections.getMainCollection().getShardKeyPattern();
+    auto shardKeyPattern = _collections.getMainCollection().getShardKeyPattern().toBSON();
     // We register the "shardFilterer" slot but we don't construct the ShardFilterer here, because
     // once constructed the ShardFilterer will prevent orphaned documents from being deleted. We
     // will construct the ShardFilterer later while preparing the SBE tree for execution.
@@ -2845,7 +2842,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // there are orphaned documents from aborted migrations. To check if the document is owned by
     // the shard, we need to own a 'ShardFilterer', and extract the document's shard key as a
     // BSONObj.
-    auto shardKeyPattern = _collections.getMainCollection().getShardKeyPattern();
+    auto shardKeyPattern = _collections.getMainCollection().getShardKeyPattern().toBSON();
     // We register the "shardFilterer" slot but we don't construct the ShardFilterer here, because
     // once constructed the ShardFilterer will prevent orphaned documents from being deleted. We
     // will construct the ShardFilterer later while preparing the SBE tree for execution.

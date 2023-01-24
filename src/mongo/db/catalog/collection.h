@@ -30,7 +30,6 @@
 #pragma once
 
 #include <functional>
-#include <memory>
 #include <string>
 #include <vector>
 
@@ -54,6 +53,7 @@
 #include "mongo/db/yieldable.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/decorable.h"
 
 namespace mongo {
@@ -768,10 +768,8 @@ public:
 
     friend std::ostream& operator<<(std::ostream& os, const CollectionPtr& coll);
 
-    void setShardKeyPattern(const BSONObj& shardKeyPattern) {
-        _shardKeyPattern = shardKeyPattern.getOwned();
-    }
-    const BSONObj& getShardKeyPattern() const;
+    void setShardKeyPattern(const BSONObj& shardKeyPattern);
+    const ShardKeyPattern& getShardKeyPattern() const;
 
     bool isSharded() const {
         return static_cast<bool>(_shardKeyPattern);
@@ -793,7 +791,7 @@ private:
 
     // Stores a consistent view of shard key with the collection that will be needed during the
     // operation. If _shardKeyPattern is set, that indicates that the collection is sharded.
-    boost::optional<BSONObj> _shardKeyPattern = boost::none;
+    boost::optional<ShardKeyPattern> _shardKeyPattern = boost::none;
 };
 
 inline std::ostream& operator<<(std::ostream& os, const CollectionPtr& coll) {

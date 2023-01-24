@@ -41,7 +41,7 @@ class SbeStageBuilderTest : public SbeStageBuilderTestFixture {
 protected:
     std::unique_ptr<ShardFiltererFactoryInterface> makeAlwaysPassShardFiltererInterface() {
         return std::make_unique<ShardFiltererFactoryMock>(
-            std::make_unique<ConstantFilterMock>(true, BSONObj{}));
+            std::make_unique<ConstantFilterMock>(true, BSONObj{BSON("a" << 1)}));
     }
 };
 
