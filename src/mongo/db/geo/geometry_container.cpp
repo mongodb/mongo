@@ -319,7 +319,9 @@ bool GeometryContainer::contains(const GeometryContainer& otherContainer) const 
     }
 
     if (nullptr != otherContainer._polygon) {
-        invariant(nullptr != otherContainer._polygon->s2Polygon);
+        tassert(7323500,
+                "Checking if geometry contains big polygon is not supported",
+                nullptr != otherContainer._polygon->s2Polygon);
         return contains(*otherContainer._polygon->s2Polygon);
     }
 
