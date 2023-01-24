@@ -63,6 +63,12 @@ class ShardSplitFixture(interface.MultiClusterFixture):
                                                                   self.config.MIXED_BIN_VERSIONS)
         self.num_nodes_per_replica_set = num_nodes_per_replica_set if num_nodes_per_replica_set \
             else self.config.NUM_REPLSET_NODES
+        # The default shard split timeout (10 seconds) is not long enough for some test cases
+        # which have slow system performances may cause the shard split operation to be long.
+        if "set_parameters" not in self.common_mongod_options:
+            self.common_mongod_options["set_parameters"] = {}
+        if "shardSplitTimeoutMS" not in self.common_mongod_options["set_parameters"]:
+            self.common_mongod_options["set_parameters"]["shardSplitTimeoutMS"] = 60000
 
         self.fixtures = []
         self._can_teardown_retired_donor_rs = threading.Event()
