@@ -189,7 +189,6 @@ executor:
     config_stepdown: true
     shard_stepdown: true
     use_action_permitted_file: true
-    wait_for_mongos_retarget: true
   - class: CheckReplDBHash
   - class: CheckOrphansDeleted
   - class: CheckRoutingTableConsistency

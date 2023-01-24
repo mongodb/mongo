@@ -250,7 +250,6 @@ executor:
     shard_stepdown: true
     stepdown_interval_ms: 15000
     use_action_permitted_file: true
-    wait_for_mongos_retarget: true
   - class: CheckReplDBHash
   - class: CheckOrphansDeleted
   - class: CheckRoutingTableConsistency

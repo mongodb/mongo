@@ -350,12 +350,9 @@ ContinuousStepdown.configure = function(stepdownOptions,
          * specified by the stepdownOptions object.
          *
          * If waitForPrimary is true, blocks until each replica set has elected a primary.
-         * If waitForMongosRetarget is true, blocks until each mongos has an up to date view of
-         * the cluster.
          */
         this.stopContinuousFailover = function({
             waitForPrimary: waitForPrimary = false,
-            waitForMongosRetarget: waitForMongosRetarget = false
         } = {}) {
             if (stepdownOptions.configStepdown) {
                 this.configRS.stopContinuousFailover({waitForPrimary: waitForPrimary});
@@ -364,44 +361,6 @@ ContinuousStepdown.configure = function(stepdownOptions,
             if (stepdownOptions.shardStepdown) {
                 this._rs.forEach(function(rst) {
                     rst.test.stopContinuousFailover({waitForPrimary: waitForPrimary});
-                });
-            }
-
-            if (waitForMongosRetarget) {
-                // Run validate on each collection in each database to ensure mongos can target
-                // the primary for each shard with data, including the config servers.
-                this._mongos.forEach(s => {
-                    const res = assert.commandWorked(s.adminCommand({listDatabases: 1}));
-                    res.databases.forEach(dbInfo => {
-                        const startTime = Date.now();
-                        print("Waiting for mongos: " + s.host + " to retarget db: " + dbInfo.name);
-
-                        const db = s.getDB(dbInfo.name);
-                        assert.soon(() => {
-                            let collInfo;
-                            try {
-                                collInfo = db.getCollectionInfos();
-                            } catch (e) {
-                                if (ErrorCodes.isNotPrimaryError(e.code)) {
-                                    return false;
-                                }
-                                throw e;
-                            }
-
-                            collInfo.forEach(collDoc => {
-                                const res = db.runCommand({collStats: collDoc["name"]});
-                                if (ErrorCodes.isNotPrimaryError(res.code)) {
-                                    return false;
-                                }
-                                assert.commandWorked(res);
-                            });
-
-                            return true;
-                        });
-                        const totalTime = Date.now() - startTime;
-                        print("Finished waiting for mongos: " + s.host +
-                              " to retarget db: " + dbInfo.name + ", in " + totalTime + " ms");
-                    });
                 });
             }
         };

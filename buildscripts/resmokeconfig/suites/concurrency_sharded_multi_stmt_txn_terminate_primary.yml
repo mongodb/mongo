@@ -250,7 +250,6 @@ executor:
     stepdown_interval_ms: 15000
     terminate: true
     use_action_permitted_file: true
-    wait_for_mongos_retarget: true
   - class: CheckReplDBHash
   - class: CheckOrphansDeleted
   - class: CheckRoutingTableConsistency

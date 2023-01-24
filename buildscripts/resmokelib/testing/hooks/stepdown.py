@@ -31,8 +31,8 @@ class ContinuousStepdown(interface.Hook):
 
     def __init__(self, hook_logger, fixture, config_stepdown=True, shard_stepdown=True,
                  stepdown_interval_ms=8000, terminate=False, kill=False,
-                 use_action_permitted_file=False, wait_for_mongos_retarget=False,
-                 background_reconfig=False, auth_options=None, should_downgrade=False):
+                 use_action_permitted_file=False, background_reconfig=False, auth_options=None,
+                 should_downgrade=False):
         """Initialize the ContinuousStepdown.
 
         Args:
@@ -44,8 +44,6 @@ class ContinuousStepdown(interface.Hook):
             terminate: shut down the node cleanly as a means of stepping it down.
             kill: With a 50% probability, kill the node instead of shutting it down cleanly.
             use_action_permitted_file: use a file to control if stepdown thread should do a stepdown.
-            wait_for_mongos_retarget: whether to run validate on all mongoses for each collection
-                in each database, after pausing the stepdown thread.
             auth_options: dictionary of auth options.
             background_reconfig: whether to conduct reconfig in the background.
             should_downgrade: whether dowgrades should be performed as part of the stepdown.
@@ -60,7 +58,6 @@ class ContinuousStepdown(interface.Hook):
         self._config_stepdown = config_stepdown
         self._shard_stepdown = shard_stepdown
         self._stepdown_interval_secs = float(stepdown_interval_ms) / 1000
-        self._wait_for_mongos_retarget = wait_for_mongos_retarget
 
         self._rs_fixtures = []
         self._mongos_fixtures = []
@@ -98,8 +95,8 @@ class ContinuousStepdown(interface.Hook):
 
         self._stepdown_thread = _StepdownThread(
             self.logger, self._mongos_fixtures, self._rs_fixtures, self._stepdown_interval_secs,
-            self._terminate, self._kill, lifecycle, self._wait_for_mongos_retarget,
-            self._background_reconfig, self._fixture, self._auth_options, self._should_downgrade)
+            self._terminate, self._kill, lifecycle, self._background_reconfig, self._fixture,
+            self._auth_options, self._should_downgrade)
         self.logger.info("Starting the stepdown thread.")
         self._stepdown_thread.start()
 
@@ -134,9 +131,8 @@ class ContinuousStepdown(interface.Hook):
                     self._add_fixture(shard_fixture)
             if self._config_stepdown:
                 self._add_fixture(fixture.configsvr)
-            if self._wait_for_mongos_retarget:
-                for mongos_fixture in fixture.mongos:
-                    self._mongos_fixtures.append(mongos_fixture)
+            for mongos_fixture in fixture.mongos:
+                self._mongos_fixtures.append(mongos_fixture)
         elif isinstance(fixture, tenant_migration.TenantMigrationFixture):
             if not fixture.all_nodes_electable:
                 raise ValueError(
@@ -165,8 +161,8 @@ def is_shard_split(fixture):
 
 class _StepdownThread(threading.Thread):
     def __init__(self, logger, mongos_fixtures, rs_fixtures, stepdown_interval_secs, terminate,
-                 kill, stepdown_lifecycle, wait_for_mongos_retarget, background_reconfig, fixture,
-                 auth_options=None, should_downgrade=False):
+                 kill, stepdown_lifecycle, background_reconfig, fixture, auth_options=None,
+                 should_downgrade=False):
         """Initialize _StepdownThread."""
         threading.Thread.__init__(self, name="StepdownThread")
         self.daemon = True
@@ -181,7 +177,6 @@ class _StepdownThread(threading.Thread):
         self._terminate = terminate
         self._kill = kill
         self.__lifecycle = stepdown_lifecycle
-        self._should_wait_for_mongos_retarget = wait_for_mongos_retarget
         self._background_reconfig = background_reconfig
         self._fixture = fixture
         self._auth_options = auth_options
@@ -265,8 +260,6 @@ class _StepdownThread(threading.Thread):
         self._check_thread()
         # Wait until we all the replica sets have primaries.
         self._await_primaries()
-        # Wait for Mongos to retarget the primary for each shard and the config server.
-        self._do_wait_for_mongos_retarget()
 
         # Check that fixtures are still running
         for rs_fixture in self._rs_fixtures:
@@ -398,54 +391,3 @@ class _StepdownThread(threading.Thread):
             rs_fixture.replset_name,
             new_primary.get_internal_connection_string() if secondaries else "none")
         self._step_up_stats[key] += 1
-
-    def _do_wait_for_mongos_retarget(self):
-        """Run collStats on each collection in each database on each mongos.
-
-        This is to ensure mongos can target the primary for each shard with data, including the
-        config servers.
-        """
-        if not self._should_wait_for_mongos_retarget:
-            return
-
-        for mongos_fixture in self._mongos_fixtures:
-            mongos_conn_str = mongos_fixture.get_internal_connection_string()
-            try:
-                client = self._create_client(mongos_fixture)
-            except pymongo.errors.AutoReconnect:
-                pass
-            for db in client.list_database_names():
-                self.logger.info("Waiting for mongos %s to retarget db: %s", mongos_conn_str, db)
-                start_time = time.time()
-                while True:
-                    try:
-                        coll_names = client[db].list_collection_names()
-                        break
-                    except pymongo.errors.NotPrimaryError:
-                        pass
-                    retarget_time = time.time() - start_time
-                    if retarget_time >= 60:
-                        raise RuntimeError(
-                            "Timeout waiting for mongos: {} to retarget to db: {}".format(
-                                mongos_conn_str, db))
-                    time.sleep(0.2)
-                for coll in coll_names:
-                    while True:
-                        try:
-                            client[db].command({"collStats": coll})
-                            break
-                        except pymongo.errors.NotPrimaryError:
-                            pass
-                        except pymongo.errors.OperationFailure as ex:
-                            if ex.code == 166:  # CommandNotSupportedOnView
-                                # listCollections return also views and collStats is not supported on views
-                                break
-                        retarget_time = time.time() - start_time
-                        if retarget_time >= 60:
-                            raise RuntimeError(
-                                "Timeout waiting for mongos: {} to retarget to db: {}".format(
-                                    mongos_conn_str, db))
-                        time.sleep(0.2)
-                retarget_time = time.time() - start_time
-                self.logger.info("Finished waiting for mongos: %s to retarget db: %s, in %d ms",
-                                 mongos_conn_str, db, retarget_time * 1000)
