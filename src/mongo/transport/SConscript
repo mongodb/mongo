@@ -112,9 +112,9 @@ tlEnv.Library(
     source=[
         'service_executor.cpp',
         'service_executor_fixed.cpp',
+        'service_executor_reserved.cpp',
         'service_executor_synchronous.cpp',
-        'service_executor_synchronous_synchronization.cpp',
-        'service_executor_synchronous_thread.cpp',
+        'service_executor_utils.cpp',
         'service_executor.idl',
     ],
     LIBDEPS=[

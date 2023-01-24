@@ -381,7 +381,7 @@ public:
         return seCtx()->useDedicatedThread();
     }
 
-    std::shared_ptr<ServiceExecutor::Executor> taskRunner() {
+    std::shared_ptr<ServiceExecutor::TaskRunner> taskRunner() {
         auto exec = executor();
         // Allows switching the executor between iterations of the workflow.
         if (MONGO_unlikely(!_taskRunner.source || _taskRunner.source != exec))
@@ -403,7 +403,7 @@ public:
 
 private:
     struct RunnerAndSource {
-        std::shared_ptr<ServiceExecutor::Executor> runner;
+        std::shared_ptr<ServiceExecutor::TaskRunner> runner;
         ServiceExecutor* source = nullptr;
     };
 
@@ -473,7 +473,7 @@ private:
      * considered to be beneficial to performance.
      */
     void _yieldPointReached() {
-        taskRunner()->yieldPointReached();
+        executor()->yieldIfAppropriate();
     }
 
     SessionWorkflow* const _workflow;

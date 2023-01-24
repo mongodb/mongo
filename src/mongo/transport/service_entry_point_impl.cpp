@@ -56,6 +56,7 @@
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/service_executor_fixed.h"
 #include "mongo/transport/service_executor_gen.h"
+#include "mongo/transport/service_executor_reserved.h"
 #include "mongo/transport/service_executor_synchronous.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/session_workflow.h"
@@ -446,7 +447,7 @@ void ServiceEntryPointImpl::appendStats(BSONObjBuilder* bob) const {
     invariant(_svcCtx);
     appendInt("active", _svcCtx->getActiveClientOperations());
 
-    const auto seStats = transport::getServiceExecutorStats(_svcCtx);
+    const auto seStats = transport::ServiceExecutorStats::get(_svcCtx);
     appendInt("threaded", seStats.usesDedicated);
     if (!serverGlobalParams.maxConnsOverride.empty())
         appendInt("limitExempt", seStats.limitExempt);

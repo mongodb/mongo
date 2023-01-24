@@ -52,6 +52,7 @@
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_entry_point_impl.h"
 #include "mongo/transport/service_executor.h"
+#include "mongo/transport/service_executor_utils.h"
 #include "mongo/transport/session_workflow.h"
 #include "mongo/transport/session_workflow_test_util.h"
 #include "mongo/transport/transport_layer_mock.h"
@@ -60,7 +61,6 @@
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/producer_consumer_queue.h"
-#include "mongo/util/synchronized_value.h"
 #include "mongo/util/tick_source_mock.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -395,10 +395,6 @@ public:
 
     int onClientDisconnectCalledTimes() const {
         return _onClientDisconnectCalled;
-    }
-
-    MockServiceEntryPoint* sep() {
-        return _sep;
     }
 
 private:
@@ -886,91 +882,6 @@ TEST_F(SessionWorkflowWithBorrowedThreadsTest, MoreToComeLoop) {
     runner.expectFinalState(SessionState::kPoll);
 
     runner.run();
-}
-
-class SessionWorkflowGetMoreTest : public SessionWorkflowWithDedicatedThreadsTest {
-public:
-    void setUp() override {
-        SessionWorkflowWithDedicatedThreadsTest::setUp();
-        // Spy on the current request.
-        savedHandleRequestCb =
-            std::exchange(sep()->handleRequestCb,
-                          [&](OperationContext* opCtx, const Message& msg) -> Future<DbResponse> {
-                              *currentRequest = msg;
-                              return savedHandleRequestCb(opCtx, msg);
-                          });
-    }
-
-    Message makeGetMoreRequest(int64_t cursorId) const {
-        OpMsgBuilder omb;
-        omb.setBody(BSONObjBuilder{}
-                        .append("getMore", cursorId)
-                        .append("collection", "testColl")
-                        .append("$db", "testDb")
-                        .obj());
-        Message m = omb.finish();
-        OpMsg::setFlag(&m, OpMsg::kExhaustSupported);
-        return m;
-    }
-
-    DbResponse makeGetMoreResponse() const {
-        DbResponse response;
-        response.response = [] {
-            OpMsgBuilder omb;
-            omb.setBody(BSONObjBuilder{}.append("id", int64_t{0}).obj());
-            return omb.finish();
-        }();
-        response.shouldRunAgainForExhaust = true;
-        return response;
-    }
-
-    /** Produces the condition of having an active `getMore` exhaust command. */
-    void initializeGetMoreExhaustInProgress() {
-        using Call = SessionState;
-        struct Spec {
-            Call call;
-            ResultValue answer;
-        };
-        auto mkSpec = [](Call call, auto&&... args) { return Spec{call, ResultValue{args...}}; };
-        const std::array specs{
-            mkSpec(Call::kSource, makeGetMoreRequest(123)),
-            mkSpec(Call::kProcess, makeGetMoreResponse()),
-            mkSpec(Call::kSink, Status::OK()),
-            mkSpec(Call::kProcess, makeGetMoreResponse()),
-            mkSpec(Call::kSink),
-        };
-        for (auto iter = specs.begin(); iter != specs.end(); ++iter) {
-            if (auto next = std::next(iter); next != specs.end()) {
-                setResult(iter->call, iter->answer);
-                ASSERT_EQ(popSessionState(), next->call);
-            }
-        }
-    }
-
-    synchronized_value<Message> currentRequest;
-    std::function<Future<DbResponse>(OperationContext*, const Message&)> savedHandleRequestCb;
-};
-
-/**
- * Check the behavior at an interrupted getMore exhaust command.
- * SessionWorkflow looks specifically for the "getMore" command name to do this cleanup.
- */
-TEST_F(SessionWorkflowGetMoreTest, CleanupFromGetMore) {
-    runWithNewSession([&] {
-        initializeGetMoreExhaustInProgress();
-        // Simulate a disconnect during the session sink call.
-        endSession();
-        // The cleanup of exhaust resources happens when the session disconnects.
-        // Expect a fire-and-forget killCursor for both the current WorkItem
-        // and for the next workItem if there is one (there is in this case).
-        // Because they're fire-and-forget commands, we only observe 'process'
-        // calls to the SEP. There's no sink call for a response.
-        ASSERT_EQ(popSessionState(), SessionState::kProcess);
-        ASSERT_EQ(OpMsgRequest::parse(*currentRequest).getCommandName(), "killCursors"_sd);
-        ASSERT_EQ(popSessionState(), SessionState::kProcess);
-        ASSERT_EQ(OpMsgRequest::parse(*currentRequest).getCommandName(), "killCursors"_sd);
-        ASSERT_EQ(popSessionState(), SessionState::kEnd);
-    });
 }
 
 }  // namespace

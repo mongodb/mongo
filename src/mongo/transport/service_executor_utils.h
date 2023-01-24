@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,16 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/base/status.h"
+#pragma once
+
+#include "mongo/transport/service_executor.h"
+#include "mongo/transport/session.h"
 #include "mongo/util/functional.h"
 
 namespace mongo::transport {
 
-/**
- * The ServiceExecutorSynchronous worker threads are specially made, and (except on Windows)
- * different from the `stdx::thread` used elsewhere in the system.
- * They're POSIX threads, they're detached, and they have a custom stack size.
- */
 Status launchServiceWorkerThread(unique_function<void()> task);
 
 }  // namespace mongo::transport

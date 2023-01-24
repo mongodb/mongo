@@ -37,60 +37,61 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/transport/service_executor.h"
-#include "mongo/util/hierarchical_acquisition.h"
 
 namespace mongo {
 namespace transport {
 
-/** Transitional for differential benchmarking of ServiceExecutorSynchronous refactor */
-#define TRANSITIONAL_SERVICE_EXECUTOR_SYNCHRONOUS_HAS_RESERVE 0
-
 /**
- * Creates a fresh worker thread for each top-level scheduled task. Any tasks
- * scheduled during the execution of that top-level task as it runs on such a
- * worker thread are pushed to the queue of that worker thread.
+ * The reserved service executor emulates a thread per connection.
+ * Each connection has its own worker thread where jobs get scheduled.
  *
- * Thus, the top-level task is expected to represent a chain of operations, each
- * of which schedules its successor before returning. The entire chain of
- * operations, and nothing else, executes on the same worker thread.
+ * The executor will start reservedThreads on start, and create a new thread every time it
+ * starts a new thread, ensuring there are always reservedThreads available for work - this
+ * means that even when you hit the NPROC ulimit, there will still be threads ready to
+ * accept work. When threads exit, they will go back to waiting for work if there are fewer
+ * than reservedThreads available.
  */
-class ServiceExecutorSynchronous final : public ServiceExecutor {
+class ServiceExecutorReserved final : public ServiceExecutor {
 public:
-    /** Returns the ServiceExecutorSynchronous decoration on `ctx`. */
-    static ServiceExecutorSynchronous* get(ServiceContext* ctx);
+    explicit ServiceExecutorReserved(ServiceContext* ctx, std::string name, size_t reservedThreads);
 
-    explicit ServiceExecutorSynchronous(ServiceContext*);
-
-    ~ServiceExecutorSynchronous();
+    static ServiceExecutorReserved* get(ServiceContext* ctx);
 
     Status start() override;
     Status shutdown(Milliseconds timeout) override;
 
-    std::unique_ptr<TaskRunner> makeTaskRunner() override;
-
-    size_t getRunningThreads() const override;
+    size_t getRunningThreads() const override {
+        return _numRunningWorkerThreads.loadRelaxed();
+    }
 
     void appendStats(BSONObjBuilder* bob) const override;
 
-private:
-    class SharedState;
+    std::unique_ptr<TaskRunner> makeTaskRunner() override;
 
-    /**
-     * The behavior of `schedule` depends on whether the calling thread is a
-     * worker thread spawned by a previous `schedule` call.
-     *
-     * If a nonworker thread schedules a task, a worker thread is spawned, and
-     * the task is transferred to the new worker thread's queue.
-     *
-     * If a worker thread schedules a task, the task is pushed to the back of its
-     * queue. The worker thread exits when the queue becomes empty.
-     */
+private:
+    Status _startWorker();
+
     void _schedule(Task task);
 
-    void _runOnDataAvailable(const SessionHandle& session, Task onCompletionCallback);
+    void _runOnDataAvailable(const SessionHandle& session, Task task);
 
+    static thread_local std::deque<Task> _localWorkQueue;
+    static thread_local int64_t _localThreadIdleCounter;
 
-    std::shared_ptr<SharedState> _sharedState;
+    AtomicWord<bool> _stillRunning{false};
+
+    mutable Mutex _mutex = MONGO_MAKE_LATCH("ServiceExecutorReserved::_mutex");
+    stdx::condition_variable _threadWakeup;
+    stdx::condition_variable _shutdownCondition;
+
+    std::deque<Task> _readyTasks;
+
+    AtomicWord<unsigned> _numRunningWorkerThreads{0};
+    size_t _numReadyThreads{0};
+    size_t _numStartingThreads{0};
+
+    const std::string _name;
+    const size_t _reservedThreads;
 };
 
 }  // namespace transport

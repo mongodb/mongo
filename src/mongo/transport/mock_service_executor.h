@@ -42,8 +42,8 @@ public:
         return startCb();
     }
 
-    std::unique_ptr<Executor> makeTaskRunner() override {
-        class Runner : public Executor {
+    std::unique_ptr<TaskRunner> makeTaskRunner() override {
+        class Runner : public TaskRunner {
         public:
             explicit Runner(MockServiceExecutor* p) : _p{p} {}
 
@@ -51,12 +51,9 @@ public:
                 return _p->scheduleTaskCb(std::move(task));
             }
 
-            void runOnDataAvailable(const SessionHandle& session,
-                                    Task onCompletionCallback) override {
+            void runOnDataAvailable(SessionHandle session, Task onCompletionCallback) override {
                 _p->runOnDataAvailableCb(session, std::move(onCompletionCallback));
             }
-
-            void yieldPointReached() const override {}
 
         private:
             MockServiceExecutor* _p;

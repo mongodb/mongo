@@ -91,6 +91,10 @@ public:
         lastTearDown();
     }
 
+    void runOnExec(ServiceExecutor::TaskRunner* taskRunner, ServiceExecutor::Task task) {
+        taskRunner->schedule(std::move(task));
+    }
+
     stdx::mutex mu;  // NOLINT
     int nThreads = 0;
     ServiceContext* sc;
@@ -101,7 +105,8 @@ auto maxThreads = 2 * ProcessInfo::getNumCores();
 
 BENCHMARK_DEFINE_F(ServiceExecutorSynchronousBm, ScheduleTask)(benchmark::State& state) {
     for (auto _ : state) {
-        executor()->makeTaskRunner()->schedule([](Status) {});
+        auto runner = executor()->makeTaskRunner();
+        runOnExec(&*runner, [](Status) {});
     }
 }
 BENCHMARK_REGISTER_F(ServiceExecutorSynchronousBm, ScheduleTask)->ThreadRange(1, maxThreads);
@@ -111,33 +116,16 @@ BENCHMARK_DEFINE_F(ServiceExecutorSynchronousBm, ScheduleAndWait)(benchmark::Sta
     for (auto _ : state) {
         auto runner = executor()->makeTaskRunner();
         Notification done;
-        runner->schedule([&](Status) { done.set(); });
+        runOnExec(&*runner, [&](Status) { done.set(); });
         done.get();
     }
 }
 BENCHMARK_REGISTER_F(ServiceExecutorSynchronousBm, ScheduleAndWait)->ThreadRange(1, maxThreads);
 
-/** Like ScheduleAndWait, but kill worker lease from within task like SessionWorkflow does. */
-BENCHMARK_DEFINE_F(ServiceExecutorSynchronousBm, ScheduleAndWaitReleaseInTask)
-(benchmark::State& state) {
-    for (auto _ : state) {
-        auto runner = executor()->makeTaskRunner();
-        Notification done;
-        auto raw = runner.get();
-        raw->schedule([&, trp = std::move(runner)](Status) mutable {
-            trp = {};
-            done.set();
-        });
-        done.get();
-    }
-}
-BENCHMARK_REGISTER_F(ServiceExecutorSynchronousBm, ScheduleAndWaitReleaseInTask)
-    ->ThreadRange(1, maxThreads);
-
 BENCHMARK_DEFINE_F(ServiceExecutorSynchronousBm, ChainedSchedule)(benchmark::State& state) {
     int chainDepth = state.range(0);
     struct LoopState {
-        std::shared_ptr<ServiceExecutor::Executor> runner;
+        std::shared_ptr<ServiceExecutor::TaskRunner> runner;
         Notification done;
         unittest::Barrier startingLine{2};
     };
@@ -145,7 +133,7 @@ BENCHMARK_DEFINE_F(ServiceExecutorSynchronousBm, ChainedSchedule)(benchmark::Sta
     std::function<void(Status)> chainedTask = [&](Status) { loopStatePtr->done.set(); };
     for (int step = 0; step != chainDepth; ++step)
         chainedTask = [this, chainedTask, &loopStatePtr](Status) {
-            loopStatePtr->runner->schedule(chainedTask);
+            runOnExec(&*loopStatePtr->runner, chainedTask);
         };
 
     // The first scheduled task starts the worker thread. This test is
@@ -161,9 +149,9 @@ BENCHMARK_DEFINE_F(ServiceExecutorSynchronousBm, ChainedSchedule)(benchmark::Sta
             {},
         };
         loopStatePtr = &loopState;
-        loopStatePtr->runner->schedule([&](Status s) {
+        runOnExec(&*loopStatePtr->runner, [&](Status s) {
             loopState.startingLine.countDownAndWait();
-            loopStatePtr->runner->schedule(chainedTask);
+            runOnExec(&*loopStatePtr->runner, chainedTask);
         });
         state.ResumeTiming();
         loopState.startingLine.countDownAndWait();
@@ -171,7 +159,7 @@ BENCHMARK_DEFINE_F(ServiceExecutorSynchronousBm, ChainedSchedule)(benchmark::Sta
     }
 }
 BENCHMARK_REGISTER_F(ServiceExecutorSynchronousBm, ChainedSchedule)
-    ->Range(1, 1 << 8)
+    ->Range(1, 2 << 10)
     ->ThreadRange(1, maxThreads);
 
 }  // namespace

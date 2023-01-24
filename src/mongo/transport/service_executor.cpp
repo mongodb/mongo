@@ -40,7 +40,9 @@
 #include "mongo/logv2/log.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_executor_fixed.h"
+#include "mongo/transport/service_executor_reserved.h"
 #include "mongo/transport/service_executor_synchronous.h"
+#include "mongo/util/processinfo.h"
 #include "mongo/util/synchronized_value.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
@@ -53,9 +55,9 @@ bool gInitialUseDedicatedThread = true;
 namespace {
 static constexpr auto kDiagnosticLogLevel = 4;
 
-auto serviceExecutorStatsDecoration =
+auto getServiceExecutorStats =
     ServiceContext::declareDecoration<synchronized_value<ServiceExecutorStats>>();
-auto serviceExecutorContextDecoration =
+auto getServiceExecutorContext =
     Client::declareDecoration<std::unique_ptr<ServiceExecutorContext>>();
 
 void incrThreadingModelStats(ServiceExecutorStats& stats, bool useDedicatedThread, int step) {
@@ -63,26 +65,26 @@ void incrThreadingModelStats(ServiceExecutorStats& stats, bool useDedicatedThrea
 }
 }  // namespace
 
-ServiceExecutorStats getServiceExecutorStats(ServiceContext* ctx) {
-    return **serviceExecutorStatsDecoration(ctx);
+ServiceExecutorStats ServiceExecutorStats::get(ServiceContext* ctx) noexcept {
+    return getServiceExecutorStats(ctx).get();
 }
 
 ServiceExecutorContext* ServiceExecutorContext::get(Client* client) noexcept {
     // Service worker Clients will never have a ServiceExecutorContext.
-    return serviceExecutorContextDecoration(client).get();
+    return getServiceExecutorContext(client).get();
 }
 
 void ServiceExecutorContext::set(Client* client,
                                  std::unique_ptr<ServiceExecutorContext> seCtxPtr) noexcept {
     auto& seCtx = *seCtxPtr;
-    auto& serviceExecutorContext = serviceExecutorContextDecoration(client);
+    auto& serviceExecutorContext = getServiceExecutorContext(client);
     invariant(!serviceExecutorContext);
 
     seCtx._client = client;
     seCtx._sep = client->getServiceContext()->getServiceEntryPoint();
 
     {
-        auto syncStats = *serviceExecutorStatsDecoration(client->getServiceContext());
+        auto&& syncStats = *getServiceExecutorStats(client->getServiceContext());
         if (seCtx._canUseReserved)
             ++syncStats->limitExempt;
         incrThreadingModelStats(*syncStats, seCtx._useDedicatedThread, 1);
@@ -100,14 +102,14 @@ void ServiceExecutorContext::set(Client* client,
 void ServiceExecutorContext::reset(Client* client) noexcept {
     if (!client)
         return;
-    auto& seCtx = serviceExecutorContextDecoration(client);
+    auto& seCtx = getServiceExecutorContext(client);
     LOGV2_DEBUG(4898001,
                 kDiagnosticLogLevel,
                 "Resetting ServiceExecutor context for client",
                 "client"_attr = client->desc(),
                 "threadingModel"_attr = seCtx->_useDedicatedThread,
                 "canUseReserved"_attr = seCtx->_canUseReserved);
-    auto stats = *serviceExecutorStatsDecoration(client->getServiceContext());
+    auto stats = *getServiceExecutorStats(client->getServiceContext());
     if (seCtx->_canUseReserved)
         --stats->limitExempt;
     incrThreadingModelStats(*stats, seCtx->_useDedicatedThread, -1);
@@ -119,7 +121,7 @@ void ServiceExecutorContext::setUseDedicatedThread(bool b) noexcept {
     auto prev = std::exchange(_useDedicatedThread, b);
     if (!_client)
         return;
-    auto stats = *serviceExecutorStatsDecoration(_client->getServiceContext());
+    auto stats = *getServiceExecutorStats(_client->getServiceContext());
     incrThreadingModelStats(*stats, prev, -1);
     incrThreadingModelStats(*stats, _useDedicatedThread, +1);
 }
@@ -132,7 +134,7 @@ void ServiceExecutorContext::setCanUseReserved(bool canUseReserved) noexcept {
 
     _canUseReserved = canUseReserved;
     if (_client) {
-        auto stats = *serviceExecutorStatsDecoration(_client->getServiceContext());
+        auto stats = getServiceExecutorStats(_client->getServiceContext()).synchronize();
         if (canUseReserved) {
             ++stats->limitExempt;
         } else {
@@ -170,6 +172,18 @@ ServiceExecutor* ServiceExecutorContext::getServiceExecutor() noexcept {
     // Once we use the ServiceExecutorSynchronous, we shouldn't use the ServiceExecutorReserved.
     _hasUsedSynchronous = true;
     return transport::ServiceExecutorSynchronous::get(_client->getServiceContext());
+}
+
+void ServiceExecutor::yieldIfAppropriate() const {
+    /*
+     * In perf testing we found that yielding after running a each request produced
+     * at 5% performance boost in microbenchmarks if the number of worker threads
+     * was greater than the number of available cores.
+     */
+    static const auto cores = ProcessInfo::getNumAvailableCores();
+    if (getRunningThreads() > cores) {
+        stdx::this_thread::yield();
+    }
 }
 
 void ServiceExecutor::shutdownAll(ServiceContext* serviceContext, Date_t deadline) {

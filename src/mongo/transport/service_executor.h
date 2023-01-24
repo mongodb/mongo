@@ -46,32 +46,32 @@ namespace mongo::transport {
 
 extern bool gInitialUseDedicatedThread;
 
+/*
+ * This is the interface for all ServiceExecutors.
+ */
 class ServiceExecutor {
 public:
     using Task = OutOfLineExecutor::Task;
 
-    class Executor : public OutOfLineExecutor {
+    class TaskRunner : public OutOfLineExecutor {
     public:
         /**
          * Awaits the availability of incoming data for the specified session. On success, it will
          * schedule the callback on current executor. Otherwise, it will invoke the callback with a
          * non-okay status on the caller thread.
          */
-        virtual void runOnDataAvailable(const std::shared_ptr<Session>& session, Task task) = 0;
-
-        /**
-         * Yields if the associated ServiceExecutor's threads > number of cores.
-         * Yielding after each request gives +5% perf when threads outnumber
-         * cores.
-         */
-        virtual void yieldPointReached() const = 0;
+        virtual void runOnDataAvailable(std::shared_ptr<Session> session, Task task) = 0;
     };
+
     static void shutdownAll(ServiceContext* serviceContext, Date_t deadline);
 
     virtual ~ServiceExecutor() = default;
 
-    virtual std::unique_ptr<Executor> makeTaskRunner() = 0;
+    virtual std::unique_ptr<TaskRunner> makeTaskRunner() = 0;
 
+    /*
+     * Starts the ServiceExecutor. This may create threads even if no tasks are scheduled.
+     */
     virtual Status start() = 0;
 
     /*
@@ -86,9 +86,14 @@ public:
 
     /** Appends statistics about task scheduling to a BSONObjBuilder for serverStatus output. */
     virtual void appendStats(BSONObjBuilder* bob) const = 0;
+
+    /** Yield if this executor controls more threads than we have cores. */
+    void yieldIfAppropriate() const;
 };
 
-/** Determines which ServiceExecutor is used for each Client. */
+/**
+ * ServiceExecutorContext determines which ServiceExecutor is used for each Client.
+ */
 class ServiceExecutorContext {
 public:
     /**
@@ -165,13 +170,27 @@ private:
     std::function<ServiceExecutor*()> _getServiceExecutorForTest;
 };
 
-struct ServiceExecutorStats {
-    size_t usesDedicated = 0; /**< Clients using the dedicated executors. */
-    size_t usesBorrowed = 0;  /**< Clients using the borrowed executors. */
-    size_t limitExempt = 0;   /**< Privileged Clients. */
-};
+/**
+ * A small statlet for tracking which executors may be in use.
+ */
+class ServiceExecutorStats {
+public:
+    /**
+     * Get the current value of ServiceExecutorStats for the given ServiceContext.
+     *
+     * Note that this value is intended for statistics and logging. It is unsynchronized and
+     * unsuitable for informing decisions in runtime.
+     */
+    static ServiceExecutorStats get(ServiceContext* ctx) noexcept;
 
-/** Snapshot of the stats attached to `ctx`. */
-ServiceExecutorStats getServiceExecutorStats(ServiceContext* ctx);
+    // The number of Clients who use the dedicated executors.
+    size_t usesDedicated = 0;
+
+    // The number of Clients who use the borrowed executors.
+    size_t usesBorrowed = 0;
+
+    // The number of Clients that are allowed to ignore maxConns and use reserved resources.
+    size_t limitExempt = 0;
+};
 
 }  // namespace mongo::transport
