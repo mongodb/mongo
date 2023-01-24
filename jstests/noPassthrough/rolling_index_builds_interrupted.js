@@ -21,6 +21,12 @@ const dbName = 'test';
 const collName = 't';
 
 let primary = replTest.getPrimary();
+if (!IndexBuildTest.supportsTwoPhaseIndexBuild(primary)) {
+    jsTestLog('Two phase index builds not supported, skipping test.');
+    replTest.stopSet();
+    return;
+}
+
 let primaryDB = primary.getDB(dbName);
 let primaryColl = primaryDB.getCollection(collName);
 
