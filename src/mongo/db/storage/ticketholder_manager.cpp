@@ -45,6 +45,14 @@ namespace mongo {
 Status TicketHolderManager::updateConcurrentWriteTransactions(const int& newWriteTransactions) {
     if (auto client = Client::getCurrent()) {
         auto ticketHolderManager = TicketHolderManager::get(client->getServiceContext());
+        if (!ticketHolderManager) {
+            LOGV2_WARNING(7323602,
+                          "Attempting to modify write transactions limit on an instance without a "
+                          "storage engine");
+            return Status(ErrorCodes::IllegalOperation,
+                          "Attempting to modify write transactions limit on an instance without a "
+                          "storage engine");
+        }
         auto& writer = ticketHolderManager->_writeTicketHolder;
         if (writer) {
             writer->resize(client->getOperationContext(), newWriteTransactions);
@@ -63,6 +71,14 @@ Status TicketHolderManager::updateConcurrentWriteTransactions(const int& newWrit
 Status TicketHolderManager::updateConcurrentReadTransactions(const int& newReadTransactions) {
     if (auto client = Client::getCurrent()) {
         auto ticketHolderManager = TicketHolderManager::get(client->getServiceContext());
+        if (!ticketHolderManager) {
+            LOGV2_WARNING(7323601,
+                          "Attempting to modify read transactions limit on an instance without a "
+                          "storage engine");
+            return Status(ErrorCodes::IllegalOperation,
+                          "Attempting to modify read transactions limit on an instance without a "
+                          "storage engine");
+        }
         auto& reader = ticketHolderManager->_readTicketHolder;
         if (reader) {
             reader->resize(client->getOperationContext(), newReadTransactions);
