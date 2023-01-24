@@ -72,9 +72,21 @@ azure_connection::put_object(const std::string &object_key, const std::string &f
     return 0;
 }
 
+// Delete an object in the bucket given the object name.
 int
-azure_connection::delete_object() const
+azure_connection::delete_object(const std::string &object_key) const
 {
+    std::string obj = _object_prefix + object_key;
+
+    auto object_client = _azure_client.GetBlobClient(obj);
+    auto delete_blob_response = object_client.DeleteIfExists();
+
+    // Returns false if obj doesn't exist.
+    if (!delete_blob_response.Value.Deleted) {
+        std::cerr << obj + " : No such object file exists in the bucket." << std::endl;
+        return -1;
+    }
+
     return 0;
 }
 
