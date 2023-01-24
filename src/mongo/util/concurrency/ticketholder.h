@@ -164,20 +164,20 @@ public:
      * tickets.
      */
     struct QueueStats {
-        AtomicWord<int64_t> totalAddedQueue{0};
-        AtomicWord<int64_t> totalRemovedQueue{0};
-        AtomicWord<int64_t> totalFinishedProcessing{0};
-        AtomicWord<int64_t> totalNewAdmissions{0};
-        AtomicWord<int64_t> totalTimeProcessingMicros{0};
-        AtomicWord<int64_t> totalStartedProcessing{0};
-        AtomicWord<int64_t> totalCanceled{0};
-        AtomicWord<int64_t> totalTimeQueuedMicros{0};
+        AtomicWord<std::int64_t> totalAddedQueue{0};
+        AtomicWord<std::int64_t> totalRemovedQueue{0};
+        AtomicWord<std::int64_t> totalFinishedProcessing{0};
+        AtomicWord<std::int64_t> totalNewAdmissions{0};
+        AtomicWord<std::int64_t> totalTimeProcessingMicros{0};
+        AtomicWord<std::int64_t> totalStartedProcessing{0};
+        AtomicWord<std::int64_t> totalCanceled{0};
+        AtomicWord<std::int64_t> totalTimeQueuedMicros{0};
     };
 
     /**
      * Instantaneous number of operations waiting in queue for a ticket.
      */
-    virtual int64_t queued() const = 0;
+    virtual int queued() const = 0;
 
     /**
      * Instantaneous number of tickets 'available' (not checked out by an operation) in the ticket

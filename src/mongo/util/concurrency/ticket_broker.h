@@ -102,7 +102,7 @@ public:
      *
      * This value will be consistent if called while holding the growthLock.
      */
-    int64_t waitingThreadsRelaxed() const noexcept {
+    int waitingThreadsRelaxed() const noexcept {
         return _numQueued.loadRelaxed();
     }
 
@@ -134,7 +134,7 @@ private:
     /**
      * Number of queued threads in the linked list.
      */
-    AtomicWord<int64_t> _numQueued;
+    AtomicWord<int> _numQueued;
 };
 
 }  // namespace mongo
