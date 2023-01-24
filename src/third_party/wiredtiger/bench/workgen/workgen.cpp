@@ -37,6 +37,7 @@
 #endif
 
 #include <algorithm>
+#include <csignal>
 #include <iomanip>
 #include <iostream>
 #include <filesystem>
@@ -196,6 +197,19 @@ thread_tables_drop_workload(void *arg)
     }
 
     return (nullptr);
+}
+
+// The signal handler allows us to gracefully terminate workgen and the user to close the
+// connection in the runner script, thus ensuring a clean shutdown of wiredtiger. The exact
+// signals handled are registered in the WorkloadRunner::run_all function.
+volatile std::sig_atomic_t signal_raised = 0;
+
+void
+signal_handler(int signum)
+{
+    std::cerr << "Workgen received signal " << signum << ": " << strsignal(signum) << "."
+              << std::endl;
+    signal_raised = signum;
 }
 
 int
@@ -2915,6 +2929,10 @@ WorkloadRunner::run_all(WT_CONNECTION *conn)
 {
     WT_DECL_RET;
 
+    // Register signal handlers for SIGINT (Ctrl-C) and SIGTERM.
+    std::signal(SIGINT, signal_handler);
+    std::signal(SIGTERM, signal_handler);
+
     Stats counts(false);
     for (size_t i = 0; i < _trunners.size(); i++)
         _trunners[i].get_static_counts(counts);
@@ -3080,10 +3098,11 @@ WorkloadRunner::run_all(WT_CONNECTION *conn)
         timespec end = _start + options->run_time;
         timespec next_report = _start + options->report_interval;
 
-        // Let the test run, reporting as needed.
+        // Let the test run, reporting as needed. Exit when we exceed the run time or
+        // when a registered signal is received.
         Stats curstats(false);
         now = _start;
-        while (now < end) {
+        while (now < end && !signal_raised) {
             timespec sleep_amt;
 
             sleep_amt = end - now;
