@@ -82,6 +82,10 @@
 namespace mongo::stage_builder {
 namespace {
 
+EvalExpr toEvalExpr(boost::optional<sbe::value::SlotId> slot) {
+    return slot ? EvalExpr{*slot} : EvalExpr{};
+}
+
 struct MatchExpressionVisitorContext;
 
 /**
@@ -141,20 +145,16 @@ struct MatchExpressionVisitorContext {
     };
 
     MatchExpressionVisitorContext(StageBuilderState& state,
-                                  EvalExpr inputExprParam,
+                                  boost::optional<sbe::value::SlotId> rootSlot,
                                   const MatchExpression* root,
                                   const PlanStageSlots* slots,
                                   bool isFilterOverIxscan)
-        : state{state},
-          inputExpr{inputExprParam.clone()},
-          slots{slots},
-          isFilterOverIxscan{isFilterOverIxscan} {
-        tassert(7097201,
-                "Expected 'inputExpr' or 'slots' to be defined",
-                !inputExpr.isNull() || slots != nullptr);
+        : state{state}, rootSlot{rootSlot}, slots{slots}, isFilterOverIxscan{isFilterOverIxscan} {
+        tassert(
+            7097201, "Expected 'rootSlot' or 'slots' to be defined", rootSlot || slots != nullptr);
 
         // Set up the top-level MatchFrame.
-        emplaceFrame(state, std::move(inputExprParam));
+        emplaceFrame(state, toEvalExpr(rootSlot));
     }
 
     EvalExpr done() {
@@ -196,9 +196,9 @@ struct MatchExpressionVisitorContext {
     StageBuilderState& state;
     std::vector<MatchFrame> matchStack;
 
-    // The current context must be initialized either with an EvalExpr that produces the root
-    // document ('inputExpr') or with the set of kField slots ('slots').
-    EvalExpr inputExpr;
+    // The current context must be initialized either with a slot that contains the root
+    // document ('rootSlot') or with the set of kField slots ('slots').
+    boost::optional<sbe::value::SlotId> rootSlot;
     const PlanStageSlots* slots = nullptr;
     bool isFilterOverIxscan = false;
 };
@@ -851,10 +851,8 @@ public:
         auto& frame = _context->topFrame();
 
         // The $expr expression is always applied to the current $$ROOT document.
-        auto expr = generateExpression(_context->state,
-                                       matchExpr->getExpression().get(),
-                                       _context->inputExpr.clone(),
-                                       _context->slots);
+        auto expr = generateExpression(
+            _context->state, matchExpr->getExpression().get(), _context->rootSlot, _context->slots);
 
         // We need to convert the result of the '{$expr: ..}' expression to a boolean value.
         auto logicExpr =
@@ -1231,7 +1229,7 @@ EvalExpr applyClassicMatcherOverIndexScan(const MatchExpression* root,
 
 EvalExpr generateFilter(StageBuilderState& state,
                         const MatchExpression* root,
-                        EvalExpr inputExpr,
+                        boost::optional<sbe::value::SlotId> rootSlot,
                         const PlanStageSlots* slots,
                         const std::vector<std::string>& keyFields,
                         bool isFilterOverIxscan) {
@@ -1247,16 +1245,13 @@ EvalExpr generateFilter(StageBuilderState& state,
     // This is because when embedding the classic matcher all of the constants used in the filter
     // are in the MatchExpression itself rather than in slots.
     if (!feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCV()) {
-        tassert(7097207,
-                "Expected input expr to be defined",
-                !inputExpr.isNull() || isFilterOverIxscan);
+        tassert(7097207, "Expected input slot to be defined", rootSlot || isFilterOverIxscan);
 
         return isFilterOverIxscan ? applyClassicMatcherOverIndexScan(root, slots, keyFields)
-                                  : applyClassicMatcher(root, std::move(inputExpr), state);
+                                  : applyClassicMatcher(root, toEvalExpr(rootSlot), state);
     }
 
-    MatchExpressionVisitorContext context{
-        state, std::move(inputExpr), root, slots, isFilterOverIxscan};
+    MatchExpressionVisitorContext context{state, rootSlot, root, slots, isFilterOverIxscan};
 
     MatchExpressionPreVisitor preVisitor{&context};
     MatchExpressionInVisitor inVisitor{&context};

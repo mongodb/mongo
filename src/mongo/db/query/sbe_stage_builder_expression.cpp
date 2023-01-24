@@ -55,31 +55,29 @@ namespace mongo::stage_builder {
 namespace {
 struct ExpressionVisitorContext {
     struct VarsFrame {
-        template <class... Args>
-        VarsFrame(Args&&... args)
-            : variablesToBind{std::forward<Args>(args)...}, varIdsForLetVariables{} {}
+        VarsFrame(const std::vector<Variables::Id>& variableIds,
+                  sbe::value::FrameIdGenerator* frameIdGenerator)
+            : currentBindingIndex(0) {
+            bindings.reserve(variableIds.size());
+            for (const auto& variableId : variableIds) {
+                bindings.push_back({variableId, frameIdGenerator->generate(), EvalExpr{}});
+            }
+        }
 
-        std::deque<Variables::Id> variablesToBind;
+        struct Binding {
+            Variables::Id variableId;
+            sbe::FrameId frameId;
+            EvalExpr expr;
+        };
 
-        // Slots that have been used to bind $let variables. This list is necessary to know which
-        // slots to remove from the environment when the $let goes out of scope.
-        std::set<Variables::Id> varIdsForLetVariables;
-
-        // Stack of expressions that have been generated so far within this VarsFrame.
-        sbe::EExpression::Vector exprStack;
-
-        // The FrameId assigned to this VarsFrame.
-        sbe::FrameId frameId = sbe::kInvalidId;
-
-        // 'nextSlotId' is used to keep track of what the next available local variable ID is within
-        // this VarsFrame.
-        sbe::value::SlotId nextSlotId = sbe::kInvalidId;
+        std::vector<Binding> bindings;
+        size_t currentBindingIndex;
     };
 
     ExpressionVisitorContext(StageBuilderState& state,
-                             EvalExpr rootExpr,
+                             boost::optional<sbe::value::SlotId> rootSlot,
                              const PlanStageSlots* slots = nullptr)
-        : state(state), rootExpr(std::move(rootExpr)), slots(slots) {}
+        : state(state), rootSlot(std::move(rootSlot)), slots(slots) {}
 
     void ensureArity(size_t arity) {
         invariant(exprStack.size() >= arity);
@@ -117,12 +115,17 @@ struct ExpressionVisitorContext {
         return abt::unwrap(expr.extractABT(state.slotVarMap));
     }
 
-    EvalExpr done() {
-        tassert(6987501, "expected exactly one EvalExpr on the stack", exprStack.size() == 1);
+    EvalExpr popEvalExpr() {
+        tassert(7261700, "tried to pop from empty EvalExpr stack", !exprStack.empty());
 
         auto expr = std::move(exprStack.back());
         exprStack.pop_back();
         return expr;
+    }
+
+    EvalExpr done() {
+        tassert(6987501, "expected exactly one EvalExpr on the stack", exprStack.size() == 1);
+        return popEvalExpr();
     }
 
     optimizer::ProjectionName registerVariable(sbe::value::SlotId slotId) {
@@ -135,14 +138,13 @@ struct ExpressionVisitorContext {
 
     std::vector<EvalExpr> exprStack;
 
-    EvalExpr rootExpr;
+    boost::optional<sbe::value::SlotId> rootSlot;
 
     // The lexical environment for the expression being traversed. A variable reference takes the
     // form "$$variable_name" in MQL's concrete syntax and gets transformed into a numeric
     // identifier (Variables::Id) in the AST. During this translation, we directly translate any
-    // such variable to an SBE slot using this mapping.
-    std::map<Variables::Id, std::pair<boost::optional<sbe::FrameId>, sbe::value::SlotId>>
-        environment;
+    // such variable to an SBE frame id using this mapping.
+    std::map<Variables::Id, sbe::FrameId> environment;
     std::stack<VarsFrame> varsFrameStack;
 
     const PlanStageSlots* slots = nullptr;
@@ -154,84 +156,9 @@ struct ExpressionVisitorContext {
     std::stack<int> filterExprChildrenCounter;
 };
 
-std::unique_ptr<sbe::EExpression> generateTraverseHelper(
-    std::unique_ptr<sbe::EExpression> inputExpr,
-    const FieldPath& fp,
-    size_t level,
-    sbe::value::FrameIdGenerator* frameIdGenerator,
-    boost::optional<sbe::value::SlotId> topLevelFieldSlot = boost::none) {
-    using namespace std::literals;
-
-    invariant(level < fp.getPathLength());
-    tassert(6023417,
-            "Expected an input expression or top level field",
-            inputExpr.get() || topLevelFieldSlot.has_value());
-
-    // Generate an expression to read a sub-field at the current nested level.
-    auto fieldName = sbe::makeE<sbe::EConstant>(fp.getFieldName(level));
-    auto fieldExpr = topLevelFieldSlot
-        ? makeVariable(*topLevelFieldSlot)
-        : makeFunction("getField"_sd, std::move(inputExpr), std::move(fieldName));
-
-    if (level == fp.getPathLength() - 1) {
-        // For the last level, we can just return the field slot without the need for a
-        // traverse stage.
-        return fieldExpr;
-    }
-
-    // Generate nested traversal.
-    auto lambdaFrameId = frameIdGenerator->generate();
-    auto lambdaParam = sbe::EVariable{lambdaFrameId, 0};
-
-    auto resultExpr = generateTraverseHelper(lambdaParam.clone(), fp, level + 1, frameIdGenerator);
-
-    auto lambdaExpr = sbe::makeE<sbe::ELocalLambda>(lambdaFrameId, std::move(resultExpr));
-
-    // Generate the traverse stage for the current nested level.
-    return makeFunction("traverseP",
-                        std::move(fieldExpr),
-                        std::move(lambdaExpr),
-                        makeConstant(sbe::value::TypeTags::NumberInt32, 1));
-}
-
 /**
  * For the given MatchExpression 'expr', generates a path traversal SBE plan stage sub-tree
  * implementing the comparison expression.
- */
-std::unique_ptr<sbe::EExpression> generateTraverse(
-    std::unique_ptr<sbe::EExpression> inputExpr,
-    bool expectsDocumentInputOnly,
-    const FieldPath& fp,
-    sbe::value::FrameIdGenerator* frameIdGenerator,
-    boost::optional<sbe::value::SlotId> topLevelFieldSlot = boost::none) {
-    size_t level = 0;
-
-    if (expectsDocumentInputOnly) {
-        // When we know for sure that 'inputExpr' will be a document and _not_ an array (such as
-        // when accessing a field on the root document), we can generate a simpler expression.
-        return generateTraverseHelper(
-            std::move(inputExpr), fp, level, frameIdGenerator, topLevelFieldSlot);
-    } else {
-        tassert(6023418, "Expected an input expression", inputExpr.get());
-        // The general case: the value in the 'inputExpr' may be an array that will require
-        // traversal.
-        auto lambdaFrameId = frameIdGenerator->generate();
-        auto lambdaParam = sbe::EVariable{lambdaFrameId, 0};
-
-        auto resultExpr = generateTraverseHelper(lambdaParam.clone(), fp, level, frameIdGenerator);
-
-        auto lambdaExpr = sbe::makeE<sbe::ELocalLambda>(lambdaFrameId, std::move(resultExpr));
-
-        return makeFunction("traverseP",
-                            std::move(inputExpr),
-                            std::move(lambdaExpr),
-                            makeConstant(sbe::value::TypeTags::NumberInt32, 1));
-    }
-}
-
-/**
- * Version of the generateTraverse helper functions that process ABT trees instead of EExpression
- * ones.
  */
 optimizer::ABT generateTraverseHelper(
     ExpressionVisitorContext* context,
@@ -439,11 +366,7 @@ public:
     void visit(const ExpressionIsNumber* expr) final {}
     void visit(const ExpressionLet* expr) final {
         _context->varsFrameStack.push(ExpressionVisitorContext::VarsFrame{
-            std::begin(expr->getOrderedVariableIds()), std::end(expr->getOrderedVariableIds())});
-
-        auto& currentFrame = _context->varsFrameStack.top();
-        currentFrame.frameId = _context->state.frameIdGenerator->generate();
-        currentFrame.nextSlotId = 0;
+            expr->getOrderedVariableIds(), _context->state.frameIdGenerator});
     }
     void visit(const ExpressionLn* expr) final {}
     void visit(const ExpressionLog* expr) final {}
@@ -609,7 +532,7 @@ public:
                     "Current element variable already exists in _context",
                     _context->environment.find(variableId) == _context->environment.end());
             auto frameId = _context->state.frameId();
-            _context->environment.insert({variableId, {frameId, 0}});
+            _context->environment.emplace(variableId, frameId);
             // This stack maintains the current element variable for $filter so that we can erase it
             // from our context in inVisitor when processing the optional limit arg, but then still
             // have access to this var again in postVisitor when constructing the filter
@@ -631,24 +554,18 @@ public:
         // visiting, so we can appropriately bind the initializer.
         invariant(!_context->varsFrameStack.empty());
         auto& currentFrame = _context->varsFrameStack.top();
+        size_t& currentBindingIndex = currentFrame.currentBindingIndex;
+        invariant(currentBindingIndex < currentFrame.bindings.size());
 
-        invariant(!currentFrame.variablesToBind.empty());
+        auto& currentBinding = currentFrame.bindings[currentBindingIndex++];
+        currentBinding.expr = _context->popEvalExpr();
 
-        auto varToBind = currentFrame.variablesToBind.front();
-        currentFrame.variablesToBind.pop_front();
-
-        auto frameId = currentFrame.frameId;
-        auto slotId = currentFrame.nextSlotId++;
-
-        currentFrame.varIdsForLetVariables.insert(varToBind);
-
-        currentFrame.exprStack.emplace_back(_context->popExpr());
-
-        // Second, we bind this variables AST-level name (with type Variable::Id) to the SlotId that
+        // Second, we bind this variables AST-level name (with type Variable::Id) to the frame that
         // will be used for compilation and execution. Once this "stage builder" finishes, these
         // Variable::Id bindings will no longer be relevant.
-        invariant(_context->environment.find(varToBind) == _context->environment.end());
-        _context->environment.insert({varToBind, {frameId, slotId}});
+        invariant(_context->environment.find(currentBinding.variableId) ==
+                  _context->environment.end());
+        _context->environment.emplace(currentBinding.variableId, currentBinding.frameId);
     }
     void visit(const ExpressionLn* expr) final {}
     void visit(const ExpressionLog* expr) final {}
@@ -3085,7 +3002,7 @@ public:
             const auto* slots = _context->slots;
             if (expr->getVariableId() == Variables::kRootId) {
                 // Set inputExpr to refer to the root document.
-                inputExpr = _context->rootExpr.clone();
+                inputExpr = _context->rootSlot ? EvalExpr{*_context->rootSlot} : EvalExpr{};
                 expectsDocumentInputOnly = true;
 
                 if (slots && fp) {
@@ -3123,7 +3040,7 @@ public:
         } else {
             auto it = _context->environment.find(expr->getVariableId());
             if (it != _context->environment.end()) {
-                inputExpr = makeVariable(*it->second.first, it->second.second);
+                inputExpr = abt::wrap(makeVariable(makeLocalVariableName(it->second, 0)));
             } else {
                 inputExpr = _context->state.getGlobalVariableSlot(expr->getVariableId());
             }
@@ -3143,27 +3060,16 @@ public:
                 !inputExpr.isNull() || topLevelFieldSlot.has_value());
 
         // Dereference a dotted path, which may contain arrays requiring implicit traversal.
-        if (inputExpr.hasExpr()) {
-            auto resultExpr = generateTraverse(
-                inputExpr.extractExpr(_context->state.slotVarMap, *_context->state.data->env),
-                expectsDocumentInputOnly,
-                *fp,
-                _context->state.frameIdGenerator,
-                topLevelFieldSlot);
+        auto resultExpr = generateTraverse(
+            _context,
+            inputExpr.isNull() ? boost::optional<optimizer::ABT>{}
+                               : abt::unwrap(inputExpr.extractABT(_context->state.slotVarMap)),
+            expectsDocumentInputOnly,
+            *fp,
+            _context->state.frameIdGenerator,
+            topLevelFieldSlot);
 
-            _context->pushExpr(std::move(resultExpr));
-        } else {
-            auto resultExpr = generateTraverse(
-                _context,
-                inputExpr.isNull() ? boost::optional<optimizer::ABT>{}
-                                   : abt::unwrap(inputExpr.extractABT(_context->state.slotVarMap)),
-                expectsDocumentInputOnly,
-                *fp,
-                _context->state.frameIdGenerator,
-                topLevelFieldSlot);
-
-            pushABT(std::move(resultExpr));
-        }
+        pushABT(std::move(resultExpr));
     }
     void visit(const ExpressionFilter* expr) final {
         if (_context->hasAllAbtEligibleEntries(2)) {
@@ -3241,10 +3147,9 @@ public:
                 "Expected frame id for the current element variable of $filter expression",
                 !_context->filterExprFrameStack.empty());
         auto lambdaFrameId = _context->filterExprFrameStack.top();
-        auto lambdaParamId = sbe::value::SlotId{0};
         _context->filterExprFrameStack.pop();
 
-        auto lambdaParamName = makeLocalVariableName(lambdaFrameId, lambdaParamId);
+        auto lambdaParamName = makeLocalVariableName(lambdaFrameId, 0);
 
         // If coerceToBool() returns true we return the lambda input, otherwise we return Nothing.
         // This will effectively cause all elements in the array that coerce to False to get
@@ -3378,31 +3283,76 @@ public:
             sbe::makeE<sbe::ELocalBind>(frameId, std::move(binds), std::move(exprIsNum)));
     }
     void visit(const ExpressionLet* expr) final {
+        invariant(!_context->varsFrameStack.empty());
+        if (isCurrentExpressionLetAbtEligible()) {
+            return visitABT(expr);
+        }
+
         // The evaluated result of the $let is the evaluated result of its "in" field, which is
         // already on top of the stack. The "infix" visitor has already popped the variable
         // initializers off the expression stack.
         _context->ensureArity(1);
 
         // We should have bound all the variables from this $let expression.
-        invariant(!_context->varsFrameStack.empty());
         auto& currentFrame = _context->varsFrameStack.top();
-        invariant(currentFrame.variablesToBind.empty());
+        invariant(currentFrame.currentBindingIndex == currentFrame.bindings.size());
 
-        _context->pushExpr(sbe::makeE<sbe::ELocalBind>(
-            currentFrame.frameId, std::move(currentFrame.exprStack), _context->popExpr()));
+        auto resultExpr = _context->popExpr();
+        for (auto& binding : currentFrame.bindings) {
+            resultExpr =
+                sbe::makeE<sbe::ELocalBind>(binding.frameId,
+                                            sbe::makeEs(binding.expr.extractExpr(_context->state)),
+                                            std::move(resultExpr));
+        }
+
+        _context->pushExpr(std::move(resultExpr));
 
         // Pop the lexical frame for this $let and remove all its bindings, which are now out of
         // scope.
-        auto it = _context->environment.begin();
-        while (it != _context->environment.end()) {
-            if (currentFrame.varIdsForLetVariables.count(it->first)) {
-                it = _context->environment.erase(it);
-            } else {
-                ++it;
-            }
+        for (const auto& binding : currentFrame.bindings) {
+            _context->environment.erase(binding.variableId);
         }
         _context->varsFrameStack.pop();
     }
+
+    bool isCurrentExpressionLetAbtEligible() {
+        if (!_context->hasAllAbtEligibleEntries(1)) {
+            return false;
+        }
+        const auto& bindings = _context->varsFrameStack.top().bindings;
+        return std::all_of(bindings.begin(), bindings.end(), [](const auto& binding) {
+            return binding.expr.hasABT() || binding.expr.hasSlot();
+        });
+    }
+
+    void visitABT(const ExpressionLet* expr) {
+        // The evaluated result of the $let is the evaluated result of its "in" field, which is
+        // already on top of the stack. The "infix" visitor has already popped the variable
+        // initializers off the expression stack.
+        _context->ensureArity(1);
+
+        // We should have bound all the variables from this $let expression.
+        auto& currentFrame = _context->varsFrameStack.top();
+        invariant(currentFrame.currentBindingIndex == currentFrame.bindings.size());
+
+        auto resultExpr = _context->popABTExpr();
+        for (auto& binding : currentFrame.bindings) {
+            resultExpr = optimizer::make<optimizer::Let>(
+                makeLocalVariableName(binding.frameId, 0),
+                abt::unwrap(binding.expr.extractABT(_context->state.slotVarMap)),
+                std::move(resultExpr));
+        }
+
+        pushABT(std::move(resultExpr));
+
+        // Pop the lexical frame for this $let and remove all its bindings, which are now out of
+        // scope.
+        for (const auto& binding : currentFrame.bindings) {
+            _context->environment.erase(binding.variableId);
+        }
+        _context->varsFrameStack.pop();
+    }
+
     void visit(const ExpressionLn* expr) final {
         if (_context->hasAllAbtEligibleEntries(1)) {
             return visitABT(expr);
@@ -4154,7 +4104,7 @@ public:
     void visit(const ExpressionSetIntersection* expr) final {
         if (expr->getChildren().size() == 0) {
             auto [emptySetTag, emptySetValue] = sbe::value::makeNewArraySet();
-            _context->pushExpr(makeConstant(emptySetTag, emptySetValue));
+            pushABT(makeABTConstant(emptySetTag, emptySetValue));
             return;
         }
 
@@ -4167,7 +4117,7 @@ public:
     void visit(const ExpressionSetUnion* expr) final {
         if (expr->getChildren().size() == 0) {
             auto [emptySetTag, emptySetValue] = sbe::value::makeNewArraySet();
-            _context->pushExpr(makeConstant(emptySetTag, emptySetValue));
+            pushABT(makeABTConstant(emptySetTag, emptySetValue));
             return;
         }
 
@@ -4286,7 +4236,7 @@ public:
         unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionIsArray* expr) final {
-        _context->pushExpr(makeFillEmptyFalse(makeFunction("isArray", _context->popExpr())));
+        pushABT(makeFillEmptyFalse(makeABTFunction("isArray", _context->popABTExpr())));
     }
     void visit(const ExpressionInternalFindAllValuesAtPath* expr) final {
         unsupportedExpression(expr->getOpName());
@@ -6390,9 +6340,9 @@ private:
 
 EvalExpr generateExpression(StageBuilderState& state,
                             const Expression* expr,
-                            EvalExpr rootExpr,
+                            boost::optional<sbe::value::SlotId> rootSlot,
                             const PlanStageSlots* slots) {
-    ExpressionVisitorContext context(state, std::move(rootExpr), slots);
+    ExpressionVisitorContext context(state, std::move(rootSlot), slots);
 
     ExpressionPreVisitor preVisitor{&context};
     ExpressionInVisitor inVisitor{&context};

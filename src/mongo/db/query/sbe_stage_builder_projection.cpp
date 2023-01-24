@@ -117,10 +117,10 @@ struct ProjectionTraversalVisitorContext {
 
     ProjectionTraversalVisitorContext(StageBuilderState& state,
                                       projection_ast::ProjectType projectType,
-                                      EvalExpr inputExpr,
+                                      EvalExpr rootExpr,
                                       const PlanStageSlots* slots)
-        : state(state), projectType(projectType), inputExpr(std::move(inputExpr)), slots(slots) {
-        levels.push({state, this->inputExpr.clone(), {}, boost::none});
+        : state(state), projectType(projectType), slots(slots) {
+        levels.push({state, std::move(rootExpr), {}, boost::none});
     }
 
     const auto& topFrontField() const {
@@ -191,9 +191,6 @@ struct ProjectionTraversalVisitorContext {
     StageBuilderState& state;
 
     projection_ast::ProjectType projectType;
-
-    // An EvalExpr that produces the root document.
-    EvalExpr inputExpr;
 
     std::stack<NestedLevel> levels;
 
@@ -332,8 +329,11 @@ std::tuple<FieldVector, FieldVector, FieldVector, std::vector<EvalExpr>> prepare
  */
 class ProjectionTraversalPostVisitor final : public projection_ast::ProjectionASTConstVisitor {
 public:
-    ProjectionTraversalPostVisitor(ProjectionTraversalVisitorContext* context)
-        : _context{context} {}
+    // Root slot is passed separately from generic context because this class is the only visitor
+    // that requires root to be a slot.
+    ProjectionTraversalPostVisitor(ProjectionTraversalVisitorContext* context,
+                                   sbe::value::SlotId rootSlot)
+        : _context{context}, _rootSlot{rootSlot} {}
 
     void visit(const projection_ast::BooleanConstantASTNode* node) final {
         using namespace std::literals;
@@ -350,8 +350,8 @@ public:
         // 'evals' stack. If the expression is translated into a sub-tree, stack it with the
         // existing sub-tree.
         auto expression = node->expression();
-        auto expr = generateExpression(
-            _context->state, expression.get(), _context->inputExpr.clone(), _context->slots);
+        auto expr =
+            generateExpression(_context->state, expression.get(), _rootSlot, _context->slots);
 
         _context->pushEvaluate(std::move(expr));
     }
@@ -481,6 +481,7 @@ public:
 
 private:
     ProjectionTraversalVisitorContext* _context;
+    sbe::value::SlotId _rootSlot;
 };
 
 /**
@@ -631,13 +632,13 @@ private:
 
 EvalExpr generateProjection(StageBuilderState& state,
                             const projection_ast::Projection* projection,
-                            EvalExpr inputExpr,
+                            sbe::value::SlotId inputSlot,
                             const PlanStageSlots* slots) {
     auto type = projection->type();
-    ProjectionTraversalVisitorContext context{state, type, std::move(inputExpr), slots};
+    ProjectionTraversalVisitorContext context{state, type, inputSlot, slots};
     ProjectionTraversalPreVisitor preVisitor{&context};
     ProjectionTraversalInVisitor inVisitor{&context};
-    ProjectionTraversalPostVisitor postVisitor{&context};
+    ProjectionTraversalPostVisitor postVisitor{&context, inputSlot};
     projection_ast::ProjectionASTConstWalker walker{&preVisitor, &inVisitor, &postVisitor};
     tree_walker::walk<true, projection_ast::ASTNode>(projection->root(), &walker);
 

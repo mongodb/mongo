@@ -2186,8 +2186,7 @@ EvalExpr generateGroupByKeyImpl(StageBuilderState& state,
                                 const boost::intrusive_ptr<Expression>& idExpr,
                                 const PlanStageSlots& outputs,
                                 const boost::optional<sbe::value::SlotId>& rootSlot) {
-    auto rootExpr = rootSlot.has_value() ? EvalExpr{*rootSlot} : EvalExpr{};
-    return generateExpression(state, idExpr.get(), std::move(rootExpr), &outputs);
+    return generateExpression(state, idExpr.get(), rootSlot, &outputs);
 }
 
 std::tuple<sbe::value::SlotVector, EvalStage, std::unique_ptr<sbe::EExpression>> generateGroupByKey(
@@ -2259,10 +2258,7 @@ sbe::value::SlotVector generateAccumulator(
     sbe::value::SlotIdGenerator* slotIdGenerator,
     sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>>& accSlotToExprMap) {
     auto rootSlot = outputs.getIfExists(PlanStageSlots::kResult);
-
-    auto rootExpr = rootSlot.has_value() ? EvalExpr{*rootSlot} : EvalExpr{};
-    auto argExpr =
-        generateExpression(state, accStmt.expr.argument.get(), std::move(rootExpr), &outputs);
+    auto argExpr = generateExpression(state, accStmt.expr.argument.get(), rootSlot, &outputs);
 
     // One accumulator may be translated to multiple accumulator expressions. For example, The
     // $avg will have two accumulators expressions, a sum(..) and a count which is implemented
@@ -2449,7 +2445,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     // Builds the child and gets the child result slot.
     auto [childStage, childOutputs] = build(childNode, childReqs);
     auto maybeRootSlot = childOutputs.getIfExists(kResult);
-    auto rootExpr = maybeRootSlot.has_value() ? EvalExpr{*maybeRootSlot} : EvalExpr{};
     auto* childOutputsPtr = &childOutputs;
 
     // Set of field paths referenced by group. Useful for de-duplicating fields and clearing the
@@ -2488,7 +2483,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
             } else {
                 // General case: we need to generate a path traversal expression.
                 auto result = stage_builder::generateExpression(
-                    _state, fieldExpr, rootExpr.clone(), childOutputsPtr);
+                    _state, fieldExpr, maybeRootSlot, childOutputsPtr);
 
                 if (result.hasSlot()) {
                     return *result.getSlot();

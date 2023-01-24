@@ -34,18 +34,19 @@
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/query/sbe_stage_builder_abt_holder_def.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
 
 namespace mongo::stage_builder {
 class PlanStageSlots;
 
 /**
- * Translates an input Expression into an SBE EvalExpr. 'rootExpr' should either be null or it
- * should be an EvalExpr that produces the root document. 'slots' can optionaly be provided as
- * well so that generateExrpession() can make use of kField slots when appropriate.
+ * Translates an input Expression into an SBE EvalExpr. 'rootSlot' should either be boost::none or
+ * a slot with the root document. 'slots' can optionaly be provided as well so that
+ * generateExpression() can make use of kField slots when appropriate.
  */
 EvalExpr generateExpression(StageBuilderState& state,
                             const Expression* expr,
-                            EvalExpr rootExpr,
+                            boost::optional<sbe::value::SlotId> rootSlot,
                             const PlanStageSlots* slots = nullptr);
 }  // namespace mongo::stage_builder

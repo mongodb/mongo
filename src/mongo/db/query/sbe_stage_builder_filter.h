@@ -42,7 +42,7 @@ class PlanStageSlots;
 
 /**
  * This function generates an EvalExpr that implements the filter expression represented by 'root'.
- * The 'inputExpr' and 'slots' parameters specify the input(s) that the filter should use.
+ * The 'inputSlot' and 'slots' parameters specify the input(s) that the filter should use.
  *
  * The 'isFilterOverIxscan' parameter controls if we should search for kField slots in 'slots' that
  * correspond to the full paths needed by the filter. Typically 'isFilterOverIxscan' is false unless
@@ -57,7 +57,7 @@ class PlanStageSlots;
  */
 EvalExpr generateFilter(StageBuilderState& state,
                         const MatchExpression* root,
-                        EvalExpr inputExpr,
+                        boost::optional<sbe::value::SlotId> inputSlot,
                         const PlanStageSlots* slots,
                         const std::vector<std::string>& keyFields = {},
                         bool isFilterOverIxscan = false);
