@@ -41,7 +41,9 @@
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
+#include "mongo/db/repl/tenant_migration_recipient_access_blocker.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/repl/tenant_oplog_applier.h"
 #include "mongo/db/repl/tenant_oplog_batcher.h"
@@ -1096,6 +1098,40 @@ TEST_F(TenantOplogApplierTest, ApplyCreateCollCommand_WrongNSS) {
     applier->join();
 }
 
+TEST_F(TenantOplogApplierTest, ApplyCreateCollCommand_WrongNSS_Merge) {
+    // Should not be able to apply a command in the wrong namespace.
+    NamespaceString nss("noTenantDB", "t");
+    auto op =
+        BSON("op"
+             << "c"
+             << "ns" << nss.getCommandNS().ns() << "wall" << Date_t() << "o"
+             << BSON("create" << nss.coll()) << "ts" << Timestamp(1, 1) << "ui" << UUID::gen());
+    bool applyCmdCalled = false;
+    _opObserver->onCreateCollectionFn = [&](OperationContext* opCtx,
+                                            const CollectionPtr&,
+                                            const NamespaceString& collNss,
+                                            const CollectionOptions&,
+                                            const BSONObj&) { applyCmdCalled = true; };
+    auto entry = OplogEntry(op);
+    pushOps({entry});
+    auto writerPool = makeTenantMigrationWriterPool();
+
+    auto applier = std::make_shared<TenantOplogApplier>(_migrationUuid,
+                                                        MigrationProtocolEnum::kShardMerge,
+                                                        boost::none,
+                                                        OpTime(),
+                                                        &_oplogBuffer,
+                                                        _executor,
+                                                        writerPool.get());
+    ASSERT_OK(applier->startup());
+    auto opAppliedFuture = applier->getNotificationForOpTime(entry.getOpTime());
+    ASSERT_EQ(opAppliedFuture.getNoThrow().getStatus().code(), ErrorCodes::InvalidTenantId);
+    ASSERT_FALSE(applyCmdCalled);
+    applier->shutdown();
+    _oplogBuffer.shutdown(_opCtx.get());
+    applier->join();
+}
+
 TEST_F(TenantOplogApplierTest, ApplyDropIndexesCommand_IndexNotFound) {
     NamespaceString nss(_dbName.toStringWithTenantId(), "bar");
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
@@ -1244,6 +1280,36 @@ TEST_F(TenantOplogApplierTest, ApplyCRUD_WrongNSS) {
     ASSERT_OK(applier->startup());
     auto opAppliedFuture = applier->getNotificationForOpTime(entry.getOpTime());
     ASSERT_NOT_OK(opAppliedFuture.getNoThrow().getStatus());
+    ASSERT_FALSE(onInsertsCalled);
+    applier->shutdown();
+    _oplogBuffer.shutdown(_opCtx.get());
+    applier->join();
+}
+
+TEST_F(TenantOplogApplierTest, ApplyCRUD_WrongNSS_Merge) {
+    auto invalidTenant = TenantId(OID::gen());
+
+    // Should not be able to apply a CRUD operation to a namespace not belonging to us.
+    NamespaceString nss(DatabaseName(invalidTenant, "test"), "bar");
+    auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
+    auto entry = makeInsertOplogEntry(1, nss, uuid);
+    bool onInsertsCalled = false;
+    _opObserver->onInsertsFn = [&](OperationContext* opCtx,
+                                   const NamespaceString& nss,
+                                   const std::vector<BSONObj>& docs) { onInsertsCalled = true; };
+    pushOps({entry});
+    auto writerPool = makeTenantMigrationWriterPool();
+
+    auto applier = std::make_shared<TenantOplogApplier>(_migrationUuid,
+                                                        MigrationProtocolEnum::kShardMerge,
+                                                        boost::none,
+                                                        OpTime(),
+                                                        &_oplogBuffer,
+                                                        _executor,
+                                                        writerPool.get());
+    ASSERT_OK(applier->startup());
+    auto opAppliedFuture = applier->getNotificationForOpTime(entry.getOpTime());
+    ASSERT_EQ(opAppliedFuture.getNoThrow().getStatus().code(), ErrorCodes::InvalidTenantId);
     ASSERT_FALSE(onInsertsCalled);
     applier->shutdown();
     _oplogBuffer.shutdown(_opCtx.get());

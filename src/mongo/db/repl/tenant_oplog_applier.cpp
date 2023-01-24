@@ -48,6 +48,7 @@
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/session_update_tracker.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/repl/tenant_oplog_batcher.h"
@@ -65,21 +66,6 @@ namespace repl {
 
 MONGO_FAIL_POINT_DEFINE(hangInTenantOplogApplication);
 MONGO_FAIL_POINT_DEFINE(fpBeforeTenantOplogApplyingBatch);
-
-bool shouldIgnore(const MigrationProtocolEnum& protocol, const OplogEntry& entry) {
-    const auto ns = entry.getNss();
-    if (protocol == MigrationProtocolEnum::kMultitenantMigrations) {
-        return ns.isOnInternalDb();
-    }
-
-    const auto tenantId = DatabaseNameUtil::parseTenantIdFromDatabaseName(ns.dbName());
-
-    // TODO SERVER-62491: Return false if tenantId is TenantId::kSystemTenantId
-    const auto ignore = !tenantId.has_value();
-
-    invariant(!ignore || ns.isOnInternalDb());
-    return ignore;
-}
 
 TenantOplogApplier::TenantOplogApplier(const UUID& migrationUuid,
                                        const MigrationProtocolEnum& protocol,
@@ -101,6 +87,8 @@ TenantOplogApplier::TenantOplogApplier(const UUID& migrationUuid,
       _resumeBatchingTs(resumeBatchingTs) {
     if (_protocol != MigrationProtocolEnum::kShardMerge) {
         invariant(_tenantId);
+    } else {
+        invariant(!_tenantId);
     }
 }
 
@@ -253,6 +241,20 @@ bool TenantOplogApplier::_shouldStopApplying(Status status) {
     return true;
 }
 
+bool TenantOplogApplier::_shouldIgnore(const OplogEntry& entry) {
+    if (_protocol == MigrationProtocolEnum::kMultitenantMigrations) {
+        return false;
+    }
+
+    // TODO SERVER-62491: Update this code path to handle TenantId::kSystemTenantId for internal
+    // collections.
+    const auto tenantId = DatabaseNameUtil::parseTenantIdFromDatabaseName(entry.getNss().dbName());
+    tenant_migration_access_blocker::validateNssIsBeingMigrated(
+        tenantId, entry.getNss(), _migrationUuid);
+
+    return !tenantId;
+}
+
 void TenantOplogApplier::_finishShutdown(WithLock lk, Status status) {
     // shouldStopApplying() might have already set the final status. So, don't mask the original
     // error.
@@ -361,9 +363,8 @@ void TenantOplogApplier::_applyOplogBatch(TenantOplogBatch* batch) {
 
 void TenantOplogApplier::_checkNsAndUuidsBelongToTenant(OperationContext* opCtx,
                                                         const TenantOplogBatch& batch) {
-    // Shard merge protocol migrates all tenants from donor to recipient, whereas multi-tenant
-    // migration protocol migrates only one tenant. So,the below check isn't required for the shard
-    // merge protocol.
+
+    // Shard merge protocol checks the namespace and UUID when ops are assigned to writer pool.
     if (_protocol == MigrationProtocolEnum::kShardMerge)
         return;
 
@@ -974,7 +975,7 @@ std::vector<std::vector<ApplierOperation>> TenantOplogApplier::_fillWriterVector
             auto expansions = &batch->expansions[op.expansionsEntry];
             bool tenantOp = false;
             for (auto&& entry : *expansions) {
-                if (shouldIgnore(_protocol, entry)) {
+                if (_shouldIgnore(entry)) {
                     uassert(6114521,
                             "Can't have a transaction with operations on both tenant and internal "
                             "collections.",
@@ -1003,7 +1004,7 @@ std::vector<std::vector<ApplierOperation>> TenantOplogApplier::_fillWriterVector
                                              &collPropertiesCache,
                                              isTransactionWithCommand /* serial */);
         } else {
-            if (shouldIgnore(_protocol, op.entry)) {
+            if (_shouldIgnore(op.entry)) {
                 op.ignore = true;
                 continue;
             }

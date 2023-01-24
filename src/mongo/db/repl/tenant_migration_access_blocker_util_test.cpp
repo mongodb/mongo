@@ -205,4 +205,38 @@ TEST_F(TenantMigrationAccessBlockerUtilTest, HasActiveShardMergeFalseAfterRemove
     ASSERT_FALSE(tenant_migration_access_blocker::hasActiveTenantMigration(opCtx(), kTenantDB));
     ASSERT_FALSE(tenant_migration_access_blocker::hasActiveTenantMigration(opCtx(), "anyDb"_sd));
 }
+
+TEST_F(TenantMigrationAccessBlockerUtilTest, TestValidateNssBeingMigrated) {
+    auto migrationId = UUID::gen();
+    auto recipientMtab =
+        std::make_shared<TenantMigrationRecipientAccessBlocker>(getServiceContext(), migrationId);
+    TenantMigrationAccessBlockerRegistry::get(getServiceContext())
+        .add(kTenantId.toString(), recipientMtab);
+
+    // No tenantId should work for an adminDB.
+    tenant_migration_access_blocker::validateNssIsBeingMigrated(
+        boost::none, NamespaceString{NamespaceString::kAdminDb, "test"}, UUID::gen());
+
+    // No tenantId will throw if it's not an adminDB.
+    ASSERT_THROWS_CODE(tenant_migration_access_blocker::validateNssIsBeingMigrated(
+                           boost::none, NamespaceString{"foo", "test"}, migrationId),
+                       DBException,
+                       ErrorCodes::InvalidTenantId);
+
+    // A different tenantId will throw.
+    ASSERT_THROWS_CODE(tenant_migration_access_blocker::validateNssIsBeingMigrated(
+                           TenantId(OID::gen()), NamespaceString{"foo", "test"}, migrationId),
+                       DBException,
+                       ErrorCodes::InvalidTenantId);
+
+    // A different migrationId will throw.
+    ASSERT_THROWS_CODE(tenant_migration_access_blocker::validateNssIsBeingMigrated(
+                           kTenantId, NamespaceString{"foo", "test"}, UUID::gen()),
+                       DBException,
+                       ErrorCodes::InvalidTenantId);
+
+    // Finally everything works.
+    tenant_migration_access_blocker::validateNssIsBeingMigrated(
+        kTenantId, NamespaceString{NamespaceString::kAdminDb, "test"}, migrationId);
+}
 }  // namespace mongo

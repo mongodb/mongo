@@ -513,6 +513,7 @@ error_codes:
     - {code: 390, name: InvalidSignature}
     - {code: 391, name: ReauthenticationRequired}
     - {code: 392, name: InvalidJWT}
+    - {code: 393, name: InvalidTenantId}
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)

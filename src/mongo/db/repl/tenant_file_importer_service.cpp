@@ -94,7 +94,8 @@ void importCopiedFiles(OperationContext* opCtx, const UUID& migrationId) {
         boost::filesystem::remove_all(tempWTDirectory, ec);
     });
 
-    auto metadatas = wiredTigerRollbackToStableAndGetMetadata(opCtx, tempWTDirectory.string());
+    auto metadatas =
+        wiredTigerRollbackToStableAndGetMetadata(opCtx, tempWTDirectory.string(), migrationId);
     wiredTigerImportFromBackupCursor(
         opCtx, migrationId, tempWTDirectory.string(), std::move(metadatas));
 }

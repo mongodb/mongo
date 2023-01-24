@@ -67,7 +67,7 @@ struct CollectionImportMetadata {
  * retrieve collection metadata.
  */
 std::vector<CollectionImportMetadata> wiredTigerRollbackToStableAndGetMetadata(
-    OperationContext* opCtx, const std::string& importPath);
+    OperationContext* opCtx, const std::string& importPath, const UUID& migrationId);
 
 /**
  * When preparing to import a collection within a WUOW, use RecoveryUnit::registerChange to

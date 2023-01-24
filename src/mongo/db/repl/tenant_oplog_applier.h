@@ -120,6 +120,8 @@ private:
 
     void _applyLoop(TenantOplogBatch batch);
     bool _shouldStopApplying(Status status);
+    // Indicates an oplog entry should be ignored and not applied.
+    bool _shouldIgnore(const OplogEntry& entry);
 
     void _applyOplogBatch(TenantOplogBatch* batch);
     Status _applyOplogBatchPerWorker(std::vector<ApplierOperation>* ops);

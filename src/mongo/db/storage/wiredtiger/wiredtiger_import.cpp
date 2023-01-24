@@ -37,6 +37,7 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/storage/bson_collection_catalog_entry.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
@@ -52,16 +53,14 @@ namespace mongo {
 using namespace fmt::literals;
 
 namespace {
-bool shouldImport(const NamespaceString& ns) {
+bool shouldImport(const NamespaceString& ns, const UUID& migrationId) {
     const auto tenantId = DatabaseNameUtil::parseTenantIdFromDatabaseName(ns.dbName());
-    // TODO SERVER-62491: Return false if tenantId is TenantId::kSystemTenantId
-    if (tenantId) {
-        return true;
-    }
 
-    // We expect only internal databases to not have a tenant id.
-    invariant(ns.isOnInternalDb());
-    return false;
+    // TODO SERVER-62491: Update this code path to handle TenantId::kSystemTenantId for internal
+    // collections.
+    tenant_migration_access_blocker::validateNssIsBeingMigrated(tenantId, ns, migrationId);
+
+    return !!tenantId;
 }
 
 // catalogEntry is like {idxIdent: {myIndex: "index-12-345", myOtherIndex: "index-67-890"}}.
@@ -134,7 +133,7 @@ private:
 }  // namespace
 
 std::vector<CollectionImportMetadata> wiredTigerRollbackToStableAndGetMetadata(
-    OperationContext* opCtx, const std::string& importPath) {
+    OperationContext* opCtx, const std::string& importPath, const UUID& migrationId) {
     LOGV2_DEBUG(6113400, 1, "Opening donor WiredTiger database", "importPath"_attr = importPath);
     WT_CONNECTION* conn;
     // WT converts the imported WiredTiger.backup file to a fresh WiredTiger.wt file, rolls back to
@@ -185,7 +184,7 @@ std::vector<CollectionImportMetadata> wiredTigerRollbackToStableAndGetMetadata(
         BSONObj rawCatalogEntry(static_cast<const char*>(catalogValue.data));
         NamespaceString ns(NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(
             rawCatalogEntry.getStringField("ns")));
-        if (!shouldImport(ns)) {
+        if (!shouldImport(ns, migrationId)) {
             LOGV2_DEBUG(6113801, 1, "Not importing donor collection", "ns"_attr = ns);
             continue;
         }

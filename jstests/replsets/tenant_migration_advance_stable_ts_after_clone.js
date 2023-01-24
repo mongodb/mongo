@@ -19,7 +19,6 @@ load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");  // For extractUUIDFromObject().
 load("jstests/replsets/rslib.js");
 
-const kUnrelatedDbNameDonor = `${ObjectId().str}_unrelatedDBDonor`;
 const kUnrelatedDbNameRecipient = `${ObjectId().str}_unrelatedDBRecipient`;
 const collName = "foo";
 const tenantId = ObjectId().str;
@@ -34,6 +33,8 @@ tmt.insertDonorDB(`${tenantId}_db`, collName);
 
 const donorPrimary = tmt.getDonorPrimary();
 const recipientPrimary = tmt.getRecipientPrimary();
+
+const kRelatedDbNameDonor = tmt.tenantDB(tenantId, "donorDb");
 
 // Note: including this explicit early return here due to the fact that multiversion
 // suites will execute this test without featureFlagShardMerge enabled (despite the
@@ -65,14 +66,13 @@ const recipientHoldStablefp = configureFailPoint(
 // recipient.
 let donorAdvancedStableTs;
 assert.soon(function() {
-    donorAdvancedStableTs =
-        assert
-            .commandWorked(donorPrimary.getDB(kUnrelatedDbNameDonor).runCommand({
-                insert: collName,
-                documents: [{n: 1}],
-                writeConcern: {w: "majority"}
-            }))
-            .operationTime;
+    donorAdvancedStableTs = assert
+                                .commandWorked(donorPrimary.getDB(kRelatedDbNameDonor).runCommand({
+                                    insert: collName,
+                                    documents: [{n: 1}],
+                                    writeConcern: {w: "majority"}
+                                }))
+                                .operationTime;
 
     return bsonWoCompare(donorAdvancedStableTs, recipientHoldStableTs) > 0;
 });

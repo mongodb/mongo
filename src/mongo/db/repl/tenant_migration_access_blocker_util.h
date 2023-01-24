@@ -65,6 +65,15 @@ void addTenantMigrationRecipientAccessBlocker(ServiceContext* serviceContext,
 boost::optional<std::string> parseTenantIdFromDB(const DatabaseName& dbName);
 
 /**
+ * Validates that the tenant that owns nss belongs to the migration identified by migrationId. The
+ * function throws ErrorCodes::InvalidTenant if there is no tenantId or if the tenant is not being
+ * migrated by the expected migration.
+ */
+void validateNssIsBeingMigrated(const boost::optional<TenantId>& tenantId,
+                                const NamespaceString& nss,
+                                const UUID& migrationId);
+
+/**
  * Returns a TenantMigrationDonorDocument constructed from the given bson doc and validate the
  * resulting doc.
  */

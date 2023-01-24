@@ -31,23 +31,24 @@ if (!isShardMergeEnabled(donorPrimary.getDB("admin"))) {
     quit();
 }
 
+const kTenant0 = ObjectId().str;
+const kTenant1 = ObjectId().str;
+const kTenant2 = ObjectId().str;
+
 // Insert some documents before migration start so that this collection gets cloned by file cloner.
 const collName = "testColl";
-const tenantDB0 = tenantMigrationTest.tenantDB(ObjectId().str, "DB");
+const tenantDB0 = tenantMigrationTest.tenantDB(kTenant0, "DB");
 assert.commandWorked(donorPrimary.getDB(tenantDB0)[collName].insert({_id: 0}));
 
 const failpoint = "pauseTenantMigrationBeforeLeavingDataSyncState";
 const pauseTenantMigrationBeforeLeavingDataSyncState =
     configureFailPoint(donorPrimary, failpoint, {action: "hang"});
 
-const kTenant1 = ObjectId().str;
-const kTenant2 = ObjectId().str;
-
 const migrationUuid = UUID();
 const migrationOpts = {
     migrationIdString: extractUUIDFromObject(migrationUuid),
     readPreference: {mode: 'primary'},
-    tenantIds: [ObjectId(kTenant1), ObjectId(kTenant2)]
+    tenantIds: [ObjectId(kTenant0), ObjectId(kTenant1), ObjectId(kTenant2)]
 };
 
 jsTestLog(`Starting the tenant migration to wait in failpoint: ${failpoint}`);

@@ -160,6 +160,31 @@ void addTenantMigrationRecipientAccessBlocker(ServiceContext* serviceContext,
     TenantMigrationAccessBlockerRegistry::get(serviceContext).add(tenantId, mtab);
 }
 
+void validateNssIsBeingMigrated(const boost::optional<TenantId>& tenantId,
+                                const NamespaceString& nss,
+                                const UUID& migrationId) {
+    if (!tenantId) {
+        uassert(ErrorCodes::InvalidTenantId,
+                str::stream() << "Failed to extract a valid tenant from namespace '"
+                              << nss.toStringWithTenantId() << "'.",
+                nss.isOnInternalDb());
+        return;
+    }
+
+    auto mtab = TenantMigrationAccessBlockerRegistry::get(getGlobalServiceContext())
+                    .getTenantMigrationAccessBlockerForTenantId(
+                        *tenantId, TenantMigrationAccessBlocker::BlockerType::kRecipient);
+    uassert(ErrorCodes::InvalidTenantId,
+            str::stream() << "The collection '" << nss.toStringWithTenantId()
+                          << "' does not belong to a tenant being migrated.",
+            mtab);
+
+    uassert(ErrorCodes::InvalidTenantId,
+            str::stream() << "The collection '" << nss.toStringWithTenantId()
+                          << "' is not being migrated in migration " << migrationId,
+            mtab->getMigrationId() == migrationId);
+}
+
 TenantMigrationDonorDocument parseDonorStateDocument(const BSONObj& doc) {
     auto donorStateDoc =
         TenantMigrationDonorDocument::parse(IDLParserContext("donorStateDoc"), doc);

@@ -84,8 +84,14 @@ function runTest({storeFindAndModifyImagesInSideCollection = false}) {
     const migrationId = UUID();
     const migrationOpts = {
         migrationIdString: extractUUIDFromObject(migrationId),
-        tenantId: kTenantId,
     };
+    if (isShardMergeEnabledOnDonor) {
+        // Shard merge needs both tenants otherwise it will fail when it receives data for an
+        // unknown tenant.
+        migrationOpts.tenantIds = [ObjectId(kTenantId), ObjectId(kTenantId2)];
+    } else {
+        migrationOpts.tenantId = kTenantId;
+    }
 
     jsTestLog("Set up failpoints.");
     // Use `hangDuringBatchInsert` on the donor to hang after the first batch of a bulk insert. The
