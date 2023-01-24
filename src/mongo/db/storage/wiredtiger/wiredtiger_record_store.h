@@ -413,13 +413,18 @@ protected:
      */
     virtual void initCursorToBeginning() = 0;
 
-    const WiredTigerRecordStore& _rs;
-    OperationContext* _opCtx;
-    const bool _forward;
-    bool _skipNextAdvance = false;
-    boost::optional<WiredTigerCursor> _cursor;
-    bool _eof = false;
+    const uint64_t _tableId;
     RecordId _lastReturnedId;  // If null, need to seek to first/last record.
+    OperationContext* _opCtx;
+    const std::string _uri;
+    const std::string _ident;
+    boost::optional<WiredTigerCursor> _cursor;
+    const KeyFormat _keyFormat;
+    const bool _forward;
+    const bool _isOplog;
+    const bool _isCapped;
+    bool _skipNextAdvance = false;
+    bool _eof = false;
     bool _hasRestored = true;
 
 private:

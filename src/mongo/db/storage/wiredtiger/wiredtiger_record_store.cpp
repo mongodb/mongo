@@ -2148,11 +2148,18 @@ Status WiredTigerRecordStore::oplogDiskLocRegisterImpl(OperationContext* opCtx,
 WiredTigerRecordStoreCursorBase::WiredTigerRecordStoreCursorBase(OperationContext* opCtx,
                                                                  const WiredTigerRecordStore& rs,
                                                                  bool forward)
-    : _rs(rs), _opCtx(opCtx), _forward(forward) {
-    if (_rs._isCapped) {
+    : _tableId(rs._tableId),
+      _opCtx(opCtx),
+      _uri(rs._uri),
+      _ident(rs._ident->getIdent()),
+      _keyFormat(rs._keyFormat),
+      _forward(forward),
+      _isOplog(rs._isOplog),
+      _isCapped(rs._isCapped) {
+    if (_isCapped) {
         initCappedVisibility(_opCtx);
     }
-    _cursor.emplace(rs.getURI(), rs.tableId(), true, opCtx);
+    _cursor.emplace(_uri, _tableId, true, opCtx);
 }
 
 boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
@@ -2191,7 +2198,7 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
     // walk backwards until we find a suitable record. This is exercised when doing a reverse
     // natural order collection scan.
     if (_readTimestampForOplog && !_forward) {
-        invariant(_rs._isOplog);
+        invariant(_isOplog);
         while (id.getLong() > *_readTimestampForOplog) {
             int advanceRet = wiredTigerPrepareConflictRetry(_opCtx, [&] { return c->prev(c); });
             if (advanceRet == WT_NOTFOUND) {
@@ -2235,7 +2242,7 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
     auto& metricsCollector = ResourceConsumption::MetricsCollector::get(_opCtx);
 
     auto keyLength = computeRecordIdSize(id);
-    metricsCollector.incrementOneDocRead(_rs.getURI(), value.size + keyLength);
+    metricsCollector.incrementOneDocRead(_uri, value.size + keyLength);
 
     _lastReturnedId = id;
     return {{std::move(id), {static_cast<const char*>(value.data), static_cast<int>(value.size)}}};
@@ -2260,7 +2267,7 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::seekExact(const RecordI
 
     _skipNextAdvance = false;
     WT_CURSOR* c = _cursor->get();
-    auto key = makeCursorKey(id, _rs.keyFormat());
+    auto key = makeCursorKey(id, _keyFormat);
     setKey(c, &key);
     // Nothing after the next line can throw WCEs.
     int seekRet = wiredTigerPrepareConflictRetry(_opCtx, [&] { return c->search(c); });
@@ -2277,7 +2284,7 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::seekExact(const RecordI
     invariantWTOK(c->get_value(c, &value), c->session);
 
     auto keyLength = computeRecordIdSize(id);
-    metricsCollector.incrementOneDocRead(_rs.getURI(), value.size + keyLength);
+    metricsCollector.incrementOneDocRead(_uri, value.size + keyLength);
 
     _lastReturnedId = id;
     _eof = false;
@@ -2304,7 +2311,7 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::seekNear(const RecordId
     WiredTigerRecoveryUnit::get(_opCtx)->getSession();
     WT_CURSOR* c = _cursor->get();
 
-    auto key = makeCursorKey(start, _rs.keyFormat());
+    auto key = makeCursorKey(start, _keyFormat);
     setKey(c, &key);
 
     int cmp;
@@ -2358,7 +2365,7 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::seekNear(const RecordId
     invariantWTOK(c->get_value(c, &value), c->session);
 
     auto keyLength = computeRecordIdSize(id);
-    metricsCollector.incrementOneDocRead(_rs.getURI(), value.size + keyLength);
+    metricsCollector.incrementOneDocRead(_uri, value.size + keyLength);
 
     _lastReturnedId = curId;
     _eof = false;
@@ -2394,7 +2401,7 @@ bool WiredTigerRecordStoreCursorBase::isVisible(const RecordId& id) {
 }
 
 void WiredTigerRecordStoreCursorBase::initCappedVisibility(OperationContext* opCtx) {
-    if (_rs._isOplog) {
+    if (_isOplog) {
         auto wtRu = WiredTigerRecoveryUnit::get(opCtx);
         wtRu->setIsOplogReader();
         if (_forward) {
@@ -2410,7 +2417,7 @@ void WiredTigerRecordStoreCursorBase::initCappedVisibility(OperationContext* opC
         // We can't enforce that the caller has initialized the capped snapshot before entering this
         // function because we need to know, for example, what locks are held. So we expect higher
         // layers to do so.
-        _cappedSnapshot = CappedSnapshots::get(_opCtx).getSnapshot(_rs._ident->getIdent());
+        _cappedSnapshot = CappedSnapshots::get(_opCtx).getSnapshot(_ident);
     }
 }
 
@@ -2420,12 +2427,12 @@ void WiredTigerRecordStoreCursorBase::saveUnpositioned() {
 }
 
 bool WiredTigerRecordStoreCursorBase::restore(bool tolerateCappedRepositioning) {
-    if (_rs._isCapped) {
+    if (_isCapped) {
         initCappedVisibility(_opCtx);
     }
 
     if (!_cursor)
-        _cursor.emplace(_rs.getURI(), _rs.tableId(), true, _opCtx);
+        _cursor.emplace(_uri, _tableId, true, _opCtx);
 
     // This will ensure an active session exists, so any restored cursors will bind to it
     invariant(WiredTigerRecoveryUnit::get(_opCtx)->getSession() == _cursor->getSession());
@@ -2442,7 +2449,7 @@ bool WiredTigerRecordStoreCursorBase::restore(bool tolerateCappedRepositioning) 
     }
 
     WT_CURSOR* c = _cursor->get();
-    auto key = makeCursorKey(_lastReturnedId, _rs.keyFormat());
+    auto key = makeCursorKey(_lastReturnedId, _keyFormat);
     setKey(c, &key);
 
     int cmp;
@@ -2450,7 +2457,7 @@ bool WiredTigerRecordStoreCursorBase::restore(bool tolerateCappedRepositioning) 
     if (ret == WT_NOTFOUND) {
         _eof = true;
 
-        if (_rs._isCapped && !tolerateCappedRepositioning) {
+        if (_isCapped && !tolerateCappedRepositioning) {
             // Capped read collscans do not tolerate cursor repositioning.
             // By contrast, write collscans on a clustered collection like TTL deletion
             // tolerate cursor repositioning like normal collections.
@@ -2463,7 +2470,7 @@ bool WiredTigerRecordStoreCursorBase::restore(bool tolerateCappedRepositioning) 
     if (cmp == 0)
         return true;  // Landed right where we left off.
 
-    if (_rs._isCapped && !tolerateCappedRepositioning) {
+    if (_isCapped && !tolerateCappedRepositioning) {
         // The cursor has been repositioned as it was sitting on a document that has been
         // removed by capped collection deletion. It is important that we error out in this case
         // so that consumers don't silently get 'holes' when scanning capped collections.
@@ -2552,7 +2559,7 @@ void WiredTigerRecordStoreStandardCursor::setKey(
 }
 
 RecordId WiredTigerRecordStoreStandardCursor::getKey(WT_CURSOR* cursor) const {
-    if (_rs.keyFormat() == KeyFormat::String) {
+    if (_keyFormat == KeyFormat::String) {
         WT_ITEM item;
         invariantWTOK(cursor->get_key(cursor, &item), cursor->session);
         return RecordId(static_cast<const char*>(item.data), item.size);
