@@ -2,11 +2,27 @@
 
 ==== VARIATION: Lower collation node with single field ====
 -- INPUT:
+Filter []
+|   BinaryOp [FillEmpty]
+|   |   Const [false]
+|   BinaryOp [Eq]
+|   |   Const [23]
+|   FunctionCall [getField]
+|   |   Const ["a"]
+|   Variable [proj0]
 Collation []
 |   |   collation: 
 |   |       sortA: Ascending
 |   RefBlock: 
 |       Variable [sortA]
+Evaluation [{proj1}]
+|   FunctionCall [getField]
+|   |   Const ["c"]
+|   Variable [scan0]
+Evaluation [{proj0}]
+|   FunctionCall [getField]
+|   |   Const ["b"]
+|   Variable [scan0]
 Evaluation [{sortA}]
 |   FunctionCall [getField]
 |   |   Const ["a"]
@@ -14,12 +30,23 @@ Evaluation [{sortA}]
 PhysicalScan [{'<root>': scan0}, collName]
 
 -- OUTPUT:
-[0] sort [s2] [asc] [] 
+[5] filter {((getField(s3, "a") == 23) ?: false)} 
+[0] sort [s2] [asc] [s3, s4] 
+[4] project [s4 = getField(s1, "c")] 
+[3] project [s3 = getField(s1, "b")] 
 [2] project [s2 = getField(s1, "a")] 
 [1] scan s1 none none none none none [] @"<collUUID>" true false 
 
 ==== VARIATION: Lower collation node with two fields ====
 -- INPUT:
+Filter []
+|   BinaryOp [FillEmpty]
+|   |   Const [false]
+|   BinaryOp [Eq]
+|   |   Const [35]
+|   FunctionCall [getField]
+|   |   Const ["a"]
+|   Variable [proj0]
 Collation []
 |   |   collation: 
 |   |       sortA: Ascending
@@ -27,6 +54,10 @@ Collation []
 |   RefBlock: 
 |       Variable [sortA]
 |       Variable [sortB]
+Evaluation [{proj0}]
+|   FunctionCall [getField]
+|   |   Const ["c"]
+|   Variable [scan0]
 Evaluation [{sortB}]
 |   FunctionCall [getField]
 |   |   Const ["b"]
@@ -38,7 +69,9 @@ Evaluation [{sortA}]
 PhysicalScan [{'<root>': scan0}, collName]
 
 -- OUTPUT:
-[0] sort [s2, s3] [asc, desc] [] 
+[5] filter {((getField(s4, "a") == 35) ?: false)} 
+[0] sort [s2, s3] [asc, desc] [s4] 
+[4] project [s4 = getField(s1, "c")] 
 [3] project [s3 = getField(s1, "b")] 
 [2] project [s2 = getField(s1, "a")] 
 [1] scan s1 none none none none none [] @"<collUUID>" true false 

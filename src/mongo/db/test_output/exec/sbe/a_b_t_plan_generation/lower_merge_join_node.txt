@@ -136,6 +136,53 @@ PhysicalScan [{'<root>': scan0}, collName]
         [3] scan s4 none none none none none [] @"<collUUID>" true false 
 
 
+==== VARIATION: Lower merge join with required projection (collation=Ascending) ====
+-- INPUT:
+Filter []
+|   BinaryOp [FillEmpty]
+|   |   Const [false]
+|   BinaryOp [Eq]
+|   |   Const ["NYC"]
+|   FunctionCall [getField]
+|   |   Const ["a"]
+|   Variable [proj3]
+MergeJoin []
+|   |   |   Condition
+|   |   |       proj0 = proj1
+|   |   Collation
+|   |       Ascending
+|   Evaluation [{proj3}]
+|   |   FunctionCall [getField]
+|   |   |   Const ["city"]
+|   |   Variable [scan1]
+|   Evaluation [{proj1}]
+|   |   FunctionCall [getField]
+|   |   |   Const ["id"]
+|   |   Variable [scan1]
+|   PhysicalScan [{'<root>': scan1}, otherColl]
+Evaluation [{proj2}]
+|   FunctionCall [getField]
+|   |   Const ["city"]
+|   Variable [scan0]
+Evaluation [{proj0}]
+|   FunctionCall [getField]
+|   |   Const ["other_id"]
+|   Variable [scan0]
+PhysicalScan [{'<root>': scan0}, collName]
+
+-- OUTPUT:
+[9] filter {((getField(s6, "a") == "NYC") ?: false)} 
+[8] mj 
+    [asc] left [s2] [s3] 
+        [3] project [s3 = getField(s1, "city")] 
+        [1] project [s2 = getField(s1, "other_id")] 
+        [0] scan s1 none none none none none [] @"<collUUID>" true false 
+    right [s5] [s6] 
+        [7] project [s6 = getField(s4, "city")] 
+        [5] project [s5 = getField(s4, "id")] 
+        [4] scan s4 none none none none none [] @"<collUUID>" true false 
+
+
 ==== VARIATION: Lower merge join with two projections (collation=Descending, Ascending) ====
 -- INPUT:
 MergeJoin []
@@ -214,4 +261,51 @@ PhysicalScan [{'<root>': scan0}, collName]
         [5] project [s6 = getField(s4, "city")] 
         [4] project [s5 = getField(s4, "id")] 
         [3] scan s4 none none none none none [] @"<collUUID>" true false 
+
+
+==== VARIATION: Lower merge join with required projection (collation=Descending) ====
+-- INPUT:
+Filter []
+|   BinaryOp [FillEmpty]
+|   |   Const [false]
+|   BinaryOp [Eq]
+|   |   Const ["NYC"]
+|   FunctionCall [getField]
+|   |   Const ["a"]
+|   Variable [proj3]
+MergeJoin []
+|   |   |   Condition
+|   |   |       proj0 = proj1
+|   |   Collation
+|   |       Descending
+|   Evaluation [{proj3}]
+|   |   FunctionCall [getField]
+|   |   |   Const ["city"]
+|   |   Variable [scan1]
+|   Evaluation [{proj1}]
+|   |   FunctionCall [getField]
+|   |   |   Const ["id"]
+|   |   Variable [scan1]
+|   PhysicalScan [{'<root>': scan1}, otherColl]
+Evaluation [{proj2}]
+|   FunctionCall [getField]
+|   |   Const ["city"]
+|   Variable [scan0]
+Evaluation [{proj0}]
+|   FunctionCall [getField]
+|   |   Const ["other_id"]
+|   Variable [scan0]
+PhysicalScan [{'<root>': scan0}, collName]
+
+-- OUTPUT:
+[9] filter {((getField(s6, "a") == "NYC") ?: false)} 
+[8] mj 
+    [desc] left [s2] [s3] 
+        [3] project [s3 = getField(s1, "city")] 
+        [1] project [s2 = getField(s1, "other_id")] 
+        [0] scan s1 none none none none none [] @"<collUUID>" true false 
+    right [s5] [s6] 
+        [7] project [s6 = getField(s4, "city")] 
+        [5] project [s5 = getField(s4, "id")] 
+        [4] scan s4 none none none none none [] @"<collUUID>" true false 
 

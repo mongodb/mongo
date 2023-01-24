@@ -164,7 +164,6 @@ protected:
                     CostType::fromDouble(0),
                     CostType::fromDouble(0),
                     {false}};
-        properties::setPropertyOverwrite(n._physicalProps, properties::ProjectionRequirement({}));
         return n;
     }
     void runPathLowering(ABT& tree) {
@@ -186,8 +185,14 @@ protected:
      * Register the passed-in ABT in the test's node map and return the same ABT. Useful for
      * constructing physical ABTs in-line for lowering tests.
      */
-    ABT&& _node(ABT&& tree) {
-        _nodeMap.insert({tree.cast<Node>(), makeNodeProp()});
+    ABT&& _node(ABT&& tree, std::initializer_list<ProjectionName> requiredProjections = {}) {
+        auto props = makeNodeProp();
+        properties::setPropertyOverwrite(
+            props._physicalProps,
+            properties::ProjectionRequirement(
+                ProjectionNameOrderPreservingSet{requiredProjections}));
+
+        _nodeMap.insert_or_assign(tree.cast<Node>(), std::move(props));
         return std::move(tree);
     }
 
@@ -230,6 +235,15 @@ protected:
         return createBindings(bindingList, _node(scanForTest()), "scan0");
     }
 
+    ABT makeEquals(ABT lhs, ABT rhs) {
+        return _path(
+            make<EvalFilter>(make<PathGet>("a", make<PathCompare>(Operations::Eq, rhs)), lhs));
+    }
+
+    ABT makeEquals(StringData lhs, ABT rhs) {
+        return makeEquals(make<Variable>(ProjectionName(lhs)), rhs);
+    }
+
 private:
     int32_t lastNodeGenerated = 0;
 };
@@ -258,7 +272,9 @@ TEST_F(ABTPlanGeneration, LowerCollationNode) {
 
     properties::PhysProps physProps;
     properties::setPropertyOverwrite<properties::ProjectionRequirement>(
-        physProps, properties::ProjectionRequirement(ProjectionNameOrderPreservingSet({"sortA"})));
+        physProps,
+        properties::ProjectionRequirement(
+            ProjectionNameOrderPreservingSet({"sortA", "proj0", "proj1"})));
     NodeProps collationNodeProp{getNextNodeID(),
                                 {},
                                 {},
@@ -268,18 +284,22 @@ TEST_F(ABTPlanGeneration, LowerCollationNode) {
                                 CostType::fromDouble(0),
                                 {false}};
 
-    runNodeVariation(ctx,
-                     "Lower collation node with single field",
-                     _node(make<CollationNode>(properties::CollationRequirement(
-                                                   {{"sortA", CollationOp::Ascending}}),
-                                               createBindings({{"a", "sortA"}})),
-                           collationNodeProp));
+    auto node = _node(
+        make<CollationNode>(properties::CollationRequirement({{"sortA", CollationOp::Ascending}}),
+                            createBindings({{"a", "sortA"}, {"b", "proj0"}, {"c", "proj1"}})),
+        collationNodeProp);
+
+    runNodeVariation(
+        ctx,
+        "Lower collation node with single field",
+        _node(make<FilterNode>(makeEquals("proj0", Constant::int32(23)), std::move(node))));
 
     // Sort on multiple fields.
     properties::PhysProps physProps2;
     properties::setPropertyOverwrite<properties::ProjectionRequirement>(
         physProps2,
-        properties::ProjectionRequirement(ProjectionNameOrderPreservingSet({"sortA", "sortB"})));
+        properties::ProjectionRequirement(
+            ProjectionNameOrderPreservingSet({"sortA", "sortB", "proj0"})));
     NodeProps collationNodeProp2{getNextNodeID(),
                                  {},
                                  {},
@@ -288,13 +308,15 @@ TEST_F(ABTPlanGeneration, LowerCollationNode) {
                                  CostType::fromDouble(0),
                                  CostType::fromDouble(0),
                                  {false}};
-    runNodeVariation(ctx,
-                     "Lower collation node with two fields",
-                     _node(make<CollationNode>(properties::CollationRequirement(
-                                                   {{"sortA", CollationOp::Ascending},
-                                                    {"sortB", CollationOp::Descending}}),
-                                               createBindings({{"a", "sortA"}, {"b", "sortB"}})),
-                           collationNodeProp2));
+    auto node2 = _node(
+        make<CollationNode>(properties::CollationRequirement({{"sortA", CollationOp::Ascending},
+                                                              {"sortB", CollationOp::Descending}}),
+                            createBindings({{"a", "sortA"}, {"b", "sortB"}, {"c", "proj0"}})),
+        collationNodeProp2);
+    runNodeVariation(
+        ctx,
+        "Lower collation node with two fields",
+        _node(make<FilterNode>(makeEquals("proj0", Constant::int32(35)), std::move(node2))));
 }
 
 TEST_F(ABTPlanGeneration, LowerCoScanNode) {
@@ -327,9 +349,9 @@ TEST_F(ABTPlanGeneration, LowerExchangeNode) {
             properties::DistributionAndProjections(exchangeType, ProjectionNameVector{"proj0"})};
 
         properties::setPropertyOverwrite<properties::DistributionRequirement>(physProps, distReq);
-        properties::setPropertyOverwrite(
-            physProps,
-            properties::ProjectionRequirement(ProjectionNameOrderPreservingSet({"proj0"})));
+        properties::setPropertyOverwrite(physProps,
+                                         properties::ProjectionRequirement(
+                                             ProjectionNameOrderPreservingSet({"proj0", "proj1"})));
         NodeProps exchangeNodeProp{getNextNodeID(),
                                    {},
                                    {},
@@ -354,18 +376,27 @@ TEST_F(ABTPlanGeneration, LowerExchangeNode) {
                                {false}};
 
 
-        auto field = make<EvalPath>(make<PathGet>(FieldNameType("a"), make<PathIdentity>()),
-                                    make<Variable>(ProjectionName("scan0")));
-        runPathLowering(field);
         ABT evalNode =
-            make<EvaluationNode>(ProjectionName("proj0"), std::move(field), _node(scanForTest()));
+            _node(make<EvaluationNode>(
+                      ProjectionName("proj0"),
+                      _path(make<EvalPath>(make<PathGet>(FieldNameType("a"), make<PathIdentity>()),
+                                           make<Variable>(ProjectionName("scan0")))),
+                      _node(scanForTest())),
+                  evalNodeProp);
+
+        ABT evalNode2 =
+            _node(make<EvaluationNode>(
+                      ProjectionName("proj1"),
+                      _path(make<EvalPath>(make<PathGet>(FieldNameType("a"), make<PathIdentity>()),
+                                           make<Variable>(ProjectionName("scan0")))),
+                      std::move(evalNode)),
+                  evalNodeProp);
 
         runNodeVariation(
             ctx,
             str::stream() << "Lower exchange node of type "
                           << DistributionTypeEnum::toString[static_cast<int>(exchangeType)],
-            _node(make<ExchangeNode>(distReq, _node(std::move(evalNode), evalNodeProp)),
-                  exchangeNodeProp));
+            _node(make<ExchangeNode>(distReq, std::move(evalNode2)), exchangeNodeProp));
     }
 }
 
@@ -431,47 +462,61 @@ TEST_F(ABTPlanGeneration, LowerHashJoinNode) {
     // Arguments may be evaluated in any order, and since _node() assigns incrementing stage IDs,
     // nodes with multiple children must have the children defined before the parent to ensure
     // deterministic ordering.
-    auto child1 = _node(make<EvaluationNode>(
-        "otherID",
-        _path(make<EvalPath>(make<PathGet>("other_id", make<PathIdentity>()),
-                             make<Variable>(ProjectionName{"scan0"}))),
-        _node(make<PhysicalScanNode>(
-            FieldProjectionMap{{}, {ProjectionName{"scan0"}}, {}}, "collName", false))));
+    auto child1 =
+        _node(createBindings(
+                  {{"other_id", "otherID"}, {"info", "proj0"}},
+                  _node(make<PhysicalScanNode>(
+                      FieldProjectionMap{{}, {ProjectionName{"scan0"}}, {}}, "collName", false)),
+                  "scan0"),
+              {ProjectionName{"proj0"}});
 
-    auto child2 = _node(make<EvaluationNode>(
-        "ID",
-        _path(make<EvalPath>(make<PathGet>("id", make<PathIdentity>()),
-                             make<Variable>(ProjectionName{"scan1"}))),
-        _node(make<PhysicalScanNode>(
-            FieldProjectionMap{{}, {ProjectionName{"scan1"}}, {}}, "otherColl", false))));
+    auto child2 =
+        _node(createBindings(
+                  {{"id", "ID"}, {"other_info", "proj1"}},
+                  _node(make<PhysicalScanNode>(
+                      FieldProjectionMap{{}, {ProjectionName{"scan1"}}, {}}, "otherColl", false)),
+                  "scan1"),
+              {ProjectionName{"proj1"}});
 
-    runNodeVariation(ctx,
-                     "Hash join with one equality",
-                     _node(make<HashJoinNode>(JoinType::Inner,
-                                              std::vector<ProjectionName>{"otherID"},
-                                              std::vector<ProjectionName>{"ID"},
-                                              std::move(child1),
-                                              std::move(child2))));
+    runNodeVariation(
+        ctx,
+        "Hash join with one equality",
+        _node(make<FilterNode>(makeEquals("proj0", Constant::int32(1337)),
+                               _node(make<HashJoinNode>(JoinType::Inner,
+                                                        std::vector<ProjectionName>{"otherID"},
+                                                        std::vector<ProjectionName>{"ID"},
+                                                        std::move(child1),
+                                                        std::move(child2))))));
 
-    child1 = createBindings(
-        {{"city", "proj0"}, {"state", "proj1"}},
-        _node(make<PhysicalScanNode>(
-            FieldProjectionMap{{}, {ProjectionName{"scan0"}}, {}}, "collName", false)),
-        "scan0");
+    child1 =
+        _node(createBindings(
+                  {{"city", "proj0"},
+                   {"state", "proj1"},
+                   {"info", "proj4"},
+                   {"more_info", "proj5"},
+                   {"some_more_info", "proj6"}},
+                  _node(make<PhysicalScanNode>(
+                      FieldProjectionMap{{}, {ProjectionName{"scan0"}}, {}}, "collName", false)),
+                  "scan0"),
+              {ProjectionName{"proj4"}, ProjectionName{"proj5"}, ProjectionName{"proj6"}});
 
-    child2 = createBindings(
-        {{"cityField", "proj2"}, {"state_id", "proj3"}},
-        _node(make<PhysicalScanNode>(
-            FieldProjectionMap{{}, {ProjectionName{"scan1"}}, {}}, "otherColl", false)),
-        "scan1");
+    child2 =
+        _node(createBindings(
+                  {{"cityField", "proj2"}, {"state_id", "proj3"}, {"another", "proj7"}},
+                  _node(make<PhysicalScanNode>(
+                      FieldProjectionMap{{}, {ProjectionName{"scan1"}}, {}}, "otherColl", false)),
+                  "scan1"),
+              {ProjectionName{"proj7"}});
 
     runNodeVariation(ctx,
                      "Hash join with two equalities",
-                     _node(make<HashJoinNode>(JoinType::Inner,
-                                              std::vector<ProjectionName>{"proj0", "proj1"},
-                                              std::vector<ProjectionName>{"proj2", "proj3"},
-                                              std::move(child1),
-                                              std::move(child2))));
+                     _node(make<FilterNode>(
+                         makeEquals("proj7", Constant::int32(56)),
+                         _node(make<HashJoinNode>(JoinType::Inner,
+                                                  std::vector<ProjectionName>{"proj0", "proj1"},
+                                                  std::vector<ProjectionName>{"proj2", "proj3"},
+                                                  std::move(child1),
+                                                  std::move(child2))))));
 }
 
 TEST_F(ABTPlanGeneration, LowerIndexScanNode) {
@@ -590,6 +635,30 @@ TEST_F(ABTPlanGeneration, LowerMergeJoinNode) {
                     std::move(child1),
                     std::move(child2))));
         }
+        auto child1 = _node(
+            createBindings(
+                {{"other_id", "proj0"}, {"city", "proj2"}},
+                _node(make<PhysicalScanNode>(
+                    FieldProjectionMap{{}, {ProjectionName{"scan0"}}, {}}, "collName", false)),
+                "scan0"),
+            {ProjectionName{"proj2"}});
+        auto child2 = _node(
+            createBindings(
+                {{"id", "proj1"}, {"city", "proj3"}},
+                _node(make<PhysicalScanNode>(
+                    FieldProjectionMap{{}, {ProjectionName{"scan1"}}, {}}, "otherColl", false)),
+                "scan1"),
+            {ProjectionName{"proj3"}});
+        runNodeVariation(ctx,
+                         str::stream() << "Lower merge join with required projection (collation="
+                                       << CollationOpEnum::toString[static_cast<int>(op1)] << ")",
+                         _node(make<FilterNode>(makeEquals("proj3", Constant::str("NYC")),
+                                                _node(make<MergeJoinNode>(
+                                                    ProjectionNameVector{ProjectionName{"proj0"}},
+                                                    ProjectionNameVector{ProjectionName{"proj1"}},
+                                                    std::vector<CollationOp>{op1},
+                                                    std::move(child1),
+                                                    std::move(child2))))));
     }
 }
 
@@ -600,29 +669,32 @@ TEST_F(ABTPlanGeneration, LowerNestedLoopJoinNode) {
     // Run a variation for both supported join types.
     std::vector<JoinType> joins = {JoinType::Inner, JoinType::Left};
     for (auto& joinType : joins) {
-        auto child1 = createBindings(
-            {{"city", "proj0"}},
-            _node(make<PhysicalScanNode>(
-                FieldProjectionMap{{}, {ProjectionName{"scan0"}}, {}}, "collName", false)),
-            "scan0");
+        auto child1 = _node(
+            createBindings(
+                {{"city", "proj0"}, {"zipcode", "proj2"}},
+                _node(make<PhysicalScanNode>(
+                    FieldProjectionMap{{}, {ProjectionName{"scan0"}}, {}}, "collName", false)),
+                "scan0"),
+            {ProjectionName{"proj2"}});
         auto child2 = createBindings(
             {{"id", "proj1"}},
             _node(make<PhysicalScanNode>(
                 FieldProjectionMap{{}, {ProjectionName{"scan1"}}, {}}, "otherColl", false)),
             "scan1");
+        auto nlj = _node(make<NestedLoopJoinNode>(
+            joinType,
+            ProjectionNameSet{"proj0"},
+            _path(make<EvalFilter>(
+                make<PathCompare>(Operations::Eq, make<Variable>(ProjectionName{"proj1"})),
+                make<Variable>(ProjectionName{"proj0"}))),
+            std::move(child1),
+            std::move(child2)));
 
         runNodeVariation(
             ctx,
             str::stream() << "Nested loop join with equality predicate ("
                           << JoinTypeEnum::toString[static_cast<int>(joinType)] << " join)",
-            _node(make<NestedLoopJoinNode>(
-                joinType,
-                ProjectionNameSet{"proj0"},
-                _path(make<EvalFilter>(
-                    make<PathCompare>(Operations::Eq, make<Variable>(ProjectionName{"proj1"})),
-                    make<Variable>(ProjectionName{"proj0"}))),
-                std::move(child1),
-                std::move(child2))));
+            _node(make<FilterNode>(makeEquals("proj2", Constant::int32(10024)), std::move(nlj))));
     }
 }
 

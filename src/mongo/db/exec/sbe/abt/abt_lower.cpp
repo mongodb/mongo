@@ -855,6 +855,10 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const SortedMergeNode& n,
         // Find the slots for the collation keys. Also find slots for other values passed.
         sbe::value::SlotVector childKeys(collSpec.size());
         sbe::value::SlotVector childVals;
+        // Note that lowering for SortedMergeNode does not take into account required projections
+        // from the Cascade props for this node. Like UnionNode, it's expected that all fields that
+        // should be visible above a SortedMergeNode should be added to the exprBinder explicitly
+        // before lowering.
         for (const auto& name : names) {
             const auto it = std::find_if(
                 collSpec.begin(), collSpec.end(), [&](const auto& x) { return x.first == name; });

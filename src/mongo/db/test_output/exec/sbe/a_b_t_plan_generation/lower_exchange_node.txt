@@ -9,6 +9,10 @@ Exchange []
 |   |               proj0
 |   RefBlock: 
 |       Variable [proj0]
+Evaluation [{proj1}]
+|   FunctionCall [getField]
+|   |   Const ["a"]
+|   Variable [scan0]
 Evaluation [{proj0}]
 |   FunctionCall [getField]
 |   |   Const ["a"]
@@ -16,7 +20,8 @@ Evaluation [{proj0}]
 PhysicalScan [{'<root>': scan0}, collName]
 
 -- OUTPUT:
-[0] exchange [s2] 1 hash 
+[0] exchange [s2, s3] 1 hash 
+[1] project [s3 = getField(s1, "a")] 
 [1] project [s2 = getField(s1, "a")] 
 [2] scan s1 none none none none none [] @"<collUUID>" true false 
 
@@ -29,6 +34,10 @@ Exchange []
 |   |               proj0
 |   RefBlock: 
 |       Variable [proj0]
+Evaluation [{proj1}]
+|   FunctionCall [getField]
+|   |   Const ["a"]
+|   Variable [scan0]
 Evaluation [{proj0}]
 |   FunctionCall [getField]
 |   |   Const ["a"]
@@ -36,7 +45,8 @@ Evaluation [{proj0}]
 PhysicalScan [{'<root>': scan0}, collName]
 
 -- OUTPUT:
-[0] exchange [s2] 1 bcast 
+[0] exchange [s2, s3] 1 bcast 
+[1] project [s3 = getField(s1, "a")] 
 [1] project [s2 = getField(s1, "a")] 
 [2] scan s1 none none none none none [] @"<collUUID>" true false 
 
@@ -49,6 +59,10 @@ Exchange []
 |   |               proj0
 |   RefBlock: 
 |       Variable [proj0]
+Evaluation [{proj1}]
+|   FunctionCall [getField]
+|   |   Const ["a"]
+|   Variable [scan0]
 Evaluation [{proj0}]
 |   FunctionCall [getField]
 |   |   Const ["a"]
@@ -56,7 +70,8 @@ Evaluation [{proj0}]
 PhysicalScan [{'<root>': scan0}, collName]
 
 -- OUTPUT:
-[0] exchange [s2] 1 round 
+[0] exchange [s2, s3] 1 round 
+[1] project [s3 = getField(s1, "a")] 
 [1] project [s2 = getField(s1, "a")] 
 [2] scan s1 none none none none none [] @"<collUUID>" true false 
 
@@ -69,6 +84,10 @@ Exchange []
 |   |               proj0
 |   RefBlock: 
 |       Variable [proj0]
+Evaluation [{proj1}]
+|   FunctionCall [getField]
+|   |   Const ["a"]
+|   Variable [scan0]
 Evaluation [{proj0}]
 |   FunctionCall [getField]
 |   |   Const ["a"]
@@ -76,6 +95,7 @@ Evaluation [{proj0}]
 PhysicalScan [{'<root>': scan0}, collName]
 
 -- OUTPUT:
-[0] exchange [s2] 1 bcast 
+[0] exchange [s2, s3] 1 bcast 
+[1] project [s3 = getField(s1, "a")] 
 [1] project [s2 = getField(s1, "a")] 
 [2] scan s1 none none none none none [] @"<collUUID>" true false 
