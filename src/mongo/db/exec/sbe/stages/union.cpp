@@ -115,7 +115,7 @@ void UnionStage::open(bool reOpen) {
     }
 
     for (auto& child : _children) {
-        _remainingBranchesToDrain.push({child.get(), reOpen});
+        _remainingBranchesToDrain.push({child.get()});
     }
 
     _remainingBranchesToDrain.front().open();

@@ -367,6 +367,7 @@ PhysicalRewriter::OptimizeGroupResult PhysicalRewriter::optimizeGroup(const Grou
                         _hints,
                         _ridProjections,
                         _prefixId,
+                        _spoolId,
                         bestResult._physProps,
                         queue,
                         logicalProps,

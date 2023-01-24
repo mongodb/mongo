@@ -214,6 +214,21 @@ private:
     std::variant<IdType, PrefixMapType> _ids;
 };
 
+/**
+ * Used to vend out fresh spool ids.
+ */
+class SpoolId {
+public:
+    SpoolId() : _nextId(0) {}
+
+    int64_t getNextId() {
+        return _nextId++;
+    }
+
+private:
+    int64_t _nextId;
+};
+
 ProjectionNameOrderedSet convertToOrderedSet(ProjectionNameSet unordered);
 
 void combineLimitSkipProperties(properties::LimitSkipRequirement& aboveProp,
@@ -445,7 +460,6 @@ void applyProjectionRenames(ProjectionRenames projectionRenames,
                             });
 
 void removeRedundantResidualPredicates(const ProjectionNameOrderPreservingSet& requiredProjections,
-                                       const ProjectionNameOrderPreservingSet& correlatedProjNames,
                                        ResidualRequirements& residualReqs,
                                        FieldProjectionMap& fieldProjectionMap);
 
@@ -493,20 +507,24 @@ ABT lowerRIDIntersectMergeJoin(PrefixId& prefixId,
                                ChildPropsType& childProps);
 
 /**
- * Lowers a plan consisting of one or several equality prefixes. The subplans for each equality
- * prefix are connected using correlated joins. The subplans for each prefix in turn are implemented
- * as one or more index scans depending on the shape of the interval expression.
+ * Lowers a plan consisting of one or several equality prefixes. The sub-plans for each equality
+ * prefix are connected using correlated joins. The sub-plans for each prefix in turn are
+ * implemented as one or more index scans which are unioned or intersected depending on the shape of
+ * the interval expression (e.g. conjunction or disjunction).
  */
 ABT lowerEqPrefixes(PrefixId& prefixId,
                     const ProjectionName& ridProjName,
                     FieldProjectionMap indexProjectionMap,
                     const std::string& scanDefName,
                     const std::string& indexDefName,
+                    SpoolId& spoolId,
+                    size_t indexFieldCount,
                     const std::vector<EqualityPrefixEntry>& eqPrefixes,
+                    size_t eqPrefixIndex,
                     const std::vector<bool>& reverseOrder,
-                    const ProjectionNameVector& correlatedProjNames,
+                    ProjectionNameVector correlatedProjNames,
                     const std::map<size_t, SelectivityType>& indexPredSelMap,
-                    CEType currentGroupCE,
+                    CEType indexCE,
                     CEType scanGroupCE,
                     NodeCEMap& nodeCEMap);
 

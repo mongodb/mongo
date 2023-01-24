@@ -1706,7 +1706,6 @@ TEST(PhysRewriter, FilterIndexingRIN) {
     ASSERT_BETWEEN(8, 12, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
     // Demonstrate RIN plan which consists of three equality prefixes.
-    // TODO: SERVER-70639. Use a spool node for RIN plans.
     ASSERT_EXPLAIN_V2_AUTO(
         "Root []\n"
         "|   |   projections: \n"
@@ -1722,26 +1721,52 @@ TEST(PhysRewriter, FilterIndexingRIN) {
         "|   Seek [ridProjection: rid_0, {'<root>': root}, c1]\n"
         "|   RefBlock: \n"
         "|       Variable [rid_0]\n"
-        "NestedLoopJoin [joinType: Inner, {evalTemp_57, evalTemp_58, evalTemp_59, evalTemp_60}]\n"
-        "|   |   Const [true]\n"
-        "|   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {=Vari"
-        "able [evalTemp_57], =Variable [evalTemp_58], =Variable [evalTemp_59], =Variable [evalTem"
-        "p_60], =Const [3]}]\n"
-        "Unique []\n"
-        "|   projections: \n"
-        "|       evalTemp_57\n"
-        "|       evalTemp_58\n"
-        "|       evalTemp_59\n"
-        "|       evalTemp_60\n"
         "NestedLoopJoin [joinType: Inner, {evalTemp_57, evalTemp_58}]\n"
         "|   |   Const [true]\n"
+        "|   NestedLoopJoin [joinType: Inner, {evalTemp_57, evalTemp_58, evalTemp_59, "
+        "evalTemp_60}]\n"
+        "|   |   |   Const [true]\n"
+        "|   |   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: "
+        "{=Variable [evalTemp_57], =Variable [evalTemp_58], =Variable [evalTemp_59], =Variable "
+        "[evalTemp_60], =Const [3]}]\n"
+        "|   SpoolProducer [Lazy, id: 0, {evalTemp_59, evalTemp_60}]\n"
+        "|   |   |   Const [true]\n"
+        "|   Union [{evalTemp_59, evalTemp_60}]\n"
+        "|   |   NestedLoopJoin [joinType: Inner, {rinInner_2, rinInner_3}]\n"
+        "|   |   |   |   Const [true]\n"
+        "|   |   |   LimitSkip []\n"
+        "|   |   |   |   limitSkip:\n"
+        "|   |   |   |       limit: 1\n"
+        "|   |   |   |       skip: 0\n"
+        "|   |   |   IndexScan [{'<indexKey> 2': evalTemp_59, '<indexKey> 3': evalTemp_60}, "
+        "scanDefName: c1, indexDefName: index1, interval: {(Variable [evalTemp_57], Variable "
+        "[evalTemp_57]], (Variable [evalTemp_58], Variable [evalTemp_58]], >Variable [rinInner_2], "
+        ">Variable [rinInner_3], =Const [maxKey]}]\n"
+        "|   |   SpoolConsumer [Stack, id: 0, {rinInner_2, rinInner_3}]\n"
+        "|   LimitSkip []\n"
+        "|   |   limitSkip:\n"
+        "|   |       limit: 1\n"
+        "|   |       skip: 0\n"
         "|   IndexScan [{'<indexKey> 2': evalTemp_59, '<indexKey> 3': evalTemp_60}, scanDefName: "
-        "c1, indexDefName: index1, interval: {=Variable [evalTemp_57], =Variable [evalTemp_58], >"
-        "Const [2], >Const [maxKey], >Const [maxKey]}]\n"
-        "Unique []\n"
-        "|   projections: \n"
-        "|       evalTemp_57\n"
-        "|       evalTemp_58\n"
+        "c1, indexDefName: index1, interval: {=Variable [evalTemp_57], =Variable [evalTemp_58], "
+        ">Const [2], >Const [maxKey], >Const [maxKey]}]\n"
+        "SpoolProducer [Lazy, id: 1, {evalTemp_57, evalTemp_58}]\n"
+        "|   |   Const [true]\n"
+        "Union [{evalTemp_57, evalTemp_58}]\n"
+        "|   NestedLoopJoin [joinType: Inner, {rinInner_0, rinInner_1}]\n"
+        "|   |   |   Const [true]\n"
+        "|   |   LimitSkip []\n"
+        "|   |   |   limitSkip:\n"
+        "|   |   |       limit: 1\n"
+        "|   |   |       skip: 0\n"
+        "|   |   IndexScan [{'<indexKey> 0': evalTemp_57, '<indexKey> 1': evalTemp_58}, "
+        "scanDefName: c1, indexDefName: index1, interval: {>Variable [rinInner_0], >Variable "
+        "[rinInner_1], =Const [maxKey], =Const [maxKey], =Const [maxKey]}]\n"
+        "|   SpoolConsumer [Stack, id: 1, {rinInner_0, rinInner_1}]\n"
+        "LimitSkip []\n"
+        "|   limitSkip:\n"
+        "|       limit: 1\n"
+        "|       skip: 0\n"
         "IndexScan [{'<indexKey> 0': evalTemp_57, '<indexKey> 1': evalTemp_58}, scanDefName: c1, "
         "indexDefName: index1, interval: {>Const [1], >Const [maxKey], >Const [maxKey], >Const [m"
         "axKey], >Const [maxKey]}]\n",
@@ -1753,11 +1778,11 @@ TEST(PhysRewriter, FilterIndexingRIN1) {
     using namespace unit_test_abt_literals;
     auto prefixId = PrefixId::createForTests();
 
-    // Construct a query which tests "a" > 1 and "b" > 2, and sorts ascending on "a", then
-    // descending on "b".
+    // Construct a query which tests "a" > 1 and "b" > 2, and sorts descending on "a", then
+    // ascending on "b".
     ABT rootNode = NodeBuilder{}
-                       .root("root")
-                       .collation({"pa:1", "pb:-1"})
+                       .root("root", "pa", "pb")
+                       .collation({"pa:-1", "pb:1"})
                        .filter(_evalf(_traverse1(_cmp("Gt", "1"_cint64)), "pa"_var))
                        .filter(_evalf(_traverse1(_cmp("Gt", "2"_cint64)), "pb"_var))
                        .eval("pa", _evalp(_get("a", _id()), "root"_var))
@@ -1791,13 +1816,17 @@ TEST(PhysRewriter, FilterIndexingRIN1) {
     phaseManager.optimize(optimized);
     ASSERT_BETWEEN(10, 15, phaseManager.getMemo().getStats()._physPlanExplorationCount);
 
-    // Observe how the index scan for the second equality prefix (on "b") is reversed while the
-    // first one (on "a") is not.
+    // Observe how the index scan for the first equality prefix (on "a") is reversed while the
+    // second one (on "a") is not.
     ASSERT_EXPLAIN_V2_AUTO(
         "Root []\n"
         "|   |   projections: \n"
         "|   |       root\n"
+        "|   |       pa\n"
+        "|   |       pb\n"
         "|   RefBlock: \n"
+        "|       Variable [pa]\n"
+        "|       Variable [pb]\n"
         "|       Variable [root]\n"
         "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
@@ -1810,13 +1839,26 @@ TEST(PhysRewriter, FilterIndexingRIN1) {
         "|       Variable [rid_0]\n"
         "NestedLoopJoin [joinType: Inner, {pa}]\n"
         "|   |   Const [true]\n"
-        "|   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {=Vari"
-        "able [pa], >Const [2]}, reversed]\n"
-        "Unique []\n"
-        "|   projections: \n"
-        "|       pa\n"
-        "IndexScan [{'<indexKey> 0': pa}, scanDefName: c1, indexDefName: index1, interval: {>Cons"
-        "t [1], >Const [maxKey]}]\n",
+        "|   IndexScan [{'<indexKey> 1': pb, '<rid>': rid_0}, scanDefName: c1, indexDefName: "
+        "index1, interval: {=Variable [pa], >Const [2]}]\n"
+        "SpoolProducer [Lazy, id: 1, {pa}]\n"
+        "|   |   Const [true]\n"
+        "Union [{pa}]\n"
+        "|   NestedLoopJoin [joinType: Inner, {rinInner_1}]\n"
+        "|   |   |   Const [true]\n"
+        "|   |   LimitSkip []\n"
+        "|   |   |   limitSkip:\n"
+        "|   |   |       limit: 1\n"
+        "|   |   |       skip: 0\n"
+        "|   |   IndexScan [{'<indexKey> 0': pa}, scanDefName: c1, indexDefName: index1, interval: "
+        "{(Const [1], Variable [rinInner_1]), (Const [maxKey], Const [minKey]]}, reversed]\n"
+        "|   SpoolConsumer [Stack, id: 1, {rinInner_1}]\n"
+        "LimitSkip []\n"
+        "|   limitSkip:\n"
+        "|       limit: 1\n"
+        "|       skip: 0\n"
+        "IndexScan [{'<indexKey> 0': pa}, scanDefName: c1, indexDefName: index1, interval: {>Const "
+        "[1], >Const [maxKey]}, reversed]\n",
         optimized);
 }
 
@@ -1828,17 +1870,15 @@ TEST(PhysRewriter, FilterIndexingRIN2) {
     // Construct a query which tests "a" in [1, 2] U [3, 4] and "b" in [5, 6] U [7, 8].
     ABT rootNode =
         NodeBuilder{}
-            .root("root")
-            .filter(
-                _evalf(_get("a",
-                            _composea(_composem(_cmp("Gte", "1"_cint64), _cmp("Lte", "2"_cint64)),
-                                      _composem(_cmp("Gte", "3"_cint64), _cmp("Lte", "4"_cint64)))),
-                       "root"_var))
-            .filter(
-                _evalf(_get("b",
-                            _composea(_composem(_cmp("Gte", "5"_cint64), _cmp("Lte", "6"_cint64)),
-                                      _composem(_cmp("Gte", "7"_cint64), _cmp("Lte", "8"_cint64)))),
-                       "root"_var))
+            .root("root", "pa", "pb")
+            .filter(_evalf(_composea(_composem(_cmp("Gte", "1"_cint64), _cmp("Lte", "2"_cint64)),
+                                     _composem(_cmp("Gte", "3"_cint64), _cmp("Lte", "4"_cint64))),
+                           "pa"_var))
+            .filter(_evalf(_composea(_composem(_cmp("Gte", "5"_cint64), _cmp("Lte", "6"_cint64)),
+                                     _composem(_cmp("Gte", "7"_cint64), _cmp("Lte", "8"_cint64))),
+                           "pb"_var))
+            .eval("pa", _evalp(_get("a", _id()), "root"_var))
+            .eval("pb", _evalp(_get("b", _id()), "root"_var))
             .finish(_scan("root", "c1"));
 
     auto phaseManager = makePhaseManager(
@@ -1872,7 +1912,11 @@ TEST(PhysRewriter, FilterIndexingRIN2) {
         "Root []\n"
         "|   |   projections: \n"
         "|   |       root\n"
+        "|   |       pa\n"
+        "|   |       pb\n"
         "|   RefBlock: \n"
+        "|       Variable [pa]\n"
+        "|       Variable [pb]\n"
         "|       Variable [root]\n"
         "NestedLoopJoin [joinType: Inner, {rid_0}]\n"
         "|   |   Const [true]\n"
@@ -1883,35 +1927,84 @@ TEST(PhysRewriter, FilterIndexingRIN2) {
         "|   Seek [ridProjection: rid_0, {'<root>': root}, c1]\n"
         "|   RefBlock: \n"
         "|       Variable [rid_0]\n"
-        "NestedLoopJoin [joinType: Inner, {evalTemp_10}]\n"
+        "GroupBy []\n"
+        "|   |   groupings: \n"
+        "|   |       RefBlock: \n"
+        "|   |           Variable [rid_0]\n"
+        "|   aggregations: \n"
+        "|       [pa]\n"
+        "|           FunctionCall [$first]\n"
+        "|           Variable [disjunction_0]\n"
+        "|       [pb]\n"
+        "|           FunctionCall [$first]\n"
+        "|           Variable [disjunction_1]\n"
+        "Union [{disjunction_0, disjunction_1, rid_0}]\n"
+        "|   NestedLoopJoin [joinType: Inner, {disjunction_0}]\n"
+        "|   |   |   Const [true]\n"
+        "|   |   GroupBy []\n"
+        "|   |   |   |   groupings: \n"
+        "|   |   |   |       RefBlock: \n"
+        "|   |   |   |           Variable [rid_0]\n"
+        "|   |   |   aggregations: \n"
+        "|   |   |       [disjunction_1]\n"
+        "|   |   |           FunctionCall [$first]\n"
+        "|   |   |           Variable [disjunction_3]\n"
+        "|   |   Union [{disjunction_3, rid_0}]\n"
+        "|   |   |   IndexScan [{'<indexKey> 1': disjunction_3, '<rid>': rid_0}, scanDefName: c1, "
+        "indexDefName: index1, interval: {=Variable [disjunction_0], [Const [7], Const [8]]}]\n"
+        "|   |   IndexScan [{'<indexKey> 1': disjunction_3, '<rid>': rid_0}, scanDefName: c1, "
+        "indexDefName: index1, interval: {=Variable [disjunction_0], [Const [5], Const [6]]}]\n"
+        "|   SpoolProducer [Lazy, id: 1, {disjunction_0}]\n"
+        "|   |   |   Const [true]\n"
+        "|   Union [{disjunction_0}]\n"
+        "|   |   NestedLoopJoin [joinType: Inner, {rinInner_1}]\n"
+        "|   |   |   |   Const [true]\n"
+        "|   |   |   LimitSkip []\n"
+        "|   |   |   |   limitSkip:\n"
+        "|   |   |   |       limit: 1\n"
+        "|   |   |   |       skip: 0\n"
+        "|   |   |   IndexScan [{'<indexKey> 0': disjunction_0}, scanDefName: c1, indexDefName: "
+        "index1, interval: {(Variable [rinInner_1], Const [4]], =Const [maxKey]}]\n"
+        "|   |   SpoolConsumer [Stack, id: 1, {rinInner_1}]\n"
+        "|   LimitSkip []\n"
+        "|   |   limitSkip:\n"
+        "|   |       limit: 1\n"
+        "|   |       skip: 0\n"
+        "|   IndexScan [{'<indexKey> 0': disjunction_0}, scanDefName: c1, indexDefName: index1, "
+        "interval: {[Const [3], Const [4]], <fully open>}]\n"
+        "NestedLoopJoin [joinType: Inner, {disjunction_0}]\n"
         "|   |   Const [true]\n"
         "|   GroupBy []\n"
         "|   |   |   groupings: \n"
         "|   |   |       RefBlock: \n"
         "|   |   |           Variable [rid_0]\n"
         "|   |   aggregations: \n"
-        "|   Union [{rid_0}]\n"
-        "|   |   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {="
-        "Variable [evalTemp_10], [Const [7], Const [8]]}]\n"
-        "|   IndexScan [{'<rid>': rid_0}, scanDefName: c1, indexDefName: index1, interval: {=Vari"
-        "able [evalTemp_10], [Const [5], Const [6]]}]\n"
-        "Unique []\n"
-        "|   projections: \n"
-        "|       evalTemp_10\n"
-        "Union [{evalTemp_10}]\n"
-        "GroupBy []\n"
-        "|   |   groupings: \n"
-        "|   |       RefBlock: \n"
-        "|   |           Variable [rid_0]\n"
-        "|   aggregations: \n"
-        "|       [evalTemp_10]\n"
-        "|           FunctionCall [$first]\n"
-        "|           Variable [disjunction_0]\n"
-        "Union [{disjunction_0, rid_0}]\n"
-        "|   IndexScan [{'<indexKey> 0': disjunction_0, '<rid>': rid_0}, scanDefName: c1, indexDe"
-        "fName: index1, interval: {[Const [3], Const [4]], <fully open>}]\n"
-        "IndexScan [{'<indexKey> 0': disjunction_0, '<rid>': rid_0}, scanDefName: c1, indexDefNam"
-        "e: index1, interval: {[Const [1], Const [2]], <fully open>}]\n",
+        "|   |       [disjunction_1]\n"
+        "|   |           FunctionCall [$first]\n"
+        "|   |           Variable [disjunction_2]\n"
+        "|   Union [{disjunction_2, rid_0}]\n"
+        "|   |   IndexScan [{'<indexKey> 1': disjunction_2, '<rid>': rid_0}, scanDefName: c1, "
+        "indexDefName: index1, interval: {=Variable [disjunction_0], [Const [7], Const [8]]}]\n"
+        "|   IndexScan [{'<indexKey> 1': disjunction_2, '<rid>': rid_0}, scanDefName: c1, "
+        "indexDefName: index1, interval: {=Variable [disjunction_0], [Const [5], Const [6]]}]\n"
+        "SpoolProducer [Lazy, id: 0, {disjunction_0}]\n"
+        "|   |   Const [true]\n"
+        "Union [{disjunction_0}]\n"
+        "|   NestedLoopJoin [joinType: Inner, {rinInner_0}]\n"
+        "|   |   |   Const [true]\n"
+        "|   |   LimitSkip []\n"
+        "|   |   |   limitSkip:\n"
+        "|   |   |       limit: 1\n"
+        "|   |   |       skip: 0\n"
+        "|   |   IndexScan [{'<indexKey> 0': disjunction_0}, scanDefName: c1, indexDefName: "
+        "index1, interval: {(Variable [rinInner_0], Const [2]], =Const [maxKey]}]\n"
+        "|   SpoolConsumer [Stack, id: 0, {rinInner_0}]\n"
+        "LimitSkip []\n"
+        "|   limitSkip:\n"
+        "|       limit: 1\n"
+        "|       skip: 0\n"
+        "IndexScan [{'<indexKey> 0': disjunction_0}, scanDefName: c1, indexDefName: index1, "
+        "interval: {[Const [1], Const [2]], <fully open>}]\n",
         optimized);
 }
 

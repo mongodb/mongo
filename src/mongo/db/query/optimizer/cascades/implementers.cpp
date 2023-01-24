@@ -514,9 +514,8 @@ public:
 
                 auto indexProjectionMap = candidateIndexEntry._fieldProjectionMap;
                 auto residualReqs = candidateIndexEntry._residualRequirements;
-                const auto& correlatedProjNames = candidateIndexEntry._correlatedProjNames;
                 removeRedundantResidualPredicates(
-                    requiredProjections, correlatedProjNames, residualReqs, indexProjectionMap);
+                    requiredProjections, residualReqs, indexProjectionMap);
 
                 // Compute the selectivities of predicates covered by index bounds and by residual
                 // predicates.
@@ -597,9 +596,12 @@ public:
                                                std::move(indexProjectionMap),
                                                scanDefName,
                                                indexDefName,
+                                               _spoolId,
+                                               indexDef.getCollationSpec().size(),
                                                eqPrefixes,
+                                               0 /*currentEqPrefixIndex*/,
                                                reverseOrder,
-                                               correlatedProjNames.getVector(),
+                                               candidateIndexEntry._correlatedProjNames.getVector(),
                                                std::move(indexPredSelMap),
                                                currentGroupCE,
                                                scanGroupCE,
@@ -643,7 +645,7 @@ public:
             FieldProjectionMap fieldProjectionMap = scanParams->_fieldProjectionMap;
             ResidualRequirements residualReqs = scanParams->_residualRequirements;
             removeRedundantResidualPredicates(
-                requiredProjections, {} /*correlatedProjNames*/, residualReqs, fieldProjectionMap);
+                requiredProjections, residualReqs, fieldProjectionMap);
 
             if (indexReqTarget == IndexReqTarget::Complete && needsRID) {
                 fieldProjectionMap._ridProjection = ridProjName;
@@ -1267,6 +1269,7 @@ public:
                           const QueryHints& hints,
                           const RIDProjectionsMap& ridProjections,
                           PrefixId& prefixId,
+                          SpoolId& spoolId,
                           PhysRewriteQueue& queue,
                           const PhysProps& physProps,
                           const LogicalProps& logicalProps,
@@ -1276,6 +1279,7 @@ public:
           _hints(hints),
           _ridProjections(ridProjections),
           _prefixId(prefixId),
+          _spoolId(spoolId),
           _queue(queue),
           _physProps(physProps),
           _logicalProps(logicalProps),
@@ -1695,6 +1699,7 @@ private:
     const QueryHints& _hints;
     const RIDProjectionsMap& _ridProjections;
     PrefixId& _prefixId;
+    SpoolId& _spoolId;
     PhysRewriteQueue& _queue;
     const PhysProps& _physProps;
     const LogicalProps& _logicalProps;
@@ -1706,6 +1711,7 @@ void addImplementers(const Metadata& metadata,
                      const QueryHints& hints,
                      const RIDProjectionsMap& ridProjections,
                      PrefixId& prefixId,
+                     SpoolId& spoolId,
                      const PhysProps& physProps,
                      PhysQueueAndImplPos& queue,
                      const LogicalProps& logicalProps,
@@ -1716,6 +1722,7 @@ void addImplementers(const Metadata& metadata,
                                   hints,
                                   ridProjections,
                                   prefixId,
+                                  spoolId,
                                   queue._queue,
                                   physProps,
                                   logicalProps,

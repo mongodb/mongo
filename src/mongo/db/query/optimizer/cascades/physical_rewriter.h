@@ -90,6 +90,8 @@ private:
                                                ChildPropsType childProps,
                                                CostType costLimit);
 
+    SpoolId _spoolId;
+
     // We don't own any of this.
     const Metadata& _metadata;
     Memo& _memo;

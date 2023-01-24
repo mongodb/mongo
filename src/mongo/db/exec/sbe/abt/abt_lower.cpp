@@ -1145,6 +1145,12 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const IndexScanNode& n, co
             "Invalid bounds combination",
             lowerBoundExpr != nullptr || upperBoundExpr == nullptr);
 
+    const bool reverse = n.isIndexReverseOrder();
+    if (reverse) {
+        // TODO: SERVER-72784: implement bounds as vector of values, move reversal to impl. phase.
+        std::swap(lowerBoundExpr, upperBoundExpr);
+    }
+
     const PlanNodeId planNodeId = _nodeToGroupPropsMap.at(&n)._planNodeId;
 
     // Unused.
@@ -1152,7 +1158,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const IndexScanNode& n, co
 
     return sbe::makeS<sbe::SimpleIndexScanStage>(nss.uuid().value(),
                                                  indexDefName,
-                                                 !n.isIndexReverseOrder(),
+                                                 !reverse,
                                                  resultSlot,
                                                  ridSlot,
                                                  boost::none,

@@ -1829,7 +1829,6 @@ void applyProjectionRenames(ProjectionRenames projectionRenames,
 }
 
 void removeRedundantResidualPredicates(const ProjectionNameOrderPreservingSet& requiredProjections,
-                                       const ProjectionNameOrderPreservingSet& correlatedProjNames,
                                        ResidualRequirements& residualReqs,
                                        FieldProjectionMap& fieldProjectionMap) {
     ProjectionNameSet residualTempProjections;
@@ -1861,8 +1860,8 @@ void removeRedundantResidualPredicates(const ProjectionNameOrderPreservingSet& r
     // Remove unused projections from the field projection map.
     auto& fieldProjMap = fieldProjectionMap._fieldProjections;
     for (auto it = fieldProjMap.begin(); it != fieldProjMap.end();) {
-        if (const ProjectionName& projName = it->second; !requiredProjections.find(projName) &&
-            residualTempProjections.count(projName) == 0 && !correlatedProjNames.find(projName)) {
+        if (const ProjectionName& projName = it->second;
+            !requiredProjections.find(projName) && residualTempProjections.count(projName) == 0) {
             fieldProjMap.erase(it++);
         } else {
             it++;
@@ -2053,6 +2052,146 @@ ABT lowerRIDIntersectMergeJoin(PrefixId& prefixId,
     return result;
 }
 
+/**
+ * Generates a distinct scan plan. This is a type of index scan which iterates over the distinct
+ * (unique) values in a particular index range. The basic outline of the plan is the following:
+ *
+ *     SpoolProducer (<spoolId>, <outerProjNames>)
+ *     Union (<outerProjNames>)
+ *         Limit 1
+ *         IxScan(<outerFPM>, <outerInterval>, reverse)
+ *
+ *         NLJ (correlated = <innerProjNames>)
+ *             SpoolConsumer (<spoolId>, <innerProjNames>)
+ *
+ *             Limit 1
+ *             IxScan(<outerProjNames>, <innerInterval>, reverse)
+ *
+ *  For a particular index, we generate a spooling plan (see corresponding spool producer and
+ * consumer nodes), which first seeds the iteration with the base case represented by the outer
+ * index scan and associated parameters. Then we iterate in the recursive case where we re-open the
+ * inner index scan on every new combination of values we receive from the spool.
+ */
+static ABT generateDistinctScan(const std::string& scanDefName,
+                                const std::string& indexDefName,
+                                const bool reverse,
+                                const CEType ce,
+                                const int spoolId,
+                                ProjectionNameVector outerProjNames,
+                                FieldProjectionMap outerFPM,
+                                CompoundIntervalRequirement outerInterval,
+                                ProjectionNameVector innerProjNames,
+                                FieldProjectionMap innerFPM,
+                                CompoundIntervalRequirement innerInterval,
+                                NodeCEMap& nodeCEMap) {
+    ProjectionNameSet innerProjNameSet;
+    for (const auto& projName : innerProjNames) {
+        innerProjNameSet.insert(projName);
+    }
+
+    ABT innerIndexScan = make<IndexScanNode>(
+        std::move(innerFPM), scanDefName, indexDefName, std::move(innerInterval), reverse);
+    nodeCEMap.emplace(innerIndexScan.cast<Node>(), ce);
+
+    // Advance to the next unique key.
+    innerIndexScan =
+        make<LimitSkipNode>(properties::LimitSkipRequirement{1, 0}, std::move(innerIndexScan));
+    nodeCEMap.emplace(innerIndexScan.cast<Node>(), ce);
+
+    ABT spoolCons =
+        make<SpoolConsumerNode>(SpoolConsumerType::Stack, spoolId, std::move(innerProjNames));
+    nodeCEMap.emplace(spoolCons.cast<Node>(), ce);
+
+    ABT innerCorrelatedJoin = make<NestedLoopJoinNode>(JoinType::Inner,
+                                                       std::move(innerProjNameSet),
+                                                       Constant::boolean(true),
+                                                       std::move(spoolCons),
+                                                       std::move(innerIndexScan));
+    nodeCEMap.emplace(innerCorrelatedJoin.cast<Node>(), ce);
+
+    // Outer index scan node.
+    ABT outerIndexScan = make<IndexScanNode>(
+        std::move(outerFPM), scanDefName, indexDefName, std::move(outerInterval), reverse);
+    nodeCEMap.emplace(outerIndexScan.cast<Node>(), ce);
+
+    // Limit to one result to seed the distinct scan.
+    outerIndexScan =
+        make<LimitSkipNode>(properties::LimitSkipRequirement{1, 0}, std::move(outerIndexScan));
+    nodeCEMap.emplace(outerIndexScan.cast<Node>(), ce);
+
+    ABT unionNode = make<UnionNode>(
+        outerProjNames, makeSeq(std::move(outerIndexScan), std::move(innerCorrelatedJoin)));
+    nodeCEMap.emplace(unionNode.cast<Node>(), ce);
+
+    ABT spoolProd = make<SpoolProducerNode>(SpoolProducerType::Lazy,
+                                            spoolId,
+                                            std::move(outerProjNames),
+                                            Constant::boolean(true),
+                                            std::move(unionNode));
+    nodeCEMap.emplace(spoolProd.cast<Node>(), ce);
+
+    return spoolProd;
+}
+
+/**
+ * This transport is responsible for encoding a set of equality prefixes into a physical plan. Each
+ * equality prefix represents a subset of predicates to be evaluated using a particular index
+ * (referenced by "indexDefName"). The combined set of predicates is structured into equality
+ * prefixes such that each prefix begins with a (possibly empty) prefix of equality (point)
+ * predicates on the respective index fields from the start, followed by at most one inequality
+ * predicate, followed by a (possibly empty) suffix of unbound fields. We encode a given equality
+ * prefix by using a combination of distinct scan (for the initial equality prefixes) or a regular
+ * index scans (for the last equality prefix). On a high level, we iterate over the distinct
+ * combinations of index field values referred to by the equality prefix using a combination of
+ * spool producer and consumer nodes. Each unique combination of index field values is then passed
+ * onto the next equality prefix which uses it to constrain its own distinct scan, or in the case of
+ * the last equality prefix, the final index scan. For a given equality prefix, there is an
+ * associated compound interval expression on the referenced fields. The compound interval is a
+ * boolean expression consisting of conjunctions and disjunctions, which on a high-level are encoded
+ * as index intersection and index union.
+ *
+ * A few examples:
+ *   1. Compound index on {a, b}. Predicates a = 1 and b > 2, translating into one equality prefix
+ * with a compound interval ({1, 2}, {1, MaxKey}). The resulting plan is a simple index scan:
+ *
+ *     IxScan(({1, 2}, {1, MaxKey})).
+ *
+ *   2. Compound index on {a, b}. Predicates (a = 1 or a = 3) and b > 2. We have one equality prefix
+ * with a compound interval ({1, 2}, {1, MaxKey}) U ({3, 2}, {3, MaxKey}). We encode the plan as:
+ *
+ *   Union
+ *       IxScan({1, 2}, {1, MaxKey})
+ *       IxScan({3, 2}, {3, MaxKey})
+ *
+ *   3. Compound index on {a, b}. Predicates a > 1 and b > 2. We now have two equality prefixes. The
+ * first equality prefix answered using the distinct scan sub-plan generated to produce distinct
+ * values for "a" in the range (1, MaxKey]. The distinct value stream is correlated and made
+ * available to the inner index scan which satisfies "b > 2".
+ *
+ *   NLJ (correlated = a)
+ *       DistinctScan(a, (1, MaxKey])
+ *       IxScan(({a, 2}, {a, MaxKey}))
+ *
+ *  Observe the first part of the plan (the outer side of the first correlated join) iterates over
+ * the distinct values of the field "a" using a combination of spooling and inner index scan with a
+ * variable bound on the current value of "a". The last index scan effectively
+ * receives a stream of unique values of "a" and delivers values which also satisfy b > 2.
+ *
+ *  4. Compound index on {a, b}. Predicates a in [1, 2], b in [3, 4]. We have two equality prefix
+ * and we generate the following plan.
+ *
+ *  Union
+ *      NLJ (correlated = a)
+ *          DistinctScan(a, [1, 1])
+ *          Union
+ *              IxScan([{a, 3}, {a, 3}])
+ *              IxScan([{a, 4}, {a, 4}])
+ *      NLJ (correlated = a)
+ *          DistinctScan(a, [2, 2])
+ *          Union
+ *             IxScan([{a, 3}, {a, 3}])
+ *             IxScan([{a, 4}, {a, 4}])
+ */
 class IntervalLowerTransport {
 public:
     IntervalLowerTransport(PrefixId& prefixId,
@@ -2060,39 +2199,187 @@ public:
                            FieldProjectionMap indexProjectionMap,
                            const std::string& scanDefName,
                            const std::string& indexDefName,
-                           const bool reverseOrder,
-                           const CEType indexCE,
+                           SpoolId& spoolId,
+                           const size_t indexFieldCount,
+                           const std::vector<EqualityPrefixEntry>& eqPrefixes,
+                           const size_t currentEqPrefixIndex,
+                           const std::vector<bool>& reverseOrder,
+                           ProjectionNameVector correlatedProjNames,
+                           const std::map<size_t, SelectivityType>& indexPredSelMap,
+                           const CEType currentGroupCE,
                            const CEType scanGroupCE,
                            NodeCEMap& nodeCEMap)
         : _prefixId(prefixId),
           _ridProjName(ridProjName),
           _scanDefName(scanDefName),
           _indexDefName(indexDefName),
+          _spoolId(spoolId),
+          _indexFieldCount(indexFieldCount),
+          _eqPrefixes(eqPrefixes),
+          _currentEqPrefixIndex(currentEqPrefixIndex),
+          _currentEqPrefix(_eqPrefixes.at(_currentEqPrefixIndex)),
           _reverseOrder(reverseOrder),
+          _indexPredSelMap(indexPredSelMap),
           _scanGroupCE(scanGroupCE),
           _nodeCEMap(nodeCEMap) {
+        // Collect estimates for predicates satisfied with the current equality prefix.
+        // TODO: rationalize cardinality estimates: estimate number of unique groups.
+        CEType indexCE = currentGroupCE;
+        if (!_currentEqPrefix._predPosSet.empty()) {
+            std::vector<SelectivityType> currentSels;
+            for (const size_t index : _currentEqPrefix._predPosSet) {
+                if (const auto it = indexPredSelMap.find(index); it != indexPredSelMap.cend()) {
+                    currentSels.push_back(it->second);
+                }
+            }
+            if (!currentSels.empty()) {
+                indexCE = scanGroupCE * ce::conjExponentialBackoff(std::move(currentSels));
+            }
+        }
+
         const SelectivityType indexSel =
             (scanGroupCE == 0.0) ? SelectivityType{0.0} : (indexCE / _scanGroupCE);
-        _estimateStack.push_back(indexSel);
-        _fpmStack.push_back(std::move(indexProjectionMap));
+
+        _paramStack.push_back(
+            {indexSel, std::move(indexProjectionMap), std::move(correlatedProjNames)});
     };
 
     ABT transport(const CompoundIntervalReqExpr::Atom& node) {
-        ABT physicalIndexScan = make<IndexScanNode>(
-            _fpmStack.back(), _scanDefName, _indexDefName, node.getExpr(), _reverseOrder);
-        _nodeCEMap.emplace(physicalIndexScan.cast<Node>(), _scanGroupCE * _estimateStack.back());
-        return physicalIndexScan;
+        const auto& params = _paramStack.back();
+        const auto& currentFPM = params._fpm;
+        const CEType currentCE = _scanGroupCE * params._estimate;
+        const size_t startPos = _currentEqPrefix._startPos;
+        const bool reverse = _reverseOrder.at(_currentEqPrefixIndex);
+
+        auto interval = node.getExpr();
+        const auto& currentCorrelatedProjNames = params._correlatedProjNames;
+        // Update interval with current correlations.
+        for (size_t i = 0; i < startPos; i++) {
+            BoundRequirement bound{true /*inclusive*/,
+                                   make<Variable>(currentCorrelatedProjNames.at(i))};
+            interval.at(i) = {bound, bound};
+        }
+
+        if (_currentEqPrefixIndex + 1 == _eqPrefixes.size()) {
+            // If this is the last equality prefix, use the input field projection map.
+            ABT result = make<IndexScanNode>(
+                currentFPM, _scanDefName, _indexDefName, std::move(interval), reverse);
+            _nodeCEMap.emplace(result.cast<Node>(), currentCE);
+            return result;
+        }
+
+        FieldProjectionMap nextFPM = currentFPM;
+        FieldProjectionMap outerFPM;
+
+        // Set of correlated projections for next equality prefix.
+        ProjectionNameSet correlationSet;
+
+        // Inner and outer auxiliary projections used to set-up the inner index scan parameters to
+        // support the spool-based distinct scan.
+        ProjectionNameVector innerProjNames;
+        ProjectionNameVector outerProjNames;
+        // Interval and projection map of the inner index scan.
+        CompoundIntervalRequirement innerInterval;
+        FieldProjectionMap innerFPM;
+
+        const auto addInnerBound = [&](BoundRequirement bound) {
+            const auto& req = interval.at(innerInterval.size());
+            if (reverse) {
+                innerInterval.emplace_back(req.getLowBound(), std::move(bound));
+            } else {
+                innerInterval.emplace_back(std::move(bound), req.getHighBound());
+            }
+        };
+
+        const size_t nextStartPos = _eqPrefixes.at(_currentEqPrefixIndex + 1)._startPos;
+        for (size_t indexField = 0; indexField < nextStartPos; indexField++) {
+            const FieldNameType indexKey{encodeIndexKeyName(indexField)};
+
+            // Restrict next fpm to not require fields up to "nextStartPos". It should require
+            // fields only from the next equality prefixes.
+            nextFPM._fieldProjections.erase(indexKey);
+
+            // Generate the combined set of correlated projections from the previous and current
+            // equality prefixes.
+            const ProjectionName& correlatedProjName = currentCorrelatedProjNames.at(indexField);
+            correlationSet.insert(correlatedProjName);
+
+            if (indexField < startPos) {
+                // The predicates referring to correlated projections from the previous prefixes
+                // are converted to equalities over the distinct set of values.
+                addInnerBound({false /*inclusive*/, make<Variable>(correlatedProjName)});
+            } else {
+                // Use the correlated projections of the current prefix as outer projections.
+                outerProjNames.push_back(correlatedProjName);
+                outerFPM._fieldProjections.emplace(indexKey, correlatedProjName);
+
+                // For each of the outer projections, generate a set of corresponding inner
+                // projections to use for the spool consumer and bounds for the inner index scan.
+                auto innerProjName = _prefixId.getNextId("rinInner");
+                innerProjNames.push_back(innerProjName);
+
+                addInnerBound({false /*inclusive*/, make<Variable>(std::move(innerProjName))});
+
+                innerFPM._fieldProjections.emplace(indexKey, correlatedProjName);
+            }
+        }
+        while (innerInterval.size() < _indexFieldCount) {
+            // Pad the remaining fields in the inner interval.
+            addInnerBound(reverse ? BoundRequirement::makeMinusInf()
+                                  : BoundRequirement::makePlusInf());
+        }
+
+        // Recursively generate a plan to encode the intervals of the subsequent prefixes.
+        ABT nextPrefix = lowerEqPrefixes(_prefixId,
+                                         _ridProjName,
+                                         std::move(nextFPM),
+                                         _scanDefName,
+                                         _indexDefName,
+                                         _spoolId,
+                                         _indexFieldCount,
+                                         _eqPrefixes,
+                                         _currentEqPrefixIndex + 1,
+                                         _reverseOrder,
+                                         currentCorrelatedProjNames,
+                                         _indexPredSelMap,
+                                         currentCE,
+                                         _scanGroupCE,
+                                         _nodeCEMap);
+
+        ABT distinctScan = generateDistinctScan(_scanDefName,
+                                                _indexDefName,
+                                                reverse,
+                                                currentCE,
+                                                _spoolId.getNextId(),
+                                                std::move(outerProjNames),
+                                                std::move(outerFPM),
+                                                std::move(interval),
+                                                std::move(innerProjNames),
+                                                std::move(innerFPM),
+                                                std::move(innerInterval),
+                                                _nodeCEMap);
+
+        ABT outerCorrelatedJoin = make<NestedLoopJoinNode>(JoinType::Inner,
+                                                           std::move(correlationSet),
+                                                           Constant::boolean(true),
+                                                           std::move(distinctScan),
+                                                           std::move(nextPrefix));
+        _nodeCEMap.emplace(outerCorrelatedJoin.cast<Node>(), currentCE);
+
+        return outerCorrelatedJoin;
     }
 
     template <bool isConjunction>
     void prepare(const size_t childCount) {
+        const auto& params = _paramStack.back();
+
         SelectivityType childSel{1.0};
         if (childCount > 0) {
             // Here we are assuming that children in each conjunction and disjunction contribute
             // equally and independently to the parent's selectivity.
             // TODO: consider estimates per individual interval.
 
-            const SelectivityType parentSel = _estimateStack.back();
+            const SelectivityType parentSel = params._estimate;
             const double childCountInv = 1.0 / childCount;
             if constexpr (isConjunction) {
                 childSel = {(parentSel == 0.0) ? SelectivityType{0.0}
@@ -2101,18 +2388,31 @@ public:
                 childSel = parentSel * childCountInv;
             }
         }
-        _estimateStack.push_back(childSel);
 
-        FieldProjectionMap childMap = _fpmStack.back();
+        FieldProjectionMap childMap = params._fpm;
+        ProjectionNameVector correlatedProjNames = params._correlatedProjNames;
         if (childCount > 1) {
             if (!childMap._ridProjection) {
                 childMap._ridProjection = _ridProjName;
             }
-            for (auto& [fieldName, projectionName] : childMap._fieldProjections) {
-                projectionName = _prefixId.getNextId(isConjunction ? "conjunction" : "disjunction");
+
+            // For projections we require, introduce temporary projections to allow us to union or
+            // intersect. Also update the current correlations.
+            auto& childFields = childMap._fieldProjections;
+            for (size_t indexField = 0; indexField < _indexFieldCount; indexField++) {
+                const FieldNameType indexKey{encodeIndexKeyName(indexField)};
+                if (auto it = childFields.find(indexKey); it != childFields.end()) {
+                    const auto tempProjName =
+                        _prefixId.getNextId(isConjunction ? "conjunction" : "disjunction");
+                    it->second = tempProjName;
+                    if (indexField < correlatedProjNames.size()) {
+                        correlatedProjNames.at(indexField) = std::move(tempProjName);
+                    }
+                }
             }
         }
-        _fpmStack.push_back(std::move(childMap));
+
+        _paramStack.push_back({childSel, std::move(childMap), std::move(correlatedProjNames)});
     }
 
     void prepare(const CompoundIntervalReqExpr::Conjunction& node) {
@@ -2121,35 +2421,36 @@ public:
 
     template <bool isIntersect>
     ABT implement(ABTVector inputs) {
-        _estimateStack.pop_back();
-        const CEType ce = _scanGroupCE * _estimateStack.back();
+        auto params = std::move(_paramStack.back());
+        _paramStack.pop_back();
+        auto& prevParams = _paramStack.back();
 
-        auto innerMap = std::move(_fpmStack.back());
-        _fpmStack.pop_back();
-        auto outerMap = _fpmStack.back();
+        const CEType ce = _scanGroupCE * params._estimate;
+        auto innerMap = std::move(params._fpm);
+        auto outerMap = prevParams._fpm;
 
         const size_t inputSize = inputs.size();
         if (inputSize == 1) {
             return std::move(inputs.front());
         }
 
+        // The input projections names we will be combining from both sides.
         ProjectionNameVector unionProjectionNames;
-        unionProjectionNames.push_back(_ridProjName);
-        for (const auto& [fieldName, projectionName] : innerMap._fieldProjections) {
-            unionProjectionNames.push_back(projectionName);
-        }
-
+        // Projection names which will be the result of the combination (intersect or union).
         ProjectionNameVector outerProjNames;
-        for (const auto& [fieldName, projectionName] : outerMap._fieldProjections) {
-            outerProjNames.push_back(projectionName);
+        // Agg expressions used to combine the unioned projections.
+        ABTVector aggExpressions;
+
+        unionProjectionNames.push_back(_ridProjName);
+        for (const auto& [fieldName, outerProjName] : outerMap._fieldProjections) {
+            outerProjNames.push_back(outerProjName);
+
+            const auto& innerProjName = innerMap._fieldProjections.at(fieldName);
+            unionProjectionNames.push_back(innerProjName);
+            aggExpressions.emplace_back(
+                make<FunctionCall>("$first", makeSeq(make<Variable>(innerProjName))));
         }
         ProjectionNameVector aggProjectionNames = outerProjNames;
-
-        ABTVector aggExpressions;
-        for (const auto& [fieldName, projectionName] : innerMap._fieldProjections) {
-            aggExpressions.emplace_back(
-                make<FunctionCall>("$first", makeSeq(make<Variable>(projectionName))));
-        }
 
         boost::optional<ProjectionName> sideSetProjectionName;
         if constexpr (isIntersect) {
@@ -2218,129 +2519,60 @@ private:
     const ProjectionName& _ridProjName;
     const std::string& _scanDefName;
     const std::string& _indexDefName;
-    const bool _reverseOrder;
+
+    // Equality-prefix and related.
+    SpoolId& _spoolId;
+    const size_t _indexFieldCount;
+    const std::vector<EqualityPrefixEntry>& _eqPrefixes;
+    const size_t _currentEqPrefixIndex;
+    const EqualityPrefixEntry& _currentEqPrefix;
+    const std::vector<bool>& _reverseOrder;
+    const std::map<size_t, SelectivityType>& _indexPredSelMap;
+
     const CEType _scanGroupCE;
     NodeCEMap& _nodeCEMap;
 
-    std::vector<SelectivityType> _estimateStack;
-    std::vector<FieldProjectionMap> _fpmStack;
+    // Stack which is used to support carrying and updating parameters across Conjunction and
+    // Disjunction nodes.
+    struct StackEntry {
+        SelectivityType _estimate;
+        FieldProjectionMap _fpm;
+        ProjectionNameVector _correlatedProjNames;
+    };
+    std::vector<StackEntry> _paramStack;
 };
-
-static ABT lowerIntervals(PrefixId& prefixId,
-                          const ProjectionName& ridProjName,
-                          FieldProjectionMap indexProjectionMap,
-                          const std::string& scanDefName,
-                          const std::string& indexDefName,
-                          const CompoundIntervalReqExpr::Node& intervals,
-                          const bool reverseOrder,
-                          const CEType indexCE,
-                          const CEType scanGroupCE,
-                          NodeCEMap& nodeCEMap) {
-    IntervalLowerTransport lowerTransport(prefixId,
-                                          ridProjName,
-                                          std::move(indexProjectionMap),
-                                          scanDefName,
-                                          indexDefName,
-                                          reverseOrder,
-                                          indexCE,
-                                          scanGroupCE,
-                                          nodeCEMap);
-    return lowerTransport.lower(intervals);
-}
 
 ABT lowerEqPrefixes(PrefixId& prefixId,
                     const ProjectionName& ridProjName,
                     FieldProjectionMap indexProjectionMap,
                     const std::string& scanDefName,
                     const std::string& indexDefName,
+                    SpoolId& spoolId,
+                    const size_t indexFieldCount,
                     const std::vector<EqualityPrefixEntry>& eqPrefixes,
+                    const size_t eqPrefixIndex,
                     const std::vector<bool>& reverseOrder,
-                    const ProjectionNameVector& correlatedProjNames,
+                    ProjectionNameVector correlatedProjNames,
                     const std::map<size_t, SelectivityType>& indexPredSelMap,
-                    const CEType currentGroupCE,
+                    const CEType indexCE,
                     const CEType scanGroupCE,
                     NodeCEMap& nodeCEMap) {
-    boost::optional<ABT> result;
-
-    for (size_t eqPrefixIndex = 0; eqPrefixIndex < eqPrefixes.size(); eqPrefixIndex++) {
-        const auto& eqPrefix = eqPrefixes.at(eqPrefixIndex);
-        const size_t startPos = eqPrefix._startPos;
-
-        FieldProjectionMap eqPrefixMap;
-        if (eqPrefixIndex == eqPrefixes.size() - 1) {
-            // If this is the last equality prefix, use the input field projection map but remove
-            // the prefix of correlated projections.
-
-            eqPrefixMap = indexProjectionMap;
-            for (size_t indexField = 0; indexField < startPos; indexField++) {
-                eqPrefixMap._fieldProjections.erase(FieldNameType{encodeIndexKeyName(indexField)});
-            }
-        } else {
-            // If this is not the last equality prefix, create a field projection map using the
-            // prefix of the correlated projections only.
-
-            const size_t nextStartPos = eqPrefixes.at(eqPrefixIndex + 1)._startPos;
-            for (size_t indexField = startPos; indexField < nextStartPos; indexField++) {
-                const FieldNameType indexKey{encodeIndexKeyName(indexField)};
-                eqPrefixMap._fieldProjections.emplace(
-                    indexKey, indexProjectionMap._fieldProjections.at(indexKey));
-            }
-        }
-
-        // Collect estimates for predicates satisfied with the current equality prefix.
-        // TODO: rationalize cardinality estimates: estimate number of unique groups.
-        CEType indexCE = currentGroupCE;
-        if (!eqPrefix._predPosSet.empty()) {
-            std::vector<SelectivityType> currentSels;
-            for (const size_t index : eqPrefix._predPosSet) {
-                if (const auto it = indexPredSelMap.find(index); it != indexPredSelMap.cend()) {
-                    currentSels.push_back(it->second);
-                }
-            }
-            if (!currentSels.empty()) {
-                indexCE = scanGroupCE * ce::conjExponentialBackoff(std::move(currentSels));
-            }
-        }
-
-        // Convert the prefix's into a tree of intervals.
-        ABT outer = lowerIntervals(prefixId,
-                                   ridProjName,
-                                   std::move(eqPrefixMap),
-                                   scanDefName,
-                                   indexDefName,
-                                   eqPrefix._interval,
-                                   reverseOrder.at(eqPrefixIndex),
-                                   indexCE,
-                                   scanGroupCE,
-                                   nodeCEMap);
-
-        if (result) {
-            // Compute correlation parameters based on the previous equality prefix.
-
-            ProjectionNameVector correlationVector;
-            ProjectionNameSet correlationSet;
-            for (size_t indexField = 0; indexField < startPos; indexField++) {
-                const auto& correlatedProjName = correlatedProjNames.at(indexField);
-                correlationVector.push_back(correlatedProjName);
-                correlationSet.insert(correlatedProjName);
-            }
-
-            ABT inner = make<UniqueNode>(std::move(correlationVector), std::move(*result));
-            nodeCEMap.emplace(inner.cast<Node>(), indexCE);
-
-            // TODO: SERVER-70639. Use a spool node for RIN plans.
-            outer = make<NestedLoopJoinNode>(JoinType::Inner,
-                                             std::move(correlationSet),
-                                             Constant::boolean(true),
-                                             std::move(inner),
-                                             std::move(outer));
-            nodeCEMap.emplace(outer.cast<Node>(), indexCE);
-        }
-
-        result = std::move(outer);
-    }
-
-    return std::move(*result);
+    IntervalLowerTransport lowerTransport(prefixId,
+                                          ridProjName,
+                                          std::move(indexProjectionMap),
+                                          scanDefName,
+                                          indexDefName,
+                                          spoolId,
+                                          indexFieldCount,
+                                          eqPrefixes,
+                                          eqPrefixIndex,
+                                          reverseOrder,
+                                          correlatedProjNames,
+                                          indexPredSelMap,
+                                          indexCE,
+                                          scanGroupCE,
+                                          nodeCEMap);
+    return lowerTransport.lower(eqPrefixes.at(eqPrefixIndex)._interval);
 }
 
 /**

@@ -71,13 +71,12 @@ public:
 
 private:
     struct UnionBranch {
-        PlanStage* stage{nullptr};
-        const bool reOpen{false};
+        PlanStage* const stage{nullptr};
         bool isOpen{false};
 
         void open() {
             if (!isOpen) {
-                stage->open(reOpen);
+                stage->open(false /*reOpen*/);
                 isOpen = true;
             }
         }
