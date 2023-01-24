@@ -428,6 +428,11 @@ TEST(FLETokens, TestVectorESCCollectionDecryptDocument) {
     ASSERT_EQ(swDoc.getValue().compactionPlaceholder, false);
     ASSERT_EQ(swDoc.getValue().position, 0);
     ASSERT_EQ(swDoc.getValue().count, 123456789);
+
+    auto swAnchorDoc = ESCCollection::decryptAnchorDocument(escTwiceValue, doc);
+    ASSERT_OK(swDoc.getStatus());
+    ASSERT_EQ(swDoc.getValue().position, 0);
+    ASSERT_EQ(swDoc.getValue().count, 123456789);
 }
 
 TEST(FLETokens, TestVectorECCCollectionDecryptDocument) {
@@ -507,6 +512,32 @@ TEST(FLE_ESC, RoundTrip) {
         ASSERT_OK(swDoc.getStatus());
         ASSERT_EQ(swDoc.getValue().compactionPlaceholder, true);
         ASSERT_EQ(swDoc.getValue().position, std::numeric_limits<uint64_t>::max());
+        ASSERT_EQ(swDoc.getValue().count, 456789);
+    }
+
+    {
+        // Non-anchor documents don't work with decryptAnchorDocument()
+        BSONObj doc = ESCCollection::generateNonAnchorDocument(escTwiceTag, 123);
+        auto swDoc = ESCCollection::decryptAnchorDocument(escTwiceValue, doc);
+        ASSERT_NOT_OK(swDoc.getStatus());
+        ASSERT_EQ(ErrorCodes::Error::NoSuchKey, swDoc.getStatus().code());
+    }
+
+    {
+        BSONObj doc =
+            ESCCollection::generateAnchorDocument(escTwiceTag, escTwiceValue, 123, 456789);
+        auto swDoc = ESCCollection::decryptAnchorDocument(escTwiceValue, doc);
+        ASSERT_OK(swDoc.getStatus());
+        ASSERT_EQ(swDoc.getValue().position, 0);
+        ASSERT_EQ(swDoc.getValue().count, 456789);
+    }
+
+    {
+        BSONObj doc =
+            ESCCollection::generateNullAnchorDocument(escTwiceTag, escTwiceValue, 123, 456789);
+        auto swDoc = ESCCollection::decryptAnchorDocument(escTwiceValue, doc);
+        ASSERT_OK(swDoc.getStatus());
+        ASSERT_EQ(swDoc.getValue().position, 123);
         ASSERT_EQ(swDoc.getValue().count, 456789);
     }
 }

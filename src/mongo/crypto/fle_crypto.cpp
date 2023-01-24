@@ -139,6 +139,10 @@ constexpr uint64_t kESCNonNullId = 1;
 constexpr uint64_t KESCInsertRecordValue = 0;
 constexpr uint64_t kESCompactionRecordValue = std::numeric_limits<uint64_t>::max();
 
+constexpr uint64_t kESCAnchorId = 0;
+constexpr uint64_t kESCNullAnchorPosition = 0;
+constexpr uint64_t kESCNonNullAnchorValuePrefix = 0;
+
 constexpr auto kId = "_id";
 constexpr auto kValue = "value";
 constexpr auto kFieldName = "fieldName";
@@ -2278,6 +2282,19 @@ PrfBlock ESCCollection::generateId(ESCTwiceDerivedTagToken tagToken,
     }
 }
 
+PrfBlock ESCCollection::generateNonAnchorId(const ESCTwiceDerivedTagToken& tagToken,
+                                            uint64_t cpos) {
+    return prf(tagToken.data, cpos);
+}
+
+PrfBlock ESCCollection::generateAnchorId(const ESCTwiceDerivedTagToken& tagToken, uint64_t apos) {
+    return prf(tagToken.data, kESCAnchorId, apos);
+}
+
+PrfBlock ESCCollection::generateNullAnchorId(const ESCTwiceDerivedTagToken& tagToken) {
+    return ESCCollection::generateAnchorId(tagToken, kESCNullAnchorPosition);
+}
+
 BSONObj ESCCollection::generateNullDocument(ESCTwiceDerivedTagToken tagToken,
                                             ESCTwiceDerivedValueToken valueToken,
                                             uint64_t pos,
@@ -2336,6 +2353,44 @@ BSONObj ESCCollection::generateCompactionPlaceholderDocument(ESCTwiceDerivedTagT
     return builder.obj();
 }
 
+BSONObj ESCCollection::generateNonAnchorDocument(const ESCTwiceDerivedTagToken& tagToken,
+                                                 uint64_t cpos) {
+    auto block = ESCCollection::generateNonAnchorId(tagToken, cpos);
+    BSONObjBuilder builder;
+    toBinData(kId, block, &builder);
+    return builder.obj();
+}
+
+BSONObj ESCCollection::generateAnchorDocument(const ESCTwiceDerivedTagToken& tagToken,
+                                              const ESCTwiceDerivedValueToken& valueToken,
+                                              uint64_t apos,
+                                              uint64_t cpos) {
+    auto block = ESCCollection::generateAnchorId(tagToken, apos);
+
+    auto swCipherText = packAndEncrypt(std::tie(kESCNonNullAnchorValuePrefix, cpos), valueToken);
+    uassertStatusOK(swCipherText);
+
+    BSONObjBuilder builder;
+    toBinData(kId, block, &builder);
+    toBinData(kValue, swCipherText.getValue(), &builder);
+    return builder.obj();
+}
+
+BSONObj ESCCollection::generateNullAnchorDocument(const ESCTwiceDerivedTagToken& tagToken,
+                                                  const ESCTwiceDerivedValueToken& valueToken,
+                                                  uint64_t apos,
+                                                  uint64_t cpos) {
+    auto block = ESCCollection::generateNullAnchorId(tagToken);
+
+    auto swCipherText = packAndEncrypt(std::tie(apos, cpos), valueToken);
+    uassertStatusOK(swCipherText);
+
+    BSONObjBuilder builder;
+    toBinData(kId, block, &builder);
+    toBinData(kValue, swCipherText.getValue(), &builder);
+    return builder.obj();
+}
+
 StatusWith<ESCNullDocument> ESCCollection::decryptNullDocument(ESCTwiceDerivedValueToken valueToken,
                                                                BSONObj& doc) {
     return ESCCollection::decryptNullDocument(valueToken, std::move(doc));
@@ -2385,6 +2440,10 @@ StatusWith<ESCDocument> ESCCollection::decryptDocument(ESCTwiceDerivedValueToken
         std::get<0>(value) == kESCompactionRecordValue, std::get<0>(value), std::get<1>(value)};
 }
 
+StatusWith<ESCDocument> ESCCollection::decryptAnchorDocument(
+    const ESCTwiceDerivedValueToken& valueToken, BSONObj& doc) {
+    return ESCCollection::decryptDocument(valueToken, doc);
+}
 
 boost::optional<uint64_t> ESCCollection::emuBinary(const FLEStateCollectionReader& reader,
                                                    ESCTwiceDerivedTagToken tagToken,

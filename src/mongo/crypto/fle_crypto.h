@@ -284,6 +284,29 @@ public:
  *    uint64_t count_type;
  *    uint64_t count;
  * }
+ *
+ * ===== Protocol Version 2 =====
+ * Positional values:
+ *   cpos = position of non-anchor record in the range [1..UINT64_MAX]
+ *   apos = position of anchor record in the range [1..UINT64_MAX]
+ *
+ * Non-anchor record:
+ * {
+ *    _id : HMAC(ESCTwiceDerivedTagToken, cpos)
+ * }
+ *
+ * Non-null anchor record:
+ * {
+ *    _id : HMAC(ESCTwiceDerivedTagToken, (0 || apos))
+ *    value : Encrypt(ESCTwiceDerivedValueToken, (0 || cpos))
+ * }
+ *
+ * Null anchor record:
+ * {
+ *    _id : HMAC(ESCTwiceDerivedTagToken, (0 || 0))
+ *    value : Encrypt(ESCTwiceDerivedValueToken, (apos || cpos))
+ * }
+ *
  */
 
 
@@ -381,6 +404,50 @@ public:
     static boost::optional<uint64_t> emuBinary(const FLEStateCollectionReader& reader,
                                                ESCTwiceDerivedTagToken tagToken,
                                                ESCTwiceDerivedValueToken valueToken);
+
+    // ===== Protocol Version 2 =====
+    /**
+     * Generate the _id value for a non-anchor record
+     */
+    static PrfBlock generateNonAnchorId(const ESCTwiceDerivedTagToken& tagToken, uint64_t cpos);
+
+    /**
+     * Generate the _id value for an anchor record
+     */
+    static PrfBlock generateAnchorId(const ESCTwiceDerivedTagToken& tagToken, uint64_t apos);
+
+    /**
+     * Generate the _id value for a null anchor record
+     */
+    static PrfBlock generateNullAnchorId(const ESCTwiceDerivedTagToken& tagToken);
+
+    /**
+     * Generate a non-anchor ESC document for inserts.
+     */
+    static BSONObj generateNonAnchorDocument(const ESCTwiceDerivedTagToken& tagToken,
+                                             uint64_t cpos);
+
+    /**
+     * Generate an anchor ESC document for compacts.
+     */
+    static BSONObj generateAnchorDocument(const ESCTwiceDerivedTagToken& tagToken,
+                                          const ESCTwiceDerivedValueToken& valueToken,
+                                          uint64_t apos,
+                                          uint64_t cpos);
+
+    /**
+     * Generate a null anchor ESC document for cleanups.
+     */
+    static BSONObj generateNullAnchorDocument(const ESCTwiceDerivedTagToken& tagToken,
+                                              const ESCTwiceDerivedValueToken& valueToken,
+                                              uint64_t apos,
+                                              uint64_t cpos);
+
+    /**
+     * Decrypts an anchor document (either null or non-null).
+     */
+    static StatusWith<ESCDocument> decryptAnchorDocument(
+        const ESCTwiceDerivedValueToken& valueToken, BSONObj& doc);
 };
 
 
