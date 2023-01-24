@@ -497,6 +497,8 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 {
     WT_BTREE *btree;
     WT_CURSOR_BTREE *cbt;
+    WT_DECL_ITEM(tmpkey);
+    WT_DECL_RET;
     WT_REC_KV *key, *val;
     WT_TIME_WINDOW tw;
     WT_UPDATE *upd;
@@ -513,8 +515,11 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
 
     upd = NULL;
 
+    /* Temporary buffer in which to instantiate any uninstantiated keys or value items we need. */
+    WT_RET(__wt_scr_alloc(session, 0, &tmpkey));
+
     for (; ins != NULL; ins = WT_SKIP_NEXT(ins)) {
-        WT_RET(__wt_rec_upd_select(session, r, ins, NULL, NULL, &upd_select));
+        WT_ERR(__wt_rec_upd_select(session, r, ins, NULL, NULL, &upd_select));
         if ((upd = upd_select.upd) == NULL) {
             /*
              * In cases where a page has grown so large we are trying to force evict it (there is
@@ -527,8 +532,8 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
             if (!upd_select.upd_saved || !__wt_rec_need_split(r, 0))
                 continue;
 
-            WT_RET(__wt_buf_set(session, r->cur, WT_INSERT_KEY(ins), WT_INSERT_KEY_SIZE(ins)));
-            WT_RET(__wt_rec_split_crossing_bnd(session, r, 0));
+            WT_ERR(__wt_buf_set(session, r->cur, WT_INSERT_KEY(ins), WT_INSERT_KEY_SIZE(ins)));
+            WT_ERR(__wt_rec_split_crossing_bnd(session, r, 0));
 
             /*
              * Turn off prefix and suffix compression until a full key is written into the new page.
@@ -557,9 +562,9 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
              * Impossible slot, there's no backing on-page item.
              */
             cbt->slot = UINT32_MAX;
-            WT_RET(__wt_modify_reconstruct_from_upd_list(session, cbt, upd, cbt->upd_value));
+            WT_ERR(__wt_modify_reconstruct_from_upd_list(session, cbt, upd, cbt->upd_value));
             __wt_value_return(cbt, cbt->upd_value);
-            WT_RET(__wt_rec_cell_build_val(
+            WT_ERR(__wt_rec_cell_build_val(
               session, r, cbt->iface.value.data, cbt->iface.value.size, &tw, 0));
             break;
         case WT_UPDATE_STANDARD:
@@ -567,15 +572,30 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
                 val->len = 0;
             else
                 /* Take the value from the update. */
-                WT_RET(__wt_rec_cell_build_val(session, r, upd->data, upd->size, &tw, 0));
+                WT_ERR(__wt_rec_cell_build_val(session, r, upd->data, upd->size, &tw, 0));
             break;
         case WT_UPDATE_TOMBSTONE:
-            continue;
+            break;
         default:
-            WT_RET(__wt_illegal_value(session, upd->type));
+            WT_ERR(__wt_illegal_value(session, upd->type));
         }
+
+        /*
+         * When a tombstone without a timestamp is written to disk, remove any historical versions
+         * that are greater in the history store for this key.
+         */
+        if (upd_select.no_ts_tombstone && r->hs_clear_on_tombstone) {
+            tmpkey->data = WT_INSERT_KEY(ins);
+            tmpkey->size = WT_INSERT_KEY_SIZE(ins);
+            WT_ERR(__wt_rec_hs_clear_on_tombstone(
+              session, r, WT_RECNO_OOB, tmpkey, upd->type == WT_UPDATE_TOMBSTONE ? false : true));
+        }
+
+        if (upd->type == WT_UPDATE_TOMBSTONE)
+            continue;
+
         /* Build key cell. */
-        WT_RET(__rec_cell_build_leaf_key(
+        WT_ERR(__rec_cell_build_leaf_key(
           session, r, WT_INSERT_KEY(ins), WT_INSERT_KEY_SIZE(ins), &ovfl_key));
 
         /* Boundary: split or write the page. */
@@ -588,10 +608,10 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
                 r->key_pfx_compress = false;
                 r->key_pfx_last = 0;
                 if (!ovfl_key)
-                    WT_RET(__rec_cell_build_leaf_key(session, r, NULL, 0, &ovfl_key));
+                    WT_ERR(__rec_cell_build_leaf_key(session, r, NULL, 0, &ovfl_key));
             }
 
-            WT_RET(__wt_rec_split_crossing_bnd(session, r, key->len + val->len));
+            WT_ERR(__wt_rec_split_crossing_bnd(session, r, key->len + val->len));
         }
 
         /* Copy the key/value pair onto the page. */
@@ -601,7 +621,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
         else {
             r->all_empty_value = false;
             if (btree->dictionary)
-                WT_RET(__wt_rec_dict_replace(session, r, &tw, 0, val));
+                WT_ERR(__wt_rec_dict_replace(session, r, &tw, 0, val));
             __wt_rec_image_copy(session, r, val);
         }
         WT_TIME_AGGREGATE_UPDATE(session, &r->cur_ptr->ta, &tw);
@@ -610,7 +630,9 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_INSERT *ins)
         __rec_key_state_update(r, ovfl_key);
     }
 
-    return (0);
+err:
+    __wt_scr_free(session, &tmpkey);
+    return (ret);
 }
 
 /*
@@ -835,14 +857,6 @@ __wt_rec_row_leaf(
             case WT_UPDATE_STANDARD:
                 /* Take the value from the update. */
                 WT_ERR(__wt_rec_cell_build_val(session, r, upd->data, upd->size, twp, 0));
-                /*
-                 * When a tombstone without a timestamp is written to disk, remove any historical
-                 * versions that are greater in the history store for that key.
-                 */
-                if (upd_select.no_ts_tombstone && r->hs_clear_on_tombstone) {
-                    WT_ERR(__wt_row_leaf_key(session, page, rip, tmpkey, true));
-                    WT_ERR(__wt_rec_hs_clear_on_tombstone(session, r, WT_RECNO_OOB, tmpkey, true));
-                }
                 dictionary = true;
                 break;
             case WT_UPDATE_TOMBSTONE:
@@ -866,23 +880,26 @@ __wt_rec_row_leaf(
                     WT_ERR(__wt_ovfl_discard_add(session, page, kpack->cell));
                 }
 
-                /*
-                 * When a tombstone without a timestamp is written to disk, remove any historical
-                 * versions that are greater in the history store for this key.
-                 */
-                if (upd_select.no_ts_tombstone && r->hs_clear_on_tombstone) {
-                    WT_ERR(__wt_row_leaf_key(session, page, rip, tmpkey, true));
-                    WT_ERR(__wt_rec_hs_clear_on_tombstone(session, r, WT_RECNO_OOB, tmpkey, false));
-                }
-
                 /* Not creating a key so we can't use last-key as a prefix for a subsequent key. */
                 lastkey->size = 0;
-
-                /* Proceed with appended key/value pairs. */
-                goto leaf_insert;
+                break;
             default:
                 WT_ERR(__wt_illegal_value(session, upd->type));
             }
+
+            /*
+             * When a tombstone without a timestamp is written to disk, remove any historical
+             * versions that are greater in the history store for this key.
+             */
+            if (upd_select.no_ts_tombstone && r->hs_clear_on_tombstone) {
+                WT_ERR(__wt_row_leaf_key(session, page, rip, tmpkey, true));
+                WT_ERR(__wt_rec_hs_clear_on_tombstone(session, r, WT_RECNO_OOB, tmpkey,
+                  upd->type == WT_UPDATE_TOMBSTONE ? false : true));
+            }
+
+            /* Proceed with appended key/value pairs. */
+            if (upd->type == WT_UPDATE_TOMBSTONE)
+                goto leaf_insert;
         }
 
         /*
