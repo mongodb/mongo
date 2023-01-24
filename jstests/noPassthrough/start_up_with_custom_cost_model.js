@@ -8,21 +8,21 @@ load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
 
 function getScanCostWith(customScanCost) {
     const costStr = `{"scanIncrementalCost": ${customScanCost}}`;
-    const conn = MongoRunner.runMongod({
-        setParameter: {
-            'internalCostModelCoefficients': costStr,
-            'internalQueryFrameworkControl': "forceBonsai"
-        }
-    });
+    const conn = MongoRunner.runMongod({setParameter: {'internalCostModelCoefficients': costStr}});
 
     const db = conn.getDB(jsTestName());
     const coll = db.start_up_with_custom_cost_model;
 
-    if (!checkCascadesOptimizerEnabled(db)) {
-        jsTestLog("Skipping test because the optimizer is not enabled");
+    const qfc = db.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1});
+
+    if (!checkCascadesOptimizerEnabled(db) || qfc === "forceClassicEngine") {
+        jsTestLog("Skipping test because the Cascades optimizer is not enabled");
         MongoRunner.stopMongod(conn);
         return;
     }
+
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceBonsai"}));
 
     const nDocuments = 100;
     assert.commandWorked(coll.insert(Array.from({length: nDocuments}, (_, i) => {
