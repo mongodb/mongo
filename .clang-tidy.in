@@ -28,6 +28,7 @@ Checks:          '-*,
                   hicpp-undelegated-constructor,
                   misc-uniqueptr-reset-release,
                   modernize-avoid-bind,
+                  modernize-deprecated-headers,
                   modernize-replace-auto-ptr,
                   modernize-replace-random-shuffle,
                   modernize-shrink-to-fit,
@@ -110,7 +111,7 @@ Checks:          '-*,
                   -readability-uniqueptr-delete-release
                   '
 WarningsAsErrors: '*'
-HeaderFilterRegex: '^(mongo|build)/'
+HeaderFilterRegex: '^(mongo|@MONGO_BUILD_DIR@)/'
 CheckOptions:
   - key:             bugprone-assert-side-effect.AssertMacros
     value:           assert

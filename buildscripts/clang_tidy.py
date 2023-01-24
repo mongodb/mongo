@@ -136,11 +136,30 @@ def main():
     else:
         mongo_tidy_check_module = ''
 
-    with open(args.compile_commands) as compile_commands:
-        compile_commands = json.load(compile_commands)
+    if os.path.exists(args.compile_commands):
+        with open(args.compile_commands) as compile_commands:
+            compile_commands = json.load(compile_commands)
+    else:
+        if args.compile_commands == parser.get_default('compile_commands'):
+            print(
+                f"Could not find compile commands: '{args.compile_commands}', to generate it, use the build command:\n\n"
+                + "python3 buildscripts/scons.py --build-profile=compiledb compiledb\n")
+        else:
+            print(f"Could not find compile commands: {args.compile_commands}")
+        sys.exit(1)
 
-    with open(args.clang_tidy_cfg) as clang_tidy_cfg:
-        clang_tidy_cfg = yaml.safe_load(clang_tidy_cfg)
+    if os.path.exists(args.clang_tidy_cfg):
+        with open(args.clang_tidy_cfg) as clang_tidy_cfg:
+            clang_tidy_cfg = yaml.safe_load(clang_tidy_cfg)
+    else:
+        if args.clang_tidy_cfg == parser.get_default('clang_tidy_cfg'):
+            print(
+                f"Could not find config file: '{args.clang_tidy_cfg}', to generate it, use the build command:\n\n"
+                + "python3 buildscripts/scons.py --build-profile=compiledb compiledb\n")
+        else:
+            print(f"Could not find config file: {args.clang_tidy_cfg}")
+        sys.exit(1)
+
     files_to_tidy = list()
     files_to_parse = list()
     for file_doc in compile_commands:

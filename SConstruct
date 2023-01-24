@@ -6231,6 +6231,19 @@ def injectModule(env, module, **kwargs):
 
 env.AddMethod(injectModule, 'InjectModule')
 
+replacements = {
+    '@MONGO_BUILD_DIR@': env.Dir('$BUILD_DIR').path + '/mongo',
+}
+
+clang_tidy_config = env.Substfile(
+    target='.clang-tidy',
+    source=[
+        '.clang-tidy.in',
+    ],
+    SUBST_DICT=replacements,
+)
+env.Alias("generated-sources", clang_tidy_config)
+
 if get_option('ninja') == 'disabled':
     compileCommands = env.CompilationDatabase('compile_commands.json')
     # Initialize generated-sources Alias as a placeholder so that it can be used as a
