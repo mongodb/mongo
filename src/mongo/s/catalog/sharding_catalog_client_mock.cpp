@@ -69,7 +69,10 @@ CollectionType ShardingCatalogClientMock::getCollection(OperationContext* opCtx,
 }
 
 std::vector<CollectionType> ShardingCatalogClientMock::getCollections(
-    OperationContext* opCtx, StringData dbName, repl::ReadConcernLevel readConcernLevel) {
+    OperationContext* opCtx,
+    StringData dbName,
+    repl::ReadConcernLevel readConcernLevel,
+    const BSONObj& sort) {
     uasserted(ErrorCodes::InternalError, "Method not implemented");
 }
 

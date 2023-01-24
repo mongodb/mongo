@@ -78,14 +78,11 @@ public:
             const auto& primaryShardId = request().getPrimaryShardId();
 
             // Get the list of collections from configsvr sorted by namespace
-            // TODO: SERVER-72669: Get collections sorted by namespace directly from the configsvr
-            auto catalogClientCollections =
-                Grid::get(opCtx)->catalogClient()->getCollections(opCtx, nss.db());
-            std::sort(catalogClientCollections.begin(),
-                      catalogClientCollections.end(),
-                      [](const CollectionType& a, const CollectionType& b) {
-                          return a.getNss().ns() < b.getNss().ns();
-                      });
+            auto catalogClientCollections = Grid::get(opCtx)->catalogClient()->getCollections(
+                opCtx,
+                nss.db(),
+                repl::ReadConcernLevel::kMajorityReadConcern,
+                BSON(CollectionType::kNssFieldName << 1) /*sort*/);
 
             // Get the list of local collections sorted by namespace
             Lock::DBLock dbLock(opCtx, nss.db(), MODE_S);

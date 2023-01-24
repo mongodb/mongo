@@ -311,10 +311,10 @@ public:
             return repl::OpTimeWith<std::vector<ShardType>>(_shards);
         }
 
-        std::vector<CollectionType> getCollections(
-            OperationContext* opCtx,
-            StringData dbName,
-            repl::ReadConcernLevel readConcernLevel) override {
+        std::vector<CollectionType> getCollections(OperationContext* opCtx,
+                                                   StringData dbName,
+                                                   repl::ReadConcernLevel readConcernLevel,
+                                                   const BSONObj& sort) override {
             return _colls;
         }
 

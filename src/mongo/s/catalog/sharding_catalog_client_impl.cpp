@@ -743,7 +743,10 @@ CollectionType ShardingCatalogClientImpl::getCollection(OperationContext* opCtx,
 }
 
 std::vector<CollectionType> ShardingCatalogClientImpl::getCollections(
-    OperationContext* opCtx, StringData dbName, repl::ReadConcernLevel readConcernLevel) {
+    OperationContext* opCtx,
+    StringData dbName,
+    repl::ReadConcernLevel readConcernLevel,
+    const BSONObj& sort) {
     BSONObjBuilder b;
     if (!dbName.empty())
         b.appendRegex(CollectionType::kNssFieldName, "^{}\\."_format(pcre_util::quoteMeta(dbName)));
@@ -753,7 +756,7 @@ std::vector<CollectionType> ShardingCatalogClientImpl::getCollections(
                                                             readConcernLevel,
                                                             CollectionType::ConfigNS,
                                                             b.obj(),
-                                                            BSONObj(),
+                                                            sort,
                                                             boost::none))
                         .value;
     std::vector<CollectionType> collections;
@@ -766,7 +769,7 @@ std::vector<CollectionType> ShardingCatalogClientImpl::getCollections(
 
 std::vector<NamespaceString> ShardingCatalogClientImpl::getAllShardedCollectionsForDb(
     OperationContext* opCtx, StringData dbName, repl::ReadConcernLevel readConcern) {
-    auto collectionsOnConfig = getCollections(opCtx, dbName, readConcern);
+    auto collectionsOnConfig = getCollections(opCtx, dbName, readConcern, BSONObj());
 
     std::vector<NamespaceString> collectionsToReturn;
     collectionsToReturn.reserve(collectionsOnConfig.size());
