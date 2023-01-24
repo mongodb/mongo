@@ -8,6 +8,7 @@ import os
 import subprocess
 import sys
 import locale
+import hashlib
 import time
 from typing import Any, Dict, List, Optional, Tuple
 import multiprocessing
@@ -76,13 +77,17 @@ def _combine_errors(fixes_filename: str, files_to_parse: List[str]) -> int:
             fix_msg = fix["DiagnosticMessage"]
             fix_data = all_fixes.setdefault(fix["DiagnosticName"], {}).setdefault(
                 fix_msg.get("FilePath", "FilePath Not Found"), {}).setdefault(
-                    fix_msg.get("FileOffset", "FileOffset Not Found"), {
+                    str(fix_msg.get("FileOffset", "FileOffset Not Found")), {
                         "replacements": fix_msg.get(
                             "Replacements", "Replacements not found"), "message": fix_msg.get(
                                 "Message", "Message not found"), "count": 0, "source_files": []
                     })
             fix_data["count"] += 1
             fix_data["source_files"].append(fixes['MainSourceFile'])
+            if fix_msg.get("FilePath") and os.path.exists(fix_msg.get("FilePath")):
+                all_fixes[fix["DiagnosticName"]][fix_msg.get("FilePath")]['md5'] = hashlib.md5(
+                    open(fix_msg.get("FilePath"), 'rb').read()).hexdigest()
+
     with open(fixes_filename, "w") as files_file:
         json.dump(all_fixes, files_file, indent=4, sort_keys=True)
 
