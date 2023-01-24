@@ -26,6 +26,8 @@ make_check_subdir_skips = [
     "test/cppsuite",
     "test/fuzz",
     "test/syscall",
+    "ext/storage_sources/azure_store/test",
+    "ext/storage_sources/gcp_store/test",
     "ext/storage_sources/s3_store/test"
 ]
 
