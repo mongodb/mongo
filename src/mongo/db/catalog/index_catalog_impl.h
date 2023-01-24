@@ -64,99 +64,54 @@ public:
      */
     std::unique_ptr<IndexCatalog> clone() const override;
 
-    // must be called before used
     void init(OperationContext* opCtx, Collection* collection) override;
-
-    /**
-     * Must be called before used.
-     */
     void initFromExisting(OperationContext* opCtx,
                           Collection* collection,
                           boost::optional<Timestamp> readTimestamp) override;
 
-    // ---- accessors -----
-
     bool haveAnyIndexes() const override;
-    bool haveAnyIndexesInProgress() const override;
-    int numIndexesTotal() const override;
-    int numIndexesReady() const override;
-    int numIndexesInProgress() const override;
 
-    /**
-     * this is in "alive" until the Collection goes away
-     * in which case everything from this tree has to go away.
-     */
+    bool haveAnyIndexesInProgress() const override;
+
+    int numIndexesTotal() const override;
+
+    int numIndexesReady() const override;
+
+    int numIndexesInProgress() const override;
 
     bool haveIdIndex(OperationContext* opCtx) const override;
 
-    /**
-     * Returns the spec for the id index to create by default for this collection.
-     */
     BSONObj getDefaultIdIndexSpec(const CollectionPtr& collection) const override;
 
     const IndexDescriptor* findIdIndex(OperationContext* opCtx) const override;
 
-    /**
-     * Find index by name.  The index name uniquely identifies an index.
-     *
-     * @return null if cannot find
-     */
     const IndexDescriptor* findIndexByName(
         OperationContext* opCtx,
         StringData name,
         InclusionPolicy inclusionPolicy = InclusionPolicy::kReady) const override;
 
-    /**
-     * Find index by matching key pattern and options. The key pattern, collation spec, and partial
-     * filter expression together uniquely identify an index.
-     *
-     * @return null if cannot find index, otherwise the index with a matching signature.
-     */
     const IndexDescriptor* findIndexByKeyPatternAndOptions(
         OperationContext* opCtx,
         const BSONObj& key,
         const BSONObj& indexSpec,
         InclusionPolicy inclusionPolicy = InclusionPolicy::kReady) const override;
 
-    /**
-     * Find indexes with a matching key pattern, putting them into the vector 'matches'.  The key
-     * pattern alone does not uniquely identify an index.
-     *
-     * Consider using 'findIndexByName' if expecting to match one index.
-     */
     void findIndexesByKeyPattern(OperationContext* opCtx,
                                  const BSONObj& key,
                                  InclusionPolicy inclusionPolicy,
                                  std::vector<const IndexDescriptor*>* matches) const override;
+
     void findIndexByType(OperationContext* opCtx,
                          const std::string& type,
                          std::vector<const IndexDescriptor*>& matches,
                          InclusionPolicy inclusionPolicy = InclusionPolicy::kReady) const override;
 
-    /**
-     * Finds the index with the given ident. The ident uniquely identifies an index.
-     *
-     * Returns nullptr if the index is not found.
-     */
     const IndexDescriptor* findIndexByIdent(
         OperationContext* opCtx,
         const Collection* collection,
         StringData ident,
         InclusionPolicy inclusionPolicy = InclusionPolicy::kReady) const override;
 
-
-    /**
-     * Reload the index definition for 'oldDesc' from the CollectionCatalogEntry.  'oldDesc'
-     * must be a ready index that is already registered with the index catalog.  Returns an
-     * unowned pointer to the descriptor for the new index definition.
-     *
-     * Use this method to notify the IndexCatalog that the spec for this index has changed.
-     *
-     * It is invalid to dereference 'oldDesc' after calling this method.
-     *
-     * The caller must hold the collection X lock and ensure no index builds are in progress
-     * on the collection.
-     */
     const IndexDescriptor* refreshEntry(OperationContext* opCtx,
                                         Collection* collection,
                                         const IndexDescriptor* oldDesc,
@@ -174,18 +129,11 @@ public:
     std::unique_ptr<IndexIterator> getIndexIterator(OperationContext* opCtx,
                                                     InclusionPolicy inclusionPolicy) const override;
 
-    // ---- index set modifiers ------
-
     IndexCatalogEntry* createIndexEntry(OperationContext* opCtx,
                                         Collection* collection,
                                         std::unique_ptr<IndexDescriptor> descriptor,
                                         CreateIndexEntryFlags flags) override;
 
-    /**
-     * Call this only on an empty collection from inside a WriteUnitOfWork. Index creation on an
-     * empty collection can be rolled back as part of a larger WUOW. Returns the full specification
-     * of the created index, as it is stored in this index catalog.
-     */
     StatusWith<BSONObj> createIndexOnEmptyCollection(OperationContext* opCtx,
                                                      Collection* collection,
                                                      BSONObj spec) override;
@@ -210,6 +158,7 @@ public:
                      Collection* collection,
                      std::function<bool(const IndexDescriptor*)> matchFn,
                      std::function<void(const IndexDescriptor*)> onDropFn) override;
+
     void dropAllIndexes(OperationContext* opCtx,
                         Collection* collection,
                         bool includingIdIndex,
@@ -218,9 +167,11 @@ public:
     Status dropIndex(OperationContext* opCtx,
                      Collection* collection,
                      const IndexDescriptor* desc) override;
+
     Status resetUnfinishedIndexForRecovery(OperationContext* opCtx,
                                            Collection* collection,
                                            const IndexDescriptor* desc) override;
+
     Status dropUnfinishedIndex(OperationContext* opCtx,
                                Collection* collection,
                                const IndexDescriptor* desc) override;
@@ -228,7 +179,6 @@ public:
     Status dropIndexEntry(OperationContext* opCtx,
                           Collection* collection,
                           IndexCatalogEntry* entry) override;
-
 
     void deleteIndexFromDisk(OperationContext* opCtx,
                              Collection* collection,
@@ -240,30 +190,17 @@ public:
         BSONObj key;
     };
 
-    // ---- modify single index
-
     void setMultikeyPaths(OperationContext* opCtx,
                           const CollectionPtr& coll,
                           const IndexDescriptor* desc,
                           const KeyStringSet& multikeyMetadataKeys,
                           const MultikeyPaths& multikeyPaths) const override;
 
-    // ----- data modifiers ------
-
-    /**
-     * When 'keysInsertedOut' is not null, it will be set to the number of index keys inserted by
-     * this operation.
-     *
-     * This method may throw.
-     */
     Status indexRecords(OperationContext* opCtx,
                         const CollectionPtr& coll,
                         const std::vector<BsonRecord>& bsonRecords,
                         int64_t* keysInsertedOut) const override;
 
-    /**
-     * See IndexCatalog::updateRecord
-     */
     Status updateRecord(OperationContext* opCtx,
                         const CollectionPtr& coll,
                         const BSONObj& oldDoc,
@@ -272,10 +209,7 @@ public:
                         const RecordId& recordId,
                         int64_t* keysInsertedOut,
                         int64_t* keysDeletedOut) const override;
-    /**
-     * When 'keysDeletedOut' is not null, it will be set to the number of index keys removed by
-     * this operation.
-     */
+
     void unindexRecord(OperationContext* opCtx,
                        const CollectionPtr& collection,
                        const BSONObj& obj,
@@ -292,14 +226,8 @@ public:
 
     std::string::size_type getLongestIndexNameLength(OperationContext* opCtx) const override;
 
-    // public static helpers
-
     BSONObj fixIndexKey(const BSONObj& key) const override;
 
-    /**
-     * Fills out 'options' in order to indicate whether to allow dups or relax
-     * index constraints, as needed by replication.
-     */
     void prepareInsertDeleteOptions(OperationContext* opCtx,
                                     const NamespaceString&,
                                     const IndexDescriptor* desc,

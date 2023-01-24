@@ -236,6 +236,9 @@ public:
 
     virtual int numIndexesInProgress() const = 0;
 
+    /**
+     * Returns true if the _id index exists.
+     */
     virtual bool haveIdIndex(OperationContext* opCtx) const = 0;
 
     /**
