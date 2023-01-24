@@ -49,8 +49,6 @@ namespace {
 
 const std::string kActionLogCollectionName("actionlog");
 const int kActionLogCollectionSizeMB = 20 * 1024 * 1024;
-
-const std::string kChangeLogCollectionName("changelog");
 const int kChangeLogCollectionSizeMB = 200 * 1024 * 1024;
 
 // Global ShardingLogging instance
@@ -107,7 +105,7 @@ Status ShardingLogging::logChangeChecked(OperationContext* opCtx,
               writeConcern.isMajority());
     if (_changeLogCollectionCreated.load() == 0) {
         Status result = _createCappedConfigCollection(
-            opCtx, kChangeLogCollectionName, kChangeLogCollectionSizeMB, writeConcern);
+            opCtx, ChangeLogType::ConfigNS.coll(), kChangeLogCollectionSizeMB, writeConcern);
         if (result.isOK()) {
             _changeLogCollectionCreated.store(1);
         } else {
@@ -119,7 +117,7 @@ Status ShardingLogging::logChangeChecked(OperationContext* opCtx,
         }
     }
 
-    return _log(opCtx, kChangeLogCollectionName, what, ns, detail, writeConcern);
+    return _log(opCtx, ChangeLogType::ConfigNS.coll(), what, ns, detail, writeConcern);
 }
 
 Status ShardingLogging::_log(OperationContext* opCtx,

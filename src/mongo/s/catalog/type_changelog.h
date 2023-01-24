@@ -33,6 +33,7 @@
 #include <string>
 
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -53,6 +54,9 @@ public:
     static const BSONField<std::string> what;
     static const BSONField<std::string> ns;
     static const BSONField<BSONObj> details;
+
+    // Name of the chunks collection in the config server.
+    static const NamespaceString ConfigNS;
 
     /**
      * Returns the BSON representation of the entry.
