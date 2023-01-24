@@ -70,8 +70,14 @@ gcp_connection::put_object(const std::string &object_key, const std::string &fil
 
 // Deletes an object from google cloud bucket.
 int
-gcp_connection::delete_object(const std::string &object_key) const
+gcp_connection::delete_object(const std::string &object_key)
 {
+    auto status = _gcp_client.DeleteObject(_bucket_name, _object_prefix + object_key);
+
+    if (!status.ok()) {
+        std::cerr << status.message() << std::endl;
+        return -1;
+    }
     return 0;
 }
 
