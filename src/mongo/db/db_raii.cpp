@@ -798,17 +798,18 @@ AutoGetCollectionForReadPITCatalog::AutoGetCollectionForReadPITCatalog(
             // Ensure that the readTimestamp is compatible with the latest Collection instances or
             // create PIT instances in the 'catalog' (if the collections existed at that PIT).
             for (const auto& secondaryNss : *resolvedSecondaryNamespaces) {
-                auto secondaryCollection = fetchOrCreatePITCollection(
+                auto secondaryCollectionAtPIT = fetchOrCreatePITCollection(
                     opCtx, catalog.get(), secondaryNss, readTimestamp, false /* isPrimaryNs */);
-                invariant(secondaryCollection);
-                invariant(secondaryCollection->ns().dbName() == _resolvedNss.dbName());
-                verifyDbAndCollectionReadIntent(
-                    opCtx,
-                    MODE_IS,
-                    secondaryNss,
-                    secondaryNss,
-                    secondaryCollection,
-                    databaseHolder->getDb(opCtx, secondaryNss.dbName()));
+                if (secondaryCollectionAtPIT) {
+                    invariant(secondaryCollectionAtPIT->ns().dbName() == _resolvedNss.dbName());
+                    verifyDbAndCollectionReadIntent(
+                        opCtx,
+                        MODE_IS,
+                        secondaryNss,
+                        secondaryNss,
+                        secondaryCollectionAtPIT,
+                        databaseHolder->getDb(opCtx, secondaryNss.dbName()));
+                }
             }
         }
     }
