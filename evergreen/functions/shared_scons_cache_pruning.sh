@@ -56,11 +56,13 @@ if [[ "${project}" == "mongodb-mongo-master" ]]; then
       ;;
     esac
 
+    activate_venv
+
     if [ "Windows_NT" = "$OS" ]; then
       echo "dir="$dir
-      python buildscripts/scons_cache_prune.py --cache-dir x:/$dir/scons-cache --cache-size $cache_size --prune-ratio 1.0
+      $python buildscripts/scons_cache_prune.py --cache-dir x:/$dir/scons-cache --cache-size $cache_size --prune-ratio 1.0
     else
-      sudo python buildscripts/scons_cache_prune.py --cache-dir /efs/$dir/scons-cache --cache-size $cache_size --prune-ratio 1.0
+      sudo $python buildscripts/scons_cache_prune.py --cache-dir /efs/$dir/scons-cache --cache-size $cache_size --prune-ratio 1.0
     fi
     echo ""
   done
