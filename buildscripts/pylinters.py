@@ -69,7 +69,7 @@ def is_interesting_file(file_name):
     # type: (str) -> bool
     """Return true if this file should be checked."""
     file_denylist = []  # type: List[str]
-    directory_denylist = ["src/third_party", "buildscripts/gdb"]
+    directory_denylist = ["src/third_party"]
     if file_name in file_denylist or file_name.startswith(tuple(directory_denylist)):
         return False
     directory_list = ["buildscripts", "pytests"]

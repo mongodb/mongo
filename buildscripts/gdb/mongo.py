@@ -8,9 +8,14 @@ import sys
 import glob
 import subprocess
 import warnings
-import textwrap
+from pathlib import Path
 
 import gdb
+
+if not gdb:
+    sys.path.insert(0, str(Path(os.path.abspath(__file__)).parent.parent.parent))
+    from buildscripts.gdb.mongo_printers import absl_get_nodes, get_unique_ptr
+
 
 def detect_toolchain(progspace):
 
@@ -48,7 +53,7 @@ def detect_toolchain(progspace):
     if gcc_version:
         if int(gcc_version.split('.')[0]) == 8:
             toolchain_ver = 'v3'
-        elif int(gcc_version.split('.')[0])  == 11:
+        elif int(gcc_version.split('.')[0]) == 11:
             toolchain_ver = 'v4'
 
     if not toolchain_ver:
@@ -65,27 +70,35 @@ STDERR:
 -----------------
 Assuming {toolchain_ver} as a default, this could cause issues with the printers.""")
 
-    pp = glob.glob(f"/opt/mongodbtoolchain/{toolchain_ver}/share/gcc-*/python/libstdcxx/v6/printers.py")
+    pp = glob.glob(
+        f"/opt/mongodbtoolchain/{toolchain_ver}/share/gcc-*/python/libstdcxx/v6/printers.py")
     printers = pp[0]
     return os.path.dirname(os.path.dirname(os.path.dirname(printers)))
 
+
 stdcxx_printer_toolchain_paths = dict()
+
+
 def load_libstdcxx_printers(progspace):
     if progspace not in stdcxx_printer_toolchain_paths:
         stdcxx_printer_toolchain_paths[progspace] = detect_toolchain(progspace)
         try:
             sys.path.insert(0, stdcxx_printer_toolchain_paths[progspace])
+            global stdlib_printers  # pylint: disable=invalid-name,global-variable-not-assigned
             from libstdcxx.v6 import register_libstdcxx_printers
             from libstdcxx.v6 import printers as stdlib_printers
             register_libstdcxx_printers(progspace)
-            print(f"Loaded libstdc++ pretty printers from '{stdcxx_printer_toolchain_paths[progspace]}'")
+            print(
+                f"Loaded libstdc++ pretty printers from '{stdcxx_printer_toolchain_paths[progspace]}'"
+            )
         except Exception as exc:
-            print(f"Failed to load the libstdc++ pretty printers from {stdcxx_printer_toolchain_paths[progspace]}: {exc}")
+            print(
+                f"Failed to load the libstdc++ pretty printers from {stdcxx_printer_toolchain_paths[progspace]}: {exc}"
+            )
+
 
 def on_new_object_file(objfile) -> None:
-    """Import the libstdc++ GDB pretty printers when either the `attach <pid>` or
-    `core-file <pathname>` commands are run in GDB.
-    """
+    """Import the libstdc++ GDB pretty printers when either the `attach <pid>` or `core-file <pathname>` commands are run in GDB."""
     progspace = objfile.new_objfile.progspace
     if progspace.filename is None:
         # The `attach` command would have filled in the filename so we only need to check if
@@ -98,8 +111,8 @@ def on_new_object_file(objfile) -> None:
                 " and reloading the core dump with the `core-file` command")
         return
 
-
     load_libstdcxx_printers(objfile.new_objfile.progspace)
+
 
 if gdb.selected_inferior().progspace.filename:
     load_libstdcxx_printers(gdb.selected_inferior().progspace)
@@ -186,7 +199,7 @@ def get_session_kv_pairs():
     session_catalog = get_session_catalog()
     if session_catalog is None:
         return list()
-    return list(absl_get_nodes(session_catalog["_sessions"]))  # pylint: disable=undefined-variable
+    return list(absl_get_nodes(session_catalog["_sessions"]))
 
 
 def get_wt_session(recovery_unit, recovery_unit_impl_type):
@@ -200,11 +213,11 @@ def get_wt_session(recovery_unit, recovery_unit_impl_type):
         return None
     if not recovery_unit:
         return None
-    wt_session_handle = get_unique_ptr(recovery_unit["_session"])  # pylint: disable=undefined-variable
+    wt_session_handle = get_unique_ptr(recovery_unit["_session"])
     if not wt_session_handle.dereference().address:
         return None
     wt_session = wt_session_handle.dereference().cast(
-        gdb.lookup_type("mongo::WiredTigerSession"))["_session"]  # pylint: disable=undefined-variable
+        gdb.lookup_type("mongo::WiredTigerSession"))["_session"]
     return wt_session
 
 
@@ -236,7 +249,7 @@ def get_decorations(obj):
         type_name = type_name[0:type_name.rindex(">")]
         type_name = type_name[type_name.index("constructAt<"):].replace("constructAt<", "")
         # get_unique_ptr should be loaded from 'mongo_printers.py'.
-        decoration_data = get_unique_ptr(decorable["_decorations"]["_decorationData"])  # pylint: disable=undefined-variable
+        decoration_data = get_unique_ptr(decorable["_decorations"]["_decorationData"])
 
         if type_name.endswith('*'):
             type_name = type_name[0:len(type_name) - 1]
@@ -337,7 +350,7 @@ class GetMongoDecoration(gdb.Command):
         """Initialize GetMongoDecoration."""
         RegisterMongoCommand.register(self, "mongo-decoration", gdb.COMMAND_DATA)
 
-    def invoke(self, args, _from_tty):  # pylint: disable=unused-argument
+    def invoke(self, args, _from_tty):
         """Invoke GetMongoDecoration."""
         argarr = args.split(" ")
         if len(argarr) < 2:
@@ -375,7 +388,7 @@ class DumpMongoDSessionCatalog(gdb.Command):
         """Initialize DumpMongoDSessionCatalog."""
         RegisterMongoCommand.register(self, "mongod-dump-sessions", gdb.COMMAND_DATA)
 
-    def invoke(self, args, _from_tty):  # pylint: disable=unused-argument
+    def invoke(self, args, _from_tty):
         """Invoke DumpMongoDSessionCatalog."""
         # See if a particular session id was specified.
         argarr = args.split(" ")
@@ -402,9 +415,9 @@ class DumpMongoDSessionCatalog(gdb.Command):
 
         for session_kv in session_kv_pairs:
             # The Session objects are stored inside the SessionRuntimeInfo object.
-            session_runtime_info = get_unique_ptr(session_kv['second']).dereference()  # pylint: disable=undefined-variable
+            session_runtime_info = get_unique_ptr(session_kv['second']).dereference()
             parent_session = session_runtime_info['parentSession']
-            child_sessions = absl_get_nodes(session_runtime_info['childSessions'])  # pylint: disable=undefined-variable
+            child_sessions = absl_get_nodes(session_runtime_info['childSessions'])
             lsid = str(parent_session['_sessionId']['_id'])
 
             # If we are only interested in a specific session, then we print out the entire Session
@@ -487,7 +500,7 @@ class DumpMongoDSessionCatalog(gdb.Command):
             # the need for special unpacking.
             val = get_boost_optional(txn_part_observable_state['txnResourceStash'])
             if val:
-                locker_addr = get_unique_ptr(val["_locker"])  # pylint: disable=undefined-variable
+                locker_addr = get_unique_ptr(val["_locker"])
                 locker_obj = locker_addr.dereference().cast(gdb.lookup_type("mongo::LockerImpl"))
                 print('txnResourceStash._locker', "@", locker_addr)
                 print("txnResourceStash._locker._id", "=", locker_obj["_id"])
@@ -513,7 +526,7 @@ class DumpMongoDBMutexes(gdb.Command):
         print("Dumping mutex info for all Clients")
 
         service_context = get_global_service_context()
-        client_set = absl_get_nodes(service_context["_clients"])  # pylint: disable=undefined-variable
+        client_set = absl_get_nodes(service_context["_clients"])
         for client_handle in client_set:
             client = client_handle.dereference().dereference()
             decoration_info = get_decoration(client, "DiagnosticInfoHandle")
@@ -523,7 +536,7 @@ class DumpMongoDBMutexes(gdb.Command):
             diagnostic_info_list = diagnostic_info_handle["list"]
 
             # Use the STL pretty-printer to iterate over the list
-            printer = stdlib_printers.StdForwardListPrinter(
+            printer = stdlib_printers.StdForwardListPrinter(  # pylint: disable=undefined-variable
                 str(diagnostic_info_list.type), diagnostic_info_list)
 
             # Prepare structured output doc
@@ -573,8 +586,9 @@ class MongoDBDumpLocks(gdb.Command):
             # Note that output will go to mongod's standard output, not the debugger output window
             # Do not call mongo::getGlobalLockManager() due to the compiler optimizing this function in a very weird way
             # See SERVER-72816 for more context
-            gdb.execute("call mongo::LockManager::get((mongo::ServiceContext*) mongo::getGlobalServiceContext())->dump()", from_tty=False,
-                        to_string=False)
+            gdb.execute(
+                "call mongo::LockManager::get((mongo::ServiceContext*) mongo::getGlobalServiceContext())->dump()",
+                from_tty=False, to_string=False)
         except gdb.error as gdberr:
             print("Ignoring error '%s' in dump_mongod_locks" % str(gdberr))
 
@@ -616,7 +630,7 @@ class MongoDBDumpRecoveryUnits(gdb.Command):
 
         # Dump active recovery unit info for each client in a mongod process
         service_context = get_global_service_context()
-        client_set = absl_get_nodes(service_context["_clients"])  # pylint: disable=undefined-variable
+        client_set = absl_get_nodes(service_context["_clients"])
 
         for client_handle in client_set:
             client = client_handle.dereference().dereference()
@@ -630,7 +644,7 @@ class MongoDBDumpRecoveryUnits(gdb.Command):
             recovery_unit = None
             if operation_context_handle:
                 operation_context = operation_context_handle.dereference()
-                recovery_unit_handle = get_unique_ptr(operation_context["_recoveryUnit"])  # pylint: disable=undefined-variable
+                recovery_unit_handle = get_unique_ptr(operation_context["_recoveryUnit"])
                 # By default, cast the recovery unit as "mongo::WiredTigerRecoveryUnit"
                 recovery_unit = recovery_unit_handle.dereference().cast(
                     gdb.lookup_type(recovery_unit_impl_type))
@@ -646,9 +660,9 @@ class MongoDBDumpRecoveryUnits(gdb.Command):
         # Dump stashed recovery unit info for each session in a mongod process
         for session_kv in get_session_kv_pairs():
             # The Session objects are stored inside the SessionRuntimeInfo object.
-            session_runtime_info = get_unique_ptr(session_kv['second']).dereference()  # pylint: disable=undefined-variable
+            session_runtime_info = get_unique_ptr(session_kv['second']).dereference()
             parent_session = session_runtime_info['parentSession']
-            child_sessions = absl_get_nodes(session_runtime_info['childSessions'])  # pylint: disable=undefined-variable
+            child_sessions = absl_get_nodes(session_runtime_info['childSessions'])
 
             MongoDBDumpRecoveryUnits.dump_session(parent_session, recovery_unit_impl_type)
             for child_session_kv in child_sessions:
@@ -675,7 +689,7 @@ class MongoDBDumpRecoveryUnits(gdb.Command):
                 txn_participant_observable_state["txnResourceStash"])
             if txn_resource_stash:
                 output_doc["txnResourceStash"] = str(txn_resource_stash.address)
-                recovery_unit_handle = get_unique_ptr(txn_resource_stash["_recoveryUnit"])  # pylint: disable=undefined-variable
+                recovery_unit_handle = get_unique_ptr(txn_resource_stash["_recoveryUnit"])
                 # By default, cast the recovery unit as "mongo::WiredTigerRecoveryUnit"
                 recovery_unit = recovery_unit_handle.dereference().cast(
                     gdb.lookup_type(recovery_unit_impl_type))

@@ -2,9 +2,14 @@
 
 import re
 import sys
-
+import os
+from pathlib import Path
 import gdb
 import gdb.printing
+
+if not gdb:
+    sys.path.insert(0, str(Path(os.path.abspath(__file__)).parent.parent.parent))
+    from buildscripts.gdb.mongo import get_current_thread_name, get_thread_id, RegisterMongoCommand
 
 if sys.version_info[0] < 3:
     raise gdb.GdbError(
@@ -372,8 +377,8 @@ def get_threads_info():
             # PTID is a tuple: Process ID (PID), Lightweight Process ID (LWPID), Thread ID (TID)
             (_, lwpid, _) = thread.ptid
             thread_num = thread.num
-            thread_name = get_current_thread_name()  # pylint: disable=undefined-variable
-            thread_id = get_thread_id()  # pylint: disable=undefined-variable
+            thread_name = get_current_thread_name()
+            thread_id = get_thread_id()
             if not thread_id:
                 print("Unable to retrieve thread_info for thread %d" % thread_num)
                 continue
@@ -389,8 +394,7 @@ class MongoDBShowLocks(gdb.Command):
 
     def __init__(self):
         """Initialize MongoDBShowLocks."""
-        RegisterMongoCommand.register(  # pylint: disable=undefined-variable
-            self, "mongodb-show-locks", gdb.COMMAND_DATA)
+        RegisterMongoCommand.register(self, "mongodb-show-locks", gdb.COMMAND_DATA)
 
     def invoke(self, *_):
         """Invoke mongodb_show_locks."""
@@ -414,8 +418,7 @@ class MongoDBWaitsForGraph(gdb.Command):
 
     def __init__(self):
         """Initialize MongoDBWaitsForGraph."""
-        RegisterMongoCommand.register(  # pylint: disable=undefined-variable
-            self, "mongodb-waitsfor-graph", gdb.COMMAND_DATA)
+        RegisterMongoCommand.register(self, "mongodb-waitsfor-graph", gdb.COMMAND_DATA)
 
     def invoke(self, arg, *_):
         """Invoke mongodb_waitsfor_graph."""

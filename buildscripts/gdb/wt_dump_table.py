@@ -142,7 +142,6 @@ def dump_insert_list(wt_insert):
 def dump_skip_list(wt_insert_head):
     if not wt_insert_head['head'].address:
         return
-    q = wt_insert_head['head']
     wt_insert = wt_insert_head['head'][0]
     idx = 0
     while True:
@@ -181,7 +180,6 @@ def dump_modified(leaf_page):
 
 
 def dump_disk(leaf_page):
-    leaf_num_entries = int(leaf_page['entries'])
     dbg('in-memory page:', leaf_page)
     dsk = leaf_page['dsk'].dereference()
     if int(dsk.address) == 0:

@@ -26,6 +26,7 @@ def get_unique_ptr(obj):
     """Read the value of a libstdc++ std::unique_ptr."""
     return obj.cast(gdb.lookup_type('std::_Head_base<0, unsigned char*, false>'))['_M_head_impl']
 
+
 ###################################################################################################
 #
 # Pretty-Printers
@@ -370,7 +371,6 @@ class WtCursorPrinter(object):
         """Initializer."""
         self.val = val
 
-    # pylint: disable=R0201
     def to_string(self):
         """to_string."""
         return None
@@ -405,7 +405,6 @@ class WtSessionImplPrinter(object):
         """Initializer."""
         self.val = val
 
-    # pylint: disable=R0201
     def to_string(self):
         """to_string."""
         return None
@@ -440,7 +439,6 @@ class WtTxnPrinter(object):
         """Initializer."""
         self.val = val
 
-    # pylint: disable=R0201
     def to_string(self):
         """to_string."""
         return None
@@ -668,7 +666,6 @@ class WtUpdateToBsonPrinter(object):
         """DisplayHint."""
         return 'map'
 
-    # pylint: disable=R0201
     def to_string(self):
         """ToString."""
         elems = []
@@ -717,9 +714,11 @@ def read_as_integer(pmem, size):
     # We assume the same platform for the debugger and the debuggee (thus, 'sys.byteorder'). If
     # this becomes a problem look into whether it's possible to determine the byteorder of the
     # inferior.
-    return int.from_bytes( \
-        gdb.selected_inferior().read_memory(pmem, size).tobytes(), \
-        sys.byteorder)
+    return int.from_bytes(
+        gdb.selected_inferior().read_memory(pmem, size).tobytes(),
+        sys.byteorder,
+    )
+
 
 def read_as_integer_signed(pmem, size):
     """Read 'size' bytes at 'pmem' as an integer."""
@@ -729,7 +728,9 @@ def read_as_integer_signed(pmem, size):
     return int.from_bytes(
         gdb.selected_inferior().read_memory(pmem, size).tobytes(),
         sys.byteorder,
-        signed = True)
+        signed=True,
+    )
+
 
 class SbeCodeFragmentPrinter(object):
     """
@@ -765,7 +766,6 @@ class SbeCodeFragmentPrinter(object):
         """Return sbe::vm::CodeFragment for printing."""
         return "%s" % (self.val.type)
 
-    # pylint: disable=R0915
     def children(self):
         """children."""
         yield '_instrs', '{... (to see raw output, run "disable pretty-printer")}'
@@ -957,6 +957,7 @@ class IntervalPrinter(OptimizerTypePrinter):
         """Initialize IntervalPrinter."""
         super().__init__(val, "ExplainGenerator::explainInterval")
 
+
 class IntervalExprPrinter(OptimizerTypePrinter):
     """Pretty-printer for mongo::optimizer::IntervalRequirement::Node."""
 
@@ -1023,61 +1024,63 @@ def register_abt_printers(pp):
         pp.add('ABT::Reference', abt_ref_type, False, ABTPrinter)
     except gdb.error:
         # ABT printer.
-        abt_type_set = ["Blackhole",
-                               "Constant",
-                               "Variable",
-                               "UnaryOp",
-                               "BinaryOp",
-                               "If",
-                               "Let",
-                               "LambdaAbstraction",
-                               "LambdaApplication",
-                               "FunctionCall",
-                               "EvalPath",
-                               "EvalFilter",
-                               "Source",
-                               "PathConstant",
-                               "PathLambda",
-                               "PathIdentity",
-                               "PathDefault",
-                               "PathCompare",
-                               "PathDrop",
-                               "PathKeep",
-                               "PathObj",
-                               "PathArr",
-                               "PathTraverse",
-                               "PathField",
-                               "PathGet",
-                               "PathComposeM",
-                               "PathComposeA",
-                               "ScanNode",
-                               "PhysicalScanNode",
-                               "ValueScanNode",
-                               "CoScanNode",
-                               "IndexScanNode",
-                               "SeekNode",
-                               "MemoLogicalDelegatorNode",
-                               "MemoPhysicalDelegatorNode",
-                               "FilterNode",
-                               "EvaluationNode",
-                               "SargableNode",
-                               "RIDIntersectNode",
-                               "RIDUnionNode",
-                               "BinaryJoinNode",
-                               "HashJoinNode",
-                               "MergeJoinNode",
-                               "SortedMergeNode",
-                               "NestedLoopJoinNode",
-                               "UnionNode",
-                               "GroupByNode",
-                               "UnwindNode",
-                               "UniqueNode",
-                               "CollationNode",
-                               "LimitSkipNode",
-                               "ExchangeNode",
-                               "RootNode",
-                               "References",
-                               "ExpressionBinder"]
+        abt_type_set = [
+            "Blackhole",
+            "Constant",
+            "Variable",
+            "UnaryOp",
+            "BinaryOp",
+            "If",
+            "Let",
+            "LambdaAbstraction",
+            "LambdaApplication",
+            "FunctionCall",
+            "EvalPath",
+            "EvalFilter",
+            "Source",
+            "PathConstant",
+            "PathLambda",
+            "PathIdentity",
+            "PathDefault",
+            "PathCompare",
+            "PathDrop",
+            "PathKeep",
+            "PathObj",
+            "PathArr",
+            "PathTraverse",
+            "PathField",
+            "PathGet",
+            "PathComposeM",
+            "PathComposeA",
+            "ScanNode",
+            "PhysicalScanNode",
+            "ValueScanNode",
+            "CoScanNode",
+            "IndexScanNode",
+            "SeekNode",
+            "MemoLogicalDelegatorNode",
+            "MemoPhysicalDelegatorNode",
+            "FilterNode",
+            "EvaluationNode",
+            "SargableNode",
+            "RIDIntersectNode",
+            "RIDUnionNode",
+            "BinaryJoinNode",
+            "HashJoinNode",
+            "MergeJoinNode",
+            "SortedMergeNode",
+            "NestedLoopJoinNode",
+            "UnionNode",
+            "GroupByNode",
+            "UnwindNode",
+            "UniqueNode",
+            "CollationNode",
+            "LimitSkipNode",
+            "ExchangeNode",
+            "RootNode",
+            "References",
+            "ExpressionBinder",
+        ]
         abt_type = "mongo::optimizer::algebra::PolyValue<"
         for type_name in abt_type_set:
             abt_type += "mongo::optimizer::" + type_name
