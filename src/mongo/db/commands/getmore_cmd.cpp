@@ -617,7 +617,6 @@ public:
                 options.atClusterTime = repl::ReadConcernArgs::get(opCtx).getArgsAtClusterTime();
             }
             CursorResponseBuilder nextBatch(reply, options);
-            BSONObj obj;
             std::uint64_t numResults = 0;
             ResourceConsumption::DocumentUnitCounter docUnitsReturned;
 

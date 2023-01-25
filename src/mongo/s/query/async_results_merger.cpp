@@ -846,7 +846,8 @@ void AsyncResultsMerger::_scheduleKillCursors(WithLock, OperationContext* opCtx)
     invariant(_killCompleteInfo);
 
     for (const auto& remote : _remotes) {
-        if (remote.status.isOK() && remote.cursorId && !remote.exhausted()) {
+        if ((remote.status.isOK() || remote.status == ErrorCodes::MaxTimeMSExpired) &&
+            remote.cursorId && !remote.exhausted()) {
             BSONObj cmdObj =
                 KillCursorsCommandRequest(_params.getNss(), {remote.cursorId}).toBSON(BSONObj{});
 
