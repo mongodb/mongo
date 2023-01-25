@@ -1,13 +1,14 @@
 """Helper functions to interact with evergreen."""
 import os
 import pathlib
-from typing import Optional, List
-
+from collections import deque
+from typing import Deque, Iterator, Optional, List, Set, Union
+from pathlib import Path
 import requests
 import structlog
 from requests import HTTPError
 
-from evergreen import RetryingEvergreenApi, Patch, Version
+from evergreen import RetryingEvergreenApi, Patch, Version, Task
 
 from buildscripts.resmokelib.setup_multiversion.config import SetupMultiversionConfig
 
@@ -34,7 +35,7 @@ class EvergreenConnError(Exception):
 
 def _find_evergreen_yaml_candidates() -> List[str]:
     # Common for machines in Evergreen
-    candidates = [os.getcwd()]
+    candidates: List[Union[str, Path]] = [os.getcwd()]
 
     cwd = pathlib.Path(os.getcwd())
     # add every path that is the parent of CWD as well
@@ -79,7 +80,8 @@ def get_evergreen_api(evergreen_config=None):
     raise last_ex
 
 
-def get_buildvariant_name(config, edition, platform, architecture, major_minor_version):
+def get_buildvariant_name(config: SetupMultiversionConfig, edition, platform, architecture,
+                          major_minor_version):
     """Return Evergreen buildvariant name."""
 
     buildvariant_name = ""
@@ -99,7 +101,7 @@ def get_buildvariant_name(config, edition, platform, architecture, major_minor_v
 
 
 # pylint: disable=protected-access
-def get_patch_module_diffs(evg_api, version_id):
+def get_patch_module_diffs(evg_api: RetryingEvergreenApi, version_id):
     """Get the raw git diffs for all modules."""
     evg_url = evg_api._create_url(f"/patches/{version_id}")
     try:
@@ -115,17 +117,17 @@ def get_patch_module_diffs(evg_api, version_id):
 
     patch = Patch(res.json(), evg_api)
 
-    res = {}
+    patch_module_diff = {}
     for module_code_change in patch.module_code_changes:
         git_diff_link = module_code_change.raw_link
         raw = evg_api._call_api(git_diff_link)
         diff = raw.text
-        res[module_code_change.branch_name] = diff
+        patch_module_diff[module_code_change.branch_name] = diff
 
-    return res
+    return patch_module_diff
 
 
-def get_generic_buildvariant_name(config, major_minor_version):
+def get_generic_buildvariant_name(config: SetupMultiversionConfig, major_minor_version):
     """Return Evergreen buildvariant name for generic platform."""
 
     LOGGER.info("Falling back to generic architecture.", edition=GENERIC_EDITION,
@@ -164,12 +166,13 @@ def get_evergreen_version(evg_api: RetryingEvergreenApi, evg_ref: str) -> Option
     return None
 
 
-def get_evergreen_versions(evg_api, evg_project):
+def get_evergreen_versions(evg_api: RetryingEvergreenApi, evg_project: str) -> Iterator[Version]:
     """Return the list of evergreen versions by evergreen project name."""
     return evg_api.versions_by_project(evg_project)
 
 
-def get_compile_artifact_urls(evg_api, evg_version, buildvariant_name, ignore_failed_push=False):
+def get_compile_artifact_urls(evg_api: RetryingEvergreenApi, evg_version: Version,
+                              buildvariant_name, ignore_failed_push=False):
     """Return compile urls from buildvariant in Evergreen version."""
     try:
         build_id = evg_version.build_variants_map[buildvariant_name]
@@ -178,8 +181,14 @@ def get_compile_artifact_urls(evg_api, evg_version, buildvariant_name, ignore_fa
 
     evg_build = evg_api.build_by_id(build_id)
     LOGGER.debug("Found evergreen build.", evergreen_build=f"{EVERGREEN_HOST}/build/{build_id}")
-    evg_tasks = evg_build.get_tasks()
-    tasks_wrapper = _filter_successful_tasks(evg_tasks)
+    evg_tasks: Deque[Union[Task, str]] = deque(evg_build.get_tasks())
+    tasks_wrapper = _filter_successful_tasks(evg_api, evg_tasks)
+    LOGGER.info(
+        "Found the following multiversion tasks",
+        symbols_task=tasks_wrapper.symbols_task,
+        binary_task=tasks_wrapper.binary_task,
+        push_task=tasks_wrapper.push_task,
+    )
 
     # Ignore push tasks if specified as such, else return no results if push does not exist.
     if ignore_failed_push:
@@ -190,7 +199,18 @@ def get_compile_artifact_urls(evg_api, evg_version, buildvariant_name, ignore_fa
     return _get_multiversion_urls(tasks_wrapper)
 
 
-def _get_multiversion_urls(tasks_wrapper):
+class _MultiversionTasks(object):
+    """Tasks relevant for multiversion setup."""
+
+    def __init__(self, symbols: Union[Task, None], binary: Union[Task, None],
+                 push: Union[Task, None]):
+        """Init function."""
+        self.symbols_task = symbols
+        self.binary_task = binary
+        self.push_task = push
+
+
+def _get_multiversion_urls(tasks_wrapper: _MultiversionTasks):
     compile_artifact_urls = {}
 
     binary = tasks_wrapper.binary_task
@@ -227,21 +247,29 @@ def _get_multiversion_urls(tasks_wrapper):
     return compile_artifact_urls
 
 
-class _MultiversionTasks(object):
-    """Tasks relevant for multiversion setup."""
+def _filter_successful_tasks(evg_api: RetryingEvergreenApi,
+                             evg_tasks: Deque[Union[Task, str]]) -> _MultiversionTasks:
+    """
+    We want to filter successful tasks in order by variant then by dependent tasks to find the compile tasks.
 
-    def __init__(self, symbols, binary, push):
-        """Init function."""
-        self.symbols_task = symbols
-        self.binary_task = binary
-        self.push_task = push
-
-
-def _filter_successful_tasks(evg_tasks) -> _MultiversionTasks:
+    evg_tasks: A queue of Tasks or task_ids (str)
+    """
     compile_task = None
     archive_symbols_task = None
     push_task = None
-    for evg_task in evg_tasks:
+    seen_task_ids: Set[str] = set()
+    while evg_tasks:
+        evg_task = evg_tasks.popleft()
+
+        # If we have checked this task before skip it
+        task_id = evg_task if isinstance(evg_task, str) else evg_task.task_id
+        if task_id in seen_task_ids:
+            continue
+        seen_task_ids.add(task_id)
+
+        if isinstance(evg_task, str):
+            evg_task = evg_api.task_by_id(evg_task)
+
         # Only set the compile task if there isn't one already, otherwise
         # newer tasks like "archive_dist_test_debug" take precedence.
         if evg_task.display_name in ("compile", "archive_dist_test") and compile_task is None:
@@ -252,4 +280,8 @@ def _filter_successful_tasks(evg_tasks) -> _MultiversionTasks:
             archive_symbols_task = evg_task
         if compile_task and push_task and archive_symbols_task:
             break
+
+        dependent_tasks = evg_task.depends_on if evg_task.depends_on else []
+        for dep_task in dependent_tasks:
+            evg_tasks.append(dep_task["id"])
     return _MultiversionTasks(symbols=archive_symbols_task, binary=compile_task, push=push_task)

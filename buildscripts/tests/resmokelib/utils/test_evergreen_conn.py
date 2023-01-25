@@ -182,6 +182,49 @@ class TestGetCompileArtifactUrls(unittest.TestCase):
         urls = evergreen_conn.get_compile_artifact_urls(mock_evg_api, mock_version, "test")
         self.assertEqual(urls, expected_urls)
 
+    @patch("evergreen.task.Artifact")
+    @patch("evergreen.task.Artifact")
+    @patch("evergreen.task.Task")
+    @patch("evergreen.task.Task")
+    @patch("evergreen.task.Task")
+    @patch("evergreen.build.Build")
+    @patch("evergreen.version.Version")
+    @patch("evergreen.api.EvergreenApi")
+    def test_child_urls_found(self, mock_evg_api, mock_version, mock_build, mock_compile_task,
+                              mock_push_task, mock_child_task, mock_compile_artifact,
+                              mock_child_task_artifact):
+
+        mock_compile_task.project_identifier = "dummy project id"
+
+        expected_urls = {
+            "Binaries":
+                "https://mciuploads.s3.amazonaws.com/mongodb-mongo-master/ubuntu1804/90f767adbb1901d007ee4dd8714f53402d893669/binaries/mongo-mongodb_mongo_master_ubuntu1804_90f767adbb1901d007ee4dd8714f53402d893669_20_11_30_03_14_30.tgz",
+            "Symbols":
+                "yeet_skeert",
+            "project_identifier":
+                "dummy project id",
+        }
+        mock_evg_api.build_by_id.return_value = mock_build
+        mock_evg_api.task_by_id.return_value = mock_child_task
+        mock_compile_artifact.name = "Binaries"
+        mock_compile_artifact.url = expected_urls["Binaries"]
+        mock_child_task_artifact.name = "Symbols"
+        mock_child_task_artifact.url = expected_urls["Symbols"]
+        mock_compile_task.display_name = "compile"
+        mock_compile_task.artifacts = [mock_compile_artifact]
+        mock_compile_task.status = "success"
+        mock_push_task.display_name = "push"
+        mock_push_task.status = "success"
+        mock_push_task.depends_on = [{"id": "fake id"}]
+        mock_child_task.display_name = "archive_dist_test_debug"
+        mock_child_task.artifacts = [mock_child_task_artifact]
+        mock_child_task.status = "success"
+
+        mock_build.get_tasks.return_value = [mock_compile_task, mock_push_task]
+
+        urls = evergreen_conn.get_compile_artifact_urls(mock_evg_api, mock_version, "test")
+        self.assertEqual(urls, expected_urls)
+
     @patch("evergreen.task.Task")
     @patch("evergreen.task.Task")
     @patch("evergreen.build.Build")

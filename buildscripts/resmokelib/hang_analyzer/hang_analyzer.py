@@ -95,13 +95,6 @@ class HangAnalyzer(Subcommand):
             for pid in pinfo.pidv:
                 process.pause_process(self.root_logger, pinfo.name, pid)
 
-        # Download symbols after pausing if the task ID is not None and not running with sanitizers.
-        # Sanitizer builds are not stripped and don't require debug symbols.
-        san_options = os.environ.get("san_options", None)
-        if self.task_id is not None and san_options is None:
-            my_symbolizer = Symbolizer(self.task_id, download_symbols_only=True)
-            download_debug_symbols(self.root_logger, my_symbolizer)
-
         # Dump python processes by signalling them. The resmoke.py process will generate
         # the report.json, when signalled, so we do this before attaching to other processes.
         for pinfo in [pinfo for pinfo in processes if is_python_process(pinfo.name)]:
@@ -129,6 +122,13 @@ class HangAnalyzer(Subcommand):
                     self.root_logger.info(
                         "Not enough space for a core dump, skipping %s processes with PIDs %s",
                         pinfo.name, str(pinfo.pidv))
+
+        # Download symbols after pausing if the task ID is not None and not running with sanitizers.
+        # Sanitizer builds are not stripped and don't require debug symbols.
+        san_options = os.environ.get("san_options", None)
+        if self.task_id is not None and san_options is None:
+            my_symbolizer = Symbolizer(self.task_id, download_symbols_only=True)
+            download_debug_symbols(self.root_logger, my_symbolizer)
 
         # Dump info of all processes, except python & java.
         for pinfo in [pinfo for pinfo in processes if not re.match("^(java|python)", pinfo.name)]:
