@@ -97,6 +97,19 @@ MONGO_FAIL_POINT_DEFINE(skipTTLIndexValidationOnCreateIndex);
 constexpr auto kCommandName = "createIndexes"_sd;
 constexpr auto kAllIndexesAlreadyExist = "all indexes already exist"_sd;
 constexpr auto kIndexAlreadyExists = "index already exists"_sd;
+constexpr auto kCsiPreviewWarning =
+    "This command requests creation of a columnstore index. Columnstore indexes "
+    "are a preview feature and are not recommended for production use"_sd;
+
+/**
+ * Appends 'message' to the 'note' component of the response.
+ */
+void appendMessageToNoteField(CreateIndexesReply* reply, StringData message) {
+    std::string noteCopy = reply->getNote() ? (*reply->getNote() + "\n\n") : "";
+    noteCopy += message;
+    // setNote() will internally make its own copy.
+    reply->setNote(StringData(noteCopy));
+}
 
 /**
  * Parses the index specifications from 'cmd', validates them, and returns equivalent index
@@ -131,19 +144,13 @@ std::vector<BSONObj> parseAndValidateIndexSpecs(OperationContext* opCtx,
 void appendFinalIndexFieldsToResult(CreateIndexesReply* reply,
                                     int numIndexesBefore,
                                     int numIndexesAfter,
-                                    int numSpecs,
-                                    boost::optional<CommitQuorumOptions> commitQuorum) {
+                                    int numSpecs) {
     reply->setNumIndexesBefore(numIndexesBefore);
     reply->setNumIndexesAfter(numIndexesAfter);
     if (numIndexesAfter == numIndexesBefore) {
-        reply->setNote(kAllIndexesAlreadyExist);
+        appendMessageToNoteField(reply, kAllIndexesAlreadyExist);
     } else if (numIndexesAfter < numIndexesBefore + numSpecs) {
-        reply->setNote(kIndexAlreadyExists);
-    }
-
-    // commitQuorum will be populated only when two phase index build is enabled.
-    if (commitQuorum) {
-        reply->setCommitQuorum(commitQuorum);
+        appendMessageToNoteField(reply, kIndexAlreadyExists);
     }
 }
 
@@ -226,6 +233,22 @@ void checkEncryptedFieldIndexRestrictions(OperationContext* opCtx,
 }
 
 /**
+ * Checks whether the command attempts to create a columnstore index, and if so, adds a "note" to
+ * the response indicating that columnstore indexes are a preview feature.
+ */
+void addNoteForColumnstoreIndexPreview(const CreateIndexesCommand& cmd,
+                                       CreateIndexesReply* outReply) {
+    for (const auto& indexSpec : cmd.getIndexes()) {
+        const auto keyPattern = indexSpec[IndexDescriptor::kKeyPatternFieldName].Obj();
+        if (IndexNames::findPluginName(keyPattern) == IndexNames::COLUMN) {
+            appendMessageToNoteField(outReply, kCsiPreviewWarning);
+            return;
+        }
+    }
+}
+
+
+/**
  * Retrieves the commit quorum from 'cmdObj' if it is present. If it isn't, we provide a default
  * commit quorum, which consists of all the data-bearing nodes.
  */
@@ -287,7 +310,7 @@ bool indexesAlreadyExist(OperationContext* opCtx,
     auto numIndexes = collection->getIndexCatalog()->numIndexesTotal();
     reply->setNumIndexesBefore(numIndexes);
     reply->setNumIndexesAfter(numIndexes);
-    reply->setNote(kAllIndexesAlreadyExist);
+    appendMessageToNoteField(reply, kAllIndexesAlreadyExist);
 
     return true;
 }
@@ -323,17 +346,16 @@ void assertNoMovePrimaryInProgress(OperationContext* opCtx, const NamespaceStrin
  * Attempts to create indexes in `specs` on a non-existent collection (or empty collection created
  * in the same multi-document transaction) with namespace `ns`. In the former case, the collection
  * is implicitly created.
- * Returns a BSONObj containing fields to be appended to the result of the calling function.
- * `commitQuorum` is passed only to be appended to the result, for completeness. It is otherwise
- * unused.
+ *
+ * The output is added to the 'reply' out argument.
+ *
  * Expects to be run at the end of a larger writeConflictRetry loop.
  */
-CreateIndexesReply runCreateIndexesOnNewCollection(
-    OperationContext* opCtx,
-    const NamespaceString& ns,
-    const std::vector<BSONObj>& specs,
-    boost::optional<CommitQuorumOptions> commitQuorum,
-    bool createCollImplicitly) {
+void runCreateIndexesOnNewCollection(OperationContext* opCtx,
+                                     const NamespaceString& ns,
+                                     const std::vector<BSONObj>& specs,
+                                     bool createCollImplicitly,
+                                     CreateIndexesReply* reply) {
     WriteUnitOfWork wunit(opCtx);
     uassert(ErrorCodes::CommandNotSupportedOnView,
             "Cannot create indexes on a view",
@@ -408,13 +430,8 @@ CreateIndexesReply runCreateIndexesOnNewCollection(
     }
     wunit.commit();
 
-    CreateIndexesReply reply;
-
-    appendFinalIndexFieldsToResult(
-        &reply, numIndexesBefore, numIndexesAfter, int(specs.size()), commitQuorum);
-    reply.setCreatedCollectionAutomatically(true);
-
-    return reply;
+    appendFinalIndexFieldsToResult(reply, numIndexesBefore, numIndexesAfter, int(specs.size()));
+    reply->setCreatedCollectionAutomatically(true);
 }
 
 bool isCreatingInternalConfigTxnsPartialIndex(const CreateIndexesCommand& cmd) {
@@ -445,6 +462,8 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
                           << " within a transaction.",
             !opCtx->inMultiDocumentTransaction() || !ns.isSystem());
 
+    CreateIndexesReply reply;
+
     auto specs = parseAndValidateIndexSpecs(opCtx, cmd, ns);
     auto replCoord = repl::ReplicationCoordinator::get(opCtx);
     auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
@@ -454,17 +473,18 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
     auto commitQuorum = parseAndGetCommitQuorum(opCtx, protocol, cmd);
     if (commitQuorum) {
         uassertStatusOK(replCoord->checkIfCommitQuorumCanBeSatisfied(commitQuorum.value()));
+        reply.setCommitQuorum(commitQuorum);
     }
 
     validateTTLOptions(opCtx, ns, cmd);
     checkEncryptedFieldIndexRestrictions(opCtx, ns, cmd);
+    addNoteForColumnstoreIndexPreview(cmd, &reply);
 
     // Preliminary checks before handing control over to IndexBuildsCoordinator:
     // 1) We are in a replication mode that allows for index creation.
     // 2) Check sharding state.
     // 3) Check if we can create the index without handing control to the IndexBuildsCoordinator.
     boost::optional<UUID> collectionUUID;
-    CreateIndexesReply reply;
     {
         AutoGetDb autoDb(opCtx, ns.dbName(), MODE_IX);
         assertNoMovePrimaryInProgress(opCtx, ns);
@@ -501,8 +521,7 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
 
             const bool createCollImplicitly = collection ? false : true;
 
-            reply = runCreateIndexesOnNewCollection(
-                opCtx, ns, specs, commitQuorum, createCollImplicitly);
+            runCreateIndexesOnNewCollection(opCtx, ns, specs, createCollImplicitly, &reply);
             return true;
         });
 
@@ -673,7 +692,7 @@ CreateIndexesReply runCreateIndexesWithCoordinator(OperationContext* opCtx,
     repl::ReplClientInfo::forClient(opCtx->getClient()).setLastOpToSystemLastOpTime(opCtx);
 
     appendFinalIndexFieldsToResult(
-        &reply, stats.numIndexesBefore, stats.numIndexesAfter, int(specs.size()), commitQuorum);
+        &reply, stats.numIndexesBefore, stats.numIndexesAfter, int(specs.size()));
 
     return reply;
 }

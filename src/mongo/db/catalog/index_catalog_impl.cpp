@@ -215,6 +215,17 @@ void IndexCatalogImpl::_init(OperationContext* opCtx,
         BSONObj spec = collection->getIndexSpec(indexName).getOwned();
         BSONObj keyPattern = spec.getObjectField("key");
 
+        if (IndexNames::findPluginName(keyPattern) == IndexNames::COLUMN) {
+            LOGV2_OPTIONS(7281100,
+                          {logv2::LogTag::kStartupWarnings},
+                          "Found a columnstore index in the catalog. Columnstore indexes are "
+                          "a preview feature and not recommended for production use",
+                          "ns"_attr = collection->ns(),
+                          "uuid"_attr = collection->uuid(),
+                          "index"_attr = indexName,
+                          "spec"_attr = spec);
+        }
+
         auto descriptor = std::make_unique<IndexDescriptor>(_getAccessMethodName(keyPattern), spec);
 
         if (spec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName)) {
