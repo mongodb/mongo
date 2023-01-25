@@ -1,4 +1,4 @@
-
+setting random seed: 6345
 Inserting collection: ce_data_100
 Inserting collection: ce_data_1000
 Indexing collection: ce_data_100
@@ -7994,6 +7994,6911 @@ Indexing collection: ce_data_1000
 ]
 
 [jsTest] ----
+[jsTest] Sample histograms:
+[jsTest] ----
+
+[
+	{
+		"_id" : "uniform_int_1000_1",
+		"statistics" : {
+			"documents" : 91,
+			"sampleRate" : 1,
+			"trueCount" : 0,
+			"falseCount" : 0,
+			"emptyArrayCount" : 0,
+			"typeCount" : [
+				{
+					"typeName" : "NumberDouble",
+					"count" : 91
+				}
+			],
+			"scalarHistogram" : {
+				"buckets" : [
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 1,
+						"cumulativeDistincts" : 1
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 2,
+						"cumulativeDistincts" : 2
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 3,
+						"cumulativeDistincts" : 3
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 4,
+						"cumulativeDistincts" : 4
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 5,
+						"cumulativeDistincts" : 5
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 7,
+						"cumulativeDistincts" : 6
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 8,
+						"cumulativeDistincts" : 7
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 9,
+						"cumulativeDistincts" : 8
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 10,
+						"cumulativeDistincts" : 9
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 11,
+						"cumulativeDistincts" : 10
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 12,
+						"cumulativeDistincts" : 11
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 13,
+						"cumulativeDistincts" : 12
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 14,
+						"cumulativeDistincts" : 13
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 15,
+						"cumulativeDistincts" : 14
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 16,
+						"cumulativeDistincts" : 15
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 17,
+						"cumulativeDistincts" : 16
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 18,
+						"cumulativeDistincts" : 17
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 19,
+						"cumulativeDistincts" : 18
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 20,
+						"cumulativeDistincts" : 19
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 21,
+						"cumulativeDistincts" : 20
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 22,
+						"cumulativeDistincts" : 21
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 23,
+						"cumulativeDistincts" : 22
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 24,
+						"cumulativeDistincts" : 23
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 25,
+						"cumulativeDistincts" : 24
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 26,
+						"cumulativeDistincts" : 25
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 27,
+						"cumulativeDistincts" : 26
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 28,
+						"cumulativeDistincts" : 27
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 29,
+						"cumulativeDistincts" : 28
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 31,
+						"cumulativeDistincts" : 29
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 32,
+						"cumulativeDistincts" : 30
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 33,
+						"cumulativeDistincts" : 31
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 34,
+						"cumulativeDistincts" : 32
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 35,
+						"cumulativeDistincts" : 33
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 36,
+						"cumulativeDistincts" : 34
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 37,
+						"cumulativeDistincts" : 35
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 38,
+						"cumulativeDistincts" : 36
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 39,
+						"cumulativeDistincts" : 37
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 40,
+						"cumulativeDistincts" : 38
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 41,
+						"cumulativeDistincts" : 39
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 42,
+						"cumulativeDistincts" : 40
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 43,
+						"cumulativeDistincts" : 41
+					},
+					{
+						"boundaryCount" : 3,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 46,
+						"cumulativeDistincts" : 42
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 47,
+						"cumulativeDistincts" : 43
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 48,
+						"cumulativeDistincts" : 44
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 49,
+						"cumulativeDistincts" : 45
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 50,
+						"cumulativeDistincts" : 46
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 52,
+						"cumulativeDistincts" : 47
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 53,
+						"cumulativeDistincts" : 48
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 54,
+						"cumulativeDistincts" : 49
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 55,
+						"cumulativeDistincts" : 50
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 56,
+						"cumulativeDistincts" : 51
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 57,
+						"cumulativeDistincts" : 52
+					},
+					{
+						"boundaryCount" : 3,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 60,
+						"cumulativeDistincts" : 53
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 61,
+						"cumulativeDistincts" : 54
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 62,
+						"cumulativeDistincts" : 55
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 63,
+						"cumulativeDistincts" : 56
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 64,
+						"cumulativeDistincts" : 57
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 66,
+						"cumulativeDistincts" : 58
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 67,
+						"cumulativeDistincts" : 59
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 68,
+						"cumulativeDistincts" : 60
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 69,
+						"cumulativeDistincts" : 61
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 70,
+						"cumulativeDistincts" : 62
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 71,
+						"cumulativeDistincts" : 63
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 73,
+						"cumulativeDistincts" : 64
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 74,
+						"cumulativeDistincts" : 65
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 75,
+						"cumulativeDistincts" : 66
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 76,
+						"cumulativeDistincts" : 67
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 77,
+						"cumulativeDistincts" : 68
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 78,
+						"cumulativeDistincts" : 69
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 79,
+						"cumulativeDistincts" : 70
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 80,
+						"cumulativeDistincts" : 71
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 81,
+						"cumulativeDistincts" : 72
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 82,
+						"cumulativeDistincts" : 73
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 83,
+						"cumulativeDistincts" : 74
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 84,
+						"cumulativeDistincts" : 75
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 85,
+						"cumulativeDistincts" : 76
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 86,
+						"cumulativeDistincts" : 77
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 87,
+						"cumulativeDistincts" : 78
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 88,
+						"cumulativeDistincts" : 79
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 89,
+						"cumulativeDistincts" : 80
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 90,
+						"cumulativeDistincts" : 81
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 91,
+						"cumulativeDistincts" : 82
+					}
+				],
+				"bounds" : [
+					4,
+					35,
+					49,
+					52,
+					66,
+					78,
+					91,
+					125,
+					130,
+					135,
+					140,
+					146,
+					162,
+					190,
+					198,
+					229,
+					260,
+					282,
+					284,
+					296,
+					302,
+					305,
+					306,
+					319,
+					345,
+					375,
+					387,
+					388,
+					393,
+					406,
+					442,
+					444,
+					459,
+					464,
+					475,
+					486,
+					500,
+					502,
+					510,
+					520,
+					600,
+					611,
+					627,
+					635,
+					642,
+					650,
+					651,
+					655,
+					658,
+					665,
+					693,
+					698,
+					705,
+					709,
+					711,
+					733,
+					771,
+					778,
+					802,
+					808,
+					815,
+					817,
+					821,
+					824,
+					827,
+					830,
+					832,
+					834,
+					851,
+					857,
+					865,
+					886,
+					891,
+					903,
+					913,
+					915,
+					975,
+					983,
+					985,
+					992,
+					996,
+					999
+				]
+			}
+		}
+	},
+	{
+		"_id" : "normal_int_1000_1",
+		"statistics" : {
+			"documents" : 91,
+			"sampleRate" : 1,
+			"trueCount" : 0,
+			"falseCount" : 0,
+			"emptyArrayCount" : 0,
+			"typeCount" : [
+				{
+					"typeName" : "NumberDouble",
+					"count" : 91
+				}
+			],
+			"scalarHistogram" : {
+				"buckets" : [
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 1,
+						"cumulativeDistincts" : 1
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 2,
+						"cumulativeDistincts" : 2
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 3,
+						"cumulativeDistincts" : 3
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 4,
+						"cumulativeDistincts" : 4
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 5,
+						"cumulativeDistincts" : 5
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 6,
+						"cumulativeDistincts" : 6
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 7,
+						"cumulativeDistincts" : 7
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 8,
+						"cumulativeDistincts" : 8
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 9,
+						"cumulativeDistincts" : 9
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 10,
+						"cumulativeDistincts" : 10
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 11,
+						"cumulativeDistincts" : 11
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 12,
+						"cumulativeDistincts" : 12
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 13,
+						"cumulativeDistincts" : 13
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 14,
+						"cumulativeDistincts" : 14
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 15,
+						"cumulativeDistincts" : 15
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 16,
+						"cumulativeDistincts" : 16
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 17,
+						"cumulativeDistincts" : 17
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 18,
+						"cumulativeDistincts" : 18
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 19,
+						"cumulativeDistincts" : 19
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 20,
+						"cumulativeDistincts" : 20
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 21,
+						"cumulativeDistincts" : 21
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 22,
+						"cumulativeDistincts" : 22
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 23,
+						"cumulativeDistincts" : 23
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 24,
+						"cumulativeDistincts" : 24
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 25,
+						"cumulativeDistincts" : 25
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 26,
+						"cumulativeDistincts" : 26
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 27,
+						"cumulativeDistincts" : 27
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 28,
+						"cumulativeDistincts" : 28
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 29,
+						"cumulativeDistincts" : 29
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 30,
+						"cumulativeDistincts" : 30
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 31,
+						"cumulativeDistincts" : 31
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 32,
+						"cumulativeDistincts" : 32
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 33,
+						"cumulativeDistincts" : 33
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 34,
+						"cumulativeDistincts" : 34
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 35,
+						"cumulativeDistincts" : 35
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 36,
+						"cumulativeDistincts" : 36
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 37,
+						"cumulativeDistincts" : 37
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 38,
+						"cumulativeDistincts" : 38
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 39,
+						"cumulativeDistincts" : 39
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 40,
+						"cumulativeDistincts" : 40
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 41,
+						"cumulativeDistincts" : 41
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 42,
+						"cumulativeDistincts" : 42
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 43,
+						"cumulativeDistincts" : 43
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 45,
+						"cumulativeDistincts" : 44
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 46,
+						"cumulativeDistincts" : 45
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 47,
+						"cumulativeDistincts" : 46
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 49,
+						"cumulativeDistincts" : 47
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 50,
+						"cumulativeDistincts" : 48
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 51,
+						"cumulativeDistincts" : 49
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 52,
+						"cumulativeDistincts" : 50
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 53,
+						"cumulativeDistincts" : 51
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 54,
+						"cumulativeDistincts" : 52
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 55,
+						"cumulativeDistincts" : 53
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 56,
+						"cumulativeDistincts" : 54
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 58,
+						"cumulativeDistincts" : 55
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 59,
+						"cumulativeDistincts" : 56
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 60,
+						"cumulativeDistincts" : 57
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 61,
+						"cumulativeDistincts" : 58
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 62,
+						"cumulativeDistincts" : 59
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 63,
+						"cumulativeDistincts" : 60
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 64,
+						"cumulativeDistincts" : 61
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 65,
+						"cumulativeDistincts" : 62
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 66,
+						"cumulativeDistincts" : 63
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 67,
+						"cumulativeDistincts" : 64
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 68,
+						"cumulativeDistincts" : 65
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 69,
+						"cumulativeDistincts" : 66
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 70,
+						"cumulativeDistincts" : 67
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 71,
+						"cumulativeDistincts" : 68
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 72,
+						"cumulativeDistincts" : 69
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 73,
+						"cumulativeDistincts" : 70
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 75,
+						"cumulativeDistincts" : 71
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 76,
+						"cumulativeDistincts" : 72
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 77,
+						"cumulativeDistincts" : 73
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 78,
+						"cumulativeDistincts" : 74
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 79,
+						"cumulativeDistincts" : 75
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 80,
+						"cumulativeDistincts" : 76
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 81,
+						"cumulativeDistincts" : 77
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 82,
+						"cumulativeDistincts" : 78
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 83,
+						"cumulativeDistincts" : 79
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 84,
+						"cumulativeDistincts" : 80
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 85,
+						"cumulativeDistincts" : 81
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 86,
+						"cumulativeDistincts" : 82
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 87,
+						"cumulativeDistincts" : 83
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 88,
+						"cumulativeDistincts" : 84
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 89,
+						"cumulativeDistincts" : 85
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 90,
+						"cumulativeDistincts" : 86
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 91,
+						"cumulativeDistincts" : 87
+					}
+				],
+				"bounds" : [
+					0,
+					81,
+					168,
+					174,
+					193,
+					214,
+					228,
+					236,
+					261,
+					262,
+					295,
+					300,
+					312,
+					313,
+					334,
+					339,
+					342,
+					368,
+					398,
+					400,
+					405,
+					410,
+					416,
+					419,
+					420,
+					426,
+					428,
+					432,
+					433,
+					435,
+					436,
+					442,
+					448,
+					455,
+					460,
+					476,
+					481,
+					487,
+					489,
+					491,
+					492,
+					498,
+					507,
+					511,
+					518,
+					519,
+					520,
+					530,
+					533,
+					537,
+					542,
+					552,
+					556,
+					560,
+					563,
+					564,
+					577,
+					581,
+					587,
+					591,
+					595,
+					598,
+					617,
+					621,
+					622,
+					623,
+					629,
+					632,
+					636,
+					639,
+					645,
+					647,
+					648,
+					661,
+					674,
+					710,
+					714,
+					717,
+					719,
+					728,
+					738,
+					765,
+					796,
+					798,
+					827,
+					828,
+					878
+				]
+			}
+		}
+	},
+	{
+		"_id" : "chi2_int_1000_1",
+		"statistics" : {
+			"documents" : 91,
+			"sampleRate" : 1,
+			"trueCount" : 0,
+			"falseCount" : 0,
+			"emptyArrayCount" : 0,
+			"typeCount" : [
+				{
+					"typeName" : "NumberDouble",
+					"count" : 91
+				}
+			],
+			"scalarHistogram" : {
+				"buckets" : [
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 1,
+						"cumulativeDistincts" : 1
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 2,
+						"cumulativeDistincts" : 2
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 3,
+						"cumulativeDistincts" : 3
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 4,
+						"cumulativeDistincts" : 4
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 5,
+						"cumulativeDistincts" : 5
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 6,
+						"cumulativeDistincts" : 6
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 7,
+						"cumulativeDistincts" : 7
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 8,
+						"cumulativeDistincts" : 8
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 9,
+						"cumulativeDistincts" : 9
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 10,
+						"cumulativeDistincts" : 10
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 12,
+						"cumulativeDistincts" : 11
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 14,
+						"cumulativeDistincts" : 12
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 15,
+						"cumulativeDistincts" : 13
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 16,
+						"cumulativeDistincts" : 14
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 17,
+						"cumulativeDistincts" : 15
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 18,
+						"cumulativeDistincts" : 16
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 20,
+						"cumulativeDistincts" : 17
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 22,
+						"cumulativeDistincts" : 18
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 23,
+						"cumulativeDistincts" : 19
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 24,
+						"cumulativeDistincts" : 20
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 25,
+						"cumulativeDistincts" : 21
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 27,
+						"cumulativeDistincts" : 22
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 28,
+						"cumulativeDistincts" : 23
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 29,
+						"cumulativeDistincts" : 24
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 30,
+						"cumulativeDistincts" : 25
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 31,
+						"cumulativeDistincts" : 26
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 33,
+						"cumulativeDistincts" : 27
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 34,
+						"cumulativeDistincts" : 28
+					},
+					{
+						"boundaryCount" : 3,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 37,
+						"cumulativeDistincts" : 29
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 38,
+						"cumulativeDistincts" : 30
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 39,
+						"cumulativeDistincts" : 31
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 41,
+						"cumulativeDistincts" : 32
+					},
+					{
+						"boundaryCount" : 3,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 44,
+						"cumulativeDistincts" : 33
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 45,
+						"cumulativeDistincts" : 34
+					},
+					{
+						"boundaryCount" : 3,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 48,
+						"cumulativeDistincts" : 35
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 49,
+						"cumulativeDistincts" : 36
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 50,
+						"cumulativeDistincts" : 37
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 51,
+						"cumulativeDistincts" : 38
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 52,
+						"cumulativeDistincts" : 39
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 53,
+						"cumulativeDistincts" : 40
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 54,
+						"cumulativeDistincts" : 41
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 56,
+						"cumulativeDistincts" : 42
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 58,
+						"cumulativeDistincts" : 43
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 59,
+						"cumulativeDistincts" : 44
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 60,
+						"cumulativeDistincts" : 45
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 62,
+						"cumulativeDistincts" : 46
+					},
+					{
+						"boundaryCount" : 3,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 65,
+						"cumulativeDistincts" : 47
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 67,
+						"cumulativeDistincts" : 48
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 68,
+						"cumulativeDistincts" : 49
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 69,
+						"cumulativeDistincts" : 50
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 70,
+						"cumulativeDistincts" : 51
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 71,
+						"cumulativeDistincts" : 52
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 72,
+						"cumulativeDistincts" : 53
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 74,
+						"cumulativeDistincts" : 54
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 75,
+						"cumulativeDistincts" : 55
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 76,
+						"cumulativeDistincts" : 56
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 77,
+						"cumulativeDistincts" : 57
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 78,
+						"cumulativeDistincts" : 58
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 79,
+						"cumulativeDistincts" : 59
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 80,
+						"cumulativeDistincts" : 60
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 81,
+						"cumulativeDistincts" : 61
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 82,
+						"cumulativeDistincts" : 62
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 83,
+						"cumulativeDistincts" : 63
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 84,
+						"cumulativeDistincts" : 64
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 85,
+						"cumulativeDistincts" : 65
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 86,
+						"cumulativeDistincts" : 66
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 87,
+						"cumulativeDistincts" : 67
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 88,
+						"cumulativeDistincts" : 68
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 89,
+						"cumulativeDistincts" : 69
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 90,
+						"cumulativeDistincts" : 70
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 91,
+						"cumulativeDistincts" : 71
+					}
+				],
+				"bounds" : [
+					294,
+					301,
+					309,
+					320,
+					321,
+					325,
+					328,
+					331,
+					334,
+					341,
+					342,
+					343,
+					345,
+					347,
+					349,
+					350,
+					353,
+					354,
+					355,
+					357,
+					358,
+					359,
+					360,
+					361,
+					364,
+					368,
+					369,
+					370,
+					371,
+					372,
+					374,
+					378,
+					379,
+					380,
+					381,
+					382,
+					385,
+					386,
+					389,
+					390,
+					393,
+					394,
+					398,
+					399,
+					400,
+					403,
+					405,
+					406,
+					407,
+					408,
+					409,
+					410,
+					413,
+					414,
+					415,
+					418,
+					419,
+					421,
+					424,
+					425,
+					429,
+					431,
+					437,
+					444,
+					445,
+					446,
+					447,
+					449,
+					450,
+					465,
+					469
+				]
+			}
+		}
+	},
+	{
+		"_id" : "mixed_int_uniform_1",
+		"statistics" : {
+			"documents" : 91,
+			"sampleRate" : 1,
+			"trueCount" : 0,
+			"falseCount" : 0,
+			"emptyArrayCount" : 0,
+			"typeCount" : [
+				{
+					"typeName" : "NumberDouble",
+					"count" : 91
+				}
+			],
+			"scalarHistogram" : {
+				"buckets" : [
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 1,
+						"cumulativeDistincts" : 1
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 2,
+						"cumulativeDistincts" : 2
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 3,
+						"cumulativeDistincts" : 3
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 4,
+						"cumulativeDistincts" : 4
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 5,
+						"cumulativeDistincts" : 5
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 6,
+						"cumulativeDistincts" : 6
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 7,
+						"cumulativeDistincts" : 7
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 8,
+						"cumulativeDistincts" : 8
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 9,
+						"cumulativeDistincts" : 9
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 10,
+						"cumulativeDistincts" : 10
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 11,
+						"cumulativeDistincts" : 11
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 12,
+						"cumulativeDistincts" : 12
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 13,
+						"cumulativeDistincts" : 13
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 14,
+						"cumulativeDistincts" : 14
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 15,
+						"cumulativeDistincts" : 15
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 16,
+						"cumulativeDistincts" : 16
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 17,
+						"cumulativeDistincts" : 17
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 18,
+						"cumulativeDistincts" : 18
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 19,
+						"cumulativeDistincts" : 19
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 20,
+						"cumulativeDistincts" : 20
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 21,
+						"cumulativeDistincts" : 21
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 22,
+						"cumulativeDistincts" : 22
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 23,
+						"cumulativeDistincts" : 23
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 24,
+						"cumulativeDistincts" : 24
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 25,
+						"cumulativeDistincts" : 25
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 26,
+						"cumulativeDistincts" : 26
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 27,
+						"cumulativeDistincts" : 27
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 28,
+						"cumulativeDistincts" : 28
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 29,
+						"cumulativeDistincts" : 29
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 30,
+						"cumulativeDistincts" : 30
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 31,
+						"cumulativeDistincts" : 31
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 32,
+						"cumulativeDistincts" : 32
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 33,
+						"cumulativeDistincts" : 33
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 34,
+						"cumulativeDistincts" : 34
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 35,
+						"cumulativeDistincts" : 35
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 37,
+						"cumulativeDistincts" : 36
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 38,
+						"cumulativeDistincts" : 37
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 39,
+						"cumulativeDistincts" : 38
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 40,
+						"cumulativeDistincts" : 39
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 41,
+						"cumulativeDistincts" : 40
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 42,
+						"cumulativeDistincts" : 41
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 43,
+						"cumulativeDistincts" : 42
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 44,
+						"cumulativeDistincts" : 43
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 45,
+						"cumulativeDistincts" : 44
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 46,
+						"cumulativeDistincts" : 45
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 47,
+						"cumulativeDistincts" : 46
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 48,
+						"cumulativeDistincts" : 47
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 49,
+						"cumulativeDistincts" : 48
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 51,
+						"cumulativeDistincts" : 49
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 52,
+						"cumulativeDistincts" : 50
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 53,
+						"cumulativeDistincts" : 51
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 54,
+						"cumulativeDistincts" : 52
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 55,
+						"cumulativeDistincts" : 53
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 56,
+						"cumulativeDistincts" : 54
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 57,
+						"cumulativeDistincts" : 55
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 58,
+						"cumulativeDistincts" : 56
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 59,
+						"cumulativeDistincts" : 57
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 60,
+						"cumulativeDistincts" : 58
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 61,
+						"cumulativeDistincts" : 59
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 62,
+						"cumulativeDistincts" : 60
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 63,
+						"cumulativeDistincts" : 61
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 64,
+						"cumulativeDistincts" : 62
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 65,
+						"cumulativeDistincts" : 63
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 66,
+						"cumulativeDistincts" : 64
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 67,
+						"cumulativeDistincts" : 65
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 68,
+						"cumulativeDistincts" : 66
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 69,
+						"cumulativeDistincts" : 67
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 70,
+						"cumulativeDistincts" : 68
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 71,
+						"cumulativeDistincts" : 69
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 72,
+						"cumulativeDistincts" : 70
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 73,
+						"cumulativeDistincts" : 71
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 74,
+						"cumulativeDistincts" : 72
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 75,
+						"cumulativeDistincts" : 73
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 76,
+						"cumulativeDistincts" : 74
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 77,
+						"cumulativeDistincts" : 75
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 78,
+						"cumulativeDistincts" : 76
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 79,
+						"cumulativeDistincts" : 77
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 80,
+						"cumulativeDistincts" : 78
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 81,
+						"cumulativeDistincts" : 79
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 82,
+						"cumulativeDistincts" : 80
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 83,
+						"cumulativeDistincts" : 81
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 84,
+						"cumulativeDistincts" : 82
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 85,
+						"cumulativeDistincts" : 83
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 86,
+						"cumulativeDistincts" : 84
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 87,
+						"cumulativeDistincts" : 85
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 88,
+						"cumulativeDistincts" : 86
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 89,
+						"cumulativeDistincts" : 87
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 90,
+						"cumulativeDistincts" : 88
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 91,
+						"cumulativeDistincts" : 89
+					}
+				],
+				"bounds" : [
+					230,
+					300,
+					500,
+					550,
+					890,
+					960,
+					1740,
+					2140,
+					2250,
+					2440,
+					2460,
+					2890,
+					4100,
+					4270,
+					4470,
+					4890,
+					5550,
+					5660,
+					5700,
+					6100,
+					6350,
+					6370,
+					6460,
+					6800,
+					6990,
+					7440,
+					7810,
+					7930,
+					8020,
+					8250,
+					8420,
+					8520,
+					9110,
+					9470,
+					9480,
+					9560,
+					9770,
+					9840,
+					9920,
+					13600,
+					14400,
+					15500,
+					23300,
+					25500,
+					25900,
+					26200,
+					27300,
+					31000,
+					32000,
+					35800,
+					36400,
+					51300,
+					57800,
+					58900,
+					59900,
+					62100,
+					68400,
+					74300,
+					79700,
+					84900,
+					88600,
+					89200,
+					90800,
+					94000,
+					94800,
+					99200,
+					162000,
+					1191000,
+					2653000,
+					2961000,
+					3054000,
+					3234000,
+					4601000,
+					5046000,
+					5496000,
+					5677000,
+					5876000,
+					6226000,
+					6249000,
+					6329000,
+					7020000,
+					7255000,
+					7538000,
+					8039000,
+					8199000,
+					9207000,
+					9252000,
+					9506000,
+					9549000
+				]
+			}
+		}
+	},
+	{
+		"_id" : "mixed_int_unf_norm_1",
+		"statistics" : {
+			"documents" : 91,
+			"sampleRate" : 1,
+			"trueCount" : 0,
+			"falseCount" : 0,
+			"emptyArrayCount" : 0,
+			"typeCount" : [
+				{
+					"typeName" : "NumberDouble",
+					"count" : 91
+				}
+			],
+			"scalarHistogram" : {
+				"buckets" : [
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 1,
+						"cumulativeDistincts" : 1
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 2,
+						"cumulativeDistincts" : 2
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 3,
+						"cumulativeDistincts" : 3
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 4,
+						"cumulativeDistincts" : 4
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 5,
+						"cumulativeDistincts" : 5
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 6,
+						"cumulativeDistincts" : 6
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 7,
+						"cumulativeDistincts" : 7
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 8,
+						"cumulativeDistincts" : 8
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 9,
+						"cumulativeDistincts" : 9
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 10,
+						"cumulativeDistincts" : 10
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 11,
+						"cumulativeDistincts" : 11
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 12,
+						"cumulativeDistincts" : 12
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 13,
+						"cumulativeDistincts" : 13
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 14,
+						"cumulativeDistincts" : 14
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 15,
+						"cumulativeDistincts" : 15
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 16,
+						"cumulativeDistincts" : 16
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 17,
+						"cumulativeDistincts" : 17
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 18,
+						"cumulativeDistincts" : 18
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 20,
+						"cumulativeDistincts" : 19
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 21,
+						"cumulativeDistincts" : 20
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 22,
+						"cumulativeDistincts" : 21
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 23,
+						"cumulativeDistincts" : 22
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 24,
+						"cumulativeDistincts" : 23
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 26,
+						"cumulativeDistincts" : 24
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 27,
+						"cumulativeDistincts" : 25
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 28,
+						"cumulativeDistincts" : 26
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 29,
+						"cumulativeDistincts" : 27
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 30,
+						"cumulativeDistincts" : 28
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 31,
+						"cumulativeDistincts" : 29
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 32,
+						"cumulativeDistincts" : 30
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 33,
+						"cumulativeDistincts" : 31
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 34,
+						"cumulativeDistincts" : 32
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 35,
+						"cumulativeDistincts" : 33
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 37,
+						"cumulativeDistincts" : 34
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 38,
+						"cumulativeDistincts" : 35
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 39,
+						"cumulativeDistincts" : 36
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 40,
+						"cumulativeDistincts" : 37
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 41,
+						"cumulativeDistincts" : 38
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 42,
+						"cumulativeDistincts" : 39
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 43,
+						"cumulativeDistincts" : 40
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 44,
+						"cumulativeDistincts" : 41
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 45,
+						"cumulativeDistincts" : 42
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 46,
+						"cumulativeDistincts" : 43
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 47,
+						"cumulativeDistincts" : 44
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 48,
+						"cumulativeDistincts" : 45
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 49,
+						"cumulativeDistincts" : 46
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 50,
+						"cumulativeDistincts" : 47
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 51,
+						"cumulativeDistincts" : 48
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 52,
+						"cumulativeDistincts" : 49
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 53,
+						"cumulativeDistincts" : 50
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 54,
+						"cumulativeDistincts" : 51
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 55,
+						"cumulativeDistincts" : 52
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 56,
+						"cumulativeDistincts" : 53
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 57,
+						"cumulativeDistincts" : 54
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 58,
+						"cumulativeDistincts" : 55
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 59,
+						"cumulativeDistincts" : 56
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 60,
+						"cumulativeDistincts" : 57
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 61,
+						"cumulativeDistincts" : 58
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 62,
+						"cumulativeDistincts" : 59
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 63,
+						"cumulativeDistincts" : 60
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 64,
+						"cumulativeDistincts" : 61
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 65,
+						"cumulativeDistincts" : 62
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 66,
+						"cumulativeDistincts" : 63
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 67,
+						"cumulativeDistincts" : 64
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 68,
+						"cumulativeDistincts" : 65
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 69,
+						"cumulativeDistincts" : 66
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 70,
+						"cumulativeDistincts" : 67
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 71,
+						"cumulativeDistincts" : 68
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 72,
+						"cumulativeDistincts" : 69
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 73,
+						"cumulativeDistincts" : 70
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 74,
+						"cumulativeDistincts" : 71
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 75,
+						"cumulativeDistincts" : 72
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 76,
+						"cumulativeDistincts" : 73
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 77,
+						"cumulativeDistincts" : 74
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 78,
+						"cumulativeDistincts" : 75
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 79,
+						"cumulativeDistincts" : 76
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 80,
+						"cumulativeDistincts" : 77
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 81,
+						"cumulativeDistincts" : 78
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 82,
+						"cumulativeDistincts" : 79
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 83,
+						"cumulativeDistincts" : 80
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 84,
+						"cumulativeDistincts" : 81
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 85,
+						"cumulativeDistincts" : 82
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 86,
+						"cumulativeDistincts" : 83
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 87,
+						"cumulativeDistincts" : 84
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 88,
+						"cumulativeDistincts" : 85
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 89,
+						"cumulativeDistincts" : 86
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 90,
+						"cumulativeDistincts" : 87
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 91,
+						"cumulativeDistincts" : 88
+					}
+				],
+				"bounds" : [
+					75,
+					100,
+					102,
+					109,
+					141,
+					173,
+					183,
+					221,
+					225,
+					325,
+					364,
+					379,
+					390,
+					414,
+					447,
+					460,
+					470,
+					487,
+					549,
+					568,
+					588,
+					607,
+					630,
+					644,
+					674,
+					750,
+					758,
+					760,
+					854,
+					942,
+					944,
+					962,
+					978,
+					989,
+					25000,
+					28800,
+					29200,
+					32200,
+					32900,
+					36800,
+					39000,
+					40900,
+					42400,
+					43000,
+					44100,
+					46500,
+					47100,
+					49500,
+					50200,
+					50300,
+					50900,
+					53700,
+					55400,
+					56200,
+					57400,
+					58900,
+					59000,
+					61300,
+					62400,
+					65100,
+					66300,
+					67700,
+					67800,
+					70800,
+					74500,
+					2177000,
+					2416000,
+					2420000,
+					3237000,
+					3663000,
+					3807000,
+					3946000,
+					4109000,
+					4378000,
+					4459000,
+					4542000,
+					4588000,
+					5007000,
+					5016000,
+					5172000,
+					5463000,
+					5706000,
+					5722000,
+					5888000,
+					6074000,
+					6126000,
+					6238000,
+					7436000
+				]
+			}
+		}
+	},
+	{
+		"_id" : "mixed_int_unf_norm_chi_1",
+		"statistics" : {
+			"documents" : 91,
+			"sampleRate" : 1,
+			"trueCount" : 0,
+			"falseCount" : 0,
+			"emptyArrayCount" : 0,
+			"typeCount" : [
+				{
+					"typeName" : "NumberDouble",
+					"count" : 91
+				}
+			],
+			"scalarHistogram" : {
+				"buckets" : [
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 2,
+						"cumulativeDistincts" : 1
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 3,
+						"cumulativeDistincts" : 2
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 4,
+						"cumulativeDistincts" : 3
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 5,
+						"cumulativeDistincts" : 4
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 6,
+						"cumulativeDistincts" : 5
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 8,
+						"cumulativeDistincts" : 6
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 9,
+						"cumulativeDistincts" : 7
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 10,
+						"cumulativeDistincts" : 8
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 11,
+						"cumulativeDistincts" : 9
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 12,
+						"cumulativeDistincts" : 10
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 13,
+						"cumulativeDistincts" : 11
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 14,
+						"cumulativeDistincts" : 12
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 15,
+						"cumulativeDistincts" : 13
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 16,
+						"cumulativeDistincts" : 14
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 17,
+						"cumulativeDistincts" : 15
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 18,
+						"cumulativeDistincts" : 16
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 19,
+						"cumulativeDistincts" : 17
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 20,
+						"cumulativeDistincts" : 18
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 21,
+						"cumulativeDistincts" : 19
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 22,
+						"cumulativeDistincts" : 20
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 23,
+						"cumulativeDistincts" : 21
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 24,
+						"cumulativeDistincts" : 22
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 25,
+						"cumulativeDistincts" : 23
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 26,
+						"cumulativeDistincts" : 24
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 27,
+						"cumulativeDistincts" : 25
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 28,
+						"cumulativeDistincts" : 26
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 29,
+						"cumulativeDistincts" : 27
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 30,
+						"cumulativeDistincts" : 28
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 31,
+						"cumulativeDistincts" : 29
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 32,
+						"cumulativeDistincts" : 30
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 33,
+						"cumulativeDistincts" : 31
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 34,
+						"cumulativeDistincts" : 32
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 35,
+						"cumulativeDistincts" : 33
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 36,
+						"cumulativeDistincts" : 34
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 37,
+						"cumulativeDistincts" : 35
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 38,
+						"cumulativeDistincts" : 36
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 39,
+						"cumulativeDistincts" : 37
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 40,
+						"cumulativeDistincts" : 38
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 41,
+						"cumulativeDistincts" : 39
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 42,
+						"cumulativeDistincts" : 40
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 43,
+						"cumulativeDistincts" : 41
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 44,
+						"cumulativeDistincts" : 42
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 45,
+						"cumulativeDistincts" : 43
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 46,
+						"cumulativeDistincts" : 44
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 47,
+						"cumulativeDistincts" : 45
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 48,
+						"cumulativeDistincts" : 46
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 49,
+						"cumulativeDistincts" : 47
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 50,
+						"cumulativeDistincts" : 48
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 51,
+						"cumulativeDistincts" : 49
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 52,
+						"cumulativeDistincts" : 50
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 53,
+						"cumulativeDistincts" : 51
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 54,
+						"cumulativeDistincts" : 52
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 55,
+						"cumulativeDistincts" : 53
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 56,
+						"cumulativeDistincts" : 54
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 57,
+						"cumulativeDistincts" : 55
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 58,
+						"cumulativeDistincts" : 56
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 59,
+						"cumulativeDistincts" : 57
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 60,
+						"cumulativeDistincts" : 58
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 61,
+						"cumulativeDistincts" : 59
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 62,
+						"cumulativeDistincts" : 60
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 63,
+						"cumulativeDistincts" : 61
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 64,
+						"cumulativeDistincts" : 62
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 65,
+						"cumulativeDistincts" : 63
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 66,
+						"cumulativeDistincts" : 64
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 67,
+						"cumulativeDistincts" : 65
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 68,
+						"cumulativeDistincts" : 66
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 69,
+						"cumulativeDistincts" : 67
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 70,
+						"cumulativeDistincts" : 68
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 71,
+						"cumulativeDistincts" : 69
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 72,
+						"cumulativeDistincts" : 70
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 73,
+						"cumulativeDistincts" : 71
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 74,
+						"cumulativeDistincts" : 72
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 75,
+						"cumulativeDistincts" : 73
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 76,
+						"cumulativeDistincts" : 74
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 77,
+						"cumulativeDistincts" : 75
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 78,
+						"cumulativeDistincts" : 76
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 79,
+						"cumulativeDistincts" : 77
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 80,
+						"cumulativeDistincts" : 78
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 81,
+						"cumulativeDistincts" : 79
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 82,
+						"cumulativeDistincts" : 80
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 83,
+						"cumulativeDistincts" : 81
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 84,
+						"cumulativeDistincts" : 82
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 85,
+						"cumulativeDistincts" : 83
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 86,
+						"cumulativeDistincts" : 84
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 87,
+						"cumulativeDistincts" : 85
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 88,
+						"cumulativeDistincts" : 86
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 89,
+						"cumulativeDistincts" : 87
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 90,
+						"cumulativeDistincts" : 88
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 91,
+						"cumulativeDistincts" : 89
+					}
+				],
+				"bounds" : [
+					70,
+					430,
+					2380,
+					2980,
+					3260,
+					3320,
+					3330,
+					3390,
+					3410,
+					3420,
+					3560,
+					3590,
+					3630,
+					3640,
+					3750,
+					3790,
+					3800,
+					3830,
+					3870,
+					4010,
+					4020,
+					4040,
+					4060,
+					4170,
+					4190,
+					4480,
+					4950,
+					5000,
+					5140,
+					5290,
+					5520,
+					5640,
+					5970,
+					6530,
+					7020,
+					7120,
+					7350,
+					8290,
+					8900,
+					8960,
+					9090,
+					9420,
+					9700,
+					9730,
+					9830,
+					17100,
+					27100,
+					72500,
+					80900,
+					142100,
+					159700,
+					186400,
+					193100,
+					214200,
+					260800,
+					272500,
+					274200,
+					301800,
+					305600,
+					331100,
+					383400,
+					383500,
+					429800,
+					434100,
+					447200,
+					455900,
+					460000,
+					461500,
+					467200,
+					481800,
+					518600,
+					576200,
+					576400,
+					612200,
+					630900,
+					652500,
+					663800,
+					674400,
+					708200,
+					734500,
+					839100,
+					995800,
+					3675000,
+					3699000,
+					3722000,
+					3770000,
+					3857000,
+					3984000,
+					4086000
+				]
+			}
+		}
+	},
+	{
+		"_id" : "mixed_int_unf_norm_chi_2",
+		"statistics" : {
+			"documents" : 91,
+			"sampleRate" : 1,
+			"trueCount" : 0,
+			"falseCount" : 0,
+			"emptyArrayCount" : 0,
+			"typeCount" : [
+				{
+					"typeName" : "NumberDouble",
+					"count" : 91
+				}
+			],
+			"scalarHistogram" : {
+				"buckets" : [
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 1,
+						"cumulativeDistincts" : 1
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 2,
+						"cumulativeDistincts" : 2
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 3,
+						"cumulativeDistincts" : 3
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 4,
+						"cumulativeDistincts" : 4
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 5,
+						"cumulativeDistincts" : 5
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 6,
+						"cumulativeDistincts" : 6
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 7,
+						"cumulativeDistincts" : 7
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 8,
+						"cumulativeDistincts" : 8
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 9,
+						"cumulativeDistincts" : 9
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 10,
+						"cumulativeDistincts" : 10
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 11,
+						"cumulativeDistincts" : 11
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 12,
+						"cumulativeDistincts" : 12
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 13,
+						"cumulativeDistincts" : 13
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 14,
+						"cumulativeDistincts" : 14
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 15,
+						"cumulativeDistincts" : 15
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 16,
+						"cumulativeDistincts" : 16
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 17,
+						"cumulativeDistincts" : 17
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 18,
+						"cumulativeDistincts" : 18
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 19,
+						"cumulativeDistincts" : 19
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 20,
+						"cumulativeDistincts" : 20
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 21,
+						"cumulativeDistincts" : 21
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 22,
+						"cumulativeDistincts" : 22
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 23,
+						"cumulativeDistincts" : 23
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 24,
+						"cumulativeDistincts" : 24
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 25,
+						"cumulativeDistincts" : 25
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 26,
+						"cumulativeDistincts" : 26
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 27,
+						"cumulativeDistincts" : 27
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 28,
+						"cumulativeDistincts" : 28
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 29,
+						"cumulativeDistincts" : 29
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 30,
+						"cumulativeDistincts" : 30
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 31,
+						"cumulativeDistincts" : 31
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 32,
+						"cumulativeDistincts" : 32
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 33,
+						"cumulativeDistincts" : 33
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 34,
+						"cumulativeDistincts" : 34
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 35,
+						"cumulativeDistincts" : 35
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 37,
+						"cumulativeDistincts" : 36
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 38,
+						"cumulativeDistincts" : 37
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 39,
+						"cumulativeDistincts" : 38
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 40,
+						"cumulativeDistincts" : 39
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 41,
+						"cumulativeDistincts" : 40
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 42,
+						"cumulativeDistincts" : 41
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 43,
+						"cumulativeDistincts" : 42
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 44,
+						"cumulativeDistincts" : 43
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 45,
+						"cumulativeDistincts" : 44
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 46,
+						"cumulativeDistincts" : 45
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 47,
+						"cumulativeDistincts" : 46
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 48,
+						"cumulativeDistincts" : 47
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 49,
+						"cumulativeDistincts" : 48
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 50,
+						"cumulativeDistincts" : 49
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 51,
+						"cumulativeDistincts" : 50
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 52,
+						"cumulativeDistincts" : 51
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 53,
+						"cumulativeDistincts" : 52
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 54,
+						"cumulativeDistincts" : 53
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 55,
+						"cumulativeDistincts" : 54
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 56,
+						"cumulativeDistincts" : 55
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 57,
+						"cumulativeDistincts" : 56
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 58,
+						"cumulativeDistincts" : 57
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 59,
+						"cumulativeDistincts" : 58
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 60,
+						"cumulativeDistincts" : 59
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 61,
+						"cumulativeDistincts" : 60
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 62,
+						"cumulativeDistincts" : 61
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 63,
+						"cumulativeDistincts" : 62
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 64,
+						"cumulativeDistincts" : 63
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 65,
+						"cumulativeDistincts" : 64
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 66,
+						"cumulativeDistincts" : 65
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 67,
+						"cumulativeDistincts" : 66
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 68,
+						"cumulativeDistincts" : 67
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 69,
+						"cumulativeDistincts" : 68
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 70,
+						"cumulativeDistincts" : 69
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 71,
+						"cumulativeDistincts" : 70
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 72,
+						"cumulativeDistincts" : 71
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 73,
+						"cumulativeDistincts" : 72
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 74,
+						"cumulativeDistincts" : 73
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 75,
+						"cumulativeDistincts" : 74
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 76,
+						"cumulativeDistincts" : 75
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 77,
+						"cumulativeDistincts" : 76
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 78,
+						"cumulativeDistincts" : 77
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 79,
+						"cumulativeDistincts" : 78
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 80,
+						"cumulativeDistincts" : 79
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 81,
+						"cumulativeDistincts" : 80
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 82,
+						"cumulativeDistincts" : 81
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 83,
+						"cumulativeDistincts" : 82
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 84,
+						"cumulativeDistincts" : 83
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 85,
+						"cumulativeDistincts" : 84
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 86,
+						"cumulativeDistincts" : 85
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 87,
+						"cumulativeDistincts" : 86
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 88,
+						"cumulativeDistincts" : 87
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 89,
+						"cumulativeDistincts" : 88
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 90,
+						"cumulativeDistincts" : 89
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 91,
+						"cumulativeDistincts" : 90
+					}
+				],
+				"bounds" : [
+					290,
+					680,
+					910,
+					1620,
+					1800,
+					2200,
+					2320,
+					2500,
+					2590,
+					2920,
+					3010,
+					3060,
+					3100,
+					3170,
+					3520,
+					3780,
+					3850,
+					4340,
+					4360,
+					4740,
+					4890,
+					4970,
+					5120,
+					5160,
+					5250,
+					5280,
+					5340,
+					5430,
+					5500,
+					5770,
+					6120,
+					6750,
+					6760,
+					6770,
+					6870,
+					7380,
+					7770,
+					8110,
+					8460,
+					8860,
+					9010,
+					9820,
+					32400,
+					40600,
+					108500,
+					181300,
+					215000,
+					227200,
+					243400,
+					258600,
+					298600,
+					331400,
+					340700,
+					351200,
+					361000,
+					368800,
+					373200,
+					379300,
+					380400,
+					383000,
+					384700,
+					385200,
+					387800,
+					387900,
+					395900,
+					396100,
+					405300,
+					406900,
+					451900,
+					457200,
+					459700,
+					465600,
+					475900,
+					497800,
+					503100,
+					526600,
+					535100,
+					548200,
+					551000,
+					559500,
+					593100,
+					609500,
+					632500,
+					636200,
+					642400,
+					670800,
+					736500,
+					810800,
+					877300,
+					950500
+				]
+			}
+		}
+	},
+	{
+		"_id" : "choice_str_set_1112_33_norm_s",
+		"statistics" : {
+			"documents" : 91,
+			"sampleRate" : 1,
+			"trueCount" : 0,
+			"falseCount" : 0,
+			"emptyArrayCount" : 0,
+			"typeCount" : [
+				{
+					"typeName" : "StringSmall",
+					"count" : 91
+				}
+			],
+			"scalarHistogram" : {
+				"buckets" : [
+					{
+						"boundaryCount" : 4,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 4,
+						"cumulativeDistincts" : 1
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 5,
+						"cumulativeDistincts" : 2
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 7,
+						"cumulativeDistincts" : 3
+					},
+					{
+						"boundaryCount" : 4,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 11,
+						"cumulativeDistincts" : 4
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 13,
+						"cumulativeDistincts" : 5
+					},
+					{
+						"boundaryCount" : 5,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 18,
+						"cumulativeDistincts" : 6
+					},
+					{
+						"boundaryCount" : 3,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 21,
+						"cumulativeDistincts" : 7
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 23,
+						"cumulativeDistincts" : 8
+					},
+					{
+						"boundaryCount" : 3,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 26,
+						"cumulativeDistincts" : 9
+					},
+					{
+						"boundaryCount" : 3,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 29,
+						"cumulativeDistincts" : 10
+					},
+					{
+						"boundaryCount" : 5,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 34,
+						"cumulativeDistincts" : 11
+					},
+					{
+						"boundaryCount" : 6,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 40,
+						"cumulativeDistincts" : 12
+					},
+					{
+						"boundaryCount" : 3,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 43,
+						"cumulativeDistincts" : 13
+					},
+					{
+						"boundaryCount" : 3,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 46,
+						"cumulativeDistincts" : 14
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 48,
+						"cumulativeDistincts" : 15
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 49,
+						"cumulativeDistincts" : 16
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 50,
+						"cumulativeDistincts" : 17
+					},
+					{
+						"boundaryCount" : 4,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 54,
+						"cumulativeDistincts" : 18
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 56,
+						"cumulativeDistincts" : 19
+					},
+					{
+						"boundaryCount" : 4,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 60,
+						"cumulativeDistincts" : 20
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 62,
+						"cumulativeDistincts" : 21
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 64,
+						"cumulativeDistincts" : 22
+					},
+					{
+						"boundaryCount" : 4,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 68,
+						"cumulativeDistincts" : 23
+					},
+					{
+						"boundaryCount" : 3,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 71,
+						"cumulativeDistincts" : 24
+					},
+					{
+						"boundaryCount" : 4,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 75,
+						"cumulativeDistincts" : 25
+					},
+					{
+						"boundaryCount" : 4,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 79,
+						"cumulativeDistincts" : 26
+					},
+					{
+						"boundaryCount" : 4,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 83,
+						"cumulativeDistincts" : 27
+					},
+					{
+						"boundaryCount" : 4,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 87,
+						"cumulativeDistincts" : 28
+					},
+					{
+						"boundaryCount" : 3,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 90,
+						"cumulativeDistincts" : 29
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 91,
+						"cumulativeDistincts" : 30
+					}
+				],
+				"bounds" : [
+					"   &",
+					"!!!'",
+					"###2",
+					"$$$3",
+					"%%%7",
+					"&&&;",
+					"'''<",
+					"(((@",
+					")))A",
+					"***H",
+					"+++I",
+					",,,M",
+					"---Q",
+					"...R",
+					"///Y",
+					"000]",
+					"111^",
+					"222e",
+					"333l",
+					"444p",
+					"555w",
+					"777#",
+					"888$",
+					"xxxx",
+					"yyy|",
+					"zzz!",
+					"{{{\"",
+					"|||#",
+					"}}}$",
+					"~~~%"
+				]
+			}
+		}
+	},
+	{
+		"_id" : "choice_str_set_1112_33_norm_l",
+		"statistics" : {
+			"documents" : 91,
+			"sampleRate" : 1,
+			"trueCount" : 0,
+			"falseCount" : 0,
+			"emptyArrayCount" : 0,
+			"typeCount" : [
+				{
+					"typeName" : "StringSmall",
+					"count" : 91
+				}
+			],
+			"scalarHistogram" : {
+				"buckets" : [
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 1,
+						"cumulativeDistincts" : 1
+					},
+					{
+						"boundaryCount" : 5,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 6,
+						"cumulativeDistincts" : 2
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 8,
+						"cumulativeDistincts" : 3
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 9,
+						"cumulativeDistincts" : 4
+					},
+					{
+						"boundaryCount" : 4,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 13,
+						"cumulativeDistincts" : 5
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 14,
+						"cumulativeDistincts" : 6
+					},
+					{
+						"boundaryCount" : 6,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 20,
+						"cumulativeDistincts" : 7
+					},
+					{
+						"boundaryCount" : 4,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 24,
+						"cumulativeDistincts" : 8
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 26,
+						"cumulativeDistincts" : 9
+					},
+					{
+						"boundaryCount" : 3,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 29,
+						"cumulativeDistincts" : 10
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 30,
+						"cumulativeDistincts" : 11
+					},
+					{
+						"boundaryCount" : 3,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 33,
+						"cumulativeDistincts" : 12
+					},
+					{
+						"boundaryCount" : 5,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 38,
+						"cumulativeDistincts" : 13
+					},
+					{
+						"boundaryCount" : 5,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 43,
+						"cumulativeDistincts" : 14
+					},
+					{
+						"boundaryCount" : 3,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 46,
+						"cumulativeDistincts" : 15
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 48,
+						"cumulativeDistincts" : 16
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 49,
+						"cumulativeDistincts" : 17
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 51,
+						"cumulativeDistincts" : 18
+					},
+					{
+						"boundaryCount" : 3,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 54,
+						"cumulativeDistincts" : 19
+					},
+					{
+						"boundaryCount" : 5,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 59,
+						"cumulativeDistincts" : 20
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 60,
+						"cumulativeDistincts" : 21
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 62,
+						"cumulativeDistincts" : 22
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 63,
+						"cumulativeDistincts" : 23
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 65,
+						"cumulativeDistincts" : 24
+					},
+					{
+						"boundaryCount" : 3,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 68,
+						"cumulativeDistincts" : 25
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 69,
+						"cumulativeDistincts" : 26
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 70,
+						"cumulativeDistincts" : 27
+					},
+					{
+						"boundaryCount" : 6,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 76,
+						"cumulativeDistincts" : 28
+					},
+					{
+						"boundaryCount" : 5,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 81,
+						"cumulativeDistincts" : 29
+					},
+					{
+						"boundaryCount" : 3,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 84,
+						"cumulativeDistincts" : 30
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 85,
+						"cumulativeDistincts" : 31
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 87,
+						"cumulativeDistincts" : 32
+					},
+					{
+						"boundaryCount" : 4,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 91,
+						"cumulativeDistincts" : 33
+					}
+				],
+				"bounds" : [
+					"   &",
+					"!!!'",
+					"\"\"\"+",
+					"###2",
+					"$$$3",
+					"%%%7",
+					"&&&;",
+					"'''<",
+					"(((@",
+					")))A",
+					"***H",
+					"+++I",
+					",,,M",
+					"---Q",
+					"...R",
+					"///Y",
+					"000]",
+					"111^",
+					"222e",
+					"333l",
+					"444p",
+					"555w",
+					"666~",
+					"777#",
+					"888$",
+					"999(",
+					"xxxx",
+					"yyy|",
+					"zzz!",
+					"{{{\"",
+					"|||#",
+					"}}}$",
+					"~~~%"
+				]
+			}
+		}
+	},
+	{
+		"_id" : "choice_str_set_1112_1000_chi2_s",
+		"statistics" : {
+			"documents" : 91,
+			"sampleRate" : 1,
+			"trueCount" : 0,
+			"falseCount" : 0,
+			"emptyArrayCount" : 0,
+			"typeCount" : [
+				{
+					"typeName" : "StringSmall",
+					"count" : 91
+				}
+			],
+			"scalarHistogram" : {
+				"buckets" : [
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 1,
+						"cumulativeDistincts" : 1
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 2,
+						"cumulativeDistincts" : 2
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 3,
+						"cumulativeDistincts" : 3
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 4,
+						"cumulativeDistincts" : 4
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 5,
+						"cumulativeDistincts" : 5
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 6,
+						"cumulativeDistincts" : 6
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 7,
+						"cumulativeDistincts" : 7
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 8,
+						"cumulativeDistincts" : 8
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 9,
+						"cumulativeDistincts" : 9
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 10,
+						"cumulativeDistincts" : 10
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 11,
+						"cumulativeDistincts" : 11
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 12,
+						"cumulativeDistincts" : 12
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 13,
+						"cumulativeDistincts" : 13
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 14,
+						"cumulativeDistincts" : 14
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 15,
+						"cumulativeDistincts" : 15
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 16,
+						"cumulativeDistincts" : 16
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 17,
+						"cumulativeDistincts" : 17
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 18,
+						"cumulativeDistincts" : 18
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 19,
+						"cumulativeDistincts" : 19
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 20,
+						"cumulativeDistincts" : 20
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 21,
+						"cumulativeDistincts" : 21
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 22,
+						"cumulativeDistincts" : 22
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 23,
+						"cumulativeDistincts" : 23
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 24,
+						"cumulativeDistincts" : 24
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 25,
+						"cumulativeDistincts" : 25
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 26,
+						"cumulativeDistincts" : 26
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 27,
+						"cumulativeDistincts" : 27
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 28,
+						"cumulativeDistincts" : 28
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 29,
+						"cumulativeDistincts" : 29
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 30,
+						"cumulativeDistincts" : 30
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 32,
+						"cumulativeDistincts" : 31
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 33,
+						"cumulativeDistincts" : 32
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 34,
+						"cumulativeDistincts" : 33
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 35,
+						"cumulativeDistincts" : 34
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 36,
+						"cumulativeDistincts" : 35
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 37,
+						"cumulativeDistincts" : 36
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 38,
+						"cumulativeDistincts" : 37
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 39,
+						"cumulativeDistincts" : 38
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 40,
+						"cumulativeDistincts" : 39
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 41,
+						"cumulativeDistincts" : 40
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 42,
+						"cumulativeDistincts" : 41
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 43,
+						"cumulativeDistincts" : 42
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 44,
+						"cumulativeDistincts" : 43
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 45,
+						"cumulativeDistincts" : 44
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 46,
+						"cumulativeDistincts" : 45
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 47,
+						"cumulativeDistincts" : 46
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 48,
+						"cumulativeDistincts" : 47
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 49,
+						"cumulativeDistincts" : 48
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 50,
+						"cumulativeDistincts" : 49
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 51,
+						"cumulativeDistincts" : 50
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 52,
+						"cumulativeDistincts" : 51
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 53,
+						"cumulativeDistincts" : 52
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 54,
+						"cumulativeDistincts" : 53
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 55,
+						"cumulativeDistincts" : 54
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 57,
+						"cumulativeDistincts" : 55
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 58,
+						"cumulativeDistincts" : 56
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 59,
+						"cumulativeDistincts" : 57
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 60,
+						"cumulativeDistincts" : 58
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 61,
+						"cumulativeDistincts" : 59
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 62,
+						"cumulativeDistincts" : 60
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 64,
+						"cumulativeDistincts" : 61
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 65,
+						"cumulativeDistincts" : 62
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 66,
+						"cumulativeDistincts" : 63
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 67,
+						"cumulativeDistincts" : 64
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 68,
+						"cumulativeDistincts" : 65
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 69,
+						"cumulativeDistincts" : 66
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 70,
+						"cumulativeDistincts" : 67
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 72,
+						"cumulativeDistincts" : 68
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 73,
+						"cumulativeDistincts" : 69
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 74,
+						"cumulativeDistincts" : 70
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 75,
+						"cumulativeDistincts" : 71
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 76,
+						"cumulativeDistincts" : 72
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 77,
+						"cumulativeDistincts" : 73
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 78,
+						"cumulativeDistincts" : 74
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 79,
+						"cumulativeDistincts" : 75
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 80,
+						"cumulativeDistincts" : 76
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 81,
+						"cumulativeDistincts" : 77
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 82,
+						"cumulativeDistincts" : 78
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 83,
+						"cumulativeDistincts" : 79
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 84,
+						"cumulativeDistincts" : 80
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 85,
+						"cumulativeDistincts" : 81
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 86,
+						"cumulativeDistincts" : 82
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 87,
+						"cumulativeDistincts" : 83
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 88,
+						"cumulativeDistincts" : 84
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 89,
+						"cumulativeDistincts" : 85
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 90,
+						"cumulativeDistincts" : 86
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 91,
+						"cumulativeDistincts" : 87
+					}
+				],
+				"bounds" : [
+					"   y",
+					"\"\"\"%",
+					"\"\"\"x",
+					"###;",
+					"$$$?",
+					"&&&;",
+					"'''6",
+					"(((.",
+					"***<",
+					"***T",
+					"+++j",
+					",,,P",
+					"---?",
+					"---E",
+					"---K",
+					"...a",
+					"222P",
+					"333W",
+					"555t",
+					"888z",
+					"888}",
+					"::: ",
+					"===8",
+					"===>",
+					"===G",
+					">>>E",
+					"@@@D",
+					"AAA?",
+					"BBBC",
+					"BBBL",
+					"CCCS",
+					"CCCV",
+					"DDDK",
+					"DDDZ",
+					"GGGu",
+					"IIIk",
+					"IIIt",
+					"JJJc",
+					"JJJ{",
+					"KKKs",
+					"LLL!",
+					"LLL\\",
+					"NNNy",
+					"OOOw",
+					"PPP+",
+					"QQQ)",
+					"QQQ,",
+					"RRRt",
+					"SSS+",
+					"VVV@",
+					"ZZZJ",
+					"[[[E",
+					"\\\\\\F",
+					"^^^W",
+					"^^^`",
+					"```b",
+					"ccch",
+					"dddo",
+					"eeeX",
+					"ggg1",
+					"ggg`",
+					"iii-",
+					"iiie",
+					"mmm1",
+					"mmm@",
+					"pppF",
+					"ppp[",
+					"qqqD",
+					"sssX",
+					"tttA",
+					"uuuE",
+					"uuuu",
+					"vvvd",
+					"vvvy",
+					"wwwP",
+					"wwwb",
+					"xxxl",
+					"zzzk",
+					"zzzn",
+					"{{{]",
+					"{{{o",
+					"{{{u",
+					"|||;",
+					"|||v",
+					"}}}h",
+					"}}}k",
+					"~~~@"
+				]
+			}
+		}
+	},
+	{
+		"_id" : "choice_str_set_1112_1000_chi2_l",
+		"statistics" : {
+			"documents" : 91,
+			"sampleRate" : 1,
+			"trueCount" : 0,
+			"falseCount" : 0,
+			"emptyArrayCount" : 0,
+			"typeCount" : [
+				{
+					"typeName" : "StringSmall",
+					"count" : 91
+				}
+			],
+			"scalarHistogram" : {
+				"buckets" : [
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 1,
+						"cumulativeDistincts" : 1
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 2,
+						"cumulativeDistincts" : 2
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 3,
+						"cumulativeDistincts" : 3
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 4,
+						"cumulativeDistincts" : 4
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 5,
+						"cumulativeDistincts" : 5
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 6,
+						"cumulativeDistincts" : 6
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 7,
+						"cumulativeDistincts" : 7
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 8,
+						"cumulativeDistincts" : 8
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 9,
+						"cumulativeDistincts" : 9
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 10,
+						"cumulativeDistincts" : 10
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 11,
+						"cumulativeDistincts" : 11
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 12,
+						"cumulativeDistincts" : 12
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 13,
+						"cumulativeDistincts" : 13
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 15,
+						"cumulativeDistincts" : 14
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 16,
+						"cumulativeDistincts" : 15
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 17,
+						"cumulativeDistincts" : 16
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 18,
+						"cumulativeDistincts" : 17
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 19,
+						"cumulativeDistincts" : 18
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 20,
+						"cumulativeDistincts" : 19
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 21,
+						"cumulativeDistincts" : 20
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 22,
+						"cumulativeDistincts" : 21
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 23,
+						"cumulativeDistincts" : 22
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 24,
+						"cumulativeDistincts" : 23
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 25,
+						"cumulativeDistincts" : 24
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 26,
+						"cumulativeDistincts" : 25
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 27,
+						"cumulativeDistincts" : 26
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 28,
+						"cumulativeDistincts" : 27
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 29,
+						"cumulativeDistincts" : 28
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 30,
+						"cumulativeDistincts" : 29
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 31,
+						"cumulativeDistincts" : 30
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 32,
+						"cumulativeDistincts" : 31
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 33,
+						"cumulativeDistincts" : 32
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 34,
+						"cumulativeDistincts" : 33
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 35,
+						"cumulativeDistincts" : 34
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 36,
+						"cumulativeDistincts" : 35
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 37,
+						"cumulativeDistincts" : 36
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 38,
+						"cumulativeDistincts" : 37
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 39,
+						"cumulativeDistincts" : 38
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 40,
+						"cumulativeDistincts" : 39
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 41,
+						"cumulativeDistincts" : 40
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 42,
+						"cumulativeDistincts" : 41
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 44,
+						"cumulativeDistincts" : 42
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 45,
+						"cumulativeDistincts" : 43
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 46,
+						"cumulativeDistincts" : 44
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 47,
+						"cumulativeDistincts" : 45
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 48,
+						"cumulativeDistincts" : 46
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 49,
+						"cumulativeDistincts" : 47
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 50,
+						"cumulativeDistincts" : 48
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 51,
+						"cumulativeDistincts" : 49
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 52,
+						"cumulativeDistincts" : 50
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 53,
+						"cumulativeDistincts" : 51
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 54,
+						"cumulativeDistincts" : 52
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 55,
+						"cumulativeDistincts" : 53
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 56,
+						"cumulativeDistincts" : 54
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 57,
+						"cumulativeDistincts" : 55
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 58,
+						"cumulativeDistincts" : 56
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 59,
+						"cumulativeDistincts" : 57
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 60,
+						"cumulativeDistincts" : 58
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 61,
+						"cumulativeDistincts" : 59
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 62,
+						"cumulativeDistincts" : 60
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 63,
+						"cumulativeDistincts" : 61
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 64,
+						"cumulativeDistincts" : 62
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 65,
+						"cumulativeDistincts" : 63
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 66,
+						"cumulativeDistincts" : 64
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 67,
+						"cumulativeDistincts" : 65
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 69,
+						"cumulativeDistincts" : 66
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 70,
+						"cumulativeDistincts" : 67
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 71,
+						"cumulativeDistincts" : 68
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 72,
+						"cumulativeDistincts" : 69
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 73,
+						"cumulativeDistincts" : 70
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 74,
+						"cumulativeDistincts" : 71
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 75,
+						"cumulativeDistincts" : 72
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 76,
+						"cumulativeDistincts" : 73
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 77,
+						"cumulativeDistincts" : 74
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 78,
+						"cumulativeDistincts" : 75
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 79,
+						"cumulativeDistincts" : 76
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 80,
+						"cumulativeDistincts" : 77
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 81,
+						"cumulativeDistincts" : 78
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 82,
+						"cumulativeDistincts" : 79
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 84,
+						"cumulativeDistincts" : 80
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 85,
+						"cumulativeDistincts" : 81
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 86,
+						"cumulativeDistincts" : 82
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 87,
+						"cumulativeDistincts" : 83
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 88,
+						"cumulativeDistincts" : 84
+					},
+					{
+						"boundaryCount" : 2,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 90,
+						"cumulativeDistincts" : 85
+					},
+					{
+						"boundaryCount" : 1,
+						"rangeCount" : 0,
+						"rangeDistincts" : 0,
+						"cumulativeCount" : 91,
+						"cumulativeDistincts" : 86
+					}
+				],
+				"bounds" : [
+					"   g",
+					"   |",
+					"!!!*",
+					"!!!k",
+					"\"\"\"U",
+					"###2",
+					"###y",
+					"$$$z",
+					"'''*",
+					"***i",
+					"+++=",
+					"+++[",
+					"...U",
+					"///G",
+					"///t",
+					"111[",
+					"333Q",
+					"333W",
+					"444y",
+					"555t",
+					"666%",
+					"666l",
+					"666{",
+					":::/",
+					":::8",
+					"===>",
+					"BBB@",
+					"BBBR",
+					"BBBa",
+					"CCCS",
+					"DDDQ",
+					"DDDT",
+					"DDDi",
+					"FFFb",
+					"GGGu",
+					"HHH[",
+					"HHHj",
+					"IIIn",
+					"LLLh",
+					"NNN&",
+					"NNNa",
+					"OOOq",
+					"PPP%",
+					"PPPl",
+					"PPP{",
+					"QQQ&",
+					"RRR0",
+					"SSS4",
+					"XXXE",
+					"[[[K",
+					"\\\\\\L",
+					"___d",
+					"___m",
+					"```M",
+					"aaac",
+					"bbbj",
+					"cccq",
+					"dddo",
+					"fffw",
+					"fffz",
+					"ggg~",
+					"hhh5",
+					"iii6",
+					"jjj1",
+					"kkk5",
+					"lll}",
+					"ooo$",
+					"ooo?",
+					"oooH",
+					"ppp=",
+					"ppp[",
+					"qqq/",
+					"rrrE",
+					"sssU",
+					"sssX",
+					"sssm",
+					"tttA",
+					"ttt_",
+					"uuuu",
+					"xxxK",
+					"yyyR",
+					"yyy[",
+					"{{{W",
+					"|||g",
+					"|||v",
+					"~~~`"
+				]
+			}
+		}
+	}
+]
+
+[jsTest] ----
 [jsTest] Query: ce_data_1000 { "uniform_int_1000_1" : { "$gte" : 334, "$lte" : 973 } }
 [jsTest] ----
 
@@ -8020,27 +14925,27 @@ Indexing collection: ce_data_1000
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 656.1673228343176,
+	"logicalCE" : 700.9568915386889,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 656.1673228343176,
+		"logicalCE" : 700.9568915386889,
 		"child" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 656.1673228343176,
+			"logicalCE" : 700.9568915386889,
 			"child" : {
 				"nodeType" : "PhysicalScan",
-				"logicalCE" : 656.1673228343176
+				"logicalCE" : 700.9568915386889
 			}
 		}
 	}
 }
 
 [jsTest] ----
-[jsTest] CE: { "uniform_int_1000_1" : { "$gte" : 334, "$lte" : 973 } }, base = 668.26, sample = 656.17, actual = 654
+[jsTest] CE: { "uniform_int_1000_1" : { "$gte" : 334, "$lte" : 973 } }, base = 668.26, sample = 700.96, actual = 654
 [jsTest] ----
 
 Base error: { "absError" : 14.26, "relError" : 0.02, "selError" : 1.43 }
-Sample error: { "absError" : 2.17, "relError" : 0, "selError" : 0.22 }
+Sample error: { "absError" : 46.96, "relError" : 0.07, "selError" : 4.7 }
 
 [jsTest] ----
 [jsTest] Query: ce_data_1000 { "uniform_int_1000_1" : { "$lt" : 334 } }
@@ -8065,23 +14970,23 @@ Sample error: { "absError" : 2.17, "relError" : 0, "selError" : 0.22 }
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 333.33333333333326,
+	"logicalCE" : 274.72527472527474,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 333.33333333333326,
+		"logicalCE" : 274.72527472527474,
 		"child" : {
 			"nodeType" : "PhysicalScan",
-			"logicalCE" : 333.33333333333326
+			"logicalCE" : 274.72527472527474
 		}
 	}
 }
 
 [jsTest] ----
-[jsTest] CE: { "uniform_int_1000_1" : { "$lt" : 334 } }, base = 323.91, sample = 333.33, actual = 322
+[jsTest] CE: { "uniform_int_1000_1" : { "$lt" : 334 } }, base = 323.91, sample = 274.73, actual = 322
 [jsTest] ----
 
 Base error: { "absError" : 1.91, "relError" : 0.01, "selError" : 0.19 }
-Sample error: { "absError" : 11.33, "relError" : 0.04, "selError" : 1.13 }
+Sample error: { "absError" : -47.27, "relError" : -0.15, "selError" : -4.73 }
 
 [jsTest] ----
 [jsTest] Query: ce_data_1000 { "uniform_int_1000_1" : { "$eq" : 334 } }
@@ -8151,27 +15056,27 @@ Sample error: { "absError" : -2, "relError" : -1, "selError" : -0.2 }
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 811.0337511887163,
+	"logicalCE" : 779.8480620628148,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 811.0337511887163,
+		"logicalCE" : 779.8480620628148,
 		"child" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 811.0337511887163,
+			"logicalCE" : 779.8480620628148,
 			"child" : {
 				"nodeType" : "PhysicalScan",
-				"logicalCE" : 811.0337511887163
+				"logicalCE" : 779.8480620628148
 			}
 		}
 	}
 }
 
 [jsTest] ----
-[jsTest] CE: { "normal_int_1000_1" : { "$gte" : 377, "$lte" : 784 } }, base = 784.4, sample = 811.03, actual = 763
+[jsTest] CE: { "normal_int_1000_1" : { "$gte" : 377, "$lte" : 784 } }, base = 784.4, sample = 779.85, actual = 763
 [jsTest] ----
 
 Base error: { "absError" : 21.4, "relError" : 0.03, "selError" : 2.14 }
-Sample error: { "absError" : 48.03, "relError" : 0.06, "selError" : 4.8 }
+Sample error: { "absError" : 16.85, "relError" : 0.02, "selError" : 1.69 }
 
 [jsTest] ----
 [jsTest] Query: ce_data_1000 { "normal_int_1000_1" : { "$lt" : 377 } }
@@ -8196,23 +15101,23 @@ Sample error: { "absError" : 48.03, "relError" : 0.06, "selError" : 4.8 }
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 185.1851851851851,
+	"logicalCE" : 197.80219780219775,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 185.1851851851851,
+		"logicalCE" : 197.80219780219775,
 		"child" : {
 			"nodeType" : "PhysicalScan",
-			"logicalCE" : 185.1851851851851
+			"logicalCE" : 197.80219780219775
 		}
 	}
 }
 
 [jsTest] ----
-[jsTest] CE: { "normal_int_1000_1" : { "$lt" : 377 } }, base = 201, sample = 185.19, actual = 201
+[jsTest] CE: { "normal_int_1000_1" : { "$lt" : 377 } }, base = 201, sample = 197.8, actual = 201
 [jsTest] ----
 
 Base error: { "absError" : 0, "relError" : 0, "selError" : 0 }
-Sample error: { "absError" : -15.81, "relError" : -0.08, "selError" : -1.58 }
+Sample error: { "absError" : -3.2, "relError" : -0.02, "selError" : -0.32 }
 
 [jsTest] ----
 [jsTest] Query: ce_data_1000 { "normal_int_1000_1" : { "$eq" : 377 } }
@@ -8282,27 +15187,27 @@ Sample error: { "absError" : -2, "relError" : -1, "selError" : -0.2 }
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 400.14145588832554,
+	"logicalCE" : 394.16104825307303,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 400.14145588832554,
+		"logicalCE" : 394.16104825307303,
 		"child" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 400.14145588832554,
+			"logicalCE" : 394.16104825307303,
 			"child" : {
 				"nodeType" : "PhysicalScan",
-				"logicalCE" : 400.14145588832554
+				"logicalCE" : 394.16104825307303
 			}
 		}
 	}
 }
 
 [jsTest] ----
-[jsTest] CE: { "chi2_int_1000_1" : { "$gte" : 380, "$lte" : 390 } }, base = 418.26, sample = 400.14, actual = 124
+[jsTest] CE: { "chi2_int_1000_1" : { "$gte" : 380, "$lte" : 390 } }, base = 418.26, sample = 394.16, actual = 124
 [jsTest] ----
 
 Base error: { "absError" : 294.26, "relError" : 2.37, "selError" : 29.43 }
-Sample error: { "absError" : 276.14, "relError" : 2.23, "selError" : 27.61 }
+Sample error: { "absError" : 270.16, "relError" : 2.18, "selError" : 27.02 }
 
 [jsTest] ----
 [jsTest] Query: ce_data_1000 { "chi2_int_1000_1" : { "$lt" : 380 } }
@@ -8327,23 +15232,23 @@ Sample error: { "absError" : 276.14, "relError" : 2.23, "selError" : 27.61 }
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 417.4757281553398,
+	"logicalCE" : 483.51648351648356,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 417.4757281553398,
+		"logicalCE" : 483.51648351648356,
 		"child" : {
 			"nodeType" : "PhysicalScan",
-			"logicalCE" : 417.4757281553398
+			"logicalCE" : 483.51648351648356
 		}
 	}
 }
 
 [jsTest] ----
-[jsTest] CE: { "chi2_int_1000_1" : { "$lt" : 380 } }, base = 446, sample = 417.48, actual = 446
+[jsTest] CE: { "chi2_int_1000_1" : { "$lt" : 380 } }, base = 446, sample = 483.52, actual = 446
 [jsTest] ----
 
 Base error: { "absError" : 0, "relError" : 0, "selError" : 0 }
-Sample error: { "absError" : -28.52, "relError" : -0.06, "selError" : -2.85 }
+Sample error: { "absError" : 37.52, "relError" : 0.08, "selError" : 3.75 }
 
 [jsTest] ----
 [jsTest] Query: ce_data_1000 { "chi2_int_1000_1" : { "$eq" : 380 } }
@@ -8368,23 +15273,23 @@ Sample error: { "absError" : -28.52, "relError" : -0.06, "selError" : -2.85 }
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 9.708737864077666,
+	"logicalCE" : 10.98901098901095,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 9.708737864077666,
+		"logicalCE" : 10.98901098901095,
 		"child" : {
 			"nodeType" : "PhysicalScan",
-			"logicalCE" : 9.708737864077666
+			"logicalCE" : 10.98901098901095
 		}
 	}
 }
 
 [jsTest] ----
-[jsTest] CE: { "chi2_int_1000_1" : { "$eq" : 380 } }, base = 9, sample = 9.71, actual = 9
+[jsTest] CE: { "chi2_int_1000_1" : { "$eq" : 380 } }, base = 9, sample = 10.99, actual = 9
 [jsTest] ----
 
 Base error: { "absError" : 0, "relError" : 0, "selError" : 0 }
-Sample error: { "absError" : 0.71, "relError" : 0.08, "selError" : 0.07 }
+Sample error: { "absError" : 1.99, "relError" : 0.22, "selError" : 0.2 }
 
 [jsTest] ----
 [jsTest] Query: ce_data_1000 { "mixed_int_uniform_1" : { "$gte" : 5030, "$lte" : 1730000 } }
@@ -8413,27 +15318,27 @@ Sample error: { "absError" : 0.71, "relError" : 0.08, "selError" : 0.07 }
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 718.0473224673574,
+	"logicalCE" : 698.3394607716951,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 718.0473224673574,
+		"logicalCE" : 698.3394607716951,
 		"child" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 718.0473224673574,
+			"logicalCE" : 698.3394607716951,
 			"child" : {
 				"nodeType" : "PhysicalScan",
-				"logicalCE" : 718.0473224673574
+				"logicalCE" : 698.3394607716951
 			}
 		}
 	}
 }
 
 [jsTest] ----
-[jsTest] CE: { "mixed_int_uniform_1" : { "$gte" : 5030, "$lte" : 1730000 } }, base = 712.21, sample = 718.05, actual = 549
+[jsTest] CE: { "mixed_int_uniform_1" : { "$gte" : 5030, "$lte" : 1730000 } }, base = 712.21, sample = 698.34, actual = 549
 [jsTest] ----
 
 Base error: { "absError" : 163.21, "relError" : 0.3, "selError" : 16.32 }
-Sample error: { "absError" : 169.05, "relError" : 0.31, "selError" : 16.9 }
+Sample error: { "absError" : 149.34, "relError" : 0.27, "selError" : 14.93 }
 
 [jsTest] ----
 [jsTest] Query: ce_data_1000 { "mixed_int_uniform_1" : { "$lt" : 5030 } }
@@ -8458,23 +15363,23 @@ Sample error: { "absError" : 169.05, "relError" : 0.31, "selError" : 16.9 }
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 139.78494623655914,
+	"logicalCE" : 175.82417582417585,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 139.78494623655914,
+		"logicalCE" : 175.82417582417585,
 		"child" : {
 			"nodeType" : "PhysicalScan",
-			"logicalCE" : 139.78494623655914
+			"logicalCE" : 175.82417582417585
 		}
 	}
 }
 
 [jsTest] ----
-[jsTest] CE: { "mixed_int_uniform_1" : { "$lt" : 5030 } }, base = 20.48, sample = 139.78, actual = 170
+[jsTest] CE: { "mixed_int_uniform_1" : { "$lt" : 5030 } }, base = 20.48, sample = 175.82, actual = 170
 [jsTest] ----
 
 Base error: { "absError" : -149.52, "relError" : -0.88, "selError" : -14.95 }
-Sample error: { "absError" : -30.22, "relError" : -0.18, "selError" : -3.02 }
+Sample error: { "absError" : 5.82, "relError" : 0.03, "selError" : 0.58 }
 
 [jsTest] ----
 [jsTest] Query: ce_data_1000 { "mixed_int_uniform_1" : { "$eq" : 5030 } }
@@ -8544,27 +15449,27 @@ Sample error: { "absError" : -2, "relError" : -1, "selError" : -0.2 }
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 798.315280921998,
+	"logicalCE" : 797.6099259894686,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 798.315280921998,
+		"logicalCE" : 797.6099259894686,
 		"child" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 798.315280921998,
+			"logicalCE" : 797.6099259894686,
 			"child" : {
 				"nodeType" : "PhysicalScan",
-				"logicalCE" : 798.315280921998
+				"logicalCE" : 797.6099259894686
 			}
 		}
 	}
 }
 
 [jsTest] ----
-[jsTest] CE: { "mixed_int_unf_norm_1" : { "$gte" : 448, "$lte" : 5362000 } }, base = 861.91, sample = 798.32, actual = 711
+[jsTest] CE: { "mixed_int_unf_norm_1" : { "$gte" : 448, "$lte" : 5362000 } }, base = 861.91, sample = 797.61, actual = 711
 [jsTest] ----
 
 Base error: { "absError" : 150.91, "relError" : 0.21, "selError" : 15.09 }
-Sample error: { "absError" : 87.32, "relError" : 0.12, "selError" : 8.73 }
+Sample error: { "absError" : 86.61, "relError" : 0.12, "selError" : 8.66 }
 
 [jsTest] ----
 [jsTest] Query: ce_data_1000 { "mixed_int_unf_norm_1" : { "$lt" : 448 } }
@@ -8589,23 +15494,23 @@ Sample error: { "absError" : 87.32, "relError" : 0.12, "selError" : 8.73 }
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 145.4545454545455,
+	"logicalCE" : 164.83516483516482,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 145.4545454545455,
+		"logicalCE" : 164.83516483516482,
 		"child" : {
 			"nodeType" : "PhysicalScan",
-			"logicalCE" : 145.4545454545455
+			"logicalCE" : 164.83516483516482
 		}
 	}
 }
 
 [jsTest] ----
-[jsTest] CE: { "mixed_int_unf_norm_1" : { "$lt" : 448 } }, base = 3.71, sample = 145.45, actual = 153
+[jsTest] CE: { "mixed_int_unf_norm_1" : { "$lt" : 448 } }, base = 3.71, sample = 164.84, actual = 153
 [jsTest] ----
 
 Base error: { "absError" : -149.29, "relError" : -0.98, "selError" : -14.93 }
-Sample error: { "absError" : -7.55, "relError" : -0.05, "selError" : -0.76 }
+Sample error: { "absError" : 11.84, "relError" : 0.08, "selError" : 1.18 }
 
 [jsTest] ----
 [jsTest] Query: ce_data_1000 { "mixed_int_unf_norm_1" : { "$eq" : 448 } }
@@ -8675,27 +15580,27 @@ Sample error: { "absError" : -1, "relError" : -1, "selError" : -0.1 }
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 931.2146227620574,
+	"logicalCE" : 967.214773613571,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 931.2146227620574,
+		"logicalCE" : 967.214773613571,
 		"child" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 931.2146227620574,
+			"logicalCE" : 967.214773613571,
 			"child" : {
 				"nodeType" : "PhysicalScan",
-				"logicalCE" : 931.2146227620574
+				"logicalCE" : 967.214773613571
 			}
 		}
 	}
 }
 
 [jsTest] ----
-[jsTest] CE: { "mixed_int_unf_norm_chi_1" : { "$gte" : 250, "$lte" : 3862000 } }, base = 899.99, sample = 931.21, actual = 900
+[jsTest] CE: { "mixed_int_unf_norm_chi_1" : { "$gte" : 250, "$lte" : 3862000 } }, base = 899.99, sample = 967.21, actual = 900
 [jsTest] ----
 
 Base error: { "absError" : -0.01, "relError" : 0, "selError" : 0 }
-Sample error: { "absError" : 31.21, "relError" : 0.03, "selError" : 3.12 }
+Sample error: { "absError" : 67.21, "relError" : 0.07, "selError" : 6.72 }
 
 [jsTest] ----
 [jsTest] Query: ce_data_1000 { "mixed_int_unf_norm_chi_1" : { "$lt" : 250 } }
@@ -8720,23 +15625,23 @@ Sample error: { "absError" : 31.21, "relError" : 0.03, "selError" : 3.12 }
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 15.38461538461533,
+	"logicalCE" : 21.97802197802201,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 15.38461538461533,
+		"logicalCE" : 21.97802197802201,
 		"child" : {
 			"nodeType" : "PhysicalScan",
-			"logicalCE" : 15.38461538461533
+			"logicalCE" : 21.97802197802201
 		}
 	}
 }
 
 [jsTest] ----
-[jsTest] CE: { "mixed_int_unf_norm_chi_1" : { "$lt" : 250 } }, base = 13.1, sample = 15.38, actual = 9
+[jsTest] CE: { "mixed_int_unf_norm_chi_1" : { "$lt" : 250 } }, base = 13.1, sample = 21.98, actual = 9
 [jsTest] ----
 
 Base error: { "absError" : 4.1, "relError" : 0.46, "selError" : 0.41 }
-Sample error: { "absError" : 6.38, "relError" : 0.71, "selError" : 0.64 }
+Sample error: { "absError" : 12.98, "relError" : 1.44, "selError" : 1.3 }
 
 [jsTest] ----
 [jsTest] Query: ce_data_1000 { "mixed_int_unf_norm_chi_1" : { "$eq" : 250 } }
@@ -8761,23 +15666,23 @@ Sample error: { "absError" : 6.38, "relError" : 0.71, "selError" : 0.64 }
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 7.692307692307665,
+	"logicalCE" : 0,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 7.692307692307665,
+		"logicalCE" : 0,
 		"child" : {
 			"nodeType" : "PhysicalScan",
-			"logicalCE" : 7.692307692307665
+			"logicalCE" : 0
 		}
 	}
 }
 
 [jsTest] ----
-[jsTest] CE: { "mixed_int_unf_norm_chi_1" : { "$eq" : 250 } }, base = 1.43, sample = 7.69, actual = 1
+[jsTest] CE: { "mixed_int_unf_norm_chi_1" : { "$eq" : 250 } }, base = 1.43, sample = 0, actual = 1
 [jsTest] ----
 
 Base error: { "absError" : 0.43, "relError" : 0.43, "selError" : 0.04 }
-Sample error: { "absError" : 6.69, "relError" : 6.69, "selError" : 0.67 }
+Sample error: { "absError" : -1, "relError" : -1, "selError" : -0.1 }
 
 [jsTest] ----
 [jsTest] Query: ce_data_1000 { "mixed_int_unf_norm_chi_2" : { "$gte" : 9130, "$lte" : 379400 } }
@@ -8806,27 +15711,27 @@ Sample error: { "absError" : 6.69, "relError" : 6.69, "selError" : 0.67 }
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 445.2535556994169,
+	"logicalCE" : 433.57077163839926,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 445.2535556994169,
+		"logicalCE" : 433.57077163839926,
 		"child" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 445.2535556994169,
+			"logicalCE" : 433.57077163839926,
 			"child" : {
 				"nodeType" : "PhysicalScan",
-				"logicalCE" : 445.2535556994169
+				"logicalCE" : 433.57077163839926
 			}
 		}
 	}
 }
 
 [jsTest] ----
-[jsTest] CE: { "mixed_int_unf_norm_chi_2" : { "$gte" : 9130, "$lte" : 379400 } }, base = 549.62, sample = 445.25, actual = 197
+[jsTest] CE: { "mixed_int_unf_norm_chi_2" : { "$gte" : 9130, "$lte" : 379400 } }, base = 549.62, sample = 433.57, actual = 197
 [jsTest] ----
 
 Base error: { "absError" : 352.62, "relError" : 1.79, "selError" : 35.26 }
-Sample error: { "absError" : 248.25, "relError" : 1.26, "selError" : 24.83 }
+Sample error: { "absError" : 236.57, "relError" : 1.2, "selError" : 23.66 }
 
 [jsTest] ----
 [jsTest] Query: ce_data_1000 { "mixed_int_unf_norm_chi_2" : { "$lt" : 9130 } }
@@ -8851,23 +15756,23 @@ Sample error: { "absError" : 248.25, "relError" : 1.26, "selError" : 24.83 }
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 428.5714285714286,
+	"logicalCE" : 461.53846153846155,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 428.5714285714286,
+		"logicalCE" : 461.53846153846155,
 		"child" : {
 			"nodeType" : "PhysicalScan",
-			"logicalCE" : 428.5714285714286
+			"logicalCE" : 461.53846153846155
 		}
 	}
 }
 
 [jsTest] ----
-[jsTest] CE: { "mixed_int_unf_norm_chi_2" : { "$lt" : 9130 } }, base = 229.85, sample = 428.57, actual = 385
+[jsTest] CE: { "mixed_int_unf_norm_chi_2" : { "$lt" : 9130 } }, base = 229.85, sample = 461.54, actual = 385
 [jsTest] ----
 
 Base error: { "absError" : -155.15, "relError" : -0.4, "selError" : -15.51 }
-Sample error: { "absError" : 43.57, "relError" : 0.11, "selError" : 4.36 }
+Sample error: { "absError" : 76.54, "relError" : 0.2, "selError" : 7.65 }
 
 [jsTest] ----
 [jsTest] Query: ce_data_1000 { "mixed_int_unf_norm_chi_2" : { "$eq" : 9130 } }
@@ -8947,16 +15852,16 @@ Sample error: { "absError" : -1, "relError" : -1, "selError" : -0.1 }
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 337.8947165999682,
+	"logicalCE" : 281.49136938009843,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 337.8947165999682,
+		"logicalCE" : 281.49136938009843,
 		"child" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 337.8947165999682,
+			"logicalCE" : 281.49136938009843,
 			"child" : {
 				"nodeType" : "PhysicalScan",
-				"logicalCE" : 337.8947165999682
+				"logicalCE" : 281.49136938009843
 			}
 		}
 	}
@@ -8968,11 +15873,11 @@ Sample error: { "absError" : -1, "relError" : -1, "selError" : -0.1 }
 [jsTest] 		"$gte" : "666~",
 [jsTest] 		"$lte" : "xxxx"
 [jsTest] 	}
-[jsTest] }, base = 300.44, sample = 337.89, actual = 147
+[jsTest] }, base = 300.44, sample = 281.49, actual = 147
 [jsTest] ----
 
 Base error: { "absError" : 153.44, "relError" : 1.04, "selError" : 15.34 }
-Sample error: { "absError" : 190.89, "relError" : 1.3, "selError" : 19.09 }
+Sample error: { "absError" : 134.49, "relError" : 0.91, "selError" : 13.45 }
 
 [jsTest] ----
 [jsTest] Query: ce_data_1000 { "choice_str_set_1112_33_norm_s" : { "$lt" : "666~" } }
@@ -8997,23 +15902,23 @@ Sample error: { "absError" : 190.89, "relError" : 1.3, "selError" : 19.09 }
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 622.2222222222223,
+	"logicalCE" : 681.3186813186813,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 622.2222222222223,
+		"logicalCE" : 681.3186813186813,
 		"child" : {
 			"nodeType" : "PhysicalScan",
-			"logicalCE" : 622.2222222222223
+			"logicalCE" : 681.3186813186813
 		}
 	}
 }
 
 [jsTest] ----
-[jsTest] CE: { "choice_str_set_1112_33_norm_s" : { "$lt" : "666~" } }, base = 667, sample = 622.22, actual = 667
+[jsTest] CE: { "choice_str_set_1112_33_norm_s" : { "$lt" : "666~" } }, base = 667, sample = 681.32, actual = 667
 [jsTest] ----
 
 Base error: { "absError" : 0, "relError" : 0, "selError" : 0 }
-Sample error: { "absError" : -44.78, "relError" : -0.07, "selError" : -4.48 }
+Sample error: { "absError" : 14.32, "relError" : 0.02, "selError" : 1.43 }
 
 [jsTest] ----
 [jsTest] Query: ce_data_1000 { "choice_str_set_1112_33_norm_s" : { "$eq" : "666~" } }
@@ -9038,23 +15943,23 @@ Sample error: { "absError" : -44.78, "relError" : -0.07, "selError" : -4.48 }
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 33.33333333333333,
+	"logicalCE" : 0,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 33.33333333333333,
+		"logicalCE" : 0,
 		"child" : {
 			"nodeType" : "PhysicalScan",
-			"logicalCE" : 33.33333333333333
+			"logicalCE" : 0
 		}
 	}
 }
 
 [jsTest] ----
-[jsTest] CE: { "choice_str_set_1112_33_norm_s" : { "$eq" : "666~" } }, base = 23, sample = 33.33, actual = 23
+[jsTest] CE: { "choice_str_set_1112_33_norm_s" : { "$eq" : "666~" } }, base = 23, sample = 0, actual = 23
 [jsTest] ----
 
 Base error: { "absError" : 0, "relError" : 0, "selError" : 0 }
-Sample error: { "absError" : 10.33, "relError" : 0.45, "selError" : 1.03 }
+Sample error: { "absError" : -23, "relError" : -1, "selError" : -2.3 }
 
 [jsTest] ----
 [jsTest] Query: ce_data_1000 {
@@ -9093,16 +15998,16 @@ Sample error: { "absError" : 10.33, "relError" : 0.45, "selError" : 1.03 }
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 385.57292494715995,
+	"logicalCE" : 433.7436647503145,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 385.57292494715995,
+		"logicalCE" : 433.7436647503145,
 		"child" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 385.57292494715995,
+			"logicalCE" : 433.7436647503145,
 			"child" : {
 				"nodeType" : "PhysicalScan",
-				"logicalCE" : 385.57292494715995
+				"logicalCE" : 433.7436647503145
 			}
 		}
 	}
@@ -9114,11 +16019,11 @@ Sample error: { "absError" : 10.33, "relError" : 0.45, "selError" : 1.03 }
 [jsTest] 		"$gte" : "(((@",
 [jsTest] 		"$lte" : "...R"
 [jsTest] 	}
-[jsTest] }, base = 380.03, sample = 385.57, actual = 186
+[jsTest] }, base = 380.03, sample = 433.74, actual = 186
 [jsTest] ----
 
 Base error: { "absError" : 194.03, "relError" : 1.04, "selError" : 19.4 }
-Sample error: { "absError" : 199.57, "relError" : 1.07, "selError" : 19.96 }
+Sample error: { "absError" : 247.74, "relError" : 1.33, "selError" : 24.77 }
 
 [jsTest] ----
 [jsTest] Query: ce_data_1000 { "choice_str_set_1112_33_norm_l" : { "$lt" : "(((@" } }
@@ -9143,23 +16048,23 @@ Sample error: { "absError" : 199.57, "relError" : 1.07, "selError" : 19.96 }
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 255.31914893617014,
+	"logicalCE" : 263.7362637362637,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 255.31914893617014,
+		"logicalCE" : 263.7362637362637,
 		"child" : {
 			"nodeType" : "PhysicalScan",
-			"logicalCE" : 255.31914893617014
+			"logicalCE" : 263.7362637362637
 		}
 	}
 }
 
 [jsTest] ----
-[jsTest] CE: { "choice_str_set_1112_33_norm_l" : { "$lt" : "(((@" } }, base = 254, sample = 255.32, actual = 254
+[jsTest] CE: { "choice_str_set_1112_33_norm_l" : { "$lt" : "(((@" } }, base = 254, sample = 263.74, actual = 254
 [jsTest] ----
 
 Base error: { "absError" : 0, "relError" : 0, "selError" : 0 }
-Sample error: { "absError" : 1.32, "relError" : 0.01, "selError" : 0.13 }
+Sample error: { "absError" : 9.74, "relError" : 0.04, "selError" : 0.97 }
 
 [jsTest] ----
 [jsTest] Query: ce_data_1000 { "choice_str_set_1112_33_norm_l" : { "$eq" : "(((@" } }
@@ -9184,23 +16089,23 @@ Sample error: { "absError" : 1.32, "relError" : 0.01, "selError" : 0.13 }
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 10.638297872340384,
+	"logicalCE" : 21.97802197802201,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 10.638297872340384,
+		"logicalCE" : 21.97802197802201,
 		"child" : {
 			"nodeType" : "PhysicalScan",
-			"logicalCE" : 10.638297872340384
+			"logicalCE" : 21.97802197802201
 		}
 	}
 }
 
 [jsTest] ----
-[jsTest] CE: { "choice_str_set_1112_33_norm_l" : { "$eq" : "(((@" } }, base = 29, sample = 10.64, actual = 29
+[jsTest] CE: { "choice_str_set_1112_33_norm_l" : { "$eq" : "(((@" } }, base = 29, sample = 21.98, actual = 29
 [jsTest] ----
 
 Base error: { "absError" : 0, "relError" : 0, "selError" : 0 }
-Sample error: { "absError" : -18.36, "relError" : -0.63, "selError" : -1.84 }
+Sample error: { "absError" : -7.02, "relError" : -0.24, "selError" : -0.7 }
 
 [jsTest] ----
 [jsTest] Query: ce_data_1000 {
@@ -9239,16 +16144,16 @@ Sample error: { "absError" : -18.36, "relError" : -0.63, "selError" : -1.84 }
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 413.1360836469153,
+	"logicalCE" : 475.6582226632411,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 413.1360836469153,
+		"logicalCE" : 475.6582226632411,
 		"child" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 413.1360836469153,
+			"logicalCE" : 475.6582226632411,
 			"child" : {
 				"nodeType" : "PhysicalScan",
-				"logicalCE" : 413.1360836469153
+				"logicalCE" : 475.6582226632411
 			}
 		}
 	}
@@ -9260,11 +16165,11 @@ Sample error: { "absError" : -18.36, "relError" : -0.63, "selError" : -1.84 }
 [jsTest] 		"$gte" : "222n",
 [jsTest] 		"$lte" : "QQQ,"
 [jsTest] 	}
-[jsTest] }, base = 456.75, sample = 413.14, actual = 305
+[jsTest] }, base = 456.75, sample = 475.66, actual = 305
 [jsTest] ----
 
 Base error: { "absError" : 151.75, "relError" : 0.5, "selError" : 15.18 }
-Sample error: { "absError" : 108.14, "relError" : 0.35, "selError" : 10.81 }
+Sample error: { "absError" : 170.66, "relError" : 0.56, "selError" : 17.07 }
 
 [jsTest] ----
 [jsTest] Query: ce_data_1000 { "choice_str_set_1112_1000_chi2_s" : { "$lt" : "222n" } }
@@ -9289,23 +16194,23 @@ Sample error: { "absError" : 108.14, "relError" : 0.35, "selError" : 10.81 }
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 187.5,
+	"logicalCE" : 186.8131868131868,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 187.5,
+		"logicalCE" : 186.8131868131868,
 		"child" : {
 			"nodeType" : "PhysicalScan",
-			"logicalCE" : 187.5
+			"logicalCE" : 186.8131868131868
 		}
 	}
 }
 
 [jsTest] ----
-[jsTest] CE: { "choice_str_set_1112_1000_chi2_s" : { "$lt" : "222n" } }, base = 204.17, sample = 187.5, actual = 204
+[jsTest] CE: { "choice_str_set_1112_1000_chi2_s" : { "$lt" : "222n" } }, base = 204.17, sample = 186.81, actual = 204
 [jsTest] ----
 
 Base error: { "absError" : 0.17, "relError" : 0, "selError" : 0.02 }
-Sample error: { "absError" : -16.5, "relError" : -0.08, "selError" : -1.65 }
+Sample error: { "absError" : -17.19, "relError" : -0.08, "selError" : -1.72 }
 
 [jsTest] ----
 [jsTest] Query: ce_data_1000 { "choice_str_set_1112_1000_chi2_s" : { "$eq" : "222n" } }
@@ -9385,16 +16290,16 @@ Sample error: { "absError" : -2, "relError" : -1, "selError" : -0.2 }
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 650.6024096385541,
+	"logicalCE" : 582.4175824175825,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 650.6024096385541,
+		"logicalCE" : 582.4175824175825,
 		"child" : {
 			"nodeType" : "Filter",
-			"logicalCE" : 650.6024096385541,
+			"logicalCE" : 582.4175824175825,
 			"child" : {
 				"nodeType" : "PhysicalScan",
-				"logicalCE" : 650.6024096385541
+				"logicalCE" : 582.4175824175825
 			}
 		}
 	}
@@ -9406,11 +16311,11 @@ Sample error: { "absError" : -2, "relError" : -1, "selError" : -0.2 }
 [jsTest] 		"$gte" : "   g",
 [jsTest] 		"$lte" : "^^^T"
 [jsTest] 	}
-[jsTest] }, base = 682.56, sample = 650.6, actual = 677
+[jsTest] }, base = 682.56, sample = 582.42, actual = 677
 [jsTest] ----
 
 Base error: { "absError" : 5.56, "relError" : 0.01, "selError" : 0.56 }
-Sample error: { "absError" : -26.4, "relError" : -0.04, "selError" : -2.64 }
+Sample error: { "absError" : -94.58, "relError" : -0.14, "selError" : -9.46 }
 
 [jsTest] ----
 [jsTest] Query: ce_data_1000 { "choice_str_set_1112_1000_chi2_l" : { "$lt" : "   g" } }
@@ -9476,27 +16381,27 @@ Sample error: { "absError" : -4, "relError" : -1, "selError" : -0.4 }
 
 {
 	"nodeType" : "Root",
-	"logicalCE" : 12.048192771084377,
+	"logicalCE" : 10.98901098901095,
 	"child" : {
 		"nodeType" : "Filter",
-		"logicalCE" : 12.048192771084377,
+		"logicalCE" : 10.98901098901095,
 		"child" : {
 			"nodeType" : "PhysicalScan",
-			"logicalCE" : 12.048192771084377
+			"logicalCE" : 10.98901098901095
 		}
 	}
 }
 
 [jsTest] ----
-[jsTest] CE: { "choice_str_set_1112_1000_chi2_l" : { "$eq" : "   g" } }, base = 2.2, sample = 12.05, actual = 4
+[jsTest] CE: { "choice_str_set_1112_1000_chi2_l" : { "$eq" : "   g" } }, base = 2.2, sample = 10.99, actual = 4
 [jsTest] ----
 
 Base error: { "absError" : -1.8, "relError" : -0.45, "selError" : -0.18 }
-Sample error: { "absError" : 8.05, "relError" : 2.01, "selError" : 0.81 }
+Sample error: { "absError" : 6.99, "relError" : 1.75, "selError" : 0.7 }
 
 [jsTest] ----
 [jsTest] Average errors (33 queries):
 [jsTest] ----
 
 Average base error: { "absError" : 31.94, "relError" : 0.18, "selError" : 3.19 }
-Average sample error: { "absError" : 37.79, "relError" : 0.26, "selError" : 3.78 }
+Average sample error: { "absError" : 42.34, "relError" : 0.03, "selError" : 4.23 }
