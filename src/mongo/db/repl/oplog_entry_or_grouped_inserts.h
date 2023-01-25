@@ -31,17 +31,30 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/session/internal_session_pool.h"
 
 namespace mongo {
 namespace repl {
 
-enum ApplicationInstruction { applyOplogEntry, startSplitPrepare, splitPrepareOplogEntry };
-struct ApplierOperation {
-    ApplicationInstruction instruction;
-    const OplogEntry* op;
-    LogicalSessionId subSession;
+enum class ApplicationInstruction {
+    applyOplogEntry,
+    applySplitPrepareOps,
+};
 
-    explicit ApplierOperation(const OplogEntry* op) : instruction(applyOplogEntry), op(op) {}
+struct ApplierOperation {
+    const OplogEntry* op;
+    ApplicationInstruction instruction;
+    boost::optional<const InternalSessionPool::Session&> subSession;
+    boost::optional<std::vector<const OplogEntry*>> splitPrepareOps;
+
+    ApplierOperation(const OplogEntry* op,
+                     ApplicationInstruction instruction = ApplicationInstruction::applyOplogEntry,
+                     boost::optional<const InternalSessionPool::Session&> subSession = boost::none,
+                     boost::optional<std::vector<const OplogEntry*>> splitPrepareOps = boost::none)
+        : op(op),
+          instruction(instruction),
+          subSession(subSession),
+          splitPrepareOps(splitPrepareOps) {}
 
     const OplogEntry* operator->() const {
         return op;

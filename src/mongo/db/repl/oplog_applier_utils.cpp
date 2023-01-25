@@ -106,13 +106,11 @@ void OplogApplierUtils::processCrudOp(
     }
 }
 
-uint32_t OplogApplierUtils::addToWriterVector(
-    OperationContext* opCtx,
-    OplogEntry* op,
-    std::vector<std::vector<ApplierOperation>>* writerVectors,
-    CachedCollectionProperties* collPropertiesCache,
-    boost::optional<uint32_t> forceWriterId) {
-
+uint32_t getWriterId(OperationContext* opCtx,
+                     OplogEntry* op,
+                     CachedCollectionProperties* collPropertiesCache,
+                     uint32_t numWriters,
+                     boost::optional<uint32_t> forceWriterId = boost::none) {
     NamespaceString nss = op->isGlobalIndexCrudOpType()
         ? NamespaceString::makeGlobalIndexNSS(op->getUuid().value())
         : op->getNss();
@@ -125,17 +123,47 @@ uint32_t OplogApplierUtils::addToWriterVector(
 
     if (op->isCrudOpType()) {
         auto collProperties = collPropertiesCache->getCollectionProperties(opCtx, hashedNs);
-        processCrudOp(opCtx, op, &hash, collProperties);
+        OplogApplierUtils::processCrudOp(opCtx, op, &hash, collProperties);
     }
 
-    const uint32_t numWriters = writerVectors->size();
-    auto writerId = (forceWriterId ? *forceWriterId : hash) % numWriters;
+    return (forceWriterId ? *forceWriterId : hash) % numWriters;
+}
+
+template <typename Operation>
+uint32_t addToWriterVectorImpl(OperationContext* opCtx,
+                               OplogEntry* op,
+                               std::vector<std::vector<Operation>>* writerVectors,
+                               CachedCollectionProperties* collPropertiesCache,
+                               boost::optional<uint32_t> forceWriterId = boost::none) {
+    auto writerId =
+        getWriterId(opCtx, op, collPropertiesCache, writerVectors->size(), forceWriterId);
     auto& writer = (*writerVectors)[writerId];
+
     if (writer.empty()) {
-        writer.reserve(8);  // Skip a few growth rounds
+        // Skip a few growth rounds.
+        writer.reserve(8);
     }
     writer.emplace_back(op);
+
     return writerId;
+}
+
+uint32_t OplogApplierUtils::addToWriterVector(
+    OperationContext* opCtx,
+    OplogEntry* op,
+    std::vector<std::vector<const OplogEntry*>>* writerVectors,
+    CachedCollectionProperties* collPropertiesCache,
+    boost::optional<uint32_t> forceWriterId) {
+    return addToWriterVectorImpl(opCtx, op, writerVectors, collPropertiesCache, forceWriterId);
+}
+
+uint32_t OplogApplierUtils::addToWriterVector(
+    OperationContext* opCtx,
+    OplogEntry* op,
+    std::vector<std::vector<ApplierOperation>>* writerVectors,
+    CachedCollectionProperties* collPropertiesCache,
+    boost::optional<uint32_t> forceWriterId) {
+    return addToWriterVectorImpl(opCtx, op, writerVectors, collPropertiesCache, forceWriterId);
 }
 
 void OplogApplierUtils::stableSortByNamespace(std::vector<ApplierOperation>* oplogEntryPointers) {
@@ -160,14 +188,62 @@ void OplogApplierUtils::addDerivedOps(OperationContext* opCtx,
                                       std::vector<std::vector<ApplierOperation>>* writerVectors,
                                       CachedCollectionProperties* collPropertiesCache,
                                       bool serial) {
-    boost::optional<uint32_t>
-        serialWriterId;  // Used to determine which writer vector to assign serial ops.
+    // Used to determine which writer vector to assign serial ops.
+    boost::optional<uint32_t> serialWriterId;
 
     for (auto&& op : *derivedOps) {
         auto writerId =
             addToWriterVector(opCtx, &op, writerVectors, collPropertiesCache, serialWriterId);
         if (serial && !serialWriterId) {
             serialWriterId.emplace(writerId);
+        }
+    }
+}
+
+void OplogApplierUtils::addDerivedPrepares(
+    OperationContext* opCtx,
+    OplogEntry* prepareOp,
+    std::vector<OplogEntry>* derivedOps,
+    std::vector<std::vector<ApplierOperation>>* writerVectors,
+    CachedCollectionProperties* collPropertiesCache) {
+
+    uint32_t bufSplits = 0;
+    std::vector<std::vector<const OplogEntry*>> bufWriterVectors(writerVectors->size());
+
+    // Add the ops in the prepared transaction to the buffered writer vectors.
+    for (auto&& op : *derivedOps) {
+        auto writerId = addToWriterVector(opCtx, &op, &bufWriterVectors, collPropertiesCache);
+        bufSplits += bufWriterVectors[writerId].size() == 1;
+    }
+
+    // Create the split sessions and track them with the the session of this prepare entry.
+    uint32_t realSplits = std::max<uint32_t>(bufSplits, 1);
+    auto splitSessManager = ReplicationCoordinator::get(opCtx)->getSplitPrepareSessionManager();
+    const auto& splitSessions = splitSessManager->splitSession(
+        *prepareOp->getSessionId(), *prepareOp->getTxnNumber(), realSplits);
+    invariant(splitSessions.size() == realSplits);
+
+    // For empty (read-only) prepares, the namespace of the prepare oplog entry (admin.$cmd)
+    // will be used to decide which writer vector to add to.
+    if (!bufSplits) {
+        auto writerId = getWriterId(opCtx, prepareOp, collPropertiesCache, writerVectors->size());
+        (*writerVectors)[writerId].emplace_back(prepareOp,
+                                                ApplicationInstruction::applySplitPrepareOps,
+                                                splitSessions[0],
+                                                std::vector<const OplogEntry*>{});
+        return;
+    }
+
+    // For each writer thread that has been assigned ops for this transaction, acquire a
+    // split session and transfer the ops to the real writer vector.
+    for (size_t i = 0, j = 0; i < bufWriterVectors.size(); ++i) {
+        auto& bufWriter = bufWriterVectors[i];
+        auto& realWriter = (*writerVectors)[i];
+        if (!bufWriter.empty()) {
+            realWriter.emplace_back(prepareOp,
+                                    ApplicationInstruction::applySplitPrepareOps,
+                                    splitSessions[j++],
+                                    std::move(bufWriter));
         }
     }
 }

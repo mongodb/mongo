@@ -40,7 +40,7 @@ namespace repl {
 /**
  * Groups consecutive insert operations on the same namespace and applies the combined operation
  * as a single oplog entry.
- * Advances the the std::vector<const OplogEntry*> iterator if the grouped insert is applied
+ * Advances the the std::vector<ApplierOperation> iterator if the grouped insert is applied
  * successfully.
  */
 class InsertGroup {

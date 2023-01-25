@@ -4743,14 +4743,27 @@ TEST_F(IdempotencyTestTxns, CommitPreparedTransactionIgnoresNamespaceNotFoundErr
     ASSERT_FALSE(docExists(_opCtx.get(), _nss, doc));
 }
 
-class GlobalIndexTest : public OplogApplierImplTest {
+class PreparedTxnSplitTest : public OplogApplierImplTest {
+public:
+    PreparedTxnSplitTest()
+        : _nss("test.prepTxnSplit"),
+          _cmdNss("admin.$cmd"),
+          _uuid(UUID::gen()),
+          _txnNum1(1),
+          _txnNum2(2) {}
+
 protected:
     using WriterVectors = std::vector<std::vector<ApplierOperation>>;
 
     void setUp() override {
         OplogApplierImplTest::setUp();
-        writerPool = makeReplWriterPool();
-        applier = std::make_unique<TrackOpsAppliedApplier>(
+
+        _lsid1 = makeLogicalSessionId(_opCtx.get());
+        _lsid2 = makeLogicalSessionId(_opCtx.get());
+
+        NoopOplogApplierObserver observer;
+        _writerPool = makeReplWriterPool();
+        _applier = std::make_unique<TrackOpsAppliedApplier>(
             nullptr,  // executor
             nullptr,  // oplogBuffer
             &observer,
@@ -4758,7 +4771,148 @@ protected:
             getConsistencyMarkers(),
             getStorageInterface(),
             repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
-            writerPool.get());
+            _writerPool.get());
+    }
+
+    auto makePrepareOplogForCrudBatch(const std::vector<BSONObj>& batch,
+                                      const OpTime opTime,
+                                      const LogicalSessionId& lsid,
+                                      TxnNumber txnNumber) {
+        BSONArrayBuilder arrBuilder;
+        arrBuilder.append(batch.begin(), batch.end());
+        auto command = BSON("applyOps" << arrBuilder.arr() << "prepare" << true);
+
+        return makeCommandOplogEntryWithSessionInfoAndStmtIds(
+            opTime, _cmdNss, command, lsid, TxnNumber(txnNumber), {StmtId(0)}, OpTime());
+    }
+
+    int filterConfigTransactionsEntryFromWriterVectors(WriterVectors& writerVectors) {
+        int txnTableOps = 0;
+        for (auto& vector : writerVectors) {
+            for (auto it = vector.begin(); it != vector.end();) {
+                if ((*it)->getNss() == NamespaceString::kSessionTransactionsTableNamespace) {
+                    txnTableOps++;
+                    it = vector.erase(it);
+                } else {
+                    ++it;
+                }
+            }
+        }
+        return txnTableOps;
+    }
+
+protected:
+    std::unique_ptr<TrackOpsAppliedApplier> _applier;
+    std::unique_ptr<ThreadPool> _writerPool;
+    NamespaceString _nss;
+    NamespaceString _cmdNss;
+    boost::optional<UUID> _uuid;
+    LogicalSessionId _lsid1;
+    LogicalSessionId _lsid2;
+    TxnNumber _txnNum1;
+    TxnNumber _txnNum2;
+};
+
+TEST_F(PreparedTxnSplitTest, MultiplePrepareTxnsInSameBatch) {
+    RAIIServerParameterControllerForTest controller("featureFlagApplyPreparedTxnsInParallel", true);
+
+    // Scale the test by the number of writer threads, so it does not start failing if maxThreads
+    // changes.
+    const int kNumEntries = _writerPool->getStats().options.maxThreads * 1000;
+
+    std::vector<OplogEntry> ops;
+    std::vector<BSONObj> cruds1;
+    std::vector<BSONObj> cruds2;
+    cruds1.reserve(kNumEntries);
+    cruds2.reserve(kNumEntries);
+
+    for (int i = 0; i < kNumEntries; i++) {
+        cruds1.push_back(BSON("op"
+                              << "i"
+                              << "ns" << _nss.ns() << "ui" << *_uuid << "o" << BSON("_id" << i)));
+        cruds2.push_back(BSON("op"
+                              << "i"
+                              << "ns" << _nss.ns() << "ui" << *_uuid << "o"
+                              << BSON("_id" << i + kNumEntries)));
+    }
+
+    ops.push_back(makePrepareOplogForCrudBatch(cruds1, {Timestamp(1, 1), 1}, _lsid1, _txnNum1));
+    ops.push_back(makePrepareOplogForCrudBatch(cruds2, {Timestamp(1, 2), 1}, _lsid2, _txnNum2));
+
+    WriterVectors writerVectors(_writerPool->getStats().options.maxThreads);
+    std::vector<std::vector<OplogEntry>> derivedOps;
+    _applier->fillWriterVectors_forTest(_opCtx.get(), &ops, &writerVectors, &derivedOps);
+
+    // Verify the config.transactions collection got one entry for each prepared transaction.
+    int txnTableOps = filterConfigTransactionsEntryFromWriterVectors(writerVectors);
+    ASSERT_EQ(2, txnTableOps);
+
+    // Verify each writer has been assigned operations for both prepared transactions.
+    for (auto& writer : writerVectors) {
+        ASSERT_EQ(2, writer.size());
+
+        ASSERT_EQ(ApplicationInstruction::applySplitPrepareOps, writer[0].instruction);
+        ASSERT_TRUE(writer[0]->shouldPrepare());
+        ASSERT_NE(boost::none, writer[0].subSession);
+        ASSERT_NE(boost::none, writer[0].splitPrepareOps);
+        ASSERT_FALSE(writer[0].splitPrepareOps->empty());
+
+        ASSERT_EQ(ApplicationInstruction::applySplitPrepareOps, writer[1].instruction);
+        ASSERT_TRUE(writer[1]->shouldPrepare());
+        ASSERT_NE(boost::none, writer[1].subSession);
+        ASSERT_NE(boost::none, writer[1].splitPrepareOps);
+        ASSERT_FALSE(writer[1].splitPrepareOps->empty());
+
+        ASSERT_NE(writer[0].subSession->getSessionId(), writer[1].subSession->getSessionId());
+    }
+}
+
+TEST_F(PreparedTxnSplitTest, SingleEmptyPrepareTransaction) {
+    RAIIServerParameterControllerForTest controller("featureFlagApplyPreparedTxnsInParallel", true);
+
+    std::vector<OplogEntry> ops;
+    ops.push_back(makePrepareOplogForCrudBatch({}, {Timestamp(1, 1), 1}, _lsid1, _txnNum1));
+
+    WriterVectors writerVectors(_writerPool->getStats().options.maxThreads);
+    std::vector<std::vector<OplogEntry>> derivedOps;
+    _applier->fillWriterVectors_forTest(_opCtx.get(), &ops, &writerVectors, &derivedOps);
+
+    // Verify the config.transactions collection got an entry for the empty prepared transaction.
+    int txnTableOps = filterConfigTransactionsEntryFromWriterVectors(writerVectors);
+    ASSERT_EQ(1, txnTableOps);
+
+    // Verify exactly writer has been assigned operation for the empty prepared transaction.
+    int count = std::count_if(writerVectors.begin(), writerVectors.end(), [](auto& writer) {
+        if (writer.size() != 1) {
+            return false;
+        }
+        ASSERT_EQ(ApplicationInstruction::applySplitPrepareOps, writer[0].instruction);
+        ASSERT_TRUE(writer[0]->shouldPrepare());
+        ASSERT_NE(boost::none, writer[0].subSession);
+        ASSERT_NE(boost::none, writer[0].splitPrepareOps);
+        ASSERT_TRUE(writer[0].splitPrepareOps->empty());
+        return true;
+    });
+    ASSERT_EQ(1, count);
+}
+
+class GlobalIndexTest : public OplogApplierImplTest {
+protected:
+    using WriterVectors = std::vector<std::vector<ApplierOperation>>;
+
+    void setUp() override {
+        OplogApplierImplTest::setUp();
+        NoopOplogApplierObserver observer;
+        _writerPool = makeReplWriterPool();
+        _applier = std::make_unique<TrackOpsAppliedApplier>(
+            nullptr,  // executor
+            nullptr,  // oplogBuffer
+            &observer,
+            ReplicationCoordinator::get(_opCtx.get()),
+            getConsistencyMarkers(),
+            getStorageInterface(),
+            repl::OplogApplier::Options(repl::OplogApplication::Mode::kSecondary),
+            _writerPool.get());
     }
 
     struct GlobalIndexCrudOp {
@@ -4819,9 +4973,9 @@ protected:
         }
     }
 
-    std::unique_ptr<TrackOpsAppliedApplier> applier;
-    std::unique_ptr<ThreadPool> writerPool;
-    NoopOplogApplierObserver observer;
+protected:
+    std::unique_ptr<TrackOpsAppliedApplier> _applier;
+    std::unique_ptr<ThreadPool> _writerPool;
 };
 
 TEST_F(GlobalIndexTest, SameUUIDSameDocKeyToSameWriter) {
@@ -4837,9 +4991,9 @@ TEST_F(GlobalIndexTest, SameUUIDSameDocKeyToSameWriter) {
         {{uuid1, GlobalIndexCrudOp::Type::Insert, key1, sameDocKey},
          {uuid1, GlobalIndexCrudOp::Type::Insert, key2, sameDocKey}});
 
-    WriterVectors writerVectors(writerPool->getStats().options.maxThreads);
+    WriterVectors writerVectors(_writerPool->getStats().options.maxThreads);
     std::vector<std::vector<OplogEntry>> derivedOps;
-    applier->fillWriterVectors_forTest(_opCtx.get(), &ops, &writerVectors, &derivedOps);
+    _applier->fillWriterVectors_forTest(_opCtx.get(), &ops, &writerVectors, &derivedOps);
     filterConfigTransactionsEntryFromWriterVectors(writerVectors);
 
     bool found = false;
@@ -4860,7 +5014,7 @@ TEST_F(GlobalIndexTest, SameUUIDSameDocKeyToSameWriter) {
 TEST_F(GlobalIndexTest, LargeBatchSameUUIDDifferentDocKeyAssignsAtLeastOneOpToEachWriter) {
     // Scale the test by the number of writer threads, so it does not start failing if maxThreads
     // changes.
-    const int kNumEntries = writerPool->getStats().options.maxThreads * 1000;
+    const int kNumEntries = _writerPool->getStats().options.maxThreads * 1000;
     const UUID uuid1 = UUID::gen();
     std::vector<GlobalIndexCrudOp> opBatch;
     opBatch.reserve(kNumEntries);
@@ -4876,9 +5030,9 @@ TEST_F(GlobalIndexTest, LargeBatchSameUUIDDifferentDocKeyAssignsAtLeastOneOpToEa
 
     auto ops = makeGlobalIndexCrudApplyOpsOplogBatch(opBatch);
 
-    WriterVectors writerVectors(writerPool->getStats().options.maxThreads);
+    WriterVectors writerVectors(_writerPool->getStats().options.maxThreads);
     std::vector<std::vector<OplogEntry>> derivedOps;
-    applier->fillWriterVectors_forTest(_opCtx.get(), &ops, &writerVectors, &derivedOps);
+    _applier->fillWriterVectors_forTest(_opCtx.get(), &ops, &writerVectors, &derivedOps);
 
     size_t count = 0;
     for (auto& vector : writerVectors) {
@@ -4892,7 +5046,7 @@ TEST_F(GlobalIndexTest, LargeBatchSameUUIDDifferentDocKeyAssignsAtLeastOneOpToEa
 TEST_F(GlobalIndexTest, LargeBatchDifferentUUIDAssignsAtLeastOneOpToEachWriter) {
     // Scale the test by the number of writer threads, so it does not start failing if maxThreads
     // changes.
-    const int kNumEntries = writerPool->getStats().options.maxThreads * 1000;
+    const int kNumEntries = _writerPool->getStats().options.maxThreads * 1000;
     std::vector<GlobalIndexCrudOp> opBatch;
     opBatch.reserve(kNumEntries);
 
@@ -4906,9 +5060,9 @@ TEST_F(GlobalIndexTest, LargeBatchDifferentUUIDAssignsAtLeastOneOpToEachWriter) 
 
     auto ops = makeGlobalIndexCrudApplyOpsOplogBatch(opBatch);
 
-    WriterVectors writerVectors(writerPool->getStats().options.maxThreads);
+    WriterVectors writerVectors(_writerPool->getStats().options.maxThreads);
     std::vector<std::vector<OplogEntry>> derivedOps;
-    applier->fillWriterVectors_forTest(_opCtx.get(), &ops, &writerVectors, &derivedOps);
+    _applier->fillWriterVectors_forTest(_opCtx.get(), &ops, &writerVectors, &derivedOps);
 
     size_t count = 0;
     for (auto& vector : writerVectors) {

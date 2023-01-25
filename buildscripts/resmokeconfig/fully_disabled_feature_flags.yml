@@ -11,3 +11,6 @@
 - featureFlagAlwaysCreateConfigTransactionsPartialIndexOnStepUp
 # Disable the feature flag for catalog shard until most of the codebase can run in this mode.
 - featureFlagCatalogShard
+# Disable the feature flag for parallelizing prepared transaction application until most of the
+# codebase can run in this mode.
+- featureFlagApplyPreparedTxnsInParallel

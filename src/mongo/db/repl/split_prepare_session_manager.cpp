@@ -36,7 +36,7 @@ SplitPrepareSessionManager::SplitPrepareSessionManager(InternalSessionPool* sess
     : _sessionPool(sessionPool) {}
 
 const std::vector<PooledSession>& SplitPrepareSessionManager::splitSession(
-    const LogicalSessionId& sessionId, TxnNumber txnNumber, int numSplits) {
+    const LogicalSessionId& sessionId, TxnNumber txnNumber, uint32_t numSplits) {
     invariant(numSplits > 0);
     stdx::lock_guard<Latch> lk(_mutex);
 
@@ -49,7 +49,7 @@ const std::vector<PooledSession>& SplitPrepareSessionManager::splitSession(
     auto& sessions = it->second.second;
     sessions.reserve(numSplits);
 
-    for (int i = 0; i < numSplits; i++) {
+    for (uint32_t i = 0; i < numSplits; ++i) {
         sessions.push_back(_sessionPool->acquireSystemSession());
     }
 

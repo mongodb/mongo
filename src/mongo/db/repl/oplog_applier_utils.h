@@ -82,16 +82,28 @@ public:
 
 
     /**
-     * Adds a single oplog entry to the appropriate writer vector.  Returns the index of the
+     * Adds a single oplog entry to the appropriate writer vector. Returns the index of the
      * writer vector the entry was written to.
+     */
+    static uint32_t addToWriterVector(OperationContext* opCtx,
+                                      OplogEntry* op,
+                                      std::vector<std::vector<const OplogEntry*>>* writerVectors,
+                                      CachedCollectionProperties* collPropertiesCache,
+                                      boost::optional<uint32_t> forceWriterId = boost::none);
+
+    /**
+     * Same as above, except that the type of ops in the writer vectors are different.
      */
     static uint32_t addToWriterVector(OperationContext* opCtx,
                                       OplogEntry* op,
                                       std::vector<std::vector<ApplierOperation>>* writerVectors,
                                       CachedCollectionProperties* collPropertiesCache,
                                       boost::optional<uint32_t> forceWriterId = boost::none);
+
     /**
-     * Adds a set of derivedOps to writerVectors.
+     * Adds a set of derivedOps to writerVectors. For ops derived from prepared transactions, the
+     * addDerivedPrepares() variant should be used.
+     *
      * If `serial` is true, assign all derived operations to the writer vector corresponding to the
      * hash of the first operation in `derivedOps`.
      */
@@ -100,6 +112,15 @@ public:
                               std::vector<std::vector<ApplierOperation>>* writerVectors,
                               CachedCollectionProperties* collPropertiesCache,
                               bool serial);
+
+    /**
+     * Adds a set of derived prepared transaction operations to writerVectors.
+     */
+    static void addDerivedPrepares(OperationContext* opCtx,
+                                   OplogEntry* prepareOp,
+                                   std::vector<OplogEntry>* derivedOps,
+                                   std::vector<std::vector<ApplierOperation>>* writerVectors,
+                                   CachedCollectionProperties* collPropertiesCache);
 
     /**
      * Returns the namespace string for this oplogEntry; if it has a UUID it looks up the

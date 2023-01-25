@@ -540,7 +540,7 @@ public:
      */
     bool isTerminalApplyOps() const {
         return getCommandType() == DurableOplogEntry::CommandType::kApplyOps && !shouldPrepare() &&
-            !isPartialTransaction() && !getObject().getBoolField("prepare");
+            !isPartialTransaction();
     }
 
     /**

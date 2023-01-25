@@ -61,7 +61,7 @@ public:
      */
     const std::vector<PooledSession>& splitSession(const LogicalSessionId& sessionId,
                                                    TxnNumber txnNumber,
-                                                   int numSplits);
+                                                   uint32_t numSplits);
 
     /**
      * Returns a vector of split sessions for the given top-level session, or nothing if
