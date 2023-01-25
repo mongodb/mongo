@@ -144,6 +144,9 @@ protected:
     mutablebson::Document& _doc;
     mutablebson::DamageVector _damages;
 
+    // Cached collection sharding description. It is reset when restoring from a yield.
+    write_stage_common::CachedShardingDescription _cachedShardingCollectionDescription;
+
 private:
     /**
      * Computes the result of applying mods to the document 'oldObj' at RecordId 'recordId' in

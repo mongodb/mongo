@@ -101,12 +101,14 @@ PlanStage::StageState UpsertStage::doWork(WorkingSetID* out) {
     _specificStats.nUpserted = 1;
 
     // Generate the new document to be inserted.
+    const auto& collDesc = _cachedShardingCollectionDescription.getCollectionDescription(opCtx());
     _specificStats.objInserted = update::produceDocumentForUpsert(opCtx(),
                                                                   _params.request,
                                                                   _params.driver,
                                                                   _params.canonicalQuery,
                                                                   _isUserInitiatedWrite,
-                                                                  _doc);
+                                                                  _doc,
+                                                                  collDesc);
 
     // If this is an explain, skip performing the actual insert.
     if (!_params.request->explain()) {
@@ -136,9 +138,12 @@ void UpsertStage::_performInsert(BSONObj newDocument) {
     // 'q' field belong to this shard, but those in the 'u' field do not. In this case we need to
     // throw so that MongoS can target the insert to the correct shard.
     if (_isUserInitiatedWrite) {
-        auto scopedCss =
-            CollectionShardingState::assertCollectionLockedAndAcquire(opCtx(), collection()->ns());
-        if (scopedCss->getCollectionDescription(opCtx()).isSharded()) {
+        const auto& collDesc =
+            _cachedShardingCollectionDescription.getCollectionDescription(opCtx());
+
+        if (collDesc.isSharded()) {
+            auto scopedCss = CollectionShardingState::assertCollectionLockedAndAcquire(
+                opCtx(), collection()->ns());
             auto collFilter = scopedCss->getOwnershipFilter(
                 opCtx(), CollectionShardingState::OrphanCleanupPolicy::kAllowOrphanCleanup);
             const ShardKeyPattern& shardKeyPattern = collFilter.getShardKeyPattern();

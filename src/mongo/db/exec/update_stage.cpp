@@ -110,6 +110,7 @@ UpdateStage::UpdateStage(ExpressionContext* expCtx,
       _params(params),
       _ws(ws),
       _doc(params.driver->getDocument()),
+      _cachedShardingCollectionDescription(collection->ns()),
       _idRetrying(WorkingSet::INVALID_ID),
       _idReturning(WorkingSet::INVALID_ID),
       _updatedRecordIds(params.request->isMulti() ? new RecordIdSet() : nullptr),
@@ -159,9 +160,8 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
         // Documents coming directly from users should be validated for storage. It is safe to
         // access the CollectionShardingState in this write context and to throw SSV if the sharding
         // metadata has not been initialized.
-        auto scopedCss =
-            CollectionShardingState::assertCollectionLockedAndAcquire(opCtx(), collection()->ns());
-        auto collDesc = scopedCss->getCollectionDescription(opCtx());
+        const auto& collDesc =
+            _cachedShardingCollectionDescription.getCollectionDescription(opCtx());
 
         if (collDesc.isSharded() && !OperationShardingState::isComingFromRouter(opCtx())) {
             immutablePaths.fillFrom(collDesc.getKeyPatternFields());
@@ -240,9 +240,8 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
             args.sampleId = request->getSampleId();
             args.update = logObj;
             if (_isUserInitiatedWrite) {
-                auto scopedCss = CollectionShardingState::assertCollectionLockedAndAcquire(
-                    opCtx(), collection()->ns());
-                auto collDesc = scopedCss->getCollectionDescription(opCtx());
+                const auto& collDesc =
+                    _cachedShardingCollectionDescription.getCollectionDescription(opCtx());
                 args.criteria = collDesc.extractDocumentKey(oldObjValue);
             } else {
                 const auto docId = oldObjValue[idFieldName];
@@ -633,6 +632,7 @@ void UpdateStage::doRestoreStateRequiresCollection() {
     _params.driver->refreshIndexKeys(&updateIndexData);
 
     _preWriteFilter.restoreState();
+    _cachedShardingCollectionDescription.restoreState();
 }
 
 std::unique_ptr<PlanStageStats> UpdateStage::getStats() {

@@ -837,12 +837,12 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx, const OplogUpdateEntryArg
                 ChangeStreamPreImageRecordingMode::kPreImagesCollection);
         }
 
-        auto scopedCss =
-            CollectionShardingState::assertCollectionLockedAndAcquire(opCtx, args.coll->ns());
-        auto scopedCollectionDescription = scopedCss->getCollectionDescription(opCtx);
-        if (scopedCollectionDescription.isSharded()) {
+        const auto& scopedCollectionDescription = shardingWriteRouter.getCollDesc();
+        // ShardingWriteRouter only has boost::none scopedCollectionDescription when not in a
+        // sharded cluster.
+        if (scopedCollectionDescription && scopedCollectionDescription->isSharded()) {
             operation.setPostImageDocumentKey(
-                scopedCollectionDescription.extractDocumentKey(args.updateArgs->updatedDoc)
+                scopedCollectionDescription->extractDocumentKey(args.updateArgs->updatedDoc)
                     .getOwned());
         }
 
