@@ -32,7 +32,6 @@
 
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 
-#include "mongo/db/catalog/catalog_helper.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/database_sharding_state.h"
@@ -279,7 +278,7 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
                     metadata().getDatabaseVersion() /* databaseVersion */);
 
                 // Check under the dbLock if this is still the primary shard for the database
-                catalog_helper::assertIsPrimaryShardForDb(opCtx, originalNss().db());
+                DatabaseShardingState::assertIsPrimaryShardForDb(opCtx, originalNss().db());
             };
         })
         .then([this, executor, token, anchor = shared_from_this()] {

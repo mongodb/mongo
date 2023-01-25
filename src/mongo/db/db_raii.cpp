@@ -38,6 +38,7 @@
 #include "mongo/db/repl/collection_utils.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/storage/capped_snapshots.h"
@@ -1288,8 +1289,7 @@ AutoGetDbForReadLockFree::AutoGetDbForReadLockFree(OperationContext* opCtx,
             // Note: this must always be checked, regardless of whether the collection exists, so
             // that the dbVersion of this node or the caller gets updated quickly in case either is
             // stale.
-            // TODO SERVER-63706 Pass dbName directly.
-            catalog_helper::assertMatchingDbVersion(opCtx, dbName.toStringWithTenantId());
+            DatabaseShardingState::assertMatchingDbVersion(opCtx, dbName);
             return std::make_pair(&fakeColl, /* isView */ false);
         },
         /* ResetFunc */

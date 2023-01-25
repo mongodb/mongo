@@ -30,7 +30,6 @@
 #include "mongo/db/s/move_primary_source_manager.h"
 
 #include "mongo/client/connpool.h"
-#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/dbdirectclient.h"
@@ -234,7 +233,7 @@ Status MovePrimarySourceManager::commitOnConfig(OperationContext* opCtx) {
         // commit operation to the config server
         scopedDss->enterCriticalSectionCommitPhase(opCtx, _critSecReason);
 
-        expectedDbVersion = DatabaseHolder::get(opCtx)->getDbVersion(opCtx, _dbname);
+        expectedDbVersion = scopedDss->getDbVersion(opCtx);
     }
 
     auto commitStatus = [&]() {
@@ -288,8 +287,9 @@ Status MovePrimarySourceManager::commitOnConfig(OperationContext* opCtx) {
             }
 
             if (!repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesFor(opCtx, getNss())) {
-                DatabaseHolder::get(opCtx)->clearDbInfo(
-                    opCtx, DatabaseName(boost::none, getNss().toString()));
+                auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
+                    opCtx, getNss().dbName(), DSSAcquisitionMode::kExclusive);
+                scopedDss->clearDbInfo(opCtx);
                 uassertStatusOK(validateStatus.withContext(
                     str::stream() << "Unable to verify movePrimary commit for database: "
                                   << getNss().ns()
@@ -518,7 +518,7 @@ void MovePrimarySourceManager::_cleanup(OperationContext* opCtx) {
         auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
             opCtx, getNss().dbName(), DSSAcquisitionMode::kExclusive);
         scopedDss->unsetMovePrimaryInProgress(opCtx);
-        DatabaseHolder::get(opCtx)->clearDbInfo(opCtx, getNss().dbName());
+        scopedDss->clearDbInfo(opCtx);
 
         // Leave the critical section if we're still registered.
         scopedDss->exitCriticalSection(opCtx, _critSecReason);

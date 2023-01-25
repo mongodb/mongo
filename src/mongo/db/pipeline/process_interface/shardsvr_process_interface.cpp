@@ -34,7 +34,6 @@
 
 #include <fmt/format.h>
 
-#include "mongo/db/catalog/catalog_helper.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/shard_filterer_impl.h"
@@ -409,7 +408,7 @@ ShardServerProcessInterface::expectUnshardedCollectionInScope(
 
 void ShardServerProcessInterface::checkOnPrimaryShardForDb(OperationContext* opCtx,
                                                            const NamespaceString& nss) {
-    catalog_helper::assertIsPrimaryShardForDb(opCtx, nss.db());
+    DatabaseShardingState::assertIsPrimaryShardForDb(opCtx, nss.db());
 }
 
 }  // namespace mongo

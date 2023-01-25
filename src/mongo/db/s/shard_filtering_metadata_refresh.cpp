@@ -29,7 +29,6 @@
 
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 
-#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/curop.h"
@@ -138,7 +137,10 @@ Status refreshDbMetadata(OperationContext* opCtx,
     // the number of possible threads convoying on the exclusive lock below.
     {
         Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
-        const auto cachedDbVersion = DatabaseHolder::get(opCtx)->getDbVersion(opCtx, dbName);
+        const auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
+            opCtx, dbName, DSSAcquisitionMode::kShared);
+
+        const auto cachedDbVersion = scopedDss->getDbVersion(opCtx);
         if (swDbMetadata.isOK() && swDbMetadata.getValue()->getVersion() <= cachedDbVersion) {
             LOGV2_DEBUG(7079300,
                         2,
@@ -157,11 +159,10 @@ Status refreshDbMetadata(OperationContext* opCtx,
     if (!cancellationToken.isCanceled()) {
         if (swDbMetadata.isOK()) {
             // Set the refreshed database metadata in the local catalog.
-            DatabaseHolder::get(opCtx)->openDb(opCtx, dbName);
-            DatabaseHolder::get(opCtx)->setDbInfo(opCtx, dbName, *swDbMetadata.getValue());
+            scopedDss->setDbInfo(opCtx, *swDbMetadata.getValue());
         } else if (swDbMetadata == ErrorCodes::NamespaceNotFound) {
             // The database has been dropped, so clear its metadata in the local catalog.
-            DatabaseHolder::get(opCtx)->clearDbInfo(opCtx, dbName);
+            scopedDss->clearDbInfo(opCtx);
         }
     }
 
@@ -260,7 +261,7 @@ void onDbVersionMismatch(OperationContext* opCtx,
                 // is in progress or can start (would require to exclusive lock the DSS).
                 // Therefore, the database version can be accessed safely.
 
-                const auto wantedVersion = DatabaseHolder::get(opCtx)->getDbVersion(opCtx, dbName);
+                const auto wantedVersion = (*scopedDss)->getDbVersion(opCtx);
                 if (receivedDbVersion <= wantedVersion) {
                     // No need to refresh the database metadata as the wanted version is newer
                     // than the one received.

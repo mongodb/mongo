@@ -29,14 +29,7 @@
 
 #include "mongo/db/catalog/catalog_helper.h"
 
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/catalog_shard_feature_flag_gen.h"
-#include "mongo/db/s/database_sharding_state.h"
-#include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/s/sharding_migration_critical_section.h"
-#include "mongo/db/s/sharding_state.h"
-#include "mongo/s/stale_exception.h"
+#include "mongo/db/catalog/collection_catalog.h"
 
 namespace mongo::catalog_helper {
 namespace {
@@ -51,64 +44,6 @@ struct ResourceIdNssComparator {
     }
 };
 }  // namespace
-
-void assertMatchingDbVersion(OperationContext* opCtx, const StringData& dbName) {
-    const auto receivedVersion = OperationShardingState::get(opCtx).getDbVersion(dbName);
-    if (!receivedVersion) {
-        return;
-    }
-
-    assertMatchingDbVersion(opCtx, dbName, *receivedVersion);
-}
-
-void assertMatchingDbVersion(OperationContext* opCtx,
-                             const StringData& dbName,
-                             const DatabaseVersion& receivedVersion) {
-    {
-        auto scopedDss = DatabaseShardingState::acquire(opCtx, dbName, DSSAcquisitionMode::kShared);
-        const auto critSecSignal = scopedDss->getCriticalSectionSignal(
-            opCtx->lockState()->isWriteLocked() ? ShardingMigrationCriticalSection::kWrite
-                                                : ShardingMigrationCriticalSection::kRead);
-        uassert(
-            StaleDbRoutingVersion(dbName.toString(), receivedVersion, boost::none, critSecSignal),
-            str::stream() << "The critical section for the database " << dbName
-                          << " is acquired with reason: " << scopedDss->getCriticalSectionReason(),
-            !critSecSignal);
-    }
-
-    const auto wantedVersion = DatabaseHolder::get(opCtx)->getDbVersion(opCtx, dbName);
-    uassert(StaleDbRoutingVersion(dbName.toString(), receivedVersion, boost::none),
-            str::stream() << "No cached info for the database " << dbName,
-            wantedVersion);
-
-    uassert(StaleDbRoutingVersion(dbName.toString(), receivedVersion, *wantedVersion),
-            str::stream() << "Version mismatch for the database " << dbName,
-            receivedVersion == *wantedVersion);
-}
-
-void assertIsPrimaryShardForDb(OperationContext* opCtx, const StringData& dbName) {
-    if (dbName == NamespaceString::kConfigDb) {
-        // TODO SERVER-72488: Include the admin database.
-        invariant(gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV());
-        invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
-        return;
-    }
-
-    uassert(ErrorCodes::IllegalOperation,
-            str::stream() << "Received request without the version for the database " << dbName,
-            OperationShardingState::get(opCtx).hasDbVersion());
-
-    // Recover the database's information if necessary (not cached or not matching).
-    AutoGetDb autoDb(opCtx, dbName, MODE_IS);
-    invariant(autoDb.getDb());
-
-    const auto primaryShardId = DatabaseHolder::get(opCtx)->getDbPrimary(opCtx, dbName).value();
-    const auto thisShardId = ShardingState::get(opCtx)->shardId();
-    uassert(ErrorCodes::IllegalOperation,
-            str::stream() << "This is not the primary shard for the database " << dbName
-                          << ". Expected: " << primaryShardId << " Actual: " << thisShardId,
-            primaryShardId == thisShardId);
-}
 
 void acquireCollectionLocksInResourceIdOrder(
     OperationContext* opCtx,

@@ -29,7 +29,6 @@
 
 #include "mongo/db/s/op_observer_sharding_impl.h"
 
-#include "mongo/db/catalog/catalog_helper.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/database_sharding_state.h"
@@ -122,7 +121,7 @@ void OpObserverShardingImpl::shardObserveInsertsOp(
 
     auto* const css = shardingWriteRouter.getCss();
     css->checkShardVersionOrThrow(opCtx);
-    catalog_helper::assertMatchingDbVersion(opCtx, nss.db());
+    DatabaseShardingState::assertMatchingDbVersion(opCtx, nss.db());
 
     auto* const csr = checked_cast<CollectionShardingRuntime*>(css);
     auto metadata = csr->getCurrentMetadataIfKnown();
@@ -164,7 +163,7 @@ void OpObserverShardingImpl::shardObserveUpdateOp(OperationContext* opCtx,
                                                   const bool inMultiDocumentTransaction) {
     auto* const css = shardingWriteRouter.getCss();
     css->checkShardVersionOrThrow(opCtx);
-    catalog_helper::assertMatchingDbVersion(opCtx, nss.db());
+    DatabaseShardingState::assertMatchingDbVersion(opCtx, nss.db());
 
     auto* const csr = checked_cast<CollectionShardingRuntime*>(css);
     auto metadata = csr->getCurrentMetadataIfKnown();
@@ -200,7 +199,7 @@ void OpObserverShardingImpl::shardObserveDeleteOp(OperationContext* opCtx,
                                                   const bool inMultiDocumentTransaction) {
     auto* const css = shardingWriteRouter.getCss();
     css->checkShardVersionOrThrow(opCtx);
-    catalog_helper::assertMatchingDbVersion(opCtx, nss.db());
+    DatabaseShardingState::assertMatchingDbVersion(opCtx, nss.db());
 
     auto* const csr = checked_cast<CollectionShardingRuntime*>(css);
     auto metadata = csr->getCurrentMetadataIfKnown();

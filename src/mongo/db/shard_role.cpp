@@ -29,8 +29,6 @@
 
 #include "mongo/db/shard_role.h"
 
-#include "mongo/db/s/collection_sharding_runtime.h"
-#include "mongo/db/s/scoped_collection_metadata.h"
 #include <exception>
 #include <map>
 
@@ -39,8 +37,11 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/scoped_collection_metadata.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/decorable.h"
@@ -186,7 +187,7 @@ void checkPlacementVersion(
 
     const auto& receivedDbVersion = resolvedAcquisitionRequest.tsPlacement.dbVersion;
     if (receivedDbVersion) {
-        catalog_helper::assertMatchingDbVersion(opCtx, nss.db(), *receivedDbVersion);
+        DatabaseShardingState::assertMatchingDbVersion(opCtx, nss.db(), *receivedDbVersion);
     }
 
     const auto& receivedShardVersion = resolvedAcquisitionRequest.tsPlacement.shardVersion;

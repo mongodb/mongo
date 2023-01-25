@@ -35,22 +35,11 @@
 #include "mongo/base/string_data.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/database_name.h"
-#include "mongo/s/catalog/type_database_gen.h"
 
 namespace mongo {
 
 /**
  * Registry of opened databases.
- *
- * This also provides functions to read and write cached information for opened databases, which
- * basically includes version and ID of the primary shard for each database. The concurrency model
- * of this API is implemented as follows:
- *   1. The `Database` class caches the information for the specific database.
- *   2. Getter and setter functions exposed by this class return and write, respectively, a copy of
- *      the cached information for the specific database.
- *   3. Getter and setter functions are synchronized with each other using the same mutex used to
- *      synchronize the database map. This prevents one thread from accessing information from a
- *      database while another is deleting it, for example.
  */
 class DatabaseHolder {
 public:
@@ -126,40 +115,6 @@ public:
      * Unlike CollectionCatalog::getAllDbNames(), this returns databases that are empty.
      */
     virtual std::vector<DatabaseName> getNames() = 0;
-
-    /**
-     * Caches the information of the database with the specific name if the database is open,
-     * otherwise it does nothing.
-     *
-     * The caller must hold the database lock in MODE_X.
-     */
-    virtual void setDbInfo(OperationContext* opCtx,
-                           const DatabaseName& dbName,
-                           const DatabaseType& dbInfo) = 0;
-
-    /**
-     * Clears the cached information of the database with the specific name if the database is open,
-     * otherwise it does nothing.
-     *
-     * The caller must hold the database lock in MODE_IX.
-     */
-    virtual void clearDbInfo(OperationContext* opCtx, const DatabaseName& dbName) = 0;
-
-    /**
-     * Returns the version of the database with the specific name if the database is open and the
-     * version is known, otherwise it returns `boost::none`.
-     */
-    virtual boost::optional<DatabaseVersion> getDbVersion(OperationContext* opCtx,
-                                                          const DatabaseName& dbName) const = 0;
-
-    /**
-     * Returns the primary shard ID of the database with the specific name if the database is open
-     * and the primary shard ID is known, otherwise it returns `boost::none`.
-     *
-     * The caller must hold the database lock in MODE_IS.
-     */
-    virtual boost::optional<ShardId> getDbPrimary(OperationContext* opCtx,
-                                                  const DatabaseName& dbName) const = 0;
 };
 
 }  // namespace mongo

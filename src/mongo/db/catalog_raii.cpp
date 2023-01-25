@@ -36,6 +36,7 @@
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/repl/collection_utils.h"
 #include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
@@ -143,8 +144,7 @@ AutoGetDb::AutoGetDb(OperationContext* opCtx,
           return databaseHolder->getDb(opCtx, dbName);
       }()) {
     // The 'primary' database must be version checked for sharding.
-    // TODO SERVER-63706 Pass dbName directly
-    catalog_helper::assertMatchingDbVersion(opCtx, _dbName.toStringWithTenantId());
+    DatabaseShardingState::assertMatchingDbVersion(opCtx, _dbName);
 }
 
 AutoGetDb AutoGetDb::createForAutoGetCollection(
@@ -202,8 +202,7 @@ Database* AutoGetDb::ensureDbExists(OperationContext* opCtx) {
 
     auto databaseHolder = DatabaseHolder::get(opCtx);
     _db = databaseHolder->openDb(opCtx, _dbName, nullptr);
-
-    catalog_helper::assertMatchingDbVersion(opCtx, _dbName.toStringWithTenantId());
+    DatabaseShardingState::assertMatchingDbVersion(opCtx, _dbName);
 
     return _db;
 }
@@ -212,7 +211,7 @@ Database* AutoGetDb::refreshDbReferenceIfNull(OperationContext* opCtx) {
     if (!_db) {
         auto databaseHolder = DatabaseHolder::get(opCtx);
         _db = databaseHolder->getDb(opCtx, _dbName);
-        catalog_helper::assertMatchingDbVersion(opCtx, _dbName.toStringWithTenantId());
+        DatabaseShardingState::assertMatchingDbVersion(opCtx, _dbName);
     }
     return _db;
 }
@@ -467,7 +466,7 @@ AutoGetCollectionLockFree::AutoGetCollectionLockFree(OperationContext* opCtx,
     // Check that the sharding database version matches our read.
     // Note: this must always be checked, regardless of whether the collection exists, so that the
     // dbVersion of this node or the caller gets updated quickly in case either is stale.
-    catalog_helper::assertMatchingDbVersion(opCtx, _resolvedNss.db());
+    DatabaseShardingState::assertMatchingDbVersion(opCtx, _resolvedNss.db());
 
     checkCollectionUUIDMismatch(opCtx, _resolvedNss, _collectionPtr, options._expectedUUID);
 

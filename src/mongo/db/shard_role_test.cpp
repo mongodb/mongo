@@ -49,8 +49,9 @@ void installDatabaseMetadata(OperationContext* opCtx,
                              const DatabaseName& dbName,
                              const DatabaseVersion& dbVersion) {
     AutoGetDb autoDb(opCtx, dbName, MODE_X, {});
-    DatabaseHolder::get(opCtx)->setDbInfo(
-        opCtx, dbName, DatabaseType{dbName.db(), ShardId("this"), dbVersion});
+    auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
+        opCtx, dbName, DSSAcquisitionMode::kExclusive);
+    scopedDss->setDbInfo(opCtx, {dbName.db(), ShardId("this"), dbVersion});
 }
 
 void installUnshardedCollectionMetadata(OperationContext* opCtx, const NamespaceString& nss) {
@@ -262,7 +263,9 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWhenShardDoesNotKnowThePlacementVersio
     {
         // Clear the database metadata
         AutoGetDb autoDb(opCtx(), dbNameTestDb, MODE_X, {});
-        DatabaseHolder::get(opCtx())->clearDbInfo(opCtx(), dbNameTestDb);
+        auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
+            opCtx(), dbNameTestDb, DSSAcquisitionMode::kExclusive);
+        scopedDss->clearDbInfo(opCtx());
     }
 
     NamespaceOrViewAcquisitionRequest::PlacementConcern placementConcern =

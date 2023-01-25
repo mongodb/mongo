@@ -30,7 +30,6 @@
 #include "mongo/db/s/shard_server_op_observer.h"
 
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/s/balancer_stats_registry.h"
@@ -433,13 +432,11 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx, const OplogUpdateE
             AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
 
             DatabaseName dbName(boost::none, db);
-
             AutoGetDb autoDb(opCtx, dbName, MODE_X);
-
             auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
                 opCtx, dbName, DSSAcquisitionMode::kExclusive);
             scopedDss->cancelDbMetadataRefresh();
-            DatabaseHolder::get(opCtx)->clearDbInfo(opCtx, dbName);
+            scopedDss->clearDbInfo(opCtx);
         }
     }
 
@@ -682,13 +679,11 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
         AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
 
         DatabaseName dbName(boost::none, deletedDatabase);
-
         AutoGetDb autoDb(opCtx, dbName, MODE_X);
-
         auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
             opCtx, dbName, DSSAcquisitionMode::kExclusive);
         scopedDss->cancelDbMetadataRefresh();
-        DatabaseHolder::get(opCtx)->clearDbInfo(opCtx, dbName);
+        scopedDss->clearDbInfo(opCtx);
     }
 
     if (nss == NamespaceString::kServerConfigurationNamespace) {
@@ -731,7 +726,7 @@ void ShardServerOpObserver::onDelete(OperationContext* opCtx,
                     // Secondary nodes must clear the database metadata before releasing the
                     // in-memory critical section.
                     if (!isStandaloneOrPrimary(opCtx)) {
-                        DatabaseHolder::get(opCtx)->clearDbInfo(opCtx, deletedNss.dbName());
+                        scopedDss->clearDbInfo(opCtx);
                     }
 
                     scopedDss->exitCriticalSection(opCtx, reason);

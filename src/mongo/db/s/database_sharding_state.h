@@ -32,6 +32,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/s/sharding_migration_critical_section.h"
+#include "mongo/s/catalog/type_database_gen.h"
 
 namespace mongo {
 
@@ -73,6 +74,7 @@ public:
         Lock::ResourceLock _lock;
         DatabaseShardingState* _dss;
     };
+
     static ScopedDatabaseShardingState assertDbLockedAndAcquire(OperationContext* opCtx,
                                                                 const DatabaseName& dbName,
                                                                 DSSAcquisitionMode mode);
@@ -86,11 +88,50 @@ public:
     static std::vector<DatabaseName> getDatabaseNames(OperationContext* opCtx);
 
     /**
+     * Checks that the cached database version matches the one attached to the operation, which
+     * means that the operation is routed to the right shard (database owner).
+     *
+     * Throws `StaleDbRoutingVersion` exception when the critical section is taken, there is no
+     * cached database version, or the cached database version does not match the one sent by the
+     * client.
+     */
+    static void assertMatchingDbVersion(OperationContext* opCtx, const DatabaseName& dbName);
+    static void assertMatchingDbVersion(OperationContext* opCtx,
+                                        const DatabaseName& dbName,
+                                        const DatabaseVersion& receivedVersion);
+
+    /**
+     * Checks that the current shard server is the primary for the given database, throwing
+     * `IllegalOperation` if not.
+     */
+    static void assertIsPrimaryShardForDb(OperationContext* opCtx, const DatabaseName& dbName);
+
+    /**
      * Returns the name of the database related to the current sharding state.
      */
     const DatabaseName& getDbName() const {
         return _dbName;
     }
+
+    /**
+     * Sets this node's cached database info.
+     *
+     * The caller must hold the database lock in MODE_IX.
+     */
+    void setDbInfo(OperationContext* opCtx, const DatabaseType& dbInfo);
+
+    /**
+     * Resets this node's cached database info.
+     *
+     * The caller must hold the database lock in MODE_IX.
+     */
+    void clearDbInfo(OperationContext* opCtx);
+
+    /**
+     * Returns this node's cached  database version if the database info is cached, otherwise
+     * it returns `boost::none`.
+     */
+    boost::optional<DatabaseVersion> getDbVersion(OperationContext* opCtx) const;
 
     /**
      * Methods to control the databases's critical section. Must be called with the database X lock
@@ -168,6 +209,9 @@ private:
     };
 
     const DatabaseName _dbName;
+
+    // This node's cached database info.
+    boost::optional<DatabaseType> _dbInfo;
 
     // Modifying the state below requires holding the DBLock in X mode; holding the DBLock in any
     // mode is acceptable for reading it. (Note: accessing this class at all requires holding the

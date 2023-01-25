@@ -29,31 +29,10 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/s/database_version.h"
 
 namespace mongo::catalog_helper {
-
-/**
- * Checks that the cached database version matches the one attached to the operation, which means
- * that the operation is routed to the right shard (database owner).
- *
- * Throws `StaleDbRoutingVersion` exception when the critical section is taken, there is no cached
- * database version, or the cached database version does not match the one sent by the client.
- */
-void assertMatchingDbVersion(OperationContext* opCtx, const StringData& dbName);
-
-void assertMatchingDbVersion(OperationContext* opCtx,
-                             const StringData& dbName,
-                             const DatabaseVersion& receivedVersion);
-
-/**
- * Checks that the current shard server is the primary for the given database, throwing
- * `IllegalOperation` if it is not.
- */
-void assertIsPrimaryShardForDb(OperationContext* opCtx, const StringData& dbName);
 
 /**
  * Fills the input 'collLocks' with CollectionLocks, acquiring locks on namespaces 'nsOrUUID' and

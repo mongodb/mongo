@@ -33,7 +33,6 @@
 
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connpool.h"
-#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands/list_collections_filter.h"
 #include "mongo/db/repl/change_stream_oplog_notification.h"
@@ -451,7 +450,9 @@ void MovePrimaryCoordinator::assertChangedMetadataOnConfig(
 
 void MovePrimaryCoordinator::clearDbMetadataOnPrimary(OperationContext* opCtx) const {
     AutoGetDb autoDb(opCtx, _dbName, MODE_X);
-    DatabaseHolder::get(opCtx)->clearDbInfo(opCtx, _dbName);
+    auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
+        opCtx, _dbName, DSSAcquisitionMode::kExclusive);
+    scopedDss->clearDbInfo(opCtx);
 }
 
 void MovePrimaryCoordinator::dropStaleDataOnDonor(OperationContext* opCtx) const {

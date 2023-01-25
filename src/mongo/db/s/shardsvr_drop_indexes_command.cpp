@@ -29,7 +29,6 @@
 
 
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/catalog_helper.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
@@ -162,7 +161,7 @@ ShardsvrDropIndexesCommand::Invocation::Response ShardsvrDropIndexesCommand::Inv
     auto dbDDLLock = ddlLockManager->lock(opCtx, ns().db(), lockReason, lockTimeout);
 
     // Check under the dbLock if this is still the primary shard for the database
-    catalog_helper::assertIsPrimaryShardForDb(opCtx, ns().db());
+    DatabaseShardingState::assertIsPrimaryShardForDb(opCtx, ns().db());
 
     auto resolvedNs = ns();
     auto dropIdxBSON = dropIdxCmd.toBSON({});

@@ -32,6 +32,7 @@
 
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/cluster_transaction_api.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/s/database_sharding_state.h"
@@ -223,6 +224,14 @@ void DropDatabaseCoordinator::_dropShardedCollection(
     sharding_ddl_util::removeQueryAnalyzerMetadataFromConfig(opCtx, nss, coll.getUuid());
 }
 
+void DropDatabaseCoordinator::_clearDatabaseInfoOnPrimary(OperationContext* opCtx) {
+    DatabaseName dbName(boost::none, _dbName);
+    AutoGetDb autoDb(opCtx, dbName, MODE_X);
+    auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquire(
+        opCtx, dbName, DSSAcquisitionMode::kExclusive);
+    scopedDss->clearDbInfo(opCtx);
+}
+
 void DropDatabaseCoordinator::_clearDatabaseInfoOnSecondaries(OperationContext* opCtx) {
     Status signalStatus = shardmetadatautil::updateShardDatabasesEntry(
         opCtx,
@@ -376,6 +385,7 @@ ExecutorFuture<void> DropDatabaseCoordinator::_runImpl(
                     // Clear the database sharding state info before exiting the critical section so
                     // that all subsequent write operations with the old database version will fail
                     // due to StaleDbVersion.
+                    _clearDatabaseInfoOnPrimary(opCtx);
                     _clearDatabaseInfoOnSecondaries(opCtx);
 
                     removeDatabaseFromConfigAndUpdatePlacementHistory(

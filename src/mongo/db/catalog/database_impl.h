@@ -31,7 +31,6 @@
 
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/database_name.h"
-#include "mongo/s/catalog/type_database_gen.h"
 
 namespace mongo {
 
@@ -118,8 +117,6 @@ public:
     }
 
 private:
-    friend class DatabaseHolderImpl;
-
     StatusWith<std::unique_ptr<CollatorInterface>> _validateCollator(OperationContext* opCtx,
                                                                      CollectionOptions& opts) const;
     Collection* _createCollection(
@@ -164,9 +161,6 @@ private:
     // collections may be created in this Database.
     // This variable may only be read/written while the database is locked in MODE_X.
     AtomicWord<bool> _dropPending{false};
-
-    // Node's cached database info.
-    boost::optional<DatabaseType> _info;
 };
 
 }  // namespace mongo

@@ -29,9 +29,12 @@
 
 #include "mongo/db/s/database_sharding_state.h"
 
+#include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/sharding_state.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/stale_exception.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/fail_point.h"
 
@@ -135,6 +138,89 @@ DatabaseShardingState::ScopedDatabaseShardingState DatabaseShardingState::acquir
 std::vector<DatabaseName> DatabaseShardingState::getDatabaseNames(OperationContext* opCtx) {
     auto& databasesMap = DatabaseShardingStateMap::get(opCtx->getServiceContext());
     return databasesMap.getDatabaseNames();
+}
+
+void DatabaseShardingState::assertMatchingDbVersion(OperationContext* opCtx,
+                                                    const DatabaseName& dbName) {
+    const auto receivedVersion = OperationShardingState::get(opCtx).getDbVersion(dbName.toString());
+    if (!receivedVersion) {
+        return;
+    }
+
+    assertMatchingDbVersion(opCtx, dbName, *receivedVersion);
+}
+
+void DatabaseShardingState::assertMatchingDbVersion(OperationContext* opCtx,
+                                                    const DatabaseName& dbName,
+                                                    const DatabaseVersion& receivedVersion) {
+    const auto scopedDss = acquire(opCtx, dbName, DSSAcquisitionMode::kShared);
+
+    {
+        const auto critSecSignal = scopedDss->getCriticalSectionSignal(
+            opCtx->lockState()->isWriteLocked() ? ShardingMigrationCriticalSection::kWrite
+                                                : ShardingMigrationCriticalSection::kRead);
+        uassert(
+            StaleDbRoutingVersion(dbName.toString(), receivedVersion, boost::none, critSecSignal),
+            str::stream() << "The critical section for the database " << dbName
+                          << " is acquired with reason: " << scopedDss->getCriticalSectionReason(),
+            !critSecSignal);
+    }
+
+    const auto wantedVersion = scopedDss->getDbVersion(opCtx);
+    uassert(StaleDbRoutingVersion(dbName.toString(), receivedVersion, boost::none),
+            str::stream() << "No cached info for the database " << dbName,
+            wantedVersion);
+
+    uassert(StaleDbRoutingVersion(dbName.toString(), receivedVersion, *wantedVersion),
+            str::stream() << "Version mismatch for the database " << dbName,
+            receivedVersion == *wantedVersion);
+}
+
+void DatabaseShardingState::assertIsPrimaryShardForDb(OperationContext* opCtx,
+                                                      const DatabaseName& dbName) {
+    if (dbName == NamespaceString::kConfigDb) {
+        // TODO (SERVER-72488): Include the admin database.
+        invariant(gFeatureFlagCatalogShard.isEnabledAndIgnoreFCV());
+        invariant(serverGlobalParams.clusterRole == ClusterRole::ConfigServer);
+        return;
+    }
+
+    uassert(ErrorCodes::IllegalOperation,
+            str::stream() << "Received request without the version for the database " << dbName,
+            OperationShardingState::get(opCtx).hasDbVersion());
+
+    Lock::DBLock dbLock(opCtx, dbName, MODE_IS);
+    assertMatchingDbVersion(opCtx, dbName);
+
+    const auto scopedDss = assertDbLockedAndAcquire(opCtx, dbName, DSSAcquisitionMode::kShared);
+    const auto primaryShardId = scopedDss->_dbInfo->getPrimary();
+    const auto thisShardId = ShardingState::get(opCtx)->shardId();
+    uassert(ErrorCodes::IllegalOperation,
+            str::stream() << "This is not the primary shard for the database " << dbName
+                          << ". Expected: " << primaryShardId << " Actual: " << thisShardId,
+            primaryShardId == thisShardId);
+}
+
+void DatabaseShardingState::setDbInfo(OperationContext* opCtx, const DatabaseType& dbInfo) {
+    invariant(opCtx->lockState()->isDbLockedForMode(_dbName, MODE_IX));
+
+    LOGV2(7286900,
+          "Setting this node's cached database info",
+          "db"_attr = _dbName,
+          "dbVersion"_attr = dbInfo.getVersion());
+    _dbInfo.emplace(dbInfo);
+}
+
+void DatabaseShardingState::clearDbInfo(OperationContext* opCtx) {
+    invariant(opCtx->lockState()->isDbLockedForMode(_dbName, MODE_IX));
+
+    LOGV2(7286901, "Clearing this node's cached database info", "db"_attr = _dbName);
+    _dbInfo = boost::none;
+}
+
+boost::optional<DatabaseVersion> DatabaseShardingState::getDbVersion(
+    OperationContext* opCtx) const {
+    return _dbInfo ? boost::optional<DatabaseVersion>(_dbInfo->getVersion()) : boost::none;
 }
 
 void DatabaseShardingState::enterCriticalSectionCatchUpPhase(OperationContext* opCtx,

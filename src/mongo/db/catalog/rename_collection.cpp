@@ -30,7 +30,6 @@
 #include "mongo/db/catalog/rename_collection.h"
 
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
-#include "mongo/db/catalog/catalog_helper.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
 #include "mongo/db/catalog/collection_write_path.h"
@@ -490,7 +489,7 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
         targetDBLock.emplace(opCtx, target.dbName(), MODE_X);
     }
 
-    catalog_helper::assertMatchingDbVersion(opCtx, source.db());
+    DatabaseShardingState::assertMatchingDbVersion(opCtx, source.db());
 
     DisableDocumentValidation validationDisabler(opCtx);
 

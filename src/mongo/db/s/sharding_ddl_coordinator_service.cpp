@@ -31,7 +31,6 @@
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 
 #include "mongo/base/checked_cast.h"
-#include "mongo/db/catalog/catalog_helper.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/s/collmod_coordinator.h"
@@ -270,7 +269,7 @@ ShardingDDLCoordinatorService::getOrCreateInstance(OperationContext* opCtx, BSON
         uassert(ErrorCodes::IllegalOperation,
                 "Request sent without attaching database version",
                 clientDbVersion);
-        catalog_helper::assertIsPrimaryShardForDb(opCtx, nss.db());
+        DatabaseShardingState::assertIsPrimaryShardForDb(opCtx, nss.db());
         coorMetadata.setDatabaseVersion(clientDbVersion);
     }
 
