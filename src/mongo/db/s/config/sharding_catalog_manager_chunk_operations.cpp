@@ -47,6 +47,7 @@
 #include "mongo/db/snapshot_window_options_gen.h"
 #include "mongo/db/transaction/transaction_api.h"
 #include "mongo/db/transaction/transaction_participant_gen.h"
+#include "mongo/db/vector_clock_mutable.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/balancer_configuration.h"
@@ -357,6 +358,13 @@ void bumpCollectionMinorVersion(OperationContext* opCtx,
                           << " docs, but only matched " << numDocsModified << " for write request "
                           << request.toString(),
             numDocsExpectedModified == numDocsModified);
+}
+
+unsigned int getHistoryWindowInSeconds() {
+    // TODO SERVER-73295 review hardcoded 10 seconds minimum history
+    return std::max(
+        std::max(minSnapshotHistoryWindowInSeconds.load(), gTransactionLifetimeLimitSeconds.load()),
+        10);
 }
 
 void logMergeToChangelog(OperationContext* opCtx,
@@ -1017,7 +1025,16 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
     auto& collUuid = coll.getUuid();
     auto newVersion = originalVersion;
 
-    // 2. Retrieve the list of chunks belonging to the requested shard/collection.
+    // 2. Retrieve the list of mergeable chunks belonging to the requested shard/collection.
+    // A chunk is mergeable when the following conditions are honored:
+    // - Non-jumbo
+    // - The last migration occurred before the current history window
+    const auto oldestTimestampSupportedForHistory = [&]() {
+        const auto currTime = VectorClock::get(opCtx)->getTime();
+        auto currTimeSeconds = currTime.clusterTime().asTimestamp().getSecs();
+        return Timestamp(currTimeSeconds - getHistoryWindowInSeconds(), 0);
+    }();
+
     const auto chunksBelongingToShard =
         uassertStatusOK(
             _localConfigShard->exhaustiveFindOnConfig(
@@ -1025,7 +1042,10 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
                 repl::ReadConcernLevel::kLocalReadConcern,
                 ChunkType::ConfigNS,
-                BSON(ChunkType::collectionUUID << collUuid << ChunkType::shard(shardId.toString())),
+                BSON(ChunkType::collectionUUID
+                     << collUuid << ChunkType::shard(shardId.toString()) << ChunkType::jumbo
+                     << BSON("$ne" << true) << ChunkType::onCurrentShardSince
+                     << BSON("$lt" << oldestTimestampSupportedForHistory)),
                 BSON(ChunkType::min << 1) /* sort */,
                 boost::none /* limit */))
             .docs;
@@ -1037,8 +1057,10 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
 
     const auto newChunks = [&]() -> std::shared_ptr<std::vector<ChunkType>> {
         auto newChunks = std::make_shared<std::vector<ChunkType>>();
+        const Timestamp minValidTimestamp = Timestamp(0, 1);
 
         BSONObj rangeMin, rangeMax;
+        Timestamp rangeOnCurrentShardSince = minValidTimestamp;
         size_t nChunksInRange = 0;
 
         // Lambda generating the new chunk to be committed if a merge can be issued on the range
@@ -1046,25 +1068,36 @@ ShardingCatalogManager::commitMergeAllChunksOnShard(OperationContext* opCtx,
             if (nChunksInRange > 1) {
                 newVersion.incMinor();
                 ChunkType newChunk(collUuid, {rangeMin, rangeMax}, newVersion, shardId);
+                newChunk.setOnCurrentShardSince(rangeOnCurrentShardSince);
+                newChunk.setHistory({ChunkHistory{rangeOnCurrentShardSince, shardId}});
                 numMergedChunks.push_back(nChunksInRange);
                 newChunks->push_back(std::move(newChunk));
             }
             nChunksInRange = 0;
+            rangeOnCurrentShardSince = minValidTimestamp;
         };
 
         for (const auto& chunkDoc : chunksBelongingToShard) {
-            const auto& currMin = chunkDoc.getObjectField(ChunkType::min());
-            const auto& currMax = chunkDoc.getObjectField(ChunkType::max());
+            const auto& chunkMin = chunkDoc.getObjectField(ChunkType::min());
+            const auto& chunkMax = chunkDoc.getObjectField(ChunkType::max());
+            const Timestamp chunkOnCurrentShardSince = [&]() {
+                Timestamp t = minValidTimestamp;
+                bsonExtractTimestampField(chunkDoc, ChunkType::onCurrentShardSince(), &t).ignore();
+                return t;
+            }();
 
-            // TODO SERVER-72283 take into account `onCurrentShardSince` for "mergeable" chunks
-            if (rangeMax.woCompare(currMin) != 0) {
+            if (rangeMax.woCompare(chunkMin) != 0) {
                 processRange();
             }
 
             if (nChunksInRange == 0) {
-                rangeMin = currMin;
+                rangeMin = chunkMin;
             }
-            rangeMax = currMax;
+            rangeMax = chunkMax;
+
+            if (chunkOnCurrentShardSince > rangeOnCurrentShardSince) {
+                rangeOnCurrentShardSince = chunkOnCurrentShardSince;
+            }
             nChunksInRange++;
         }
         processRange();
@@ -1273,12 +1306,9 @@ ShardingCatalogManager::commitChunkMigration(OperationContext* opCtx,
     // Drop old history. Keep at least 1 entry so ChunkInfo::getShardIdAt finds valid history for
     // any query younger than the history window.
     if (!MONGO_unlikely(skipExpiringOldChunkHistory.shouldFail())) {
-        auto windowInSeconds = std::max(std::max(minSnapshotHistoryWindowInSeconds.load(),
-                                                 gTransactionLifetimeLimitSeconds.load()),
-                                        10);
         int entriesDeleted = 0;
         while (newHistory.size() > 1 &&
-               newHistory.back().getValidAfter().getSecs() + windowInSeconds <
+               newHistory.back().getValidAfter().getSecs() + getHistoryWindowInSeconds() <
                    validAfter.value().getSecs()) {
             newHistory.pop_back();
             ++entriesDeleted;

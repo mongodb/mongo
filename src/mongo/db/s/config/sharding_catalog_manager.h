@@ -291,8 +291,6 @@ public:
      *
      * Returns a ShardAndCollectionVersion object containing the new collection version produced by
      * the merge(s).
-     *
-     * TODO SERVER-72283 add definition of "mergeable" related to `onCurrentShardSince`
      */
     StatusWith<ShardingCatalogManager::ShardAndCollectionVersion> commitMergeAllChunksOnShard(
         OperationContext* opCtx, const NamespaceString& nss, const ShardId& shardId);

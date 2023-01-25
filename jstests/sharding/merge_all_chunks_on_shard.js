@@ -292,7 +292,7 @@ function mergeAllChunksOnShardConsideringJumboFlagTest(st, testDB) {
 }
 
 /* Test setup */
-const st = new ShardingTest({mongos: 1, shards: 2});
+const st = new ShardingTest({mongos: 1, shards: 2, other: {enableBalancer: false}});
 const testDB = st.s.getDB(jsTestName());
 
 // Ensure primary shard is shard0
@@ -302,9 +302,8 @@ assert.commandWorked(
 /* Perform tests */
 mergeAllChunksOnShardTest(st, testDB);
 
-// TODO SERVER-72283 enable the following test cases
-// mergeAllChunksOnShardConsideringHistoryWindowTest(st, testDB);
-// mergeAllChunksOnShardConsideringJumboFlagTest(st, testDB);
+mergeAllChunksOnShardConsideringHistoryWindowTest(st, testDB);
+mergeAllChunksOnShardConsideringJumboFlagTest(st, testDB);
 
 st.stop();
 })();
