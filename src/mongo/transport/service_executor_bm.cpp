@@ -41,6 +41,16 @@
 namespace mongo::transport {
 namespace {
 
+/**
+ * ASAN can't handle the # of threads the benchmark creates (SERVER-73168).
+ * With sanitizers, run this in a diminished "correctness check" mode.
+ */
+#if __has_feature(address_sanitizer) || __has_feature(thread_sanitizer)
+constexpr bool kNoLoops = true;
+#else
+constexpr bool kNoLoops = false;
+#endif
+
 struct Notification {
     void set() {
         stdx::unique_lock lk{mu};
@@ -107,6 +117,8 @@ BENCHMARK_DEFINE_F(ServiceExecutorSynchronousBm, ScheduleTask)(benchmark::State&
     for (auto _ : state) {
         auto runner = executor()->makeTaskRunner();
         runOnExec(&*runner, [](Status) {});
+        if constexpr (kNoLoops)
+            break;
     }
 }
 BENCHMARK_REGISTER_F(ServiceExecutorSynchronousBm, ScheduleTask)->ThreadRange(1, maxThreads);
@@ -118,6 +130,8 @@ BENCHMARK_DEFINE_F(ServiceExecutorSynchronousBm, ScheduleAndWait)(benchmark::Sta
         Notification done;
         runOnExec(&*runner, [&](Status) { done.set(); });
         done.get();
+        if constexpr (kNoLoops)
+            break;
     }
 }
 BENCHMARK_REGISTER_F(ServiceExecutorSynchronousBm, ScheduleAndWait)->ThreadRange(1, maxThreads);
@@ -156,6 +170,8 @@ BENCHMARK_DEFINE_F(ServiceExecutorSynchronousBm, ChainedSchedule)(benchmark::Sta
         state.ResumeTiming();
         loopState.startingLine.countDownAndWait();
         loopState.done.get();
+        if constexpr (kNoLoops)
+            break;
     }
 }
 BENCHMARK_REGISTER_F(ServiceExecutorSynchronousBm, ChainedSchedule)
