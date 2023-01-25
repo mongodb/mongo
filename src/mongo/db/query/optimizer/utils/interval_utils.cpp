@@ -271,12 +271,12 @@ static IntervalReqExpr::Node makeSingularDNF(const IntervalRequirement& interval
             IntervalReqExpr::makeSeq(IntervalReqExpr::make<IntervalReqExpr::Atom>(interval)))));
 }
 
-boost::optional<IntervalReqExpr::Node> unionDNFIntervals(const IntervalReqExpr::Node& interval,
+boost::optional<IntervalReqExpr::Node> unionDNFIntervals(const IntervalReqExpr::Node& intervalDNF,
                                                          const ConstFoldFn& constFold) {
     IntervalReqExpr::NodeVector resultIntervals;
     // Since our input intervals are sorted, constDisjIntervals will be sorted as well.
     std::vector<IntervalRequirement> constDisjIntervals;
-    const auto& disjNodes = interval.cast<IntervalReqExpr::Disjunction>()->nodes();
+    const auto& disjNodes = intervalDNF.cast<IntervalReqExpr::Disjunction>()->nodes();
     for (const auto& disjunct : disjNodes) {
         const auto& conjNodes = disjunct.cast<IntervalReqExpr::Conjunction>()->nodes();
         tassert(

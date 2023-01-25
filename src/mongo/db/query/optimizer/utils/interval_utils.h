@@ -60,7 +60,7 @@ std::vector<IntervalRequirement> unionTwoIntervals(const IntervalRequirement& in
  * Union DNF intervals. Analyzes constant intervals, and merges them if possible. Requires interval
  * to be normalized, as well as intersection simplification to be run before this is called.
  */
-boost::optional<IntervalReqExpr::Node> unionDNFIntervals(const IntervalReqExpr::Node& interval,
+boost::optional<IntervalReqExpr::Node> unionDNFIntervals(const IntervalReqExpr::Node& intervalDNF,
                                                          const ConstFoldFn& constFold);
 
 /**
