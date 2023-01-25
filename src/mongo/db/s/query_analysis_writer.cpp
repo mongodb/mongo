@@ -54,18 +54,12 @@
 namespace mongo {
 namespace analyze_shard_key {
 
-const std::string QueryAnalysisWriter::kSampledQueriesTTLIndexName = "SampledQueriesTTLIndex";
-const std::string QueryAnalysisWriter::kSampledQueriesDiffTTLIndexName =
-    "SampledQueriesDiffTTLIndex";
-BSONObj QueryAnalysisWriter::kSampledQueriesTTLIndexSpec(BSON("key"
-                                                              << BSON("expireAt" << 1)
-                                                              << "expireAfterSeconds" << 0 << "name"
-                                                              << kSampledQueriesTTLIndexName));
-BSONObj QueryAnalysisWriter::kSampledQueriesDiffTTLIndexSpec(
-    BSON("key" << BSON("expireAt" << 1) << "expireAfterSeconds" << 0 << "name"
-               << kSampledQueriesDiffTTLIndexName));
-
 namespace {
+
+const auto getQueryAnalysisWriter = ServiceContext::declareDecoration<QueryAnalysisWriter>();
+
+static ReplicaSetAwareServiceRegistry::Registerer<QueryAnalysisWriter>
+    queryAnalysisWriterServiceRegisterer("QueryAnalysisWriter");
 
 MONGO_FAIL_POINT_DEFINE(disableQueryAnalysisWriter);
 MONGO_FAIL_POINT_DEFINE(hangQueryAnalysisWriterBeforeWritingLocally);
@@ -73,72 +67,52 @@ MONGO_FAIL_POINT_DEFINE(hangQueryAnalysisWriterBeforeWritingRemotely);
 
 const Backoff kExponentialBackoff(Seconds(1), Milliseconds::max());
 
-static ReplicaSetAwareServiceRegistry::Registerer<QueryAnalysisWriter>
-    queryAnalysisWriterServiceRegisterer("QueryAnalysisWriter");
-
-const auto getQueryAnalysisWriter = ServiceContext::declareDecoration<QueryAnalysisWriter>();
-
-constexpr int kMaxRetriesOnRetryableErrors = 5;
-const WriteConcernOptions kMajorityWriteConcern{WriteConcernOptions::kMajority,
-                                                WriteConcernOptions::SyncMode::UNSET,
-                                                WriteConcernOptions::kWriteConcernTimeoutSystem};
-
-// The size limit for the documents to an insert in a single batch. Leave some padding for other
-// fields in the insert command.
-constexpr int kMaxBSONObjSizeForInsert = BSONObjMaxUserSize - 500 * 1024;
-
 /**
- * Creates TTL index for sampled queries collection.
+ * Creates TTL index for the collection storing sampled queries.
  */
 BSONObj createSampledQueriesTTLIndex(OperationContext* opCtx) {
-    BSONObj result;
+    BSONObj resObj;
+
     DBDirectClient client(opCtx);
     client.runCommand(NamespaceString::kConfigSampledQueriesNamespace.db(),
                       BSON("createIndexes"
                            << NamespaceString::kConfigSampledQueriesNamespace.coll().toString()
                            << "indexes"
                            << BSON_ARRAY(QueryAnalysisWriter::kSampledQueriesTTLIndexSpec)),
-                      result);
+                      resObj);
+
     LOGV2_DEBUG(7078401,
                 1,
-                "Creation of the TTL index for {coll} returned {result}",
-                "coll"_attr = NamespaceString::kConfigSampledQueriesNamespace,
-                "result"_attr = ErrorCodes::errorString(getStatusFromCommandResult(result).code()));
-    return result;
+                "Creation of the TTL index for the collection storing sampled queries",
+                "ns"_attr = NamespaceString::kConfigSampledQueriesNamespace,
+                "response"_attr = redact(resObj));
+
+    return resObj;
 }
 
 /**
- * Creates TTL index for sampled queries diff collection.
+ * Creates TTL index for the collection storing sampled diffs.
  */
 BSONObj createSampledQueriesDiffTTLIndex(OperationContext* opCtx) {
-    BSONObj result;
+    BSONObj resObj;
+
     DBDirectClient client(opCtx);
     client.runCommand(NamespaceString::kConfigSampledQueriesDiffNamespace.db(),
                       BSON("createIndexes"
                            << NamespaceString::kConfigSampledQueriesDiffNamespace.coll().toString()
                            << "indexes"
                            << BSON_ARRAY(QueryAnalysisWriter::kSampledQueriesDiffTTLIndexSpec)),
-                      result);
+                      resObj);
+
     LOGV2_DEBUG(7078402,
                 1,
-                "Creation of the TTL index for {coll} returned {result}",
-                "coll"_attr = NamespaceString::kConfigSampledQueriesDiffNamespace,
-                "result"_attr = ErrorCodes::errorString(getStatusFromCommandResult(result).code()));
-    return result;
+                "Creation of the TTL index for the collection storing sampled diffs",
+                "ns"_attr = NamespaceString::kConfigSampledQueriesDiffNamespace,
+                "response"_attr = redact(resObj));
+
+    return resObj;
 }
 
-/*
- * Returns true if this mongod can accept writes to the given collection. Unless the collection is
- * in the "local" database, this will only return true if this mongod is a primary (or a
- * standalone).
- */
-bool canAcceptWrites(OperationContext* opCtx, const NamespaceString& ns) {
-    ShouldNotConflictWithSecondaryBatchApplicationBlock noPBWMBlock(opCtx->lockState());
-    Lock::DBLock lk(opCtx, ns.dbName(), MODE_IS);
-    Lock::CollectionLock lock(opCtx, ns, MODE_IS);
-    return mongo::repl::ReplicationCoordinator::get(opCtx)->canAcceptWritesForDatabase(opCtx,
-                                                                                       ns.db());
-}
 
 struct SampledWriteCommandRequest {
     UUID sampleId;
@@ -205,6 +179,17 @@ SampledWriteCommandRequest makeSampledFindAndModifyCommandRequest(
 }
 
 }  // namespace
+
+const std::string QueryAnalysisWriter::kSampledQueriesTTLIndexName = "SampledQueriesTTLIndex";
+const std::string QueryAnalysisWriter::kSampledQueriesDiffTTLIndexName =
+    "SampledQueriesDiffTTLIndex";
+BSONObj QueryAnalysisWriter::kSampledQueriesTTLIndexSpec(BSON("key"
+                                                              << BSON("expireAt" << 1)
+                                                              << "expireAfterSeconds" << 0 << "name"
+                                                              << kSampledQueriesTTLIndexName));
+BSONObj QueryAnalysisWriter::kSampledQueriesDiffTTLIndexSpec(
+    BSON("key" << BSON("expireAt" << 1) << "expireAfterSeconds" << 0 << "name"
+               << kSampledQueriesDiffTTLIndexName));
 
 QueryAnalysisWriter* QueryAnalysisWriter::get(OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
@@ -290,8 +275,10 @@ ExecutorFuture<void> QueryAnalysisWriter::createTTLIndexes(OperationContext* opC
     auto future =
         AsyncTry([this, opCtx] {
             ++tryCount;
+
             auto opCtxHolder = cc().makeOperationContext();
             auto opCtx = opCtxHolder.get();
+
             auto status = getStatusFromCommandResult(createSampledQueriesTTLIndex(opCtx));
             if (!status.isOK() && status != ErrorCodes::IndexAlreadyExists) {
                 if (tryCount % 100 == 0) {
@@ -306,6 +293,7 @@ ExecutorFuture<void> QueryAnalysisWriter::createTTLIndexes(OperationContext* opC
                 }
                 return status;
             }
+
             status = getStatusFromCommandResult(createSampledQueriesDiffTTLIndex(opCtx));
             if (!status.isOK() && status != ErrorCodes::IndexAlreadyExists) {
                 if (tryCount % 100 == 0) {
@@ -320,12 +308,12 @@ ExecutorFuture<void> QueryAnalysisWriter::createTTLIndexes(OperationContext* opC
                 }
                 return status;
             }
-            // It's OK if IndexAlreadyExists, so just return OK status:
+
             return Status::OK();
         })
             .until([](Status status) {
                 // Stop retrying if index creation succeeds, or if server is no longer
-                // primary:
+                // primary.
                 return (status.isOK() || ErrorCodes::isNotPrimaryError(status));
             })
             .withBackoffBetweenIterations(kExponentialBackoff)
@@ -401,7 +389,7 @@ void QueryAnalysisWriter::_flush(OperationContext* opCtx,
         // added at least one document to 'docsToInsert'.
         invariant(!docsToInsert.empty());
         LOGV2_DEBUG(
-            6876102, 2, "Persisting sapmled queries", "docsToInsert"_attr = docsToInsert.size());
+            6876102, 2, "Persisting samples", "ns"_attr = ns, "count"_attr = docsToInsert.size());
 
         insertDocuments(opCtx, ns, docsToInsert, [&](const BatchedCommandResponse& response) {
             if (response.isErrDetailsSet() && response.sizeErrDetails() > 0) {
@@ -515,6 +503,7 @@ ExecutorFuture<void> QueryAnalysisWriter::_addReadQuery(const UUID& sampleId,
                 mongo::Milliseconds(gQueryAnalysisSampleExpirationSecs.load() * 1000);
             auto doc =
                 SampledQueryDocument{sampleId, nss, *collUuid, cmdName, cmd.toBSON(), expireAt};
+
             stdx::lock_guard<Latch> lk(_mutex);
             _queries.add(doc.toBSON());
         })
@@ -560,6 +549,7 @@ ExecutorFuture<void> QueryAnalysisWriter::addUpdateQuery(
                                             SampledCommandNameEnum::kUpdate,
                                             std::move(sampledUpdateCmd.cmd),
                                             expireAt};
+
             stdx::lock_guard<Latch> lk(_mutex);
             _queries.add(doc.toBSON());
         })
@@ -605,6 +595,7 @@ ExecutorFuture<void> QueryAnalysisWriter::addDeleteQuery(
                                             SampledCommandNameEnum::kDelete,
                                             std::move(sampledDeleteCmd.cmd),
                                             expireAt};
+
             stdx::lock_guard<Latch> lk(_mutex);
             _queries.add(doc.toBSON());
         })
@@ -652,6 +643,7 @@ ExecutorFuture<void> QueryAnalysisWriter::addFindAndModifyQuery(
                                             SampledCommandNameEnum::kFindAndModify,
                                             std::move(sampledFindAndModifyCmd.cmd),
                                             expireAt};
+
             stdx::lock_guard<Latch> lk(_mutex);
             _queries.add(doc.toBSON());
         })
@@ -695,6 +687,7 @@ ExecutorFuture<void> QueryAnalysisWriter::addDiff(const UUID& sampleId,
                 mongo::Milliseconds(gQueryAnalysisSampleExpirationSecs.load() * 1000);
             auto doc =
                 SampledQueryDiffDocument{sampleId, nss, collUuid, std::move(*diff), expireAt};
+
             stdx::lock_guard<Latch> lk(_mutex);
             _diffs.add(doc.toBSON());
         })
