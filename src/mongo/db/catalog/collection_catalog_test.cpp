@@ -923,15 +923,23 @@ public:
 
     void concurrentCreateCollectionAndOpenCollection(OperationContext* opCtx,
                                                      const NamespaceString& nss,
+                                                     boost::optional<UUID> uuid,
                                                      Timestamp timestamp,
                                                      bool openSnapshotBeforeCommit,
                                                      bool expectedExistence,
                                                      int expectedNumIndexes) {
+        NamespaceStringOrUUID readNssOrUUID = [&]() {
+            if (uuid) {
+                return NamespaceStringOrUUID(nss.dbName(), *uuid);
+            } else {
+                return NamespaceStringOrUUID(nss);
+            }
+        }();
         _concurrentDDLOperationAndOpenCollection(
             opCtx,
-            nss,
+            readNssOrUUID,
             timestamp,
-            [this, &nss](OperationContext* opCtx) { _createCollection(opCtx, nss); },
+            [this, &nss, &uuid](OperationContext* opCtx) { _createCollection(opCtx, nss, uuid); },
             openSnapshotBeforeCommit,
             expectedExistence,
             expectedNumIndexes);
@@ -939,12 +947,13 @@ public:
 
     void concurrentDropCollectionAndOpenCollection(OperationContext* opCtx,
                                                    const NamespaceString& nss,
+                                                   const NamespaceStringOrUUID& readNssOrUUID,
                                                    Timestamp timestamp,
                                                    bool openSnapshotBeforeCommit,
                                                    bool expectedExistence,
                                                    int expectedNumIndexes) {
         _concurrentDDLOperationAndOpenCollection(opCtx,
-                                                 nss,
+                                                 readNssOrUUID,
                                                  timestamp,
                                                  [this, &nss, &timestamp](OperationContext* opCtx) {
                                                      _dropCollection(opCtx, nss, timestamp);
@@ -958,7 +967,7 @@ public:
         OperationContext* opCtx,
         const NamespaceString& from,
         const NamespaceString& to,
-        const NamespaceString& lookupNss,
+        const NamespaceStringOrUUID& lookupNssOrUUID,
         Timestamp timestamp,
         bool openSnapshotBeforeCommit,
         bool expectedExistence,
@@ -966,7 +975,7 @@ public:
         std::function<void()> verifyStateCallback = {}) {
         _concurrentDDLOperationAndOpenCollection(
             opCtx,
-            lookupNss,
+            lookupNssOrUUID,
             timestamp,
             [this, &from, &to, &timestamp](OperationContext* opCtx) {
                 _renameCollection(opCtx, from, to, timestamp);
@@ -979,13 +988,14 @@ public:
 
     void concurrentCreateIndexAndOpenCollection(OperationContext* opCtx,
                                                 const NamespaceString& nss,
+                                                const NamespaceStringOrUUID& readNssOrUUID,
                                                 BSONObj indexSpec,
                                                 Timestamp timestamp,
                                                 bool openSnapshotBeforeCommit,
                                                 bool expectedExistence,
                                                 int expectedNumIndexes) {
         _concurrentDDLOperationAndOpenCollection(opCtx,
-                                                 nss,
+                                                 readNssOrUUID,
                                                  timestamp,
                                                  [this, &nss, &indexSpec](OperationContext* opCtx) {
                                                      _createIndex(opCtx, nss, indexSpec);
@@ -997,13 +1007,14 @@ public:
 
     void concurrentDropIndexAndOpenCollection(OperationContext* opCtx,
                                               const NamespaceString& nss,
+                                              const NamespaceStringOrUUID& readNssOrUUID,
                                               const std::string& indexName,
                                               Timestamp timestamp,
                                               bool openSnapshotBeforeCommit,
                                               bool expectedExistence,
                                               int expectedNumIndexes) {
         _concurrentDDLOperationAndOpenCollection(opCtx,
-                                                 nss,
+                                                 readNssOrUUID,
                                                  timestamp,
                                                  [this, &nss, &indexName](OperationContext* opCtx) {
                                                      _dropIndex(opCtx, nss, indexName);
@@ -1027,7 +1038,9 @@ private:
         opCtx->recoveryUnit()->setCommitTimestamp(timestamp);
     }
 
-    void _createCollection(OperationContext* opCtx, const NamespaceString& nss) {
+    void _createCollection(OperationContext* opCtx,
+                           const NamespaceString& nss,
+                           boost::optional<UUID> uuid = boost::none) {
         AutoGetDb databaseWriteGuard(opCtx, nss.dbName(), MODE_IX);
         auto db = databaseWriteGuard.ensureDbExists(opCtx);
         ASSERT(db);
@@ -1035,7 +1048,11 @@ private:
         Lock::CollectionLock lk(opCtx, nss, MODE_IX);
 
         CollectionOptions options;
-        options.uuid.emplace(UUID::gen());
+        if (uuid) {
+            options.uuid.emplace(*uuid);
+        } else {
+            options.uuid.emplace(UUID::gen());
+        }
 
         // Adds the collection to the durable catalog.
         auto storageEngine = getServiceContext()->getStorageEngine();
@@ -1141,7 +1158,7 @@ private:
      */
     template <typename Callable>
     void _concurrentDDLOperationAndOpenCollection(OperationContext* opCtx,
-                                                  const NamespaceString& nss,
+                                                  const NamespaceStringOrUUID& nssOrUUID,
                                                   Timestamp timestamp,
                                                   Callable&& ddlOperation,
                                                   bool openSnapshotBeforeCommit,
@@ -1203,7 +1220,8 @@ private:
         // Stash the catalog so we may perform multiple lookups that will be in sync with our
         // snapshot
         CollectionCatalog::stash(opCtx, CollectionCatalog::get(opCtx));
-        CollectionPtr coll = CollectionCatalog::get(opCtx)->openCollection(opCtx, nss, boost::none);
+        CollectionPtr coll =
+            CollectionCatalog::get(opCtx)->openCollection(opCtx, nssOrUUID, boost::none);
 
         // Notify the thread that our openCollection lookup is done.
         {
@@ -1216,6 +1234,9 @@ private:
 
         if (expectedExistence) {
             ASSERT(coll);
+
+            NamespaceString nss =
+                CollectionCatalog::get(opCtx)->resolveNamespaceStringOrUUID(opCtx, nssOrUUID);
 
             ASSERT_EQ(coll->ns(), nss);
             // Check that lookup returns the same instance as openCollection above
@@ -1245,14 +1266,27 @@ private:
                       coll.get());
         } else {
             ASSERT(!coll);
-            auto catalogEntry = DurableCatalog::get(opCtx)->scanForCatalogEntryByNss(opCtx, nss);
-            ASSERT(!catalogEntry);
+            if (auto nss = nssOrUUID.nss()) {
+                auto catalogEntry =
+                    DurableCatalog::get(opCtx)->scanForCatalogEntryByNss(opCtx, *nss);
+                ASSERT(!catalogEntry);
 
-            // Lookups from the catalog should return the newly opened collection (in this case
-            // nullptr).
-            ASSERT_EQ(
-                CollectionCatalog::get(opCtx)->lookupCollectionByNamespaceForRead(opCtx, nss).get(),
-                coll.get());
+                // Lookups from the catalog should return the newly opened collection (in this case
+                // nullptr).
+                ASSERT_EQ(CollectionCatalog::get(opCtx)
+                              ->lookupCollectionByNamespaceForRead(opCtx, *nss)
+                              .get(),
+                          coll.get());
+            } else if (auto uuid = nssOrUUID.uuid()) {
+                // TODO SERVER-71222: Check UUID->catalogId mapping here.
+
+                // Lookups from the catalog should return the newly opened collection (in this case
+                // nullptr).
+                ASSERT_EQ(CollectionCatalog::get(opCtx)
+                              ->lookupCollectionByUUIDForRead(opCtx, *uuid)
+                              .get(),
+                          coll.get());
+            }
         }
 
         if (verifyStateCallback) {
@@ -2922,7 +2956,7 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentCreateCollectionAndOpenCollecti
     // When the snapshot is opened right before the create is committed to the durable catalog, the
     // collection instance should not exist yet.
     concurrentCreateCollectionAndOpenCollection(
-        opCtx.get(), nss, createCollectionTs, true, false, 0);
+        opCtx.get(), nss, boost::none, createCollectionTs, true, false, 0);
 }
 
 TEST_F(CollectionCatalogTimestampTest, ConcurrentCreateCollectionAndOpenCollectionAfterCommit) {
@@ -2935,7 +2969,37 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentCreateCollectionAndOpenCollecti
     // When the snapshot is opened right after the create is committed to the durable catalog, the
     // collection instance should exist.
     concurrentCreateCollectionAndOpenCollection(
-        opCtx.get(), nss, createCollectionTs, false, true, 0);
+        opCtx.get(), nss, boost::none, createCollectionTs, false, true, 0);
+}
+
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentCreateCollectionAndOpenCollectionByUUIDBeforeCommit) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    const NamespaceString nss("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    UUID uuid = UUID::gen();
+
+    // When the snapshot is opened right before the create is committed to the durable catalog, the
+    // collection instance should not exist yet.
+    concurrentCreateCollectionAndOpenCollection(
+        opCtx.get(), nss, uuid, createCollectionTs, true, false, 0);
+}
+
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentCreateCollectionAndOpenCollectionByUUIDAfterCommit) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    const NamespaceString nss("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    UUID uuid = UUID::gen();
+
+    // When the snapshot is opened right after the create is committed to the durable catalog, the
+    // collection instance should exist.
+    concurrentCreateCollectionAndOpenCollection(
+        opCtx.get(), nss, uuid, createCollectionTs, false, true, 0);
 }
 
 TEST_F(CollectionCatalogTimestampTest, ConcurrentDropCollectionAndOpenCollectionBeforeCommit) {
@@ -2950,7 +3014,8 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentDropCollectionAndOpenCollection
 
     // When the snapshot is opened right before the drop is committed to the durable catalog, the
     // collection instance should be returned.
-    concurrentDropCollectionAndOpenCollection(opCtx.get(), nss, dropCollectionTs, true, true, 0);
+    concurrentDropCollectionAndOpenCollection(
+        opCtx.get(), nss, nss, dropCollectionTs, true, true, 0);
 }
 
 TEST_F(CollectionCatalogTimestampTest, ConcurrentDropCollectionAndOpenCollectionAfterCommit) {
@@ -2965,7 +3030,47 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentDropCollectionAndOpenCollection
 
     // When the snapshot is opened right after the drop is committed to the durable catalog, no
     // collection instance should be returned.
-    concurrentDropCollectionAndOpenCollection(opCtx.get(), nss, dropCollectionTs, false, false, 0);
+    concurrentDropCollectionAndOpenCollection(
+        opCtx.get(), nss, nss, dropCollectionTs, false, false, 0);
+}
+
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentDropCollectionAndOpenCollectionByUUIDBeforeCommit) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    const NamespaceString nss("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp dropCollectionTs = Timestamp(20, 20);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    UUID uuid =
+        CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), nss)->uuid();
+    NamespaceStringOrUUID uuidWithDbName(nss.dbName(), uuid);
+
+    // When the snapshot is opened right before the drop is committed to the durable catalog, the
+    // collection instance should be returned.
+    concurrentDropCollectionAndOpenCollection(
+        opCtx.get(), nss, uuidWithDbName, dropCollectionTs, true, true, 0);
+}
+
+TEST_F(CollectionCatalogTimestampTest, ConcurrentDropCollectionAndOpenCollectionByUUIDAfterCommit) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    const NamespaceString nss("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp dropCollectionTs = Timestamp(20, 20);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    UUID uuid =
+        CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), nss)->uuid();
+    NamespaceStringOrUUID uuidWithDbName(nss.dbName(), uuid);
+
+    // When the snapshot is opened right after the drop is committed to the durable catalog, no
+    // collection instance should be returned.
+    concurrentDropCollectionAndOpenCollection(
+        opCtx.get(), nss, uuidWithDbName, dropCollectionTs, false, false, 0);
 }
 
 TEST_F(CollectionCatalogTimestampTest,
@@ -3068,6 +3173,70 @@ TEST_F(CollectionCatalogTimestampTest,
         opCtx.get(), originalNss, newNss, newNss, renameCollectionTs, false, true, 0);
 }
 
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentRenameCollectionAndOpenCollectionWithUUIDBeforeCommit) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    const NamespaceString originalNss("a.b");
+    const NamespaceString newNss("a.c");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp renameCollectionTs = Timestamp(20, 20);
+
+    createCollection(opCtx.get(), originalNss, createCollectionTs);
+    UUID uuid = CollectionCatalog::get(opCtx.get())
+                    ->lookupCollectionByNamespace(opCtx.get(), originalNss)
+                    ->uuid();
+    NamespaceStringOrUUID uuidWithDbName(originalNss.dbName(), uuid);
+    // When the snapshot is opened right before the rename is committed to the durable catalog, and
+    // the openCollection looks for the originalNss, the collection instance should be returned.
+    concurrentRenameCollectionAndOpenCollection(
+        opCtx.get(), originalNss, newNss, uuidWithDbName, renameCollectionTs, true, true, 0, [&]() {
+            // Verify that we cannot find the Collection when we search by the new namespace as
+            // the rename was committed when we read.
+            auto coll = CollectionCatalog::get(opCtx.get())
+                            ->lookupCollectionByNamespace(opCtx.get(), newNss);
+            ASSERT(!coll);
+        });
+}
+
+TEST_F(CollectionCatalogTimestampTest,
+       ConcurrentRenameCollectionAndOpenCollectionWithUUIDAfterCommit) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    const NamespaceString originalNss("a.b");
+    const NamespaceString newNss("a.c");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp renameCollectionTs = Timestamp(20, 20);
+
+    createCollection(opCtx.get(), originalNss, createCollectionTs);
+    UUID uuid = CollectionCatalog::get(opCtx.get())
+                    ->lookupCollectionByNamespace(opCtx.get(), originalNss)
+                    ->uuid();
+    NamespaceStringOrUUID uuidWithDbName(originalNss.dbName(), uuid);
+
+    // When the snapshot is opened right after the rename is committed to the durable catalog, and
+    // the openCollection looks for the originalNss, no collection instance should be returned.
+    concurrentRenameCollectionAndOpenCollection(opCtx.get(),
+                                                originalNss,
+                                                newNss,
+                                                uuidWithDbName,
+                                                renameCollectionTs,
+                                                false,
+                                                true,
+                                                0,
+                                                [&]() {
+                                                    // Verify that we cannot find the Collection
+                                                    // when we search by the original namespace as
+                                                    // the rename was committed when we read.
+                                                    auto coll = CollectionCatalog::get(opCtx.get())
+                                                                    ->lookupCollectionByNamespace(
+                                                                        opCtx.get(), originalNss);
+                                                    ASSERT(!coll);
+                                                });
+}
+
 TEST_F(CollectionCatalogTimestampTest, ConcurrentCreateIndexAndOpenCollectionBeforeCommit) {
     RAIIServerParameterControllerForTest featureFlagController(
         "featureFlagPointInTimeCatalogLookups", true);
@@ -3088,6 +3257,7 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentCreateIndexAndOpenCollectionBef
     // When the snapshot is opened right before the second index create is committed to the durable
     // catalog, the collection instance should not have the second index.
     concurrentCreateIndexAndOpenCollection(opCtx.get(),
+                                           nss,
                                            nss,
                                            BSON("v" << 2 << "name"
                                                     << "y_1"
@@ -3119,6 +3289,75 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentCreateIndexAndOpenCollectionAft
     // catalog, the collection instance should have both indexes.
     concurrentCreateIndexAndOpenCollection(opCtx.get(),
                                            nss,
+                                           nss,
+                                           BSON("v" << 2 << "name"
+                                                    << "y_1"
+                                                    << "key" << BSON("y" << 1)),
+                                           createYIndexTs,
+                                           false,
+                                           true,
+                                           2);
+}
+
+TEST_F(CollectionCatalogTimestampTest, ConcurrentCreateIndexAndOpenCollectionByUUIDBeforeCommit) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    const NamespaceString nss("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp createXIndexTs = Timestamp(20, 20);
+    const Timestamp createYIndexTs = Timestamp(30, 30);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "x_1"
+                         << "key" << BSON("x" << 1)),
+                createXIndexTs);
+    UUID uuid =
+        CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), nss)->uuid();
+    NamespaceStringOrUUID uuidWithDbName(nss.dbName(), uuid);
+
+    // When the snapshot is opened right before the second index create is committed to the durable
+    // catalog, the collection instance should not have the second index.
+    concurrentCreateIndexAndOpenCollection(opCtx.get(),
+                                           nss,
+                                           uuidWithDbName,
+                                           BSON("v" << 2 << "name"
+                                                    << "y_1"
+                                                    << "key" << BSON("y" << 1)),
+                                           createYIndexTs,
+                                           true,
+                                           true,
+                                           1);
+}
+
+TEST_F(CollectionCatalogTimestampTest, ConcurrentCreateIndexAndOpenCollectionByUUIDAfterCommit) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    const NamespaceString nss("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp createXIndexTs = Timestamp(20, 20);
+    const Timestamp createYIndexTs = Timestamp(30, 30);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "x_1"
+                         << "key" << BSON("x" << 1)),
+                createXIndexTs);
+    UUID uuid =
+        CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), nss)->uuid();
+    NamespaceStringOrUUID uuidWithDbName(nss.dbName(), uuid);
+
+    // When the snapshot is opened right before the second index create is committed to the durable
+    // catalog, the collection instance should have both indexes.
+    concurrentCreateIndexAndOpenCollection(opCtx.get(),
+                                           nss,
+                                           uuidWithDbName,
                                            BSON("v" << 2 << "name"
                                                     << "y_1"
                                                     << "key" << BSON("y" << 1)),
@@ -3153,7 +3392,7 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentDropIndexAndOpenCollectionBefor
 
     // When the snapshot is opened right before the index drop is committed to the durable
     // catalog, the collection instance should not have the second index.
-    concurrentDropIndexAndOpenCollection(opCtx.get(), nss, "y_1", dropIndexTs, true, true, 2);
+    concurrentDropIndexAndOpenCollection(opCtx.get(), nss, nss, "y_1", dropIndexTs, true, true, 2);
 }
 
 TEST_F(CollectionCatalogTimestampTest, ConcurrentDropIndexAndOpenCollectionAfterCommit) {
@@ -3181,7 +3420,71 @@ TEST_F(CollectionCatalogTimestampTest, ConcurrentDropIndexAndOpenCollectionAfter
 
     // When the snapshot is opened right before the index drop is committed to the durable
     // catalog, the collection instance should not have the second index.
-    concurrentDropIndexAndOpenCollection(opCtx.get(), nss, "y_1", dropIndexTs, false, true, 1);
+    concurrentDropIndexAndOpenCollection(opCtx.get(), nss, nss, "y_1", dropIndexTs, false, true, 1);
+}
+
+TEST_F(CollectionCatalogTimestampTest, ConcurrentDropIndexAndOpenCollectionByUUIDBeforeCommit) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    const NamespaceString nss("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp createIndexTs = Timestamp(20, 20);
+    const Timestamp dropIndexTs = Timestamp(30, 30);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "x_1"
+                         << "key" << BSON("x" << 1)),
+                createIndexTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "y_1"
+                         << "key" << BSON("y" << 1)),
+                createIndexTs);
+    UUID uuid =
+        CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), nss)->uuid();
+    NamespaceStringOrUUID uuidWithDbName(nss.dbName(), uuid);
+
+    // When the snapshot is opened right before the index drop is committed to the durable
+    // catalog, the collection instance should not have the second index.
+    concurrentDropIndexAndOpenCollection(
+        opCtx.get(), nss, uuidWithDbName, "y_1", dropIndexTs, true, true, 2);
+}
+
+TEST_F(CollectionCatalogTimestampTest, ConcurrentDropIndexAndOpenCollectionByUUIDAfterCommit) {
+    RAIIServerParameterControllerForTest featureFlagController(
+        "featureFlagPointInTimeCatalogLookups", true);
+
+    const NamespaceString nss("a.b");
+    const Timestamp createCollectionTs = Timestamp(10, 10);
+    const Timestamp createIndexTs = Timestamp(20, 20);
+    const Timestamp dropIndexTs = Timestamp(30, 30);
+
+    createCollection(opCtx.get(), nss, createCollectionTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "x_1"
+                         << "key" << BSON("x" << 1)),
+                createIndexTs);
+    createIndex(opCtx.get(),
+                nss,
+                BSON("v" << 2 << "name"
+                         << "y_1"
+                         << "key" << BSON("y" << 1)),
+                createIndexTs);
+    UUID uuid =
+        CollectionCatalog::get(opCtx.get())->lookupCollectionByNamespace(opCtx.get(), nss)->uuid();
+    NamespaceStringOrUUID uuidWithDbName(nss.dbName(), uuid);
+
+    // When the snapshot is opened right before the index drop is committed to the durable
+    // catalog, the collection instance should not have the second index.
+    concurrentDropIndexAndOpenCollection(
+        opCtx.get(), nss, uuidWithDbName, "y_1", dropIndexTs, false, true, 1);
 }
 
 TEST_F(CollectionCatalogTimestampTest, OpenCollectionBetweenIndexBuildInProgressAndReady) {

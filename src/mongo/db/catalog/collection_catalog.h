@@ -216,15 +216,15 @@ public:
     void reloadViews(OperationContext* opCtx, const DatabaseName& dbName) const;
 
     /**
-     * Returns the collection pointer representative of 'nss' at the provided read timestamp. If no
-     * timestamp is provided, returns instance of the latest collection. The returned collection
-     * instance is only valid while the storage snapshot is open and becomes invalidated when the
-     * snapshot is closed.
+     * Returns the collection pointer representative of 'nssOrUUID' at the provided read timestamp.
+     * If no timestamp is provided, returns instance of the latest collection. The returned
+     * collection instance is only valid while the storage snapshot is open and becomes invalidated
+     * when the snapshot is closed.
      *
      * Returns nullptr when reading from a point-in-time where the collection did not exist.
      */
     CollectionPtr openCollection(OperationContext* opCtx,
-                                 const NamespaceString& nss,
+                                 const NamespaceStringOrUUID& nssOrUUID,
                                  boost::optional<Timestamp> readTimestamp) const;
 
     /**
@@ -775,6 +775,14 @@ private:
     // catalogIds
     void _markNamespaceForCatalogIdCleanupIfNeeded(const NamespaceString& nss,
                                                    const std::vector<TimestampedCatalogId>& ids);
+
+    // Helpers to perform openCollection at latest or at point-in-time on Namespace/UUID.
+    CollectionPtr _openCollectionAtLatestByNamespace(OperationContext* opCtx,
+                                                     const NamespaceString& nss) const;
+    CollectionPtr _openCollectionAtLatestByUUID(OperationContext* opCtx, const UUID& uuid) const;
+    CollectionPtr _openCollectionAtPointInTimeByNamespace(OperationContext* opCtx,
+                                                          const NamespaceString& nss,
+                                                          Timestamp readTimestamp) const;
 
     /**
      * When present, indicates that the catalog is in closed state, and contains a map from UUID
