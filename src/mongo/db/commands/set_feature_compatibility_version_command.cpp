@@ -292,11 +292,19 @@ public:
         // stepdown.
         opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
-        // Only allow one instance of setFeatureCompatibilityVersion to run at a time.
-        Lock::ExclusiveLock setFCVCommandLock(opCtx, commandMutex);
-
         auto request = SetFeatureCompatibilityVersion::parse(
             IDLParserContext("setFeatureCompatibilityVersion"), cmdObj);
+        auto isFromConfigServer = request.getFromConfigServer().value_or(false);
+
+        // Only allow one instance of setFeatureCompatibilityVersion to run at a time.
+        // Acquire the lock only when the node is exclusively the shard role or we are the config
+        // coordinator processing the request from mongos. This is done to prevent deadlock on the
+        // catalog shard when it sends the setFeatureCompatabilityVersion command to itself.
+        std::unique_ptr<Lock::ExclusiveLock> setFCVCommandLock;
+        if (!isFromConfigServer || serverGlobalParams.clusterRole.isExclusivelyShardRole()) {
+            setFCVCommandLock = std::make_unique<Lock::ExclusiveLock>(opCtx, commandMutex);
+        }
+
         const auto requestedVersion = request.getCommandParameter();
         const auto actualVersion = serverGlobalParams.featureCompatibility.getVersion();
         if (request.getDowngradeOnDiskChanges()) {
@@ -350,8 +358,6 @@ public:
         uassert(5563600,
                 "'phase' field is only valid to be specified on shards",
                 !request.getPhase() || serverGlobalParams.clusterRole == ClusterRole::ShardServer);
-
-        auto isFromConfigServer = request.getFromConfigServer().value_or(false);
 
         if (!request.getPhase() || request.getPhase() == SetFCVPhaseEnum::kStart) {
             {
