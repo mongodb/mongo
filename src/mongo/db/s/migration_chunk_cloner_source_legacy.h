@@ -208,6 +208,168 @@ private:
     friend class LogOpForShardingHandler;
     friend class LogTransactionOperationsForShardingHandler;
 
+    using RecordIdSet = std::set<RecordId>;
+
+    /**
+     * This is responsible for all the logic revolving around handling documents that needs to be
+     * cloned.
+     *
+     * This class is multithread-safe.
+     */
+    class CloneList {
+    public:
+        /**
+         * Simple container that increments the given counter when this is constructed and
+         * decrements it when it is destroyed. User of this class is responsible for holding
+         * necessary mutexes when counter is being modified.
+         */
+        class InProgressReadToken {
+        public:
+            InProgressReadToken(WithLock, CloneList& cloneList);
+            InProgressReadToken(const InProgressReadToken&) = delete;
+            InProgressReadToken(InProgressReadToken&&) = default;
+
+            ~InProgressReadToken();
+
+        private:
+            CloneList& _cloneList;
+        };
+
+        /**
+         * Container for a document that can be added to the nextCloneBatch call. As long as
+         * instances of this object exist, it will prevent getNextDoc from prematurely returning
+         * an empty response (which means there are no more docs left to clone).
+         *
+         * This assumes that _mutex is not being held when it is destroyed.
+         */
+        class DocumentInFlightWhileNotInLock {
+        public:
+            DocumentInFlightWhileNotInLock(std::unique_ptr<InProgressReadToken> inProgressReadToken,
+                                           boost::optional<Snapshotted<BSONObj>> doc);
+            DocumentInFlightWhileNotInLock(const DocumentInFlightWhileNotInLock&) = delete;
+            DocumentInFlightWhileNotInLock(DocumentInFlightWhileNotInLock&&) = default;
+
+            void setDoc(boost::optional<Snapshotted<BSONObj>> doc);
+            const boost::optional<Snapshotted<BSONObj>>& getDoc();
+
+        private:
+            std::unique_ptr<InProgressReadToken> _inProgressReadToken;
+            boost::optional<Snapshotted<BSONObj>> _doc;
+        };
+
+        /**
+         * A variant of the DocumentInFlightWhileNotInLock where the _mutex should be held while it
+         * has a document contained within it.
+         */
+        class DocumentInFlightWithLock {
+        public:
+            DocumentInFlightWithLock(WithLock, CloneList& clonerList);
+            DocumentInFlightWithLock(const DocumentInFlightWithLock&) = delete;
+            DocumentInFlightWithLock(DocumentInFlightWithLock&&) = default;
+
+            void setDoc(boost::optional<Snapshotted<BSONObj>> doc);
+
+            /**
+             * Releases the contained document. Can only be called once for the entire lifetime
+             * of this object.
+             */
+            std::unique_ptr<DocumentInFlightWhileNotInLock> release();
+
+        private:
+            std::unique_ptr<InProgressReadToken> _inProgressReadToken;
+            boost::optional<Snapshotted<BSONObj>> _doc;
+        };
+
+        CloneList();
+
+        /**
+         * Overwrites the list of record ids to clone.
+         */
+        void populateList(RecordIdSet recordIds);
+
+        /**
+         * Returns a document to clone. If there are no more documents left to clone,
+         * DocumentInFlightWhileNotInLock::getDoc will return boost::none.
+         *
+         * numRecordsNoLonger exists is an optional parameter that can be used to track
+         * the number of recordIds encountered that refers to a document that no longer
+         * exists.
+         */
+        std::unique_ptr<DocumentInFlightWhileNotInLock> getNextDoc(OperationContext* opCtx,
+                                                                   const CollectionPtr& collection,
+                                                                   int* numRecordsNoLongerExist);
+
+        /**
+         * Put back a document previously obtained from this CloneList instance to the overflow
+         * pool.
+         */
+        void insertOverflowDoc(Snapshotted<BSONObj> doc);
+
+        /**
+         * Returns true if there are more documents to clone.
+         */
+        bool hasMore() const;
+
+        /**
+         * Returns the size of the populated record ids.
+         */
+        size_t size() const;
+
+    private:
+        /**
+         * Increments the counter for inProgressReads.
+         */
+        void _startedOneInProgressRead(WithLock);
+
+        /**
+         * Decrements the counter for inProgressReads.
+         */
+        void _finishedOneInProgressRead();
+
+        mutable Mutex _mutex = MONGO_MAKE_LATCH("MigrationChunkClonerSource::CloneList::_mutex");
+
+        RecordIdSet _recordIds;
+
+        // This iterator is a pointer into the _recordIds set.  It allows concurrent access to
+        // the _recordIds set by allowing threads servicing _migrateClone requests to do the
+        // following:
+        //   1.  Acquire mutex "_mutex" above.
+        //   2.  Copy *_recordIdsIter into its local stack frame.
+        //   3.  Increment _recordIdsIter
+        //   4.  Unlock "_mutex."
+        //   5.  Do the I/O to fetch the document corresponding to this record Id.
+        //
+        // The purpose of this algorithm, is to allow different threads to concurrently start I/O
+        // jobs in order to more fully saturate the disk.
+        //
+        // One issue with this algorithm, is that only 16MB worth of documents can be returned in
+        // response to a _migrateClone request.  But, the thread does not know the size of a
+        // document until it does the I/O.  At which point, if the document does not fit in the
+        // response to _migrateClone request the document must be made available to a different
+        // thread servicing a _migrateClone request. To solve this problem, the thread adds the
+        // document to the below _overflowDocs deque.
+        RecordIdSet::iterator _recordIdsIter;
+
+        // This deque stores all documents that must be sent to the destination, but could not fit
+        // in the response to a particular _migrateClone request.
+        std::deque<Snapshotted<BSONObj>> _overflowDocs;
+
+        // This integer represents how many documents are being "held" by threads servicing
+        // _migrateClone requests. Any document that is "held" by a thread may be added to the
+        // _overflowDocs deque if it doesn't fit in the response to a _migrateClone request.
+        // This integer is necessary because it gives us a condition on when all documents to be
+        // sent to the destination have been exhausted.
+        //
+        // If (_recordIdsIter == _recordIds.end() && _overflowDocs.empty() &&
+        //     _inProgressReads == 0) then all documents have been returned to the destination.
+        RecordIdSet::size_type _inProgressReads = 0;
+
+        // This condition variable allows us to wait on the following condition:
+        //   Either we're done and the above condition is satisfied, or there is some document to
+        //   return.
+        stdx::condition_variable _moreDocsCV;
+    };
+
     // Represents the states in which the cloner can be
     enum State { kNew, kCloning, kDone };
 
@@ -243,15 +405,6 @@ private:
      * Returns OK or any error status otherwise.
      */
     Status _storeCurrentLocs(OperationContext* opCtx);
-
-    /**
-     * Returns boost::none if there are no more documents to get.
-     * Increments _inProgressReads if and only if return value is not none.
-     */
-    boost::optional<Snapshotted<BSONObj>> _getNextDoc(OperationContext* opCtx,
-                                                      const CollectionPtr& collection);
-
-    void _insertOverflowDoc(Snapshotted<BSONObj> doc);
 
     /**
      * Adds the OpTime to the list of OpTimes for oplog entries that we should consider migrating as
@@ -361,49 +514,10 @@ private:
     // The current state of the cloner
     State _state{kNew};
 
-    // List of record ids that needs to be transferred (initial clone)
-    std::set<RecordId> _cloneLocs;
+    CloneList _cloneList;
 
-    // This iterator is a pointer into the _cloneLocs set.  It allows concurrent access to
-    // the _cloneLocs set by allowing threads servicing _migrateClone requests to do the
-    // following:
-    //   1.  Acquire mutex "_mutex" above.
-    //   2.  Copy *_cloneRecordIdsIter into its local stack frame.
-    //   3.  Increment _cloneRecordIdsIter
-    //   4.  Unlock "_mutex."
-    //   5.  Do the I/O to fetch the document corresponding to this record Id.
-    //
-    // The purpose of this algorithm, is to allow different threads to concurrently start I/O jobs
-    // in order to more fully saturate the disk.
-    //
-    // One issue with this algorithm, is that only 16MB worth of documents can be returned in
-    // response to a _migrateClone request.  But, the thread does not know the size of a document
-    // until it does the I/O.  At which point, if the document does not fit in the response to
-    // _migrateClone request the document must be made available to a different thread servicing a
-    // _migrateClone request. To solve this problem, the thread adds the document
-    // to the below _overflowDocs deque.
-    std::set<RecordId>::iterator _cloneRecordIdsIter;
-
-    // This deque stores all documents that must be sent to the destination, but could not fit
-    // in the response to a particular _migrateClone request.
-    std::deque<Snapshotted<BSONObj>> _overflowDocs;
-
-    // This integer represents how many documents are being "held" by threads servicing
-    // _migrateClone requests. Any document that is "held" by a thread may be added to the
-    // _overflowDocs deque if it doesn't fit in the response to a _migrateClone request.
-    // This integer is necessary because it gives us a condition on when all documents to be sent
-    // to the destination have been exhausted.
-    //
-    // If (_cloneRecordIdsIter == _cloneLocs.end() && _overflowDocs.empty() && _inProgressReads
-    // == 0) then all documents have been returned to the destination.
-    decltype(_cloneLocs.size()) _inProgressReads = 0;
-
-    // This condition variable allows us to wait on the following condition:
-    //   Either we're done and the above condition is satisfied, or there is some document to
-    //   return.
-    stdx::condition_variable _moreDocsCV;
-    decltype(_cloneLocs.size()) _numRecordsCloned{0};
-    decltype(_cloneLocs.size()) _numRecordsPassedOver{0};
+    RecordIdSet::size_type _numRecordsCloned{0};
+    RecordIdSet::size_type _numRecordsPassedOver{0};
 
     // The estimated average object size during the clone phase. Used for buffer size
     // pre-allocation (initial clone).
