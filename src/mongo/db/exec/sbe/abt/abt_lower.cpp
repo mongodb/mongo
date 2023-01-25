@@ -720,6 +720,8 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const NestedLoopJoinNode& 
     for (const ProjectionName& projectionName : n.getCorrelatedProjectionNames()) {
         correlatedSlots.push_back(_slotMap.at(projectionName));
     }
+    // Soring is not essential. Here we sort only for SBE plan stability.
+    std::sort(correlatedSlots.begin(), correlatedSlots.end());
 
     auto expr = lowerExpression(filter);
 
@@ -979,7 +981,13 @@ void SBENodeLowering::generateSlots(const FieldProjectionMap& fieldProjectionMap
         rootSlot = _slotIdGenerator.generate();
         mapProjToSlot(*projName, rootSlot.value());
     }
-    for (const auto& [fieldName, projectionName] : fieldProjectionMap._fieldProjections) {
+
+    // Soring is not essential. Here we sort only for SBE plan stability.
+    std::map<FieldNameType, ProjectionName> ordered;
+    for (const auto& entry : fieldProjectionMap._fieldProjections) {
+        ordered.insert(entry);
+    }
+    for (const auto& [fieldName, projectionName] : ordered) {
         vars.push_back(_slotIdGenerator.generate());
         mapProjToSlot(projectionName, vars.back());
         fields.push_back(fieldName.value().toString());
