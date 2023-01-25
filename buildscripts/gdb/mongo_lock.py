@@ -320,8 +320,11 @@ def find_lock_manager_holders(graph, thread_dict, show):
 
     locker_ptr_type = gdb.lookup_type("mongo::LockerImpl").pointer()
 
+    # Do not call mongo::getGlobalLockManager() due to the compiler optimizing this function in a very weird way
+    # See SERVER-72816 for more context
     lock_head = gdb.parse_and_eval(
-        "mongo::getGlobalLockManager()->_getBucket(resId)->findOrInsert(resId)")
+        "mongo::LockManager::get((mongo::ServiceContext*) mongo::getGlobalServiceContext())->_getBucket(resId)->findOrInsert(resId)"
+    )
 
     granted_list = lock_head.dereference()["grantedList"]
     lock_request_ptr = granted_list["_front"]
