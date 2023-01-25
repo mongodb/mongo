@@ -50,6 +50,7 @@ const char kToShardId[] = "toShardName";
 const char kChunkMinKey[] = "min";
 const char kChunkMaxKey[] = "max";
 const char kShardKeyPattern[] = "shardKeyPattern";
+const char kParallelMigration[] = "parallelMigrateCloneSupported";
 
 }  // namespace
 
@@ -152,6 +153,14 @@ StatusWith<StartChunkCloneRequest> StartChunkCloneRequest::createFromCommand(Nam
         }
     }
 
+    {
+        Status status = bsonExtractBooleanFieldWithDefault(
+            obj, kParallelMigration, false, &request._parallelFetchingSupported);
+        if (!status.isOK()) {
+            return status;
+        }
+    }
+
     request._migrationId = UUID::parse(obj);
     request._lsid =
         LogicalSessionId::parse(IDLParserErrorContext("StartChunkCloneRequest"), obj[kLsid].Obj());
@@ -179,6 +188,7 @@ void StartChunkCloneRequest::appendAsCommand(
     invariant(fromShardConnectionString.isValid());
 
     builder->append(kRecvChunkStart, nss.ns());
+    builder->append(kParallelMigration, true);
 
     migrationId.appendToBuilder(builder, kMigrationId);
     builder->append(kLsid, lsid.toBSON());

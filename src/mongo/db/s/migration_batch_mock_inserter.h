@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2018-present MongoDB, Inc.
+ *    Copyright (C) 2022-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,16 +27,41 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/s/migration_batch_inserter.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/s/catalog/type_chunk.h"
 
-#include "mongo/bson/bsonobj.h"
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/s/migration_chunk_cloner_source.h"
+#pragma once
 
 namespace mongo {
 
-MigrationChunkClonerSource::MigrationChunkClonerSource() = default;
+class MigrationBatchMockInserter {
+public:
+    void run(Status status) const {
+        // Run is passed in a non-ok status if this function runs inline.
+        // That happens if we schedule this task on a ThreadPool that is
+        // already shutdown.  We should never do that.  Therefore,
+        // we assert that here.
+        invariant(status.isOK());
+    }
+    MigrationBatchMockInserter(OperationContext*,
+                               OperationContext*,
+                               BSONObj,
+                               NamespaceString,
+                               ChunkRange,
+                               WriteConcernOptions,
+                               UUID,
+                               std::shared_ptr<MigrationCloningProgressSharedState>,
+                               UUID,
+                               int) {}
 
-MigrationChunkClonerSource::~MigrationChunkClonerSource() = default;
+    static void onCreateThread(const std::string& threadName) {}
+
+private:
+    BSONObj _batch;
+};
 
 }  // namespace mongo
