@@ -420,7 +420,7 @@ StatusWith<BSONObj> MigrationChunkClonerSource::commitClone(OperationContext* op
             }
         } else {
             invariant(PlanExecutor::IS_EOF == _jumboChunkCloneState->clonerState);
-            invariant(_cloneList.hasMore());
+            invariant(!_cloneList.hasMore());
         }
     }
 
