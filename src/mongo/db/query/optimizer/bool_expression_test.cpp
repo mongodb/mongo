@@ -181,11 +181,7 @@ private:
 
 // Builds a BoolExpr according to input 'permutation'. The root will have 'rootChildren' children,
 // and each child will itself have between [1, maxBranching] atom children (variables with int Ids).
-template <bool buildCNF,
-          class TopLevel =
-              std::conditional_t<buildCNF, IntBoolExpr::Conjunction, IntBoolExpr::Disjunction>,
-          class SecondLevel =
-              std::conditional_t<buildCNF, IntBoolExpr::Disjunction, IntBoolExpr::Conjunction>>
+template <bool buildCNF>
 std::pair<IntBoolExpr::Node, int> buildExpr(int rootChildren, int permutation, int maxBranching) {
     auto getNextNumChildren = [&permutation, &maxBranching]() {
         const int result = permutation % maxBranching;
@@ -193,17 +189,18 @@ std::pair<IntBoolExpr::Node, int> buildExpr(int rootChildren, int permutation, i
         return result + 1;
     };
 
-    IntBoolExpr::NodeVector v;
     int varId = 0;
+    IntBoolExpr::Builder builder;
+    builder.push(buildCNF);
     for (int i = 0; i < rootChildren; i++) {
-        IntBoolExpr::NodeVector child;
-        int numAtomsForChild = getNextNumChildren();
+        builder.push(!buildCNF);
+        const int numAtomsForChild = getNextNumChildren();
         for (int j = 0; j < numAtomsForChild; j++) {
-            child.push_back(IntBoolExpr::make<IntBoolExpr::Atom>(varId++));
+            builder.atom(varId++);
         }
-        v.push_back(IntBoolExpr::make<SecondLevel>(std::move(child)));
+        builder.pop();
     }
-    return {IntBoolExpr::make<TopLevel>(std::move(v)), varId};
+    return {std::move(*builder.finish()), varId};
 }
 
 // For every assignment to the 'n' variables, 'expr' and 'transformed' should have the same result.

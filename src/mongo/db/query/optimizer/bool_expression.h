@@ -39,6 +39,13 @@
 
 namespace mongo::optimizer {
 
+template <class T>
+struct NoOpNegator {
+    T operator()(const T v) const {
+        return v;
+    }
+};
+
 /**
  * Represents a generic boolean expression with arbitrarily nested conjunctions and disjunction
  * elements.
@@ -135,6 +142,141 @@ struct BoolExpr {
         }
         return {};
     }
+
+    /**
+     * Builder which is used to create BoolExpr trees. It supports negation, which is translated
+     * internally to conjunction and disjunction via deMorgan elimination. The following template
+     * parameters need to be supplied:
+     *   1. Flag to enable empty or singular conjunction/disjunction simplifications. For example
+     * or-ing 0 elements results in the default constructed value of T (T{}).
+     *   2. Flag to allow removing of duplicate predicates. For example "x and x" is simplified to
+     * just "x".
+     *   3. Negation function. Used for deMorgan transformation. For example "not (x and y) is
+     * simplified to neg(x) or neg(y).
+     *
+     *  Usage:
+     *    1. use .pushConj() or .pushDisj() to begin a new conjunction / disjunction.
+     *    2. use .atom() to add elements to the current conjunction / disjunction.
+     *    3. use .pop() when done adding elements to the current conjunction / disjunction, and
+     * implicitly move to adding elements to the parent.
+     *    4. When we are done, call .finish(). Finish returns an empty result if no elements have
+     * been added to the root level, and we do not simplify singular conjunction/disjunctions.
+     */
+    template <bool simplifyEmptyOrSingular = false,
+              bool removeDups = false,
+              class Negator = NoOpNegator<T>>
+    class Builder {
+        enum class NodeType { Conj, Disj };
+
+        struct StackEntry {
+            NodeType _type;
+            bool _negated;
+            NodeVector _vector;
+        };
+
+    public:
+        Builder() : _result(), _stack(), _currentNegated(false) {}
+
+        template <typename... Ts>
+        Builder& atom(Ts&&... pack) {
+            return atom(T{std::forward<Ts>(pack)...});
+        }
+
+        Builder& atom(T value) {
+            if (isCurrentlyNegated()) {
+                value = Negator{}(std::move(value));
+            }
+            _result = make<Atom>(std::move(value));
+            maybeAddToParent();
+            return *this;
+        }
+
+        Builder& push(const bool isConjunction) {
+            const bool negated = isCurrentlyNegated();
+            _stack.push_back({(negated == isConjunction) ? NodeType::Disj : NodeType::Conj,
+                              negated,
+                              NodeVector{}});
+            return *this;
+        }
+
+        Builder& pushConj() {
+            return push(true /*isConjunction*/);
+        }
+
+        Builder& pushDisj() {
+            return push(false /*isConjunction*/);
+        }
+
+        Builder& negate() {
+            _currentNegated = !_currentNegated;
+            return *this;
+        }
+
+        Builder& pop() {
+            auto [type, negated, v] = std::move(_stack.back());
+            _stack.pop_back();
+
+            if constexpr (simplifyEmptyOrSingular) {
+                if (v.empty()) {
+                    // Empty set of children: return either default constructed T{} or its negation.
+                    _result = make<Atom>(type == NodeType::Conj ? Negator{}(T{}) : T{});
+                } else if (v.size() == 1) {
+                    // Eliminate singular conjunctions / disjunctions.
+                    _result = std::move(v.front());
+                } else {
+                    createNode(type, std::move(v));
+                }
+            } else if (v.empty()) {
+                _result = boost::none;
+            } else {
+                createNode(type, std::move(v));
+            }
+
+            maybeAddToParent();
+            return *this;
+        }
+
+        boost::optional<Node> finish() {
+            while (!_stack.empty()) {
+                pop();
+            }
+            return std::move(_result);
+        }
+
+    private:
+        void maybeAddToParent() {
+            if (_stack.empty() || !_result) {
+                return;
+            }
+
+            auto& parentVector = _stack.back()._vector;
+            if (!removeDups ||
+                std::find(parentVector.cbegin(), parentVector.cend(), *_result) ==
+                    parentVector.cend()) {
+                // Eliminate duplicate elements.
+                parentVector.push_back(std::move(*_result));
+            }
+            _result = boost::none;
+        }
+
+        void createNode(const NodeType type, NodeVector v) {
+            if (type == NodeType::Conj) {
+                _result = make<Conjunction>(std::move(v));
+            } else {
+                _result = make<Disjunction>(std::move(v));
+            }
+        }
+
+        bool isCurrentlyNegated() {
+            const bool negated = (!_stack.empty() && _stack.back()._negated) ^ _currentNegated;
+            _currentNegated = false;
+            return negated;
+        }
+
+        boost::optional<Node> _result;
+        std::vector<StackEntry> _stack;
+        bool _currentNegated;
+    };
 
     /**
      * Converts a BoolExpr to DNF. Assumes 'n' is in CNF. Returns boost::none if the resulting

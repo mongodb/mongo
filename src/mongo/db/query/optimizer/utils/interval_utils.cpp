@@ -265,15 +265,11 @@ std::vector<IntervalRequirement> unionTwoIntervals(const IntervalRequirement& in
     return result;
 }
 
-static IntervalReqExpr::Node makeSingularDNF(const IntervalRequirement& interval) {
-    return IntervalReqExpr::make<IntervalReqExpr::Disjunction>(
-        IntervalReqExpr::makeSeq(IntervalReqExpr::make<IntervalReqExpr::Conjunction>(
-            IntervalReqExpr::makeSeq(IntervalReqExpr::make<IntervalReqExpr::Atom>(interval)))));
-}
-
 boost::optional<IntervalReqExpr::Node> unionDNFIntervals(const IntervalReqExpr::Node& intervalDNF,
                                                          const ConstFoldFn& constFold) {
-    IntervalReqExpr::NodeVector resultIntervals;
+    IntervalReqExpr::Builder builder;
+    builder.pushDisj();
+
     // Since our input intervals are sorted, constDisjIntervals will be sorted as well.
     std::vector<IntervalRequirement> constDisjIntervals;
     const auto& disjNodes = intervalDNF.cast<IntervalReqExpr::Disjunction>()->nodes();
@@ -289,7 +285,7 @@ boost::optional<IntervalReqExpr::Node> unionDNFIntervals(const IntervalReqExpr::
             constDisjIntervals.push_back(interval);
         } else {
             // The bound is not constant, so we won't simplify.
-            resultIntervals.push_back(disjunct);
+            builder.pushConj().atom(interval).pop();
         }
     }
 
@@ -322,22 +318,17 @@ boost::optional<IntervalReqExpr::Node> unionDNFIntervals(const IntervalReqExpr::
     // to us. For example, (-inf, 5) U (3, inf) would become (-inf, inf).
     for (const auto& interval : constDisjIntervals) {
         if (interval.isFullyOpen()) {
-            return makeSingularDNF(interval);
+            return IntervalReqExpr::makeSingularDNF(interval);
         }
     }
 
     // Add our simplified constant disjuncts to the final result.
     for (auto& interval : constDisjIntervals) {
-        resultIntervals.emplace_back(
-            IntervalReqExpr::make<IntervalReqExpr::Conjunction>(IntervalReqExpr::makeSeq(
-                IntervalReqExpr::make<IntervalReqExpr::Atom>(std::move(interval)))));
+        builder.pushConj().atom(std::move(interval)).pop();
     }
 
-    if (resultIntervals.empty()) {
-        return boost::none;
-    }
-
-    return IntervalReqExpr::make<IntervalReqExpr::Disjunction>(std::move(resultIntervals));
+    // If we have an empty result, .finish() will return boost::none.
+    return builder.finish();
 }
 
 void combineIntervalsDNF(const bool intersect,
@@ -366,7 +357,15 @@ void combineIntervalsDNF(const bool intersect,
         return;
     }
 
-    IntervalReqExpr::NodeVector newDisjunction;
+    IntervalReqExpr::Builder builder;
+    builder.pushDisj();
+
+    const auto pushConjNodesFn = [&builder](const IntervalReqExpr::Node& conj) {
+        for (const auto& interval : conj.cast<IntervalReqExpr::Conjunction>()->nodes()) {
+            builder.atom(interval.cast<IntervalReqExpr::Atom>()->getExpr());
+        }
+    };
+
     // Integrate both compound bounds.
     if (intersect) {
         // Intersection is analogous to polynomial multiplication. Using '.' to denote intersection
@@ -375,33 +374,34 @@ void combineIntervalsDNF(const bool intersect,
         // can simplify (-inf, 10) ^ (5, +inf) to (5, 10), but this does not work with arrays.
 
         for (const auto& sourceConjunction : source.cast<IntervalReqExpr::Disjunction>()->nodes()) {
-            const auto& sourceConjunctionIntervals =
-                sourceConjunction.cast<IntervalReqExpr::Conjunction>()->nodes();
             for (const auto& targetConjunction :
                  target.cast<IntervalReqExpr::Disjunction>()->nodes()) {
                 // TODO: handle case with targetConjunct  fully open
-                // TODO: handle case with targetConjunct half-open and sourceConjuct equality.
-                // TODO: handle case with both targetConjunct and sourceConjuct equalities
+                // TODO: handle case with targetConjunct half-open and sourceConjunct equality.
+                // TODO: handle case with both targetConjunct and sourceConjunct equalities
                 // (different consts).
 
-                auto newConjunctionIntervals =
-                    targetConjunction.cast<IntervalReqExpr::Conjunction>()->nodes();
-                std::copy(sourceConjunctionIntervals.cbegin(),
-                          sourceConjunctionIntervals.cend(),
-                          std::back_inserter(newConjunctionIntervals));
-                newDisjunction.emplace_back(IntervalReqExpr::make<IntervalReqExpr::Conjunction>(
-                    std::move(newConjunctionIntervals)));
+                builder.pushConj();
+                pushConjNodesFn(sourceConjunction);
+                pushConjNodesFn(targetConjunction);
+                builder.pop();
             }
         }
     } else {
         // Unioning is analogous to polynomial addition.
         // (a.b + c.d) + (e+f) = a.b + c.d + e + f
-        newDisjunction = target.cast<IntervalReqExpr::Disjunction>()->nodes();
-        for (const auto& sourceConjunction : source.cast<IntervalReqExpr::Disjunction>()->nodes()) {
-            newDisjunction.push_back(sourceConjunction);
+        for (const auto& conj : target.cast<IntervalReqExpr::Disjunction>()->nodes()) {
+            builder.pushConj();
+            pushConjNodesFn(conj);
+            builder.pop();
+        }
+        for (const auto& conj : source.cast<IntervalReqExpr::Disjunction>()->nodes()) {
+            builder.pushConj();
+            pushConjNodesFn(conj);
+            builder.pop();
         }
     }
-    target = IntervalReqExpr::make<IntervalReqExpr::Disjunction>(std::move(newDisjunction));
+    target = std::move(*builder.finish());
 }
 
 static std::vector<IntervalRequirement> intersectIntervals(const IntervalRequirement& i1,
@@ -590,7 +590,8 @@ static std::vector<IntervalRequirement> intersectIntervals(const IntervalRequire
 
 boost::optional<IntervalReqExpr::Node> intersectDNFIntervals(
     const IntervalReqExpr::Node& intervalDNF, const ConstFoldFn& constFold) {
-    IntervalReqExpr::NodeVector disjuncts;
+    IntervalReqExpr::Builder<false /*simplifyEmptyOrSingular*/, true /*removeDups*/> builder;
+    builder.pushDisj();
 
     for (const auto& disjunct : intervalDNF.cast<IntervalReqExpr::Disjunction>()->nodes()) {
         const auto& conjuncts = disjunct.cast<IntervalReqExpr::Conjunction>()->nodes();
@@ -627,22 +628,14 @@ boost::optional<IntervalReqExpr::Node> intersectDNFIntervals(
             continue;  // The whole conjunct is false (empty interval), skip it.
         }
 
-        for (const auto& interval : intersectedIntervalDisjunction) {
-            auto conjunction =
-                IntervalReqExpr::make<IntervalReqExpr::Conjunction>(IntervalReqExpr::makeSeq(
-                    IntervalReqExpr::make<IntervalReqExpr::Atom>(std::move(interval))));
-
-            // Remove redundant conjunctions.
-            if (std::find(disjuncts.cbegin(), disjuncts.cend(), conjunction) == disjuncts.cend()) {
-                disjuncts.push_back(std::move(conjunction));
-            }
+        for (auto& interval : intersectedIntervalDisjunction) {
+            // We will remove duplicate conjuncts here.
+            builder.pushConj().atom(std::move(interval)).pop();
         }
     }
 
-    if (disjuncts.empty()) {
-        return {};
-    }
-    return IntervalReqExpr::make<IntervalReqExpr::Disjunction>(std::move(disjuncts));
+    // If we have an empty result, .finish() will return boost::none.
+    return builder.finish();
 }
 
 boost::optional<IntervalReqExpr::Node> simplifyDNFIntervals(const IntervalReqExpr::Node& interval,
@@ -657,13 +650,14 @@ boost::optional<IntervalReqExpr::Node> simplifyDNFIntervals(const IntervalReqExp
 bool combineCompoundIntervalsDNF(CompoundIntervalReqExpr::Node& targetIntervals,
                                  const IntervalReqExpr::Node& sourceIntervals,
                                  bool reverseSource) {
-    CompoundIntervalReqExpr::NodeVector newDisjunction;
+    CompoundIntervalReqExpr::Builder builder;
+    builder.pushDisj();
 
     for (const auto& sourceConjunction :
          sourceIntervals.cast<IntervalReqExpr::Disjunction>()->nodes()) {
         for (const auto& targetConjunction :
              targetIntervals.cast<CompoundIntervalReqExpr::Disjunction>()->nodes()) {
-            CompoundIntervalReqExpr::NodeVector newConjunction;
+            builder.pushConj();
 
             for (const auto& sourceConjunct :
                  sourceConjunction.cast<IntervalReqExpr::Conjunction>()->nodes()) {
@@ -687,30 +681,26 @@ bool combineCompoundIntervalsDNF(CompoundIntervalReqExpr::Node& targetIntervals,
                     } else {
                         newInterval.push_back(sourceInterval);
                     }
-                    newConjunction.emplace_back(
-                        CompoundIntervalReqExpr::make<CompoundIntervalReqExpr::Atom>(
-                            std::move(newInterval)));
+                    builder.atom(std::move(newInterval));
                 }
             }
 
-            newDisjunction.emplace_back(
-                CompoundIntervalReqExpr::make<CompoundIntervalReqExpr::Conjunction>(
-                    std::move(newConjunction)));
+            builder.pop();
         }
     }
 
-    targetIntervals = CompoundIntervalReqExpr::make<CompoundIntervalReqExpr::Disjunction>(
-        std::move(newDisjunction));
+    targetIntervals = std::move(*builder.finish());
     return true;
 }
 
 void padCompoundIntervalsDNF(CompoundIntervalReqExpr::Node& targetIntervals,
                              const bool reverseSource) {
-    CompoundIntervalReqExpr::NodeVector newDisjunction;
+    CompoundIntervalReqExpr::Builder builder;
+    builder.pushDisj();
 
     for (const auto& targetConjunction :
          targetIntervals.cast<CompoundIntervalReqExpr::Disjunction>()->nodes()) {
-        CompoundIntervalReqExpr::NodeVector newConjunction;
+        builder.pushConj();
 
         for (const auto& targetConjunct :
              targetConjunction.cast<CompoundIntervalReqExpr::Conjunction>()->nodes()) {
@@ -736,18 +726,13 @@ void padCompoundIntervalsDNF(CompoundIntervalReqExpr::Node& targetIntervals,
             } else {
                 newInterval.push_back(sourceInterval);
             }
-            newConjunction.emplace_back(
-                CompoundIntervalReqExpr::make<CompoundIntervalReqExpr::Atom>(
-                    std::move(newInterval)));
+            builder.atom(std::move(newInterval));
         }
 
-        newDisjunction.emplace_back(
-            CompoundIntervalReqExpr::make<CompoundIntervalReqExpr::Conjunction>(
-                std::move(newConjunction)));
+        builder.pop();
     }
 
-    targetIntervals = CompoundIntervalReqExpr::make<CompoundIntervalReqExpr::Disjunction>(
-        std::move(newDisjunction));
+    targetIntervals = std::move(*builder.finish());
 }
 
 /**

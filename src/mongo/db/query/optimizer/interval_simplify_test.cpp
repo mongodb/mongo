@@ -35,6 +35,8 @@
 #include "mongo/db/query/optimizer/metadata_factory.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
+#include "mongo/db/query/optimizer/utils/bool_expression_printer.h"
+#include "mongo/db/query/optimizer/utils/ce_math.h"
 #include "mongo/db/query/optimizer/utils/interval_utils.h"
 #include "mongo/db/query/optimizer/utils/unit_test_abt_literals.h"
 #include "mongo/db/query/optimizer/utils/unit_test_pipeline_utils.h"
@@ -926,13 +928,14 @@ void testIntervalFuzz(const uint64_t seed, PseudoRandom& threadLocalRNG) {
 
     // Intersect with multiple intervals.
     {
-        IntervalReqExpr::NodeVector intervalVec;
+        IntervalReqExpr::Builder builder;
+        builder.pushDisj().pushConj();
         for (size_t i = 0; i < numIntervals; i++) {
-            intervalVec.push_back(_interval(makeRandomBound<N, true>(threadLocalRNG, vars),
-                                            makeRandomBound<N, false>(threadLocalRNG, vars)));
+            builder.atom(makeRandomBound<N, true>(threadLocalRNG, vars),
+                         makeRandomBound<N, false>(threadLocalRNG, vars));
         }
 
-        auto original = _disj(_conj(std::move(intervalVec)));
+        auto original = std::move(*builder.finish());
         normalizeIntervals(original);
         auto simplified = intersectDNFIntervals(original, ConstEval::constFold);
 
@@ -960,12 +963,13 @@ void testIntervalFuzz(const uint64_t seed, PseudoRandom& threadLocalRNG) {
         std::vector<IntervalRequirement> unionResult =
             unionTwoIntervals(int1, int2, ConstEval::constFold);
 
-        IntervalReqExpr::NodeVector simplifiedDisj;
+        IntervalReqExpr::Builder builder;
+        builder.pushDisj();
         for (IntervalRequirement& interval : unionResult) {
-            simplifiedDisj.push_back(_conj(_interval(std::move(interval))));
+            builder.pushConj().atom(std::move(interval)).pop();
         }
-        IntervalReqExpr::Node simplified =
-            simplifiedDisj.empty() ? makeEmptyInterval() : _disj(std::move(simplifiedDisj));
+        auto result = builder.finish();
+        IntervalReqExpr::Node simplified = result ? std::move(*result) : makeEmptyInterval();
 
         varEval.replaceVarsInInterval(original);
         varEval.replaceVarsInInterval(simplified);
@@ -977,14 +981,16 @@ void testIntervalFuzz(const uint64_t seed, PseudoRandom& threadLocalRNG) {
 
     // Union with multiple intervals.
     {
-        IntervalReqExpr::NodeVector intervalVec;
+        IntervalReqExpr::Builder builder;
+        builder.pushDisj();
         for (size_t i = 0; i < numIntervals; i++) {
-            intervalVec.push_back(
-                _conj(_interval(makeRandomBound<N, true>(threadLocalRNG, vars),
-                                makeRandomBound<N, false>(threadLocalRNG, vars))));
+            builder.pushConj()
+                .atom(makeRandomBound<N, true>(threadLocalRNG, vars),
+                      makeRandomBound<N, false>(threadLocalRNG, vars))
+                .pop();
         }
 
-        auto original = _disj(std::move(intervalVec));
+        auto original = std::move(*builder.finish());
         normalizeIntervals(original);
         auto simplified = unionDNFIntervals(original, ConstEval::constFold);
 
@@ -1002,18 +1008,19 @@ void testIntervalFuzz(const uint64_t seed, PseudoRandom& threadLocalRNG) {
 
     // Test a mix of unions and intersections.
     {
-        IntervalReqExpr::NodeVector disjVec;
+        IntervalReqExpr::Builder builder;
+        builder.pushDisj();
         for (size_t i = 0; i < numIntervals; i++) {
             const size_t numConjuncts = 1 + threadLocalRNG.nextInt32(3);
-            IntervalReqExpr::NodeVector conjVec;
+            builder.pushConj();
             for (size_t j = 0; j < numConjuncts; j++) {
-                conjVec.push_back(_interval(makeRandomBound<N, true>(threadLocalRNG, vars),
-                                            makeRandomBound<N, false>(threadLocalRNG, vars)));
+                builder.atom(makeRandomBound<N, true>(threadLocalRNG, vars),
+                             makeRandomBound<N, false>(threadLocalRNG, vars));
             }
-            disjVec.push_back(_conj(std::move(conjVec)));
+            builder.pop();
         }
 
-        auto original = _disj(std::move(disjVec));
+        auto original = std::move(*builder.finish());
         normalizeIntervals(original);
         auto simplified = simplifyDNFIntervals(original, ConstEval::constFold);
 
@@ -1117,6 +1124,59 @@ TEST(IntervalIntersection, IntersectionSpecialCase) {
     varEval.replaceVarsInInterval(original);
     varEval.replaceVarsInInterval(*simplified);
     ASSERT(compareIntervals<bitsetSize>(original, *simplified));
+}
+
+TEST(BoolExprBuilder, Builder1) {
+    struct SelNegator {
+        SelectivityType operator()(const SelectivityType sel) const {
+            return ce::negateSel(sel);
+        }
+    };
+
+    using SelTreeBuilder = BoolExpr<
+        SelectivityType>::Builder<true /*simplifyEmptyConjDisj*/, false /*removeDups*/, SelNegator>;
+    using PrinterType = BoolExprPrinter<SelectivityType>;
+
+    {
+        auto node = SelTreeBuilder{}
+                        .pushConj()
+                        .atom(SelectivityType{0.1})
+                        .atom(SelectivityType{0.2})
+                        .pushDisj()
+                        .pushConj()
+                        .atom(SelectivityType{0.4})
+                        .atom(SelectivityType{0.5})
+                        .pop()
+                        .atom(SelectivityType{0.3})
+                        .pop()
+                        .pop()
+                        .finish();
+
+        ASSERT_STR_EQ_AUTO(                         // NOLINT
+            "(0.1 ^ 0.2 ^ ((0.4 ^ 0.5) U 0.3))\n",  // NOLINT (test auto-update)
+            PrinterType{}.print(*node));
+    }
+
+    {
+        auto node = SelTreeBuilder{}
+                        .pushConj()
+                        .atom(SelectivityType{0.1})
+                        .atom(SelectivityType{0.2})
+                        .negate()  // Observe negation: below deMorgan applies.
+                        .pushDisj()
+                        .pushConj()
+                        .atom(SelectivityType{0.4})
+                        .atom(SelectivityType{0.5})
+                        .pop()
+                        .atom(SelectivityType{0.3})
+                        .pop()
+                        .pop()
+                        .finish();
+
+        ASSERT_STR_EQ_AUTO(                         // NOLINT
+            "(0.1 ^ 0.2 ^ ((0.6 U 0.5) ^ 0.7))\n",  // NOLINT (test auto-update)
+            PrinterType{}.print(*node));
+    }
 }
 
 }  // namespace
