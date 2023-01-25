@@ -16,15 +16,17 @@ ARTIFACT_DIR = os.path.join(BUILD_DIR, VARIANT_DIR)
 if os.path.exists(ARTIFACT_DIR):
     shutil.rmtree(ARTIFACT_DIR)
 
-
-@patch("sys.argv", [
+ARGS = [
     'buildscripts/scons.py',
     f"VARIANT_DIR={VARIANT_DIR}",
     f"--build-dir={BUILD_DIR}",
     "--build-profile=fast",
     "--ninja=disabled",
     "install-platform",
-])
+]
+
+
+@patch("sys.argv", ARGS)
 @patch.object(TopLevelMetrics, 'should_collect_metrics', MagicMock(return_value=True))
 class TestSconsAtExitMetricsCollection(unittest.TestCase):
     @patch.object(client, 'should_collect_internal_metrics', MagicMock(return_value=True))
@@ -43,6 +45,10 @@ class TestSconsAtExitMetricsCollection(unittest.TestCase):
 
         assert not metrics.is_malformed()
         assert len(metrics.build_info.build_artifacts) > 0
+        assert metrics.command_info.command == ARGS
+        assert metrics.command_info.positional_args == [
+            f"VARIANT_DIR={VARIANT_DIR}", "install-platform"
+        ]
 
     @patch.object(client, 'should_collect_internal_metrics', MagicMock(return_value=False))
     @patch.object(atexit, "register", MagicMock())
@@ -68,3 +74,7 @@ class TestSconsAtExitMetricsCollection(unittest.TestCase):
         metrics = generate_metrics(**kwargs)
 
         assert not metrics.is_malformed()
+        assert metrics.command_info.command == ARGS
+        assert metrics.command_info.positional_args == [
+            f"VARIANT_DIR={VARIANT_DIR}", "install-platform"
+        ]

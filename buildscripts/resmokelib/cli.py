@@ -29,8 +29,11 @@ def main(argv):
     )
     try:
         metrics_client = get_mongo_metrics_client()
-        metrics_client.register_metrics(ResmokeToolingMetrics,
-                                        utc_starttime=datetime.utcfromtimestamp(__start_time))
+        metrics_client.register_metrics(
+            ResmokeToolingMetrics,
+            utc_starttime=datetime.utcfromtimestamp(__start_time),
+            parser=parser.get_parser(),
+        )
     except ExternalHostException as _:
         pass
     except Exception as _:  # pylint: disable=broad-except

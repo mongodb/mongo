@@ -30,6 +30,9 @@ class TestResmokeAtExitMetricsCollection(unittest.TestCase):
         metrics = generate_metrics(**kwargs)
 
         assert not metrics.is_malformed()
+        assert metrics.command_info.command == ['buildscripts/resmoke.py', 'list-suites']
+        assert metrics.command_info.options['command'] == 'list-suites'
+        assert metrics.command_info.positional_args == []
 
     @patch("sys.argv", ['buildscripts/resmoke.py', 'list-suites'])
     @patch.object(client, 'should_collect_internal_metrics', MagicMock(return_value=True))
@@ -65,3 +68,8 @@ class TestResmokeAtExitMetricsCollection(unittest.TestCase):
         metrics = generate_metrics(**kwargs)
 
         assert not metrics.is_malformed()
+        assert metrics.command_info.command == [
+            'buildscripts/resmoke.py', 'run', '--suite', 'buildscripts_test'
+        ]
+        assert metrics.command_info.options['command'] == 'run'
+        assert metrics.command_info.positional_args == []

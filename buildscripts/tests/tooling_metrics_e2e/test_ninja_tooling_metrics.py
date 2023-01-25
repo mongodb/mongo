@@ -52,6 +52,17 @@ class TestNinjaAtExitMetricsCollection(unittest.TestCase):
 
         assert not metrics.is_malformed()
         assert len(metrics.build_info.build_artifacts) > 0
+        assert metrics.command_info.command == [
+            "ninja",
+            "-j",
+            "400",
+            "-f",
+            "fast.ninja",
+            "install-platform",
+        ]
+        assert metrics.command_info.positional_args == ["install-platform"]
+        assert metrics.command_info.options['f'] == "fast.ninja"
+        assert metrics.command_info.options['j'] == "400"
 
     @patch.object(client, 'should_collect_internal_metrics', MagicMock(return_value=False))
     @patch.object(atexit, "register", MagicMock())

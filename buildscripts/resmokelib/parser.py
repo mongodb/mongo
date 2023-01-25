@@ -26,9 +26,8 @@ _PLUGINS = [
 ]
 
 
-def parse(sys_args, usage=None):
-    """Parse the CLI args."""
-
+def get_parser(usage=None):
+    """Get the resmoke parser."""
     parser = argparse.ArgumentParser(usage=usage)
     subparsers = parser.add_subparsers(dest="command")
     parser.add_argument("--configDir", dest="config_dir", metavar="CONFIG_DIR",
@@ -38,6 +37,13 @@ def parse(sys_args, usage=None):
     for plugin in _PLUGINS:
         plugin.add_subcommand(subparsers)
 
+    return parser
+
+
+def parse(sys_args, usage=None):
+    """Parse the CLI args."""
+
+    parser = get_parser(usage=usage)
     parsed_args = parser.parse_args(sys_args)
 
     return parser, parsed_args

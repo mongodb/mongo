@@ -1612,7 +1612,6 @@ try:
         env_vars=env_vars,
         env=env,
         parser=_parser,
-        args=sys.argv,
     )
 except ExternalHostException as _:
     pass
