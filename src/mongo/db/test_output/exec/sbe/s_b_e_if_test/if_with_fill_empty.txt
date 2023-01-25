@@ -7,17 +7,16 @@
 
 
 -- COMPILED EXPRESSION:
-[0x0000-0x0040]
+[0x0000-0x003b]
 0x0000: pushAccessVal(accessor: <accessor>);
-0x0009: jmpNothing(target: 0x0013);
-0x000e: jmp(target: 0x001d);
-0x0013: pop();
-0x0014: pushAccessVal(accessor: <accessor>);
-0x001d: jmpNothing(target: 0x0040);
-0x0022: jmpTrue(target: 0x0036);
-0x0027: pushConstVal(value: "else");
-0x0031: jmp(target: 0x0040);
-0x0036: pushConstVal(value: "then");
+0x0009: jmpNotNothing(target: 0x0018);
+0x000e: pop();
+0x000f: pushAccessVal(accessor: <accessor>);
+0x0018: jmpNothing(target: 0x003b);
+0x001d: jmpTrue(target: 0x0031);
+0x0022: pushConstVal(value: "else");
+0x002c: jmp(target: 0x003b);
+0x0031: pushConstVal(value: "then");
 
 
 -- EXECUTE VARIATION:

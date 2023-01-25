@@ -4,12 +4,11 @@
 (s1 ?: Nothing) 
 
 -- COMPILED EXPRESSION:
-[0x0000-0x001e]
+[0x0000-0x0019]
 0x0000: pushAccessVal(accessor: <accessor>);
-0x0009: jmpNothing(target: 0x0013);
-0x000e: jmp(target: 0x001e);
-0x0013: pop();
-0x0014: pushConstVal(value: Nothing);
+0x0009: jmpNotNothing(target: 0x0019);
+0x000e: pop();
+0x000f: pushConstVal(value: Nothing);
 
 
 -- EXECUTE VARIATION:

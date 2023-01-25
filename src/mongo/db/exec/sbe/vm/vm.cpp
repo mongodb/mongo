@@ -160,6 +160,7 @@ int Instruction::stackOffset[Instruction::Tags::lastInstruction] = {
     -1,  // jmpTrue
     -1,  // jmpFalse
     0,   // jmpNothing
+    0,   // jmpNotNothing
     0,   // ret
     0,   // allocStack does not affect the top of stack
 
@@ -925,6 +926,17 @@ void CodeFragment::appendJumpNothing(int jumpOffset) {
     offset += writeToMemory(offset, jumpOffset);
 
     adjustStackSimple(i);
+}
+
+void CodeFragment::appendJumpNotNothing(int jumpOffset) {
+    Instruction i;
+    i.tag = Instruction::jmpNotNothing;
+    adjustStackSimple(i);
+
+    auto offset = allocateSpace(sizeof(Instruction) + sizeof(jumpOffset));
+
+    offset += writeToMemory(offset, i);
+    offset += writeToMemory(offset, jumpOffset);
 }
 
 void CodeFragment::appendRet() {
@@ -6702,6 +6714,16 @@ void ByteCode::runInternal(const CodeFragment* code, int64_t position) {
 
                 auto [owned, tag, val] = getFromStack(0);
                 if (tag == value::TypeTags::Nothing) {
+                    pcPointer += jumpOffset;
+                }
+                break;
+            }
+            case Instruction::jmpNotNothing: {
+                auto jumpOffset = readFromMemory<int>(pcPointer);
+                pcPointer += sizeof(jumpOffset);
+
+                auto [owned, tag, val] = getFromStack(0);
+                if (tag != value::TypeTags::Nothing) {
                     pcPointer += jumpOffset;
                 }
                 break;

@@ -268,7 +268,8 @@ public:
                 case Instruction::jmp:
                 case Instruction::jmpTrue:
                 case Instruction::jmpFalse:
-                case Instruction::jmpNothing: {
+                case Instruction::jmpNothing:
+                case Instruction::jmpNotNothing: {
                     auto offset = readFromMemory<int>(pcPointer);
                     pcPointer += sizeof(offset);
                     os << "target: " << _formatter.pcPointer(pcPointer + offset);

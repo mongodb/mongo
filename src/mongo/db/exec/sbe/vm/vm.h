@@ -343,6 +343,7 @@ struct Instruction {
         jmpTrue,
         jmpFalse,
         jmpNothing,
+        jmpNotNothing,
         ret,  // used only by simple local lambdas
         allocStack,
 
@@ -568,6 +569,8 @@ struct Instruction {
                 return "jmpFalse";
             case jmpNothing:
                 return "jmpNothing";
+            case jmpNotNothing:
+                return "jmpNotNothing";
             case ret:
                 return "ret";
             case allocStack:
@@ -880,6 +883,7 @@ public:
     void appendJumpTrue(int jumpOffset);
     void appendJumpFalse(int jumpOffset);
     void appendJumpNothing(int jumpOffset);
+    void appendJumpNotNothing(int jumpOffset);
     void appendRet();
     void appendAllocStack(uint32_t size);
     void appendFail();

@@ -811,7 +811,7 @@ class SbeCodeFragmentPrinter(object):
             if op_name in ['pushLocalVal', 'pushMoveLocalVal', 'pushLocalLambda']:
                 args = 'arg: ' + str(read_as_integer(cur_op, int_size))
                 cur_op += int_size
-            elif op_name in ['jmp', 'jmpTrue', 'jmpNothing']:
+            elif op_name in ['jmp', 'jmpTrue', 'jmpFalse', 'jmpNothing', 'jmpNotNothing']:
                 offset = read_as_integer_signed(cur_op, int_size)
                 cur_op += int_size
                 args = 'offset: ' + str(offset) + ', target: ' + hex(cur_op + offset)
