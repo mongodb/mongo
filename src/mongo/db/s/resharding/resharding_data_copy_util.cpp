@@ -170,8 +170,6 @@ Value findHighestInsertedId(OperationContext* opCtx, const CollectionPtr& collec
 
 boost::optional<Document> findDocWithHighestInsertedId(OperationContext* opCtx,
                                                        const CollectionPtr& collection) {
-    // TODO SERVER-60824: Remove special handling for empty collections once non-blocking sort is
-    // enabled on clustered collections.
     if (collection && collection->isEmpty(opCtx)) {
         return boost::none;
     }

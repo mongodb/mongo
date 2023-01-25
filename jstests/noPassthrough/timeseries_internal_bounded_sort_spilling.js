@@ -46,9 +46,6 @@ assert.commandWorked(
     }
     assert.gt(buckets.aggregate([{$count: 'n'}]).next().n, 1, 'Expected more than one bucket');
 }
-// Create an index: we'll need this to scan the buckets in time order.
-// TODO SERVER-60824 use the $natural / _id index instead.
-assert.commandWorked(coll.createIndex({t: 1}));
 
 const unpackStage = getAggPlanStage(coll.explain().aggregate(), '$_internalUnpackBucket');
 

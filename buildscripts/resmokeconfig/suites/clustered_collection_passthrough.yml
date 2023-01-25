@@ -52,8 +52,6 @@ selector:
   # Expects to see IXSCAN over _id (cluster key).
   - jstests/core/**/find_and_modify_hint.js
   - jstests/core/**/covered_index_sort_2.js
-  # TODO (SERVER-60824): Resolve sort exceeded memory limit.
-  - jstests/core/**/sortg.js
   # Expects duplicate key error to have _id index use specified.
   - jstests/core/**/uniqueness.js
   # Expects to see the usage of _id_ index by using $indexStats.

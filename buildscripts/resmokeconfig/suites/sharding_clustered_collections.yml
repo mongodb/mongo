@@ -5,12 +5,6 @@ selector:
   - jstests/sharding/**/*.js
   exclude_files:
   - jstests/sharding/**/libs/**/*.js
-  # TODO (SERVER-60824): Support non-blocking sort() for resharding cloner.
-  - jstests/sharding/test_resharding_test_fixture_shutdown_retry_needed.js
-  - jstests/sharding/resharding_collection_cloner_resuming.js
-  - jstests/sharding/reshard_collection_failover_shutdown_basic.js
-  # TODO (SERVER-60824): Support non-blocking sort() to prevent 'Sort exceeded memory limit'.
-  - jstests/sharding/shard6.js
   # Expects hint(_id) to yield an index scan instead of a table scan.
   - jstests/sharding/shard2.js
   # Expects the collection creation options not to change.
