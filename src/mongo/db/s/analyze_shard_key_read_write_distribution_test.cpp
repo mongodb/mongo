@@ -37,8 +37,10 @@
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
+#include "mongo/s/analyze_shard_key_server_parameters_gen.h"
 #include "mongo/s/analyze_shard_key_util.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -146,7 +148,14 @@ protected:
                                                       const BSONObj& filter,
                                                       const BSONObj& collation = BSONObj()) const {
         auto cmd = SampledReadCommand{filter, collation};
-        return {UUID::gen(), nss, collUuid, cmdName, cmd.toBSON()};
+        return {UUID::gen(),
+                nss,
+                collUuid,
+                cmdName,
+                cmd.toBSON(),
+                Date_t::now() +
+                    mongo::Milliseconds(
+                        analyze_shard_key::gQueryAnalysisSampleExpirationSecs.load() * 1000)};
     }
 
     SampledQueryDocument makeSampledUpdateQueryDocument(
@@ -157,7 +166,10 @@ protected:
                 nss,
                 collUuid,
                 SampledCommandNameEnum::kUpdate,
-                cmd.toBSON(BSON("$db" << nss.db().toString()))};
+                cmd.toBSON(BSON("$db" << nss.db().toString())),
+                Date_t::now() +
+                    mongo::Milliseconds(
+                        analyze_shard_key::gQueryAnalysisSampleExpirationSecs.load() * 1000)};
     }
 
     SampledQueryDocument makeSampledDeleteQueryDocument(
@@ -168,7 +180,10 @@ protected:
                 nss,
                 collUuid,
                 SampledCommandNameEnum::kDelete,
-                cmd.toBSON(BSON("$db" << nss.db().toString()))};
+                cmd.toBSON(BSON("$db" << nss.db().toString())),
+                Date_t::now() +
+                    mongo::Milliseconds(
+                        analyze_shard_key::gQueryAnalysisSampleExpirationSecs.load() * 1000)};
     }
 
     SampledQueryDocument makeSampledFindAndModifyQueryDocument(
@@ -187,7 +202,10 @@ protected:
                 nss,
                 collUuid,
                 SampledCommandNameEnum::kFindAndModify,
-                cmd.toBSON(BSON("$db" << nss.db().toString()))};
+                cmd.toBSON(BSON("$db" << nss.db().toString())),
+                Date_t::now() +
+                    mongo::Milliseconds(
+                        analyze_shard_key::gQueryAnalysisSampleExpirationSecs.load() * 1000)};
     }
 
     void assertTargetMetricsForReadQuery(const CollectionRoutingInfoTargeter& targeter,

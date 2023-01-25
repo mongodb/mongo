@@ -990,10 +990,10 @@ Status runAggregate(OperationContext* opCtx,
 
         if (analyze_shard_key::supportsPersistingSampledQueries() && request.getSampleId()) {
             analyze_shard_key::QueryAnalysisWriter::get(opCtx)
-                .addAggregateQuery(*request.getSampleId(),
-                                   expCtx->ns,
-                                   pipeline->getInitialQuery(),
-                                   expCtx->getCollatorBSON())
+                ->addAggregateQuery(*request.getSampleId(),
+                                    expCtx->ns,
+                                    pipeline->getInitialQuery(),
+                                    expCtx->getCollatorBSON())
                 .getAsync([](auto) {});
         }
 

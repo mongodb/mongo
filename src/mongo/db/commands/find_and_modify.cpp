@@ -681,7 +681,7 @@ write_ops::FindAndModifyCommandReply CmdFindAndModify::Invocation::typedRun(
 
     if (analyze_shard_key::supportsPersistingSampledQueries() && request().getSampleId()) {
         analyze_shard_key::QueryAnalysisWriter::get(opCtx)
-            .addFindAndModifyQuery(request())
+            ->addFindAndModifyQuery(request())
             .getAsync([](auto) {});
     }
 

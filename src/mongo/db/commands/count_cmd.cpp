@@ -256,10 +256,10 @@ public:
 
         if (analyze_shard_key::supportsPersistingSampledQueries() && request.getSampleId()) {
             analyze_shard_key::QueryAnalysisWriter::get(opCtx)
-                .addCountQuery(*request.getSampleId(),
-                               nss,
-                               request.getQuery(),
-                               request.getCollation().value_or(BSONObj()))
+                ->addCountQuery(*request.getSampleId(),
+                                nss,
+                                request.getQuery(),
+                                request.getCollation().value_or(BSONObj()))
                 .getAsync([](auto) {});
         }
 

@@ -433,7 +433,7 @@ CommonMongodProcessInterface::attachCursorSourceToPipelineForLocalRead(Pipeline*
     if (expCtx->eligibleForSampling()) {
         if (auto sampleId = analyze_shard_key::tryGenerateSampleId(expCtx->opCtx, expCtx->ns)) {
             analyze_shard_key::QueryAnalysisWriter::get(expCtx->opCtx)
-                .addAggregateQuery(
+                ->addAggregateQuery(
                     *sampleId, expCtx->ns, pipeline->getInitialQuery(), expCtx->getCollatorBSON())
                 .getAsync([](auto) {});
         }

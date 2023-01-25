@@ -80,6 +80,9 @@ structs:
       cmd:
         type: object
         description: "The command object for the read or write."
+      expireAt:
+        type: date
+        description: "The time at which the document should be deleted by the TTL monitor."
 
   SampledQueryDiffDocument:
     description: "Represents a document storing the diff for a sampled write query."
@@ -98,3 +101,6 @@ structs:
       diff:
         type: object
         description: "The diff for the write."
+      expireAt:
+        type: date
+        description: "The time at which the document should be deleted by the TTL monitor."

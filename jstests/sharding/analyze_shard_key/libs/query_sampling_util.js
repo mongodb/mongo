@@ -262,6 +262,32 @@ var QuerySamplingUtil = (function() {
         return actualNumPerSec;
     }
 
+    /**
+     * Returns the total number of query sample documents across shards.
+     */
+    function getNumSampledQueryDocuments(st) {
+        let numDocs = 0;
+
+        st._rs.forEach((rs) => {
+            numDocs += rs.test.getPrimary().getCollection(kSampledQueriesNs).find().itcount();
+        });
+
+        return numDocs;
+    }
+
+    /**
+     * Returns the total number of query sample diff documents across shards.
+     */
+    function getNumSampledQueryDiffDocuments(st) {
+        let numDocs = 0;
+
+        st._rs.forEach((rs) => {
+            numDocs += rs.test.getPrimary().getCollection(kSampledQueriesDiffNs).find().itcount();
+        });
+
+        return numDocs;
+    }
+
     return {
         getCollectionUuid,
         generateRandomString,
@@ -276,6 +302,8 @@ var QuerySamplingUtil = (function() {
         assertSoonSingleSampledDiffDocument,
         assertNoSampledDiffDocuments,
         clearSampledDiffCollection,
-        runCmdsOnRepeat
+        runCmdsOnRepeat,
+        getNumSampledQueryDocuments,
+        getNumSampledQueryDiffDocuments
     };
 })();

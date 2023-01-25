@@ -883,10 +883,6 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     auto catalog = std::make_unique<stats::StatsCatalog>(serviceContext, std::move(cacheLoader));
     stats::StatsCatalog::set(serviceContext, std::move(catalog));
 
-    if (analyze_shard_key::supportsPersistingSampledQueriesIgnoreFCV()) {
-        analyze_shard_key::QueryAnalysisWriter::get(serviceContext).onStartup();
-    }
-
     // MessageServer::run will return when exit code closes its socket and we don't need the
     // operation context anymore
     startupOpCtx.reset();
@@ -1359,15 +1355,6 @@ void shutdownTask(const ShutdownTaskArgs& shutdownArgs) {
     if (auto lsc = LogicalSessionCache::get(serviceContext)) {
         LOGV2(4784903, "Shutting down the LogicalSessionCache");
         lsc->joinOnShutDown();
-    }
-
-    if (analyze_shard_key::supportsSamplingQueriesIgnoreFCV()) {
-        LOGV2(7114100, "Shutting down the QueryAnalysisSampler");
-        analyze_shard_key::QueryAnalysisSampler::get(serviceContext).onShutdown();
-    }
-    if (analyze_shard_key::supportsPersistingSampledQueriesIgnoreFCV()) {
-        LOGV2(7047303, "Shutting down the QueryAnalysisWriter");
-        analyze_shard_key::QueryAnalysisWriter::get(serviceContext).onShutdown();
     }
 
     // Shutdown the TransportLayer so that new connections aren't accepted

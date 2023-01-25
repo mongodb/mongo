@@ -127,3 +127,13 @@ server_parameters:
         default: 8
         validator:
             gte: 1
+    queryAnalysisSampleExpirationSecs:
+        description: The amount of time in seconds that a sampled query document should exist
+                     before being removed by the TTL monitor.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gQueryAnalysisSampleExpirationSecs
+        default:
+            expr: 7 * 24 * 3600
+        validator:
+            gt: 0

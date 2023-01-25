@@ -250,10 +250,10 @@ public:
         if (analyze_shard_key::supportsPersistingSampledQueries() && parsedDistinct.getSampleId()) {
             auto cq = parsedDistinct.getQuery();
             analyze_shard_key::QueryAnalysisWriter::get(opCtx)
-                .addDistinctQuery(*parsedDistinct.getSampleId(),
-                                  nss,
-                                  cq->getQueryObj(),
-                                  cq->getFindCommandRequest().getCollation())
+                ->addDistinctQuery(*parsedDistinct.getSampleId(),
+                                   nss,
+                                   cq->getQueryObj(),
+                                   cq->getFindCommandRequest().getCollation())
                 .getAsync([](auto) {});
         }
 

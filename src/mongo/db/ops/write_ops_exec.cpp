@@ -1061,7 +1061,7 @@ WriteResult performUpdates(OperationContext* opCtx,
 
         if (analyze_shard_key::supportsPersistingSampledQueries() && singleOp.getSampleId()) {
             analyze_shard_key::QueryAnalysisWriter::get(opCtx)
-                .addUpdateQuery(wholeOp, currentOpIndex)
+                ->addUpdateQuery(wholeOp, currentOpIndex)
                 .getAsync([](auto) {});
         }
 
@@ -1304,7 +1304,7 @@ WriteResult performDeletes(OperationContext* opCtx,
 
         if (analyze_shard_key::supportsPersistingSampledQueries() && singleOp.getSampleId()) {
             analyze_shard_key::QueryAnalysisWriter::get(opCtx)
-                .addDeleteQuery(wholeOp, currentOpIndex)
+                ->addDeleteQuery(wholeOp, currentOpIndex)
                 .getAsync([](auto) {});
         }
 

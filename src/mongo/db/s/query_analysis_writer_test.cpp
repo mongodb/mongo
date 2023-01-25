@@ -167,7 +167,7 @@ struct QueryAnalysisWriterTest : public ShardServerTestFixture {
 public:
     void setUp() {
         ShardServerTestFixture::setUp();
-        QueryAnalysisWriter::get(operationContext()).onStartup();
+        QueryAnalysisWriter::get(operationContext())->onStartup(operationContext());
 
         DBDirectClient client(operationContext());
         client.createCollection(nss0.toString());
@@ -175,7 +175,7 @@ public:
     }
 
     void tearDown() {
-        QueryAnalysisWriter::get(operationContext()).onShutdown();
+        QueryAnalysisWriter::get(operationContext())->onShutdown();
         ShardServerTestFixture::tearDown();
     }
 
@@ -194,6 +194,35 @@ protected:
         return BSON("locale"
                     << "en_US"
                     << "strength" << strength);
+    }
+
+    /*
+     * Asserts that collection nss has a TTL index with the specified name and
+     * expireAfterSeconds set to 0.
+     */
+    void assertTTLIndexExists(const NamespaceString& nss, const std::string& name) const {
+        DBDirectClient client(operationContext());
+        BSONObj result;
+        client.runCommand(nss.db(), BSON("listIndexes" << nss.coll().toString()), result);
+
+        auto indexes = result.getObjectField("cursor").getField("firstBatch").Array();
+        auto iter = indexes.begin();
+        BSONObj indexSpec = iter->Obj();
+        bool foundTTLIndex = false;
+
+        while (iter != indexes.end()) {
+            foundTTLIndex =
+                (indexSpec.hasField("name") && indexSpec.getStringField("name") == name);
+            if (foundTTLIndex) {
+                break;
+            }
+            ++iter;
+            indexSpec = iter->Obj();
+        }
+
+        ASSERT(foundTTLIndex);
+        ASSERT_EQ(indexSpec.getObjectField("key").getIntField("expireAt"), 1);
+        ASSERT_EQ(indexSpec.getIntField("expireAfterSeconds"), 0);
     }
 
     /*
@@ -456,29 +485,112 @@ private:
     PseudoRandom _random{SecureRandom{}.nextInt64()};
 };
 
-DEATH_TEST_F(QueryAnalysisWriterTest, CannotGetIfFeatureFlagNotEnabled, "invariant") {
-    RAIIServerParameterControllerForTest _featureFlagController{"featureFlagAnalyzeShardKey",
-                                                                false};
-    QueryAnalysisWriter::get(operationContext());
+TEST_F(QueryAnalysisWriterTest, CreateTTLIndexes) {
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
+    auto future = writer.createTTLIndexes(operationContext());
+    future.get();
+    assertTTLIndexExists(NamespaceString::kConfigSampledQueriesNamespace,
+                         QueryAnalysisWriter::kSampledQueriesTTLIndexName);
+    assertTTLIndexExists(NamespaceString::kConfigSampledQueriesDiffNamespace,
+                         QueryAnalysisWriter::kSampledQueriesDiffTTLIndexName);
 }
 
-DEATH_TEST_F(QueryAnalysisWriterTest, CannotGetOnConfigServer, "invariant") {
-    serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
-    QueryAnalysisWriter::get(operationContext());
+TEST_F(QueryAnalysisWriterTest, CreateTTLIndexesWhenSampledQueriesIndexExists) {
+    auto failCreateIndexes = globalFailPointRegistry().find("failCommand");
+    failCreateIndexes->setMode(FailPoint::nTimes,
+                               1,
+                               BSON("failCommands" << BSON_ARRAY("createIndexes") << "errorCode"
+                                                   << ErrorCodes::IndexAlreadyExists
+                                                   << "failInternalCommands" << true
+                                                   << "failLocalClients" << true));
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
+    auto future = writer.createTTLIndexes(operationContext());
+    future.get();
+    assertTTLIndexExists(NamespaceString::kConfigSampledQueriesDiffNamespace,
+                         QueryAnalysisWriter::kSampledQueriesDiffTTLIndexName);
 }
 
-DEATH_TEST_F(QueryAnalysisWriterTest, CannotGetOnNonShardServer, "invariant") {
-    serverGlobalParams.clusterRole = ClusterRole::None;
-    QueryAnalysisWriter::get(operationContext());
+TEST_F(QueryAnalysisWriterTest, CreateTTLIndexesWhenSampledQueriesDiffIndexExists) {
+    auto failCreateIndexes = globalFailPointRegistry().find("failCommand");
+    failCreateIndexes->setMode(FailPoint::skip,
+                               1,
+                               BSON("failCommands" << BSON_ARRAY("createIndexes") << "errorCode"
+                                                   << ErrorCodes::IndexAlreadyExists
+                                                   << "failInternalCommands" << true
+                                                   << "failLocalClients" << true));
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
+    auto future = writer.createTTLIndexes(operationContext());
+    future.get();
+    assertTTLIndexExists(NamespaceString::kConfigSampledQueriesNamespace,
+                         QueryAnalysisWriter::kSampledQueriesTTLIndexName);
+}
+
+TEST_F(QueryAnalysisWriterTest, CreateTTLIndexesWhenBothIndexesExist) {
+    auto failCreateIndexes = globalFailPointRegistry().find("failCommand");
+    failCreateIndexes->setMode(FailPoint::alwaysOn,
+                               0,
+                               BSON("failCommands" << BSON_ARRAY("createIndexes") << "errorCode"
+                                                   << ErrorCodes::IndexAlreadyExists
+                                                   << "failInternalCommands" << true
+                                                   << "failLocalClients" << true));
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
+    auto future = writer.createTTLIndexes(operationContext());
+    future.get();
+}
+
+TEST_F(QueryAnalysisWriterTest, CreateTTLIndexesRetriesOnIntermittentError) {
+    auto failCreateIndexes = globalFailPointRegistry().find("failCommand");
+    failCreateIndexes->setMode(FailPoint::nTimes,
+                               5,
+                               BSON("failCommands" << BSON_ARRAY("createIndexes") << "errorCode"
+                                                   << ErrorCodes::NetworkTimeout
+                                                   << "failInternalCommands" << true
+                                                   << "failLocalClients" << true));
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
+    auto future = writer.createTTLIndexes(operationContext());
+    future.get();
+    assertTTLIndexExists(NamespaceString::kConfigSampledQueriesNamespace,
+                         QueryAnalysisWriter::kSampledQueriesTTLIndexName);
+    assertTTLIndexExists(NamespaceString::kConfigSampledQueriesDiffNamespace,
+                         QueryAnalysisWriter::kSampledQueriesDiffTTLIndexName);
+}
+
+TEST_F(QueryAnalysisWriterTest, CreateTTLIndexesStopsOnStepDownWhileCreatingSampledQueriesIndex) {
+    auto failCreateIndexes = globalFailPointRegistry().find("failCommand");
+    failCreateIndexes->setMode(FailPoint::alwaysOn,
+                               0,
+                               BSON("failCommands" << BSON_ARRAY("createIndexes") << "errorCode"
+                                                   << ErrorCodes::PrimarySteppedDown
+                                                   << "failInternalCommands" << true
+                                                   << "failLocalClients" << true));
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
+    auto future = writer.createTTLIndexes(operationContext());
+    ASSERT_THROWS_CODE(future.get(), AssertionException, ErrorCodes::PrimarySteppedDown);
+    failCreateIndexes->setMode(FailPoint::off, 0);
+}
+
+TEST_F(QueryAnalysisWriterTest,
+       CreateTTLIndexesStopsOnStepDownWhileCreatingSampledQueriesDiffIndex) {
+    auto failCreateIndexes = globalFailPointRegistry().find("failCommand");
+    failCreateIndexes->setMode(FailPoint::skip,
+                               1,
+                               BSON("failCommands" << BSON_ARRAY("createIndexes") << "errorCode"
+                                                   << ErrorCodes::PrimarySteppedDown
+                                                   << "failInternalCommands" << true
+                                                   << "failLocalClients" << true));
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
+    auto future = writer.createTTLIndexes(operationContext());
+    ASSERT_THROWS_CODE(future.get(), AssertionException, ErrorCodes::PrimarySteppedDown);
+    failCreateIndexes->setMode(FailPoint::off, 0);
 }
 
 TEST_F(QueryAnalysisWriterTest, NoQueries) {
-    auto& writer = QueryAnalysisWriter::get(operationContext());
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
     writer.flushQueriesForTest(operationContext());
 }
 
 TEST_F(QueryAnalysisWriterTest, FindQuery) {
-    auto& writer = QueryAnalysisWriter::get(operationContext());
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
 
     auto testFindCmdCommon = [&](const BSONObj& filter, const BSONObj& collation) {
         auto sampleId = UUID::gen();
@@ -502,7 +614,7 @@ TEST_F(QueryAnalysisWriterTest, FindQuery) {
 }
 
 TEST_F(QueryAnalysisWriterTest, CountQuery) {
-    auto& writer = QueryAnalysisWriter::get(operationContext());
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
 
     auto testCountCmdCommon = [&](const BSONObj& filter, const BSONObj& collation) {
         auto sampleId = UUID::gen();
@@ -526,7 +638,7 @@ TEST_F(QueryAnalysisWriterTest, CountQuery) {
 }
 
 TEST_F(QueryAnalysisWriterTest, DistinctQuery) {
-    auto& writer = QueryAnalysisWriter::get(operationContext());
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
 
     auto testDistinctCmdCommon = [&](const BSONObj& filter, const BSONObj& collation) {
         auto sampleId = UUID::gen();
@@ -550,7 +662,7 @@ TEST_F(QueryAnalysisWriterTest, DistinctQuery) {
 }
 
 TEST_F(QueryAnalysisWriterTest, AggregateQuery) {
-    auto& writer = QueryAnalysisWriter::get(operationContext());
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
 
     auto testAggregateCmdCommon = [&](const BSONObj& filter, const BSONObj& collation) {
         auto sampleId = UUID::gen();
@@ -574,13 +686,13 @@ TEST_F(QueryAnalysisWriterTest, AggregateQuery) {
 }
 
 DEATH_TEST_F(QueryAnalysisWriterTest, UpdateQueryNotMarkedForSampling, "invariant") {
-    auto& writer = QueryAnalysisWriter::get(operationContext());
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
     auto [originalCmd, _] = makeUpdateCommandRequest(nss0, 1, {} /* markForSampling */);
     writer.addUpdateQuery(originalCmd, 0).get();
 }
 
 TEST_F(QueryAnalysisWriterTest, UpdateQueriesMarkedForSampling) {
-    auto& writer = QueryAnalysisWriter::get(operationContext());
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
 
     auto [originalCmd, expectedSampledCmds] =
         makeUpdateCommandRequest(nss0, 3, {0, 2} /* markForSampling */);
@@ -602,13 +714,13 @@ TEST_F(QueryAnalysisWriterTest, UpdateQueriesMarkedForSampling) {
 }
 
 DEATH_TEST_F(QueryAnalysisWriterTest, DeleteQueryNotMarkedForSampling, "invariant") {
-    auto& writer = QueryAnalysisWriter::get(operationContext());
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
     auto [originalCmd, _] = makeDeleteCommandRequest(nss0, 1, {} /* markForSampling */);
     writer.addDeleteQuery(originalCmd, 0).get();
 }
 
 TEST_F(QueryAnalysisWriterTest, DeleteQueriesMarkedForSampling) {
-    auto& writer = QueryAnalysisWriter::get(operationContext());
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
 
     auto [originalCmd, expectedSampledCmds] =
         makeDeleteCommandRequest(nss0, 3, {1, 2} /* markForSampling */);
@@ -630,14 +742,14 @@ TEST_F(QueryAnalysisWriterTest, DeleteQueriesMarkedForSampling) {
 }
 
 DEATH_TEST_F(QueryAnalysisWriterTest, FindAndModifyQueryNotMarkedForSampling, "invariant") {
-    auto& writer = QueryAnalysisWriter::get(operationContext());
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
     auto [originalCmd, _] =
         makeFindAndModifyCommandRequest(nss0, true /* isUpdate */, false /* markForSampling */);
     writer.addFindAndModifyQuery(originalCmd).get();
 }
 
 TEST_F(QueryAnalysisWriterTest, FindAndModifyQueryUpdateMarkedForSampling) {
-    auto& writer = QueryAnalysisWriter::get(operationContext());
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
 
     auto [originalCmd, expectedSampledCmds] =
         makeFindAndModifyCommandRequest(nss0, true /* isUpdate */, true /* markForSampling */);
@@ -657,7 +769,7 @@ TEST_F(QueryAnalysisWriterTest, FindAndModifyQueryUpdateMarkedForSampling) {
 }
 
 TEST_F(QueryAnalysisWriterTest, FindAndModifyQueryRemoveMarkedForSampling) {
-    auto& writer = QueryAnalysisWriter::get(operationContext());
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
 
     auto [originalCmd, expectedSampledCmds] =
         makeFindAndModifyCommandRequest(nss0, false /* isUpdate */, true /* markForSampling */);
@@ -677,7 +789,7 @@ TEST_F(QueryAnalysisWriterTest, FindAndModifyQueryRemoveMarkedForSampling) {
 }
 
 TEST_F(QueryAnalysisWriterTest, MultipleQueriesAndCollections) {
-    auto& writer = QueryAnalysisWriter::get(operationContext());
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
 
     // Make nss0 have one query.
     auto [originalDeleteCmd, expectedSampledDeleteCmds] =
@@ -720,7 +832,7 @@ TEST_F(QueryAnalysisWriterTest, MultipleQueriesAndCollections) {
 }
 
 TEST_F(QueryAnalysisWriterTest, DuplicateQueries) {
-    auto& writer = QueryAnalysisWriter::get(operationContext());
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
 
     auto findSampleId = UUID::gen();
     auto originalFindFilter = makeNonEmptyFilter();
@@ -773,7 +885,7 @@ TEST_F(QueryAnalysisWriterTest, DuplicateQueries) {
 }
 
 TEST_F(QueryAnalysisWriterTest, QueriesMultipleBatches_MaxBatchSize) {
-    auto& writer = QueryAnalysisWriter::get(operationContext());
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
 
     RAIIServerParameterControllerForTest maxBatchSize{"queryAnalysisWriterMaxBatchSize", 2};
     auto numQueries = 5;
@@ -798,7 +910,8 @@ TEST_F(QueryAnalysisWriterTest, QueriesMultipleBatches_MaxBatchSize) {
 }
 
 TEST_F(QueryAnalysisWriterTest, QueriesMultipleBatches_MaxBSONObjSize) {
-    auto& writer = QueryAnalysisWriter::get(operationContext());
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagAnalyzeShardKey", true);
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
 
     auto numQueries = 3;
     std::vector<std::tuple<UUID, BSONObj, BSONObj>> expectedSampledCmds;
@@ -821,7 +934,7 @@ TEST_F(QueryAnalysisWriterTest, QueriesMultipleBatches_MaxBSONObjSize) {
 }
 
 TEST_F(QueryAnalysisWriterTest, FlushAfterAddReadIfExceedsSizeLimit) {
-    auto& writer = QueryAnalysisWriter::get(operationContext());
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
 
     auto maxMemoryUsageBytes = 1024;
     RAIIServerParameterControllerForTest maxMemoryBytes{"queryAnalysisWriterMaxMemoryUsageBytes",
@@ -850,7 +963,7 @@ TEST_F(QueryAnalysisWriterTest, FlushAfterAddReadIfExceedsSizeLimit) {
 }
 
 TEST_F(QueryAnalysisWriterTest, FlushAfterAddUpdateIfExceedsSizeLimit) {
-    auto& writer = QueryAnalysisWriter::get(operationContext());
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
 
     auto maxMemoryUsageBytes = 1024;
     RAIIServerParameterControllerForTest maxMemoryBytes{"queryAnalysisWriterMaxMemoryUsageBytes",
@@ -878,7 +991,7 @@ TEST_F(QueryAnalysisWriterTest, FlushAfterAddUpdateIfExceedsSizeLimit) {
 }
 
 TEST_F(QueryAnalysisWriterTest, FlushAfterAddDeleteIfExceedsSizeLimit) {
-    auto& writer = QueryAnalysisWriter::get(operationContext());
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
 
     auto maxMemoryUsageBytes = 1024;
     RAIIServerParameterControllerForTest maxMemoryBytes{"queryAnalysisWriterMaxMemoryUsageBytes",
@@ -906,7 +1019,7 @@ TEST_F(QueryAnalysisWriterTest, FlushAfterAddDeleteIfExceedsSizeLimit) {
 }
 
 TEST_F(QueryAnalysisWriterTest, FlushAfterAddFindAndModifyIfExceedsSizeLimit) {
-    auto& writer = QueryAnalysisWriter::get(operationContext());
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
 
     auto maxMemoryUsageBytes = 1024;
     RAIIServerParameterControllerForTest maxMemoryBytes{"queryAnalysisWriterMaxMemoryUsageBytes",
@@ -947,7 +1060,7 @@ TEST_F(QueryAnalysisWriterTest, FlushAfterAddFindAndModifyIfExceedsSizeLimit) {
 }
 
 TEST_F(QueryAnalysisWriterTest, AddQueriesBackAfterWriteError) {
-    auto& writer = QueryAnalysisWriter::get(operationContext());
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
 
     auto originalFilter = makeNonEmptyFilter();
     auto originalCollation = makeNonEmptyCollation();
@@ -1001,7 +1114,7 @@ TEST_F(QueryAnalysisWriterTest, AddQueriesBackAfterWriteError) {
 }
 
 TEST_F(QueryAnalysisWriterTest, RemoveDuplicatesFromBufferAfterWriteError) {
-    auto& writer = QueryAnalysisWriter::get(operationContext());
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
 
     auto originalFilter = makeNonEmptyFilter();
     auto originalCollation = makeNonEmptyCollation();
@@ -1074,12 +1187,12 @@ TEST_F(QueryAnalysisWriterTest, RemoveDuplicatesFromBufferAfterWriteError) {
 }
 
 TEST_F(QueryAnalysisWriterTest, NoDiffs) {
-    auto& writer = QueryAnalysisWriter::get(operationContext());
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
     writer.flushQueriesForTest(operationContext());
 }
 
 TEST_F(QueryAnalysisWriterTest, DiffsBasic) {
-    auto& writer = QueryAnalysisWriter::get(operationContext());
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
 
     auto collUuid0 = getCollectionUUID(nss0);
     auto sampleId = UUID::gen();
@@ -1096,7 +1209,7 @@ TEST_F(QueryAnalysisWriterTest, DiffsBasic) {
 }
 
 TEST_F(QueryAnalysisWriterTest, DiffsMultipleQueriesAndCollections) {
-    auto& writer = QueryAnalysisWriter::get(operationContext());
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
 
     // Make nss0 have a diff for one query.
     auto collUuid0 = getCollectionUUID(nss0);
@@ -1132,7 +1245,7 @@ TEST_F(QueryAnalysisWriterTest, DiffsMultipleQueriesAndCollections) {
 }
 
 TEST_F(QueryAnalysisWriterTest, DuplicateDiffs) {
-    auto& writer = QueryAnalysisWriter::get(operationContext());
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
 
     auto collUuid0 = getCollectionUUID(nss0);
 
@@ -1171,7 +1284,7 @@ TEST_F(QueryAnalysisWriterTest, DuplicateDiffs) {
 }
 
 TEST_F(QueryAnalysisWriterTest, DiffsMultipleBatches_MaxBatchSize) {
-    auto& writer = QueryAnalysisWriter::get(operationContext());
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
 
     RAIIServerParameterControllerForTest maxBatchSize{"queryAnalysisWriterMaxBatchSize", 2};
     auto numDiffs = 5;
@@ -1197,7 +1310,7 @@ TEST_F(QueryAnalysisWriterTest, DiffsMultipleBatches_MaxBatchSize) {
 }
 
 TEST_F(QueryAnalysisWriterTest, DiffsMultipleBatches_MaxBSONObjSize) {
-    auto& writer = QueryAnalysisWriter::get(operationContext());
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
 
     auto numDiffs = 3;
     auto collUuid0 = getCollectionUUID(nss0);
@@ -1222,7 +1335,7 @@ TEST_F(QueryAnalysisWriterTest, DiffsMultipleBatches_MaxBSONObjSize) {
 }
 
 TEST_F(QueryAnalysisWriterTest, FlushAfterAddDiffIfExceedsSizeLimit) {
-    auto& writer = QueryAnalysisWriter::get(operationContext());
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
 
     auto maxMemoryUsageBytes = 1024;
     RAIIServerParameterControllerForTest maxMemoryBytes{"queryAnalysisWriterMaxMemoryUsageBytes",
@@ -1251,7 +1364,7 @@ TEST_F(QueryAnalysisWriterTest, FlushAfterAddDiffIfExceedsSizeLimit) {
 }
 
 TEST_F(QueryAnalysisWriterTest, DiffEmpty) {
-    auto& writer = QueryAnalysisWriter::get(operationContext());
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
 
     auto collUuid0 = getCollectionUUID(nss0);
     auto sampleId = UUID::gen();
@@ -1267,7 +1380,7 @@ TEST_F(QueryAnalysisWriterTest, DiffEmpty) {
 }
 
 TEST_F(QueryAnalysisWriterTest, DiffExceedsSizeLimit) {
-    auto& writer = QueryAnalysisWriter::get(operationContext());
+    auto& writer = *QueryAnalysisWriter::get(operationContext());
 
     auto collUuid0 = getCollectionUUID(nss0);
     auto sampleId = UUID::gen();

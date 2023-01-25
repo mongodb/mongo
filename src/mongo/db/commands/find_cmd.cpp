@@ -474,10 +474,10 @@ public:
             if (analyze_shard_key::supportsPersistingSampledQueries() &&
                 findCommand->getSampleId()) {
                 analyze_shard_key::QueryAnalysisWriter::get(opCtx)
-                    .addFindQuery(*findCommand->getSampleId(),
-                                  nss,
-                                  findCommand->getFilter(),
-                                  findCommand->getCollation())
+                    ->addFindQuery(*findCommand->getSampleId(),
+                                   nss,
+                                   findCommand->getFilter(),
+                                   findCommand->getCollation())
                     .getAsync([](auto) {});
             }
 

@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
@@ -56,11 +57,17 @@ namespace analyze_shard_key {
  * the limit, the writer will flush the corresponding buffer immediately instead of waiting for it
  * to get flushed later by the periodic job.
  */
-class QueryAnalysisWriter final : public std::enable_shared_from_this<QueryAnalysisWriter> {
+class QueryAnalysisWriter final : public std::enable_shared_from_this<QueryAnalysisWriter>,
+                                  public ReplicaSetAwareService<QueryAnalysisWriter> {
     QueryAnalysisWriter(const QueryAnalysisWriter&) = delete;
     QueryAnalysisWriter& operator=(const QueryAnalysisWriter&) = delete;
 
 public:
+    static const std::string kSampledQueriesTTLIndexName;
+    static const std::string kSampledQueriesDiffTTLIndexName;
+    static BSONObj kSampledQueriesTTLIndexSpec;
+    static BSONObj kSampledQueriesDiffTTLIndexSpec;
+
     /**
      * Temporarily stores documents to be written to disk.
      */
@@ -109,12 +116,17 @@ public:
     /**
      * Obtains the service-wide QueryAnalysisWriter instance.
      */
-    static QueryAnalysisWriter& get(OperationContext* opCtx);
-    static QueryAnalysisWriter& get(ServiceContext* serviceContext);
+    static QueryAnalysisWriter* get(OperationContext* opCtx);
+    static QueryAnalysisWriter* get(ServiceContext* serviceContext);
 
-    void onStartup();
-
+    /**
+     * ReplicaSetAwareService methods:
+     */
+    void onStartup(OperationContext* opCtx);
     void onShutdown();
+    void onStepUpComplete(OperationContext* opCtx, long long term);
+
+    ExecutorFuture<void> createTTLIndexes(OperationContext* opCtx);
 
     ExecutorFuture<void> addFindQuery(const UUID& sampleId,
                                       const NamespaceString& nss,
@@ -169,6 +181,19 @@ public:
     }
 
 private:
+    bool shouldRegisterReplicaSetAwareService() const override final;
+
+    void onInitialDataAvailable(OperationContext* opCtx,
+                                bool isMajorityDataAvailable) override final {}
+
+    void onStepUpBegin(OperationContext* opCtx, long long term) override final {}
+
+    void onStepDown() override final {}
+
+    void onBecomeArbiter() override final {}
+
+    void onSetCurrentConfig(OperationContext* opCtx) override final {}
+
     ExecutorFuture<void> _addReadQuery(const UUID& sampleId,
                                        const NamespaceString& nss,
                                        SampledCommandNameEnum cmdName,
