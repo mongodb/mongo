@@ -179,7 +179,6 @@ void SortStage::open(bool reOpen) {
 
     while (_children[0]->getNext() == PlanState::ADVANCED) {
         value::MaterializedRow keys{_inKeyAccessors.size()};
-        value::MaterializedRow vals{_inValueAccessors.size()};
 
         size_t idx = 0;
         for (auto accessor : _inKeyAccessors) {
@@ -187,13 +186,17 @@ void SortStage::open(bool reOpen) {
             keys.reset(idx++, false, tag, val);
         }
 
-        idx = 0;
-        for (auto accessor : _inValueAccessors) {
-            auto [tag, val] = accessor->getViewOfValue();
-            vals.reset(idx++, false, tag, val);
-        }
-
-        _sorter->emplace(std::move(keys), std::move(vals));
+        // Do not allocate the values here, instead let the sorter decide, since the sorter may
+        // decide not to store the values in the case of sort-limit.
+        _sorter->emplace(std::move(keys), [&]() {
+            value::MaterializedRow vals{_inValueAccessors.size()};
+            size_t idx = 0;
+            for (auto accessor : _inValueAccessors) {
+                auto [tag, val] = accessor->getViewOfValue();
+                vals.reset(idx++, false, tag, val);
+            }
+            return vals;
+        });
 
         if (_tracker && _tracker->trackProgress<TrialRunTracker::kNumResults>(1)) {
             // If we either hit the maximum number of document to return during the trial run, or

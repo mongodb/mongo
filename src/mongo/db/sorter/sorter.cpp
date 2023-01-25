@@ -673,6 +673,7 @@ template <typename Key, typename Value, typename Comparator>
 class NoLimitSorter : public MergeableSorter<Key, Value, Comparator> {
 public:
     typedef std::pair<Key, Value> Data;
+    typedef std::function<Value()> ValueProducer;
     using Iterator = typename MergeableSorter<Key, Value, Comparator>::Iterator;
     using Settings = typename MergeableSorter<Key, Value, Comparator>::Settings;
 
@@ -711,22 +712,20 @@ public:
         this->_stats.setSpilledRanges(this->_iters.size());
     }
 
-    template <typename Generator>
-    void addImpl(const Key& key, const Value& val, Generator keyValProducer) {
+    template <typename DataProducer>
+    void addImpl(DataProducer dataProducer) {
         invariant(!_done);
+
+        auto& keyVal = _data.emplace_back(dataProducer());
 
         auto& memPool = this->_memPool;
         if (memPool) {
             auto memUsedInsideSorter = (sizeof(Key) + sizeof(Value)) * (_data.size() + 1);
             this->_stats.setMemUsage(memPool->memUsage() + memUsedInsideSorter);
         } else {
-            auto memUsage = key.memUsageForSorter() + val.memUsageForSorter();
+            auto memUsage = keyVal.first.memUsageForSorter() + keyVal.second.memUsageForSorter();
             this->_stats.incrementMemUsage(memUsage);
         }
-
-        // Invoking keyValProducer could invalidate key and val if it uses move semantics,
-        // don't reference them anymore from this point on.
-        _data.emplace_back(keyValProducer());
 
         if (this->_stats.memUsage() > this->_opts.maxMemoryUsageBytes) {
             spill();
@@ -734,12 +733,13 @@ public:
     }
 
     void add(const Key& key, const Value& val) override {
-        addImpl(key, val, [&]() -> Data { return {key.getOwned(), val.getOwned()}; });
+        addImpl([&]() -> Data { return {key.getOwned(), val.getOwned()}; });
     }
 
-    void emplace(Key&& key, Value&& val) override {
-        addImpl(key, val, [&]() -> Data {
+    void emplace(Key&& key, ValueProducer valProducer) override {
+        addImpl([&]() -> Data {
             key.makeOwned();
+            auto val = valProducer();
             val.makeOwned();
             return {std::move(key), std::move(val)};
         });
@@ -836,6 +836,7 @@ class LimitOneSorter : public Sorter<Key, Value> {
     // spill to disk and only tracks memory usage if explicitly requested.
 public:
     typedef std::pair<Key, Value> Data;
+    typedef std::function<Value()> ValueProducer;
     typedef SortIteratorInterface<Key, Value> Iterator;
 
     LimitOneSorter(const SortOptions& opts, const Comparator& comp)
@@ -843,8 +844,8 @@ public:
         verify(opts.limit == 1);
     }
 
-    template <typename Generator>
-    void addImpl(const Key& key, const Value& val, Generator keyValProducer) {
+    template <typename DataProducer>
+    void addImpl(const Key& key, DataProducer dataProducer) {
         this->_stats.incrementNumSorted();
         if (_haveData) {
             dassertCompIsSane(_comp, _best.first, key);
@@ -854,18 +855,19 @@ public:
             _haveData = true;
         }
 
-        // Invoking keyValProducer could invalidate key and val if it uses move semantics,
+        // Invoking dataProducer could invalidate key if it uses move semantics,
         // don't reference them anymore from this point on.
-        _best = keyValProducer();
+        _best = dataProducer();
     }
 
     void add(const Key& key, const Value& val) override {
-        addImpl(key, val, [&]() -> Data { return {key.getOwned(), val.getOwned()}; });
+        addImpl(key, [&]() -> Data { return {key.getOwned(), val.getOwned()}; });
     }
 
-    void emplace(Key&& key, Value&& val) override {
-        addImpl(key, val, [&]() -> Data {
+    void emplace(Key&& key, ValueProducer valProducer) override {
+        addImpl(key, [&]() -> Data {
             key.makeOwned();
+            auto val = valProducer();
             val.makeOwned();
             return {std::move(key), std::move(val)};
         });
@@ -896,6 +898,7 @@ template <typename Key, typename Value, typename Comparator>
 class TopKSorter : public MergeableSorter<Key, Value, Comparator> {
 public:
     typedef std::pair<Key, Value> Data;
+    typedef std::function<Value()> ValueProducer;
     using Iterator = typename MergeableSorter<Key, Value, Comparator>::Iterator;
     using Settings = typename MergeableSorter<Key, Value, Comparator>::Settings;
 
@@ -918,8 +921,8 @@ public:
         }
     }
 
-    template <typename Generator>
-    void addImpl(const Key& key, const Value& val, Generator keyValProducer) {
+    template <typename DataProducer>
+    void addImpl(const Key& key, DataProducer dataProducer) {
         invariant(!_done);
 
         this->_stats.incrementNumSorted();
@@ -930,12 +933,11 @@ public:
             if (_haveCutoff && this->_comp(key, _cutoff.first) >= 0)
                 return;
 
-            auto memUsage = key.memUsageForSorter() + val.memUsageForSorter();
-
-            // Invoking keyValProducer could invalidate key and val if it uses move semantics,
+            // Invoking dataProducer could invalidate key if it uses move semantics,
             // don't reference them anymore from this point on.
-            _data.emplace_back(keyValProducer());
+            auto& keyVal = _data.emplace_back(dataProducer());
 
+            auto memUsage = keyVal.first.memUsageForSorter() + keyVal.second.memUsageForSorter();
             this->_stats.incrementMemUsage(memUsage);
 
             if (_data.size() == this->_opts.limit)
@@ -954,16 +956,18 @@ public:
 
         // Remove the old worst pair and insert the contender, adjusting _memUsed
 
-        auto memUsage = key.memUsageForSorter() + val.memUsageForSorter();
-        this->_stats.incrementMemUsage(memUsage);
-
         this->_stats.decrementMemUsage(_data.front().first.memUsageForSorter());
         this->_stats.decrementMemUsage(_data.front().second.memUsageForSorter());
 
         std::pop_heap(_data.begin(), _data.end(), less);
-        // Invoking keyValProducer could invalidate key and val if it uses move semantics,
+
+        // Invoking dataProducer could invalidate key if it uses move semantics,
         // don't reference them anymore from this point on.
-        _data.back() = keyValProducer();
+        _data.back() = dataProducer();
+
+        this->_stats.incrementMemUsage(_data.back().first.memUsageForSorter());
+        this->_stats.incrementMemUsage(_data.back().second.memUsageForSorter());
+
         std::push_heap(_data.begin(), _data.end(), less);
 
         if (this->_stats.memUsage() > this->_opts.maxMemoryUsageBytes)
@@ -971,12 +975,13 @@ public:
     }
 
     void add(const Key& key, const Value& val) override {
-        addImpl(key, val, [&]() -> Data { return {key.getOwned(), val.getOwned()}; });
+        addImpl(key, [&]() -> Data { return {key.getOwned(), val.getOwned()}; });
     }
 
-    void emplace(Key&& key, Value&& val) override {
-        addImpl(key, val, [&]() -> Data {
+    void emplace(Key&& key, ValueProducer valProducer) override {
+        addImpl(key, [&]() -> Data {
             key.makeOwned();
+            auto val = valProducer();
             val.makeOwned();
             return {std::move(key), std::move(val)};
         });

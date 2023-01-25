@@ -289,6 +289,7 @@ class Sorter : public SorterBase {
 
 public:
     typedef std::pair<Key, Value> Data;
+    typedef std::function<Value()> ValueProducer;
     typedef SortIteratorInterface<Key, Value> Iterator;
     typedef std::pair<typename Key::SorterDeserializeSettings,
                       typename Value::SorterDeserializeSettings>
@@ -378,7 +379,7 @@ public:
                                           const Settings& settings = Settings());
 
     virtual void add(const Key&, const Value&) = 0;
-    virtual void emplace(Key&& k, Value&& v) = 0;
+    virtual void emplace(Key&&, ValueProducer) = 0;
 
     /**
      * Cannot add more data after calling done().
