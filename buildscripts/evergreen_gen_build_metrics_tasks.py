@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import sys
+import platform
 
 from shrub.v2 import ShrubProject, Task, BuildVariant, FunctionCall, TaskGroup
 from shrub.v2.command import BuiltInCommand
@@ -10,7 +11,8 @@ def main():
 
     tasks = {
         'windows_tasks': [],
-        'linux_tasks': [],
+        'linux_x86_64_tasks': [],
+        'linux_arm64_tasks': [],
         'macos_tasks': [],
     }
 
@@ -77,13 +79,16 @@ def main():
                     build_flags = f"BUILD_METRICS_BLOATY=/opt/mongodbtoolchain/v4/bin/bloaty --variables-files=etc/scons/mongodbtoolchain_{toolchain}_{compiler}.vars --link-model={link_model}" + (
                         ' --cache=nolinked' if link_model == 'static' else "")
 
-                    tasks['linux_tasks'].append(
-                        Task(f"build_metrics_{toolchain}_{compiler}_{link_model}",
+                    tasks['linux_x86_64_tasks'].append(
+                        Task(f"build_metrics_x86_64_{toolchain}_{compiler}_{link_model}",
+                             create_build_metric_task_steps(build_flags, targets)))
+                    tasks['linux_arm64_tasks'].append(
+                        Task(f"build_metrics_arm64_{toolchain}_{compiler}_{link_model}",
                              create_build_metric_task_steps(build_flags, targets)))
 
-    def create_task_group(platform, tasks):
+    def create_task_group(target_platform, tasks):
         task_group = TaskGroup(
-            name=f'build_metrics_{platform}_task_group_gen',
+            name=f'build_metrics_{target_platform}_task_group_gen',
             tasks=tasks,
             max_hosts=len(tasks),
             setup_group=[
@@ -141,17 +146,21 @@ def main():
         )
         variant.add_task_group(create_task_group('macos', tasks['macos_tasks']), ['macos-1100'])
     else:
-        variant = BuildVariant(
-            name="enterprise-rhel-80-64-bit-build-metrics",
-            activate=True,
-        )
-        variant.add_task_group(create_task_group('linux', tasks['linux_tasks']), ['rhel80-xlarge'])
-        variant = BuildVariant(
-            name="enterprise-rhel-80-aarch64-build-metrics",
-            activate=True,
-        )
-        variant.add_task_group(
-            create_task_group('linux', tasks['linux_tasks']), ['amazon2022-arm64-large'])
+        if platform.machine() == 'x86_64':
+            variant = BuildVariant(
+                name="enterprise-rhel-80-64-bit-build-metrics",
+                activate=True,
+            )
+            variant.add_task_group(
+                create_task_group('linux_X86_64', tasks['linux_x86_64_tasks']), ['rhel80-xlarge'])
+        else:
+            variant = BuildVariant(
+                name="enterprise-rhel-80-aarch64-build-metrics",
+                activate=True,
+            )
+            variant.add_task_group(
+                create_task_group('linux_arm64', tasks['linux_arm64_tasks']),
+                ['amazon2022-arm64-large'])
 
     project = ShrubProject({variant})
     with open('build_metrics_task_gen.json', 'w') as fout:
