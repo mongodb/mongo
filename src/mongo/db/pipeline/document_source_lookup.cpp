@@ -912,6 +912,14 @@ DocumentSource::GetNextResult DocumentSourceLookUp::unwindResult() {
     // Note we may return early from this loop if our source stage is exhausted or if the unwind
     // source was asked to return empty arrays and we get a document without a match.
     while (!_pipeline || !_nextValue) {
+        // Accumulate stats from the pipeline for the previous input, if applicable. This is to
+        // avoid missing the accumulation of stats on an early exit (below) if the input (i.e., left
+        // side of the lookup) is done.
+        if (_pipeline) {
+            accumulatePipelinePlanSummaryStats(*_pipeline, _stats.planSummaryStats);
+            _pipeline->dispose(pExpCtx->opCtx);
+        }
+
         auto nextInput = pSource->getNext();
         if (!nextInput.isAdvanced()) {
             return nextInput;
@@ -928,11 +936,6 @@ DocumentSource::GetNextResult DocumentSourceLookUp::unwindResult() {
                 makeMatchStageFromInput(*_input, *_localField, _foreignField->fullPath(), filter);
             // We've already allocated space for the trailing $match stage in '_resolvedPipeline'.
             _resolvedPipeline[*_fieldMatchPipelineIdx] = matchStage;
-        }
-
-        if (_pipeline) {
-            accumulatePipelinePlanSummaryStats(*_pipeline, _stats.planSummaryStats);
-            _pipeline->dispose(pExpCtx->opCtx);
         }
 
         _pipeline = buildPipeline(*_input);

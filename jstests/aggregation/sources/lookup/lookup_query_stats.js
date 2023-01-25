@@ -11,6 +11,7 @@
  *     assumes_read_concern_unchanged,
  *     assumes_against_mongod_not_mongos,
  *     does_not_support_repeated_reads,
+ *     requires_pipeline_optimization
  * ]
  */
 (function() {
@@ -48,27 +49,29 @@ let insertDocumentToCollection = function(collection, docCount, fieldName) {
     assert.commandWorked(bulk.execute());
 };
 
-let aggregationLookupPipeline = function(localColl, fromColl, allowDiskUse) {
-    return localColl.aggregate([
-        {
+let aggregationLookupPipeline = function(localColl, fromColl, allowDiskUse, withUnwind) {
+    const lookupStage =         {
             $lookup: {
                 from: fromColl.getName(),
                 localField: "localField",
                 foreignField: "foreignField",
                 as: "output"
             }
-        },
-        {
-            $sort: {localField: 1}
-        }], allowDiskUse);
+        };
+    const sortStage = {$sort: {localField: 1}};
+    const pipeline = withUnwind ? [lookupStage, {$unwind: {path: '$output'}}, sortStage]
+                                : [lookupStage, sortStage];
+    return localColl.aggregate(pipeline, allowDiskUse);
 };
 
-let doAggregationLookup = function(localColl, fromColl, allowDiskUse) {
-    return aggregationLookupPipeline(localColl, fromColl, allowDiskUse).toArray();
+let doAggregationLookup = function(localColl, fromColl, allowDiskUse, withUnwind) {
+    return aggregationLookupPipeline(localColl, fromColl, allowDiskUse, withUnwind).toArray();
 };
 
-let explainAggregationLookup = function(localColl, fromColl, verbosityLevel, allowDiskUse) {
-    return aggregationLookupPipeline(localColl.explain(verbosityLevel), fromColl, allowDiskUse);
+let explainAggregationLookup = function(
+    localColl, fromColl, verbosityLevel, allowDiskUse, withUnwind) {
+    return aggregationLookupPipeline(
+        localColl.explain(verbosityLevel), fromColl, allowDiskUse, withUnwind);
 };
 
 let getCurrentQueryExecutorStats = function() {
@@ -84,11 +87,11 @@ let getCurrentQueryExecutorStats = function() {
 };
 
 let checkExplainOutputForVerLevel = function(
-    explainOutput, expected, verbosityLevel, expectedQueryPlan) {
+    explainOutput, expected, verbosityLevel, expectedQueryPlan, withUnwind) {
     const lkpStages = getAggPlanStages(explainOutput, "$lookup");
 
     // Only make SBE specific assertions when we know that our $lookup has been pushed down.
-    if (isSBELookupEnabled) {
+    if (isSBELookupEnabled && !withUnwind) {
         // If the SBE lookup is enabled, the $lookup stage is pushed down to the SBE and it's
         // not visible in 'stages' field of the explain output. Instead, 'queryPlan.stage' must be
         // "EQ_LOOKUP".
@@ -139,6 +142,10 @@ let checkExplainOutputForVerLevel = function(
     } else {
         assert.eq(lkpStages.length, 1, lkpStages);
         const lkpStage = lkpStages[0];
+        assert.eq(
+            lkpStage.hasOwnProperty("$lookup") && lkpStage.$lookup.hasOwnProperty("unwinding"),
+            withUnwind,
+            lkpStage);
         if (verbosityLevel && verbosityLevel !== kQueryPlanner) {
             assert(lkpStage.hasOwnProperty("totalDocsExamined"), lkpStage);
             assert.eq(lkpStage.totalDocsExamined, expected.totalDocsExamined, lkpStage);
@@ -159,34 +166,48 @@ let checkExplainOutputForVerLevel = function(
 };
 
 let checkExplainOutputForAllVerbosityLevels = function(
-    localColl, fromColl, expectedExplainResult, allowDiskUse, expectedQueryPlan = {}) {
+    localColl, fromColl, expectedExplainResult, allowDiskUse, withUnwind, expectedQueryPlan = {}) {
     // The `explain` verbosity level: 'allPlansExecution'.
     let explainAllPlansOutput =
-        explainAggregationLookup(localColl, fromColl, kAllPlansExecution, allowDiskUse);
-    checkExplainOutputForVerLevel(
-        explainAllPlansOutput, expectedExplainResult, kAllPlansExecution, expectedQueryPlan);
+        explainAggregationLookup(localColl, fromColl, kAllPlansExecution, allowDiskUse, withUnwind);
+    checkExplainOutputForVerLevel(explainAllPlansOutput,
+                                  expectedExplainResult,
+                                  kAllPlansExecution,
+                                  expectedQueryPlan,
+                                  withUnwind);
 
     // The `explain` verbosity level: 'executionStats'.
     let explainExecStatsOutput =
-        explainAggregationLookup(localColl, fromColl, kExecutionStats, allowDiskUse);
-    checkExplainOutputForVerLevel(
-        explainExecStatsOutput, expectedExplainResult, kExecutionStats, expectedQueryPlan);
+        explainAggregationLookup(localColl, fromColl, kExecutionStats, allowDiskUse, withUnwind);
+    checkExplainOutputForVerLevel(explainExecStatsOutput,
+                                  expectedExplainResult,
+                                  kExecutionStats,
+                                  expectedQueryPlan,
+                                  withUnwind);
 
     // The `explain` verbosity level: 'queryPlanner'.
     let explainQueryPlannerOutput =
-        explainAggregationLookup(localColl, fromColl, kQueryPlanner, allowDiskUse);
-    checkExplainOutputForVerLevel(
-        explainQueryPlannerOutput, expectedExplainResult, kQueryPlanner, expectedQueryPlan);
+        explainAggregationLookup(localColl, fromColl, kQueryPlanner, allowDiskUse, withUnwind);
+    checkExplainOutputForVerLevel(explainQueryPlannerOutput,
+                                  expectedExplainResult,
+                                  kQueryPlanner,
+                                  expectedQueryPlan,
+                                  withUnwind);
 
     // The `explain` verbosity level is not passed.
-    let explainOutput = explainAggregationLookup(localColl, fromColl, {}, allowDiskUse);
-    checkExplainOutputForVerLevel(explainOutput, expectedExplainResult, {}, expectedQueryPlan);
+    let explainOutput = explainAggregationLookup(localColl, fromColl, {}, allowDiskUse, withUnwind);
+    checkExplainOutputForVerLevel(
+        explainOutput, expectedExplainResult, {}, expectedQueryPlan, withUnwind);
 };
 
-let testQueryExecutorStatsWithCollectionScan = function() {
-    let output = doAggregationLookup(localColl, fromColl, {allowDiskUse: false});
+let testQueryExecutorStatsWithCollectionScan = function(params) {
+    let output = doAggregationLookup(localColl, fromColl, {allowDiskUse: false}, params.withUnwind);
 
-    let expectedOutput = [
+    let expectedOutput = params.withUnwind ? [
+        {_id: 0, localField: 0, output: {_id: 0, foreignField: 0}},
+        {_id: 1, localField: 1, output: {_id: 1, foreignField: 1}},
+    ]
+    : [
         {_id: 0, localField: 0, output: [{_id: 0, foreignField: 0}]},
         {_id: 1, localField: 1, output: [{_id: 1, foreignField: 1}]}
     ];
@@ -203,7 +224,7 @@ let testQueryExecutorStatsWithCollectionScan = function() {
     // There is no index in the collection.
     assert.eq(0, curScannedKeys);
 
-    if (isSBELookupEnabled) {
+    if (isSBELookupEnabled && !params.withUnwind) {
         checkExplainOutputForAllVerbosityLevels(
             localColl,
             fromColl,
@@ -225,13 +246,15 @@ let testQueryExecutorStatsWithCollectionScan = function() {
                 indexesUsed: []
             },
             {allowDiskUse: false},
+            params.withUnwind,
             {strategy: "NestedLoopJoin"});
     } else {
         checkExplainOutputForAllVerbosityLevels(
             localColl,
             fromColl,
             {totalDocsExamined: 20, totalKeysExamined: 0, collectionScans: 4, indexesUsed: []},
-            {allowDiskUse: false});
+            {allowDiskUse: false},
+            params.withUnwind);
     }
 };
 
@@ -241,7 +264,10 @@ let testQueryExecutorStatsWithHashLookup = function() {
         return;
     }
 
-    let output = doAggregationLookup(localColl, fromColl, {allowDiskUse: true});
+    // SBE HashJoin doesn't $unwind internally.
+    const withUnwind = false;
+
+    let output = doAggregationLookup(localColl, fromColl, {allowDiskUse: true}, withUnwind);
 
     let expectedOutput = [
         {_id: 0, localField: 0, output: [{_id: 0, foreignField: 0}]},
@@ -280,6 +306,7 @@ let testQueryExecutorStatsWithHashLookup = function() {
             indexesUsed: []
         },
         {allowDiskUse: true},
+        withUnwind,
         {strategy: "HashJoin"});
 };
 
@@ -289,12 +316,16 @@ let createIndexForCollection = function(collection, fieldName) {
     assert.commandWorked(collection.createIndex(request));
 };
 
-let testQueryExecutorStatsWithIndexScan = function() {
+let testQueryExecutorStatsWithIndexScan = function(params) {
     createIndexForCollection(fromColl, "foreignField");
 
-    let output = doAggregationLookup(localColl, fromColl, {allowDiskUse: false});
+    let output = doAggregationLookup(localColl, fromColl, {allowDiskUse: false}, params.withUnwind);
 
-    let expectedOutput = [
+    let expectedOutput = params.withUnwind ? [
+        {_id: 0, localField: 0, output: {_id: 0, foreignField: 0}},
+        {_id: 1, localField: 1, output: {_id: 1, foreignField: 1}},
+    ]
+    : [
         {_id: 0, localField: 0, output: [{_id: 0, foreignField: 0}]},
         {_id: 1, localField: 1, output: [{_id: 1, foreignField: 1}]}
     ];
@@ -311,7 +342,7 @@ let testQueryExecutorStatsWithIndexScan = function() {
     // collection.
     assert.eq(localDocCount, curScannedKeys);
 
-    if (isSBELookupEnabled) {
+    if (isSBELookupEnabled && !params.withUnwind) {
         checkExplainOutputForAllVerbosityLevels(
             localColl,
             fromColl,
@@ -335,6 +366,7 @@ let testQueryExecutorStatsWithIndexScan = function() {
                 indexesUsed: ["foreignField_1"]
             },
             {allowDiskUse: false},
+            params.withUnwind,
             {strategy: "IndexedLoopJoin", indexName: "foreignField_1"});
     } else {
         checkExplainOutputForAllVerbosityLevels(localColl,
@@ -345,8 +377,11 @@ let testQueryExecutorStatsWithIndexScan = function() {
                                                     collectionScans: 0,
                                                     indexesUsed: ["foreignField_1"]
                                                 },
-                                                {allowDiskUse: false});
+                                                {allowDiskUse: false},
+                                                params.withUnwind);
     }
+
+    assert.commandWorked(fromColl.dropIndex({foreignField: 1}));
 };
 
 insertDocumentToCollection(fromColl, foreignDocCount, "foreignField");
@@ -356,7 +391,12 @@ insertDocumentToCollection(localColl, localDocCount, "localField");
 // lastScannedObjects and lastScannedKeys with existing stats values in that case.
 getCurrentQueryExecutorStats();
 
-testQueryExecutorStatsWithCollectionScan();
+testQueryExecutorStatsWithCollectionScan({withUnwind: false});
 testQueryExecutorStatsWithHashLookup();
-testQueryExecutorStatsWithIndexScan();
+testQueryExecutorStatsWithIndexScan({withUnwind: false});
+
+// Now test $lookup including an $unwind of the output field. This should result in the unwind
+// taking place within the lookup stage.
+testQueryExecutorStatsWithCollectionScan({withUnwind: true});
+testQueryExecutorStatsWithIndexScan({withUnwind: true});
 }());
