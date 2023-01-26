@@ -7,6 +7,7 @@ import functools
 import json
 import os
 import re
+import pathlib
 import platform
 import shlex
 import shutil
@@ -6231,7 +6232,7 @@ def injectModule(env, module, **kwargs):
 env.AddMethod(injectModule, 'InjectModule')
 
 replacements = {
-    '@MONGO_BUILD_DIR@': env.Dir('$BUILD_DIR').path + '/mongo',
+    '@MONGO_BUILD_DIR@': (pathlib.Path(env.Dir('$BUILD_DIR').path) / 'mongo').as_posix(),
 }
 
 clang_tidy_config = env.Substfile(
