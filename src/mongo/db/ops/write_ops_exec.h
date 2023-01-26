@@ -38,6 +38,7 @@
 #include "mongo/db/ops/single_write_result_gen.h"
 #include "mongo/db/ops/update_result.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/ops/write_ops_exec_util.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/s/stale_exception.h"
@@ -64,32 +65,6 @@ struct WriteResult {
 
     // In case of an error, whether the operation can continue.
     bool canContinue = true;
-};
-
-/**
- * Sets the Client's LastOp to the system OpTime if needed. This is especially helpful for
- * adjusting the client opTime for cases when batched write performed multiple writes, but
- * when the last write was a no-op (which will not advance the client opTime).
- */
-class LastOpFixer {
-public:
-    LastOpFixer(OperationContext* opCtx, const NamespaceString& ns);
-
-    ~LastOpFixer();
-
-    void startingOp();
-
-    void finishedOpSuccessfully();
-
-private:
-    repl::ReplClientInfo& replClientInfo() {
-        return repl::ReplClientInfo::forClient(_opCtx->getClient());
-    }
-
-    OperationContext* const _opCtx;
-    bool _needToFixLastOp = true;
-    const bool _isOnLocalDb;
-    repl::OpTime _opTimeAtLastOpStart;
 };
 
 bool getFleCrudProcessed(OperationContext* opCtx,

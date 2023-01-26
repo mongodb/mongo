@@ -31,9 +31,24 @@ env.Library(
 )
 
 env.Library(
+    target='write_ops_exec_util',
+    source=[
+        'write_ops_exec_util.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/base',
+        '$BUILD_DIR/mongo/db/catalog/collection',
+        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
+    ],
+)
+
+env.Library(
     target='write_ops_exec',
     source=[
         'write_ops_exec.cpp',
+    ],
+    LIBDEPS=[
+        'write_ops_exec_util',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/base',
