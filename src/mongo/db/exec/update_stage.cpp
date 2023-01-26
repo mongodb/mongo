@@ -450,43 +450,20 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
 
         bool writeToOrphan = false;
         if (!_params.request->explain() && _isUserInitiatedWrite) {
-            try {
-                const auto action = _preWriteFilter.computeAction(member->doc.value());
-                if (action == write_stage_common::PreWriteFilter::Action::kSkip) {
-                    LOGV2_DEBUG(
-                        5983200,
-                        3,
-                        "Skipping update operation to orphan document to prevent a wrong change "
-                        "stream event",
-                        "namespace"_attr = collection()->ns(),
-                        "record"_attr = member->doc.value());
-                    return PlanStage::NEED_TIME;
-                } else if (action ==
-                           write_stage_common::PreWriteFilter::Action::kWriteAsFromMigrate) {
-                    LOGV2_DEBUG(
-                        6184701,
-                        3,
-                        "Marking update operation to orphan document with the fromMigrate flag "
-                        "to prevent a wrong change stream event",
-                        "namespace"_attr = collection()->ns(),
-                        "record"_attr = member->doc.value());
-                    writeToOrphan = true;
-                }
-            } catch (const ExceptionFor<ErrorCodes::StaleConfig>& ex) {
-                if (ex->getVersionReceived() == ShardVersion::IGNORED() &&
-                    ex->getCriticalSectionSignal()) {
-                    // If ShardVersion is IGNORED and we encountered a critical section, then yield,
-                    // wait for critical section to finish and then we'll resume the write from the
-                    // point we had left. We do this to prevent large multi-writes from repeatedly
-                    // failing due to StaleConfig and exhausting the mongos retry attempts.
+            auto [immediateReturnStageState, fromMigrate] = _preWriteFilter.checkIfNotWritable(
+                member->doc.value(),
+                "update"_sd,
+                collection()->ns(),
+                [&](const ExceptionFor<ErrorCodes::StaleConfig>& ex) {
                     planExecutorShardingCriticalSectionFuture(opCtx()) =
                         ex->getCriticalSectionSignal();
-                    memberFreer.dismiss();  // Keep this member around so we can retry deleting it.
+                    memberFreer.dismiss();  // Keep this member around so we can retry updating it.
                     prepareToRetryWSM(id, out);
-                    return PlanStage::NEED_YIELD;
-                }
-                throw;
+                });
+            if (immediateReturnStageState) {
+                return *immediateReturnStageState;
             }
+            writeToOrphan = fromMigrate;
         }
 
         // Ensure that the BSONObj underlying the WorkingSetMember is owned because saveState()

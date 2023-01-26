@@ -198,40 +198,19 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
 
     bool writeToOrphan = false;
     if (!_params->isExplain && !_params->fromMigrate) {
-        try {
-            const auto action = _preWriteFilter.computeAction(member->doc.value());
-            if (action == write_stage_common::PreWriteFilter::Action::kSkip) {
-                LOGV2_DEBUG(
-                    5983201,
-                    3,
-                    "Skipping delete operation to orphan document to prevent a wrong change "
-                    "stream event",
-                    "namespace"_attr = collection()->ns(),
-                    "record"_attr = member->doc.value());
-                return PlanStage::NEED_TIME;
-            } else if (action == write_stage_common::PreWriteFilter::Action::kWriteAsFromMigrate) {
-                LOGV2_DEBUG(6184700,
-                            3,
-                            "Marking delete operation to orphan document with the fromMigrate flag "
-                            "to prevent a wrong change stream event",
-                            "namespace"_attr = collection()->ns(),
-                            "record"_attr = member->doc.value());
-                writeToOrphan = true;
-            }
-        } catch (const ExceptionFor<ErrorCodes::StaleConfig>& ex) {
-            if (ex->getVersionReceived() == ShardVersion::IGNORED() &&
-                ex->getCriticalSectionSignal()) {
-                // If ShardVersion is IGNORED and we encountered a critical section, then yield,
-                // wait for the critical section to finish and then we'll resume the write from the
-                // point we had left. We do this to prevent large multi-writes from repeatedly
-                // failing due to StaleConfig and exhausting the mongos retry attempts.
+        auto [immediateReturnStageState, fromMigrate] = _preWriteFilter.checkIfNotWritable(
+            member->doc.value(),
+            "delete"_sd,
+            collection()->ns(),
+            [&](const ExceptionFor<ErrorCodes::StaleConfig>& ex) {
                 planExecutorShardingCriticalSectionFuture(opCtx()) = ex->getCriticalSectionSignal();
                 memberFreer.dismiss();  // Keep this member around so we can retry deleting it.
                 prepareToRetryWSM(id, out);
-                return PlanStage::NEED_YIELD;
-            }
-            throw;
+            });
+        if (immediateReturnStageState) {
+            return *immediateReturnStageState;
         }
+        writeToOrphan = fromMigrate;
     }
 
     auto retryableWrite = write_stage_common::isRetryableWrite(opCtx());

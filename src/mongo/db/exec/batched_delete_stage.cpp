@@ -36,7 +36,9 @@
 #include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/scoped_timer.h"
+#include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/exec/write_stage_common.h"
 #include "mongo/db/op_observer/op_observer.h"
@@ -346,86 +348,66 @@ long long BatchedDeleteStage::_commitBatch(WorkingSetID* out,
 
         // Determine whether the document being deleted is owned by this shard, and the action
         // to undertake if it isn't.
-        const auto action = docStillMatches ? _preWriteFilter.computeAction(member->doc.value())
-                                            : write_stage_common::PreWriteFilter::Action::kSkip;
         bool writeToOrphan = false;
+        auto action = _preWriteFilter.computeActionAndLogSpecialCases(
+            member->doc.value(), "batched delete"_sd, collection()->ns());
+        if (!docStillMatches || action == write_stage_common::PreWriteFilter::Action::kSkip) {
+            recordsToSkip->insert(workingSetMemberID);
+            continue;
+        }
+        writeToOrphan = action == write_stage_common::PreWriteFilter::Action::kWriteAsFromMigrate;
+
         auto retryableWrite = write_stage_common::isRetryableWrite(opCtx());
-        switch (action) {
-            case write_stage_common::PreWriteFilter::Action::kSkip:
-                LOGV2_DEBUG(
-                    6410700,
-                    3,
-                    "Skipping delete operation in batched delete: either the record no longer "
-                    "matches the query or skipping an orphan document to prevent a wrong "
-                    "change stream event",
-                    "namespace"_attr = collection()->ns(),
-                    "isOrphan"_attr = docStillMatches,
-                    "record"_attr = member->doc.value());
-                recordsToSkip->insert(workingSetMemberID);
-                break;
-            case write_stage_common::PreWriteFilter::Action::kWriteAsFromMigrate:
-                LOGV2_DEBUG(6410701,
-                            3,
-                            "Marking delete operation to orphan document with the fromMigrate flag "
-                            "to prevent a wrong change stream event in a batched delete",
-                            "namespace"_attr = collection()->ns(),
-                            "record"_attr = member->doc.value());
-                writeToOrphan = true;
-                [[fallthrough]];  // To still peform the delete, but mark fromMigrate.
-            case write_stage_common::PreWriteFilter::Action::kWrite:
-                Snapshotted<Document> memberDoc = member->doc;
-                BSONObj bsonObjDoc = memberDoc.value().toBson();
-                applyOpsBytes += kApplyOpsArrayEntryPaddingBytes;
-                tassert(6515700,
-                        "Expected document to have an _id field present",
-                        bsonObjDoc.hasField("_id"));
-                applyOpsBytes += bsonObjDoc.getField("_id").size();
-                if (applyOpsBytes > BSONObjMaxUserSize) {
-                    // There's no room to fit this deletion in the current batch, as doing so
-                    // would exceed 16MB of oplog entry: put this deletion back into the staging
-                    // buffer and commit the batch.
-                    invariant(*bufferOffset > 0);
-                    (*bufferOffset)--;
-                    wuow.commit();
-                    return batchTimer.millis();
-                }
+        Snapshotted<Document> memberDoc = member->doc;
+        BSONObj bsonObjDoc = memberDoc.value().toBson();
+        applyOpsBytes += kApplyOpsArrayEntryPaddingBytes;
+        tassert(
+            6515700, "Expected document to have an _id field present", bsonObjDoc.hasField("_id"));
+        applyOpsBytes += bsonObjDoc.getField("_id").size();
+        if (applyOpsBytes > BSONObjMaxUserSize) {
+            // There's no room to fit this deletion in the current batch, as doing so
+            // would exceed 16MB of oplog entry: put this deletion back into the staging
+            // buffer and commit the batch.
+            invariant(*bufferOffset > 0);
+            (*bufferOffset)--;
+            wuow.commit();
+            return batchTimer.millis();
+        }
 
-                collection_internal::deleteDocument(
-                    opCtx(),
-                    collection(),
-                    Snapshotted(memberDoc.snapshotId(), bsonObjDoc),
-                    _params->stmtId,
-                    member->recordId,
-                    _params->opDebug,
-                    _params->fromMigrate || writeToOrphan,
-                    false,
-                    _params->returnDeleted ? collection_internal::StoreDeletedDoc::On
-                                           : collection_internal::StoreDeletedDoc::Off,
-                    CheckRecordId::Off,
-                    retryableWrite ? collection_internal::RetryableWrite::kYes
-                                   : collection_internal::RetryableWrite::kNo);
+        collection_internal::deleteDocument(
+            opCtx(),
+            collection(),
+            Snapshotted(memberDoc.snapshotId(), bsonObjDoc),
+            _params->stmtId,
+            member->recordId,
+            _params->opDebug,
+            _params->fromMigrate || writeToOrphan,
+            false,
+            _params->returnDeleted ? collection_internal::StoreDeletedDoc::On
+                                   : collection_internal::StoreDeletedDoc::Off,
+            CheckRecordId::Off,
+            retryableWrite ? collection_internal::RetryableWrite::kYes
+                           : collection_internal::RetryableWrite::kNo);
 
-                (*docsDeleted)++;
-                (*bytesDeleted) += bsonObjDoc.objsize();
+        (*docsDeleted)++;
+        (*bytesDeleted) += bsonObjDoc.objsize();
 
-                batchedDeleteStageSleepAfterNDocuments.executeIf(
-                    [&](const BSONObj& data) {
-                        int sleepMs = data["sleepMs"].safeNumberInt();
-                        opCtx()->sleepFor(Milliseconds(sleepMs));
-                    },
-                    [&](const BSONObj& data) {
-                        // hangAfterApproxNDocs is roughly estimated as the number of deletes
-                        // committed + the number of documents deleted in the current unit of work.
+        batchedDeleteStageSleepAfterNDocuments.executeIf(
+            [&](const BSONObj& data) {
+                int sleepMs = data["sleepMs"].safeNumberInt();
+                opCtx()->sleepFor(Milliseconds(sleepMs));
+            },
+            [&](const BSONObj& data) {
+                // hangAfterApproxNDocs is roughly estimated as the number of deletes
+                // committed + the number of documents deleted in the current unit of work.
 
-                        // Assume nDocs is positive.
-                        return data.hasField("sleepMs") && data.hasField("ns") &&
-                            data.getStringField("ns") == collection()->ns().toString() &&
-                            data.hasField("nDocs") &&
-                            _specificStats.docsDeleted + *docsDeleted >=
-                            static_cast<unsigned int>(data.getIntField("nDocs"));
-                    });
-                break;
-        };
+                // Assume nDocs is positive.
+                return data.hasField("sleepMs") && data.hasField("ns") &&
+                    data.getStringField("ns") == collection()->ns().toString() &&
+                    data.hasField("nDocs") &&
+                    _specificStats.docsDeleted + *docsDeleted >=
+                    static_cast<unsigned int>(data.getIntField("nDocs"));
+            });
 
         const Milliseconds elapsedMillis(batchTimer.millis());
         if (_batchedDeleteParams->targetBatchTimeMS != Milliseconds(0) &&

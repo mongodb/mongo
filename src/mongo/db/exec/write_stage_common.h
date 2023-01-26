@@ -31,6 +31,7 @@
 
 #include "mongo/platform/basic.h"
 
+#include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/shard_filterer.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/namespace_string.h"
@@ -70,13 +71,78 @@ public:
      */
     Action computeAction(const Document& doc);
 
+    /**
+     * Computes the required action for the current write operation over the 'doc' and logs cases
+     * of 'kSkip' or 'kWriteAsFromMigrate'.
+     *
+     * - Returns 'kWRite' if the 'doc' is writeable
+     * - Returns 'kSkip' if the 'doc' is not writeable and should be skipped.
+     * - Returns 'kWriteAsFromMigrate' meaning that the 'doc' should be written to orphan chunk.
+     */
+    Action computeActionAndLogSpecialCases(const Document& doc,
+                                           StringData opKind,
+                                           const NamespaceString& collNs) {
+        const auto action = computeAction(doc);
+        if (action == Action::kSkip) {
+            logSkippingDocument(doc, opKind, collNs);
+        } else if (action == Action::kWriteAsFromMigrate) {
+            logFromMigrate(doc, opKind, collNs);
+        }
+
+        return action;
+    }
+
+    /**
+     * Checks if the 'doc' is NOT writable and additionally handles the StaleConfig exception. This
+     * method should be called in a context of single update / delete.
+     *
+     * Returns a pair of [optional immediate StageState return code, bool fromMigrate].
+     * - Returns {{}, false} if the 'doc' is simply writable.
+     * - Returns PlanStage::StageState if the 'doc' is not writable and the caller should return
+     *   immediately with the state.
+     * - Returns bool for 'fromMigrate' flag meaning that the 'doc' should be written to orphan
+     *   chunk.
+     */
+    template <typename F>
+    std::pair<boost::optional<PlanStage::StageState>, bool> checkIfNotWritable(
+        const Document& doc, StringData opKind, const NamespaceString& collNs, F&& yieldHandler) {
+        try {
+            auto action = computeActionAndLogSpecialCases(doc, opKind, collNs);
+            // If the 'doc' should be skipped in a context of single update / delete, the caller
+            // should return immediately with NEED_TIME state. When action is 'kSkip', 'fromMigrate'
+            // is a 'don't care' condition but we just fill it with false.
+            if (action == Action::kSkip) {
+                return {PlanStage::NEED_TIME, false};
+            }
+            return {{}, action == Action::kWriteAsFromMigrate};
+        } catch (const ExceptionFor<ErrorCodes::StaleConfig>& ex) {
+            // If ShardVersion is IGNORED and we encountered a critical section, then yield,
+            // wait for the critical section to finish and then we'll resume the write from the
+            // point we had left. We do this to prevent large multi-writes from repeatedly
+            // failing due to StaleConfig and exhausting the mongos retry attempts.
+            if (ex->getVersionReceived() == ShardVersion::IGNORED() &&
+                ex->getCriticalSectionSignal()) {
+                yieldHandler(ex);
+                return {PlanStage::NEED_YIELD, false};
+            }
+            throw;
+        }
+    }
+
 private:
     /**
      * Returns true if the operation is not versioned or if the doc is owned by the shard.
      *
-     * May thow a ShardKeyNotFound if the document has an invalid shard key.
+     * May throw a ShardKeyNotFound if the document has an invalid shard key.
      */
     bool _documentBelongsToMe(const BSONObj& doc);
+
+    static void logSkippingDocument(const Document& doc,
+                                    StringData opKind,
+                                    const NamespaceString& collNs);
+    static void logFromMigrate(const Document& doc,
+                               StringData opKind,
+                               const NamespaceString& collNs);
 
     OperationContext* _opCtx;
     NamespaceString _nss;

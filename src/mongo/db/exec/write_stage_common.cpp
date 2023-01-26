@@ -40,6 +40,7 @@
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/logv2/log.h"
 #include "mongo/logv2/redaction.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
@@ -104,6 +105,30 @@ bool PreWriteFilter::_documentBelongsToMe(const BSONObj& doc) {
 
 void PreWriteFilter::restoreState() {
     _shardFilterer.reset();
+}
+
+void PreWriteFilter::logSkippingDocument(const Document& doc,
+                                         StringData opKind,
+                                         const NamespaceString& collNs) {
+    LOGV2_DEBUG(5983201,
+                3,
+                "Skipping the operation to orphan document to prevent a wrong change "
+                "stream event",
+                "op"_attr = opKind,
+                "namespace"_attr = collNs,
+                "record"_attr = doc);
+}
+
+void PreWriteFilter::logFromMigrate(const Document& doc,
+                                    StringData opKind,
+                                    const NamespaceString& collNs) {
+    LOGV2_DEBUG(6184700,
+                3,
+                "Marking the operation to orphan document with the fromMigrate flag to "
+                "prevent a wrong change stream event",
+                "op"_attr = opKind,
+                "namespace"_attr = collNs,
+                "record"_attr = doc);
 }
 
 void CachedShardingDescription::restoreState() {
