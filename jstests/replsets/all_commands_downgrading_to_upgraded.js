@@ -22,6 +22,8 @@ const fullNs = dbName + "." + collName;
 // Pre-written reasons for skipping a test.
 const isAnInternalCommand = "internal command";
 const isDeprecated = "deprecated command";
+// TODO SERVER-69753 some commands we didn't have time for. Other commands are new in recent
+// releases and don't make sense to test here.
 const isNotImplementedYet = "not implemented yet";
 
 let _lsid = UUID();
@@ -1112,6 +1114,7 @@ const allCommands = {
     setIndexCommitQuorum: {skip: isNotImplementedYet},
     setFeatureCompatibilityVersion: {skip: isNotImplementedYet},
     setFreeMonitoring: {skip: isNotImplementedYet},
+    setProfilingFilterGlobally: {skip: isNotImplementedYet},
     setParameter: {skip: isNotImplementedYet},
     setShardVersion: {skip: isNotImplementedYet},
     setChangeStreamState: {skip: isNotImplementedYet},

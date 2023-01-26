@@ -5971,6 +5971,26 @@ export const authCommandsLib = {
           ]
         },
         {
+            testname: "setProfilingFilterGlobally",
+            command: {setProfilingFilterGlobally: 1, filter: {nreturned: 0}},
+            testcases: [
+                {
+                    runOnDb: firstDbName,
+                    roles: roles_dbAdminAny,
+                    privileges: [{resource: {db: "", collection: ""}, actions: ["enableProfiler"]}],
+                    expectFail:
+                        true /* the command will fail because the query knob is not turned on */
+                },
+                {
+                    runOnDb: firstDbName,
+                    privileges: [
+                        {resource: {db: firstDbName, collection: ""}, actions: ["enableProfiler"]}
+                    ],
+                    expectAuthzFailure: true
+                }
+            ]
+        },
+        {
           testname: "setParameter",
           command: {setParameter: 1, quiet: 1},
           testcases: [

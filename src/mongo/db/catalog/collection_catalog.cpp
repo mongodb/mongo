@@ -1773,6 +1773,12 @@ std::set<TenantId> CollectionCatalog::getAllTenants() const {
     return ret;
 }
 
+void CollectionCatalog::setAllDatabaseProfileFilters(std::shared_ptr<ProfileFilter> filter) {
+    for (auto& [_, settings] : _databaseProfileSettings) {
+        settings.filter = filter;
+    }
+}
+
 void CollectionCatalog::setDatabaseProfileSettings(
     const DatabaseName& dbName, CollectionCatalog::ProfileSettings newProfileSettings) {
     _databaseProfileSettings[dbName] = newProfileSettings;

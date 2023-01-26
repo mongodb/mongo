@@ -653,6 +653,7 @@ export const TenantMigrationConcurrentWriteUtil = {
         setDefaultRWConcern: {skip: isNotRunOnUserDatabase},
         setFeatureCompatibilityVersion: {skip: isNotRunOnUserDatabase},
         setFreeMonitoring: {skip: isNotRunOnUserDatabase},
+        setProfilingFilterGlobally: {skip: isNotRunOnUserDatabase},
         setIndexCommitQuorum: {skip: isNotRunOnUserDatabase},
         setParameter: {skip: isNotRunOnUserDatabase},
         setShardVersion: {skip: isNotRunOnUserDatabase},
