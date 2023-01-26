@@ -3017,12 +3017,7 @@ Expression::ComputedPaths ExpressionMap::getComputedPaths(const std::string& exp
 
 /* ------------------------- ExpressionMeta ----------------------------- */
 
-REGISTER_EXPRESSION_CONDITIONALLY(meta,
-                                  ExpressionMeta::parse,
-                                  AllowedWithApiStrict::kConditionally,
-                                  AllowedWithClientType::kAny,
-                                  boost::none,
-                                  true);
+REGISTER_STABLE_EXPRESSION(meta, ExpressionMeta::parse);
 
 namespace {
 const std::string textScoreName = "textScore";
@@ -3077,19 +3072,6 @@ intrusive_ptr<Expression> ExpressionMeta::parse(ExpressionContext* const expCtx,
     uassert(17307, "$meta only supports string arguments", expr.type() == String);
 
     const auto iter = kMetaNameToMetaType.find(expr.valueStringData());
-
-    const auto apiStrict =
-        expCtx->opCtx && APIParameters::get(expCtx->opCtx).getAPIStrict().value_or(false);
-
-    auto typeName = iter->first;
-    auto usesUnstableField = (typeName == "searchScore") || (typeName == "indexKey") ||
-        (typeName == "textScore") || (typeName == "searchHighlights");
-
-    if (apiStrict && usesUnstableField) {
-        uasserted(ErrorCodes::APIStrictError,
-                  "Provided apiStrict is true with an unstable parameter");
-    }
-
     if (iter != kMetaNameToMetaType.end()) {
         return new ExpressionMeta(expCtx, iter->second);
     } else {
