@@ -230,7 +230,7 @@ mc_getTypeInfoDouble (mc_getTypeInfoDouble_args_t args,
    uint32_t bits_range;
    if (args.precision.set) {
       // Subnormal representations can support up to 5x10^-324 as a number
-      if (args.precision.value < 0 || args.precision.value > 324) {
+      if (args.precision.value > 324) {
          CLIENT_ERR (
             "Precision must be between 0 and 324 inclusive, got: %" PRIu32,
             args.precision.value);
@@ -310,6 +310,306 @@ mc_getTypeInfoDouble (mc_getTypeInfoDouble_args_t args,
    }
 
    *out = (mc_OSTType_Double){.min = 0, .max = UINT64_MAX, .value = uv};
+
+   return true;
+}
+
+/**
+ * @brief There is no shipped algorithm for creating a full 128-bit integer from
+ * a Decimal128, but it's easy enough to write one of our own.
+ *
+ * @param dec
+ * @return mlib_int128
+ */
+static mlib_int128
+dec128_to_int128 (mc_dec128 dec)
+{
+   // Only normal numbers
+   BSON_ASSERT (mc_dec128_is_finite (dec));
+   BSON_ASSERT (!mc_dec128_is_nan (dec));
+   // We don't support negative numbers
+   BSON_ASSERT (!mc_dec128_is_negative (dec));
+   // There is no fractional part:
+   BSON_ASSERT (mc_dec128_is_zero (mc_dec128_modf (dec).frac));
+
+   mlib_int128 ret = mc_dec128_coeff (dec);
+
+   // Scale the resulting number by a power of ten matching the exponent of the
+   // Decimal128:
+   int32_t exp =
+      ((int32_t) mc_dec128_get_biased_exp (dec)) - MC_DEC128_EXPONENT_BIAS;
+   // We will scale up/down based on whether it is negative:
+   mlib_int128 e1 = mlib_int128_pow10 ((uint8_t) abs (exp));
+   if (exp < 0) {
+      ret = mlib_int128_div (ret, e1);
+   } else {
+      ret = mlib_int128_mul (ret, e1);
+   }
+
+   return ret;
+}
+
+bool
+mc_getTypeInfoDecimal128 (mc_getTypeInfoDecimal128_args_t args,
+                          mc_OSTType_Decimal128 *out,
+                          mongocrypt_status_t *status)
+{
+   /// Basic param checks
+   if (args.min.set != args.max.set || args.min.set != args.precision.set) {
+      CLIENT_ERR (
+         "min, max, and precision must all be set or must all be unset");
+      return false;
+   }
+
+   // We only accept normal numbers
+   if (mc_dec128_is_inf (args.value) || mc_dec128_is_nan (args.value)) {
+      CLIENT_ERR ("Infinity and Nan Decimal128 values are not supported.");
+      return false;
+   }
+
+   // Check boundary if a range is set
+   if (args.min.set) {
+      // [min,max] must be valid
+      if (mc_dec128_greater_equal (args.min.value, args.max.value)) {
+         CLIENT_ERR (
+            "The minimum value must be less than the maximum value, got "
+            "min: %s, max: %s",
+            mc_dec128_to_string (args.min.value).str,
+            mc_dec128_to_string (args.max.value).str);
+         return false;
+      }
+
+      // Value must be within [min,max)
+      if (mc_dec128_greater (args.value, args.max.value) ||
+          mc_dec128_less (args.value, args.min.value)) {
+         CLIENT_ERR ("Value must be greater than or equal to the minimum value "
+                     "and less than or equal to the maximum value, got "
+                     "min: %s, max: %s, value: %s",
+                     mc_dec128_to_string (args.min.value).str,
+                     mc_dec128_to_string (args.max.value).str,
+                     mc_dec128_to_string (args.value).str);
+         return false;
+      }
+   }
+
+   // Should we use precision mode?
+   //
+   // When we use precision mode, we try to represent as a decimal128 value that
+   // fits in [-2^127, 2^127] (i.e. is a valid int128)
+   //
+   // This check determines if we can represent any precision-truncated value as
+   // a 128-bit integer I.e. Is ((ub - lb) * 10^precision) < 128 bits.
+   //
+   // It is important that we determine whether a range and its precision would
+   // fit, regardless of the value to be encoded, because the encoding for
+   // precision-truncated-decimal128 is incompatible with the encoding of the
+   // full range.
+   bool use_precision_mode = false;
+   // The number of bits required to hold the result (used for precision mode)
+   uint8_t bits_range = 0;
+   if (args.precision.set) {
+      // Subnormal representations can support up to 5x10^-6182 as a number
+      if (args.precision.value > 6182) {
+         CLIENT_ERR (
+            "Precision must be between 0 and 6182 inclusive, got: %" PRIu32,
+            args.precision.value);
+         return false;
+      }
+
+      // max - min
+      mc_dec128 bounds_n1 = mc_dec128_sub (args.max.value, args.min.value);
+      // The size of [min, max]: (max - min) + 1
+      mc_dec128 bounds = mc_dec128_add (bounds_n1, MC_DEC128_ONE);
+
+      // We can overflow if max = max_dec128 and min = min_dec128 so make sure
+      // we have finite number after we do subtraction
+      if (mc_dec128_is_finite (bounds)) {
+         // This creates a range which is wider then we permit by our min/max
+         // bounds check with the +1 but it is as the algorithm is written in
+         // WRITING-11907.
+         mc_dec128 precision_scaled_bounds =
+            mc_dec128_scale (bounds, args.precision.value);
+         /// The number of bits required to hold the result for the given
+         /// precision (as decimal)
+         mc_dec128 bits_range_dec = mc_dec128_log2 (precision_scaled_bounds);
+
+         if (mc_dec128_is_finite (bits_range_dec) &&
+             mc_dec128_less (bits_range_dec, MC_DEC128 (128))) {
+            // We need fewer than 128 bits to hold the result. But round up,
+            // just to be sure:
+            int64_t r = mc_dec128_to_int64 (
+               mc_dec128_round_integral_positive (bits_range_dec));
+            BSON_ASSERT (r >= 0);
+            BSON_ASSERT (r <= UINT8_MAX);
+            // We've computed the proper 'bits_range'
+            bits_range = (uint8_t) r;
+
+            if (bits_range < 128) {
+               use_precision_mode = true;
+            }
+         }
+      }
+   }
+
+   // Constant zero
+   const mlib_int128 i128_zero = MLIB_INT128 (0);
+   // Constant 1
+   const mlib_int128 i128_one = MLIB_INT128 (1);
+   // Constant 10
+   const mlib_int128 i128_ten = MLIB_INT128 (10);
+   // Constant: 2^127
+   const mlib_int128 i128_2pow127 = mlib_int128_lshift (i128_one, 127);
+   // ↑ Coincidentally has the same bit pattern as INT128_SMIN, but we're
+   // treating it as an unsigned number here, so don't get confused!
+
+   if (use_precision_mode) {
+      BSON_ASSERT (args.precision.set);
+      // Example value: 31.4159
+      // Example Precision = 2
+
+      // Shift the number up
+      // Returns: 3141.9
+      mc_dec128 valScaled = mc_dec128_scale (args.value, args.precision.value);
+
+      // Round the number down
+      // Returns 3141.0
+      mc_dec128 valTrunc = mc_dec128_round_integral_zero (valScaled);
+
+      // Shift the number down
+      // Returns: 31.41
+      mc_dec128 v_prime =
+         mc_dec128_scale (valTrunc, -(int32_t) args.precision.value);
+
+      // Adjust the number by the lower bound
+      // Make it an integer by scaling the number
+      //
+      // Returns 3141.0
+      mc_dec128 v_prime2 = mc_dec128_scale (
+         mc_dec128_sub (v_prime, args.min.value), args.precision.value);
+      // Round the number down again. min may have a fractional value with more
+      // decimal places than the precision (e.g. .001). Subtracting min may have
+      // resulted in v_prime2 with a non-zero fraction. v_prime2 is expected to
+      // have no fractional value when converting to int128.
+      v_prime2 = mc_dec128_round_integral_zero (v_prime2);
+
+      BSON_ASSERT (mc_dec128_less (mc_dec128_log2 (v_prime2), MC_DEC128 (128)));
+
+      // Resulting OST maximum
+      mlib_int128 ost_max =
+         mlib_int128_sub (mlib_int128_pow2 (bits_range), i128_one);
+
+      // Now we need to get the Decimal128 out as a 128-bit integer
+      // But Decimal128 does not support conversion to Int128.
+      //
+      // If we think the Decimal128 fits in the range, based on the maximum
+      // value, we try to convert to int64 directly.
+      if (bits_range < 64) {
+         // Try conversion to int64, it may fail but since it is easy we try
+         // this first.
+         mc_dec128_flagset flags = {0};
+         int64_t as64 = mc_dec128_to_int64_ex (v_prime2, &flags);
+         if (flags.bits == 0) {
+            // No error. It fits
+            *out = (mc_OSTType_Decimal128){
+               .value = MLIB_INT128_CAST (as64),
+               .min = i128_zero,
+               .max = ost_max,
+            };
+            return true;
+         } else {
+            // Conversion failure to 64-bit. Possible overflow, imprecision,
+            // etc. Fallback to slower dec128_to_int128
+         }
+      }
+
+      mlib_int128 u_ret = dec128_to_int128 (v_prime2);
+
+      *out = (mc_OSTType_Decimal128){
+         .value = u_ret,
+         .min = i128_zero,
+         .max = ost_max,
+      };
+
+      return true;
+   }
+
+   // The coefficient of the number, without exponent/sign
+   const mlib_int128 coeff = mc_dec128_coeff (args.value);
+
+   if (mlib_int128_eq (coeff, i128_zero)) {
+      // If the coefficient is zero, the result is encoded as the midpoint
+      // between zero and 2^128-1
+      *out = (mc_OSTType_Decimal128){
+         .value = i128_2pow127,
+         .min = i128_zero,
+         .max = MLIB_INT128_UMAX,
+      };
+      return true;
+   }
+
+   // Coefficient is an unsigned value. We'll later scale our answer based on
+   // the sign of the actual Decimal128
+   const bool isNegative = mc_dec128_is_negative (args.value);
+
+   // cMax = 10^34 - 1 (The largest integer representable in Decimal128)
+   const mlib_int128 cMax =
+      mlib_int128_sub (mlib_int128_pow10 (34), MLIB_INT128_CAST (1));
+   const mlib_int128 cMax_div_ten = mlib_int128_div (cMax, i128_ten);
+
+   // The biased exponent from the decimal number. The paper refers to the
+   // expression (e - e_min), which is the value of the biased exponent.
+   const uint32_t exp_biased = mc_dec128_get_biased_exp (args.value);
+
+   // ρ (rho) is the greatest integer such that: coeff×10^ρ <= cMax
+   unsigned rho = 0;
+   // Keep track of the subexpression coeff×10^ρ rather than recalculating it
+   // time.
+   // Initially: (ρ = 0) -> (10^ρ = 1) -> (coeff×10^ρ = coeff×1 = coeff):
+   mlib_int128 coeff_scaled = coeff;
+   // Calculate ρ: This could be done using a log10 with a division, but that
+   // is far more work than just a few multiplications.
+   // While: coeff×ten^ρ < cMax/10:
+   while (mlib_int128_ucmp (coeff_scaled, cMax_div_ten) < 0) {
+      // Increase rho until we pass cMax/10
+      rho++;
+      // Scale our computed subexpression rather than fully recomputing it
+      coeff_scaled = mlib_int128_mul (coeff_scaled, i128_ten);
+   }
+
+   // No multiplication by 10 should ever send us from N < cMax/10 to N > cMax
+   BSON_ASSERT (mlib_int128_ucmp (coeff_scaled, cMax) <= 0);
+
+   mlib_int128 result;
+   if (rho <= exp_biased) {
+      // ρ is less-than/equal to the exponent with bias.
+
+      // Diff between the biased exponent and ρ.
+      // Value in paper is spelled "e - e_min - ρ"
+      const uint32_t exp_diff = exp_biased - (uint32_t) rho;
+      // cMax * (exp_diff)
+      const mlib_int128 cmax_scaled =
+         mlib_int128_mul (cMax, MLIB_INT128_CAST (exp_diff));
+      // coeff * 10^rho * cMax * (exp_biased - rho)
+      result = mlib_int128_add (coeff_scaled, cmax_scaled);
+   } else {
+      const mlib_int128 biased_scale = mlib_int128_pow10 ((uint8_t) exp_biased);
+      result = mlib_int128_mul (biased_scale, coeff);
+   }
+
+   // Always add 2^127:
+   result = mlib_int128_add (result, i128_2pow127);
+
+   if (isNegative) {
+      // We calculated the value of the positive coefficient, but the decimal is
+      // negative. That's okay: Just flip the sign of the encoded result:
+      result = mlib_int128_negate (result);
+   }
+
+   *out = (mc_OSTType_Decimal128){
+      .value = result,
+      .min = i128_zero,
+      .max = MLIB_INT128_UMAX,
+   };
 
    return true;
 }

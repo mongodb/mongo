@@ -975,6 +975,54 @@ mlib_strlen (const char *s)
    return r;
 }
 
+/**
+ * @brief Copy characters into the destination, guaranteed null-terminated and
+ * bounds checked.
+ *
+ * @param dst Pointer to the beginning of the destination array.
+ * @param dst_bufsize The size of the destination array, in characters. MUST be
+ * greater than zero.
+ * @param src Pointer to the beginning of a null-terminated character array.
+ * @param src_bufsize The size of the array pointed-to by `src`.
+ * @return size_t The number `R` of characters written (NOT including the null
+ * terminator). R is guaranteed to be less than dst_bufsize, and
+ * less-than-or-equal-to src_bufsize.
+ *
+ * @note Characters beyond (dst + R) are unmodified. dst[R] is guaranteed to
+ * be a null terminator.
+ */
+static mlib_constexpr_fn size_t
+mlib_strnmcopy (char *dst,
+                size_t dst_bufsize,
+                const char *src,
+                size_t src_bufsize)
+{
+   // No empty destination, since we *must* write a null terminator:
+   assert (dst_bufsize > 0);
+   // The maximum number of characters in the dest is one less than the buffer
+   // size, since we need room for the null terminator:
+   const size_t dstlen = dst_bufsize - 1u;
+   // The actual maximum number of characters we can copy is the less of the
+   // source length and the dest length:
+   const size_t minlen = dstlen < src_bufsize ? dstlen : src_bufsize;
+   // Track what we copy:
+   size_t ncopied = 0;
+   while (ncopied != minlen // Stop if we hit our character limit
+          && *src != 0      // Or if we hit the null terminator in the source
+   ) {
+      // Copy:
+      *dst = *src;
+      // Advance:
+      ++dst;
+      ++src;
+      ++ncopied;
+   }
+   // "dst" now points past the final character we copied (if any), and is still
+   // in-bounds. This will be the null terminator.
+   *dst = 0;
+   return ncopied;
+}
+
 MLIB_C_LINKAGE_END
 
 #endif // MONGOCRYPT_STR_PRIVATE_H

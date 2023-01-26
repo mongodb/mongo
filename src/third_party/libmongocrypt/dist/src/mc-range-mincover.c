@@ -68,49 +68,73 @@ mc_mincover_destroy (mc_mincover_t *mincover)
    bson_free (mincover);
 }
 
-#define BITS 32
+#define UINT_T uint32_t
+#define UINT_C UINT32_C
+#define UINT_FMT_S PRIu32
+#define DECORATE_NAME(N) N##_u32
 #include "mc-range-mincover-generator.template.h"
-#undef BITS
+
+#define UINT_T uint64_t
+#define UINT_C UINT64_C
+#define UINT_FMT_S PRIu64
+#define DECORATE_NAME(N) N##_u64
+#include "mc-range-mincover-generator.template.h"
+
+#define UINT_T mlib_int128
+#define UINT_C MLIB_INT128
+#define UINT_FMT_S "s"
+#define UINT_FMT_ARG(X) (mlib_int128_format (X).str)
+#define DECORATE_NAME(N) N##_u128
+#define UINT_LESSTHAN(L, R) (mlib_int128_ucmp (L, R) < 0)
+#define UINT_ADD mlib_int128_add
+#define UINT_SUB mlib_int128_sub
+#define UINT_LSHIFT mlib_int128_lshift
+#define MC_UINT_MAX MLIB_INT128_UMAX
+#define UINT_BITOR mlib_int128_bitor
+#include "mc-range-mincover-generator.template.h"
+
 
 // Check bounds and return an error message including the original inputs.
-#define CHECK_BOUNDS(args, FMT)                                                \
+#define IDENTITY(X) X
+#define LESSTHAN(L, R) ((L) < (R))
+#define CHECK_BOUNDS(args, FMT, FormatArg, LessThan)                           \
    if (1) {                                                                    \
       if ((args).min.set) {                                                    \
-         if ((args).upperBound < (args).min.value) {                           \
+         if (LessThan ((args).upperBound, (args).min.value)) {                 \
             CLIENT_ERR (                                                       \
                "Upper bound (%" FMT                                            \
                ") must be greater than or equal to the range minimum (%" FMT   \
                ")",                                                            \
-               (args).upperBound,                                              \
-               (args).min.value);                                              \
+               FormatArg ((args).upperBound),                                  \
+               FormatArg ((args).min.value));                                  \
             return false;                                                      \
          }                                                                     \
          if (!(args).includeUpperBound &&                                      \
-             (args).upperBound <= (args).min.value) {                          \
+             !LessThan ((args.min.value), (args.upperBound))) {                \
             CLIENT_ERR ("Upper bound (%" FMT                                   \
                         ") must be greater than the range minimum (%" FMT      \
                         ") if upper bound is excluded from range",             \
-                        (args).upperBound,                                     \
-                        (args).min.value);                                     \
+                        FormatArg ((args).upperBound),                         \
+                        FormatArg ((args).min.value));                         \
             return false;                                                      \
          }                                                                     \
       }                                                                        \
       if ((args).max.set) {                                                    \
-         if ((args).lowerBound > (args).max.value) {                           \
+         if (LessThan ((args).max.value, (args).lowerBound)) {                 \
             CLIENT_ERR (                                                       \
                "Lower bound (%" FMT                                            \
                ") must be less than or equal to the range maximum (%" FMT ")", \
-               (args).lowerBound,                                              \
-               (args).max.value);                                              \
+               FormatArg ((args).lowerBound),                                  \
+               FormatArg ((args).max.value));                                  \
             return false;                                                      \
          }                                                                     \
          if (!(args).includeLowerBound &&                                      \
-             (args).lowerBound >= (args).max.value) {                          \
+             !LessThan ((args).lowerBound, (args).max.value)) {                \
             CLIENT_ERR ("Lower bound (%" FMT                                   \
                         ") must be less than the range maximum (%" FMT         \
                         ") if lower bound is excluded from range",             \
-                        (args).lowerBound,                                     \
-                        (args).max.value);                                     \
+                        FormatArg ((args).lowerBound),                         \
+                        FormatArg ((args).max.value));                         \
             return false;                                                      \
          }                                                                     \
       }                                                                        \
@@ -122,7 +146,7 @@ mc_getMincoverInt32 (mc_getMincoverInt32_args_t args,
                      mongocrypt_status_t *status)
 {
    BSON_ASSERT_PARAM (status);
-   CHECK_BOUNDS (args, PRId32);
+   CHECK_BOUNDS (args, PRId32, IDENTITY, LESSTHAN);
    mc_OSTType_Int32 a, b;
    if (!mc_getTypeInfo32 ((mc_getTypeInfo32_args_t){.min = args.min,
                                                     .max = args.max,
@@ -162,16 +186,12 @@ mc_getMincoverInt32 (mc_getMincoverInt32_args_t args,
    return mc;
 }
 
-#define BITS 64
-#include "mc-range-mincover-generator.template.h"
-#undef BITS
-
 mc_mincover_t *
 mc_getMincoverInt64 (mc_getMincoverInt64_args_t args,
                      mongocrypt_status_t *status)
 {
    BSON_ASSERT_PARAM (status);
-   CHECK_BOUNDS (args, PRId64);
+   CHECK_BOUNDS (args, PRId64, IDENTITY, LESSTHAN);
    mc_OSTType_Int64 a, b;
    if (!mc_getTypeInfo64 ((mc_getTypeInfo64_args_t){.min = args.min,
                                                     .max = args.max,
@@ -218,7 +238,7 @@ mc_getMincoverDouble (mc_getMincoverDouble_args_t args,
                       mongocrypt_status_t *status)
 {
    BSON_ASSERT_PARAM (status);
-   CHECK_BOUNDS (args, "g");
+   CHECK_BOUNDS (args, "g", IDENTITY, LESSTHAN);
 
    mc_OSTType_Double a, b;
    if (!mc_getTypeInfoDouble (
@@ -260,5 +280,56 @@ mc_getMincoverDouble (mc_getMincoverDouble_args_t args,
    }
    mc_mincover_t *mc = MinCoverGenerator_minCover_u64 (mcg);
    MinCoverGenerator_destroy_u64 (mcg);
+   return mc;
+}
+
+mc_mincover_t *
+mc_getMincoverDecimal128 (mc_getMincoverDecimal128_args_t args,
+                          mongocrypt_status_t *status)
+{
+   BSON_ASSERT_PARAM (status);
+#define ToString(Dec) (mc_dec128_to_string (Dec).str)
+   CHECK_BOUNDS (args, "s", ToString, mc_dec128_less);
+
+   mc_OSTType_Decimal128 a, b;
+   if (!mc_getTypeInfoDecimal128 (
+          (mc_getTypeInfoDecimal128_args_t){.value = args.lowerBound,
+                                            .min = args.min,
+                                            .max = args.max,
+                                            .precision = args.precision},
+          &a,
+          status)) {
+      return NULL;
+   }
+   if (!mc_getTypeInfoDecimal128 (
+          (mc_getTypeInfoDecimal128_args_t){.value = args.upperBound,
+                                            .min = args.min,
+                                            .max = args.max,
+                                            .precision = args.precision},
+          &b,
+          status)) {
+      return NULL;
+   }
+
+   BSON_ASSERT (mlib_int128_eq (a.min, b.min));
+   BSON_ASSERT (mlib_int128_eq (a.max, b.max));
+
+   if (!adjustBounds_u128 (&a.value,
+                           args.includeLowerBound,
+                           a.min,
+                           &b.value,
+                           args.includeUpperBound,
+                           b.max,
+                           status)) {
+      return NULL;
+   }
+
+   MinCoverGenerator_u128 *mcg = MinCoverGenerator_new_u128 (
+      a.value, b.value, a.max, args.sparsity, status);
+   if (!mcg) {
+      return NULL;
+   }
+   mc_mincover_t *mc = MinCoverGenerator_minCover_u128 (mcg);
+   MinCoverGenerator_destroy_u128 (mcg);
    return mc;
 }

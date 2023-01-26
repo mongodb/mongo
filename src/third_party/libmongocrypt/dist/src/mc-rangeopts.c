@@ -282,6 +282,13 @@ mc_RangeOpts_appendMin (const mc_RangeOpts_t *ro,
          CLIENT_ERR ("failed to append BSON");
          return false;
       }
+   } else if (valueType == BSON_TYPE_DECIMAL128) {
+      const bson_decimal128_t min =
+         mc_dec128_to_bson_decimal128 (MC_DEC128_LARGEST_NEGATIVE);
+      if (!BSON_APPEND_DECIMAL128 (out, fieldName, &min)) {
+         CLIENT_ERR ("failed to append BSON");
+         return false;
+      }
    } else {
       CLIENT_ERR ("unsupported BSON type: %s for range",
                   mc_bson_type_to_string (valueType));
@@ -334,6 +341,13 @@ mc_RangeOpts_appendMax (const mc_RangeOpts_t *ro,
       }
    } else if (valueType == BSON_TYPE_DOUBLE) {
       if (!BSON_APPEND_DOUBLE (out, fieldName, DBL_MAX)) {
+         CLIENT_ERR ("failed to append BSON");
+         return false;
+      }
+   } else if (valueType == BSON_TYPE_DECIMAL128) {
+      const bson_decimal128_t max =
+         mc_dec128_to_bson_decimal128 (MC_DEC128_LARGEST_POSITIVE);
+      if (!BSON_APPEND_DECIMAL128 (out, fieldName, &max)) {
          CLIENT_ERR ("failed to append BSON");
          return false;
       }

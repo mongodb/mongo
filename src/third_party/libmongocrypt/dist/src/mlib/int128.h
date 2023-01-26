@@ -131,7 +131,7 @@ mlib_int128_add (mlib_int128 left, mlib_int128 right)
 {
    uint64_t losum = left.r.lo + right.r.lo;
    // Overflow check
-   int carry = (losum < left.r.lo || losum < right.r.lo);
+   unsigned carry = (losum < left.r.lo || losum < right.r.lo);
    uint64_t hisum = left.r.hi + right.r.hi + carry;
    return MLIB_INIT (mlib_int128) MLIB_INT128_FROM_PARTS (losum, hisum);
 }
@@ -156,7 +156,7 @@ mlib_int128_negate (mlib_int128 v)
 static mlib_constexpr_fn mlib_int128
 mlib_int128_sub (mlib_int128 from, mlib_int128 less)
 {
-   int borrow = from.r.lo < less.r.lo;
+   unsigned borrow = from.r.lo < less.r.lo;
    uint64_t low = from.r.lo - less.r.lo;
    uint64_t high = from.r.hi - less.r.hi;
    high -= borrow;
@@ -338,7 +338,7 @@ _mlibKnuth431D (uint32_t *const u,
             u[i + j] = (u32) (t);
             k = t >> 32;
          }
-         u[j + n] += (int32_t) k;
+         u[j + n] += (u32) k;
       }
 
       // D7:
@@ -516,9 +516,9 @@ mlib_int128_divmod (mlib_int128 numer, mlib_int128 denom)
          (uint32_t) (denom.r.hi >> (32 - d)),
       };
       if (d != 0) {
-         u[2] |= numer.r.lo >> (64 - d);
-         u[4] |= numer.r.hi >> (64 - d);
-         v[2] |= denom.r.lo >> (64 - d);
+         u[2] |= (uint32_t) (numer.r.lo >> (64 - d));
+         u[4] |= (uint32_t) (numer.r.hi >> (64 - d));
+         v[2] |= (uint32_t) (denom.r.lo >> (64 - d));
       };
 
       uint32_t q[2] = {0};
@@ -561,7 +561,7 @@ mlib_int128_mod (mlib_int128 numer, mlib_int128 denom)
  * @brief Get the nth power of ten as a 128-bit number
  */
 static mlib_constexpr_fn mlib_int128
-mlib_int128_pow10 (long nth)
+mlib_int128_pow10 (uint8_t nth)
 {
    mlib_int128 r = MLIB_INT128 (1);
    while (nth-- > 0) {
@@ -574,9 +574,9 @@ mlib_int128_pow10 (long nth)
  * @brief Get the Nth power of two as a 128-bit number
  */
 static mlib_constexpr_fn mlib_int128
-mlib_int128_pow2 (long nth)
+mlib_int128_pow2 (uint8_t nth)
 {
-   return mlib_int128_lshift (MLIB_INT128 (1), nth);
+   return mlib_int128_lshift (MLIB_INT128 (1), (int) nth);
 }
 
 /**
@@ -612,7 +612,8 @@ mlib_int128_from_string (const char *s, const char **end)
          continue;
       }
       if (c >= 'a') {
-         c -= 'a' - 'A'; // Uppercase (if a letter, otherwise some other punct)
+         // Uppercase (if a letter, otherwise some other punct):
+         c = (char) (c - ('a' - 'A'));
       }
       int digit = c - '0';
       if (c >= 'A') {
@@ -655,7 +656,7 @@ typedef struct {
 static mlib_constexpr_fn mlib_int128_charbuf
 mlib_int128_format (mlib_int128 i)
 {
-   mlib_int128_charbuf into = {0};
+   mlib_int128_charbuf into = {{0}};
    char *out = into.str + (sizeof into) - 1;
    int len = 0;
    if (mlib_int128_eq (i, MLIB_INT128 (0))) {

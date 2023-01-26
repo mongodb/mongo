@@ -43,4 +43,11 @@
  */
 #define mlib_constexpr_fn _mlibConstexprFn
 
+#ifdef __GNUC__
+#define MLIB_ANNOTATE_PRINTF(FStringArgAt, VarArgsStartAt) \
+   __attribute__ ((format (__printf__, FStringArgAt, VarArgsStartAt)))
+#else
+#define MLIB_ANNOTATE_PRINTF(FStringArgAt, VarArgsStartAt) /* no-op */
+#endif
+
 #endif // MLIB_MACROS_H_INCLUDED

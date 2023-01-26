@@ -310,7 +310,7 @@ mongocrypt_setopt_schema_map (mongocrypt_t *crypt,
    }
 
    if (!bson_validate_with_error (&tmp, BSON_VALIDATE_NONE, &bson_err)) {
-      CLIENT_ERR (bson_err.message);
+      CLIENT_ERR ("%s", bson_err.message);
       return false;
    }
 
@@ -353,7 +353,7 @@ mongocrypt_setopt_encrypted_field_config_map (mongocrypt_t *crypt,
    }
 
    if (!bson_validate_with_error (&as_bson, BSON_VALIDATE_NONE, &bson_err)) {
-      CLIENT_ERR (bson_err.message);
+      CLIENT_ERR ("%s", bson_err.message);
       return false;
    }
 

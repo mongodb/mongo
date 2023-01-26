@@ -33,6 +33,8 @@
 
 #include "mongo_crypt-v1.h"
 
+#include <mlib/macros.h>
+
 
 #define MONGOCRYPT_GENERIC_ERROR_CODE 1
 
@@ -64,7 +66,16 @@ tmp_json (const bson_t *bson);
 const char *
 tmp_buf (const _mongocrypt_buffer_t *buf);
 
-
+// _mongocrypt_set_error sets an error status.
+// `status->message` is set after evaluating `format` and variadic args.
+// It is safe to uses a `status->message` as an argument to wrap an error. For example:
+// _mongocrypt_set_error (
+//    status,
+//    MONGOCRYPT_STATUS_ERROR_CLIENT,
+//    MONGOCRYPT_GENERIC_ERROR_CODE,
+//    "Error occurred. Original error: %s",
+//    mongocrypt_status_message (status, NULL /* len */));
+MLIB_ANNOTATE_PRINTF (4, 5)
 void
 _mongocrypt_set_error (mongocrypt_status_t *status,
                        mongocrypt_status_type_t type,

@@ -1,4 +1,8 @@
 #include "./int128.h"
+#include "./endian.h"
+
+#include "./check.hpp"
+#define CHECK MLIB_CHECK
 
 #include <iostream>
 #include <random>
@@ -155,73 +159,6 @@ operator<< (std::ostream &out, const mlib_int128 &v)
    return out;
 }
 
-struct check_info {
-   const char *filename;
-   int line;
-   const char *expr;
-};
-
-struct nil {
-};
-
-template <typename Left> struct bound_lhs {
-   check_info info;
-   Left value;
-
-#define DEFOP(Oper)                                                   \
-   template <typename Rhs> nil operator Oper (Rhs rhs) const noexcept \
-   {                                                                  \
-      if (value Oper rhs) {                                           \
-         return {};                                                   \
-      }                                                               \
-      fprintf (stderr,                                                \
-               "%s:%d: CHECK( %s ) failed!\n",                        \
-               info.filename,                                         \
-               info.line,                                             \
-               info.expr);                                            \
-      fprintf (stderr, "Expanded expression: ");                      \
-      std::cerr << value << " " #Oper " " << rhs << '\n';             \
-      std::exit (1);                                                  \
-      return {};                                                      \
-   }
-   DEFOP (==)
-   DEFOP (!=)
-   DEFOP (<)
-   DEFOP (<=)
-   DEFOP (>)
-   DEFOP (>=)
-#undef DEFOP
-};
-
-struct check_magic {
-   check_info info;
-
-   template <typename Oper>
-   bound_lhs<Oper>
-   operator->*(Oper op)
-   {
-      return bound_lhs<Oper>{info, op};
-   }
-};
-
-struct check_consume {
-   void
-   operator= (nil)
-   {
-   }
-
-   void
-   operator= (bound_lhs<bool> const &l)
-   {
-      // Invoke the test for truthiness:
-      (void) (l == true);
-   }
-};
-
-#undef CHECK
-#define CHECK(Cond) \
-   check_consume{} = check_magic{check_info{__FILE__, __LINE__, #Cond}}->*Cond
-
 #ifndef BROKEN_CONSTEXPR
 static_assert (mlib_int128 (MLIB_INT128_UMAX) ==
                   340282366920938463463374607431768211455_i128,
@@ -239,6 +176,46 @@ static_assert (mlib_int128_negate (9223372036854775809_i128) <
                "fail");
 #endif
 
+#ifdef __SIZEOF_INT128__
+// mlib_int128_to_native converts mlib_int128 to native __uint128_t.
+// Endian-ness is accounted for.
+static __uint128_t
+mlib_int128_to_native (mlib_int128 in)
+{
+   __uint128_t out;
+   uint8_t *out_u8 = (uint8_t *) &out;
+   if (MLIB_IS_BIG_ENDIAN) {
+      // Copy hi, then lo.
+      memcpy (out_u8, &in.r.hi, sizeof (in.r.hi));
+      memcpy (out_u8 + sizeof (in.r.hi), &in.r.lo, sizeof (in.r.lo));
+   } else {
+      // Copy lo, then hi.
+      memcpy (out_u8, &in.r.lo, sizeof (in.r.lo));
+      memcpy (out_u8 + sizeof (in.r.lo), &in.r.hi, sizeof (in.r.hi));
+   }
+   return out;
+}
+
+// native_to_mlib_int128 converts native __uint128_t to mlib_int128.
+// Endian-ness is accounted for.
+static mlib_int128
+native_to_mlib_int128 (__uint128_t in)
+{
+   mlib_int128 out;
+   uint8_t *in_u8 = (uint8_t *) &in;
+   if (MLIB_IS_BIG_ENDIAN) {
+      // Copy hi, then lo.
+      memcpy (&out.r.hi, in_u8, sizeof (out.r.hi));
+      memcpy (&out.r.lo, in_u8 + sizeof (out.r.hi), sizeof (out.r.lo));
+   } else {
+      // Copy lo, then hi.
+      memcpy (&out.r.lo, in_u8, sizeof (out.r.lo));
+      memcpy (&out.r.hi, in_u8 + sizeof (out.r.lo), sizeof (out.r.hi));
+   }
+   return out;
+}
+#endif // __SIZEOF_INT128__
+
 static mlib_int128_divmod_result
 div_check (mlib_int128 num, mlib_int128 den)
 {
@@ -246,15 +223,23 @@ div_check (mlib_int128 num, mlib_int128 den)
    mlib_int128_divmod_result res = mlib_int128_divmod (num, den);
 #ifdef __SIZEOF_INT128__
    // When we have an existing i128 impl, test against that:
-   __uint128_t num1;
-   __uint128_t den1;
-   memcpy (&num1, &num.r, sizeof num);
-   memcpy (&den1, &den.r, sizeof den);
+   __uint128_t num1 = mlib_int128_to_native (num);
+   __uint128_t den1 = mlib_int128_to_native (den);
    __uint128_t q = num1 / den1;
    __uint128_t r = num1 % den1;
    mlib_int128_divmod_result expect;
-   memcpy (&expect.quotient.r, &q, sizeof q);
-   memcpy (&expect.remainder.r, &r, sizeof r);
+   expect.quotient = native_to_mlib_int128 (q);
+   expect.remainder = native_to_mlib_int128 (r);
+   if (!mlib_int128_eq (expect.quotient, res.quotient) ||
+       !mlib_int128_eq (expect.remainder, res.remainder)) {
+      std::cout << "unexpected result in division"
+                << " num=" << mlib_int128_format (num).str
+                << " den=" << mlib_int128_format (den).str
+                << " expect.quotient="
+                << mlib_int128_format (expect.quotient).str
+                << " expect.remainder="
+                << mlib_int128_format (expect.remainder).str << std::endl;
+   }
    CHECK (expect.quotient == res.quotient);
    CHECK (expect.remainder == res.remainder);
 #endif

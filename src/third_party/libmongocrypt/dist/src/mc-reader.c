@@ -185,7 +185,8 @@ mc_reader_read_buffer (mc_reader_t *reader,
                                buf, ptr, (size_t) length)) {
       CLIENT_ERR ("%s failed to copy "
                   "data of length %" PRIu64,
-                  reader->parser_name);
+                  reader->parser_name,
+                  length);
       return false;
    }
 

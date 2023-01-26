@@ -151,7 +151,7 @@ _key_broker_fail_w_msg (_mongocrypt_key_broker_t *kb, const char *msg)
 
    kb->state = KB_ERROR;
    status = kb->status;
-   CLIENT_ERR (msg);
+   CLIENT_ERR ("%s", msg);
    return false;
 }
 

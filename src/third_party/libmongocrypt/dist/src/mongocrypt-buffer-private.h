@@ -22,6 +22,7 @@
 #include "mongocrypt-compat.h"
 
 #define UUID_LEN 16
+#define PRF_LEN 32
 
 struct _mongocrypt_binary_t;
 

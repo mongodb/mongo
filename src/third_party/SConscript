@@ -164,7 +164,7 @@ if not use_system_version_of_library('asio'):
 
 if not use_system_version_of_library('intel_decimal128'):
     thirdPartyEnvironmentModifications['intel_decimal128'] = {
-        'CPPPATH': ['#/src/third_party/IntelRDFPMathLib20U1/LIBRARY'],
+        'CPPPATH': ['#/src/third_party/IntelRDFPMathLib20U1/LIBRARY/src'],
     }
 
 if not use_system_version_of_library('icu'):

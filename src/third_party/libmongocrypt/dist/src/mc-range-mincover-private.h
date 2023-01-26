@@ -21,6 +21,7 @@
 #include <stdint.h>
 #include "mc-optional-private.h"
 #include "mongocrypt-status-private.h"
+#include "mc-dec128.h"
 
 // mc_mincover_t represents the results of the mincover algorithm.
 typedef struct _mc_mincover_t mc_mincover_t;
@@ -86,6 +87,24 @@ typedef struct {
 mc_mincover_t *
 mc_getMincoverDouble (mc_getMincoverDouble_args_t args,
                       mongocrypt_status_t *status)
+   MONGOCRYPT_WARN_UNUSED_RESULT;
+
+
+typedef struct {
+   mc_dec128 lowerBound;
+   bool includeLowerBound;
+   mc_dec128 upperBound;
+   bool includeUpperBound;
+   size_t sparsity;
+   mc_optional_dec128_t min, max;
+   mc_optional_uint32_t precision;
+} mc_getMincoverDecimal128_args_t;
+
+// mc_getMincoverDecimal128 implements the Mincover Generation algorithm
+// described in SERVER-68600 for Decimal128 (as mc_dec128).
+mc_mincover_t *
+mc_getMincoverDecimal128 (mc_getMincoverDecimal128_args_t args,
+                          mongocrypt_status_t *status)
    MONGOCRYPT_WARN_UNUSED_RESULT;
 
 #endif /* MC_RANGE_MINCOVER_PRIVATE_H */

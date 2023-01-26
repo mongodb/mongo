@@ -17,9 +17,13 @@
 #ifndef MC_RANGE_ENCODING_PRIVATE_H
 #define MC_RANGE_ENCODING_PRIVATE_H
 
-#include <stdint.h>
 #include "mc-optional-private.h"
+#include "mc-dec128.h"
 #include "mongocrypt-status-private.h"
+
+#include <mlib/int128.h>
+
+#include <stdint.h>
 
 /* mc-range-encoding-private.h has functions to encode numeric types for
  * Queryable Encryption Range queries. It is a translation from server code:
@@ -90,6 +94,33 @@ bool
 mc_getTypeInfoDouble (mc_getTypeInfoDouble_args_t args,
                       mc_OSTType_Double *out,
                       mongocrypt_status_t *status)
+   MONGOCRYPT_WARN_UNUSED_RESULT;
+
+/**
+ * @brief OST-encoding of a Decimal128
+ */
+typedef struct {
+   mlib_int128 value, min, max;
+} mc_OSTType_Decimal128;
+
+typedef struct {
+   mc_dec128 value;
+   mc_optional_dec128_t min, max;
+   mc_optional_uint32_t precision;
+} mc_getTypeInfoDecimal128_args_t;
+
+/**
+ * @brief Obtain the OST encoding of a finite Decimal128 value.
+ *
+ * @param out Output for the result
+ * @param status Output for status on error
+ * @retval true On success
+ * @retval false Otherwise
+ */
+bool
+mc_getTypeInfoDecimal128 (mc_getTypeInfoDecimal128_args_t args,
+                          mc_OSTType_Decimal128 *out,
+                          mongocrypt_status_t *status)
    MONGOCRYPT_WARN_UNUSED_RESULT;
 
 #endif /* MC_RANGE_ENCODING_PRIVATE_H */

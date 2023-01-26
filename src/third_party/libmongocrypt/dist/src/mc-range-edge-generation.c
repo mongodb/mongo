@@ -89,66 +89,53 @@ mc_edges_destroy (mc_edges_t *edges)
    bson_free (edges);
 }
 
-size_t
-mc_count_leading_zeros_u64 (uint64_t in)
-{
-   uint64_t bit = UINT64_C (1) << 63;
-   size_t count = 0;
-   while ((bit & in) == 0 && bit > 0) {
-      bit >>= 1;
-      ++count;
-   }
-   return count;
-}
-
-size_t
-mc_count_leading_zeros_u32 (uint32_t in)
-{
-   uint32_t bit = UINT32_C (1) << 31;
-   size_t count = 0;
-   while ((bit & in) == 0 && bit > 0) {
-      bit >>= 1;
-      ++count;
-   }
-   return count;
-}
-
-char *
+mc_bitstring
 mc_convert_to_bitstring_u64 (uint64_t in)
 {
-   char *out = bson_malloc (64 + 1);
+   mc_bitstring ret = {{0}};
+   char *out = ret.str;
    uint64_t bit = UINT64_C (1) << 63;
-   size_t count = 0;
    while (bit > 0) {
       if (bit & in) {
-         out[count] = '1';
+         *out++ = '1';
       } else {
-         out[count] = '0';
+         *out++ = '0';
       }
       bit >>= 1;
-      ++count;
    }
-   out[64] = '\0';
-   return out;
+   return ret;
 }
 
-char *
+mc_bitstring
 mc_convert_to_bitstring_u32 (uint32_t in)
 {
-   char *out = bson_malloc (32 + 1);
+   mc_bitstring ret = {{0}};
+   char *out = ret.str;
    uint32_t bit = UINT32_C (1) << 31;
-   size_t count = 0;
    while (bit > 0) {
       if (bit & in) {
-         out[count] = '1';
+         *out++ = '1';
       } else {
-         out[count] = '0';
+         *out++ = '0';
       }
       bit >>= 1;
-      ++count;
    }
-   out[32] = '\0';
-   return out;
+   return ret;
+}
+
+mc_bitstring
+mc_convert_to_bitstring_u128 (mlib_int128 i)
+{
+   const uint64_t lo = mlib_int128_to_u64 (i);
+   const uint64_t hi = mlib_int128_to_u64 (mlib_int128_rshift (i, 64));
+   mc_bitstring his = mc_convert_to_bitstring_u64 (hi);
+   mc_bitstring los = mc_convert_to_bitstring_u64 (lo);
+   mc_bitstring ret = {{0}};
+   const size_t off =
+      mlib_strnmcopy (ret.str, sizeof ret.str, his.str, sizeof his.str);
+   mlib_strnmcopy (
+      ret.str + off, (sizeof ret.str) - off, los.str, sizeof los.str);
+   return ret;
 }
 
 mc_edges_t *
@@ -168,11 +155,10 @@ mc_getEdgesInt32 (mc_getEdgesInt32_args_t args, mongocrypt_status_t *status)
    // for consistency with the server implementation.
    BSON_ASSERT (got.min == 0);
 
-   char *valueBin = mc_convert_to_bitstring_u32 (got.value);
+   mc_bitstring valueBin = mc_convert_to_bitstring_u32 (got.value);
    size_t offset = mc_count_leading_zeros_u32 (got.max);
-   const char *leaf = valueBin + offset;
+   const char *leaf = valueBin.str + offset;
    mc_edges_t *ret = mc_edges_new (leaf, args.sparsity, status);
-   bson_free (valueBin);
    return ret;
 }
 
@@ -193,11 +179,10 @@ mc_getEdgesInt64 (mc_getEdgesInt64_args_t args, mongocrypt_status_t *status)
    // for consistency with the server implementation.
    BSON_ASSERT (got.min == 0);
 
-   char *valueBin = mc_convert_to_bitstring_u64 (got.value);
+   mc_bitstring valueBin = mc_convert_to_bitstring_u64 (got.value);
    size_t offset = mc_count_leading_zeros_u64 (got.max);
-   const char *leaf = valueBin + offset;
+   const char *leaf = valueBin.str + offset;
    mc_edges_t *ret = mc_edges_new (leaf, args.sparsity, status);
-   bson_free (valueBin);
    return ret;
 }
 
@@ -221,10 +206,35 @@ mc_getEdgesDouble (mc_getEdgesDouble_args_t args, mongocrypt_status_t *status)
    // for consistency with the server implementation.
    BSON_ASSERT (got.min == 0);
 
-   char *valueBin = mc_convert_to_bitstring_u64 (got.value);
+   mc_bitstring valueBin = mc_convert_to_bitstring_u64 (got.value);
    size_t offset = mc_count_leading_zeros_u64 (got.max);
-   const char *leaf = valueBin + offset;
+   const char *leaf = valueBin.str + offset;
    mc_edges_t *ret = mc_edges_new (leaf, args.sparsity, status);
-   bson_free (valueBin);
+   return ret;
+}
+
+mc_edges_t *
+mc_getEdgesDecimal128 (mc_getEdgesDecimal128_args_t args,
+                       mongocrypt_status_t *status)
+{
+   mc_OSTType_Decimal128 got;
+   if (!mc_getTypeInfoDecimal128 (
+          (mc_getTypeInfoDecimal128_args_t){
+             .value = args.value,
+             .min = args.min,
+             .max = args.max,
+             .precision = args.precision,
+          },
+          &got,
+          status)) {
+      return NULL;
+   }
+
+   BSON_ASSERT (mlib_int128_eq (got.min, MLIB_INT128 (0)));
+
+   mc_bitstring bits = mc_convert_to_bitstring_u128 (got.value);
+   size_t offset = mc_count_leading_zeros_u128 (got.max);
+   const char *leaf = bits.str + offset;
+   mc_edges_t *ret = mc_edges_new (leaf, args.sparsity, status);
    return ret;
 }

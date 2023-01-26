@@ -21,6 +21,8 @@
 #include <stdint.h>
 #include "mc-optional-private.h"
 #include "mongocrypt-status-private.h"
+#include "mc-dec128.h"
+#include <mlib/int128.h>
 
 // mc_edges_t represents a list of edges.
 typedef struct _mc_edges_t mc_edges_t;
@@ -75,24 +77,87 @@ typedef struct {
 mc_edges_t *
 mc_getEdgesDouble (mc_getEdgesDouble_args_t args, mongocrypt_status_t *status);
 
+typedef struct {
+   mc_dec128 value;
+   size_t sparsity;
+   mc_optional_dec128_t min, max;
+   mc_optional_uint32_t precision;
+} mc_getEdgesDecimal128_args_t;
+
+mc_edges_t *
+mc_getEdgesDecimal128 (mc_getEdgesDecimal128_args_t args,
+                       mongocrypt_status_t *status);
+
+
 // count_leading_zeros_u64 returns the number of leading 0 bits of `in`.
-size_t
-mc_count_leading_zeros_u64 (uint64_t in);
+static inline size_t
+mc_count_leading_zeros_u64 (uint64_t in)
+{
+#ifdef __has_builtin
+#if __has_builtin(__builtin_clzl)
+// Pointer-cast to ensure we are speaking the right type
+#ifdef __APPLE__
+   unsigned long long *p = &in;
+   return (size_t) (in ? __builtin_clzll (*p) : 64);
+#else
+   unsigned long *p = &in;
+   return (size_t) (in ? __builtin_clzl (*p) : 64);
+#endif
+#endif
+#endif
+   uint64_t bit = UINT64_C (1) << 63;
+   size_t count = 0;
+   while ((bit & in) == 0 && bit > 0) {
+      bit >>= 1;
+      ++count;
+   }
+   return count;
+}
 
 // count_leading_zeros_u32 returns the number of leading 0 bits of `in`.
-size_t
-mc_count_leading_zeros_u32 (uint32_t in);
+static inline size_t
+mc_count_leading_zeros_u32 (uint32_t in)
+{
+#ifdef __has_builtin
+#if __has_builtin(__builtin_clz)
+   // Pointer-cast to ensure we are speaking the right type
+   unsigned int *p = &in;
+   return (size_t) (in ? __builtin_clz (*p) : 32);
+#endif
+#endif
+   uint32_t bit = UINT32_C (1) << 31;
+   int count = 0;
+   while ((bit & in) == 0 && bit > 0) {
+      bit >>= 1;
+      ++count;
+   }
+   return (size_t) count;
+}
+
+static inline size_t
+mc_count_leading_zeros_u128 (mlib_int128 in)
+{
+   size_t hi = mc_count_leading_zeros_u64 (
+      mlib_int128_to_u64 (mlib_int128_rshift (in, 64)));
+   size_t lo = mc_count_leading_zeros_u64 (mlib_int128_to_u64 (in));
+   return hi + ((hi == 64 ? 1u : 0u) * lo);
+}
+
+typedef struct mc_bitstring {
+   char str[129];
+} mc_bitstring;
 
 // mc_convert_to_bitstring_u64 returns a 64 character string of 1's and 0's
-// representing the bits of `in`. Caller must call `bson_free` on returned
-// value.
-char *
+// representing the bits of `in`
+mc_bitstring
 mc_convert_to_bitstring_u64 (uint64_t in);
 
 // mc_convert_to_bitstring_u32 returns a 32 character string of 1's and 0's
-// representing the bits of `in`. Caller must call `bson_free` on returned
-// value.
-char *
+// representing the bits of `in`.
+mc_bitstring
 mc_convert_to_bitstring_u32 (uint32_t in);
+
+mc_bitstring
+mc_convert_to_bitstring_u128 (mlib_int128 i);
 
 #endif /* MC_RANGE_EDGE_GENERATION_PRIVATE_H */

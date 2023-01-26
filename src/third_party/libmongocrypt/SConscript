@@ -12,6 +12,8 @@ env['CXXFLAGS_WERROR'] = []
 
 env.InjectThirdParty(libraries=['libbson'])
 
+env.InjectThirdParty(libraries=['intel_decimal128'])
+
 env.Append(CPPDEFINES=[
     'KMS_MSG_STATIC',
     'MONGOCRYPT_STATIC_DEFINE',
@@ -126,6 +128,7 @@ env.Library(
         'dist/src/mc-rangeopts.c',
         'dist/src/mc-reader.c',
         'dist/src/mc-tokens.c',
+        'dist/src/mc-writer.c',
         'dist/src/mongocrypt-binary.c',
         'dist/src/mongocrypt-buffer.c',
         'dist/src/mongocrypt-cache-collinfo.c',
@@ -153,6 +156,7 @@ env.Library(
         'dist/src/mongocrypt.c',
     ] + additional_sources,
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/third_party/shim_intel_decimal128',
         '$BUILD_DIR/third_party/shim_libbson',
     ],
     LIBDEPS_TAGS=[

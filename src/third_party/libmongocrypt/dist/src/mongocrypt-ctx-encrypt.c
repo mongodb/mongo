@@ -1075,15 +1075,25 @@ _try_run_csfle_marking (mongocrypt_ctx_t *ctx)
    mongocrypt_binary_t *marked =
       mongocrypt_binary_new_from_data (marked_bson, marked_bson_len);
    if (!_mongo_feed_markings (ctx, marked)) {
-      _mongocrypt_ctx_fail_w_msg (
-         ctx, "Consuming the generated csfle markings failed");
+      // Wrap error with additional information.
+      _mongocrypt_set_error (
+         ctx->status,
+         MONGOCRYPT_STATUS_ERROR_CLIENT,
+         MONGOCRYPT_GENERIC_ERROR_CODE,
+         "Consuming the generated csfle markings failed: %s",
+         mongocrypt_status_message (ctx->status, NULL /* len */));
       goto fail_feed_markings;
    }
 
    okay = _mongo_done_markings (ctx);
    if (!okay) {
-      _mongocrypt_ctx_fail_w_msg (
-         ctx, "Finalizing the generated csfle markings failed");
+      // Wrap error with additional information.
+      _mongocrypt_set_error (
+         ctx->status,
+         MONGOCRYPT_STATUS_ERROR_CLIENT,
+         MONGOCRYPT_GENERIC_ERROR_CODE,
+         "Finalizing the generated csfle markings failed: %s",
+         mongocrypt_status_message (ctx->status, NULL /* len */));
    }
 
 fail_feed_markings:
