@@ -1003,7 +1003,7 @@ public:
 
         optimizer::ProjectionName resultName = makeLocalVariableName(_context->state.frameId(), 0);
         auto resultExpr = optimizer::make<optimizer::Let>(
-            std::move(resultName),
+            resultName,
             optimizer::make<optimizer::FunctionCall>("concatArrays", std::move(argVars)),
             optimizer::make<optimizer::If>(makeABTFunction("exists", makeVariable(resultName)),
                                            makeVariable(resultName),
