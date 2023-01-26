@@ -379,8 +379,28 @@ void executeTwoPhaseWrite(OperationContext* opCtx,
                           BatchWriteExecStats* stats,
                           const BatchedCommandRequest& clientRequest,
                           bool& abortBatch) {
-    auto targetedWrite = childBatches.begin()->second.get();
-    auto cmdObj = batchOp.buildBatchRequest(*targetedWrite, targeter).toBSON();
+    const auto targetedWriteBatch = [&] {
+        // If there is a targeted write with a sampleId, use that write instead in order to pass the
+        // sampleId to the two phase write protocol. Otherwise, just choose the first targeted
+        // write.
+        for (auto&& [_ /* shardId */, childBatch] : childBatches) {
+            auto nextBatch = childBatch.get();
+
+            // For a write without shard key, we expect each TargetedWriteBatch in childBatches to
+            // contain only one TargetedWrite directed to each shard.
+            tassert(7208400,
+                    "There must be only 1 targeted write in this targeted write batch.",
+                    !nextBatch->getWrites().empty());
+
+            auto targetedWrite = nextBatch->getWrites().begin()->get();
+            if (targetedWrite->sampleId) {
+                return nextBatch;
+            }
+        }
+        return childBatches.begin()->second.get();
+    }();
+
+    auto cmdObj = batchOp.buildBatchRequest(*targetedWriteBatch, targeter).toBSON();
 
     auto swRes = write_without_shard_key::runTwoPhaseWriteProtocol(
         opCtx, clientRequest.getNS(), std::move(cmdObj));
