@@ -119,7 +119,7 @@ std::vector<BSONObj> makeSpecs(const NamespaceString& nss, std::vector<std::stri
     return indexSpecs;
 }
 
-TEST_F(IndexBuildsCoordinatorMongodTest, AttemptBuildSameIndexReturnsImmediateSuccess) {
+TEST_F(IndexBuildsCoordinatorMongodTest, AttemptBuildSameIndexFails) {
     _indexBuildsCoord->sleepIndexBuilds_forTestOnly(true);
 
     // Register an index build on _testFooNss.
@@ -134,17 +134,14 @@ TEST_F(IndexBuildsCoordinatorMongodTest, AttemptBuildSameIndexReturnsImmediateSu
 
     // Attempt and fail to register an index build on _testFooNss with the same index name, while
     // the prior build is still running.
-    auto readyFuture = assertGet(_indexBuildsCoord->startIndexBuild(operationContext(),
-                                                                    _testFooNss.dbName(),
-                                                                    _testFooUUID,
-                                                                    makeSpecs(_testFooNss, {"b"}),
-                                                                    UUID::gen(),
-                                                                    IndexBuildProtocol::kTwoPhase,
-                                                                    _indexBuildOptions));
-
-    auto readyStats = assertGet(readyFuture.getNoThrow());
-    ASSERT_EQ(3, readyStats.numIndexesBefore);
-    ASSERT_EQ(3, readyStats.numIndexesAfter);
+    ASSERT_EQ(_indexBuildsCoord->startIndexBuild(operationContext(),
+                                                 _testFooNss.dbName(),
+                                                 _testFooUUID,
+                                                 makeSpecs(_testFooNss, {"b"}),
+                                                 UUID::gen(),
+                                                 IndexBuildProtocol::kTwoPhase,
+                                                 _indexBuildOptions),
+              ErrorCodes::IndexBuildAlreadyInProgress);
 
     _indexBuildsCoord->sleepIndexBuilds_forTestOnly(false);
     auto indexCatalogStats = unittest::assertGet(testFoo1Future.getNoThrow());

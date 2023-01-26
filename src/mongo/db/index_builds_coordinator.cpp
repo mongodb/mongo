@@ -3147,7 +3147,7 @@ std::vector<BSONObj> IndexBuildsCoordinator::prepareSpecListForCreate(
 
     // Remove any index specifications which already exist in the catalog.
     auto resultSpecs = indexCatalog->removeExistingIndexes(
-        opCtx, collection, normalSpecs, true /*removeIndexBuildsToo*/);
+        opCtx, collection, normalSpecs, false /*removeIndexBuildsToo*/);
 
     // Verify that each spec is compatible with the collection's sharding state.
     for (const BSONObj& spec : resultSpecs) {
