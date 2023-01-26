@@ -36,6 +36,10 @@ bool EvalPathLowering::optimize(ABT& n) {
 
     algebra::transport<true>(n, *this);
 
+    if (_changed) {
+        _env.rebuild(n);
+    }
+
     return _changed;
 }
 
@@ -220,6 +224,10 @@ bool EvalFilterLowering::optimize(ABT& n) {
     _changed = false;
 
     algebra::transport<true>(n, *this);
+
+    if (_changed) {
+        _env.rebuild(n);
+    }
 
     return _changed;
 }
@@ -412,8 +420,7 @@ bool PathLowering::optimize(ABT& n) {
 
     algebra::transport<true>(n, *this);
 
-    // Rebuilding the environment is always safe to do. Rebuild to make sure all refs are correct
-    // after lowering.
+    // TODO investigate why we crash when this is removed. It should not be needed here.
     if (_changed) {
         _env.rebuild(n);
     }
