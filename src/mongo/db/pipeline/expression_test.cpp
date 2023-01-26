@@ -3046,11 +3046,20 @@ TEST(ExpressionMetaTest, ExpressionMetaSearchScore) {
     VariablesParseState vps = expCtx.variablesParseState;
     BSONObj expr = fromjson("{$meta: \"searchScore\"}");
     auto expressionMeta = ExpressionMeta::parse(&expCtx, expr.firstElement(), vps);
-
     MutableDocument doc;
     doc.metadata().setSearchScore(1.234);
     Value val = expressionMeta->evaluate(doc.freeze(), &expCtx.variables);
     ASSERT_EQ(val.getDouble(), 1.234);
+}
+
+TEST(ExpressionMetaTest, ExpressionMetaSearchScoreAPIStrict) {
+    auto expCtx = ExpressionContextForTest{};
+    APIParameters::get(expCtx.opCtx).setAPIStrict(true);
+    VariablesParseState vps = expCtx.variablesParseState;
+    BSONObj expr = fromjson("{$meta: \"searchScore\"}");
+    ASSERT_THROWS_CODE(ExpressionMeta::parse(&expCtx, expr.firstElement(), vps),
+                       AssertionException,
+                       ErrorCodes::APIStrictError);
 }
 
 TEST(ExpressionMetaTest, ExpressionMetaSearchHighlights) {
@@ -3065,6 +3074,16 @@ TEST(ExpressionMetaTest, ExpressionMetaSearchHighlights) {
 
     Value val = expressionMeta->evaluate(doc.freeze(), &expCtx.variables);
     ASSERT_DOCUMENT_EQ(val.getDocument(), highlights);
+}
+
+TEST(ExpressionMetaTest, ExpressionMetasearchHighlightsAPIStrict) {
+    auto expCtx = ExpressionContextForTest{};
+    APIParameters::get(expCtx.opCtx).setAPIStrict(true);
+    VariablesParseState vps = expCtx.variablesParseState;
+    BSONObj expr = fromjson("{$meta: \"searchHighlights\"}");
+    ASSERT_THROWS_CODE(ExpressionMeta::parse(&expCtx, expr.firstElement(), vps),
+                       AssertionException,
+                       ErrorCodes::APIStrictError);
 }
 
 TEST(ExpressionMetaTest, ExpressionMetaGeoNearDistance) {
@@ -3103,6 +3122,16 @@ TEST(ExpressionMetaTest, ExpressionMetaIndexKey) {
     doc.metadata().setIndexKey(ixKey);
     Value val = expressionMeta->evaluate(doc.freeze(), &expCtx.variables);
     ASSERT_DOCUMENT_EQ(val.getDocument(), Document(ixKey));
+}
+
+TEST(ExpressionMetaTest, ExpressionMetaIndexKeyAPIStrict) {
+    auto expCtx = ExpressionContextForTest{};
+    APIParameters::get(expCtx.opCtx).setAPIStrict(true);
+    VariablesParseState vps = expCtx.variablesParseState;
+    BSONObj expr = fromjson("{$meta: \"indexKey\"}");
+    ASSERT_THROWS_CODE(ExpressionMeta::parse(&expCtx, expr.firstElement(), vps),
+                       AssertionException,
+                       ErrorCodes::APIStrictError);
 }
 
 TEST(ExpressionMetaTest, ExpressionMetaRecordId) {
@@ -3152,6 +3181,16 @@ TEST(ExpressionMetaTest, ExpressionMetaTextScore) {
     doc.metadata().setTextScore(1.23);
     Value val = expressionMeta->evaluate(doc.freeze(), &expCtx.variables);
     ASSERT_EQ(val.getDouble(), 1.23);
+}
+
+TEST(ExpressionMetaTest, ExpressionMetaTextScoreAPIStrict) {
+    auto expCtx = ExpressionContextForTest{};
+    APIParameters::get(expCtx.opCtx).setAPIStrict(true);
+    VariablesParseState vps = expCtx.variablesParseState;
+    BSONObj expr = fromjson("{$meta: \"textScore\"}");
+    ASSERT_THROWS_CODE(ExpressionMeta::parse(&expCtx, expr.firstElement(), vps),
+                       AssertionException,
+                       ErrorCodes::APIStrictError);
 }
 
 TEST(ExpressionMetaTest, ExpressionMetaSearchScoreDetails) {
