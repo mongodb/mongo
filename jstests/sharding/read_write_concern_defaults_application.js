@@ -689,6 +689,7 @@ let testCases = {
     setDefaultRWConcern: {skip: "special case (must run after all other commands)"},
     setFeatureCompatibilityVersion: {skip: "does not accept read or write concern"},
     setFreeMonitoring: {skip: "does not accept read or write concern"},
+    setProfilingFilterGlobally: {skip: "does not accept read or write concern"},
     setIndexCommitQuorum: {skip: "does not accept read or write concern"},
     setParameter: {skip: "does not accept read or write concern"},
     setShardVersion: {skip: "internal command"},

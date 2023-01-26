@@ -420,7 +420,7 @@ static constexpr size_t appendMaxElementSize = 50 * 1024;
 
 bool CurOp::completeAndLogOperation(OperationContext* opCtx,
                                     logv2::LogComponent component,
-                                    std::shared_ptr<ProfileFilter> filter,
+                                    std::shared_ptr<const ProfileFilter> filter,
                                     boost::optional<size_t> responseLength,
                                     boost::optional<long long> slowMsOverride,
                                     bool forceLog) {

@@ -95,7 +95,7 @@ public:
 
     struct ProfileSettings {
         int level;
-        std::shared_ptr<ProfileFilter> filter;  // nullable
+        std::shared_ptr<const ProfileFilter> filter;  // nullable
 
         ProfileSettings(int level, std::shared_ptr<ProfileFilter> filter)
             : level(level), filter(filter) {
@@ -504,6 +504,11 @@ public:
      * Only returns tenantIds which are attached to at least one non-empty database.
      */
     std::set<TenantId> getAllTenants() const;
+
+    /**
+     * Updates the profile filter on all databases with non-default settings.
+     */
+    void setAllDatabaseProfileFilters(std::shared_ptr<ProfileFilter> filter);
 
     /**
      * Sets 'newProfileSettings' as the profiling settings for the database 'dbName'.

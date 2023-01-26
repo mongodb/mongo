@@ -1204,6 +1204,10 @@ let MongosAPIParametersUtil = (function() {
             conditional: true
         },
         {
+            commandName: "setProfilingFilterGlobally",
+            skip: "executes locally on mongos (not sent to any remote node)",
+        },
+        {
             commandName: "setParameter",
             skip: "executes locally on mongos (not sent to any remote node)"
         },

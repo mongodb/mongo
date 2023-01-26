@@ -736,6 +736,7 @@ TenantMigrationConcurrentWriteUtil.testCases = {
     setFreeMonitoring: {skip: isNotRunOnUserDatabase},
     setIndexCommitQuorum: {skip: isNotRunOnUserDatabase},
     setParameter: {skip: isNotRunOnUserDatabase},
+    setProfilingFilterGlobally: {skip: isNotRunOnUserDatabase},
     setShardVersion: {skip: isNotRunOnUserDatabase},
     shardingState: {skip: isNotRunOnUserDatabase},
     shutdown: {skip: isNotRunOnUserDatabase},
