@@ -55,7 +55,7 @@ CandidatePlans SubPlanner::plan(
         -> StatusWith<std::unique_ptr<QuerySolution>> {
         // One of the indexes in '_queryParams' might have been dropped while planning a previous
         // branch of the OR query. In this case, fail with a 'QueryPlanKilled' error.
-        _indexExistenceChecker.check();
+        _indexExistenceChecker.check(_opCtx, _collections);
 
         // Ensure that no previous plans are registered to yield while we multi plan each branch.
         _yieldPolicy->clearRegisteredPlans();
@@ -86,7 +86,7 @@ CandidatePlans SubPlanner::plan(
 
     // One of the indexes in '_queryParams' might have been dropped while planning the final branch
     // of the OR query. In this case, fail with a 'QueryPlanKilled' error.
-    _indexExistenceChecker.check();
+    _indexExistenceChecker.check(_opCtx, _collections);
 
     if (!subplanSelectStat.isOK()) {
         // Query planning can continue if we failed to find a solution for one of the children.

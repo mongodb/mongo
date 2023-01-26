@@ -42,24 +42,37 @@ AllIndicesRequiredChecker::AllIndicesRequiredChecker(
 void AllIndicesRequiredChecker::saveIndicesForCollection(const CollectionPtr& collection) {
     if (collection) {
         auto allEntriesShared = collection->getIndexCatalog()->getAllReadyEntriesShared();
-        auto& indexMap = _indexCatalogEntries[collection->ns()];
+        auto& indexMap = _identEntries[collection->uuid()];
         for (auto&& index : allEntriesShared) {
-            indexMap[index->descriptor()->indexName()] = index;
+            indexMap[index->descriptor()->indexName()] = index->getIdent();
         }
     }
 }
 
-void AllIndicesRequiredChecker::check() const {
-    for (auto& [ns, indexMap] : _indexCatalogEntries) {
-        auto& nsCopy = ns;
-        for (auto& [name, index] : indexMap) {
-            // Create copies for 'ns' and 'name' to make them accessible to the uassert below.
-            auto& nameCopy = name;
-            auto indexCatalogEntry = index.lock();
-            uassert(ErrorCodes::QueryPlanKilled,
-                    str::stream() << "query plan killed :: index '" << nameCopy
-                                  << "' for collection '" << nsCopy << "' dropped",
-                    indexCatalogEntry && !indexCatalogEntry->isDropped());
+void AllIndicesRequiredChecker::checkIndicesForCollection(OperationContext* opCtx,
+                                                          const CollectionPtr& collection) const {
+    invariant(collection);
+
+    auto it = _identEntries.find(collection->uuid());
+    invariant(it != _identEntries.end());
+
+    for (const auto& [name, ident] : it->second) {
+        // Structured bindings cannot be captured by closures (the uassert below).
+        auto& nameRef = name;
+        auto indexDesc = collection->getIndexCatalog()->findIndexByIdent(opCtx, ident);
+        uassert(ErrorCodes::QueryPlanKilled,
+                str::stream() << "query plan killed :: index '" << nameRef << "' for collection '"
+                              << collection->ns() << "' dropped",
+                indexDesc && !indexDesc->getEntry()->isDropped());
+    }
+}
+
+void AllIndicesRequiredChecker::check(OperationContext* opCtx,
+                                      const MultipleCollectionAccessor& collections) const {
+    checkIndicesForCollection(opCtx, collections.getMainCollection());
+    for (auto& [_, collection] : collections.getSecondaryCollections()) {
+        if (collection) {
+            checkIndicesForCollection(opCtx, collection);
         }
     }
 }

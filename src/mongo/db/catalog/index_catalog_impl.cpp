@@ -1609,7 +1609,6 @@ void IndexCatalogImpl::findIndexByType(OperationContext* opCtx,
 }
 
 const IndexDescriptor* IndexCatalogImpl::findIndexByIdent(OperationContext* opCtx,
-                                                          const Collection* collection,
                                                           StringData ident,
                                                           InclusionPolicy inclusionPolicy) const {
     auto ii = getIndexIterator(opCtx, inclusionPolicy);

@@ -293,7 +293,6 @@ public:
      */
     virtual const IndexDescriptor* findIndexByIdent(
         OperationContext* opCtx,
-        const Collection* collection,
         StringData ident,
         InclusionPolicy inclusionPolicy = InclusionPolicy::kReady) const = 0;
 

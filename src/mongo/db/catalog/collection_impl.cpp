@@ -225,8 +225,7 @@ StatusWith<std::shared_ptr<Ident>> findSharedIdentForIndex(OperationContext* opC
         if (!collection)
             return nullptr;
 
-        auto desc = collection->getIndexCatalog()->findIndexByIdent(
-            opCtx, nullptr /*unused parameter*/, ident);
+        auto desc = collection->getIndexCatalog()->findIndexByIdent(opCtx, ident);
         if (!desc)
             return nullptr;
         return collection->getIndexCatalog()->getEntryShared(desc);

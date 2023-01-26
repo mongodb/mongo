@@ -157,7 +157,7 @@ void IndexScanStageBase::restoreCollectionAndIndex() {
     tassert(5777406, "Collection name should be initialized", _collName);
     tassert(5777407, "Catalog epoch should be initialized", _catalogEpoch);
     _coll = restoreCollection(_opCtx, *_collName, _collUuid, *_catalogEpoch);
-    auto desc = _coll->getIndexCatalog()->findIndexByIdent(_opCtx, _coll.get(), _indexIdent);
+    auto desc = _coll->getIndexCatalog()->findIndexByIdent(_opCtx, _indexIdent);
     uassert(ErrorCodes::QueryPlanKilled,
             str::stream() << "query plan killed :: index '" << _indexName << "' dropped",
             desc && !desc->getEntry()->isDropped());

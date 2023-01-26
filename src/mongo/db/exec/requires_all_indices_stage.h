@@ -55,7 +55,7 @@ protected:
 
     void doRestoreStateRequiresCollection() override final {
         if (_allIndicesRequiredChecker) {
-            _allIndicesRequiredChecker->check();
+            _allIndicesRequiredChecker->check(opCtx(), MultipleCollectionAccessor(collection()));
         }
     }
 

@@ -160,7 +160,7 @@ BaseRuntimePlanner::prepareExecutionPlan(PlanStage* root,
 void BaseRuntimePlanner::executeCandidateTrial(plan_ranker::CandidatePlan* candidate,
                                                size_t maxNumResults,
                                                const bool isCachedPlanTrial) {
-    _indexExistenceChecker.check();
+    _indexExistenceChecker.check(_opCtx, _collections);
 
     auto status = prepareExecutionPlan(candidate->root.get(), &candidate->data, isCachedPlanTrial);
     if (!status.isOK()) {
