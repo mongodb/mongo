@@ -2220,20 +2220,20 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
         return {};
     }
 
-    if (_forward && _lastReturnedId >= id) {
+    if ((_forward && _lastReturnedId >= id) ||
+        (!_forward && !_lastReturnedId.isNull() && id >= _lastReturnedId)) {
         LOGV2_ERROR(22406,
-                    "WTCursor::next -- c->next_key ( {next}) was not greater than _lastReturnedId "
-                    "({last}) which is a bug.",
-                    "WTCursor::next -- next was not greater than last which is a bug",
+                    "WTCursor::next -- returned out-of-order keys",
+                    "forward"_attr = _forward,
                     "next"_attr = id,
                     "last"_attr = _lastReturnedId);
 
         // Crash when testing diagnostics are enabled.
-        invariant(!TestingProctor::instance().isEnabled(), "next was not greater than last");
+        invariant(!TestingProctor::instance().isEnabled(), "cursor returned out-of-order keys");
 
         // Force a retry of the operation from our last known position by acting as-if
         // we received a WT_ROLLBACK error.
-        throwWriteConflictException("WTCursor::next -- next was not greater than last.");
+        throwWriteConflictException("WTCursor::next -- returned out-of-order keys");
     }
 
     WT_ITEM value;
