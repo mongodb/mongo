@@ -152,9 +152,9 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/bson/bson_validate',
-        '$BUILD_DIR/mongo/db/server_options_core',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
         '$BUILD_DIR/mongo/util/net/network',
+        'server_base',
     ],
 )
 
@@ -215,17 +215,6 @@ env.Library(
     ],
 )
 
-# Range arithmetic library, used by both mongod and mongos
-env.Library(
-    target='range_arithmetic',
-    source=[
-        'range_arithmetic.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-    ],
-)
-
 env.Library(
     target='update_index_data',
     source=[
@@ -277,10 +266,6 @@ env.Library(
     ],
 )
 
-# This library exists because some libraries, such as our networking library, need access to server
-# options, but not to the helpers to set them from the command line.  libserver_options_core.a just
-# has the structure for storing the server options, while libserver_options.a has the code to set
-# them via the command line.
 env.Library(
     target='server_options_core',
     source=[
@@ -299,7 +284,6 @@ env.Library(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/util/cmdline_utils/cmdline_utils',
-        'server_options_core',
     ],
     LIBDEPS_PRIVATE=[
         '$BUILD_DIR/mongo/util/fail_point',
@@ -526,12 +510,10 @@ env.Library(
         'change_stream_serverless_helpers.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/catalog/collection',
-        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
-        '$BUILD_DIR/mongo/db/global_settings',
-        '$BUILD_DIR/mongo/db/query/query_knobs',
-        '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/db/server_options',
+        'catalog/collection_catalog',
+        'global_settings',
+        'query/query_knobs',
+        'server_base',
     ],
 )
 
@@ -831,6 +813,7 @@ env.Library(
 env.Library(
     target='shard_role_api',
     source=[
+        's/range_arithmetic.cpp',
         's/database_sharding_state.cpp',
         's/operation_sharding_state.cpp',
         's/shard_key_index_util.cpp',
@@ -1111,16 +1094,16 @@ env.Library(
         'index_builds_coordinator_interface',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
-        '$BUILD_DIR/mongo/db/catalog/index_build_entry_idl',
-        '$BUILD_DIR/mongo/db/query/op_metrics',
-        '$BUILD_DIR/mongo/db/repl/tenant_migration_access_blocker',
-        '$BUILD_DIR/mongo/db/s/forwardable_operation_metadata',
-        '$BUILD_DIR/mongo/db/storage/two_phase_index_build_knobs_idl',
         '$BUILD_DIR/mongo/executor/task_executor_interface',
+        'catalog/collection_catalog',
+        'catalog/index_build_entry_idl',
         'index_build_entry_helpers',
+        'query/op_metrics',
+        'repl/tenant_migration_access_blocker',
         'resumable_index_builds_idl',
+        's/forwardable_operation_metadata',
         'shard_role',
+        'storage/two_phase_index_build_knobs_idl',
     ],
 )
 
@@ -1132,33 +1115,32 @@ env.Library(
         'active_index_builds.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/catalog/commit_quorum_options',
-        '$BUILD_DIR/mongo/db/catalog/index_builds_manager',
+        'catalog/commit_quorum_options',
+        'catalog/index_builds_manager',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/catalog/collection',
-        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
-        '$BUILD_DIR/mongo/db/catalog/index_build_entry_idl',
-        '$BUILD_DIR/mongo/db/catalog/index_build_oplog_entry',
-        '$BUILD_DIR/mongo/db/catalog/multi_index_block',
-        '$BUILD_DIR/mongo/db/concurrency/exception_util',
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-        '$BUILD_DIR/mongo/db/dbhelpers',
-        '$BUILD_DIR/mongo/db/repl/cloner_utils',
-        '$BUILD_DIR/mongo/db/repl/repl_coordinator_interface',
-        '$BUILD_DIR/mongo/db/repl/replica_set_messages',
-        '$BUILD_DIR/mongo/db/repl/tenant_migration_access_blocker',
-        '$BUILD_DIR/mongo/db/repl/timestamp_block',
-        '$BUILD_DIR/mongo/db/server_base',
-        '$BUILD_DIR/mongo/db/storage/encryption_hooks',
-        '$BUILD_DIR/mongo/db/storage/storage_util',
-        '$BUILD_DIR/mongo/db/storage/two_phase_index_build_knobs_idl',
         '$BUILD_DIR/mongo/executor/task_executor_interface',
         '$BUILD_DIR/mongo/util/fail_point',
+        'catalog/collection_catalog',
+        'catalog/index_build_entry_idl',
+        'catalog/index_build_oplog_entry',
+        'catalog/multi_index_block',
+        'concurrency/exception_util',
+        'concurrency/lock_manager',
+        'dbhelpers',
         'index_build_entry_helpers',
+        'repl/cloner_utils',
+        'repl/repl_coordinator_interface',
+        'repl/replica_set_messages',
+        'repl/tenant_migration_access_blocker',
+        'repl/timestamp_block',
         'resumable_index_builds_idl',
+        'server_base',
         'server_options_core',
         'shard_role',
+        'storage/encryption_hooks',
+        'storage/storage_util',
+        'storage/two_phase_index_build_knobs_idl',
     ],
 )
 
@@ -1282,30 +1264,6 @@ env.Library(
         'index_builds_coordinator_interface',
         'server_base',
         'storage/write_unit_of_work',
-    ],
-)
-
-env.Library(
-    target='repair',
-    source=[
-        'repair.cpp',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/catalog/collection',
-        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
-        '$BUILD_DIR/mongo/db/catalog/collection_validation',
-        '$BUILD_DIR/mongo/db/catalog/database_holder',
-        '$BUILD_DIR/mongo/db/catalog/document_validation',
-        '$BUILD_DIR/mongo/db/catalog/index_key_validate',
-        '$BUILD_DIR/mongo/db/catalog/multi_index_block',
-        '$BUILD_DIR/mongo/db/repl/oplog',
-        '$BUILD_DIR/mongo/db/storage/storage_repair_observer',
-        '$BUILD_DIR/mongo/db/storage/storage_util',
-        'index_builds_coordinator_interface',
-        'multitenancy',
-        'rebuild_indexes',
-        'rw_concern_d',
-        'vector_clock',
     ],
 )
 
@@ -1637,25 +1595,33 @@ env.Library(
 env.Library(
     target='startup_recovery',
     source=[
+        'repair.cpp',
         'startup_recovery.cpp',
     ],
     LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/db/catalog/catalog_helpers',
-        '$BUILD_DIR/mongo/db/catalog/collection_crud',
-        '$BUILD_DIR/mongo/db/catalog/database_holder',
-        '$BUILD_DIR/mongo/db/catalog/multi_index_block',
-        '$BUILD_DIR/mongo/db/commands/mongod_fcv',
-        '$BUILD_DIR/mongo/db/concurrency/exception_util',
-        '$BUILD_DIR/mongo/db/repl/repl_settings',
-        '$BUILD_DIR/mongo/db/storage/storage_repair_observer',
-        '$BUILD_DIR/mongo/db/timeseries/timeseries_extended_range',
+        'catalog/catalog_helpers',
+        'catalog/collection_catalog',
+        'catalog/collection_crud',
+        'catalog/collection_validation',
+        'catalog/database_holder',
+        'catalog/document_validation',
+        'catalog/index_key_validate',
+        'catalog/multi_index_block',
+        'commands/mongod_fcv',
+        'concurrency/exception_util',
         'dbdirectclient',
         'dbhelpers',
         'index_builds_coordinator_interface',
         'multitenancy',
         'rebuild_indexes',
-        'repair',
+        'repl/oplog',
+        'repl/repl_settings',
+        'rw_concern_d',
         'server_feature_flags',
+        'storage/storage_repair_observer',
+        'storage/storage_util',
+        'timeseries/timeseries_extended_range',
+        'vector_clock',
     ],
 )
 
@@ -2546,7 +2512,6 @@ if wiredtiger:
             'query/fle/range_predicate_test.cpp',
             'query/fle/range_validator_test.cpp',
             'query/fle/query_rewriter_test.cpp',
-            'range_arithmetic_test.cpp',
             'read_write_concern_defaults_test.cpp',
             'read_write_concern_provenance_test.cpp',
             'record_id_test.cpp',
@@ -2632,7 +2597,6 @@ if wiredtiger:
             'multitenancy',
             'operation_time_tracker',
             'query_exec',
-            'range_arithmetic',
             'read_write_concern_defaults_mock',
             'record_id_helpers',
             'rw_concern_d',

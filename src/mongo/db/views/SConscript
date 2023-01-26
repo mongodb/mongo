@@ -21,7 +21,6 @@ env.Library(
         'view_catalog_helpers.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/catalog/collection',
         '$BUILD_DIR/mongo/db/catalog/collection_catalog',
         '$BUILD_DIR/mongo/db/pipeline/aggregation',
         'resolved_view',

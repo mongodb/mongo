@@ -27,10 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/range_arithmetic.h"
+#include "mongo/db/s/range_arithmetic.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

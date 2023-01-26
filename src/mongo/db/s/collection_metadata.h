@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include "mongo/db/range_arithmetic.h"
+#include "mongo/db/s/range_arithmetic.h"
 #include "mongo/s/chunk_manager.h"
 
 namespace mongo {
