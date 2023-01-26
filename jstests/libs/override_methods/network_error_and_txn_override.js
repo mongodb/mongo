@@ -846,18 +846,6 @@ function shouldRetryWithNetworkErrorOverride(
             return kContinue;
         }
 
-        // listCollections and listIndexes called through mongos may return OperationFailed if
-        // the request to establish a cursor on the targeted shard fails with a network error.
-        //
-        // TODO SERVER-30949: Remove this check once those two commands retry on retryable
-        // errors automatically.
-        if ((cmdName === "listCollections" || cmdName === "listIndexes") &&
-            res.code === ErrorCodes.OperationFailed && res.hasOwnProperty("errmsg") &&
-            res.errmsg.indexOf("failed to read command response from shard") >= 0) {
-            logError("Retrying failed mongos cursor command");
-            return kContinue;
-        }
-
         // Some sharding commands return raw responses from all contacted shards and there won't
         // be a top level code if shards returned more than one error code, in which case retry
         // if any error is retryable.
